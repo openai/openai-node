@@ -28,7 +28,7 @@ const completion = await openai.createCompletion("davinci", {
 console.log(completion.data.choices[0].text);
 ```
 
-Check out the [full API documentation](https://beta.openai.com/docs/api-reference?lang=javascript) for examples of all the available functions.
+Check out the [full API documentation](https://beta.openai.com/docs/api-reference?lang=node.js) for examples of all the available functions.
 
 ### Request options
 
@@ -51,6 +51,26 @@ const completion = await openai.createCompletion(
 );
 ```
 
+### Error handling
+
+API requests can potentially return errors due to invalid inputs or other issues. These errors can be handled with a `try...catch` statement, and the error details can be found in either `error.response` or `error.message`:
+
+```javascript
+try {
+  const completion = await openai.createCompletion("davinci", {
+    prompt: "Hello world",
+  });
+  console.log(completion.data.choices[0].text);
+} catch (error) {
+  if (error.response) {
+    console.log(error.response.status);
+    console.log(error.response.data);
+  } else {
+    console.log(error.message);
+  }
+}
+```
+
 ## Thanks
 
-Thank you to [ceifa](https://github.com/ceifa) for creating and maintaining the original unofficial `openai` npm package before we released this official library!
+Thank you to [ceifa](https://github.com/ceifa) for creating and maintaining the original unofficial `openai` npm package before we released this official library! ceifa's original package has been renamed to [gpt-x](https://www.npmjs.com/package/gpt-x).
