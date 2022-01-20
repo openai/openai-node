@@ -9,6 +9,10 @@
     "gpt-3",
     "gpt3"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:openai/openai-node.git"
+  },
   "author": "OpenAI",
   "license": "MIT",
   "main": "./dist/index.js",
