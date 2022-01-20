@@ -22,7 +22,7 @@ const configuration = new Configuration({
 });
 const openai = new OpenAIApi(configuration);
 
-const completion = await openai.createCompletion("davinci", {
+const completion = await openai.createCompletion("text-davinci-001", {
   prompt: "Hello world",
 });
 console.log(completion.data.choices[0].text);
@@ -37,10 +37,9 @@ All of the available API request functions additionally contain an optional fina
 
 ```javascript
 const completion = await openai.createCompletion(
-  "davinci",
+  "text-davinci-001",
   {
-    prompt: "Once upon a time",
-    max_tokens: 5,
+    prompt: "Hello world",
   },
   {
     timeout: 1000,
@@ -57,7 +56,7 @@ API requests can potentially return errors due to invalid inputs or other issues
 
 ```javascript
 try {
-  const completion = await openai.createCompletion("davinci", {
+  const completion = await openai.createCompletion("text-davinci-001", {
     prompt: "Hello world",
   });
   console.log(completion.data.choices[0].text);
