@@ -19,7 +19,7 @@ import { RequestArgs, BaseAPI } from './base';
  */
 export interface CreateAnswerRequest {
     /**
-     * ID of the engine to use for completion.
+     * ID of the engine to use for completion. You can select one of `ada`, `babbage`, `curie`, or `davinci`.
      * @type {string}
      * @memberof CreateAnswerRequest
      */
@@ -55,7 +55,7 @@ export interface CreateAnswerRequest {
      */
     'file'?: string | null;
     /**
-     * ID of the engine to use for [Search](/docs/api-reference/searches/create).
+     * ID of the engine to use for [Search](/docs/api-reference/searches/create). You can select one of `ada`, `babbage`, `curie`, or `davinci`.
      * @type {string}
      * @memberof CreateAnswerRequest
      */
@@ -190,7 +190,7 @@ export interface CreateAnswerResponseSelectedDocuments {
  */
 export interface CreateClassificationRequest {
     /**
-     * ID of the engine to use for completion.
+     * ID of the engine to use for completion. You can select one of `ada`, `babbage`, `curie`, or `davinci`.
      * @type {string}
      * @memberof CreateClassificationRequest
      */
@@ -220,7 +220,7 @@ export interface CreateClassificationRequest {
      */
     'labels'?: Array<string> | null;
     /**
-     * ID of the engine to use for [Search](/docs/api-reference/searches/create).
+     * ID of the engine to use for [Search](/docs/api-reference/searches/create). You can select one of `ada`, `babbage`, `curie`, or `davinci`.
      * @type {string}
      * @memberof CreateClassificationRequest
      */
@@ -339,6 +339,110 @@ export interface CreateClassificationResponseSelectedExamples {
 /**
  *
  * @export
+ * @interface CreateCompletionFromModelRequest
+ */
+export interface CreateCompletionFromModelRequest {
+    /**
+     * The prompt(s) to generate completions for, encoded as a string, array of strings, array of tokens, or array of token arrays.  Note that <|endoftext|> is the document separator that the model sees during training, so if a prompt is not specified the model will generate as if from the beginning of a new document.
+     * @type {string | Array<string> | Array<number> | Array<any>}
+     * @memberof CreateCompletionFromModelRequest
+     */
+    'prompt'?: string | Array<string> | Array<number> | Array<any> | null;
+    /**
+     * The maximum number of [tokens](/tokenizer) to generate in the completion.  The token count of your prompt plus `max_tokens` cannot exceed the model\'s context length. Most models have a context length of 2048 tokens (except `code-davinci-001`, which supports 4096).
+     * @type {number}
+     * @memberof CreateCompletionFromModelRequest
+     */
+    'max_tokens'?: number | null;
+    /**
+     * What [sampling temperature](https://towardsdatascience.com/how-to-sample-from-language-models-682bceb97277) to use. Higher values means the model will take more risks. Try 0.9 for more creative applications, and 0 (argmax sampling) for ones with a well-defined answer.  We generally recommend altering this or `top_p` but not both.
+     * @type {number}
+     * @memberof CreateCompletionFromModelRequest
+     */
+    'temperature'?: number | null;
+    /**
+     * An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass. So 0.1 means only the tokens comprising the top 10% probability mass are considered.  We generally recommend altering this or `temperature` but not both.
+     * @type {number}
+     * @memberof CreateCompletionFromModelRequest
+     */
+    'top_p'?: number | null;
+    /**
+     * How many completions to generate for each prompt.  **Note:** Because this parameter generates many completions, it can quickly consume your token quota. Use carefully and ensure that you have reasonable settings for `max_tokens` and `stop`.
+     * @type {number}
+     * @memberof CreateCompletionFromModelRequest
+     */
+    'n'?: number | null;
+    /**
+     * Whether to stream back partial progress. If set, tokens will be sent as data-only [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format) as they become available, with the stream terminated by a `data: [DONE]` message.
+     * @type {boolean}
+     * @memberof CreateCompletionFromModelRequest
+     */
+    'stream'?: boolean | null;
+    /**
+     * Include the log probabilities on the `logprobs` most likely tokens, as well the chosen tokens. For example, if `logprobs` is 5, the API will return a list of the 5 most likely tokens. The API will always return the `logprob` of the sampled token, so there may be up to `logprobs+1` elements in the response.  The maximum value for `logprobs` is 5. If you need more than this, please contact support@openai.com and describe your use case.
+     * @type {number}
+     * @memberof CreateCompletionFromModelRequest
+     */
+    'logprobs'?: number | null;
+    /**
+     * Echo back the prompt in addition to the completion
+     * @type {boolean}
+     * @memberof CreateCompletionFromModelRequest
+     */
+    'echo'?: boolean | null;
+    /**
+     * Up to 4 sequences where the API will stop generating further tokens. The returned text will not contain the stop sequence.
+     * @type {string | Array<string>}
+     * @memberof CreateCompletionFromModelRequest
+     */
+    'stop'?: string | Array<string> | null;
+    /**
+     * Number between -2.0 and 2.0. Positive values penalize new tokens based on whether they appear in the text so far, increasing the model\'s likelihood to talk about new topics.  [See more information about frequency and presence penalties.](/docs/api-reference/parameter-details)
+     * @type {number}
+     * @memberof CreateCompletionFromModelRequest
+     */
+    'presence_penalty'?: number | null;
+    /**
+     * Number between -2.0 and 2.0. Positive values penalize new tokens based on their existing frequency in the text so far, decreasing the model\'s likelihood to repeat the same line verbatim.  [See more information about frequency and presence penalties.](/docs/api-reference/parameter-details)
+     * @type {number}
+     * @memberof CreateCompletionFromModelRequest
+     */
+    'frequency_penalty'?: number | null;
+    /**
+     * Generates `best_of` completions server-side and returns the \"best\" (the one with the lowest log probability per token). Results cannot be streamed.  When used with `n`, `best_of` controls the number of candidate completions and `n` specifies how many to return – `best_of` must be greater than `n`.  **Note:** Because this parameter generates many completions, it can quickly consume your token quota. Use carefully and ensure that you have reasonable settings for `max_tokens` and `stop`.
+     * @type {number}
+     * @memberof CreateCompletionFromModelRequest
+     */
+    'best_of'?: number | null;
+    /**
+     * Modify the likelihood of specified tokens appearing in the completion.  Accepts a json object that maps tokens (specified by their token ID in the GPT tokenizer) to an associated bias value from -100 to 100. You can use this [tokenizer tool](/tokenizer?view=bpe) (which works for both GPT-2 and GPT-3) to convert text to token IDs. Mathematically, the bias is added to the logits generated by the model prior to sampling. The exact effect will vary per model, but values between -1 and 1 should decrease or increase likelihood of selection; values like -100 or 100 should result in a ban or exclusive selection of the relevant token.  As an example, you can pass `{\"50256\": -100}` to prevent the <|endoftext|> token from being generated.
+     * @type {object}
+     * @memberof CreateCompletionFromModelRequest
+     */
+    'logit_bias'?: object | null;
+    /**
+     * ID of the model to use for completion.
+     * @type {string}
+     * @memberof CreateCompletionFromModelRequest
+     */
+    'model'?: string;
+}
+/**
+ *
+ * @export
+ * @interface CreateCompletionFromModelRequestAllOf
+ */
+export interface CreateCompletionFromModelRequestAllOf {
+    /**
+     * ID of the model to use for completion.
+     * @type {string}
+     * @memberof CreateCompletionFromModelRequestAllOf
+     */
+    'model'?: string;
+}
+/**
+ *
+ * @export
  * @interface CreateCompletionRequest
  */
 export interface CreateCompletionRequest {
@@ -349,7 +453,7 @@ export interface CreateCompletionRequest {
      */
     'prompt'?: string | Array<string> | Array<number> | Array<any> | null;
     /**
-     * The maximum number of [tokens](/tokenizer) to generate in the completion.  The token count of your prompt plus `max_tokens` cannot exceed the model\'s context length. Most models have a context length of 2048 tokens (except `davinci-codex`, which supports 4096).
+     * The maximum number of [tokens](/tokenizer) to generate in the completion.  The token count of your prompt plus `max_tokens` cannot exceed the model\'s context length. Most models have a context length of 2048 tokens (except `code-davinci-001`, which supports 4096).
      * @type {number}
      * @memberof CreateCompletionRequest
      */
@@ -1086,6 +1190,14 @@ export declare const OpenAIApiAxiosParamCreator: (configuration?: Configuration)
     createCompletion: (engineId: string, createCompletionRequest: CreateCompletionRequest, options?: AxiosRequestConfig) => Promise<RequestArgs>;
     /**
      *
+     * @summary Creates a completion using a fine-tuned model
+     * @param {CreateCompletionFromModelRequest} createCompletionFromModelRequest
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    createCompletionFromModel: (createCompletionFromModelRequest: CreateCompletionFromModelRequest, options?: AxiosRequestConfig) => Promise<RequestArgs>;
+    /**
+     *
      * @summary Creates an embedding vector representing the input text.
      * @param {string} engineId The ID of the engine to use for this request
      * @param {CreateEmbeddingRequest} createEmbeddingRequest
@@ -1113,7 +1225,7 @@ export declare const OpenAIApiAxiosParamCreator: (configuration?: Configuration)
     /**
      *
      * @summary The search endpoint computes similarity scores between provided query and documents. Documents can be passed directly to the API if there are no more than 200 of them.  To go beyond the 200 document limit, documents can be processed offline and then used for efficient retrieval at query time. When `file` is set, the search endpoint searches over all the documents in the given file and returns up to the `max_rerank` number of documents. These documents will be returned along with their search scores.  The similarity score is a positive score that usually ranges from 0 to 300 (but can sometimes go higher), where a score above 200 usually means the document is semantically similar to the query.
-     * @param {string} engineId The ID of the engine to use for this request
+     * @param {string} engineId The ID of the engine to use for this request.  You can select one of &#x60;ada&#x60;, &#x60;babbage&#x60;, &#x60;curie&#x60;, or &#x60;davinci&#x60;.
      * @param {CreateSearchRequest} createSearchRequest
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
@@ -1230,6 +1342,14 @@ export declare const OpenAIApiFp: (configuration?: Configuration) => {
     createCompletion(engineId: string, createCompletionRequest: CreateCompletionRequest, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CreateCompletionResponse>>;
     /**
      *
+     * @summary Creates a completion using a fine-tuned model
+     * @param {CreateCompletionFromModelRequest} createCompletionFromModelRequest
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    createCompletionFromModel(createCompletionFromModelRequest: CreateCompletionFromModelRequest, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CreateCompletionResponse>>;
+    /**
+     *
      * @summary Creates an embedding vector representing the input text.
      * @param {string} engineId The ID of the engine to use for this request
      * @param {CreateEmbeddingRequest} createEmbeddingRequest
@@ -1257,7 +1377,7 @@ export declare const OpenAIApiFp: (configuration?: Configuration) => {
     /**
      *
      * @summary The search endpoint computes similarity scores between provided query and documents. Documents can be passed directly to the API if there are no more than 200 of them.  To go beyond the 200 document limit, documents can be processed offline and then used for efficient retrieval at query time. When `file` is set, the search endpoint searches over all the documents in the given file and returns up to the `max_rerank` number of documents. These documents will be returned along with their search scores.  The similarity score is a positive score that usually ranges from 0 to 300 (but can sometimes go higher), where a score above 200 usually means the document is semantically similar to the query.
-     * @param {string} engineId The ID of the engine to use for this request
+     * @param {string} engineId The ID of the engine to use for this request.  You can select one of &#x60;ada&#x60;, &#x60;babbage&#x60;, &#x60;curie&#x60;, or &#x60;davinci&#x60;.
      * @param {CreateSearchRequest} createSearchRequest
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
@@ -1374,6 +1494,14 @@ export declare const OpenAIApiFactory: (configuration?: Configuration, basePath?
     createCompletion(engineId: string, createCompletionRequest: CreateCompletionRequest, options?: any): AxiosPromise<CreateCompletionResponse>;
     /**
      *
+     * @summary Creates a completion using a fine-tuned model
+     * @param {CreateCompletionFromModelRequest} createCompletionFromModelRequest
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    createCompletionFromModel(createCompletionFromModelRequest: CreateCompletionFromModelRequest, options?: any): AxiosPromise<CreateCompletionResponse>;
+    /**
+     *
      * @summary Creates an embedding vector representing the input text.
      * @param {string} engineId The ID of the engine to use for this request
      * @param {CreateEmbeddingRequest} createEmbeddingRequest
@@ -1401,7 +1529,7 @@ export declare const OpenAIApiFactory: (configuration?: Configuration, basePath?
     /**
      *
      * @summary The search endpoint computes similarity scores between provided query and documents. Documents can be passed directly to the API if there are no more than 200 of them.  To go beyond the 200 document limit, documents can be processed offline and then used for efficient retrieval at query time. When `file` is set, the search endpoint searches over all the documents in the given file and returns up to the `max_rerank` number of documents. These documents will be returned along with their search scores.  The similarity score is a positive score that usually ranges from 0 to 300 (but can sometimes go higher), where a score above 200 usually means the document is semantically similar to the query.
-     * @param {string} engineId The ID of the engine to use for this request
+     * @param {string} engineId The ID of the engine to use for this request.  You can select one of &#x60;ada&#x60;, &#x60;babbage&#x60;, &#x60;curie&#x60;, or &#x60;davinci&#x60;.
      * @param {CreateSearchRequest} createSearchRequest
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
@@ -1524,6 +1652,15 @@ export declare class OpenAIApi extends BaseAPI {
     createCompletion(engineId: string, createCompletionRequest: CreateCompletionRequest, options?: AxiosRequestConfig): Promise<import("axios").AxiosResponse<CreateCompletionResponse, any>>;
     /**
      *
+     * @summary Creates a completion using a fine-tuned model
+     * @param {CreateCompletionFromModelRequest} createCompletionFromModelRequest
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof OpenAIApi
+     */
+    createCompletionFromModel(createCompletionFromModelRequest: CreateCompletionFromModelRequest, options?: AxiosRequestConfig): Promise<import("axios").AxiosResponse<CreateCompletionResponse, any>>;
+    /**
+     *
      * @summary Creates an embedding vector representing the input text.
      * @param {string} engineId The ID of the engine to use for this request
      * @param {CreateEmbeddingRequest} createEmbeddingRequest
@@ -1554,7 +1691,7 @@ export declare class OpenAIApi extends BaseAPI {
     /**
      *
      * @summary The search endpoint computes similarity scores between provided query and documents. Documents can be passed directly to the API if there are no more than 200 of them.  To go beyond the 200 document limit, documents can be processed offline and then used for efficient retrieval at query time. When `file` is set, the search endpoint searches over all the documents in the given file and returns up to the `max_rerank` number of documents. These documents will be returned along with their search scores.  The similarity score is a positive score that usually ranges from 0 to 300 (but can sometimes go higher), where a score above 200 usually means the document is semantically similar to the query.
-     * @param {string} engineId The ID of the engine to use for this request
+     * @param {string} engineId The ID of the engine to use for this request.  You can select one of &#x60;ada&#x60;, &#x60;babbage&#x60;, &#x60;curie&#x60;, or &#x60;davinci&#x60;.
      * @param {CreateSearchRequest} createSearchRequest
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
