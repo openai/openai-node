@@ -22,7 +22,8 @@ const configuration = new Configuration({
 });
 const openai = new OpenAIApi(configuration);
 
-const completion = await openai.createCompletion("text-davinci-001", {
+const completion = await openai.createCompletion({
+  model: "text-davinci-002",
   prompt: "Hello world",
 });
 console.log(completion.data.choices[0].text);
@@ -37,8 +38,8 @@ All of the available API request functions additionally contain an optional fina
 
 ```javascript
 const completion = await openai.createCompletion(
-  "text-davinci-001",
   {
+    model: "text-davinci-002",
     prompt: "Hello world",
   },
   {
@@ -56,7 +57,8 @@ API requests can potentially return errors due to invalid inputs or other issues
 
 ```javascript
 try {
-  const completion = await openai.createCompletion("text-davinci-001", {
+  const completion = await openai.createCompletion({
+    model: "text-davinci-002",
     prompt: "Hello world",
   });
   console.log(completion.data.choices[0].text);
@@ -69,6 +71,14 @@ try {
   }
 }
 ```
+
+## Upgrade guide
+
+All breaking changes for major version releases are listed below.
+
+### 3.0.0
+
+- The function signature of `createCompletion(engineId, params)` changed to `createCompletion(params)`. The value previously passed in as the `engineId` argument should now be passed in as `model` in the params object (e.g. `createCompletion({ model: "text-davinci-002, ... })`)
 
 ## Thanks
 
