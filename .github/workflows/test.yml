@@ -1,0 +1,17 @@
+name: test
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches:
+      - "*"
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@master
+      - name: Install dependencies
+        run: npm install
+      - name: Run build
+        run: npm run build
