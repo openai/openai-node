@@ -824,6 +824,31 @@ export interface CreateFineTuneRequest {
 /**
  * 
  * @export
+ * @interface CreateModerationRequest
+ */
+ export interface CreateModerationRequest {
+    /**
+     * 
+     * @type {CreateModerationRequestInput}
+     * @memberof CreateModerationRequest
+     */
+    'input': CreateModerationRequestInput;
+    /**
+     * Two content moderation models are available: \"text-moderation-stable\" and \"text-moderation-latest\". The default is \"text-moderation-latest\" which will be automatically upgraded over time. This ensures you are always using our most accurate model. If you use \"text-moderation-stable\", we will provide advance notice before updating the model. The accuracy of \"text-moderation-stable\" may be slightly lower than that of \"text-moderation-latest\".
+     * @type {string}
+     * @memberof CreateModerationRequest
+     */
+    'model'?: string | null;
+}
+/**
+ * @type CreateModerationRequestInput
+ * The input text to classify.
+ * @export
+ */
+ export type CreateModerationRequestInput = string | Array<string>;
+/**
+ * 
+ * @export
  * @interface CreateSearchRequest
  */
 export interface CreateSearchRequest {
@@ -1111,6 +1136,62 @@ export interface FineTuneEvent {
      */
     'message'?: string;
 }
+/**
+ * 
+ * @export
+ * @interface Moderation
+ */
+ export interface Moderation {
+    /**
+     * 
+     * @type {string}
+     * @memberof Moderation
+     */
+    'id'?: string;
+    /**
+     * 
+     * @type {string}
+     * @memberof Moderation
+     */
+    'model'?: string;
+    /**
+     * 
+     * @type {Array<ModerationResult>}
+     * @memberof Moderation
+     */
+    'results'?: Array<ModerationResult>;
+}
+ /**
+  * 
+  * @export
+  * @interface ModerationResult
+  */
+ export interface ModerationResult {
+     /**
+      * 
+      * @type {Record<ModerationCategory, boolean>}
+      * @memberof ModerationResult
+      */
+     'categories'?: Record<ModerationCategory, boolean>;
+     /**
+      * 
+      * @type {Record<ModerationCategory, number>}
+      * @memberof ModerationResult
+      */
+     'category_scores'?: Record<ModerationCategory, number>;
+     /**
+      * 
+      * @type {Array<number>}
+      * @memberof ModerationResult
+      */
+     'flagged'?: boolean;
+ }
+ /**
+ * @type ModerationCategory
+ * Content moderation category.
+ * @export
+ */
+export type ModerationCategory = "hate" | "hate/threatening" | "self-harm" | "sexual" | "sexual/minors" | "violence" | "violence/graphic";
 /**
  * 
  * @export
@@ -1593,6 +1674,42 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
             localVarRequestOptions.data = serializeDataIfNeeded(createFineTuneRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Classifies if text violates OpenAI's Content Policy.
+         * @param {CreateModerationRequest} createModerationRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+         createModeration: async (createModerationRequest: CreateModerationRequest, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'createModerationRequest' is not null or undefined
+            assertParamExists('createModeration', 'createModerationRequest', createModerationRequest)
+            const localVarPath = `/moderations`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(createModerationRequest, localVarRequestOptions, configuration)
 
             return {
                 url: toPathString(localVarUrlObj),
@@ -2142,6 +2259,17 @@ export const OpenAIApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
+         * @summary Classifies if text violates OpenAI's Content Policy.
+         * @param {CreateModerationRequest} createModerationRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+         async createModeration(createModerationRequest: CreateModerationRequest, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Moderation>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.createModeration(createModerationRequest, options);
+            return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
+        },
+        /**
+         * 
          * @summary The search endpoint computes similarity scores between provided query and documents. Documents can be passed directly to the API if there are no more than 200 of them.  To go beyond the 200 document limit, documents can be processed offline and then used for efficient retrieval at query time. When `file` is set, the search endpoint searches over all the documents in the given file and returns up to the `max_rerank` number of documents. These documents will be returned along with their search scores.  The similarity score is a positive score that usually ranges from 0 to 300 (but can sometimes go higher), where a score above 200 usually means the document is semantically similar to the query. 
          * @param {string} engineId The ID of the engine to use for this request.  You can select one of &#x60;ada&#x60;, &#x60;babbage&#x60;, &#x60;curie&#x60;, or &#x60;davinci&#x60;.
          * @param {CreateSearchRequest} createSearchRequest 
@@ -2376,6 +2504,16 @@ export const OpenAIApiFactory = function (configuration?: Configuration, basePat
          */
         createFineTune(createFineTuneRequest: CreateFineTuneRequest, options?: any): AxiosPromise<FineTune> {
             return localVarFp.createFineTune(createFineTuneRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Classifies if text violates OpenAI's Content Policy.
+         * @param {CreateModerationRequest} createModerationRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+         createModeration(createModerationRequest: CreateModerationRequest, options?: any): AxiosPromise<Moderation> {
+            return localVarFp.createModeration(createModerationRequest, options).then((request) => request(axios, basePath));
         },
         /**
          * 
@@ -2615,6 +2753,18 @@ export class OpenAIApi extends BaseAPI {
      */
     public createFineTune(createFineTuneRequest: CreateFineTuneRequest, options?: AxiosRequestConfig) {
         return OpenAIApiFp(this.configuration).createFineTune(createFineTuneRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Classifies if text violates OpenAI's Content Policy.
+     * @param {CreateModerationRequest} createModerationRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof OpenAIApi
+     */
+     public createModeration(createModerationRequest: CreateModerationRequest, options?: AxiosRequestConfig) {
+        return OpenAIApiFp(this.configuration).createModeration(createModerationRequest, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
