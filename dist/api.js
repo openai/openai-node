@@ -288,6 +288,36 @@ exports.OpenAIApiAxiosParamCreator = function (configuration) {
         }),
         /**
          *
+         * @summary Classifies if text violates OpenAI's Content Policy.
+         * @param {CreateModerationRequest} createModerationRequest
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        createModeration: (createModerationRequest, options = {}) => __awaiter(this, void 0, void 0, function* () {
+            // verify required parameter 'createModerationRequest' is not null or undefined
+            common_1.assertParamExists('createModeration', 'createModerationRequest', createModerationRequest);
+            const localVarPath = `/moderations`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, common_1.DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+            const localVarRequestOptions = Object.assign(Object.assign({ method: 'POST' }, baseOptions), options);
+            const localVarHeaderParameter = {};
+            const localVarQueryParameter = {};
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            common_1.setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = Object.assign(Object.assign(Object.assign({}, localVarHeaderParameter), headersFromBaseOptions), options.headers);
+            localVarRequestOptions.data = common_1.serializeDataIfNeeded(createModerationRequest, localVarRequestOptions, configuration);
+            return {
+                url: common_1.toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        }),
+        /**
+         *
          * @summary The search endpoint computes similarity scores between provided query and documents. Documents can be passed directly to the API if there are no more than 200 of them.  To go beyond the 200 document limit, documents can be processed offline and then used for efficient retrieval at query time. When `file` is set, the search endpoint searches over all the documents in the given file and returns up to the `max_rerank` number of documents. These documents will be returned along with their search scores.  The similarity score is a positive score that usually ranges from 0 to 300 (but can sometimes go higher), where a score above 200 usually means the document is semantically similar to the query.
          * @param {string} engineId The ID of the engine to use for this request.  You can select one of &#x60;ada&#x60;, &#x60;babbage&#x60;, &#x60;curie&#x60;, or &#x60;davinci&#x60;.
          * @param {CreateSearchRequest} createSearchRequest
@@ -777,6 +807,19 @@ exports.OpenAIApiFp = function (configuration) {
         },
         /**
          *
+         * @summary Classifies if text violates OpenAI's Content Policy.
+         * @param {CreateModerationRequest} createModerationRequest
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        createModeration(createModerationRequest, options) {
+            return __awaiter(this, void 0, void 0, function* () {
+                const localVarAxiosArgs = yield localVarAxiosParamCreator.createModeration(createModerationRequest, options);
+                return common_1.createRequestFunction(localVarAxiosArgs, axios_1.default, base_1.BASE_PATH, configuration);
+            });
+        },
+        /**
+         *
          * @summary The search endpoint computes similarity scores between provided query and documents. Documents can be passed directly to the API if there are no more than 200 of them.  To go beyond the 200 document limit, documents can be processed offline and then used for efficient retrieval at query time. When `file` is set, the search endpoint searches over all the documents in the given file and returns up to the `max_rerank` number of documents. These documents will be returned along with their search scores.  The similarity score is a positive score that usually ranges from 0 to 300 (but can sometimes go higher), where a score above 200 usually means the document is semantically similar to the query.
          * @param {string} engineId The ID of the engine to use for this request.  You can select one of &#x60;ada&#x60;, &#x60;babbage&#x60;, &#x60;curie&#x60;, or &#x60;davinci&#x60;.
          * @param {CreateSearchRequest} createSearchRequest
@@ -1039,6 +1082,16 @@ exports.OpenAIApiFactory = function (configuration, basePath, axios) {
         },
         /**
          *
+         * @summary Classifies if text violates OpenAI's Content Policy.
+         * @param {CreateModerationRequest} createModerationRequest
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        createModeration(createModerationRequest, options) {
+            return localVarFp.createModeration(createModerationRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         *
          * @summary The search endpoint computes similarity scores between provided query and documents. Documents can be passed directly to the API if there are no more than 200 of them.  To go beyond the 200 document limit, documents can be processed offline and then used for efficient retrieval at query time. When `file` is set, the search endpoint searches over all the documents in the given file and returns up to the `max_rerank` number of documents. These documents will be returned along with their search scores.  The similarity score is a positive score that usually ranges from 0 to 300 (but can sometimes go higher), where a score above 200 usually means the document is semantically similar to the query.
          * @param {string} engineId The ID of the engine to use for this request.  You can select one of &#x60;ada&#x60;, &#x60;babbage&#x60;, &#x60;curie&#x60;, or &#x60;davinci&#x60;.
          * @param {CreateSearchRequest} createSearchRequest
@@ -1267,6 +1320,17 @@ class OpenAIApi extends base_1.BaseAPI {
      */
     createFineTune(createFineTuneRequest, options) {
         return exports.OpenAIApiFp(this.configuration).createFineTune(createFineTuneRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+    /**
+     *
+     * @summary Classifies if text violates OpenAI's Content Policy.
+     * @param {CreateModerationRequest} createModerationRequest
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof OpenAIApi
+     */
+    createModeration(createModerationRequest, options) {
+        return exports.OpenAIApiFp(this.configuration).createModeration(createModerationRequest, options).then((request) => request(this.axios, this.basePath));
     }
     /**
      *

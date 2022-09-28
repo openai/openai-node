@@ -811,6 +811,31 @@ export interface CreateFineTuneRequest {
 /**
  *
  * @export
+ * @interface CreateModerationRequest
+ */
+export interface CreateModerationRequest {
+    /**
+     *
+     * @type {CreateModerationRequestInput}
+     * @memberof CreateModerationRequest
+     */
+    'input': CreateModerationRequestInput;
+    /**
+     * Two content moderation models are available: \"text-moderation-stable\" and \"text-moderation-latest\". The default is \"text-moderation-latest\" which will be automatically upgraded over time. This ensures you are always using our most accurate model. If you use \"text-moderation-stable\", we will provide advance notice before updating the model. The accuracy of \"text-moderation-stable\" may be slightly lower than that of \"text-moderation-latest\".
+     * @type {string}
+     * @memberof CreateModerationRequest
+     */
+    'model'?: string | null;
+}
+/**
+ * @type CreateModerationRequestInput
+ * The input text to classify.
+ * @export
+ */
+export declare type CreateModerationRequestInput = string | Array<string>;
+/**
+ *
+ * @export
  * @interface CreateSearchRequest
  */
 export interface CreateSearchRequest {
@@ -1101,6 +1126,62 @@ export interface FineTuneEvent {
 /**
  *
  * @export
+ * @interface Moderation
+ */
+export interface Moderation {
+    /**
+     *
+     * @type {string}
+     * @memberof Moderation
+     */
+    'id'?: string;
+    /**
+     *
+     * @type {string}
+     * @memberof Moderation
+     */
+    'model'?: string;
+    /**
+     *
+     * @type {Array<ModerationResult>}
+     * @memberof Moderation
+     */
+    'results'?: Array<ModerationResult>;
+}
+/**
+ *
+ * @export
+ * @interface ModerationResult
+ */
+export interface ModerationResult {
+    /**
+     *
+     * @type {Record<ModerationCategory, boolean>}
+     * @memberof ModerationResult
+     */
+    'categories'?: Record<ModerationCategory, boolean>;
+    /**
+     *
+     * @type {Record<ModerationCategory, number>}
+     * @memberof ModerationResult
+     */
+    'category_scores'?: Record<ModerationCategory, number>;
+    /**
+     *
+     * @type {Array<number>}
+     * @memberof ModerationResult
+     */
+    'flagged'?: boolean;
+}
+/**
+* @type ModerationCategory
+* Content moderation category.
+* @export
+*/
+export declare type ModerationCategory = "hate" | "hate/threatening" | "self-harm" | "sexual" | "sexual/minors" | "violence" | "violence/graphic";
+/**
+ *
+ * @export
  * @interface ListEnginesResponse
  */
 export interface ListEnginesResponse {
@@ -1353,6 +1434,14 @@ export declare const OpenAIApiAxiosParamCreator: (configuration?: Configuration)
     createFineTune: (createFineTuneRequest: CreateFineTuneRequest, options?: AxiosRequestConfig) => Promise<RequestArgs>;
     /**
      *
+     * @summary Classifies if text violates OpenAI's Content Policy.
+     * @param {CreateModerationRequest} createModerationRequest
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    createModeration: (createModerationRequest: CreateModerationRequest, options?: AxiosRequestConfig) => Promise<RequestArgs>;
+    /**
+     *
      * @summary The search endpoint computes similarity scores between provided query and documents. Documents can be passed directly to the API if there are no more than 200 of them.  To go beyond the 200 document limit, documents can be processed offline and then used for efficient retrieval at query time. When `file` is set, the search endpoint searches over all the documents in the given file and returns up to the `max_rerank` number of documents. These documents will be returned along with their search scores.  The similarity score is a positive score that usually ranges from 0 to 300 (but can sometimes go higher), where a score above 200 usually means the document is semantically similar to the query.
      * @param {string} engineId The ID of the engine to use for this request.  You can select one of &#x60;ada&#x60;, &#x60;babbage&#x60;, &#x60;curie&#x60;, or &#x60;davinci&#x60;.
      * @param {CreateSearchRequest} createSearchRequest
@@ -1531,6 +1620,14 @@ export declare const OpenAIApiFp: (configuration?: Configuration) => {
     createFineTune(createFineTuneRequest: CreateFineTuneRequest, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<FineTune>>;
     /**
      *
+     * @summary Classifies if text violates OpenAI's Content Policy.
+     * @param {CreateModerationRequest} createModerationRequest
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    createModeration(createModerationRequest: CreateModerationRequest, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Moderation>>;
+    /**
+     *
      * @summary The search endpoint computes similarity scores between provided query and documents. Documents can be passed directly to the API if there are no more than 200 of them.  To go beyond the 200 document limit, documents can be processed offline and then used for efficient retrieval at query time. When `file` is set, the search endpoint searches over all the documents in the given file and returns up to the `max_rerank` number of documents. These documents will be returned along with their search scores.  The similarity score is a positive score that usually ranges from 0 to 300 (but can sometimes go higher), where a score above 200 usually means the document is semantically similar to the query.
      * @param {string} engineId The ID of the engine to use for this request.  You can select one of &#x60;ada&#x60;, &#x60;babbage&#x60;, &#x60;curie&#x60;, or &#x60;davinci&#x60;.
      * @param {CreateSearchRequest} createSearchRequest
@@ -1707,6 +1804,14 @@ export declare const OpenAIApiFactory: (configuration?: Configuration, basePath?
      * @throws {RequiredError}
      */
     createFineTune(createFineTuneRequest: CreateFineTuneRequest, options?: any): AxiosPromise<FineTune>;
+    /**
+     *
+     * @summary Classifies if text violates OpenAI's Content Policy.
+     * @param {CreateModerationRequest} createModerationRequest
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    createModeration(createModerationRequest: CreateModerationRequest, options?: any): AxiosPromise<Moderation>;
     /**
      *
      * @summary The search endpoint computes similarity scores between provided query and documents. Documents can be passed directly to the API if there are no more than 200 of them.  To go beyond the 200 document limit, documents can be processed offline and then used for efficient retrieval at query time. When `file` is set, the search endpoint searches over all the documents in the given file and returns up to the `max_rerank` number of documents. These documents will be returned along with their search scores.  The similarity score is a positive score that usually ranges from 0 to 300 (but can sometimes go higher), where a score above 200 usually means the document is semantically similar to the query.
@@ -1895,6 +2000,15 @@ export declare class OpenAIApi extends BaseAPI {
      * @memberof OpenAIApi
      */
     createFineTune(createFineTuneRequest: CreateFineTuneRequest, options?: AxiosRequestConfig): Promise<import("axios").AxiosResponse<FineTune, any>>;
+    /**
+     *
+     * @summary Classifies if text violates OpenAI's Content Policy.
+     * @param {CreateModerationRequest} createModerationRequest
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof OpenAIApi
+     */
+    createModeration(createModerationRequest: CreateModerationRequest, options?: AxiosRequestConfig): Promise<import("axios").AxiosResponse<Moderation, any>>;
     /**
      *
      * @summary The search endpoint computes similarity scores between provided query and documents. Documents can be passed directly to the API if there are no more than 200 of them.  To go beyond the 200 document limit, documents can be processed offline and then used for efficient retrieval at query time. When `file` is set, the search endpoint searches over all the documents in the given file and returns up to the `max_rerank` number of documents. These documents will be returned along with their search scores.  The similarity score is a positive score that usually ranges from 0 to 300 (but can sometimes go higher), where a score above 200 usually means the document is semantically similar to the query.
