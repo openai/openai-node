@@ -2,6 +2,10 @@
   "name": "openai",
   "version": "3.0.1",
   "description": "Node.js library for the OpenAI API",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/openai/openai-node.git"
+  },
   "keywords": [
     "openai",
     "open",
