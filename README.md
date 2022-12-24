@@ -79,6 +79,7 @@ All breaking changes for major version releases are listed below.
 ### 3.0.0
 
 - The function signature of `createCompletion(engineId, params)` changed to `createCompletion(params)`. The value previously passed in as the `engineId` argument should now be passed in as `model` in the params object (e.g. `createCompletion({ model: "text-davinci-002, ... })`)
+- Replace any `createCompletionFromModel(params)` calls with `createCompletion(params)`
 
 ## Thanks
 
