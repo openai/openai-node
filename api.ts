@@ -12,7 +12,6 @@
  * Do not edit the class manually.
  */
 
-
 import { Configuration } from './configuration';
 import globalAxios, { AxiosPromise, AxiosInstance, AxiosRequestConfig } from 'axios';
 // Some imports not used depending on template conditions
