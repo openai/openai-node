@@ -72,6 +72,10 @@ try {
 }
 ```
 
+### Streaming completions
+
+Streaming completions (`stream=true`) are not natively supported in this package yet, but [a workaround exists](https://github.com/openai/openai-node/issues/18#issuecomment-1369996933) if needed.
+
 ## Upgrade guide
 
 All breaking changes for major version releases are listed below.
