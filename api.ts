@@ -318,6 +318,12 @@ export interface CreateChatCompletionRequest {
      */
     'stop'?: CreateChatCompletionRequestStop;
     /**
+     * The maximum number of tokens allowed for the generated answer. By default, the number of tokens the model can return will be (4096 - prompt tokens). 
+     * @type {number}
+     * @memberof CreateChatCompletionRequest
+     */
+    'max_tokens'?: number;
+    /**
      * Number between -2.0 and 2.0. Positive values penalize new tokens based on whether they appear in the text so far, increasing the model\'s likelihood to talk about new topics.  [See more information about frequency and presence penalties.](/docs/api-reference/parameter-details) 
      * @type {number}
      * @memberof CreateChatCompletionRequest
@@ -2442,10 +2448,11 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
          * @param {string} [prompt] An optional text to guide the model\\\&#39;s style or continue a previous audio segment. The [prompt](/docs/guides/speech-to-text/prompting) should match the audio language. 
          * @param {string} [responseFormat] The format of the transcript output, in one of these options: json, text, srt, verbose_json, or vtt. 
          * @param {number} [temperature] The sampling temperature, between 0 and 1. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic. If set to 0, the model will use [log probability](https://en.wikipedia.org/wiki/Log_probability) to automatically increase the temperature until certain thresholds are hit. 
+         * @param {string} [language] The language of the input audio. Supplying the input language in [ISO-639-1](https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes) format will improve accuracy and latency. 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        createTranscription: async (file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+        createTranscription: async (file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, language?: string, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'file' is not null or undefined
             assertParamExists('createTranscription', 'file', file)
             // verify required parameter 'model' is not null or undefined
@@ -2482,6 +2489,10 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
     
             if (temperature !== undefined) { 
                 localVarFormParams.append('temperature', temperature as any);
+            }
+    
+            if (language !== undefined) { 
+                localVarFormParams.append('language', language as any);
             }
     
     
@@ -3146,11 +3157,12 @@ export const OpenAIApiFp = function(configuration?: Configuration) {
          * @param {string} [prompt] An optional text to guide the model\\\&#39;s style or continue a previous audio segment. The [prompt](/docs/guides/speech-to-text/prompting) should match the audio language. 
          * @param {string} [responseFormat] The format of the transcript output, in one of these options: json, text, srt, verbose_json, or vtt. 
          * @param {number} [temperature] The sampling temperature, between 0 and 1. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic. If set to 0, the model will use [log probability](https://en.wikipedia.org/wiki/Log_probability) to automatically increase the temperature until certain thresholds are hit. 
+         * @param {string} [language] The language of the input audio. Supplying the input language in [ISO-639-1](https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes) format will improve accuracy and latency. 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async createTranscription(file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CreateTranscriptionResponse>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.createTranscription(file, model, prompt, responseFormat, temperature, options);
+        async createTranscription(file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, language?: string, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CreateTranscriptionResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.createTranscription(file, model, prompt, responseFormat, temperature, language, options);
             return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
         },
         /**
@@ -3472,11 +3484,12 @@ export const OpenAIApiFactory = function (configuration?: Configuration, basePat
          * @param {string} [prompt] An optional text to guide the model\\\&#39;s style or continue a previous audio segment. The [prompt](/docs/guides/speech-to-text/prompting) should match the audio language. 
          * @param {string} [responseFormat] The format of the transcript output, in one of these options: json, text, srt, verbose_json, or vtt. 
          * @param {number} [temperature] The sampling temperature, between 0 and 1. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic. If set to 0, the model will use [log probability](https://en.wikipedia.org/wiki/Log_probability) to automatically increase the temperature until certain thresholds are hit. 
+         * @param {string} [language] The language of the input audio. Supplying the input language in [ISO-639-1](https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes) format will improve accuracy and latency. 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        createTranscription(file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, options?: any): AxiosPromise<CreateTranscriptionResponse> {
-            return localVarFp.createTranscription(file, model, prompt, responseFormat, temperature, options).then((request) => request(axios, basePath));
+        createTranscription(file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, language?: string, options?: any): AxiosPromise<CreateTranscriptionResponse> {
+            return localVarFp.createTranscription(file, model, prompt, responseFormat, temperature, language, options).then((request) => request(axios, basePath));
         },
         /**
          * 
@@ -3812,12 +3825,13 @@ export class OpenAIApi extends BaseAPI {
      * @param {string} [prompt] An optional text to guide the model\\\&#39;s style or continue a previous audio segment. The [prompt](/docs/guides/speech-to-text/prompting) should match the audio language. 
      * @param {string} [responseFormat] The format of the transcript output, in one of these options: json, text, srt, verbose_json, or vtt. 
      * @param {number} [temperature] The sampling temperature, between 0 and 1. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic. If set to 0, the model will use [log probability](https://en.wikipedia.org/wiki/Log_probability) to automatically increase the temperature until certain thresholds are hit. 
+     * @param {string} [language] The language of the input audio. Supplying the input language in [ISO-639-1](https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes) format will improve accuracy and latency. 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof OpenAIApi
      */
-    public createTranscription(file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, options?: AxiosRequestConfig) {
-        return OpenAIApiFp(this.configuration).createTranscription(file, model, prompt, responseFormat, temperature, options).then((request) => request(this.axios, this.basePath));
+    public createTranscription(file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, language?: string, options?: AxiosRequestConfig) {
+        return OpenAIApiFp(this.configuration).createTranscription(file, model, prompt, responseFormat, temperature, language, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
