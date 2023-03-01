@@ -26,30 +26,30 @@ import { BASE_PATH, COLLECTION_FORMATS, BaseAPI, RequiredError } from './base';
 /**
  * 
  * @export
- * @interface ChatCompletionRequestMessage
+ * @interface ChatCompletionMessage
  */
-export interface ChatCompletionRequestMessage {
+export interface ChatCompletionMessage {
     /**
      * The entity that sent the message
      * @type {string}
-     * @memberof ChatCompletionRequestMessage
+     * @memberof ChatCompletionMessage
      */
-    'role'?: ChatCompletionRequestMessageRoleEnum;
+    'role'?: ChatCompletionMessageRoleEnum;
     /**
      * The contents of the message
      * @type {string}
-     * @memberof ChatCompletionRequestMessage
+     * @memberof ChatCompletionMessage
      */
     'content'?: string;
 }
 
-export const ChatCompletionRequestMessageRoleEnum = {
+export const ChatCompletionMessageRoleEnum = {
     System: 'system',
     User: 'user',
     Assistant: 'assistant'
 } as const;
 
-export type ChatCompletionRequestMessageRoleEnum = typeof ChatCompletionRequestMessageRoleEnum[keyof typeof ChatCompletionRequestMessageRoleEnum];
+export type ChatCompletionMessageRoleEnum = typeof ChatCompletionMessageRoleEnum[keyof typeof ChatCompletionMessageRoleEnum];
 
 /**
  * 
@@ -249,10 +249,10 @@ export interface CreateChatCompletionRequest {
     'model': string;
     /**
      * The messages to generate chat completions for, in the [chat format](/docs/guides/chat/introduction).
-     * @type {Array<ChatCompletionRequestMessage>}
+     * @type {Array<ChatCompletionMessage>}
      * @memberof CreateChatCompletionRequest
      */
-    'messages': Array<ChatCompletionRequestMessage>;
+    'messages': Array<ChatCompletionMessage>;
     /**
      * What sampling temperature to use, between 0 and 2. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.  We generally recommend altering this or `top_p` but not both. 
      * @type {number}
@@ -366,10 +366,10 @@ export interface CreateChatCompletionResponseChoicesInner {
     'index'?: number;
     /**
      * 
-     * @type {Objects}
+     * @type {ChatCompletionMessage}
      * @memberof CreateChatCompletionResponseChoicesInner
      */
-    'message'?: Objects;
+    'message'?: ChatCompletionMessage;
     /**
      * 
      * @type {string}
@@ -2504,7 +2504,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
             }
     
             if (temperature !== undefined) { 
-                localVarFormParams.append('temperature', new Blob([JSON.stringify(temperature)], { type: "application/json", }));
+                localVarFormParams.append('temperature', temperature as any);
             }
     
     

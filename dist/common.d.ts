@@ -9,9 +9,9 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { Configuration } from "./configuration";
-import { RequestArgs } from "./base";
-import { AxiosInstance, AxiosResponse } from 'axios';
+import type { Configuration } from "./configuration";
+import type { RequestArgs } from "./base";
+import type { AxiosInstance, AxiosResponse } from 'axios';
 /**
  *
  * @export
