@@ -91,6 +91,8 @@ exports.setOAuthToObject = function (object, name, scopes, configuration) {
     });
 };
 function setFlattenedQueryParams(urlSearchParams, parameter, key = "") {
+    if (parameter == null)
+        return;
     if (typeof parameter === "object") {
         if (Array.isArray(parameter)) {
             parameter.forEach(item => setFlattenedQueryParams(urlSearchParams, item, key));

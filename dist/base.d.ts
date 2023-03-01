@@ -9,8 +9,8 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { Configuration } from "./configuration";
-import { AxiosInstance, AxiosRequestConfig } from 'axios';
+import type { Configuration } from './configuration';
+import type { AxiosInstance, AxiosRequestConfig } from 'axios';
 export declare const BASE_PATH: string;
 /**
  *
@@ -50,6 +50,5 @@ export declare class BaseAPI {
  */
 export declare class RequiredError extends Error {
     field: string;
-    name: "RequiredError";
     constructor(field: string, msg?: string);
 }

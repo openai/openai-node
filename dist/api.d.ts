@@ -9,9 +9,66 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { Configuration } from './configuration';
-import { AxiosPromise, AxiosInstance, AxiosRequestConfig } from 'axios';
-import { RequestArgs, BaseAPI } from './base';
+import type { Configuration } from './configuration';
+import type { AxiosPromise, AxiosInstance, AxiosRequestConfig } from 'axios';
+import type { RequestArgs } from './base';
+import { BaseAPI } from './base';
+/**
+ *
+ * @export
+ * @interface ChatCompletionRequestMessage
+ */
+export interface ChatCompletionRequestMessage {
+    /**
+     * The role of the author of this message.
+     * @type {string}
+     * @memberof ChatCompletionRequestMessage
+     */
+    'role': ChatCompletionRequestMessageRoleEnum;
+    /**
+     * The contents of the message
+     * @type {string}
+     * @memberof ChatCompletionRequestMessage
+     */
+    'content': string;
+    /**
+     * The name of the user in a multi-user chat
+     * @type {string}
+     * @memberof ChatCompletionRequestMessage
+     */
+    'name'?: string;
+}
+export declare const ChatCompletionRequestMessageRoleEnum: {
+    readonly System: "system";
+    readonly User: "user";
+    readonly Assistant: "assistant";
+};
+export declare type ChatCompletionRequestMessageRoleEnum = typeof ChatCompletionRequestMessageRoleEnum[keyof typeof ChatCompletionRequestMessageRoleEnum];
+/**
+ *
+ * @export
+ * @interface ChatCompletionResponseMessage
+ */
+export interface ChatCompletionResponseMessage {
+    /**
+     * The role of the author of this message.
+     * @type {string}
+     * @memberof ChatCompletionResponseMessage
+     */
+    'role': ChatCompletionResponseMessageRoleEnum;
+    /**
+     * The contents of the message
+     * @type {string}
+     * @memberof ChatCompletionResponseMessage
+     */
+    'content': string;
+}
+export declare const ChatCompletionResponseMessageRoleEnum: {
+    readonly System: "system";
+    readonly User: "user";
+    readonly Assistant: "assistant";
+};
+export declare type ChatCompletionResponseMessageRoleEnum = typeof ChatCompletionResponseMessageRoleEnum[keyof typeof ChatCompletionResponseMessageRoleEnum];
 /**
  *
  * @export
@@ -67,7 +124,7 @@ export interface CreateAnswerRequest {
      */
     'max_rerank'?: number | null;
     /**
-     * What [sampling temperature](https://towardsdatascience.com/how-to-sample-from-language-models-682bceb97277) to use. Higher values mean the model will take more risks and value 0 (argmax sampling) works better for scenarios with a well-defined answer.
+     * What sampling temperature to use, between 0 and 2. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.
      * @type {number}
      * @memberof CreateAnswerRequest
      */
@@ -121,7 +178,7 @@ export interface CreateAnswerRequest {
      */
     'expand'?: Array<any> | null;
     /**
-     * A unique identifier representing your end-user, which will help OpenAI to monitor and detect abuse. [Learn more](/docs/usage-policies/end-user-ids).
+     * A unique identifier representing your end-user, which can help OpenAI to monitor and detect abuse. [Learn more](/docs/guides/safety-best-practices/end-user-ids).
      * @type {string}
      * @memberof CreateAnswerRequest
      */
@@ -198,6 +255,153 @@ export interface CreateAnswerResponseSelectedDocumentsInner {
 /**
  *
  * @export
+ * @interface CreateChatCompletionRequest
+ */
+export interface CreateChatCompletionRequest {
+    /**
+     * ID of the model to use. Currently, only `gpt-3.5-turbo` and `gpt-3.5-turbo-0301` are supported.
+     * @type {string}
+     * @memberof CreateChatCompletionRequest
+     */
+    'model': string;
+    /**
+     * The messages to generate chat completions for, in the [chat format](/docs/guides/chat/introduction).
+     * @type {Array<ChatCompletionRequestMessage>}
+     * @memberof CreateChatCompletionRequest
+     */
+    'messages': Array<ChatCompletionRequestMessage>;
+    /**
+     * What sampling temperature to use, between 0 and 2. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.  We generally recommend altering this or `top_p` but not both.
+     * @type {number}
+     * @memberof CreateChatCompletionRequest
+     */
+    'temperature'?: number | null;
+    /**
+     * An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass. So 0.1 means only the tokens comprising the top 10% probability mass are considered.  We generally recommend altering this or `temperature` but not both.
+     * @type {number}
+     * @memberof CreateChatCompletionRequest
+     */
+    'top_p'?: number | null;
+    /**
+     * How many chat completion choices to generate for each input message.
+     * @type {number}
+     * @memberof CreateChatCompletionRequest
+     */
+    'n'?: number | null;
+    /**
+     * If set, partial message deltas will be sent, like in ChatGPT. Tokens will be sent as data-only [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format) as they become available, with the stream terminated by a `data: [DONE]` message.
+     * @type {boolean}
+     * @memberof CreateChatCompletionRequest
+     */
+    'stream'?: boolean | null;
+    /**
+     *
+     * @type {CreateChatCompletionRequestStop}
+     * @memberof CreateChatCompletionRequest
+     */
+    'stop'?: CreateChatCompletionRequestStop;
+    /**
+     * Number between -2.0 and 2.0. Positive values penalize new tokens based on whether they appear in the text so far, increasing the model\'s likelihood to talk about new topics.  [See more information about frequency and presence penalties.](/docs/api-reference/parameter-details)
+     * @type {number}
+     * @memberof CreateChatCompletionRequest
+     */
+    'presence_penalty'?: number | null;
+    /**
+     * Number between -2.0 and 2.0. Positive values penalize new tokens based on their existing frequency in the text so far, decreasing the model\'s likelihood to repeat the same line verbatim.  [See more information about frequency and presence penalties.](/docs/api-reference/parameter-details)
+     * @type {number}
+     * @memberof CreateChatCompletionRequest
+     */
+    'frequency_penalty'?: number | null;
+    /**
+     * Modify the likelihood of specified tokens appearing in the completion.  Accepts a json object that maps tokens (specified by their token ID in the tokenizer) to an associated bias value from -100 to 100. Mathematically, the bias is added to the logits generated by the model prior to sampling. The exact effect will vary per model, but values between -1 and 1 should decrease or increase likelihood of selection; values like -100 or 100 should result in a ban or exclusive selection of the relevant token.
+     * @type {object}
+     * @memberof CreateChatCompletionRequest
+     */
+    'logit_bias'?: object | null;
+    /**
+     * A unique identifier representing your end-user, which can help OpenAI to monitor and detect abuse. [Learn more](/docs/guides/safety-best-practices/end-user-ids).
+     * @type {string}
+     * @memberof CreateChatCompletionRequest
+     */
+    'user'?: string;
+}
+/**
+ * @type CreateChatCompletionRequestStop
+ * Up to 4 sequences where the API will stop generating further tokens.
+ * @export
+ */
+export declare type CreateChatCompletionRequestStop = Array<string> | string;
+/**
+ *
+ * @export
+ * @interface CreateChatCompletionResponse
+ */
+export interface CreateChatCompletionResponse {
+    /**
+     *
+     * @type {string}
+     * @memberof CreateChatCompletionResponse
+     */
+    'id': string;
+    /**
+     *
+     * @type {string}
+     * @memberof CreateChatCompletionResponse
+     */
+    'object': string;
+    /**
+     *
+     * @type {number}
+     * @memberof CreateChatCompletionResponse
+     */
+    'created': number;
+    /**
+     *
+     * @type {string}
+     * @memberof CreateChatCompletionResponse
+     */
+    'model': string;
+    /**
+     *
+     * @type {Array<CreateChatCompletionResponseChoicesInner>}
+     * @memberof CreateChatCompletionResponse
+     */
+    'choices': Array<CreateChatCompletionResponseChoicesInner>;
+    /**
+     *
+     * @type {CreateCompletionResponseUsage}
+     * @memberof CreateChatCompletionResponse
+     */
+    'usage'?: CreateCompletionResponseUsage;
+}
+/**
+ *
+ * @export
+ * @interface CreateChatCompletionResponseChoicesInner
+ */
+export interface CreateChatCompletionResponseChoicesInner {
+    /**
+     *
+     * @type {number}
+     * @memberof CreateChatCompletionResponseChoicesInner
+     */
+    'index'?: number;
+    /**
+     *
+     * @type {ChatCompletionResponseMessage}
+     * @memberof CreateChatCompletionResponseChoicesInner
+     */
+    'message'?: ChatCompletionResponseMessage;
+    /**
+     *
+     * @type {string}
+     * @memberof CreateChatCompletionResponseChoicesInner
+     */
+    'finish_reason'?: string;
+}
+/**
+ *
+ * @export
  * @interface CreateClassificationRequest
  */
 export interface CreateClassificationRequest {
@@ -238,7 +442,7 @@ export interface CreateClassificationRequest {
      */
     'search_model'?: string | null;
     /**
-     * What sampling `temperature` to use. Higher values mean the model will take more risks. Try 0.9 for more creative applications, and 0 (argmax sampling) for ones with a well-defined answer.
+     * What sampling temperature to use, between 0 and 2. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.
      * @type {number}
      * @memberof CreateClassificationRequest
      */
@@ -280,7 +484,7 @@ export interface CreateClassificationRequest {
      */
     'expand'?: Array<any> | null;
     /**
-     * A unique identifier representing your end-user, which will help OpenAI to monitor and detect abuse. [Learn more](/docs/usage-policies/end-user-ids).
+     * A unique identifier representing your end-user, which can help OpenAI to monitor and detect abuse. [Learn more](/docs/guides/safety-best-practices/end-user-ids).
      * @type {string}
      * @memberof CreateClassificationRequest
      */
@@ -385,7 +589,7 @@ export interface CreateCompletionRequest {
      */
     'max_tokens'?: number | null;
     /**
-     * What [sampling temperature](https://towardsdatascience.com/how-to-sample-from-language-models-682bceb97277) to use. Higher values means the model will take more risks. Try 0.9 for more creative applications, and 0 (argmax sampling) for ones with a well-defined answer.  We generally recommend altering this or `top_p` but not both.
+     * What sampling temperature to use, between 0 and 2. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.  We generally recommend altering this or `top_p` but not both.
      * @type {number}
      * @memberof CreateCompletionRequest
      */
@@ -451,7 +655,7 @@ export interface CreateCompletionRequest {
      */
     'logit_bias'?: object | null;
     /**
-     * A unique identifier representing your end-user, which will help OpenAI to monitor and detect abuse. [Learn more](/docs/usage-policies/end-user-ids).
+     * A unique identifier representing your end-user, which can help OpenAI to monitor and detect abuse. [Learn more](/docs/guides/safety-best-practices/end-user-ids).
      * @type {string}
      * @memberof CreateCompletionRequest
      */
@@ -606,7 +810,7 @@ export interface CreateCompletionResponseUsage {
  */
 export interface CreateEditRequest {
     /**
-     * ID of the model to use. You can use the [List models](/docs/api-reference/models/list) API to see all of your available models, or see our [Model overview](/docs/models/overview) for descriptions of them.
+     * ID of the model to use. You can use the `text-davinci-edit-001` or `code-davinci-edit-001` model with this endpoint.
      * @type {string}
      * @memberof CreateEditRequest
      */
@@ -630,7 +834,7 @@ export interface CreateEditRequest {
      */
     'n'?: number | null;
     /**
-     * What [sampling temperature](https://towardsdatascience.com/how-to-sample-from-language-models-682bceb97277) to use. Higher values means the model will take more risks. Try 0.9 for more creative applications, and 0 (argmax sampling) for ones with a well-defined answer.  We generally recommend altering this or `top_p` but not both.
+     * What sampling temperature to use, between 0 and 2. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.  We generally recommend altering this or `top_p` but not both.
      * @type {number}
      * @memberof CreateEditRequest
      */
@@ -653,12 +857,6 @@ export interface CreateEditResponse {
      * @type {string}
      * @memberof CreateEditResponse
      */
-    'id': string;
-    /**
-     *
-     * @type {string}
-     * @memberof CreateEditResponse
-     */
     'object': string;
     /**
      *
@@ -666,12 +864,6 @@ export interface CreateEditResponse {
      * @memberof CreateEditResponse
      */
     'created': number;
-    /**
-     *
-     * @type {string}
-     * @memberof CreateEditResponse
-     */
-    'model': string;
     /**
      *
      * @type {Array<CreateCompletionResponseChoicesInner>}
@@ -704,7 +896,7 @@ export interface CreateEmbeddingRequest {
      */
     'input': CreateEmbeddingRequestInput;
     /**
-     * A unique identifier representing your end-user, which will help OpenAI to monitor and detect abuse. [Learn more](/docs/usage-policies/end-user-ids).
+     * A unique identifier representing your end-user, which can help OpenAI to monitor and detect abuse. [Learn more](/docs/guides/safety-best-practices/end-user-ids).
      * @type {string}
      * @memberof CreateEmbeddingRequest
      */
@@ -712,7 +904,7 @@ export interface CreateEmbeddingRequest {
 }
 /**
  * @type CreateEmbeddingRequestInput
- * Input text to get embeddings for, encoded as a string or array of tokens. To get embeddings for multiple inputs in a single request, pass an array of strings or array of token arrays. Each input must not exceed 2048 tokens in length.  Unless you are embedding code, we suggest replacing newlines (`\\n`) in your input with a single space, as we have observed inferior results when newlines are present.
+ * Input text to get embeddings for, encoded as a string or array of tokens. To get embeddings for multiple inputs in a single request, pass an array of strings or array of token arrays. Each input must not exceed 8192 tokens in length.
  * @export
  */
 export declare type CreateEmbeddingRequestInput = Array<any> | Array<number> | Array<string> | string;
@@ -810,7 +1002,7 @@ export interface CreateFineTuneRequest {
      */
     'validation_file'?: string | null;
     /**
-     * The name of the base model to fine-tune. You can select one of \"ada\", \"babbage\", \"curie\", \"davinci\", or a fine-tuned model created after 2022-04-21. To learn more about these models, see the [Models](https://beta.openai.com/docs/models) documentation.
+     * The name of the base model to fine-tune. You can select one of \"ada\", \"babbage\", \"curie\", \"davinci\", or a fine-tuned model created after 2022-04-21. To learn more about these models, see the [Models](https://platform.openai.com/docs/models) documentation.
      * @type {string}
      * @memberof CreateFineTuneRequest
      */
@@ -901,7 +1093,7 @@ export interface CreateImageRequest {
      */
     'response_format'?: CreateImageRequestResponseFormatEnum;
     /**
-     * A unique identifier representing your end-user, which will help OpenAI to monitor and detect abuse. [Learn more](/docs/usage-policies/end-user-ids).
+     * A unique identifier representing your end-user, which can help OpenAI to monitor and detect abuse. [Learn more](/docs/guides/safety-best-practices/end-user-ids).
      * @type {string}
      * @memberof CreateImageRequest
      */
@@ -1128,7 +1320,7 @@ export interface CreateSearchRequest {
      */
     'return_metadata'?: boolean | null;
     /**
-     * A unique identifier representing your end-user, which will help OpenAI to monitor and detect abuse. [Learn more](/docs/usage-policies/end-user-ids).
+     * A unique identifier representing your end-user, which can help OpenAI to monitor and detect abuse. [Learn more](/docs/guides/safety-best-practices/end-user-ids).
      * @type {string}
      * @memberof CreateSearchRequest
      */
@@ -1183,6 +1375,32 @@ export interface CreateSearchResponseDataInner {
      * @memberof CreateSearchResponseDataInner
      */
     'score'?: number;
+}
+/**
+ *
+ * @export
+ * @interface CreateTranscriptionResponse
+ */
+export interface CreateTranscriptionResponse {
+    /**
+     *
+     * @type {string}
+     * @memberof CreateTranscriptionResponse
+     */
+    'text': string;
+}
+/**
+ *
+ * @export
+ * @interface CreateTranslationResponse
+ */
+export interface CreateTranslationResponse {
+    /**
+     *
+     * @type {string}
+     * @memberof CreateTranslationResponse
+     */
+    'text': string;
 }
 /**
  *
@@ -1624,6 +1842,14 @@ export declare const OpenAIApiAxiosParamCreator: (configuration?: Configuration)
     createAnswer: (createAnswerRequest: CreateAnswerRequest, options?: AxiosRequestConfig) => Promise<RequestArgs>;
     /**
      *
+     * @summary Creates a completion for the chat message
+     * @param {CreateChatCompletionRequest} createChatCompletionRequest
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    createChatCompletion: (createChatCompletionRequest: CreateChatCompletionRequest, options?: AxiosRequestConfig) => Promise<RequestArgs>;
+    /**
+     *
      * @summary Classifies the specified `query` using provided examples.  The endpoint first [searches](/docs/api-reference/searches) over the labeled examples to select the ones most relevant for the particular query. Then, the relevant examples are combined with the query to construct a prompt to produce the final label via the [completions](/docs/api-reference/completions) endpoint.  Labeled examples can be provided via an uploaded `file`, or explicitly listed in the request using the `examples` parameter for quick tests and small scale use cases.
      * @param {CreateClassificationRequest} createClassificationRequest
      * @param {*} [options] Override http request option.
@@ -1641,7 +1867,7 @@ export declare const OpenAIApiAxiosParamCreator: (configuration?: Configuration)
     createCompletion: (createCompletionRequest: CreateCompletionRequest, options?: AxiosRequestConfig) => Promise<RequestArgs>;
     /**
      *
-     * @summary Creates a new edit for the provided input, instruction, and parameters
+     * @summary Creates a new edit for the provided input, instruction, and parameters.
      * @param {CreateEditRequest} createEditRequest
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
@@ -1683,17 +1909,17 @@ export declare const OpenAIApiAxiosParamCreator: (configuration?: Configuration)
     /**
      *
      * @summary Creates an edited or extended image given an original image and a prompt.
-     * @param {File} image The image to edit. Must be a valid PNG file, less than 4MB, and square.
-     * @param {File} mask An additional image whose fully transparent areas (e.g. where alpha is zero) indicate where &#x60;image&#x60; should be edited. Must be a valid PNG file, less than 4MB, and have the same dimensions as &#x60;image&#x60;.
+     * @param {File} image The image to edit. Must be a valid PNG file, less than 4MB, and square. If mask is not provided, image must have transparency, which will be used as the mask.
      * @param {string} prompt A text description of the desired image(s). The maximum length is 1000 characters.
+     * @param {File} [mask] An additional image whose fully transparent areas (e.g. where alpha is zero) indicate where &#x60;image&#x60; should be edited. Must be a valid PNG file, less than 4MB, and have the same dimensions as &#x60;image&#x60;.
      * @param {number} [n] The number of images to generate. Must be between 1 and 10.
      * @param {string} [size] The size of the generated images. Must be one of &#x60;256x256&#x60;, &#x60;512x512&#x60;, or &#x60;1024x1024&#x60;.
      * @param {string} [responseFormat] The format in which the generated images are returned. Must be one of &#x60;url&#x60; or &#x60;b64_json&#x60;.
-     * @param {string} [user] A unique identifier representing your end-user, which will help OpenAI to monitor and detect abuse. [Learn more](/docs/usage-policies/end-user-ids).
+     * @param {string} [user] A unique identifier representing your end-user, which can help OpenAI to monitor and detect abuse. [Learn more](/docs/guides/safety-best-practices/end-user-ids).
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
-    createImageEdit: (image: File, mask: File, prompt: string, n?: number, size?: string, responseFormat?: string, user?: string, options?: AxiosRequestConfig) => Promise<RequestArgs>;
+    createImageEdit: (image: File, prompt: string, mask?: File, n?: number, size?: string, responseFormat?: string, user?: string, options?: AxiosRequestConfig) => Promise<RequestArgs>;
     /**
      *
      * @summary Creates a variation of a given image.
@@ -1701,7 +1927,7 @@ export declare const OpenAIApiAxiosParamCreator: (configuration?: Configuration)
      * @param {number} [n] The number of images to generate. Must be between 1 and 10.
      * @param {string} [size] The size of the generated images. Must be one of &#x60;256x256&#x60;, &#x60;512x512&#x60;, or &#x60;1024x1024&#x60;.
      * @param {string} [responseFormat] The format in which the generated images are returned. Must be one of &#x60;url&#x60; or &#x60;b64_json&#x60;.
-     * @param {string} [user] A unique identifier representing your end-user, which will help OpenAI to monitor and detect abuse. [Learn more](/docs/usage-policies/end-user-ids).
+     * @param {string} [user] A unique identifier representing your end-user, which can help OpenAI to monitor and detect abuse. [Learn more](/docs/guides/safety-best-practices/end-user-ids).
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
@@ -1724,6 +1950,30 @@ export declare const OpenAIApiAxiosParamCreator: (configuration?: Configuration)
      * @throws {RequiredError}
      */
     createSearch: (engineId: string, createSearchRequest: CreateSearchRequest, options?: AxiosRequestConfig) => Promise<RequestArgs>;
+    /**
+     *
+     * @summary Transcribes audio into the input language.
+     * @param {File} file The audio file to transcribe, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm.
+     * @param {string} model ID of the model to use. Only &#x60;whisper-1&#x60; is currently available.
+     * @param {string} [prompt] An optional text to guide the model\\\&#39;s style or continue a previous audio segment. The [prompt](/docs/guides/speech-to-text/prompting) should match the audio language.
+     * @param {string} [responseFormat] The format of the transcript output, in one of these options: json, text, srt, verbose_json, or vtt.
+     * @param {number} [temperature] The sampling temperature, between 0 and 1. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic. If set to 0, the model will use [log probability](https://en.wikipedia.org/wiki/Log_probability) to automatically increase the temperature until certain thresholds are hit.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    createTranscription: (file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, options?: AxiosRequestConfig) => Promise<RequestArgs>;
+    /**
+     *
+     * @summary Translates audio into into English.
+     * @param {File} file The audio file to translate, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm.
+     * @param {string} model ID of the model to use. Only &#x60;whisper-1&#x60; is currently available.
+     * @param {string} [prompt] An optional text to guide the model\\\&#39;s style or continue a previous audio segment. The [prompt](/docs/guides/speech-to-text/prompting) should be in English.
+     * @param {string} [responseFormat] The format of the transcript output, in one of these options: json, text, srt, verbose_json, or vtt.
+     * @param {number} [temperature] The sampling temperature, between 0 and 1. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic. If set to 0, the model will use [log probability](https://en.wikipedia.org/wiki/Log_probability) to automatically increase the temperature until certain thresholds are hit.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    createTranslation: (file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, options?: AxiosRequestConfig) => Promise<RequestArgs>;
     /**
      *
      * @summary Delete a file.
@@ -1844,6 +2094,14 @@ export declare const OpenAIApiFp: (configuration?: Configuration) => {
     createAnswer(createAnswerRequest: CreateAnswerRequest, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CreateAnswerResponse>>;
     /**
      *
+     * @summary Creates a completion for the chat message
+     * @param {CreateChatCompletionRequest} createChatCompletionRequest
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    createChatCompletion(createChatCompletionRequest: CreateChatCompletionRequest, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CreateChatCompletionResponse>>;
+    /**
+     *
      * @summary Classifies the specified `query` using provided examples.  The endpoint first [searches](/docs/api-reference/searches) over the labeled examples to select the ones most relevant for the particular query. Then, the relevant examples are combined with the query to construct a prompt to produce the final label via the [completions](/docs/api-reference/completions) endpoint.  Labeled examples can be provided via an uploaded `file`, or explicitly listed in the request using the `examples` parameter for quick tests and small scale use cases.
      * @param {CreateClassificationRequest} createClassificationRequest
      * @param {*} [options] Override http request option.
@@ -1861,7 +2119,7 @@ export declare const OpenAIApiFp: (configuration?: Configuration) => {
     createCompletion(createCompletionRequest: CreateCompletionRequest, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CreateCompletionResponse>>;
     /**
      *
-     * @summary Creates a new edit for the provided input, instruction, and parameters
+     * @summary Creates a new edit for the provided input, instruction, and parameters.
      * @param {CreateEditRequest} createEditRequest
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
@@ -1903,17 +2161,17 @@ export declare const OpenAIApiFp: (configuration?: Configuration) => {
     /**
      *
      * @summary Creates an edited or extended image given an original image and a prompt.
-     * @param {File} image The image to edit. Must be a valid PNG file, less than 4MB, and square.
-     * @param {File} mask An additional image whose fully transparent areas (e.g. where alpha is zero) indicate where &#x60;image&#x60; should be edited. Must be a valid PNG file, less than 4MB, and have the same dimensions as &#x60;image&#x60;.
+     * @param {File} image The image to edit. Must be a valid PNG file, less than 4MB, and square. If mask is not provided, image must have transparency, which will be used as the mask.
      * @param {string} prompt A text description of the desired image(s). The maximum length is 1000 characters.
+     * @param {File} [mask] An additional image whose fully transparent areas (e.g. where alpha is zero) indicate where &#x60;image&#x60; should be edited. Must be a valid PNG file, less than 4MB, and have the same dimensions as &#x60;image&#x60;.
      * @param {number} [n] The number of images to generate. Must be between 1 and 10.
      * @param {string} [size] The size of the generated images. Must be one of &#x60;256x256&#x60;, &#x60;512x512&#x60;, or &#x60;1024x1024&#x60;.
      * @param {string} [responseFormat] The format in which the generated images are returned. Must be one of &#x60;url&#x60; or &#x60;b64_json&#x60;.
-     * @param {string} [user] A unique identifier representing your end-user, which will help OpenAI to monitor and detect abuse. [Learn more](/docs/usage-policies/end-user-ids).
+     * @param {string} [user] A unique identifier representing your end-user, which can help OpenAI to monitor and detect abuse. [Learn more](/docs/guides/safety-best-practices/end-user-ids).
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
-    createImageEdit(image: File, mask: File, prompt: string, n?: number, size?: string, responseFormat?: string, user?: string, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ImagesResponse>>;
+    createImageEdit(image: File, prompt: string, mask?: File, n?: number, size?: string, responseFormat?: string, user?: string, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ImagesResponse>>;
     /**
      *
      * @summary Creates a variation of a given image.
@@ -1921,7 +2179,7 @@ export declare const OpenAIApiFp: (configuration?: Configuration) => {
      * @param {number} [n] The number of images to generate. Must be between 1 and 10.
      * @param {string} [size] The size of the generated images. Must be one of &#x60;256x256&#x60;, &#x60;512x512&#x60;, or &#x60;1024x1024&#x60;.
      * @param {string} [responseFormat] The format in which the generated images are returned. Must be one of &#x60;url&#x60; or &#x60;b64_json&#x60;.
-     * @param {string} [user] A unique identifier representing your end-user, which will help OpenAI to monitor and detect abuse. [Learn more](/docs/usage-policies/end-user-ids).
+     * @param {string} [user] A unique identifier representing your end-user, which can help OpenAI to monitor and detect abuse. [Learn more](/docs/guides/safety-best-practices/end-user-ids).
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
@@ -1944,6 +2202,30 @@ export declare const OpenAIApiFp: (configuration?: Configuration) => {
      * @throws {RequiredError}
      */
     createSearch(engineId: string, createSearchRequest: CreateSearchRequest, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CreateSearchResponse>>;
+    /**
+     *
+     * @summary Transcribes audio into the input language.
+     * @param {File} file The audio file to transcribe, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm.
+     * @param {string} model ID of the model to use. Only &#x60;whisper-1&#x60; is currently available.
+     * @param {string} [prompt] An optional text to guide the model\\\&#39;s style or continue a previous audio segment. The [prompt](/docs/guides/speech-to-text/prompting) should match the audio language.
+     * @param {string} [responseFormat] The format of the transcript output, in one of these options: json, text, srt, verbose_json, or vtt.
+     * @param {number} [temperature] The sampling temperature, between 0 and 1. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic. If set to 0, the model will use [log probability](https://en.wikipedia.org/wiki/Log_probability) to automatically increase the temperature until certain thresholds are hit.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    createTranscription(file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CreateTranscriptionResponse>>;
+    /**
+     *
+     * @summary Translates audio into into English.
+     * @param {File} file The audio file to translate, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm.
+     * @param {string} model ID of the model to use. Only &#x60;whisper-1&#x60; is currently available.
+     * @param {string} [prompt] An optional text to guide the model\\\&#39;s style or continue a previous audio segment. The [prompt](/docs/guides/speech-to-text/prompting) should be in English.
+     * @param {string} [responseFormat] The format of the transcript output, in one of these options: json, text, srt, verbose_json, or vtt.
+     * @param {number} [temperature] The sampling temperature, between 0 and 1. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic. If set to 0, the model will use [log probability](https://en.wikipedia.org/wiki/Log_probability) to automatically increase the temperature until certain thresholds are hit.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    createTranslation(file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CreateTranslationResponse>>;
     /**
      *
      * @summary Delete a file.
@@ -2064,6 +2346,14 @@ export declare const OpenAIApiFactory: (configuration?: Configuration, basePath?
     createAnswer(createAnswerRequest: CreateAnswerRequest, options?: any): AxiosPromise<CreateAnswerResponse>;
     /**
      *
+     * @summary Creates a completion for the chat message
+     * @param {CreateChatCompletionRequest} createChatCompletionRequest
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    createChatCompletion(createChatCompletionRequest: CreateChatCompletionRequest, options?: any): AxiosPromise<CreateChatCompletionResponse>;
+    /**
+     *
      * @summary Classifies the specified `query` using provided examples.  The endpoint first [searches](/docs/api-reference/searches) over the labeled examples to select the ones most relevant for the particular query. Then, the relevant examples are combined with the query to construct a prompt to produce the final label via the [completions](/docs/api-reference/completions) endpoint.  Labeled examples can be provided via an uploaded `file`, or explicitly listed in the request using the `examples` parameter for quick tests and small scale use cases.
      * @param {CreateClassificationRequest} createClassificationRequest
      * @param {*} [options] Override http request option.
@@ -2081,7 +2371,7 @@ export declare const OpenAIApiFactory: (configuration?: Configuration, basePath?
     createCompletion(createCompletionRequest: CreateCompletionRequest, options?: any): AxiosPromise<CreateCompletionResponse>;
     /**
      *
-     * @summary Creates a new edit for the provided input, instruction, and parameters
+     * @summary Creates a new edit for the provided input, instruction, and parameters.
      * @param {CreateEditRequest} createEditRequest
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
@@ -2123,17 +2413,17 @@ export declare const OpenAIApiFactory: (configuration?: Configuration, basePath?
     /**
      *
      * @summary Creates an edited or extended image given an original image and a prompt.
-     * @param {File} image The image to edit. Must be a valid PNG file, less than 4MB, and square.
-     * @param {File} mask An additional image whose fully transparent areas (e.g. where alpha is zero) indicate where &#x60;image&#x60; should be edited. Must be a valid PNG file, less than 4MB, and have the same dimensions as &#x60;image&#x60;.
+     * @param {File} image The image to edit. Must be a valid PNG file, less than 4MB, and square. If mask is not provided, image must have transparency, which will be used as the mask.
      * @param {string} prompt A text description of the desired image(s). The maximum length is 1000 characters.
+     * @param {File} [mask] An additional image whose fully transparent areas (e.g. where alpha is zero) indicate where &#x60;image&#x60; should be edited. Must be a valid PNG file, less than 4MB, and have the same dimensions as &#x60;image&#x60;.
      * @param {number} [n] The number of images to generate. Must be between 1 and 10.
      * @param {string} [size] The size of the generated images. Must be one of &#x60;256x256&#x60;, &#x60;512x512&#x60;, or &#x60;1024x1024&#x60;.
      * @param {string} [responseFormat] The format in which the generated images are returned. Must be one of &#x60;url&#x60; or &#x60;b64_json&#x60;.
-     * @param {string} [user] A unique identifier representing your end-user, which will help OpenAI to monitor and detect abuse. [Learn more](/docs/usage-policies/end-user-ids).
+     * @param {string} [user] A unique identifier representing your end-user, which can help OpenAI to monitor and detect abuse. [Learn more](/docs/guides/safety-best-practices/end-user-ids).
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
-    createImageEdit(image: File, mask: File, prompt: string, n?: number, size?: string, responseFormat?: string, user?: string, options?: any): AxiosPromise<ImagesResponse>;
+    createImageEdit(image: File, prompt: string, mask?: File, n?: number, size?: string, responseFormat?: string, user?: string, options?: any): AxiosPromise<ImagesResponse>;
     /**
      *
      * @summary Creates a variation of a given image.
@@ -2141,7 +2431,7 @@ export declare const OpenAIApiFactory: (configuration?: Configuration, basePath?
      * @param {number} [n] The number of images to generate. Must be between 1 and 10.
      * @param {string} [size] The size of the generated images. Must be one of &#x60;256x256&#x60;, &#x60;512x512&#x60;, or &#x60;1024x1024&#x60;.
      * @param {string} [responseFormat] The format in which the generated images are returned. Must be one of &#x60;url&#x60; or &#x60;b64_json&#x60;.
-     * @param {string} [user] A unique identifier representing your end-user, which will help OpenAI to monitor and detect abuse. [Learn more](/docs/usage-policies/end-user-ids).
+     * @param {string} [user] A unique identifier representing your end-user, which can help OpenAI to monitor and detect abuse. [Learn more](/docs/guides/safety-best-practices/end-user-ids).
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
@@ -2164,6 +2454,30 @@ export declare const OpenAIApiFactory: (configuration?: Configuration, basePath?
      * @throws {RequiredError}
      */
     createSearch(engineId: string, createSearchRequest: CreateSearchRequest, options?: any): AxiosPromise<CreateSearchResponse>;
+    /**
+     *
+     * @summary Transcribes audio into the input language.
+     * @param {File} file The audio file to transcribe, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm.
+     * @param {string} model ID of the model to use. Only &#x60;whisper-1&#x60; is currently available.
+     * @param {string} [prompt] An optional text to guide the model\\\&#39;s style or continue a previous audio segment. The [prompt](/docs/guides/speech-to-text/prompting) should match the audio language.
+     * @param {string} [responseFormat] The format of the transcript output, in one of these options: json, text, srt, verbose_json, or vtt.
+     * @param {number} [temperature] The sampling temperature, between 0 and 1. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic. If set to 0, the model will use [log probability](https://en.wikipedia.org/wiki/Log_probability) to automatically increase the temperature until certain thresholds are hit.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    createTranscription(file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, options?: any): AxiosPromise<CreateTranscriptionResponse>;
+    /**
+     *
+     * @summary Translates audio into into English.
+     * @param {File} file The audio file to translate, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm.
+     * @param {string} model ID of the model to use. Only &#x60;whisper-1&#x60; is currently available.
+     * @param {string} [prompt] An optional text to guide the model\\\&#39;s style or continue a previous audio segment. The [prompt](/docs/guides/speech-to-text/prompting) should be in English.
+     * @param {string} [responseFormat] The format of the transcript output, in one of these options: json, text, srt, verbose_json, or vtt.
+     * @param {number} [temperature] The sampling temperature, between 0 and 1. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic. If set to 0, the model will use [log probability](https://en.wikipedia.org/wiki/Log_probability) to automatically increase the temperature until certain thresholds are hit.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    createTranslation(file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, options?: any): AxiosPromise<CreateTranslationResponse>;
     /**
      *
      * @summary Delete a file.
@@ -2288,6 +2602,15 @@ export declare class OpenAIApi extends BaseAPI {
     createAnswer(createAnswerRequest: CreateAnswerRequest, options?: AxiosRequestConfig): Promise<import("axios").AxiosResponse<CreateAnswerResponse, any>>;
     /**
      *
+     * @summary Creates a completion for the chat message
+     * @param {CreateChatCompletionRequest} createChatCompletionRequest
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof OpenAIApi
+     */
+    createChatCompletion(createChatCompletionRequest: CreateChatCompletionRequest, options?: AxiosRequestConfig): Promise<import("axios").AxiosResponse<CreateChatCompletionResponse, any>>;
+    /**
+     *
      * @summary Classifies the specified `query` using provided examples.  The endpoint first [searches](/docs/api-reference/searches) over the labeled examples to select the ones most relevant for the particular query. Then, the relevant examples are combined with the query to construct a prompt to produce the final label via the [completions](/docs/api-reference/completions) endpoint.  Labeled examples can be provided via an uploaded `file`, or explicitly listed in the request using the `examples` parameter for quick tests and small scale use cases.
      * @param {CreateClassificationRequest} createClassificationRequest
      * @param {*} [options] Override http request option.
@@ -2307,7 +2630,7 @@ export declare class OpenAIApi extends BaseAPI {
     createCompletion(createCompletionRequest: CreateCompletionRequest, options?: AxiosRequestConfig): Promise<import("axios").AxiosResponse<CreateCompletionResponse, any>>;
     /**
      *
-     * @summary Creates a new edit for the provided input, instruction, and parameters
+     * @summary Creates a new edit for the provided input, instruction, and parameters.
      * @param {CreateEditRequest} createEditRequest
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
@@ -2354,18 +2677,18 @@ export declare class OpenAIApi extends BaseAPI {
     /**
      *
      * @summary Creates an edited or extended image given an original image and a prompt.
-     * @param {File} image The image to edit. Must be a valid PNG file, less than 4MB, and square.
-     * @param {File} mask An additional image whose fully transparent areas (e.g. where alpha is zero) indicate where &#x60;image&#x60; should be edited. Must be a valid PNG file, less than 4MB, and have the same dimensions as &#x60;image&#x60;.
+     * @param {File} image The image to edit. Must be a valid PNG file, less than 4MB, and square. If mask is not provided, image must have transparency, which will be used as the mask.
      * @param {string} prompt A text description of the desired image(s). The maximum length is 1000 characters.
+     * @param {File} [mask] An additional image whose fully transparent areas (e.g. where alpha is zero) indicate where &#x60;image&#x60; should be edited. Must be a valid PNG file, less than 4MB, and have the same dimensions as &#x60;image&#x60;.
      * @param {number} [n] The number of images to generate. Must be between 1 and 10.
      * @param {string} [size] The size of the generated images. Must be one of &#x60;256x256&#x60;, &#x60;512x512&#x60;, or &#x60;1024x1024&#x60;.
      * @param {string} [responseFormat] The format in which the generated images are returned. Must be one of &#x60;url&#x60; or &#x60;b64_json&#x60;.
-     * @param {string} [user] A unique identifier representing your end-user, which will help OpenAI to monitor and detect abuse. [Learn more](/docs/usage-policies/end-user-ids).
+     * @param {string} [user] A unique identifier representing your end-user, which can help OpenAI to monitor and detect abuse. [Learn more](/docs/guides/safety-best-practices/end-user-ids).
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof OpenAIApi
      */
-    createImageEdit(image: File, mask: File, prompt: string, n?: number, size?: string, responseFormat?: string, user?: string, options?: AxiosRequestConfig): Promise<import("axios").AxiosResponse<ImagesResponse, any>>;
+    createImageEdit(image: File, prompt: string, mask?: File, n?: number, size?: string, responseFormat?: string, user?: string, options?: AxiosRequestConfig): Promise<import("axios").AxiosResponse<ImagesResponse, any>>;
     /**
      *
      * @summary Creates a variation of a given image.
@@ -2373,7 +2696,7 @@ export declare class OpenAIApi extends BaseAPI {
      * @param {number} [n] The number of images to generate. Must be between 1 and 10.
      * @param {string} [size] The size of the generated images. Must be one of &#x60;256x256&#x60;, &#x60;512x512&#x60;, or &#x60;1024x1024&#x60;.
      * @param {string} [responseFormat] The format in which the generated images are returned. Must be one of &#x60;url&#x60; or &#x60;b64_json&#x60;.
-     * @param {string} [user] A unique identifier representing your end-user, which will help OpenAI to monitor and detect abuse. [Learn more](/docs/usage-policies/end-user-ids).
+     * @param {string} [user] A unique identifier representing your end-user, which can help OpenAI to monitor and detect abuse. [Learn more](/docs/guides/safety-best-practices/end-user-ids).
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof OpenAIApi
@@ -2399,6 +2722,32 @@ export declare class OpenAIApi extends BaseAPI {
      * @memberof OpenAIApi
      */
     createSearch(engineId: string, createSearchRequest: CreateSearchRequest, options?: AxiosRequestConfig): Promise<import("axios").AxiosResponse<CreateSearchResponse, any>>;
+    /**
+     *
+     * @summary Transcribes audio into the input language.
+     * @param {File} file The audio file to transcribe, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm.
+     * @param {string} model ID of the model to use. Only &#x60;whisper-1&#x60; is currently available.
+     * @param {string} [prompt] An optional text to guide the model\\\&#39;s style or continue a previous audio segment. The [prompt](/docs/guides/speech-to-text/prompting) should match the audio language.
+     * @param {string} [responseFormat] The format of the transcript output, in one of these options: json, text, srt, verbose_json, or vtt.
+     * @param {number} [temperature] The sampling temperature, between 0 and 1. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic. If set to 0, the model will use [log probability](https://en.wikipedia.org/wiki/Log_probability) to automatically increase the temperature until certain thresholds are hit.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof OpenAIApi
+     */
+    createTranscription(file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, options?: AxiosRequestConfig): Promise<import("axios").AxiosResponse<CreateTranscriptionResponse, any>>;
+    /**
+     *
+     * @summary Translates audio into into English.
+     * @param {File} file The audio file to translate, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm.
+     * @param {string} model ID of the model to use. Only &#x60;whisper-1&#x60; is currently available.
+     * @param {string} [prompt] An optional text to guide the model\\\&#39;s style or continue a previous audio segment. The [prompt](/docs/guides/speech-to-text/prompting) should be in English.
+     * @param {string} [responseFormat] The format of the transcript output, in one of these options: json, text, srt, verbose_json, or vtt.
+     * @param {number} [temperature] The sampling temperature, between 0 and 1. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic. If set to 0, the model will use [log probability](https://en.wikipedia.org/wiki/Log_probability) to automatically increase the temperature until certain thresholds are hit.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof OpenAIApi
+     */
+    createTranslation(file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, options?: AxiosRequestConfig): Promise<import("axios").AxiosResponse<CreateTranslationResponse, any>>;
     /**
      *
      * @summary Delete a file.
