@@ -26,30 +26,64 @@ import { BASE_PATH, COLLECTION_FORMATS, BaseAPI, RequiredError } from './base';
 /**
  * 
  * @export
- * @interface ChatCompletionMessage
+ * @interface ChatCompletionRequestMessage
  */
-export interface ChatCompletionMessage {
+export interface ChatCompletionRequestMessage {
     /**
-     * The entity that sent the message
+     * The role of the author of this message.
      * @type {string}
-     * @memberof ChatCompletionMessage
+     * @memberof ChatCompletionRequestMessage
      */
-    'role'?: ChatCompletionMessageRoleEnum;
+    'role': ChatCompletionRequestMessageRoleEnum;
     /**
      * The contents of the message
      * @type {string}
-     * @memberof ChatCompletionMessage
+     * @memberof ChatCompletionRequestMessage
      */
-    'content'?: string;
+    'content': string;
+    /**
+     * The name of the user in a multi-user chat
+     * @type {string}
+     * @memberof ChatCompletionRequestMessage
+     */
+    'name'?: string;
 }
 
-export const ChatCompletionMessageRoleEnum = {
+export const ChatCompletionRequestMessageRoleEnum = {
     System: 'system',
     User: 'user',
     Assistant: 'assistant'
 } as const;
 
-export type ChatCompletionMessageRoleEnum = typeof ChatCompletionMessageRoleEnum[keyof typeof ChatCompletionMessageRoleEnum];
+export type ChatCompletionRequestMessageRoleEnum = typeof ChatCompletionRequestMessageRoleEnum[keyof typeof ChatCompletionRequestMessageRoleEnum];
+
+/**
+ * 
+ * @export
+ * @interface ChatCompletionResponseMessage
+ */
+export interface ChatCompletionResponseMessage {
+    /**
+     * The role of the author of this message.
+     * @type {string}
+     * @memberof ChatCompletionResponseMessage
+     */
+    'role': ChatCompletionResponseMessageRoleEnum;
+    /**
+     * The contents of the message
+     * @type {string}
+     * @memberof ChatCompletionResponseMessage
+     */
+    'content': string;
+}
+
+export const ChatCompletionResponseMessageRoleEnum = {
+    System: 'system',
+    User: 'user',
+    Assistant: 'assistant'
+} as const;
+
+export type ChatCompletionResponseMessageRoleEnum = typeof ChatCompletionResponseMessageRoleEnum[keyof typeof ChatCompletionResponseMessageRoleEnum];
 
 /**
  * 
@@ -242,17 +276,17 @@ export interface CreateAnswerResponseSelectedDocumentsInner {
  */
 export interface CreateChatCompletionRequest {
     /**
-     * ID of the model to use. Currently, only `gpt-3.5-turbo` is available.
+     * ID of the model to use. Currently, only `gpt-3.5-turbo` and `gpt-3.5-turbo-0301` are supported.
      * @type {string}
      * @memberof CreateChatCompletionRequest
      */
     'model': string;
     /**
      * The messages to generate chat completions for, in the [chat format](/docs/guides/chat/introduction).
-     * @type {Array<ChatCompletionMessage>}
+     * @type {Array<ChatCompletionRequestMessage>}
      * @memberof CreateChatCompletionRequest
      */
-    'messages': Array<ChatCompletionMessage>;
+    'messages': Array<ChatCompletionRequestMessage>;
     /**
      * What sampling temperature to use, between 0 and 2. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.  We generally recommend altering this or `top_p` but not both. 
      * @type {number}
@@ -272,7 +306,7 @@ export interface CreateChatCompletionRequest {
      */
     'n'?: number | null;
     /**
-     * Whether to stream back partial progress, like ChatGPT. If set, tokens will be sent as data-only [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format) as they become available, with the stream terminated by a `data: [DONE]` message. 
+     * If set, partial message deltas will be sent, like in ChatGPT. Tokens will be sent as data-only [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format) as they become available, with the stream terminated by a `data: [DONE]` message. 
      * @type {boolean}
      * @memberof CreateChatCompletionRequest
      */
@@ -310,7 +344,7 @@ export interface CreateChatCompletionRequest {
 }
 /**
  * @type CreateChatCompletionRequestStop
- * Up to 4 sequences where the API will stop generating further tokens. The following special sequences are also supported: \"<|end|>\", \"<|continue|>\", or \"<|endoftext|>\". 
+ * Up to 4 sequences where the API will stop generating further tokens. 
  * @export
  */
 export type CreateChatCompletionRequestStop = Array<string> | string;
@@ -341,6 +375,12 @@ export interface CreateChatCompletionResponse {
     'created': number;
     /**
      * 
+     * @type {string}
+     * @memberof CreateChatCompletionResponse
+     */
+    'model': string;
+    /**
+     * 
      * @type {Array<CreateChatCompletionResponseChoicesInner>}
      * @memberof CreateChatCompletionResponse
      */
@@ -366,10 +406,10 @@ export interface CreateChatCompletionResponseChoicesInner {
     'index'?: number;
     /**
      * 
-     * @type {ChatCompletionMessage}
+     * @type {ChatCompletionResponseMessage}
      * @memberof CreateChatCompletionResponseChoicesInner
      */
-    'message'?: ChatCompletionMessage;
+    'message'?: ChatCompletionResponseMessage;
     /**
      * 
      * @type {string}
@@ -1884,7 +1924,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
         },
         /**
          * 
-         * @summary Creates a completion for the chat
+         * @summary Creates a completion for the chat message
          * @param {CreateChatCompletionRequest} createChatCompletionRequest 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -2397,19 +2437,19 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
         /**
          * 
          * @summary Transcribes audio into the input language.
-         * @param {string} file The audio file to transcribe, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm. 
+         * @param {File} file The audio file to transcribe, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm. 
          * @param {string} model ID of the model to use. Only &#x60;whisper-1&#x60; is currently available. 
          * @param {string} [prompt] An optional text to guide the model\\\&#39;s style or continue a previous audio segment. The [prompt](/docs/guides/speech-to-text/prompting) should match the audio language. 
          * @param {string} [responseFormat] The format of the transcript output, in one of these options: json, text, srt, verbose_json, or vtt. 
-         * @param {string} [temperature] The sampling temperature, between 0 and 1. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic. If set to 0, the model will use [log probability](https://en.wikipedia.org/wiki/Log_probability) to automatically increase the temperature until certain thresholds are hit. 
+         * @param {number} [temperature] The sampling temperature, between 0 and 1. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic. If set to 0, the model will use [log probability](https://en.wikipedia.org/wiki/Log_probability) to automatically increase the temperature until certain thresholds are hit. 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        createTranscriptions: async (file: string, model: string, prompt?: string, responseFormat?: string, temperature?: string, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+        createTranscription: async (file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'file' is not null or undefined
-            assertParamExists('createTranscriptions', 'file', file)
+            assertParamExists('createTranscription', 'file', file)
             // verify required parameter 'model' is not null or undefined
-            assertParamExists('createTranscriptions', 'model', model)
+            assertParamExists('createTranscription', 'model', model)
             const localVarPath = `/audio/transcriptions`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
@@ -2460,7 +2500,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
         /**
          * 
          * @summary Translates audio into into English.
-         * @param {string} file The audio file to translate, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm. 
+         * @param {File} file The audio file to translate, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm. 
          * @param {string} model ID of the model to use. Only &#x60;whisper-1&#x60; is currently available. 
          * @param {string} [prompt] An optional text to guide the model\\\&#39;s style or continue a previous audio segment. The [prompt](/docs/guides/speech-to-text/prompting) should be in English. 
          * @param {string} [responseFormat] The format of the transcript output, in one of these options: json, text, srt, verbose_json, or vtt. 
@@ -2468,11 +2508,11 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        createTranslations: async (file: string, model: string, prompt?: string, responseFormat?: string, temperature?: number, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+        createTranslation: async (file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'file' is not null or undefined
-            assertParamExists('createTranslations', 'file', file)
+            assertParamExists('createTranslation', 'file', file)
             // verify required parameter 'model' is not null or undefined
-            assertParamExists('createTranslations', 'model', model)
+            assertParamExists('createTranslation', 'model', model)
             const localVarPath = `/audio/translations`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
@@ -2954,7 +2994,7 @@ export const OpenAIApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
-         * @summary Creates a completion for the chat
+         * @summary Creates a completion for the chat message
          * @param {CreateChatCompletionRequest} createChatCompletionRequest 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -3101,22 +3141,22 @@ export const OpenAIApiFp = function(configuration?: Configuration) {
         /**
          * 
          * @summary Transcribes audio into the input language.
-         * @param {string} file The audio file to transcribe, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm. 
+         * @param {File} file The audio file to transcribe, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm. 
          * @param {string} model ID of the model to use. Only &#x60;whisper-1&#x60; is currently available. 
          * @param {string} [prompt] An optional text to guide the model\\\&#39;s style or continue a previous audio segment. The [prompt](/docs/guides/speech-to-text/prompting) should match the audio language. 
          * @param {string} [responseFormat] The format of the transcript output, in one of these options: json, text, srt, verbose_json, or vtt. 
-         * @param {string} [temperature] The sampling temperature, between 0 and 1. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic. If set to 0, the model will use [log probability](https://en.wikipedia.org/wiki/Log_probability) to automatically increase the temperature until certain thresholds are hit. 
+         * @param {number} [temperature] The sampling temperature, between 0 and 1. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic. If set to 0, the model will use [log probability](https://en.wikipedia.org/wiki/Log_probability) to automatically increase the temperature until certain thresholds are hit. 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async createTranscriptions(file: string, model: string, prompt?: string, responseFormat?: string, temperature?: string, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CreateTranscriptionResponse>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.createTranscriptions(file, model, prompt, responseFormat, temperature, options);
+        async createTranscription(file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CreateTranscriptionResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.createTranscription(file, model, prompt, responseFormat, temperature, options);
             return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
         },
         /**
          * 
          * @summary Translates audio into into English.
-         * @param {string} file The audio file to translate, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm. 
+         * @param {File} file The audio file to translate, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm. 
          * @param {string} model ID of the model to use. Only &#x60;whisper-1&#x60; is currently available. 
          * @param {string} [prompt] An optional text to guide the model\\\&#39;s style or continue a previous audio segment. The [prompt](/docs/guides/speech-to-text/prompting) should be in English. 
          * @param {string} [responseFormat] The format of the transcript output, in one of these options: json, text, srt, verbose_json, or vtt. 
@@ -3124,8 +3164,8 @@ export const OpenAIApiFp = function(configuration?: Configuration) {
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async createTranslations(file: string, model: string, prompt?: string, responseFormat?: string, temperature?: number, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CreateTranslationResponse>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.createTranslations(file, model, prompt, responseFormat, temperature, options);
+        async createTranslation(file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CreateTranslationResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.createTranslation(file, model, prompt, responseFormat, temperature, options);
             return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
         },
         /**
@@ -3292,7 +3332,7 @@ export const OpenAIApiFactory = function (configuration?: Configuration, basePat
         },
         /**
          * 
-         * @summary Creates a completion for the chat
+         * @summary Creates a completion for the chat message
          * @param {CreateChatCompletionRequest} createChatCompletionRequest 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -3427,21 +3467,21 @@ export const OpenAIApiFactory = function (configuration?: Configuration, basePat
         /**
          * 
          * @summary Transcribes audio into the input language.
-         * @param {string} file The audio file to transcribe, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm. 
+         * @param {File} file The audio file to transcribe, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm. 
          * @param {string} model ID of the model to use. Only &#x60;whisper-1&#x60; is currently available. 
          * @param {string} [prompt] An optional text to guide the model\\\&#39;s style or continue a previous audio segment. The [prompt](/docs/guides/speech-to-text/prompting) should match the audio language. 
          * @param {string} [responseFormat] The format of the transcript output, in one of these options: json, text, srt, verbose_json, or vtt. 
-         * @param {string} [temperature] The sampling temperature, between 0 and 1. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic. If set to 0, the model will use [log probability](https://en.wikipedia.org/wiki/Log_probability) to automatically increase the temperature until certain thresholds are hit. 
+         * @param {number} [temperature] The sampling temperature, between 0 and 1. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic. If set to 0, the model will use [log probability](https://en.wikipedia.org/wiki/Log_probability) to automatically increase the temperature until certain thresholds are hit. 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        createTranscriptions(file: string, model: string, prompt?: string, responseFormat?: string, temperature?: string, options?: any): AxiosPromise<CreateTranscriptionResponse> {
-            return localVarFp.createTranscriptions(file, model, prompt, responseFormat, temperature, options).then((request) => request(axios, basePath));
+        createTranscription(file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, options?: any): AxiosPromise<CreateTranscriptionResponse> {
+            return localVarFp.createTranscription(file, model, prompt, responseFormat, temperature, options).then((request) => request(axios, basePath));
         },
         /**
          * 
          * @summary Translates audio into into English.
-         * @param {string} file The audio file to translate, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm. 
+         * @param {File} file The audio file to translate, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm. 
          * @param {string} model ID of the model to use. Only &#x60;whisper-1&#x60; is currently available. 
          * @param {string} [prompt] An optional text to guide the model\\\&#39;s style or continue a previous audio segment. The [prompt](/docs/guides/speech-to-text/prompting) should be in English. 
          * @param {string} [responseFormat] The format of the transcript output, in one of these options: json, text, srt, verbose_json, or vtt. 
@@ -3449,8 +3489,8 @@ export const OpenAIApiFactory = function (configuration?: Configuration, basePat
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        createTranslations(file: string, model: string, prompt?: string, responseFormat?: string, temperature?: number, options?: any): AxiosPromise<CreateTranslationResponse> {
-            return localVarFp.createTranslations(file, model, prompt, responseFormat, temperature, options).then((request) => request(axios, basePath));
+        createTranslation(file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, options?: any): AxiosPromise<CreateTranslationResponse> {
+            return localVarFp.createTranslation(file, model, prompt, responseFormat, temperature, options).then((request) => request(axios, basePath));
         },
         /**
          * 
@@ -3608,7 +3648,7 @@ export class OpenAIApi extends BaseAPI {
 
     /**
      * 
-     * @summary Creates a completion for the chat
+     * @summary Creates a completion for the chat message
      * @param {CreateChatCompletionRequest} createChatCompletionRequest 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
@@ -3767,23 +3807,23 @@ export class OpenAIApi extends BaseAPI {
     /**
      * 
      * @summary Transcribes audio into the input language.
-     * @param {string} file The audio file to transcribe, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm. 
+     * @param {File} file The audio file to transcribe, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm. 
      * @param {string} model ID of the model to use. Only &#x60;whisper-1&#x60; is currently available. 
      * @param {string} [prompt] An optional text to guide the model\\\&#39;s style or continue a previous audio segment. The [prompt](/docs/guides/speech-to-text/prompting) should match the audio language. 
      * @param {string} [responseFormat] The format of the transcript output, in one of these options: json, text, srt, verbose_json, or vtt. 
-     * @param {string} [temperature] The sampling temperature, between 0 and 1. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic. If set to 0, the model will use [log probability](https://en.wikipedia.org/wiki/Log_probability) to automatically increase the temperature until certain thresholds are hit. 
+     * @param {number} [temperature] The sampling temperature, between 0 and 1. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic. If set to 0, the model will use [log probability](https://en.wikipedia.org/wiki/Log_probability) to automatically increase the temperature until certain thresholds are hit. 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof OpenAIApi
      */
-    public createTranscriptions(file: string, model: string, prompt?: string, responseFormat?: string, temperature?: string, options?: AxiosRequestConfig) {
-        return OpenAIApiFp(this.configuration).createTranscriptions(file, model, prompt, responseFormat, temperature, options).then((request) => request(this.axios, this.basePath));
+    public createTranscription(file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, options?: AxiosRequestConfig) {
+        return OpenAIApiFp(this.configuration).createTranscription(file, model, prompt, responseFormat, temperature, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
      * 
      * @summary Translates audio into into English.
-     * @param {string} file The audio file to translate, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm. 
+     * @param {File} file The audio file to translate, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm. 
      * @param {string} model ID of the model to use. Only &#x60;whisper-1&#x60; is currently available. 
      * @param {string} [prompt] An optional text to guide the model\\\&#39;s style or continue a previous audio segment. The [prompt](/docs/guides/speech-to-text/prompting) should be in English. 
      * @param {string} [responseFormat] The format of the transcript output, in one of these options: json, text, srt, verbose_json, or vtt. 
@@ -3792,8 +3832,8 @@ export class OpenAIApi extends BaseAPI {
      * @throws {RequiredError}
      * @memberof OpenAIApi
      */
-    public createTranslations(file: string, model: string, prompt?: string, responseFormat?: string, temperature?: number, options?: AxiosRequestConfig) {
-        return OpenAIApiFp(this.configuration).createTranslations(file, model, prompt, responseFormat, temperature, options).then((request) => request(this.axios, this.basePath));
+    public createTranslation(file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, options?: AxiosRequestConfig) {
+        return OpenAIApiFp(this.configuration).createTranslation(file, model, prompt, responseFormat, temperature, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
