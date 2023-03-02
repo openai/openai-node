@@ -1,8 +1,9 @@
 {
   "compilerOptions": {
     "declaration": true,
-    "target": "es6",
+    "target": "es2022",
     "module": "commonjs",
+    "esModuleInterop": true,
     "noImplicitAny": true,
     "outDir": "dist",
     "rootDir": ".",
