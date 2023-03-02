@@ -9,6 +9,8 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+/// <reference types="node" />
+import type { ReadStream } from "fs";
 import type { Configuration } from './configuration';
 import type { AxiosPromise, AxiosInstance, AxiosRequestConfig } from 'axios';
 import type { RequestArgs } from './base';
@@ -1895,7 +1897,7 @@ export declare const OpenAIApiAxiosParamCreator: (configuration?: Configuration)
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
-    createFile: (file: File, purpose: string, options?: AxiosRequestConfig) => Promise<RequestArgs>;
+    createFile: (file: File | ReadStream, purpose: string, options?: AxiosRequestConfig) => Promise<RequestArgs>;
     /**
      *
      * @summary Creates a job that fine-tunes a specified model from a given dataset.  Response includes details of the enqueued job including job status and the name of the fine-tuned models once complete.  [Learn more about Fine-tuning](/docs/guides/fine-tuning)
@@ -1968,7 +1970,7 @@ export declare const OpenAIApiAxiosParamCreator: (configuration?: Configuration)
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
-    createTranscription: (file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, language?: string, options?: AxiosRequestConfig) => Promise<RequestArgs>;
+    createTranscription: (file: File | ReadStream, model: string, prompt?: string, responseFormat?: string, temperature?: number, language?: string, options?: AxiosRequestConfig) => Promise<RequestArgs>;
     /**
      *
      * @summary Translates audio into into English.
@@ -1980,7 +1982,7 @@ export declare const OpenAIApiAxiosParamCreator: (configuration?: Configuration)
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
-    createTranslation: (file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, options?: AxiosRequestConfig) => Promise<RequestArgs>;
+    createTranslation: (file: File | ReadStream, model: string, prompt?: string, responseFormat?: string, temperature?: number, options?: AxiosRequestConfig) => Promise<RequestArgs>;
     /**
      *
      * @summary Delete a file.
@@ -2148,7 +2150,7 @@ export declare const OpenAIApiFp: (configuration?: Configuration) => {
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
-    createFile(file: File, purpose: string, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<OpenAIFile>>;
+    createFile(file: File | ReadStream, purpose: string, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<OpenAIFile>>;
     /**
      *
      * @summary Creates a job that fine-tunes a specified model from a given dataset.  Response includes details of the enqueued job including job status and the name of the fine-tuned models once complete.  [Learn more about Fine-tuning](/docs/guides/fine-tuning)
@@ -2221,7 +2223,7 @@ export declare const OpenAIApiFp: (configuration?: Configuration) => {
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
-    createTranscription(file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, language?: string, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CreateTranscriptionResponse>>;
+    createTranscription(file: File | ReadStream, model: string, prompt?: string, responseFormat?: string, temperature?: number, language?: string, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CreateTranscriptionResponse>>;
     /**
      *
      * @summary Translates audio into into English.
@@ -2233,7 +2235,7 @@ export declare const OpenAIApiFp: (configuration?: Configuration) => {
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
-    createTranslation(file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CreateTranslationResponse>>;
+    createTranslation(file: File | ReadStream, model: string, prompt?: string, responseFormat?: string, temperature?: number, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CreateTranslationResponse>>;
     /**
      *
      * @summary Delete a file.
@@ -2401,7 +2403,7 @@ export declare const OpenAIApiFactory: (configuration?: Configuration, basePath?
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
-    createFile(file: File, purpose: string, options?: any): AxiosPromise<OpenAIFile>;
+    createFile(file: File | ReadStream, purpose: string, options?: any): AxiosPromise<OpenAIFile>;
     /**
      *
      * @summary Creates a job that fine-tunes a specified model from a given dataset.  Response includes details of the enqueued job including job status and the name of the fine-tuned models once complete.  [Learn more about Fine-tuning](/docs/guides/fine-tuning)
@@ -2474,7 +2476,7 @@ export declare const OpenAIApiFactory: (configuration?: Configuration, basePath?
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
-    createTranscription(file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, language?: string, options?: any): AxiosPromise<CreateTranscriptionResponse>;
+    createTranscription(file: File | ReadStream, model: string, prompt?: string, responseFormat?: string, temperature?: number, language?: string, options?: any): AxiosPromise<CreateTranscriptionResponse>;
     /**
      *
      * @summary Translates audio into into English.
@@ -2486,7 +2488,7 @@ export declare const OpenAIApiFactory: (configuration?: Configuration, basePath?
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
-    createTranslation(file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, options?: any): AxiosPromise<CreateTranslationResponse>;
+    createTranslation(file: File | ReadStream, model: string, prompt?: string, responseFormat?: string, temperature?: number, options?: any): AxiosPromise<CreateTranslationResponse>;
     /**
      *
      * @summary Delete a file.
@@ -2664,7 +2666,7 @@ export declare class OpenAIApi extends BaseAPI {
      * @throws {RequiredError}
      * @memberof OpenAIApi
      */
-    createFile(file: File, purpose: string, options?: AxiosRequestConfig): Promise<import("axios").AxiosResponse<OpenAIFile, any>>;
+    createFile(file: File | ReadStream, purpose: string, options?: AxiosRequestConfig): Promise<import("axios").AxiosResponse<OpenAIFile, any>>;
     /**
      *
      * @summary Creates a job that fine-tunes a specified model from a given dataset.  Response includes details of the enqueued job including job status and the name of the fine-tuned models once complete.  [Learn more about Fine-tuning](/docs/guides/fine-tuning)
@@ -2744,7 +2746,7 @@ export declare class OpenAIApi extends BaseAPI {
      * @throws {RequiredError}
      * @memberof OpenAIApi
      */
-    createTranscription(file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, language?: string, options?: AxiosRequestConfig): Promise<import("axios").AxiosResponse<CreateTranscriptionResponse, any>>;
+    createTranscription(file: File | ReadStream, model: string, prompt?: string, responseFormat?: string, temperature?: number, language?: string, options?: AxiosRequestConfig): Promise<import("axios").AxiosResponse<CreateTranscriptionResponse, any>>;
     /**
      *
      * @summary Translates audio into into English.
@@ -2757,7 +2759,7 @@ export declare class OpenAIApi extends BaseAPI {
      * @throws {RequiredError}
      * @memberof OpenAIApi
      */
-    createTranslation(file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, options?: AxiosRequestConfig): Promise<import("axios").AxiosResponse<CreateTranslationResponse, any>>;
+    createTranslation(file: File | ReadStream, model: string, prompt?: string, responseFormat?: string, temperature?: number, options?: AxiosRequestConfig): Promise<import("axios").AxiosResponse<CreateTranslationResponse, any>>;
     /**
      *
      * @summary Delete a file.
