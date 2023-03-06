@@ -76,6 +76,21 @@ try {
 
 Streaming completions (`stream=true`) are not natively supported in this package yet, but [a workaround exists](https://github.com/openai/openai-node/issues/18#issuecomment-1369996933) if needed.
 
+### Fetch support
+
+Usage with Vercel Edge Functions or Cloudflare Workers where fetch is required could be supported with proper axios adapter :
+
+```javascript
+import fetchAdapter from "@haverstack/axios-fetch-adapter";
+
+const configuration = new Configuration({
+  apiKey: process.env.OPENAI_API_KEY,
+  baseOptions: { 
+    adapter: fetchAdapter
+  }
+});
+```
+
 ## Upgrade guide
 
 All breaking changes for major version releases are listed below.
