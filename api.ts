@@ -2149,7 +2149,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
     
             setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
-            localVarRequestOptions.headers = {...localVarHeaderParameter, ...localVarFormParams.getHeaders(), ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...(localVarFormParams as any).getHeaders?.(), ...options.headers};
             localVarRequestOptions.data = localVarFormParams;
 
             return {
@@ -2294,7 +2294,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
     
             setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
-            localVarRequestOptions.headers = {...localVarHeaderParameter, ...localVarFormParams.getHeaders(), ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...(localVarFormParams as any).getHeaders?.(), ...options.headers};
             localVarRequestOptions.data = localVarFormParams;
 
             return {
@@ -2355,7 +2355,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
     
             setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
-            localVarRequestOptions.headers = {...localVarHeaderParameter, ...localVarFormParams.getHeaders(), ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...(localVarFormParams as any).getHeaders?.(), ...options.headers};
             localVarRequestOptions.data = localVarFormParams;
 
             return {
@@ -2500,7 +2500,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
     
             setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
-            localVarRequestOptions.headers = {...localVarHeaderParameter, ...localVarFormParams.getHeaders(), ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...(localVarFormParams as any).getHeaders?.(), ...options.headers};
             localVarRequestOptions.data = localVarFormParams;
 
             return {
@@ -2563,7 +2563,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
     
             setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
-            localVarRequestOptions.headers = {...localVarHeaderParameter, ...localVarFormParams.getHeaders(), ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...(localVarFormParams as any).getHeaders?.(), ...options.headers};
             localVarRequestOptions.data = localVarFormParams;
 
             return {

@@ -13,7 +13,8 @@
  */
 
 
-const packageJson = require("../package.json");
+import FormData from "form-data";
+import { LIB_VERSION } from "./version";
 
 export interface ConfigurationParameters {
     apiKey?: string | Promise<string> | ((name: string) => string) | ((name: string) => Promise<string>);
@@ -98,7 +99,7 @@ export class Configuration {
             this.baseOptions = {};
         }
         this.baseOptions.headers = {
-            'User-Agent': `OpenAI/NodeJS/${packageJson.version}`,
+            'User-Agent': `OpenAI/NodeJS/${LIB_VERSION}`,
             'Authorization': `Bearer ${this.apiKey}`,
             ...this.baseOptions.headers,
         }
@@ -106,7 +107,7 @@ export class Configuration {
             this.baseOptions.headers['OpenAI-Organization'] = this.organization;
         }
         if (!this.formDataCtor) {
-            this.formDataCtor = require("form-data");
+            this.formDataCtor = FormData;
         }
     }
 

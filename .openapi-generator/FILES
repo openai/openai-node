@@ -4,3 +4,7 @@ base.ts
 common.ts
 configuration.ts
 index.ts
+stream.ts
+tsc-multi.json
+tsconfig.esm.json
+tsconfig.json

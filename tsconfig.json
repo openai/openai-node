@@ -1,11 +1,13 @@
 {
   "compilerOptions": {
     "declaration": true,
-    "target": "es6",
+    "target": "ES6",
     "module": "commonjs",
+    "esModuleInterop": true,
     "noImplicitAny": true,
     "outDir": "dist",
     "rootDir": ".",
+    "moduleResolution": "node",
     "typeRoots": [
       "node_modules/@types"
     ]

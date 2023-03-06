@@ -1,0 +1,4 @@
+{
+  "targets": [{ "extname": ".mjs" }],
+  "projects": ["tsconfig.esm.json"]
+}
