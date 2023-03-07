@@ -7,7 +7,7 @@ The OpenAI Node.js library provides convenient access to the OpenAI API from Nod
 ## Installation
 
 ```bash
-$ npm install openai
+npm install openai
 ```
 
 ## Usage
