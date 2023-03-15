@@ -50,8 +50,11 @@ export interface RequestArgs {
 export class BaseAPI {
     protected configuration: Configuration | undefined;
 
-    constructor(configuration?: Configuration, protected basePath: string = BASE_PATH, protected axios: AxiosInstance = globalAxios) {
+    constructor(configuration?: Configuration | string, protected basePath: string = BASE_PATH, protected axios: AxiosInstance = globalAxios) {
         if (configuration) {
+            if ('string' == typeof configuration) {
+                configuration = new Configuration({ apiKey: configuration });
+            }
             this.configuration = configuration;
             this.basePath = configuration.basePath || this.basePath;
         }
