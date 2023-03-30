@@ -23,6 +23,81 @@ import type { RequestArgs } from './base';
 // @ts-ignore
 import { BASE_PATH, COLLECTION_FORMATS, BaseAPI, RequiredError } from './base';
 
+
+/**
+ * @export
+ * @type {CreateCompletionRequestModal}
+ */
+export type CreateCompletionRequestModal =
+  | "text-davinci-003"
+  | "text-davinci-002"
+  | "text-curie-001"
+  | "text-babbage-001"
+  | "text-ada-001"
+  | "davinci"
+  | "curie"
+  | "babbage"
+  | "ada";
+
+/**
+ * @export
+ * @type {CreateEditRequestModal}
+ */
+export type CreateEditRequestModal =
+  | "text-davinci-edit-001"
+  | "code-davinci-edit-001";
+
+/**
+ * @export
+ * @type {CreateChatCompletionRequestModal}
+ */
+export type CreateChatCompletionRequestModal =
+  | "gpt-4"
+  | "gpt-4-0314"
+  | "gpt-4-32k"
+  | "gpt-4-32k-0314"
+  | "gpt-3.5-turbo"
+  | "gpt-3.5-turbo-0301";
+
+/**
+ * @export
+ * @type {CreateFineTuneRequestModal}
+ */
+export type CreateFineTuneRequestModal =
+  | "davinci"
+  | "curie"
+  | "babbage"
+  | "ada";
+
+/**
+ * @export
+ * @type {CreateEmbeddingRequestModal}
+ */
+export type CreateEmbeddingRequestModal =
+  | "text-embedding-ada-002"
+  | "text-search-ada-doc-001";
+
+/**
+ * @export
+ * @type {CreateModerationRequestModal}
+ */
+export type CreateModerationRequestModal =
+  | "text-moderation-stable"
+  | "text-moderation-latest";
+
+/**
+ * @export
+ * @type {CreateTranscriptionRequestModal}
+ */
+export type CreateTranscriptionRequestModal = "whisper-1";
+
+/**
+ * @export
+ * @type {CreateTranslationRequestModal}
+ */
+export type CreateTranslationRequestModal = "whisper-1";
+
+
 /**
  * 
  * @export
@@ -280,7 +355,7 @@ export interface CreateChatCompletionRequest {
      * @type {string}
      * @memberof CreateChatCompletionRequest
      */
-    'model': string;
+    'model': CreateChatCompletionRequestModal;
     /**
      * The messages to generate chat completions for, in the [chat format](/docs/guides/chat/introduction).
      * @type {Array<ChatCompletionRequestMessage>}
@@ -593,7 +668,7 @@ export interface CreateCompletionRequest {
      * @type {string}
      * @memberof CreateCompletionRequest
      */
-    'model': string;
+    'model': CreateCompletionRequestModal;
     /**
      * 
      * @type {CreateCompletionRequestPrompt}
@@ -840,7 +915,7 @@ export interface CreateEditRequest {
      * @type {string}
      * @memberof CreateEditRequest
      */
-    'model': string;
+    'model': CreateEditRequestModal;
     /**
      * The input text to use as a starting point for the edit.
      * @type {string}
@@ -914,7 +989,7 @@ export interface CreateEmbeddingRequest {
      * @type {string}
      * @memberof CreateEmbeddingRequest
      */
-    'model': string;
+    'model': CreateEmbeddingRequestModal;
     /**
      * 
      * @type {CreateEmbeddingRequestInput}
@@ -1033,7 +1108,7 @@ export interface CreateFineTuneRequest {
      * @type {string}
      * @memberof CreateFineTuneRequest
      */
-    'model'?: string | null;
+    'model'?: CreateFineTuneRequestModal | null;
     /**
      * The number of epochs to train the model for. An epoch refers to one full cycle through the training dataset. 
      * @type {number}
@@ -1158,7 +1233,7 @@ export interface CreateModerationRequest {
      * @type {string}
      * @memberof CreateModerationRequest
      */
-    'model'?: string;
+    'model'?: CreateModerationRequestModal;
 }
 /**
  * @type CreateModerationRequestInput
@@ -2452,7 +2527,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        createTranscription: async (file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, language?: string, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+        createTranscription: async (file: File, model: CreateTranscriptionRequestModal, prompt?: string, responseFormat?: string, temperature?: number, language?: string, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'file' is not null or undefined
             assertParamExists('createTranscription', 'file', file)
             // verify required parameter 'model' is not null or undefined
@@ -2519,7 +2594,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        createTranslation: async (file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+        createTranslation: async (file: File, model: CreateTranslationRequestModal, prompt?: string, responseFormat?: string, temperature?: number, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'file' is not null or undefined
             assertParamExists('createTranslation', 'file', file)
             // verify required parameter 'model' is not null or undefined
@@ -3993,5 +4068,3 @@ export class OpenAIApi extends BaseAPI {
         return OpenAIApiFp(this.configuration).retrieveModel(model, options).then((request) => request(this.axios, this.basePath));
     }
 }
-
-
