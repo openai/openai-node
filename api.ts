@@ -26,9 +26,9 @@ import { BASE_PATH, COLLECTION_FORMATS, BaseAPI, RequiredError } from './base';
 
 /**
  * @export
- * @type {CreateCompletionRequestModal}
+ * @type {CreateCompletionRequestModel}
  */
-export type CreateCompletionRequestModal =
+export type CreateCompletionRequestModel =
   | "text-davinci-003"
   | "text-davinci-002"
   | "text-curie-001"
@@ -41,17 +41,17 @@ export type CreateCompletionRequestModal =
 
 /**
  * @export
- * @type {CreateEditRequestModal}
+ * @type {CreateEditRequestModel}
  */
-export type CreateEditRequestModal =
+export type CreateEditRequestModel =
   | "text-davinci-edit-001"
   | "code-davinci-edit-001";
 
 /**
  * @export
- * @type {CreateChatCompletionRequestModal}
+ * @type {CreateChatCompletionRequestModel}
  */
-export type CreateChatCompletionRequestModal =
+export type CreateChatCompletionRequestModel =
   | "gpt-4"
   | "gpt-4-0314"
   | "gpt-4-32k"
@@ -61,9 +61,9 @@ export type CreateChatCompletionRequestModal =
 
 /**
  * @export
- * @type {CreateFineTuneRequestModal}
+ * @type {CreateFineTuneRequestModel}
  */
-export type CreateFineTuneRequestModal =
+export type CreateFineTuneRequestModel =
   | "davinci"
   | "curie"
   | "babbage"
@@ -71,31 +71,31 @@ export type CreateFineTuneRequestModal =
 
 /**
  * @export
- * @type {CreateEmbeddingRequestModal}
+ * @type {CreateEmbeddingRequestModel}
  */
-export type CreateEmbeddingRequestModal =
+export type CreateEmbeddingRequestModel =
   | "text-embedding-ada-002"
   | "text-search-ada-doc-001";
 
 /**
  * @export
- * @type {CreateModerationRequestModal}
+ * @type {CreateModerationRequestModel}
  */
-export type CreateModerationRequestModal =
+export type CreateModerationRequestModel =
   | "text-moderation-stable"
   | "text-moderation-latest";
 
 /**
  * @export
- * @type {CreateTranscriptionRequestModal}
+ * @type {CreateTranscriptionRequestModel}
  */
-export type CreateTranscriptionRequestModal = "whisper-1";
+export type CreateTranscriptionRequestModel = "whisper-1";
 
 /**
  * @export
- * @type {CreateTranslationRequestModal}
+ * @type {CreateTranslationRequestModel}
  */
-export type CreateTranslationRequestModal = "whisper-1";
+export type CreateTranslationRequestModel = "whisper-1";
 
 
 /**
@@ -355,7 +355,7 @@ export interface CreateChatCompletionRequest {
      * @type {string}
      * @memberof CreateChatCompletionRequest
      */
-    'model': CreateChatCompletionRequestModal;
+    'model': CreateChatCompletionRequestModel;
     /**
      * The messages to generate chat completions for, in the [chat format](/docs/guides/chat/introduction).
      * @type {Array<ChatCompletionRequestMessage>}
@@ -668,7 +668,7 @@ export interface CreateCompletionRequest {
      * @type {string}
      * @memberof CreateCompletionRequest
      */
-    'model': CreateCompletionRequestModal;
+    'model': CreateCompletionRequestModel;
     /**
      * 
      * @type {CreateCompletionRequestPrompt}
@@ -915,7 +915,7 @@ export interface CreateEditRequest {
      * @type {string}
      * @memberof CreateEditRequest
      */
-    'model': CreateEditRequestModal;
+    'model': CreateEditRequestModel;
     /**
      * The input text to use as a starting point for the edit.
      * @type {string}
@@ -989,7 +989,7 @@ export interface CreateEmbeddingRequest {
      * @type {string}
      * @memberof CreateEmbeddingRequest
      */
-    'model': CreateEmbeddingRequestModal;
+    'model': CreateEmbeddingRequestModel;
     /**
      * 
      * @type {CreateEmbeddingRequestInput}
@@ -1108,7 +1108,7 @@ export interface CreateFineTuneRequest {
      * @type {string}
      * @memberof CreateFineTuneRequest
      */
-    'model'?: CreateFineTuneRequestModal | null;
+    'model'?: CreateFineTuneRequestModel | null;
     /**
      * The number of epochs to train the model for. An epoch refers to one full cycle through the training dataset. 
      * @type {number}
@@ -1233,7 +1233,7 @@ export interface CreateModerationRequest {
      * @type {string}
      * @memberof CreateModerationRequest
      */
-    'model'?: CreateModerationRequestModal;
+    'model'?: CreateModerationRequestModel;
 }
 /**
  * @type CreateModerationRequestInput
@@ -2527,7 +2527,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        createTranscription: async (file: File, model: CreateTranscriptionRequestModal, prompt?: string, responseFormat?: string, temperature?: number, language?: string, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+        createTranscription: async (file: File, model: CreateTranscriptionRequestModel, prompt?: string, responseFormat?: string, temperature?: number, language?: string, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'file' is not null or undefined
             assertParamExists('createTranscription', 'file', file)
             // verify required parameter 'model' is not null or undefined
@@ -2594,7 +2594,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        createTranslation: async (file: File, model: CreateTranslationRequestModal, prompt?: string, responseFormat?: string, temperature?: number, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+        createTranslation: async (file: File, model: CreateTranslationRequestModel, prompt?: string, responseFormat?: string, temperature?: number, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'file' is not null or undefined
             assertParamExists('createTranslation', 'file', file)
             // verify required parameter 'model' is not null or undefined
