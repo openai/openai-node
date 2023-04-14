@@ -19,7 +19,7 @@ import globalAxios from 'axios';
 // Some imports not used depending on template conditions
 // @ts-ignore
 import { DUMMY_BASE_URL, assertParamExists, setApiKeyToObject, setBasicAuthToObject, setBearerAuthToObject, setOAuthToObject, setSearchParams, serializeDataIfNeeded, toPathString, createRequestFunction } from './common';
-import type { RequestArgs } from './base';
+import type { Fileish, RequestArgs } from './base';
 // @ts-ignore
 import { BASE_PATH, COLLECTION_FORMATS, BaseAPI, RequiredError } from './base';
 
@@ -2112,12 +2112,12 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
         /**
          * 
          * @summary Upload a file that contains document(s) to be used across various endpoints/features. Currently, the size of all the files uploaded by one organization can be up to 1 GB. Please contact us if you need to increase the storage limit. 
-         * @param {File} file Name of the [JSON Lines](https://jsonlines.readthedocs.io/en/latest/) file to be uploaded.  If the &#x60;purpose&#x60; is set to \\\&quot;fine-tune\\\&quot;, each line is a JSON record with \\\&quot;prompt\\\&quot; and \\\&quot;completion\\\&quot; fields representing your [training examples](/docs/guides/fine-tuning/prepare-training-data). 
+         * @param {Fileish} file Name of the [JSON Lines](https://jsonlines.readthedocs.io/en/latest/) file to be uploaded.  If the &#x60;purpose&#x60; is set to \\\&quot;fine-tune\\\&quot;, each line is a JSON record with \\\&quot;prompt\\\&quot; and \\\&quot;completion\\\&quot; fields representing your [training examples](/docs/guides/fine-tuning/prepare-training-data).
          * @param {string} purpose The intended purpose of the uploaded documents.  Use \\\&quot;fine-tune\\\&quot; for [Fine-tuning](/docs/api-reference/fine-tunes). This allows us to validate the format of the uploaded file. 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        createFile: async (file: File, purpose: string, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+        createFile: async (file: Fileish, purpose: string, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'file' is not null or undefined
             assertParamExists('createFile', 'file', file)
             // verify required parameter 'purpose' is not null or undefined
@@ -2232,9 +2232,9 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
         /**
          * 
          * @summary Creates an edited or extended image given an original image and a prompt.
-         * @param {File} image The image to edit. Must be a valid PNG file, less than 4MB, and square. If mask is not provided, image must have transparency, which will be used as the mask.
+         * @param {Fileish} image The image to edit. Must be a valid PNG file, less than 4MB, and square. If mask is not provided, image must have transparency, which will be used as the mask.
          * @param {string} prompt A text description of the desired image(s). The maximum length is 1000 characters.
-         * @param {File} [mask] An additional image whose fully transparent areas (e.g. where alpha is zero) indicate where &#x60;image&#x60; should be edited. Must be a valid PNG file, less than 4MB, and have the same dimensions as &#x60;image&#x60;.
+         * @param {Fileish} [mask] An additional image whose fully transparent areas (e.g. where alpha is zero) indicate where &#x60;image&#x60; should be edited. Must be a valid PNG file, less than 4MB, and have the same dimensions as &#x60;image&#x60;.
          * @param {number} [n] The number of images to generate. Must be between 1 and 10.
          * @param {string} [size] The size of the generated images. Must be one of &#x60;256x256&#x60;, &#x60;512x512&#x60;, or &#x60;1024x1024&#x60;.
          * @param {string} [responseFormat] The format in which the generated images are returned. Must be one of &#x60;url&#x60; or &#x60;b64_json&#x60;.
@@ -2242,7 +2242,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        createImageEdit: async (image: File, prompt: string, mask?: File, n?: number, size?: string, responseFormat?: string, user?: string, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+        createImageEdit: async (image: Fileish, prompt: string, mask?: Fileish, n?: number, size?: string, responseFormat?: string, user?: string, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'image' is not null or undefined
             assertParamExists('createImageEdit', 'image', image)
             // verify required parameter 'prompt' is not null or undefined
@@ -2305,7 +2305,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
         /**
          * 
          * @summary Creates a variation of a given image.
-         * @param {File} image The image to use as the basis for the variation(s). Must be a valid PNG file, less than 4MB, and square.
+         * @param {Fileish} image The image to use as the basis for the variation(s). Must be a valid PNG file, less than 4MB, and square.
          * @param {number} [n] The number of images to generate. Must be between 1 and 10.
          * @param {string} [size] The size of the generated images. Must be one of &#x60;256x256&#x60;, &#x60;512x512&#x60;, or &#x60;1024x1024&#x60;.
          * @param {string} [responseFormat] The format in which the generated images are returned. Must be one of &#x60;url&#x60; or &#x60;b64_json&#x60;.
@@ -2313,7 +2313,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        createImageVariation: async (image: File, n?: number, size?: string, responseFormat?: string, user?: string, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+        createImageVariation: async (image: Fileish, n?: number, size?: string, responseFormat?: string, user?: string, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'image' is not null or undefined
             assertParamExists('createImageVariation', 'image', image)
             const localVarPath = `/images/variations`;
@@ -2443,7 +2443,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
         /**
          * 
          * @summary Transcribes audio into the input language.
-         * @param {File} file The audio file to transcribe, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm. 
+         * @param {Fileish} file The audio file to transcribe, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm. 
          * @param {string} model ID of the model to use. Only &#x60;whisper-1&#x60; is currently available. 
          * @param {string} [prompt] An optional text to guide the model\\\&#39;s style or continue a previous audio segment. The [prompt](/docs/guides/speech-to-text/prompting) should match the audio language. 
          * @param {string} [responseFormat] The format of the transcript output, in one of these options: json, text, srt, verbose_json, or vtt. 
@@ -2452,7 +2452,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        createTranscription: async (file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, language?: string, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+        createTranscription: async (file: Fileish, model: string, prompt?: string, responseFormat?: string, temperature?: number, language?: string, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'file' is not null or undefined
             assertParamExists('createTranscription', 'file', file)
             // verify required parameter 'model' is not null or undefined
@@ -2511,7 +2511,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
         /**
          * 
          * @summary Translates audio into into English.
-         * @param {File} file The audio file to translate, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm. 
+         * @param {Fileish} file The audio file to translate, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm. 
          * @param {string} model ID of the model to use. Only &#x60;whisper-1&#x60; is currently available. 
          * @param {string} [prompt] An optional text to guide the model\\\&#39;s style or continue a previous audio segment. The [prompt](/docs/guides/speech-to-text/prompting) should be in English. 
          * @param {string} [responseFormat] The format of the transcript output, in one of these options: json, text, srt, verbose_json, or vtt. 
@@ -2519,7 +2519,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        createTranslation: async (file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+        createTranslation: async (file: Fileish, model: string, prompt?: string, responseFormat?: string, temperature?: number, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'file' is not null or undefined
             assertParamExists('createTranslation', 'file', file)
             // verify required parameter 'model' is not null or undefined
@@ -3062,12 +3062,12 @@ export const OpenAIApiFp = function(configuration?: Configuration) {
         /**
          * 
          * @summary Upload a file that contains document(s) to be used across various endpoints/features. Currently, the size of all the files uploaded by one organization can be up to 1 GB. Please contact us if you need to increase the storage limit. 
-         * @param {File} file Name of the [JSON Lines](https://jsonlines.readthedocs.io/en/latest/) file to be uploaded.  If the &#x60;purpose&#x60; is set to \\\&quot;fine-tune\\\&quot;, each line is a JSON record with \\\&quot;prompt\\\&quot; and \\\&quot;completion\\\&quot; fields representing your [training examples](/docs/guides/fine-tuning/prepare-training-data). 
+         * @param {Fileish} file Name of the [JSON Lines](https://jsonlines.readthedocs.io/en/latest/) file to be uploaded.  If the &#x60;purpose&#x60; is set to \\\&quot;fine-tune\\\&quot;, each line is a JSON record with \\\&quot;prompt\\\&quot; and \\\&quot;completion\\\&quot; fields representing your [training examples](/docs/guides/fine-tuning/prepare-training-data). 
          * @param {string} purpose The intended purpose of the uploaded documents.  Use \\\&quot;fine-tune\\\&quot; for [Fine-tuning](/docs/api-reference/fine-tunes). This allows us to validate the format of the uploaded file. 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async createFile(file: File, purpose: string, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<OpenAIFile>> {
+        async createFile(file: Fileish, purpose: string, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<OpenAIFile>> {
             const localVarAxiosArgs = await localVarAxiosParamCreator.createFile(file, purpose, options);
             return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
         },
@@ -3096,9 +3096,9 @@ export const OpenAIApiFp = function(configuration?: Configuration) {
         /**
          * 
          * @summary Creates an edited or extended image given an original image and a prompt.
-         * @param {File} image The image to edit. Must be a valid PNG file, less than 4MB, and square. If mask is not provided, image must have transparency, which will be used as the mask.
+         * @param {Fileish} image The image to edit. Must be a valid PNG file, less than 4MB, and square. If mask is not provided, image must have transparency, which will be used as the mask.
          * @param {string} prompt A text description of the desired image(s). The maximum length is 1000 characters.
-         * @param {File} [mask] An additional image whose fully transparent areas (e.g. where alpha is zero) indicate where &#x60;image&#x60; should be edited. Must be a valid PNG file, less than 4MB, and have the same dimensions as &#x60;image&#x60;.
+         * @param {Fileish} [mask] An additional image whose fully transparent areas (e.g. where alpha is zero) indicate where &#x60;image&#x60; should be edited. Must be a valid PNG file, less than 4MB, and have the same dimensions as &#x60;image&#x60;.
          * @param {number} [n] The number of images to generate. Must be between 1 and 10.
          * @param {string} [size] The size of the generated images. Must be one of &#x60;256x256&#x60;, &#x60;512x512&#x60;, or &#x60;1024x1024&#x60;.
          * @param {string} [responseFormat] The format in which the generated images are returned. Must be one of &#x60;url&#x60; or &#x60;b64_json&#x60;.
@@ -3106,14 +3106,14 @@ export const OpenAIApiFp = function(configuration?: Configuration) {
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async createImageEdit(image: File, prompt: string, mask?: File, n?: number, size?: string, responseFormat?: string, user?: string, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ImagesResponse>> {
+        async createImageEdit(image: Fileish, prompt: string, mask?: Fileish, n?: number, size?: string, responseFormat?: string, user?: string, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ImagesResponse>> {
             const localVarAxiosArgs = await localVarAxiosParamCreator.createImageEdit(image, prompt, mask, n, size, responseFormat, user, options);
             return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
         },
         /**
          * 
          * @summary Creates a variation of a given image.
-         * @param {File} image The image to use as the basis for the variation(s). Must be a valid PNG file, less than 4MB, and square.
+         * @param {Fileish} image The image to use as the basis for the variation(s). Must be a valid PNG file, less than 4MB, and square.
          * @param {number} [n] The number of images to generate. Must be between 1 and 10.
          * @param {string} [size] The size of the generated images. Must be one of &#x60;256x256&#x60;, &#x60;512x512&#x60;, or &#x60;1024x1024&#x60;.
          * @param {string} [responseFormat] The format in which the generated images are returned. Must be one of &#x60;url&#x60; or &#x60;b64_json&#x60;.
@@ -3121,7 +3121,7 @@ export const OpenAIApiFp = function(configuration?: Configuration) {
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async createImageVariation(image: File, n?: number, size?: string, responseFormat?: string, user?: string, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ImagesResponse>> {
+        async createImageVariation(image: Fileish, n?: number, size?: string, responseFormat?: string, user?: string, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ImagesResponse>> {
             const localVarAxiosArgs = await localVarAxiosParamCreator.createImageVariation(image, n, size, responseFormat, user, options);
             return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
         },
@@ -3152,7 +3152,7 @@ export const OpenAIApiFp = function(configuration?: Configuration) {
         /**
          * 
          * @summary Transcribes audio into the input language.
-         * @param {File} file The audio file to transcribe, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm. 
+         * @param {Fileish} file The audio file to transcribe, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm. 
          * @param {string} model ID of the model to use. Only &#x60;whisper-1&#x60; is currently available. 
          * @param {string} [prompt] An optional text to guide the model\\\&#39;s style or continue a previous audio segment. The [prompt](/docs/guides/speech-to-text/prompting) should match the audio language. 
          * @param {string} [responseFormat] The format of the transcript output, in one of these options: json, text, srt, verbose_json, or vtt. 
@@ -3161,14 +3161,14 @@ export const OpenAIApiFp = function(configuration?: Configuration) {
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async createTranscription(file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, language?: string, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CreateTranscriptionResponse>> {
+        async createTranscription(file: Fileish, model: string, prompt?: string, responseFormat?: string, temperature?: number, language?: string, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CreateTranscriptionResponse>> {
             const localVarAxiosArgs = await localVarAxiosParamCreator.createTranscription(file, model, prompt, responseFormat, temperature, language, options);
             return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
         },
         /**
          * 
          * @summary Translates audio into into English.
-         * @param {File} file The audio file to translate, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm. 
+         * @param {Fileish} file The audio file to translate, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm. 
          * @param {string} model ID of the model to use. Only &#x60;whisper-1&#x60; is currently available. 
          * @param {string} [prompt] An optional text to guide the model\\\&#39;s style or continue a previous audio segment. The [prompt](/docs/guides/speech-to-text/prompting) should be in English. 
          * @param {string} [responseFormat] The format of the transcript output, in one of these options: json, text, srt, verbose_json, or vtt. 
@@ -3176,7 +3176,7 @@ export const OpenAIApiFp = function(configuration?: Configuration) {
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async createTranslation(file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CreateTranslationResponse>> {
+        async createTranslation(file: Fileish, model: string, prompt?: string, responseFormat?: string, temperature?: number, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CreateTranslationResponse>> {
             const localVarAxiosArgs = await localVarAxiosParamCreator.createTranslation(file, model, prompt, responseFormat, temperature, options);
             return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
         },
@@ -3396,12 +3396,12 @@ export const OpenAIApiFactory = function (configuration?: Configuration, basePat
         /**
          * 
          * @summary Upload a file that contains document(s) to be used across various endpoints/features. Currently, the size of all the files uploaded by one organization can be up to 1 GB. Please contact us if you need to increase the storage limit. 
-         * @param {File} file Name of the [JSON Lines](https://jsonlines.readthedocs.io/en/latest/) file to be uploaded.  If the &#x60;purpose&#x60; is set to \\\&quot;fine-tune\\\&quot;, each line is a JSON record with \\\&quot;prompt\\\&quot; and \\\&quot;completion\\\&quot; fields representing your [training examples](/docs/guides/fine-tuning/prepare-training-data). 
+         * @param {Fileish} file Name of the [JSON Lines](https://jsonlines.readthedocs.io/en/latest/) file to be uploaded.  If the &#x60;purpose&#x60; is set to \\\&quot;fine-tune\\\&quot;, each line is a JSON record with \\\&quot;prompt\\\&quot; and \\\&quot;completion\\\&quot; fields representing your [training examples](/docs/guides/fine-tuning/prepare-training-data). 
          * @param {string} purpose The intended purpose of the uploaded documents.  Use \\\&quot;fine-tune\\\&quot; for [Fine-tuning](/docs/api-reference/fine-tunes). This allows us to validate the format of the uploaded file. 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        createFile(file: File, purpose: string, options?: any): AxiosPromise<OpenAIFile> {
+        createFile(file: Fileish, purpose: string, options?: any): AxiosPromise<OpenAIFile> {
             return localVarFp.createFile(file, purpose, options).then((request) => request(axios, basePath));
         },
         /**
@@ -3427,9 +3427,9 @@ export const OpenAIApiFactory = function (configuration?: Configuration, basePat
         /**
          * 
          * @summary Creates an edited or extended image given an original image and a prompt.
-         * @param {File} image The image to edit. Must be a valid PNG file, less than 4MB, and square. If mask is not provided, image must have transparency, which will be used as the mask.
+         * @param {Fileish} image The image to edit. Must be a valid PNG file, less than 4MB, and square. If mask is not provided, image must have transparency, which will be used as the mask.
          * @param {string} prompt A text description of the desired image(s). The maximum length is 1000 characters.
-         * @param {File} [mask] An additional image whose fully transparent areas (e.g. where alpha is zero) indicate where &#x60;image&#x60; should be edited. Must be a valid PNG file, less than 4MB, and have the same dimensions as &#x60;image&#x60;.
+         * @param {Fileish} [mask] An additional image whose fully transparent areas (e.g. where alpha is zero) indicate where &#x60;image&#x60; should be edited. Must be a valid PNG file, less than 4MB, and have the same dimensions as &#x60;image&#x60;.
          * @param {number} [n] The number of images to generate. Must be between 1 and 10.
          * @param {string} [size] The size of the generated images. Must be one of &#x60;256x256&#x60;, &#x60;512x512&#x60;, or &#x60;1024x1024&#x60;.
          * @param {string} [responseFormat] The format in which the generated images are returned. Must be one of &#x60;url&#x60; or &#x60;b64_json&#x60;.
@@ -3437,13 +3437,13 @@ export const OpenAIApiFactory = function (configuration?: Configuration, basePat
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        createImageEdit(image: File, prompt: string, mask?: File, n?: number, size?: string, responseFormat?: string, user?: string, options?: any): AxiosPromise<ImagesResponse> {
+        createImageEdit(image: Fileish, prompt: string, mask?: Fileish, n?: number, size?: string, responseFormat?: string, user?: string, options?: any): AxiosPromise<ImagesResponse> {
             return localVarFp.createImageEdit(image, prompt, mask, n, size, responseFormat, user, options).then((request) => request(axios, basePath));
         },
         /**
          * 
          * @summary Creates a variation of a given image.
-         * @param {File} image The image to use as the basis for the variation(s). Must be a valid PNG file, less than 4MB, and square.
+         * @param {Fileish} image The image to use as the basis for the variation(s). Must be a valid PNG file, less than 4MB, and square.
          * @param {number} [n] The number of images to generate. Must be between 1 and 10.
          * @param {string} [size] The size of the generated images. Must be one of &#x60;256x256&#x60;, &#x60;512x512&#x60;, or &#x60;1024x1024&#x60;.
          * @param {string} [responseFormat] The format in which the generated images are returned. Must be one of &#x60;url&#x60; or &#x60;b64_json&#x60;.
@@ -3451,7 +3451,7 @@ export const OpenAIApiFactory = function (configuration?: Configuration, basePat
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        createImageVariation(image: File, n?: number, size?: string, responseFormat?: string, user?: string, options?: any): AxiosPromise<ImagesResponse> {
+        createImageVariation(image: Fileish, n?: number, size?: string, responseFormat?: string, user?: string, options?: any): AxiosPromise<ImagesResponse> {
             return localVarFp.createImageVariation(image, n, size, responseFormat, user, options).then((request) => request(axios, basePath));
         },
         /**
@@ -3479,7 +3479,7 @@ export const OpenAIApiFactory = function (configuration?: Configuration, basePat
         /**
          * 
          * @summary Transcribes audio into the input language.
-         * @param {File} file The audio file to transcribe, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm. 
+         * @param {Fileish} file The audio file to transcribe, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm. 
          * @param {string} model ID of the model to use. Only &#x60;whisper-1&#x60; is currently available. 
          * @param {string} [prompt] An optional text to guide the model\\\&#39;s style or continue a previous audio segment. The [prompt](/docs/guides/speech-to-text/prompting) should match the audio language. 
          * @param {string} [responseFormat] The format of the transcript output, in one of these options: json, text, srt, verbose_json, or vtt. 
@@ -3488,13 +3488,13 @@ export const OpenAIApiFactory = function (configuration?: Configuration, basePat
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        createTranscription(file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, language?: string, options?: any): AxiosPromise<CreateTranscriptionResponse> {
+        createTranscription(file: Fileish, model: string, prompt?: string, responseFormat?: string, temperature?: number, language?: string, options?: any): AxiosPromise<CreateTranscriptionResponse> {
             return localVarFp.createTranscription(file, model, prompt, responseFormat, temperature, language, options).then((request) => request(axios, basePath));
         },
         /**
          * 
          * @summary Translates audio into into English.
-         * @param {File} file The audio file to translate, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm. 
+         * @param {Fileish} file The audio file to translate, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm. 
          * @param {string} model ID of the model to use. Only &#x60;whisper-1&#x60; is currently available. 
          * @param {string} [prompt] An optional text to guide the model\\\&#39;s style or continue a previous audio segment. The [prompt](/docs/guides/speech-to-text/prompting) should be in English. 
          * @param {string} [responseFormat] The format of the transcript output, in one of these options: json, text, srt, verbose_json, or vtt. 
@@ -3502,7 +3502,7 @@ export const OpenAIApiFactory = function (configuration?: Configuration, basePat
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        createTranslation(file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, options?: any): AxiosPromise<CreateTranslationResponse> {
+        createTranslation(file: Fileish, model: string, prompt?: string, responseFormat?: string, temperature?: number, options?: any): AxiosPromise<CreateTranslationResponse> {
             return localVarFp.createTranslation(file, model, prompt, responseFormat, temperature, options).then((request) => request(axios, basePath));
         },
         /**
@@ -3723,13 +3723,13 @@ export class OpenAIApi extends BaseAPI {
     /**
      * 
      * @summary Upload a file that contains document(s) to be used across various endpoints/features. Currently, the size of all the files uploaded by one organization can be up to 1 GB. Please contact us if you need to increase the storage limit. 
-     * @param {File} file Name of the [JSON Lines](https://jsonlines.readthedocs.io/en/latest/) file to be uploaded.  If the &#x60;purpose&#x60; is set to \\\&quot;fine-tune\\\&quot;, each line is a JSON record with \\\&quot;prompt\\\&quot; and \\\&quot;completion\\\&quot; fields representing your [training examples](/docs/guides/fine-tuning/prepare-training-data). 
+     * @param {Fileish} file Name of the [JSON Lines](https://jsonlines.readthedocs.io/en/latest/) file to be uploaded.  If the &#x60;purpose&#x60; is set to \\\&quot;fine-tune\\\&quot;, each line is a JSON record with \\\&quot;prompt\\\&quot; and \\\&quot;completion\\\&quot; fields representing your [training examples](/docs/guides/fine-tuning/prepare-training-data). 
      * @param {string} purpose The intended purpose of the uploaded documents.  Use \\\&quot;fine-tune\\\&quot; for [Fine-tuning](/docs/api-reference/fine-tunes). This allows us to validate the format of the uploaded file. 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof OpenAIApi
      */
-    public createFile(file: File, purpose: string, options?: AxiosRequestConfig) {
+    public createFile(file: Fileish, purpose: string, options?: AxiosRequestConfig) {
         return OpenAIApiFp(this.configuration).createFile(file, purpose, options).then((request) => request(this.axios, this.basePath));
     }
 
@@ -3760,9 +3760,9 @@ export class OpenAIApi extends BaseAPI {
     /**
      * 
      * @summary Creates an edited or extended image given an original image and a prompt.
-     * @param {File} image The image to edit. Must be a valid PNG file, less than 4MB, and square. If mask is not provided, image must have transparency, which will be used as the mask.
+     * @param {Fileish} image The image to edit. Must be a valid PNG file, less than 4MB, and square. If mask is not provided, image must have transparency, which will be used as the mask.
      * @param {string} prompt A text description of the desired image(s). The maximum length is 1000 characters.
-     * @param {File} [mask] An additional image whose fully transparent areas (e.g. where alpha is zero) indicate where &#x60;image&#x60; should be edited. Must be a valid PNG file, less than 4MB, and have the same dimensions as &#x60;image&#x60;.
+     * @param {Fileish} [mask] An additional image whose fully transparent areas (e.g. where alpha is zero) indicate where &#x60;image&#x60; should be edited. Must be a valid PNG file, less than 4MB, and have the same dimensions as &#x60;image&#x60;.
      * @param {number} [n] The number of images to generate. Must be between 1 and 10.
      * @param {string} [size] The size of the generated images. Must be one of &#x60;256x256&#x60;, &#x60;512x512&#x60;, or &#x60;1024x1024&#x60;.
      * @param {string} [responseFormat] The format in which the generated images are returned. Must be one of &#x60;url&#x60; or &#x60;b64_json&#x60;.
@@ -3771,14 +3771,14 @@ export class OpenAIApi extends BaseAPI {
      * @throws {RequiredError}
      * @memberof OpenAIApi
      */
-    public createImageEdit(image: File, prompt: string, mask?: File, n?: number, size?: string, responseFormat?: string, user?: string, options?: AxiosRequestConfig) {
+    public createImageEdit(image: Fileish, prompt: string, mask?: Fileish, n?: number, size?: string, responseFormat?: string, user?: string, options?: AxiosRequestConfig) {
         return OpenAIApiFp(this.configuration).createImageEdit(image, prompt, mask, n, size, responseFormat, user, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
      * 
      * @summary Creates a variation of a given image.
-     * @param {File} image The image to use as the basis for the variation(s). Must be a valid PNG file, less than 4MB, and square.
+     * @param {Fileish} image The image to use as the basis for the variation(s). Must be a valid PNG file, less than 4MB, and square.
      * @param {number} [n] The number of images to generate. Must be between 1 and 10.
      * @param {string} [size] The size of the generated images. Must be one of &#x60;256x256&#x60;, &#x60;512x512&#x60;, or &#x60;1024x1024&#x60;.
      * @param {string} [responseFormat] The format in which the generated images are returned. Must be one of &#x60;url&#x60; or &#x60;b64_json&#x60;.
@@ -3787,7 +3787,7 @@ export class OpenAIApi extends BaseAPI {
      * @throws {RequiredError}
      * @memberof OpenAIApi
      */
-    public createImageVariation(image: File, n?: number, size?: string, responseFormat?: string, user?: string, options?: AxiosRequestConfig) {
+    public createImageVariation(image: Fileish, n?: number, size?: string, responseFormat?: string, user?: string, options?: AxiosRequestConfig) {
         return OpenAIApiFp(this.configuration).createImageVariation(image, n, size, responseFormat, user, options).then((request) => request(this.axios, this.basePath));
     }
 
@@ -3820,7 +3820,7 @@ export class OpenAIApi extends BaseAPI {
     /**
      * 
      * @summary Transcribes audio into the input language.
-     * @param {File} file The audio file to transcribe, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm. 
+     * @param {Fileish} file The audio file to transcribe, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm. 
      * @param {string} model ID of the model to use. Only &#x60;whisper-1&#x60; is currently available. 
      * @param {string} [prompt] An optional text to guide the model\\\&#39;s style or continue a previous audio segment. The [prompt](/docs/guides/speech-to-text/prompting) should match the audio language. 
      * @param {string} [responseFormat] The format of the transcript output, in one of these options: json, text, srt, verbose_json, or vtt. 
@@ -3830,14 +3830,14 @@ export class OpenAIApi extends BaseAPI {
      * @throws {RequiredError}
      * @memberof OpenAIApi
      */
-    public createTranscription(file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, language?: string, options?: AxiosRequestConfig) {
+    public createTranscription(file: Fileish, model: string, prompt?: string, responseFormat?: string, temperature?: number, language?: string, options?: AxiosRequestConfig) {
         return OpenAIApiFp(this.configuration).createTranscription(file, model, prompt, responseFormat, temperature, language, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
      * 
      * @summary Translates audio into into English.
-     * @param {File} file The audio file to translate, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm. 
+     * @param {Fileish} file The audio file to translate, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm. 
      * @param {string} model ID of the model to use. Only &#x60;whisper-1&#x60; is currently available. 
      * @param {string} [prompt] An optional text to guide the model\\\&#39;s style or continue a previous audio segment. The [prompt](/docs/guides/speech-to-text/prompting) should be in English. 
      * @param {string} [responseFormat] The format of the transcript output, in one of these options: json, text, srt, verbose_json, or vtt. 
@@ -3846,7 +3846,7 @@ export class OpenAIApi extends BaseAPI {
      * @throws {RequiredError}
      * @memberof OpenAIApi
      */
-    public createTranslation(file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, options?: AxiosRequestConfig) {
+    public createTranslation(file: Fileish, model: string, prompt?: string, responseFormat?: string, temperature?: number, options?: AxiosRequestConfig) {
         return OpenAIApiFp(this.configuration).createTranslation(file, model, prompt, responseFormat, temperature, options).then((request) => request(this.axios, this.basePath));
     }
 

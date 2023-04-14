@@ -11,7 +11,7 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-
+import { ReadStream } from 'fs';
 
 import type { Configuration } from './configuration';
 // Some imports not used depending on template conditions
@@ -31,6 +31,13 @@ export const COLLECTION_FORMATS = {
     tsv: "\t",
     pipes: "|",
 };
+
+/**
+ * A type alias for a file-like object.
+ *
+ * @export
+ */
+export type Fileish = File | Buffer | ReadStream | ReadableStream | Blob;
 
 /**
  *
