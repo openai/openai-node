@@ -13,7 +13,7 @@
  */
 
 
-import type { Configuration } from './configuration';
+import { Configuration } from './configuration';
 import type { AxiosPromise, AxiosInstance, AxiosRequestConfig } from 'axios';
 import globalAxios from 'axios';
 // Some imports not used depending on template conditions
@@ -1855,7 +1855,7 @@ export interface OpenAIFile {
  * OpenAIApi - axios parameter creator
  * @export
  */
-export const OpenAIApiAxiosParamCreator = function (configuration?: Configuration) {
+export const OpenAIApiAxiosParamCreator = function (configuration: Configuration = new Configuration()) {
     return {
         /**
          * 
@@ -1871,10 +1871,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
                 .replace(`{${"fine_tune_id"}}`, encodeURIComponent(String(fineTuneId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
+            let baseOptions = configuration.baseOptions;
 
             const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
@@ -1905,10 +1902,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
             const localVarPath = `/answers`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
+            let baseOptions = configuration.baseOptions;
 
             const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
@@ -1941,10 +1935,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
             const localVarPath = `/chat/completions`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
+            let baseOptions = configuration.baseOptions;
 
             const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
@@ -1978,10 +1969,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
             const localVarPath = `/classifications`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
+            let baseOptions = configuration.baseOptions;
 
             const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
@@ -2014,10 +2002,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
             const localVarPath = `/completions`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
+            let baseOptions = configuration.baseOptions;
 
             const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
@@ -2050,10 +2035,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
             const localVarPath = `/edits`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
+            let baseOptions = configuration.baseOptions;
 
             const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
@@ -2086,10 +2068,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
             const localVarPath = `/embeddings`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
+            let baseOptions = configuration.baseOptions;
 
             const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
@@ -2125,15 +2104,12 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
             const localVarPath = `/files`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
+            let baseOptions = configuration.baseOptions;
 
             const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
             const localVarQueryParameter = {} as any;
-            const localVarFormParams = new ((configuration && configuration.formDataCtor) || FormData)();
+            const localVarFormParams = new configuration.formDataCtor();
 
 
             if (file !== undefined) { 
@@ -2170,10 +2146,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
             const localVarPath = `/fine-tunes`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
+            let baseOptions = configuration.baseOptions;
 
             const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
@@ -2206,10 +2179,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
             const localVarPath = `/images/generations`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
+            let baseOptions = configuration.baseOptions;
 
             const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
@@ -2250,15 +2220,12 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
             const localVarPath = `/images/edits`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
+            let baseOptions = configuration.baseOptions;
 
             const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
             const localVarQueryParameter = {} as any;
-            const localVarFormParams = new ((configuration && configuration.formDataCtor) || FormData)();
+            const localVarFormParams = new configuration.formDataCtor();
 
 
             if (image !== undefined) { 
@@ -2319,15 +2286,12 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
             const localVarPath = `/images/variations`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
+            let baseOptions = configuration.baseOptions;
 
             const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
             const localVarQueryParameter = {} as any;
-            const localVarFormParams = new ((configuration && configuration.formDataCtor) || FormData)();
+            const localVarFormParams = new configuration.formDataCtor();
 
 
             if (image !== undefined) { 
@@ -2376,10 +2340,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
             const localVarPath = `/moderations`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
+            let baseOptions = configuration.baseOptions;
 
             const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
@@ -2417,10 +2378,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
                 .replace(`{${"engine_id"}}`, encodeURIComponent(String(engineId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
+            let baseOptions = configuration.baseOptions;
 
             const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
@@ -2460,15 +2418,12 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
             const localVarPath = `/audio/transcriptions`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
+            let baseOptions = configuration.baseOptions;
 
             const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
             const localVarQueryParameter = {} as any;
-            const localVarFormParams = new ((configuration && configuration.formDataCtor) || FormData)();
+            const localVarFormParams = new configuration.formDataCtor();
 
 
             if (file !== undefined) { 
@@ -2527,15 +2482,12 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
             const localVarPath = `/audio/translations`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
+            let baseOptions = configuration.baseOptions;
 
             const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
             const localVarQueryParameter = {} as any;
-            const localVarFormParams = new ((configuration && configuration.formDataCtor) || FormData)();
+            const localVarFormParams = new configuration.formDataCtor();
 
 
             if (file !== undefined) { 
@@ -2585,10 +2537,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
                 .replace(`{${"file_id"}}`, encodeURIComponent(String(fileId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
+            let baseOptions = configuration.baseOptions;
 
             const localVarRequestOptions = { method: 'DELETE', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
@@ -2619,10 +2568,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
                 .replace(`{${"model"}}`, encodeURIComponent(String(model)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
+            let baseOptions = configuration.baseOptions;
 
             const localVarRequestOptions = { method: 'DELETE', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
@@ -2653,10 +2599,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
                 .replace(`{${"file_id"}}`, encodeURIComponent(String(fileId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
+            let baseOptions = configuration.baseOptions;
 
             const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
@@ -2684,10 +2627,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
             const localVarPath = `/engines`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
+            let baseOptions = configuration.baseOptions;
 
             const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
@@ -2714,10 +2654,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
             const localVarPath = `/files`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
+            let baseOptions = configuration.baseOptions;
 
             const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
@@ -2749,10 +2686,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
                 .replace(`{${"fine_tune_id"}}`, encodeURIComponent(String(fineTuneId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
+            let baseOptions = configuration.baseOptions;
 
             const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
@@ -2783,10 +2717,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
             const localVarPath = `/fine-tunes`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
+            let baseOptions = configuration.baseOptions;
 
             const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
@@ -2813,10 +2744,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
             const localVarPath = `/models`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
+            let baseOptions = configuration.baseOptions;
 
             const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
@@ -2848,10 +2776,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
                 .replace(`{${"engine_id"}}`, encodeURIComponent(String(engineId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
+            let baseOptions = configuration.baseOptions;
 
             const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
@@ -2882,10 +2807,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
                 .replace(`{${"file_id"}}`, encodeURIComponent(String(fileId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
+            let baseOptions = configuration.baseOptions;
 
             const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
@@ -2916,10 +2838,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
                 .replace(`{${"fine_tune_id"}}`, encodeURIComponent(String(fineTuneId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
+            let baseOptions = configuration.baseOptions;
 
             const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
@@ -2950,10 +2869,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
                 .replace(`{${"model"}}`, encodeURIComponent(String(model)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
+            let baseOptions = configuration.baseOptions;
 
             const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
