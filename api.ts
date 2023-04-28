@@ -1947,8 +1947,8 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
 
             let localVarPath = `/chat/completions`;
             if (configuration.azure) {
-                let deploymentName = configuration.azure.deploymentName ? configuration.azure.deploymentName : createChatCompletionRequest.model;
-                let apiVersion = configuration.azure.apiVersion ? configuration.azure.apiVersion : '2023-03-15-preview';
+                const deploymentName = configuration.azure.deploymentName ? configuration.azure.deploymentName : createChatCompletionRequest.model;
+                const apiVersion = configuration.azure.apiVersion ? configuration.azure.apiVersion : '2023-03-15-preview';
                 localVarPath = `/openai/deployments/${deploymentName}/chat/completions?api-version=${configuration.azure.apiVersion}`;
             }
 
