@@ -2103,8 +2103,8 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
             assertParamExists('createEmbedding', 'createEmbeddingRequest', createEmbeddingRequest)
             let localVarPath = `/embeddings`;
             if (configuration.azure) {
-                let deploymentName = configuration.azure.deploymentName ? configuration.azure.deploymentName : createEmbeddingRequest.model;
-                let apiVersion = configuration.azure.apiVersion ? configuration.azure.apiVersion : '2023-03-15-preview';
+                const deploymentName = configuration.azure.deploymentName ? configuration.azure.deploymentName : createEmbeddingRequest.model;
+                const apiVersion = configuration.azure.apiVersion ? configuration.azure.apiVersion : '2023-03-15-preview';
                 localVarPath = `/openai/deployments/${deploymentName}/embeddings?api-version=${configuration.azure.apiVersion}`;
             }
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
