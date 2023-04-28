@@ -111,7 +111,7 @@ export class Configuration {
             this.baseOptions = {};
         }
         this.baseOptions.headers = {
-            'User-Agent': `AzureQOpenAI/NodeJS/${packageJson.version}`,
+            'User-Agent': `AzureOpenAI/NodeJS/${packageJson.version}`,
             'Authorization': `Bearer ${this.apiKey}`,
             ...this.baseOptions.headers,
         }
