@@ -1948,7 +1948,8 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
             let localVarPath = `/chat/completions`;
             if (configuration.azure) {
                 let deploymentName = configuration.azure.deploymentName ? configuration.azure.deploymentName : createChatCompletionRequest.model;
-                localVarPath = `/openai/deployments/${deploymentName}/chat/completions?api-version=2023-03-15-preview`; // FIXME make version variable Konsti and Dominik
+                let apiVersion = configuration.azure.apiVersion ? configuration.azure.apiVersion : '2023-03-15-preview';
+                localVarPath = `/openai/deployments/${deploymentName}/chat/completions?api-version=${configuration.azure.apiVersion}`;
             }
 
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
@@ -2026,7 +2027,8 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
             let localVarPath = `/completions`;
             if (configuration.azure) {
                 let deploymentName = configuration.azure.deploymentName ? configuration.azure.deploymentName : createCompletionRequest.model;
-                localVarPath = `/openai/deployments/${deploymentName}/completions?api-version=2023-03-15-preview`; // FIXME dynamic version konsti and dominik
+                let apiVersion = configuration.azure.apiVersion ? configuration.azure.apiVersion : '2023-03-15-preview';
+                localVarPath = `/openai/deployments/${deploymentName}/completions?api-version=${configuration.azure.apiVersion}`;
             }
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
@@ -2102,7 +2104,8 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
             let localVarPath = `/embeddings`;
             if (configuration.azure) {
                 let deploymentName = configuration.azure.deploymentName ? configuration.azure.deploymentName : createEmbeddingRequest.model;
-                localVarPath = `/openai/deployments/${deploymentName}/embeddings?api-version=2023-03-15-preview`; // fixme, dynamic version konsti and dominik
+                let apiVersion = configuration.azure.apiVersion ? configuration.azure.apiVersion : '2023-03-15-preview';
+                localVarPath = `/openai/deployments/${deploymentName}/embeddings?api-version=${configuration.azure.apiVersion}`;
             }
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
