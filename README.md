@@ -10,7 +10,7 @@ This library allows you to use Azure OpenAI's API without making any changes to 
 ## Installation
 
 ```bash
-$ npm install @unique/openai
+$ npm install @unique-ag/openai
 ```
 
 ## Usage
@@ -18,7 +18,7 @@ $ npm install @unique/openai
 The library must be configured with your Azure OpenAI's `key`, `endpoint`, and `deploymentId`. You can obtain these credentials from [Azure Portal](https://portal.azure.com).
 
 ```ts
-import { Configuration, OpenAIApi } from '@unique/openai';
+import { Configuration, OpenAIApi } from '@unique-ag/openai';
 
 const configuration = new Configuration({
   apiKey: process.env.OPENAI_API_KEY,

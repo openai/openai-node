@@ -1,6 +1,6 @@
 {
-  "name": "openai",
-  "version": "0.9.0",
+  "name": "@unique-ag/openai",
+  "version": "3.2.1",
   "description": "Node.js library for the Azure OpenAI API, forked from the official node package.",
   "repository": {
     "type": "git",
@@ -15,6 +15,14 @@
     "gpt3"
   ],
   "author": "Unique AG",
+  "contributors": [
+    {
+      "name": "OpenAI"
+    },
+    {
+      "name": "Unique AG"
+    }
+  ],
   "license": "MIT",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

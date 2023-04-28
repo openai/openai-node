@@ -12,16 +12,16 @@
  * Do not edit the class manually.
  */
 
-
+import type { Configuration } from './configuration';
 import type { AxiosInstance, AxiosPromise, AxiosRequestConfig } from 'axios';
 import globalAxios from 'axios';
-import type { Configuration } from './configuration';
+
 // Some imports not used depending on template conditions
 // @ts-ignore
+import { DUMMY_BASE_URL, assertParamExists, setApiKeyToObject, setBasicAuthToObject, setBearerAuthToObject, setOAuthToObject, setSearchParams, serializeDataIfNeeded, toPathString, createRequestFunction } from './common';
 import type { RequestArgs } from './base';
-import { DUMMY_BASE_URL, assertParamExists, createRequestFunction, serializeDataIfNeeded, setSearchParams, toPathString } from './common';
 // @ts-ignore
-import { BASE_PATH, BaseAPI, RequiredError } from './base';
+import { BASE_PATH, COLLECTION_FORMATS, BaseAPI, RequiredError } from './base';
 
 /**
  * 
@@ -287,12 +287,6 @@ export interface CreateChatCompletionRequest {
      * @memberof CreateChatCompletionRequest
      */
     'messages'?: Array<ChatCompletionRequestMessage>;
-    /**
-     * The messages to generate chat completions for, in the [chat format](/docs/guides/chat/introduction).
-     * @type {Array<ChatCompletionRequestMessage>}
-     * @memberof CreateChatCompletionRequest
-     */
-    'prompt'?: string;
     /**
      * What sampling temperature to use, between 0 and 2. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.  We generally recommend altering this or `top_p` but not both. 
      * @type {number}
@@ -1947,9 +1941,9 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
 
             let localVarPath = `/chat/completions`;
             if (configuration.azure) {
-                const deploymentName = configuration.azure.deploymentName ? configuration.azure.deploymentName : createChatCompletionRequest.model;
-                const apiVersion = configuration.azure.apiVersion ? configuration.azure.apiVersion : '2023-03-15-preview';
-                localVarPath = `/openai/deployments/${deploymentName}/chat/completions?api-version=${configuration.azure.apiVersion}`;
+                const deploymentName = configuration.azure.deploymentName ?? createChatCompletionRequest.model;
+                const apiVersion = configuration.azure.apiVersion ?? '2023-03-15-preview';
+                localVarPath = `/openai/deployments/${deploymentName}/chat/completions?api-version=${apiVersion}`;
             }
 
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
@@ -2026,9 +2020,9 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
             assertParamExists('createCompletion', 'createCompletionRequest', createCompletionRequest)
             let localVarPath = `/completions`;
             if (configuration.azure) {
-                let deploymentName = configuration.azure.deploymentName ? configuration.azure.deploymentName : createCompletionRequest.model;
-                let apiVersion = configuration.azure.apiVersion ? configuration.azure.apiVersion : '2023-03-15-preview';
-                localVarPath = `/openai/deployments/${deploymentName}/completions?api-version=${configuration.azure.apiVersion}`;
+                const deploymentName = configuration.azure.deploymentName ?? createCompletionRequest.model;
+                const apiVersion = configuration.azure.apiVersion ?? '2023-03-15-preview';
+                localVarPath = `/openai/deployments/${deploymentName}/completions?api-version=${apiVersion}`;
             }
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
