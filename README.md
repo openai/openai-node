@@ -31,7 +31,7 @@ const openai = new OpenAIApi(
     azure: {
       apiKey: <key1>
       endpoint: <endpoint>,
-    // deploymentName is optional, if you donot set it, you need to set it in the request parameter
+    // The `deploymentName` parameter is optional; if you do not set it, you need to put it in the request parameter
       deploymentName: <model-deployment-name>,
       apiVerison: '2023-03-15-preview' // or other version
     }
