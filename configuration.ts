@@ -15,6 +15,13 @@
 
 const packageJson = require("../package.json");
 
+export interface AzureConfigurationParameters {
+    apiKey: string | Promise<string> | ((name: string) => string) | ((name: string) => Promise<string>);
+    endpoint: string;
+    deploymentName?: string;
+    apiVersion?: string; // fixme use this later
+}
+
 export interface ConfigurationParameters {
     apiKey?: string | Promise<string> | ((name: string) => string) | ((name: string) => Promise<string>);
     organization?: string;
@@ -24,6 +31,7 @@ export interface ConfigurationParameters {
     basePath?: string;
     baseOptions?: any;
     formDataCtor?: new () => any;
+    azure?: AzureConfigurationParameters;
 }
 
 export class Configuration {
@@ -83,6 +91,10 @@ export class Configuration {
      * @type {new () => FormData}
      */
     formDataCtor?: new () => any;
+    /**
+     * @memberof Configuration
+     */
+    azure?: AzureConfigurationParameters;
 
     constructor(param: ConfigurationParameters = {}) {
         this.apiKey = param.apiKey;
@@ -93,12 +105,13 @@ export class Configuration {
         this.basePath = param.basePath;
         this.baseOptions = param.baseOptions;
         this.formDataCtor = param.formDataCtor;
+        this.azure = param.azure;
 
         if (!this.baseOptions) {
             this.baseOptions = {};
         }
         this.baseOptions.headers = {
-            'User-Agent': `OpenAI/NodeJS/${packageJson.version}`,
+            'User-Agent': `AzureOpenAI/NodeJS/${packageJson.version}`,
             'Authorization': `Bearer ${this.apiKey}`,
             ...this.baseOptions.headers,
         }
@@ -107,6 +120,15 @@ export class Configuration {
         }
         if (!this.formDataCtor) {
             this.formDataCtor = require("form-data");
+        }
+        if (this.azure) {
+            if (!this.azure.apiKey || !this.azure.endpoint) {
+                throw new Error("Azure Configuration requires apiKey and endpoint.");
+            }
+            this.apiKey = this.azure.apiKey;
+            this.baseOptions.headers['api-key'] = this.azure.apiKey;
+            this.baseOptions.headers['Authorization'] = '';
+            this.basePath = this.azure.endpoint;
         }
     }
 

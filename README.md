@@ -1,89 +1,74 @@
-# OpenAI Node.js Library
+# Azure OpenAI NodeJS Library
 
-The OpenAI Node.js library provides convenient access to the OpenAI API from Node.js applications. Most of the code in this library is generated from our [OpenAPI specification](https://github.com/openai/openai-openapi).
+This is a fork of the official [OpenAI Node.js library](https://github.com/openai/openai-node) that has been adapted to support the Azure OpenAI API. The objective of this library is to minimize the changes required to migrate from the official OpenAI library to Azure OpenAI or revert back to OpenAI.
 
-**Important note: this library is meant for server-side usage only, as using it in client-side browser code will expose your secret API key. [See here](https://platform.openai.com/docs/api-reference/authentication) for more details.**
+> **Note**
+> It is also an inofficial fork of [1openwindow/azure-openai-node](https://github.com/1openwindow/azure-openai-node) which we could not use due to due diligence reasons 🥇 
+
+This library allows you to use Azure OpenAI's API without making any changes to your existing OpenAI code. You can simply add Azure information to your configuration and start using the Azure OpenAI model.
 
 ## Installation
 
 ```bash
-npm install openai
+$ npm install @unique-ag/openai
 ```
 
 ## Usage
 
-The library needs to be configured with your account's secret key, which is available on the [website](https://platform.openai.com/account/api-keys). We recommend setting it as an environment variable. Here's an example of initializing the library with the API key loaded from an environment variable and creating a completion:
+The library must be configured with your Azure OpenAI's `key`, `endpoint`, and `deploymentId`. You can obtain these credentials from [Azure Portal](https://portal.azure.com).
 
-```javascript
-const { Configuration, OpenAIApi } = require("openai");
+```ts
+import { Configuration, OpenAIApi } from '@unique-ag/openai';
 
 const configuration = new Configuration({
   apiKey: process.env.OPENAI_API_KEY,
 });
-const openai = new OpenAIApi(configuration);
+
+const openai = new OpenAIApi(
+  new Configuration({
+    apiKey: this.apiKey,
+    // add azure info into configuration
+    azure: {
+      apiKey: <key1>
+      endpoint: <endpoint>,
+    // The `deploymentName` parameter is optional; if you do not set it, you need to put it in the request parameter
+      deploymentName: <model-deployment-name>,
+      apiVerison: '2023-03-15-preview' // or other version
+    }
+  )
+);
 
 const completion = await openai.createCompletion({
   model: "text-davinci-003",
   prompt: "Hello world",
 });
+
 console.log(completion.data.choices[0].text);
+
 ```
 
-Check out the [full API documentation](https://platform.openai.com/docs/api-reference?lang=node.js) for examples of all the available functions.
-
-### Request options
-
-All of the available API request functions additionally contain an optional final parameter where you can pass custom [axios request options](https://axios-http.com/docs/req_config), for example:
-
-```javascript
-const completion = await openai.createCompletion(
-  {
-    model: "text-davinci-003",
-    prompt: "Hello world",
-  },
-  {
-    timeout: 1000,
-    headers: {
-      "Example-Header": "example",
-    },
-  }
-);
+## Variations
+### Streaming
+Azure OpenAI does not response delta data, so you need to change the response to text
+```ts
+// before: const delta = parsed.choices[0].delta.content;
+const delta = parsed.choices[0].text;
 ```
 
-### Error handling
-
-API requests can potentially return errors due to invalid inputs or other issues. These errors can be handled with a `try...catch` statement, and the error details can be found in either `error.response` or `error.message`:
-
-```javascript
-try {
-  const completion = await openai.createCompletion({
-    model: "text-davinci-003",
-    prompt: "Hello world",
-  });
-  console.log(completion.data.choices[0].text);
-} catch (error) {
-  if (error.response) {
-    console.log(error.response.status);
-    console.log(error.response.data);
-  } else {
-    console.log(error.message);
-  }
-}
+### Deployment name
+```ts
+const response = await this.openAiApi.createCompletion({
+  model: <deployement>,
+  prompt: prompt,
+  maxTokens: 100,
+  temperature: 0.9,
+  topP: 1,
+  presencePenalty: 0,
+  frequencyPenalty: 0,
+  bestOf: 1,
+});
 ```
 
-### Streaming completions
+## Releases
 
-Streaming completions (`stream=true`) are not natively supported in this package yet, but [a workaround exists](https://github.com/openai/openai-node/issues/18#issuecomment-1369996933) if needed.
-
-## Upgrade guide
-
-All breaking changes for major version releases are listed below.
-
-### 3.0.0
-
-- The function signature of `createCompletion(engineId, params)` changed to `createCompletion(params)`. The value previously passed in as the `engineId` argument should now be passed in as `model` in the params object (e.g. `createCompletion({ model: "text-davinci-003", ... })`)
-- Replace any `createCompletionFromModel(params)` calls with `createCompletion(params)`
-
-## Thanks
-
-Thank you to [ceifa](https://github.com/ceifa) for creating and maintaining the original unofficial `openai` npm package before we released this official library! ceifa's original package has been renamed to [gpt-x](https://www.npmjs.com/package/gpt-x).
+This library follows the versioning and releases of the official OpenAI node library.

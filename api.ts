@@ -12,7 +12,6 @@
  * Do not edit the class manually.
  */
 
-
 import type { Configuration } from './configuration';
 import type { AxiosPromise, AxiosInstance, AxiosRequestConfig } from 'axios';
 import globalAxios from 'axios';
@@ -1938,7 +1937,14 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
         createChatCompletion: async (createChatCompletionRequest: CreateChatCompletionRequest, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'createChatCompletionRequest' is not null or undefined
             assertParamExists('createChatCompletion', 'createChatCompletionRequest', createChatCompletionRequest)
-            const localVarPath = `/chat/completions`;
+
+            let localVarPath = `/chat/completions`;
+            if (configuration.azure) {
+                const deploymentName = configuration.azure.deploymentName ?? createChatCompletionRequest.model;
+                const apiVersion = configuration.azure.apiVersion ?? '2023-03-15-preview';
+                localVarPath = `/openai/deployments/${deploymentName}/chat/completions?api-version=${apiVersion}`;
+            }
+
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -2011,7 +2017,14 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
         createCompletion: async (createCompletionRequest: CreateCompletionRequest, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'createCompletionRequest' is not null or undefined
             assertParamExists('createCompletion', 'createCompletionRequest', createCompletionRequest)
-            const localVarPath = `/completions`;
+            
+            let localVarPath = `/completions`;
+            if (configuration.azure) {
+                const deploymentName = configuration.azure.deploymentName ?? createCompletionRequest.model;
+                const apiVersion = configuration.azure.apiVersion ?? '2023-03-15-preview';
+                localVarPath = `/openai/deployments/${deploymentName}/completions?api-version=${apiVersion}`;
+            }
+            
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -2083,7 +2096,14 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
         createEmbedding: async (createEmbeddingRequest: CreateEmbeddingRequest, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'createEmbeddingRequest' is not null or undefined
             assertParamExists('createEmbedding', 'createEmbeddingRequest', createEmbeddingRequest)
-            const localVarPath = `/embeddings`;
+
+            let localVarPath = `/embeddings`;
+            if (configuration.azure) {
+                const deploymentName = configuration.azure.deploymentName ?? createEmbeddingRequest.model;
+                const apiVersion = configuration.azure.apiVersion ?? '2023-03-15-preview';
+                localVarPath = `/openai/deployments/${deploymentName}/embeddings?api-version=${apiVersion}`;
+            }
+            
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
