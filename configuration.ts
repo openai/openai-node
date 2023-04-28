@@ -127,7 +127,9 @@ export class Configuration {
 
                 break;
             }
-            case API_TYPE.AzureAD: {
+            case API_TYPE.AzureAD:
+            case API_TYPE.Azure:
+            {
                 this.baseOptions.headers = {
                     'api-key': this.apiKey,
                     ...this.baseOptions.headers,
