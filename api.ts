@@ -15,7 +15,6 @@
 import type { Configuration } from './configuration';
 import type { AxiosPromise, AxiosInstance, AxiosRequestConfig } from 'axios';
 import globalAxios from 'axios';
-
 // Some imports not used depending on template conditions
 // @ts-ignore
 import { DUMMY_BASE_URL, assertParamExists, setApiKeyToObject, setBasicAuthToObject, setBearerAuthToObject, setOAuthToObject, setSearchParams, serializeDataIfNeeded, toPathString, createRequestFunction } from './common';
@@ -2097,12 +2096,14 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
         createEmbedding: async (createEmbeddingRequest: CreateEmbeddingRequest, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'createEmbeddingRequest' is not null or undefined
             assertParamExists('createEmbedding', 'createEmbeddingRequest', createEmbeddingRequest)
+
             let localVarPath = `/embeddings`;
             if (configuration.azure) {
-                const deploymentName = configuration.azure.deploymentName ? configuration.azure.deploymentName : createEmbeddingRequest.model;
-                const apiVersion = configuration.azure.apiVersion ? configuration.azure.apiVersion : '2023-03-15-preview';
-                localVarPath = `/openai/deployments/${deploymentName}/embeddings?api-version=${configuration.azure.apiVersion}`;
+                const deploymentName = configuration.azure.deploymentName ?? createEmbeddingRequest.model;
+                const apiVersion = configuration.azure.apiVersion ?? '2023-03-15-preview';
+                localVarPath = `/openai/deployments/${deploymentName}/embeddings?api-version=${apiVersion}`;
             }
+            
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
