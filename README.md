@@ -15,7 +15,7 @@ $ npm install @unique/openai
 
 ## Usage
 
-The library needs to be configured with your Azure OpenAI's key, endpoint and deploymentId. you can obtain these credentials from [Azure Portal](https://portal.azure.com).
+The library must be configured with your Azure OpenAI's `key`, `endpoint`, and `deploymentId`. You can obtain these credentials from [Azure Portal](https://portal.azure.com).
 
 ```ts
 import { Configuration, OpenAIApi } from '@unique/openai';
