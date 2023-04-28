@@ -16,6 +16,7 @@
 const packageJson = require("../package.json");
 
 export interface ConfigurationParameters {
+    apiType?: API_TYPE;
     apiKey?: string | Promise<string> | ((name: string) => string) | ((name: string) => Promise<string>);
     organization?: string;
     username?: string;
@@ -23,10 +24,18 @@ export interface ConfigurationParameters {
     accessToken?: string | Promise<string> | ((name?: string, scopes?: string[]) => string) | ((name?: string, scopes?: string[]) => Promise<string>);
     basePath?: string;
     baseOptions?: any;
+    apiVersion?: any;
     formDataCtor?: new () => any;
 }
 
+export enum API_TYPE {
+    Azure = 'azure',
+    OpenAi = 'openai',
+    AzureAD = 'azuread',
+}
+
 export class Configuration {
+    apiType?: API_TYPE;
     /**
      * parameter for apiKey security
      * @param name security name
@@ -75,6 +84,14 @@ export class Configuration {
      * @memberof Configuration
      */
     baseOptions?: any;
+
+    /**
+     * parameter for api version
+     * 
+     * @type {any}
+     * @memberof Configuration
+     */
+    apiVersion?: any;
     /**
      * The FormData constructor that will be used to create multipart form data
      * requests. You can inject this here so that execution environments that
@@ -85,6 +102,7 @@ export class Configuration {
     formDataCtor?: new () => any;
 
     constructor(param: ConfigurationParameters = {}) {
+        this.apiType = param.apiType || API_TYPE.OpenAi;
         this.apiKey = param.apiKey;
         this.organization = param.organization;
         this.username = param.username;
@@ -92,14 +110,34 @@ export class Configuration {
         this.accessToken = param.accessToken;
         this.basePath = param.basePath;
         this.baseOptions = param.baseOptions;
+        this.apiVersion = param.apiVersion;
         this.formDataCtor = param.formDataCtor;
 
         if (!this.baseOptions) {
             this.baseOptions = {};
         }
+        switch (this.apiType) {
+            case API_TYPE.OpenAi: {
+                this.baseOptions.headers = {
+                    'Authorization': `Bearer ${this.apiKey}`,
+                    ...this.baseOptions.headers,
+                }
+
+                if (!this.apiVersion) throw new Error('Azure AD required apiVersion');
+
+                break;
+            }
+            case API_TYPE.AzureAD: {
+                this.baseOptions.headers = {
+                    'api-key': this.apiKey,
+                    ...this.baseOptions.headers,
+                }
+                break;
+            }
+        }
+
         this.baseOptions.headers = {
             'User-Agent': `OpenAI/NodeJS/${packageJson.version}`,
-            'Authorization': `Bearer ${this.apiKey}`,
             ...this.baseOptions.headers,
         }
         if (this.organization) {

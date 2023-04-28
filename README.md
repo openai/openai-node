@@ -38,6 +38,8 @@ All of the available API request functions additionally contain an optional fina
 ```javascript
 const completion = await openai.createCompletion(
   {
+    apiType: API_TYPE.Azure,
+    basePath: /** URL */,
     model: "text-davinci-003",
     prompt: "Hello world",
   },
@@ -57,6 +59,8 @@ API requests can potentially return errors due to invalid inputs or other issues
 ```javascript
 try {
   const completion = await openai.createCompletion({
+    apiType: API_TYPE.Azure,
+    basePath: /** URL */,    
     model: "text-davinci-003",
     prompt: "Hello world",
   });

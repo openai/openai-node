@@ -13,10 +13,17 @@
  * Do not edit the class manually.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Configuration = void 0;
+exports.Configuration = exports.API_TYPE = void 0;
 const packageJson = require("../package.json");
+var API_TYPE;
+(function (API_TYPE) {
+    API_TYPE["Azure"] = "azure";
+    API_TYPE["OpenAi"] = "openai";
+    API_TYPE["AzureAD"] = "azuread";
+})(API_TYPE = exports.API_TYPE || (exports.API_TYPE = {}));
 class Configuration {
     constructor(param = {}) {
+        this.apiType = param.apiType || API_TYPE.OpenAi;
         this.apiKey = param.apiKey;
         this.organization = param.organization;
         this.username = param.username;
@@ -24,11 +31,24 @@ class Configuration {
         this.accessToken = param.accessToken;
         this.basePath = param.basePath;
         this.baseOptions = param.baseOptions;
+        this.apiVersion = param.apiVersion;
         this.formDataCtor = param.formDataCtor;
         if (!this.baseOptions) {
             this.baseOptions = {};
         }
-        this.baseOptions.headers = Object.assign({ 'User-Agent': `OpenAI/NodeJS/${packageJson.version}`, 'Authorization': `Bearer ${this.apiKey}` }, this.baseOptions.headers);
+        switch (this.apiType) {
+            case API_TYPE.OpenAi: {
+                this.baseOptions.headers = Object.assign({ 'Authorization': `Bearer ${this.apiKey}` }, this.baseOptions.headers);
+                if (!this.apiVersion)
+                    throw new Error('Azure AD required apiVersion');
+                break;
+            }
+            case API_TYPE.AzureAD: {
+                this.baseOptions.headers = Object.assign({ 'api-key': this.apiKey }, this.baseOptions.headers);
+                break;
+            }
+        }
+        this.baseOptions.headers = Object.assign({ 'User-Agent': `OpenAI/NodeJS/${packageJson.version}` }, this.baseOptions.headers);
         if (this.organization) {
             this.baseOptions.headers['OpenAI-Organization'] = this.organization;
         }

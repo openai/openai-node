@@ -10,6 +10,7 @@
  * Do not edit the class manually.
  */
 export interface ConfigurationParameters {
+    apiType?: API_TYPE;
     apiKey?: string | Promise<string> | ((name: string) => string) | ((name: string) => Promise<string>);
     organization?: string;
     username?: string;
@@ -17,9 +18,16 @@ export interface ConfigurationParameters {
     accessToken?: string | Promise<string> | ((name?: string, scopes?: string[]) => string) | ((name?: string, scopes?: string[]) => Promise<string>);
     basePath?: string;
     baseOptions?: any;
+    apiVersion?: any;
     formDataCtor?: new () => any;
 }
+export declare enum API_TYPE {
+    Azure = "azure",
+    OpenAi = "openai",
+    AzureAD = "azuread"
+}
 export declare class Configuration {
+    apiType?: API_TYPE;
     /**
      * parameter for apiKey security
      * @param name security name
@@ -68,6 +76,13 @@ export declare class Configuration {
      * @memberof Configuration
      */
     baseOptions?: any;
+    /**
+     * parameter for api version
+     *
+     * @type {any}
+     * @memberof Configuration
+     */
+    apiVersion?: any;
     /**
      * The FormData constructor that will be used to create multipart form data
      * requests. You can inject this here so that execution environments that

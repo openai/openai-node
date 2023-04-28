@@ -23,6 +23,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.OpenAIApi = exports.OpenAIApiFactory = exports.OpenAIApiFp = exports.OpenAIApiAxiosParamCreator = exports.CreateImageRequestResponseFormatEnum = exports.CreateImageRequestSizeEnum = exports.ChatCompletionResponseMessageRoleEnum = exports.ChatCompletionRequestMessageRoleEnum = void 0;
+const configuration_1 = require("./configuration");
 const axios_1 = require("axios");
 // Some imports not used depending on template conditions
 // @ts-ignore
@@ -75,6 +76,9 @@ exports.OpenAIApiAxiosParamCreator = function (configuration) {
             const localVarRequestOptions = Object.assign(Object.assign({ method: 'POST' }, baseOptions), options);
             const localVarHeaderParameter = {};
             const localVarQueryParameter = {};
+            if ([configuration_1.API_TYPE.Azure, configuration_1.API_TYPE.AzureAD].includes(configuration.apiType)) {
+                localVarQueryParameter['api-version'] = configuration.apiVersion;
+            }
             common_1.setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = Object.assign(Object.assign(Object.assign({}, localVarHeaderParameter), headersFromBaseOptions), options.headers);
@@ -105,6 +109,9 @@ exports.OpenAIApiAxiosParamCreator = function (configuration) {
             const localVarHeaderParameter = {};
             const localVarQueryParameter = {};
             localVarHeaderParameter['Content-Type'] = 'application/json';
+            if ([configuration_1.API_TYPE.Azure, configuration_1.API_TYPE.AzureAD].includes(configuration.apiType)) {
+                localVarQueryParameter['api-version'] = configuration.apiVersion;
+            }
             common_1.setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = Object.assign(Object.assign(Object.assign({}, localVarHeaderParameter), headersFromBaseOptions), options.headers);
@@ -135,6 +142,9 @@ exports.OpenAIApiAxiosParamCreator = function (configuration) {
             const localVarHeaderParameter = {};
             const localVarQueryParameter = {};
             localVarHeaderParameter['Content-Type'] = 'application/json';
+            if ([configuration_1.API_TYPE.Azure, configuration_1.API_TYPE.AzureAD].includes(configuration.apiType)) {
+                localVarQueryParameter['api-version'] = configuration.apiVersion;
+            }
             common_1.setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = Object.assign(Object.assign(Object.assign({}, localVarHeaderParameter), headersFromBaseOptions), options.headers);
@@ -166,6 +176,9 @@ exports.OpenAIApiAxiosParamCreator = function (configuration) {
             const localVarHeaderParameter = {};
             const localVarQueryParameter = {};
             localVarHeaderParameter['Content-Type'] = 'application/json';
+            if ([configuration_1.API_TYPE.Azure, configuration_1.API_TYPE.AzureAD].includes(configuration.apiType)) {
+                localVarQueryParameter['api-version'] = configuration.apiVersion;
+            }
             common_1.setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = Object.assign(Object.assign(Object.assign({}, localVarHeaderParameter), headersFromBaseOptions), options.headers);
@@ -188,14 +201,14 @@ exports.OpenAIApiAxiosParamCreator = function (configuration) {
             const localVarPath = `/completions`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, common_1.DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
+            const baseOptions = configuration.baseOptions || {};
             const localVarRequestOptions = Object.assign(Object.assign({ method: 'POST' }, baseOptions), options);
             const localVarHeaderParameter = {};
             const localVarQueryParameter = {};
             localVarHeaderParameter['Content-Type'] = 'application/json';
+            if ([configuration_1.API_TYPE.Azure, configuration_1.API_TYPE.AzureAD].includes(configuration.apiType)) {
+                localVarQueryParameter['api-version'] = configuration.apiVersion;
+            }
             common_1.setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = Object.assign(Object.assign(Object.assign({}, localVarHeaderParameter), headersFromBaseOptions), options.headers);
@@ -213,6 +226,9 @@ exports.OpenAIApiAxiosParamCreator = function (configuration) {
          * @throws {RequiredError}
          */
         createEdit: (createEditRequest, options = {}) => __awaiter(this, void 0, void 0, function* () {
+            if ([configuration_1.API_TYPE.Azure, configuration_1.API_TYPE.AzureAD].includes(configuration.apiType)) {
+                throw new Error("This operation is not supported by the Azure OpenAI API yet.");
+            }
             // verify required parameter 'createEditRequest' is not null or undefined
             common_1.assertParamExists('createEdit', 'createEditRequest', createEditRequest);
             const localVarPath = `/edits`;
@@ -256,6 +272,9 @@ exports.OpenAIApiAxiosParamCreator = function (configuration) {
             const localVarHeaderParameter = {};
             const localVarQueryParameter = {};
             localVarHeaderParameter['Content-Type'] = 'application/json';
+            if ([configuration_1.API_TYPE.Azure, configuration_1.API_TYPE.AzureAD].includes(configuration.apiType)) {
+                localVarQueryParameter['api-version'] = configuration.apiVersion;
+            }
             common_1.setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = Object.assign(Object.assign(Object.assign({}, localVarHeaderParameter), headersFromBaseOptions), options.headers);
@@ -296,6 +315,9 @@ exports.OpenAIApiAxiosParamCreator = function (configuration) {
                 localVarFormParams.append('purpose', purpose);
             }
             localVarHeaderParameter['Content-Type'] = 'multipart/form-data';
+            if ([configuration_1.API_TYPE.Azure, configuration_1.API_TYPE.AzureAD].includes(configuration.apiType)) {
+                localVarQueryParameter['api-version'] = configuration.apiVersion;
+            }
             common_1.setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = Object.assign(Object.assign(Object.assign(Object.assign({}, localVarHeaderParameter), localVarFormParams.getHeaders()), headersFromBaseOptions), options.headers);
@@ -326,6 +348,9 @@ exports.OpenAIApiAxiosParamCreator = function (configuration) {
             const localVarHeaderParameter = {};
             const localVarQueryParameter = {};
             localVarHeaderParameter['Content-Type'] = 'application/json';
+            if ([configuration_1.API_TYPE.Azure, configuration_1.API_TYPE.AzureAD].includes(configuration.apiType)) {
+                localVarQueryParameter['api-version'] = configuration.apiVersion;
+            }
             common_1.setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = Object.assign(Object.assign(Object.assign({}, localVarHeaderParameter), headersFromBaseOptions), options.headers);
@@ -356,6 +381,9 @@ exports.OpenAIApiAxiosParamCreator = function (configuration) {
             const localVarHeaderParameter = {};
             const localVarQueryParameter = {};
             localVarHeaderParameter['Content-Type'] = 'application/json';
+            if ([configuration_1.API_TYPE.Azure, configuration_1.API_TYPE.AzureAD].includes(configuration.apiType)) {
+                localVarQueryParameter['api-version'] = configuration.apiVersion;
+            }
             common_1.setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = Object.assign(Object.assign(Object.assign({}, localVarHeaderParameter), headersFromBaseOptions), options.headers);
@@ -416,6 +444,9 @@ exports.OpenAIApiAxiosParamCreator = function (configuration) {
                 localVarFormParams.append('user', user);
             }
             localVarHeaderParameter['Content-Type'] = 'multipart/form-data';
+            if ([configuration_1.API_TYPE.Azure, configuration_1.API_TYPE.AzureAD].includes(configuration.apiType)) {
+                localVarQueryParameter['api-version'] = configuration.apiVersion;
+            }
             common_1.setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = Object.assign(Object.assign(Object.assign(Object.assign({}, localVarHeaderParameter), localVarFormParams.getHeaders()), headersFromBaseOptions), options.headers);
@@ -466,6 +497,9 @@ exports.OpenAIApiAxiosParamCreator = function (configuration) {
                 localVarFormParams.append('user', user);
             }
             localVarHeaderParameter['Content-Type'] = 'multipart/form-data';
+            if ([configuration_1.API_TYPE.Azure, configuration_1.API_TYPE.AzureAD].includes(configuration.apiType)) {
+                localVarQueryParameter['api-version'] = configuration.apiVersion;
+            }
             common_1.setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = Object.assign(Object.assign(Object.assign(Object.assign({}, localVarHeaderParameter), localVarFormParams.getHeaders()), headersFromBaseOptions), options.headers);
@@ -496,6 +530,9 @@ exports.OpenAIApiAxiosParamCreator = function (configuration) {
             const localVarHeaderParameter = {};
             const localVarQueryParameter = {};
             localVarHeaderParameter['Content-Type'] = 'application/json';
+            if ([configuration_1.API_TYPE.Azure, configuration_1.API_TYPE.AzureAD].includes(configuration.apiType)) {
+                localVarQueryParameter['api-version'] = configuration.apiVersion;
+            }
             common_1.setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = Object.assign(Object.assign(Object.assign({}, localVarHeaderParameter), headersFromBaseOptions), options.headers);
@@ -531,6 +568,9 @@ exports.OpenAIApiAxiosParamCreator = function (configuration) {
             const localVarHeaderParameter = {};
             const localVarQueryParameter = {};
             localVarHeaderParameter['Content-Type'] = 'application/json';
+            if ([configuration_1.API_TYPE.Azure, configuration_1.API_TYPE.AzureAD].includes(configuration.apiType)) {
+                localVarQueryParameter['api-version'] = configuration.apiVersion;
+            }
             common_1.setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = Object.assign(Object.assign(Object.assign({}, localVarHeaderParameter), headersFromBaseOptions), options.headers);
@@ -587,6 +627,9 @@ exports.OpenAIApiAxiosParamCreator = function (configuration) {
                 localVarFormParams.append('language', language);
             }
             localVarHeaderParameter['Content-Type'] = 'multipart/form-data';
+            if ([configuration_1.API_TYPE.Azure, configuration_1.API_TYPE.AzureAD].includes(configuration.apiType)) {
+                localVarQueryParameter['api-version'] = configuration.apiVersion;
+            }
             common_1.setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = Object.assign(Object.assign(Object.assign(Object.assign({}, localVarHeaderParameter), localVarFormParams.getHeaders()), headersFromBaseOptions), options.headers);
@@ -639,6 +682,9 @@ exports.OpenAIApiAxiosParamCreator = function (configuration) {
                 localVarFormParams.append('temperature', temperature);
             }
             localVarHeaderParameter['Content-Type'] = 'multipart/form-data';
+            if ([configuration_1.API_TYPE.Azure, configuration_1.API_TYPE.AzureAD].includes(configuration.apiType)) {
+                localVarQueryParameter['api-version'] = configuration.apiVersion;
+            }
             common_1.setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = Object.assign(Object.assign(Object.assign(Object.assign({}, localVarHeaderParameter), localVarFormParams.getHeaders()), headersFromBaseOptions), options.headers);
@@ -669,6 +715,9 @@ exports.OpenAIApiAxiosParamCreator = function (configuration) {
             const localVarRequestOptions = Object.assign(Object.assign({ method: 'DELETE' }, baseOptions), options);
             const localVarHeaderParameter = {};
             const localVarQueryParameter = {};
+            if ([configuration_1.API_TYPE.Azure, configuration_1.API_TYPE.AzureAD].includes(configuration.apiType)) {
+                localVarQueryParameter['api-version'] = configuration.apiVersion;
+            }
             common_1.setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = Object.assign(Object.assign(Object.assign({}, localVarHeaderParameter), headersFromBaseOptions), options.headers);
@@ -698,6 +747,9 @@ exports.OpenAIApiAxiosParamCreator = function (configuration) {
             const localVarRequestOptions = Object.assign(Object.assign({ method: 'DELETE' }, baseOptions), options);
             const localVarHeaderParameter = {};
             const localVarQueryParameter = {};
+            if ([configuration_1.API_TYPE.Azure, configuration_1.API_TYPE.AzureAD].includes(configuration.apiType)) {
+                localVarQueryParameter['api-version'] = configuration.apiVersion;
+            }
             common_1.setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = Object.assign(Object.assign(Object.assign({}, localVarHeaderParameter), headersFromBaseOptions), options.headers);
@@ -727,6 +779,9 @@ exports.OpenAIApiAxiosParamCreator = function (configuration) {
             const localVarRequestOptions = Object.assign(Object.assign({ method: 'GET' }, baseOptions), options);
             const localVarHeaderParameter = {};
             const localVarQueryParameter = {};
+            if ([configuration_1.API_TYPE.Azure, configuration_1.API_TYPE.AzureAD].includes(configuration.apiType)) {
+                localVarQueryParameter['api-version'] = configuration.apiVersion;
+            }
             common_1.setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = Object.assign(Object.assign(Object.assign({}, localVarHeaderParameter), headersFromBaseOptions), options.headers);
@@ -753,6 +808,9 @@ exports.OpenAIApiAxiosParamCreator = function (configuration) {
             const localVarRequestOptions = Object.assign(Object.assign({ method: 'GET' }, baseOptions), options);
             const localVarHeaderParameter = {};
             const localVarQueryParameter = {};
+            if ([configuration_1.API_TYPE.Azure, configuration_1.API_TYPE.AzureAD].includes(configuration.apiType)) {
+                localVarQueryParameter['api-version'] = configuration.apiVersion;
+            }
             common_1.setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = Object.assign(Object.assign(Object.assign({}, localVarHeaderParameter), headersFromBaseOptions), options.headers);
@@ -778,6 +836,9 @@ exports.OpenAIApiAxiosParamCreator = function (configuration) {
             const localVarRequestOptions = Object.assign(Object.assign({ method: 'GET' }, baseOptions), options);
             const localVarHeaderParameter = {};
             const localVarQueryParameter = {};
+            if ([configuration_1.API_TYPE.Azure, configuration_1.API_TYPE.AzureAD].includes(configuration.apiType)) {
+                localVarQueryParameter['api-version'] = configuration.apiVersion;
+            }
             common_1.setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = Object.assign(Object.assign(Object.assign({}, localVarHeaderParameter), headersFromBaseOptions), options.headers);
@@ -836,6 +897,9 @@ exports.OpenAIApiAxiosParamCreator = function (configuration) {
             const localVarRequestOptions = Object.assign(Object.assign({ method: 'GET' }, baseOptions), options);
             const localVarHeaderParameter = {};
             const localVarQueryParameter = {};
+            if ([configuration_1.API_TYPE.Azure, configuration_1.API_TYPE.AzureAD].includes(configuration.apiType)) {
+                localVarQueryParameter['api-version'] = configuration.apiVersion;
+            }
             common_1.setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = Object.assign(Object.assign(Object.assign({}, localVarHeaderParameter), headersFromBaseOptions), options.headers);
@@ -861,6 +925,9 @@ exports.OpenAIApiAxiosParamCreator = function (configuration) {
             const localVarRequestOptions = Object.assign(Object.assign({ method: 'GET' }, baseOptions), options);
             const localVarHeaderParameter = {};
             const localVarQueryParameter = {};
+            if ([configuration_1.API_TYPE.Azure, configuration_1.API_TYPE.AzureAD].includes(configuration.apiType)) {
+                localVarQueryParameter['api-version'] = configuration.apiVersion;
+            }
             common_1.setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = Object.assign(Object.assign(Object.assign({}, localVarHeaderParameter), headersFromBaseOptions), options.headers);
@@ -891,6 +958,9 @@ exports.OpenAIApiAxiosParamCreator = function (configuration) {
             const localVarRequestOptions = Object.assign(Object.assign({ method: 'GET' }, baseOptions), options);
             const localVarHeaderParameter = {};
             const localVarQueryParameter = {};
+            if ([configuration_1.API_TYPE.Azure, configuration_1.API_TYPE.AzureAD].includes(configuration.apiType)) {
+                localVarQueryParameter['api-version'] = configuration.apiVersion;
+            }
             common_1.setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = Object.assign(Object.assign(Object.assign({}, localVarHeaderParameter), headersFromBaseOptions), options.headers);
@@ -920,6 +990,9 @@ exports.OpenAIApiAxiosParamCreator = function (configuration) {
             const localVarRequestOptions = Object.assign(Object.assign({ method: 'GET' }, baseOptions), options);
             const localVarHeaderParameter = {};
             const localVarQueryParameter = {};
+            if ([configuration_1.API_TYPE.Azure, configuration_1.API_TYPE.AzureAD].includes(configuration.apiType)) {
+                localVarQueryParameter['api-version'] = configuration.apiVersion;
+            }
             common_1.setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = Object.assign(Object.assign(Object.assign({}, localVarHeaderParameter), headersFromBaseOptions), options.headers);
@@ -949,6 +1022,9 @@ exports.OpenAIApiAxiosParamCreator = function (configuration) {
             const localVarRequestOptions = Object.assign(Object.assign({ method: 'GET' }, baseOptions), options);
             const localVarHeaderParameter = {};
             const localVarQueryParameter = {};
+            if ([configuration_1.API_TYPE.Azure, configuration_1.API_TYPE.AzureAD].includes(configuration.apiType)) {
+                localVarQueryParameter['api-version'] = configuration.apiVersion;
+            }
             common_1.setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = Object.assign(Object.assign(Object.assign({}, localVarHeaderParameter), headersFromBaseOptions), options.headers);
@@ -978,6 +1054,9 @@ exports.OpenAIApiAxiosParamCreator = function (configuration) {
             const localVarRequestOptions = Object.assign(Object.assign({ method: 'GET' }, baseOptions), options);
             const localVarHeaderParameter = {};
             const localVarQueryParameter = {};
+            if ([configuration_1.API_TYPE.Azure, configuration_1.API_TYPE.AzureAD].includes(configuration.apiType)) {
+                localVarQueryParameter['api-version'] = configuration.apiVersion;
+            }
             common_1.setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = Object.assign(Object.assign(Object.assign({}, localVarHeaderParameter), headersFromBaseOptions), options.headers);
