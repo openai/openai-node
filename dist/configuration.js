@@ -25,15 +25,25 @@ class Configuration {
         this.basePath = param.basePath;
         this.baseOptions = param.baseOptions;
         this.formDataCtor = param.formDataCtor;
+        this.azure = param.azure;
         if (!this.baseOptions) {
             this.baseOptions = {};
         }
-        this.baseOptions.headers = Object.assign({ 'User-Agent': `OpenAI/NodeJS/${packageJson.version}`, 'Authorization': `Bearer ${this.apiKey}` }, this.baseOptions.headers);
+        this.baseOptions.headers = Object.assign({ 'User-Agent': `AzureOpenAI/NodeJS/${packageJson.version}`, 'Authorization': `Bearer ${this.apiKey}` }, this.baseOptions.headers);
         if (this.organization) {
             this.baseOptions.headers['OpenAI-Organization'] = this.organization;
         }
         if (!this.formDataCtor) {
             this.formDataCtor = require("form-data");
+        }
+        if (this.azure) {
+            if (!this.azure.apiKey || !this.azure.endpoint) {
+                throw new Error("Azure Configuration requires apiKey and endpoint.");
+            }
+            this.apiKey = this.azure.apiKey;
+            this.baseOptions.headers['api-key'] = this.azure.apiKey;
+            this.baseOptions.headers['Authorization'] = '';
+            this.basePath = this.azure.endpoint;
         }
     }
     /**

@@ -9,6 +9,12 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+export interface AzureConfigurationParameters {
+    apiKey: string | Promise<string> | ((name: string) => string) | ((name: string) => Promise<string>);
+    endpoint: string;
+    deploymentName?: string;
+    apiVersion?: string;
+}
 export interface ConfigurationParameters {
     apiKey?: string | Promise<string> | ((name: string) => string) | ((name: string) => Promise<string>);
     organization?: string;
@@ -18,6 +24,7 @@ export interface ConfigurationParameters {
     basePath?: string;
     baseOptions?: any;
     formDataCtor?: new () => any;
+    azure?: AzureConfigurationParameters;
 }
 export declare class Configuration {
     /**
@@ -76,6 +83,10 @@ export declare class Configuration {
      * @type {new () => FormData}
      */
     formDataCtor?: new () => any;
+    /**
+     * @memberof Configuration
+     */
+    azure?: AzureConfigurationParameters;
     constructor(param?: ConfigurationParameters);
     /**
      * Check if the given MIME is a JSON MIME.
