@@ -286,7 +286,7 @@ export interface CreateChatCompletionRequest {
      * @type {Array<ChatCompletionRequestMessage>}
      * @memberof CreateChatCompletionRequest
      */
-    'messages'?: Array<ChatCompletionRequestMessage>;
+    'messages': Array<ChatCompletionRequestMessage>;
     /**
      * What sampling temperature to use, between 0 and 2. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.  We generally recommend altering this or `top_p` but not both. 
      * @type {number}
@@ -2018,12 +2018,14 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
         createCompletion: async (createCompletionRequest: CreateCompletionRequest, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'createCompletionRequest' is not null or undefined
             assertParamExists('createCompletion', 'createCompletionRequest', createCompletionRequest)
+            
             let localVarPath = `/completions`;
             if (configuration.azure) {
                 const deploymentName = configuration.azure.deploymentName ?? createCompletionRequest.model;
                 const apiVersion = configuration.azure.apiVersion ?? '2023-03-15-preview';
                 localVarPath = `/openai/deployments/${deploymentName}/completions?api-version=${apiVersion}`;
             }
+            
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
