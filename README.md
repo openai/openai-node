@@ -68,3 +68,7 @@ const response = await this.openAiApi.createCompletion({
   bestOf: 1,
 });
 ```
+
+## Releases
+
+This library follows the versioning and releases of the official OpenAI node library.
