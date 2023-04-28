@@ -13,10 +13,11 @@
  */
 
 
-import type { Configuration } from "./configuration";
-import type { RequestArgs } from "./base";
 import type { AxiosInstance, AxiosResponse } from 'axios';
+import { ChatCompletionRequestMessage } from "./api";
+import type { RequestArgs } from "./base";
 import { RequiredError } from "./base";
+import type { Configuration } from "./configuration";
 
 /**
  *
@@ -147,4 +148,30 @@ export const createRequestFunction = function (axiosArgs: RequestArgs, globalAxi
         const axiosRequestArgs = {...axiosArgs.options, url: (configuration?.basePath || basePath) + axiosArgs.url};
         return axios.request<T, R>(axiosRequestArgs);
     };
+}
+
+/**
+ * 
+ * @export
+ */
+export const createPrompt = function (systemMessage: string, messages: { sender: string, text: string }[]): string {
+    let prompt = systemMessage;
+    for (const message of messages) {
+        prompt += `\n<|im_start|>${message.sender}\n${message.text}\n<|im_end|>`;
+    }
+    prompt += "\n<|im_start|>assistant\n";
+    return prompt;
+}
+
+export const messageToAzurePrompt = function (messages: Array<ChatCompletionRequestMessage>): string {
+    let systemMessage = '';
+    let conversationMessage = [];
+    for (const message of messages) {
+        systemMessage = message.role === "system" ? `<|im_start|>system\n{'${message.content}'}\n<|im_end|>` : '';
+        conversationMessage.push({
+            sender: message.role,
+            text: message.content,
+        })
+    }
+    return createPrompt(systemMessage, conversationMessage);
 }
