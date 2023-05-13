@@ -9,8 +9,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+/// <reference types="node" />
 import type { Configuration } from './configuration';
 import type { AxiosPromise, AxiosInstance, AxiosRequestConfig } from 'axios';
+import type { Readable } from 'stream';
 import type { RequestArgs } from './base';
 import { BaseAPI } from './base';
 /**
@@ -338,11 +340,19 @@ export interface CreateChatCompletionRequest {
  */
 export declare type CreateChatCompletionRequestStop = Array<string> | string;
 /**
+ * @type ReadableChatStream
+ * Provide "on" property when using stream response type
+ */
+declare type ReadableChatStream = Omit<Readable, keyof Readable> & {
+    on: Readable['on'];
+};
+/**
  *
  * @export
  * @interface CreateChatCompletionResponse
+ * @extends ReadableChatStream
  */
-export interface CreateChatCompletionResponse {
+export interface CreateChatCompletionResponse extends ReadableChatStream {
     /**
      *
      * @type {string}
@@ -2866,3 +2876,4 @@ export declare class OpenAIApi extends BaseAPI {
      */
     retrieveModel(model: string, options?: AxiosRequestConfig): Promise<import("axios").AxiosResponse<Model, any>>;
 }
+export {};

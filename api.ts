@@ -16,6 +16,7 @@
 import type { Configuration } from './configuration';
 import type { AxiosPromise, AxiosInstance, AxiosRequestConfig } from 'axios';
 import globalAxios from 'axios';
+import type { Readable } from 'stream';
 // Some imports not used depending on template conditions
 // @ts-ignore
 import { DUMMY_BASE_URL, assertParamExists, setApiKeyToObject, setBasicAuthToObject, setBearerAuthToObject, setOAuthToObject, setSearchParams, serializeDataIfNeeded, toPathString, createRequestFunction } from './common';
@@ -356,11 +357,18 @@ export interface CreateChatCompletionRequest {
 export type CreateChatCompletionRequestStop = Array<string> | string;
 
 /**
+ * @type ReadableChatStream
+ * Provide "on" property when using stream response type
+ */
+type ReadableChatStream = Omit<Readable, keyof Readable> & { on: Readable['on'] };
+
+/**
  * 
  * @export
  * @interface CreateChatCompletionResponse
+ * @extends ReadableChatStream
  */
-export interface CreateChatCompletionResponse {
+export interface CreateChatCompletionResponse extends ReadableChatStream{
     /**
      * 
      * @type {string}
