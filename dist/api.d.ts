@@ -13,6 +13,7 @@ import type { Configuration } from './configuration';
 import type { AxiosPromise, AxiosInstance, AxiosRequestConfig } from 'axios';
 import type { RequestArgs } from './base';
 import { BaseAPI } from './base';
+import { ReadStream } from 'fs';
 /**
  *
  * @export
@@ -1968,7 +1969,7 @@ export declare const OpenAIApiAxiosParamCreator: (configuration?: Configuration)
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
-    createTranscription: (file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, language?: string, options?: AxiosRequestConfig) => Promise<RequestArgs>;
+    createTranscription: (file: File | ReadStream, model: string, prompt?: string, responseFormat?: string, temperature?: number, language?: string, options?: AxiosRequestConfig) => Promise<RequestArgs>;
     /**
      *
      * @summary Translates audio into into English.

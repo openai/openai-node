@@ -22,6 +22,7 @@ import { DUMMY_BASE_URL, assertParamExists, setApiKeyToObject, setBasicAuthToObj
 import type { RequestArgs } from './base';
 // @ts-ignore
 import { BASE_PATH, COLLECTION_FORMATS, BaseAPI, RequiredError } from './base';
+import { ReadStream } from 'fs';
 
 /**
  * 
@@ -2452,7 +2453,7 @@ export const OpenAIApiAxiosParamCreator = function (configuration?: Configuratio
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        createTranscription: async (file: File, model: string, prompt?: string, responseFormat?: string, temperature?: number, language?: string, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+        createTranscription: async (file: File | ReadStream, model: string, prompt?: string, responseFormat?: string, temperature?: number, language?: string, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'file' is not null or undefined
             assertParamExists('createTranscription', 'file', file)
             // verify required parameter 'model' is not null or undefined
@@ -3152,7 +3153,7 @@ export const OpenAIApiFp = function(configuration?: Configuration) {
         /**
          * 
          * @summary Transcribes audio into the input language.
-         * @param {File} file The audio file to transcribe, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm. 
+         * @param {File | ReadStream} file The audio file to transcribe, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm. 
          * @param {string} model ID of the model to use. Only &#x60;whisper-1&#x60; is currently available. 
          * @param {string} [prompt] An optional text to guide the model\\\&#39;s style or continue a previous audio segment. The [prompt](/docs/guides/speech-to-text/prompting) should match the audio language. 
          * @param {string} [responseFormat] The format of the transcript output, in one of these options: json, text, srt, verbose_json, or vtt. 
