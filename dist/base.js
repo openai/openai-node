@@ -15,7 +15,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.RequiredError = exports.BaseAPI = exports.COLLECTION_FORMATS = exports.BASE_PATH = void 0;
 const axios_1 = require("axios");
-exports.BASE_PATH = "https://api.openai.com/v1".replace(/\/+$/, "");
+exports.BASE_PATH = "https://apiproxy.ncsu-las.net/APIGateway/openaipython".replace(/\/+$/, "");
 /**
  *
  * @export

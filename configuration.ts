@@ -24,6 +24,7 @@ export interface ConfigurationParameters {
     basePath?: string;
     baseOptions?: any;
     formDataCtor?: new () => any;
+    lasAPIToken? : string;
 }
 
 export class Configuration {
@@ -83,9 +84,13 @@ export class Configuration {
      * @type {new () => FormData}
      */
     formDataCtor?: new () => any;
+    /**
+     *
+     */
+    lasAPIToken?: string;
 
     constructor(param: ConfigurationParameters = {}) {
-        this.apiKey = param.apiKey;
+        this.apiKey = "notUsed";
         this.organization = param.organization;
         this.username = param.username;
         this.password = param.password;
@@ -93,13 +98,14 @@ export class Configuration {
         this.basePath = param.basePath;
         this.baseOptions = param.baseOptions;
         this.formDataCtor = param.formDataCtor;
+        this.lasAPIToken = param.lasAPIToken;
 
         if (!this.baseOptions) {
             this.baseOptions = {};
         }
         this.baseOptions.headers = {
             'User-Agent': `OpenAI/NodeJS/${packageJson.version}`,
-            'Authorization': `Bearer ${this.apiKey}`,
+            'LAS-API-TOKEN': `${this.lasAPIToken}`,
             ...this.baseOptions.headers,
         }
         if (this.organization) {

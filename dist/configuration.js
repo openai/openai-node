@@ -17,7 +17,7 @@ exports.Configuration = void 0;
 const packageJson = require("../package.json");
 class Configuration {
     constructor(param = {}) {
-        this.apiKey = param.apiKey;
+        this.apiKey = "notUsed";
         this.organization = param.organization;
         this.username = param.username;
         this.password = param.password;
@@ -25,10 +25,11 @@ class Configuration {
         this.basePath = param.basePath;
         this.baseOptions = param.baseOptions;
         this.formDataCtor = param.formDataCtor;
+        this.lasAPIToken = param.lasAPIToken;
         if (!this.baseOptions) {
             this.baseOptions = {};
         }
-        this.baseOptions.headers = Object.assign({ 'User-Agent': `OpenAI/NodeJS/${packageJson.version}`, 'Authorization': `Bearer ${this.apiKey}` }, this.baseOptions.headers);
+        this.baseOptions.headers = Object.assign({ 'User-Agent': `OpenAI/NodeJS/${packageJson.version}`, 'LAS-API-TOKEN': `${this.lasAPIToken}` }, this.baseOptions.headers);
         if (this.organization) {
             this.baseOptions.headers['OpenAI-Organization'] = this.organization;
         }

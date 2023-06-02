@@ -18,6 +18,7 @@ export interface ConfigurationParameters {
     basePath?: string;
     baseOptions?: any;
     formDataCtor?: new () => any;
+    lasAPIToken?: string;
 }
 export declare class Configuration {
     /**
@@ -76,6 +77,10 @@ export declare class Configuration {
      * @type {new () => FormData}
      */
     formDataCtor?: new () => any;
+    /**
+     *
+     */
+    lasAPIToken?: string;
     constructor(param?: ConfigurationParameters);
     /**
      * Check if the given MIME is a JSON MIME.

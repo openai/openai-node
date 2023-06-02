@@ -1,33 +1,50 @@
-# OpenAI Node.js Library
+# OpenAI Node.js Library - LAS Version
 
 The OpenAI Node.js library provides convenient access to the OpenAI API from Node.js applications. Most of the code in this library is generated from our [OpenAPI specification](https://github.com/openai/openai-openapi).
 
 **Important note: this library is meant for server-side usage only, as using it in client-side browser code will expose your secret API key. [See here](https://platform.openai.com/docs/api-reference/authentication) for more details.**
 
-## Installation
+This version has been forked by LAS to allow for use within our AWS environment. You must install this through the source code method. To run this version, you will need to define an LAS_API_TOKEN environment variable with your API token from the My Account page of Commander. You may also define this value programmatically.
 
-```bash
-npm install openai
-```
+## Installation
+You must install this version from source locally.
+
+1. Download / clone this repository
+2. Open a terminal / shell window
+3. cd (change directory) to the location where the code has been downloaded/cloned.
+4. execute: ```npm install```
+
+The last step makes downloads the dependencies for OpenAIi and is required. 
 
 ## Usage
+The library needs to be configured with the LAS API Token. The example below shows bringing in the value from a defined environment variable (recommended).
 
-The library needs to be configured with your account's secret key, which is available on the [website](https://platform.openai.com/account/api-keys). We recommend setting it as an environment variable. Here's an example of initializing the library with the API key loaded from an environment variable and creating a completion:
+```bash
+export LAS_API_TOKEN=valueFromMyAcccountPageOnCommander
+```
+
 
 ```javascript
-const { Configuration, OpenAIApi } = require("openai");
+async function testCall() {
+    const { Configuration, OpenAIApi } = require("openai");
 
-const configuration = new Configuration({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-const openai = new OpenAIApi(configuration);
+    const configuration = new Configuration({
+        lasAPIToken: process.env.LAS_API_TOKEN
+    });
+    const openai = new OpenAIApi(configuration);
 
-const completion = await openai.createCompletion({
-  model: "text-davinci-003",
-  prompt: "Hello world",
-});
-console.log(completion.data.choices[0].text);
+    console.log("Starting Open AI call")
+
+    const completion = await openai.createCompletion({
+        model: "text-davinci-003",
+        prompt: "Hello. It's raining outside.",
+    });
+    console.log(completion.data.choices[0].text);
+}
+
+testCall();
 ```
+Note how the lasAPIToken parameter is configrued for the Open AI Configuration object.
 
 Check out the [full API documentation](https://platform.openai.com/docs/api-reference?lang=node.js) for examples of all the available functions.
 
