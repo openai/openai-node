@@ -19,9 +19,17 @@ The last step makes downloads the dependencies for OpenAIi and is required.
 ## Usage
 The library needs to be configured with the LAS API Token. The example below shows bringing in the value from a defined environment variable (recommended).
 
+Setting the environment variable:
+
 ```bash
 export LAS_API_TOKEN=valueFromMyAcccountPageOnCommander
 ```
+
+To create a new node application:
+1. Create a new directory for your project
+2. Change to that directory in a terminal / shell window.
+3. execute ```npm init```
+4. execute ```npm install --save /pathToLasVersion```
 
 
 ```javascript
