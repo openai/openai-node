@@ -22,11 +22,11 @@ const configuration = new Configuration({
 });
 const openai = new OpenAIApi(configuration);
 
-const completion = await openai.createCompletion({
-  model: "text-davinci-003",
-  prompt: "Hello world",
+const chatCompletion = await openai.createChatCompletion({
+  model: "gpt-3.5-turbo",
+  messages: [{role: "user", content: "Hello world"}],
 });
-console.log(completion.data.choices[0].text);
+console.log(chatCompletion.data.choices[0].message);
 ```
 
 Check out the [full API documentation](https://platform.openai.com/docs/api-reference?lang=node.js) for examples of all the available functions.
