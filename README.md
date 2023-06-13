@@ -26,7 +26,7 @@ const chatCompletion = await openai.createChatCompletion({
   model: "gpt-3.5-turbo",
   messages: [{role: "user", content: "Hello world"}],
 });
-console.log(completion.data.choices[0].message);
+console.log(chatCompletion.data.choices[0].message);
 ```
 
 Check out the [full API documentation](https://platform.openai.com/docs/api-reference?lang=node.js) for examples of all the available functions.
