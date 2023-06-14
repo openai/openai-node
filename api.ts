@@ -125,7 +125,7 @@ export interface ChatCompletionResponseMessage {
      * @type {string}
      * @memberof ChatCompletionResponseMessage
      */
-    'content'?: string;
+    'content'?: string | null;
     /**
      * 
      * @type {ChatCompletionRequestMessageFunctionCall}
