@@ -1,0 +1,47 @@
+{
+  "name": "openai",
+  "version": "v4.0.0-beta.0",
+  "description": "Client library for the OpenAI API",
+  "author": "OpenAI <support@openai.com>",
+  "types": "dist/cjs/index.d.ts",
+  "main": "dist/cjs/index.js",
+  "type": "commonjs",
+  "repository": "github:openai/openai-node",
+  "license": "Apache-2.0",
+  "private": false,
+  "scripts": {
+    "test": "bin/check-test-server && yarn jest",
+    "build": "bash ./build",
+    "prepack": "yarn build",
+    "format": "prettier --write .",
+    "tsn": "ts-node -r tsconfig-paths/register",
+    "fix": "eslint --fix --ext ts,js ."
+  },
+  "dependencies": {
+    "@types/node": "^18.11.18",
+    "@types/node-fetch": "^2.6.1",
+    "@types/qs": "^6.9.7",
+    "abort-controller": "^3.0.0",
+    "agentkeepalive": "^4.2.1",
+    "digest-fetch": "^1.3.0",
+    "form-data-encoder": "1.7.2",
+    "formdata-node": "^4.3.2",
+    "node-fetch": "^2.6.7",
+    "qs": "^6.10.3"
+  },
+  "devDependencies": {
+    "openai": "link:.",
+    "@types/jest": "^27.5.0",
+    "@typescript-eslint/eslint-plugin": "^5.33.0",
+    "@typescript-eslint/parser": "^5.33.0",
+    "eslint": "^8.22.0",
+    "eslint-plugin-unused-imports": "^2.0.0",
+    "jest": "^28.1.0",
+    "prettier": "rattrayalex/prettier#postfix-ternaries",
+    "ts-jest": "^28.0.2",
+    "ts-node": "^10.5.0",
+    "tsc-alias": "^1.6.9",
+    "tsconfig-paths": "^3.12.0",
+    "typescript": "^4.8.2"
+  }
+}
