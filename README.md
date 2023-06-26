@@ -12,10 +12,10 @@ npm install openai
 
 ## Usage
 
-The library needs to be configured with your account's secret key, which is available in your [OpenAI account page](https://platform.openai.com/account/api-keys). We recommend setting it as an environment variable. Here's an example of initializing the library with the API key loaded from an environment variable and creating a completion:
+The library needs to be configured with your account's secret key, which is available in your [OpenAI account page](https://platform.openai.com/account/api-keys). Also, remember to run `npm init` in your test dir and update the `package.json` to have the line `type:"module"`. This will allow access to ES6 features like `await` at the top level without being insode an `async function already`. We recommend setting it as an environment variable. Here's an example of initializing the library with the API key loaded from an environment variable and creating a completion:
 
 ```javascript
-const { Configuration, OpenAIApi } = require("openai");
+import  {Configuration, OpenAIApi } from "openai";
 
 const configuration = new Configuration({
   apiKey: process.env.OPENAI_API_KEY,
