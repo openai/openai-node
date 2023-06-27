@@ -2,8 +2,8 @@
 
 import * as Core from '~/core';
 import { APIResource } from '~/resource';
-import type * as FormData from 'formdata-node';
-import { multipartFormRequestOptions } from '~/core';
+import * as API from './';
+import { type Uploadable, multipartFormRequestOptions } from '~/core';
 
 export class Files extends APIResource {
   /**
@@ -12,14 +12,17 @@ export class Files extends APIResource {
    * organization can be up to 1 GB. Please contact us if you need to increase the
    * storage limit.
    */
-  create(body: FileCreateParams, options?: Core.RequestOptions): Promise<Core.APIResponse<File>> {
-    return this.post('/files', multipartFormRequestOptions({ body, ...options }));
+  async create(
+    body: FileCreateParams,
+    options?: Core.RequestOptions,
+  ): Promise<Core.APIResponse<FileResponse>> {
+    return this.post('/files', await multipartFormRequestOptions({ body, ...options }));
   }
 
   /**
    * Returns information about a specific file.
    */
-  retrieve(fileId: string, options?: Core.RequestOptions): Promise<Core.APIResponse<File>> {
+  retrieve(fileId: string, options?: Core.RequestOptions): Promise<Core.APIResponse<FileResponse>> {
     return this.get(`/files/${fileId}`, options);
   }
 
@@ -33,7 +36,7 @@ export class Files extends APIResource {
   /**
    * Delete a file.
    */
-  del(fileId: string, options?: Core.RequestOptions): Promise<Core.APIResponse<FileDeleteResponse>> {
+  del(fileId: string, options?: Core.RequestOptions): Promise<Core.APIResponse<FileDeletedResponse>> {
     return this.delete(`/files/${fileId}`, options);
   }
 
@@ -51,7 +54,17 @@ export class Files extends APIResource {
   }
 }
 
-export interface File {
+export type FileContentResponse = string;
+
+export interface FileDeletedResponse {
+  deleted: boolean;
+
+  id: string;
+
+  object: string;
+}
+
+export interface FileResponse {
   bytes: number;
 
   created_at: number;
@@ -65,23 +78,15 @@ export interface File {
   purpose: string;
 
   status?: string;
+
+  status_details?: unknown | null;
 }
 
 export interface FileListResponse {
-  data: Array<File>;
+  data: Array<FileResponse>;
 
   object: string;
 }
-
-export interface FileDeleteResponse {
-  deleted: boolean;
-
-  id: string;
-
-  object: string;
-}
-
-export type FileRetrieveFileContentResponse = string;
 
 export interface FileCreateParams {
   /**
@@ -92,7 +97,7 @@ export interface FileCreateParams {
    * and "completion" fields representing your
    * [training examples](/docs/guides/fine-tuning/prepare-training-data).
    */
-  file: FormData.Blob | FormData.File;
+  file: Uploadable;
 
   /**
    * The intended purpose of the uploaded documents.
@@ -101,4 +106,12 @@ export interface FileCreateParams {
    * us to validate the format of the uploaded file.
    */
   purpose: string;
+}
+
+export namespace Files {
+  export import FileContentResponse = API.FileContentResponse;
+  export import FileDeletedResponse = API.FileDeletedResponse;
+  export import FileResponse = API.FileResponse;
+  export import FileListResponse = API.FileListResponse;
+  export import FileCreateParams = API.FileCreateParams;
 }

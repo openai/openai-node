@@ -16,7 +16,7 @@ Methods:
 Models:
 
 - <code><a href="./resources/chat/completions.ts">ChatCompletion</a></code>
-- <code><a href="./resources/chat/completions.ts">ChatCompletionEvent</a></code>
+- <code><a href="./resources/chat/completions.ts">ChatCompletionChunk</a></code>
 
 Methods:
 
@@ -46,17 +46,17 @@ Methods:
 
 Models:
 
-- <code><a href="./resources/files.ts">File</a></code>
+- <code><a href="./resources/files.ts">FileContentResponse</a></code>
+- <code><a href="./resources/files.ts">FileDeletedResponse</a></code>
+- <code><a href="./resources/files.ts">FileResponse</a></code>
 - <code><a href="./resources/files.ts">FileListResponse</a></code>
-- <code><a href="./resources/files.ts">FileDeleteResponse</a></code>
-- <code><a href="./resources/files.ts">FileRetrieveFileContentResponse</a></code>
 
 Methods:
 
-- <code title="post /files">client.files.<a href="./resources/files.ts">create</a>({ ...params }) -> File</code>
-- <code title="get /files/{file_id}">client.files.<a href="./resources/files.ts">retrieve</a>(fileId) -> File</code>
+- <code title="post /files">client.files.<a href="./resources/files.ts">create</a>({ ...params }) -> FileResponse</code>
+- <code title="get /files/{file_id}">client.files.<a href="./resources/files.ts">retrieve</a>(fileId) -> FileResponse</code>
 - <code title="get /files">client.files.<a href="./resources/files.ts">list</a>() -> FileListResponse</code>
-- <code title="delete /files/{file_id}">client.files.<a href="./resources/files.ts">del</a>(fileId) -> FileDeleteResponse</code>
+- <code title="delete /files/{file_id}">client.files.<a href="./resources/files.ts">del</a>(fileId) -> FileDeletedResponse</code>
 - <code title="get /files/{file_id}/content">client.files.<a href="./resources/files.ts">retrieveFileContent</a>(fileId) -> Promise<string></code>
 
 # Images
@@ -94,26 +94,6 @@ Methods:
 
 - <code title="post /audio/translations">client.audio.translations.<a href="./resources/audio/translations.ts">create</a>({ ...params }) -> Translation</code>
 
-# Answers
-
-Models:
-
-- <code><a href="./resources/answers.ts">AnswerCreateResponse</a></code>
-
-Methods:
-
-- <code title="post /answers">client.answers.<a href="./resources/answers.ts">create</a>({ ...params }) -> AnswerCreateResponse</code>
-
-# Classifications
-
-Models:
-
-- <code><a href="./resources/classifications.ts">ClassificationCreateResponse</a></code>
-
-Methods:
-
-- <code title="post /classifications">client.classifications.<a href="./resources/classifications.ts">create</a>({ ...params }) -> ClassificationCreateResponse</code>
-
 # Moderations
 
 Models:
@@ -129,15 +109,15 @@ Methods:
 
 Models:
 
-- <code><a href="./resources/models.ts">DeleteModelResponse</a></code>
 - <code><a href="./resources/models.ts">ListModelsResponse</a></code>
 - <code><a href="./resources/models.ts">Model</a></code>
+- <code><a href="./resources/models.ts">ModelDeletedResponse</a></code>
 
 Methods:
 
 - <code title="get /models/{model}">client.models.<a href="./resources/models.ts">retrieve</a>(model) -> Model</code>
 - <code title="get /models">client.models.<a href="./resources/models.ts">list</a>() -> ListModelsResponse</code>
-- <code title="delete /models/{model}">client.models.<a href="./resources/models.ts">del</a>(model) -> DeleteModelResponse</code>
+- <code title="delete /models/{model}">client.models.<a href="./resources/models.ts">del</a>(model) -> ModelDeletedResponse</code>
 
 # FineTunes
 

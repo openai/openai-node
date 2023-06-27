@@ -2,25 +2,28 @@
 
 import * as Core from '~/core';
 import { APIResource } from '~/resource';
-import type * as FormData from 'formdata-node';
-import { multipartFormRequestOptions } from '~/core';
+import * as API from './';
+import { type Uploadable, multipartFormRequestOptions } from '~/core';
 
 export class Images extends APIResource {
   /**
    * Creates a variation of a given image.
    */
-  createVariation(
+  async createVariation(
     body: ImageCreateVariationParams,
     options?: Core.RequestOptions,
   ): Promise<Core.APIResponse<ImagesResponse>> {
-    return this.post('/images/variations', multipartFormRequestOptions({ body, ...options }));
+    return this.post('/images/variations', await multipartFormRequestOptions({ body, ...options }));
   }
 
   /**
    * Creates an edited or extended image given an original image and a prompt.
    */
-  edit(body: ImageEditParams, options?: Core.RequestOptions): Promise<Core.APIResponse<ImagesResponse>> {
-    return this.post('/images/edits', multipartFormRequestOptions({ body, ...options }));
+  async edit(
+    body: ImageEditParams,
+    options?: Core.RequestOptions,
+  ): Promise<Core.APIResponse<ImagesResponse>> {
+    return this.post('/images/edits', await multipartFormRequestOptions({ body, ...options }));
   }
 
   /**
@@ -51,7 +54,7 @@ export interface ImageCreateVariationParams {
    * The image to use as the basis for the variation(s). Must be a valid PNG file,
    * less than 4MB, and square.
    */
-  image: FormData.Blob | FormData.File;
+  image: Uploadable;
 
   /**
    * The number of images to generate. Must be between 1 and 10.
@@ -82,7 +85,7 @@ export interface ImageEditParams {
    * The image to edit. Must be a valid PNG file, less than 4MB, and square. If mask
    * is not provided, image must have transparency, which will be used as the mask.
    */
-  image: FormData.Blob | FormData.File;
+  image: Uploadable;
 
   /**
    * A text description of the desired image(s). The maximum length is 1000
@@ -95,7 +98,7 @@ export interface ImageEditParams {
    * indicate where `image` should be edited. Must be a valid PNG file, less than
    * 4MB, and have the same dimensions as `image`.
    */
-  mask?: FormData.Blob | FormData.File;
+  mask?: Uploadable;
 
   /**
    * The number of images to generate. Must be between 1 and 10.
@@ -150,4 +153,12 @@ export interface ImageGenerateParams {
    * and detect abuse. [Learn more](/docs/guides/safety-best-practices/end-user-ids).
    */
   user?: string;
+}
+
+export namespace Images {
+  export import Image = API.Image;
+  export import ImagesResponse = API.ImagesResponse;
+  export import ImageCreateVariationParams = API.ImageCreateVariationParams;
+  export import ImageEditParams = API.ImageEditParams;
+  export import ImageGenerateParams = API.ImageGenerateParams;
 }

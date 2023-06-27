@@ -2,6 +2,7 @@
 
 import * as Core from '~/core';
 import { APIResource } from '~/resource';
+import * as API from './';
 
 export class Embeddings extends APIResource {
   /**
@@ -55,11 +56,16 @@ export interface EmbeddingCreateParams {
    * models, or see our [Model overview](/docs/models/overview) for descriptions of
    * them.
    */
-  model: string;
+  model: (string & {}) | 'text-embedding-ada-002';
 
   /**
    * A unique identifier representing your end-user, which can help OpenAI to monitor
    * and detect abuse. [Learn more](/docs/guides/safety-best-practices/end-user-ids).
    */
   user?: string;
+}
+
+export namespace Embeddings {
+  export import Embedding = API.Embedding;
+  export import EmbeddingCreateParams = API.EmbeddingCreateParams;
 }

@@ -1,0 +1,6 @@
+{
+  "tasks": {
+    "install": "deno install --node-modules-dir main_test.ts -f",
+    "test": "deno test --allow-env --allow-net --allow-read --node-modules-dir"
+  }
+}

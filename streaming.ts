@@ -1,4 +1,4 @@
-import type { Response } from 'node-fetch';
+import type { Response } from 'openai/_shims/fetch';
 import { APIResponse, Headers, createResponseHeaders } from '~/core';
 
 type ServerSentEvent = {
@@ -88,6 +88,8 @@ export class Stream<Item> implements AsyncIterable<Item>, APIResponse<Stream<Ite
       let text;
       if (chunk instanceof Buffer) {
         text = chunk.toString();
+      } else if ((chunk as any) instanceof Uint8Array) {
+        text = Buffer.from(chunk).toString();
       } else {
         text = chunk;
       }

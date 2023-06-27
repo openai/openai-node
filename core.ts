@@ -1,17 +1,21 @@
-import qs from 'qs';
-
+import type { Readable } from 'node:stream';
 import type { Agent } from 'http';
-import type { RequestInfo, RequestInit, Response } from 'node-fetch';
-import { FormData, File, Blob } from 'formdata-node';
-import { FormDataEncoder } from 'form-data-encoder';
-import { Readable } from 'stream';
+
+import qs from 'qs';
 
 import { VERSION } from './version';
 import { Stream } from './streaming';
 import { APIError, APIConnectionError, APIConnectionTimeoutError } from './error';
-import { Fetch, getDefaultAgent, getFetch } from './fetch-polyfill';
+import { getDefaultAgent } from 'openai/_shims/agent';
+import { fetch, isPolyfilled as fetchIsPolyfilled } from 'openai/_shims/fetch';
+import type { RequestInfo, RequestInit, Response } from 'openai/_shims/fetch';
+import { isMultipartBody } from './uploads';
+export { maybeMultipartFormRequestOptions, multipartFormRequestOptions, createForm } from './uploads';
+export type { Uploadable } from 'openai/_shims/uploadable';
 
 const MAX_RETRIES = 2;
+
+type Fetch = (url: RequestInfo, init?: RequestInit) => Promise<Response>;
 
 export abstract class APIClient {
   baseURL: string;
@@ -38,7 +42,7 @@ export abstract class APIClient {
     this.timeout = validatePositiveInteger('timeout', timeout);
     this.httpAgent = httpAgent;
 
-    this.fetch = getFetch();
+    this.fetch = fetch;
   }
 
   protected authHeaders(): Headers {
@@ -112,8 +116,9 @@ export abstract class APIClient {
     options: FinalRequestOptions<Req>,
   ): { req: RequestInit; url: string; timeout: number } {
     const { method, path, query, headers: headers = {} } = options;
+
     const body =
-      options.body instanceof Readable ? options.body
+      isMultipartBody(options.body) ? options.body.__multipartBody__
       : options.body ? JSON.stringify(options.body, null, 2)
       : null;
     const contentLength = typeof body === 'string' ? body.length.toString() : null;
@@ -133,6 +138,10 @@ export abstract class APIClient {
       ...this.defaultHeaders(),
       ...headers,
     };
+    // let builtin fetch set the Content-Type for multipart bodies
+    if (isMultipartBody(options.body) && !fetchIsPolyfilled) {
+      delete reqHeaders['Content-Type'];
+    }
 
     // Strip any headers being explicitly omitted with null
     Object.keys(reqHeaders).forEach((key) => reqHeaders[key] === null && delete reqHeaders[key]);
@@ -145,6 +154,7 @@ export abstract class APIClient {
     };
 
     this.validateHeaders(reqHeaders, headers);
+
     return { req, url, timeout };
   }
 
@@ -342,7 +352,7 @@ export abstract class APIClient {
   }
 
   private debug(action: string, ...args: any[]) {
-    if (process.env['DEBUG'] === 'true') {
+    if (typeof process !== 'undefined' && process.env['DEBUG'] === 'true') {
       console.log(`${this.constructor.name}:DEBUG:${action}`, ...args);
     }
   }
@@ -545,6 +555,7 @@ export type APIResponse<T> = T & {
 };
 
 declare const Deno: any;
+declare const EdgeRuntime: any;
 type Arch = 'x32' | 'x64' | 'arm' | 'arm64' | `other:${string}` | 'unknown';
 type PlatformName =
   | 'MacOS'
@@ -561,7 +572,7 @@ type PlatformProperties = {
   'X-Stainless-Package-Version': string;
   'X-Stainless-OS': PlatformName;
   'X-Stainless-Arch': Arch;
-  'X-Stainless-Runtime': 'node' | 'deno' | 'unknown';
+  'X-Stainless-Runtime': 'node' | 'deno' | 'edge' | 'unknown';
   'X-Stainless-Runtime-Version': string;
 };
 const getPlatformProperties = (): PlatformProperties => {
@@ -575,7 +586,18 @@ const getPlatformProperties = (): PlatformProperties => {
       'X-Stainless-Runtime-Version': Deno.version,
     };
   }
-  if (typeof process !== 'undefined') {
+  if (typeof EdgeRuntime !== 'undefined') {
+    return {
+      'X-Stainless-Lang': 'js',
+      'X-Stainless-Package-Version': VERSION,
+      'X-Stainless-OS': 'Unknown',
+      'X-Stainless-Arch': `other:${EdgeRuntime}`,
+      'X-Stainless-Runtime': 'edge',
+      'X-Stainless-Runtime-Version': process.version,
+    };
+  }
+  // Check if Node.js
+  if (Object.prototype.toString.call(typeof process !== 'undefined' ? process : 0) === '[object process]') {
     return {
       'X-Stainless-Lang': 'js',
       'X-Stainless-Package-Version': VERSION,
@@ -667,81 +689,6 @@ const validatePositiveInteger = (name: string, n: number) => {
 export const castToError = (err: any): Error => {
   if (err instanceof Error) return err;
   return new Error(err);
-};
-
-/**
- * Returns a multipart/form-data request if any part of the given request body contains a File / Blob value.
- * Otherwise returns the request as is.
- */
-export const maybeMultipartFormRequestOptions = <T extends {} = Record<string, unknown>>(
-  opts: RequestOptions<T>,
-): RequestOptions<T | Readable> => {
-  // TODO: does this add unreasonable overhead in the case where we shouldn't use multipart/form-data?
-  const form = createForm(opts.body);
-
-  for (const [_, entry] of form.entries()) {
-    const value = entry.valueOf();
-    if (value instanceof File || value instanceof Blob) {
-      return getMultipartRequestOptions(form, opts);
-    }
-  }
-
-  return opts;
-};
-
-export const multipartFormRequestOptions = <T extends {} = Record<string, unknown>>(
-  opts: RequestOptions<T>,
-): RequestOptions<T | Readable> => {
-  return getMultipartRequestOptions(createForm(opts.body), opts);
-};
-
-const createForm = <T = Record<string, unknown>>(body: T | undefined): FormData => {
-  const form = new FormData();
-  Object.entries(body || {}).forEach(([key, value]) => addFormValue(form, key, value));
-  return form;
-};
-
-const getMultipartRequestOptions = <T extends {} = Record<string, unknown>>(
-  form: FormData,
-  opts: RequestOptions<T>,
-): RequestOptions<T | Readable> => {
-  const encoder = new FormDataEncoder(form);
-  return {
-    ...opts,
-    headers: { ...opts.headers, ...encoder.headers, 'Content-Length': encoder.contentLength },
-    body: Readable.from(encoder),
-  };
-};
-
-const addFormValue = (form: FormData, key: string, value: unknown) => {
-  if (value == null) {
-    throw new TypeError(
-      `null is not a valid form data value, if you want to pass null then you need to use the string 'null'`,
-    );
-  }
-
-  // TODO: make nested formats configurable
-  if (
-    typeof value === 'string' ||
-    typeof value === 'number' ||
-    typeof value === 'boolean' ||
-    value instanceof File ||
-    value instanceof Blob
-  ) {
-    form.append(key, value);
-  } else if (Array.isArray(value)) {
-    value.forEach((entry) => {
-      addFormValue(form, key + '[]', entry);
-    });
-  } else if (typeof value === 'object') {
-    Object.entries(value).forEach(([name, prop]) => {
-      addFormValue(form, `${key}[${name}]`, prop);
-    });
-  } else {
-    throw new TypeError(
-      `Invalid value given to form, expected a string, number, boolean, object, Array, File or Blob but got ${value} instead`,
-    );
-  }
 };
 
 export const ensurePresent = <T>(value: T | null | undefined): T => {

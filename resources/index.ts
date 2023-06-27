@@ -1,18 +1,15 @@
 // File generated from our OpenAPI spec by Stainless.
 
-export { AnswerCreateResponse, AnswerCreateParams, Answers } from './answers';
 export { Audio } from './audio/audio';
 export { Chat } from './chat/chat';
-export { ClassificationCreateResponse, ClassificationCreateParams, Classifications } from './classifications';
 export { Completion, CompletionChoice, CompletionCreateParams, Completions } from './completions';
-export { DeleteModelResponse, ListModelsResponse, Model, Models } from './models';
 export { Edit, EditCreateParams, Edits } from './edits';
 export { Embedding, EmbeddingCreateParams, Embeddings } from './embeddings';
 export {
-  File,
+  FileContentResponse,
+  FileDeletedResponse,
+  FileResponse,
   FileListResponse,
-  FileDeleteResponse,
-  FileRetrieveFileContentResponse,
   FileCreateParams,
   Files,
 } from './files';
@@ -33,4 +30,5 @@ export {
   ImageGenerateParams,
   Images,
 } from './images';
+export { ListModelsResponse, Model, ModelDeletedResponse, Models } from './models';
 export { Moderation, ModerationCreateResponse, ModerationCreateParams, Moderations } from './moderations';

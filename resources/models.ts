@@ -2,6 +2,7 @@
 
 import * as Core from '~/core';
 import { APIResource } from '~/resource';
+import * as API from './';
 
 export class Models extends APIResource {
   /**
@@ -23,17 +24,9 @@ export class Models extends APIResource {
   /**
    * Delete a fine-tuned model. You must have the Owner role in your organization.
    */
-  del(model: string, options?: Core.RequestOptions): Promise<Core.APIResponse<DeleteModelResponse>> {
+  del(model: string, options?: Core.RequestOptions): Promise<Core.APIResponse<ModelDeletedResponse>> {
     return this.delete(`/models/${model}`, options);
   }
-}
-
-export interface DeleteModelResponse {
-  deleted: boolean;
-
-  id: string;
-
-  object: string;
 }
 
 export interface ListModelsResponse {
@@ -50,4 +43,18 @@ export interface Model {
   object: string;
 
   owned_by: string;
+}
+
+export interface ModelDeletedResponse {
+  deleted: boolean;
+
+  id: string;
+
+  object: string;
+}
+
+export namespace Models {
+  export import ListModelsResponse = API.ListModelsResponse;
+  export import Model = API.Model;
+  export import ModelDeletedResponse = API.ModelDeletedResponse;
 }

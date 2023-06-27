@@ -2,6 +2,7 @@
 
 import * as Core from '~/core';
 import { APIResource } from '~/resource';
+import * as API from './';
 
 export class Moderations extends APIResource {
   /**
@@ -81,5 +82,11 @@ export interface ModerationCreateParams {
    * model. Accuracy of `text-moderation-stable` may be slightly lower than for
    * `text-moderation-latest`.
    */
-  model?: string;
+  model?: (string & {}) | 'text-moderation-latest' | 'text-moderation-stable';
+}
+
+export namespace Moderations {
+  export import Moderation = API.Moderation;
+  export import ModerationCreateResponse = API.ModerationCreateResponse;
+  export import ModerationCreateParams = API.ModerationCreateParams;
 }

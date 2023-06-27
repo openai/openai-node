@@ -2,18 +2,18 @@
 
 import * as Core from '~/core';
 import { APIResource } from '~/resource';
-import type * as FormData from 'formdata-node';
-import { multipartFormRequestOptions } from '~/core';
+import * as API from './';
+import { type Uploadable, multipartFormRequestOptions } from '~/core';
 
 export class Transcriptions extends APIResource {
   /**
    * Transcribes audio into the input language.
    */
-  create(
+  async create(
     body: TranscriptionCreateParams,
     options?: Core.RequestOptions,
   ): Promise<Core.APIResponse<Transcription>> {
-    return this.post('/audio/transcriptions', multipartFormRequestOptions({ body, ...options }));
+    return this.post('/audio/transcriptions', await multipartFormRequestOptions({ body, ...options }));
   }
 }
 
@@ -26,12 +26,12 @@ export interface TranscriptionCreateParams {
    * The audio file object (not file name) to transcribe, in one of these formats:
    * mp3, mp4, mpeg, mpga, m4a, wav, or webm.
    */
-  file: FormData.Blob | FormData.File;
+  file: Uploadable;
 
   /**
    * ID of the model to use. Only `whisper-1` is currently available.
    */
-  model: string;
+  model: (string & {}) | 'whisper-1';
 
   /**
    * The language of the input audio. Supplying the input language in
@@ -61,4 +61,9 @@ export interface TranscriptionCreateParams {
    * automatically increase the temperature until certain thresholds are hit.
    */
   temperature?: number;
+}
+
+export namespace Transcriptions {
+  export import Transcription = API.Transcription;
+  export import TranscriptionCreateParams = API.TranscriptionCreateParams;
 }

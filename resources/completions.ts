@@ -2,6 +2,7 @@
 
 import * as Core from '~/core';
 import { APIResource } from '~/resource';
+import * as API from './';
 import { Stream } from '~/streaming';
 
 export class Completions extends APIResource {
@@ -82,7 +83,15 @@ export namespace CompletionCreateParams {
      * models, or see our [Model overview](/docs/models/overview) for descriptions of
      * them.
      */
-    model: string;
+    model:
+      | (string & {})
+      | 'text-davinci-003'
+      | 'text-davinci-002'
+      | 'text-davinci-001'
+      | 'code-davinci-002'
+      | 'text-curie-001'
+      | 'text-babbage-001'
+      | 'text-ada-001';
 
     /**
      * The prompt(s) to generate completions for, encoded as a string, array of
@@ -229,7 +238,15 @@ export namespace CompletionCreateParams {
      * models, or see our [Model overview](/docs/models/overview) for descriptions of
      * them.
      */
-    model: string;
+    model:
+      | (string & {})
+      | 'text-davinci-003'
+      | 'text-davinci-002'
+      | 'text-davinci-001'
+      | 'code-davinci-002'
+      | 'text-curie-001'
+      | 'text-babbage-001'
+      | 'text-ada-001';
 
     /**
      * The prompt(s) to generate completions for, encoded as a string, array of
@@ -368,4 +385,10 @@ export namespace CompletionCreateParams {
      */
     user?: string;
   }
+}
+
+export namespace Completions {
+  export import Completion = API.Completion;
+  export import CompletionChoice = API.CompletionChoice;
+  export import CompletionCreateParams = API.CompletionCreateParams;
 }

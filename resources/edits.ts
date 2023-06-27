@@ -2,6 +2,7 @@
 
 import * as Core from '~/core';
 import { APIResource } from '~/resource';
+import * as API from './';
 
 export class Edits extends APIResource {
   /**
@@ -13,7 +14,7 @@ export class Edits extends APIResource {
 }
 
 export interface Edit {
-  choices: Array<Edit.Choices>;
+  choices: Array<Edit.Choice>;
 
   created: number;
 
@@ -23,17 +24,17 @@ export interface Edit {
 }
 
 export namespace Edit {
-  export interface Choices {
+  export interface Choice {
     finish_reason?: 'stop' | 'length';
 
     index?: number;
 
-    logprobs?: Choices.Logprobs | null;
+    logprobs?: Choice.Logprobs | null;
 
     text?: string;
   }
 
-  export namespace Choices {
+  export namespace Choice {
     export interface Logprobs {
       text_offset?: Array<number>;
 
@@ -64,7 +65,7 @@ export interface EditCreateParams {
    * ID of the model to use. You can use the `text-davinci-edit-001` or
    * `code-davinci-edit-001` model with this endpoint.
    */
-  model: string;
+  model: (string & {}) | 'text-davinci-edit-001' | 'code-davinci-edit-001';
 
   /**
    * The input text to use as a starting point for the edit.
@@ -93,4 +94,9 @@ export interface EditCreateParams {
    * We generally recommend altering this or `temperature` but not both.
    */
   top_p?: number | null;
+}
+
+export namespace Edits {
+  export import Edit = API.Edit;
+  export import EditCreateParams = API.EditCreateParams;
 }

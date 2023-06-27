@@ -2,15 +2,15 @@
 
 import OpenAI from '~/index';
 
-const openAI = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010' });
+const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010' });
 
 describe('resource fineTunes', () => {
   test('create: only required params', async () => {
-    const response = await openAI.fineTunes.create({ training_file: 'file-ajSREls59WBbvgSzJSVWxMCB' });
+    const response = await openai.fineTunes.create({ training_file: 'file-ajSREls59WBbvgSzJSVWxMCB' });
   });
 
   test('create: required and optional params', async () => {
-    const response = await openAI.fineTunes.create({
+    const response = await openai.fineTunes.create({
       training_file: 'file-ajSREls59WBbvgSzJSVWxMCB',
       batch_size: 0,
       classification_betas: [0, 0, 0],
@@ -18,7 +18,7 @@ describe('resource fineTunes', () => {
       classification_positive_class: 'string',
       compute_classification_metrics: true,
       learning_rate_multiplier: 0,
-      model: 'string',
+      model: 'curie',
       n_epochs: 0,
       prompt_loss_weight: 0,
       suffix: 'x',
@@ -27,48 +27,48 @@ describe('resource fineTunes', () => {
   });
 
   test('retrieve', async () => {
-    const response = await openAI.fineTunes.retrieve('ft-AF1WoRqd3aJAHsqc9NY7iL8F');
+    const response = await openai.fineTunes.retrieve('ft-AF1WoRqd3aJAHsqc9NY7iL8F');
   });
 
   test('retrieve: request options instead of params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openAI.fineTunes.retrieve('ft-AF1WoRqd3aJAHsqc9NY7iL8F', { path: '/_stainless_unknown_path' }),
+      openai.fineTunes.retrieve('ft-AF1WoRqd3aJAHsqc9NY7iL8F', { path: '/_stainless_unknown_path' }),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
   test('list', async () => {
-    const response = await openAI.fineTunes.list();
+    const response = await openai.fineTunes.list();
   });
 
   test('list: request options instead of params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(openAI.fineTunes.list({ path: '/_stainless_unknown_path' })).rejects.toThrow(
+    await expect(openai.fineTunes.list({ path: '/_stainless_unknown_path' })).rejects.toThrow(
       OpenAI.NotFoundError,
     );
   });
 
   test('cancel', async () => {
-    const response = await openAI.fineTunes.cancel('ft-AF1WoRqd3aJAHsqc9NY7iL8F');
+    const response = await openai.fineTunes.cancel('ft-AF1WoRqd3aJAHsqc9NY7iL8F');
   });
 
   test('cancel: request options instead of params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openAI.fineTunes.cancel('ft-AF1WoRqd3aJAHsqc9NY7iL8F', { path: '/_stainless_unknown_path' }),
+      openai.fineTunes.cancel('ft-AF1WoRqd3aJAHsqc9NY7iL8F', { path: '/_stainless_unknown_path' }),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
   // Prism chokes on this
   test.skip('listEvents', async () => {
-    const response = await openAI.fineTunes.listEvents('ft-AF1WoRqd3aJAHsqc9NY7iL8F');
+    const response = await openai.fineTunes.listEvents('ft-AF1WoRqd3aJAHsqc9NY7iL8F');
   });
 
   // Prism chokes on this
   test.skip('listEvents: request options and params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openAI.fineTunes.listEvents(
+      openai.fineTunes.listEvents(
         'ft-AF1WoRqd3aJAHsqc9NY7iL8F',
         { stream: false },
         { path: '/_stainless_unknown_path' },

@@ -6,7 +6,19 @@ rm -rf dist/*
 yarn tsn check-version.ts
 
 # build node:
+node scripts/prepare-cjs-build.mjs
 yarn tsc -p tsconfig.cjs.json
 yarn tsc-alias -p tsconfig.cjs.json
 
-yarn prettier --write .
+node scripts/prepare-esm-build.mjs
+yarn tsc -p tsconfig.esm.json
+yarn tsc-alias -p tsconfig.esm.json --resolve-full-paths true
+
+echo '{"type": "module"}' > dist/esm/package.json
+
+yarn prettier --loglevel=warn --write .
+
+# smoke test cjs export
+node -e 'require("openai")'
+# smoke test esm export
+node -e 'import("openai")'

@@ -1,4 +1,5 @@
 {
+  "exclude": ["dist", "ecosystem-tests"],
   "compilerOptions": {
     "target": "es2019",
     "lib": ["es2020"],
@@ -9,6 +10,7 @@
     "baseUrl": "./",
     "paths": {
       "~/*": ["*"],
+      "openai/_shims/*": ["_shims/*.node"],
       "digest-fetch": ["./typings/digest-fetch"]
     },
 

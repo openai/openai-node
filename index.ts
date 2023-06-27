@@ -3,9 +3,9 @@
 import qs from 'qs';
 import * as Core from './core';
 import * as API from './resources';
-import * as Errors from '~/error';
+import * as Errors from './error';
 import type { Agent } from 'http';
-import * as FileFromPath from 'formdata-node/file-from-path';
+import * as Uploads from './uploads';
 
 type Config = {
   /**
@@ -27,7 +27,7 @@ export class OpenAI extends Core.APIClient {
 
   constructor(config?: Config) {
     const options: Config = {
-      apiKey: process.env['OPENAI_API_KEY'] || '',
+      apiKey: typeof process === 'undefined' ? '' : process.env['OPENAI_API_KEY'] || '',
       baseURL: 'https://api.openai.com/v1',
       ...config,
     };
@@ -55,8 +55,6 @@ export class OpenAI extends Core.APIClient {
   files: API.Files = new API.Files(this);
   images: API.Images = new API.Images(this);
   audio: API.Audio = new API.Audio(this);
-  answers: API.Answers = new API.Answers(this);
-  classifications: API.Classifications = new API.Classifications(this);
   moderations: API.Moderations = new API.Moderations(this);
   models: API.Models = new API.Models(this);
   fineTunes: API.FineTunes = new API.FineTunes(this);
@@ -103,48 +101,56 @@ export const {
   UnprocessableEntityError,
 } = Errors;
 
-export import fileFromPath = FileFromPath.fileFromPath;
+export import toFile = Uploads.toFile;
+export import fileFromPath = Uploads.fileFromPath;
 
 export namespace OpenAI {
   // Helper functions
-  export import fileFromPath = FileFromPath.fileFromPath;
+  export import toFile = Uploads.toFile;
+  export import fileFromPath = Uploads.fileFromPath;
 
+  export import Completions = API.Completions;
   export import Completion = API.Completion;
   export import CompletionChoice = API.CompletionChoice;
   export import CompletionCreateParams = API.CompletionCreateParams;
 
+  export import Chat = API.Chat;
+
+  export import Edits = API.Edits;
   export import Edit = API.Edit;
   export import EditCreateParams = API.EditCreateParams;
 
+  export import Embeddings = API.Embeddings;
   export import Embedding = API.Embedding;
   export import EmbeddingCreateParams = API.EmbeddingCreateParams;
 
-  export import File = API.File;
+  export import Files = API.Files;
+  export import FileContentResponse = API.FileContentResponse;
+  export import FileDeletedResponse = API.FileDeletedResponse;
+  export import FileResponse = API.FileResponse;
   export import FileListResponse = API.FileListResponse;
-  export import FileDeleteResponse = API.FileDeleteResponse;
-  export import FileRetrieveFileContentResponse = API.FileRetrieveFileContentResponse;
   export import FileCreateParams = API.FileCreateParams;
 
+  export import Images = API.Images;
   export import Image = API.Image;
   export import ImagesResponse = API.ImagesResponse;
   export import ImageCreateVariationParams = API.ImageCreateVariationParams;
   export import ImageEditParams = API.ImageEditParams;
   export import ImageGenerateParams = API.ImageGenerateParams;
 
-  export import AnswerCreateResponse = API.AnswerCreateResponse;
-  export import AnswerCreateParams = API.AnswerCreateParams;
+  export import Audio = API.Audio;
 
-  export import ClassificationCreateResponse = API.ClassificationCreateResponse;
-  export import ClassificationCreateParams = API.ClassificationCreateParams;
-
+  export import Moderations = API.Moderations;
   export import Moderation = API.Moderation;
   export import ModerationCreateResponse = API.ModerationCreateResponse;
   export import ModerationCreateParams = API.ModerationCreateParams;
 
-  export import DeleteModelResponse = API.DeleteModelResponse;
+  export import Models = API.Models;
   export import ListModelsResponse = API.ListModelsResponse;
   export import Model = API.Model;
+  export import ModelDeletedResponse = API.ModelDeletedResponse;
 
+  export import FineTunes = API.FineTunes;
   export import FineTune = API.FineTune;
   export import FineTuneEvent = API.FineTuneEvent;
   export import ListFineTuneEventsResponse = API.ListFineTuneEventsResponse;
@@ -152,6 +158,4 @@ export namespace OpenAI {
   export import FineTuneCreateParams = API.FineTuneCreateParams;
   export import FineTuneListEventsParams = API.FineTuneListEventsParams;
 }
-
-exports = module.exports = OpenAI;
 export default OpenAI;

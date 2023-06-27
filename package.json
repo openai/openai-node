@@ -1,6 +1,6 @@
 {
   "name": "openai",
-  "version": "v4.0.0-beta.0",
+  "version": "4.0.0-beta.1",
   "description": "Client library for the OpenAI API",
   "author": "OpenAI <support@openai.com>",
   "types": "dist/cjs/index.d.ts",
@@ -9,6 +9,86 @@
   "repository": "github:openai/openai-node",
   "license": "Apache-2.0",
   "private": false,
+  "files": [
+    "dist",
+    "resources",
+    "_shims",
+    "/*.ts"
+  ],
+  "exports": {
+    "./_shims/*": {
+      "deno": {
+        "require": {
+          "types": "./dist/cjs/_shims/*.d.ts",
+          "default": "./dist/cjs/_shims/*.js"
+        },
+        "types": "./dist/esm/_shims/*.d.ts",
+        "default": "./dist/esm/_shims/*.js"
+      },
+      "browser": {
+        "require": {
+          "types": "./dist/cjs/_shims/*.d.ts",
+          "default": "./dist/cjs/_shims/*.js"
+        },
+        "types": "./dist/esm/_shims/*.d.ts",
+        "default": "./dist/esm/_shims/*.js"
+      },
+      "worker": {
+        "require": {
+          "types": "./dist/cjs/_shims/*.d.ts",
+          "default": "./dist/cjs/_shims/*.js"
+        },
+        "types": "./dist/esm/_shims/*.d.ts",
+        "default": "./dist/esm/_shims/*.js"
+      },
+      "workerd": {
+        "require": {
+          "types": "./dist/cjs/_shims/*.d.ts",
+          "default": "./dist/cjs/_shims/*.js"
+        },
+        "types": "./dist/esm/_shims/*.d.ts",
+        "default": "./dist/esm/_shims/*.js"
+      },
+      "node": {
+        "require": {
+          "types": "./dist/cjs/_shims/*.node.d.ts",
+          "default": "./dist/cjs/_shims/*.node.js"
+        },
+        "types": "./dist/esm/_shims/*.node.d.ts",
+        "default": "./dist/esm/_shims/*.node.js"
+      },
+      "require": {
+        "types": "./dist/cjs/_shims/*.d.ts",
+        "default": "./dist/cjs/_shims/*.js"
+      },
+      "types": "./dist/esm/_shims/*.d.ts",
+      "default": "./dist/esm/_shims/*.js"
+    },
+    ".": {
+      "require": {
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/cjs/index.js"
+      },
+      "types": "./dist/esm/index.d.ts",
+      "default": "./dist/esm/index.js"
+    },
+    "./*": {
+      "require": {
+        "types": "./dist/cjs/*.d.ts",
+        "require": "./dist/cjs/*.js"
+      },
+      "types": "./dist/esm/*.d.ts",
+      "default": "./dist/esm/*.js"
+    },
+    "./*.js": {
+      "require": {
+        "types": "./dist/cjs/*.d.ts",
+        "require": "./dist/cjs/*.js"
+      },
+      "types": "./dist/esm/*.d.ts",
+      "default": "./dist/esm/*.js"
+    }
+  },
   "scripts": {
     "test": "bin/check-test-server && yarn jest",
     "build": "bash ./build",
@@ -19,7 +99,7 @@
   },
   "dependencies": {
     "@types/node": "^18.11.18",
-    "@types/node-fetch": "^2.6.1",
+    "@types/node-fetch": "^2.6.4",
     "@types/qs": "^6.9.7",
     "abort-controller": "^3.0.0",
     "agentkeepalive": "^4.2.1",
@@ -31,14 +111,14 @@
   },
   "devDependencies": {
     "openai": "link:.",
-    "@types/jest": "^27.5.0",
+    "@types/jest": "^29.4.0",
     "@typescript-eslint/eslint-plugin": "^5.33.0",
     "@typescript-eslint/parser": "^5.33.0",
     "eslint": "^8.22.0",
     "eslint-plugin-unused-imports": "^2.0.0",
-    "jest": "^28.1.0",
+    "jest": "^29.4.0",
     "prettier": "rattrayalex/prettier#postfix-ternaries",
-    "ts-jest": "^28.0.2",
+    "ts-jest": "^29.1.0",
     "ts-node": "^10.5.0",
     "tsc-alias": "^1.6.9",
     "tsconfig-paths": "^3.12.0",

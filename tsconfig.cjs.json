@@ -1,5 +1,6 @@
 {
   "extends": "./tsconfig.json",
+  "exclude": ["examples", "dist", "tests", "ecosystem-tests"],
   "compilerOptions": {
     "target": "es2016",
     "module": "commonjs",

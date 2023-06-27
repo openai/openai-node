@@ -24,12 +24,12 @@ yarn add openai
 ```js
 import OpenAI from 'openai';
 
-const openAI = new OpenAI({
+const openai = new OpenAI({
   apiKey: 'my api key', // defaults to process.env["OPENAI_API_KEY"]
 });
 
 async function main() {
-  const completion = await openAI.completions.create({
+  const completion = await openai.completions.create({
     model: 'text-davinci-002',
     prompt: 'Say this is a test',
     max_tokens: 6,
@@ -71,7 +71,7 @@ If you like, you may reference our types directly:
 ```ts
 import OpenAI from 'openai';
 
-const openAI = new OpenAI({
+const openai = new OpenAI({
   apiKey: 'my api key', // defaults to process.env["OPENAI_API_KEY"]
 });
 
@@ -82,7 +82,7 @@ async function main() {
     max_tokens: 6,
     temperature: 0,
   };
-  const completion: OpenAI.Completion = await openAI.completions.create(params);
+  const completion: OpenAI.Completion = await openai.completions.create(params);
 }
 main().catch(console.error);
 ```
@@ -91,17 +91,38 @@ Documentation for each method, request param, and response field are available i
 
 ## File Uploads
 
-Request parameters that correspond to file uploads can be passed as either a `FormData.Blob` or a `FormData.File` instance.
+Request parameters that correspond to file uploads can be passed in many different forms:
 
-We provide a `fileFromPath` helper function to easily create `FormData.File` instances from a given class.
+- `File` (or an object with the same structure)
+- a `fetch` `Response` (or an object with the same structure)
+- an `fs.ReadStream`
+- the return value of our `toFile` helper
 
 ```ts
-import OpenAI, { fileFromPath } from 'openai';
+import fs from 'fs';
+import fetch from 'node-fetch';
+import OpenAI, { toFile } from 'openai';
 
-const openAI = new OpenAI();
+const openai = new OpenAI();
 
-const file = await fileFromPath('input.jsonl');
-await openAI.files.create({ file: file, purpose: 'fine-tune' });
+// If you have access to Node `fs` we recommend using `fs.createReadStream()`:
+await openai.files.create({ file: fs.createReadStream('input.jsonl'), purpose: 'fine-tune' });
+
+// Or if you have the web `File` API you can pass a `File` instance:
+await openai.files.create({ file: new File(['my bytes'], 'input.jsonl'), purpose: 'fine-tune' });
+
+// You can also pass a `fetch` `Response`:
+await openai.files.create({ file: await fetch('https://somesite/input.jsonl'), purpose: 'fine-tune' });
+
+// Finally, if none of the above are convenient, you can use our `toFile` helper:
+await openai.files.create({
+  file: await toFile(Buffer.from('my bytes'), 'input.jsonl'),
+  purpose: 'fine-tune',
+});
+await openai.files.create({
+  file: await toFile(new Uint8Array([0, 1, 2]), 'input.jsonl'),
+  purpose: 'fine-tune',
+});
 ```
 
 ## Handling errors
@@ -112,7 +133,7 @@ a subclass of `APIError` will be thrown:
 
 ```ts
 async function main() {
-  const fineTune = await openAI.fineTunes
+  const fineTune = await openai.fineTunes
     .create({ training_file: 'file-XGinujblHPwGLSztz8cPS8XY' })
     .catch((err) => {
       if (err instanceof OpenAI.APIError) {
@@ -150,12 +171,12 @@ You can use the `maxRetries` option to configure or disable this:
 <!-- prettier-ignore -->
 ```js
 // Configure the default for all requests:
-const openAI = new OpenAI({
+const openai = new OpenAI({
   maxRetries: 0, // default is 2
 });
 
 // Or, configure per-request:
-openAI.embeddings.create({ model: 'text-similarity-babbage-001',input: 'The food was delicious and the waiter...' }, {
+openai.embeddings.create({ model: 'text-similarity-babbage-001',input: 'The food was delicious and the waiter...' }, {
   maxRetries: 5,
 });
 ```
@@ -167,12 +188,12 @@ Requests time out after 60 seconds by default. You can configure this with a `ti
 <!-- prettier-ignore -->
 ```ts
 // Configure the default for all requests:
-const openAI = new OpenAI({
+const openai = new OpenAI({
   timeout: 20 * 1000, // 20 seconds (default is 60s)
 });
 
 // Override per-request:
-openAI.edits.create({ model: 'text-davinci-edit-001',input: 'What day of the wek is it?',instruction: 'Fix the spelling mistakes' }, {
+openai.edits.create({ model: 'text-davinci-edit-001',input: 'What day of the wek is it?',instruction: 'Fix the spelling mistakes' }, {
   timeout: 5 * 1000,
 });
 ```
@@ -193,12 +214,12 @@ import http from 'http';
 import HttpsProxyAgent from 'https-proxy-agent';
 
 // Configure the default for all requests:
-const openAI = new OpenAI({
+const openai = new OpenAI({
   httpAgent: new HttpsProxyAgent(process.env.PROXY_URL),
 });
 
 // Override per-request:
-openAI.models.list({
+openai.models.list({
   baseURL: 'http://localhost:8080/test-api',
   httpAgent: new http.Agent({ keepAlive: false }),
 })
@@ -216,7 +237,7 @@ We are keen for your feedback; please open an [issue](https://www.github.com/ope
 
 The following runtimes are supported:
 
-- Node.js version 12 or higher.
+- Node.js 16 LTS or later ([non-EOL](https://endoflife.date/nodejs)) versions.
 - Deno v1.28.0 or higher (experimental).
   Use `import OpenAI from "npm:openai"`.
 

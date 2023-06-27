@@ -2,15 +2,15 @@
 
 import OpenAI from '~/index';
 
-const openAI = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010' });
+const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010' });
 
 describe('resource completions', () => {
   test('create: only required params', async () => {
-    const response = await openAI.completions.create({ model: 'string', prompt: 'This is a test.' });
+    const response = await openai.completions.create({ model: 'string', prompt: 'This is a test.' });
   });
 
   test('create: required and optional params', async () => {
-    const response = await openAI.completions.create({
+    const response = await openai.completions.create({
       model: 'string',
       prompt: 'This is a test.',
       best_of: 0,

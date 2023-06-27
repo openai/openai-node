@@ -2,18 +2,18 @@
 
 import * as Core from '~/core';
 import { APIResource } from '~/resource';
-import type * as FormData from 'formdata-node';
-import { multipartFormRequestOptions } from '~/core';
+import * as API from './';
+import { type Uploadable, multipartFormRequestOptions } from '~/core';
 
 export class Translations extends APIResource {
   /**
-   * Translates audio into into English.
+   * Translates audio into English.
    */
-  create(
+  async create(
     body: TranslationCreateParams,
     options?: Core.RequestOptions,
   ): Promise<Core.APIResponse<Translation>> {
-    return this.post('/audio/translations', multipartFormRequestOptions({ body, ...options }));
+    return this.post('/audio/translations', await multipartFormRequestOptions({ body, ...options }));
   }
 }
 
@@ -26,12 +26,12 @@ export interface TranslationCreateParams {
    * The audio file object (not file name) translate, in one of these formats: mp3,
    * mp4, mpeg, mpga, m4a, wav, or webm.
    */
-  file: FormData.Blob | FormData.File;
+  file: Uploadable;
 
   /**
    * ID of the model to use. Only `whisper-1` is currently available.
    */
-  model: string;
+  model: (string & {}) | 'whisper-1';
 
   /**
    * An optional text to guide the model's style or continue a previous audio
@@ -54,4 +54,9 @@ export interface TranslationCreateParams {
    * automatically increase the temperature until certain thresholds are hit.
    */
   temperature?: number;
+}
+
+export namespace Translations {
+  export import Translation = API.Translation;
+  export import TranslationCreateParams = API.TranslationCreateParams;
 }

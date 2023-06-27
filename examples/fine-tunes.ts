@@ -8,7 +8,8 @@
  * - https://platform.openai.com/docs/guides/fine-tuning
  */
 
-import OpenAI, { fileFromPath } from 'openai';
+import fs from 'fs';
+import OpenAI from 'openai';
 
 // Gets the API Key from the environment variable `OPENAI_API_KEY`
 const client = new OpenAI();
@@ -16,7 +17,7 @@ const client = new OpenAI();
 async function main() {
   console.log(`Uploading file`);
   const file = await client.files.create({
-    file: await fileFromPath('examples/fine-tune-data.jsonl'),
+    file: fs.createReadStream('examples/fine-tune-data.jsonl'),
     purpose: 'fine-tune',
   });
   console.log(`Uploaded file with ID: ${file.id}`);

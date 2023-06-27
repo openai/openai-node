@@ -2,20 +2,20 @@
 
 import OpenAI from '~/index';
 
-const openAI = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010' });
+const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010' });
 
 describe('resource edits', () => {
   test('create: only required params', async () => {
-    const response = await openAI.edits.create({
+    const response = await openai.edits.create({
       instruction: 'Fix the spelling mistakes.',
-      model: 'string',
+      model: 'text-davinci-edit-001',
     });
   });
 
   test('create: required and optional params', async () => {
-    const response = await openAI.edits.create({
+    const response = await openai.edits.create({
       instruction: 'Fix the spelling mistakes.',
-      model: 'string',
+      model: 'text-davinci-edit-001',
       input: 'What day of the wek is it?',
       n: 1,
       temperature: 1,

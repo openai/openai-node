@@ -3,6 +3,7 @@
 import * as Core from '~/core';
 import { APIResource } from '~/resource';
 import * as Files from '~/resources/files';
+import * as API from './';
 import { Stream } from '~/streaming';
 
 export class FineTunes extends APIResource {
@@ -82,15 +83,15 @@ export interface FineTune {
 
   organization_id: string;
 
-  result_files: Array<Files.File>;
+  result_files: Array<Files.FileResponse>;
 
   status: string;
 
-  training_files: Array<Files.File>;
+  training_files: Array<Files.FileResponse>;
 
   updated_at: number;
 
-  validation_files: Array<Files.File>;
+  validation_files: Array<Files.FileResponse>;
 
   events?: Array<FineTuneEvent>;
 }
@@ -198,7 +199,7 @@ export interface FineTuneCreateParams {
    * more about these models, see the
    * [Models](https://platform.openai.com/docs/models) documentation.
    */
-  model?: string | null;
+  model?: (string & {}) | 'ada' | 'babbage' | 'curie' | 'davinci' | null;
 
   /**
    * The number of epochs to train the model for. An epoch refers to one full cycle
@@ -274,4 +275,13 @@ export namespace FineTuneListEventsParams {
      */
     stream: true;
   }
+}
+
+export namespace FineTunes {
+  export import FineTune = API.FineTune;
+  export import FineTuneEvent = API.FineTuneEvent;
+  export import ListFineTuneEventsResponse = API.ListFineTuneEventsResponse;
+  export import ListFineTunesResponse = API.ListFineTunesResponse;
+  export import FineTuneCreateParams = API.FineTuneCreateParams;
+  export import FineTuneListEventsParams = API.FineTuneListEventsParams;
 }
