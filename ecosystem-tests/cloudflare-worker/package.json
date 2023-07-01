@@ -4,11 +4,11 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"tsc": "tsc",
+		"tsc": "tsc && tsc -p tsconfig.check.json",
 		"deploy": "wrangler publish",
 		"start": "wrangler dev",
 		"test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
-		"test:ci": "start-server-and-test start http://localhost:8787 test"
+		"test:ci": "WAIT_ON_INTERVAL=10000 start-server-and-test start http://localhost:8787 test"
 	},
 	"devDependencies": {
 		"@cloudflare/workers-types": "^4.20230419.0",

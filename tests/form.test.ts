@@ -1,4 +1,4 @@
-import { multipartFormRequestOptions, createForm } from '../core';
+import { multipartFormRequestOptions, createForm } from 'openai/core';
 import { Blob } from 'openai/_shims/formdata';
 import { toFile } from 'openai';
 

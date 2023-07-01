@@ -1,4 +1,5 @@
 import OpenAI, { toFile } from 'openai';
+import { TranscriptionCreateParams } from 'openai/resources/audio/transcriptions';
 
 /**
  * Tests uploads using various Web API data objects.
@@ -30,12 +31,23 @@ export function uploadWebApiTestCases({
 		'It was anxious to find him no one that expectation of a man who were giving his father enjoyment. But he was avoided in sight in the minister to which indeed,';
 	const model = 'whisper-1';
 
+	async function typeTests() {
+		// @ts-expect-error this should error if the `Uploadable` type was resolved correctly
+		await client.audio.transcriptions.create({ file: { foo: true }, model: 'whisper-1' });
+		// @ts-expect-error this should error if the `Uploadable` type was resolved correctly
+		await client.audio.transcriptions.create({ file: null, model: 'whisper-1' });
+		// @ts-expect-error this should error if the `Uploadable` type was resolved correctly
+		await client.audio.transcriptions.create({ file: 'test', model: 'whisper-1' });
+	}
+
 	it('handles File', async () => {
 		const file = await fetch(url)
 			.then((x) => x.arrayBuffer())
 			.then((x) => new File([x], filename));
 
-		const result = await client.audio.transcriptions.create({ file, model });
+		const params: TranscriptionCreateParams = { file, model };
+
+		const result = await client.audio.transcriptions.create(params);
 		expectEqual(result.text, correctAnswer);
 	});
 
@@ -50,7 +62,7 @@ export function uploadWebApiTestCases({
 
 	it('toFile handles string', async () => {
 		// @ts-expect-error we don't type support for `string` to avoid a footgun with passing the file path
-		const file = await toFile(fineTune, 'finetune.jsonl')
+		const file = await toFile(fineTune, 'finetune.jsonl');
 		const result = await client.files.create({ file, purpose: 'fine-tune' });
 		expectEqual(result.status, 'uploaded');
 	});

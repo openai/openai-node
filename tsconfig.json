@@ -1,16 +1,17 @@
 {
-  "exclude": ["dist", "ecosystem-tests"],
+  "include": ["src", "tests", "examples"],
   "compilerOptions": {
     "target": "es2019",
     "lib": ["es2020"],
     "module": "commonjs",
     "moduleResolution": "node",
     "esModuleInterop": true,
-    "rootDir": "./",
+    "rootDir": "./src",
     "baseUrl": "./",
     "paths": {
-      "~/*": ["*"],
-      "openai/_shims/*": ["_shims/*.node"],
+      "openai/_shims/*": ["src/_shims/*.node"],
+      "openai": ["src/index.ts"],
+      "openai/*": ["src/*"],
       "digest-fetch": ["./typings/digest-fetch"]
     },
 

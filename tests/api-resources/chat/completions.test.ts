@@ -1,13 +1,13 @@
 // File generated from our OpenAPI spec by Stainless.
 
-import OpenAI from '~/index';
+import OpenAI from 'openai';
 
 const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010' });
 
 describe('resource completions', () => {
   test('create: only required params', async () => {
     const response = await openai.chat.completions.create({
-      messages: [{ role: 'system' }],
+      messages: [{ role: 'system', content: 'string' }],
       model: 'gpt-3.5-turbo',
     });
   });

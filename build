@@ -1,24 +1,50 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -exuo pipefail
 
-rm -rf dist/*
+node scripts/check-version.cjs
 
-yarn tsn check-version.ts
+# Build into dist and will publish the package from there,
+# so that src/resources/foo.ts becomes <package root>/resources/foo.js
+# This way importing from `"openai/resources/foo"` works
+# even with `"moduleResolution": "node"`
 
-# build node:
-node scripts/prepare-cjs-build.mjs
-yarn tsc -p tsconfig.cjs.json
-yarn tsc-alias -p tsconfig.cjs.json
+rm -rf dist
+mkdir dist
+# Copy src to dist/src and build from dist/src into dist, so that
+# the source map for index.js.map will refer to ./src/index.ts etc
+cp -rp src dist
+# this converts the export map paths for the dist directory
+# and does a few other minor things
+node scripts/make-dist-package-json.cjs > dist/package.json
 
-node scripts/prepare-esm-build.mjs
-yarn tsc -p tsconfig.esm.json
-yarn tsc-alias -p tsconfig.esm.json --resolve-full-paths true
+# build to .js/.mjs/.d.ts files
+tsc-multi
+# copy over handwritten .js/.mjs/.d.ts files
+cp src/_shims/*.{d.ts,js,mjs} dist/_shims
+tsc-alias -p tsconfig.json --resolve-full-paths
+# we need to add exports = module.exports = OpenAI Node to index.js;
+# No way to get that from index.ts because it would cause compile errors
+# when building .mjs
+node scripts/fix-index-exports.cjs
+# with "moduleResolution": "nodenext", if ESM resolves to index.d.ts,
+# it'll have TS errors on the default import.  But if it resolves to
+# index.d.mts the default import will work (even though both files have
+# the same export default statement)
+cp dist/index.d.ts dist/index.d.mts
 
-echo '{"type": "module"}' > dist/esm/package.json
+# strip out lib="dom" and types="node" references; these are needed at build time,
+# but would pollute the user's TS environment
+REFERENCE_SUBS='s/^ *\/\/\/ *<reference *lib="dom".*//g;s/^ *\/\/\/ *<reference *types="node".*//g'
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  find dist -type f -exec sed -i '' "${REFERENCE_SUBS}" {} +
+else
+  find dist -type f -exec sed -i "${REFERENCE_SUBS}" {} +
+fi
 
 yarn prettier --loglevel=warn --write .
 
-# smoke test cjs export
+# make sure that nothing crashes when we require the output CJS or
+# import the output ESM
+cd dist
 node -e 'require("openai")'
-# smoke test esm export
-node -e 'import("openai")'
+node -e 'import("openai")' --input-type=module

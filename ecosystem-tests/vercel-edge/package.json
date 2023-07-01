@@ -11,6 +11,7 @@
     "vercel": "vercel"
   },
   "dependencies": {
+    "ai": "2.1.9",
     "next": "13.4.6",
     "react": "18.2.0",
     "react-dom": "18.2.0"
@@ -20,7 +21,7 @@
     "@types/react": "18.2.13",
     "@types/react-dom": "18.2.6",
     "edge-runtime": "^2.4.3",
-    "vercel": "^30.2.3",
-    "typescript": "5.1.3"
+    "typescript": "5.1.3",
+    "vercel": "^30.2.3"
   }
 }

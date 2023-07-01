@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { TranscriptionCreateParams } from 'openai/resources/audio';
 
 // smoke test that importing and constructing the client works
 const openai = new OpenAI({ apiKey: '<invalid API key>' });
@@ -12,6 +13,22 @@ openai.completions
   })
   .catch((err) => console.error(err));
 
+async function typeTests() {
+  // @ts-expect-error this should error if the `Uploadable` type was resolved correctly
+  await openai.audio.transcriptions.create({ file: { foo: true }, model: 'whisper-1' });
+  // @ts-expect-error this should error if the `Uploadable` type was resolved correctly
+  await openai.audio.transcriptions.create({ file: null, model: 'whisper-1' });
+  // @ts-expect-error this should error if the `Uploadable` type was resolved correctly
+  await openai.audio.transcriptions.create({ file: 'test', model: 'whisper-1' });
+
+  const url = 'https://audio-samples.github.io/samples/mp3/blizzard_biased/sample-1.mp3';
+  const model = 'whisper-1';
+
+  const file = await fetch(url);
+  const params: TranscriptionCreateParams = { file, model };
+
+  await openai.audio.transcriptions.create(params);
+}
 
 // --------
 class Greeter {

@@ -3,8 +3,9 @@ module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
   moduleNameMapper: {
-    '^~/(.*)$': '<rootDir>/$1',
-    '^openai/_shims/(.*)$': '<rootDir>/_shims/$1.node',
+    '^openai$': '<rootDir>/src/index.ts',
+    '^openai/_shims/(.*)$': '<rootDir>/src/_shims/$1.node',
+    '^openai/(.*)$': '<rootDir>/src/$1',
   },
-  modulePathIgnorePatterns: ['<rootDir>/ecosystem-tests/'],
+  modulePathIgnorePatterns: ['<rootDir>/ecosystem-tests/', '<rootDir>/dist/'],
 };

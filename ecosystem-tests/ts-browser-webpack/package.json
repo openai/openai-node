@@ -4,6 +4,7 @@
   "private": true,
   "description": "ts-browser-webpack",
   "scripts": {
+    "tsc": "tsc",
     "test": "echo \"Error: no test specified\" && exit 1",
     "serve": "webpack-cli serve --mode development",
     "build": "webpack"

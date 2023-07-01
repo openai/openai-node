@@ -1,4 +1,4 @@
-import { createResponseHeaders } from '../core';
+import { createResponseHeaders } from 'openai/core';
 import { Headers } from 'openai/_shims/fetch';
 
 describe('response parsing', () => {

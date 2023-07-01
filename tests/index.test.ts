@@ -1,7 +1,7 @@
 // File generated from our OpenAPI spec by Stainless.
 
-import { Headers } from '~/core';
-import OpenAI from '../index';
+import { Headers } from 'openai/core';
+import OpenAI from 'openai';
 
 describe('instantiate client', () => {
   const env = process.env;

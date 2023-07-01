@@ -1,6 +1,6 @@
 # Completions
 
-Models:
+Types:
 
 - <code><a href="./resources/completions.ts">Completion</a></code>
 - <code><a href="./resources/completions.ts">CompletionChoice</a></code>
@@ -13,7 +13,7 @@ Methods:
 
 ## Completions
 
-Models:
+Types:
 
 - <code><a href="./resources/chat/completions.ts">ChatCompletion</a></code>
 - <code><a href="./resources/chat/completions.ts">ChatCompletionChunk</a></code>
@@ -24,7 +24,7 @@ Methods:
 
 # Edits
 
-Models:
+Types:
 
 - <code><a href="./resources/edits.ts">Edit</a></code>
 
@@ -34,7 +34,7 @@ Methods:
 
 # Embeddings
 
-Models:
+Types:
 
 - <code><a href="./resources/embeddings.ts">Embedding</a></code>
 
@@ -44,24 +44,23 @@ Methods:
 
 # Files
 
-Models:
+Types:
 
-- <code><a href="./resources/files.ts">FileContentResponse</a></code>
-- <code><a href="./resources/files.ts">FileDeletedResponse</a></code>
-- <code><a href="./resources/files.ts">FileResponse</a></code>
-- <code><a href="./resources/files.ts">FileListResponse</a></code>
+- <code><a href="./resources/files.ts">FileContent</a></code>
+- <code><a href="./resources/files.ts">FileDeleted</a></code>
+- <code><a href="./resources/files.ts">FileObject</a></code>
 
 Methods:
 
-- <code title="post /files">client.files.<a href="./resources/files.ts">create</a>({ ...params }) -> FileResponse</code>
-- <code title="get /files/{file_id}">client.files.<a href="./resources/files.ts">retrieve</a>(fileId) -> FileResponse</code>
-- <code title="get /files">client.files.<a href="./resources/files.ts">list</a>() -> FileListResponse</code>
-- <code title="delete /files/{file_id}">client.files.<a href="./resources/files.ts">del</a>(fileId) -> FileDeletedResponse</code>
-- <code title="get /files/{file_id}/content">client.files.<a href="./resources/files.ts">retrieveFileContent</a>(fileId) -> Promise<string></code>
+- <code title="post /files">client.files.<a href="./resources/files.ts">create</a>({ ...params }) -> FileObject</code>
+- <code title="get /files/{file_id}">client.files.<a href="./resources/files.ts">retrieve</a>(fileId) -> FileObject</code>
+- <code title="get /files">client.files.<a href="./resources/files.ts">list</a>() -> FileObjectsPage</code>
+- <code title="delete /files/{file_id}">client.files.<a href="./resources/files.ts">del</a>(fileId) -> FileDeleted</code>
+- <code title="get /files/{file_id}/content">client.files.<a href="./resources/files.ts">retrieveFileContent</a>(fileId) -> string</code>
 
 # Images
 
-Models:
+Types:
 
 - <code><a href="./resources/images.ts">Image</a></code>
 - <code><a href="./resources/images.ts">ImagesResponse</a></code>
@@ -76,7 +75,7 @@ Methods:
 
 ## Transcriptions
 
-Models:
+Types:
 
 - <code><a href="./resources/audio/transcriptions.ts">Transcription</a></code>
 
@@ -86,7 +85,7 @@ Methods:
 
 ## Translations
 
-Models:
+Types:
 
 - <code><a href="./resources/audio/translations.ts">Translation</a></code>
 
@@ -96,7 +95,7 @@ Methods:
 
 # Moderations
 
-Models:
+Types:
 
 - <code><a href="./resources/moderations.ts">Moderation</a></code>
 - <code><a href="./resources/moderations.ts">ModerationCreateResponse</a></code>
@@ -107,31 +106,29 @@ Methods:
 
 # Models
 
-Models:
+Types:
 
-- <code><a href="./resources/models.ts">ListModelsResponse</a></code>
 - <code><a href="./resources/models.ts">Model</a></code>
-- <code><a href="./resources/models.ts">ModelDeletedResponse</a></code>
+- <code><a href="./resources/models.ts">ModelDeleted</a></code>
 
 Methods:
 
 - <code title="get /models/{model}">client.models.<a href="./resources/models.ts">retrieve</a>(model) -> Model</code>
-- <code title="get /models">client.models.<a href="./resources/models.ts">list</a>() -> ListModelsResponse</code>
-- <code title="delete /models/{model}">client.models.<a href="./resources/models.ts">del</a>(model) -> ModelDeletedResponse</code>
+- <code title="get /models">client.models.<a href="./resources/models.ts">list</a>() -> ModelsPage</code>
+- <code title="delete /models/{model}">client.models.<a href="./resources/models.ts">del</a>(model) -> ModelDeleted</code>
 
 # FineTunes
 
-Models:
+Types:
 
 - <code><a href="./resources/fine-tunes.ts">FineTune</a></code>
 - <code><a href="./resources/fine-tunes.ts">FineTuneEvent</a></code>
-- <code><a href="./resources/fine-tunes.ts">ListFineTuneEventsResponse</a></code>
-- <code><a href="./resources/fine-tunes.ts">ListFineTunesResponse</a></code>
+- <code><a href="./resources/fine-tunes.ts">FineTuneEventsListResponse</a></code>
 
 Methods:
 
 - <code title="post /fine-tunes">client.fineTunes.<a href="./resources/fine-tunes.ts">create</a>({ ...params }) -> FineTune</code>
 - <code title="get /fine-tunes/{fine_tune_id}">client.fineTunes.<a href="./resources/fine-tunes.ts">retrieve</a>(fineTuneId) -> FineTune</code>
-- <code title="get /fine-tunes">client.fineTunes.<a href="./resources/fine-tunes.ts">list</a>() -> ListFineTunesResponse</code>
+- <code title="get /fine-tunes">client.fineTunes.<a href="./resources/fine-tunes.ts">list</a>() -> FineTunesPage</code>
 - <code title="post /fine-tunes/{fine_tune_id}/cancel">client.fineTunes.<a href="./resources/fine-tunes.ts">cancel</a>(fineTuneId) -> FineTune</code>
-- <code title="get /fine-tunes/{fine_tune_id}/events">client.fineTunes.<a href="./resources/fine-tunes.ts">listEvents</a>(fineTuneId, { ...params }) -> ListFineTuneEventsResponse</code>
+- <code title="get /fine-tunes/{fine_tune_id}/events">client.fineTunes.<a href="./resources/fine-tunes.ts">listEvents</a>(fineTuneId, { ...params }) -> FineTuneEventsListResponse</code>

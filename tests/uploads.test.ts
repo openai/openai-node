@@ -1,6 +1,5 @@
 import fs from 'fs';
-import { toFile } from '~/uploads';
-import { ResponseLike } from 'openai/_shims/uploadable';
+import { toFile, type ResponseLike } from 'openai/uploads';
 import { File } from 'openai/_shims/formdata';
 
 class MyClass {

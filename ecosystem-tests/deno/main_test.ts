@@ -10,6 +10,15 @@ const model = 'whisper-1';
 
 const client = new OpenAI({ apiKey: Deno.env.get('OPENAI_API_KEY') });
 
+async function _typeTests() {
+  // @ts-expect-error this should error if the `Uploadable` type was resolved correctly
+  await client.audio.transcriptions.create({ file: { foo: true }, model: 'whisper-1' });
+  // @ts-expect-error this should error if the `Uploadable` type was resolved correctly
+  await client.audio.transcriptions.create({ file: null, model: 'whisper-1' });
+  // @ts-expect-error this should error if the `Uploadable` type was resolved correctly
+  await client.audio.transcriptions.create({ file: 'test', model: 'whisper-1' });
+}
+
 Deno.test(async function handlesFile() {
   const file = await fetch(url)
     .then((x) => x.arrayBuffer())

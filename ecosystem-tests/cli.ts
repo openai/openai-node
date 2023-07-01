@@ -9,58 +9,63 @@ const PACK_FILE = `.pack/${TAR_NAME}`;
 
 const projects = {
   'ts-browser-webpack': async () => {
-    await run('yarn', ['install']);
     await installPackage();
 
-    await run('yarn', ['build']);
+    await run('npm', ['run', 'tsc']);
+    await run('npm', ['run', 'build']);
   },
   'vercel-edge': async () => {
-    await run('yarn', ['install']);
-    await installPackage({ method: 'copy' });
+    await installPackage();
 
-    await run('yarn', ['build']);
+    await run('npm', ['run', 'build']);
 
     if (state.deploy) {
-      await run('yarn', ['vercel', 'deploy', '--prod', '--force']);
+      await run('npm', ['run', 'vercel', 'deploy', '--prod', '--force']);
     }
   },
   'cloudflare-worker': async () => {
-    await run('yarn', ['install']);
     await installPackage();
 
-    await run('yarn', ['tsc']);
+    await run('npm', ['run', 'tsc']);
 
     if (state.live) {
-      await run('yarn', ['test:ci']);
+      await run('npm', ['run', 'test:ci']);
     }
     if (state.deploy) {
-      await run('yarn', ['deploy']);
+      await run('npm', ['run', 'deploy']);
     }
   },
   'node-ts-cjs': async () => {
-    await run('yarn', ['install']);
     await installPackage();
 
-    await run('yarn', ['tsc']);
+    await run('npm', ['run', 'tsc']);
 
     if (state.live) {
-      await run('yarn', ['test']);
+      await run('npm', ['test']);
     }
   },
+  'node-ts-cjs-dom': async () => {
+    await installPackage();
+    await run('npm', ['run', 'tsc']);
+  },
   'node-ts-esm': async () => {
-    await run('yarn', ['install']);
     await installPackage();
 
-    await run('yarn', ['tsc']);
+    await run('npm', ['run', 'tsc']);
 
     if (state.live) {
-      await run('yarn', ['test']);
+      await run('pnpm', ['test']);
     }
+  },
+  'node-ts-esm-dom': async () => {
+    await installPackage();
+    await run('npm', ['run', 'tsc']);
   },
   deno: async () => {
     await run('deno', ['task', 'install']);
-    await run('yarn', ['install']);
     await installPackage();
+    const packFile = getPackFile();
+
     const openaiDir = path.resolve(
       process.cwd(),
       'node_modules',
@@ -71,12 +76,11 @@ const projects = {
     );
 
     await run('sh', ['-c', 'rm -rf *'], { cwd: openaiDir, stdio: 'inherit' });
-    const packFile = getPackFile();
     await run('tar', ['xzf', path.resolve(packFile)], { cwd: openaiDir, stdio: 'inherit' });
     await run('sh', ['-c', 'mv package/* .'], { cwd: openaiDir, stdio: 'inherit' });
     await run('sh', ['-c', 'rm -rf package'], { cwd: openaiDir, stdio: 'inherit' });
 
-    await run('deno', ['lint']);
+    await run('deno', ['task', 'check']);
     if (state.live) await run('deno', ['task', 'test']);
   },
 };
@@ -103,6 +107,10 @@ function parseArgs() {
         type: 'boolean',
         default: false,
       },
+      fromNpm: {
+        type: 'string',
+        description: 'Test installing from a given NPM package instead of the local package',
+      },
       live: {
         type: 'boolean',
         default: false,
@@ -123,10 +131,10 @@ let state: Args & { rootDir: string };
 
 async function main() {
   const args = (await parseArgs()) as Args;
-  console.log(`args:`, args);
+  console.error(`args:`, args);
 
   const rootDir = await packageDir();
-  console.log(`rootDir:`, rootDir);
+  console.error(`rootDir:`, rootDir);
 
   state = { ...args, rootDir };
 
@@ -141,7 +149,7 @@ async function main() {
     args.projects?.length ? args.projects
     : args._.length ? args._
     : projectNames) as typeof projectNames;
-  console.log(`running projects: ${projectsToRun}`);
+  console.error(`running projects: ${projectsToRun}`);
 
   const failed: typeof projectNames = [];
 
@@ -149,58 +157,82 @@ async function main() {
     const fn = projects[project];
 
     await withChdir(path.join(rootDir, 'ecosystem-tests', project), async () => {
-      console.log('\n');
-      console.log(`----------- ${project} -----------`);
+      console.error('\n');
+      console.error(banner(project));
+      console.error('\n');
 
       try {
         await fn();
-        console.log(`✅ - Successfully ran ${project}`);
+        console.error(`✅ - Successfully ran ${project}`);
       } catch (err) {
-        console.error(err);
+        if (err && (err as any).shortMessage) {
+          console.error((err as any).shortMessage);
+        } else {
+          console.error(err);
+        }
         failed.push(project);
       }
     });
   }
 
   if (failed.length) {
-    throw new Error(`${failed.length} project(s) failed - ${failed.join(', ')}`);
+    console.error(`${failed.length} project(s) failed - ${failed.join(', ')}`);
+    process.exit(1);
   }
+  console.error();
+  process.exit(0);
 }
 
+function centerPad(text: string, width = text.length, char = ' '): string {
+  return text.padStart(Math.floor((width + text.length) / 2), char).padEnd(width, char);
+}
+
+function banner(name: string, width = 80): string {
+  function line(text = ''): string {
+    if (text) text = centerPad(text, width - 40);
+    return centerPad(text, width, '/');
+  }
+  return [line(), line(), line(' '), line(name), line(' '), line(), line()].join('\n');
+}
+
+module.exports = banner;
+
 async function buildPackage() {
+  if (state.fromNpm) {
+    return;
+  }
+
   await run('yarn', ['build']);
 
   if (!(await pathExists('.pack'))) {
     await fs.mkdir('.pack');
   }
 
-  const proc = await run('npm', ['pack', '--json'], { alwaysPipe: true });
+  const proc = await run('npm', ['pack', '--ignore-scripts', '--json'], {
+    cwd: path.join(process.cwd(), 'dist'),
+    alwaysPipe: true,
+  });
+
   const pack = JSON.parse(proc.stdout);
   assert(Array.isArray(pack), `Expected pack output to be an array but got ${typeof pack}`);
   assert(pack.length === 1, `Expected pack output to be an array of length 1 but got ${pack.length}`);
 
-  const filename = pack[0].filename;
-  console.log({ filename });
+  const filename = path.join('dist', (pack[0] as any).filename);
+  console.error({ filename });
 
   await fs.rename(filename, PACK_FILE);
-  console.log(`Successfully created tarball at ${PACK_FILE}`);
+  console.error(`Successfully created tarball at ${PACK_FILE}`);
 }
 
-async function installPackage({ method }: { method: 'reference' | 'copy' } = { method: 'reference' }) {
-  // TODO: this won't always install, sometimes it will read from a cache
+async function installPackage() {
+  if (state.fromNpm) {
+    await run('npm', ['install', '-D', state.fromNpm]);
+    return;
+  }
 
   const packFile = getPackFile();
-
-  switch (method) {
-    case 'reference': {
-      return await run('yarn', ['add', '-D', '--force', packFile]);
-    }
-    case 'copy':
-      await fs.copyFile(packFile, TAR_NAME);
-      return await run('yarn', ['add', '-D', '--force', './' + TAR_NAME]);
-    default:
-      throw checkNever(method);
-  }
+  await fs.copyFile(packFile, `./${TAR_NAME}`);
+  return await run('npm', ['install', '-D', `./${TAR_NAME}`]);
 }
 
 function getPackFile() {
@@ -219,7 +251,15 @@ async function run(command: string, args: string[], config?: RunOpts): Promise<e
   }
 
   console.debug('[run]:', command, ...args);
-  return await execa(command, args, config);
+  try {
+    return await execa(command, args, config);
+  } catch (error) {
+    if (error instanceof Object && !state.verbose) {
+      const { stderr } = error as any;
+      if (stderr) process.stderr.write(stderr);
+    }
+    throw error;
+  }
 }
 
 async function withChdir<R>(newDir: string, fn: () => Promise<R>): Promise<R> {
