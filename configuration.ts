@@ -102,6 +102,9 @@ export class Configuration {
             'Authorization': `Bearer ${this.apiKey}`,
             ...this.baseOptions.headers,
         }
+        if (this.baseOptions.maxBodyLength == null) {
+            this.baseOptions.maxBodyLength = 25 * 1024 * 1024; // 25MB
+        }
         if (this.organization) {
             this.baseOptions.headers['OpenAI-Organization'] = this.organization;
         }

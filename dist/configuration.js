@@ -29,6 +29,9 @@ class Configuration {
             this.baseOptions = {};
         }
         this.baseOptions.headers = Object.assign({ 'User-Agent': `OpenAI/NodeJS/${packageJson.version}`, 'Authorization': `Bearer ${this.apiKey}` }, this.baseOptions.headers);
+        if (this.baseOptions.maxBodyLength == null) {
+            this.baseOptions.maxBodyLength = 25 * 1024 * 1024; // 25MB
+        }
         if (this.organization) {
             this.baseOptions.headers['OpenAI-Organization'] = this.organization;
         }
