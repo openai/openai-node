@@ -73,6 +73,8 @@ export abstract class APIClient {
     };
   }
 
+  protected abstract defaultQuery(): DefaultQuery | undefined;
+
   /**
    * Override this to add your own headers validation:
    */
@@ -130,9 +132,17 @@ export abstract class APIClient {
     const contentLength = typeof body === 'string' ? body.length.toString() : null;
 
     const url = this.buildURL(path!, query);
-    const httpAgent = options.httpAgent ?? this.httpAgent ?? getDefaultAgent(url);
+    if ('timeout' in options) validatePositiveInteger('timeout', options.timeout);
     const timeout = options.timeout ?? this.timeout;
-    validatePositiveInteger('timeout', timeout);
+    const httpAgent = options.httpAgent ?? this.httpAgent ?? getDefaultAgent(url);
+    const minAgentTimeout = timeout + 1000;
+    if ((httpAgent as any)?.options && minAgentTimeout > ((httpAgent as any).options.timeout ?? 0)) {
+      // Allow any given request to bump our agent active socket timeout.
+      // This may seem strange, but leaking active sockets should be rare and not particularly problematic,
+      // and without mutating agent we would need to create more of them.
+      // This tradeoff optimizes for performance.
+      (httpAgent as any).options.timeout = minAgentTimeout;
+    }
 
     if (this.idempotencyHeader && method !== 'get') {
       if (!options.idempotencyKey) options.idempotencyKey = this.defaultIdempotencyKey();
@@ -259,6 +269,11 @@ export abstract class APIClient {
       isAbsoluteURL(path) ?
         new URL(path)
       : new URL(this.baseURL + (this.baseURL.endsWith('/') && path.startsWith('/') ? path.slice(1) : path));
+
+    const defaultQuery = this.defaultQuery();
+    if (!isEmptyObj(defaultQuery)) {
+      query = { ...defaultQuery, ...query } as Req;
+    }
 
     if (query) {
       url.search = qs.stringify(query, this.qsOptions());
@@ -516,6 +531,7 @@ type HTTPMethod = 'get' | 'post' | 'put' | 'patch' | 'delete';
 
 export type RequestClient = { fetch: Fetch };
 export type Headers = Record<string, string | null | undefined>;
+export type DefaultQuery = Record<string, string | undefined>;
 export type KeysEnum<T> = { [P in keyof Required<T>]: true };
 
 export type RequestOptions<Req extends {} = Record<string, unknown> | Readable> = {
@@ -564,6 +580,7 @@ export type FinalRequestOptions<Req extends {} = Record<string, unknown> | Reada
 };
 
 export type APIResponse<T> = T & {
+  /** @deprecated - we plan to add a different way to access raw response information shortly. */
   responseHeaders: Headers;
 };
 

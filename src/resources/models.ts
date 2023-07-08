@@ -34,6 +34,8 @@ export class Models extends APIResource {
  * Note: no pagination actually occurs yet, this is for forwards-compatibility.
  */
 export class ModelsPage extends Page<Model> {}
+// alias so we can export it in the namespace
+type _ModelsPage = ModelsPage;
 
 export interface Model {
   id: string;
@@ -56,5 +58,5 @@ export interface ModelDeleted {
 export namespace Models {
   export import Model = API.Model;
   export import ModelDeleted = API.ModelDeleted;
-  export import ModelsPage = API.ModelsPage;
+  export type ModelsPage = _ModelsPage;
 }

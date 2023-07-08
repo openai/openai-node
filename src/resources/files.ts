@@ -53,6 +53,8 @@ export class Files extends APIResource {
  * Note: no pagination actually occurs yet, this is for forwards-compatibility.
  */
 export class FileObjectsPage extends Page<FileObject> {}
+// alias so we can export it in the namespace
+type _FileObjectsPage = FileObjectsPage;
 
 export type FileContent = string;
 
@@ -79,7 +81,7 @@ export interface FileObject {
 
   status?: string;
 
-  status_details?: unknown | null;
+  status_details?: string | null;
 }
 
 export interface FileCreateParams {
@@ -106,6 +108,6 @@ export namespace Files {
   export import FileContent = API.FileContent;
   export import FileDeleted = API.FileDeleted;
   export import FileObject = API.FileObject;
-  export import FileObjectsPage = API.FileObjectsPage;
+  export type FileObjectsPage = _FileObjectsPage;
   export import FileCreateParams = API.FileCreateParams;
 }

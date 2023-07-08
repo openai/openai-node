@@ -17,11 +17,64 @@ describe('instantiate client', () => {
     process.env = env;
   });
 
-  test('defaultHeaders are passed through', () => {
-    const client = new OpenAI({ defaultHeaders: { 'X-My-Default-Header': '2' }, apiKey: 'my api key' });
+  describe('defaultHeaders', () => {
+    const client = new OpenAI({
+      baseURL: 'http://localhost:5000/',
+      defaultHeaders: { 'X-My-Default-Header': '2' },
+      apiKey: 'my api key',
+    });
 
-    const { req } = client.buildRequest({ path: '/foo', method: 'post' });
-    expect((req.headers as Headers)['X-My-Default-Header']).toEqual('2');
+    test('they are used in the request', () => {
+      const { req } = client.buildRequest({ path: '/foo', method: 'post' });
+      expect((req.headers as Headers)['X-My-Default-Header']).toEqual('2');
+    });
+
+    test('can be overriden with `undefined`', () => {
+      const { req } = client.buildRequest({
+        path: '/foo',
+        method: 'post',
+        headers: { 'X-My-Default-Header': undefined },
+      });
+      expect((req.headers as Headers)['X-My-Default-Header']).toBeUndefined();
+    });
+
+    test('can be overriden with `null`', () => {
+      const { req } = client.buildRequest({
+        path: '/foo',
+        method: 'post',
+        headers: { 'X-My-Default-Header': null },
+      });
+      expect((req.headers as Headers)['X-My-Default-Header']).toBeUndefined();
+    });
+  });
+
+  describe('defaultQuery', () => {
+    test('with null query params given', () => {
+      const client = new OpenAI({
+        baseURL: 'http://localhost:5000/',
+        defaultQuery: { apiVersion: 'foo' },
+        apiKey: 'my api key',
+      });
+      expect(client.buildURL('/foo', null)).toEqual('http://localhost:5000/foo?apiVersion=foo');
+    });
+
+    test('multiple default query params', () => {
+      const client = new OpenAI({
+        baseURL: 'http://localhost:5000/',
+        defaultQuery: { apiVersion: 'foo', hello: 'world' },
+        apiKey: 'my api key',
+      });
+      expect(client.buildURL('/foo', null)).toEqual('http://localhost:5000/foo?apiVersion=foo&hello=world');
+    });
+
+    test('overriding with `undefined`', () => {
+      const client = new OpenAI({
+        baseURL: 'http://localhost:5000/',
+        defaultQuery: { hello: 'world' },
+        apiKey: 'my api key',
+      });
+      expect(client.buildURL('/foo', { hello: undefined })).toEqual('http://localhost:5000/foo');
+    });
   });
 
   describe('baseUrl', () => {

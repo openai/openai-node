@@ -96,7 +96,7 @@ export type ToFileInput = Uploadable | Exclude<BlobPart, string> | AsyncIterable
  * @returns a {@link File} with the given properties
  */
 export async function toFile(
-  value: ToFileInput,
+  value: ToFileInput | PromiseLike<ToFileInput>,
   name?: string | null | undefined,
   options: FilePropertyBag | undefined = {},
 ): Promise<FileLike> {
@@ -121,8 +121,9 @@ export async function toFile(
   return new File(bits, name, options);
 }
 
-async function getBytes(value: ToFileInput): Promise<Array<BlobPart>> {
-  if (value instanceof Promise) return getBytes(await (value as any));
+async function getBytes(value: ToFileInput | PromiseLike<ToFileInput>): Promise<Array<BlobPart>> {
+  // resolve input promise or promiselike object
+  value = await value;
 
   let parts: Array<BlobPart> = [];
   if (

@@ -229,7 +229,7 @@ export namespace CompletionCreateParams {
      * increase likelihood of selection; values like -100 or 100 should result in a ban
      * or exclusive selection of the relevant token.
      */
-    logit_bias?: unknown | null;
+    logit_bias?: Record<string, number> | null;
 
     /**
      * The maximum number of [tokens](/tokenizer) to generate in the chat completion.
@@ -451,7 +451,7 @@ export namespace CompletionCreateParams {
      * increase likelihood of selection; values like -100 or 100 should result in a ban
      * or exclusive selection of the relevant token.
      */
-    logit_bias?: unknown | null;
+    logit_bias?: Record<string, number> | null;
 
     /**
      * The maximum number of [tokens](/tokenizer) to generate in the chat completion.

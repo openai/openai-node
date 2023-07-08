@@ -63,6 +63,7 @@ export class FineTunes extends APIResource {
   ): Promise<Core.APIResponse<FineTuneEventsListResponse | Stream<FineTuneEvent>>> {
     return this.get(`/fine-tunes/${fineTuneId}/events`, {
       query,
+      timeout: 86400000,
       ...options,
       stream: query?.stream ?? false,
     });
@@ -73,6 +74,8 @@ export class FineTunes extends APIResource {
  * Note: no pagination actually occurs yet, this is for forwards-compatibility.
  */
 export class FineTunesPage extends Page<FineTune> {}
+// alias so we can export it in the namespace
+type _FineTunesPage = FineTunesPage;
 
 export interface FineTune {
   id: string;
@@ -81,7 +84,7 @@ export interface FineTune {
 
   fine_tuned_model: string | null;
 
-  hyperparams: unknown;
+  hyperparams: FineTune.Hyperparams;
 
   model: string;
 
@@ -100,6 +103,24 @@ export interface FineTune {
   validation_files: Array<Files.FileObject>;
 
   events?: Array<FineTuneEvent>;
+}
+
+export namespace FineTune {
+  export interface Hyperparams {
+    batch_size: number;
+
+    learning_rate_multiplier: number;
+
+    n_epochs: number;
+
+    prompt_loss_weight: number;
+
+    classification_n_classes?: number;
+
+    classification_positive_class?: string;
+
+    compute_classification_metrics?: boolean;
+  }
 }
 
 export interface FineTuneEvent {
@@ -281,7 +302,7 @@ export namespace FineTunes {
   export import FineTune = API.FineTune;
   export import FineTuneEvent = API.FineTuneEvent;
   export import FineTuneEventsListResponse = API.FineTuneEventsListResponse;
-  export import FineTunesPage = API.FineTunesPage;
+  export type FineTunesPage = _FineTunesPage;
   export import FineTuneCreateParams = API.FineTuneCreateParams;
   export import FineTuneListEventsParams = API.FineTuneListEventsParams;
 }

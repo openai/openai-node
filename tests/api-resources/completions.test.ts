@@ -16,7 +16,7 @@ describe('resource completions', () => {
       best_of: 0,
       echo: true,
       frequency_penalty: -2,
-      logit_bias: {},
+      logit_bias: { foo: 0 },
       logprobs: 0,
       max_tokens: 16,
       n: 1,

@@ -3,6 +3,8 @@ set -exuo pipefail
 
 node scripts/check-version.cjs
 
+yarn tsc
+
 # Build into dist and will publish the package from there,
 # so that src/resources/foo.ts becomes <package root>/resources/foo.js
 # This way importing from `"openai/resources/foo"` works
@@ -12,7 +14,10 @@ rm -rf dist
 mkdir dist
 # Copy src to dist/src and build from dist/src into dist, so that
 # the source map for index.js.map will refer to ./src/index.ts etc
-cp -rp src dist
+cp -rp src README.md dist
+for file in LICENSE CHANGELOG.md; do
+  if [ -e "${file}" ]; then cp "${file}" dist; fi
+done
 # this converts the export map paths for the dist directory
 # and does a few other minor things
 node scripts/make-dist-package-json.cjs > dist/package.json
@@ -21,7 +26,7 @@ node scripts/make-dist-package-json.cjs > dist/package.json
 tsc-multi
 # copy over handwritten .js/.mjs/.d.ts files
 cp src/_shims/*.{d.ts,js,mjs} dist/_shims
-tsc-alias -p tsconfig.json --resolve-full-paths
+tsc-alias -p tsconfig.build.json
 # we need to add exports = module.exports = OpenAI Node to index.js;
 # No way to get that from index.ts because it would cause compile errors
 # when building .mjs

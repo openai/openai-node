@@ -67,7 +67,7 @@ export namespace CompletionChoice {
 
     tokens?: Array<string>;
 
-    top_logprobs?: Array<unknown>;
+    top_logprobs?: Array<Record<string, number>>;
   }
 }
 
@@ -145,7 +145,7 @@ export namespace CompletionCreateParams {
      * As an example, you can pass `{"50256": -100}` to prevent the <|endoftext|> token
      * from being generated.
      */
-    logit_bias?: unknown | null;
+    logit_bias?: Record<string, number> | null;
 
     /**
      * Include the log probabilities on the `logprobs` most likely tokens, as well the
@@ -310,7 +310,7 @@ export namespace CompletionCreateParams {
      * As an example, you can pass `{"50256": -100}` to prevent the <|endoftext|> token
      * from being generated.
      */
-    logit_bias?: unknown | null;
+    logit_bias?: Record<string, number> | null;
 
     /**
      * Include the log probabilities on the `logprobs` most likely tokens, as well the

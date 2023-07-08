@@ -1,11 +1,79 @@
 import type { Response } from 'openai/_shims/fetch';
+
 import { APIResponse, Headers, createResponseHeaders } from './core';
+
+type Bytes = string | ArrayBuffer | Uint8Array | Buffer | null | undefined;
 
 type ServerSentEvent = {
   event: string | null;
   data: string;
   raw: string[];
 };
+
+export class Stream<Item> implements AsyncIterable<Item>, APIResponse<Stream<Item>> {
+  /** @deprecated - please use the async iterator instead. We plan to add additional helper methods shortly. */
+  response: Response;
+  /** @deprecated - we plan to add a different way to access raw response information shortly. */
+  responseHeaders: Headers;
+  controller: AbortController;
+
+  private decoder: SSEDecoder;
+
+  constructor(response: Response, controller: AbortController) {
+    this.response = response;
+    this.controller = controller;
+    this.decoder = new SSEDecoder();
+    this.responseHeaders = createResponseHeaders(response.headers);
+  }
+
+  private async *iterMessages(): AsyncGenerator<ServerSentEvent, void, unknown> {
+    if (!this.response.body) {
+      this.controller.abort();
+      throw new Error(`Attempted to iterate over a response with no body`);
+    }
+    const lineDecoder = new LineDecoder();
+
+    const iter = readableStreamAsyncIterable<Bytes>(this.response.body);
+    for await (const chunk of iter) {
+      for (const line of lineDecoder.decode(chunk)) {
+        const sse = this.decoder.decode(line);
+        if (sse) yield sse;
+      }
+    }
+
+    for (const line of lineDecoder.flush()) {
+      const sse = this.decoder.decode(line);
+      if (sse) yield sse;
+    }
+  }
+
+  async *[Symbol.asyncIterator](): AsyncIterator<Item, any, undefined> {
+    try {
+      for await (const sse of this.iterMessages()) {
+        if (sse.data.startsWith('[DONE]')) {
+          break;
+        }
+
+        if (sse.event === null) {
+          try {
+            yield JSON.parse(sse.data);
+          } catch (e) {
+            console.error(`Could not parse message into JSON:`, sse.data);
+            console.error(`From chunk:`, sse.raw);
+            throw e;
+          }
+        }
+      }
+    } catch (e) {
+      // If the user calls `stream.controller.abort()`, we should exit without throwing.
+      if (e instanceof Error && e.name === 'AbortError') return;
+      throw e;
+    } finally {
+      // If the user `break`s, abort the ongoing request.
+      this.controller.abort();
+    }
+  }
+}
 
 class SSEDecoder {
   private data: string[];
@@ -62,81 +130,6 @@ class SSEDecoder {
   }
 }
 
-export class Stream<Item> implements AsyncIterable<Item>, APIResponse<Stream<Item>> {
-  response: Response;
-  responseHeaders: Headers;
-  controller: AbortController;
-
-  private decoder: SSEDecoder;
-
-  constructor(response: Response, controller: AbortController) {
-    this.response = response;
-    this.controller = controller;
-    this.decoder = new SSEDecoder();
-    this.responseHeaders = createResponseHeaders(response.headers);
-  }
-
-  private async *iterMessages(): AsyncGenerator<ServerSentEvent, void, unknown> {
-    if (!this.response.body) {
-      this.controller.abort();
-      throw new Error(`Attempted to iterate over a response with no body`);
-    }
-
-    const lineDecoder = new LineDecoder();
-
-    // @ts-ignore
-    for await (const chunk of this.response.body) {
-      let text;
-      if (chunk instanceof Buffer) {
-        text = chunk.toString();
-      } else if ((chunk as any) instanceof Uint8Array) {
-        text = Buffer.from(chunk).toString();
-      } else {
-        text = chunk;
-      }
-
-      for (const line of lineDecoder.decode(text)) {
-        const sse = this.decoder.decode(line);
-        if (sse) yield sse;
-      }
-    }
-
-    for (const line of lineDecoder.flush()) {
-      const sse = this.decoder.decode(line);
-      if (sse) yield sse;
-    }
-  }
-
-  async *[Symbol.asyncIterator](): AsyncIterator<Item, any, undefined> {
-    try {
-      for await (const sse of this.iterMessages()) {
-        if (sse.data.startsWith('[DONE]')) {
-          break;
-        }
-
-        if (sse.event === null) {
-          try {
-            yield JSON.parse(sse.data);
-          } catch (e) {
-            console.error(`Could not parse message into JSON:`, sse.data);
-            console.error(`From chunk:`, sse.raw);
-            throw e;
-          }
-        }
-      }
-    } catch (e) {
-      // If the user calls `stream.controller.abort()`, we should exit without throwing.
-      if (e instanceof Error && e.name === 'AbortError') return;
-      throw e;
-    } finally {
-      // If the user `break`s, abort the ongoing request.
-      this.controller.abort();
-    }
-  }
-}
-
-const NEWLINE_CHARS = '\n\r\x0b\x0c\x1c\x1d\x1e\x85\u2028\u2029';
-
 /**
  * A re-implementation of httpx's `LineDecoder` in Python that handles incrementally
  * reading lines from text.
@@ -144,15 +137,22 @@ const NEWLINE_CHARS = '\n\r\x0b\x0c\x1c\x1d\x1e\x85\u2028\u2029';
  * https://github.com/encode/httpx/blob/920333ea98118e9cf617f246905d7b202510941c/httpx/_decoders.py#L258
  */
 class LineDecoder {
+  // prettier-ignore
+  static NEWLINE_CHARS = new Set(['\n', '\r', '\x0b', '\x0c', '\x1c', '\x1d', '\x1e', '\x85', '\u2028', '\u2029']);
+  static NEWLINE_REGEXP = /\r\n|[\n\r\x0b\x0c\x1c\x1d\x1e\x85\u2028\u2029]/g;
+
   buffer: string[];
   trailingCR: boolean;
+  textDecoder: any; // TextDecoder found in browsers; not typed to avoid pulling in either "dom" or "node" types.
 
   constructor() {
     this.buffer = [];
     this.trailingCR = false;
   }
 
-  decode(text: string): string[] {
+  decode(chunk: Bytes): string[] {
+    let text = this.decodeText(chunk);
+
     if (this.trailingCR) {
       text = '\r' + text;
       this.trailingCR = false;
@@ -166,10 +166,10 @@ class LineDecoder {
       return [];
     }
 
-    const trailing_newline = NEWLINE_CHARS.includes(text.slice(-1));
-    let lines = text.split(/\r\n|[\n\r\x0b\x0c\x1c\x1d\x1e\x85\u2028\u2029]/g);
+    const trailingNewline = LineDecoder.NEWLINE_CHARS.has(text[text.length - 1] || '');
+    let lines = text.split(LineDecoder.NEWLINE_REGEXP);
 
-    if (lines.length === 1 && !trailing_newline) {
+    if (lines.length === 1 && !trailingNewline) {
       this.buffer.push(lines[0]!);
       return [];
     }
@@ -179,11 +179,48 @@ class LineDecoder {
       this.buffer = [];
     }
 
-    if (!trailing_newline) {
+    if (!trailingNewline) {
       this.buffer = [lines.pop() || ''];
     }
 
     return lines;
+  }
+
+  decodeText(bytes: Bytes): string {
+    if (bytes == null) return '';
+    if (typeof bytes === 'string') return bytes;
+
+    // Node:
+    if (typeof Buffer !== 'undefined') {
+      if (bytes instanceof Buffer) {
+        return bytes.toString();
+      }
+      if (bytes instanceof Uint8Array) {
+        return Buffer.from(bytes).toString();
+      }
+
+      throw new Error(
+        `Unexpected: received non-Uint8Array (${bytes.constructor.name}) stream chunk in an environment with a global "Buffer" defined, which this library assumes to be Node. Please report this error.`,
+      );
+    }
+
+    // Browser
+    if (typeof TextDecoder !== 'undefined') {
+      if (bytes instanceof Uint8Array || bytes instanceof ArrayBuffer) {
+        this.textDecoder ??= new TextDecoder('utf8');
+        return this.textDecoder.decode(bytes);
+      }
+
+      throw new Error(
+        `Unexpected: received non-Uint8Array/ArrayBuffer (${
+          (bytes as any).constructor.name
+        }) in a web platform. Please report this error.`,
+      );
+    }
+
+    throw new Error(
+      `Unexpected: neither Buffer nor TextDecoder are available as globals. Please report this error.`,
+    );
   }
 
   flush(): string[] {
@@ -205,4 +242,29 @@ function partition(str: string, delimiter: string): [string, string, string] {
   }
 
   return [str, '', ''];
+}
+
+/**
+ * Most browsers don't yet have async iterable support for ReadableStream,
+ * and Node has a very different way of reading bytes from its "ReadableStream".
+ *
+ * This polyfill was pulled from https://github.com/MattiasBuelens/web-streams-polyfill/pull/122#issuecomment-1624185965
+ */
+function readableStreamAsyncIterable<T>(stream: any): AsyncIterableIterator<T> {
+  if (stream[Symbol.asyncIterator]) return stream[Symbol.asyncIterator];
+
+  const reader = stream.getReader();
+  return {
+    next() {
+      return reader.read();
+    },
+    async return() {
+      reader.cancel();
+      reader.releaseLock();
+      return { done: true, value: undefined };
+    },
+    [Symbol.asyncIterator]() {
+      return this;
+    },
+  };
 }

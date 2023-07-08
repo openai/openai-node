@@ -1,43 +1,32 @@
 {
+  "extends": "./tsconfig.json",
   "include": ["dist/src"],
   "exclude": [],
   "compilerOptions": {
-    "target": "es2019",
-    "lib": ["es2020"],
-    "module": "commonjs",
-    "moduleResolution": "node",
-    "esModuleInterop": true,
     "rootDir": "./dist/src",
-    "baseUrl": "./",
     "paths": {
       "openai/_shims/*": ["dist/src/_shims/*.node"],
       "openai": ["dist/src/index.ts"],
       "openai/*": ["dist/src/*"],
       "digest-fetch": ["./typings/digest-fetch"]
     },
-
+    "noEmit": false,
     "declaration": true,
     "declarationMap": true,
     "outDir": "dist",
     "pretty": true,
-    "sourceMap": true,
-    "resolveJsonModule": true,
-
-    "forceConsistentCasingInFileNames": true,
-
-    "strict": true,
-    "noImplicitAny": true,
-    "strictNullChecks": true,
-    "strictFunctionTypes": true,
-    "strictBindCallApply": true,
-    "strictPropertyInitialization": true,
-    "noImplicitThis": true,
-    "alwaysStrict": true,
-    "exactOptionalPropertyTypes": true,
-    "noUncheckedIndexedAccess": true,
-    "noImplicitOverride": true,
-    "noPropertyAccessFromIndexSignature": true,
-
-    "skipLibCheck": true
+    "sourceMap": true
+  },
+  "tsc-alias": {
+    "resolveFullPaths": true,
+    "fileExtensions": {
+      "inputGlob": "{mjs,cjs,js,jsx,mts,cts,ts,tsx}"
+    },
+    "replacers": {
+      "replace-absolute-imports": {
+        "enabled": true,
+        "file": "./scripts/replace-self-referencing-imports.js"
+      }
+    }
   }
 }

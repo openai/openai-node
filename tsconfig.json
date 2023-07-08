@@ -6,7 +6,6 @@
     "module": "commonjs",
     "moduleResolution": "node",
     "esModuleInterop": true,
-    "rootDir": "./src",
     "baseUrl": "./",
     "paths": {
       "openai/_shims/*": ["src/_shims/*.node"],
@@ -14,12 +13,8 @@
       "openai/*": ["src/*"],
       "digest-fetch": ["./typings/digest-fetch"]
     },
+    "noEmit": true,
 
-    "declaration": true,
-    "declarationMap": true,
-    "outDir": "dist",
-    "pretty": true,
-    "sourceMap": true,
     "resolveJsonModule": true,
 
     "forceConsistentCasingInFileNames": true,
