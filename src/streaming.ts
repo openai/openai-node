@@ -251,7 +251,7 @@ function partition(str: string, delimiter: string): [string, string, string] {
  * This polyfill was pulled from https://github.com/MattiasBuelens/web-streams-polyfill/pull/122#issuecomment-1624185965
  */
 function readableStreamAsyncIterable<T>(stream: any): AsyncIterableIterator<T> {
-  if (stream[Symbol.asyncIterator]) return stream[Symbol.asyncIterator];
+  if (stream[Symbol.asyncIterator]) return stream;
 
   const reader = stream.getReader();
   return {
