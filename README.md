@@ -4,6 +4,10 @@ The OpenAI Node.js library provides convenient access to the OpenAI API from Nod
 
 > ⚠️ **Important note: this library is meant for server-side usage only, as using it in client-side browser code will expose your secret API key. [See here](https://platform.openai.com/docs/api-reference/authentication) for more details.**
 
+
+# description
+I want to use this!
+
 ## Installation
 
 ```bash
