@@ -129,7 +129,7 @@ export abstract class APIClient {
       isMultipartBody(options.body) ? options.body.body
       : options.body ? JSON.stringify(options.body, null, 2)
       : null;
-    const contentLength = typeof body === 'string' ? body.length.toString() : null;
+    const contentLength = typeof body === 'string' ? Buffer.byteLength(body).toString() : null;
 
     const url = this.buildURL(path!, query);
     if ('timeout' in options) validatePositiveInteger('timeout', options.timeout);
