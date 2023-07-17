@@ -1,7 +1,7 @@
 import * as qs from 'qs';
 import { VERSION } from './version';
 import { Stream } from './streaming';
-import { APIError, APIConnectionError, APIConnectionTimeoutError } from './error';
+import { APIError, APIConnectionError, APIConnectionTimeoutError, APIUserAbortError } from './error';
 import type { Readable } from 'openai/_shims/node-readable';
 import { getDefaultAgent, type Agent } from 'openai/_shims/agent';
 import {
@@ -21,7 +21,7 @@ export {
 
 const MAX_RETRIES = 2;
 
-type Fetch = (url: RequestInfo, init?: RequestInit) => Promise<Response>;
+export type Fetch = (url: RequestInfo, init?: RequestInit) => Promise<Response>;
 
 export abstract class APIClient {
   baseURL: string;
@@ -37,18 +37,20 @@ export abstract class APIClient {
     maxRetries,
     timeout = 60 * 1000, // 60s
     httpAgent,
+    fetch: overridenFetch,
   }: {
     baseURL: string;
     maxRetries?: number | undefined;
     timeout: number | undefined;
     httpAgent: Agent | undefined;
+    fetch: Fetch | undefined;
   }) {
     this.baseURL = baseURL;
     this.maxRetries = validatePositiveInteger('maxRetries', maxRetries ?? MAX_RETRIES);
     this.timeout = validatePositiveInteger('timeout', timeout);
     this.httpAgent = httpAgent;
 
-    this.fetch = fetch;
+    this.fetch = overridenFetch ?? fetch;
   }
 
   protected authHeaders(): Headers {
@@ -120,6 +122,20 @@ export abstract class APIClient {
     return this.requestAPIList(Page, { method: 'get', path, ...opts });
   }
 
+  private calculateContentLength(body: unknown): string | null {
+    if (typeof body === 'string') {
+      if (typeof Buffer !== 'undefined') {
+        return Buffer.byteLength(body, 'utf8').toString();
+      }
+
+      const encoder = new TextEncoder();
+      const encoded = encoder.encode(body);
+      return encoded.length.toString();
+    }
+
+    return null;
+  }
+
   buildRequest<Req extends {}>(
     options: FinalRequestOptions<Req>,
   ): { req: RequestInit; url: string; timeout: number } {
@@ -129,7 +145,7 @@ export abstract class APIClient {
       isMultipartBody(options.body) ? options.body.body
       : options.body ? JSON.stringify(options.body, null, 2)
       : null;
-    const contentLength = typeof body === 'string' ? body.length.toString() : null;
+    const contentLength = this.calculateContentLength(body);
 
     const url = this.buildURL(path!, query);
     if ('timeout' in options) validatePositiveInteger('timeout', options.timeout);
@@ -167,6 +183,9 @@ export abstract class APIClient {
       ...(body && { body: body as any }),
       headers: reqHeaders,
       ...(httpAgent && { agent: httpAgent }),
+      // @ts-ignore node-fetch uses a custom AbortSignal type that is
+      // not compatible with standard web types
+      signal: options.signal ?? null,
     };
 
     this.validateHeaders(reqHeaders, headers);
@@ -204,8 +223,15 @@ export abstract class APIClient {
     const response = await this.fetchWithTimeout(url, req, timeout, controller).catch(castToError);
 
     if (response instanceof Error) {
-      if (retriesRemaining) return this.retryRequest(options, retriesRemaining);
-      if (response.name === 'AbortError') throw new APIConnectionTimeoutError();
+      if (options.signal?.aborted) {
+        throw new APIUserAbortError();
+      }
+      if (retriesRemaining) {
+        return this.retryRequest(options, retriesRemaining);
+      }
+      if (response.name === 'AbortError') {
+        throw new APIConnectionTimeoutError();
+      }
       throw new APIConnectionError({ cause: response });
     }
 
@@ -229,7 +255,7 @@ export abstract class APIClient {
     if (options.stream) {
       // Note: there is an invariant here that isn't represented in the type system
       // that if you set `stream: true` the response type must also be `Stream<T>`
-      return new Stream<Rsp>(response, controller) as any;
+      return new Stream(response, controller) as any;
     }
 
     const contentType = response.headers.get('content-type');
@@ -545,6 +571,7 @@ export type RequestOptions<Req extends {} = Record<string, unknown> | Readable> 
   stream?: boolean | undefined;
   timeout?: number;
   httpAgent?: Agent;
+  signal?: AbortSignal | undefined | null;
   idempotencyKey?: string;
 };
 
@@ -562,6 +589,7 @@ const requestOptionsKeys: KeysEnum<RequestOptions> = {
   stream: true,
   timeout: true,
   httpAgent: true,
+  signal: true,
   idempotencyKey: true,
 };
 
@@ -788,4 +816,20 @@ export const getHeader = (headers: HeadersLike, key: string): string | null | un
     return value[0];
   }
   return value;
+};
+
+/**
+ * Encodes a string to Base64 format.
+ */
+export const toBase64 = (str: string | null | undefined): string => {
+  if (!str) return '';
+  if (typeof Buffer !== 'undefined') {
+    return Buffer.from(str).toString('base64');
+  }
+
+  if (typeof btoa !== 'undefined') {
+    return btoa(str);
+  }
+
+  throw new Error('Cannot generate b64 string; Expected `Buffer` or `btoa` to be defined');
 };

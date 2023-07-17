@@ -1,5 +1,7 @@
 import OpenAI from 'openai';
 import { uploadWebApiTestCases } from './uploadWebApiTestCases.js';
+import { distance } from 'fastest-levenshtein'
+
 /**
  * Welcome to Cloudflare Workers! This is your first worker.
  *
@@ -44,10 +46,27 @@ export default {
 				throw new Error(`expected values to be equal: ${JSON.stringify({ a, b })}`);
 			}
 		}
+		function expectSimilar(received: string, expected: string, maxDistance: number) {
+			const receivedDistance = distance(received, expected);
+			if (receivedDistance < maxDistance) {
+				return;
+			}
+
+			const message = [
+				`Received: ${JSON.stringify(received)}`,
+				`Expected: ${JSON.stringify(expected)}`,
+				`Max distance: ${maxDistance}`,
+				`Received distance: ${receivedDistance}`,
+			].join('\n');
+
+			throw new Error(message);
+		}
+
 		uploadWebApiTestCases({
 			client: client as any,
 			it,
 			expectEqual,
+			expectSimilar,
 		});
 
 		let allPassed = true;

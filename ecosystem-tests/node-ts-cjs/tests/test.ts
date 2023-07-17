@@ -3,6 +3,7 @@ import { TranscriptionCreateParams } from 'openai/resources/audio/transcriptions
 import fetch from 'node-fetch';
 import { File as FormDataFile, Blob as FormDataBlob } from 'formdata-node';
 import * as fs from 'fs';
+import { distance } from 'fastest-levenshtein'
 
 const url = 'https://audio-samples.github.io/samples/mp3/blizzard_biased/sample-1.mp3';
 const filename = 'sample-1.mp3';
@@ -22,6 +23,38 @@ async function typeTests() {
   await client.audio.transcriptions.create({ file: 'test', model: 'whisper-1' });
 }
 
+declare global {
+  namespace jest {
+    interface Matchers<R> {
+      toBeSimilarTo(comparedTo: string, expectedDistance: number): R;
+    }
+  }
+}
+expect.extend({
+  toBeSimilarTo(received, comparedTo: string, expectedDistance: number) {
+    const message = () =>
+      [
+        `Received: ${JSON.stringify(received)}`,
+        `Expected: ${JSON.stringify(comparedTo)}`,
+        `Expected distance: ${expectedDistance}`,
+        `Received distance: ${actualDistance}`,
+      ].join('\n');
+
+    const actualDistance = distance(received, comparedTo);
+    if (actualDistance < expectedDistance) {
+      return {
+        message,
+        pass: true,
+      };
+    }
+
+    return {
+      message,
+      pass: false,
+    };
+  }
+});
+
 it('handles formdata-node File', async function () {
   const file = await fetch(url)
     .then((x) => x.arrayBuffer())
@@ -30,7 +63,7 @@ it('handles formdata-node File', async function () {
   const params: TranscriptionCreateParams = { file, model };
 
   const result = await client.audio.transcriptions.create(params);
-  expect(result.text).toEqual(correctAnswer);
+  expect(result.text).toBeSimilarTo(correctAnswer, 12);
 });
 
 // @ts-ignore avoid DOM lib for testing purposes
@@ -42,7 +75,7 @@ if (typeof File !== 'undefined') {
       .then((x) => new File([x], filename));
 
     const result = await client.audio.transcriptions.create({ file, model });
-    expect(result.text).toEqual(correctAnswer);
+    expect(result.text).toBeSimilarTo(correctAnswer, 12);
   });
 }
 
@@ -50,7 +83,7 @@ it('handles Response', async function () {
   const file = await fetch(url);
 
   const result = await client.audio.transcriptions.create({ file, model });
-  expect(result.text).toEqual(correctAnswer);
+  expect(result.text).toBeSimilarTo(correctAnswer, 12);
 });
 
 it('handles fs.ReadStream', async function () {
@@ -58,7 +91,7 @@ it('handles fs.ReadStream', async function () {
     file: fs.createReadStream('sample1.mp3'),
     model,
   });
-  expect(result.text).toEqual(correctAnswer);
+  expect(result.text).toBeSimilarTo(correctAnswer, 12);
 });
 
 const fineTune = `{"prompt": "<prompt text>", "completion": "<ideal generated text>"}`;

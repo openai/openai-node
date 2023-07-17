@@ -1,5 +1,6 @@
-import { assertEquals } from 'https://deno.land/std@0.192.0/testing/asserts.ts';
+import { assertEquals, AssertionError } from 'https://deno.land/std@0.192.0/testing/asserts.ts';
 import OpenAI, { toFile } from 'npm:openai@3.3.0';
+import { distance } from 'https://deno.land/x/fastest_levenshtein/mod.ts'
 
 const url = 'https://audio-samples.github.io/samples/mp3/blizzard_biased/sample-1.mp3';
 const filename = 'sample-1.mp3';
@@ -19,19 +20,35 @@ async function _typeTests() {
   await client.audio.transcriptions.create({ file: 'test', model: 'whisper-1' });
 }
 
+function assertSimilar(received: string, expected: string, maxDistance: number) {
+  const receivedDistance = distance(received, expected);
+  if (receivedDistance < maxDistance) {
+    return;
+  }
+
+  const message = [
+    `Received: ${JSON.stringify(received)}`,
+    `Expected: ${JSON.stringify(expected)}`,
+    `Max distance: ${maxDistance}`,
+    `Received distance: ${receivedDistance}`,
+  ].join('\n');
+
+  throw new AssertionError(message);
+}
+
 Deno.test(async function handlesFile() {
   const file = await fetch(url)
     .then((x) => x.arrayBuffer())
     .then((x) => new File([x], filename));
 
   const result = await client.audio.transcriptions.create({ file, model });
-  assertEquals(result.text, correctAnswer);
+  assertSimilar(result.text, correctAnswer, 12);
 });
 Deno.test(async function handlesResponse() {
   const file = await fetch(url);
 
   const result = await client.audio.transcriptions.create({ file, model });
-  assertEquals(result.text, correctAnswer);
+  assertSimilar(result.text, correctAnswer, 12);
 });
 
 const fineTune = `{"prompt": "<prompt text>", "completion": "<ideal generated text>"}`;

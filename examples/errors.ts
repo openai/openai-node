@@ -21,8 +21,9 @@ async function main() {
       console.log(`param: `, err.param);
     } else {
       console.log(`Raised unknown error`);
+      throw err;
     }
   }
 }
 
-main().catch(console.error);
+main();

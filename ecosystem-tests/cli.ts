@@ -54,7 +54,7 @@ const projects = {
     await run('npm', ['run', 'tsc']);
 
     if (state.live) {
-      await run('pnpm', ['test']);
+      await run('npm', ['run', 'test']);
     }
   },
   'node-ts-esm-dom': async () => {

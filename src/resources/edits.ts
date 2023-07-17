@@ -29,25 +29,11 @@ export interface Edit {
 
 export namespace Edit {
   export interface Choice {
-    finish_reason?: 'stop' | 'length';
+    finish_reason: 'stop' | 'length';
 
-    index?: number;
+    index: number;
 
-    logprobs?: Choice.Logprobs | null;
-
-    text?: string;
-  }
-
-  export namespace Choice {
-    export interface Logprobs {
-      text_offset?: Array<number>;
-
-      token_logprobs?: Array<number>;
-
-      tokens?: Array<string>;
-
-      top_logprobs?: Array<Record<string, number>>;
-    }
+    text: string;
   }
 
   export interface Usage {

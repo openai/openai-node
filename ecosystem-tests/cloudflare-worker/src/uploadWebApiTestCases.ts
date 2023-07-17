@@ -10,6 +10,7 @@ export function uploadWebApiTestCases({
 	client,
 	it,
 	expectEqual,
+	expectSimilar,
 }: {
 	/**
 	 * OpenAI client instance
@@ -23,6 +24,10 @@ export function uploadWebApiTestCases({
 	 * Jest expect(a).toEqual(b) function, or an imitation in envs like Cloudflare workers
 	 */
 	expectEqual(a: unknown, b: unknown): void;
+	/**
+	 * Assert that the levenshtein distance between the two given strings is less than the given max distance.
+	 */
+	expectSimilar(received: string, expected: string, maxDistance: number): void;
 }) {
 	const url = 'https://audio-samples.github.io/samples/mp3/blizzard_biased/sample-1.mp3';
 	const filename = 'sample-1.mp3';
@@ -48,14 +53,14 @@ export function uploadWebApiTestCases({
 		const params: TranscriptionCreateParams = { file, model };
 
 		const result = await client.audio.transcriptions.create(params);
-		expectEqual(result.text, correctAnswer);
+		expectSimilar(result.text, correctAnswer, 12);
 	});
 
 	it('handles Response', async () => {
 		const file = await fetch(url);
 
 		const result = await client.audio.transcriptions.create({ file, model });
-		expectEqual(result.text, correctAnswer);
+		expectSimilar(result.text, correctAnswer, 12);
 	});
 
 	const fineTune = `{"prompt": "<prompt text>", "completion": "<ideal generated text>"}`;

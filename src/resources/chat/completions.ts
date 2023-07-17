@@ -41,11 +41,11 @@ export interface ChatCompletion {
 
 export namespace ChatCompletion {
   export interface Choice {
-    finish_reason?: 'stop' | 'length' | 'function_call';
+    finish_reason: 'stop' | 'length' | 'function_call';
 
-    index?: number;
+    index: number;
 
-    message?: Choice.Message;
+    message: Choice.Message;
   }
 
   export namespace Choice {
@@ -112,11 +112,11 @@ export interface ChatCompletionChunk {
 
 export namespace ChatCompletionChunk {
   export interface Choice {
-    delta?: Choice.Delta;
+    delta: Choice.Delta;
 
-    finish_reason?: 'stop' | 'length' | 'function_call';
+    finish_reason: 'stop' | 'length' | 'function_call' | null;
 
-    index?: number;
+    index: number;
   }
 
   export namespace Choice {

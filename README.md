@@ -29,16 +29,15 @@ const openai = new OpenAI({
 });
 
 async function main() {
-  const completion = await openai.completions.create({
-    model: 'text-davinci-002',
-    prompt: 'Say this is a test',
-    max_tokens: 6,
-    temperature: 0,
+  const completion = await openai.chat.completions.create({
+    messages: [{ role: 'user', content: 'Say this is a test' }],
+    model: 'gpt-3.5-turbo',
   });
 
   console.log(completion.choices);
 }
-main().catch(console.error);
+
+main();
 ```
 
 ## Streaming Responses
@@ -48,16 +47,20 @@ We provide support for streaming responses using Server Side Events (SSE).
 ```ts
 import OpenAI from 'openai';
 
-const client = new OpenAI();
+const openai = new OpenAI();
 
-const stream = await client.completions.create({
-  prompt: 'Say this is a test',
-  model: 'text-davinci-003',
-  stream: true,
-});
-for await (const part of stream) {
-  process.stdout.write(part.choices[0]?.text || '');
+async function main() {
+  const completion = await openai.chat.completions.create({
+    model: 'gpt-4',
+    messages: [{ role: 'user', content: 'Say this is a test' }],
+    stream: true,
+  });
+  for await (const part of stream) {
+    process.stdout.write(part.choices[0]?.text || '');
+  }
 }
+
+main();
 ```
 
 If you need to cancel a stream, you can `break` from the loop
@@ -76,15 +79,14 @@ const openai = new OpenAI({
 });
 
 async function main() {
-  const params: OpenAI.CompletionCreateParams = {
-    model: 'text-davinci-002',
-    prompt: 'Say this is a test',
-    max_tokens: 6,
-    temperature: 0,
+  const params: OpenAI.Chat.CompletionCreateParams = {
+    messages: [{ role: 'user', content: 'Say this is a test' }],
+    model: 'gpt-3.5-turbo',
   };
-  const completion: OpenAI.Completion = await openai.completions.create(params);
+  const completion: OpenAI.Chat.ChatCompletion = await openai.chat.completions.create(params);
 }
-main().catch(console.error);
+
+main();
 ```
 
 Documentation for each method, request param, and response field are available in docstrings and will appear on hover in most modern editors.
@@ -141,10 +143,13 @@ async function main() {
         console.log(err.name); // BadRequestError
 
         console.log(err.headers); // {server: 'nginx', ...}
+      } else {
+        throw err;
       }
     });
 }
-main().catch(console.error);
+
+main();
 ```
 
 Error codes are as followed:
@@ -176,7 +181,7 @@ const openai = new OpenAI({
 });
 
 // Or, configure per-request:
-openai.embeddings.create({ model: 'text-similarity-babbage-001',input: 'The food was delicious and the waiter...' }, {
+await openai.chat.completions.create({ messages: [{ role: 'user', content: 'How can I get the name of the current day in Node.js?' }], model: 'gpt-3.5-turbo' }, {
   maxRetries: 5,
 });
 ```
@@ -193,7 +198,7 @@ const openai = new OpenAI({
 });
 
 // Override per-request:
-openai.edits.create({ model: 'text-davinci-edit-001',input: 'What day of the wek is it?',instruction: 'Fix the spelling mistakes' }, {
+await openai.chat.completions.create({ messages: [{ role: 'user', content: 'How can I list all files in a directory using Python?' }], model: 'gpt-3.5-turbo' }, {
   timeout: 5 * 1000,
 });
 ```
@@ -219,7 +224,7 @@ const openai = new OpenAI({
 });
 
 // Override per-request:
-openai.models.list({
+await openai.models.list({
   baseURL: 'http://localhost:8080/test-api',
   httpAgent: new http.Agent({ keepAlive: false }),
 })

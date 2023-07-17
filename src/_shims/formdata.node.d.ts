@@ -10,6 +10,7 @@ type EndingType = 'native' | 'transparent';
 
 export interface BlobPropertyBag {
   endings?: EndingType;
+  /** MIME type, e.g., "text/plain" */
   type?: string;
 }
 

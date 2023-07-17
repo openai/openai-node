@@ -77,6 +77,14 @@ export class APIError extends Error {
   }
 }
 
+export class APIUserAbortError extends APIError {
+  override readonly status: undefined = undefined;
+
+  constructor({ message }: { message?: string } = {}) {
+    super(undefined, undefined, message || 'Request was aborted.', undefined);
+  }
+}
+
 export class APIConnectionError extends APIError {
   override readonly status: undefined = undefined;
 

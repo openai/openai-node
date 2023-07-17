@@ -45,4 +45,7 @@ async function main() {
   process.stdout.write('\n');
 }
 
-main().catch(console.error);
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

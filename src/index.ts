@@ -37,6 +37,14 @@ type Config = {
   httpAgent?: Agent;
 
   /**
+   * Specify a custom `fetch` function implementation.
+   *
+   * If not provided, we use `node-fetch` on Node.js and otherwise expect that `fetch` is
+   * defined globally.
+   */
+  fetch?: Core.Fetch | undefined;
+
+  /**
    * The maximum number of times that the client will retry a request in case of a
    * temporary failure, like a network error or a 5XX error from the server.
    *
@@ -85,6 +93,7 @@ export class OpenAI extends Core.APIClient {
       timeout: options.timeout ?? 600000,
       httpAgent: options.httpAgent,
       maxRetries: options.maxRetries,
+      fetch: options.fetch,
     });
     this.apiKey = options.apiKey;
     this._options = options;
@@ -120,9 +129,12 @@ export class OpenAI extends Core.APIClient {
     return { arrayFormat: 'comma' };
   }
 
+  static OpenAI = this;
+
   static APIError = Errors.APIError;
   static APIConnectionError = Errors.APIConnectionError;
   static APIConnectionTimeoutError = Errors.APIConnectionTimeoutError;
+  static APIUserAbortError = Errors.APIUserAbortError;
   static NotFoundError = Errors.NotFoundError;
   static ConflictError = Errors.ConflictError;
   static RateLimitError = Errors.RateLimitError;
@@ -137,6 +149,7 @@ export const {
   APIError,
   APIConnectionError,
   APIConnectionTimeoutError,
+  APIUserAbortError,
   NotFoundError,
   ConflictError,
   RateLimitError,

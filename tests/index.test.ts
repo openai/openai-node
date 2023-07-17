@@ -1,7 +1,9 @@
 // File generated from our OpenAPI spec by Stainless.
 
-import { Headers } from 'openai/core';
 import OpenAI from 'openai';
+import { APIUserAbortError } from 'openai';
+import { Headers } from 'openai/core';
+import { Response, fetch as defaultFetch } from 'openai/_shims/fetch';
 
 describe('instantiate client', () => {
   const env = process.env;
@@ -77,6 +79,49 @@ describe('instantiate client', () => {
     });
   });
 
+  test('custom fetch', async () => {
+    const client = new OpenAI({
+      baseURL: 'http://localhost:5000/',
+      apiKey: 'my api key',
+      fetch: (url) => {
+        return Promise.resolve(
+          new Response(JSON.stringify({ url, custom: true }), {
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        );
+      },
+    });
+
+    const response = await client.get('/foo');
+    expect(response).toEqual({ url: 'http://localhost:5000/foo', custom: true });
+  });
+
+  test('custom signal', async () => {
+    const client = new OpenAI({
+      baseURL: 'http://127.0.0.1:4010',
+      apiKey: 'my api key',
+      fetch: (...args) => {
+        return new Promise((resolve, reject) =>
+          setTimeout(
+            () =>
+              defaultFetch(...args)
+                .then(resolve)
+                .catch(reject),
+            300,
+          ),
+        );
+      },
+    });
+
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 200);
+
+    const spy = jest.spyOn(client, 'request');
+
+    await expect(client.get('/foo', { signal: controller.signal })).rejects.toThrowError(APIUserAbortError);
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
   describe('baseUrl', () => {
     test('trailing slash', () => {
       const client = new OpenAI({ baseURL: 'http://localhost:5000/custom/path/', apiKey: 'my api key' });
@@ -125,5 +170,21 @@ describe('instantiate client', () => {
     expect(() => {
       new OpenAI();
     }).toThrow();
+  });
+});
+
+describe('request building', () => {
+  const client = new OpenAI({ apiKey: 'my api key' });
+
+  describe('Content-Length', () => {
+    test('handles multi-byte characters', () => {
+      const { req } = client.buildRequest({ path: '/foo', method: 'post', body: { value: '—' } });
+      expect((req.headers as Record<string, string>)['Content-Length']).toEqual('20');
+    });
+
+    test('handles standard characters', () => {
+      const { req } = client.buildRequest({ path: '/foo', method: 'post', body: { value: 'hello' } });
+      expect((req.headers as Record<string, string>)['Content-Length']).toEqual('22');
+    });
   });
 });

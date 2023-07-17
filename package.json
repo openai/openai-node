@@ -1,6 +1,6 @@
 {
   "name": "openai",
-  "version": "4.0.0-beta.4",
+  "version": "4.0.0-beta.5",
   "description": "Client library for the OpenAI API",
   "author": "OpenAI <support@openai.com>",
   "types": "dist/index.d.ts",
@@ -67,7 +67,7 @@
     "build": "bash ./build",
     "prepack": "echo 'to pack, run yarn build && (cd dist; yarn pack)' && exit 1",
     "prepublishOnly": "echo 'to publish, run yarn build && (cd dist; yarn publish)' && exit 1",
-    "format": "prettier --write .",
+    "format": "prettier --write --cache  --cache-strategy metadata . !dist",
     "tsn": "ts-node -r tsconfig-paths/register",
     "fix": "eslint --fix --ext ts,js ."
   },

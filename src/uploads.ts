@@ -88,7 +88,7 @@ export type ToFileInput = Uploadable | Exclude<BlobPart, string> | AsyncIterable
 
 /**
  * Helper for creating a {@link File} to pass to an SDK upload method from a variety of different data formats
- * @param bits the raw content of the file.  Can be an {@link Uploadable}, {@link BlobPart}, or {@link AsyncIterable} of {@link BlobPart}s
+ * @param value the raw content of the file.  Can be an {@link Uploadable}, {@link BlobPart}, or {@link AsyncIterable} of {@link BlobPart}s
  * @param {string=} name the name of the file. If omitted, toFile will try to determine a file name from bits if possible
  * @param {Object=} options additional properties
  * @param {string=} options.type the MIME type of the content
@@ -100,6 +100,9 @@ export async function toFile(
   name?: string | null | undefined,
   options: FilePropertyBag | undefined = {},
 ): Promise<FileLike> {
+  // If it's a promise, resolve it.
+  value = await value;
+
   if (isResponseLike(value)) {
     const blob = await value.blob();
     name ||= new URL(value.url).pathname.split(/[\\/]/).pop() ?? 'unknown_file';
@@ -121,10 +124,7 @@ export async function toFile(
   return new File(bits, name, options);
 }
 
-async function getBytes(value: ToFileInput | PromiseLike<ToFileInput>): Promise<Array<BlobPart>> {
-  // resolve input promise or promiselike object
-  value = await value;
-
+async function getBytes(value: ToFileInput): Promise<Array<BlobPart>> {
   let parts: Array<BlobPart> = [];
   if (
     typeof value === 'string' ||

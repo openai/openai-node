@@ -20,7 +20,7 @@ describe('resource transcriptions', () => {
       model: 'whisper-1',
       language: 'string',
       prompt: 'string',
-      response_format: 'string',
+      response_format: 'json',
       temperature: 0,
     });
   });
