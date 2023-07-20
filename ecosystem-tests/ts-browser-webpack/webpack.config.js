@@ -8,6 +8,8 @@ const buildPath = path.resolve(__dirname, 'dist');
 module.exports = {
   entry: path.join(srcPath, 'index.ts'),
 
+  mode: 'development',
+
   output: {
     path: buildPath,
     filename: 'bundle.js',
@@ -32,7 +34,7 @@ module.exports = {
     extensions: ['*', '.js', '.ts'],
   },
 
-  devtool: 'inline-source-map',
+  devtool: 'eval',
 
   plugins: [
     new HtmlWebpackPlugin({

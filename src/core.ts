@@ -1,4 +1,3 @@
-import * as qs from 'qs';
 import { VERSION } from './version';
 import { Stream } from './streaming';
 import { APIError, APIConnectionError, APIConnectionTimeoutError, APIUserAbortError } from './error';
@@ -82,18 +81,6 @@ export abstract class APIClient {
    */
   protected validateHeaders(headers: Headers, customHeaders: Headers) {}
 
-  /**
-   * Override this to add your own qs.stringify options, for example:
-   *
-   *  {
-   *    ...super.qsOptions(),
-   *    strictNullHandling: true,
-   *  }
-   */
-  protected qsOptions(): qs.IStringifyOptions | undefined {
-    return {};
-  }
-
   protected defaultIdempotencyKey(): string {
     return `stainless-node-retry-${uuid4()}`;
   }
@@ -128,9 +115,11 @@ export abstract class APIClient {
         return Buffer.byteLength(body, 'utf8').toString();
       }
 
-      const encoder = new TextEncoder();
-      const encoded = encoder.encode(body);
-      return encoded.length.toString();
+      if (typeof TextEncoder !== 'undefined') {
+        const encoder = new TextEncoder();
+        const encoded = encoder.encode(body);
+        return encoded.length.toString();
+      }
     }
 
     return null;
@@ -302,10 +291,27 @@ export abstract class APIClient {
     }
 
     if (query) {
-      url.search = qs.stringify(query, this.qsOptions());
+      url.search = this.stringifyQuery(query);
     }
 
     return url.toString();
+  }
+
+  protected stringifyQuery(query: Record<string, unknown>): string {
+    return Object.entries(query)
+      .filter(([_, value]) => typeof value !== 'undefined')
+      .map(([key, value]) => {
+        if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+          return `${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
+        }
+        if (value === null) {
+          return `${encodeURIComponent(key)}=`;
+        }
+        throw new Error(
+          `Cannot stringify type ${typeof value}; Expected string, number, boolean, or null. If you need to pass nested query parameters, you can manually encode them, e.g. { query: { 'foo[key1]': value1, 'foo[key2]': value2 } }, and please open a GitHub issue requesting better support for your use case.`,
+        );
+      })
+      .join('&');
   }
 
   async fetchWithTimeout(

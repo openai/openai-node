@@ -10,4 +10,4 @@ exports.Request = Request;
 exports.Response = Response;
 exports.Headers = Headers;
 
-exports.isPolyfilled = true;
+exports.isPolyfilled = false;

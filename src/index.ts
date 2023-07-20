@@ -1,6 +1,5 @@
 // File generated from our OpenAPI spec by Stainless.
 
-import * as qs from 'qs';
 import * as Core from './core';
 import * as Pagination from './pagination';
 import * as API from './resources/index';
@@ -8,7 +7,7 @@ import * as Errors from './error';
 import type { Agent } from 'openai/_shims/agent';
 import * as Uploads from './uploads';
 
-type Config = {
+export interface ClientOptions {
   /**
    * Defaults to process.env["OPENAI_API_KEY"].
    */
@@ -67,19 +66,19 @@ type Config = {
    * param to `undefined` in request options.
    */
   defaultQuery?: Core.DefaultQuery;
-};
+}
 
 /** Instantiate the API Client. */
 export class OpenAI extends Core.APIClient {
   apiKey: string;
 
-  private _options: Config;
+  private _options: ClientOptions;
 
-  constructor(config?: Config) {
-    const options: Config = {
+  constructor(opts?: ClientOptions) {
+    const options: ClientOptions = {
       apiKey: typeof process === 'undefined' ? '' : process.env['OPENAI_API_KEY'] || '',
       baseURL: 'https://api.openai.com/v1',
-      ...config,
+      ...opts,
     };
 
     if (!options.apiKey && options.apiKey !== null) {
@@ -123,10 +122,6 @@ export class OpenAI extends Core.APIClient {
 
   protected override authHeaders(): Core.Headers {
     return { Authorization: `Bearer ${this.apiKey}` };
-  }
-
-  protected override qsOptions(): qs.IStringifyOptions {
-    return { arrayFormat: 'comma' };
   }
 
   static OpenAI = this;
