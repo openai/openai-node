@@ -31,6 +31,8 @@ To create a new node application:
 3. execute ```npm init```
 4. execute ```npm install --save /pathToLasVersion```
 
+The library needs to be configured with your account's secret key, which is available in your [OpenAI account page](https://platform.openai.com/account/api-keys). We recommend setting it as an environment variable. Here's an example of initializing the library with the API key loaded from an environment variable and creating a completion:
+
 
 ```javascript
 async function testCall() {
@@ -51,6 +53,7 @@ async function testCall() {
 }
 
 testCall();
+
 ```
 Note how the lasAPIToken parameter is configrued for the Open AI Configuration object.
 
