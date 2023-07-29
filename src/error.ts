@@ -17,16 +17,25 @@ export class APIError extends Error {
     message: string | undefined,
     headers: Headers | undefined,
   ) {
-    super(message || (error as any)?.message || 'Unknown error occurred.');
+    super(APIError.makeMessage(error, message));
     this.status = status;
     this.headers = headers;
 
     const data = error as Record<string, any>;
     this.error = data;
     this.code = data?.['code'];
-    this.message = data?.['message'];
     this.param = data?.['param'];
     this.type = data?.['type'];
+  }
+
+  private static makeMessage(error: any, message: string | undefined) {
+    return (
+      error?.message ?
+        typeof error.message === 'string' ? error.message
+        : JSON.stringify(error.message)
+      : error ? JSON.stringify(error)
+      : message || 'Unknown error occurred'
+    );
   }
 
   static generate(

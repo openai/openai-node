@@ -208,6 +208,10 @@ export abstract class APIClient {
 
     this.debug('request', url, options, req.headers);
 
+    if (options.signal?.aborted) {
+      throw new APIUserAbortError();
+    }
+
     const controller = new AbortController();
     const response = await this.fetchWithTimeout(url, req, timeout, controller).catch(castToError);
 
@@ -760,6 +764,19 @@ export const ensurePresent = <T>(value: T | null | undefined): T => {
   return value;
 };
 
+/**
+ * Read an environment variable.
+ *
+ * Will return an empty string if the environment variable doesn't exist or cannot be accessed.
+ */
+export const readEnv = (env: string): string | undefined => {
+  if (typeof process === 'undefined') {
+    return undefined;
+  }
+
+  return process.env[env] ?? undefined;
+};
+
 export const coerceInteger = (value: unknown): number => {
   if (typeof value === 'number') return Math.round(value);
   if (typeof value === 'string') return parseInt(value, 10);
@@ -778,6 +795,27 @@ export const coerceBoolean = (value: unknown): boolean => {
   if (typeof value === 'boolean') return value;
   if (typeof value === 'string') return value === 'true';
   return Boolean(value);
+};
+
+export const maybeCoerceInteger = (value: unknown): number | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+  return coerceInteger(value);
+};
+
+export const maybeCoerceFloat = (value: unknown): number | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+  return coerceFloat(value);
+};
+
+export const maybeCoerceBoolean = (value: unknown): boolean | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+  return coerceBoolean(value);
 };
 
 // https://stackoverflow.com/a/34491287

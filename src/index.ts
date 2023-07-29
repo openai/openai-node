@@ -66,26 +66,34 @@ export interface ClientOptions {
    * param to `undefined` in request options.
    */
   defaultQuery?: Core.DefaultQuery;
+
+  organization?: string | null;
 }
 
 /** Instantiate the API Client. */
 export class OpenAI extends Core.APIClient {
   apiKey: string;
+  organization?: string | null;
 
   private _options: ClientOptions;
 
-  constructor(opts?: ClientOptions) {
-    const options: ClientOptions = {
-      apiKey: typeof process === 'undefined' ? '' : process.env['OPENAI_API_KEY'] || '',
-      baseURL: 'https://api.openai.com/v1',
-      ...opts,
-    };
-
-    if (!options.apiKey && options.apiKey !== null) {
+  constructor({
+    apiKey = Core.readEnv('OPENAI_API_KEY'),
+    organization = Core.readEnv('OPENAI_ORG_ID') ?? null,
+    ...opts
+  }: ClientOptions = {}) {
+    if (apiKey === undefined) {
       throw new Error(
-        "The OPENAI_API_KEY environment variable is missing or empty; either provide it, or instantiate the OpenAI client with an apiKey option, like new OpenAI({ apiKey: 'my api key' }).",
+        'The OPENAI_API_KEY environment variable is missing or empty; either provide it, or instantiate the OpenAI client with an apiKey option, like new OpenAI({ apiKey: undefined }).',
       );
     }
+
+    const options: ClientOptions = {
+      apiKey,
+      organization,
+      baseURL: `https://api.openai.com/v1`,
+      ...opts,
+    };
 
     super({
       baseURL: options.baseURL!,
@@ -94,8 +102,10 @@ export class OpenAI extends Core.APIClient {
       maxRetries: options.maxRetries,
       fetch: options.fetch,
     });
-    this.apiKey = options.apiKey;
     this._options = options;
+
+    this.apiKey = apiKey;
+    this.organization = organization;
   }
 
   completions: API.Completions = new API.Completions(this);
@@ -116,6 +126,7 @@ export class OpenAI extends Core.APIClient {
   protected override defaultHeaders(): Core.Headers {
     return {
       ...super.defaultHeaders(),
+      'OpenAI-Organization': this.organization,
       ...this._options.defaultHeaders,
     };
   }

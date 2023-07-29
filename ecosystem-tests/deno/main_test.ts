@@ -1,6 +1,6 @@
 import { assertEquals, AssertionError } from 'https://deno.land/std@0.192.0/testing/asserts.ts';
 import OpenAI, { toFile } from 'npm:openai@3.3.0';
-import { distance } from 'https://deno.land/x/fastest_levenshtein/mod.ts'
+import { distance } from 'https://deno.land/x/fastest_levenshtein/mod.ts';
 
 const url = 'https://audio-samples.github.io/samples/mp3/blizzard_biased/sample-1.mp3';
 const filename = 'sample-1.mp3';

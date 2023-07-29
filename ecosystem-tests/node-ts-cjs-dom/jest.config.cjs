@@ -5,5 +5,5 @@ module.exports = {
   testMatch: ['<rootDir>/tests/*.ts'],
   watchPathIgnorePatterns: ['<rootDir>/node_modules/'],
   verbose: false,
-  testTimeout: 15000,
+  testTimeout: 60000,
 };

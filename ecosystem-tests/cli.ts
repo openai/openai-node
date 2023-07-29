@@ -125,6 +125,16 @@ function parseArgs() {
         default: false,
         description: 'Push projects to live servers',
       },
+      jobs: {
+        type: 'number',
+        default: 1,
+        description: 'number of parallel jobs to run',
+      },
+      parallel: {
+        type: 'boolean',
+        default: false,
+        description: 'run all projects in parallel (jobs = # projects)',
+      },
     })
     .help().argv;
 }
@@ -157,26 +167,97 @@ async function main() {
 
   const failed: typeof projectNames = [];
 
-  for (const project of projectsToRun) {
-    const fn = projects[project];
+  let { jobs } = args;
+  if (args.parallel) jobs = projectsToRun.length;
+  if (jobs > 1) {
+    const queue = [...projectsToRun];
+    const runningProjects = new Set();
 
-    await withChdir(path.join(rootDir, 'ecosystem-tests', project), async () => {
-      console.error('\n');
-      console.error(banner(project));
-      console.error('\n');
+    const cursorLeft = '\x1B[G';
+    const eraseLine = '\x1B[2K';
 
-      try {
-        await fn();
-        console.error(`✅ - Successfully ran ${project}`);
-      } catch (err) {
-        if (err && (err as any).shortMessage) {
-          console.error((err as any).shortMessage);
-        } else {
-          console.error(err);
-        }
-        failed.push(project);
+    let progressDisplayed = false;
+    function clearProgress() {
+      if (progressDisplayed) {
+        process.stderr.write(cursorLeft + eraseLine);
+        progressDisplayed = false;
       }
-    });
+    }
+    const spinner = ['|', '/', '-', '\\'];
+
+    function showProgress() {
+      clearProgress();
+      progressDisplayed = true;
+      const spin = spinner[Math.floor(Date.now() / 500) % spinner.length];
+      process.stderr.write(
+        `${spin} Running ${[...runningProjects].join(', ')}`.substring(0, process.stdout.columns - 3) + '...',
+      );
+    }
+
+    const progressInterval = setInterval(showProgress, process.stdout.isTTY ? 500 : 5000);
+    showProgress();
+
+    await Promise.all(
+      [...Array(jobs).keys()].map(async () => {
+        while (queue.length) {
+          const project = queue.shift();
+          if (!project) break;
+          let stdout, stderr;
+          try {
+            runningProjects.add(project);
+            const result = await execa(
+              'yarn',
+              [
+                'tsn',
+                __filename,
+                project,
+                '--skip-pack',
+                ...(args.live ? ['--live'] : []),
+                ...(args.verbose ? ['--verbose'] : []),
+                ...(args.deploy ? ['--deploy'] : []),
+                ...(args.fromNpm ? ['--from-npm'] : []),
+              ],
+              { stdio: 'pipe', encoding: 'utf8', maxBuffer: 100 * 1024 * 1024 },
+            );
+            ({ stdout, stderr } = result);
+          } catch (error) {
+            ({ stdout, stderr } = error as any);
+            failed.push(project);
+          } finally {
+            runningProjects.delete(project);
+          }
+
+          if (stdout) process.stdout.write(stdout);
+          if (stderr) process.stderr.write(stderr);
+        }
+      }),
+    );
+
+    clearInterval(progressInterval);
+    clearProgress();
+  } else {
+    for (const project of projectsToRun) {
+      const fn = projects[project];
+
+      await withChdir(path.join(rootDir, 'ecosystem-tests', project), async () => {
+        console.error('\n');
+        console.error(banner(project));
+        console.error('\n');
+
+        try {
+          await fn();
+          console.error(`✅ - Successfully ran ${project}`);
+        } catch (err) {
+          if (err && (err as any).shortMessage) {
+            console.error('❌', (err as any).shortMessage);
+          } else {
+            console.error('❌', err);
+          }
+          failed.push(project);
+        }
+        console.error('\n');
+      });
+    }
   }
 
   if (failed.length) {

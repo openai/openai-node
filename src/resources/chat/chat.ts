@@ -12,5 +12,6 @@ export namespace Chat {
   export import Completions = API.Completions;
   export import ChatCompletion = API.ChatCompletion;
   export import ChatCompletionChunk = API.ChatCompletionChunk;
+  export import CreateChatCompletionRequestMessage = API.CreateChatCompletionRequestMessage;
   export import CompletionCreateParams = API.CompletionCreateParams;
 }
