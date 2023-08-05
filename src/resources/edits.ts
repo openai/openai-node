@@ -2,7 +2,7 @@
 
 import * as Core from 'openai/core';
 import { APIResource } from 'openai/resource';
-import * as API from './';
+import * as API from './index';
 
 export class Edits extends APIResource {
   /**

@@ -3,7 +3,7 @@
 import { APIResource } from 'openai/resource';
 import { Transcriptions } from './transcriptions';
 import { Translations } from './translations';
-import * as API from './';
+import * as API from './index';
 
 export class Audio extends APIResource {
   transcriptions: Transcriptions = new Transcriptions(this.client);

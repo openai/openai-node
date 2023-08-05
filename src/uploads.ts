@@ -1,14 +1,15 @@
 import { type RequestOptions } from './core';
 import { type Readable } from 'openai/_shims/node-readable';
 import { type BodyInit } from 'openai/_shims/fetch';
-import { FormData, File, type FilePropertyBag } from 'openai/_shims/formdata';
+import { FormData, File, type Blob, type FilePropertyBag } from 'openai/_shims/formdata';
 import { getMultipartRequestOptions } from 'openai/_shims/getMultipartRequestOptions';
 import { fileFromPath } from 'openai/_shims/fileFromPath';
 import { type FsReadStream, isFsReadStream } from 'openai/_shims/node-readable';
 
 export { fileFromPath };
 
-export type BlobPart = string | ArrayBuffer | ArrayBufferView | BlobLike | Uint8Array | DataView;
+type BlobLikePart = string | ArrayBuffer | ArrayBufferView | BlobLike | Uint8Array | DataView;
+export type BlobPart = string | ArrayBuffer | ArrayBufferView | Blob | Uint8Array | DataView;
 
 /**
  * Typically, this is a native "File" class.
@@ -84,11 +85,11 @@ export const isUploadable = (value: any): value is Uploadable => {
   return isFileLike(value) || isResponseLike(value) || isFsReadStream(value);
 };
 
-export type ToFileInput = Uploadable | Exclude<BlobPart, string> | AsyncIterable<BlobPart>;
+export type ToFileInput = Uploadable | Exclude<BlobLikePart, string> | AsyncIterable<BlobLikePart>;
 
 /**
  * Helper for creating a {@link File} to pass to an SDK upload method from a variety of different data formats
- * @param value the raw content of the file.  Can be an {@link Uploadable}, {@link BlobPart}, or {@link AsyncIterable} of {@link BlobPart}s
+ * @param value the raw content of the file.  Can be an {@link Uploadable}, {@link BlobLikePart}, or {@link AsyncIterable} of {@link BlobLikePart}s
  * @param {string=} name the name of the file. If omitted, toFile will try to determine a file name from bits if possible
  * @param {Object=} options additional properties
  * @param {string=} options.type the MIME type of the content
@@ -231,10 +232,10 @@ const addFormValue = async (form: FormData, key: string, value: unknown): Promis
 
   // TODO: make nested formats configurable
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-    form.append(key, value);
+    form.append(key, String(value));
   } else if (isUploadable(value)) {
     const file = await toFile(value);
-    form.append(key, file);
+    form.append(key, file as File);
   } else if (Array.isArray(value)) {
     await Promise.all(value.map((entry) => addFormValue(form, key + '[]', entry)));
   } else if (typeof value === 'object') {

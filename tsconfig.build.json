@@ -1,7 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "include": ["dist/src"],
-  "exclude": [],
+  "exclude": ["dist/src/_shims/*.deno.ts"],
   "compilerOptions": {
     "rootDir": "./dist/src",
     "paths": {

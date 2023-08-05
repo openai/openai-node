@@ -2,7 +2,14 @@
 
 export { Audio } from './audio/audio';
 export { Chat } from './chat/chat';
-export { Completion, CompletionChoice, CompletionCreateParams, Completions } from './completions';
+export {
+  Completion,
+  CompletionChoice,
+  CompletionCreateParams,
+  CompletionCreateParamsNonStreaming,
+  CompletionCreateParamsStreaming,
+  Completions,
+} from './completions';
 export { Edit, EditCreateParams, Edits } from './edits';
 export { Embedding, EmbeddingCreateParams, Embeddings } from './embeddings';
 export { FileContent, FileDeleted, FileObject, FileCreateParams, FileObjectsPage, Files } from './files';
@@ -12,6 +19,8 @@ export {
   FineTuneEventsListResponse,
   FineTuneCreateParams,
   FineTuneListEventsParams,
+  FineTuneListEventsParamsNonStreaming,
+  FineTuneListEventsParamsStreaming,
   FineTunesPage,
   FineTunes,
 } from './fine-tunes';

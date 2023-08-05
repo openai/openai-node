@@ -1,4 +1,4 @@
-#!/usr/bin/env yarn tsn -T
+#!/usr/bin/env -S npm run tsn -T
 
 import OpenAI, { NotFoundError } from 'openai';
 

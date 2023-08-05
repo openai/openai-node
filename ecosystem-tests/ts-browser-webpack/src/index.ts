@@ -93,7 +93,7 @@ const model = 'whisper-1';
 
 const params = new URLSearchParams(location.search);
 
-const client = new OpenAI({ apiKey: params.get('apiKey') ?? undefined });
+const client = new OpenAI({ apiKey: params.get('apiKey') ?? undefined, dangerouslyAllowBrowser: true });
 
 async function typeTests() {
   // @ts-expect-error this should error if the `Uploadable` type was resolved correctly

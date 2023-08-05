@@ -67,6 +67,12 @@ export interface ClientOptions {
    */
   defaultQuery?: Core.DefaultQuery;
 
+  /**
+   * By default, client-side use of this library is not allowed, as it risks exposing your secret API credentials to attackers.
+   * Only set this option to `true` if you understand the risks and have appropriate mitigations in place.
+   */
+  dangerouslyAllowBrowser?: boolean;
+
   organization?: string | null;
 }
 
@@ -94,6 +100,12 @@ export class OpenAI extends Core.APIClient {
       baseURL: `https://api.openai.com/v1`,
       ...opts,
     };
+
+    if (!options.dangerouslyAllowBrowser && Core.isRunningInBrowser()) {
+      throw new Error(
+        "It looks like you're running in a browser-like environment.\n\nThis is disabled by default, as it risks exposing your secret API credentials to attackers. \nIf you understand the risks and have appropriate mitigations in place,\nyou can set the `dangerouslyAllowBrowser` option to `true`, e.g.,\n\nnew OpenAI({ apiKey, dangerouslyAllowBrowser: true });\n\nhttps://help.openai.com/en/articles/5112595-best-practices-for-api-key-safety\n",
+      );
+    }
 
     super({
       baseURL: options.baseURL!,
@@ -181,6 +193,8 @@ export namespace OpenAI {
   export import Completion = API.Completion;
   export import CompletionChoice = API.CompletionChoice;
   export import CompletionCreateParams = API.CompletionCreateParams;
+  export import CompletionCreateParamsNonStreaming = API.CompletionCreateParamsNonStreaming;
+  export import CompletionCreateParamsStreaming = API.CompletionCreateParamsStreaming;
 
   export import Chat = API.Chat;
 
@@ -225,6 +239,8 @@ export namespace OpenAI {
   export import FineTunesPage = API.FineTunesPage;
   export import FineTuneCreateParams = API.FineTuneCreateParams;
   export import FineTuneListEventsParams = API.FineTuneListEventsParams;
+  export import FineTuneListEventsParamsNonStreaming = API.FineTuneListEventsParamsNonStreaming;
+  export import FineTuneListEventsParamsStreaming = API.FineTuneListEventsParamsStreaming;
 }
 
 export default OpenAI;

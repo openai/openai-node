@@ -6,5 +6,7 @@ export {
   ChatCompletionChunk,
   CreateChatCompletionRequestMessage,
   CompletionCreateParams,
+  CompletionCreateParamsNonStreaming,
+  CompletionCreateParamsStreaming,
   Completions,
 } from './completions';

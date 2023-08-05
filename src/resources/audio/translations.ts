@@ -2,7 +2,7 @@
 
 import * as Core from 'openai/core';
 import { APIResource } from 'openai/resource';
-import * as API from './';
+import * as API from './index';
 import { type Uploadable, multipartFormRequestOptions } from 'openai/core';
 
 export class Translations extends APIResource {

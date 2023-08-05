@@ -1,6 +1,6 @@
 {
   "name": "openai",
-  "version": "4.0.0-beta.7",
+  "version": "4.0.0-beta.8",
   "description": "Client library for the OpenAI API",
   "author": "OpenAI <support@openai.com>",
   "types": "dist/index.d.ts",
@@ -91,6 +91,7 @@
     "jest": "^29.4.0",
     "prettier": "rattrayalex/prettier#postfix-ternaries",
     "ts-jest": "^29.1.0",
+    "ts-morph": "^19.0.0",
     "ts-node": "^10.5.0",
     "tsc-alias": "^1.8.6",
     "tsc-multi": "^1.1.0",

@@ -1,5 +1,6 @@
 {
   "include": ["src", "tests", "examples"],
+  "exclude": ["src/_shims/*.deno.ts"],
   "compilerOptions": {
     "target": "es2019",
     "lib": ["es2020"],

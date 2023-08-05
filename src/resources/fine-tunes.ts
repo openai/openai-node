@@ -3,7 +3,7 @@
 import * as Core from 'openai/core';
 import { APIResource } from 'openai/resource';
 import * as Files from 'openai/resources/files';
-import * as API from './';
+import * as API from './index';
 import { Page } from 'openai/pagination';
 import { Stream } from 'openai/streaming';
 
@@ -48,14 +48,19 @@ export class FineTunes extends APIResource {
    */
   listEvents(
     fineTuneId: string,
-    query?: FineTuneListEventsParams.ListEventsRequestNonStreaming,
+    query?: FineTuneListEventsParamsNonStreaming,
     options?: Core.RequestOptions,
   ): Promise<Core.APIResponse<FineTuneEventsListResponse>>;
   listEvents(
     fineTuneId: string,
-    query: FineTuneListEventsParams.ListEventsRequestStreaming,
+    query: FineTuneListEventsParamsStreaming,
     options?: Core.RequestOptions,
   ): Promise<Core.APIResponse<Stream<FineTuneEvent>>>;
+  listEvents(
+    fineTuneId: string,
+    query?: FineTuneListEventsParams,
+    options?: Core.RequestOptions,
+  ): Promise<Core.APIResponse<FineTuneEventsListResponse | Stream<FineTuneEvent>>>;
   listEvents(
     fineTuneId: string,
     query?: FineTuneListEventsParams | undefined,
@@ -266,36 +271,48 @@ export interface FineTuneCreateParams {
   validation_file?: string | null;
 }
 
-export type FineTuneListEventsParams =
-  | FineTuneListEventsParams.ListEventsRequestNonStreaming
-  | FineTuneListEventsParams.ListEventsRequestStreaming;
+export interface FineTuneListEventsParams {
+  /**
+   * Whether to stream events for the fine-tune job. If set to true, events will be
+   * sent as data-only
+   * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format)
+   * as they become available. The stream will terminate with a `data: [DONE]`
+   * message when the job is finished (succeeded, cancelled, or failed).
+   *
+   * If set to false, only events generated so far will be returned.
+   */
+  stream?: boolean;
+}
 
 export namespace FineTuneListEventsParams {
-  export interface ListEventsRequestNonStreaming {
-    /**
-     * Whether to stream events for the fine-tune job. If set to true, events will be
-     * sent as data-only
-     * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format)
-     * as they become available. The stream will terminate with a `data: [DONE]`
-     * message when the job is finished (succeeded, cancelled, or failed).
-     *
-     * If set to false, only events generated so far will be returned.
-     */
-    stream?: false;
-  }
+  export type FineTuneListEventsParamsNonStreaming = API.FineTuneListEventsParamsNonStreaming;
+  export type FineTuneListEventsParamsStreaming = API.FineTuneListEventsParamsStreaming;
+}
 
-  export interface ListEventsRequestStreaming {
-    /**
-     * Whether to stream events for the fine-tune job. If set to true, events will be
-     * sent as data-only
-     * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format)
-     * as they become available. The stream will terminate with a `data: [DONE]`
-     * message when the job is finished (succeeded, cancelled, or failed).
-     *
-     * If set to false, only events generated so far will be returned.
-     */
-    stream: true;
-  }
+export interface FineTuneListEventsParamsNonStreaming extends FineTuneListEventsParams {
+  /**
+   * Whether to stream events for the fine-tune job. If set to true, events will be
+   * sent as data-only
+   * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format)
+   * as they become available. The stream will terminate with a `data: [DONE]`
+   * message when the job is finished (succeeded, cancelled, or failed).
+   *
+   * If set to false, only events generated so far will be returned.
+   */
+  stream?: false;
+}
+
+export interface FineTuneListEventsParamsStreaming extends FineTuneListEventsParams {
+  /**
+   * Whether to stream events for the fine-tune job. If set to true, events will be
+   * sent as data-only
+   * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format)
+   * as they become available. The stream will terminate with a `data: [DONE]`
+   * message when the job is finished (succeeded, cancelled, or failed).
+   *
+   * If set to false, only events generated so far will be returned.
+   */
+  stream: true;
 }
 
 export namespace FineTunes {
@@ -305,4 +322,6 @@ export namespace FineTunes {
   export type FineTunesPage = _FineTunesPage;
   export import FineTuneCreateParams = API.FineTuneCreateParams;
   export import FineTuneListEventsParams = API.FineTuneListEventsParams;
+  export import FineTuneListEventsParamsNonStreaming = API.FineTuneListEventsParamsNonStreaming;
+  export import FineTuneListEventsParamsStreaming = API.FineTuneListEventsParamsStreaming;
 }

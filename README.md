@@ -230,11 +230,15 @@ await openai.models.list({
 })
 ```
 
-## Status
+## Semantic Versioning
 
-This package is in beta. Its internals and interfaces are not stable
-and subject to change without a major semver bump;
-please reach out if you rely on any undocumented behavior.
+This package generally attempts to follow [SemVer](https://semver.org/spec/v2.0.0.html) conventions, though certain backwards-incompatible changes may be released as minor versions:
+
+1. Changes that only affect static types, without breaking runtime behavior.
+2. Changes to library internals which are technically public but not intended or documented for external use. _(Please open a GitHub issue to let us know if you are relying on such internals)_.
+3. Changes that we do not expect to impact the vast majority of users in practice.
+
+We take backwards-compatibility seriously and work hard to ensure you can rely on a smooth upgrade experience.
 
 We are keen for your feedback; please open an [issue](https://www.github.com/openai/openai-node/issues) with questions, bugs, or suggestions.
 

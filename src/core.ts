@@ -635,12 +635,13 @@ type PlatformName =
   | 'Android'
   | `Other:${string}`
   | 'Unknown';
+type Browser = 'ie' | 'edge' | 'chrome' | 'firefox' | 'safari';
 type PlatformProperties = {
   'X-Stainless-Lang': 'js';
   'X-Stainless-Package-Version': string;
   'X-Stainless-OS': PlatformName;
   'X-Stainless-Arch': Arch;
-  'X-Stainless-Runtime': 'node' | 'deno' | 'edge' | 'unknown';
+  'X-Stainless-Runtime': 'node' | 'deno' | 'edge' | `browser:${Browser}` | 'unknown';
   'X-Stainless-Runtime-Version': string;
 };
 const getPlatformProperties = (): PlatformProperties => {
@@ -675,7 +676,20 @@ const getPlatformProperties = (): PlatformProperties => {
       'X-Stainless-Runtime-Version': process.version,
     };
   }
-  // TODO add support for Cloudflare workers, browsers, etc.
+
+  const browserInfo = getBrowserInfo();
+  if (browserInfo) {
+    return {
+      'X-Stainless-Lang': 'js',
+      'X-Stainless-Package-Version': VERSION,
+      'X-Stainless-OS': 'Unknown',
+      'X-Stainless-Arch': 'unknown',
+      'X-Stainless-Runtime': `browser:${browserInfo.browser}`,
+      'X-Stainless-Runtime-Version': browserInfo.version,
+    };
+  }
+
+  // TODO add support for Cloudflare workers, etc.
   return {
     'X-Stainless-Lang': 'js',
     'X-Stainless-Package-Version': VERSION,
@@ -685,6 +699,44 @@ const getPlatformProperties = (): PlatformProperties => {
     'X-Stainless-Runtime-Version': 'unknown',
   };
 };
+
+type BrowserInfo = {
+  browser: Browser;
+  version: string;
+};
+
+declare const navigator: { userAgent: string } | undefined;
+
+// Note: modified from https://github.com/JS-DevTools/host-environment/blob/b1ab79ecde37db5d6e163c050e54fe7d287d7c92/src/isomorphic.browser.ts
+function getBrowserInfo(): BrowserInfo | null {
+  if (!navigator || typeof navigator === 'undefined') {
+    return null;
+  }
+
+  // NOTE: The order matters here!
+  const browserPatterns = [
+    { key: 'edge' as const, pattern: /Edge(?:\W+(\d+)\.(\d+)(?:\.(\d+))?)?/ },
+    { key: 'ie' as const, pattern: /MSIE(?:\W+(\d+)\.(\d+)(?:\.(\d+))?)?/ },
+    { key: 'ie' as const, pattern: /Trident(?:.*rv\:(\d+)\.(\d+)(?:\.(\d+))?)?/ },
+    { key: 'chrome' as const, pattern: /Chrome(?:\W+(\d+)\.(\d+)(?:\.(\d+))?)?/ },
+    { key: 'firefox' as const, pattern: /Firefox(?:\W+(\d+)\.(\d+)(?:\.(\d+))?)?/ },
+    { key: 'safari' as const, pattern: /(?:Version\W+(\d+)\.(\d+)(?:\.(\d+))?)?(?:\W+Mobile\S*)?\W+Safari/ },
+  ];
+
+  // Find the FIRST matching browser
+  for (const { key, pattern } of browserPatterns) {
+    const match = pattern.exec(navigator.userAgent);
+    if (match) {
+      const major = match[1] || 0;
+      const minor = match[2] || 0;
+      const patch = match[3] || 0;
+
+      return { browser: key, version: `${major}.${minor}.${patch}` };
+    }
+  }
+
+  return null;
+}
 
 const normalizeArch = (arch: string): Arch => {
   // Node docs:
@@ -744,8 +796,8 @@ const isAbsoluteURL = (url: string): boolean => {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const validatePositiveInteger = (name: string, n: number) => {
-  if (!Number.isInteger(n)) {
+const validatePositiveInteger = (name: string, n: unknown): number => {
+  if (typeof n !== 'number' || !Number.isInteger(n)) {
     throw new Error(`${name} must be an integer`);
   }
   if (n < 0) {
@@ -767,14 +819,16 @@ export const ensurePresent = <T>(value: T | null | undefined): T => {
 /**
  * Read an environment variable.
  *
- * Will return an empty string if the environment variable doesn't exist or cannot be accessed.
+ * Will return undefined if the environment variable doesn't exist or cannot be accessed.
  */
 export const readEnv = (env: string): string | undefined => {
-  if (typeof process === 'undefined') {
-    return undefined;
+  if (typeof process !== 'undefined') {
+    return process.env?.[env] ?? undefined;
   }
-
-  return process.env[env] ?? undefined;
+  if (typeof Deno !== 'undefined') {
+    return Deno.env?.get?.(env);
+  }
+  return undefined;
 };
 
 export const coerceInteger = (value: unknown): number => {
@@ -839,6 +893,17 @@ const uuid4 = () => {
     const v = c === 'x' ? r : (r & 0x3) | 0x8;
     return v.toString(16);
   });
+};
+
+export const isRunningInBrowser = () => {
+  return (
+    // @ts-ignore
+    typeof window !== 'undefined' &&
+    // @ts-ignore
+    typeof window.document !== 'undefined' &&
+    // @ts-ignore
+    typeof navigator !== 'undefined'
+  );
 };
 
 export interface HeadersProtocol {
