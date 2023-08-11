@@ -8,7 +8,7 @@ export class Embeddings extends APIResource {
   /**
    * Creates an embedding vector representing the input text.
    */
-  create(body: EmbeddingCreateParams, options?: Core.RequestOptions): Promise<Core.APIResponse<Embedding>> {
+  create(body: EmbeddingCreateParams, options?: Core.RequestOptions): Core.APIPromise<Embedding> {
     return this.post('/embeddings', { body, ...options });
   }
 }

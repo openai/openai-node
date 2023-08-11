@@ -1,6 +1,7 @@
 // File generated from our OpenAPI spec by Stainless.
 
 import * as Core from 'openai/core';
+import { APIPromise } from 'openai/core';
 import { APIResource } from 'openai/resource';
 import * as Files from 'openai/resources/files';
 import * as API from './index';
@@ -16,7 +17,7 @@ export class FineTunes extends APIResource {
    *
    * [Learn more about Fine-tuning](/docs/guides/fine-tuning)
    */
-  create(body: FineTuneCreateParams, options?: Core.RequestOptions): Promise<Core.APIResponse<FineTune>> {
+  create(body: FineTuneCreateParams, options?: Core.RequestOptions): Core.APIPromise<FineTune> {
     return this.post('/fine-tunes', { body, ...options });
   }
 
@@ -25,21 +26,21 @@ export class FineTunes extends APIResource {
    *
    * [Learn more about Fine-tuning](/docs/guides/fine-tuning)
    */
-  retrieve(fineTuneId: string, options?: Core.RequestOptions): Promise<Core.APIResponse<FineTune>> {
+  retrieve(fineTuneId: string, options?: Core.RequestOptions): Core.APIPromise<FineTune> {
     return this.get(`/fine-tunes/${fineTuneId}`, options);
   }
 
   /**
    * List your organization's fine-tuning jobs
    */
-  list(options?: Core.RequestOptions): Core.PagePromise<FineTunesPage> {
+  list(options?: Core.RequestOptions): Core.PagePromise<FineTunesPage, FineTune> {
     return this.getAPIList('/fine-tunes', FineTunesPage, options);
   }
 
   /**
    * Immediately cancel a fine-tune job.
    */
-  cancel(fineTuneId: string, options?: Core.RequestOptions): Promise<Core.APIResponse<FineTune>> {
+  cancel(fineTuneId: string, options?: Core.RequestOptions): Core.APIPromise<FineTune> {
     return this.post(`/fine-tunes/${fineTuneId}/cancel`, options);
   }
 
@@ -50,28 +51,23 @@ export class FineTunes extends APIResource {
     fineTuneId: string,
     query?: FineTuneListEventsParamsNonStreaming,
     options?: Core.RequestOptions,
-  ): Promise<Core.APIResponse<FineTuneEventsListResponse>>;
+  ): APIPromise<FineTuneEventsListResponse>;
   listEvents(
     fineTuneId: string,
     query: FineTuneListEventsParamsStreaming,
     options?: Core.RequestOptions,
-  ): Promise<Core.APIResponse<Stream<FineTuneEvent>>>;
-  listEvents(
-    fineTuneId: string,
-    query?: FineTuneListEventsParams,
-    options?: Core.RequestOptions,
-  ): Promise<Core.APIResponse<FineTuneEventsListResponse | Stream<FineTuneEvent>>>;
+  ): APIPromise<Stream<FineTuneEvent>>;
   listEvents(
     fineTuneId: string,
     query?: FineTuneListEventsParams | undefined,
     options?: Core.RequestOptions,
-  ): Promise<Core.APIResponse<FineTuneEventsListResponse | Stream<FineTuneEvent>>> {
+  ): APIPromise<FineTuneEventsListResponse> | APIPromise<Stream<FineTuneEvent>> {
     return this.get(`/fine-tunes/${fineTuneId}/events`, {
       query,
       timeout: 86400000,
       ...options,
       stream: query?.stream ?? false,
-    });
+    }) as APIPromise<FineTuneEventsListResponse> | APIPromise<Stream<FineTuneEvent>>;
   }
 }
 

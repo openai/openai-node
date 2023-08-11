@@ -11,7 +11,7 @@ export class Moderations extends APIResource {
   create(
     body: ModerationCreateParams,
     options?: Core.RequestOptions,
-  ): Promise<Core.APIResponse<ModerationCreateResponse>> {
+  ): Core.APIPromise<ModerationCreateResponse> {
     return this.post('/moderations', { body, ...options });
   }
 }

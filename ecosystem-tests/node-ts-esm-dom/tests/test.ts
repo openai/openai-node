@@ -3,7 +3,7 @@ import { TranscriptionCreateParams } from 'openai/resources/audio/transcriptions
 import fetch from 'node-fetch';
 import { File as FormDataFile, Blob as FormDataBlob } from 'formdata-node';
 import * as fs from 'fs';
-import { distance } from 'fastest-levenshtein'
+import { distance } from 'fastest-levenshtein';
 
 const url = 'https://audio-samples.github.io/samples/mp3/blizzard_biased/sample-1.mp3';
 const filename = 'sample-1.mp3';
@@ -52,7 +52,20 @@ expect.extend({
       message,
       pass: false,
     };
+  },
+});
+
+it(`streaming works`, async function () {
+  const stream = await client.chat.completions.create({
+    model: 'gpt-4',
+    messages: [{ role: 'user', content: 'Say this is a test' }],
+    stream: true,
+  });
+  const chunks = [];
+  for await (const part of stream) {
+    chunks.push(part);
   }
+  expect(chunks.map((c) => c.choices[0]?.delta.content || '').join('')).toBeSimilarTo('This is a test', 10);
 });
 
 it('handles formdata-node File', async function () {

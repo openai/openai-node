@@ -15,6 +15,10 @@ cp -rp src README.md dist
 for file in LICENSE CHANGELOG.md; do
   if [ -e "${file}" ]; then cp "${file}" dist; fi
 done
+if [ -e "bin/cli" ]; then
+  mkdir dist/bin
+  cp -p "bin/cli" dist/bin/;
+fi
 # this converts the export map paths for the dist directory
 # and does a few other minor things
 node scripts/make-dist-package-json.cjs > dist/package.json

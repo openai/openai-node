@@ -1,8 +1,6 @@
 import type { Response } from 'openai/_shims/fetch';
 import { ReadableStream } from 'openai/_shims/ReadableStream';
 
-import { APIResponse, Headers, createResponseHeaders } from './core';
-
 type Bytes = string | ArrayBuffer | Uint8Array | Buffer | null | undefined;
 
 type ServerSentEvent = {
@@ -11,20 +9,11 @@ type ServerSentEvent = {
   raw: string[];
 };
 
-export class Stream<Item> implements AsyncIterable<Item>, APIResponse<Stream<Item>> {
-  /** @deprecated - please use the async iterator instead. We plan to add additional helper methods shortly. */
-  response: Response;
-  /** @deprecated - we plan to add a different way to access raw response information shortly. */
-  responseHeaders: Headers;
-  controller: AbortController;
-
+export class Stream<Item> implements AsyncIterable<Item> {
   private decoder: SSEDecoder;
 
-  constructor(response: Response, controller: AbortController) {
-    this.response = response;
-    this.controller = controller;
+  constructor(private response: Response, private controller: AbortController) {
     this.decoder = new SSEDecoder();
-    this.responseHeaders = createResponseHeaders(response.headers);
   }
 
   private async *iterMessages(): AsyncGenerator<ServerSentEvent, void, unknown> {

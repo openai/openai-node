@@ -1,6 +1,7 @@
 // File generated from our OpenAPI spec by Stainless.
 
 import * as Core from 'openai/core';
+import { APIPromise } from 'openai/core';
 import { APIResource } from 'openai/resource';
 import * as API from './index';
 import { Stream } from 'openai/streaming';
@@ -9,23 +10,18 @@ export class Completions extends APIResource {
   /**
    * Creates a completion for the provided prompt and parameters.
    */
-  create(
-    body: CompletionCreateParamsNonStreaming,
-    options?: Core.RequestOptions,
-  ): Promise<Core.APIResponse<Completion>>;
+  create(body: CompletionCreateParamsNonStreaming, options?: Core.RequestOptions): APIPromise<Completion>;
   create(
     body: CompletionCreateParamsStreaming,
     options?: Core.RequestOptions,
-  ): Promise<Core.APIResponse<Stream<Completion>>>;
+  ): APIPromise<Stream<Completion>>;
   create(
     body: CompletionCreateParams,
     options?: Core.RequestOptions,
-  ): Promise<Core.APIResponse<Completion | Stream<Completion>>>;
-  create(
-    body: CompletionCreateParams,
-    options?: Core.RequestOptions,
-  ): Promise<Core.APIResponse<Completion | Stream<Completion>>> {
-    return this.post('/completions', { body, ...options, stream: body.stream ?? false });
+  ): APIPromise<Completion> | APIPromise<Stream<Completion>> {
+    return this.post('/completions', { body, ...options, stream: body.stream ?? false }) as
+      | APIPromise<Completion>
+      | APIPromise<Stream<Completion>>;
   }
 }
 

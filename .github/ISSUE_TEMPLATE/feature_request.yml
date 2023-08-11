@@ -1,6 +1,6 @@
 name: Feature request
 description: Suggest an idea for this library
-labels: ["feature-request"]
+labels: ['feature-request']
 body:
   - type: markdown
     attributes:

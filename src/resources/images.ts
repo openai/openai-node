@@ -9,30 +9,24 @@ export class Images extends APIResource {
   /**
    * Creates a variation of a given image.
    */
-  async createVariation(
+  createVariation(
     body: ImageCreateVariationParams,
     options?: Core.RequestOptions,
-  ): Promise<Core.APIResponse<ImagesResponse>> {
-    return this.post('/images/variations', await multipartFormRequestOptions({ body, ...options }));
+  ): Core.APIPromise<ImagesResponse> {
+    return this.post('/images/variations', multipartFormRequestOptions({ body, ...options }));
   }
 
   /**
    * Creates an edited or extended image given an original image and a prompt.
    */
-  async edit(
-    body: ImageEditParams,
-    options?: Core.RequestOptions,
-  ): Promise<Core.APIResponse<ImagesResponse>> {
-    return this.post('/images/edits', await multipartFormRequestOptions({ body, ...options }));
+  edit(body: ImageEditParams, options?: Core.RequestOptions): Core.APIPromise<ImagesResponse> {
+    return this.post('/images/edits', multipartFormRequestOptions({ body, ...options }));
   }
 
   /**
    * Creates an image given a prompt.
    */
-  generate(
-    body: ImageGenerateParams,
-    options?: Core.RequestOptions,
-  ): Promise<Core.APIResponse<ImagesResponse>> {
+  generate(body: ImageGenerateParams, options?: Core.RequestOptions): Core.APIPromise<ImagesResponse> {
     return this.post('/images/generations', { body, ...options });
   }
 }

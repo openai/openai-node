@@ -1,16 +1,24 @@
 // File generated from our OpenAPI spec by Stainless.
 
 import OpenAI, { toFile } from 'openai';
+import { Response } from 'node-fetch';
 
 const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010' });
 
 describe('resource files', () => {
   // Prism tests are broken
   test.skip('create: only required params', async () => {
-    const response = await openai.files.create({
+    const responsePromise = openai.files.create({
       file: await toFile(Buffer.from('# my file contents'), 'README.md'),
       purpose: 'string',
     });
+    const rawResponse = await responsePromise.asResponse();
+    expect(rawResponse).toBeInstanceOf(Response);
+    const response = await responsePromise;
+    expect(response).not.toBeInstanceOf(Response);
+    const dataAndResponse = await responsePromise.withResponse();
+    expect(dataAndResponse.data).toBe(response);
+    expect(dataAndResponse.response).toBe(rawResponse);
   });
 
   // Prism tests are broken
@@ -22,7 +30,14 @@ describe('resource files', () => {
   });
 
   test('retrieve', async () => {
-    const response = await openai.files.retrieve('string');
+    const responsePromise = openai.files.retrieve('string');
+    const rawResponse = await responsePromise.asResponse();
+    expect(rawResponse).toBeInstanceOf(Response);
+    const response = await responsePromise;
+    expect(response).not.toBeInstanceOf(Response);
+    const dataAndResponse = await responsePromise.withResponse();
+    expect(dataAndResponse.data).toBe(response);
+    expect(dataAndResponse.response).toBe(rawResponse);
   });
 
   test('retrieve: request options instead of params are passed correctly', async () => {
@@ -33,7 +48,14 @@ describe('resource files', () => {
   });
 
   test('list', async () => {
-    const response = await openai.files.list();
+    const responsePromise = openai.files.list();
+    const rawResponse = await responsePromise.asResponse();
+    expect(rawResponse).toBeInstanceOf(Response);
+    const response = await responsePromise;
+    expect(response).not.toBeInstanceOf(Response);
+    const dataAndResponse = await responsePromise.withResponse();
+    expect(dataAndResponse.data).toBe(response);
+    expect(dataAndResponse.response).toBe(rawResponse);
   });
 
   test('list: request options instead of params are passed correctly', async () => {
@@ -44,7 +66,14 @@ describe('resource files', () => {
   });
 
   test('del', async () => {
-    const response = await openai.files.del('string');
+    const responsePromise = openai.files.del('string');
+    const rawResponse = await responsePromise.asResponse();
+    expect(rawResponse).toBeInstanceOf(Response);
+    const response = await responsePromise;
+    expect(response).not.toBeInstanceOf(Response);
+    const dataAndResponse = await responsePromise.withResponse();
+    expect(dataAndResponse.data).toBe(response);
+    expect(dataAndResponse.response).toBe(rawResponse);
   });
 
   test('del: request options instead of params are passed correctly', async () => {
@@ -56,7 +85,14 @@ describe('resource files', () => {
 
   // Prism tests are broken
   test.skip('retrieveFileContent', async () => {
-    const response = await openai.files.retrieveFileContent('string');
+    const responsePromise = openai.files.retrieveFileContent('string');
+    const rawResponse = await responsePromise.asResponse();
+    expect(rawResponse).toBeInstanceOf(Response);
+    const response = await responsePromise;
+    expect(response).not.toBeInstanceOf(Response);
+    const dataAndResponse = await responsePromise.withResponse();
+    expect(dataAndResponse.data).toBe(response);
+    expect(dataAndResponse.response).toBe(rawResponse);
   });
 
   // Prism tests are broken

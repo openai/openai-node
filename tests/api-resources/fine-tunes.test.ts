@@ -1,12 +1,20 @@
 // File generated from our OpenAPI spec by Stainless.
 
 import OpenAI from 'openai';
+import { Response } from 'node-fetch';
 
 const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010' });
 
 describe('resource fineTunes', () => {
   test('create: only required params', async () => {
-    const response = await openai.fineTunes.create({ training_file: 'file-ajSREls59WBbvgSzJSVWxMCB' });
+    const responsePromise = openai.fineTunes.create({ training_file: 'file-ajSREls59WBbvgSzJSVWxMCB' });
+    const rawResponse = await responsePromise.asResponse();
+    expect(rawResponse).toBeInstanceOf(Response);
+    const response = await responsePromise;
+    expect(response).not.toBeInstanceOf(Response);
+    const dataAndResponse = await responsePromise.withResponse();
+    expect(dataAndResponse.data).toBe(response);
+    expect(dataAndResponse.response).toBe(rawResponse);
   });
 
   test('create: required and optional params', async () => {
@@ -27,7 +35,14 @@ describe('resource fineTunes', () => {
   });
 
   test('retrieve', async () => {
-    const response = await openai.fineTunes.retrieve('ft-AF1WoRqd3aJAHsqc9NY7iL8F');
+    const responsePromise = openai.fineTunes.retrieve('ft-AF1WoRqd3aJAHsqc9NY7iL8F');
+    const rawResponse = await responsePromise.asResponse();
+    expect(rawResponse).toBeInstanceOf(Response);
+    const response = await responsePromise;
+    expect(response).not.toBeInstanceOf(Response);
+    const dataAndResponse = await responsePromise.withResponse();
+    expect(dataAndResponse.data).toBe(response);
+    expect(dataAndResponse.response).toBe(rawResponse);
   });
 
   test('retrieve: request options instead of params are passed correctly', async () => {
@@ -38,7 +53,14 @@ describe('resource fineTunes', () => {
   });
 
   test('list', async () => {
-    const response = await openai.fineTunes.list();
+    const responsePromise = openai.fineTunes.list();
+    const rawResponse = await responsePromise.asResponse();
+    expect(rawResponse).toBeInstanceOf(Response);
+    const response = await responsePromise;
+    expect(response).not.toBeInstanceOf(Response);
+    const dataAndResponse = await responsePromise.withResponse();
+    expect(dataAndResponse.data).toBe(response);
+    expect(dataAndResponse.response).toBe(rawResponse);
   });
 
   test('list: request options instead of params are passed correctly', async () => {
@@ -49,7 +71,14 @@ describe('resource fineTunes', () => {
   });
 
   test('cancel', async () => {
-    const response = await openai.fineTunes.cancel('ft-AF1WoRqd3aJAHsqc9NY7iL8F');
+    const responsePromise = openai.fineTunes.cancel('ft-AF1WoRqd3aJAHsqc9NY7iL8F');
+    const rawResponse = await responsePromise.asResponse();
+    expect(rawResponse).toBeInstanceOf(Response);
+    const response = await responsePromise;
+    expect(response).not.toBeInstanceOf(Response);
+    const dataAndResponse = await responsePromise.withResponse();
+    expect(dataAndResponse.data).toBe(response);
+    expect(dataAndResponse.response).toBe(rawResponse);
   });
 
   test('cancel: request options instead of params are passed correctly', async () => {
@@ -61,7 +90,14 @@ describe('resource fineTunes', () => {
 
   // Prism chokes on this
   test.skip('listEvents', async () => {
-    const response = await openai.fineTunes.listEvents('ft-AF1WoRqd3aJAHsqc9NY7iL8F');
+    const responsePromise = openai.fineTunes.listEvents('ft-AF1WoRqd3aJAHsqc9NY7iL8F');
+    const rawResponse = await responsePromise.asResponse();
+    expect(rawResponse).toBeInstanceOf(Response);
+    const response = await responsePromise;
+    expect(response).not.toBeInstanceOf(Response);
+    const dataAndResponse = await responsePromise.withResponse();
+    expect(dataAndResponse.data).toBe(response);
+    expect(dataAndResponse.response).toBe(rawResponse);
   });
 
   // Prism chokes on this

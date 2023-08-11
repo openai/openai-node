@@ -10,7 +10,7 @@ export class Models extends APIResource {
    * Retrieves a model instance, providing basic information about the model such as
    * the owner and permissioning.
    */
-  retrieve(model: string, options?: Core.RequestOptions): Promise<Core.APIResponse<Model>> {
+  retrieve(model: string, options?: Core.RequestOptions): Core.APIPromise<Model> {
     return this.get(`/models/${model}`, options);
   }
 
@@ -18,14 +18,14 @@ export class Models extends APIResource {
    * Lists the currently available models, and provides basic information about each
    * one such as the owner and availability.
    */
-  list(options?: Core.RequestOptions): Core.PagePromise<ModelsPage> {
+  list(options?: Core.RequestOptions): Core.PagePromise<ModelsPage, Model> {
     return this.getAPIList('/models', ModelsPage, options);
   }
 
   /**
    * Delete a fine-tuned model. You must have the Owner role in your organization.
    */
-  del(model: string, options?: Core.RequestOptions): Promise<Core.APIResponse<ModelDeleted>> {
+  del(model: string, options?: Core.RequestOptions): Core.APIPromise<ModelDeleted> {
     return this.delete(`/models/${model}`, options);
   }
 }

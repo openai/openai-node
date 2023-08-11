@@ -26,6 +26,8 @@ type _Response = unknown extends Response ? never : Response;
 // @ts-ignore
 type _ResponseInit = unknown extends ResponseInit ? never : ResponseInit;
 // @ts-ignore
+type _ResponseType = unknown extends ResponseType ? never : ResponseType;
+// @ts-ignore
 type _BodyInit = unknown extends BodyInit ? never : BodyInit;
 // @ts-ignore
 type _Headers = unknown extends Headers ? never : Headers;
@@ -49,4 +51,9 @@ declare const _Headers: {
 export const isPolyfilled = false;
 
 export { _fetch as fetch, _Request as Request, _Response as Response, _Headers as Headers };
-export type { _RequestInit as RequestInit, _RequestInfo as RequestInfo, _BodyInit as BodyInit };
+export type {
+  _RequestInit as RequestInit,
+  _RequestInfo as RequestInfo,
+  _ResponseType as ResponseType,
+  _BodyInit as BodyInit,
+};

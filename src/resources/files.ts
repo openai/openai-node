@@ -13,35 +13,35 @@ export class Files extends APIResource {
    * organization can be up to 1 GB. Please contact us if you need to increase the
    * storage limit.
    */
-  async create(body: FileCreateParams, options?: Core.RequestOptions): Promise<Core.APIResponse<FileObject>> {
-    return this.post('/files', await multipartFormRequestOptions({ body, ...options }));
+  create(body: FileCreateParams, options?: Core.RequestOptions): Core.APIPromise<FileObject> {
+    return this.post('/files', multipartFormRequestOptions({ body, ...options }));
   }
 
   /**
    * Returns information about a specific file.
    */
-  retrieve(fileId: string, options?: Core.RequestOptions): Promise<Core.APIResponse<FileObject>> {
+  retrieve(fileId: string, options?: Core.RequestOptions): Core.APIPromise<FileObject> {
     return this.get(`/files/${fileId}`, options);
   }
 
   /**
    * Returns a list of files that belong to the user's organization.
    */
-  list(options?: Core.RequestOptions): Core.PagePromise<FileObjectsPage> {
+  list(options?: Core.RequestOptions): Core.PagePromise<FileObjectsPage, FileObject> {
     return this.getAPIList('/files', FileObjectsPage, options);
   }
 
   /**
    * Delete a file.
    */
-  del(fileId: string, options?: Core.RequestOptions): Promise<Core.APIResponse<FileDeleted>> {
+  del(fileId: string, options?: Core.RequestOptions): Core.APIPromise<FileDeleted> {
     return this.delete(`/files/${fileId}`, options);
   }
 
   /**
    * Returns the contents of the specified file
    */
-  retrieveFileContent(fileId: string, options?: Core.RequestOptions): Promise<Core.APIResponse<string>> {
+  retrieveFileContent(fileId: string, options?: Core.RequestOptions): Core.APIPromise<string> {
     return this.get(`/files/${fileId}/content`, {
       ...options,
       headers: { Accept: 'application/json', ...options?.headers },

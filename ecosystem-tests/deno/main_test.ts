@@ -36,6 +36,19 @@ function assertSimilar(received: string, expected: string, maxDistance: number) 
   throw new AssertionError(message);
 }
 
+Deno.test(async function streamingWorks() {
+  const stream = await client.chat.completions.create({
+    model: 'gpt-4',
+    messages: [{ role: 'user', content: 'Say this is a test' }],
+    stream: true,
+  });
+  const chunks = [];
+  for await (const part of stream) {
+    chunks.push(part);
+  }
+  assertSimilar(chunks.map((c) => c.choices[0]?.delta.content || '').join(''), 'This is a test', 10);
+});
+
 Deno.test(async function handlesFile() {
   const file = await fetch(url)
     .then((x) => x.arrayBuffer())

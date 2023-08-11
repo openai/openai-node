@@ -1,6 +1,6 @@
 // File generated from our OpenAPI spec by Stainless.
 
-import { AbstractPage, APIResponse, APIClient, FinalRequestOptions } from './core';
+import { AbstractPage, Response, APIClient, FinalRequestOptions } from './core';
 
 export interface PageResponse<Item> {
   data: Array<Item>;
@@ -16,11 +16,11 @@ export class Page<Item> extends AbstractPage<Item> implements PageResponse<Item>
 
   data: Array<Item>;
 
-  constructor(client: APIClient, response: APIResponse<PageResponse<Item>>, options: FinalRequestOptions) {
-    super(client, response, options);
+  constructor(client: APIClient, response: Response, body: PageResponse<Item>, options: FinalRequestOptions) {
+    super(client, response, body, options);
 
-    this.object = response.object;
-    this.data = response.data;
+    this.object = body.object;
+    this.data = body.data;
   }
 
   getPaginatedItems(): Item[] {

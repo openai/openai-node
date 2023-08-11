@@ -10,6 +10,7 @@ import {
   type RequestInit,
   type Response,
 } from 'openai/_shims/fetch';
+export { type Response };
 import { isMultipartBody } from './uploads';
 export {
   maybeMultipartFormRequestOptions,
@@ -21,6 +22,106 @@ export {
 const MAX_RETRIES = 2;
 
 export type Fetch = (url: RequestInfo, init?: RequestInit) => Promise<Response>;
+
+type PromiseOrValue<T> = T | Promise<T>;
+
+type APIResponseProps = {
+  response: Response;
+  options: FinalRequestOptions;
+  controller: AbortController;
+};
+
+async function defaultParseResponse<T>(props: APIResponseProps): Promise<T> {
+  const { response } = props;
+  if (props.options.stream) {
+    // Note: there is an invariant here that isn't represented in the type system
+    // that if you set `stream: true` the response type must also be `Stream<T>`
+    return new Stream(response, props.controller) as any;
+  }
+
+  const contentType = response.headers.get('content-type');
+  if (contentType?.includes('application/json')) {
+    const json = await response.json();
+
+    debug('response', response.status, response.url, response.headers, json);
+
+    return json as T;
+  }
+
+  // TODO handle blob, arraybuffer, other content types, etc.
+  const text = await response.text();
+  debug('response', response.status, response.url, response.headers, text);
+  return text as T;
+}
+
+/**
+ * A subclass of `Promise` providing additional helper methods
+ * for interacting with the SDK.
+ */
+export class APIPromise<T> extends Promise<T> {
+  private parsedPromise: Promise<T> | undefined;
+
+  constructor(
+    private responsePromise: Promise<APIResponseProps>,
+    private parseResponse: (props: APIResponseProps) => PromiseOrValue<T> = defaultParseResponse,
+  ) {
+    super((resolve) => {
+      // this is maybe a bit weird but this has to be a no-op to not implicitly
+      // parse the response body; instead .then, .catch, .finally are overridden
+      // to parse the response
+      resolve(null as any);
+    });
+  }
+
+  _thenUnwrap<U>(transform: (data: T) => U): APIPromise<U> {
+    return new APIPromise(this.responsePromise, async (props) => transform(await this.parseResponse(props)));
+  }
+
+  /**
+   * Gets the raw `Response` instance instead of parsing the response
+   * data.
+   *
+   * If you want to parse the response body but still get the `Response`
+   * instance, you can use {@link withResponse()}.
+   */
+  asResponse(): Promise<Response> {
+    return this.responsePromise.then((p) => p.response);
+  }
+  /**
+   * Gets the parsed response data and the raw `Response` instance.
+   *
+   * If you just want to get the raw `Response` instance without parsing it,
+   * you can use {@link asResponse()}.
+   */
+  async withResponse(): Promise<{ data: T; response: Response }> {
+    const [data, response] = await Promise.all([this.parse(), this.asResponse()]);
+    return { data, response };
+  }
+
+  private parse(): Promise<T> {
+    if (!this.parsedPromise) {
+      this.parsedPromise = this.responsePromise.then(this.parseResponse);
+    }
+    return this.parsedPromise;
+  }
+
+  override then<TResult1 = T, TResult2 = never>(
+    onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null,
+    onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null,
+  ): Promise<TResult1 | TResult2> {
+    return this.parse().then(onfulfilled, onrejected);
+  }
+
+  override catch<TResult = never>(
+    onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null,
+  ): Promise<T | TResult> {
+    return this.parse().catch(onrejected);
+  }
+
+  override finally(onfinally?: (() => void) | undefined | null): Promise<T> {
+    return this.parse().finally(onfinally);
+  }
+}
 
 export abstract class APIClient {
   baseURL: string;
@@ -85,27 +186,39 @@ export abstract class APIClient {
     return `stainless-node-retry-${uuid4()}`;
   }
 
-  get<Req extends {}, Rsp>(path: string, opts?: RequestOptions<Req>): Promise<Rsp> {
-    return this.request({ method: 'get', path, ...opts });
+  get<Req extends {}, Rsp>(path: string, opts?: PromiseOrValue<RequestOptions<Req>>): APIPromise<Rsp> {
+    return this.methodRequest('get', path, opts);
   }
-  post<Req extends {}, Rsp>(path: string, opts?: RequestOptions<Req>): Promise<Rsp> {
-    return this.request({ method: 'post', path, ...opts });
+
+  post<Req extends {}, Rsp>(path: string, opts?: PromiseOrValue<RequestOptions<Req>>): APIPromise<Rsp> {
+    return this.methodRequest('post', path, opts);
   }
-  patch<Req extends {}, Rsp>(path: string, opts?: RequestOptions<Req>): Promise<Rsp> {
-    return this.request({ method: 'patch', path, ...opts });
+
+  patch<Req extends {}, Rsp>(path: string, opts?: PromiseOrValue<RequestOptions<Req>>): APIPromise<Rsp> {
+    return this.methodRequest('patch', path, opts);
   }
-  put<Req extends {}, Rsp>(path: string, opts?: RequestOptions<Req>): Promise<Rsp> {
-    return this.request({ method: 'put', path, ...opts });
+
+  put<Req extends {}, Rsp>(path: string, opts?: PromiseOrValue<RequestOptions<Req>>): APIPromise<Rsp> {
+    return this.methodRequest('put', path, opts);
   }
-  delete<Req extends {}, Rsp>(path: string, opts?: RequestOptions<Req>): Promise<Rsp> {
-    return this.request({ method: 'delete', path, ...opts });
+
+  delete<Req extends {}, Rsp>(path: string, opts?: PromiseOrValue<RequestOptions<Req>>): APIPromise<Rsp> {
+    return this.methodRequest('delete', path, opts);
+  }
+
+  private methodRequest<Req extends {}, Rsp>(
+    method: HTTPMethod,
+    path: string,
+    opts?: PromiseOrValue<RequestOptions<Req>>,
+  ): APIPromise<Rsp> {
+    return this.request(Promise.resolve(opts).then((opts) => ({ method, path, ...opts })));
   }
 
   getAPIList<Item, PageClass extends AbstractPage<Item> = AbstractPage<Item>>(
     path: string,
     Page: new (...args: any[]) => PageClass,
     opts?: RequestOptions<any>,
-  ): PagePromise<PageClass> {
+  ): PagePromise<PageClass, Item> {
     return this.requestAPIList(Page, { method: 'get', path, ...opts });
   }
 
@@ -199,14 +312,27 @@ export abstract class APIClient {
     return APIError.generate(status, error, message, headers);
   }
 
-  async request<Req extends {}, Rsp>(
-    options: FinalRequestOptions<Req>,
-    retriesRemaining = options.maxRetries ?? this.maxRetries,
-  ): Promise<APIResponse<Rsp>> {
+  request<Req extends {}, Rsp>(
+    options: PromiseOrValue<FinalRequestOptions<Req>>,
+    remainingRetries: number | null = null,
+  ): APIPromise<Rsp> {
+    return new APIPromise(this.makeRequest(options, remainingRetries));
+  }
+
+  private async makeRequest<T>(
+    optionsInput: PromiseOrValue<FinalRequestOptions>,
+    retriesRemaining: number | null,
+  ): Promise<{ response: Response; options: FinalRequestOptions; controller: AbortController }> {
+    const options = await optionsInput;
+    if (retriesRemaining == null) {
+      retriesRemaining = options.maxRetries ?? this.maxRetries;
+    }
+
     const { req, url, timeout } = this.buildRequest(options);
+
     await this.prepareRequest(req, { url });
 
-    this.debug('request', url, options, req.headers);
+    debug('request', url, options, req.headers);
 
     if (options.signal?.aborted) {
       throw new APIUserAbortError();
@@ -239,48 +365,21 @@ export abstract class APIClient {
       const errJSON = safeJSON(errText);
       const errMessage = errJSON ? undefined : errText;
 
-      this.debug('response', response.status, url, responseHeaders, errMessage);
+      debug('response', response.status, url, responseHeaders, errMessage);
 
       const err = this.makeStatusError(response.status, errJSON, errMessage, responseHeaders);
       throw err;
     }
 
-    if (options.stream) {
-      // Note: there is an invariant here that isn't represented in the type system
-      // that if you set `stream: true` the response type must also be `Stream<T>`
-      return new Stream(response, controller) as any;
-    }
-
-    const contentType = response.headers.get('content-type');
-    if (contentType?.includes('application/json')) {
-      const json = await response.json();
-
-      if (typeof json === 'object' && json != null) {
-        /** @deprecated – we expect to change this interface in the near future. */
-        Object.defineProperty(json, 'responseHeaders', {
-          enumerable: false,
-          writable: false,
-          value: responseHeaders,
-        });
-      }
-
-      this.debug('response', response.status, url, responseHeaders, json);
-
-      return json as APIResponse<Rsp>;
-    }
-
-    // TODO handle blob, arraybuffer, other content types, etc.
-    const text = response.text();
-    this.debug('response', response.status, url, responseHeaders, text);
-    return text as Promise<any>;
+    return { response, options, controller };
   }
 
   requestAPIList<Item = unknown, PageClass extends AbstractPage<Item> = AbstractPage<Item>>(
     Page: new (...args: ConstructorParameters<typeof AbstractPage>) => PageClass,
     options: FinalRequestOptions,
-  ): PagePromise<PageClass> {
-    const requestPromise = this.request(options) as Promise<APIResponse<unknown>>;
-    return new PagePromise(this, requestPromise, options, Page);
+  ): PagePromise<PageClass, Item> {
+    const request = this.makeRequest(options, null);
+    return new PagePromise<PageClass, Item>(this, request, Page);
   }
 
   buildURL<Req>(path: string, query: Req | undefined): string {
@@ -408,12 +507,6 @@ export abstract class APIClient {
   private getUserAgent(): string {
     return `${this.constructor.name}/JS ${VERSION}`;
   }
-
-  private debug(action: string, ...args: any[]) {
-    if (typeof process !== 'undefined' && process.env['DEBUG'] === 'true') {
-      console.log(`${this.constructor.name}:DEBUG:${action}`, ...args);
-    }
-  }
 }
 
 export class APIResource {
@@ -443,9 +536,14 @@ export abstract class AbstractPage<Item> implements AsyncIterable<Item> {
   #client: APIClient;
   protected options: FinalRequestOptions;
 
-  constructor(client: APIClient, response: APIResponse<unknown>, options: FinalRequestOptions) {
+  protected response: Response;
+  protected body: unknown;
+
+  constructor(client: APIClient, response: Response, body: unknown, options: FinalRequestOptions) {
     this.#client = client;
     this.options = options;
+    this.response = response;
+    this.body = body;
   }
 
   /**
@@ -502,33 +600,31 @@ export abstract class AbstractPage<Item> implements AsyncIterable<Item> {
   }
 }
 
+/**
+ * This subclass of Promise will resolve to an instantiated Page once the request completes.
+ *
+ * It also implements AsyncIterable to allow auto-paginating iteration on an unawaited list call, eg:
+ *
+ *    for await (const item of client.items.list()) {
+ *      console.log(item)
+ *    }
+ */
 export class PagePromise<
     PageClass extends AbstractPage<Item>,
     Item = ReturnType<PageClass['getPaginatedItems']>[number],
   >
-  extends Promise<PageClass>
+  extends APIPromise<PageClass>
   implements AsyncIterable<Item>
 {
-  /**
-   * This subclass of Promise will resolve to an instantiated Page once the request completes.
-   */
   constructor(
     client: APIClient,
-    requestPromise: Promise<APIResponse<unknown>>,
-    options: FinalRequestOptions,
+    request: Promise<APIResponseProps>,
     Page: new (...args: ConstructorParameters<typeof AbstractPage>) => PageClass,
   ) {
-    super((resolve, reject) =>
-      requestPromise.then((response) => resolve(new Page(client, response, options))).catch(reject),
+    super(
+      request,
+      async (props) => new Page(client, props.response, await defaultParseResponse(props), props.options),
     );
-  }
-
-  /**
-   * Enable subclassing Promise.
-   * Ref: https://stackoverflow.com/a/60328122
-   */
-  static get [Symbol.species]() {
-    return Promise;
   }
 
   /**
@@ -615,11 +711,6 @@ export const isRequestOptions = (obj: unknown): obj is RequestOptions => {
 export type FinalRequestOptions<Req extends {} = Record<string, unknown> | Readable> = RequestOptions<Req> & {
   method: HTTPMethod;
   path: string;
-};
-
-export type APIResponse<T> = T & {
-  /** @deprecated - we plan to add a different way to access raw response information shortly. */
-  responseHeaders: Headers;
 };
 
 declare const Deno: any;
@@ -882,6 +973,12 @@ export function isEmptyObj(obj: Object | null | undefined): boolean {
 // https://eslint.org/docs/latest/rules/no-prototype-builtins
 export function hasOwn(obj: Object, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(obj, key);
+}
+
+export function debug(action: string, ...args: any[]) {
+  if (typeof process !== 'undefined' && process.env['DEBUG'] === 'true') {
+    console.log(`OpenAI:DEBUG:${action}`, ...args);
+  }
 }
 
 /**

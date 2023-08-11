@@ -2,12 +2,9 @@
 
 [![NPM version](https://img.shields.io/npm/v/openai.svg)](https://npmjs.org/package/openai)
 
-The OpenAI Node library provides convenient access to the OpenAI REST API from applications written in server-side JavaScript.
-It includes TypeScript definitions for all request params and response fields.
+This library provides convenient access to the OpenAI REST API from TypeScript or JavaScript.
 
-> ⚠️ **Important note: this library is meant for server-side usage only, as using it in client-side browser code will expose your secret API key. [See here](https://platform.openai.com/docs/api-reference/authentication) for more details.**
-
-## Documentation
+It is generated from our [OpenAPI specification](https://github.com/openai/openai-openapi) with [Stainless](https://stainlessapi.com/).
 
 To learn how to use the OpenAI API, check out our [API Reference](https://platform.openai.com/docs/api-reference) and [Documentation](https://platform.openai.com/docs).
 
@@ -20,6 +17,9 @@ yarn add openai
 ```
 
 ## Usage
+
+> [!IMPORTANT]
+> Previous versions of this SDK used a `Configuration` class. See the [v3 to v4 migration guide](https://github.com/openai/openai-node/discussions/217).
 
 ```js
 import OpenAI from 'openai';
@@ -66,10 +66,9 @@ main();
 If you need to cancel a stream, you can `break` from the loop
 or call `stream.controller.abort()`.
 
-### Usage with TypeScript
+### Request & Response types
 
-Importing, instantiating, and interacting with the library are the same as above.
-If you like, you may reference our types directly:
+This library includes TypeScript definitions for all request params and response fields. You may import and use them like so:
 
 ```ts
 import OpenAI from 'openai';
@@ -207,6 +206,30 @@ On timeout, an `APIConnectionTimeoutError` is thrown.
 
 Note that requests which time out will be [retried twice by default](#retries).
 
+## Advanced Usage
+
+### Accessing raw Response data (e.g., headers)
+
+The "raw" `Response` returned by `fetch()` can be accessed through the `.asResponse()` method on the `APIPromise` type that all methods return.
+
+You can also use the `.withResponse()` method to get the raw `Response` along with the parsed data.
+
+```ts
+const openai = new OpenAI();
+
+const response = await openai.chat.completions
+  .create({ messages: [{ role: 'user', content: 'Say this is a test' }], model: 'gpt-3.5-turbo' })
+  .asResponse();
+console.log(response.headers.get('X-My-Header'));
+console.log(response.statusText); // access the underlying Response object
+
+const { data: completions, response: raw } = await openai.chat.completions
+  .create({ messages: [{ role: 'user', content: 'Say this is a test' }], model: 'gpt-3.5-turbo' })
+  .withResponse();
+console.log(raw.headers.get('X-My-Header'));
+console.log(completions.choices);
+```
+
 ## Configuring an HTTP(S) Agent (e.g., for proxies)
 
 By default, this library uses a stable agent for all http/https requests to reuse TCP connections, eliminating many TCP & TLS handshakes and shaving around 100ms off most requests.
@@ -247,7 +270,9 @@ We are keen for your feedback; please open an [issue](https://www.github.com/ope
 The following runtimes are supported:
 
 - Node.js 16 LTS or later ([non-EOL](https://endoflife.date/nodejs)) versions.
-- Deno v1.28.0 or higher (experimental).
-  Use `import OpenAI from "npm:openai"`.
+- Deno v1.28.0 or higher, using `import OpenAI from "npm:openai"`.
+  Deno Deploy is not yet supported.
+- Cloudflare Workers.
+- Vercel Edge Runtime.
 
 If you are interested in other runtime environments, please open or upvote an issue on GitHub.

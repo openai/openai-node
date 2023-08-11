@@ -104,6 +104,19 @@ async function typeTests() {
   await client.audio.transcriptions.create({ file: 'test', model: 'whisper-1' });
 }
 
+it(`streaming works`, async function () {
+  const stream = await client.chat.completions.create({
+    model: 'gpt-4',
+    messages: [{ role: 'user', content: 'Say this is a test' }],
+    stream: true,
+  });
+  const chunks = [];
+  for await (const part of stream) {
+    chunks.push(part);
+  }
+  expect(chunks.map((c) => c.choices[0]?.delta.content || '').join('')).toBeSimilarTo('This is a test', 10);
+});
+
 if (typeof File !== 'undefined') {
   it('handles builtinFile', async function () {
     const file = await fetch(url)

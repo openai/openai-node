@@ -17,13 +17,15 @@ export default async (request: NextRequest) => {
   const { messages } = await request.json();
 
   // Ask OpenAI for a streaming chat completion given the prompt
-  const streamResponse = await openai.chat.completions.create({
-    model: 'gpt-3.5-turbo',
-    stream: true,
-    messages,
-  });
+  const streamResponse = await openai.chat.completions
+    .create({
+      model: 'gpt-3.5-turbo',
+      stream: true,
+      messages,
+    })
+    .asResponse();
 
-  const stream = OpenAIStream(streamResponse.response);
+  const stream = OpenAIStream(streamResponse);
 
   // Respond with the stream
   return new StreamingTextResponse(stream);

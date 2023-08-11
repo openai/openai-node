@@ -26,6 +26,11 @@ type _RequestInit = unknown extends RequestInit ? nf.RequestInit : RequestInit;
 type _Response = unknown extends Response ? nf.Response : Response;
 // @ts-ignore
 type _ResponseInit = unknown extends ResponseInit ? nf.ResponseInit : ResponseInit;
+type _ResponseType =
+  // @ts-ignore
+  unknown extends ResponseType ? 'basic' | 'cors' | 'default' | 'error' | 'opaque' | 'opaqueredirect'
+  : // @ts-ignore
+    ResponseType;
 // @ts-ignore
 type _BodyInit = unknown extends BodyInit ? nf.BodyInit : BodyInit;
 // @ts-ignore
@@ -50,4 +55,9 @@ declare const _Headers: {
 export const isPolyfilled = false;
 
 export { _fetch as fetch, _Request as Request, _Response as Response, _Headers as Headers };
-export type { _RequestInit as RequestInit, _RequestInfo as RequestInfo, _BodyInit as BodyInit };
+export type {
+  _RequestInit as RequestInit,
+  _RequestInfo as RequestInfo,
+  _ResponseType as ResponseType,
+  _BodyInit as BodyInit,
+};
