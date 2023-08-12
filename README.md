@@ -56,7 +56,7 @@ async function main() {
     stream: true,
   });
   for await (const part of stream) {
-    process.stdout.write(part.choices[0]?.text || '');
+    process.stdout.write(part.choices[0]?.delta?.content || '');
   }
 }
 
