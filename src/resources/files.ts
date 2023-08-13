@@ -66,21 +66,50 @@ export interface FileDeleted {
   object: string;
 }
 
+/**
+ * The `File` object represents a document that has been uploaded to OpenAI.
+ */
 export interface FileObject {
+  /**
+   * The file identifier, which can be referenced in the API endpoints.
+   */
   id: string;
 
+  /**
+   * The size of the file in bytes.
+   */
   bytes: number;
 
+  /**
+   * The unix timestamp for when the file was created.
+   */
   created_at: number;
 
+  /**
+   * The name of the file.
+   */
   filename: string;
 
+  /**
+   * The object type, which is always "file".
+   */
   object: string;
 
+  /**
+   * The intended purpose of the file. Currently, only "fine-tune" is supported.
+   */
   purpose: string;
 
+  /**
+   * The current status of the file, which can be either `uploaded`, `processed`,
+   * `pending`, `error`, `deleting` or `deleted`.
+   */
   status?: string;
 
+  /**
+   * Additional details about the status of the file. If the file is in the `error`
+   * state, this will include a message describing the error.
+   */
   status_details?: string | null;
 }
 

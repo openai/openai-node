@@ -25,31 +25,48 @@ export class Completions extends APIResource {
   }
 }
 
+/**
+ * Represents a completion response from the API. Note: both the streamed and
+ * non-streamed response objects share the same shape (unlike the chat endpoint).
+ */
 export interface Completion {
+  /**
+   * A unique identifier for the completion.
+   */
   id: string;
 
+  /**
+   * The list of completion choices the model generated for the input prompt.
+   */
   choices: Array<CompletionChoice>;
 
+  /**
+   * The Unix timestamp of when the completion was created.
+   */
   created: number;
 
+  /**
+   * The model used for completion.
+   */
   model: string;
 
+  /**
+   * The object type, which is always "text_completion"
+   */
   object: string;
 
-  usage?: Completion.Usage;
-}
-
-export namespace Completion {
-  export interface Usage {
-    completion_tokens: number;
-
-    prompt_tokens: number;
-
-    total_tokens: number;
-  }
+  /**
+   * Usage statistics for the completion request.
+   */
+  usage?: CompletionUsage;
 }
 
 export interface CompletionChoice {
+  /**
+   * The reason the model stopped generating tokens. This will be `stop` if the model
+   * hit a natural stop point or a provided stop sequence, or `length` if the maximum
+   * number of tokens specified in the request was reached.
+   */
   finish_reason: 'stop' | 'length';
 
   index: number;
@@ -69,6 +86,26 @@ export namespace CompletionChoice {
 
     top_logprobs?: Array<Record<string, number>>;
   }
+}
+
+/**
+ * Usage statistics for the completion request.
+ */
+export interface CompletionUsage {
+  /**
+   * Number of tokens in the generated completion.
+   */
+  completion_tokens: number;
+
+  /**
+   * Number of tokens in the prompt.
+   */
+  prompt_tokens: number;
+
+  /**
+   * Total number of tokens used in the request (prompt + completion).
+   */
+  total_tokens: number;
 }
 
 export interface CompletionCreateParams {
@@ -258,6 +295,7 @@ export interface CompletionCreateParamsStreaming extends CompletionCreateParams 
 export namespace Completions {
   export import Completion = API.Completion;
   export import CompletionChoice = API.CompletionChoice;
+  export import CompletionUsage = API.CompletionUsage;
   export import CompletionCreateParams = API.CompletionCreateParams;
   export import CompletionCreateParamsNonStreaming = API.CompletionCreateParamsNonStreaming;
   export import CompletionCreateParamsStreaming = API.CompletionCreateParamsStreaming;

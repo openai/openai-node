@@ -4,6 +4,7 @@ Types:
 
 - <code><a href="./src/resources/completions.ts">Completion</a></code>
 - <code><a href="./src/resources/completions.ts">CompletionChoice</a></code>
+- <code><a href="./src/resources/completions.ts">CompletionUsage</a></code>
 
 Methods:
 
@@ -38,11 +39,12 @@ Methods:
 
 Types:
 
+- <code><a href="./src/resources/embeddings.ts">CreateEmbeddingResponse</a></code>
 - <code><a href="./src/resources/embeddings.ts">Embedding</a></code>
 
 Methods:
 
-- <code title="post /embeddings">client.embeddings.<a href="./src/resources/embeddings.ts">create</a>({ ...params }) -> Embedding</code>
+- <code title="post /embeddings">client.embeddings.<a href="./src/resources/embeddings.ts">create</a>({ ...params }) -> CreateEmbeddingResponse</code>
 
 # Files
 

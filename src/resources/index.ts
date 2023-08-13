@@ -5,13 +5,14 @@ export { Chat } from './chat/chat';
 export {
   Completion,
   CompletionChoice,
+  CompletionUsage,
   CompletionCreateParams,
   CompletionCreateParamsNonStreaming,
   CompletionCreateParamsStreaming,
   Completions,
 } from './completions';
+export { CreateEmbeddingResponse, Embedding, EmbeddingCreateParams, Embeddings } from './embeddings';
 export { Edit, EditCreateParams, Edits } from './edits';
-export { Embedding, EmbeddingCreateParams, Embeddings } from './embeddings';
 export { FileContent, FileDeleted, FileObject, FileCreateParams, FileObjectsPage, Files } from './files';
 export {
   FineTune,

@@ -78,48 +78,121 @@ export class FineTunesPage extends Page<FineTune> {}
 // alias so we can export it in the namespace
 type _FineTunesPage = FineTunesPage;
 
+/**
+ * The `FineTune` object represents a fine-tuning job that has been created through
+ * the API.
+ */
 export interface FineTune {
+  /**
+   * The object identifier, which can be referenced in the API endpoints.
+   */
   id: string;
 
+  /**
+   * The unix timestamp for when the fine-tuning job was created.
+   */
   created_at: number;
 
+  /**
+   * The name of the fine-tuned model that is being created.
+   */
   fine_tuned_model: string | null;
 
+  /**
+   * The hyperparameters used for the fine-tuning job. See the
+   * [Fine-tuning Guide](/docs/guides/fine-tuning/hyperparameters) for more details.
+   */
   hyperparams: FineTune.Hyperparams;
 
+  /**
+   * The base model that is being fine-tuned.
+   */
   model: string;
 
+  /**
+   * The object type, which is always "fine-tune".
+   */
   object: string;
 
+  /**
+   * The organization that owns the fine-tuning job.
+   */
   organization_id: string;
 
+  /**
+   * The compiled results files for the fine-tuning job.
+   */
   result_files: Array<Files.FileObject>;
 
+  /**
+   * The current status of the fine-tuning job, which can be either `created`,
+   * `pending`, `running`, `succeeded`, `failed`, or `cancelled`.
+   */
   status: string;
 
+  /**
+   * The list of files used for training.
+   */
   training_files: Array<Files.FileObject>;
 
+  /**
+   * The unix timestamp for when the fine-tuning job was last updated.
+   */
   updated_at: number;
 
+  /**
+   * The list of files used for validation.
+   */
   validation_files: Array<Files.FileObject>;
 
+  /**
+   * The list of events that have been observed in the lifecycle of the FineTune job.
+   */
   events?: Array<FineTuneEvent>;
 }
 
 export namespace FineTune {
+  /**
+   * The hyperparameters used for the fine-tuning job. See the
+   * [Fine-tuning Guide](/docs/guides/fine-tuning/hyperparameters) for more details.
+   */
   export interface Hyperparams {
+    /**
+     * The batch size to use for training. The batch size is the number of training
+     * examples used to train a single forward and backward pass.
+     */
     batch_size: number;
 
+    /**
+     * The learning rate multiplier to use for training.
+     */
     learning_rate_multiplier: number;
 
+    /**
+     * The number of epochs to train the model for. An epoch refers to one full cycle
+     * through the training dataset.
+     */
     n_epochs: number;
 
+    /**
+     * The weight to use for loss on the prompt tokens.
+     */
     prompt_loss_weight: number;
 
+    /**
+     * The number of classes to use for computing classification metrics.
+     */
     classification_n_classes?: number;
 
+    /**
+     * The positive class to use for computing classification metrics.
+     */
     classification_positive_class?: string;
 
+    /**
+     * The classification metrics to compute using the validation dataset at the end of
+     * every epoch.
+     */
     compute_classification_metrics?: boolean;
   }
 }

@@ -192,6 +192,7 @@ export namespace OpenAI {
   export import Completions = API.Completions;
   export import Completion = API.Completion;
   export import CompletionChoice = API.CompletionChoice;
+  export import CompletionUsage = API.CompletionUsage;
   export import CompletionCreateParams = API.CompletionCreateParams;
   export import CompletionCreateParamsNonStreaming = API.CompletionCreateParamsNonStreaming;
   export import CompletionCreateParamsStreaming = API.CompletionCreateParamsStreaming;
@@ -203,6 +204,7 @@ export namespace OpenAI {
   export import EditCreateParams = API.EditCreateParams;
 
   export import Embeddings = API.Embeddings;
+  export import CreateEmbeddingResponse = API.CreateEmbeddingResponse;
   export import Embedding = API.Embedding;
   export import EmbeddingCreateParams = API.EmbeddingCreateParams;
 

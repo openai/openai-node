@@ -37,13 +37,28 @@ export class ModelsPage extends Page<Model> {}
 // alias so we can export it in the namespace
 type _ModelsPage = ModelsPage;
 
+/**
+ * Describes an OpenAI model offering that can be used with the API.
+ */
 export interface Model {
+  /**
+   * The model identifier, which can be referenced in the API endpoints.
+   */
   id: string;
 
+  /**
+   * The date and time when the model was created.
+   */
   created: number;
 
+  /**
+   * The object type, which is always "model".
+   */
   object: string;
 
+  /**
+   * The organization that owns the model.
+   */
   owned_by: string;
 }
 

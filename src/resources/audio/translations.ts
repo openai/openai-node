@@ -20,8 +20,8 @@ export interface Translation {
 
 export interface TranslationCreateParams {
   /**
-   * The audio file object (not file name) translate, in one of these formats: mp3,
-   * mp4, mpeg, mpga, m4a, wav, or webm.
+   * The audio file object (not file name) translate, in one of these formats: flac,
+   * mp3, mp4, mpeg, mpga, m4a, ogg, wav, or webm.
    */
   file: Uploadable;
 

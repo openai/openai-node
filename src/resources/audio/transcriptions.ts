@@ -21,7 +21,7 @@ export interface Transcription {
 export interface TranscriptionCreateParams {
   /**
    * The audio file object (not file name) to transcribe, in one of these formats:
-   * mp3, mp4, mpeg, mpga, m4a, wav, or webm.
+   * flac, mp3, mp4, mpeg, mpga, m4a, ogg, wav, or webm.
    */
   file: Uploadable;
 

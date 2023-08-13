@@ -2,6 +2,7 @@
 
 import * as Core from 'openai/core';
 import { APIResource } from 'openai/resource';
+import * as Completions from 'openai/resources/completions';
 import * as API from './index';
 
 export class Edits extends APIResource {
@@ -18,30 +19,45 @@ export class Edits extends APIResource {
 }
 
 export interface Edit {
+  /**
+   * A list of edit choices. Can be more than one if `n` is greater than 1.
+   */
   choices: Array<Edit.Choice>;
 
+  /**
+   * A unix timestamp of when the edit was created.
+   */
   created: number;
 
+  /**
+   * The object type, which is always `edit`.
+   */
   object: string;
 
-  usage: Edit.Usage;
+  /**
+   * Usage statistics for the completion request.
+   */
+  usage: Completions.CompletionUsage;
 }
 
 export namespace Edit {
   export interface Choice {
+    /**
+     * The reason the model stopped generating tokens. This will be `stop` if the model
+     * hit a natural stop point or a provided stop sequence, or `length` if the maximum
+     * number of tokens specified in the request was reached.
+     */
     finish_reason: 'stop' | 'length';
 
+    /**
+     * The index of the choice in the list of choices.
+     */
     index: number;
 
+    /**
+     * The edited result.
+     */
     text: string;
-  }
-
-  export interface Usage {
-    completion_tokens: number;
-
-    prompt_tokens: number;
-
-    total_tokens: number;
   }
 }
 
