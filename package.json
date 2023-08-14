@@ -22,7 +22,8 @@
   },
   "dependencies": {
     "axios": "^0.26.0",
-    "form-data": "^4.0.0"
+    "form-data": "^4.0.0",
+    "openai": "^3.3.0"
   },
   "devDependencies": {
     "@types/node": "^12.11.5",
