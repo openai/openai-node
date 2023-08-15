@@ -187,13 +187,13 @@ await openai.chat.completions.create({ messages: [{ role: 'user', content: 'How 
 
 ### Timeouts
 
-Requests time out after 60 seconds by default. You can configure this with a `timeout` option:
+Requests time out after 10 minutes by default. You can configure this with a `timeout` option:
 
 <!-- prettier-ignore -->
 ```ts
 // Configure the default for all requests:
 const openai = new OpenAI({
-  timeout: 20 * 1000, // 20 seconds (default is 60s)
+  timeout: 20 * 1000, // 20 seconds (default is 10 minutes)
 });
 
 // Override per-request:

@@ -90,7 +90,7 @@ export class OpenAI extends Core.APIClient {
   }: ClientOptions = {}) {
     if (apiKey === undefined) {
       throw new Error(
-        'The OPENAI_API_KEY environment variable is missing or empty; either provide it, or instantiate the OpenAI client with an apiKey option, like new OpenAI({ apiKey: undefined }).',
+        "The OPENAI_API_KEY environment variable is missing or empty; either provide it, or instantiate the OpenAI client with an apiKey option, like new OpenAI({ apiKey: 'my apiKey' }).",
       );
     }
 
@@ -109,7 +109,7 @@ export class OpenAI extends Core.APIClient {
 
     super({
       baseURL: options.baseURL!,
-      timeout: options.timeout ?? 600000,
+      timeout: options.timeout ?? 600000 /* 10 minutes */,
       httpAgent: options.httpAgent,
       maxRetries: options.maxRetries,
       fetch: options.fetch,
