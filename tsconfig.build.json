@@ -1,0 +1,32 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["dist/src"],
+  "exclude": ["dist/src/_shims/*.deno.ts"],
+  "compilerOptions": {
+    "rootDir": "./dist/src",
+    "paths": {
+      "openai/_shims/*": ["dist/src/_shims/*.node"],
+      "openai": ["dist/src/index.ts"],
+      "openai/*": ["dist/src/*"],
+      "digest-fetch": ["./typings/digest-fetch"]
+    },
+    "noEmit": false,
+    "declaration": true,
+    "declarationMap": true,
+    "outDir": "dist",
+    "pretty": true,
+    "sourceMap": true
+  },
+  "tsc-alias": {
+    "resolveFullPaths": true,
+    "fileExtensions": {
+      "inputGlob": "{mjs,cjs,js,jsx,mts,cts,ts,tsx}"
+    },
+    "replacers": {
+      "replace-absolute-imports": {
+        "enabled": true,
+        "file": "./scripts/replace-self-referencing-imports.js"
+      }
+    }
+  }
+}

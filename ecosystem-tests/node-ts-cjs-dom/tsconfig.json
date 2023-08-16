@@ -1,0 +1,54 @@
+{
+  "exclude": ["node_modules"],
+
+  "compilerOptions": {
+    /* Visit https://aka.ms/tsconfig.json to read more about this file */
+    /* Projects */
+    "incremental": true,
+
+    /* Language and Environment */
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "jsx": "react",
+
+    /* Modules */
+    "module": "commonjs",
+    "rootDir": "./",
+    "moduleResolution": "node",
+    "baseUrl": "./",
+    "paths": {
+      "~/*": ["*"]
+    },
+    "resolveJsonModule": true,
+    "composite": true,
+
+    /* Emit */
+    "outDir": "node_modules",
+    "noEmit": true,
+
+    /* Interop Constraints */
+    "isolatedModules": true,
+    "allowSyntheticDefaultImports": true,
+    /* "esModuleInterop": true, */
+    "forceConsistentCasingInFileNames": true,
+    "allowJs": true,
+    "checkJs": true,
+
+    /* Experimental Features */
+    "experimentalDecorators": true,
+
+    /* Type Checking */
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "skipLibCheck": true
+  }
+}

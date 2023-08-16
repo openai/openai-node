@@ -1,89 +1,278 @@
-# OpenAI Node.js Library
+# OpenAI Node API Library
 
-The OpenAI Node.js library provides convenient access to the OpenAI API from Node.js applications. Most of the code in this library is generated from our [OpenAPI specification](https://github.com/openai/openai-openapi).
+[![NPM version](https://img.shields.io/npm/v/openai.svg)](https://npmjs.org/package/openai)
 
-> ⚠️ **Important note: this library is meant for server-side usage only, as using it in client-side browser code will expose your secret API key. [See here](https://platform.openai.com/docs/api-reference/authentication) for more details.**
+This library provides convenient access to the OpenAI REST API from TypeScript or JavaScript.
+
+It is generated from our [OpenAPI specification](https://github.com/openai/openai-openapi) with [Stainless](https://stainlessapi.com/).
+
+To learn how to use the OpenAI API, check out our [API Reference](https://platform.openai.com/docs/api-reference) and [Documentation](https://platform.openai.com/docs).
 
 ## Installation
 
-```bash
-npm install openai
+```sh
+npm install --save openai
+# or
+yarn add openai
 ```
 
 ## Usage
 
-The library needs to be configured with your account's secret key, which is available in your [OpenAI account page](https://platform.openai.com/account/api-keys). We recommend setting it as an environment variable. Here's an example of initializing the library with the API key loaded from an environment variable and creating a completion:
+> [!IMPORTANT]
+> Previous versions of this SDK used a `Configuration` class. See the [v3 to v4 migration guide](https://github.com/openai/openai-node/discussions/217).
 
-```javascript
-const { Configuration, OpenAIApi } = require("openai");
+```js
+import OpenAI from 'openai';
 
-const configuration = new Configuration({
-  apiKey: process.env.OPENAI_API_KEY,
+const openai = new OpenAI({
+  apiKey: 'my api key', // defaults to process.env["OPENAI_API_KEY"]
 });
-const openai = new OpenAIApi(configuration);
 
-const chatCompletion = await openai.createChatCompletion({
-  model: "gpt-3.5-turbo",
-  messages: [{role: "user", content: "Hello world"}],
-});
-console.log(chatCompletion.data.choices[0].message);
-```
-
-Check out the [full API documentation](https://platform.openai.com/docs/api-reference?lang=node.js) for examples of all the available functions.
-
-### Request options
-
-All of the available API request functions additionally contain an optional final parameter where you can pass custom [axios request options](https://axios-http.com/docs/req_config), for example:
-
-```javascript
-const completion = await openai.createCompletion(
-  {
-    model: "text-davinci-003",
-    prompt: "Hello world",
-  },
-  {
-    timeout: 1000,
-    headers: {
-      "Example-Header": "example",
-    },
-  }
-);
-```
-
-### Error handling
-
-API requests can potentially return errors due to invalid inputs or other issues. These errors can be handled with a `try...catch` statement, and the error details can be found in either `error.response` or `error.message`:
-
-```javascript
-try {
-  const completion = await openai.createCompletion({
-    model: "text-davinci-003",
-    prompt: "Hello world",
+async function main() {
+  const completion = await openai.chat.completions.create({
+    messages: [{ role: 'user', content: 'Say this is a test' }],
+    model: 'gpt-3.5-turbo',
   });
-  console.log(completion.data.choices[0].text);
-} catch (error) {
-  if (error.response) {
-    console.log(error.response.status);
-    console.log(error.response.data);
-  } else {
-    console.log(error.message);
+
+  console.log(completion.choices);
+}
+
+main();
+```
+
+## Streaming Responses
+
+We provide support for streaming responses using Server Side Events (SSE).
+
+```ts
+import OpenAI from 'openai';
+
+const openai = new OpenAI();
+
+async function main() {
+  const stream = await openai.chat.completions.create({
+    model: 'gpt-4',
+    messages: [{ role: 'user', content: 'Say this is a test' }],
+    stream: true,
+  });
+  for await (const part of stream) {
+    process.stdout.write(part.choices[0]?.delta?.content || '');
   }
 }
+
+main();
 ```
 
-### Streaming completions
+If you need to cancel a stream, you can `break` from the loop
+or call `stream.controller.abort()`.
 
-Streaming completions (`stream=true`) are not natively supported in this package yet, but [a workaround exists](https://github.com/openai/openai-node/issues/18#issuecomment-1369996933) if needed.
+### Request & Response types
 
-## Upgrade guide
+This library includes TypeScript definitions for all request params and response fields. You may import and use them like so:
 
-All breaking changes for major version releases are listed below.
+```ts
+import OpenAI from 'openai';
 
-### 3.0.0
+const openai = new OpenAI({
+  apiKey: 'my api key', // defaults to process.env["OPENAI_API_KEY"]
+});
 
-- The function signature of `createCompletion(engineId, params)` changed to `createCompletion(params)`. The value previously passed in as the `engineId` argument should now be passed in as `model` in the params object (e.g. `createCompletion({ model: "text-davinci-003", ... })`)
-- Replace any `createCompletionFromModel(params)` calls with `createCompletion(params)`
+async function main() {
+  const params: OpenAI.Chat.CompletionCreateParams = {
+    messages: [{ role: 'user', content: 'Say this is a test' }],
+    model: 'gpt-3.5-turbo',
+  };
+  const completion: OpenAI.Chat.ChatCompletion = await openai.chat.completions.create(params);
+}
 
-## Thanks
+main();
+```
 
-Thank you to [ceifa](https://github.com/ceifa) for creating and maintaining the original unofficial `openai` npm package before we released this official library! ceifa's original package has been renamed to [gpt-x](https://www.npmjs.com/package/gpt-x).
+Documentation for each method, request param, and response field are available in docstrings and will appear on hover in most modern editors.
+
+## File Uploads
+
+Request parameters that correspond to file uploads can be passed in many different forms:
+
+- `File` (or an object with the same structure)
+- a `fetch` `Response` (or an object with the same structure)
+- an `fs.ReadStream`
+- the return value of our `toFile` helper
+
+```ts
+import fs from 'fs';
+import fetch from 'node-fetch';
+import OpenAI, { toFile } from 'openai';
+
+const openai = new OpenAI();
+
+// If you have access to Node `fs` we recommend using `fs.createReadStream()`:
+await openai.files.create({ file: fs.createReadStream('input.jsonl'), purpose: 'fine-tune' });
+
+// Or if you have the web `File` API you can pass a `File` instance:
+await openai.files.create({ file: new File(['my bytes'], 'input.jsonl'), purpose: 'fine-tune' });
+
+// You can also pass a `fetch` `Response`:
+await openai.files.create({ file: await fetch('https://somesite/input.jsonl'), purpose: 'fine-tune' });
+
+// Finally, if none of the above are convenient, you can use our `toFile` helper:
+await openai.files.create({
+  file: await toFile(Buffer.from('my bytes'), 'input.jsonl'),
+  purpose: 'fine-tune',
+});
+await openai.files.create({
+  file: await toFile(new Uint8Array([0, 1, 2]), 'input.jsonl'),
+  purpose: 'fine-tune',
+});
+```
+
+## Handling errors
+
+When the library is unable to connect to the API,
+or if the API returns a non-success status code (i.e., 4xx or 5xx response),
+a subclass of `APIError` will be thrown:
+
+```ts
+async function main() {
+  const fineTune = await openai.fineTunes
+    .create({ training_file: 'file-XGinujblHPwGLSztz8cPS8XY' })
+    .catch((err) => {
+      if (err instanceof OpenAI.APIError) {
+        console.log(err.status); // 400
+        console.log(err.name); // BadRequestError
+
+        console.log(err.headers); // {server: 'nginx', ...}
+      } else {
+        throw err;
+      }
+    });
+}
+
+main();
+```
+
+Error codes are as followed:
+
+| Status Code | Error Type                 |
+| ----------- | -------------------------- |
+| 400         | `BadRequestError`          |
+| 401         | `AuthenticationError`      |
+| 403         | `PermissionDeniedError`    |
+| 404         | `NotFoundError`            |
+| 422         | `UnprocessableEntityError` |
+| 429         | `RateLimitError`           |
+| >=500       | `InternalServerError`      |
+| N/A         | `APIConnectionError`       |
+
+### Retries
+
+Certain errors will be automatically retried 2 times by default, with a short exponential backoff.
+Connection errors (for example, due to a network connectivity problem), 409 Conflict, 429 Rate Limit,
+and >=500 Internal errors will all be retried by default.
+
+You can use the `maxRetries` option to configure or disable this:
+
+<!-- prettier-ignore -->
+```js
+// Configure the default for all requests:
+const openai = new OpenAI({
+  maxRetries: 0, // default is 2
+});
+
+// Or, configure per-request:
+await openai.chat.completions.create({ messages: [{ role: 'user', content: 'How can I get the name of the current day in Node.js?' }], model: 'gpt-3.5-turbo' }, {
+  maxRetries: 5,
+});
+```
+
+### Timeouts
+
+Requests time out after 10 minutes by default. You can configure this with a `timeout` option:
+
+<!-- prettier-ignore -->
+```ts
+// Configure the default for all requests:
+const openai = new OpenAI({
+  timeout: 20 * 1000, // 20 seconds (default is 10 minutes)
+});
+
+// Override per-request:
+await openai.chat.completions.create({ messages: [{ role: 'user', content: 'How can I list all files in a directory using Python?' }], model: 'gpt-3.5-turbo' }, {
+  timeout: 5 * 1000,
+});
+```
+
+On timeout, an `APIConnectionTimeoutError` is thrown.
+
+Note that requests which time out will be [retried twice by default](#retries).
+
+## Advanced Usage
+
+### Accessing raw Response data (e.g., headers)
+
+The "raw" `Response` returned by `fetch()` can be accessed through the `.asResponse()` method on the `APIPromise` type that all methods return.
+
+You can also use the `.withResponse()` method to get the raw `Response` along with the parsed data.
+
+```ts
+const openai = new OpenAI();
+
+const response = await openai.chat.completions
+  .create({ messages: [{ role: 'user', content: 'Say this is a test' }], model: 'gpt-3.5-turbo' })
+  .asResponse();
+console.log(response.headers.get('X-My-Header'));
+console.log(response.statusText); // access the underlying Response object
+
+const { data: completions, response: raw } = await openai.chat.completions
+  .create({ messages: [{ role: 'user', content: 'Say this is a test' }], model: 'gpt-3.5-turbo' })
+  .withResponse();
+console.log(raw.headers.get('X-My-Header'));
+console.log(completions.choices);
+```
+
+## Configuring an HTTP(S) Agent (e.g., for proxies)
+
+By default, this library uses a stable agent for all http/https requests to reuse TCP connections, eliminating many TCP & TLS handshakes and shaving around 100ms off most requests.
+
+If you would like to disable or customize this behavior, for example to use the API behind a proxy, you can pass an `httpAgent` which is used for all requests (be they http or https), for example:
+
+<!-- prettier-ignore -->
+```ts
+import http from 'http';
+import HttpsProxyAgent from 'https-proxy-agent';
+
+// Configure the default for all requests:
+const openai = new OpenAI({
+  httpAgent: new HttpsProxyAgent(process.env.PROXY_URL),
+});
+
+// Override per-request:
+await openai.models.list({
+  baseURL: 'http://localhost:8080/test-api',
+  httpAgent: new http.Agent({ keepAlive: false }),
+})
+```
+
+## Semantic Versioning
+
+This package generally attempts to follow [SemVer](https://semver.org/spec/v2.0.0.html) conventions, though certain backwards-incompatible changes may be released as minor versions:
+
+1. Changes that only affect static types, without breaking runtime behavior.
+2. Changes to library internals which are technically public but not intended or documented for external use. _(Please open a GitHub issue to let us know if you are relying on such internals)_.
+3. Changes that we do not expect to impact the vast majority of users in practice.
+
+We take backwards-compatibility seriously and work hard to ensure you can rely on a smooth upgrade experience.
+
+We are keen for your feedback; please open an [issue](https://www.github.com/openai/openai-node/issues) with questions, bugs, or suggestions.
+
+## Requirements
+
+The following runtimes are supported:
+
+- Node.js 16 LTS or later ([non-EOL](https://endoflife.date/nodejs)) versions.
+- Deno v1.28.0 or higher, using `import OpenAI from "npm:openai"`.
+  Deno Deploy is not yet supported.
+- Cloudflare Workers.
+- Vercel Edge Runtime.
+
+If you are interested in other runtime environments, please open or upvote an issue on GitHub.
