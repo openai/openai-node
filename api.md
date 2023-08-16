@@ -60,7 +60,7 @@ Methods:
 - <code title="get /files/{file_id}">client.files.<a href="./src/resources/files.ts">retrieve</a>(fileId) -> FileObject</code>
 - <code title="get /files">client.files.<a href="./src/resources/files.ts">list</a>() -> FileObjectsPage</code>
 - <code title="delete /files/{file_id}">client.files.<a href="./src/resources/files.ts">del</a>(fileId) -> FileDeleted</code>
-- <code title="get /files/{file_id}/content">client.files.<a href="./src/resources/files.ts">retrieveFileContent</a>(fileId) -> string</code>
+- <code title="get /files/{file_id}/content">client.files.<a href="./src/resources/files.ts">retrieveContent</a>(fileId) -> string</code>
 
 # Images
 

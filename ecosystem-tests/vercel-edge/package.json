@@ -11,7 +11,7 @@
     "vercel": "vercel"
   },
   "dependencies": {
-    "ai": "2.1.9",
+    "ai": "2.1.34",
     "next": "13.4.6",
     "react": "18.2.0",
     "react-dom": "18.2.0"

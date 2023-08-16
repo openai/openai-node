@@ -76,13 +76,27 @@ export interface ClientOptions {
   organization?: string | null;
 }
 
-/** Instantiate the API Client. */
+/** API Client for interfacing with the OpenAI API. */
 export class OpenAI extends Core.APIClient {
   apiKey: string;
   organization?: string | null;
 
   private _options: ClientOptions;
 
+  /**
+   * API Client for interfacing with the OpenAI API.
+   *
+   * @param {string} [opts.apiKey=process.env['OPENAI_API_KEY']] - The API Key to send to the API.
+   * @param {string} [opts.baseURL] - Override the default base URL for the API.
+   * @param {number} [opts.timeout=10 minutes] - The maximum amount of time (in milliseconds) the client will wait for a response before timing out.
+   * @param {number} [opts.httpAgent] - An HTTP agent used to manage HTTP(s) connections.
+   * @param {Core.Fetch} [opts.fetch] - Specify a custom `fetch` function implementation.
+   * @param {number} [opts.maxRetries=2] - The maximum number of times the client will retry a request.
+   * @param {Core.Headers} opts.defaultHeaders - Default headers to include with every request to the API.
+   * @param {Core.DefaultQuery} opts.defaultQuery - Default query parameters to include with every request to the API.
+   * @param {boolean} [opts.dangerouslyAllowBrowser=false] - By default, client-side use of this library is not allowed, as it risks exposing your secret API credentials to attackers.
+   * @param {string | null} [opts.organization]
+   */
   constructor({
     apiKey = Core.readEnv('OPENAI_API_KEY'),
     organization = Core.readEnv('OPENAI_ORG_ID') ?? null,

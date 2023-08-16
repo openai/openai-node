@@ -130,6 +130,11 @@ function parseArgs() {
         default: 1,
         description: 'number of parallel jobs to run',
       },
+      retry: {
+        type: 'number',
+        default: 0,
+        description: 'number of times to retry failing jobs',
+      },
       parallel: {
         type: 'boolean',
         default: false,
@@ -202,6 +207,7 @@ async function main() {
         while (queue.length) {
           const project = queue.shift();
           if (!project) break;
+
           let stdout, stderr;
           try {
             runningProjects.add(project);
@@ -212,6 +218,7 @@ async function main() {
                 __filename,
                 project,
                 '--skip-pack',
+                `--retry=${args.retry}`,
                 ...(args.live ? ['--live'] : []),
                 ...(args.verbose ? ['--verbose'] : []),
                 ...(args.deploy ? ['--deploy'] : []),
@@ -245,7 +252,7 @@ async function main() {
         console.error('\n');
 
         try {
-          await fn();
+          await withRetry(fn, project, state.retry)
           console.error(`✅ - Successfully ran ${project}`);
         } catch (err) {
           if (err && (err as any).shortMessage) {
@@ -266,6 +273,18 @@ async function main() {
   }
   console.error();
   process.exit(0);
+}
+
+async function withRetry(fn: () => Promise<void>, identifier: string, retryAmount: number): Promise<void> {
+  do {
+    try {
+      return await fn()
+    } catch (err) {
+      console.error(`${identifier} failed due to ${err}; retries left ${retryAmount}`)
+    }
+
+    retryAmount--;
+  } while (retryAmount > 0)
 }
 
 function centerPad(text: string, width = text.length, char = ' '): string {

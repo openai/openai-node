@@ -6,8 +6,7 @@ import { Response } from 'node-fetch';
 const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010' });
 
 describe('resource files', () => {
-  // Prism tests are broken
-  test.skip('create: only required params', async () => {
+  test('create: only required params', async () => {
     const responsePromise = openai.files.create({
       file: await toFile(Buffer.from('# my file contents'), 'README.md'),
       purpose: 'string',
@@ -21,8 +20,7 @@ describe('resource files', () => {
     expect(dataAndResponse.response).toBe(rawResponse);
   });
 
-  // Prism tests are broken
-  test.skip('create: required and optional params', async () => {
+  test('create: required and optional params', async () => {
     const response = await openai.files.create({
       file: await toFile(Buffer.from('# my file contents'), 'README.md'),
       purpose: 'string',
@@ -83,9 +81,8 @@ describe('resource files', () => {
     );
   });
 
-  // Prism tests are broken
-  test.skip('retrieveFileContent', async () => {
-    const responsePromise = openai.files.retrieveFileContent('string');
+  test('retrieveContent', async () => {
+    const responsePromise = openai.files.retrieveContent('string');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -95,11 +92,10 @@ describe('resource files', () => {
     expect(dataAndResponse.response).toBe(rawResponse);
   });
 
-  // Prism tests are broken
-  test.skip('retrieveFileContent: request options instead of params are passed correctly', async () => {
+  test('retrieveContent: request options instead of params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openai.files.retrieveFileContent('string', { path: '/_stainless_unknown_path' }),
+      openai.files.retrieveContent('string', { path: '/_stainless_unknown_path' }),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 });

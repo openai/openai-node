@@ -322,10 +322,10 @@ export abstract class APIClient {
     return new APIPromise(this.makeRequest(options, remainingRetries));
   }
 
-  private async makeRequest<T>(
+  private async makeRequest(
     optionsInput: PromiseOrValue<FinalRequestOptions>,
     retriesRemaining: number | null,
-  ): Promise<{ response: Response; options: FinalRequestOptions; controller: AbortController }> {
+  ): Promise<APIResponseProps> {
     const options = await optionsInput;
     if (retriesRemaining == null) {
       retriesRemaining = options.maxRetries ?? this.maxRetries;
@@ -462,11 +462,11 @@ export abstract class APIClient {
     return false;
   }
 
-  private async retryRequest<Req extends {}, Rsp>(
-    options: FinalRequestOptions<Req>,
+  private async retryRequest(
+    options: FinalRequestOptions,
     retriesRemaining: number,
     responseHeaders?: Headers | undefined,
-  ): Promise<Rsp> {
+  ): Promise<APIResponseProps> {
     retriesRemaining -= 1;
 
     // About the Retry-After header: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After
@@ -479,7 +479,7 @@ export abstract class APIClient {
     const timeout = this.calculateRetryTimeoutSeconds(retriesRemaining, retryAfter, maxRetries) * 1000;
     await sleep(timeout);
 
-    return this.request(options, retriesRemaining);
+    return this.makeRequest(options, retriesRemaining);
   }
 
   private calculateRetryTimeoutSeconds(
