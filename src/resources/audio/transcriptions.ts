@@ -9,7 +9,7 @@ export class Transcriptions extends APIResource {
   /**
    * Transcribes audio into the input language.
    */
-  create(body: TranscriptionCreateParams, options?: Core.RequestOptions): Core.APIPromise<Transcription> {
+  create(body: TranscriptionCreateParams, options?: Core.RequestOptions): Core.APIPromise<Transcription|string> {
     return this.post('/audio/transcriptions', multipartFormRequestOptions({ body, ...options }));
   }
 }
