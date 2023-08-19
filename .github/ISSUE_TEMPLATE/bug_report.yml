@@ -1,11 +1,19 @@
 name: Bug report
-description: Create a report to help us improve
+description: Report an issue or bug with this library
 labels: ['bug']
 body:
   - type: markdown
     attributes:
       value: |
         Thanks for taking the time to fill out this bug report!
+  - type: checkboxes
+    id: non_api
+    attributes:
+      label: Confirm this is a Node library issue and not an underlying OpenAI API issue
+      description: Issues with the underlying OpenAI API should be reported on our [Developer Community](https://community.openai.com/c/api/7)
+      options:
+        - label: This is an issue with the Node library
+          required: true
   - type: textarea
     id: what-happened
     attributes:

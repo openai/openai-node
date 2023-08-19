@@ -6,6 +6,14 @@ body:
     attributes:
       value: |
         Thanks for taking the time to fill out this feature request!
+  - type: checkboxes
+    id: non_api
+    attributes:
+      label: Confirm this is a feature request for the Node library and not the underlying OpenAI API.
+      description: Feature requests for the underlying OpenAI API should be reported on our [Developer Community](https://community.openai.com/c/api/7)
+      options:
+        - label: This is a feature request for the Node library
+          required: true
   - type: textarea
     id: feature
     attributes:
