@@ -42,7 +42,7 @@ main();
 
 ## Streaming Responses
 
-We provide support for streaming responses using Server Side Events (SSE).
+We provide support for streaming responses using Server Sent Events (SSE).
 
 ```ts
 import OpenAI from 'openai';

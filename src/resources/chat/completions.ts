@@ -19,6 +19,10 @@ export class Completions extends APIResource {
   create(
     body: CompletionCreateParams,
     options?: Core.RequestOptions,
+  ): APIPromise<Stream<ChatCompletionChunk> | ChatCompletion>;
+  create(
+    body: CompletionCreateParams,
+    options?: Core.RequestOptions,
   ): APIPromise<ChatCompletion> | APIPromise<Stream<ChatCompletionChunk>> {
     return this.post('/chat/completions', { body, ...options, stream: body.stream ?? false }) as
       | APIPromise<ChatCompletion>

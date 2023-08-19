@@ -65,6 +65,22 @@ const projects = {
     await installPackage();
     await run('npm', ['run', 'tsc']);
   },
+  bun: async () => {
+    if (state.fromNpm) {
+      await run('bun', ['install', '-D', state.fromNpm]);
+      return;
+    }
+
+    const packFile = getPackFile();
+    await fs.copyFile(packFile, `./${TAR_NAME}`);
+    await run('bun', ['install', '-D', `./${TAR_NAME}`]);
+
+    await run('npm', ['run', 'tsc']);
+
+    if (state.live) {
+      await run('bun', ['test']);
+    }
+  },
   deno: async () => {
     await run('deno', ['task', 'install']);
     await installPackage();

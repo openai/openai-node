@@ -1,0 +1,15 @@
+{
+  "name": "openai-bun-test",
+  "module": "index.ts",
+  "type": "module",
+  "scripts": {
+    "tsc": "tsc"
+  },
+  "devDependencies": {
+    "fastest-levenshtein": "^1.0.16",
+    "bun-types": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

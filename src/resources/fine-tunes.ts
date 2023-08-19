@@ -61,6 +61,11 @@ export class FineTunes extends APIResource {
     fineTuneId: string,
     query?: FineTuneListEventsParams | undefined,
     options?: Core.RequestOptions,
+  ): APIPromise<Stream<FineTuneEvent> | FineTuneEventsListResponse>;
+  listEvents(
+    fineTuneId: string,
+    query?: FineTuneListEventsParams | undefined,
+    options?: Core.RequestOptions,
   ): APIPromise<FineTuneEventsListResponse> | APIPromise<Stream<FineTuneEvent>> {
     return this.get(`/fine-tunes/${fineTuneId}/events`, {
       query,
