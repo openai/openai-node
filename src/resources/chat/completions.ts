@@ -17,7 +17,7 @@ export class Completions extends APIResource {
     options?: Core.RequestOptions,
   ): APIPromise<Stream<ChatCompletionChunk>>;
   create(
-    body: CompletionCreateParams,
+    body: CompletionCreateParamsBase,
     options?: Core.RequestOptions,
   ): APIPromise<Stream<ChatCompletionChunk> | ChatCompletion>;
   create(
@@ -278,7 +278,9 @@ export namespace CreateChatCompletionRequestMessage {
   }
 }
 
-export interface CompletionCreateParams {
+export type CompletionCreateParams = CompletionCreateParamsNonStreaming | CompletionCreateParamsStreaming;
+
+export interface CompletionCreateParamsBase {
   /**
    * A list of messages comprising the conversation so far.
    * [Example Python code](https://github.com/openai/openai-cookbook/blob/main/examples/How_to_format_inputs_to_ChatGPT_models.ipynb).
@@ -441,7 +443,7 @@ export namespace CompletionCreateParams {
   export type CompletionCreateParamsStreaming = API.CompletionCreateParamsStreaming;
 }
 
-export interface CompletionCreateParamsNonStreaming extends CompletionCreateParams {
+export interface CompletionCreateParamsNonStreaming extends CompletionCreateParamsBase {
   /**
    * If set, partial message deltas will be sent, like in ChatGPT. Tokens will be
    * sent as data-only
@@ -453,7 +455,7 @@ export interface CompletionCreateParamsNonStreaming extends CompletionCreatePara
   stream?: false | null;
 }
 
-export interface CompletionCreateParamsStreaming extends CompletionCreateParams {
+export interface CompletionCreateParamsStreaming extends CompletionCreateParamsBase {
   /**
    * If set, partial message deltas will be sent, like in ChatGPT. Tokens will be
    * sent as data-only

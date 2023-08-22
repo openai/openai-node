@@ -25,6 +25,7 @@ export {
   FineTunesPage,
   FineTunes,
 } from './fine-tunes';
+export { FineTuning } from './fine-tuning/fine-tuning';
 export {
   Image,
   ImagesResponse,

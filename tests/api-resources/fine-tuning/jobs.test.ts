@@ -5,9 +5,12 @@ import { Response } from 'node-fetch';
 
 const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010' });
 
-describe('resource fineTunes', () => {
+describe('resource jobs', () => {
   test('create: only required params', async () => {
-    const responsePromise = openai.fineTunes.create({ training_file: 'file-abc123' });
+    const responsePromise = openai.fineTuning.jobs.create({
+      model: 'gpt-3.5-turbo',
+      training_file: 'file-abc123',
+    });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -18,24 +21,17 @@ describe('resource fineTunes', () => {
   });
 
   test('create: required and optional params', async () => {
-    const response = await openai.fineTunes.create({
+    const response = await openai.fineTuning.jobs.create({
+      model: 'gpt-3.5-turbo',
       training_file: 'file-abc123',
-      batch_size: 0,
-      classification_betas: [0, 0, 0],
-      classification_n_classes: 0,
-      classification_positive_class: 'string',
-      compute_classification_metrics: true,
-      learning_rate_multiplier: 0,
-      model: 'curie',
-      n_epochs: 0,
-      prompt_loss_weight: 0,
+      hyperparameters: { n_epochs: 'auto' },
       suffix: 'x',
       validation_file: 'file-abc123',
     });
   });
 
   test('retrieve', async () => {
-    const responsePromise = openai.fineTunes.retrieve('ft-AF1WoRqd3aJAHsqc9NY7iL8F');
+    const responsePromise = openai.fineTuning.jobs.retrieve('ft-AF1WoRqd3aJAHsqc9NY7iL8F');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -48,12 +44,12 @@ describe('resource fineTunes', () => {
   test('retrieve: request options instead of params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openai.fineTunes.retrieve('ft-AF1WoRqd3aJAHsqc9NY7iL8F', { path: '/_stainless_unknown_path' }),
+      openai.fineTuning.jobs.retrieve('ft-AF1WoRqd3aJAHsqc9NY7iL8F', { path: '/_stainless_unknown_path' }),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
   test('list', async () => {
-    const responsePromise = openai.fineTunes.list();
+    const responsePromise = openai.fineTuning.jobs.list();
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -65,13 +61,20 @@ describe('resource fineTunes', () => {
 
   test('list: request options instead of params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(openai.fineTunes.list({ path: '/_stainless_unknown_path' })).rejects.toThrow(
+    await expect(openai.fineTuning.jobs.list({ path: '/_stainless_unknown_path' })).rejects.toThrow(
       OpenAI.NotFoundError,
     );
   });
 
+  test('list: request options and params are passed correctly', async () => {
+    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
+    await expect(
+      openai.fineTuning.jobs.list({ after: 'string', limit: 0 }, { path: '/_stainless_unknown_path' }),
+    ).rejects.toThrow(OpenAI.NotFoundError);
+  });
+
   test('cancel', async () => {
-    const responsePromise = openai.fineTunes.cancel('ft-AF1WoRqd3aJAHsqc9NY7iL8F');
+    const responsePromise = openai.fineTuning.jobs.cancel('ft-AF1WoRqd3aJAHsqc9NY7iL8F');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -84,13 +87,12 @@ describe('resource fineTunes', () => {
   test('cancel: request options instead of params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openai.fineTunes.cancel('ft-AF1WoRqd3aJAHsqc9NY7iL8F', { path: '/_stainless_unknown_path' }),
+      openai.fineTuning.jobs.cancel('ft-AF1WoRqd3aJAHsqc9NY7iL8F', { path: '/_stainless_unknown_path' }),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
-  // Prism chokes on this
-  test.skip('listEvents', async () => {
-    const responsePromise = openai.fineTunes.listEvents('ft-AF1WoRqd3aJAHsqc9NY7iL8F');
+  test('listEvents', async () => {
+    const responsePromise = openai.fineTuning.jobs.listEvents('ft-AF1WoRqd3aJAHsqc9NY7iL8F');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -100,13 +102,19 @@ describe('resource fineTunes', () => {
     expect(dataAndResponse.response).toBe(rawResponse);
   });
 
-  // Prism chokes on this
-  test.skip('listEvents: request options and params are passed correctly', async () => {
+  test('listEvents: request options instead of params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openai.fineTunes.listEvents(
+      openai.fineTuning.jobs.listEvents('ft-AF1WoRqd3aJAHsqc9NY7iL8F', { path: '/_stainless_unknown_path' }),
+    ).rejects.toThrow(OpenAI.NotFoundError);
+  });
+
+  test('listEvents: request options and params are passed correctly', async () => {
+    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
+    await expect(
+      openai.fineTuning.jobs.listEvents(
         'ft-AF1WoRqd3aJAHsqc9NY7iL8F',
-        { stream: false },
+        { after: 'string', limit: 0 },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);

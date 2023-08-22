@@ -7,7 +7,7 @@ const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:
 
 describe('resource models', () => {
   test('retrieve', async () => {
-    const responsePromise = openai.models.retrieve('text-davinci-001');
+    const responsePromise = openai.models.retrieve('gpt-3.5-turbo');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -20,7 +20,7 @@ describe('resource models', () => {
   test('retrieve: request options instead of params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openai.models.retrieve('text-davinci-001', { path: '/_stainless_unknown_path' }),
+      openai.models.retrieve('gpt-3.5-turbo', { path: '/_stainless_unknown_path' }),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
@@ -43,7 +43,7 @@ describe('resource models', () => {
   });
 
   test('del', async () => {
-    const responsePromise = openai.models.del('curie:ft-acmeco-2021-03-03-21-44-20');
+    const responsePromise = openai.models.del('ft:gpt-3.5-turbo:acemeco:suffix:abc123');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -56,7 +56,7 @@ describe('resource models', () => {
   test('del: request options instead of params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openai.models.del('curie:ft-acmeco-2021-03-03-21-44-20', { path: '/_stainless_unknown_path' }),
+      openai.models.del('ft:gpt-3.5-turbo:acemeco:suffix:abc123', { path: '/_stainless_unknown_path' }),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 });

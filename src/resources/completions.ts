@@ -16,7 +16,7 @@ export class Completions extends APIResource {
     options?: Core.RequestOptions,
   ): APIPromise<Stream<Completion>>;
   create(
-    body: CompletionCreateParams,
+    body: CompletionCreateParamsBase,
     options?: Core.RequestOptions,
   ): APIPromise<Stream<Completion> | Completion>;
   create(
@@ -112,7 +112,9 @@ export interface CompletionUsage {
   total_tokens: number;
 }
 
-export interface CompletionCreateParams {
+export type CompletionCreateParams = CompletionCreateParamsNonStreaming | CompletionCreateParamsStreaming;
+
+export interface CompletionCreateParamsBase {
   /**
    * ID of the model to use. You can use the
    * [List models](/docs/api-reference/models/list) API to see all of your available
@@ -121,6 +123,8 @@ export interface CompletionCreateParams {
    */
   model:
     | (string & {})
+    | 'babbage-002'
+    | 'davinci-002'
     | 'text-davinci-003'
     | 'text-davinci-002'
     | 'text-davinci-001'
@@ -272,7 +276,7 @@ export namespace CompletionCreateParams {
   export type CompletionCreateParamsStreaming = API.CompletionCreateParamsStreaming;
 }
 
-export interface CompletionCreateParamsNonStreaming extends CompletionCreateParams {
+export interface CompletionCreateParamsNonStreaming extends CompletionCreateParamsBase {
   /**
    * Whether to stream back partial progress. If set, tokens will be sent as
    * data-only
@@ -284,7 +288,7 @@ export interface CompletionCreateParamsNonStreaming extends CompletionCreatePara
   stream?: false | null;
 }
 
-export interface CompletionCreateParamsStreaming extends CompletionCreateParams {
+export interface CompletionCreateParamsStreaming extends CompletionCreateParamsBase {
   /**
    * Whether to stream back partial progress. If set, tokens will be sent as
    * data-only

@@ -121,6 +121,23 @@ Methods:
 - <code title="get /models">client.models.<a href="./src/resources/models.ts">list</a>() -> ModelsPage</code>
 - <code title="delete /models/{model}">client.models.<a href="./src/resources/models.ts">del</a>(model) -> ModelDeleted</code>
 
+# FineTuning
+
+## Jobs
+
+Types:
+
+- <code><a href="./src/resources/fine-tuning/jobs.ts">FineTuningJob</a></code>
+- <code><a href="./src/resources/fine-tuning/jobs.ts">FineTuningJobEvent</a></code>
+
+Methods:
+
+- <code title="post /fine_tuning/jobs">client.fineTuning.jobs.<a href="./src/resources/fine-tuning/jobs.ts">create</a>({ ...params }) -> FineTuningJob</code>
+- <code title="get /fine_tuning/jobs/{fine_tuning_job_id}">client.fineTuning.jobs.<a href="./src/resources/fine-tuning/jobs.ts">retrieve</a>(fineTuningJobId) -> FineTuningJob</code>
+- <code title="get /fine_tuning/jobs">client.fineTuning.jobs.<a href="./src/resources/fine-tuning/jobs.ts">list</a>({ ...params }) -> FineTuningJobsPage</code>
+- <code title="post /fine_tuning/jobs/{fine_tuning_job_id}/cancel">client.fineTuning.jobs.<a href="./src/resources/fine-tuning/jobs.ts">cancel</a>(fineTuningJobId) -> FineTuningJob</code>
+- <code title="get /fine_tuning/jobs/{fine_tuning_job_id}/events">client.fineTuning.jobs.<a href="./src/resources/fine-tuning/jobs.ts">listEvents</a>(fineTuningJobId, { ...params }) -> FineTuningJobEventsPage</code>
+
 # FineTunes
 
 Types:

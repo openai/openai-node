@@ -803,7 +803,7 @@ declare const navigator: { userAgent: string } | undefined;
 
 // Note: modified from https://github.com/JS-DevTools/host-environment/blob/b1ab79ecde37db5d6e163c050e54fe7d287d7c92/src/isomorphic.browser.ts
 function getBrowserInfo(): BrowserInfo | null {
-  if (!navigator || typeof navigator === 'undefined') {
+  if (typeof navigator === 'undefined' || !navigator) {
     return null;
   }
 

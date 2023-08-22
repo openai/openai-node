@@ -118,16 +118,14 @@ export interface FileCreateParams {
    * Name of the [JSON Lines](https://jsonlines.readthedocs.io/en/latest/) file to be
    * uploaded.
    *
-   * If the `purpose` is set to "fine-tune", each line is a JSON record with "prompt"
-   * and "completion" fields representing your
-   * [training examples](/docs/guides/fine-tuning/prepare-training-data).
+   * If the `purpose` is set to "fine-tune", the file will be used for fine-tuning.
    */
   file: Uploadable;
 
   /**
    * The intended purpose of the uploaded documents.
    *
-   * Use "fine-tune" for [Fine-tuning](/docs/api-reference/fine-tunes). This allows
+   * Use "fine-tune" for [fine-tuning](/docs/api-reference/fine-tuning). This allows
    * us to validate the format of the uploaded file.
    */
   purpose: string;

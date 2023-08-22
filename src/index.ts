@@ -143,6 +143,7 @@ export class OpenAI extends Core.APIClient {
   audio: API.Audio = new API.Audio(this);
   moderations: API.Moderations = new API.Moderations(this);
   models: API.Models = new API.Models(this);
+  fineTuning: API.FineTuning = new API.FineTuning(this);
   fineTunes: API.FineTunes = new API.FineTunes(this);
 
   protected override defaultQuery(): Core.DefaultQuery | undefined {
@@ -247,6 +248,8 @@ export namespace OpenAI {
   export import Model = API.Model;
   export import ModelDeleted = API.ModelDeleted;
   export import ModelsPage = API.ModelsPage;
+
+  export import FineTuning = API.FineTuning;
 
   export import FineTunes = API.FineTunes;
   export import FineTune = API.FineTune;

@@ -15,7 +15,7 @@ export class FineTunes extends APIResource {
    * Response includes details of the enqueued job including job status and the name
    * of the fine-tuned models once complete.
    *
-   * [Learn more about Fine-tuning](/docs/guides/fine-tuning)
+   * [Learn more about fine-tuning](/docs/guides/legacy-fine-tuning)
    */
   create(body: FineTuneCreateParams, options?: Core.RequestOptions): Core.APIPromise<FineTune> {
     return this.post('/fine-tunes', { body, ...options });
@@ -24,7 +24,7 @@ export class FineTunes extends APIResource {
   /**
    * Gets info about the fine-tune job.
    *
-   * [Learn more about Fine-tuning](/docs/guides/fine-tuning)
+   * [Learn more about fine-tuning](/docs/guides/legacy-fine-tuning)
    */
   retrieve(fineTuneId: string, options?: Core.RequestOptions): Core.APIPromise<FineTune> {
     return this.get(`/fine-tunes/${fineTuneId}`, options);
@@ -59,7 +59,7 @@ export class FineTunes extends APIResource {
   ): APIPromise<Stream<FineTuneEvent>>;
   listEvents(
     fineTuneId: string,
-    query?: FineTuneListEventsParams | undefined,
+    query?: FineTuneListEventsParamsBase | undefined,
     options?: Core.RequestOptions,
   ): APIPromise<Stream<FineTuneEvent> | FineTuneEventsListResponse>;
   listEvents(
@@ -84,8 +84,8 @@ export class FineTunesPage extends Page<FineTune> {}
 type _FineTunesPage = FineTunesPage;
 
 /**
- * The `FineTune` object represents a fine-tuning job that has been created through
- * the API.
+ * The `FineTune` object represents a legacy fine-tune job that has been created
+ * through the API.
  */
 export interface FineTune {
   /**
@@ -105,7 +105,8 @@ export interface FineTune {
 
   /**
    * The hyperparameters used for the fine-tuning job. See the
-   * [Fine-tuning Guide](/docs/guides/fine-tuning/hyperparameters) for more details.
+   * [fine-tuning guide](/docs/guides/legacy-fine-tuning/hyperparameters) for more
+   * details.
    */
   hyperparams: FineTune.Hyperparams;
 
@@ -131,7 +132,7 @@ export interface FineTune {
 
   /**
    * The current status of the fine-tuning job, which can be either `created`,
-   * `pending`, `running`, `succeeded`, `failed`, or `cancelled`.
+   * `running`, `succeeded`, `failed`, or `cancelled`.
    */
   status: string;
 
@@ -159,7 +160,8 @@ export interface FineTune {
 export namespace FineTune {
   /**
    * The hyperparameters used for the fine-tuning job. See the
-   * [Fine-tuning Guide](/docs/guides/fine-tuning/hyperparameters) for more details.
+   * [fine-tuning guide](/docs/guides/legacy-fine-tuning/hyperparameters) for more
+   * details.
    */
   export interface Hyperparams {
     /**
@@ -228,7 +230,8 @@ export interface FineTuneCreateParams {
    * JSON object with the keys "prompt" and "completion". Additionally, you must
    * upload your file with the purpose `fine-tune`.
    *
-   * See the [fine-tuning guide](/docs/guides/fine-tuning/creating-training-data) for
+   * See the
+   * [fine-tuning guide](/docs/guides/legacy-fine-tuning/creating-training-data) for
    * more details.
    */
   training_file: string;
@@ -273,7 +276,7 @@ export interface FineTuneCreateParams {
    * If set, we calculate classification-specific metrics such as accuracy and F-1
    * score using the validation set at the end of every epoch. These metrics can be
    * viewed in the
-   * [results file](/docs/guides/fine-tuning/analyzing-your-fine-tuned-model).
+   * [results file](/docs/guides/legacy-fine-tuning/analyzing-your-fine-tuned-model).
    *
    * In order to compute classification metrics, you must provide a
    * `validation_file`. Additionally, you must specify `classification_n_classes` for
@@ -295,9 +298,9 @@ export interface FineTuneCreateParams {
 
   /**
    * The name of the base model to fine-tune. You can select one of "ada", "babbage",
-   * "curie", "davinci", or a fine-tuned model created after 2022-04-21. To learn
-   * more about these models, see the
-   * [Models](https://platform.openai.com/docs/models) documentation.
+   * "curie", "davinci", or a fine-tuned model created after 2022-04-21 and before
+   * 2023-08-22. To learn more about these models, see the [Models](/docs/models)
+   * documentation.
    */
   model?: (string & {}) | 'ada' | 'babbage' | 'curie' | 'davinci' | null;
 
@@ -332,20 +335,25 @@ export interface FineTuneCreateParams {
    *
    * If you provide this file, the data is used to generate validation metrics
    * periodically during fine-tuning. These metrics can be viewed in the
-   * [fine-tuning results file](/docs/guides/fine-tuning/analyzing-your-fine-tuned-model).
+   * [fine-tuning results file](/docs/guides/legacy-fine-tuning/analyzing-your-fine-tuned-model).
    * Your train and validation data should be mutually exclusive.
    *
    * Your dataset must be formatted as a JSONL file, where each validation example is
    * a JSON object with the keys "prompt" and "completion". Additionally, you must
    * upload your file with the purpose `fine-tune`.
    *
-   * See the [fine-tuning guide](/docs/guides/fine-tuning/creating-training-data) for
+   * See the
+   * [fine-tuning guide](/docs/guides/legacy-fine-tuning/creating-training-data) for
    * more details.
    */
   validation_file?: string | null;
 }
 
-export interface FineTuneListEventsParams {
+export type FineTuneListEventsParams =
+  | FineTuneListEventsParamsNonStreaming
+  | FineTuneListEventsParamsStreaming;
+
+export interface FineTuneListEventsParamsBase {
   /**
    * Whether to stream events for the fine-tune job. If set to true, events will be
    * sent as data-only
@@ -363,7 +371,7 @@ export namespace FineTuneListEventsParams {
   export type FineTuneListEventsParamsStreaming = API.FineTuneListEventsParamsStreaming;
 }
 
-export interface FineTuneListEventsParamsNonStreaming extends FineTuneListEventsParams {
+export interface FineTuneListEventsParamsNonStreaming extends FineTuneListEventsParamsBase {
   /**
    * Whether to stream events for the fine-tune job. If set to true, events will be
    * sent as data-only
@@ -376,7 +384,7 @@ export interface FineTuneListEventsParamsNonStreaming extends FineTuneListEvents
   stream?: false;
 }
 
-export interface FineTuneListEventsParamsStreaming extends FineTuneListEventsParams {
+export interface FineTuneListEventsParamsStreaming extends FineTuneListEventsParamsBase {
   /**
    * Whether to stream events for the fine-tune job. If set to true, events will be
    * sent as data-only
