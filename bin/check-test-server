@@ -38,6 +38,9 @@ else
   echo -e "  With yarn:"
   echo -e "    \$ ${YELLOW}yarn global add @stoplight/prism-cli${NC}"
   echo
+  echo -e "  With Bun:"
+  echo -e "    \$ ${YELLOW}bun add --global @stoplight/prism-cli${NC}"
+  echo
   echo -e "2. Run the mock server"
   echo
   echo -e "  To run the server, pass in the path of your OpenAPI"

@@ -75,7 +75,7 @@ const projects = {
     await fs.copyFile(packFile, `./${TAR_NAME}`);
     await run('bun', ['install', '-D', `./${TAR_NAME}`]);
 
-    await run('npm', ['run', 'tsc']);
+    await run('bun', ['run', 'tsc']);
 
     if (state.live) {
       await run('bun', ['test']);

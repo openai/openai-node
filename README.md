@@ -14,6 +14,8 @@ To learn how to use the OpenAI API, check out our [API Reference](https://platfo
 npm install --save openai
 # or
 yarn add openai
+# or
+bun add openai
 ```
 
 ## Usage
