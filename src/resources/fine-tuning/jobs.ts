@@ -185,6 +185,8 @@ export namespace FineTuningJob {
 }
 
 export interface FineTuningJobEvent {
+  id: string;
+
   created_at: number;
 
   level: 'info' | 'warn' | 'error';
