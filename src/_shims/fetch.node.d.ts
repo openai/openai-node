@@ -60,4 +60,5 @@ export type {
   _RequestInfo as RequestInfo,
   _ResponseType as ResponseType,
   _BodyInit as BodyInit,
+  _HeadersInit as HeadersInit,
 };
