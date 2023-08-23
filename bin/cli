@@ -1,21 +1,49 @@
-#!/usr/bin/env bash
-set -eou pipefail
+#!/usr/bin/env node
 
-if [ $# -eq 0 ]; then
-  echo "Usage: $0 <subcommand>"
-  echo
-  echo "Subcommands:"
-  echo "  migrate   Run migrations to update from openai v3 to v4"
-  echo
-  exit 1
-fi
+const { spawnSync } = require('child_process');
 
-if [ "$1" = "migrate" ]; then
-  echo "This automatic code migration is provided by grit.io"
-  echo "Visit https://app.grit.io/studio?preset=openai_v4 for more details."
-  shift
-  npx -y @getgrit/launcher apply openai_v4 "$@"
-else
-  echo "Unknown subcommand $1; Expected 'migrate'" >&2
-  exit 1
-fi
+const commands = {
+  migrate: {
+    description: 'Run migrations to update from openai v3 to v4',
+    fn: () => {
+      console.log('This automatic code migration is provided by grit.io');
+      console.log('Visit https://app.grit.io/studio?preset=openai_v4 for more details.')
+
+      const result = spawnSync(
+        'npx',
+        ['-y', '@getgrit/launcher', 'apply', 'openai_v4', ...process.argv.slice(3)],
+        { stdio: 'inherit' },
+      );
+      if (result.status !== 0) {
+        process.exit(result.status);
+      }
+    }
+  }
+}
+
+function exitWithHelp() {
+  console.log("Usage: $0 <subcommand>");
+  console.log();
+  console.log('Subcommands:');
+
+  for (const [name, info] of Object.entries(commands)) {
+    console.log(`  ${name}  ${info.description}`);
+  }
+
+  console.log();
+  process.exit(1);
+}
+
+if (process.argv.length < 3) {
+  exitWithHelp();
+}
+
+const commandName = process.argv[2];
+
+const command = commands[commandName];
+if (!command) {
+  console.log(`Unknown subcommand ${commandName}.`);
+  exitWithHelp();
+}
+
+command.fn();
