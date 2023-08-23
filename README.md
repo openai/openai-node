@@ -276,5 +276,6 @@ The following runtimes are supported:
   Deno Deploy is not yet supported.
 - Cloudflare Workers.
 - Vercel Edge Runtime.
+- Bun v0.8 or later
 
 If you are interested in other runtime environments, please open or upvote an issue on GitHub.
