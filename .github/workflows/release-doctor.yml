@@ -1,0 +1,23 @@
+name: Release Doctor
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  release_doctor:
+    name: release doctor
+    runs-on: ubuntu-latest
+    environment: publish
+    if: github.repository == 'openai/openai-node' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'release-please') || github.head_ref == 'next')
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Check release environment
+        run: |
+          bash ./bin/check-release-environment
+        env:
+          STAINLESS_API_KEY: ${{ secrets.STAINLESS_API_KEY }}
+          NPM_TOKEN: ${{ secrets.OPENAI_NPM_TOKEN }}
