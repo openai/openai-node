@@ -3,8 +3,7 @@
 /**
  * Fine-tuning allows you to train models on your own data.
  *
- * See these guides for more information:
- * - https://help.openai.com/en/articles/5528730-fine-tuning-a-classifier-to-improve-truthfulness
+ * See this guides for more information:
  * - https://platform.openai.com/docs/guides/fine-tuning
  */
 
