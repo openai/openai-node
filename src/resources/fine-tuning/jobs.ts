@@ -194,8 +194,6 @@ export interface FineTuningJobEvent {
   message: string;
 
   object: string;
-
-  id: string;
 }
 
 export interface JobCreateParams {
