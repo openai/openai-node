@@ -164,6 +164,15 @@ Error codes are as followed:
 | >=500       | `InternalServerError`      |
 | N/A         | `APIConnectionError`       |
 
+### Azure OpenAI
+
+An example of using this library with Azure OpenAI can be found [here](https://github.com/openai/openai-node/blob/master/examples/azure.ts).
+
+Please note there are subtle differences in API shape & behavior between the Azure OpenAI API and the OpenAI API,
+so using this library with Azure OpenAI may result in incorrect types, which can lead to bugs.
+
+See [`@azure/openai`](https://www.npmjs.com/package/@azure/openai) for an Azure-specific SDK provided by Microsoft.
+
 ### Retries
 
 Certain errors will be automatically retried 2 times by default, with a short exponential backoff.

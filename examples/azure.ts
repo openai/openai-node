@@ -10,6 +10,9 @@ const resource = '<your resource name>';
 // Navigate to the Azure OpenAI Studio to deploy a model.
 const model = '<your model>';
 
+// https://learn.microsoft.com/en-us/azure/ai-services/openai/reference#rest-api-versioning
+const apiVersion = '2023-06-01-preview';
+
 const apiKey = process.env['AZURE_OPENAI_API_KEY'];
 if (!apiKey) {
   throw new Error('The AZURE_OPENAI_API_KEY environment variable is missing or empty.');
@@ -19,7 +22,7 @@ if (!apiKey) {
 const openai = new OpenAI({
   apiKey,
   baseURL: `https://${resource}.openai.azure.com/openai/deployments/${model}`,
-  defaultQuery: { 'api-version': '2023-06-01-preview' },
+  defaultQuery: { 'api-version': apiVersion },
   defaultHeaders: { 'api-key': apiKey },
 });
 
