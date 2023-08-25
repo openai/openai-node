@@ -206,6 +206,10 @@ export namespace OpenAI {
   export import Page = Pagination.Page;
   export import PageResponse = Pagination.PageResponse;
 
+  export import CursorPage = Pagination.CursorPage;
+  export import CursorPageParams = Pagination.CursorPageParams;
+  export import CursorPageResponse = Pagination.CursorPageResponse;
+
   export import Completions = API.Completions;
   export import Completion = API.Completion;
   export import CompletionChoice = API.CompletionChoice;
