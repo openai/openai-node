@@ -9,9 +9,14 @@ type ServerSentEvent = {
 };
 
 export class Stream<Item> implements AsyncIterable<Item> {
+  controller: AbortController;
+
+  private response: Response;
   private decoder: SSEDecoder;
 
-  constructor(private response: Response, private controller: AbortController) {
+  constructor(response: Response, controller: AbortController) {
+    this.response = response;
+    this.controller = controller;
     this.decoder = new SSEDecoder();
   }
 
