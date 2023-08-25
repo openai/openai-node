@@ -5,7 +5,7 @@ import { APIResource } from 'openai/resource';
 import { isRequestOptions } from 'openai/core';
 import * as Files from 'openai/resources/files';
 import * as API from './index';
-import { Page } from 'openai/pagination';
+import { CursorPage, CursorPageParams } from 'openai/pagination';
 
 export class Jobs extends APIResource {
   /**
@@ -81,17 +81,11 @@ export class Jobs extends APIResource {
   }
 }
 
-/**
- * Note: no pagination actually occurs yet, this is for forwards-compatibility.
- */
-export class FineTuningJobsPage extends Page<FineTuningJob> {}
+export class FineTuningJobsPage extends CursorPage<FineTuningJob> {}
 // alias so we can export it in the namespace
 type _FineTuningJobsPage = FineTuningJobsPage;
 
-/**
- * Note: no pagination actually occurs yet, this is for forwards-compatibility.
- */
-export class FineTuningJobEventsPage extends Page<FineTuningJobEvent> {}
+export class FineTuningJobEventsPage extends CursorPage<FineTuningJobEvent> {}
 // alias so we can export it in the namespace
 type _FineTuningJobEventsPage = FineTuningJobEventsPage;
 
@@ -258,29 +252,9 @@ export namespace JobCreateParams {
   }
 }
 
-export interface JobListParams {
-  /**
-   * Identifier for the last job from the previous pagination request.
-   */
-  after?: string;
+export interface JobListParams extends CursorPageParams {}
 
-  /**
-   * Number of fine-tuning jobs to retrieve.
-   */
-  limit?: number;
-}
-
-export interface JobListEventsParams {
-  /**
-   * Identifier for the last event from the previous pagination request.
-   */
-  after?: string;
-
-  /**
-   * Number of events to retrieve.
-   */
-  limit?: number;
-}
+export interface JobListEventsParams extends CursorPageParams {}
 
 export namespace Jobs {
   export import FineTuningJob = API.FineTuningJob;
