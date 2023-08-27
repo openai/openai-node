@@ -164,6 +164,15 @@ Error codes are as followed:
 | >=500       | `InternalServerError`      |
 | N/A         | `APIConnectionError`       |
 
+### Azure OpenAI
+
+An example of using this library with Azure OpenAI can be found [here](https://github.com/openai/openai-node/blob/master/examples/azure.ts).
+
+Please note there are subtle differences in API shape & behavior between the Azure OpenAI API and the OpenAI API,
+so using this library with Azure OpenAI may result in incorrect types, which can lead to bugs.
+
+See [`@azure/openai`](https://www.npmjs.com/package/@azure/openai) for an Azure-specific SDK provided by Microsoft.
+
 ### Retries
 
 Certain errors will be automatically retried 2 times by default, with a short exponential backoff.
@@ -205,6 +214,37 @@ await openai.chat.completions.create({ messages: [{ role: 'user', content: 'How 
 On timeout, an `APIConnectionTimeoutError` is thrown.
 
 Note that requests which time out will be [retried twice by default](#retries).
+
+## Auto-pagination
+
+List methods in the OpenAI API are paginated.
+You can use `for await … of` syntax to iterate through items across all pages:
+
+```ts
+async function fetchAllFineTuningJobs(params) {
+  const allFineTuningJobs = [];
+  // Automatically fetches more pages as needed.
+  for await (const job of openai.fineTuning.jobs.list({ limit: 20 })) {
+    allFineTuningJobs.push(job);
+  }
+  return allFineTuningJobs;
+}
+```
+
+Alternatively, you can make request a single page at a time:
+
+```ts
+let page = await openai.fineTuning.jobs.list({ limit: 20 });
+for (const job of page.data) {
+  console.log(job);
+}
+
+// Convenience methods are provided for manually paginating:
+while (page.hasNextPage()) {
+  page = page.getNextPage();
+  // ...
+}
+```
 
 ## Advanced Usage
 
