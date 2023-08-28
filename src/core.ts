@@ -575,7 +575,7 @@ export abstract class AbstractPage<Item> implements AsyncIterable<Item> {
     return this.nextPageInfo() != null;
   }
 
-  async getNextPage(): Promise<AbstractPage<Item>> {
+  async getNextPage(): Promise<this> {
     const nextInfo = this.nextPageInfo();
     if (!nextInfo) {
       throw new Error(
