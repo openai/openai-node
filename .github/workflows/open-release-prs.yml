@@ -1,0 +1,21 @@
+name: Open release PRs
+on:
+  push:
+    branches:
+      - next
+
+jobs:
+  release:
+    name: release
+    if: github.ref == 'refs/heads/next' && github.repository == 'openai/openai-node'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: stainless-api/trigger-release-please@v1
+        id: release
+        with:
+          repo: ${{ github.event.repository.full_name }}
+          stainless-api-key: ${{ secrets.STAINLESS_API_KEY }}
+          branch-with-changes: next
