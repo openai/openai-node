@@ -5,13 +5,13 @@ import OpenAI from 'openai';
 import {
   ChatCompletionMessage,
   ChatCompletionChunk,
-  CreateChatCompletionRequestMessage,
+  ChatCompletionMessageParam,
 } from 'openai/resources/chat';
 
 // gets API Key from environment variable OPENAI_API_KEY
 const openai = new OpenAI();
 
-const functions: OpenAI.Chat.CompletionCreateParams.Function[] = [
+const functions: OpenAI.Chat.ChatCompletionCreateParams.Function[] = [
   {
     name: 'list',
     description: 'list queries books by genre, and returns a list of names of books',
@@ -63,7 +63,7 @@ async function callFunction(function_call: ChatCompletionMessage.FunctionCall): 
 }
 
 async function main() {
-  const messages: CreateChatCompletionRequestMessage[] = [
+  const messages: ChatCompletionMessageParam[] = [
     {
       role: 'system',
       content:

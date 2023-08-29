@@ -9,7 +9,7 @@ const openai = new OpenAI();
 async function main() {
   // ---------------- Explicit non-streaming params ------------
 
-  const params: OpenAI.Chat.CompletionCreateParams = {
+  const params: OpenAI.Chat.ChatCompletionCreateParams = {
     model: 'gpt-4',
     messages: [{ role: 'user', content: 'Say this is a test!' }],
   };
@@ -18,7 +18,7 @@ async function main() {
 
   // ---------------- Explicit streaming params ----------------
 
-  const streamingParams: OpenAI.Chat.CompletionCreateParams = {
+  const streamingParams: OpenAI.Chat.ChatCompletionCreateParams = {
     model: 'gpt-4',
     messages: [{ role: 'user', content: 'Say this is a test!' }],
     stream: true,
@@ -32,12 +32,12 @@ async function main() {
 
   // ---------------- Explicit (non)streaming types ----------------
 
-  const params1: OpenAI.Chat.CompletionCreateParamsNonStreaming = {
+  const params1: OpenAI.Chat.ChatCompletionCreateParamsNonStreaming = {
     model: 'gpt-4',
     messages: [{ role: 'user', content: 'Say this is a test!' }],
   };
 
-  const params2: OpenAI.Chat.CompletionCreateParamsStreaming = {
+  const params2: OpenAI.Chat.ChatCompletionCreateParamsStreaming = {
     model: 'gpt-4',
     messages: [{ role: 'user', content: 'Say this is a test!' }],
     stream: true,
@@ -52,9 +52,9 @@ async function main() {
   // `role: string` is not assignable.
   const streamingParams2 = {
     model: 'gpt-4',
-    messages: [{ role: 'user', content: 'Say this is a test!' }],
-    stream: true,
-  } as const;
+    messages: [{ role: 'user' as const, content: 'Say this is a test!' }],
+    stream: true as const,
+  };
 
   // TS knows this is a Stream instance.
   const stream2 = await openai.chat.completions.create(streamingParams2);
@@ -95,11 +95,13 @@ async function main() {
 // not the response will be streamed.
 export async function createCompletionParams(
   stream: true,
-): Promise<OpenAI.Chat.CompletionCreateParamsStreaming>;
+): Promise<OpenAI.Chat.ChatCompletionCreateParamsStreaming>;
 export async function createCompletionParams(
   stream: false,
-): Promise<OpenAI.Chat.CompletionCreateParamsNonStreaming>;
-export async function createCompletionParams(stream: boolean): Promise<OpenAI.Chat.CompletionCreateParams> {
+): Promise<OpenAI.Chat.ChatCompletionCreateParamsNonStreaming>;
+export async function createCompletionParams(
+  stream: boolean,
+): Promise<OpenAI.Chat.ChatCompletionCreateParams> {
   const params = {
     model: 'gpt-3.5-turbo',
     messages: [{ role: 'user' as const, content: 'Hello!' }],

@@ -78,7 +78,7 @@ const openai = new OpenAI({
 });
 
 async function main() {
-  const params: OpenAI.Chat.CompletionCreateParams = {
+  const params: OpenAI.Chat.ChatCompletionCreateParams = {
     messages: [{ role: 'user', content: 'Say this is a test' }],
     model: 'gpt-3.5-turbo',
   };
