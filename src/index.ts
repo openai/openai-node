@@ -220,6 +220,14 @@ export namespace OpenAI {
 
   export import Chat = API.Chat;
 
+  export import ChatCompletion = API.ChatCompletion;
+  export import ChatCompletionChunk = API.ChatCompletionChunk;
+  export import ChatCompletionMessage = API.ChatCompletionMessage;
+  export import ChatCompletionMessageParam = API.ChatCompletionMessageParam;
+  export import ChatCompletionCreateParams = API.ChatCompletionCreateParams;
+  export import ChatCompletionCreateParamsNonStreaming = API.ChatCompletionCreateParamsNonStreaming;
+  export import ChatCompletionCreateParamsStreaming = API.ChatCompletionCreateParamsStreaming;
+
   export import Edits = API.Edits;
   export import Edit = API.Edit;
   export import EditCreateParams = API.EditCreateParams;

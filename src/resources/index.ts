@@ -1,7 +1,7 @@
 // File generated from our OpenAPI spec by Stainless.
 
+export * from './chat';
 export { Audio } from './audio/audio';
-export { Chat } from './chat/chat';
 export {
   Completion,
   CompletionChoice,
