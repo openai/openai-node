@@ -16,6 +16,11 @@
         "require": "./dist/_shims/*.js",
         "default": "./dist/_shims/*.mjs"
       },
+      "bun": {
+        "types": "./dist/_shims/*.d.ts",
+        "require": "./dist/_shims/*.js",
+        "default": "./dist/_shims/*.mjs"
+      },
       "browser": {
         "types": "./dist/_shims/*.d.ts",
         "require": "./dist/_shims/*.js",
