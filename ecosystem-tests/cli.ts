@@ -268,7 +268,7 @@ async function main() {
         console.error('\n');
 
         try {
-          await withRetry(fn, project, state.retry)
+          await withRetry(fn, project, state.retry);
           console.error(`✅ - Successfully ran ${project}`);
         } catch (err) {
           if (err && (err as any).shortMessage) {
@@ -294,13 +294,13 @@ async function main() {
 async function withRetry(fn: () => Promise<void>, identifier: string, retryAmount: number): Promise<void> {
   do {
     try {
-      return await fn()
+      return await fn();
     } catch (err) {
-      console.error(`${identifier} failed due to ${err}; retries left ${retryAmount}`)
+      retryAmount--;
+      if (retryAmount === 0) throw err;
+      console.error(`${identifier} failed due to ${err}; retries left ${retryAmount}`);
     }
-
-    retryAmount--;
-  } while (retryAmount > 0)
+  } while (retryAmount > 0);
 }
 
 function centerPad(text: string, width = text.length, char = ' '): string {
