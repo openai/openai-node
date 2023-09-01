@@ -6,8 +6,7 @@ import { Response } from 'node-fetch';
 const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010' });
 
 describe('resource images', () => {
-  // Prism doesn't support multipart/form-data
-  test.skip('createVariation: only required params', async () => {
+  test('createVariation: only required params', async () => {
     const responsePromise = openai.images.createVariation({
       image: await toFile(Buffer.from('# my file contents'), 'README.md'),
     });
@@ -20,8 +19,7 @@ describe('resource images', () => {
     expect(dataAndResponse.response).toBe(rawResponse);
   });
 
-  // Prism doesn't support multipart/form-data
-  test.skip('createVariation: required and optional params', async () => {
+  test('createVariation: required and optional params', async () => {
     const response = await openai.images.createVariation({
       image: await toFile(Buffer.from('# my file contents'), 'README.md'),
       n: 1,
@@ -31,8 +29,7 @@ describe('resource images', () => {
     });
   });
 
-  // Prism doesn't support multipart/form-data
-  test.skip('edit: only required params', async () => {
+  test('edit: only required params', async () => {
     const responsePromise = openai.images.edit({
       image: await toFile(Buffer.from('# my file contents'), 'README.md'),
       prompt: 'A cute baby sea otter wearing a beret',
@@ -46,8 +43,7 @@ describe('resource images', () => {
     expect(dataAndResponse.response).toBe(rawResponse);
   });
 
-  // Prism doesn't support multipart/form-data
-  test.skip('edit: required and optional params', async () => {
+  test('edit: required and optional params', async () => {
     const response = await openai.images.edit({
       image: await toFile(Buffer.from('# my file contents'), 'README.md'),
       prompt: 'A cute baby sea otter wearing a beret',
@@ -59,8 +55,7 @@ describe('resource images', () => {
     });
   });
 
-  // Prism doesn't support multipart/form-data
-  test.skip('generate: only required params', async () => {
+  test('generate: only required params', async () => {
     const responsePromise = openai.images.generate({ prompt: 'A cute baby sea otter' });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
@@ -71,8 +66,7 @@ describe('resource images', () => {
     expect(dataAndResponse.response).toBe(rawResponse);
   });
 
-  // Prism doesn't support multipart/form-data
-  test.skip('generate: required and optional params', async () => {
+  test('generate: required and optional params', async () => {
     const response = await openai.images.generate({
       prompt: 'A cute baby sea otter',
       n: 1,
