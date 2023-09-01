@@ -1,7 +1,7 @@
 import { type RequestOptions } from './core';
 import { type Readable } from 'openai/_shims/node-readable';
 import { type BodyInit } from 'openai/_shims/fetch';
-import { FormData, File, type Blob, type FilePropertyBag } from 'openai/_shims/formdata';
+import { FormData, File, type Blob, type FilePropertyBag } from 'openai/_shims/form-data';
 import { getMultipartRequestOptions } from 'openai/_shims/getMultipartRequestOptions';
 import { fileFromPath } from 'openai/_shims/fileFromPath';
 import { type FsReadStream, isFsReadStream } from 'openai/_shims/node-readable';

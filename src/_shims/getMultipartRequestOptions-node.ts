@@ -2,7 +2,7 @@
  * Disclaimer: modules in _shims aren't intended to be imported by SDK users.
  */
 
-import { FormData } from './formdata.node';
+import { FormData } from './form-data-node';
 import type { RequestOptions } from '../core';
 import { Readable } from 'node:stream';
 import { FormDataEncoder } from 'form-data-encoder';

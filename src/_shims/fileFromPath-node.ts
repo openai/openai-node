@@ -3,7 +3,7 @@
  */
 
 import { fileFromPath as _fileFromPath } from 'formdata-node/file-from-path';
-import type { File, FilePropertyBag } from './formdata.node';
+import type { File, FilePropertyBag } from './form-data-node';
 
 export type FileFromPathOptions = Omit<FilePropertyBag, 'lastModified'>;
 

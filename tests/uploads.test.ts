@@ -1,6 +1,6 @@
 import fs from 'fs';
 import { toFile, type ResponseLike } from 'openai/uploads';
-import { File } from 'openai/_shims/formdata';
+import { File } from 'openai/_shims/form-data';
 
 class MyClass {
   name: string = 'foo';
