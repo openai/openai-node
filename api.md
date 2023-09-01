@@ -19,6 +19,7 @@ Types:
 - <code><a href="./src/resources/chat/completions.ts">ChatCompletion</a></code>
 - <code><a href="./src/resources/chat/completions.ts">ChatCompletionChunk</a></code>
 - <code><a href="./src/resources/chat/completions.ts">ChatCompletionMessage</a></code>
+- <code><a href="./src/resources/chat/completions.ts">ChatCompletionMessageParam</a></code>
 - <code><a href="./src/resources/chat/completions.ts">CreateChatCompletionRequestMessage</a></code>
 
 Methods:
