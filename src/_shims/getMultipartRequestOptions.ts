@@ -2,7 +2,7 @@
  * Disclaimer: modules in _shims aren't intended to be imported by SDK users.
  */
 
-import { FormData } from './formdata';
+import { FormData } from './form-data';
 import type { RequestOptions } from '../core';
 import { MultipartBody } from '../uploads';
 
