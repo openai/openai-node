@@ -1,17 +1,38 @@
 {
+  "include": ["src", "tests", "examples"],
+  "exclude": ["src/_shims/*.deno.ts"],
   "compilerOptions": {
-    "declaration": true,
-    "target": "es6",
+    "target": "es2019",
+    "lib": ["es2020"],
     "module": "commonjs",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "baseUrl": "./",
+    "paths": {
+      "openai/_shims/*": ["src/_shims/*.node"],
+      "openai": ["src/index.ts"],
+      "openai/*": ["src/*"],
+      "digest-fetch": ["./typings/digest-fetch"]
+    },
+    "noEmit": true,
+
+    "resolveJsonModule": true,
+
+    "forceConsistentCasingInFileNames": true,
+
+    "strict": true,
     "noImplicitAny": true,
-    "outDir": "dist",
-    "rootDir": ".",
-    "typeRoots": [
-      "node_modules/@types"
-    ]
-  },
-  "exclude": [
-    "dist",
-    "node_modules"
-  ]
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+
+    "skipLibCheck": true
+  }
 }

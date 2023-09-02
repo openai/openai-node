@@ -1,0 +1,28 @@
+# workflow for re-running publishing to NPM in case it fails for some reason
+# you can run this workflow by navigating to https://www.github.com/openai/openai-node/actions/workflows/publish-npm.yml
+name: Publish NPM
+on:
+  workflow_dispatch:
+
+jobs:
+  publish:
+    name: publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+
+      - name: Install dependencies
+        run: |
+          yarn install
+
+      - name: Publish to NPM
+        run: |
+          bash ./bin/publish-npm
+        env:
+          NPM_TOKEN: ${{ secrets.OPENAI_NPM_TOKEN }}

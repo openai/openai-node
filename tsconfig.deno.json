@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["deno"],
+  "exclude": [],
+  "compilerOptions": {
+    "rootDir": "./deno",
+    "lib": ["es2020", "DOM"],
+    "paths": {
+      "openai/_shims/*": ["deno/_shims/*"],
+      "openai": ["deno/index.ts"],
+      "openai/*": ["deno/*"],
+      "digest-fetch": ["./typings/digest-fetch"]
+    },
+    "noEmit": true,
+    "declaration": true,
+    "declarationMap": true,
+    "outDir": "deno",
+    "pretty": true,
+    "sourceMap": true
+  }
+}
