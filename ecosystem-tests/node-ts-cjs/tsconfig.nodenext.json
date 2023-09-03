@@ -7,8 +7,8 @@
     "incremental": true,
 
     /* Language and Environment */
-    "target": "ES2022",
-    "lib": ["ES2022"],
+    "target": "ES2015",
+    "lib": ["ES2015"],
     "jsx": "react",
 
     /* Modules */
