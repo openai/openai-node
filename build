@@ -38,14 +38,14 @@ node scripts/fix-index-exports.cjs
 # index.d.mts the default import will work (even though both files have
 # the same export default statement)
 cp dist/index.d.ts dist/index.d.mts
-
-SED=(sed -i)
-if [[ "$OSTYPE" == "darwin"* ]]; then SED=(sed -i ''); fi
+cp tsconfig.dist-src.json dist/src/tsconfig.json
 
 # strip out lib="dom" and types="node" references; these are needed at build time,
 # but would pollute the user's TS environment
-REFERENCE_SUBS='s/^ *\/\/\/ *<reference *lib="dom".*//g;s/^ *\/\/\/ *<reference *types="node".*//g'
-find dist -type f -exec "${SED[@]}" "${REFERENCE_SUBS}" {} +
+find dist -type f -exec node scripts/remove-triple-slash-references.js {} +
+# strip out `unknown extends RequestInit ? never :` from dist/src/_shims;
+# these cause problems when viewing the .ts source files in go to definition
+find dist/src/_shims -type f -exec node scripts/replace-shim-guards.js {} +
 
 npm exec prettier -- --loglevel=warn --write .
 

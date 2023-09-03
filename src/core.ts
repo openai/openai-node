@@ -52,7 +52,7 @@ async function defaultParseResponse<T>(props: APIResponseProps): Promise<T> {
   // TODO handle blob, arraybuffer, other content types, etc.
   const text = await response.text();
   debug('response', response.status, response.url, response.headers, text);
-  return text as T;
+  return text as any as T;
 }
 
 /**
@@ -313,7 +313,8 @@ export abstract class APIClient {
   protected parseHeaders(headers: HeadersInit | null | undefined): Record<string, string> {
     return (
       !headers ? {}
-      : Symbol.iterator in headers ? Object.fromEntries(Array.from(headers).map((header) => [...header]))
+      : Symbol.iterator in headers ?
+        Object.fromEntries(Array.from(headers as Iterable<string[]>).map((header) => [...header]))
       : { ...headers }
     );
   }
@@ -397,7 +398,7 @@ export abstract class APIClient {
     return new PagePromise<PageClass, Item>(this, request, Page);
   }
 
-  buildURL<Req>(path: string, query: Req | undefined): string {
+  buildURL<Req extends Record<string, unknown>>(path: string, query: Req | null | undefined): string {
     const url =
       isAbsoluteURL(path) ?
         new URL(path)

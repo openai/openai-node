@@ -4,7 +4,7 @@
   "main": "index.js",
   "private": true,
   "scripts": {
-    "tsc": "tsc && tsc -p tsconfig.nodenext.json && tsc -p node_modules/openai/src/tsconfig.json",
+    "tsc": "tsc",
     "test": "jest"
   },
   "dependencies": {
@@ -19,6 +19,6 @@
     "fastest-levenshtein": "^1.0.16",
     "jest": "^29.5.0",
     "ts-jest": "^29.1.0",
-    "typescript": "4.7.4"
+    "typescript": "4.5.4"
   }
 }
