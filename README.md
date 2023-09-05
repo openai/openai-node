@@ -40,6 +40,10 @@ async function main() {
 main();
 ```
 
+## Supported functions
+
+For a full list of available functions in this SDK, please refer to the [auto-generated API.md file](https://github.com/openai/openai-node/blob/master/api.md).
+
 ## Streaming Responses
 
 We provide support for streaming responses using Server Sent Events (SSE).
