@@ -81,7 +81,7 @@ export interface FileObject {
   bytes: number;
 
   /**
-   * The unix timestamp for when the file was created.
+   * The Unix timestamp (in seconds) for when the file was created.
    */
   created_at: number;
 
