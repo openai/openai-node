@@ -21,6 +21,8 @@ yarn add openai
 > [!IMPORTANT]
 > Previous versions of this SDK used a `Configuration` class. See the [v3 to v4 migration guide](https://github.com/openai/openai-node/discussions/217).
 
+To run this example, copy the code below into a file called `hello.js`.
+
 ```js
 import OpenAI from 'openai';
 
@@ -39,6 +41,8 @@ async function main() {
 
 main();
 ```
+
+Go into the same directory as you installed the OpenAI Node package and then enter: `node hello.js`.
 
 ## Streaming Responses
 
