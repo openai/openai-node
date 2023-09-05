@@ -25,7 +25,7 @@ export interface Edit {
   choices: Array<Edit.Choice>;
 
   /**
-   * A unix timestamp of when the edit was created.
+   * The Unix timestamp (in seconds) of when the edit was created.
    */
   created: number;
 
