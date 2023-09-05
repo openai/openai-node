@@ -100,7 +100,7 @@ export interface FineTuningJob {
   id: string;
 
   /**
-   * The unix timestamp for when the fine-tuning job was created.
+   * The Unix timestamp (in seconds) for when the fine-tuning job was created.
    */
   created_at: number;
 
@@ -154,10 +154,10 @@ export interface FineTuningJob {
   /**
    * The file ID used for validation.
    */
-  validation_file: string;
+  validation_file: string | null;
 
   /**
-   * The unix timestamp for when the fine-tuning job was finished.
+   * The Unix timestamp (in seconds) for when the fine-tuning job was finished.
    */
   finished_at?: number;
 }

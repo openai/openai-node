@@ -23,7 +23,8 @@ export class Models extends APIResource {
   }
 
   /**
-   * Delete a fine-tuned model. You must have the Owner role in your organization.
+   * Delete a fine-tuned model. You must have the Owner role in your organization to
+   * delete a model.
    */
   del(model: string, options?: Core.RequestOptions): Core.APIPromise<ModelDeleted> {
     return this.delete(`/models/${model}`, options);
@@ -47,7 +48,7 @@ export interface Model {
   id: string;
 
   /**
-   * The date and time when the model was created.
+   * The Unix timestamp (in seconds) when the model was created.
    */
   created: number;
 
