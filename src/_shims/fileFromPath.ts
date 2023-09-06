@@ -1,11 +1,11 @@
 /**
  * Disclaimer: modules in _shims aren't intended to be imported by SDK users.
  *
- * This is a stub that gets replaced by fileFromPath.node.js for node environments
+ * This is a stub that gets replaced by fileFromPath-node.js for node environments
  * in the package export map
  */
 
-import type { FilePropertyBag, File } from './formdata';
+import type { FilePropertyBag, File } from './form-data';
 
 export type FileFromPathOptions = Omit<FilePropertyBag, 'lastModified'>;
 

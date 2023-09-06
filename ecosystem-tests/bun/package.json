@@ -8,6 +8,6 @@
   "devDependencies": {
     "fastest-levenshtein": "^1.0.16",
     "bun-types": "latest",
-    "typescript": "^5.1.0"
+    "typescript": "5.0.4"
   }
 }

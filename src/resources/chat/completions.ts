@@ -50,7 +50,7 @@ export interface ChatCompletion {
   choices: Array<ChatCompletion.Choice>;
 
   /**
-   * A unix timestamp of when the chat completion was created.
+   * The Unix timestamp (in seconds) of when the chat completion was created.
    */
   created: number;
 
@@ -109,7 +109,7 @@ export interface ChatCompletionChunk {
   choices: Array<ChatCompletionChunk.Choice>;
 
   /**
-   * A unix timestamp of when the chat completion chunk was created.
+   * The Unix timestamp (in seconds) of when the chat completion chunk was created.
    */
   created: number;
 
@@ -321,7 +321,7 @@ export interface ChatCompletionCreateParamsBase {
    * existing frequency in the text so far, decreasing the model's likelihood to
    * repeat the same line verbatim.
    *
-   * [See more information about frequency and presence penalties.](/docs/api-reference/parameter-details)
+   * [See more information about frequency and presence penalties.](/docs/guides/gpt/parameter-details)
    */
   frequency_penalty?: number | null;
 
@@ -329,7 +329,7 @@ export interface ChatCompletionCreateParamsBase {
    * Controls how the model responds to function calls. "none" means the model does
    * not call a function, and responds to the end-user. "auto" means the model can
    * pick between an end-user or calling a function. Specifying a particular function
-   * via `{"name":\ "my_function"}` forces the model to call that function. "none" is
+   * via `{"name": "my_function"}` forces the model to call that function. "none" is
    * the default when no functions are present. "auto" is the default if functions
    * are present.
    */
@@ -372,7 +372,7 @@ export interface ChatCompletionCreateParamsBase {
    * whether they appear in the text so far, increasing the model's likelihood to
    * talk about new topics.
    *
-   * [See more information about frequency and presence penalties.](/docs/api-reference/parameter-details)
+   * [See more information about frequency and presence penalties.](/docs/guides/gpt/parameter-details)
    */
   presence_penalty?: number | null;
 

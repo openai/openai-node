@@ -5,7 +5,7 @@
   "compilerOptions": {
     "rootDir": "./dist/src",
     "paths": {
-      "openai/_shims/*": ["dist/src/_shims/*.node"],
+      "openai/_shims/*": ["dist/src/_shims/*-node"],
       "openai": ["dist/src/index.ts"],
       "openai/*": ["dist/src/*"],
       "digest-fetch": ["./typings/digest-fetch"]
@@ -18,14 +18,17 @@
     "sourceMap": true
   },
   "tsc-alias": {
-    "resolveFullPaths": true,
     "fileExtensions": {
       "inputGlob": "{mjs,cjs,js,jsx,mts,cts,ts,tsx}"
     },
     "replacers": {
-      "replace-absolute-imports": {
+      "replace-self-referencing-imports": {
         "enabled": true,
         "file": "./scripts/replace-self-referencing-imports.js"
+      },
+      "resolve-full-paths": {
+        "enabled": true,
+        "file": "./scripts/resolve-full-paths.js"
       }
     }
   }

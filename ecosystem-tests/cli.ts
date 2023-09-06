@@ -48,6 +48,10 @@ const projects = {
       await run('npm', ['test']);
     }
   },
+  'node-ts-cjs-ts4.5': async () => {
+    await installPackage();
+    await run('npm', ['run', 'tsc']);
+  },
   'node-ts-cjs-dom': async () => {
     await installPackage();
     await run('npm', ['run', 'tsc']);
@@ -296,8 +300,7 @@ async function withRetry(fn: () => Promise<void>, identifier: string, retryAmoun
     try {
       return await fn();
     } catch (err) {
-      retryAmount--;
-      if (retryAmount === 0) throw err;
+      if (--retryAmount <= 0) throw err;
       console.error(`${identifier} failed due to ${err}; retries left ${retryAmount}`);
     }
   } while (retryAmount > 0);

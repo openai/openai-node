@@ -18,7 +18,7 @@ yarn add openai
 
 ## Usage
 
-The full API of this library can be found in [API.md file](https://github.com/openai/openai-node/blob/master/api.md). The code below shows how to get started using the chat completions API.
+The full API of this library can be found in [api.md file](https://github.com/openai/openai-node/blob/master/api.md). The code below shows how to get started using the chat completions API.
 
 ```js
 import OpenAI from 'openai';
@@ -38,9 +38,6 @@ async function main() {
 
 main();
 ```
-
-> [!IMPORTANT]
-> Previous versions of this SDK used a `Configuration` class. See the [v3 to v4 migration guide](https://github.com/openai/openai-node/discussions/217).
 
 ## Streaming Responses
 
@@ -91,6 +88,9 @@ main();
 ```
 
 Documentation for each method, request param, and response field are available in docstrings and will appear on hover in most modern editors.
+
+> [!IMPORTANT]
+> Previous versions of this SDK used a `Configuration` class. See the [v3 to v4 migration guide](https://github.com/openai/openai-node/discussions/217).
 
 ## File Uploads
 
@@ -308,6 +308,8 @@ We take backwards-compatibility seriously and work hard to ensure you can rely o
 We are keen for your feedback; please open an [issue](https://www.github.com/openai/openai-node/issues) with questions, bugs, or suggestions.
 
 ## Requirements
+
+TypeScript >= 4.5 is supported.
 
 The following runtimes are supported:
 

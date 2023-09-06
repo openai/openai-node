@@ -9,7 +9,7 @@
     "esModuleInterop": true,
     "baseUrl": "./",
     "paths": {
-      "openai/_shims/*": ["src/_shims/*.node"],
+      "openai/_shims/*": ["src/_shims/*-node"],
       "openai": ["src/index.ts"],
       "openai/*": ["src/*"],
       "digest-fetch": ["./typings/digest-fetch"]

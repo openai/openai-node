@@ -21,7 +21,7 @@ describe('resource fineTunes', () => {
     const response = await openai.fineTunes.create({
       training_file: 'file-abc123',
       batch_size: 0,
-      classification_betas: [0, 0, 0],
+      classification_betas: [0.6, 1, 1.5, 2],
       classification_n_classes: 0,
       classification_positive_class: 'string',
       compute_classification_metrics: true,

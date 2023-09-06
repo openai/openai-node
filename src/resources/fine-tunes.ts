@@ -94,7 +94,7 @@ export interface FineTune {
   id: string;
 
   /**
-   * The unix timestamp for when the fine-tuning job was created.
+   * The Unix timestamp (in seconds) for when the fine-tuning job was created.
    */
   created_at: number;
 
@@ -142,7 +142,7 @@ export interface FineTune {
   training_files: Array<Files.FileObject>;
 
   /**
-   * The unix timestamp for when the fine-tuning job was last updated.
+   * The Unix timestamp (in seconds) for when the fine-tuning job was last updated.
    */
   updated_at: number;
 
