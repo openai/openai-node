@@ -18,7 +18,8 @@ yarn add openai
 
 ## Usage
 
-The full API of this library can be found in [API.md file](https://github.com/openai/openai-node/blob/master/api.md). The code below shows how to get started using the chat completions API.
+> [!IMPORTANT]
+> Previous versions of this SDK used a `Configuration` class. See the [v3 to v4 migration guide](https://github.com/openai/openai-node/discussions/217).
 
 ```js
 import OpenAI from 'openai';
@@ -38,9 +39,6 @@ async function main() {
 
 main();
 ```
-
-> [!IMPORTANT]
-> Previous versions of this SDK used a `Configuration` class. See the [v3 to v4 migration guide](https://github.com/openai/openai-node/discussions/217).
 
 ## Streaming Responses
 
