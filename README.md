@@ -18,7 +18,7 @@ yarn add openai
 
 ## Usage
 
-The full API of this library can be found in [API.md file](https://github.com/openai/openai-node/blob/master/api.md). The code below shows how to get started using the Chat completions API.
+The full API of this library can be found in [API.md file](https://github.com/openai/openai-node/blob/master/api.md). The code below shows how to get started using the chat completions API.
 
 ```js
 import OpenAI from 'openai';
