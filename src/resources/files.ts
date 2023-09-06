@@ -2,6 +2,8 @@
 
 import * as Core from 'openai/core';
 import { APIResource } from 'openai/resource';
+import { sleep } from 'openai/core';
+import { APIConnectionTimeoutError } from 'openai/error';
 import * as API from './index';
 import { type Uploadable, multipartFormRequestOptions } from 'openai/core';
 import { Page } from 'openai/pagination';
@@ -46,6 +48,32 @@ export class Files extends APIResource {
       ...options,
       headers: { Accept: 'application/json', ...options?.headers },
     });
+  }
+
+  /**
+   * Waits for the given file to be processed, default timeout is 30 mins.
+   */
+  async waitForProcessing(
+    id: string,
+    { pollInterval = 5000, maxWait = 30 * 60 * 1000 }: { pollInterval?: number; maxWait?: number } = {},
+  ): Promise<FileObject> {
+    const TERMINAL_STATES = new Set(['processed', 'error', 'deleted']);
+
+    const start = Date.now();
+    let file = await this.retrieve(id);
+
+    while (!file.status || !TERMINAL_STATES.has(file.status)) {
+      await sleep(pollInterval);
+
+      file = await this.retrieve(id);
+      if (Date.now() - start > maxWait) {
+        throw new APIConnectionTimeoutError({
+          message: `Giving up on waiting for file ${id} to finish processing after ${maxWait} milliseconds.`,
+        });
+      }
+    }
+
+    return file;
   }
 }
 
