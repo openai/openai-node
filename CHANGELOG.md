@@ -13,6 +13,11 @@ Full Changelog: [v4.5.0...v4.6.0](https://github.com/openai/openai-node/compare/
 
 * fix module not found errors in Vercel edge ([#300](https://github.com/openai/openai-node/issues/300)) ([47c79fe](https://github.com/openai/openai-node/commit/47c79fee0fa715ad04410e73530829602736d85f))
 
+
+### Chores
+
+* **next => master:** release 4.6.0 ([b90ee4a](https://github.com/openai/openai-node/commit/b90ee4ac45c32d76f1d65e18c428f4387e4dabfd))
+
 ## 4.5.0 (2023-09-06)
 
 Full Changelog: [v4.4.0...v4.5.0](https://github.com/openai/openai-node/compare/v4.4.0...v4.5.0)
