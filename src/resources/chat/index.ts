@@ -6,6 +6,7 @@ export {
   ChatCompletionChunk,
   ChatCompletionMessage,
   ChatCompletionMessageParam,
+  ChatCompletionRole,
   CreateChatCompletionRequestMessage,
   ChatCompletionCreateParams,
   CompletionCreateParams,
