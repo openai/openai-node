@@ -12,11 +12,7 @@ function replaceSelfReferencingImports({ orig, file, config }) {
 
   return orig.replace(/['"]([^"'\r\n]+)['"]/, (match, importPath) => {
     if (!importPath.startsWith('openai/')) return match;
-    if (!file.startsWith(distSrcDir)) {
-      const ext = file.endsWith('.d.ts') ? '' : path.extname(file);
-      const { dir, base } = path.parse(importPath);
-      return JSON.stringify(`${dir}/${base}${ext}`);
-    }
+    if (!file.startsWith(distSrcDir)) return match;
     let relativePath = path.relative(
       path.dirname(file),
       path.join(distSrcDir, importPath.substring('openai/'.length)),
