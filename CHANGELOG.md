@@ -1,5 +1,18 @@
 # Changelog
 
+## 4.6.0 (2023-09-08)
+
+Full Changelog: [v4.5.0...v4.6.0](https://github.com/openai/openai-node/compare/v4.5.0...v4.6.0)
+
+### Features
+
+* **types:** extract ChatCompletionRole enum to its own type ([#298](https://github.com/openai/openai-node/issues/298)) ([5893e37](https://github.com/openai/openai-node/commit/5893e37406ff85331c85a3baa519ca3051a28e00))
+
+
+### Bug Fixes
+
+* fix module not found errors in Vercel edge ([#300](https://github.com/openai/openai-node/issues/300)) ([47c79fe](https://github.com/openai/openai-node/commit/47c79fee0fa715ad04410e73530829602736d85f))
+
 ## 4.5.0 (2023-09-06)
 
 Full Changelog: [v4.4.0...v4.5.0](https://github.com/openai/openai-node/compare/v4.4.0...v4.5.0)
