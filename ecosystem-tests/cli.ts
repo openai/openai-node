@@ -21,8 +21,14 @@ const projects = {
   'vercel-edge': async () => {
     await installPackage();
 
+    if (state.live) {
+      await run('npm', ['run', 'test:ci:dev']);
+    }
     await run('npm', ['run', 'build']);
 
+    if (state.live) {
+      await run('npm', ['run', 'test:ci']);
+    }
     if (state.deploy) {
       await run('npm', ['run', 'vercel', 'deploy', '--prod', '--force']);
     }

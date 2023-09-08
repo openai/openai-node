@@ -10,9 +10,10 @@
   "license": "Apache-2.0",
   "private": false,
   "exports": {
-    "./_shims/*.mjs": {
+    "./_shims/*": {
       "deno": {
         "types": "./dist/_shims/*.d.ts",
+        "require": "./dist/_shims/*.js",
         "default": "./dist/_shims/*.mjs"
       },
       "bun": {
@@ -22,46 +23,27 @@
       },
       "browser": {
         "types": "./dist/_shims/*.d.ts",
+        "require": "./dist/_shims/*.js",
         "default": "./dist/_shims/*.mjs"
       },
       "worker": {
         "types": "./dist/_shims/*.d.ts",
+        "require": "./dist/_shims/*.js",
         "default": "./dist/_shims/*.mjs"
       },
       "workerd": {
         "types": "./dist/_shims/*.d.ts",
+        "require": "./dist/_shims/*.js",
         "default": "./dist/_shims/*.mjs"
       },
       "node": {
         "types": "./dist/_shims/*-node.d.ts",
+        "require": "./dist/_shims/*-node.js",
         "default": "./dist/_shims/*-node.mjs"
       },
       "types": "./dist/_shims/*.d.ts",
+      "require": "./dist/_shims/*.js",
       "default": "./dist/_shims/*.mjs"
-    },
-    "./_shims/*.js": {
-      "deno": {
-        "types": "./dist/_shims/*.d.ts",
-        "default": "./dist/_shims/*.js"
-      },
-      "browser": {
-        "types": "./dist/_shims/*.d.ts",
-        "default": "./dist/_shims/*.js"
-      },
-      "worker": {
-        "types": "./dist/_shims/*.d.ts",
-        "default": "./dist/_shims/*.js"
-      },
-      "workerd": {
-        "types": "./dist/_shims/*.d.ts",
-        "default": "./dist/_shims/*.js"
-      },
-      "node": {
-        "types": "./dist/_shims/*-node.d.ts",
-        "default": "./dist/_shims/*-node.js"
-      },
-      "types": "./dist/_shims/*.d.ts",
-      "default": "./dist/_shims/*.js"
     },
     ".": {
       "require": {
