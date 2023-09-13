@@ -14,7 +14,7 @@ export class Jobs extends APIResource {
    * Response includes details of the enqueued job including job status and the name
    * of the fine-tuned models once complete.
    *
-   * [Learn more about fine-tuning](/docs/guides/fine-tuning)
+   * [Learn more about fine-tuning](https://platform.openai.com/docs/guides/fine-tuning)
    */
   create(body: JobCreateParams, options?: Core.RequestOptions): Core.APIPromise<FineTuningJob> {
     return this.post('/fine_tuning/jobs', { body, ...options });
@@ -23,7 +23,7 @@ export class Jobs extends APIResource {
   /**
    * Get info about a fine-tuning job.
    *
-   * [Learn more about fine-tuning](/docs/guides/fine-tuning)
+   * [Learn more about fine-tuning](https://platform.openai.com/docs/guides/fine-tuning)
    */
   retrieve(fineTuningJobId: string, options?: Core.RequestOptions): Core.APIPromise<FineTuningJob> {
     return this.get(`/fine_tuning/jobs/${fineTuningJobId}`, options);
@@ -111,7 +111,8 @@ export interface FineTuningJob {
 
   /**
    * The hyperparameters used for the fine-tuning job. See the
-   * [fine-tuning guide](/docs/guides/fine-tuning) for more details.
+   * [fine-tuning guide](https://platform.openai.com/docs/guides/fine-tuning) for
+   * more details.
    */
   hyperparameters: FineTuningJob.Hyperparameters;
 
@@ -165,7 +166,8 @@ export interface FineTuningJob {
 export namespace FineTuningJob {
   /**
    * The hyperparameters used for the fine-tuning job. See the
-   * [fine-tuning guide](/docs/guides/fine-tuning) for more details.
+   * [fine-tuning guide](https://platform.openai.com/docs/guides/fine-tuning) for
+   * more details.
    */
   export interface Hyperparameters {
     /**
@@ -193,19 +195,21 @@ export interface FineTuningJobEvent {
 export interface JobCreateParams {
   /**
    * The name of the model to fine-tune. You can select one of the
-   * [supported models](/docs/guides/fine-tuning/what-models-can-be-fine-tuned).
+   * [supported models](https://platform.openai.com/docs/guides/fine-tuning/what-models-can-be-fine-tuned).
    */
   model: (string & {}) | 'babbage-002' | 'davinci-002' | 'gpt-3.5-turbo';
 
   /**
    * The ID of an uploaded file that contains training data.
    *
-   * See [upload file](/docs/api-reference/files/upload) for how to upload a file.
+   * See [upload file](https://platform.openai.com/docs/api-reference/files/upload)
+   * for how to upload a file.
    *
    * Your dataset must be formatted as a JSONL file. Additionally, you must upload
    * your file with the purpose `fine-tune`.
    *
-   * See the [fine-tuning guide](/docs/guides/fine-tuning) for more details.
+   * See the [fine-tuning guide](https://platform.openai.com/docs/guides/fine-tuning)
+   * for more details.
    */
   training_file: string;
 
@@ -234,7 +238,8 @@ export interface JobCreateParams {
    * Your dataset must be formatted as a JSONL file. You must upload your file with
    * the purpose `fine-tune`.
    *
-   * See the [fine-tuning guide](/docs/guides/fine-tuning) for more details.
+   * See the [fine-tuning guide](https://platform.openai.com/docs/guides/fine-tuning)
+   * for more details.
    */
   validation_file?: string | null;
 }

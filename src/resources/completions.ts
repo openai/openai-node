@@ -117,9 +117,10 @@ export type CompletionCreateParams = CompletionCreateParamsNonStreaming | Comple
 export interface CompletionCreateParamsBase {
   /**
    * ID of the model to use. You can use the
-   * [List models](/docs/api-reference/models/list) API to see all of your available
-   * models, or see our [Model overview](/docs/models/overview) for descriptions of
-   * them.
+   * [List models](https://platform.openai.com/docs/api-reference/models/list) API to
+   * see all of your available models, or see our
+   * [Model overview](https://platform.openai.com/docs/models/overview) for
+   * descriptions of them.
    */
   model:
     | (string & {})
@@ -166,7 +167,7 @@ export interface CompletionCreateParamsBase {
    * existing frequency in the text so far, decreasing the model's likelihood to
    * repeat the same line verbatim.
    *
-   * [See more information about frequency and presence penalties.](/docs/guides/gpt/parameter-details)
+   * [See more information about frequency and presence penalties.](https://platform.openai.com/docs/guides/gpt/parameter-details)
    */
   frequency_penalty?: number | null;
 
@@ -221,7 +222,7 @@ export interface CompletionCreateParamsBase {
    * whether they appear in the text so far, increasing the model's likelihood to
    * talk about new topics.
    *
-   * [See more information about frequency and presence penalties.](/docs/guides/gpt/parameter-details)
+   * [See more information about frequency and presence penalties.](https://platform.openai.com/docs/guides/gpt/parameter-details)
    */
   presence_penalty?: number | null;
 
@@ -266,7 +267,8 @@ export interface CompletionCreateParamsBase {
 
   /**
    * A unique identifier representing your end-user, which can help OpenAI to monitor
-   * and detect abuse. [Learn more](/docs/guides/safety-best-practices/end-user-ids).
+   * and detect abuse.
+   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices/end-user-ids).
    */
   user?: string;
 }

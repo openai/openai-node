@@ -304,8 +304,8 @@ export interface ChatCompletionCreateParamsBase {
 
   /**
    * ID of the model to use. See the
-   * [model endpoint compatibility](/docs/models/model-endpoint-compatibility) table
-   * for details on which models work with the Chat API.
+   * [model endpoint compatibility](https://platform.openai.com/docs/models/model-endpoint-compatibility)
+   * table for details on which models work with the Chat API.
    */
   model:
     | (string & {})
@@ -326,7 +326,7 @@ export interface ChatCompletionCreateParamsBase {
    * existing frequency in the text so far, decreasing the model's likelihood to
    * repeat the same line verbatim.
    *
-   * [See more information about frequency and presence penalties.](/docs/guides/gpt/parameter-details)
+   * [See more information about frequency and presence penalties.](https://platform.openai.com/docs/guides/gpt/parameter-details)
    */
   frequency_penalty?: number | null;
 
@@ -377,7 +377,7 @@ export interface ChatCompletionCreateParamsBase {
    * whether they appear in the text so far, increasing the model's likelihood to
    * talk about new topics.
    *
-   * [See more information about frequency and presence penalties.](/docs/guides/gpt/parameter-details)
+   * [See more information about frequency and presence penalties.](https://platform.openai.com/docs/guides/gpt/parameter-details)
    */
   presence_penalty?: number | null;
 
@@ -416,7 +416,8 @@ export interface ChatCompletionCreateParamsBase {
 
   /**
    * A unique identifier representing your end-user, which can help OpenAI to monitor
-   * and detect abuse. [Learn more](/docs/guides/safety-best-practices/end-user-ids).
+   * and detect abuse.
+   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices/end-user-ids).
    */
   user?: string;
 }
@@ -438,7 +439,8 @@ export namespace ChatCompletionCreateParams {
 
     /**
      * The parameters the functions accepts, described as a JSON Schema object. See the
-     * [guide](/docs/guides/gpt/function-calling) for examples, and the
+     * [guide](https://platform.openai.com/docs/guides/gpt/function-calling) for
+     * examples, and the
      * [JSON Schema reference](https://json-schema.org/understanding-json-schema/) for
      * documentation about the format.
      *
