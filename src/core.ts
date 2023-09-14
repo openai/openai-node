@@ -463,6 +463,9 @@ export abstract class APIClient {
     if (shouldRetryHeader === 'true') return true;
     if (shouldRetryHeader === 'false') return false;
 
+    // Retry on request timeouts.
+    if (response.status === 408) return true;
+
     // Retry on lock timeouts.
     if (response.status === 409) return true;
 
