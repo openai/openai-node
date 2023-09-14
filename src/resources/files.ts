@@ -153,8 +153,9 @@ export interface FileCreateParams {
   /**
    * The intended purpose of the uploaded documents.
    *
-   * Use "fine-tune" for [fine-tuning](/docs/api-reference/fine-tuning). This allows
-   * us to validate the format of the uploaded file.
+   * Use "fine-tune" for
+   * [fine-tuning](https://platform.openai.com/docs/api-reference/fine-tuning). This
+   * allows us to validate the format of the uploaded file.
    */
   purpose: string;
 }

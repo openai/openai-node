@@ -1,5 +1,14 @@
 # Changelog
 
+## 4.7.0 (2023-09-14)
+
+Full Changelog: [v4.6.0...v4.7.0](https://github.com/openai/openai-node/compare/v4.6.0...v4.7.0)
+
+### Features
+
+* **client:** retry on 408 Request Timeout ([#310](https://github.com/openai/openai-node/issues/310)) ([1f98eac](https://github.com/openai/openai-node/commit/1f98eac5be956e56d75ef5456115165b45a4763c))
+* make docs urls in comments absolute ([#306](https://github.com/openai/openai-node/issues/306)) ([9db3819](https://github.com/openai/openai-node/commit/9db381961e38d2280b0602447e7d91691b327bde))
+
 ## 4.6.0 (2023-09-08)
 
 Full Changelog: [v4.5.0...v4.6.0](https://github.com/openai/openai-node/compare/v4.5.0...v4.6.0)
