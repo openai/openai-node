@@ -79,7 +79,8 @@ export interface ImageCreateVariationParams {
 
   /**
    * A unique identifier representing your end-user, which can help OpenAI to monitor
-   * and detect abuse. [Learn more](/docs/guides/safety-best-practices/end-user-ids).
+   * and detect abuse.
+   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices/end-user-ids).
    */
   user?: string;
 }
@@ -123,7 +124,8 @@ export interface ImageEditParams {
 
   /**
    * A unique identifier representing your end-user, which can help OpenAI to monitor
-   * and detect abuse. [Learn more](/docs/guides/safety-best-practices/end-user-ids).
+   * and detect abuse.
+   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices/end-user-ids).
    */
   user?: string;
 }
@@ -154,7 +156,8 @@ export interface ImageGenerateParams {
 
   /**
    * A unique identifier representing your end-user, which can help OpenAI to monitor
-   * and detect abuse. [Learn more](/docs/guides/safety-best-practices/end-user-ids).
+   * and detect abuse.
+   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices/end-user-ids).
    */
   user?: string;
 }
