@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.8.0 (2023-09-15)
+
+Full Changelog: [v4.7.1...v4.8.0](https://github.com/openai/openai-node/compare/v4.7.1...v4.8.0)
+
+### Features
+
+* **errors:** add status code to error message ([#315](https://github.com/openai/openai-node/issues/315)) ([9341219](https://github.com/openai/openai-node/commit/93412197c67cb3fb203f35e3ae0a7c3fb173453e))
+
 ## 4.7.1 (2023-09-15)
 
 Full Changelog: [v4.7.0...v4.7.1](https://github.com/openai/openai-node/compare/v4.7.0...v4.7.1)
