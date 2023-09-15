@@ -8,6 +8,7 @@
   "bump-minor-pre-major": true,
   "bump-patch-for-minor-pre-major": true,
   "pull-request-header": "Automated Release PR",
+  "pull-request-title-pattern": "release: ${version}",
   "changelog-sections": [
     {
       "type": "feat",
