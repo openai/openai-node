@@ -10,6 +10,41 @@
   "license": "Apache-2.0",
   "private": false,
   "exports": {
+    "./_shims/node-readable": {
+      "deno": {
+        "types": "./dist/_shims/node-readable.d.ts",
+        "require": "./dist/_shims/node-readable.js",
+        "default": "./dist/_shims/node-readable.mjs"
+      },
+      "bun": {
+        "types": "./dist/_shims/node-readable-node.d.ts",
+        "require": "./dist/_shims/node-readable-node.js",
+        "default": "./dist/_shims/node-readable-node.mjs"
+      },
+      "browser": {
+        "types": "./dist/_shims/node-readable.d.ts",
+        "require": "./dist/_shims/node-readable.js",
+        "default": "./dist/_shims/node-readable.mjs"
+      },
+      "worker": {
+        "types": "./dist/_shims/node-readable.d.ts",
+        "require": "./dist/_shims/node-readable.js",
+        "default": "./dist/_shims/node-readable.mjs"
+      },
+      "workerd": {
+        "types": "./dist/_shims/node-readable.d.ts",
+        "require": "./dist/_shims/node-readable.js",
+        "default": "./dist/_shims/node-readable.mjs"
+      },
+      "node": {
+        "types": "./dist/_shims/node-readable-node.d.ts",
+        "require": "./dist/_shims/node-readable-node.js",
+        "default": "./dist/_shims/node-readable-node.mjs"
+      },
+      "types": "./dist/_shims/node-readable.d.ts",
+      "require": "./dist/_shims/node-readable.js",
+      "default": "./dist/_shims/node-readable.mjs"
+    },
     "./_shims/*": {
       "deno": {
         "types": "./dist/_shims/*.d.ts",
