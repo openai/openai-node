@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.7.1 (2023-09-15)
+
+Full Changelog: [v4.7.0...v4.7.1](https://github.com/openai/openai-node/compare/v4.7.0...v4.7.1)
+
+### Documentation
+
+* declare Bun 1.0 officially supported ([#314](https://github.com/openai/openai-node/issues/314)) ([a16e268](https://github.com/openai/openai-node/commit/a16e26863390235cb43e2fe0e569298a4f84c32f))
+
 ## 4.7.0 (2023-09-14)
 
 Full Changelog: [v4.6.0...v4.7.0](https://github.com/openai/openai-node/compare/v4.6.0...v4.7.0)

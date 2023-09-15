@@ -57,7 +57,7 @@ test(`streaming works`, async function () {
 
 // @ts-ignore avoid DOM lib for testing purposes
 if (typeof File !== 'undefined') {
-  test.todo('handles builtinFile', async function () {
+  test('handles builtinFile', async function () {
     const file = await fetch(url)
       .then((x) => x.arrayBuffer())
       // @ts-ignore avoid DOM lib for testing purposes
@@ -68,14 +68,14 @@ if (typeof File !== 'undefined') {
   });
 }
 
-test.todo('handles Response', async function () {
+test('handles Response', async function () {
   const file = await fetch(url);
 
   const result = await client.audio.transcriptions.create({ file, model });
   expectSimilar(result.text, correctAnswer, 12);
 });
 
-test.todo('handles fs.ReadStream', async function () {
+test('handles fs.ReadStream', async function () {
   const result = await client.audio.transcriptions.create({
     file: fs.createReadStream('sample1.mp3'),
     model,
@@ -87,7 +87,7 @@ const fineTune = `{"prompt": "<prompt text>", "completion": "<ideal generated te
 
 // @ts-ignore avoid DOM lib for testing purposes
 if (typeof Blob !== 'undefined') {
-  test.todo('toFile handles builtin Blob', async function () {
+  test('toFile handles builtin Blob', async function () {
     const result = await client.files.create({
       file: await toFile(
         // @ts-ignore avoid DOM lib for testing purposes
@@ -99,7 +99,7 @@ if (typeof Blob !== 'undefined') {
     expect(result.status).toEqual('uploaded');
   });
 }
-test.todo('toFile handles Uint8Array', async function () {
+test('toFile handles Uint8Array', async function () {
   const result = await client.files.create({
     file: await toFile(
       // @ts-ignore avoid DOM lib for testing purposes
@@ -110,7 +110,7 @@ test.todo('toFile handles Uint8Array', async function () {
   });
   expect(result.status).toEqual('uploaded');
 });
-test.todo('toFile handles ArrayBuffer', async function () {
+test('toFile handles ArrayBuffer', async function () {
   const result = await client.files.create({
     file: await toFile(
       // @ts-ignore avoid DOM lib for testing purposes
@@ -121,7 +121,7 @@ test.todo('toFile handles ArrayBuffer', async function () {
   });
   expect(result.status).toEqual('uploaded');
 });
-test.todo('toFile handles DataView', async function () {
+test('toFile handles DataView', async function () {
   const result = await client.files.create({
     file: await toFile(
       // @ts-ignore avoid DOM lib for testing purposes
