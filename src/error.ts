@@ -17,7 +17,7 @@ export class APIError extends Error {
     message: string | undefined,
     headers: Headers | undefined,
   ) {
-    super(APIError.makeMessage(error, message));
+    super(`${status} ${APIError.makeMessage(error, message)}`);
     this.status = status;
     this.headers = headers;
 
@@ -34,7 +34,7 @@ export class APIError extends Error {
         typeof error.message === 'string' ? error.message
         : JSON.stringify(error.message)
       : error ? JSON.stringify(error)
-      : message || 'Unknown error occurred'
+      : message || 'status code (no body)'
     );
   }
 
