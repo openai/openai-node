@@ -2,6 +2,7 @@ import OpenAI, { toFile } from 'openai';
 import fs from 'fs';
 import { distance } from 'fastest-levenshtein';
 import { test, expect } from 'bun:test';
+import { ChatCompletion } from 'openai/resources/chat/completions';
 
 const url = 'https://audio-samples.github.io/samples/mp3/blizzard_biased/sample-1.mp3';
 const filename = 'sample-1.mp3';
@@ -40,6 +41,39 @@ test(`basic request works`, async function () {
     messages: [{ role: 'user', content: 'Say this is a test' }],
   });
   expectSimilar(completion.choices[0]?.message?.content, 'This is a test', 10);
+});
+
+test(`raw response`, async function () {
+  const response = await client.chat.completions
+    .create({
+      model: 'gpt-4',
+      messages: [{ role: 'user', content: 'Say this is a test' }],
+    })
+    .asResponse();
+
+  // test that we can use web Response API
+  const { body } = response;
+  if (!body) throw new Error('expected response.body to be defined');
+
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let result;
+  do {
+    result = await reader.read();
+    if (!result.done) chunks.push(result.value);
+  } while (!result.done);
+
+  reader.releaseLock();
+
+  let offset = 0;
+  const merged = new Uint8Array(chunks.reduce((total, chunk) => total + chunk.length, 0));
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.length;
+  }
+
+  const json: ChatCompletion = JSON.parse(new TextDecoder().decode(merged));
+  expectSimilar(json.choices[0]?.message.content || '', 'This is a test', 10);
 });
 
 test(`streaming works`, async function () {

@@ -318,5 +318,9 @@ The following runtimes are supported:
 - Bun 1.0 or later.
 - Cloudflare Workers.
 - Vercel Edge Runtime.
+- Jest 28 or greater with the `"node"` environment (`"jsdom"` is not supported at this time).
+- Nitro v2.6 or greater.
+
+Note that React Native is not supported at this time.
 
 If you are interested in other runtime environments, please open or upvote an issue on GitHub.

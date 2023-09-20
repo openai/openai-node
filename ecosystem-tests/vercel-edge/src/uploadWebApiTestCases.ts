@@ -1,5 +1,7 @@
 import OpenAI, { toFile } from 'openai';
 import { TranscriptionCreateParams } from 'openai/resources/audio/transcriptions';
+import { ChatCompletion } from 'openai/resources/chat/completions';
+import * as nf from 'node-fetch';
 
 /**
  * Tests uploads using various Web API data objects.
@@ -47,6 +49,65 @@ export function uploadWebApiTestCases({
     await client.audio.transcriptions.create({ file: 'test', model: 'whisper-1' });
   }
 
+  if (runtime === 'node') {
+    it(`raw response`, async function () {
+      const response = await client.chat.completions
+        .create({
+          model: 'gpt-4',
+          messages: [{ role: 'user', content: 'Say this is a test' }],
+        })
+        .asResponse();
+
+      // test that we can use node-fetch Response API
+      const chunks: string[] = [];
+      // we can't have both node and web response types in one project,
+      // but the tests will work at runtime because they will be in different
+      // enrivonments.  So cast to any here
+      const { body } = response as any as nf.Response;
+      if (!body) throw new Error(`expected response.body to be defined`);
+      body.on('data', (chunk) => chunks.push(chunk));
+      await new Promise<void>((resolve, reject) => {
+        body.once('end', resolve);
+        body.once('error', reject);
+      });
+      const json: ChatCompletion = JSON.parse(chunks.join(''));
+      expectSimilar(json.choices[0]?.message.content || '', 'This is a test', 10);
+    });
+  } else {
+    it(`raw response`, async function () {
+      const response = await client.chat.completions
+        .create({
+          model: 'gpt-4',
+          messages: [{ role: 'user', content: 'Say this is a test' }],
+        })
+        .asResponse();
+
+      // test that we can use web Response API
+      const { body } = response;
+      if (!body) throw new Error('expected response.body to be defined');
+
+      const reader = body.getReader();
+      const chunks: Uint8Array[] = [];
+      let result;
+      do {
+        result = await reader.read();
+        if (!result.done) chunks.push(result.value);
+      } while (!result.done);
+
+      reader.releaseLock();
+
+      let offset = 0;
+      const merged = new Uint8Array(chunks.reduce((total, chunk) => total + chunk.length, 0));
+      for (const chunk of chunks) {
+        merged.set(chunk, offset);
+        offset += chunk.length;
+      }
+
+      const json: ChatCompletion = JSON.parse(new TextDecoder().decode(merged));
+      expectSimilar(json.choices[0]?.message.content || '', 'This is a test', 10);
+    });
+  }
+
   it(`streaming works`, async function () {
     const stream = await client.chat.completions.create({
       model: 'gpt-4',
@@ -83,7 +144,7 @@ export function uploadWebApiTestCases({
   const fineTune = `{"prompt": "<prompt text>", "completion": "<ideal generated text>"}`;
 
   it('toFile handles string', async () => {
-    // @ts-expect-error we don't type support for `string` to avoid a footgun with passing the file path
+    // @ts-ignore this only doesn't error in vercel build...
     const file = await toFile(fineTune, 'finetune.jsonl');
     const result = await client.files.create({ file, purpose: 'fine-tune' });
     expectEqual(result.status, 'uploaded');

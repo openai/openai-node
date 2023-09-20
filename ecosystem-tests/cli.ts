@@ -7,7 +7,20 @@ import path from 'path';
 const TAR_NAME = 'openai.tgz';
 const PACK_FILE = `.pack/${TAR_NAME}`;
 
+async function defaultNodeRunner() {
+  await installPackage();
+  await run('npm', ['run', 'tsc']);
+  if (state.live) await run('npm', ['test']);
+}
+
 const projects = {
+  'node-ts-cjs': defaultNodeRunner,
+  'node-ts-cjs-web': defaultNodeRunner,
+  'node-ts-cjs-auto': defaultNodeRunner,
+  'node-ts4.5-jest27': defaultNodeRunner,
+  'node-ts-esm': defaultNodeRunner,
+  'node-ts-esm-web': defaultNodeRunner,
+  'node-ts-esm-auto': defaultNodeRunner,
   'ts-browser-webpack': async () => {
     await installPackage();
 
@@ -44,36 +57,6 @@ const projects = {
     if (state.deploy) {
       await run('npm', ['run', 'deploy']);
     }
-  },
-  'node-ts-cjs': async () => {
-    await installPackage();
-
-    await run('npm', ['run', 'tsc']);
-
-    if (state.live) {
-      await run('npm', ['test']);
-    }
-  },
-  'node-ts-cjs-ts4.5': async () => {
-    await installPackage();
-    await run('npm', ['run', 'tsc']);
-  },
-  'node-ts-cjs-dom': async () => {
-    await installPackage();
-    await run('npm', ['run', 'tsc']);
-  },
-  'node-ts-esm': async () => {
-    await installPackage();
-
-    await run('npm', ['run', 'tsc']);
-
-    if (state.live) {
-      await run('npm', ['run', 'test']);
-    }
-  },
-  'node-ts-esm-dom': async () => {
-    await installPackage();
-    await run('npm', ['run', 'tsc']);
   },
   bun: async () => {
     if (state.fromNpm) {
@@ -116,6 +99,7 @@ const projects = {
 };
 
 const projectNames = Object.keys(projects) as Array<keyof typeof projects>;
+const projectNamesSet = new Set(projectNames);
 
 function parseArgs() {
   return yargs(process.argv.slice(2))
@@ -189,10 +173,13 @@ async function main() {
     await buildPackage();
   }
 
+  const positionalArgs = args._.filter(Boolean);
+
   // For some reason `yargs` doesn't pick up the positional args correctly
   const projectsToRun = (
     args.projects?.length ? args.projects
-    : args._.length ? args._
+    : positionalArgs.length ?
+      positionalArgs.filter((n) => typeof n === 'string' && (projectNamesSet as Set<string>).has(n))
     : projectNames) as typeof projectNames;
   console.error(`running projects: ${projectsToRun}`);
 
@@ -234,10 +221,11 @@ async function main() {
           const project = queue.shift();
           if (!project) break;
 
-          let stdout, stderr;
+          // preserve interleaved ordering of writes to stdout/stderr
+          const chunks: { dest: 'stdout' | 'stderr'; data: string | Buffer }[] = [];
           try {
             runningProjects.add(project);
-            const result = await execa(
+            const child = execa(
               'yarn',
               [
                 'tsn',
@@ -252,16 +240,19 @@ async function main() {
               ],
               { stdio: 'pipe', encoding: 'utf8', maxBuffer: 100 * 1024 * 1024 },
             );
-            ({ stdout, stderr } = result);
+            child.stdout?.on('data', (data) => chunks.push({ dest: 'stdout', data }));
+            child.stderr?.on('data', (data) => chunks.push({ dest: 'stderr', data }));
+            await child;
           } catch (error) {
-            ({ stdout, stderr } = error as any);
             failed.push(project);
           } finally {
             runningProjects.delete(project);
           }
 
-          if (stdout) process.stdout.write(stdout);
-          if (stderr) process.stderr.write(stderr);
+          for (const { dest, data } of chunks) {
+            if (dest === 'stdout') process.stdout.write(data);
+            else process.stderr.write(data);
+          }
         }
       }),
     );
@@ -274,18 +265,21 @@ async function main() {
 
       await withChdir(path.join(rootDir, 'ecosystem-tests', project), async () => {
         console.error('\n');
-        console.error(banner(project));
+        console.error(banner(`▶️ ${project}`));
         console.error('\n');
 
         try {
           await withRetry(fn, project, state.retry);
-          console.error(`✅ - Successfully ran ${project}`);
+          console.error('\n');
+          console.error(banner(`✅ ${project}`));
         } catch (err) {
           if (err && (err as any).shortMessage) {
-            console.error('❌', (err as any).shortMessage);
+            console.error((err as any).shortMessage);
           } else {
-            console.error('❌', err);
+            console.error(err);
           }
+          console.error('\n');
+          console.error(banner(`❌ ${project}`));
           failed.push(project);
         }
         console.error('\n');
@@ -330,8 +324,6 @@ async function buildPackage() {
   if (state.fromNpm) {
     return;
   }
-
-  await run('yarn', ['build']);
 
   if (!(await pathExists('.pack'))) {
     await fs.mkdir('.pack');
