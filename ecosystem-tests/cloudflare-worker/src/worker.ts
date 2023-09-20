@@ -33,6 +33,11 @@ type Test = { description: string; handler: () => Promise<void> };
 
 export default {
 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+		const url = new URL(request.url);
+		// start-server-and-test polls / to see if the server is up and running
+		if (url.pathname === '/') return new Response();
+		// then the test code requests /test
+		if (url.pathname !== '/test') return new Response(null, { status: 404 });
 		try {
 			console.error('importing openai');
 			const { default: OpenAI } = await import('openai');

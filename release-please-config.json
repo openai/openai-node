@@ -58,5 +58,7 @@
     }
   ],
   "release-type": "node",
-  "extra-files": ["src/version.ts"]
+  "extra-files": [
+    "src/version.ts"
+  ]
 }

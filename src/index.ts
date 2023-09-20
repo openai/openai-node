@@ -4,7 +4,7 @@ import * as Core from './core';
 import * as Pagination from './pagination';
 import * as API from './resources/index';
 import * as Errors from './error';
-import type { Agent } from 'openai/_shims/agent';
+import { type Agent } from './_shims/index';
 import * as Uploads from './uploads';
 
 export interface ClientOptions {
