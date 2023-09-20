@@ -1,16 +1,17 @@
 import { VERSION } from './version';
 import { Stream } from './streaming';
 import { APIError, APIConnectionError, APIConnectionTimeoutError, APIUserAbortError } from './error';
-import type { Readable } from 'openai/_shims/node-readable';
-import { getDefaultAgent, type Agent } from 'openai/_shims/agent';
 import {
+  kind as shimsKind,
+  type Readable,
+  getDefaultAgent,
+  type Agent,
   fetch,
-  isPolyfilled as fetchIsPolyfilled,
   type RequestInfo,
   type RequestInit,
   type Response,
   type HeadersInit,
-} from 'openai/_shims/fetch';
+} from './_shims/index';
 export { type Response };
 import { isMultipartBody } from './uploads';
 export {
@@ -84,6 +85,12 @@ export class APIPromise<T> extends Promise<T> {
    *
    * If you want to parse the response body but still get the `Response`
    * instance, you can use {@link withResponse()}.
+   *
+   * 👋 Getting the wrong TypeScript type for `Response`?
+   * Try setting `"moduleResolution": "NodeNext"` if you can,
+   * or add one of these imports before your first `import … from 'openai'`:
+   * - `import 'openai/shims/node'` (if you're running on Node)
+   * - `import 'openai/shims/web'` (otherwise)
    */
   asResponse(): Promise<Response> {
     return this.responsePromise.then((p) => p.response);
@@ -93,6 +100,13 @@ export class APIPromise<T> extends Promise<T> {
    *
    * If you just want to get the raw `Response` instance without parsing it,
    * you can use {@link asResponse()}.
+   *
+   *
+   * 👋 Getting the wrong TypeScript type for `Response`?
+   * Try setting `"moduleResolution": "NodeNext"` if you can,
+   * or add one of these imports before your first `import … from 'openai'`:
+   * - `import 'openai/shims/node'` (if you're running on Node)
+   * - `import 'openai/shims/web'` (otherwise)
    */
   async withResponse(): Promise<{ data: T; response: Response }> {
     const [data, response] = await Promise.all([this.parse(), this.asResponse()]);
@@ -277,7 +291,7 @@ export abstract class APIClient {
       ...headers,
     };
     // let builtin fetch set the Content-Type for multipart bodies
-    if (isMultipartBody(options.body) && !fetchIsPolyfilled) {
+    if (isMultipartBody(options.body) && shimsKind !== 'node') {
       delete reqHeaders['Content-Type'];
     }
 
@@ -444,11 +458,14 @@ export abstract class APIClient {
 
     const timeout = setTimeout(() => controller.abort(), ms);
 
-    return this.getRequestClient()
-      .fetch(url, { signal: controller.signal as any, ...options })
-      .finally(() => {
-        clearTimeout(timeout);
-      });
+    return (
+      this.getRequestClient()
+        // use undefined this binding; fetch errors if bound to something else in browser/cloudflare
+        .fetch.call(undefined, url, { signal: controller.signal as any, ...options })
+        .finally(() => {
+          clearTimeout(timeout);
+        })
+    );
   }
 
   protected getRequestClient(): RequestClient {
@@ -592,7 +609,7 @@ export abstract class AbstractPage<Item> implements AsyncIterable<Item> {
     } else if ('url' in nextInfo) {
       const params = [...Object.entries(nextOptions.query || {}), ...nextInfo.url.searchParams.entries()];
       for (const [key, value] of params) {
-        nextInfo.url.searchParams.set(key, value);
+        nextInfo.url.searchParams.set(key, value as any);
       }
       nextOptions.query = undefined;
       nextOptions.path = nextInfo.url.toString();
@@ -718,7 +735,7 @@ const requestOptionsKeys: KeysEnum<RequestOptions> = {
   idempotencyKey: true,
 };
 
-export const isRequestOptions = (obj: unknown): obj is RequestOptions => {
+export const isRequestOptions = (obj: unknown): obj is RequestOptions<Record<string, unknown> | Readable> => {
   return (
     typeof obj === 'object' &&
     obj !== null &&

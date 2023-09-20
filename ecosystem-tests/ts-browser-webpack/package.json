@@ -8,7 +8,7 @@
     "serve": "webpack-cli serve",
     "build": "webpack",
     "test": "ts-node src/test.ts",
-    "test:ci": "WAIT_ON_INTERVAL=10000 start-server-and-test serve http://localhost:8080 test"
+    "test:ci": "start-server-and-test serve http://localhost:8080 test"
   },
   "devDependencies": {
     "babel-core": "^6.26.3",

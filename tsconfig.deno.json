@@ -6,9 +6,9 @@
     "rootDir": "./deno",
     "lib": ["es2020", "DOM"],
     "paths": {
-      "openai/_shims/*": ["deno/_shims/*"],
-      "openai": ["deno/index.ts"],
+      "openai/_shims/auto/*": ["deno/_shims/auto/*-deno"],
       "openai/*": ["deno/*"],
+      "openai": ["deno/index.ts"],
       "digest-fetch": ["./typings/digest-fetch"]
     },
     "noEmit": true,

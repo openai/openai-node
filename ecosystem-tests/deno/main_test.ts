@@ -1,6 +1,7 @@
 import { assertEquals, AssertionError } from 'https://deno.land/std@0.192.0/testing/asserts.ts';
 import OpenAI, { toFile } from 'npm:openai@3.3.0';
 import { distance } from 'https://deno.land/x/fastest_levenshtein/mod.ts';
+import { ChatCompletion } from 'npm:openai@3.3.0/resources/chat/completions';
 
 const url = 'https://audio-samples.github.io/samples/mp3/blizzard_biased/sample-1.mp3';
 const filename = 'sample-1.mp3';
@@ -35,6 +36,39 @@ function assertSimilar(received: string, expected: string, maxDistance: number) 
 
   throw new AssertionError(message);
 }
+
+Deno.test(async function rawResponse() {
+  const response = await client.chat.completions
+    .create({
+      model: 'gpt-4',
+      messages: [{ role: 'user', content: 'Say this is a test' }],
+    })
+    .asResponse();
+
+  // test that we can use web Response API
+  const { body } = response;
+  if (!body) throw new Error('expected response.body to be defined');
+
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let result;
+  do {
+    result = await reader.read();
+    if (!result.done) chunks.push(result.value);
+  } while (!result.done);
+
+  reader.releaseLock();
+
+  let offset = 0;
+  const merged = new Uint8Array(chunks.reduce((total, chunk) => total + chunk.length, 0));
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.length;
+  }
+
+  const json: ChatCompletion = JSON.parse(new TextDecoder().decode(merged));
+  assertSimilar(json.choices[0]?.message.content || '', 'This is a test', 10);
+});
 
 Deno.test(async function streamingWorks() {
   const stream = await client.chat.completions.create({

@@ -1,5 +1,6 @@
 {
-  "exclude": ["node_modules"],
+  "include": ["tests/*.ts"],
+  "exclude": ["tests/*-shim-errors.ts"],
 
   "compilerOptions": {
     /* Visit https://aka.ms/tsconfig.json to read more about this file */

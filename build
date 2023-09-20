@@ -12,7 +12,7 @@ rm -rf dist; mkdir dist
 # Copy src to dist/src and build from dist/src into dist, so that
 # the source map for index.js.map will refer to ./src/index.ts etc
 cp -rp src README.md dist
-rm dist/src/_shims/*-deno.*
+rm dist/src/_shims/*-deno.ts dist/src/_shims/auto/*-deno.ts
 for file in LICENSE CHANGELOG.md; do
   if [ -e "${file}" ]; then cp "${file}" dist; fi
 done
@@ -27,8 +27,8 @@ node scripts/make-dist-package-json.cjs > dist/package.json
 # build to .js/.mjs/.d.ts files
 npm exec tsc-multi
 # copy over handwritten .js/.mjs/.d.ts files
-cp src/_shims/*.{d.ts,js,mjs} dist/_shims
-npm exec tsc-alias -- -p tsconfig.build.json
+cp src/_shims/*.{d.ts,js,mjs,md} dist/_shims
+cp src/_shims/auto/*.{d.ts,js,mjs} dist/_shims/auto
 # we need to add exports = module.exports = OpenAI Node to index.js;
 # No way to get that from index.ts because it would cause compile errors
 # when building .mjs
@@ -40,14 +40,7 @@ node scripts/fix-index-exports.cjs
 cp dist/index.d.ts dist/index.d.mts
 cp tsconfig.dist-src.json dist/src/tsconfig.json
 
-# strip out lib="dom" and types="node" references; these are needed at build time,
-# but would pollute the user's TS environment
-find dist -type f -exec node scripts/remove-triple-slash-references.js {} +
-# strip out `unknown extends RequestInit ? never :` from dist/src/_shims;
-# these cause problems when viewing the .ts source files in go to definition
-find dist/src/_shims -type f -exec node scripts/replace-shim-guards.js {} +
-
-npm exec prettier -- --loglevel=warn --write .
+node scripts/postprocess-files.cjs
 
 # make sure that nothing crashes when we require the output CJS or
 # import the output ESM

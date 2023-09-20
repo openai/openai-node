@@ -1,4 +1,4 @@
-import type { Response } from 'openai/_shims/fetch';
+import { type Response } from './_shims/index';
 
 type Bytes = string | ArrayBuffer | Uint8Array | Buffer | null | undefined;
 
