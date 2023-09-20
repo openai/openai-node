@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.9.0 (2023-09-20)
+
+Full Changelog: [v4.8.0...v4.9.0](https://github.com/openai/openai-node/compare/v4.8.0...v4.9.0)
+
+### Features
+
+* **client:** support importing node or web shims manually ([#325](https://github.com/openai/openai-node/issues/325)) ([628f293](https://github.com/openai/openai-node/commit/628f2935a8791625685f68f73db8f3759b8f4f91))
+
 ## 4.8.0 (2023-09-15)
 
 Full Changelog: [v4.7.1...v4.8.0](https://github.com/openai/openai-node/compare/v4.7.1...v4.8.0)
