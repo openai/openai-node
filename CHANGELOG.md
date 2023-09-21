@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.9.1 (2023-09-21)
+
+Full Changelog: [v4.9.0...v4.9.1](https://github.com/openai/openai-node/compare/v4.9.0...v4.9.1)
+
+### Documentation
+
+* **README:** fix variable names in some examples ([#327](https://github.com/openai/openai-node/issues/327)) ([5e05b31](https://github.com/openai/openai-node/commit/5e05b31c132545ce166cea92c5f3e4410fd40711))
+
 ## 4.9.0 (2023-09-20)
 
 Full Changelog: [v4.8.0...v4.9.0](https://github.com/openai/openai-node/compare/v4.8.0...v4.9.0)
