@@ -28,12 +28,12 @@ const openai = new OpenAI({
 });
 
 async function main() {
-  const completion = await openai.chat.completions.create({
+  const chatCompletion = await openai.chat.completions.create({
     messages: [{ role: 'user', content: 'Say this is a test' }],
     model: 'gpt-3.5-turbo',
   });
 
-  console.log(completion.choices);
+  console.log(chatCompletion.choices);
 }
 
 main();
@@ -81,7 +81,7 @@ async function main() {
     messages: [{ role: 'user', content: 'Say this is a test' }],
     model: 'gpt-3.5-turbo',
   };
-  const completion: OpenAI.Chat.ChatCompletion = await openai.chat.completions.create(params);
+  const chatCompletion: OpenAI.Chat.ChatCompletion = await openai.chat.completions.create(params);
 }
 
 main();
@@ -226,8 +226,8 @@ You can use `for await … of` syntax to iterate through items across all pages:
 async function fetchAllFineTuningJobs(params) {
   const allFineTuningJobs = [];
   // Automatically fetches more pages as needed.
-  for await (const job of openai.fineTuning.jobs.list({ limit: 20 })) {
-    allFineTuningJobs.push(job);
+  for await (const fineTuningJob of openai.fineTuning.jobs.list({ limit: 20 })) {
+    allFineTuningJobs.push(fineTuningJob);
   }
   return allFineTuningJobs;
 }
@@ -237,8 +237,8 @@ Alternatively, you can make request a single page at a time:
 
 ```ts
 let page = await openai.fineTuning.jobs.list({ limit: 20 });
-for (const job of page.data) {
-  console.log(job);
+for (const fineTuningJob of page.data) {
+  console.log(fineTuningJob);
 }
 
 // Convenience methods are provided for manually paginating:
@@ -265,11 +265,11 @@ const response = await openai.chat.completions
 console.log(response.headers.get('X-My-Header'));
 console.log(response.statusText); // access the underlying Response object
 
-const { data: completions, response: raw } = await openai.chat.completions
+const { data: chatCompletion, response: raw } = await openai.chat.completions
   .create({ messages: [{ role: 'user', content: 'Say this is a test' }], model: 'gpt-3.5-turbo' })
   .withResponse();
 console.log(raw.headers.get('X-My-Header'));
-console.log(completions.choices);
+console.log(chatCompletion.choices);
 ```
 
 ## Configuring an HTTP(S) Agent (e.g., for proxies)
