@@ -3,7 +3,6 @@
 import * as Core from 'openai/core';
 import { APIResource } from 'openai/resource';
 import { isRequestOptions } from 'openai/core';
-import * as Files from 'openai/resources/files';
 import * as API from './index';
 import { CursorPage, CursorPageParams } from 'openai/pagination';
 
@@ -105,9 +104,22 @@ export interface FineTuningJob {
   created_at: number;
 
   /**
-   * The name of the fine-tuned model that is being created.
+   * For fine-tuning jobs that have `failed`, this will contain more information on
+   * the cause of the failure.
+   */
+  error: FineTuningJob.Error | null;
+
+  /**
+   * The name of the fine-tuned model that is being created. The value will be null
+   * if the fine-tuning job is still running.
    */
   fine_tuned_model: string | null;
+
+  /**
+   * The Unix timestamp (in seconds) for when the fine-tuning job was finished. The
+   * value will be null if the fine-tuning job is still running.
+   */
+  finished_at: number | null;
 
   /**
    * The hyperparameters used for the fine-tuning job. See the
@@ -132,38 +144,61 @@ export interface FineTuningJob {
   organization_id: string;
 
   /**
-   * The compiled results files for the fine-tuning job.
+   * The compiled results file ID(s) for the fine-tuning job. You can retrieve the
+   * results with the
+   * [Files API](https://platform.openai.com/docs/api-reference/files/retrieve-contents).
    */
-  result_files: Array<Files.FileObject>;
+  result_files: Array<string>;
 
   /**
-   * The current status of the fine-tuning job, which can be either `created`,
-   * `pending`, `running`, `succeeded`, `failed`, or `cancelled`.
+   * The current status of the fine-tuning job, which can be either
+   * `validating_files`, `queued`, `running`, `succeeded`, `failed`, or `cancelled`.
    */
   status: string;
 
   /**
-   * The total number of billable tokens processed by this fine tuning job.
+   * The total number of billable tokens processed by this fine-tuning job. The value
+   * will be null if the fine-tuning job is still running.
    */
-  trained_tokens: number;
+  trained_tokens: number | null;
 
   /**
-   * The file ID used for training.
+   * The file ID used for training. You can retrieve the training data with the
+   * [Files API](https://platform.openai.com/docs/api-reference/files/retrieve-contents).
    */
   training_file: string;
 
   /**
-   * The file ID used for validation.
+   * The file ID used for validation. You can retrieve the validation results with
+   * the
+   * [Files API](https://platform.openai.com/docs/api-reference/files/retrieve-contents).
    */
   validation_file: string | null;
-
-  /**
-   * The Unix timestamp (in seconds) for when the fine-tuning job was finished.
-   */
-  finished_at?: number;
 }
 
 export namespace FineTuningJob {
+  /**
+   * For fine-tuning jobs that have `failed`, this will contain more information on
+   * the cause of the failure.
+   */
+  export interface Error {
+    /**
+     * A machine-readable error code.
+     */
+    code: string;
+
+    /**
+     * A human-readable error message.
+     */
+    message: string;
+
+    /**
+     * The parameter that was invalid, usually `training_file` or `validation_file`.
+     * This field will be null if the failure was not parameter-specific.
+     */
+    param: string | null;
+  }
+
   /**
    * The hyperparameters used for the fine-tuning job. See the
    * [fine-tuning guide](https://platform.openai.com/docs/guides/fine-tuning) for
@@ -172,11 +207,11 @@ export namespace FineTuningJob {
   export interface Hyperparameters {
     /**
      * The number of epochs to train the model for. An epoch refers to one full cycle
-     * through the training dataset. "Auto" decides the optimal number of epochs based
+     * through the training dataset. "auto" decides the optimal number of epochs based
      * on the size of the dataset. If setting the number manually, we support any
      * number between 1 and 50 epochs.
      */
-    n_epochs?: 'auto' | number;
+    n_epochs: 'auto' | number;
   }
 }
 
@@ -219,7 +254,7 @@ export interface JobCreateParams {
   hyperparameters?: JobCreateParams.Hyperparameters;
 
   /**
-   * A string of up to 40 characters that will be added to your fine-tuned model
+   * A string of up to 18 characters that will be added to your fine-tuned model
    * name.
    *
    * For example, a `suffix` of "custom-model-name" would produce a model name like
