@@ -75,10 +75,11 @@ export namespace ChatCompletion {
     /**
      * The reason the model stopped generating tokens. This will be `stop` if the model
      * hit a natural stop point or a provided stop sequence, `length` if the maximum
-     * number of tokens specified in the request was reached, or `function_call` if the
-     * model called a function.
+     * number of tokens specified in the request was reached, `content_filter` if
+     * content was omitted due to a flag from our content filters, or `function_call`
+     * if the model called a function.
      */
-    finish_reason: 'stop' | 'length' | 'function_call';
+    finish_reason: 'stop' | 'length' | 'function_call' | 'content_filter';
 
     /**
      * The index of the choice in the list of choices.
@@ -134,8 +135,9 @@ export namespace ChatCompletionChunk {
     /**
      * The reason the model stopped generating tokens. This will be `stop` if the model
      * hit a natural stop point or a provided stop sequence, `length` if the maximum
-     * number of tokens specified in the request was reached, or `function_call` if the
-     * model called a function.
+     * number of tokens specified in the request was reached, `content_filter` if
+     * content was omitted due to a flag from our content filters, or `function_call`
+     * if the model called a function.
      */
     finish_reason: 'stop' | 'length' | 'function_call' | null;
 
@@ -331,11 +333,11 @@ export interface ChatCompletionCreateParamsBase {
   frequency_penalty?: number | null;
 
   /**
-   * Controls how the model responds to function calls. "none" means the model does
-   * not call a function, and responds to the end-user. "auto" means the model can
+   * Controls how the model responds to function calls. `none` means the model does
+   * not call a function, and responds to the end-user. `auto` means the model can
    * pick between an end-user or calling a function. Specifying a particular function
-   * via `{"name": "my_function"}` forces the model to call that function. "none" is
-   * the default when no functions are present. "auto" is the default if functions
+   * via `{"name": "my_function"}` forces the model to call that function. `none` is
+   * the default when no functions are present. `auto` is the default if functions
    * are present.
    */
   function_call?: 'none' | 'auto' | ChatCompletionCreateParams.FunctionCallOption;
@@ -365,7 +367,7 @@ export interface ChatCompletionCreateParamsBase {
    * [Example Python code](https://github.com/openai/openai-cookbook/blob/main/examples/How_to_count_tokens_with_tiktoken.ipynb)
    * for counting tokens.
    */
-  max_tokens?: number;
+  max_tokens?: number | null;
 
   /**
    * How many chat completion choices to generate for each input message.

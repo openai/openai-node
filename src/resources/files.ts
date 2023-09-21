@@ -41,7 +41,7 @@ export class Files extends APIResource {
   }
 
   /**
-   * Returns the contents of the specified file
+   * Returns the contents of the specified file.
    */
   retrieveContent(fileId: string, options?: Core.RequestOptions): Core.APIPromise<string> {
     return this.get(`/files/${fileId}/content`, {
