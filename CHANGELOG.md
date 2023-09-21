@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.10.0 (2023-09-21)
+
+Full Changelog: [v4.9.1...v4.10.0](https://github.com/openai/openai-node/compare/v4.9.1...v4.10.0)
+
+### Features
+
+* **api:** add 'gpt-3.5-turbo-instruct', fine-tune error objects, update documentation ([#329](https://github.com/openai/openai-node/issues/329)) ([e5f3852](https://github.com/openai/openai-node/commit/e5f385233737002b4bb47a94cba33da7fedfe64d))
+
 ## 4.9.1 (2023-09-21)
 
 Full Changelog: [v4.9.0...v4.9.1](https://github.com/openai/openai-node/compare/v4.9.0...v4.9.1)
