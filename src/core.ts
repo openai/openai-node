@@ -509,31 +509,36 @@ export abstract class APIClient {
     retriesRemaining -= 1;
 
     // About the Retry-After header: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After
-    //
-    // TODO: we may want to handle the case where the header is using the http-date syntax: "Retry-After: <http-date>".
-    // See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After#syntax for details.
-    const retryAfter = parseInt(responseHeaders?.['retry-after'] || '');
+    let timeoutMillis: number | undefined;
+    const retryAfterHeader = responseHeaders?.['retry-after'];
+    if (retryAfterHeader) {
+      const timeoutSeconds = parseInt(retryAfterHeader);
+      if (!Number.isNaN(timeoutSeconds)) {
+        timeoutMillis = timeoutSeconds * 1000;
+      } else {
+        timeoutMillis = Date.parse(retryAfterHeader) - Date.now();
+      }
+    }
 
-    const maxRetries = options.maxRetries ?? this.maxRetries;
-    const timeout = this.calculateRetryTimeoutSeconds(retriesRemaining, retryAfter, maxRetries) * 1000;
-    await sleep(timeout);
+    // If the API asks us to wait a certain amount of time (and it's a reasonable amount),
+    // just do what it says, but otherwise calculate a default
+    if (
+      !timeoutMillis ||
+      !Number.isInteger(timeoutMillis) ||
+      timeoutMillis <= 0 ||
+      timeoutMillis > 60 * 1000
+    ) {
+      const maxRetries = options.maxRetries ?? this.maxRetries;
+      timeoutMillis = this.calculateDefaultRetryTimeoutMillis(retriesRemaining, maxRetries);
+    }
+    await sleep(timeoutMillis);
 
     return this.makeRequest(options, retriesRemaining);
   }
 
-  private calculateRetryTimeoutSeconds(
-    retriesRemaining: number,
-    retryAfter: number,
-    maxRetries: number,
-  ): number {
+  private calculateDefaultRetryTimeoutMillis(retriesRemaining: number, maxRetries: number): number {
     const initialRetryDelay = 0.5;
     const maxRetryDelay = 2;
-
-    // If the API asks us to wait a certain amount of time (and it's a reasonable amount),
-    // just do what it says.
-    if (Number.isInteger(retryAfter) && retryAfter <= 60) {
-      return retryAfter;
-    }
 
     const numRetries = maxRetries - retriesRemaining;
 
@@ -543,7 +548,7 @@ export abstract class APIClient {
     // Apply some jitter, plus-or-minus half a second.
     const jitter = Math.random() - 0.5;
 
-    return sleepSeconds + jitter;
+    return (sleepSeconds + jitter) * 1000;
   }
 
   private getUserAgent(): string {
