@@ -103,7 +103,7 @@ export class OpenAI extends Core.APIClient {
     ...opts
   }: ClientOptions = {}) {
     if (apiKey === undefined) {
-      throw new Error(
+      throw new Errors.OpenAIError(
         "The OPENAI_API_KEY environment variable is missing or empty; either provide it, or instantiate the OpenAI client with an apiKey option, like new OpenAI({ apiKey: 'my apiKey' }).",
       );
     }
@@ -116,7 +116,7 @@ export class OpenAI extends Core.APIClient {
     };
 
     if (!options.dangerouslyAllowBrowser && Core.isRunningInBrowser()) {
-      throw new Error(
+      throw new Errors.OpenAIError(
         "It looks like you're running in a browser-like environment.\n\nThis is disabled by default, as it risks exposing your secret API credentials to attackers.\nIf you understand the risks and have appropriate mitigations in place,\nyou can set the `dangerouslyAllowBrowser` option to `true`, e.g.,\n\nnew OpenAI({ apiKey, dangerouslyAllowBrowser: true });\n\nhttps://help.openai.com/en/articles/5112595-best-practices-for-api-key-safety\n",
       );
     }
@@ -164,6 +164,7 @@ export class OpenAI extends Core.APIClient {
 
   static OpenAI = this;
 
+  static OpenAIError = Errors.OpenAIError;
   static APIError = Errors.APIError;
   static APIConnectionError = Errors.APIConnectionError;
   static APIConnectionTimeoutError = Errors.APIConnectionTimeoutError;
@@ -179,6 +180,7 @@ export class OpenAI extends Core.APIClient {
 }
 
 export const {
+  OpenAIError,
   APIError,
   APIConnectionError,
   APIConnectionTimeoutError,
