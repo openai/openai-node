@@ -139,7 +139,7 @@ export namespace ChatCompletionChunk {
      * content was omitted due to a flag from our content filters, or `function_call`
      * if the model called a function.
      */
-    finish_reason: 'stop' | 'length' | 'function_call' | null;
+    finish_reason: 'stop' | 'length' | 'function_call' | 'content_filter' | null;
 
     /**
      * The index of the choice in the list of choices.

@@ -1,5 +1,27 @@
 # Changelog
 
+## 4.11.0 (2023-09-29)
+
+Full Changelog: [v4.10.0...v4.11.0](https://github.com/openai/openai-node/compare/v4.10.0...v4.11.0)
+
+### Features
+
+* **client:** handle retry-after with a date ([#340](https://github.com/openai/openai-node/issues/340)) ([b6dd384](https://github.com/openai/openai-node/commit/b6dd38488ea7cc4c22495f16d027b7ffdb87da53))
+* **package:** export a root error type ([#338](https://github.com/openai/openai-node/issues/338)) ([462bcda](https://github.com/openai/openai-node/commit/462bcda7140611afa20bc25de4aec6d4b205b37d))
+
+
+### Bug Fixes
+
+* **api:** add content_filter to chat completion finish reason ([#344](https://github.com/openai/openai-node/issues/344)) ([f10c757](https://github.com/openai/openai-node/commit/f10c757d831d90407ba47b4659d9cd34b1a35b1d))
+
+
+### Chores
+
+* **internal:** bump lock file ([#334](https://github.com/openai/openai-node/issues/334)) ([fd2337b](https://github.com/openai/openai-node/commit/fd2337b018ab2f31bcea8f9feda0ddaf755390c7))
+* **internal:** update lock file ([#339](https://github.com/openai/openai-node/issues/339)) ([1bf84b6](https://github.com/openai/openai-node/commit/1bf84b672c386f8ca46bb8fc120eb8d8d48b3a82))
+* **internal:** update lock file ([#342](https://github.com/openai/openai-node/issues/342)) ([0001f06](https://github.com/openai/openai-node/commit/0001f062728b0e2047d2bf03b9d947a4be0c7206))
+* **internal:** update lock file ([#343](https://github.com/openai/openai-node/issues/343)) ([a02ac8e](https://github.com/openai/openai-node/commit/a02ac8e7f881551527a3cbcadad53b7e424650e8))
+
 ## 4.10.0 (2023-09-21)
 
 Full Changelog: [v4.9.1...v4.10.0](https://github.com/openai/openai-node/compare/v4.9.1...v4.10.0)
