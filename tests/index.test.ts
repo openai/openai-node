@@ -98,7 +98,7 @@ describe('instantiate client', () => {
 
   test('custom signal', async () => {
     const client = new OpenAI({
-      baseURL: 'http://127.0.0.1:4010',
+      baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
       apiKey: 'my api key',
       fetch: (...args) => {
         return new Promise((resolve, reject) =>
