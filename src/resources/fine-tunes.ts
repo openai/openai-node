@@ -204,6 +204,9 @@ export namespace FineTune {
   }
 }
 
+/**
+ * Fine-tune event object
+ */
 export interface FineTuneEvent {
   created_at: number;
 

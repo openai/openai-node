@@ -215,6 +215,9 @@ export namespace FineTuningJob {
   }
 }
 
+/**
+ * Fine-tuning job event object
+ */
 export interface FineTuningJobEvent {
   id: string;
 
