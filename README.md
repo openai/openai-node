@@ -324,3 +324,7 @@ The following runtimes are supported:
 Note that React Native is not supported at this time.
 
 If you are interested in other runtime environments, please open or upvote an issue on GitHub.
+
+## Other Node.js Clients for OpenAI
+
+[OpenAI Clients](https://npm-compare.com/openai,@azure/openai,chatgpt)
