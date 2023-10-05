@@ -325,6 +325,12 @@ Note that React Native is not supported at this time.
 
 If you are interested in other runtime environments, please open or upvote an issue on GitHub.
 
-## Other Node.js Clients for OpenAI
+## Comparison of OpenAI Node.js Clients
 
-[OpenAI Clients](https://npm-compare.com/openai,@azure/openai,chatgpt)
+[Usage Trend Among OpenAI Node.js Clients](https://npm-compare.com/openai,@azure/openai,chatgpt)
+
+- [openai](https://www.npmjs.com/package/openai): The official Node.js client provided by OpenAI. It is widely adopted and has gained significant community support. This package is actively maintained and aligns with OpenAI's recommended practices.
+
+- [@azure/openai](https://www.npmjs.com/package/@azure/openai): This package is developed by Azure and provides an alternative option for integrating the ChatGPT API in Node.js. It offers integration with Azure services and may appeal to users already utilizing Azure infrastructure.
+
+- [chatgpt](https://www.npmjs.com/package/chatgpt): Another package that provides a ChatGPT API client for Node.js. While it is not the official client, it has also gained some popularity among developers. However, it is essential to note that it may lack the same level of official support and recommended practices as the "openai" package.
