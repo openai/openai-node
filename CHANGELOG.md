@@ -1,5 +1,18 @@
 # Changelog
 
+## 4.12.0 (2023-10-05)
+
+Full Changelog: [v4.11.1...v4.12.0](https://github.com/openai/openai-node/compare/v4.11.1...v4.12.0)
+
+### Features
+
+* **api:** remove `content_filter` stop_reason and update documentation ([#352](https://github.com/openai/openai-node/issues/352)) ([a4b401e](https://github.com/openai/openai-node/commit/a4b401e91a0b3fbf55aedfb6ed6d93396377bf27))
+
+
+### Chores
+
+* **internal:** minor formatting improvement ([#354](https://github.com/openai/openai-node/issues/354)) ([3799863](https://github.com/openai/openai-node/commit/3799863da4ff2a27940ef0b7e57360c72e44d986))
+
 ## 4.11.1 (2023-10-03)
 
 Full Changelog: [v4.11.0...v4.11.1](https://github.com/openai/openai-node/compare/v4.11.0...v4.11.1)
