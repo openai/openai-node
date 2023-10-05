@@ -205,7 +205,7 @@ export interface CompletionCreateParamsBase {
    *
    * The token count of your prompt plus `max_tokens` cannot exceed the model's
    * context length.
-   * [Example Python code](https://github.com/openai/openai-cookbook/blob/main/examples/How_to_count_tokens_with_tiktoken.ipynb)
+   * [Example Python code](https://cookbook.openai.com/examples/how_to_count_tokens_with_tiktoken)
    * for counting tokens.
    */
   max_tokens?: number | null;
@@ -240,7 +240,7 @@ export interface CompletionCreateParamsBase {
    * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format)
    * as they become available, with the stream terminated by a `data: [DONE]`
    * message.
-   * [Example Python code](https://github.com/openai/openai-cookbook/blob/main/examples/How_to_stream_completions.ipynb).
+   * [Example Python code](https://cookbook.openai.com/examples/how_to_stream_completions).
    */
   stream?: boolean | null;
 
@@ -287,7 +287,7 @@ export interface CompletionCreateParamsNonStreaming extends CompletionCreatePara
    * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format)
    * as they become available, with the stream terminated by a `data: [DONE]`
    * message.
-   * [Example Python code](https://github.com/openai/openai-cookbook/blob/main/examples/How_to_stream_completions.ipynb).
+   * [Example Python code](https://cookbook.openai.com/examples/how_to_stream_completions).
    */
   stream?: false | null;
 }
@@ -299,7 +299,7 @@ export interface CompletionCreateParamsStreaming extends CompletionCreateParamsB
    * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format)
    * as they become available, with the stream terminated by a `data: [DONE]`
    * message.
-   * [Example Python code](https://github.com/openai/openai-cookbook/blob/main/examples/How_to_stream_completions.ipynb).
+   * [Example Python code](https://cookbook.openai.com/examples/how_to_stream_completions).
    */
   stream: true;
 }

@@ -99,7 +99,7 @@ export namespace ChatCompletion {
  */
 export interface ChatCompletionChunk {
   /**
-   * A unique identifier for the chat completion chunk.
+   * A unique identifier for the chat completion. Each chunk has the same ID.
    */
   id: string;
 
@@ -110,7 +110,8 @@ export interface ChatCompletionChunk {
   choices: Array<ChatCompletionChunk.Choice>;
 
   /**
-   * The Unix timestamp (in seconds) of when the chat completion chunk was created.
+   * The Unix timestamp (in seconds) of when the chat completion was created. Each
+   * chunk has the same timestamp.
    */
   created: number;
 
@@ -139,7 +140,7 @@ export namespace ChatCompletionChunk {
      * content was omitted due to a flag from our content filters, or `function_call`
      * if the model called a function.
      */
-    finish_reason: 'stop' | 'length' | 'function_call' | 'content_filter' | null;
+    finish_reason: 'stop' | 'length' | 'function_call' | null;
 
     /**
      * The index of the choice in the list of choices.
@@ -300,7 +301,7 @@ export type ChatCompletionCreateParams =
 export interface ChatCompletionCreateParamsBase {
   /**
    * A list of messages comprising the conversation so far.
-   * [Example Python code](https://github.com/openai/openai-cookbook/blob/main/examples/How_to_format_inputs_to_ChatGPT_models.ipynb).
+   * [Example Python code](https://cookbook.openai.com/examples/how_to_format_inputs_to_chatgpt_models).
    */
   messages: Array<ChatCompletionMessageParam>;
 
@@ -333,12 +334,12 @@ export interface ChatCompletionCreateParamsBase {
   frequency_penalty?: number | null;
 
   /**
-   * Controls how the model responds to function calls. `none` means the model does
-   * not call a function, and responds to the end-user. `auto` means the model can
-   * pick between an end-user or calling a function. Specifying a particular function
-   * via `{"name": "my_function"}` forces the model to call that function. `none` is
-   * the default when no functions are present. `auto` is the default if functions
-   * are present.
+   * Controls how the model calls functions. "none" means the model will not call a
+   * function and instead generates a message. "auto" means the model can pick
+   * between generating a message or calling a function. Specifying a particular
+   * function via `{"name": "my_function"}` forces the model to call that function.
+   * "none" is the default when no functions are present. "auto" is the default if
+   * functions are present.
    */
   function_call?: 'none' | 'auto' | ChatCompletionCreateParams.FunctionCallOption;
 
@@ -364,7 +365,7 @@ export interface ChatCompletionCreateParamsBase {
    *
    * The total length of input tokens and generated tokens is limited by the model's
    * context length.
-   * [Example Python code](https://github.com/openai/openai-cookbook/blob/main/examples/How_to_count_tokens_with_tiktoken.ipynb)
+   * [Example Python code](https://cookbook.openai.com/examples/how_to_count_tokens_with_tiktoken)
    * for counting tokens.
    */
   max_tokens?: number | null;
@@ -394,7 +395,7 @@ export interface ChatCompletionCreateParamsBase {
    * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format)
    * as they become available, with the stream terminated by a `data: [DONE]`
    * message.
-   * [Example Python code](https://github.com/openai/openai-cookbook/blob/main/examples/How_to_stream_completions.ipynb).
+   * [Example Python code](https://cookbook.openai.com/examples/how_to_stream_completions).
    */
   stream?: boolean | null;
 
@@ -474,7 +475,7 @@ export interface ChatCompletionCreateParamsNonStreaming extends ChatCompletionCr
    * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format)
    * as they become available, with the stream terminated by a `data: [DONE]`
    * message.
-   * [Example Python code](https://github.com/openai/openai-cookbook/blob/main/examples/How_to_stream_completions.ipynb).
+   * [Example Python code](https://cookbook.openai.com/examples/how_to_stream_completions).
    */
   stream?: false | null;
 }
@@ -491,7 +492,7 @@ export interface ChatCompletionCreateParamsStreaming extends ChatCompletionCreat
    * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format)
    * as they become available, with the stream terminated by a `data: [DONE]`
    * message.
-   * [Example Python code](https://github.com/openai/openai-cookbook/blob/main/examples/How_to_stream_completions.ipynb).
+   * [Example Python code](https://cookbook.openai.com/examples/how_to_stream_completions).
    */
   stream: true;
 }
