@@ -313,7 +313,7 @@ TypeScript >= 4.5 is supported.
 
 The following runtimes are supported:
 
-- Node.js 16 LTS or later ([non-EOL](https://endoflife.date/nodejs)) versions.
+- Node.js 18 LTS or later ([non-EOL](https://endoflife.date/nodejs)) versions.
 - Deno v1.28.0 or higher, using `import OpenAI from "npm:openai"`.
 - Bun 1.0 or later.
 - Cloudflare Workers.
