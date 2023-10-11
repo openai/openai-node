@@ -210,7 +210,7 @@ export interface ModerationCreateParams {
 }
 
 export namespace Moderations {
-  export type Moderation = ModerationsAPI.Moderation;
-  export type ModerationCreateResponse = ModerationsAPI.ModerationCreateResponse;
-  export type ModerationCreateParams = ModerationsAPI.ModerationCreateParams;
+  export import Moderation = ModerationsAPI.Moderation;
+  export import ModerationCreateResponse = ModerationsAPI.ModerationCreateResponse;
+  export import ModerationCreateParams = ModerationsAPI.ModerationCreateParams;
 }

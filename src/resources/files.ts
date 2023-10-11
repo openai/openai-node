@@ -159,9 +159,9 @@ export interface FileCreateParams {
 }
 
 export namespace Files {
-  export type FileContent = FilesAPI.FileContent;
-  export type FileDeleted = FilesAPI.FileDeleted;
-  export type FileObject = FilesAPI.FileObject;
+  export import FileContent = FilesAPI.FileContent;
+  export import FileDeleted = FilesAPI.FileDeleted;
+  export import FileObject = FilesAPI.FileObject;
   export import FileObjectsPage = FilesAPI.FileObjectsPage;
-  export type FileCreateParams = FilesAPI.FileCreateParams;
+  export import FileCreateParams = FilesAPI.FileCreateParams;
 }

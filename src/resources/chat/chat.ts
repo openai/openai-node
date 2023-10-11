@@ -9,16 +9,16 @@ export class Chat extends APIResource {
 
 export namespace Chat {
   export import Completions = CompletionsAPI.Completions;
-  export type ChatCompletion = CompletionsAPI.ChatCompletion;
-  export type ChatCompletionChunk = CompletionsAPI.ChatCompletionChunk;
-  export type ChatCompletionMessage = CompletionsAPI.ChatCompletionMessage;
-  export type ChatCompletionMessageParam = CompletionsAPI.ChatCompletionMessageParam;
-  export type ChatCompletionRole = CompletionsAPI.ChatCompletionRole;
-  export type CreateChatCompletionRequestMessage = CompletionsAPI.CreateChatCompletionRequestMessage;
-  export type ChatCompletionCreateParams = CompletionsAPI.ChatCompletionCreateParams;
-  export type CompletionCreateParams = CompletionsAPI.CompletionCreateParams;
-  export type ChatCompletionCreateParamsNonStreaming = CompletionsAPI.ChatCompletionCreateParamsNonStreaming;
-  export type CompletionCreateParamsNonStreaming = CompletionsAPI.CompletionCreateParamsNonStreaming;
-  export type ChatCompletionCreateParamsStreaming = CompletionsAPI.ChatCompletionCreateParamsStreaming;
-  export type CompletionCreateParamsStreaming = CompletionsAPI.CompletionCreateParamsStreaming;
+  export import ChatCompletion = CompletionsAPI.ChatCompletion;
+  export import ChatCompletionChunk = CompletionsAPI.ChatCompletionChunk;
+  export import ChatCompletionMessage = CompletionsAPI.ChatCompletionMessage;
+  export import ChatCompletionMessageParam = CompletionsAPI.ChatCompletionMessageParam;
+  export import ChatCompletionRole = CompletionsAPI.ChatCompletionRole;
+  export import CreateChatCompletionRequestMessage = CompletionsAPI.CreateChatCompletionRequestMessage;
+  export import ChatCompletionCreateParams = CompletionsAPI.ChatCompletionCreateParams;
+  export import CompletionCreateParams = CompletionsAPI.CompletionCreateParams;
+  export import ChatCompletionCreateParamsNonStreaming = CompletionsAPI.ChatCompletionCreateParamsNonStreaming;
+  export import CompletionCreateParamsNonStreaming = CompletionsAPI.CompletionCreateParamsNonStreaming;
+  export import ChatCompletionCreateParamsStreaming = CompletionsAPI.ChatCompletionCreateParamsStreaming;
+  export import CompletionCreateParamsStreaming = CompletionsAPI.CompletionCreateParamsStreaming;
 }

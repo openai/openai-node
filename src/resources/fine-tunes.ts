@@ -412,12 +412,12 @@ export interface FineTuneListEventsParamsStreaming extends FineTuneListEventsPar
 }
 
 export namespace FineTunes {
-  export type FineTune = FineTunesAPI.FineTune;
-  export type FineTuneEvent = FineTunesAPI.FineTuneEvent;
-  export type FineTuneEventsListResponse = FineTunesAPI.FineTuneEventsListResponse;
+  export import FineTune = FineTunesAPI.FineTune;
+  export import FineTuneEvent = FineTunesAPI.FineTuneEvent;
+  export import FineTuneEventsListResponse = FineTunesAPI.FineTuneEventsListResponse;
   export import FineTunesPage = FineTunesAPI.FineTunesPage;
-  export type FineTuneCreateParams = FineTunesAPI.FineTuneCreateParams;
-  export type FineTuneListEventsParams = FineTunesAPI.FineTuneListEventsParams;
-  export type FineTuneListEventsParamsNonStreaming = FineTunesAPI.FineTuneListEventsParamsNonStreaming;
-  export type FineTuneListEventsParamsStreaming = FineTunesAPI.FineTuneListEventsParamsStreaming;
+  export import FineTuneCreateParams = FineTunesAPI.FineTuneCreateParams;
+  export import FineTuneListEventsParams = FineTunesAPI.FineTuneListEventsParams;
+  export import FineTuneListEventsParamsNonStreaming = FineTunesAPI.FineTuneListEventsParamsNonStreaming;
+  export import FineTuneListEventsParamsStreaming = FineTunesAPI.FineTuneListEventsParamsStreaming;
 }
