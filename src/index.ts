@@ -213,69 +213,69 @@ export namespace OpenAI {
   export import CursorPageResponse = Pagination.CursorPageResponse;
 
   export import Completions = API.Completions;
-  export type Completion = API.Completion;
-  export type CompletionChoice = API.CompletionChoice;
-  export type CompletionUsage = API.CompletionUsage;
-  export type CompletionCreateParams = API.CompletionCreateParams;
-  export type CompletionCreateParamsNonStreaming = API.CompletionCreateParamsNonStreaming;
-  export type CompletionCreateParamsStreaming = API.CompletionCreateParamsStreaming;
+  export import Completion = API.Completion;
+  export import CompletionChoice = API.CompletionChoice;
+  export import CompletionUsage = API.CompletionUsage;
+  export import CompletionCreateParams = API.CompletionCreateParams;
+  export import CompletionCreateParamsNonStreaming = API.CompletionCreateParamsNonStreaming;
+  export import CompletionCreateParamsStreaming = API.CompletionCreateParamsStreaming;
 
   export import Chat = API.Chat;
-  export type ChatCompletion = API.ChatCompletion;
-  export type ChatCompletionChunk = API.ChatCompletionChunk;
-  export type ChatCompletionMessage = API.ChatCompletionMessage;
-  export type ChatCompletionMessageParam = API.ChatCompletionMessageParam;
-  export type ChatCompletionRole = API.ChatCompletionRole;
-  export type ChatCompletionCreateParams = API.ChatCompletionCreateParams;
-  export type ChatCompletionCreateParamsNonStreaming = API.ChatCompletionCreateParamsNonStreaming;
-  export type ChatCompletionCreateParamsStreaming = API.ChatCompletionCreateParamsStreaming;
+  export import ChatCompletion = API.ChatCompletion;
+  export import ChatCompletionChunk = API.ChatCompletionChunk;
+  export import ChatCompletionMessage = API.ChatCompletionMessage;
+  export import ChatCompletionMessageParam = API.ChatCompletionMessageParam;
+  export import ChatCompletionRole = API.ChatCompletionRole;
+  export import ChatCompletionCreateParams = API.ChatCompletionCreateParams;
+  export import ChatCompletionCreateParamsNonStreaming = API.ChatCompletionCreateParamsNonStreaming;
+  export import ChatCompletionCreateParamsStreaming = API.ChatCompletionCreateParamsStreaming;
 
   export import Edits = API.Edits;
-  export type Edit = API.Edit;
-  export type EditCreateParams = API.EditCreateParams;
+  export import Edit = API.Edit;
+  export import EditCreateParams = API.EditCreateParams;
 
   export import Embeddings = API.Embeddings;
-  export type CreateEmbeddingResponse = API.CreateEmbeddingResponse;
-  export type Embedding = API.Embedding;
-  export type EmbeddingCreateParams = API.EmbeddingCreateParams;
+  export import CreateEmbeddingResponse = API.CreateEmbeddingResponse;
+  export import Embedding = API.Embedding;
+  export import EmbeddingCreateParams = API.EmbeddingCreateParams;
 
   export import Files = API.Files;
-  export type FileContent = API.FileContent;
-  export type FileDeleted = API.FileDeleted;
-  export type FileObject = API.FileObject;
+  export import FileContent = API.FileContent;
+  export import FileDeleted = API.FileDeleted;
+  export import FileObject = API.FileObject;
   export import FileObjectsPage = API.FileObjectsPage;
-  export type FileCreateParams = API.FileCreateParams;
+  export import FileCreateParams = API.FileCreateParams;
 
   export import Images = API.Images;
-  export type Image = API.Image;
-  export type ImagesResponse = API.ImagesResponse;
-  export type ImageCreateVariationParams = API.ImageCreateVariationParams;
-  export type ImageEditParams = API.ImageEditParams;
-  export type ImageGenerateParams = API.ImageGenerateParams;
+  export import Image = API.Image;
+  export import ImagesResponse = API.ImagesResponse;
+  export import ImageCreateVariationParams = API.ImageCreateVariationParams;
+  export import ImageEditParams = API.ImageEditParams;
+  export import ImageGenerateParams = API.ImageGenerateParams;
 
   export import Audio = API.Audio;
 
   export import Moderations = API.Moderations;
-  export type Moderation = API.Moderation;
-  export type ModerationCreateResponse = API.ModerationCreateResponse;
-  export type ModerationCreateParams = API.ModerationCreateParams;
+  export import Moderation = API.Moderation;
+  export import ModerationCreateResponse = API.ModerationCreateResponse;
+  export import ModerationCreateParams = API.ModerationCreateParams;
 
   export import Models = API.Models;
-  export type Model = API.Model;
-  export type ModelDeleted = API.ModelDeleted;
+  export import Model = API.Model;
+  export import ModelDeleted = API.ModelDeleted;
   export import ModelsPage = API.ModelsPage;
 
   export import FineTuning = API.FineTuning;
 
   export import FineTunes = API.FineTunes;
-  export type FineTune = API.FineTune;
-  export type FineTuneEvent = API.FineTuneEvent;
-  export type FineTuneEventsListResponse = API.FineTuneEventsListResponse;
+  export import FineTune = API.FineTune;
+  export import FineTuneEvent = API.FineTuneEvent;
+  export import FineTuneEventsListResponse = API.FineTuneEventsListResponse;
   export import FineTunesPage = API.FineTunesPage;
-  export type FineTuneCreateParams = API.FineTuneCreateParams;
-  export type FineTuneListEventsParams = API.FineTuneListEventsParams;
-  export type FineTuneListEventsParamsNonStreaming = API.FineTuneListEventsParamsNonStreaming;
-  export type FineTuneListEventsParamsStreaming = API.FineTuneListEventsParamsStreaming;
+  export import FineTuneCreateParams = API.FineTuneCreateParams;
+  export import FineTuneListEventsParams = API.FineTuneListEventsParams;
+  export import FineTuneListEventsParamsNonStreaming = API.FineTuneListEventsParamsNonStreaming;
+  export import FineTuneListEventsParamsStreaming = API.FineTuneListEventsParamsStreaming;
 }
 
 export default OpenAI;

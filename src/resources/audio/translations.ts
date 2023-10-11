@@ -55,6 +55,6 @@ export interface TranslationCreateParams {
 }
 
 export namespace Translations {
-  export type Translation = TranslationsAPI.Translation;
-  export type TranslationCreateParams = TranslationsAPI.TranslationCreateParams;
+  export import Translation = TranslationsAPI.Translation;
+  export import TranslationCreateParams = TranslationsAPI.TranslationCreateParams;
 }

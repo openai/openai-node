@@ -62,6 +62,6 @@ export interface TranscriptionCreateParams {
 }
 
 export namespace Transcriptions {
-  export type Transcription = TranscriptionsAPI.Transcription;
-  export type TranscriptionCreateParams = TranscriptionsAPI.TranscriptionCreateParams;
+  export import Transcription = TranscriptionsAPI.Transcription;
+  export import TranscriptionCreateParams = TranscriptionsAPI.TranscriptionCreateParams;
 }
