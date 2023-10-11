@@ -2,7 +2,7 @@
   "include": ["src", "tests", "examples"],
   "exclude": ["src/_shims/**/*-deno.ts"],
   "compilerOptions": {
-    "target": "es2019",
+    "target": "es2020",
     "lib": ["es2020"],
     "module": "commonjs",
     "moduleResolution": "node",

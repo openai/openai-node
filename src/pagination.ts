@@ -12,15 +12,15 @@ export interface PageResponse<Item> {
  * Note: no pagination actually occurs yet, this is for forwards-compatibility.
  */
 export class Page<Item> extends AbstractPage<Item> implements PageResponse<Item> {
-  object: string;
-
   data: Array<Item>;
+
+  object: string;
 
   constructor(client: APIClient, response: Response, body: PageResponse<Item>, options: FinalRequestOptions) {
     super(client, response, body, options);
 
-    this.object = body.object;
     this.data = body.data;
+    this.object = body.object;
   }
 
   getPaginatedItems(): Item[] {

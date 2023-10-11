@@ -2,8 +2,8 @@
 
 import * as Core from 'openai/core';
 import { APIResource } from 'openai/resource';
-import * as Completions from 'openai/resources/completions';
-import * as API from './index';
+import * as EditsAPI from 'openai/resources/edits';
+import * as CompletionsAPI from 'openai/resources/completions';
 
 export class Edits extends APIResource {
   /**
@@ -37,7 +37,7 @@ export interface Edit {
   /**
    * Usage statistics for the completion request.
    */
-  usage: Completions.CompletionUsage;
+  usage: CompletionsAPI.CompletionUsage;
 }
 
 export namespace Edit {
@@ -104,6 +104,6 @@ export interface EditCreateParams {
 }
 
 export namespace Edits {
-  export import Edit = API.Edit;
-  export import EditCreateParams = API.EditCreateParams;
+  export type Edit = EditsAPI.Edit;
+  export type EditCreateParams = EditsAPI.EditCreateParams;
 }

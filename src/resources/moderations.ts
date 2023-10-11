@@ -2,7 +2,7 @@
 
 import * as Core from 'openai/core';
 import { APIResource } from 'openai/resource';
-import * as API from './index';
+import * as ModerationsAPI from 'openai/resources/moderations';
 
 export class Moderations extends APIResource {
   /**
@@ -210,7 +210,7 @@ export interface ModerationCreateParams {
 }
 
 export namespace Moderations {
-  export import Moderation = API.Moderation;
-  export import ModerationCreateResponse = API.ModerationCreateResponse;
-  export import ModerationCreateParams = API.ModerationCreateParams;
+  export type Moderation = ModerationsAPI.Moderation;
+  export type ModerationCreateResponse = ModerationsAPI.ModerationCreateResponse;
+  export type ModerationCreateParams = ModerationsAPI.ModerationCreateParams;
 }

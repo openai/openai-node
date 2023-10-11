@@ -2,7 +2,7 @@
 
 import * as Core from 'openai/core';
 import { APIResource } from 'openai/resource';
-import * as API from './index';
+import * as TranscriptionsAPI from 'openai/resources/audio/transcriptions';
 import { type Uploadable, multipartFormRequestOptions } from 'openai/core';
 
 export class Transcriptions extends APIResource {
@@ -62,6 +62,6 @@ export interface TranscriptionCreateParams {
 }
 
 export namespace Transcriptions {
-  export import Transcription = API.Transcription;
-  export import TranscriptionCreateParams = API.TranscriptionCreateParams;
+  export type Transcription = TranscriptionsAPI.Transcription;
+  export type TranscriptionCreateParams = TranscriptionsAPI.TranscriptionCreateParams;
 }

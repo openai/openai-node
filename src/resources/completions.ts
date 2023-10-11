@@ -3,7 +3,7 @@
 import * as Core from 'openai/core';
 import { APIPromise } from 'openai/core';
 import { APIResource } from 'openai/resource';
-import * as API from './index';
+import * as CompletionsAPI from 'openai/resources/completions';
 import { Stream } from 'openai/streaming';
 
 export class Completions extends APIResource {
@@ -205,7 +205,7 @@ export interface CompletionCreateParamsBase {
    *
    * The token count of your prompt plus `max_tokens` cannot exceed the model's
    * context length.
-   * [Example Python code](https://github.com/openai/openai-cookbook/blob/main/examples/How_to_count_tokens_with_tiktoken.ipynb)
+   * [Example Python code](https://cookbook.openai.com/examples/how_to_count_tokens_with_tiktoken)
    * for counting tokens.
    */
   max_tokens?: number | null;
@@ -240,7 +240,7 @@ export interface CompletionCreateParamsBase {
    * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format)
    * as they become available, with the stream terminated by a `data: [DONE]`
    * message.
-   * [Example Python code](https://github.com/openai/openai-cookbook/blob/main/examples/How_to_stream_completions.ipynb).
+   * [Example Python code](https://cookbook.openai.com/examples/how_to_stream_completions).
    */
   stream?: boolean | null;
 
@@ -276,8 +276,8 @@ export interface CompletionCreateParamsBase {
 }
 
 export namespace CompletionCreateParams {
-  export type CompletionCreateParamsNonStreaming = API.CompletionCreateParamsNonStreaming;
-  export type CompletionCreateParamsStreaming = API.CompletionCreateParamsStreaming;
+  export type CompletionCreateParamsNonStreaming = CompletionsAPI.CompletionCreateParamsNonStreaming;
+  export type CompletionCreateParamsStreaming = CompletionsAPI.CompletionCreateParamsStreaming;
 }
 
 export interface CompletionCreateParamsNonStreaming extends CompletionCreateParamsBase {
@@ -287,7 +287,7 @@ export interface CompletionCreateParamsNonStreaming extends CompletionCreatePara
    * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format)
    * as they become available, with the stream terminated by a `data: [DONE]`
    * message.
-   * [Example Python code](https://github.com/openai/openai-cookbook/blob/main/examples/How_to_stream_completions.ipynb).
+   * [Example Python code](https://cookbook.openai.com/examples/how_to_stream_completions).
    */
   stream?: false | null;
 }
@@ -299,16 +299,16 @@ export interface CompletionCreateParamsStreaming extends CompletionCreateParamsB
    * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format)
    * as they become available, with the stream terminated by a `data: [DONE]`
    * message.
-   * [Example Python code](https://github.com/openai/openai-cookbook/blob/main/examples/How_to_stream_completions.ipynb).
+   * [Example Python code](https://cookbook.openai.com/examples/how_to_stream_completions).
    */
   stream: true;
 }
 
 export namespace Completions {
-  export import Completion = API.Completion;
-  export import CompletionChoice = API.CompletionChoice;
-  export import CompletionUsage = API.CompletionUsage;
-  export import CompletionCreateParams = API.CompletionCreateParams;
-  export import CompletionCreateParamsNonStreaming = API.CompletionCreateParamsNonStreaming;
-  export import CompletionCreateParamsStreaming = API.CompletionCreateParamsStreaming;
+  export type Completion = CompletionsAPI.Completion;
+  export type CompletionChoice = CompletionsAPI.CompletionChoice;
+  export type CompletionUsage = CompletionsAPI.CompletionUsage;
+  export type CompletionCreateParams = CompletionsAPI.CompletionCreateParams;
+  export type CompletionCreateParamsNonStreaming = CompletionsAPI.CompletionCreateParamsNonStreaming;
+  export type CompletionCreateParamsStreaming = CompletionsAPI.CompletionCreateParamsStreaming;
 }

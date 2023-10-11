@@ -4,16 +4,16 @@ import * as Core from 'openai/core';
 import { APIResource } from 'openai/resource';
 import { sleep } from 'openai/core';
 import { APIConnectionTimeoutError } from 'openai/error';
-import * as API from './index';
+import * as FilesAPI from 'openai/resources/files';
 import { type Uploadable, multipartFormRequestOptions } from 'openai/core';
 import { Page } from 'openai/pagination';
 
 export class Files extends APIResource {
   /**
-   * Upload a file that contains document(s) to be used across various
-   * endpoints/features. Currently, the size of all the files uploaded by one
-   * organization can be up to 1 GB. Please contact us if you need to increase the
-   * storage limit.
+   * Upload a file that can be used across various endpoints/features. Currently, the
+   * size of all the files uploaded by one organization can be up to 1 GB. Please
+   * [contact us](https://help.openai.com/) if you need to increase the storage
+   * limit.
    */
   create(body: FileCreateParams, options?: Core.RequestOptions): Core.APIPromise<FileObject> {
     return this.post('/files', multipartFormRequestOptions({ body, ...options }));
@@ -81,8 +81,6 @@ export class Files extends APIResource {
  * Note: no pagination actually occurs yet, this is for forwards-compatibility.
  */
 export class FileObjectsPage extends Page<FileObject> {}
-// alias so we can export it in the namespace
-type _FileObjectsPage = FileObjectsPage;
 
 export type FileContent = string;
 
@@ -143,27 +141,27 @@ export interface FileObject {
 
 export interface FileCreateParams {
   /**
-   * Name of the [JSON Lines](https://jsonlines.readthedocs.io/en/latest/) file to be
-   * uploaded.
+   * The file object (not file name) to be uploaded.
    *
    * If the `purpose` is set to "fine-tune", the file will be used for fine-tuning.
    */
   file: Uploadable;
 
   /**
-   * The intended purpose of the uploaded documents.
+   * The intended purpose of the uploaded file.
    *
    * Use "fine-tune" for
    * [fine-tuning](https://platform.openai.com/docs/api-reference/fine-tuning). This
-   * allows us to validate the format of the uploaded file.
+   * allows us to validate the format of the uploaded file is correct for
+   * fine-tuning.
    */
   purpose: string;
 }
 
 export namespace Files {
-  export import FileContent = API.FileContent;
-  export import FileDeleted = API.FileDeleted;
-  export import FileObject = API.FileObject;
-  export type FileObjectsPage = _FileObjectsPage;
-  export import FileCreateParams = API.FileCreateParams;
+  export type FileContent = FilesAPI.FileContent;
+  export type FileDeleted = FilesAPI.FileDeleted;
+  export type FileObject = FilesAPI.FileObject;
+  export import FileObjectsPage = FilesAPI.FileObjectsPage;
+  export type FileCreateParams = FilesAPI.FileCreateParams;
 }

@@ -2,7 +2,7 @@
 
 import * as Core from 'openai/core';
 import { APIResource } from 'openai/resource';
-import * as API from './index';
+import * as TranslationsAPI from 'openai/resources/audio/translations';
 import { type Uploadable, multipartFormRequestOptions } from 'openai/core';
 
 export class Translations extends APIResource {
@@ -55,6 +55,6 @@ export interface TranslationCreateParams {
 }
 
 export namespace Translations {
-  export import Translation = API.Translation;
-  export import TranslationCreateParams = API.TranslationCreateParams;
+  export type Translation = TranslationsAPI.Translation;
+  export type TranslationCreateParams = TranslationsAPI.TranslationCreateParams;
 }

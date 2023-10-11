@@ -3,8 +3,8 @@
 import * as Core from 'openai/core';
 import { APIPromise } from 'openai/core';
 import { APIResource } from 'openai/resource';
-import * as Files from 'openai/resources/files';
-import * as API from './index';
+import * as FineTunesAPI from 'openai/resources/fine-tunes';
+import * as FilesAPI from 'openai/resources/files';
 import { Page } from 'openai/pagination';
 import { Stream } from 'openai/streaming';
 
@@ -80,8 +80,6 @@ export class FineTunes extends APIResource {
  * Note: no pagination actually occurs yet, this is for forwards-compatibility.
  */
 export class FineTunesPage extends Page<FineTune> {}
-// alias so we can export it in the namespace
-type _FineTunesPage = FineTunesPage;
 
 /**
  * The `FineTune` object represents a legacy fine-tune job that has been created
@@ -128,7 +126,7 @@ export interface FineTune {
   /**
    * The compiled results files for the fine-tuning job.
    */
-  result_files: Array<Files.FileObject>;
+  result_files: Array<FilesAPI.FileObject>;
 
   /**
    * The current status of the fine-tuning job, which can be either `created`,
@@ -139,7 +137,7 @@ export interface FineTune {
   /**
    * The list of files used for training.
    */
-  training_files: Array<Files.FileObject>;
+  training_files: Array<FilesAPI.FileObject>;
 
   /**
    * The Unix timestamp (in seconds) for when the fine-tuning job was last updated.
@@ -149,7 +147,7 @@ export interface FineTune {
   /**
    * The list of files used for validation.
    */
-  validation_files: Array<Files.FileObject>;
+  validation_files: Array<FilesAPI.FileObject>;
 
   /**
    * The list of events that have been observed in the lifecycle of the FineTune job.
@@ -204,6 +202,9 @@ export namespace FineTune {
   }
 }
 
+/**
+ * Fine-tune event object
+ */
 export interface FineTuneEvent {
   created_at: number;
 
@@ -287,6 +288,11 @@ export interface FineTuneCreateParams {
   compute_classification_metrics?: boolean | null;
 
   /**
+   * The hyperparameters used for the fine-tuning job.
+   */
+  hyperparameters?: FineTuneCreateParams.Hyperparameters;
+
+  /**
    * The learning rate multiplier to use for training. The fine-tuning learning rate
    * is the original learning rate used for pretraining multiplied by this value.
    *
@@ -304,12 +310,6 @@ export interface FineTuneCreateParams {
    * [Models](https://platform.openai.com/docs/models) documentation.
    */
   model?: (string & {}) | 'ada' | 'babbage' | 'curie' | 'davinci' | null;
-
-  /**
-   * The number of epochs to train the model for. An epoch refers to one full cycle
-   * through the training dataset.
-   */
-  n_epochs?: number | null;
 
   /**
    * The weight to use for loss on the prompt tokens. This controls how much the
@@ -350,6 +350,19 @@ export interface FineTuneCreateParams {
   validation_file?: string | null;
 }
 
+export namespace FineTuneCreateParams {
+  /**
+   * The hyperparameters used for the fine-tuning job.
+   */
+  export interface Hyperparameters {
+    /**
+     * The number of epochs to train the model for. An epoch refers to one full cycle
+     * through the training dataset.
+     */
+    n_epochs?: 'auto' | number;
+  }
+}
+
 export type FineTuneListEventsParams =
   | FineTuneListEventsParamsNonStreaming
   | FineTuneListEventsParamsStreaming;
@@ -368,8 +381,8 @@ export interface FineTuneListEventsParamsBase {
 }
 
 export namespace FineTuneListEventsParams {
-  export type FineTuneListEventsParamsNonStreaming = API.FineTuneListEventsParamsNonStreaming;
-  export type FineTuneListEventsParamsStreaming = API.FineTuneListEventsParamsStreaming;
+  export type FineTuneListEventsParamsNonStreaming = FineTunesAPI.FineTuneListEventsParamsNonStreaming;
+  export type FineTuneListEventsParamsStreaming = FineTunesAPI.FineTuneListEventsParamsStreaming;
 }
 
 export interface FineTuneListEventsParamsNonStreaming extends FineTuneListEventsParamsBase {
@@ -399,12 +412,12 @@ export interface FineTuneListEventsParamsStreaming extends FineTuneListEventsPar
 }
 
 export namespace FineTunes {
-  export import FineTune = API.FineTune;
-  export import FineTuneEvent = API.FineTuneEvent;
-  export import FineTuneEventsListResponse = API.FineTuneEventsListResponse;
-  export type FineTunesPage = _FineTunesPage;
-  export import FineTuneCreateParams = API.FineTuneCreateParams;
-  export import FineTuneListEventsParams = API.FineTuneListEventsParams;
-  export import FineTuneListEventsParamsNonStreaming = API.FineTuneListEventsParamsNonStreaming;
-  export import FineTuneListEventsParamsStreaming = API.FineTuneListEventsParamsStreaming;
+  export type FineTune = FineTunesAPI.FineTune;
+  export type FineTuneEvent = FineTunesAPI.FineTuneEvent;
+  export type FineTuneEventsListResponse = FineTunesAPI.FineTuneEventsListResponse;
+  export import FineTunesPage = FineTunesAPI.FineTunesPage;
+  export type FineTuneCreateParams = FineTunesAPI.FineTuneCreateParams;
+  export type FineTuneListEventsParams = FineTunesAPI.FineTuneListEventsParams;
+  export type FineTuneListEventsParamsNonStreaming = FineTunesAPI.FineTuneListEventsParamsNonStreaming;
+  export type FineTuneListEventsParamsStreaming = FineTunesAPI.FineTuneListEventsParamsStreaming;
 }
