@@ -104,6 +104,6 @@ export interface EditCreateParams {
 }
 
 export namespace Edits {
-  export type Edit = EditsAPI.Edit;
-  export type EditCreateParams = EditsAPI.EditCreateParams;
+  export import Edit = EditsAPI.Edit;
+  export import EditCreateParams = EditsAPI.EditCreateParams;
 }
