@@ -2,7 +2,7 @@
 
 import * as Core from 'openai/core';
 import { APIResource } from 'openai/resource';
-import * as API from './index';
+import * as ImagesAPI from 'openai/resources/images';
 import { type Uploadable, multipartFormRequestOptions } from 'openai/core';
 
 export class Images extends APIResource {
@@ -163,9 +163,9 @@ export interface ImageGenerateParams {
 }
 
 export namespace Images {
-  export import Image = API.Image;
-  export import ImagesResponse = API.ImagesResponse;
-  export import ImageCreateVariationParams = API.ImageCreateVariationParams;
-  export import ImageEditParams = API.ImageEditParams;
-  export import ImageGenerateParams = API.ImageGenerateParams;
+  export type Image = ImagesAPI.Image;
+  export type ImagesResponse = ImagesAPI.ImagesResponse;
+  export type ImageCreateVariationParams = ImagesAPI.ImageCreateVariationParams;
+  export type ImageEditParams = ImagesAPI.ImageEditParams;
+  export type ImageGenerateParams = ImagesAPI.ImageGenerateParams;
 }

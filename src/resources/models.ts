@@ -2,7 +2,7 @@
 
 import * as Core from 'openai/core';
 import { APIResource } from 'openai/resource';
-import * as API from './index';
+import * as ModelsAPI from 'openai/resources/models';
 import { Page } from 'openai/pagination';
 
 export class Models extends APIResource {
@@ -35,8 +35,6 @@ export class Models extends APIResource {
  * Note: no pagination actually occurs yet, this is for forwards-compatibility.
  */
 export class ModelsPage extends Page<Model> {}
-// alias so we can export it in the namespace
-type _ModelsPage = ModelsPage;
 
 /**
  * Describes an OpenAI model offering that can be used with the API.
@@ -72,7 +70,7 @@ export interface ModelDeleted {
 }
 
 export namespace Models {
-  export import Model = API.Model;
-  export import ModelDeleted = API.ModelDeleted;
-  export type ModelsPage = _ModelsPage;
+  export type Model = ModelsAPI.Model;
+  export type ModelDeleted = ModelsAPI.ModelDeleted;
+  export import ModelsPage = ModelsAPI.ModelsPage;
 }
