@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.12.1 (2023-10-11)
+
+Full Changelog: [v4.12.0...v4.12.1](https://github.com/openai/openai-node/compare/v4.12.0...v4.12.1)
+
+### Bug Fixes
+
+* fix namespace exports regression ([#366](https://github.com/openai/openai-node/issues/366)) ([b2b1d85](https://github.com/openai/openai-node/commit/b2b1d85d90eef51e689ca75c0ca2f35bb63cccc0))
+
 ## 4.12.0 (2023-10-11)
 
 Full Changelog: [v4.11.1...v4.12.0](https://github.com/openai/openai-node/compare/v4.11.1...v4.12.0)
