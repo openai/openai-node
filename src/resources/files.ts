@@ -4,7 +4,7 @@ import * as Core from 'openai/core';
 import { APIResource } from 'openai/resource';
 import { sleep } from 'openai/core';
 import { APIConnectionTimeoutError } from 'openai/error';
-import * as API from './index';
+import * as FilesAPI from 'openai/resources/files';
 import { type Uploadable, multipartFormRequestOptions } from 'openai/core';
 import { Page } from 'openai/pagination';
 
@@ -81,8 +81,6 @@ export class Files extends APIResource {
  * Note: no pagination actually occurs yet, this is for forwards-compatibility.
  */
 export class FileObjectsPage extends Page<FileObject> {}
-// alias so we can export it in the namespace
-type _FileObjectsPage = FileObjectsPage;
 
 export type FileContent = string;
 
@@ -161,9 +159,9 @@ export interface FileCreateParams {
 }
 
 export namespace Files {
-  export import FileContent = API.FileContent;
-  export import FileDeleted = API.FileDeleted;
-  export import FileObject = API.FileObject;
-  export type FileObjectsPage = _FileObjectsPage;
-  export import FileCreateParams = API.FileCreateParams;
+  export type FileContent = FilesAPI.FileContent;
+  export type FileDeleted = FilesAPI.FileDeleted;
+  export type FileObject = FilesAPI.FileObject;
+  export import FileObjectsPage = FilesAPI.FileObjectsPage;
+  export type FileCreateParams = FilesAPI.FileCreateParams;
 }

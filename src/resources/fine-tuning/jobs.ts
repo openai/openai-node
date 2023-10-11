@@ -3,8 +3,8 @@
 import * as Core from 'openai/core';
 import { APIResource } from 'openai/resource';
 import { isRequestOptions } from 'openai/core';
-import * as API from './index';
-import { CursorPage, CursorPageParams } from 'openai/pagination';
+import * as JobsAPI from 'openai/resources/fine-tuning/jobs';
+import { CursorPage, type CursorPageParams } from 'openai/pagination';
 
 export class Jobs extends APIResource {
   /**
@@ -81,12 +81,8 @@ export class Jobs extends APIResource {
 }
 
 export class FineTuningJobsPage extends CursorPage<FineTuningJob> {}
-// alias so we can export it in the namespace
-type _FineTuningJobsPage = FineTuningJobsPage;
 
 export class FineTuningJobEventsPage extends CursorPage<FineTuningJobEvent> {}
-// alias so we can export it in the namespace
-type _FineTuningJobEventsPage = FineTuningJobEventsPage;
 
 /**
  * The `fine_tuning.job` object represents a fine-tuning job that has been created
@@ -300,11 +296,11 @@ export interface JobListParams extends CursorPageParams {}
 export interface JobListEventsParams extends CursorPageParams {}
 
 export namespace Jobs {
-  export import FineTuningJob = API.FineTuningJob;
-  export import FineTuningJobEvent = API.FineTuningJobEvent;
-  export type FineTuningJobsPage = _FineTuningJobsPage;
-  export type FineTuningJobEventsPage = _FineTuningJobEventsPage;
-  export import JobCreateParams = API.JobCreateParams;
-  export import JobListParams = API.JobListParams;
-  export import JobListEventsParams = API.JobListEventsParams;
+  export type FineTuningJob = JobsAPI.FineTuningJob;
+  export type FineTuningJobEvent = JobsAPI.FineTuningJobEvent;
+  export import FineTuningJobsPage = JobsAPI.FineTuningJobsPage;
+  export import FineTuningJobEventsPage = JobsAPI.FineTuningJobEventsPage;
+  export type JobCreateParams = JobsAPI.JobCreateParams;
+  export type JobListParams = JobsAPI.JobListParams;
+  export type JobListEventsParams = JobsAPI.JobListEventsParams;
 }
