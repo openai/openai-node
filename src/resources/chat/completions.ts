@@ -509,6 +509,9 @@ export namespace Completions {
   export import ChatCompletionMessage = ChatCompletionsAPI.ChatCompletionMessage;
   export import ChatCompletionMessageParam = ChatCompletionsAPI.ChatCompletionMessageParam;
   export import ChatCompletionRole = ChatCompletionsAPI.ChatCompletionRole;
+  /**
+   * @deprecated ChatCompletionMessageParam should be used instead
+   */
   export import CreateChatCompletionRequestMessage = ChatCompletionsAPI.CreateChatCompletionRequestMessage;
   export import ChatCompletionCreateParams = ChatCompletionsAPI.ChatCompletionCreateParams;
   export import CompletionCreateParams = ChatCompletionsAPI.CompletionCreateParams;
