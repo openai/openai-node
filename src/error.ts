@@ -19,7 +19,7 @@ export class APIError extends OpenAIError {
     message: string | undefined,
     headers: Headers | undefined,
   ) {
-    super(`${status} ${APIError.makeMessage(error, message)}`);
+    super(`${APIError.makeMessage(status, error, message)}`);
     this.status = status;
     this.headers = headers;
 
@@ -30,13 +30,14 @@ export class APIError extends OpenAIError {
     this.type = data?.['type'];
   }
 
-  private static makeMessage(error: any, message: string | undefined) {
+  private static makeMessage(status: number | undefined, error: any, message: string | undefined) {
     return (
-      error?.message ?
+      (status || '') +
+      (error?.message ?
         typeof error.message === 'string' ? error.message
         : JSON.stringify(error.message)
       : error ? JSON.stringify(error)
-      : message || 'status code (no body)'
+      : message || 'status code (no body)')
     );
   }
 
