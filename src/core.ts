@@ -1059,16 +1059,33 @@ export const isHeadersProtocol = (headers: any): headers is HeadersProtocol => {
   return typeof headers?.get === 'function';
 };
 
-export const getHeader = (headers: HeadersLike, key: string): string | null | undefined => {
-  const lowerKey = key.toLowerCase();
-  if (isHeadersProtocol(headers)) return headers.get(key) || headers.get(lowerKey);
-  const value = headers[key] || headers[lowerKey];
-  if (Array.isArray(value)) {
-    if (value.length <= 1) return value[0];
-    console.warn(`Received ${value.length} entries for the ${key} header, using the first entry.`);
-    return value[0];
+export const getRequiredHeader = (headers: HeadersLike, header: string): string => {
+  const lowerCasedHeader = header.toLowerCase();
+  if (isHeadersProtocol(headers)) {
+    // to deal with the case where the header looks like Finch-Event-Id
+    const intercapsHeader =
+      header[0]?.toUpperCase() +
+      header.substring(1).replace(/([^\w])(\w)/g, (_m, g1, g2) => g1 + g2.toUpperCase());
+    for (const key of [header, lowerCasedHeader, header.toUpperCase(), intercapsHeader]) {
+      const value = headers.get(key);
+      if (value) {
+        return value;
+      }
+    }
   }
-  return value;
+
+  for (const [key, value] of Object.entries(headers)) {
+    if (key.toLowerCase() === lowerCasedHeader) {
+      if (Array.isArray(value)) {
+        if (value.length <= 1) return value[0];
+        console.warn(`Received ${value.length} entries for the ${header} header, using the first entry.`);
+        return value[0];
+      }
+      return value;
+    }
+  }
+
+  throw new Error(`Could not find ${header} header`);
 };
 
 /**
