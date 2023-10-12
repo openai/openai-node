@@ -79,4 +79,5 @@ export declare class FsReadStream extends Readable {
 }
 
 type _ReadableStream<R = any> = ReadableStream<R>;
-export { type _ReadableStream as ReadableStream };
+declare const _ReadableStream: typeof ReadableStream;
+export { _ReadableStream as ReadableStream };

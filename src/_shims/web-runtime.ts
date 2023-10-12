@@ -72,6 +72,18 @@ export function getRuntime({ manuallyImported }: { manuallyImported?: boolean } 
           }
         }
       ),
+    ReadableStream:
+      // @ts-ignore
+      typeof ReadableStream !== 'undefined' ? ReadableStream : (
+        class ReadableStream {
+          // @ts-ignore
+          constructor() {
+            throw new Error(
+              `streaming isn't supported in this environment yet as 'ReadableStream' is undefined. ${recommendation}`,
+            );
+          }
+        }
+      ),
     getMultipartRequestOptions: async <T extends {} = Record<string, unknown>>(
       // @ts-ignore
       form: FormData,

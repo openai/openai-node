@@ -44,7 +44,7 @@ async function defaultParseResponse<T>(props: APIResponseProps): Promise<T> {
   if (props.options.stream) {
     // Note: there is an invariant here that isn't represented in the type system
     // that if you set `stream: true` the response type must also be `Stream<T>`
-    return new Stream(response, props.controller) as any;
+    return Stream.fromSSEResponse(response, props.controller) as any;
   }
 
   const contentType = response.headers.get('content-type');

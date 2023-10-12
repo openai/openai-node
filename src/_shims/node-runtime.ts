@@ -13,6 +13,7 @@ import { Readable } from 'node:stream';
 import { type RequestOptions } from '../core';
 import { MultipartBody } from './MultipartBody';
 import { type Shims } from './registry';
+import { ReadableStream } from 'web-streams-polyfill';
 
 type FileFromPathOptions = Omit<FilePropertyBag, 'lastModified'>;
 
@@ -71,6 +72,7 @@ export function getRuntime(): Shims {
     FormData: fd.FormData,
     Blob: fd.Blob,
     File: fd.File,
+    ReadableStream,
     getMultipartRequestOptions,
     getDefaultAgent: (url: string): Agent => (url.startsWith('https') ? defaultHttpsAgent : defaultHttpAgent),
     fileFromPath,
