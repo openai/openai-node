@@ -1062,7 +1062,7 @@ export const isHeadersProtocol = (headers: any): headers is HeadersProtocol => {
 export const getRequiredHeader = (headers: HeadersLike, header: string): string => {
   const lowerCasedHeader = header.toLowerCase();
   if (isHeadersProtocol(headers)) {
-    // to deal with the case where the header looks like Finch-Event-Id
+    // to deal with the case where the header looks like Stainless-Event-Id
     const intercapsHeader =
       header[0]?.toUpperCase() +
       header.substring(1).replace(/([^\w])(\w)/g, (_m, g1, g2) => g1 + g2.toUpperCase());
