@@ -1,8 +1,6 @@
 import { ReadableStream, type Response } from './_shims/index';
 import { OpenAIError } from './error';
 
-import { APIError } from 'openai/error';
-
 type Bytes = string | ArrayBuffer | Uint8Array | Buffer | null | undefined;
 
 type ServerSentEvent = {
@@ -60,21 +58,13 @@ export class Stream<Item> implements AsyncIterable<Item> {
           }
 
           if (sse.event === null) {
-            let data;
-
             try {
-              data = JSON.parse(sse.data);
+              yield JSON.parse(sse.data);
             } catch (e) {
               console.error(`Could not parse message into JSON:`, sse.data);
               console.error(`From chunk:`, sse.raw);
               throw e;
             }
-
-            if (data && data.error) {
-              throw new APIError(undefined, data.error, undefined, undefined);
-            }
-
-            yield data;
           }
         }
         done = true;
