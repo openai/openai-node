@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.12.3 (2023-10-16)
+
+Full Changelog: [v4.12.2...v4.12.3](https://github.com/openai/openai-node/compare/v4.12.2...v4.12.3)
+
+### Documentation
+
+* organisation -&gt; organization (UK to US English) ([#382](https://github.com/openai/openai-node/issues/382)) ([516f0ad](https://github.com/openai/openai-node/commit/516f0ade1ec1fd8fc4c78999ee0f656cc2b5ae58))
+
 ## 4.12.2 (2023-10-16)
 
 Full Changelog: [v4.12.1...v4.12.2](https://github.com/openai/openai-node/compare/v4.12.1...v4.12.2)
