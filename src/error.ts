@@ -31,14 +31,23 @@ export class APIError extends OpenAIError {
   }
 
   private static makeMessage(status: number | undefined, error: any, message: string | undefined) {
-    return (
-      (status || '') +
-      (error?.message ?
+    const msg =
+      error?.message ?
         typeof error.message === 'string' ? error.message
         : JSON.stringify(error.message)
       : error ? JSON.stringify(error)
-      : message || 'status code (no body)')
-    );
+      : message;
+
+    if (status && msg) {
+      return `${status} ${msg}`;
+    }
+    if (status) {
+      return `${status} status code (no body)`;
+    }
+    if (msg) {
+      return msg;
+    }
+    return '(no status code or body)';
   }
 
   static generate(
