@@ -1,5 +1,30 @@
 # Changelog
 
+## 4.12.2 (2023-10-16)
+
+Full Changelog: [v4.12.1...v4.12.2](https://github.com/openai/openai-node/compare/v4.12.1...v4.12.2)
+
+### Bug Fixes
+
+* **client:** correctly handle errors during streaming ([#377](https://github.com/openai/openai-node/issues/377)) ([09233b1](https://github.com/openai/openai-node/commit/09233b1ccc80ee900be19050f438cc8aa9dbb513))
+* **client:** correctly handle errors during streaming ([#379](https://github.com/openai/openai-node/issues/379)) ([9ced580](https://github.com/openai/openai-node/commit/9ced5804777a5857d6775a49ddf30ed9cc016fab))
+* improve status code in error messages ([#381](https://github.com/openai/openai-node/issues/381)) ([68dfb17](https://github.com/openai/openai-node/commit/68dfb17cce300ade8d29afc854d616833b3283ca))
+
+
+### Chores
+
+* add case insensitive get header function ([#373](https://github.com/openai/openai-node/issues/373)) ([b088998](https://github.com/openai/openai-node/commit/b088998ae610de54bb8700eefd6b664eb9a2fcc3))
+* **internal:** add debug logs for stream responses ([#380](https://github.com/openai/openai-node/issues/380)) ([689db0b](https://github.com/openai/openai-node/commit/689db0b8058527ae5c3af5e457c962d8a6635297))
+* show deprecation notice on re-export ([#368](https://github.com/openai/openai-node/issues/368)) ([b176703](https://github.com/openai/openai-node/commit/b176703102998f0e9d8ca2ed93ccd495fd10a6ee))
+* update comment ([#376](https://github.com/openai/openai-node/issues/376)) ([a06c685](https://github.com/openai/openai-node/commit/a06c6850bfdd756dc8f07dd1f70218be610faa30))
+* update comment ([#378](https://github.com/openai/openai-node/issues/378)) ([b04031d](https://github.com/openai/openai-node/commit/b04031d19210a66f82c7d233a50f7bc427a1bf92))
+
+
+### Refactors
+
+* **streaming:** change Stream constructor signature ([#370](https://github.com/openai/openai-node/issues/370)) ([71984ed](https://github.com/openai/openai-node/commit/71984edc3141ba99ffa1327bab6a182b4452209f))
+* **test:** refactor authentication tests ([#371](https://github.com/openai/openai-node/issues/371)) ([e0d459f](https://github.com/openai/openai-node/commit/e0d459f958451a99e15a11a0e5ea6471abbe1ac1))
+
 ## 4.12.1 (2023-10-11)
 
 Full Changelog: [v4.12.0...v4.12.1](https://github.com/openai/openai-node/compare/v4.12.0...v4.12.1)
