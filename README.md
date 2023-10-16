@@ -24,7 +24,7 @@ The full API of this library can be found in [api.md file](https://github.com/op
 import OpenAI from 'openai';
 
 const openai = new OpenAI({
-  apiKey: 'my api key', // defaults to process.env["OPENAI_API_KEY"]
+  apiKey: 'My API Key', // defaults to process.env["OPENAI_API_KEY"]
 });
 
 async function main() {
@@ -73,7 +73,7 @@ This library includes TypeScript definitions for all request params and response
 import OpenAI from 'openai';
 
 const openai = new OpenAI({
-  apiKey: 'my api key', // defaults to process.env["OPENAI_API_KEY"]
+  apiKey: 'My API Key', // defaults to process.env["OPENAI_API_KEY"]
 });
 
 async function main() {
@@ -297,7 +297,7 @@ await openai.models.list({
 
 ## Semantic Versioning
 
-This package generally attempts to follow [SemVer](https://semver.org/spec/v2.0.0.html) conventions, though certain backwards-incompatible changes may be released as minor versions:
+This package generally follows [SemVer](https://semver.org/spec/v2.0.0.html) conventions, though certain backwards-incompatible changes may be released as minor versions:
 
 1. Changes that only affect static types, without breaking runtime behavior.
 2. Changes to library internals which are technically public but not intended or documented for external use. _(Please open a GitHub issue to let us know if you are relying on such internals)_.

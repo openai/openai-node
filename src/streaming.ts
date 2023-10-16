@@ -1,5 +1,7 @@
-import { type Response } from './_shims/index';
+import { ReadableStream, type Response } from './_shims/index';
 import { OpenAIError } from './error';
+
+import { APIError } from 'openai/error';
 
 type Bytes = string | ArrayBuffer | Uint8Array | Buffer | null | undefined;
 
@@ -12,67 +14,183 @@ type ServerSentEvent = {
 export class Stream<Item> implements AsyncIterable<Item> {
   controller: AbortController;
 
-  private response: Response;
-  private decoder: SSEDecoder;
-
-  constructor(response: Response, controller: AbortController) {
-    this.response = response;
+  constructor(private iterator: () => AsyncIterator<Item>, controller: AbortController) {
     this.controller = controller;
-    this.decoder = new SSEDecoder();
   }
 
-  private async *iterMessages(): AsyncGenerator<ServerSentEvent, void, unknown> {
-    if (!this.response.body) {
-      this.controller.abort();
-      throw new OpenAIError(`Attempted to iterate over a response with no body`);
-    }
+  static fromSSEResponse<Item>(response: Response, controller: AbortController) {
+    let consumed = false;
+    const decoder = new SSEDecoder();
 
-    const lineDecoder = new LineDecoder();
+    async function* iterMessages(): AsyncGenerator<ServerSentEvent, void, unknown> {
+      if (!response.body) {
+        controller.abort();
+        throw new OpenAIError(`Attempted to iterate over a response with no body`);
+      }
 
-    const iter = readableStreamAsyncIterable<Bytes>(this.response.body);
-    for await (const chunk of iter) {
-      for (const line of lineDecoder.decode(chunk)) {
-        const sse = this.decoder.decode(line);
+      const lineDecoder = new LineDecoder();
+
+      const iter = readableStreamAsyncIterable<Bytes>(response.body);
+      for await (const chunk of iter) {
+        for (const line of lineDecoder.decode(chunk)) {
+          const sse = decoder.decode(line);
+          if (sse) yield sse;
+        }
+      }
+
+      for (const line of lineDecoder.flush()) {
+        const sse = decoder.decode(line);
         if (sse) yield sse;
       }
     }
 
-    for (const line of lineDecoder.flush()) {
-      const sse = this.decoder.decode(line);
-      if (sse) yield sse;
-    }
-  }
+    async function* iterator(): AsyncIterator<Item, any, undefined> {
+      if (consumed) {
+        throw new Error('Cannot iterate over a consumed stream, use `.tee()` to split the stream.');
+      }
+      consumed = true;
+      let done = false;
+      try {
+        for await (const sse of iterMessages()) {
+          if (done) continue;
 
-  async *[Symbol.asyncIterator](): AsyncIterator<Item, any, undefined> {
-    let done = false;
-    try {
-      for await (const sse of this.iterMessages()) {
-        if (done) continue;
+          if (sse.data.startsWith('[DONE]')) {
+            done = true;
+            continue;
+          }
 
-        if (sse.data.startsWith('[DONE]')) {
-          done = true;
-          continue;
-        }
+          if (sse.event === null) {
+            let data;
 
-        if (sse.event === null) {
-          try {
-            yield JSON.parse(sse.data);
-          } catch (e) {
-            console.error(`Could not parse message into JSON:`, sse.data);
-            console.error(`From chunk:`, sse.raw);
-            throw e;
+            try {
+              data = JSON.parse(sse.data);
+            } catch (e) {
+              console.error(`Could not parse message into JSON:`, sse.data);
+              console.error(`From chunk:`, sse.raw);
+              throw e;
+            }
+
+            if (data && data.error) {
+              throw new APIError(undefined, data.error, undefined, undefined);
+            }
+
+            yield data;
           }
         }
+        done = true;
+      } catch (e) {
+        // If the user calls `stream.controller.abort()`, we should exit without throwing.
+        if (e instanceof Error && e.name === 'AbortError') return;
+        throw e;
+      } finally {
+        // If the user `break`s, abort the ongoing request.
+        if (!done) controller.abort();
       }
-      done = true;
-    } catch (e) {
-      // If the user calls `stream.controller.abort()`, we should exit without throwing.
-      if (e instanceof Error && e.name === 'AbortError') return;
-      throw e;
-    } finally {
-      // If the user `break`s, abort the ongoing request.
-      if (!done) this.controller.abort();
     }
+
+    return new Stream(iterator, controller);
+  }
+
+  // Generates a Stream from a newline-separated ReadableStream where each item
+  // is a JSON Value.
+  static fromReadableStream<Item>(readableStream: ReadableStream, controller: AbortController) {
+    let consumed = false;
+
+    async function* iterLines(): AsyncGenerator<string, void, unknown> {
+      const lineDecoder = new LineDecoder();
+
+      const iter = readableStreamAsyncIterable<Bytes>(readableStream);
+      for await (const chunk of iter) {
+        for (const line of lineDecoder.decode(chunk)) {
+          yield line;
+        }
+      }
+
+      for (const line of lineDecoder.flush()) {
+        yield line;
+      }
+    }
+
+    async function* iterator(): AsyncIterator<Item, any, undefined> {
+      if (consumed) {
+        throw new Error('Cannot iterate over a consumed stream, use `.tee()` to split the stream.');
+      }
+      consumed = true;
+      let done = false;
+      try {
+        for await (const line of iterLines()) {
+          if (done) continue;
+          if (line) yield JSON.parse(line);
+        }
+        done = true;
+      } catch (e) {
+        // If the user calls `stream.controller.abort()`, we should exit without throwing.
+        if (e instanceof Error && e.name === 'AbortError') return;
+        throw e;
+      } finally {
+        // If the user `break`s, abort the ongoing request.
+        if (!done) controller.abort();
+      }
+    }
+
+    return new Stream(iterator, controller);
+  }
+
+  [Symbol.asyncIterator](): AsyncIterator<Item> {
+    return this.iterator();
+  }
+
+  tee(): [Stream<Item>, Stream<Item>] {
+    const left: Array<Promise<IteratorResult<Item>>> = [];
+    const right: Array<Promise<IteratorResult<Item>>> = [];
+    const iterator = this.iterator();
+
+    const teeIterator = (queue: Array<Promise<IteratorResult<Item>>>): AsyncIterator<Item> => {
+      return {
+        next: () => {
+          if (queue.length === 0) {
+            const result = iterator.next();
+            left.push(result);
+            right.push(result);
+          }
+          return queue.shift()!;
+        },
+      };
+    };
+
+    return [
+      new Stream(() => teeIterator(left), this.controller),
+      new Stream(() => teeIterator(right), this.controller),
+    ];
+  }
+
+  // Converts this stream to a newline-separated ReadableStream of JSON Stringified values in the stream
+  // which can be turned back into a Stream with Stream.fromReadableStream.
+  toReadableStream(): ReadableStream {
+    const self = this;
+    let iter: AsyncIterator<Item>;
+    const encoder = new TextEncoder();
+
+    return new ReadableStream({
+      async start() {
+        iter = self[Symbol.asyncIterator]();
+      },
+      async pull(ctrl) {
+        try {
+          const { value, done } = await iter.next();
+          if (done) return ctrl.close();
+
+          const bytes = encoder.encode(JSON.stringify(value) + '\n');
+
+          ctrl.enqueue(bytes);
+        } catch (err) {
+          ctrl.error(err);
+        }
+      },
+      async cancel() {
+        await iter.return?.();
+      },
+    });
   }
 }
 

@@ -4,7 +4,7 @@ import OpenAI from 'openai';
 import { Response } from 'node-fetch';
 
 const openai = new OpenAI({
-  apiKey: 'something1234',
+  apiKey: 'My API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 

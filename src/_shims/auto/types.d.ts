@@ -96,4 +96,6 @@ export declare class FsReadStream extends Readable {
 
 // @ts-ignore
 type _ReadableStream<R = any> = unknown extends ReadableStream<R> ? never : ReadableStream<R>;
-export { type _ReadableStream as ReadableStream };
+// @ts-ignore
+declare const _ReadableStream: unknown extends typeof ReadableStream ? never : typeof ReadableStream;
+export { _ReadableStream as ReadableStream };

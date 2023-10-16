@@ -12,6 +12,7 @@ export interface Shims {
   FormData: any;
   Blob: any;
   File: any;
+  ReadableStream: any;
   getMultipartRequestOptions: <T extends {} = Record<string, unknown>>(
     form: Shims['FormData'],
     opts: RequestOptions<T>,
@@ -32,6 +33,7 @@ export let Headers: Shims['Headers'] | undefined = undefined;
 export let FormData: Shims['FormData'] | undefined = undefined;
 export let Blob: Shims['Blob'] | undefined = undefined;
 export let File: Shims['File'] | undefined = undefined;
+export let ReadableStream: Shims['ReadableStream'] | undefined = undefined;
 export let getMultipartRequestOptions: Shims['getMultipartRequestOptions'] | undefined = undefined;
 export let getDefaultAgent: Shims['getDefaultAgent'] | undefined = undefined;
 export let fileFromPath: Shims['fileFromPath'] | undefined = undefined;
@@ -55,6 +57,7 @@ export function setShims(shims: Shims, options: { auto: boolean } = { auto: fals
   FormData = shims.FormData;
   Blob = shims.Blob;
   File = shims.File;
+  ReadableStream = shims.ReadableStream;
   getMultipartRequestOptions = shims.getMultipartRequestOptions;
   getDefaultAgent = shims.getDefaultAgent;
   fileFromPath = shims.fileFromPath;
