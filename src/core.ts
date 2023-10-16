@@ -42,6 +42,8 @@ type APIResponseProps = {
 async function defaultParseResponse<T>(props: APIResponseProps): Promise<T> {
   const { response } = props;
   if (props.options.stream) {
+    debug('response', response.status, response.url, response.headers, response.body);
+
     // Note: there is an invariant here that isn't represented in the type system
     // that if you set `stream: true` the response type must also be `Stream<T>`
     return Stream.fromSSEResponse(response, props.controller) as any;
