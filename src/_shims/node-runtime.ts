@@ -13,7 +13,9 @@ import { Readable } from 'node:stream';
 import { type RequestOptions } from '../core';
 import { MultipartBody } from './MultipartBody';
 import { type Shims } from './registry';
-import { ReadableStream } from 'web-streams-polyfill';
+
+// @ts-ignore (this package does not have proper export maps for this export)
+import { ReadableStream } from 'web-streams-polyfill/dist/ponyfill.es2018.js';
 
 type FileFromPathOptions = Omit<FilePropertyBag, 'lastModified'>;
 
