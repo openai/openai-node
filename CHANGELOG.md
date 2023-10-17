@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.12.4 (2023-10-17)
+
+Full Changelog: [v4.12.3...v4.12.4](https://github.com/openai/openai-node/compare/v4.12.3...v4.12.4)
+
+### Bug Fixes
+
+* import web-streams-polyfill without overriding globals ([#385](https://github.com/openai/openai-node/issues/385)) ([be8e18b](https://github.com/openai/openai-node/commit/be8e18ba4c6a16e7b6413c77246f83230e0b8fc2))
+
 ## 4.12.3 (2023-10-16)
 
 Full Changelog: [v4.12.2...v4.12.3](https://github.com/openai/openai-node/compare/v4.12.2...v4.12.3)
