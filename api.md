@@ -26,6 +26,8 @@ Types:
 Methods:
 
 - <code title="post /chat/completions">client.chat.completions.<a href="./src/resources/chat/completions.ts">create</a>({ ...params }) -> ChatCompletion</code>
+- <code>client.chat.completions.<a href="./src/resources/chat/completions.ts">runFunctions</a>(body, options?) -> ChatCompletionRunner | ChatCompletionStreamingRunner</code>
+- <code>client.chat.completions.<a href="./src/resources/chat/completions.ts">stream</a>(body, options?) -> ChatCompletionStreamingRunner</code>
 
 # Edits
 

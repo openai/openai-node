@@ -3,6 +3,25 @@
 import * as Core from 'openai/core';
 import { APIPromise } from 'openai/core';
 import { APIResource } from 'openai/resource';
+import { ChatCompletionRunner, ChatCompletionFunctionRunnerParams } from 'openai/lib/ChatCompletionRunner';
+export { ChatCompletionRunner, ChatCompletionFunctionRunnerParams } from 'openai/lib/ChatCompletionRunner';
+import {
+  ChatCompletionStreamingRunner,
+  ChatCompletionStreamingFunctionRunnerParams,
+} from 'openai/lib/ChatCompletionStream';
+export {
+  ChatCompletionSnapshot,
+  ChatCompletionStreamingRunner,
+  ChatCompletionStreamingFunctionRunnerParams,
+} from 'openai/lib/ChatCompletionStream';
+export {
+  RunnableFunction,
+  RunnableFunctions,
+  RunnableFunctionWithParse,
+  RunnableFunctionWithoutParse,
+  ParsingFunction,
+} from 'openai/lib/RunnableFunction';
+import { type BaseFunctionsArgs } from 'openai/lib/RunnableFunction';
 import * as ChatCompletionsAPI from 'openai/resources/chat/completions';
 import * as CompletionsAPI from 'openai/resources/completions';
 import { Stream } from 'openai/streaming';
@@ -30,6 +49,52 @@ export class Completions extends APIResource {
     return this.post('/chat/completions', { body, ...options, stream: body.stream ?? false }) as
       | APIPromise<ChatCompletion>
       | APIPromise<Stream<ChatCompletionChunk>>;
+  }
+
+  /**
+   * A convenience helper for using function calls with the /chat/completions
+   * endpoint which automatically calls the JavaScript functions you provide and
+   * sends their results back to the /chat/completions endpoint, looping as long as
+   * the model requests function calls.
+   *
+   * For more details and examples, see
+   * [the docs](https://github.com/openai/openai-node#runFunctions)
+   */
+  runFunctions<FunctionsArgs extends BaseFunctionsArgs>(
+    body: ChatCompletionFunctionRunnerParams<FunctionsArgs>,
+    options?: Core.RequestOptions,
+  ): ChatCompletionRunner;
+  runFunctions<FunctionsArgs extends BaseFunctionsArgs>(
+    body: ChatCompletionStreamingFunctionRunnerParams<FunctionsArgs>,
+    options?: Core.RequestOptions,
+  ): ChatCompletionStreamingRunner;
+  runFunctions<FunctionsArgs extends BaseFunctionsArgs>(
+    body:
+      | ChatCompletionFunctionRunnerParams<FunctionsArgs>
+      | ChatCompletionStreamingFunctionRunnerParams<FunctionsArgs>,
+    options?: Core.RequestOptions,
+  ): ChatCompletionRunner | ChatCompletionStreamingRunner {
+    return body.stream ?
+        ChatCompletionStreamingRunner.runFunctions(
+          this,
+          body as ChatCompletionStreamingFunctionRunnerParams<FunctionsArgs>,
+          options,
+        )
+      : ChatCompletionRunner.runFunctions(
+          this,
+          body as ChatCompletionFunctionRunnerParams<FunctionsArgs>,
+          options,
+        );
+  }
+
+  /**
+   * Creates a chat completion stream
+   */
+  stream(
+    body: Omit<ChatCompletionCreateParamsStreaming, 'stream'> & { stream?: true },
+    options?: Core.RequestOptions,
+  ): ChatCompletionStreamingRunner {
+    return ChatCompletionStreamingRunner.createChatCompletion(this, body, options);
   }
 }
 
@@ -519,4 +584,11 @@ export namespace Completions {
   export import CompletionCreateParamsNonStreaming = ChatCompletionsAPI.CompletionCreateParamsNonStreaming;
   export import ChatCompletionCreateParamsStreaming = ChatCompletionsAPI.ChatCompletionCreateParamsStreaming;
   export import CompletionCreateParamsStreaming = ChatCompletionsAPI.CompletionCreateParamsStreaming;
+  export import RunnableFunction = ChatCompletionsAPI.RunnableFunction;
+  export import RunnableFunctions = ChatCompletionsAPI.RunnableFunctions;
+  export import RunnableFunctionWithParse = ChatCompletionsAPI.RunnableFunctionWithParse;
+  export import RunnableFunctionWithoutParse = ChatCompletionsAPI.RunnableFunctionWithoutParse;
+  export import ParsingFunction = ChatCompletionsAPI.ParsingFunction;
+  export import ChatCompletionRunner = ChatCompletionsAPI.ChatCompletionRunner;
+  export import ChatCompletionStreamingRunner = ChatCompletionsAPI.ChatCompletionStreamingRunner;
 }

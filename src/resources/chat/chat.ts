@@ -24,4 +24,11 @@ export namespace Chat {
   export import CompletionCreateParamsNonStreaming = CompletionsAPI.CompletionCreateParamsNonStreaming;
   export import ChatCompletionCreateParamsStreaming = CompletionsAPI.ChatCompletionCreateParamsStreaming;
   export import CompletionCreateParamsStreaming = CompletionsAPI.CompletionCreateParamsStreaming;
+  export import RunnableFunction = CompletionsAPI.RunnableFunction;
+  export import RunnableFunctions = CompletionsAPI.RunnableFunctions;
+  export import RunnableFunctionWithParse = CompletionsAPI.RunnableFunctionWithParse;
+  export import RunnableFunctionWithoutParse = CompletionsAPI.RunnableFunctionWithoutParse;
+  export import ParsingFunction = CompletionsAPI.ParsingFunction;
+  export import ChatCompletionRunner = CompletionsAPI.ChatCompletionRunner;
+  export import ChatCompletionStreamingRunner = CompletionsAPI.ChatCompletionStreamingRunner;
 }
