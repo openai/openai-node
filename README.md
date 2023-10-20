@@ -102,6 +102,8 @@ Alternatively, you can use `openai.chat.completions.create({ stream: true, … }
 
 If you need to cancel a stream, you can `break` from a `for await` loop or call `stream.abort()`.
 
+See examples with streaming in the `examples/` directory on advanced use cases like [proxying a stream to the browser](helpers.md#proxy-streaming to-a-browser).
+
 ### Automated function calls
 
 We provide a `openai.chat.completions.runFunctions({…})` convenience helper for using function calls with the `/chat/completions` endpoint which automatically calls the JavaScript functions you provide and sends their results back to the `/chat/completions` endpoint, looping as long as the model requests function calls.
@@ -167,7 +169,7 @@ main();
 ```
 
 Like with `.stream()`, we provide a variety of [helpers and events](helpers.md#events). Read more about various
-examples such as with integrating with [zod](helpers.md#integrate-with-zod), [next.js](helpers.md#integrate-wtih-next-js), and [proxying a stream to the browser](helpers.md#proxy-streaming to-a-browser).
+examples such as with integrating with [zod](helpers.md#integrate-with-zod) and [next.js](helpers.md#integrate-wtih-next-js).
 
 ## File Uploads
 
