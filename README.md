@@ -16,6 +16,12 @@ npm install --save openai
 yarn add openai
 ```
 
+You can import in Deno via:
+
+```ts
+import OpenAI from 'https://raw.githubusercontent.com/openai/openai-node/v4.12.4-deno/mod.ts';
+```
+
 ## Usage
 
 The full API of this library can be found in [api.md file](https://github.com/openai/openai-node/blob/master/api.md). The code below shows how to get started using the chat completions API.
