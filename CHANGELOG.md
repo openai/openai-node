@@ -1,5 +1,14 @@
 # Changelog
 
+## 4.13.0 (2023-10-22)
+
+Full Changelog: [v4.12.4...v4.13.0](https://github.com/openai/openai-node/compare/v4.12.4...v4.13.0)
+
+### Features
+
+* **api:** add embeddings encoding_format ([#390](https://github.com/openai/openai-node/issues/390)) ([cf70dea](https://github.com/openai/openai-node/commit/cf70deaba1426786aba9b938d280c61aeb516e34))
+* handle 204 No Content gracefully ([#391](https://github.com/openai/openai-node/issues/391)) ([2dd005c](https://github.com/openai/openai-node/commit/2dd005c1c497605036d3524f19d130b3fc5f8d8b))
+
 ## 4.12.4 (2023-10-17)
 
 Full Changelog: [v4.12.3...v4.12.4](https://github.com/openai/openai-node/compare/v4.12.3...v4.12.4)
