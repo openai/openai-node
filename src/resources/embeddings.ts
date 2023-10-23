@@ -98,6 +98,12 @@ export interface EmbeddingCreateParams {
   model: (string & {}) | 'text-embedding-ada-002';
 
   /**
+   * The format to return the embeddings in. Can be either `float` or
+   * [`base64`](https://pypi.org/project/pybase64/).
+   */
+  encoding_format?: 'float' | 'base64';
+
+  /**
    * A unique identifier representing your end-user, which can help OpenAI to monitor
    * and detect abuse.
    * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices/end-user-ids).

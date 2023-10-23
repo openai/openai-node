@@ -27,6 +27,7 @@ describe('resource embeddings', () => {
     const response = await openai.embeddings.create({
       input: 'The quick brown fox jumped over the lazy dog',
       model: 'text-embedding-ada-002',
+      encoding_format: 'float',
       user: 'user-1234',
     });
   });
