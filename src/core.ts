@@ -190,7 +190,7 @@ export abstract class APIClient {
    */
   protected defaultHeaders(opts: FinalRequestOptions): Headers {
     return {
-      Accept: 'application/json',
+      Accept: 'application/json, text/plain, */*',
       'Content-Type': 'application/json',
       'User-Agent': this.getUserAgent(),
       ...getPlatformHeaders(),
