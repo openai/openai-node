@@ -27,8 +27,6 @@ export {
   type Uploadable,
 } from './uploads';
 
-const MAX_RETRIES = 2;
-
 export type Fetch = (url: RequestInfo, init?: RequestInit) => Promise<Response>;
 
 type PromiseOrValue<T> = T | Promise<T>;
@@ -162,7 +160,7 @@ export abstract class APIClient {
 
   constructor({
     baseURL,
-    maxRetries,
+    maxRetries = 2,
     timeout = 600000, // 10 minutes
     httpAgent,
     fetch: overridenFetch,
@@ -174,7 +172,7 @@ export abstract class APIClient {
     fetch: Fetch | undefined;
   }) {
     this.baseURL = baseURL;
-    this.maxRetries = validatePositiveInteger('maxRetries', maxRetries ?? MAX_RETRIES);
+    this.maxRetries = validatePositiveInteger('maxRetries', maxRetries);
     this.timeout = validatePositiveInteger('timeout', timeout);
     this.httpAgent = httpAgent;
 
@@ -513,8 +511,6 @@ export abstract class APIClient {
     retriesRemaining: number,
     responseHeaders?: Headers | undefined,
   ): Promise<APIResponseProps> {
-    retriesRemaining -= 1;
-
     // About the Retry-After header: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After
     let timeoutMillis: number | undefined;
     const retryAfterHeader = responseHeaders?.['retry-after'];
@@ -540,22 +536,22 @@ export abstract class APIClient {
     }
     await sleep(timeoutMillis);
 
-    return this.makeRequest(options, retriesRemaining);
+    return this.makeRequest(options, retriesRemaining - 1);
   }
 
   private calculateDefaultRetryTimeoutMillis(retriesRemaining: number, maxRetries: number): number {
     const initialRetryDelay = 0.5;
-    const maxRetryDelay = 2;
+    const maxRetryDelay = 8.0;
 
     const numRetries = maxRetries - retriesRemaining;
 
     // Apply exponential backoff, but not more than the max.
-    const sleepSeconds = Math.min(initialRetryDelay * Math.pow(numRetries - 1, 2), maxRetryDelay);
+    const sleepSeconds = Math.min(initialRetryDelay * Math.pow(2, numRetries), maxRetryDelay);
 
-    // Apply some jitter, plus-or-minus half a second.
-    const jitter = Math.random() - 0.5;
+    // Apply some jitter, take up to at most 25 percent of the retry time.
+    const jitter = 1 - Math.random() * 0.25;
 
-    return (sleepSeconds + jitter) * 1000;
+    return sleepSeconds * jitter * 1000;
   }
 
   private getUserAgent(): string {
