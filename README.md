@@ -228,7 +228,7 @@ Request parameters that correspond to file uploads can be passed in many differe
 
 ```ts
 import fs from 'fs';
-import fetch from 'node-fetch';
+import { fetch } from 'undici';
 import OpenAI, { toFile } from 'openai';
 
 const openai = new OpenAI();

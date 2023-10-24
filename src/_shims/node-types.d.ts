@@ -1,26 +1,25 @@
 /**
  * Disclaimer: modules in _shims aren't intended to be imported by SDK users.
  */
-import * as nf from 'node-fetch';
-import * as fd from 'formdata-node';
+import undici from 'undici';
 
 export { type Agent } from 'node:http';
-export { type Readable } from 'node:stream';
+export { type ReadableStream } from 'node:stream/web';
 export { type ReadStream as FsReadStream } from 'node:fs';
-export { ReadableStream } from 'web-streams-polyfill';
+import { Blob } from 'node:buffer';
 
-export const fetch: typeof nf.default;
+export const fetch: typeof undici.fetch;
 
-export type Request = nf.Request;
-export type RequestInfo = nf.RequestInfo;
-export type RequestInit = nf.RequestInit;
+export type Request = undici.Request;
+export type RequestInfo = undici.RequestInfo;
+export type RequestInit = undici.RequestInit;
 
-export type Response = nf.Response;
-export type ResponseInit = nf.ResponseInit;
-export type ResponseType = nf.ResponseType;
-export type BodyInit = nf.BodyInit;
-export type Headers = nf.Headers;
-export type HeadersInit = nf.HeadersInit;
+export type Response = undici.Response;
+export type ResponseInit = undici.ResponseInit;
+export type ResponseType = undici.ResponseType;
+export type BodyInit = undici.BodyInit;
+export type Headers = undici.Headers;
+export type HeadersInit = undici.HeadersInit;
 
 type EndingType = 'native' | 'transparent';
 export interface BlobPropertyBag {
@@ -34,9 +33,9 @@ export interface FilePropertyBag extends BlobPropertyBag {
 
 export type FileFromPathOptions = Omit<FilePropertyBag, 'lastModified'>;
 
-export type FormData = fd.FormData;
-export const FormData: typeof fd.FormData;
-export type File = fd.File;
-export const File: typeof fd.File;
-export type Blob = fd.Blob;
-export const Blob: typeof fd.Blob;
+export type FormData = undici.FormData;
+export const FormData: typeof undici.FormData;
+export type File = undici.File;
+export const File: typeof undici.File;
+export type Blob = Blob;
+export const Blob: typeof Blob;

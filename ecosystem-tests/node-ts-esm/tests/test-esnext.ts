@@ -3,6 +3,8 @@ import OpenAI from 'openai';
 import { distance } from 'fastest-levenshtein';
 import { ChatCompletion } from 'openai/resources/chat/completions';
 import * as shims from 'openai/_shims/index';
+import { Readable } from 'node:stream';
+import { ReadableStream } from 'node:stream/web';
 
 // The tests in this file don't typecheck with "moduleResolution": "node"
 
@@ -54,7 +56,7 @@ it(`raw response`, async function () {
 
   // test that we can use node-fetch Response API
   const chunks: string[] = [];
-  const { body } = response;
+  const body = Readable.fromWeb(response.body as ReadableStream<any>)
   if (!body) throw new Error(`expected response.body to be defined`);
   body.on('data', (chunk) => chunks.push(chunk));
   await new Promise<void>((resolve, reject) => {

@@ -1,11 +1,12 @@
 import 'openai/shims/node';
 import OpenAI, { toFile } from 'openai';
 import { TranscriptionCreateParams } from 'openai/resources/audio/transcriptions';
-import fetch from 'node-fetch';
 import { File as FormDataFile, Blob as FormDataBlob } from 'formdata-node';
 import * as fs from 'fs';
 import { distance } from 'fastest-levenshtein';
 import { ChatCompletion } from 'openai/resources/chat/completions';
+import { Readable } from 'node:stream';
+import { ReadableStream } from 'node:stream/web';
 
 const url = 'https://audio-samples.github.io/samples/mp3/blizzard_biased/sample-1.mp3';
 const filename = 'sample-1.mp3';
@@ -67,10 +68,11 @@ it(`raw response`, async function () {
 
   // test that we can use node-fetch Response API
   const chunks: string[] = [];
-  response.body.on('data', (chunk) => chunks.push(chunk));
+  const body = Readable.fromWeb(response.body as ReadableStream<any>)
+  body.on('data', (chunk) => chunks.push(chunk));
   await new Promise<void>((resolve, reject) => {
-    response.body.once('end', resolve);
-    response.body.once('error', reject);
+    body.once('end', resolve);
+    body.once('error', reject);
   });
   const json: ChatCompletion = JSON.parse(chunks.join(''));
   expect(json.choices[0]?.message.content || '').toBeSimilarTo('This is a test', 10);

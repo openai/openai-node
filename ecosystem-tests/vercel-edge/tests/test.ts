@@ -1,5 +1,3 @@
-import fetch from 'node-fetch';
-
 const baseUrl = process.env.TEST_BASE_URL || 'http://localhost:3000';
 console.log(baseUrl);
 

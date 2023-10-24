@@ -319,8 +319,6 @@ export abstract class APIClient {
       ...(body && { body: body as any }),
       headers: reqHeaders,
       ...(httpAgent && { agent: httpAgent }),
-      // @ts-ignore node-fetch uses a custom AbortSignal type that is
-      // not compatible with standard web types
       signal: options.signal ?? null,
     };
 

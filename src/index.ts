@@ -43,7 +43,7 @@ export interface ClientOptions {
   /**
    * Specify a custom `fetch` function implementation.
    *
-   * If not provided, we use `node-fetch` on Node.js and otherwise expect that `fetch` is
+   * If not provided, we use `undici` on Node.js and otherwise expect that `fetch` is
    * defined globally.
    */
   fetch?: Core.Fetch | undefined;

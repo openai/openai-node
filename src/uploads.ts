@@ -26,7 +26,7 @@ export type BlobPart = string | ArrayBuffer | ArrayBufferView | Blob | Uint8Arra
 export type Uploadable = FileLike | ResponseLike | FsReadStream;
 
 /**
- * Intended to match web.Blob, node.Blob, node-fetch.Blob, etc.
+ * Intended to match web.Blob, node.Blob, undici.Blob, etc.
  */
 export interface BlobLike {
   /** [MDN Reference](https://developer.mozilla.org/docs/Web/API/Blob/size) */
@@ -125,7 +125,7 @@ export async function toFile(
     }
   }
 
-  return new File(bits, name, options);
+  return new File(bits as (string | Blob | NodeJS.ArrayBufferView)[], name, options);
 }
 
 async function getBytes(value: ToFileInput): Promise<Array<BlobPart>> {

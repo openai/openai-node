@@ -29,6 +29,7 @@
     "form-data-encoder": "1.7.2",
     "formdata-node": "^4.3.2",
     "node-fetch": "^2.6.7",
+    "undici": "^5.28.1",
     "web-streams-polyfill": "^3.2.1"
   },
   "devDependencies": {
