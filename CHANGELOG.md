@@ -1,5 +1,18 @@
 # Changelog
 
+## 4.14.0 (2023-10-25)
+
+Full Changelog: [v4.13.0...v4.14.0](https://github.com/openai/openai-node/compare/v4.13.0...v4.14.0)
+
+### Features
+
+* **client:** adjust retry behavior to be exponential backoff ([#400](https://github.com/openai/openai-node/issues/400)) ([2bc14ce](https://github.com/openai/openai-node/commit/2bc14ce300ef020bc045199fe3d76dd352d78ef9))
+
+
+### Chores
+
+* **docs:** update deno version ([#399](https://github.com/openai/openai-node/issues/399)) ([cdee077](https://github.com/openai/openai-node/commit/cdee0770690d4b66b357d970827e9ba1597ffb89))
+
 ## 4.13.0 (2023-10-22)
 
 Full Changelog: [v4.12.4...v4.13.0](https://github.com/openai/openai-node/compare/v4.12.4...v4.13.0)
