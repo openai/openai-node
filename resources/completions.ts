@@ -3,7 +3,7 @@
 import * as Core from "../core.ts";
 import { APIPromise } from "../core.ts";
 import { APIResource } from "../resource.ts";
-import * as API from "./mod.ts";
+import * as CompletionsAPI from "./completions.ts";
 import { Stream } from "../streaming.ts";
 
 export class Completions extends APIResource {
@@ -18,6 +18,10 @@ export class Completions extends APIResource {
     body: CompletionCreateParamsStreaming,
     options?: Core.RequestOptions,
   ): APIPromise<Stream<Completion>>;
+  create(
+    body: CompletionCreateParamsBase,
+    options?: Core.RequestOptions,
+  ): APIPromise<Stream<Completion> | Completion>;
   create(
     body: CompletionCreateParams,
     options?: Core.RequestOptions,
@@ -48,7 +52,7 @@ export interface Completion {
   choices: Array<CompletionChoice>;
 
   /**
-   * The Unix timestamp of when the completion was created.
+   * The Unix timestamp (in seconds) of when the completion was created.
    */
   created: number;
 
@@ -71,10 +75,11 @@ export interface Completion {
 export interface CompletionChoice {
   /**
    * The reason the model stopped generating tokens. This will be `stop` if the model
-   * hit a natural stop point or a provided stop sequence, or `length` if the maximum
-   * number of tokens specified in the request was reached.
+   * hit a natural stop point or a provided stop sequence, `length` if the maximum
+   * number of tokens specified in the request was reached, or `content_filter` if
+   * content was omitted due to a flag from our content filters.
    */
-  finish_reason: "stop" | "length";
+  finish_reason: "stop" | "length" | "content_filter";
 
   index: number;
 
@@ -115,15 +120,23 @@ export interface CompletionUsage {
   total_tokens: number;
 }
 
-export interface CompletionCreateParams {
+export type CompletionCreateParams =
+  | CompletionCreateParamsNonStreaming
+  | CompletionCreateParamsStreaming;
+
+export interface CompletionCreateParamsBase {
   /**
    * ID of the model to use. You can use the
-   * [List models](/docs/api-reference/models/list) API to see all of your available
-   * models, or see our [Model overview](/docs/models/overview) for descriptions of
-   * them.
+   * [List models](https://platform.openai.com/docs/api-reference/models/list) API to
+   * see all of your available models, or see our
+   * [Model overview](https://platform.openai.com/docs/models/overview) for
+   * descriptions of them.
    */
   model:
     | (string & {})
+    | "babbage-002"
+    | "davinci-002"
+    | "gpt-3.5-turbo-instruct"
     | "text-davinci-003"
     | "text-davinci-002"
     | "text-davinci-001"
@@ -165,7 +178,7 @@ export interface CompletionCreateParams {
    * existing frequency in the text so far, decreasing the model's likelihood to
    * repeat the same line verbatim.
    *
-   * [See more information about frequency and presence penalties.](/docs/api-reference/parameter-details)
+   * [See more information about frequency and presence penalties.](https://platform.openai.com/docs/guides/gpt/parameter-details)
    */
   frequency_penalty?: number | null;
 
@@ -201,7 +214,7 @@ export interface CompletionCreateParams {
    *
    * The token count of your prompt plus `max_tokens` cannot exceed the model's
    * context length.
-   * [Example Python code](https://github.com/openai/openai-cookbook/blob/main/examples/How_to_count_tokens_with_tiktoken.ipynb)
+   * [Example Python code](https://cookbook.openai.com/examples/how_to_count_tokens_with_tiktoken)
    * for counting tokens.
    */
   max_tokens?: number | null;
@@ -220,7 +233,7 @@ export interface CompletionCreateParams {
    * whether they appear in the text so far, increasing the model's likelihood to
    * talk about new topics.
    *
-   * [See more information about frequency and presence penalties.](/docs/api-reference/parameter-details)
+   * [See more information about frequency and presence penalties.](https://platform.openai.com/docs/guides/gpt/parameter-details)
    */
   presence_penalty?: number | null;
 
@@ -236,7 +249,7 @@ export interface CompletionCreateParams {
    * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format)
    * as they become available, with the stream terminated by a `data: [DONE]`
    * message.
-   * [Example Python code](https://github.com/openai/openai-cookbook/blob/main/examples/How_to_stream_completions.ipynb).
+   * [Example Python code](https://cookbook.openai.com/examples/how_to_stream_completions).
    */
   stream?: boolean | null;
 
@@ -265,51 +278,52 @@ export interface CompletionCreateParams {
 
   /**
    * A unique identifier representing your end-user, which can help OpenAI to monitor
-   * and detect abuse. [Learn more](/docs/guides/safety-best-practices/end-user-ids).
+   * and detect abuse.
+   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices/end-user-ids).
    */
   user?: string;
 }
 
 export namespace CompletionCreateParams {
   export type CompletionCreateParamsNonStreaming =
-    API.CompletionCreateParamsNonStreaming;
+    CompletionsAPI.CompletionCreateParamsNonStreaming;
   export type CompletionCreateParamsStreaming =
-    API.CompletionCreateParamsStreaming;
+    CompletionsAPI.CompletionCreateParamsStreaming;
 }
 
 export interface CompletionCreateParamsNonStreaming
-  extends CompletionCreateParams {
+  extends CompletionCreateParamsBase {
   /**
    * Whether to stream back partial progress. If set, tokens will be sent as
    * data-only
    * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format)
    * as they become available, with the stream terminated by a `data: [DONE]`
    * message.
-   * [Example Python code](https://github.com/openai/openai-cookbook/blob/main/examples/How_to_stream_completions.ipynb).
+   * [Example Python code](https://cookbook.openai.com/examples/how_to_stream_completions).
    */
   stream?: false | null;
 }
 
 export interface CompletionCreateParamsStreaming
-  extends CompletionCreateParams {
+  extends CompletionCreateParamsBase {
   /**
    * Whether to stream back partial progress. If set, tokens will be sent as
    * data-only
    * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format)
    * as they become available, with the stream terminated by a `data: [DONE]`
    * message.
-   * [Example Python code](https://github.com/openai/openai-cookbook/blob/main/examples/How_to_stream_completions.ipynb).
+   * [Example Python code](https://cookbook.openai.com/examples/how_to_stream_completions).
    */
   stream: true;
 }
 
 export namespace Completions {
-  export type Completion = API.Completion;
-  export type CompletionChoice = API.CompletionChoice;
-  export type CompletionUsage = API.CompletionUsage;
-  export type CompletionCreateParams = API.CompletionCreateParams;
+  export type Completion = CompletionsAPI.Completion;
+  export type CompletionChoice = CompletionsAPI.CompletionChoice;
+  export type CompletionUsage = CompletionsAPI.CompletionUsage;
+  export type CompletionCreateParams = CompletionsAPI.CompletionCreateParams;
   export type CompletionCreateParamsNonStreaming =
-    API.CompletionCreateParamsNonStreaming;
+    CompletionsAPI.CompletionCreateParamsNonStreaming;
   export type CompletionCreateParamsStreaming =
-    API.CompletionCreateParamsStreaming;
+    CompletionsAPI.CompletionCreateParamsStreaming;
 }

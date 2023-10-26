@@ -2,7 +2,7 @@
 
 import * as Core from "../core.ts";
 import { APIResource } from "../resource.ts";
-import * as API from "./mod.ts";
+import * as ImagesAPI from "./images.ts";
 import { multipartFormRequestOptions, type Uploadable } from "../core.ts";
 
 export class Images extends APIResource {
@@ -91,7 +91,8 @@ export interface ImageCreateVariationParams {
 
   /**
    * A unique identifier representing your end-user, which can help OpenAI to monitor
-   * and detect abuse. [Learn more](/docs/guides/safety-best-practices/end-user-ids).
+   * and detect abuse.
+   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices/end-user-ids).
    */
   user?: string;
 }
@@ -135,7 +136,8 @@ export interface ImageEditParams {
 
   /**
    * A unique identifier representing your end-user, which can help OpenAI to monitor
-   * and detect abuse. [Learn more](/docs/guides/safety-best-practices/end-user-ids).
+   * and detect abuse.
+   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices/end-user-ids).
    */
   user?: string;
 }
@@ -166,15 +168,16 @@ export interface ImageGenerateParams {
 
   /**
    * A unique identifier representing your end-user, which can help OpenAI to monitor
-   * and detect abuse. [Learn more](/docs/guides/safety-best-practices/end-user-ids).
+   * and detect abuse.
+   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices/end-user-ids).
    */
   user?: string;
 }
 
 export namespace Images {
-  export type Image = API.Image;
-  export type ImagesResponse = API.ImagesResponse;
-  export type ImageCreateVariationParams = API.ImageCreateVariationParams;
-  export type ImageEditParams = API.ImageEditParams;
-  export type ImageGenerateParams = API.ImageGenerateParams;
+  export type Image = ImagesAPI.Image;
+  export type ImagesResponse = ImagesAPI.ImagesResponse;
+  export type ImageCreateVariationParams = ImagesAPI.ImageCreateVariationParams;
+  export type ImageEditParams = ImagesAPI.ImageEditParams;
+  export type ImageGenerateParams = ImagesAPI.ImageGenerateParams;
 }

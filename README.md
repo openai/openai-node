@@ -21,26 +21,36 @@ npm install --save openai
 yarn add openai
 ```
 
+You can import in Deno via:
+
+<!-- x-release-please-start-version -->
+
+```ts
+import OpenAI from "https://raw.githubusercontent.com/openai/openai-node/v4.2.0-deno/mod.ts";
+```
+
+<!-- x-release-please-end -->
+
 ## Usage
 
-> [!IMPORTANT] Previous versions of this SDK used a `Configuration` class. See
-> the
-> [v3 to v4 migration guide](https://github.com/openai/openai-node/discussions/217).
+The full API of this library can be found in
+[api.md file](https://github.com/openai/openai-node/blob/master/api.md). The
+code below shows how to get started using the chat completions API.
 
 ```js
 import OpenAI from "openai";
 
 const openai = new OpenAI({
-  apiKey: "my api key", // defaults to process.env["OPENAI_API_KEY"]
+  apiKey: "My API Key", // defaults to process.env["OPENAI_API_KEY"]
 });
 
 async function main() {
-  const completion = await openai.chat.completions.create({
+  const chatCompletion = await openai.chat.completions.create({
     messages: [{ role: "user", content: "Say this is a test" }],
     model: "gpt-3.5-turbo",
   });
 
-  console.log(completion.choices);
+  console.log(chatCompletion.choices);
 }
 
 main();
@@ -48,7 +58,7 @@ main();
 
 ## Streaming Responses
 
-We provide support for streaming responses using Server Side Events (SSE).
+We provide support for streaming responses using Server Sent Events (SSE).
 
 ```ts
 import OpenAI from "openai";
@@ -81,16 +91,16 @@ fields. You may import and use them like so:
 import OpenAI from "openai";
 
 const openai = new OpenAI({
-  apiKey: "my api key", // defaults to process.env["OPENAI_API_KEY"]
+  apiKey: "My API Key", // defaults to process.env["OPENAI_API_KEY"]
 });
 
 async function main() {
-  const params: OpenAI.Chat.CompletionCreateParams = {
+  const params: OpenAI.Chat.ChatCompletionCreateParams = {
     messages: [{ role: "user", content: "Say this is a test" }],
     model: "gpt-3.5-turbo",
   };
-  const completion: OpenAI.Chat.ChatCompletion = await openai.chat.completions
-    .create(params);
+  const chatCompletion: OpenAI.Chat.ChatCompletion = await openai.chat
+    .completions.create(params);
 }
 
 main();
@@ -98,6 +108,10 @@ main();
 
 Documentation for each method, request param, and response field are available
 in docstrings and will appear on hover in most modern editors.
+
+> [!IMPORTANT] Previous versions of this SDK used a `Configuration` class. See
+> the
+> [v3 to v4 migration guide](https://github.com/openai/openai-node/discussions/217).
 
 ## File Uploads
 
@@ -183,12 +197,24 @@ Error codes are as followed:
 | >=500       | `InternalServerError`      |
 | N/A         | `APIConnectionError`       |
 
+### Azure OpenAI
+
+An example of using this library with Azure OpenAI can be found
+[here](https://github.com/openai/openai-node/blob/master/examples/azure.ts).
+
+Please note there are subtle differences in API shape & behavior between the
+Azure OpenAI API and the OpenAI API, so using this library with Azure OpenAI may
+result in incorrect types, which can lead to bugs.
+
+See [`@azure/openai`](https://www.npmjs.com/package/@azure/openai) for an
+Azure-specific SDK provided by Microsoft.
+
 ### Retries
 
 Certain errors will be automatically retried 2 times by default, with a short
 exponential backoff. Connection errors (for example, due to a network
-connectivity problem), 409 Conflict, 429 Rate Limit, and >=500 Internal errors
-will all be retried by default.
+connectivity problem), 408 Request Timeout, 409 Conflict, 429 Rate Limit, and
+>=500 Internal errors will all be retried by default.
 
 You can use the `maxRetries` option to configure or disable this:
 
@@ -241,6 +267,39 @@ On timeout, an `APIConnectionTimeoutError` is thrown.
 
 Note that requests which time out will be [retried twice by default](#retries).
 
+## Auto-pagination
+
+List methods in the OpenAI API are paginated. You can use `for await … of`
+syntax to iterate through items across all pages:
+
+```ts
+async function fetchAllFineTuningJobs(params) {
+  const allFineTuningJobs = [];
+  // Automatically fetches more pages as needed.
+  for await (
+    const fineTuningJob of openai.fineTuning.jobs.list({ limit: 20 })
+  ) {
+    allFineTuningJobs.push(fineTuningJob);
+  }
+  return allFineTuningJobs;
+}
+```
+
+Alternatively, you can make request a single page at a time:
+
+```ts
+let page = await openai.fineTuning.jobs.list({ limit: 20 });
+for (const fineTuningJob of page.data) {
+  console.log(fineTuningJob);
+}
+
+// Convenience methods are provided for manually paginating:
+while (page.hasNextPage()) {
+  page = page.getNextPage();
+  // ...
+}
+```
+
 ## Advanced Usage
 
 ### Accessing raw Response data (e.g., headers)
@@ -263,14 +322,14 @@ const response = await openai.chat.completions
 console.log(response.headers.get("X-My-Header"));
 console.log(response.statusText); // access the underlying Response object
 
-const { data: completions, response: raw } = await openai.chat.completions
+const { data: chatCompletion, response: raw } = await openai.chat.completions
   .create({
     messages: [{ role: "user", content: "Say this is a test" }],
     model: "gpt-3.5-turbo",
   })
   .withResponse();
 console.log(raw.headers.get("X-My-Header"));
-console.log(completions.choices);
+console.log(chatCompletion.choices);
 ```
 
 ## Configuring an HTTP(S) Agent (e.g., for proxies)
@@ -303,9 +362,9 @@ await openai.models.list({
 
 ## Semantic Versioning
 
-This package generally attempts to follow
-[SemVer](https://semver.org/spec/v2.0.0.html) conventions, though certain
-backwards-incompatible changes may be released as minor versions:
+This package generally follows [SemVer](https://semver.org/spec/v2.0.0.html)
+conventions, though certain backwards-incompatible changes may be released as
+minor versions:
 
 1. Changes that only affect static types, without breaking runtime behavior.
 2. Changes to library internals which are technically public but not intended or
@@ -323,13 +382,20 @@ or suggestions.
 
 ## Requirements
 
+TypeScript >= 4.5 is supported.
+
 The following runtimes are supported:
 
-- Node.js 16 LTS or later ([non-EOL](https://endoflife.date/nodejs)) versions.
-- Deno v1.28.0 or higher, using `import OpenAI from "npm:openai"`. Deno Deploy
-  is not yet supported.
+- Node.js 18 LTS or later ([non-EOL](https://endoflife.date/nodejs)) versions.
+- Deno v1.28.0 or higher, using `import OpenAI from "npm:openai"`.
+- Bun 1.0 or later.
 - Cloudflare Workers.
 - Vercel Edge Runtime.
+- Jest 28 or greater with the `"node"` environment (`"jsdom"` is not supported
+  at this time).
+- Nitro v2.6 or greater.
+
+Note that React Native is not supported at this time.
 
 If you are interested in other runtime environments, please open or upvote an
 issue on GitHub.

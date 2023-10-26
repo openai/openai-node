@@ -2,7 +2,7 @@
 
 import * as Core from "../../core.ts";
 import { APIResource } from "../../resource.ts";
-import * as API from "./mod.ts";
+import * as TranslationsAPI from "./translations.ts";
 import { multipartFormRequestOptions, type Uploadable } from "../../core.ts";
 
 export class Translations extends APIResource {
@@ -38,8 +38,9 @@ export interface TranslationCreateParams {
 
   /**
    * An optional text to guide the model's style or continue a previous audio
-   * segment. The [prompt](/docs/guides/speech-to-text/prompting) should be in
-   * English.
+   * segment. The
+   * [prompt](https://platform.openai.com/docs/guides/speech-to-text/prompting)
+   * should be in English.
    */
   prompt?: string;
 
@@ -60,6 +61,6 @@ export interface TranslationCreateParams {
 }
 
 export namespace Translations {
-  export type Translation = API.Translation;
-  export type TranslationCreateParams = API.TranslationCreateParams;
+  export type Translation = TranslationsAPI.Translation;
+  export type TranslationCreateParams = TranslationsAPI.TranslationCreateParams;
 }

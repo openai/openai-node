@@ -1,23 +1,33 @@
 // File generated from our OpenAPI spec by Stainless.
 
 import { APIResource } from "../../resource.ts";
-import { Completions } from "./completions.ts";
-import * as API from "./mod.ts";
+import * as CompletionsAPI from "./completions.ts";
 
 export class Chat extends APIResource {
-  completions: Completions = new Completions(this.client);
+  completions: CompletionsAPI.Completions = new CompletionsAPI.Completions(
+    this.client,
+  );
 }
 
 export namespace Chat {
-  export type Completions = API.Completions;
-  export type ChatCompletion = API.ChatCompletion;
-  export type ChatCompletionChunk = API.ChatCompletionChunk;
-  export type ChatCompletionMessage = API.ChatCompletionMessage;
+  export import Completions = CompletionsAPI.Completions;
+  export type ChatCompletion = CompletionsAPI.ChatCompletion;
+  export type ChatCompletionChunk = CompletionsAPI.ChatCompletionChunk;
+  export type ChatCompletionMessage = CompletionsAPI.ChatCompletionMessage;
+  export type ChatCompletionMessageParam =
+    CompletionsAPI.ChatCompletionMessageParam;
+  export type ChatCompletionRole = CompletionsAPI.ChatCompletionRole;
   export type CreateChatCompletionRequestMessage =
-    API.CreateChatCompletionRequestMessage;
-  export type CompletionCreateParams = API.CompletionCreateParams;
+    CompletionsAPI.CreateChatCompletionRequestMessage;
+  export type ChatCompletionCreateParams =
+    CompletionsAPI.ChatCompletionCreateParams;
+  export type CompletionCreateParams = CompletionsAPI.CompletionCreateParams;
+  export type ChatCompletionCreateParamsNonStreaming =
+    CompletionsAPI.ChatCompletionCreateParamsNonStreaming;
   export type CompletionCreateParamsNonStreaming =
-    API.CompletionCreateParamsNonStreaming;
+    CompletionsAPI.CompletionCreateParamsNonStreaming;
+  export type ChatCompletionCreateParamsStreaming =
+    CompletionsAPI.ChatCompletionCreateParamsStreaming;
   export type CompletionCreateParamsStreaming =
-    API.CompletionCreateParamsStreaming;
+    CompletionsAPI.CompletionCreateParamsStreaming;
 }

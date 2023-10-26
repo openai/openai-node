@@ -1,7 +1,7 @@
 // File generated from our OpenAPI spec by Stainless.
 
+export * from "./chat/mod.ts";
 export { Audio } from "./audio/audio.ts";
-export { Chat } from "./chat/chat.ts";
 export {
   type Completion,
   type CompletionChoice,
@@ -37,6 +37,7 @@ export {
   FineTunes,
   FineTunesPage,
 } from "./fine-tunes.ts";
+export { FineTuning } from "./fine-tuning/fine-tuning.ts";
 export {
   type Image,
   type ImageCreateVariationParams,

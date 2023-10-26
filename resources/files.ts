@@ -2,16 +2,18 @@
 
 import * as Core from "../core.ts";
 import { APIResource } from "../resource.ts";
-import * as API from "./mod.ts";
+import { sleep } from "../core.ts";
+import { APIConnectionTimeoutError } from "../error.ts";
+import * as FilesAPI from "./files.ts";
 import { multipartFormRequestOptions, type Uploadable } from "../core.ts";
 import { Page } from "../pagination.ts";
 
 export class Files extends APIResource {
   /**
-   * Upload a file that contains document(s) to be used across various
-   * endpoints/features. Currently, the size of all the files uploaded by one
-   * organization can be up to 1 GB. Please contact us if you need to increase the
-   * storage limit.
+   * Upload a file that can be used across various endpoints/features. Currently, the
+   * size of all the files uploaded by one organization can be up to 1 GB. Please
+   * [contact us](https://help.openai.com/) if you need to increase the storage
+   * limit.
    */
   create(
     body: FileCreateParams,
@@ -53,9 +55,9 @@ export class Files extends APIResource {
   }
 
   /**
-   * Returns the contents of the specified file
+   * Returns the contents of the specified file.
    */
-  retrieveFileContent(
+  retrieveContent(
     fileId: string,
     options?: Core.RequestOptions,
   ): Core.APIPromise<string> {
@@ -64,14 +66,42 @@ export class Files extends APIResource {
       headers: { Accept: "application/json", ...options?.headers },
     });
   }
+
+  /**
+   * Waits for the given file to be processed, default timeout is 30 mins.
+   */
+  async waitForProcessing(
+    id: string,
+    { pollInterval = 5000, maxWait = 30 * 60 * 1000 }: {
+      pollInterval?: number;
+      maxWait?: number;
+    } = {},
+  ): Promise<FileObject> {
+    const TERMINAL_STATES = new Set(["processed", "error", "deleted"]);
+
+    const start = Date.now();
+    let file = await this.retrieve(id);
+
+    while (!file.status || !TERMINAL_STATES.has(file.status)) {
+      await sleep(pollInterval);
+
+      file = await this.retrieve(id);
+      if (Date.now() - start > maxWait) {
+        throw new APIConnectionTimeoutError({
+          message:
+            `Giving up on waiting for file ${id} to finish processing after ${maxWait} milliseconds.`,
+        });
+      }
+    }
+
+    return file;
+  }
 }
 
 /**
  * Note: no pagination actually occurs yet, this is for forwards-compatibility.
  */
 export class FileObjectsPage extends Page<FileObject> {}
-// alias so we can export it in the namespace
-type _FileObjectsPage = FileObjectsPage;
 
 export type FileContent = string;
 
@@ -98,7 +128,7 @@ export interface FileObject {
   bytes: number;
 
   /**
-   * The unix timestamp for when the file was created.
+   * The Unix timestamp (in seconds) for when the file was created.
    */
   created_at: number;
 
@@ -132,28 +162,27 @@ export interface FileObject {
 
 export interface FileCreateParams {
   /**
-   * Name of the [JSON Lines](https://jsonlines.readthedocs.io/en/latest/) file to be
-   * uploaded.
+   * The file object (not file name) to be uploaded.
    *
-   * If the `purpose` is set to "fine-tune", each line is a JSON record with "prompt"
-   * and "completion" fields representing your
-   * [training examples](/docs/guides/fine-tuning/prepare-training-data).
+   * If the `purpose` is set to "fine-tune", the file will be used for fine-tuning.
    */
   file: Uploadable;
 
   /**
-   * The intended purpose of the uploaded documents.
+   * The intended purpose of the uploaded file.
    *
-   * Use "fine-tune" for [Fine-tuning](/docs/api-reference/fine-tunes). This allows
-   * us to validate the format of the uploaded file.
+   * Use "fine-tune" for
+   * [fine-tuning](https://platform.openai.com/docs/api-reference/fine-tuning). This
+   * allows us to validate the format of the uploaded file is correct for
+   * fine-tuning.
    */
   purpose: string;
 }
 
 export namespace Files {
-  export type FileContent = API.FileContent;
-  export type FileDeleted = API.FileDeleted;
-  export type FileObject = API.FileObject;
-  export type FileObjectsPage = _FileObjectsPage;
-  export type FileCreateParams = API.FileCreateParams;
+  export type FileContent = FilesAPI.FileContent;
+  export type FileDeleted = FilesAPI.FileDeleted;
+  export type FileObject = FilesAPI.FileObject;
+  export import FileObjectsPage = FilesAPI.FileObjectsPage;
+  export type FileCreateParams = FilesAPI.FileCreateParams;
 }

@@ -2,7 +2,7 @@
 
 import * as Core from "../../core.ts";
 import { APIResource } from "../../resource.ts";
-import * as API from "./mod.ts";
+import * as TranscriptionsAPI from "./transcriptions.ts";
 import { multipartFormRequestOptions, type Uploadable } from "../../core.ts";
 
 export class Transcriptions extends APIResource {
@@ -45,8 +45,9 @@ export interface TranscriptionCreateParams {
 
   /**
    * An optional text to guide the model's style or continue a previous audio
-   * segment. The [prompt](/docs/guides/speech-to-text/prompting) should match the
-   * audio language.
+   * segment. The
+   * [prompt](https://platform.openai.com/docs/guides/speech-to-text/prompting)
+   * should match the audio language.
    */
   prompt?: string;
 
@@ -67,6 +68,7 @@ export interface TranscriptionCreateParams {
 }
 
 export namespace Transcriptions {
-  export type Transcription = API.Transcription;
-  export type TranscriptionCreateParams = API.TranscriptionCreateParams;
+  export type Transcription = TranscriptionsAPI.Transcription;
+  export type TranscriptionCreateParams =
+    TranscriptionsAPI.TranscriptionCreateParams;
 }

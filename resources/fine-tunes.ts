@@ -3,8 +3,8 @@
 import * as Core from "../core.ts";
 import { APIPromise } from "../core.ts";
 import { APIResource } from "../resource.ts";
-import * as Files from "./files.ts";
-import * as API from "./mod.ts";
+import * as FineTunesAPI from "./fine-tunes.ts";
+import * as FilesAPI from "./files.ts";
 import { Page } from "../pagination.ts";
 import { Stream } from "../streaming.ts";
 
@@ -15,7 +15,7 @@ export class FineTunes extends APIResource {
    * Response includes details of the enqueued job including job status and the name
    * of the fine-tuned models once complete.
    *
-   * [Learn more about Fine-tuning](/docs/guides/fine-tuning)
+   * [Learn more about fine-tuning](https://platform.openai.com/docs/guides/legacy-fine-tuning)
    */
   create(
     body: FineTuneCreateParams,
@@ -27,7 +27,7 @@ export class FineTunes extends APIResource {
   /**
    * Gets info about the fine-tune job.
    *
-   * [Learn more about Fine-tuning](/docs/guides/fine-tuning)
+   * [Learn more about fine-tuning](https://platform.openai.com/docs/guides/legacy-fine-tuning)
    */
   retrieve(
     fineTuneId: string,
@@ -70,6 +70,11 @@ export class FineTunes extends APIResource {
   ): APIPromise<Stream<FineTuneEvent>>;
   listEvents(
     fineTuneId: string,
+    query?: FineTuneListEventsParamsBase | undefined,
+    options?: Core.RequestOptions,
+  ): APIPromise<Stream<FineTuneEvent> | FineTuneEventsListResponse>;
+  listEvents(
+    fineTuneId: string,
     query?: FineTuneListEventsParams | undefined,
     options?: Core.RequestOptions,
   ):
@@ -90,12 +95,10 @@ export class FineTunes extends APIResource {
  * Note: no pagination actually occurs yet, this is for forwards-compatibility.
  */
 export class FineTunesPage extends Page<FineTune> {}
-// alias so we can export it in the namespace
-type _FineTunesPage = FineTunesPage;
 
 /**
- * The `FineTune` object represents a fine-tuning job that has been created through
- * the API.
+ * The `FineTune` object represents a legacy fine-tune job that has been created
+ * through the API.
  */
 export interface FineTune {
   /**
@@ -104,7 +107,7 @@ export interface FineTune {
   id: string;
 
   /**
-   * The unix timestamp for when the fine-tuning job was created.
+   * The Unix timestamp (in seconds) for when the fine-tuning job was created.
    */
   created_at: number;
 
@@ -115,7 +118,8 @@ export interface FineTune {
 
   /**
    * The hyperparameters used for the fine-tuning job. See the
-   * [Fine-tuning Guide](/docs/guides/fine-tuning/hyperparameters) for more details.
+   * [fine-tuning guide](https://platform.openai.com/docs/guides/legacy-fine-tuning/hyperparameters)
+   * for more details.
    */
   hyperparams: FineTune.Hyperparams;
 
@@ -137,28 +141,28 @@ export interface FineTune {
   /**
    * The compiled results files for the fine-tuning job.
    */
-  result_files: Array<Files.FileObject>;
+  result_files: Array<FilesAPI.FileObject>;
 
   /**
    * The current status of the fine-tuning job, which can be either `created`,
-   * `pending`, `running`, `succeeded`, `failed`, or `cancelled`.
+   * `running`, `succeeded`, `failed`, or `cancelled`.
    */
   status: string;
 
   /**
    * The list of files used for training.
    */
-  training_files: Array<Files.FileObject>;
+  training_files: Array<FilesAPI.FileObject>;
 
   /**
-   * The unix timestamp for when the fine-tuning job was last updated.
+   * The Unix timestamp (in seconds) for when the fine-tuning job was last updated.
    */
   updated_at: number;
 
   /**
    * The list of files used for validation.
    */
-  validation_files: Array<Files.FileObject>;
+  validation_files: Array<FilesAPI.FileObject>;
 
   /**
    * The list of events that have been observed in the lifecycle of the FineTune job.
@@ -169,7 +173,8 @@ export interface FineTune {
 export namespace FineTune {
   /**
    * The hyperparameters used for the fine-tuning job. See the
-   * [Fine-tuning Guide](/docs/guides/fine-tuning/hyperparameters) for more details.
+   * [fine-tuning guide](https://platform.openai.com/docs/guides/legacy-fine-tuning/hyperparameters)
+   * for more details.
    */
   export interface Hyperparams {
     /**
@@ -212,6 +217,9 @@ export namespace FineTune {
   }
 }
 
+/**
+ * Fine-tune event object
+ */
 export interface FineTuneEvent {
   created_at: number;
 
@@ -232,14 +240,16 @@ export interface FineTuneCreateParams {
   /**
    * The ID of an uploaded file that contains training data.
    *
-   * See [upload file](/docs/api-reference/files/upload) for how to upload a file.
+   * See [upload file](https://platform.openai.com/docs/api-reference/files/upload)
+   * for how to upload a file.
    *
    * Your dataset must be formatted as a JSONL file, where each training example is a
    * JSON object with the keys "prompt" and "completion". Additionally, you must
    * upload your file with the purpose `fine-tune`.
    *
-   * See the [fine-tuning guide](/docs/guides/fine-tuning/creating-training-data) for
-   * more details.
+   * See the
+   * [fine-tuning guide](https://platform.openai.com/docs/guides/legacy-fine-tuning/creating-training-data)
+   * for more details.
    */
   training_file: string;
 
@@ -283,7 +293,7 @@ export interface FineTuneCreateParams {
    * If set, we calculate classification-specific metrics such as accuracy and F-1
    * score using the validation set at the end of every epoch. These metrics can be
    * viewed in the
-   * [results file](/docs/guides/fine-tuning/analyzing-your-fine-tuned-model).
+   * [results file](https://platform.openai.com/docs/guides/legacy-fine-tuning/analyzing-your-fine-tuned-model).
    *
    * In order to compute classification metrics, you must provide a
    * `validation_file`. Additionally, you must specify `classification_n_classes` for
@@ -291,6 +301,11 @@ export interface FineTuneCreateParams {
    * classification.
    */
   compute_classification_metrics?: boolean | null;
+
+  /**
+   * The hyperparameters used for the fine-tuning job.
+   */
+  hyperparameters?: FineTuneCreateParams.Hyperparameters;
 
   /**
    * The learning rate multiplier to use for training. The fine-tuning learning rate
@@ -305,17 +320,11 @@ export interface FineTuneCreateParams {
 
   /**
    * The name of the base model to fine-tune. You can select one of "ada", "babbage",
-   * "curie", "davinci", or a fine-tuned model created after 2022-04-21. To learn
-   * more about these models, see the
+   * "curie", "davinci", or a fine-tuned model created after 2022-04-21 and before
+   * 2023-08-22. To learn more about these models, see the
    * [Models](https://platform.openai.com/docs/models) documentation.
    */
   model?: (string & {}) | "ada" | "babbage" | "curie" | "davinci" | null;
-
-  /**
-   * The number of epochs to train the model for. An epoch refers to one full cycle
-   * through the training dataset.
-   */
-  n_epochs?: number | null;
 
   /**
    * The weight to use for loss on the prompt tokens. This controls how much the
@@ -342,20 +351,38 @@ export interface FineTuneCreateParams {
    *
    * If you provide this file, the data is used to generate validation metrics
    * periodically during fine-tuning. These metrics can be viewed in the
-   * [fine-tuning results file](/docs/guides/fine-tuning/analyzing-your-fine-tuned-model).
+   * [fine-tuning results file](https://platform.openai.com/docs/guides/legacy-fine-tuning/analyzing-your-fine-tuned-model).
    * Your train and validation data should be mutually exclusive.
    *
    * Your dataset must be formatted as a JSONL file, where each validation example is
    * a JSON object with the keys "prompt" and "completion". Additionally, you must
    * upload your file with the purpose `fine-tune`.
    *
-   * See the [fine-tuning guide](/docs/guides/fine-tuning/creating-training-data) for
-   * more details.
+   * See the
+   * [fine-tuning guide](https://platform.openai.com/docs/guides/legacy-fine-tuning/creating-training-data)
+   * for more details.
    */
   validation_file?: string | null;
 }
 
-export interface FineTuneListEventsParams {
+export namespace FineTuneCreateParams {
+  /**
+   * The hyperparameters used for the fine-tuning job.
+   */
+  export interface Hyperparameters {
+    /**
+     * The number of epochs to train the model for. An epoch refers to one full cycle
+     * through the training dataset.
+     */
+    n_epochs?: "auto" | number;
+  }
+}
+
+export type FineTuneListEventsParams =
+  | FineTuneListEventsParamsNonStreaming
+  | FineTuneListEventsParamsStreaming;
+
+export interface FineTuneListEventsParamsBase {
   /**
    * Whether to stream events for the fine-tune job. If set to true, events will be
    * sent as data-only
@@ -370,13 +397,13 @@ export interface FineTuneListEventsParams {
 
 export namespace FineTuneListEventsParams {
   export type FineTuneListEventsParamsNonStreaming =
-    API.FineTuneListEventsParamsNonStreaming;
+    FineTunesAPI.FineTuneListEventsParamsNonStreaming;
   export type FineTuneListEventsParamsStreaming =
-    API.FineTuneListEventsParamsStreaming;
+    FineTunesAPI.FineTuneListEventsParamsStreaming;
 }
 
 export interface FineTuneListEventsParamsNonStreaming
-  extends FineTuneListEventsParams {
+  extends FineTuneListEventsParamsBase {
   /**
    * Whether to stream events for the fine-tune job. If set to true, events will be
    * sent as data-only
@@ -390,7 +417,7 @@ export interface FineTuneListEventsParamsNonStreaming
 }
 
 export interface FineTuneListEventsParamsStreaming
-  extends FineTuneListEventsParams {
+  extends FineTuneListEventsParamsBase {
   /**
    * Whether to stream events for the fine-tune job. If set to true, events will be
    * sent as data-only
@@ -404,14 +431,15 @@ export interface FineTuneListEventsParamsStreaming
 }
 
 export namespace FineTunes {
-  export type FineTune = API.FineTune;
-  export type FineTuneEvent = API.FineTuneEvent;
-  export type FineTuneEventsListResponse = API.FineTuneEventsListResponse;
-  export type FineTunesPage = _FineTunesPage;
-  export type FineTuneCreateParams = API.FineTuneCreateParams;
-  export type FineTuneListEventsParams = API.FineTuneListEventsParams;
+  export type FineTune = FineTunesAPI.FineTune;
+  export type FineTuneEvent = FineTunesAPI.FineTuneEvent;
+  export type FineTuneEventsListResponse =
+    FineTunesAPI.FineTuneEventsListResponse;
+  export import FineTunesPage = FineTunesAPI.FineTunesPage;
+  export type FineTuneCreateParams = FineTunesAPI.FineTuneCreateParams;
+  export type FineTuneListEventsParams = FineTunesAPI.FineTuneListEventsParams;
   export type FineTuneListEventsParamsNonStreaming =
-    API.FineTuneListEventsParamsNonStreaming;
+    FineTunesAPI.FineTuneListEventsParamsNonStreaming;
   export type FineTuneListEventsParamsStreaming =
-    API.FineTuneListEventsParamsStreaming;
+    FineTunesAPI.FineTuneListEventsParamsStreaming;
 }

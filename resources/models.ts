@@ -2,7 +2,7 @@
 
 import * as Core from "../core.ts";
 import { APIResource } from "../resource.ts";
-import * as API from "./mod.ts";
+import * as ModelsAPI from "./models.ts";
 import { Page } from "../pagination.ts";
 
 export class Models extends APIResource {
@@ -26,7 +26,8 @@ export class Models extends APIResource {
   }
 
   /**
-   * Delete a fine-tuned model. You must have the Owner role in your organization.
+   * Delete a fine-tuned model. You must have the Owner role in your organization to
+   * delete a model.
    */
   del(
     model: string,
@@ -40,8 +41,6 @@ export class Models extends APIResource {
  * Note: no pagination actually occurs yet, this is for forwards-compatibility.
  */
 export class ModelsPage extends Page<Model> {}
-// alias so we can export it in the namespace
-type _ModelsPage = ModelsPage;
 
 /**
  * Describes an OpenAI model offering that can be used with the API.
@@ -53,7 +52,7 @@ export interface Model {
   id: string;
 
   /**
-   * The date and time when the model was created.
+   * The Unix timestamp (in seconds) when the model was created.
    */
   created: number;
 
@@ -77,7 +76,7 @@ export interface ModelDeleted {
 }
 
 export namespace Models {
-  export type Model = API.Model;
-  export type ModelDeleted = API.ModelDeleted;
-  export type ModelsPage = _ModelsPage;
+  export type Model = ModelsAPI.Model;
+  export type ModelDeleted = ModelsAPI.ModelDeleted;
+  export import ModelsPage = ModelsAPI.ModelsPage;
 }

@@ -5,16 +5,19 @@ import {
   APIConnectionTimeoutError,
   APIError,
   APIUserAbortError,
+  OpenAIError,
 } from "./error.ts";
-import type { Readable } from "./_shims/node-readable.ts";
-import { type Agent, getDefaultAgent } from "./_shims/agent.ts";
 import {
+  type Agent,
   fetch,
-  isPolyfilled as fetchIsPolyfilled,
+  getDefaultAgent,
+  type HeadersInit,
+  kind as shimsKind,
+  type Readable,
   type RequestInfo,
   type RequestInit,
   type Response,
-} from "./_shims/fetch.ts";
+} from "./_shims/mod.ts";
 export { type Response };
 import { isMultipartBody } from "./uploads.ts";
 export {
@@ -23,8 +26,6 @@ export {
   multipartFormRequestOptions,
   type Uploadable,
 } from "./uploads.ts";
-
-const MAX_RETRIES = 2;
 
 export type Fetch = (url: RequestInfo, init?: RequestInit) => Promise<Response>;
 
@@ -39,9 +40,22 @@ type APIResponseProps = {
 async function defaultParseResponse<T>(props: APIResponseProps): Promise<T> {
   const { response } = props;
   if (props.options.stream) {
+    debug(
+      "response",
+      response.status,
+      response.url,
+      response.headers,
+      response.body,
+    );
+
     // Note: there is an invariant here that isn't represented in the type system
     // that if you set `stream: true` the response type must also be `Stream<T>`
-    return new Stream(response, props.controller) as any;
+    return Stream.fromSSEResponse(response, props.controller) as any;
+  }
+
+  // fetch refuses to read the body when the status code is 204.
+  if (response.status === 204) {
+    return null as T;
   }
 
   const contentType = response.headers.get("content-type");
@@ -56,7 +70,7 @@ async function defaultParseResponse<T>(props: APIResponseProps): Promise<T> {
   // TODO handle blob, arraybuffer, other content types, etc.
   const text = await response.text();
   debug("response", response.status, response.url, response.headers, text);
-  return text as T;
+  return text as any as T;
 }
 
 /**
@@ -92,6 +106,12 @@ export class APIPromise<T> extends Promise<T> {
    *
    * If you want to parse the response body but still get the `Response`
    * instance, you can use {@link withResponse()}.
+   *
+   * 👋 Getting the wrong TypeScript type for `Response`?
+   * Try setting `"moduleResolution": "NodeNext"` if you can,
+   * or add one of these imports before your first `import … from 'openai'`:
+   * - `import 'openai/shims/node'` (if you're running on Node)
+   * - `import 'openai/shims/web'` (otherwise)
    */
   asResponse(): Promise<Response> {
     return this.responsePromise.then((p) => p.response);
@@ -101,6 +121,12 @@ export class APIPromise<T> extends Promise<T> {
    *
    * If you just want to get the raw `Response` instance without parsing it,
    * you can use {@link asResponse()}.
+   *
+   * 👋 Getting the wrong TypeScript type for `Response`?
+   * Try setting `"moduleResolution": "NodeNext"` if you can,
+   * or add one of these imports before your first `import … from 'openai'`:
+   * - `import 'openai/shims/node'` (if you're running on Node)
+   * - `import 'openai/shims/web'` (otherwise)
    */
   async withResponse(): Promise<{ data: T; response: Response }> {
     const [data, response] = await Promise.all([
@@ -155,7 +181,7 @@ export abstract class APIClient {
 
   constructor({
     baseURL,
-    maxRetries,
+    maxRetries = 2,
     timeout = 600000, // 10 minutes
     httpAgent,
     fetch: overridenFetch,
@@ -167,17 +193,14 @@ export abstract class APIClient {
     fetch: Fetch | undefined;
   }) {
     this.baseURL = baseURL;
-    this.maxRetries = validatePositiveInteger(
-      "maxRetries",
-      maxRetries ?? MAX_RETRIES,
-    );
+    this.maxRetries = validatePositiveInteger("maxRetries", maxRetries);
     this.timeout = validatePositiveInteger("timeout", timeout);
     this.httpAgent = httpAgent;
 
     this.fetch = overridenFetch ?? fetch;
   }
 
-  protected authHeaders(): Headers {
+  protected authHeaders(opts: FinalRequestOptions): Headers {
     return {};
   }
 
@@ -189,13 +212,13 @@ export abstract class APIClient {
    *    Authorization: 'Bearer 123',
    *  }
    */
-  protected defaultHeaders(): Headers {
+  protected defaultHeaders(opts: FinalRequestOptions): Headers {
     return {
       Accept: "application/json",
       "Content-Type": "application/json",
       "User-Agent": this.getUserAgent(),
       ...getPlatformHeaders(),
-      ...this.authHeaders(),
+      ...this.authHeaders(opts),
     };
   }
 
@@ -300,7 +323,7 @@ export abstract class APIClient {
       getDefaultAgent(url);
     const minAgentTimeout = timeout + 1000;
     if (
-      (httpAgent as any)?.options &&
+      typeof (httpAgent as any)?.options?.timeout === "number" &&
       minAgentTimeout > ((httpAgent as any).options.timeout ?? 0)
     ) {
       // Allow any given request to bump our agent active socket timeout.
@@ -319,11 +342,11 @@ export abstract class APIClient {
 
     const reqHeaders: Record<string, string> = {
       ...(contentLength && { "Content-Length": contentLength }),
-      ...this.defaultHeaders(),
+      ...this.defaultHeaders(options),
       ...headers,
     };
     // let builtin fetch set the Content-Type for multipart bodies
-    if (isMultipartBody(options.body) && !fetchIsPolyfilled) {
+    if (isMultipartBody(options.body) && shimsKind !== "node") {
       delete reqHeaders["Content-Type"];
     }
 
@@ -355,8 +378,22 @@ export abstract class APIClient {
    */
   protected async prepareRequest(
     request: RequestInit,
-    { url }: { url: string },
+    { url, options }: { url: string; options: FinalRequestOptions },
   ): Promise<void> {}
+
+  protected parseHeaders(
+    headers: HeadersInit | null | undefined,
+  ): Record<string, string> {
+    return (
+      !headers ? {} : Symbol.iterator in headers
+        ? Object.fromEntries(
+          Array.from(headers as Iterable<string[]>).map((
+            header,
+          ) => [...header]),
+        )
+        : { ...headers }
+    );
+  }
 
   protected makeStatusError(
     status: number | undefined,
@@ -374,16 +411,10 @@ export abstract class APIClient {
     return new APIPromise(this.makeRequest(options, remainingRetries));
   }
 
-  private async makeRequest<T>(
+  private async makeRequest(
     optionsInput: PromiseOrValue<FinalRequestOptions>,
     retriesRemaining: number | null,
-  ): Promise<
-    {
-      response: Response;
-      options: FinalRequestOptions;
-      controller: AbortController;
-    }
-  > {
+  ): Promise<APIResponseProps> {
     const options = await optionsInput;
     if (retriesRemaining == null) {
       retriesRemaining = options.maxRetries ?? this.maxRetries;
@@ -391,7 +422,7 @@ export abstract class APIClient {
 
     const { req, url, timeout } = this.buildRequest(options);
 
-    await this.prepareRequest(req, { url });
+    await this.prepareRequest(req, { url, options });
 
     debug("request", url, options, req.headers);
 
@@ -423,7 +454,9 @@ export abstract class APIClient {
         return this.retryRequest(options, retriesRemaining, responseHeaders);
       }
 
-      const errText = await response.text().catch(() => "Unknown");
+      const errText = await response.text().catch((e) =>
+        castToError(e).message
+      );
       const errJSON = safeJSON(errText);
       const errMessage = errJSON ? undefined : errText;
 
@@ -454,7 +487,10 @@ export abstract class APIClient {
     return new PagePromise<PageClass, Item>(this, request, Page);
   }
 
-  buildURL<Req>(path: string, query: Req | undefined): string {
+  buildURL<Req extends Record<string, unknown>>(
+    path: string,
+    query: Req | null | undefined,
+  ): string {
     const url = isAbsoluteURL(path) ? new URL(path) : new URL(
       this.baseURL +
         (this.baseURL.endsWith("/") && path.startsWith("/")
@@ -487,7 +523,7 @@ export abstract class APIClient {
         if (value === null) {
           return `${encodeURIComponent(key)}=`;
         }
-        throw new Error(
+        throw new OpenAIError(
           `Cannot stringify type ${typeof value}; Expected string, number, boolean, or null. If you need to pass nested query parameters, you can manually encode them, e.g. { query: { 'foo[key1]': value1, 'foo[key2]': value2 } }, and please open a GitHub issue requesting better support for your use case.`,
         );
       })
@@ -505,11 +541,17 @@ export abstract class APIClient {
 
     const timeout = setTimeout(() => controller.abort(), ms);
 
-    return this.getRequestClient()
-      .fetch(url, { signal: controller.signal as any, ...options })
-      .finally(() => {
-        clearTimeout(timeout);
-      });
+    return (
+      this.getRequestClient()
+        // use undefined this binding; fetch errors if bound to something else in browser/cloudflare
+        .fetch.call(undefined, url, {
+          signal: controller.signal as any,
+          ...options,
+        })
+        .finally(() => {
+          clearTimeout(timeout);
+        })
+    );
   }
 
   protected getRequestClient(): RequestClient {
@@ -524,6 +566,9 @@ export abstract class APIClient {
     if (shouldRetryHeader === "true") return true;
     if (shouldRetryHeader === "false") return false;
 
+    // Retry on request timeouts.
+    if (response.status === 408) return true;
+
     // Retry on lock timeouts.
     if (response.status === 409) return true;
 
@@ -536,56 +581,61 @@ export abstract class APIClient {
     return false;
   }
 
-  private async retryRequest<Req extends {}, Rsp>(
-    options: FinalRequestOptions<Req>,
+  private async retryRequest(
+    options: FinalRequestOptions,
     retriesRemaining: number,
     responseHeaders?: Headers | undefined,
-  ): Promise<Rsp> {
-    retriesRemaining -= 1;
-
+  ): Promise<APIResponseProps> {
     // About the Retry-After header: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After
-    //
-    // TODO: we may want to handle the case where the header is using the http-date syntax: "Retry-After: <http-date>".
-    // See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After#syntax for details.
-    const retryAfter = parseInt(responseHeaders?.["retry-after"] || "");
+    let timeoutMillis: number | undefined;
+    const retryAfterHeader = responseHeaders?.["retry-after"];
+    if (retryAfterHeader) {
+      const timeoutSeconds = parseInt(retryAfterHeader);
+      if (!Number.isNaN(timeoutSeconds)) {
+        timeoutMillis = timeoutSeconds * 1000;
+      } else {
+        timeoutMillis = Date.parse(retryAfterHeader) - Date.now();
+      }
+    }
 
-    const maxRetries = options.maxRetries ?? this.maxRetries;
-    const timeout = this.calculateRetryTimeoutSeconds(
-      retriesRemaining,
-      retryAfter,
-      maxRetries,
-    ) * 1000;
-    await sleep(timeout);
+    // If the API asks us to wait a certain amount of time (and it's a reasonable amount),
+    // just do what it says, but otherwise calculate a default
+    if (
+      !timeoutMillis ||
+      !Number.isInteger(timeoutMillis) ||
+      timeoutMillis <= 0 ||
+      timeoutMillis > 60 * 1000
+    ) {
+      const maxRetries = options.maxRetries ?? this.maxRetries;
+      timeoutMillis = this.calculateDefaultRetryTimeoutMillis(
+        retriesRemaining,
+        maxRetries,
+      );
+    }
+    await sleep(timeoutMillis);
 
-    return this.request(options, retriesRemaining);
+    return this.makeRequest(options, retriesRemaining - 1);
   }
 
-  private calculateRetryTimeoutSeconds(
+  private calculateDefaultRetryTimeoutMillis(
     retriesRemaining: number,
-    retryAfter: number,
     maxRetries: number,
   ): number {
     const initialRetryDelay = 0.5;
-    const maxRetryDelay = 2;
-
-    // If the API asks us to wait a certain amount of time (and it's a reasonable amount),
-    // just do what it says.
-    if (Number.isInteger(retryAfter) && retryAfter <= 60) {
-      return retryAfter;
-    }
+    const maxRetryDelay = 8.0;
 
     const numRetries = maxRetries - retriesRemaining;
 
     // Apply exponential backoff, but not more than the max.
     const sleepSeconds = Math.min(
-      initialRetryDelay * Math.pow(numRetries - 1, 2),
+      initialRetryDelay * Math.pow(2, numRetries),
       maxRetryDelay,
     );
 
-    // Apply some jitter, plus-or-minus half a second.
-    const jitter = Math.random() - 0.5;
+    // Apply some jitter, take up to at most 25 percent of the retry time.
+    const jitter = 1 - Math.random() * 0.25;
 
-    return sleepSeconds + jitter;
+    return sleepSeconds * jitter * 1000;
   }
 
   private getUserAgent(): string {
@@ -651,10 +701,10 @@ export abstract class AbstractPage<Item> implements AsyncIterable<Item> {
     return this.nextPageInfo() != null;
   }
 
-  async getNextPage(): Promise<AbstractPage<Item>> {
+  async getNextPage(): Promise<this> {
     const nextInfo = this.nextPageInfo();
     if (!nextInfo) {
-      throw new Error(
+      throw new OpenAIError(
         "No next page expected; please check `.hasNextPage()` before calling `.getNextPage()`.",
       );
     }
@@ -667,7 +717,7 @@ export abstract class AbstractPage<Item> implements AsyncIterable<Item> {
         ...nextInfo.url.searchParams.entries(),
       ];
       for (const [key, value] of params) {
-        nextInfo.url.searchParams.set(key, value);
+        nextInfo.url.searchParams.set(key, value as any);
       }
       nextOptions.query = undefined;
       nextOptions.path = nextInfo.url.toString();
@@ -803,7 +853,9 @@ const requestOptionsKeys: KeysEnum<RequestOptions> = {
   idempotencyKey: true,
 };
 
-export const isRequestOptions = (obj: unknown): obj is RequestOptions => {
+export const isRequestOptions = (
+  obj: unknown,
+): obj is RequestOptions<Record<string, unknown> | Readable> => {
   return (
     typeof obj === "object" &&
     obj !== null &&
@@ -915,7 +967,7 @@ declare const navigator: { userAgent: string } | undefined;
 
 // Note: modified from https://github.com/JS-DevTools/host-environment/blob/b1ab79ecde37db5d6e163c050e54fe7d287d7c92/src/isomorphic.browser.ts
 function getBrowserInfo(): BrowserInfo | null {
-  if (!navigator || typeof navigator === "undefined") {
+  if (typeof navigator === "undefined" || !navigator) {
     return null;
   }
 
@@ -1013,14 +1065,15 @@ const isAbsoluteURL = (url: string): boolean => {
   return startsWithSchemeRegexp.test(url);
 };
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+export const sleep = (ms: number) =>
+  new Promise((resolve) => setTimeout(resolve, ms));
 
 const validatePositiveInteger = (name: string, n: unknown): number => {
   if (typeof n !== "number" || !Number.isInteger(n)) {
-    throw new Error(`${name} must be an integer`);
+    throw new OpenAIError(`${name} must be an integer`);
   }
   if (n < 0) {
-    throw new Error(`${name} must be a positive integer`);
+    throw new OpenAIError(`${name} must be a positive integer`);
   }
   return n;
 };
@@ -1032,7 +1085,7 @@ export const castToError = (err: any): Error => {
 
 export const ensurePresent = <T>(value: T | null | undefined): T => {
   if (value == null) {
-    throw new Error(
+    throw new OpenAIError(
       `Expected a value to be given but received ${value} instead.`,
     );
   }
@@ -1058,7 +1111,7 @@ export const coerceInteger = (value: unknown): number => {
   if (typeof value === "number") return Math.round(value);
   if (typeof value === "string") return parseInt(value, 10);
 
-  throw new Error(
+  throw new OpenAIError(
     `Could not coerce ${value} (type: ${typeof value}) into a number`,
   );
 };
@@ -1067,7 +1120,7 @@ export const coerceFloat = (value: unknown): number => {
   if (typeof value === "number") return value;
   if (typeof value === "string") return parseFloat(value);
 
-  throw new Error(
+  throw new OpenAIError(
     `Could not coerce ${value} (type: ${typeof value}) into a number`,
   );
 };
@@ -1150,23 +1203,47 @@ export const isHeadersProtocol = (headers: any): headers is HeadersProtocol => {
   return typeof headers?.get === "function";
 };
 
-export const getHeader = (
+export const getRequiredHeader = (
   headers: HeadersLike,
-  key: string,
-): string | null | undefined => {
-  const lowerKey = key.toLowerCase();
+  header: string,
+): string => {
+  const lowerCasedHeader = header.toLowerCase();
   if (isHeadersProtocol(headers)) {
-    return headers.get(key) || headers.get(lowerKey);
+    // to deal with the case where the header looks like Stainless-Event-Id
+    const intercapsHeader = header[0]?.toUpperCase() +
+      header.substring(1).replace(
+        /([^\w])(\w)/g,
+        (_m, g1, g2) => g1 + g2.toUpperCase(),
+      );
+    for (
+      const key of [
+        header,
+        lowerCasedHeader,
+        header.toUpperCase(),
+        intercapsHeader,
+      ]
+    ) {
+      const value = headers.get(key);
+      if (value) {
+        return value;
+      }
+    }
   }
-  const value = headers[key] || headers[lowerKey];
-  if (Array.isArray(value)) {
-    if (value.length <= 1) return value[0];
-    console.warn(
-      `Received ${value.length} entries for the ${key} header, using the first entry.`,
-    );
-    return value[0];
+
+  for (const [key, value] of Object.entries(headers)) {
+    if (key.toLowerCase() === lowerCasedHeader) {
+      if (Array.isArray(value)) {
+        if (value.length <= 1) return value[0];
+        console.warn(
+          `Received ${value.length} entries for the ${header} header, using the first entry.`,
+        );
+        return value[0];
+      }
+      return value;
+    }
   }
-  return value;
+
+  throw new Error(`Could not find ${header} header`);
 };
 
 /**
@@ -1182,7 +1259,7 @@ export const toBase64 = (str: string | null | undefined): string => {
     return btoa(str);
   }
 
-  throw new Error(
+  throw new OpenAIError(
     "Cannot generate b64 string; Expected `Buffer` or `btoa` to be defined",
   );
 };

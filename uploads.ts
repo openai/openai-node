@@ -1,17 +1,15 @@
 import { type RequestOptions } from "./core.ts";
-import { type Readable } from "./_shims/node-readable.ts";
-import { type BodyInit } from "./_shims/fetch.ts";
 import {
   type Blob,
   File,
   type FilePropertyBag,
   FormData,
-} from "./_shims/formdata.ts";
-import { getMultipartRequestOptions } from "./_shims/getMultipartRequestOptions.ts";
-import { fileFromPath } from "./_shims/fileFromPath.ts";
-import { type FsReadStream, isFsReadStream } from "./_shims/node-readable.ts";
-
-export { fileFromPath };
+  type FsReadStream,
+  getMultipartRequestOptions,
+  isFsReadStream,
+} from "./_shims/mod.ts";
+import { MultipartBody } from "./_shims/MultipartBody.ts";
+export { fileFromPath } from "./_shims/mod.ts";
 
 type BlobLikePart =
   | string
@@ -201,13 +199,6 @@ const isAsyncIterableIterator = (
 ): value is AsyncIterableIterator<unknown> =>
   value != null && typeof value === "object" &&
   typeof value[Symbol.asyncIterator] === "function";
-
-export class MultipartBody {
-  constructor(public body: Readable | BodyInit) {}
-  get [Symbol.toStringTag](): string {
-    return "MultipartBody";
-  }
-}
 
 export const isMultipartBody = (body: any): body is MultipartBody =>
   body && typeof body === "object" && body.body &&
