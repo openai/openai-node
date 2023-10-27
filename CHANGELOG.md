@@ -1,5 +1,19 @@
 # Changelog
 
+## 4.14.1 (2023-10-27)
+
+Full Changelog: [v4.14.0...v4.14.1](https://github.com/openai/openai-node/compare/v4.14.0...v4.14.1)
+
+### Bug Fixes
+
+* deploy deno in a github workflow instead of postpublish step ([#405](https://github.com/openai/openai-node/issues/405)) ([3a6dba0](https://github.com/openai/openai-node/commit/3a6dba074258274bffcfe3a4260ca1b95bcd6bdc))
+* typo in build script ([#403](https://github.com/openai/openai-node/issues/403)) ([76c5c96](https://github.com/openai/openai-node/commit/76c5c96a359f750f58ea38b5d32365db7e34409a))
+
+
+### Chores
+
+* **internal:** update gitignore ([#406](https://github.com/openai/openai-node/issues/406)) ([986b0bb](https://github.com/openai/openai-node/commit/986b0bbac9f5ca43a0df6f29f2a468dd4223e053))
+
 ## 4.14.0 (2023-10-25)
 
 Full Changelog: [v4.13.0...v4.14.0](https://github.com/openai/openai-node/compare/v4.13.0...v4.14.0)
