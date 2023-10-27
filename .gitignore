@@ -4,3 +4,4 @@ codegen.log
 dist
 /deno
 /*.tgz
+.idea/
