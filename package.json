@@ -83,8 +83,7 @@
     "format": "prettier --write --cache  --cache-strategy metadata . !dist",
     "tsn": "ts-node -r tsconfig-paths/register",
     "lint": "eslint --ext ts,js .",
-    "fix": "eslint --fix --ext ts,js .",
-    "postpublish": "bash scripts/git-publish-deno.sh"
+    "fix": "eslint --fix --ext ts,js ."
   },
   "dependencies": {
     "@types/node": "^18.11.18",
