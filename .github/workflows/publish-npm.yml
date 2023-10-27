@@ -17,6 +17,11 @@ jobs:
         with:
           node-version: '16'
 
+      - name: Set up Deno
+        uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+
       - name: Install dependencies
         run: |
           yarn install
@@ -26,3 +31,8 @@ jobs:
           bash ./bin/publish-npm
         env:
           NPM_TOKEN: ${{ secrets.OPENAI_NPM_TOKEN || secrets.NPM_TOKEN }}
+
+      - name: Publish to Deno
+        run: |
+          bash ./scripts/git-publish-deno.sh
+        env: {}
