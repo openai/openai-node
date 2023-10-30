@@ -1,4 +1,4 @@
-import OpenAI, { toFile } from 'openai';
+import OpenAI, { APIUserAbortError, toFile } from 'openai';
 import { TranscriptionCreateParams } from 'openai/resources/audio/transcriptions';
 import fetch from 'node-fetch';
 import { File as FormDataFile, Blob as FormDataBlob } from 'formdata-node';
@@ -66,6 +66,92 @@ it(`streaming works`, async function () {
     chunks.push(part);
   }
   expect(chunks.map((c) => c.choices[0]?.delta.content || '').join('')).toBeSimilarTo('This is a test', 10);
+});
+
+it(`ChatCompletionStream works`, async function () {
+  const chunks: OpenAI.Chat.ChatCompletionChunk[] = [];
+  const contents: [string, string][] = [];
+  const messages: OpenAI.Chat.ChatCompletionMessage[] = [];
+  const chatCompletions: OpenAI.Chat.ChatCompletion[] = [];
+  let finalContent: string | undefined;
+  let finalMessage: OpenAI.Chat.ChatCompletionMessage | undefined;
+  let finalChatCompletion: OpenAI.Chat.ChatCompletion | undefined;
+
+  const stream = client.beta.chat.completions
+    .stream({
+      model: 'gpt-4',
+      messages: [{ role: 'user', content: 'Say this is a test' }],
+    })
+    .on('chunk', (chunk) => chunks.push(chunk))
+    .on('content', (delta, snapshot) => contents.push([delta, snapshot]))
+    .on('message', (message) => messages.push(message))
+    .on('chatCompletion', (completion) => chatCompletions.push(completion))
+    .on('finalContent', (content) => (finalContent = content))
+    .on('finalMessage', (message) => (finalMessage = message))
+    .on('finalChatCompletion', (completion) => (finalChatCompletion = completion));
+  const content = await stream.finalContent();
+
+  expect(content).toBeSimilarTo('This is a test', 10);
+  expect(chunks.length).toBeGreaterThan(0);
+  expect(contents.length).toBeGreaterThan(0);
+  for (const chunk of chunks) {
+    expect(chunk.id).toEqual(finalChatCompletion?.id);
+    expect(chunk.created).toEqual(finalChatCompletion?.created);
+    expect(chunk.model).toEqual(finalChatCompletion?.model);
+  }
+  expect(finalContent).toEqual(content);
+  expect(contents.at(-1)?.[1]).toEqual(content);
+  expect(finalMessage?.content).toEqual(content);
+  expect(finalChatCompletion?.choices?.[0]?.message.content).toEqual(content);
+  expect(messages).toEqual([finalMessage]);
+  expect(chatCompletions).toEqual([finalChatCompletion]);
+  expect(await stream.finalContent()).toEqual(content);
+  expect(await stream.finalMessage()).toEqual(finalMessage);
+  expect(await stream.finalChatCompletion()).toEqual(finalChatCompletion);
+});
+
+it(`aborting ChatCompletionStream works`, async function () {
+  const chunks: OpenAI.Chat.ChatCompletionChunk[] = [];
+  const contents: [string, string][] = [];
+  const messages: OpenAI.Chat.ChatCompletionMessage[] = [];
+  const chatCompletions: OpenAI.Chat.ChatCompletion[] = [];
+  let finalContent: string | undefined;
+  let finalMessage: OpenAI.Chat.ChatCompletionMessage | undefined;
+  let finalChatCompletion: OpenAI.Chat.ChatCompletion | undefined;
+  let emittedError: any;
+  let caughtError: any;
+  const controller = new AbortController();
+  const stream = client.beta.chat.completions
+    .stream(
+      {
+        model: 'gpt-4',
+        messages: [{ role: 'user', content: 'Say this is a test' }],
+      },
+      { signal: controller.signal },
+    )
+    .on('error', (e) => (emittedError = e))
+    .on('chunk', (chunk) => chunks.push(chunk))
+    .on('content', (delta, snapshot) => {
+      contents.push([delta, snapshot]);
+      controller.abort();
+    })
+    .on('message', (message) => messages.push(message))
+    .on('chatCompletion', (completion) => chatCompletions.push(completion))
+    .on('finalContent', (content) => (finalContent = content))
+    .on('finalMessage', (message) => (finalMessage = message))
+    .on('finalChatCompletion', (completion) => (finalChatCompletion = completion));
+  try {
+    await stream.finalContent();
+  } catch (error) {
+    caughtError = error;
+  }
+  expect(caughtError).toBeInstanceOf(APIUserAbortError);
+  expect(finalContent).toBeUndefined();
+  expect(finalMessage).toBeUndefined();
+  expect(finalChatCompletion).toBeUndefined();
+  expect(chatCompletions).toEqual([]);
+  expect(chunks.length).toBeGreaterThan(0);
+  expect(contents.length).toBeGreaterThan(0);
 });
 
 it('handles formdata-node File', async function () {

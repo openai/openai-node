@@ -156,3 +156,14 @@ Methods:
 - <code title="get /fine-tunes">client.fineTunes.<a href="./src/resources/fine-tunes.ts">list</a>() -> FineTunesPage</code>
 - <code title="post /fine-tunes/{fine_tune_id}/cancel">client.fineTunes.<a href="./src/resources/fine-tunes.ts">cancel</a>(fineTuneId) -> FineTune</code>
 - <code title="get /fine-tunes/{fine_tune_id}/events">client.fineTunes.<a href="./src/resources/fine-tunes.ts">listEvents</a>(fineTuneId, { ...params }) -> FineTuneEventsListResponse</code>
+
+# Beta
+
+## Chat
+
+### Completions
+
+Methods:
+
+- <code>client.beta.chat.completions.<a href="./src/resources/beta/chat/completions.ts">runFunctions</a>(body, options?) -> ChatCompletionRunner | ChatCompletionStreamingRunner</code>
+- <code>client.beta.chat.completions.<a href="./src/resources/beta/chat/completions.ts">stream</a>(body, options?) -> ChatCompletionStream</code>
