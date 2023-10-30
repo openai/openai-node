@@ -1,4 +1,4 @@
-#!/usr/bin/env yarn tsn -T
+#!/usr/bin/env -S yarn tsn -T
 
 import OpenAI from 'openai';
 
