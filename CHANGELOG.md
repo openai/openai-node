@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.14.2 (2023-10-30)
+
+Full Changelog: [v4.14.1...v4.14.2](https://github.com/openai/openai-node/compare/v4.14.1...v4.14.2)
+
+### Chores
+
+* **docs:** update deno link ([#407](https://github.com/openai/openai-node/issues/407)) ([0328882](https://github.com/openai/openai-node/commit/0328882cccb3e5386283ffa5eb9cd8ad9442f3a0))
+
 ## 4.14.1 (2023-10-27)
 
 Full Changelog: [v4.14.0...v4.14.1](https://github.com/openai/openai-node/compare/v4.14.0...v4.14.1)
