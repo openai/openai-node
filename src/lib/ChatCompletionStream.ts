@@ -5,7 +5,7 @@ import {
   type ChatCompletion,
   type ChatCompletionChunk,
   type ChatCompletionCreateParams,
-  type ChatCompletionCreateParamsStreaming,
+  ChatCompletionCreateParamsBase,
 } from 'openai/resources/chat/completions';
 import {
   AbstractChatCompletionRunner,
@@ -19,7 +19,9 @@ export interface ChatCompletionStreamEvents extends AbstractChatCompletionRunner
   chunk: (chunk: ChatCompletionChunk, snapshot: ChatCompletionSnapshot) => void;
 }
 
-export type ChatCompletionStreamParams = ChatCompletionCreateParamsStreaming;
+export type ChatCompletionStreamParams = Omit<ChatCompletionCreateParamsBase, 'stream'> & {
+  stream?: true;
+};
 
 export class ChatCompletionStream
   extends AbstractChatCompletionRunner<ChatCompletionStreamEvents>
@@ -31,6 +33,13 @@ export class ChatCompletionStream
     return this.#currentChatCompletionSnapshot;
   }
 
+  /**
+   * Intended for use on the frontend, consuming a stream produced with
+   * `.toReadableStream()` on the backend.
+   *
+   * Note that messages sent to the model do not appear in `.on('message')`
+   * in this context.
+   */
   static fromReadableStream(stream: ReadableStream): ChatCompletionStream {
     const runner = new ChatCompletionStream();
     runner._run(() => runner._fromReadableStream(stream));
@@ -39,11 +48,11 @@ export class ChatCompletionStream
 
   static createChatCompletion(
     completions: Completions,
-    params: ChatCompletionCreateParams,
+    params: ChatCompletionStreamParams,
     options?: Core.RequestOptions,
   ): ChatCompletionStream {
     const runner = new ChatCompletionStream();
-    runner._run(() => runner._runChatCompletion(completions, params, options));
+    runner._run(() => runner._runChatCompletion(completions, { ...params, stream: true }, options));
     return runner;
   }
 
@@ -110,8 +119,15 @@ export class ChatCompletionStream
     this.#beginRequest();
     this._connected();
     const stream = Stream.fromReadableStream<ChatCompletionChunk>(readableStream, this.controller);
+    let chatId;
     for await (const chunk of stream) {
+      if (chatId && chatId !== chunk.id) {
+        // A new request has been made.
+        this._addChatCompletion(this.#endRequest());
+      }
+
       this.#addChunk(chunk);
+      chatId = chunk.id;
     }
     if (stream.controller.signal?.aborted) {
       throw new APIUserAbortError();
