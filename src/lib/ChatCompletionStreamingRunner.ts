@@ -2,7 +2,6 @@ import * as Core from 'openai/core';
 import {
   Completions,
   type ChatCompletionChunk,
-  type ChatCompletionCreateParams,
   type ChatCompletionCreateParamsStreaming,
 } from 'openai/resources/chat/completions';
 import { type AbstractChatCompletionRunnerEvents } from './AbstractChatCompletionRunner';
@@ -39,16 +38,6 @@ export class ChatCompletionStreamingRunner
   ): ChatCompletionStreamingRunner {
     const runner = new ChatCompletionStreamingRunner();
     runner._run(() => runner._runFunctions(completions, params, options));
-    return runner;
-  }
-
-  static override createChatCompletion(
-    completions: Completions,
-    params: ChatCompletionCreateParams,
-    options?: Core.RequestOptions,
-  ): ChatCompletionStreamingRunner {
-    const runner = new ChatCompletionStreamingRunner();
-    runner._run(() => runner._runChatCompletion(completions, params, options));
     return runner;
   }
 }

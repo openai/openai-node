@@ -20,8 +20,8 @@ export {
   RunnableFunctionWithoutParse,
   ParsingFunction,
 } from 'openai/lib/RunnableFunction';
-import { ChatCompletionStream } from 'openai/lib/ChatCompletionStream';
-import { ChatCompletionCreateParamsStreaming } from 'openai/resources/chat/completions';
+import { ChatCompletionStream, type ChatCompletionStreamParams } from 'openai/lib/ChatCompletionStream';
+export { ChatCompletionStream, type ChatCompletionStreamParams } from 'openai/lib/ChatCompletionStream';
 
 export class Completions extends APIResource {
   /**
@@ -64,14 +64,7 @@ export class Completions extends APIResource {
   /**
    * Creates a chat completion stream
    */
-  stream(
-    body: Omit<ChatCompletionCreateParamsStreaming, 'stream'> & { stream?: true },
-    options?: Core.RequestOptions,
-  ): ChatCompletionStream {
-    return ChatCompletionStream.createChatCompletion(
-      this.client.chat.completions,
-      { ...body, stream: true },
-      options,
-    );
+  stream(body: ChatCompletionStreamParams, options?: Core.RequestOptions): ChatCompletionStream {
+    return ChatCompletionStream.createChatCompletion(this.client.chat.completions, body, options);
   }
 }
