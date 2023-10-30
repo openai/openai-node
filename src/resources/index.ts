@@ -2,6 +2,7 @@
 
 export * from './chat/index';
 export { Audio } from './audio/audio';
+export { Beta } from './beta/beta';
 export {
   Completion,
   CompletionChoice,
