@@ -3,7 +3,6 @@ import {
   type Completions,
   type ChatCompletionMessage,
   type ChatCompletionMessageParam,
-  type ChatCompletionCreateParams,
   type ChatCompletionCreateParamsNonStreaming,
 } from 'openai/resources/chat/completions';
 import { type RunnableFunctions, type BaseFunctionsArgs } from './RunnableFunction';
@@ -31,16 +30,6 @@ export class ChatCompletionRunner extends AbstractChatCompletionRunner<ChatCompl
   ): ChatCompletionRunner {
     const runner = new ChatCompletionRunner();
     runner._run(() => runner._runFunctions(completions, params, options));
-    return runner;
-  }
-
-  static createChatCompletion(
-    completions: Completions,
-    params: ChatCompletionCreateParams,
-    options?: Core.RequestOptions,
-  ): ChatCompletionRunner {
-    const runner = new ChatCompletionRunner();
-    runner._run(() => runner._runChatCompletion(completions, params, options));
     return runner;
   }
 
