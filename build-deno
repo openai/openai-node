@@ -3,7 +3,26 @@
 set -exuo pipefail
 
 rm -rf deno; mkdir deno
-cp -rp src/* README.md deno
+cp -rp src/* deno
+
+cat << EOF > deno/README.md
+# OpenAI Node API Library - Deno build
+
+This is a build produced from openai/openai-node - please go there to read the source, file issues, etc.
+
+Installation:
+
+\`\`\`
+import OpenAI from "https://deno.land/x/openai";
+\`\`\`
+
+Note that in many Deno environments, you can also do this:
+
+\`\`\`
+import OpenAI from "npm:openai";
+\`\`\`
+EOF
+
 rm deno/_shims/auto/*-node.ts
 for dir in deno/_shims deno/_shims/auto; do
   rm "${dir}"/*.{d.ts,js,mjs}
