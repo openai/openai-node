@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.15.1 (2023-11-04)
+
+Full Changelog: [v4.15.0...v4.15.1](https://github.com/openai/openai-node/compare/v4.15.0...v4.15.1)
+
+### Documentation
+
+* document customizing fetch ([#420](https://github.com/openai/openai-node/issues/420)) ([1ca982f](https://github.com/openai/openai-node/commit/1ca982f192daf49e33b7acb5505ed26c9d891255))
+
 ## 4.15.0 (2023-11-03)
 
 Full Changelog: [v4.14.2...v4.15.0](https://github.com/openai/openai-node/compare/v4.14.2...v4.15.0)
