@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -exuo pipefail
 
 # This script pushes the contents of the `deno`` directory to the `deno` branch,
 # and creates a `vx.x.x-deno` tag, so that Deno users can
@@ -10,6 +11,7 @@
 # - Set the following environment variables when running this script:
 #   - DENO_PUSH_REMOTE_URL - the remote url of the separate GitHub repo
 #   - DENO_PUSH_BRANCH - the branch you want to push to in that repo (probably `main`)
+#   - DENO_MAIN_BRANCH - the branch you want as the main branch in that repo (probably `main`, sometimes `master`)
 #   - DENO_PUSH_VERSION - defaults to version in package.json
 #   - DENO_PUSH_RELEASE_TAG - defaults to v$DENO_PUSH_VERSION-deno
 
@@ -17,8 +19,6 @@ die () {
   echo >&2 "$@"
   exit 1
 }
-
-set -exuo pipefail
 
 # Allow caller to set the following environment variables, but provide defaults
 # if unset
@@ -28,8 +28,15 @@ set -exuo pipefail
 
 : "${DENO_PUSH_VERSION:=$(node -p 'require("./package.json").version')}"
 : "${DENO_PUSH_BRANCH:=deno}"
+: "${DENO_MAIN_BRANCH:=main}"
 : "${DENO_PUSH_REMOTE_URL:=$(git remote get-url origin)}"
-: "${DENO_PUSH_RELEASE_TAG:="v$DENO_PUSH_VERSION-deno"}"
+: "${DENO_GIT_USER_NAME:="Stainless Bot"}"
+: "${DENO_GIT_USER_NAME:="bot@stainlessapi.com"}"
+if [[ $DENO_PUSH_BRANCH = "deno" ]]; then
+  : "${DENO_PUSH_RELEASE_TAG:="v$DENO_PUSH_VERSION-deno"}"
+else
+  : "${DENO_PUSH_RELEASE_TAG:="v$DENO_PUSH_VERSION"}"
+fi
 
 if [ ! -e deno ]; then ./build; fi
 
@@ -41,7 +48,7 @@ if [ ! -e deno ]; then ./build; fi
 
 cd deno
 rm -rf .git
-git init
+git init -b "$DENO_MAIN_BRANCH"
 git remote add origin "$DENO_PUSH_REMOTE_URL"
 if git fetch origin "$DENO_PUSH_RELEASE_TAG"; then
   die "Tag $DENO_PUSH_RELEASE_TAG already exists"
@@ -56,6 +63,10 @@ else
   # the branch doesn't exist on the remote yet
   git checkout -b "$DENO_PUSH_BRANCH"
 fi
+
+git config user.email "$DENO_GIT_USER_EMAIL"
+git config user.name "$DENO_GIT_USER_NAME"
+
 git add .
 git commit -m "chore(deno): release $DENO_PUSH_VERSION"
 git tag -a "$DENO_PUSH_RELEASE_TAG" -m "release $DENO_PUSH_VERSION"
