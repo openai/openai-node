@@ -38,8 +38,6 @@ async function main() {
     messages: [{ role: 'user', content: 'Say this is a test' }],
     model: 'gpt-3.5-turbo',
   });
-
-  console.log(chatCompletion.choices);
 }
 
 main();
@@ -261,7 +259,6 @@ async function main() {
       if (err instanceof OpenAI.APIError) {
         console.log(err.status); // 400
         console.log(err.name); // BadRequestError
-
         console.log(err.headers); // {server: 'nginx', ...}
       } else {
         throw err;
@@ -388,7 +385,7 @@ const { data: chatCompletion, response: raw } = await openai.chat.completions
   .create({ messages: [{ role: 'user', content: 'Say this is a test' }], model: 'gpt-3.5-turbo' })
   .withResponse();
 console.log(raw.headers.get('X-My-Header'));
-console.log(chatCompletion.choices);
+console.log(chatCompletion);
 ```
 
 ## Customizing the fetch client
