@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.15.4 (2023-11-05)
+
+Full Changelog: [v4.15.3...v4.15.4](https://github.com/openai/openai-node/compare/v4.15.3...v4.15.4)
+
+### Documentation
+
+* **readme:** remove redundant whitespace ([#427](https://github.com/openai/openai-node/issues/427)) ([aa3a178](https://github.com/openai/openai-node/commit/aa3a1782914a4a285263e4d070bca73e72ed47ec))
+
 ## 4.15.3 (2023-11-04)
 
 Full Changelog: [v4.15.2...v4.15.3](https://github.com/openai/openai-node/compare/v4.15.2...v4.15.3)
