@@ -25,14 +25,7 @@ describe('resource completions', () => {
 
   test('create: required and optional params', async () => {
     const response = await openai.chat.completions.create({
-      messages: [
-        {
-          content: 'string',
-          function_call: { arguments: 'string', name: 'string' },
-          name: 'string',
-          role: 'system',
-        },
-      ],
+      messages: [{ content: 'string', role: 'system' }],
       model: 'gpt-3.5-turbo',
       frequency_penalty: -2,
       function_call: 'none',
@@ -41,9 +34,17 @@ describe('resource completions', () => {
       max_tokens: 0,
       n: 1,
       presence_penalty: -2,
+      response_format: { type: 'json_object' },
+      seed: -9223372036854776000,
       stop: 'string',
       stream: false,
       temperature: 1,
+      tool_choice: 'none',
+      tools: [
+        { type: 'function', function: { description: 'string', name: 'string', parameters: { foo: 'bar' } } },
+        { type: 'function', function: { description: 'string', name: 'string', parameters: { foo: 'bar' } } },
+        { type: 'function', function: { description: 'string', name: 'string', parameters: { foo: 'bar' } } },
+      ],
       top_p: 1,
       user: 'user-1234',
     });

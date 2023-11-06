@@ -1,12 +1,11 @@
-import * as Core from 'openai/core';
 import {
   Completions,
   type ChatCompletionChunk,
   type ChatCompletionCreateParamsStreaming,
 } from 'openai/resources/chat/completions';
-import { type AbstractChatCompletionRunnerEvents } from './AbstractChatCompletionRunner';
+import { RunnerOptions, type AbstractChatCompletionRunnerEvents } from './AbstractChatCompletionRunner';
 import { type ReadableStream } from 'openai/_shims/index';
-import { type BaseFunctionsArgs, type RunnableFunctions } from './RunnableFunction';
+import { RunnableTools, type BaseFunctionsArgs, type RunnableFunctions } from './RunnableFunction';
 import { ChatCompletionSnapshot, ChatCompletionStream } from './ChatCompletionStream';
 
 export interface ChatCompletionStreamEvents extends AbstractChatCompletionRunnerEvents {
@@ -19,6 +18,13 @@ export type ChatCompletionStreamingFunctionRunnerParams<FunctionsArgs extends Ba
   'functions'
 > & {
   functions: RunnableFunctions<FunctionsArgs>;
+};
+
+export type ChatCompletionStreamingToolRunnerParams<FunctionsArgs extends BaseFunctionsArgs> = Omit<
+  ChatCompletionCreateParamsStreaming,
+  'tools'
+> & {
+  tools: RunnableTools<FunctionsArgs>;
 };
 
 export class ChatCompletionStreamingRunner
@@ -34,10 +40,20 @@ export class ChatCompletionStreamingRunner
   static runFunctions<T extends (string | object)[]>(
     completions: Completions,
     params: ChatCompletionStreamingFunctionRunnerParams<T>,
-    options?: Core.RequestOptions & { maxChatCompletions?: number },
+    options?: RunnerOptions,
   ): ChatCompletionStreamingRunner {
     const runner = new ChatCompletionStreamingRunner();
     runner._run(() => runner._runFunctions(completions, params, options));
+    return runner;
+  }
+
+  static runTools<T extends (string | object)[]>(
+    completions: Completions,
+    params: ChatCompletionStreamingToolRunnerParams<T>,
+    options?: RunnerOptions,
+  ): ChatCompletionStreamingRunner {
+    const runner = new ChatCompletionStreamingRunner();
+    runner._run(() => runner._runTools(completions, params, options));
     return runner;
   }
 }

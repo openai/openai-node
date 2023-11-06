@@ -12,7 +12,7 @@ describe('resource files', () => {
   test('create: only required params', async () => {
     const responsePromise = openai.files.create({
       file: await toFile(Buffer.from('# my file contents'), 'README.md'),
-      purpose: 'string',
+      purpose: 'fine-tune',
     });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
@@ -26,7 +26,7 @@ describe('resource files', () => {
   test('create: required and optional params', async () => {
     const response = await openai.files.create({
       file: await toFile(Buffer.from('# my file contents'), 'README.md'),
-      purpose: 'string',
+      purpose: 'fine-tune',
     });
   });
 
@@ -64,6 +64,13 @@ describe('resource files', () => {
     await expect(openai.files.list({ path: '/_stainless_unknown_path' })).rejects.toThrow(
       OpenAI.NotFoundError,
     );
+  });
+
+  test('list: request options and params are passed correctly', async () => {
+    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
+    await expect(
+      openai.files.list({ purpose: 'string' }, { path: '/_stainless_unknown_path' }),
+    ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
   test('del', async () => {

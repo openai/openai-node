@@ -226,10 +226,23 @@ export namespace OpenAI {
 
   export import Chat = API.Chat;
   export import ChatCompletion = API.ChatCompletion;
+  export import ChatCompletionAssistantMessageParam = API.ChatCompletionAssistantMessageParam;
   export import ChatCompletionChunk = API.ChatCompletionChunk;
+  export import ChatCompletionContentPart = API.ChatCompletionContentPart;
+  export import ChatCompletionContentPartImage = API.ChatCompletionContentPartImage;
+  export import ChatCompletionContentPartText = API.ChatCompletionContentPartText;
+  export import ChatCompletionFunctionCallOption = API.ChatCompletionFunctionCallOption;
+  export import ChatCompletionFunctionMessageParam = API.ChatCompletionFunctionMessageParam;
   export import ChatCompletionMessage = API.ChatCompletionMessage;
   export import ChatCompletionMessageParam = API.ChatCompletionMessageParam;
+  export import ChatCompletionMessageToolCall = API.ChatCompletionMessageToolCall;
+  export import ChatCompletionNamedToolChoice = API.ChatCompletionNamedToolChoice;
   export import ChatCompletionRole = API.ChatCompletionRole;
+  export import ChatCompletionSystemMessageParam = API.ChatCompletionSystemMessageParam;
+  export import ChatCompletionTool = API.ChatCompletionTool;
+  export import ChatCompletionToolChoiceOption = API.ChatCompletionToolChoiceOption;
+  export import ChatCompletionToolMessageParam = API.ChatCompletionToolMessageParam;
+  export import ChatCompletionUserMessageParam = API.ChatCompletionUserMessageParam;
   export import ChatCompletionCreateParams = API.ChatCompletionCreateParams;
   export import ChatCompletionCreateParamsNonStreaming = API.ChatCompletionCreateParamsNonStreaming;
   export import ChatCompletionCreateParamsStreaming = API.ChatCompletionCreateParamsStreaming;
@@ -249,6 +262,7 @@ export namespace OpenAI {
   export import FileObject = API.FileObject;
   export import FileObjectsPage = API.FileObjectsPage;
   export import FileCreateParams = API.FileCreateParams;
+  export import FileListParams = API.FileListParams;
 
   export import Images = API.Images;
   export import Image = API.Image;

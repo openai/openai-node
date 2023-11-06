@@ -5,7 +5,7 @@ import { AbstractPage, Response, APIClient, FinalRequestOptions, PageInfo } from
 export interface PageResponse<Item> {
   data: Array<Item>;
 
-  object: string;
+  object: 'list';
 }
 
 /**
@@ -14,7 +14,7 @@ export interface PageResponse<Item> {
 export class Page<Item> extends AbstractPage<Item> implements PageResponse<Item> {
   data: Array<Item>;
 
-  object: string;
+  object: 'list';
 
   constructor(client: APIClient, response: Response, body: PageResponse<Item>, options: FinalRequestOptions) {
     super(client, response, body, options);
