@@ -11,7 +11,7 @@ export class Messages extends APIResource {
   files: FilesAPI.Files = new FilesAPI.Files(this.client);
 
   /**
-   * Create a Message.
+   * Create a message.
    */
   create(
     threadId: string,
@@ -26,7 +26,7 @@ export class Messages extends APIResource {
   }
 
   /**
-   * Retrieve a Message.
+   * Retrieve a message.
    */
   retrieve(
     threadId: string,
@@ -40,7 +40,7 @@ export class Messages extends APIResource {
   }
 
   /**
-   * Modifies a Message.
+   * Modifies a message.
    */
   update(
     threadId: string,
@@ -56,7 +56,7 @@ export class Messages extends APIResource {
   }
 
   /**
-   * Returns a list of Messages for a given Thread.
+   * Returns a list of messages for a given thread.
    */
   list(
     threadId: string,
@@ -84,13 +84,13 @@ export class ThreadMessagesPage extends CursorPage<ThreadMessage> {}
 
 /**
  * References an image [File](https://platform.openai.com/docs/api-reference/files)
- * in the content of a Message.
+ * in the content of a message.
  */
 export interface MessageContentImageFile {
   image_file: MessageContentImageFile.ImageFile;
 
   /**
-   * Will always be `image_file`.
+   * Always `image_file`.
    */
   type: 'image_file';
 }
@@ -99,20 +99,20 @@ export namespace MessageContentImageFile {
   export interface ImageFile {
     /**
      * The [File](https://platform.openai.com/docs/api-reference/files) ID of the image
-     * in the Message content.
+     * in the message content.
      */
     file_id: string;
   }
 }
 
 /**
- * The text content that is part of a Message.
+ * The text content that is part of a message.
  */
 export interface MessageContentText {
   text: MessageContentText.Text;
 
   /**
-   * Will always be `text`.
+   * Always `text`.
    */
   type: 'text';
 }
@@ -129,8 +129,8 @@ export namespace MessageContentText {
 
   export namespace Text {
     /**
-     * A citation within the Message that points to a specific quote from a specific
-     * File associated with the Assistant or the Message. Generated when the Assistant
+     * A citation within the message that points to a specific quote from a specific
+     * File associated with the assistant or the message. Generated when the assistant
      * uses the "retrieval" tool to search files.
      */
     export interface FileCitation {
@@ -141,12 +141,12 @@ export namespace MessageContentText {
       start_index: number;
 
       /**
-       * The text in the Message content that needs to be replaced.
+       * The text in the message content that needs to be replaced.
        */
       text: string;
 
       /**
-       * Will always be `file_citation`.
+       * Always `file_citation`.
        */
       type: 'file_citation';
     }
@@ -159,15 +159,15 @@ export namespace MessageContentText {
         file_id: string;
 
         /**
-         * The specific quote in the File.
+         * The specific quote in the file.
          */
         quote: string;
       }
     }
 
     /**
-     * A URL for the File that's generated when the Assistant used the
-     * `code_interpreter` tool to generate a File.
+     * A URL for the file that's generated when the assistant used the
+     * `code_interpreter` tool to generate a file.
      */
     export interface FilePath {
       end_index: number;
@@ -177,12 +177,12 @@ export namespace MessageContentText {
       start_index: number;
 
       /**
-       * The text in the Message content that needs to be replaced.
+       * The text in the message content that needs to be replaced.
        */
       text: string;
 
       /**
-       * Will always be `file_path`.
+       * Always `file_path`.
        */
       type: 'file_path';
     }
@@ -190,7 +190,7 @@ export namespace MessageContentText {
     export namespace FilePath {
       export interface FilePath {
         /**
-         * The ID of the File that was generated.
+         * The ID of the file that was generated.
          */
         file_id: string;
       }
@@ -199,8 +199,8 @@ export namespace MessageContentText {
 }
 
 /**
- * Represents a Message within a
- * [Thread](https://platform.openai.com/docs/api-reference/threads).
+ * Represents a message within a
+ * [thread](https://platform.openai.com/docs/api-reference/threads).
  */
 export interface ThreadMessage {
   /**
@@ -210,25 +210,25 @@ export interface ThreadMessage {
 
   /**
    * If applicable, the ID of the
-   * [Assistant](https://platform.openai.com/docs/api-reference/assistants) that
-   * authored this Message.
+   * [assistant](https://platform.openai.com/docs/api-reference/assistants) that
+   * authored this message.
    */
   assistant_id: string | null;
 
   /**
-   * The content of the Message in array of text and/or images.
+   * The content of the message in array of text and/or images.
    */
   content: Array<MessageContentImageFile | MessageContentText>;
 
   /**
-   * The Unix timestamp (in seconds) for when the Message was created.
+   * The Unix timestamp (in seconds) for when the message was created.
    */
   created_at: number;
 
   /**
    * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs that
-   * the Assistant should use. Useful for tools like retrieval and code_interpreter
-   * that can access files. A maximum of 10 files can be attached to a Message.
+   * the assistant should use. Useful for tools like retrieval and code_interpreter
+   * that can access files. A maximum of 10 files can be attached to a message.
    */
   file_ids: Array<string>;
 
@@ -246,20 +246,20 @@ export interface ThreadMessage {
   object: 'thread.message';
 
   /**
-   * The entity that produced the Message. One of `user` or `assistant`.
+   * The entity that produced the message. One of `user` or `assistant`.
    */
   role: 'user' | 'assistant';
 
   /**
    * If applicable, the ID of the
-   * [Run](https://platform.openai.com/docs/api-reference/runs) associated with the
-   * authoring of this Message.
+   * [run](https://platform.openai.com/docs/api-reference/runs) associated with the
+   * authoring of this message.
    */
   run_id: string | null;
 
   /**
-   * The [Thread](https://platform.openai.com/docs/api-reference/threads) ID that
-   * this Message belongs to.
+   * The [thread](https://platform.openai.com/docs/api-reference/threads) ID that
+   * this message belongs to.
    */
   thread_id: string;
 }
@@ -274,20 +274,20 @@ export interface ThreadMessageDeleted {
 
 export interface MessageCreateParams {
   /**
-   * The content of the Message.
+   * The content of the message.
    */
   content: string;
 
   /**
-   * The role of the entity that is creating the Message. Currently only `user` is
+   * The role of the entity that is creating the message. Currently only `user` is
    * supported.
    */
   role: 'user';
 
   /**
    * A list of [File](https://platform.openai.com/docs/api-reference/files) IDs that
-   * the Message should use. There can be a maximum of 10 files attached to a
-   * Message. Useful for tools like `retrieval` and `code_interpreter` that can
+   * the message should use. There can be a maximum of 10 files attached to a
+   * message. Useful for tools like `retrieval` and `code_interpreter` that can
    * access and use files.
    */
   file_ids?: Array<string>;

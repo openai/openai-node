@@ -11,7 +11,7 @@ export class Assistants extends APIResource {
   files: FilesAPI.Files = new FilesAPI.Files(this.client);
 
   /**
-   * Create an Assistant with a model and instructions.
+   * Create an assistant with a model and instructions.
    */
   create(body: AssistantCreateParams, options?: Core.RequestOptions): Core.APIPromise<Assistant> {
     return this.post('/assistants', {
@@ -22,7 +22,7 @@ export class Assistants extends APIResource {
   }
 
   /**
-   * Retrieves an Assistant.
+   * Retrieves an assistant.
    */
   retrieve(assistantId: string, options?: Core.RequestOptions): Core.APIPromise<Assistant> {
     return this.get(`/assistants/${assistantId}`, {
@@ -32,7 +32,7 @@ export class Assistants extends APIResource {
   }
 
   /**
-   * Modifies an Assistant.
+   * Modifies an assistant.
    */
   update(
     assistantId: string,
@@ -47,7 +47,7 @@ export class Assistants extends APIResource {
   }
 
   /**
-   * Returns a list of Assistants.
+   * Returns a list of assistants.
    */
   list(
     query?: AssistantListParams,
@@ -69,7 +69,7 @@ export class Assistants extends APIResource {
   }
 
   /**
-   * Delete an Assistant.
+   * Delete an assistant.
    */
   del(assistantId: string, options?: Core.RequestOptions): Core.APIPromise<AsssitantDeleted> {
     return this.delete(`/assistants/${assistantId}`, {
@@ -82,7 +82,7 @@ export class Assistants extends APIResource {
 export class AssistantsPage extends CursorPage<Assistant> {}
 
 /**
- * Represents an `Assistant` that can call the model and use tools.
+ * Represents an `assistant` that can call the model and use tools.
  */
 export interface Assistant {
   /**
@@ -91,24 +91,24 @@ export interface Assistant {
   id: string;
 
   /**
-   * The Unix timestamp (in seconds) for when the Assistant was created.
+   * The Unix timestamp (in seconds) for when the assistant was created.
    */
   created_at: number;
 
   /**
-   * The description of the Assistant. The maximum length is 512 characters.
+   * The description of the assistant. The maximum length is 512 characters.
    */
   description: string | null;
 
   /**
-   * A list of [File](https://platform.openai.com/docs/api-reference/files) IDs
-   * attached to this Assistant. There can be a maximum of 20 files attached to the
-   * Assistant. Files are ordered by their creation date in ascending order.
+   * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs
+   * attached to this assistant. There can be a maximum of 20 files attached to the
+   * assistant. Files are ordered by their creation date in ascending order.
    */
   file_ids: Array<string>;
 
   /**
-   * The system instructions that the Assistant uses. The maximum length is 32768
+   * The system instructions that the assistant uses. The maximum length is 32768
    * characters.
    */
   instructions: string | null;
@@ -131,7 +131,7 @@ export interface Assistant {
   model: string;
 
   /**
-   * The name of the Assistant. The maximum length is 256 characters.
+   * The name of the assistant. The maximum length is 256 characters.
    */
   name: string | null;
 
@@ -141,7 +141,7 @@ export interface Assistant {
   object: 'assistant';
 
   /**
-   * A list of tool enabled on the Assistant. There can be a maximum of 128 tools per
+   * A list of tool enabled on the assistant. There can be a maximum of 128 tools per
    * assistant. Tools can be of types `code_interpreter`, `retrieval`, or `function`.
    */
   tools: Array<Assistant.CodeInterpreter | Assistant.Retreival | Assistant.Function>;
@@ -225,19 +225,19 @@ export interface AssistantCreateParams {
   model: string;
 
   /**
-   * The description of the Assistant. The maximum length is 512 characters.
+   * The description of the assistant. The maximum length is 512 characters.
    */
   description?: string | null;
 
   /**
-   * A list of [File](https://platform.openai.com/docs/api-reference/files) IDs
-   * attached to this Assistant. There can be a maximum of 20 files attached to the
-   * Assistant. Files are ordered by their creation date in ascending order.
+   * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs
+   * attached to this assistant. There can be a maximum of 20 files attached to the
+   * assistant. Files are ordered by their creation date in ascending order.
    */
   file_ids?: Array<string>;
 
   /**
-   * The system instructions that the Assistant uses. The maximum length is 32768
+   * The system instructions that the assistant uses. The maximum length is 32768
    * characters.
    */
   instructions?: string | null;
@@ -251,12 +251,12 @@ export interface AssistantCreateParams {
   metadata?: unknown | null;
 
   /**
-   * The name of the Assistant. The maximum length is 256 characters.
+   * The name of the assistant. The maximum length is 256 characters.
    */
   name?: string | null;
 
   /**
-   * A list of tool enabled on the Assistant. There can be a maximum of 128 tools per
+   * A list of tool enabled on the assistant. There can be a maximum of 128 tools per
    * assistant. Tools can be of types `code_interpreter`, `retrieval`, or `function`.
    */
   tools?: Array<
@@ -327,21 +327,21 @@ export namespace AssistantCreateParams {
 
 export interface AssistantUpdateParams {
   /**
-   * The description of the Assistant. The maximum length is 512 characters.
+   * The description of the assistant. The maximum length is 512 characters.
    */
   description?: string | null;
 
   /**
    * A list of [File](https://platform.openai.com/docs/api-reference/files) IDs
-   * attached to this Assistant. There can be a maximum of 20 files attached to the
-   * Assistant. Files are ordered by their creation date in ascending order. If a
+   * attached to this assistant. There can be a maximum of 20 files attached to the
+   * assistant. Files are ordered by their creation date in ascending order. If a
    * file was previosuly attached to the list but does not show up in the list, it
    * will be deleted from the assistant.
    */
   file_ids?: Array<string>;
 
   /**
-   * The system instructions that the Assistant uses. The maximum length is 32768
+   * The system instructions that the assistant uses. The maximum length is 32768
    * characters.
    */
   instructions?: string | null;
@@ -364,12 +364,12 @@ export interface AssistantUpdateParams {
   model?: string;
 
   /**
-   * The name of the Assistant. The maximum length is 256 characters.
+   * The name of the assistant. The maximum length is 256 characters.
    */
   name?: string | null;
 
   /**
-   * A list of tool enabled on the Assistant. There can be a maximum of 128 tools per
+   * A list of tool enabled on the assistant. There can be a maximum of 128 tools per
    * assistant. Tools can be of types `code_interpreter`, `retrieval`, or `function`.
    */
   tools?: Array<

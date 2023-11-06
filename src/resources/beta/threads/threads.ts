@@ -11,7 +11,7 @@ export class Threads extends APIResource {
   messages: MessagesAPI.Messages = new MessagesAPI.Messages(this.client);
 
   /**
-   * Create a Thread.
+   * Create a thread.
    */
   create(body: ThreadCreateParams, options?: Core.RequestOptions): Core.APIPromise<Thread> {
     return this.post('/threads', {
@@ -22,7 +22,7 @@ export class Threads extends APIResource {
   }
 
   /**
-   * Retrieves a Thread.
+   * Retrieves a thread.
    */
   retrieve(threadId: string, options?: Core.RequestOptions): Core.APIPromise<Thread> {
     return this.get(`/threads/${threadId}`, {
@@ -32,7 +32,7 @@ export class Threads extends APIResource {
   }
 
   /**
-   * Modifies a Thread.
+   * Modifies a thread.
    */
   update(threadId: string, body: ThreadUpdateParams, options?: Core.RequestOptions): Core.APIPromise<Thread> {
     return this.post(`/threads/${threadId}`, {
@@ -43,7 +43,7 @@ export class Threads extends APIResource {
   }
 
   /**
-   * Delete a Thread.
+   * Delete a thread.
    */
   del(threadId: string, options?: Core.RequestOptions): Core.APIPromise<ThreadDeleted> {
     return this.delete(`/threads/${threadId}`, {
@@ -53,7 +53,7 @@ export class Threads extends APIResource {
   }
 
   /**
-   * Create a Thread and Run it in one request.
+   * Create a thread and run it in one request.
    */
   createAndRun(body: ThreadCreateAndRunParams, options?: Core.RequestOptions): Core.APIPromise<RunsAPI.Run> {
     return this.post('/threads/runs', {
@@ -65,8 +65,8 @@ export class Threads extends APIResource {
 }
 
 /**
- * Represents a Thread that contains
- * [Messages](https://platform.openai.com/docs/api-reference/messages).
+ * Represents a thread that contains
+ * [messages](https://platform.openai.com/docs/api-reference/messages).
  */
 export interface Thread {
   /**
@@ -75,7 +75,7 @@ export interface Thread {
   id: string;
 
   /**
-   * The Unix timestamp (in seconds) for when the Thread was created.
+   * The Unix timestamp (in seconds) for when the thread was created.
    */
   created_at: number;
 
@@ -103,8 +103,8 @@ export interface ThreadDeleted {
 
 export interface ThreadCreateParams {
   /**
-   * A list of [Messages](https://platform.openai.com/docs/api-reference/messages) to
-   * start the Thread with.
+   * A list of [messages](https://platform.openai.com/docs/api-reference/messages) to
+   * start the thread with.
    */
   messages?: Array<ThreadCreateParams.Message>;
 
@@ -120,20 +120,20 @@ export interface ThreadCreateParams {
 export namespace ThreadCreateParams {
   export interface Message {
     /**
-     * The content of the Message.
+     * The content of the message.
      */
     content: string;
 
     /**
-     * The role of the entity that is creating the Message. Currently only `user` is
+     * The role of the entity that is creating the message. Currently only `user` is
      * supported.
      */
     role: 'user';
 
     /**
      * A list of [File](https://platform.openai.com/docs/api-reference/files) IDs that
-     * the Message should use. There can be a maximum of 10 files attached to a
-     * Message. Useful for tools like `retrieval` and `code_interpreter` that can
+     * the message should use. There can be a maximum of 10 files attached to a
+     * message. Useful for tools like `retrieval` and `code_interpreter` that can
      * access and use files.
      */
     file_ids?: Array<string>;
@@ -161,13 +161,13 @@ export interface ThreadUpdateParams {
 export interface ThreadCreateAndRunParams {
   /**
    * The ID of the
-   * [Assistant](https://platform.openai.com/docs/api-reference/assistants) to use to
-   * execute this Run.
+   * [assistant](https://platform.openai.com/docs/api-reference/assistants) to use to
+   * execute this run.
    */
   assistant_id: string;
 
   /**
-   * Override the default system message of the Assistant. This is useful for
+   * Override the default system message of the assistant. This is useful for
    * modifying the behavior on a per-run basis.
    */
   instructions?: string | null;
@@ -182,19 +182,19 @@ export interface ThreadCreateAndRunParams {
 
   /**
    * The ID of the [Model](https://platform.openai.com/docs/api-reference/models) to
-   * be used to execute this Run. If a value is provided here, it will override the
-   * model associated with the Assistant. If not, the model associated with the
-   * Assistant will be used.
+   * be used to execute this run. If a value is provided here, it will override the
+   * model associated with the assistant. If not, the model associated with the
+   * assistant will be used.
    */
   model?: string | null;
 
   /**
-   * If no Thread is provided, an empty Thread will be created.
+   * If no thread is provided, an empty thread will be created.
    */
   thread?: ThreadCreateAndRunParams.Thread;
 
   /**
-   * Override the tools the Assistant can use for this Run. This is useful for
+   * Override the tools the assistant can use for this run. This is useful for
    * modifying the behavior on a per-run basis.
    */
   tools?: Array<
@@ -206,12 +206,12 @@ export interface ThreadCreateAndRunParams {
 
 export namespace ThreadCreateAndRunParams {
   /**
-   * If no Thread is provided, an empty Thread will be created.
+   * If no thread is provided, an empty thread will be created.
    */
   export interface Thread {
     /**
-     * A list of [Messages](https://platform.openai.com/docs/api-reference/messages) to
-     * start the Thread with.
+     * A list of [messages](https://platform.openai.com/docs/api-reference/messages) to
+     * start the thread with.
      */
     messages?: Array<Thread.Message>;
 
@@ -227,20 +227,20 @@ export namespace ThreadCreateAndRunParams {
   export namespace Thread {
     export interface Message {
       /**
-       * The content of the Message.
+       * The content of the message.
        */
       content: string;
 
       /**
-       * The role of the entity that is creating the Message. Currently only `user` is
+       * The role of the entity that is creating the message. Currently only `user` is
        * supported.
        */
       role: 'user';
 
       /**
        * A list of [File](https://platform.openai.com/docs/api-reference/files) IDs that
-       * the Message should use. There can be a maximum of 10 files attached to a
-       * Message. Useful for tools like `retrieval` and `code_interpreter` that can
+       * the message should use. There can be a maximum of 10 files attached to a
+       * message. Useful for tools like `retrieval` and `code_interpreter` that can
        * access and use files.
        */
       file_ids?: Array<string>;

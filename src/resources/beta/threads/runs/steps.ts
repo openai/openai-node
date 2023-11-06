@@ -8,7 +8,7 @@ import { CursorPage, type CursorPageParams } from 'openai/pagination';
 
 export class Steps extends APIResource {
   /**
-   * Retrieves a Run Step.
+   * Retrieves a run step.
    */
   retrieve(
     threadId: string,
@@ -23,7 +23,7 @@ export class Steps extends APIResource {
   }
 
   /**
-   * Returns a list of Run Steps belonging to a Run.
+   * Returns a list of run steps belonging to a run.
    */
   list(
     threadId: string,
@@ -56,7 +56,7 @@ export class Steps extends APIResource {
 export class RunStepsPage extends CursorPage<RunStep> {}
 
 /**
- * Details of the Code Interpreter tool call the Run Step was involved in.
+ * Details of the Code Interpreter tool call the run step was involved in.
  */
 export interface CodeToolCall {
   /**
@@ -65,7 +65,7 @@ export interface CodeToolCall {
   id: string;
 
   /**
-   * The code interpreter tool call definition.
+   * The Code Interpreter tool call definition.
    */
   code_interpreter: CodeToolCall.CodeInterpreter;
 
@@ -78,7 +78,7 @@ export interface CodeToolCall {
 
 export namespace CodeToolCall {
   /**
-   * The code interpreter tool call definition.
+   * The Code Interpreter tool call definition.
    */
   export interface CodeInterpreter {
     /**
@@ -96,7 +96,7 @@ export namespace CodeToolCall {
 
   export namespace CodeInterpreter {
     /**
-     * Text output from the Code Interpreter tool call as part of a Run Step.
+     * Text output from the Code Interpreter tool call as part of a run step.
      */
     export interface Logs {
       /**
@@ -105,7 +105,7 @@ export namespace CodeToolCall {
       logs: string;
 
       /**
-       * Will always be `logs`.
+       * Always `logs`.
        */
       type: 'logs';
     }
@@ -114,7 +114,7 @@ export namespace CodeToolCall {
       image: Image.Image;
 
       /**
-       * Will always be `image`.
+       * Always `image`.
        */
       type: 'image';
     }
@@ -122,7 +122,7 @@ export namespace CodeToolCall {
     export namespace Image {
       export interface Image {
         /**
-         * The [File](https://platform.openai.com/docs/api-reference/files) ID of the
+         * The [file](https://platform.openai.com/docs/api-reference/files) ID of the
          * image.
          */
         file_id: string;
@@ -174,13 +174,13 @@ export namespace FunctionToolCall {
 }
 
 /**
- * Details of the Message creation activity that the Run Step was involved in.
+ * Details of the message creation by the run step.
  */
 export interface MessageCreationStepDetails {
   message_creation: MessageCreationStepDetails.MessageCreation;
 
   /**
-   * Will always be `message_creation``.
+   * Always `message_creation``.
    */
   type: 'message_creation';
 }
@@ -188,7 +188,7 @@ export interface MessageCreationStepDetails {
 export namespace MessageCreationStepDetails {
   export interface MessageCreation {
     /**
-     * The ID of the Message that was created by this Run Step.
+     * The ID of the message that was created by this run step.
      */
     message_id: string;
   }
@@ -213,7 +213,7 @@ export interface RetrievalToolCall {
 }
 
 /**
- * Represents a Step in execution of a Run.
+ * Represents a step in execution of a run.
  */
 export interface RunStep {
   /**
@@ -223,39 +223,39 @@ export interface RunStep {
 
   /**
    * The ID of the
-   * [Assistant](https://platform.openai.com/docs/api-reference/assistants)
-   * associated with the Run Step.
+   * [assistant](https://platform.openai.com/docs/api-reference/assistants)
+   * associated with the run step.
    */
   assistant_id: string;
 
   /**
-   * The Unix timestamp (in seconds) for when the Run Step was cancelled.
+   * The Unix timestamp (in seconds) for when the run step was cancelled.
    */
   cancelled_at: number | null;
 
   /**
-   * The Unix timestamp (in seconds) for when the Run Step was completed.
+   * The Unix timestamp (in seconds) for when the run step completed.
    */
   completed_at: number | null;
 
   /**
-   * The Unix timestamp (in seconds) for when the Run Step was created.
+   * The Unix timestamp (in seconds) for when the run step was created.
    */
   created_at: number;
 
   /**
-   * The Unix timestamp (in seconds) for when the Run Step expired. A step is
-   * considered expired if the parent Run is expired.
+   * The Unix timestamp (in seconds) for when the run step expired. A step is
+   * considered expired if the parent run is expired.
    */
   expired_at: number | null;
 
   /**
-   * The Unix timestamp (in seconds) for when the Run Step failed.
+   * The Unix timestamp (in seconds) for when the run step failed.
    */
   failed_at: number | null;
 
   /**
-   * The last error associated with this Run Step. Will be `null` if there are no
+   * The last error associated with this run step. Will be `null` if there are no
    * errors.
    */
   last_error: RunStep.LastError | null;
@@ -274,8 +274,8 @@ export interface RunStep {
   object: 'assistant.run.step';
 
   /**
-   * The ID of the [Run](https://platform.openai.com/docs/api-reference/runs) that
-   * this Run Step is a part of.
+   * The ID of the [run](https://platform.openai.com/docs/api-reference/runs) that
+   * this run step is a part of.
    */
   run_id: string;
 
@@ -286,25 +286,25 @@ export interface RunStep {
   status: 'in_progress' | 'cancelled' | 'failed' | 'completed' | 'expired';
 
   /**
-   * The details of the activity the Run Step was involved in.
+   * The details of the run step.
    */
   step_details: MessageCreationStepDetails | ToolCallsStepDetails;
 
   /**
-   * The ID of the [Thread](https://platform.openai.com/docs/api-reference/threads)
-   * that was Run.
+   * The ID of the [thread](https://platform.openai.com/docs/api-reference/threads)
+   * that was run.
    */
   thread_id: string;
 
   /**
-   * The type of Run Step, which can be either `message_creation` or `tool_calls`.
+   * The type of run step, which can be either `message_creation` or `tool_calls`.
    */
   type: 'message_creation' | 'tool_calls';
 }
 
 export namespace RunStep {
   /**
-   * The last error associated with this Run Step. Will be `null` if there are no
+   * The last error associated with this run step. Will be `null` if there are no
    * errors.
    */
   export interface LastError {
@@ -321,18 +321,18 @@ export namespace RunStep {
 }
 
 /**
- * Details of the Tool Call activity that the Run Step was involved in.
+ * Details of the tool call.
  */
 export interface ToolCallsStepDetails {
   /**
-   * An array of tool calls the Run Step was involved in. These can be associated
+   * An array of tool calls the run step was involved in. These can be associated
    * with one of three types of tools: `code_interpreter`, `retrieval`, or
    * `function`.
    */
   tool_calls: Array<CodeToolCall | RetrievalToolCall | FunctionToolCall>;
 
   /**
-   * Will always be `tool_calls`.
+   * Always `tool_calls`.
    */
   type: 'tool_calls';
 }

@@ -8,9 +8,9 @@ import { CursorPage, type CursorPageParams } from 'openai/pagination';
 
 export class Files extends APIResource {
   /**
-   * Create an Assistant File by attaching a
+   * Create an assistant file by attaching a
    * [File](https://platform.openai.com/docs/api-reference/files) to an
-   * [Assistant](https://platform.openai.com/docs/api-reference/assistants).
+   * [assistant](https://platform.openai.com/docs/api-reference/assistants).
    */
   create(
     assistantId: string,
@@ -39,7 +39,7 @@ export class Files extends APIResource {
   }
 
   /**
-   * Returns a list of Assistant Files.
+   * Returns a list of assistant files.
    */
   list(
     assistantId: string,
@@ -66,7 +66,7 @@ export class Files extends APIResource {
   }
 
   /**
-   * Delete an Assistant File.
+   * Delete an assistant file.
    */
   del(
     assistantId: string,
@@ -84,7 +84,7 @@ export class AssistantFilesPage extends CursorPage<AssistantFile> {}
 
 /**
  * A list of [Files](https://platform.openai.com/docs/api-reference/files) attached
- * to an `Assistant`.
+ * to an `assistant`.
  */
 export interface AssistantFile {
   /**
@@ -93,12 +93,12 @@ export interface AssistantFile {
   id: string;
 
   /**
-   * The Assistant ID that the File is attached to.
+   * The assistant ID that the file is attached to.
    */
   assistant_id: string;
 
   /**
-   * The Unix timestamp (in seconds) for when the Assistant File was created.
+   * The Unix timestamp (in seconds) for when the assistant file was created.
    */
   created_at: number;
 
@@ -109,7 +109,7 @@ export interface AssistantFile {
 }
 
 /**
- * Deletes the association between the Assistant and the File, but does not delete
+ * Deletes the association between the assistant and the file, but does not delete
  * the [File](https://platform.openai.com/docs/api-reference/files) object itself.
  */
 export interface FileDeleteResponse {
@@ -123,7 +123,7 @@ export interface FileDeleteResponse {
 export interface FileCreateParams {
   /**
    * A [File](https://platform.openai.com/docs/api-reference/files) ID (with
-   * `purpose="assistants"`) that the Assistant should use. Useful for tools like
+   * `purpose="assistants"`) that the assistant should use. Useful for tools like
    * `retrieval` and `code_interpreter` that can access files.
    */
   file_id: string;

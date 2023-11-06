@@ -112,7 +112,7 @@ export interface FileDeleted {
  */
 export interface FileObject {
   /**
-   * The File identifier, which can be referenced in the API endpoints.
+   * The file identifier, which can be referenced in the API endpoints.
    */
   id: string;
 
@@ -122,12 +122,12 @@ export interface FileObject {
   bytes: number;
 
   /**
-   * The Unix timestamp (in seconds) for when the File was created.
+   * The Unix timestamp (in seconds) for when the file was created.
    */
   created_at: number;
 
   /**
-   * The name of the File.
+   * The name of the file.
    */
   filename: string;
 
@@ -137,13 +137,13 @@ export interface FileObject {
   object: 'file';
 
   /**
-   * The intended purpose of the File. Supported values are `fine-tune`,
+   * The intended purpose of the file. Supported values are `fine-tune`,
    * `fine-tune-results`, `assistants`, and `assistants_output`.
    */
   purpose: 'fine-tune' | 'fine-tune-results' | 'assistants' | 'assistants_output';
 
   /**
-   * Deprecated. The current status of the File, which can be either `uploaded`,
+   * Deprecated. The current status of the file, which can be either `uploaded`,
    * `processed`, or `error`.
    */
   status: 'uploaded' | 'processed' | 'error';

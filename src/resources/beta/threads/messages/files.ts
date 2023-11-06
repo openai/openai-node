@@ -8,7 +8,7 @@ import { CursorPage, type CursorPageParams } from 'openai/pagination';
 
 export class Files extends APIResource {
   /**
-   * Retrieves a Message File.
+   * Retrieves a message file.
    */
   retrieve(
     threadId: string,
@@ -23,7 +23,7 @@ export class Files extends APIResource {
   }
 
   /**
-   * Returns a list of Message Files.
+   * Returns a list of message files.
    */
   list(
     threadId: string,
@@ -56,7 +56,7 @@ export class Files extends APIResource {
 export class MessageFilesPage extends CursorPage<MessageFile> {}
 
 /**
- * A list of Files attached to a `Message`.
+ * A list of files attached to a `message`.
  */
 export interface MessageFile {
   /**
@@ -65,12 +65,12 @@ export interface MessageFile {
   id: string;
 
   /**
-   * The Unix timestamp (in seconds) for when the Message File was created.
+   * The Unix timestamp (in seconds) for when the message file was created.
    */
   created_at: number;
 
   /**
-   * The ID of the [Message](https://platform.openai.com/docs/api-reference/messages)
+   * The ID of the [message](https://platform.openai.com/docs/api-reference/messages)
    * that the [File](https://platform.openai.com/docs/api-reference/files) is
    * attached to.
    */

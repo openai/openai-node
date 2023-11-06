@@ -11,7 +11,7 @@ export class Runs extends APIResource {
   steps: StepsAPI.Steps = new StepsAPI.Steps(this.client);
 
   /**
-   * Create a Run.
+   * Create a run.
    */
   create(threadId: string, body: RunCreateParams, options?: Core.RequestOptions): Core.APIPromise<Run> {
     return this.post(`/threads/${threadId}/runs`, {
@@ -22,7 +22,7 @@ export class Runs extends APIResource {
   }
 
   /**
-   * Retrieves a Run.
+   * Retrieves a run.
    */
   retrieve(threadId: string, runId: string, options?: Core.RequestOptions): Core.APIPromise<Run> {
     return this.get(`/threads/${threadId}/runs/${runId}`, {
@@ -32,7 +32,7 @@ export class Runs extends APIResource {
   }
 
   /**
-   * Modifies a Run.
+   * Modifies a run.
    */
   update(
     threadId: string,
@@ -48,7 +48,7 @@ export class Runs extends APIResource {
   }
 
   /**
-   * Returns a list of Runs belonging to a Thread.
+   * Returns a list of runs belonging to a thread.
    */
   list(
     threadId: string,
@@ -72,7 +72,7 @@ export class Runs extends APIResource {
   }
 
   /**
-   * Cancels a Run that is `in_progress`.
+   * Cancels a run that is `in_progress`.
    */
   cancel(threadId: string, runId: string, options?: Core.RequestOptions): Core.APIPromise<Run> {
     return this.post(`/threads/${threadId}/runs/${runId}/cancel`, {
@@ -82,7 +82,7 @@ export class Runs extends APIResource {
   }
 
   /**
-   * When a Run has the `status: "requires_action"` and `required_action.type` is
+   * When a run has the `status: "requires_action"` and `required_action.type` is
    * `submit_tool_outputs`, this endpoint can be used to submit the outputs from the
    * tool calls once they're all completed. All outputs must be submitted in a single
    * request.
@@ -110,7 +110,7 @@ export interface RequiredActionFunctionToolCall {
   /**
    * The ID of the tool call. This ID must be referenced when you submit the tool
    * outputs in using the
-   * [Submit tool outputs to Run](https://platform.openai.com/docs/api-reference/runs/submitToolOutputs)
+   * [Submit tool outputs to run](https://platform.openai.com/docs/api-reference/runs/submitToolOutputs)
    * endpoint.
    */
   id: string;
@@ -145,8 +145,8 @@ export namespace RequiredActionFunctionToolCall {
 }
 
 /**
- * Represents an execution Run on a
- * [Thread](https://platform.openai.com/docs/api-reference/threads).
+ * Represents an execution run on a
+ * [thread](https://platform.openai.com/docs/api-reference/threads).
  */
 export interface Run {
   /**
@@ -156,52 +156,52 @@ export interface Run {
 
   /**
    * The ID of the
-   * [Assistant](https://platform.openai.com/docs/api-reference/assistants) used for
-   * execution of this Run.
+   * [assistant](https://platform.openai.com/docs/api-reference/assistants) used for
+   * execution of this run.
    */
   assistant_id: string;
 
   /**
-   * The Unix timestamp (in seconds) for when the Run was cancelled.
+   * The Unix timestamp (in seconds) for when the run was cancelled.
    */
   cancelled_at: number | null;
 
   /**
-   * The Unix timestamp (in seconds) for when the Run was completed.
+   * The Unix timestamp (in seconds) for when the run was completed.
    */
   completed_at: number | null;
 
   /**
-   * The Unix timestamp (in seconds) for when the Run was created.
+   * The Unix timestamp (in seconds) for when the run was created.
    */
   created_at: number;
 
   /**
-   * The Unix timestamp (in seconds) for when the Run will expire.
+   * The Unix timestamp (in seconds) for when the run will expire.
    */
   expires_at: number;
 
   /**
-   * The Unix timestamp (in seconds) for when the Run failed.
+   * The Unix timestamp (in seconds) for when the run failed.
    */
   failed_at: number | null;
 
   /**
    * The list of [File](https://platform.openai.com/docs/api-reference/files) IDs the
-   * [Assistant](https://platform.openai.com/docs/api-reference/assistants) used for
-   * this Run.
+   * [assistant](https://platform.openai.com/docs/api-reference/assistants) used for
+   * this run.
    */
   file_ids: Array<string>;
 
   /**
    * The instructions that the
-   * [Assistant](https://platform.openai.com/docs/api-reference/assistants) used for
+   * [assistant](https://platform.openai.com/docs/api-reference/assistants) used for
    * this run.
    */
   instructions: string;
 
   /**
-   * The last error associated with this Run. Will be `null` if there are no errors.
+   * The last error associated with this run. Will be `null` if there are no errors.
    */
   last_error: Run.LastError | null;
 
@@ -215,8 +215,8 @@ export interface Run {
 
   /**
    * The model that the
-   * [Assistant](https://platform.openai.com/docs/api-reference/assistants) used for
-   * this Run.
+   * [assistant](https://platform.openai.com/docs/api-reference/assistants) used for
+   * this run.
    */
   model: string;
 
@@ -226,13 +226,13 @@ export interface Run {
   object: 'assistant.run';
 
   /**
-   * Details on the action required to continue the Run. Will be `null` if no action
+   * Details on the action required to continue the run. Will be `null` if no action
    * is required.
    */
   required_action: Run.RequiredAction | null;
 
   /**
-   * The Unix timestamp (in seconds) for when the Run was started.
+   * The Unix timestamp (in seconds) for when the run was started.
    */
   started_at: number | null;
 
@@ -252,22 +252,22 @@ export interface Run {
     | 'expired';
 
   /**
-   * The ID of the [Thread](https://platform.openai.com/docs/api-reference/threads)
-   * that was executed on as a part of this Run.
+   * The ID of the [thread](https://platform.openai.com/docs/api-reference/threads)
+   * that was executed on as a part of this run.
    */
   thread_id: string;
 
   /**
    * The list of tools that the
-   * [Assistant](https://platform.openai.com/docs/api-reference/assistants) used for
-   * this Run.
+   * [assistant](https://platform.openai.com/docs/api-reference/assistants) used for
+   * this run.
    */
   tools: Array<Run.AssistantToolsCode | Run.AssistantToolsRetrieval | Run.AssistantToolsFunction>;
 }
 
 export namespace Run {
   /**
-   * The last error associated with this Run. Will be `null` if there are no errors.
+   * The last error associated with this run. Will be `null` if there are no errors.
    */
   export interface LastError {
     /**
@@ -282,12 +282,12 @@ export namespace Run {
   }
 
   /**
-   * Details on the action required to continue the Run. Will be `null` if no action
+   * Details on the action required to continue the run. Will be `null` if no action
    * is required.
    */
   export interface RequiredAction {
     /**
-     * Details on the tool outputs needed for this Run to continue.
+     * Details on the tool outputs needed for this run to continue.
      */
     submit_tool_outputs: RequiredAction.SubmitToolOutputs;
 
@@ -299,7 +299,7 @@ export namespace Run {
 
   export namespace RequiredAction {
     /**
-     * Details on the tool outputs needed for this Run to continue.
+     * Details on the tool outputs needed for this run to continue.
      */
     export interface SubmitToolOutputs {
       /**
@@ -370,13 +370,13 @@ export namespace Run {
 export interface RunCreateParams {
   /**
    * The ID of the
-   * [Assistant](https://platform.openai.com/docs/api-reference/assistants) to use to
-   * execute this Run.
+   * [assistant](https://platform.openai.com/docs/api-reference/assistants) to use to
+   * execute this run.
    */
   assistant_id: string;
 
   /**
-   * Override the default system message of the Assistant. This is useful for
+   * Override the default system message of the assistant. This is useful for
    * modifying the behavior on a per-run basis.
    */
   instructions?: string | null;
@@ -391,14 +391,14 @@ export interface RunCreateParams {
 
   /**
    * The ID of the [Model](https://platform.openai.com/docs/api-reference/models) to
-   * be used to execute this Run. If a value is provided here, it will override the
-   * model associated with the Assistant. If not, the model associated with the
-   * Assistant will be used.
+   * be used to execute this run. If a value is provided here, it will override the
+   * model associated with the assistant. If not, the model associated with the
+   * assistant will be used.
    */
   model?: string | null;
 
   /**
-   * Override the tools the Assistant can use for this Run. This is useful for
+   * Override the tools the assistant can use for this run. This is useful for
    * modifying the behavior on a per-run basis.
    */
   tools?: Array<
@@ -503,12 +503,12 @@ export interface RunSubmitToolOutputsParams {
 export namespace RunSubmitToolOutputsParams {
   export interface ToolOutput {
     /**
-     * The output of the tool call to be submitted to continue the Run.
+     * The output of the tool call to be submitted to continue the run.
      */
     output?: string;
 
     /**
-     * The ID of the tool call in the `required_action` object within the Run object
+     * The ID of the tool call in the `required_action` object within the run object
      * the output is being submitted for.
      */
     tool_call_id?: string;
