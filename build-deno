@@ -5,17 +5,16 @@ set -exuo pipefail
 rm -rf deno; mkdir deno
 cp -rp src/* deno
 
-PACKAGE_VERSION=$(node -p 'require("./package.json").version')
-
+# x-release-please-start-version
 cat << EOF > deno/README.md
 # OpenAI Node API Library - Deno build
 
-This is a build produced from https://github.com/openai/openai-node - please go there to read the source and docs, file issues, etc.
+This is a build produced from https://github.com/openai/openai-node – please go there to read the source and docs, file issues, etc.
 
 Usage:
 
 \`\`\`ts
-import OpenAI from "https://deno.land/x/openai@$PACKAGE_VERSION/mod.ts";
+import OpenAI from "https://deno.land/x/openai@4.15.4/mod.ts";
 
 const client = new OpenAI();
 \`\`\`
@@ -26,6 +25,7 @@ Note that in many Deno environments, you can also do this:
 import OpenAI from "npm:openai";
 \`\`\`
 EOF
+# x-release-please-end
 
 rm deno/_shims/auto/*-node.ts
 for dir in deno/_shims deno/_shims/auto; do
