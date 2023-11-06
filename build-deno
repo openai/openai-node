@@ -15,7 +15,7 @@ This is a build produced from https://github.com/openai/openai-node – please g
 Usage:
 
 \`\`\`ts
-import OpenAI from "$(echo 'https://deno.land/x/openai@4.15.4/mod.ts' | sed -E s/@\.+\\//@"$PACKAGE_VERSION"\\//)";
+import OpenAI from "$(echo 'https://deno.land/x/openai@4.16.0/mod.ts' | sed -E s/@\.+\\//@"$PACKAGE_VERSION"\\//)";
 
 const client = new OpenAI();
 \`\`\`
