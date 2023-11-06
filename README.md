@@ -18,9 +18,13 @@ yarn add openai
 
 You can import in Deno via:
 
+<!-- x-release-please-start-version -->
+
 ```ts
-import OpenAI from 'https://deno.land/x/openai';
+import OpenAI from 'https://deno.land/x/openai@4.15.4/mod.ts';
 ```
+
+<!-- x-release-please-end -->
 
 ## Usage
 
