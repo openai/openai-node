@@ -20,6 +20,10 @@ export {
   RunnableFunctionWithoutParse,
   ParsingFunction,
 } from 'openai/lib/RunnableFunction';
+import { ChatCompletionToolRunnerParams } from 'openai/lib/ChatCompletionRunner';
+export { ChatCompletionToolRunnerParams } from 'openai/lib/ChatCompletionRunner';
+import { ChatCompletionStreamingToolRunnerParams } from 'openai/lib/ChatCompletionStreamingRunner';
+export { ChatCompletionStreamingToolRunnerParams } from 'openai/lib/ChatCompletionStreamingRunner';
 import { ChatCompletionStream, type ChatCompletionStreamParams } from 'openai/lib/ChatCompletionStream';
 export { ChatCompletionStream, type ChatCompletionStreamParams } from 'openai/lib/ChatCompletionStream';
 
@@ -31,7 +35,7 @@ export class Completions extends APIResource {
    * the model requests function calls.
    *
    * For more details and examples, see
-   * [the docs](https://github.com/openai/openai-node#runFunctions)
+   * [the docs](https://github.com/openai/openai-node#automated-function-calls)
    */
   runFunctions<FunctionsArgs extends BaseFunctionsArgs>(
     body: ChatCompletionFunctionRunnerParams<FunctionsArgs>,
@@ -57,6 +61,43 @@ export class Completions extends APIResource {
     return ChatCompletionRunner.runFunctions(
       this.client.chat.completions,
       body as ChatCompletionFunctionRunnerParams<FunctionsArgs>,
+      options,
+    );
+  }
+
+  /**
+   * A convenience helper for using tool calls with the /chat/completions endpoint
+   * which automatically calls the JavaScript functions you provide and sends their
+   * results back to the /chat/completions endpoint, looping as long as the model
+   * requests function calls.
+   *
+   * For more details and examples, see
+   * [the docs](https://github.com/openai/openai-node#automated-function-calls)
+   */
+  runTools<FunctionsArgs extends BaseFunctionsArgs>(
+    body: ChatCompletionToolRunnerParams<FunctionsArgs>,
+    options?: Core.RequestOptions,
+  ): ChatCompletionRunner;
+  runTools<FunctionsArgs extends BaseFunctionsArgs>(
+    body: ChatCompletionStreamingToolRunnerParams<FunctionsArgs>,
+    options?: Core.RequestOptions,
+  ): ChatCompletionStreamingRunner;
+  runTools<FunctionsArgs extends BaseFunctionsArgs>(
+    body:
+      | ChatCompletionToolRunnerParams<FunctionsArgs>
+      | ChatCompletionStreamingToolRunnerParams<FunctionsArgs>,
+    options?: Core.RequestOptions,
+  ): ChatCompletionRunner | ChatCompletionStreamingRunner {
+    if (body.stream) {
+      return ChatCompletionStreamingRunner.runTools(
+        this.client.chat.completions,
+        body as ChatCompletionStreamingToolRunnerParams<FunctionsArgs>,
+        options,
+      );
+    }
+    return ChatCompletionRunner.runTools(
+      this.client.chat.completions,
+      body as ChatCompletionToolRunnerParams<FunctionsArgs>,
       options,
     );
   }

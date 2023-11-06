@@ -71,10 +71,10 @@ it(`streaming works`, async function () {
 it(`ChatCompletionStream works`, async function () {
   const chunks: OpenAI.Chat.ChatCompletionChunk[] = [];
   const contents: [string, string][] = [];
-  const messages: OpenAI.Chat.ChatCompletionMessage[] = [];
+  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
   const chatCompletions: OpenAI.Chat.ChatCompletion[] = [];
   let finalContent: string | undefined;
-  let finalMessage: OpenAI.Chat.ChatCompletionMessage | undefined;
+  let finalMessage: OpenAI.Chat.ChatCompletionMessageParam | undefined;
   let finalChatCompletion: OpenAI.Chat.ChatCompletion | undefined;
 
   const stream = client.beta.chat.completions
@@ -113,10 +113,10 @@ it(`ChatCompletionStream works`, async function () {
 it(`aborting ChatCompletionStream works`, async function () {
   const chunks: OpenAI.Chat.ChatCompletionChunk[] = [];
   const contents: [string, string][] = [];
-  const messages: OpenAI.Chat.ChatCompletionMessage[] = [];
+  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
   const chatCompletions: OpenAI.Chat.ChatCompletion[] = [];
   let finalContent: string | undefined;
-  let finalMessage: OpenAI.Chat.ChatCompletionMessage | undefined;
+  let finalMessage: OpenAI.Chat.ChatCompletionMessageParam | undefined;
   let finalChatCompletion: OpenAI.Chat.ChatCompletion | undefined;
   let emittedError: any;
   let caughtError: any;

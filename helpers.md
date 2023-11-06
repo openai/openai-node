@@ -7,7 +7,7 @@ openai.chat.completions.stream({ stream?: false, … }, options?): ChatCompletio
 ```
 
 `openai.chat.completions.stream()` returns a `ChatCompletionStreamingRunner`, which emits events, has an async
-iterator, and exposes a helper methods to accumulate chunks into a convenient shape and make it easy to reason
+iterator, and exposes helper methods to accumulate chunks into a convenient shape and make it easy to reason
 about the conversation.
 
 Alternatively, you can use `openai.chat.completions.create({ stream: true, … })` which returns an async
@@ -23,10 +23,14 @@ See an example of streaming helpers in action in [`examples/stream.ts`](examples
 ```ts
 openai.chat.completions.runFunctions({ stream: false, … }, options?): ChatCompletionRunner
 openai.chat.completions.runFunctions({ stream: true, … }, options?): ChatCompletionStreamingRunner
+
+openai.chat.completions.runTools({ stream: false, … }, options?): ChatCompletionRunner
+openai.chat.completions.runTools({ stream: true, … }, options?): ChatCompletionStreamingRunner
 ```
 
-`openai.chat.completions.runFunctions()` returns either a Runner for automating function calls with chat
-completions. The runner automatically calls the JavaScript functions you provide and sends their results back
+`openai.chat.completions.runFunctions()` and `openai.chat.completions.runTools()` return a Runner
+for automating function calls with chat completions.
+The runner automatically calls the JavaScript functions you provide and sends their results back
 to the API, looping as long as the model requests function calls.
 
 If you pass a `parse` function, it will automatically parse the `arguments` for you and returns any parsing
@@ -36,7 +40,7 @@ as a string.
 ```ts
 client.chat.completions.runFunctions({
   model: 'gpt-3.5-turbo',
-  messages: [{ role: 'user', content: 'How's the weather this week?' }],
+  messages: [{ role: 'user', content: 'How is the weather this week?' }],
   functions: [{
     function: getWeather as (args: { location: string, time: Date}) => any,
     parse: parseFunction as (args: strings) => { location: string, time: Date }.
@@ -51,13 +55,34 @@ client.chat.completions.runFunctions({
 });
 ```
 
+```ts
+client.chat.completions.runTools({
+  model: 'gpt-3.5-turbo',
+  messages: [{ role: 'user', content: 'How is the weather this week?' }],
+  tools: [{
+    type: 'function',
+    function: {
+      function: getWeather as (args: { location: string, time: Date}) => any,
+      parse: parseFunction as (args: strings) => { location: string, time: Date },
+      parameters: {
+        type: 'object',
+        properties: {
+          location: { type: 'string' },
+          time: { type: 'string', format: 'date-time' },
+        },
+      },
+    }
+  }],
+});
+```
+
 
 If you pass `function_call: {name: …}` instead of `auto`, it returns immediately after calling that
 function (and only loops to auto-recover parsing errors).
 
-By default, we run the loop up to five chat completions from the API. You can change this behavior by
+By default, we run the loop up to 10 chat completions from the API. You can change this behavior by
 adjusting `maxChatCompletions` in the request options object. Note that `max_tokens` is the limit per
-chat completion request, not for the entire run functions call run.
+chat completion request, not for the entire call run.
 
 See an example of automated function calls in action in
 [`examples/function-call-helpers.ts`](examples/function-call-helpers.ts).
@@ -80,7 +105,7 @@ fields and is built up from the chunks.
 
 The event fired when a chat completion is returned or done being streamed by the API.
 
-#### `.on('message', (message: ChatCompletionMessage | ChatCompletionMessageParam) => …)`
+#### `.on('message', (message: ChatCompletionMessageParam) => …)`
 
 The event fired when a new message is either sent or received from the API. Does not fire for the messages
 sent as the parameter to either `.runFunctions()` or `.stream()`
@@ -113,7 +138,7 @@ The event fired for the final chat completion. If the function call runner excee
 The event fired for the `content` of the last `role: "assistant"` message. Not fired if there is no `assistant`
 message.
 
-#### `.on('finalMessage', (message: ChatCompletionMessage | ChatCompletionMessageParam) => …)`
+#### `.on('finalMessage', (message: ChatCompletionMessage) => …)`
 
 The event fired for the last message.
 

@@ -61,6 +61,11 @@ export type RunnableFunction<Args extends object | string> =
   : Args extends object ? RunnableFunctionWithParse<Args>
   : never;
 
+export type RunnableToolFunction<Args extends object | string> = {
+  type: 'function';
+  function: RunnableFunction<Args>;
+};
+
 export function isRunnableFunctionWithParse<Args extends object>(
   fn: any,
 ): fn is RunnableFunctionWithParse<Args> {
@@ -73,6 +78,13 @@ export type RunnableFunctions<FunctionsArgs extends BaseFunctionsArgs> =
   [any[]] extends [FunctionsArgs] ? readonly RunnableFunction<any>[]
   : {
       [Index in keyof FunctionsArgs]: Index extends number ? RunnableFunction<FunctionsArgs[Index]>
+      : FunctionsArgs[Index];
+    };
+
+export type RunnableTools<FunctionsArgs extends BaseFunctionsArgs> =
+  [any[]] extends [FunctionsArgs] ? readonly RunnableToolFunction<any>[]
+  : {
+      [Index in keyof FunctionsArgs]: Index extends number ? RunnableToolFunction<FunctionsArgs[Index]>
       : FunctionsArgs[Index];
     };
 

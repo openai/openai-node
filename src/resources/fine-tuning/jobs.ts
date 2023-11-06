@@ -132,7 +132,7 @@ export interface FineTuningJob {
   /**
    * The object type, which is always "fine_tuning.job".
    */
-  object: string;
+  object: 'fine_tuning.job';
 
   /**
    * The organization that owns the fine-tuning job.
@@ -150,7 +150,7 @@ export interface FineTuningJob {
    * The current status of the fine-tuning job, which can be either
    * `validating_files`, `queued`, `running`, `succeeded`, `failed`, or `cancelled`.
    */
-  status: string;
+  status: 'validating_files' | 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
 
   /**
    * The total number of billable tokens processed by this fine-tuning job. The value
@@ -223,7 +223,7 @@ export interface FineTuningJobEvent {
 
   message: string;
 
-  object: string;
+  object: 'fine_tuning.job.event';
 }
 
 export interface JobCreateParams {
@@ -283,6 +283,18 @@ export namespace JobCreateParams {
    * The hyperparameters used for the fine-tuning job.
    */
   export interface Hyperparameters {
+    /**
+     * Number of examples in each batch. A larger batch size means that model
+     * parameters are updated less frequently, but with lower variance.
+     */
+    batch_size?: 'auto' | number;
+
+    /**
+     * Scaling factor for the learning rate. A smaller learning rate may be useful to
+     * avoid overfitting.
+     */
+    learning_rate_multiplier?: 'auto' | number;
+
     /**
      * The number of epochs to train the model for. An epoch refers to one full cycle
      * through the training dataset.
