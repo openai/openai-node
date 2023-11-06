@@ -1,5 +1,24 @@
 # Changelog
 
+## 4.16.0 (2023-11-06)
+
+Full Changelog: [v4.15.4...v4.16.0](https://github.com/openai/openai-node/compare/v4.15.4...v4.16.0)
+
+### Features
+
+* **api:** releases from DevDay; assistants, multimodality, tools, dall-e-3, tts, and more ([#433](https://github.com/openai/openai-node/issues/433)) ([fb92f5e](https://github.com/openai/openai-node/commit/fb92f5e6e3b6e7969b3d91f4ccdaef87e5fea0a4))
+
+
+### Bug Fixes
+
+* improve deno readme ([#429](https://github.com/openai/openai-node/issues/429)) ([871ceac](https://github.com/openai/openai-node/commit/871ceac2b37f53f7fc7c0163454115c709cd7ced))
+
+
+### Documentation
+
+* deno version ([#432](https://github.com/openai/openai-node/issues/432)) ([74bf336](https://github.com/openai/openai-node/commit/74bf3364379fd23252fde01401c44b2fa796cba4))
+* update deno link in more places ([#431](https://github.com/openai/openai-node/issues/431)) ([5da63d4](https://github.com/openai/openai-node/commit/5da63d4a9143c0ab493b742f7fde22b01a372844))
+
 ## 4.15.4 (2023-11-05)
 
 Full Changelog: [v4.15.3...v4.15.4](https://github.com/openai/openai-node/compare/v4.15.3...v4.15.4)
