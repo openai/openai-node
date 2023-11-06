@@ -144,7 +144,7 @@ export interface Assistant {
    * A list of tool enabled on the assistant. There can be a maximum of 128 tools per
    * assistant. Tools can be of types `code_interpreter`, `retrieval`, or `function`.
    */
-  tools: Array<Assistant.CodeInterpreter | Assistant.Retreival | Assistant.Function>;
+  tools: Array<Assistant.CodeInterpreter | Assistant.Retrieval | Assistant.Function>;
 }
 
 export namespace Assistant {
@@ -155,11 +155,11 @@ export namespace Assistant {
     type: 'code_interpreter';
   }
 
-  export interface Retreival {
+  export interface Retrieval {
     /**
-     * The type of tool being defined: `retreival`
+     * The type of tool being defined: `retrieval`
      */
-    type: 'retreival';
+    type: 'retrieval';
   }
 
   export interface Function {
@@ -276,9 +276,9 @@ export namespace AssistantCreateParams {
 
   export interface AssistantToolsRetrieval {
     /**
-     * The type of tool being defined: `retreival`
+     * The type of tool being defined: `retrieval`
      */
-    type: 'retreival';
+    type: 'retrieval';
   }
 
   export interface AssistantToolsFunction {
@@ -389,9 +389,9 @@ export namespace AssistantUpdateParams {
 
   export interface AssistantToolsRetrieval {
     /**
-     * The type of tool being defined: `retreival`
+     * The type of tool being defined: `retrieval`
      */
-    type: 'retreival';
+    type: 'retrieval';
   }
 
   export interface AssistantToolsFunction {

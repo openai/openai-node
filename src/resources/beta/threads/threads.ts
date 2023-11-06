@@ -264,9 +264,9 @@ export namespace ThreadCreateAndRunParams {
 
   export interface AssistantToolsRetrieval {
     /**
-     * The type of tool being defined: `retreival`
+     * The type of tool being defined: `retrieval`
      */
-    type: 'retreival';
+    type: 'retrieval';
   }
 
   export interface AssistantToolsFunction {

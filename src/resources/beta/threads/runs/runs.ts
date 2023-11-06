@@ -318,9 +318,9 @@ export namespace Run {
 
   export interface AssistantToolsRetrieval {
     /**
-     * The type of tool being defined: `retreival`
+     * The type of tool being defined: `retrieval`
      */
-    type: 'retreival';
+    type: 'retrieval';
   }
 
   export interface AssistantToolsFunction {
@@ -418,9 +418,9 @@ export namespace RunCreateParams {
 
   export interface AssistantToolsRetrieval {
     /**
-     * The type of tool being defined: `retreival`
+     * The type of tool being defined: `retrieval`
      */
-    type: 'retreival';
+    type: 'retrieval';
   }
 
   export interface AssistantToolsFunction {
