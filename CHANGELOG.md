@@ -1,5 +1,18 @@
 # Changelog
 
+## 4.16.1 (2023-11-06)
+
+Full Changelog: [v4.16.0...v4.16.1](https://github.com/openai/openai-node/compare/v4.16.0...v4.16.1)
+
+### Bug Fixes
+
+* **api:** retreival -&gt; retrieval ([#437](https://github.com/openai/openai-node/issues/437)) ([b4bd3ee](https://github.com/openai/openai-node/commit/b4bd3eefdd3903abcc57c431382cc2124d39307b))
+
+
+### Documentation
+
+* **api:** improve docstrings ([#435](https://github.com/openai/openai-node/issues/435)) ([ee8b24c](https://github.com/openai/openai-node/commit/ee8b24c70a5ccb944e02ff2201668d6bc2b597b3))
+
 ## 4.16.0 (2023-11-06)
 
 Full Changelog: [v4.15.4...v4.16.0](https://github.com/openai/openai-node/compare/v4.15.4...v4.16.0)
