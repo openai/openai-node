@@ -32,7 +32,7 @@ export interface Edit {
   /**
    * The object type, which is always `edit`.
    */
-  object: string;
+  object: 'edit';
 
   /**
    * Usage statistics for the completion request.

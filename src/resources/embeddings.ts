@@ -30,7 +30,7 @@ export interface CreateEmbeddingResponse {
   /**
    * The object type, which is always "embedding".
    */
-  object: string;
+  object: 'embedding';
 
   /**
    * The usage information for the request.
@@ -74,7 +74,7 @@ export interface Embedding {
   /**
    * The object type, which is always "embedding".
    */
-  object: string;
+  object: 'embedding';
 }
 
 export interface EmbeddingCreateParams {

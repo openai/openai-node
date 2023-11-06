@@ -62,8 +62,8 @@ async function main() {
     messages: [{ role: 'user', content: 'Say this is a test' }],
     stream: true,
   });
-  for await (const part of stream) {
-    process.stdout.write(part.choices[0]?.delta?.content || '');
+  for await (const chunk of stream) {
+    process.stdout.write(chunk.choices[0]?.delta?.content || '');
   }
 }
 
@@ -121,8 +121,8 @@ async function main() {
   });
 
   // or, equivalently:
-  for await (const part of stream) {
-    process.stdout.write(part.choices[0]?.delta?.content || '');
+  for await (const chunk of stream) {
+    process.stdout.write(chunk.choices[0]?.delta?.content || '');
   }
 
   const chatCompletion = await stream.finalChatCompletion();
@@ -143,14 +143,18 @@ If you need to cancel a stream, you can `break` from a `for await` loop or call 
 
 ### Automated function calls
 
-We provide a `openai.beta.chat.completions.runFunctions({…})` convenience helper for using function calls
-with the `/chat/completions` endpoint which automatically calls the JavaScript functions you provide
+We provide `openai.beta.chat.completions.runFunctions({…})` and `openai.beta.chat.completions.runTools({…})`
+convenience helpers for using function calls with the `/chat/completions` endpoint
+which automatically call the JavaScript functions you provide
 and sends their results back to the `/chat/completions` endpoint,
 looping as long as the model requests function calls.
 
-If you pass a `parse` function, it will automatically parse the `arguments` for you and returns any parsing errors to the model to attempt auto-recovery. Otherwise, the args will be passed to the function you provide as a string.
+If you pass a `parse` function, it will automatically parse the `arguments` for you
+and returns any parsing errors to the model to attempt auto-recovery.
+Otherwise, the args will be passed to the function you provide as a string.
 
-If you pass `function_call: {name: …}` instead of `auto`, it returns immediately after calling that function (and only loops to auto-recover parsing errors).
+If you pass `function_call: {name: …}` or `tool_call: {function: {name: …}}` instead of `auto`,
+it returns immediately after calling that function (and only loops to auto-recover parsing errors).
 
 ```ts
 import OpenAI from 'openai';

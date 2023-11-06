@@ -5,7 +5,7 @@ import {
   type ChatCompletion,
   type ChatCompletionChunk,
   type ChatCompletionCreateParams,
-  ChatCompletionCreateParamsBase,
+  type ChatCompletionCreateParamsBase,
 } from 'openai/resources/chat/completions';
 import {
   AbstractChatCompletionRunner,
@@ -64,7 +64,7 @@ export class ChatCompletionStream
     if (this.ended) return;
     const completion = this.#accumulateChatCompletion(chunk);
     this._emit('chunk', chunk, completion);
-    const delta = chunk.choices[0]?.delta.content;
+    const delta = chunk.choices[0]?.delta?.content;
     const snapshot = completion.choices[0]?.message;
     if (delta != null && snapshot?.role === 'assistant' && snapshot?.content) {
       this._emit('content', delta, snapshot.content);
@@ -137,29 +137,51 @@ export class ChatCompletionStream
 
   #accumulateChatCompletion(chunk: ChatCompletionChunk): ChatCompletionSnapshot {
     let snapshot = this.#currentChatCompletionSnapshot;
+    const { choices, ...rest } = chunk;
     if (!snapshot) {
-      const { choices, ...rest } = chunk;
-      this.#currentChatCompletionSnapshot = snapshot = {
+      snapshot = this.#currentChatCompletionSnapshot = {
         ...rest,
         choices: [],
       };
+    } else {
+      Object.assign(snapshot, rest);
     }
-    for (const { delta, finish_reason, index } of chunk.choices) {
+
+    for (const { delta, finish_reason, index, ...other } of chunk.choices) {
       let choice = snapshot.choices[index];
-      if (!choice) snapshot.choices[index] = choice = { finish_reason, index, message: delta };
-      else {
-        if (finish_reason) choice.finish_reason = finish_reason;
-        const { content, function_call, role } = delta;
-        if (content) choice.message.content = (choice.message.content || '') + content;
-        if (role) choice.message.role = role;
-        if (function_call) {
-          if (!choice.message.function_call) choice.message.function_call = function_call;
-          else {
-            if (function_call.arguments)
-              choice.message.function_call.arguments =
-                (choice.message.function_call.arguments || '') + function_call.arguments;
-            if (function_call.name) choice.message.function_call.name = function_call.name;
+      if (!choice) {
+        snapshot.choices[index] = { finish_reason, index, message: delta, ...other };
+        continue;
+      }
+
+      if (finish_reason) choice.finish_reason = finish_reason;
+      Object.assign(choice, other);
+
+      if (!delta) continue; // Shouldn't happen; just in case.
+      const { content, function_call, role, tool_calls } = delta;
+
+      if (content) choice.message.content = (choice.message.content || '') + content;
+      if (role) choice.message.role = role;
+      if (function_call) {
+        if (!choice.message.function_call) {
+          choice.message.function_call = function_call;
+        } else {
+          if (function_call.name) choice.message.function_call.name = function_call.name;
+          if (function_call.arguments) {
+            choice.message.function_call.arguments ??= '';
+            choice.message.function_call.arguments += function_call.arguments;
           }
+        }
+      }
+      if (tool_calls) {
+        if (!choice.message.tool_calls) choice.message.tool_calls = [];
+        for (const { index, id, type, function: fn } of tool_calls) {
+          const tool_call = (choice.message.tool_calls[index] ??= {});
+          if (id) tool_call.id = id;
+          if (type) tool_call.type = type;
+          if (fn) tool_call.function ??= { arguments: '' };
+          if (fn?.name) tool_call.function!.name = fn.name;
+          if (fn?.arguments) tool_call.function!.arguments += fn.arguments;
         }
       }
     }
@@ -216,7 +238,8 @@ function finalizeChatCompletion(snapshot: ChatCompletionSnapshot): ChatCompletio
     id,
     choices: choices.map(({ message, finish_reason, index }): ChatCompletion.Choice => {
       if (!finish_reason) throw new OpenAIError(`missing finish_reason for choice ${index}`);
-      const { content = null, function_call, role } = message;
+      const { content = null, function_call, tool_calls } = message;
+      const role = message.role as 'assistant'; // this is what we expect; in theory it could be different which would make our types a slight lie but would be fine.
       if (!role) throw new OpenAIError(`missing role for choice ${index}`);
       if (function_call) {
         const { arguments: args, name } = function_call;
@@ -224,12 +247,44 @@ function finalizeChatCompletion(snapshot: ChatCompletionSnapshot): ChatCompletio
         if (!name) throw new OpenAIError(`missing function_call.name for choice ${index}`);
         return { message: { content, function_call: { arguments: args, name }, role }, finish_reason, index };
       }
+      if (tool_calls) {
+        return {
+          index,
+          finish_reason,
+          message: {
+            role,
+            content,
+            tool_calls: tool_calls.map((tool_call, i) => {
+              const { function: fn, type, id } = tool_call;
+              const { arguments: args, name } = fn || {};
+              if (id == null)
+                throw new OpenAIError(`missing choices[${index}].tool_calls[${i}].id\n${str(snapshot)}`);
+              if (type == null)
+                throw new OpenAIError(`missing choices[${index}].tool_calls[${i}].type\n${str(snapshot)}`);
+              if (name == null)
+                throw new OpenAIError(
+                  `missing choices[${index}].tool_calls[${i}].function.name\n${str(snapshot)}`,
+                );
+              if (args == null)
+                throw new OpenAIError(
+                  `missing choices[${index}].tool_calls[${i}].function.arguments\n${str(snapshot)}`,
+                );
+
+              return { id, type, function: { name, arguments: args } };
+            }),
+          },
+        };
+      }
       return { message: { content: content, role }, finish_reason, index };
     }),
     created,
     model,
     object: 'chat.completion',
   };
+}
+
+function str(x: unknown) {
+  return JSON.stringify(x);
 }
 
 /**
@@ -273,7 +328,7 @@ export namespace ChatCompletionSnapshot {
      * content was omitted due to a flag from our content filters, or `function_call`
      * if the model called a function.
      */
-    finish_reason: 'stop' | 'length' | 'function_call' | 'content_filter' | null;
+    finish_reason: ChatCompletion.Choice['finish_reason'] | null;
 
     /**
      * The index of the choice in the list of choices.
@@ -297,13 +352,46 @@ export namespace ChatCompletionSnapshot {
        */
       function_call?: Message.FunctionCall;
 
+      tool_calls?: Array<Message.ToolCall>;
+
       /**
        * The role of the author of this message.
        */
-      role?: 'system' | 'user' | 'assistant' | 'function';
+      role?: 'system' | 'user' | 'assistant' | 'function' | 'tool';
     }
 
     export namespace Message {
+      export interface ToolCall {
+        /**
+         * The ID of the tool call.
+         */
+        id?: string;
+
+        function?: ToolCall.Function;
+
+        /**
+         * The type of the tool.
+         */
+        type?: 'function';
+      }
+
+      export namespace ToolCall {
+        export interface Function {
+          /**
+           * The arguments to call the function with, as generated by the model in JSON
+           * format. Note that the model does not always generate valid JSON, and may
+           * hallucinate parameters not defined by your function schema. Validate the
+           * arguments in your code before calling your function.
+           */
+          arguments?: string;
+
+          /**
+           * The name of the function to call.
+           */
+          name?: string;
+        }
+      }
+
       /**
        * The name and arguments of a function that should be called, as generated by the
        * model.

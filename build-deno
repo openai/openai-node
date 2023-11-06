@@ -37,7 +37,7 @@ done
 for file in LICENSE CHANGELOG.md; do
   if [ -e "${file}" ]; then cp "${file}" deno; fi
 done
-npm exec ts-node -- scripts/denoify.ts
+npm exec ts-node -T -- scripts/denoify.ts
 deno fmt deno
 deno check deno/mod.ts
 if [ -e deno_tests ]; then

@@ -14,7 +14,15 @@ export {
 } from './completions';
 export { CreateEmbeddingResponse, Embedding, EmbeddingCreateParams, Embeddings } from './embeddings';
 export { Edit, EditCreateParams, Edits } from './edits';
-export { FileContent, FileDeleted, FileObject, FileCreateParams, FileObjectsPage, Files } from './files';
+export {
+  FileContent,
+  FileDeleted,
+  FileObject,
+  FileCreateParams,
+  FileListParams,
+  FileObjectsPage,
+  Files,
+} from './files';
 export {
   FineTune,
   FineTuneEvent,

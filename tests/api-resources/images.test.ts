@@ -25,6 +25,7 @@ describe('resource images', () => {
   test('createVariation: required and optional params', async () => {
     const response = await openai.images.createVariation({
       image: await toFile(Buffer.from('# my file contents'), 'README.md'),
+      model: 'dall-e-2',
       n: 1,
       response_format: 'url',
       size: '1024x1024',
@@ -51,6 +52,7 @@ describe('resource images', () => {
       image: await toFile(Buffer.from('# my file contents'), 'README.md'),
       prompt: 'A cute baby sea otter wearing a beret',
       mask: await toFile(Buffer.from('# my file contents'), 'README.md'),
+      model: 'dall-e-2',
       n: 1,
       response_format: 'url',
       size: '1024x1024',
@@ -72,9 +74,12 @@ describe('resource images', () => {
   test('generate: required and optional params', async () => {
     const response = await openai.images.generate({
       prompt: 'A cute baby sea otter',
+      model: 'dall-e-3',
       n: 1,
+      quality: 'standard',
       response_format: 'url',
       size: '1024x1024',
+      style: 'vivid',
       user: 'user-1234',
     });
   });
