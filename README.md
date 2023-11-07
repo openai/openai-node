@@ -21,7 +21,7 @@ You can import in Deno via:
 <!-- x-release-please-start-version -->
 
 ```ts
-import OpenAI from 'https://deno.land/x/openai@4.16.0/mod.ts';
+import OpenAI from 'https://deno.land/x/openai@v4.16.1/mod.ts';
 ```
 
 <!-- x-release-please-end -->
