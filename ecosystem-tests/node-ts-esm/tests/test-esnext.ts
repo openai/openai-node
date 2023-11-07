@@ -1,5 +1,3 @@
-// shouldn't need extension, but Jest's ESM module resolution is broken
-// however, using .mjs doesn't set the right typings with "moduleResolution": "node"...argh
 import 'openai/shims/node.mjs';
 import OpenAI from 'openai';
 import { distance } from 'fastest-levenshtein';
