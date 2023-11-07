@@ -285,7 +285,7 @@ export namespace ChatCompletionChunk {
 export type ChatCompletionContentPart = ChatCompletionContentPartText | ChatCompletionContentPartImage;
 
 export interface ChatCompletionContentPartImage {
-  image_url: ChatCompletionContentPartImage.ImageURL;
+  image_url: ChatCompletionContentPartImage.ImageURL | string
 
   /**
    * The type of the content part.
