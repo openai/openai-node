@@ -59,6 +59,8 @@
   ],
   "release-type": "node",
   "extra-files": [
-    "src/version.ts"
+    "src/version.ts",
+    "README.md",
+    "bin/build-deno"
   ]
 }
