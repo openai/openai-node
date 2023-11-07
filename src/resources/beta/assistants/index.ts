@@ -2,7 +2,7 @@
 
 export {
   Assistant,
-  AssitantDeleted,
+  AssistantDeleted,
   AssistantCreateParams,
   AssistantUpdateParams,
   AssistantListParams,
