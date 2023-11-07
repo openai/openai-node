@@ -413,7 +413,7 @@ import OpenAI from "openai";
 ```
 
 To do the inverse, add `import "openai/shims/node"` (which does import polyfills).
-This can also be useful if you are getting the wrong TypeScript types for `Response` - more details [here](https://github.com/openai/openai-node/src/_shims#readme).
+This can also be useful if you are getting the wrong TypeScript types for `Response` - more details [here](https://github.com/openai/openai-node/tree/master/src/_shims#readme).
 
 You may also provide a custom `fetch` function when instantiating the client,
 which can be used to inspect or alter the `Request` or `Response` before/after each request:
