@@ -15,7 +15,7 @@ export namespace Beta {
   export import Chat = ChatAPI.Chat;
   export import Assistants = AssistantsAPI.Assistants;
   export import Assistant = AssistantsAPI.Assistant;
-  export import AsssitantDeleted = AssistantsAPI.AsssitantDeleted;
+  export import AssistantDeleted = AssistantsAPI.AssistantDeleted;
   export import AssistantsPage = AssistantsAPI.AssistantsPage;
   export import AssistantCreateParams = AssistantsAPI.AssistantCreateParams;
   export import AssistantUpdateParams = AssistantsAPI.AssistantUpdateParams;

@@ -71,7 +71,7 @@ export class Assistants extends APIResource {
   /**
    * Delete an assistant.
    */
-  del(assistantId: string, options?: Core.RequestOptions): Core.APIPromise<AsssitantDeleted> {
+  del(assistantId: string, options?: Core.RequestOptions): Core.APIPromise<AssistantDeleted> {
     return this.delete(`/assistants/${assistantId}`, {
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
@@ -206,7 +206,7 @@ export namespace Assistant {
   }
 }
 
-export interface AsssitantDeleted {
+export interface AssistantDeleted {
   id: string;
 
   deleted: boolean;
@@ -456,7 +456,7 @@ export interface AssistantListParams extends CursorPageParams {
 
 export namespace Assistants {
   export import Assistant = AssistantsAPI.Assistant;
-  export import AsssitantDeleted = AssistantsAPI.AsssitantDeleted;
+  export import AssistantDeleted = AssistantsAPI.AssistantDeleted;
   export import AssistantsPage = AssistantsAPI.AssistantsPage;
   export import AssistantCreateParams = AssistantsAPI.AssistantCreateParams;
   export import AssistantUpdateParams = AssistantsAPI.AssistantUpdateParams;

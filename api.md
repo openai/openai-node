@@ -193,7 +193,7 @@ Methods:
 Types:
 
 - <code><a href="./src/resources/beta/assistants/assistants.ts">Assistant</a></code>
-- <code><a href="./src/resources/beta/assistants/assistants.ts">AsssitantDeleted</a></code>
+- <code><a href="./src/resources/beta/assistants/assistants.ts">AssistantDeleted</a></code>
 
 Methods:
 
@@ -201,7 +201,7 @@ Methods:
 - <code title="get /assistants/{assistant_id}">client.beta.assistants.<a href="./src/resources/beta/assistants/assistants.ts">retrieve</a>(assistantId) -> Assistant</code>
 - <code title="post /assistants/{assistant_id}">client.beta.assistants.<a href="./src/resources/beta/assistants/assistants.ts">update</a>(assistantId, { ...params }) -> Assistant</code>
 - <code title="get /assistants">client.beta.assistants.<a href="./src/resources/beta/assistants/assistants.ts">list</a>({ ...params }) -> AssistantsPage</code>
-- <code title="delete /assistants/{assistant_id}">client.beta.assistants.<a href="./src/resources/beta/assistants/assistants.ts">del</a>(assistantId) -> AsssitantDeleted</code>
+- <code title="delete /assistants/{assistant_id}">client.beta.assistants.<a href="./src/resources/beta/assistants/assistants.ts">del</a>(assistantId) -> AssistantDeleted</code>
 
 ### Files
 
