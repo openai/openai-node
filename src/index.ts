@@ -296,6 +296,9 @@ export namespace OpenAI {
   export import FineTuneListEventsParamsStreaming = API.FineTuneListEventsParamsStreaming;
 
   export import Beta = API.Beta;
+
+  export import FunctionObject = API.FunctionObject;
+  export import FunctionParameters = API.FunctionParameters;
 }
 
 export default OpenAI;
