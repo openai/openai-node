@@ -177,6 +177,14 @@ export interface ChatCompletionChunk {
    * The object type, which is always `chat.completion.chunk`.
    */
   object: 'chat.completion.chunk';
+
+  /**
+   * This fingerprint represents the backend configuration that the model runs with.
+   *
+   * Can be used in conjunction with the `seed` request parameter to understand when
+   * backend changes have been made that might impact determinism.
+   */
+  system_fingerprint?: string;
 }
 
 export namespace ChatCompletionChunk {
@@ -296,14 +304,14 @@ export interface ChatCompletionContentPartImage {
 export namespace ChatCompletionContentPartImage {
   export interface ImageURL {
     /**
+     * Either a URL of the image or the base64 encoded image data.
+     */
+    url: string;
+
+    /**
      * Specifies the detail level of the image.
      */
     detail?: 'auto' | 'low' | 'high';
-
-    /**
-     * Either a URL of the image or the base64 encoded image data.
-     */
-    url?: string;
   }
 }
 
@@ -579,6 +587,8 @@ export interface ChatCompletionCreateParamsBase {
    */
   model:
     | (string & {})
+    | 'gpt-4-1106-preview'
+    | 'gpt-4-vision-preview'
     | 'gpt-4'
     | 'gpt-4-0314'
     | 'gpt-4-0613'

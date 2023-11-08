@@ -2,6 +2,7 @@
 
 import * as Core from 'openai/core';
 import { APIResource } from 'openai/resource';
+import { isRequestOptions } from 'openai/core';
 import * as ThreadsAPI from 'openai/resources/beta/threads/threads';
 import * as MessagesAPI from 'openai/resources/beta/threads/messages/messages';
 import * as RunsAPI from 'openai/resources/beta/threads/runs/runs';
@@ -13,7 +14,15 @@ export class Threads extends APIResource {
   /**
    * Create a thread.
    */
-  create(body: ThreadCreateParams, options?: Core.RequestOptions): Core.APIPromise<Thread> {
+  create(body?: ThreadCreateParams, options?: Core.RequestOptions): Core.APIPromise<Thread>;
+  create(options?: Core.RequestOptions): Core.APIPromise<Thread>;
+  create(
+    body: ThreadCreateParams | Core.RequestOptions = {},
+    options?: Core.RequestOptions,
+  ): Core.APIPromise<Thread> {
+    if (isRequestOptions(body)) {
+      return this.create({}, body);
+    }
     return this.post('/threads', {
       body,
       ...options,
