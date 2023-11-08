@@ -4,6 +4,7 @@ import * as Core from 'openai/core';
 import { APIResource } from 'openai/resource';
 import { isRequestOptions } from 'openai/core';
 import * as AssistantsAPI from 'openai/resources/beta/assistants/assistants';
+import * as Shared from 'openai/resources/shared';
 import * as FilesAPI from 'openai/resources/beta/assistants/files';
 import { CursorPage, type CursorPageParams } from 'openai/pagination';
 
@@ -163,46 +164,12 @@ export namespace Assistant {
   }
 
   export interface Function {
-    /**
-     * The function definition.
-     */
-    function: Function.Function;
+    function: Shared.FunctionObject;
 
     /**
      * The type of tool being defined: `function`
      */
     type: 'function';
-  }
-
-  export namespace Function {
-    /**
-     * The function definition.
-     */
-    export interface Function {
-      /**
-       * A description of what the function does, used by the model to choose when and
-       * how to call the function.
-       */
-      description: string;
-
-      /**
-       * The name of the function to be called. Must be a-z, A-Z, 0-9, or contain
-       * underscores and dashes, with a maximum length of 64.
-       */
-      name: string;
-
-      /**
-       * The parameters the functions accepts, described as a JSON Schema object. See the
-       * [guide](https://platform.openai.com/docs/guides/gpt/function-calling) for
-       * examples, and the
-       * [JSON Schema reference](https://json-schema.org/understanding-json-schema/) for
-       * documentation about the format.
-       *
-       * To describe a function that accepts no parameters, provide the value
-       * `{"type": "object", "properties": {}}`.
-       */
-      parameters: Record<string, unknown>;
-    }
   }
 }
 
@@ -282,46 +249,12 @@ export namespace AssistantCreateParams {
   }
 
   export interface AssistantToolsFunction {
-    /**
-     * The function definition.
-     */
-    function: AssistantToolsFunction.Function;
+    function: Shared.FunctionObject;
 
     /**
      * The type of tool being defined: `function`
      */
     type: 'function';
-  }
-
-  export namespace AssistantToolsFunction {
-    /**
-     * The function definition.
-     */
-    export interface Function {
-      /**
-       * A description of what the function does, used by the model to choose when and
-       * how to call the function.
-       */
-      description: string;
-
-      /**
-       * The name of the function to be called. Must be a-z, A-Z, 0-9, or contain
-       * underscores and dashes, with a maximum length of 64.
-       */
-      name: string;
-
-      /**
-       * The parameters the functions accepts, described as a JSON Schema object. See the
-       * [guide](https://platform.openai.com/docs/guides/gpt/function-calling) for
-       * examples, and the
-       * [JSON Schema reference](https://json-schema.org/understanding-json-schema/) for
-       * documentation about the format.
-       *
-       * To describe a function that accepts no parameters, provide the value
-       * `{"type": "object", "properties": {}}`.
-       */
-      parameters: Record<string, unknown>;
-    }
   }
 }
 
@@ -395,46 +328,12 @@ export namespace AssistantUpdateParams {
   }
 
   export interface AssistantToolsFunction {
-    /**
-     * The function definition.
-     */
-    function: AssistantToolsFunction.Function;
+    function: Shared.FunctionObject;
 
     /**
      * The type of tool being defined: `function`
      */
     type: 'function';
-  }
-
-  export namespace AssistantToolsFunction {
-    /**
-     * The function definition.
-     */
-    export interface Function {
-      /**
-       * A description of what the function does, used by the model to choose when and
-       * how to call the function.
-       */
-      description: string;
-
-      /**
-       * The name of the function to be called. Must be a-z, A-Z, 0-9, or contain
-       * underscores and dashes, with a maximum length of 64.
-       */
-      name: string;
-
-      /**
-       * The parameters the functions accepts, described as a JSON Schema object. See the
-       * [guide](https://platform.openai.com/docs/guides/gpt/function-calling) for
-       * examples, and the
-       * [JSON Schema reference](https://json-schema.org/understanding-json-schema/) for
-       * documentation about the format.
-       *
-       * To describe a function that accepts no parameters, provide the value
-       * `{"type": "object", "properties": {}}`.
-       */
-      parameters: Record<string, unknown>;
-    }
   }
 }
 

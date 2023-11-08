@@ -5,6 +5,7 @@ import { APIPromise } from 'openai/core';
 import { APIResource } from 'openai/resource';
 import * as ChatCompletionsAPI from 'openai/resources/chat/completions';
 import * as CompletionsAPI from 'openai/resources/completions';
+import * as Shared from 'openai/resources/shared';
 import { Stream } from 'openai/streaming';
 
 export class Completions extends APIResource {
@@ -180,7 +181,6 @@ export interface ChatCompletionChunk {
 
   /**
    * This fingerprint represents the backend configuration that the model runs with.
-   *
    * Can be used in conjunction with the `seed` request parameter to understand when
    * backend changes have been made that might impact determinism.
    */
@@ -486,40 +486,12 @@ export interface ChatCompletionSystemMessageParam {
 }
 
 export interface ChatCompletionTool {
-  function: ChatCompletionTool.Function;
+  function: Shared.FunctionObject;
 
   /**
    * The type of the tool. Currently, only `function` is supported.
    */
   type: 'function';
-}
-
-export namespace ChatCompletionTool {
-  export interface Function {
-    /**
-     * The name of the function to be called. Must be a-z, A-Z, 0-9, or contain
-     * underscores and dashes, with a maximum length of 64.
-     */
-    name: string;
-
-    /**
-     * The parameters the functions accepts, described as a JSON Schema object. See the
-     * [guide](https://platform.openai.com/docs/guides/gpt/function-calling) for
-     * examples, and the
-     * [JSON Schema reference](https://json-schema.org/understanding-json-schema/) for
-     * documentation about the format.
-     *
-     * To describe a function that accepts no parameters, provide the value
-     * `{"type": "object", "properties": {}}`.
-     */
-    parameters: Record<string, unknown>;
-
-    /**
-     * A description of what the function does, used by the model to choose when and
-     * how to call the function.
-     */
-    description?: string;
-  }
 }
 
 /**
@@ -668,8 +640,18 @@ export interface ChatCompletionCreateParamsBase {
   presence_penalty?: number | null;
 
   /**
-   * An object specifying the format that the model must output. Used to enable JSON
-   * mode.
+   * An object specifying the format that the model must output.
+   *
+   * Setting to `{ "type": "json_object" }` enables JSON mode, which guarantees the
+   * message the model generates is valid JSON.
+   *
+   * **Important:** when using JSON mode, you **must** also instruct the model to
+   * produce JSON yourself via a system or user message. Without this, the model may
+   * generate an unending stream of whitespace until the generation reaches the token
+   * limit, resulting in increased latency and appearance of a "stuck" request. Also
+   * note that the message content may be partially cut off if
+   * `finish_reason="length"`, which indicates the generation exceeded `max_tokens`
+   * or the conversation exceeded the max context length.
    */
   response_format?: ChatCompletionCreateParams.ResponseFormat;
 
@@ -761,7 +743,7 @@ export namespace ChatCompletionCreateParams {
      * To describe a function that accepts no parameters, provide the value
      * `{"type": "object", "properties": {}}`.
      */
-    parameters: Record<string, unknown>;
+    parameters: Shared.FunctionParameters;
 
     /**
      * A description of what the function does, used by the model to choose when and
@@ -771,21 +753,21 @@ export namespace ChatCompletionCreateParams {
   }
 
   /**
-   * An object specifying the format that the model must output. Used to enable JSON
-   * mode.
+   * An object specifying the format that the model must output.
+   *
+   * Setting to `{ "type": "json_object" }` enables JSON mode, which guarantees the
+   * message the model generates is valid JSON.
+   *
+   * **Important:** when using JSON mode, you **must** also instruct the model to
+   * produce JSON yourself via a system or user message. Without this, the model may
+   * generate an unending stream of whitespace until the generation reaches the token
+   * limit, resulting in increased latency and appearance of a "stuck" request. Also
+   * note that the message content may be partially cut off if
+   * `finish_reason="length"`, which indicates the generation exceeded `max_tokens`
+   * or the conversation exceeded the max context length.
    */
   export interface ResponseFormat {
     /**
-     * Setting to `json_object` enables JSON mode. This guarantees that the message the
-     * model generates is valid JSON.
-     *
-     * Note that your system prompt must still instruct the model to produce JSON, and
-     * to help ensure you don't forget, the API will throw an error if the string
-     * `JSON` does not appear in your system message. Also note that the message
-     * content may be partial (i.e. cut off) if `finish_reason="length"`, which
-     * indicates the generation exceeded `max_tokens` or the conversation exceeded the
-     * max context length.
-     *
      * Must be one of `text` or `json_object`.
      */
     type?: 'text' | 'json_object';
