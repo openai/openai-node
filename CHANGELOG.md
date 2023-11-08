@@ -1,5 +1,18 @@
 # Changelog
 
+## 4.17.0 (2023-11-08)
+
+Full Changelog: [v4.16.2...v4.17.0](https://github.com/openai/openai-node/compare/v4.16.2...v4.17.0)
+
+### Features
+
+* **api:** unify function types ([#467](https://github.com/openai/openai-node/issues/467)) ([d51cd94](https://github.com/openai/openai-node/commit/d51cd94b3103219789447e2e9afc4762ae672e5a))
+
+
+### Refactors
+
+* **api:** rename FunctionObject to FunctionDefinition ([#470](https://github.com/openai/openai-node/issues/470)) ([f3990c7](https://github.com/openai/openai-node/commit/f3990c779e596309b62f41d7a1253d8629aca3bf))
+
 ## 4.16.2 (2023-11-08)
 
 Full Changelog: [v4.16.1...v4.16.2](https://github.com/openai/openai-node/compare/v4.16.1...v4.16.2)
