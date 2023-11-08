@@ -280,7 +280,7 @@ export namespace ThreadCreateAndRunParams {
   }
 
   export interface AssistantToolsFunction {
-    function: Shared.FunctionObject;
+    function: Shared.FunctionDefinition;
 
     /**
      * The type of tool being defined: `function`

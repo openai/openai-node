@@ -1,6 +1,6 @@
 // File generated from our OpenAPI spec by Stainless.
 
-export interface FunctionObject {
+export interface FunctionDefinition {
   /**
    * The name of the function to be called. Must be a-z, A-Z, 0-9, or contain
    * underscores and dashes, with a maximum length of 64.

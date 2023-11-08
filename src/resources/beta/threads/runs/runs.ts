@@ -325,7 +325,7 @@ export namespace Run {
   }
 
   export interface AssistantToolsFunction {
-    function: Shared.FunctionObject;
+    function: Shared.FunctionDefinition;
 
     /**
      * The type of tool being defined: `function`
@@ -391,7 +391,7 @@ export namespace RunCreateParams {
   }
 
   export interface AssistantToolsFunction {
-    function: Shared.FunctionObject;
+    function: Shared.FunctionDefinition;
 
     /**
      * The type of tool being defined: `function`
