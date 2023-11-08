@@ -1,5 +1,27 @@
 # Changelog
 
+## 4.16.2 (2023-11-08)
+
+Full Changelog: [v4.16.1...v4.16.2](https://github.com/openai/openai-node/compare/v4.16.1...v4.16.2)
+
+### Bug Fixes
+
+* **api:** accidentally required params, add new models & other fixes ([#463](https://github.com/openai/openai-node/issues/463)) ([1cb403e](https://github.com/openai/openai-node/commit/1cb403e4ccde61bb1613d362f6bdbca8b1681e00))
+* **api:** update embedding response object type ([#466](https://github.com/openai/openai-node/issues/466)) ([53b7e25](https://github.com/openai/openai-node/commit/53b7e2539cca0b272be96136c123d2b33745e7f6))
+* asssitant_deleted -&gt; assistant_deleted ([#452](https://github.com/openai/openai-node/issues/452)) ([ef89bd7](https://github.com/openai/openai-node/commit/ef89bd74d85c833bf7de500eecd1b092a0ad3f37))
+* **types:** ensure all code paths return a value ([#458](https://github.com/openai/openai-node/issues/458)) ([19402c3](https://github.com/openai/openai-node/commit/19402c365572a99cbee58bcd34a9942e741269bf))
+
+
+### Chores
+
+* **docs:** fix github links ([#457](https://github.com/openai/openai-node/issues/457)) ([6b9b94e](https://github.com/openai/openai-node/commit/6b9b94e4e123349a908b708cd574ff107f40a8e1))
+* **internal:** fix typo in comment ([#456](https://github.com/openai/openai-node/issues/456)) ([fe24342](https://github.com/openai/openai-node/commit/fe2434284a91d424510873a18079b8870469c672))
+
+
+### Documentation
+
+* update deno deploy link to include v ([#441](https://github.com/openai/openai-node/issues/441)) ([47b13aa](https://github.com/openai/openai-node/commit/47b13aaa6fac86fffabee1f752ee6d2efc3def9b))
+
 ## 4.16.1 (2023-11-06)
 
 Full Changelog: [v4.16.0...v4.16.1](https://github.com/openai/openai-node/compare/v4.16.0...v4.16.1)
