@@ -486,7 +486,7 @@ export interface ChatCompletionSystemMessageParam {
 }
 
 export interface ChatCompletionTool {
-  function: Shared.FunctionObject;
+  function: Shared.FunctionDefinition;
 
   /**
    * The type of the tool. Currently, only `function` is supported.

@@ -2,7 +2,7 @@
 
 Types:
 
-- <code><a href="./src/resources/shared.ts">FunctionObject</a></code>
+- <code><a href="./src/resources/shared.ts">FunctionDefinition</a></code>
 - <code><a href="./src/resources/shared.ts">FunctionParameters</a></code>
 
 # Completions

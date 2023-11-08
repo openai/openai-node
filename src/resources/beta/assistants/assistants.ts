@@ -164,7 +164,7 @@ export namespace Assistant {
   }
 
   export interface Function {
-    function: Shared.FunctionObject;
+    function: Shared.FunctionDefinition;
 
     /**
      * The type of tool being defined: `function`
@@ -249,7 +249,7 @@ export namespace AssistantCreateParams {
   }
 
   export interface AssistantToolsFunction {
-    function: Shared.FunctionObject;
+    function: Shared.FunctionDefinition;
 
     /**
      * The type of tool being defined: `function`
@@ -328,7 +328,7 @@ export namespace AssistantUpdateParams {
   }
 
   export interface AssistantToolsFunction {
-    function: Shared.FunctionObject;
+    function: Shared.FunctionDefinition;
 
     /**
      * The type of tool being defined: `function`
