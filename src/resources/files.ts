@@ -3,6 +3,7 @@
 import * as Core from 'openai/core';
 import { APIResource } from 'openai/resource';
 import { isRequestOptions } from 'openai/core';
+import { type Response } from 'openai/_shims/index';
 import { sleep } from 'openai/core';
 import { APIConnectionTimeoutError } from 'openai/error';
 import * as FilesAPI from 'openai/resources/files';
@@ -57,6 +58,15 @@ export class Files extends APIResource {
 
   /**
    * Returns the contents of the specified file.
+   */
+  content(fileId: string, options?: Core.RequestOptions): Core.APIPromise<Response> {
+    return this.get(`/files/${fileId}/content`, { ...options, __binaryResponse: true });
+  }
+
+  /**
+   * Returns the contents of the specified file.
+   *
+   * @deprecated The `.content()` method should be used instead
    */
   retrieveContent(fileId: string, options?: Core.RequestOptions): Core.APIPromise<string> {
     return this.get(`/files/${fileId}/content`, {
