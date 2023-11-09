@@ -61,6 +61,6 @@
   "extra-files": [
     "src/version.ts",
     "README.md",
-    "bin/build-deno"
+    "build-deno"
   ]
 }
