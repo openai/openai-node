@@ -91,6 +91,13 @@ describe('resource files', () => {
     );
   });
 
+  test('content: request options instead of params are passed correctly', async () => {
+    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
+    await expect(openai.files.content('string', { path: '/_stainless_unknown_path' })).rejects.toThrow(
+      OpenAI.NotFoundError,
+    );
+  });
+
   test('retrieveContent', async () => {
     const responsePromise = openai.files.retrieveContent('string');
     const rawResponse = await responsePromise.asResponse();
