@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.17.3 (2023-11-09)
+
+Full Changelog: [v4.17.2...v4.17.3](https://github.com/openai/openai-node/compare/v4.17.2...v4.17.3)
+
 ## 4.17.2 (2023-11-09)
 
 Full Changelog: [v4.17.1...v4.17.2](https://github.com/openai/openai-node/compare/v4.17.1...v4.17.2)
