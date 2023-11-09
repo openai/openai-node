@@ -184,7 +184,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
       async start() {
         iter = self[Symbol.asyncIterator]();
       },
-      async pull(ctrl) {
+      async pull(ctrl: ReadableStreamDefaultController) {
         try {
           const { value, done } = await iter.next();
           if (done) return ctrl.close();
