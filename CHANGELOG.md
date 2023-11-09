@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.17.2 (2023-11-09)
+
+Full Changelog: [v4.17.1...v4.17.2](https://github.com/openai/openai-node/compare/v4.17.1...v4.17.2)
+
+### Chores
+
+* **internal:** bump deno version number ([#478](https://github.com/openai/openai-node/issues/478)) ([69913f3](https://github.com/openai/openai-node/commit/69913f3a4b0123394029759375445dae7b4f15ab))
+
 ## 4.17.1 (2023-11-09)
 
 Full Changelog: [v4.17.0...v4.17.1](https://github.com/openai/openai-node/compare/v4.17.0...v4.17.1)
