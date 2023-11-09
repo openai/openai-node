@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.17.1 (2023-11-09)
+
+Full Changelog: [v4.17.0...v4.17.1](https://github.com/openai/openai-node/compare/v4.17.0...v4.17.1)
+
+### Refactors
+
+* **client:** deprecate files.retrieveContent in favour of files.content ([#474](https://github.com/openai/openai-node/issues/474)) ([7c7bfc2](https://github.com/openai/openai-node/commit/7c7bfc2fad5a786c9172110e90c9566a943e49f9))
+
 ## 4.17.0 (2023-11-08)
 
 Full Changelog: [v4.16.2...v4.17.0](https://github.com/openai/openai-node/compare/v4.16.2...v4.17.0)
