@@ -8,7 +8,8 @@ const openai = new OpenAI({
 });
 
 describe('resource speech', () => {
-  test('create: required and optional params', async () => {
+  // Mocked tests are currently broken
+  test.skip('create: required and optional params', async () => {
     const response = await openai.audio.speech.create({
       input: 'string',
       model: 'string',
