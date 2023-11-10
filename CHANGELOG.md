@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.17.4 (2023-11-10)
+
+Full Changelog: [v4.17.3...v4.17.4](https://github.com/openai/openai-node/compare/v4.17.3...v4.17.4)
+
+### Chores
+
+* **internal:** update jest config ([#482](https://github.com/openai/openai-node/issues/482)) ([3013e8c](https://github.com/openai/openai-node/commit/3013e8c73a61a397a418ca75b996f0a7dd03a744))
+
 ## 4.17.3 (2023-11-09)
 
 Full Changelog: [v4.17.2...v4.17.3](https://github.com/openai/openai-node/compare/v4.17.2...v4.17.3)
