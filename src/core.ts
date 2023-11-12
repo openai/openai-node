@@ -432,7 +432,7 @@ export abstract class APIClient {
     const url =
       isAbsoluteURL(path) ?
         new URL(path)
-      : new URL(this.baseURL + (this.baseURL.endsWith('/') && path.startsWith('/') ? path.slice(1) : path));
+      : new URL((this.baseURL.endsWith('/') && path.startsWith('/') ? path.slice(1) : path), this.baseURL);
 
     const defaultQuery = this.defaultQuery();
     if (!isEmptyObj(defaultQuery)) {
