@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.17.5 (2023-11-13)
+
+Full Changelog: [v4.17.4...v4.17.5](https://github.com/openai/openai-node/compare/v4.17.4...v4.17.5)
+
+### Chores
+
+* fix typo in docs and add request header for function calls ([#494](https://github.com/openai/openai-node/issues/494)) ([22ce244](https://github.com/openai/openai-node/commit/22ce2443a77f10988b3215bd81ba17d4eda4b10e))
+
 ## 4.17.4 (2023-11-10)
 
 Full Changelog: [v4.17.3...v4.17.4](https://github.com/openai/openai-node/compare/v4.17.3...v4.17.4)
