@@ -153,7 +153,7 @@ If you pass a `parse` function, it will automatically parse the `arguments` for 
 and returns any parsing errors to the model to attempt auto-recovery.
 Otherwise, the args will be passed to the function you provide as a string.
 
-If you pass `function_call: {name: …}` or `tool_call: {function: {name: …}}` instead of `auto`,
+If you pass `function_call: {name: …}` or `tool_choice: {function: {name: …}}` instead of `auto`,
 it returns immediately after calling that function (and only loops to auto-recover parsing errors).
 
 ```ts
