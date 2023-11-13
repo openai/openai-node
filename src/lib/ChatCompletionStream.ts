@@ -52,7 +52,13 @@ export class ChatCompletionStream
     options?: Core.RequestOptions,
   ): ChatCompletionStream {
     const runner = new ChatCompletionStream();
-    runner._run(() => runner._runChatCompletion(completions, { ...params, stream: true }, options));
+    runner._run(() =>
+      runner._runChatCompletion(
+        completions,
+        { ...params, stream: true },
+        { ...options, headers: { ...options?.headers, 'X-Stainless-Helper-Method': 'stream' } },
+      ),
+    );
     return runner;
   }
 
