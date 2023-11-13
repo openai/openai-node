@@ -85,7 +85,7 @@ async function main() {
   console.log(runner.messages);
 
   console.log();
-  console.log('final chat competion');
+  console.log('final chat completion');
   console.dir(result, { depth: null });
 }
 
