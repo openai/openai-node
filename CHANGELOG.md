@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.18.0 (2023-11-14)
+
+Full Changelog: [v4.17.5...v4.18.0](https://github.com/openai/openai-node/compare/v4.17.5...v4.18.0)
+
+### Features
+
+* **api:** add gpt-3.5-turbo-1106 ([#496](https://github.com/openai/openai-node/issues/496)) ([45f7672](https://github.com/openai/openai-node/commit/45f7672ccf4856ac309b08c6c96f0e73ab48b525))
+
 ## 4.17.5 (2023-11-13)
 
 Full Changelog: [v4.17.4...v4.17.5](https://github.com/openai/openai-node/compare/v4.17.4...v4.17.5)
