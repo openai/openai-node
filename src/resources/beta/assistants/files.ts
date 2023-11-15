@@ -17,7 +17,7 @@ export class Files extends APIResource {
     body: FileCreateParams,
     options?: Core.RequestOptions,
   ): Core.APIPromise<AssistantFile> {
-    return this.post(`/assistants/${assistantId}/files`, {
+    return this._client.post(`/assistants/${assistantId}/files`, {
       body,
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
@@ -32,7 +32,7 @@ export class Files extends APIResource {
     fileId: string,
     options?: Core.RequestOptions,
   ): Core.APIPromise<AssistantFile> {
-    return this.get(`/assistants/${assistantId}/files/${fileId}`, {
+    return this._client.get(`/assistants/${assistantId}/files/${fileId}`, {
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
     });
@@ -58,7 +58,7 @@ export class Files extends APIResource {
     if (isRequestOptions(query)) {
       return this.list(assistantId, {}, query);
     }
-    return this.getAPIList(`/assistants/${assistantId}/files`, AssistantFilesPage, {
+    return this._client.getAPIList(`/assistants/${assistantId}/files`, AssistantFilesPage, {
       query,
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
@@ -73,7 +73,7 @@ export class Files extends APIResource {
     fileId: string,
     options?: Core.RequestOptions,
   ): Core.APIPromise<FileDeleteResponse> {
-    return this.delete(`/assistants/${assistantId}/files/${fileId}`, {
+    return this._client.delete(`/assistants/${assistantId}/files/${fileId}`, {
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
     });

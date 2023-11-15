@@ -564,27 +564,6 @@ export abstract class APIClient {
   }
 }
 
-export class APIResource {
-  protected client: APIClient;
-  constructor(client: APIClient) {
-    this.client = client;
-
-    this.get = client.get.bind(client);
-    this.post = client.post.bind(client);
-    this.patch = client.patch.bind(client);
-    this.put = client.put.bind(client);
-    this.delete = client.delete.bind(client);
-    this.getAPIList = client.getAPIList.bind(client);
-  }
-
-  protected get: APIClient['get'];
-  protected post: APIClient['post'];
-  protected patch: APIClient['patch'];
-  protected put: APIClient['put'];
-  protected delete: APIClient['delete'];
-  protected getAPIList: APIClient['getAPIList'];
-}
-
 export type PageInfo = { url: URL } | { params: Record<string, unknown> | null };
 
 export abstract class AbstractPage<Item> implements AsyncIterable<Item> {

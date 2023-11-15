@@ -16,7 +16,7 @@ export class Steps extends APIResource {
     stepId: string,
     options?: Core.RequestOptions,
   ): Core.APIPromise<RunStep> {
-    return this.get(`/threads/${threadId}/runs/${runId}/steps/${stepId}`, {
+    return this._client.get(`/threads/${threadId}/runs/${runId}/steps/${stepId}`, {
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
     });
@@ -45,7 +45,7 @@ export class Steps extends APIResource {
     if (isRequestOptions(query)) {
       return this.list(threadId, runId, {}, query);
     }
-    return this.getAPIList(`/threads/${threadId}/runs/${runId}/steps`, RunStepsPage, {
+    return this._client.getAPIList(`/threads/${threadId}/runs/${runId}/steps`, RunStepsPage, {
       query,
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },

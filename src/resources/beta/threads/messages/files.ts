@@ -16,7 +16,7 @@ export class Files extends APIResource {
     fileId: string,
     options?: Core.RequestOptions,
   ): Core.APIPromise<MessageFile> {
-    return this.get(`/threads/${threadId}/messages/${messageId}/files/${fileId}`, {
+    return this._client.get(`/threads/${threadId}/messages/${messageId}/files/${fileId}`, {
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
     });
@@ -45,7 +45,7 @@ export class Files extends APIResource {
     if (isRequestOptions(query)) {
       return this.list(threadId, messageId, {}, query);
     }
-    return this.getAPIList(`/threads/${threadId}/messages/${messageId}/files`, MessageFilesPage, {
+    return this._client.getAPIList(`/threads/${threadId}/messages/${messageId}/files`, MessageFilesPage, {
       query,
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },

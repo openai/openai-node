@@ -11,7 +11,7 @@ export class Models extends APIResource {
    * the owner and permissioning.
    */
   retrieve(model: string, options?: Core.RequestOptions): Core.APIPromise<Model> {
-    return this.get(`/models/${model}`, options);
+    return this._client.get(`/models/${model}`, options);
   }
 
   /**
@@ -19,7 +19,7 @@ export class Models extends APIResource {
    * one such as the owner and availability.
    */
   list(options?: Core.RequestOptions): Core.PagePromise<ModelsPage, Model> {
-    return this.getAPIList('/models', ModelsPage, options);
+    return this._client.getAPIList('/models', ModelsPage, options);
   }
 
   /**
@@ -27,7 +27,7 @@ export class Models extends APIResource {
    * delete a model.
    */
   del(model: string, options?: Core.RequestOptions): Core.APIPromise<ModelDeleted> {
-    return this.delete(`/models/${model}`, options);
+    return this._client.delete(`/models/${model}`, options);
   }
 }
 
