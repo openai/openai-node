@@ -6,9 +6,9 @@ import * as ChatAPI from 'openai/resources/beta/chat/chat';
 import * as ThreadsAPI from 'openai/resources/beta/threads/threads';
 
 export class Beta extends APIResource {
-  chat: ChatAPI.Chat = new ChatAPI.Chat(this.client);
-  assistants: AssistantsAPI.Assistants = new AssistantsAPI.Assistants(this.client);
-  threads: ThreadsAPI.Threads = new ThreadsAPI.Threads(this.client);
+  chat: ChatAPI.Chat = new ChatAPI.Chat(this._client);
+  assistants: AssistantsAPI.Assistants = new AssistantsAPI.Assistants(this._client);
+  threads: ThreadsAPI.Threads = new ThreadsAPI.Threads(this._client);
 }
 
 export namespace Beta {

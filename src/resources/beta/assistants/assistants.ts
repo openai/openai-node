@@ -9,13 +9,13 @@ import * as FilesAPI from 'openai/resources/beta/assistants/files';
 import { CursorPage, type CursorPageParams } from 'openai/pagination';
 
 export class Assistants extends APIResource {
-  files: FilesAPI.Files = new FilesAPI.Files(this.client);
+  files: FilesAPI.Files = new FilesAPI.Files(this._client);
 
   /**
    * Create an assistant with a model and instructions.
    */
   create(body: AssistantCreateParams, options?: Core.RequestOptions): Core.APIPromise<Assistant> {
-    return this.post('/assistants', {
+    return this._client.post('/assistants', {
       body,
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
@@ -26,7 +26,7 @@ export class Assistants extends APIResource {
    * Retrieves an assistant.
    */
   retrieve(assistantId: string, options?: Core.RequestOptions): Core.APIPromise<Assistant> {
-    return this.get(`/assistants/${assistantId}`, {
+    return this._client.get(`/assistants/${assistantId}`, {
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
     });
@@ -40,7 +40,7 @@ export class Assistants extends APIResource {
     body: AssistantUpdateParams,
     options?: Core.RequestOptions,
   ): Core.APIPromise<Assistant> {
-    return this.post(`/assistants/${assistantId}`, {
+    return this._client.post(`/assistants/${assistantId}`, {
       body,
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
@@ -62,7 +62,7 @@ export class Assistants extends APIResource {
     if (isRequestOptions(query)) {
       return this.list({}, query);
     }
-    return this.getAPIList('/assistants', AssistantsPage, {
+    return this._client.getAPIList('/assistants', AssistantsPage, {
       query,
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
@@ -73,7 +73,7 @@ export class Assistants extends APIResource {
    * Delete an assistant.
    */
   del(assistantId: string, options?: Core.RequestOptions): Core.APIPromise<AssistantDeleted> {
-    return this.delete(`/assistants/${assistantId}`, {
+    return this._client.delete(`/assistants/${assistantId}`, {
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
     });

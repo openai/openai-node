@@ -24,14 +24,14 @@ export class Files extends APIResource {
    * storage limits.
    */
   create(body: FileCreateParams, options?: Core.RequestOptions): Core.APIPromise<FileObject> {
-    return this.post('/files', multipartFormRequestOptions({ body, ...options }));
+    return this._client.post('/files', multipartFormRequestOptions({ body, ...options }));
   }
 
   /**
    * Returns information about a specific file.
    */
   retrieve(fileId: string, options?: Core.RequestOptions): Core.APIPromise<FileObject> {
-    return this.get(`/files/${fileId}`, options);
+    return this._client.get(`/files/${fileId}`, options);
   }
 
   /**
@@ -46,21 +46,21 @@ export class Files extends APIResource {
     if (isRequestOptions(query)) {
       return this.list({}, query);
     }
-    return this.getAPIList('/files', FileObjectsPage, { query, ...options });
+    return this._client.getAPIList('/files', FileObjectsPage, { query, ...options });
   }
 
   /**
    * Delete a file.
    */
   del(fileId: string, options?: Core.RequestOptions): Core.APIPromise<FileDeleted> {
-    return this.delete(`/files/${fileId}`, options);
+    return this._client.delete(`/files/${fileId}`, options);
   }
 
   /**
    * Returns the contents of the specified file.
    */
   content(fileId: string, options?: Core.RequestOptions): Core.APIPromise<Response> {
-    return this.get(`/files/${fileId}/content`, { ...options, __binaryResponse: true });
+    return this._client.get(`/files/${fileId}/content`, { ...options, __binaryResponse: true });
   }
 
   /**
@@ -69,7 +69,7 @@ export class Files extends APIResource {
    * @deprecated The `.content()` method should be used instead
    */
   retrieveContent(fileId: string, options?: Core.RequestOptions): Core.APIPromise<string> {
-    return this.get(`/files/${fileId}/content`, {
+    return this._client.get(`/files/${fileId}/content`, {
       ...options,
       headers: { Accept: 'application/json', ...options?.headers },
     });

@@ -8,7 +8,7 @@ import * as FilesAPI from 'openai/resources/beta/threads/messages/files';
 import { CursorPage, type CursorPageParams } from 'openai/pagination';
 
 export class Messages extends APIResource {
-  files: FilesAPI.Files = new FilesAPI.Files(this.client);
+  files: FilesAPI.Files = new FilesAPI.Files(this._client);
 
   /**
    * Create a message.
@@ -18,7 +18,7 @@ export class Messages extends APIResource {
     body: MessageCreateParams,
     options?: Core.RequestOptions,
   ): Core.APIPromise<ThreadMessage> {
-    return this.post(`/threads/${threadId}/messages`, {
+    return this._client.post(`/threads/${threadId}/messages`, {
       body,
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
@@ -33,7 +33,7 @@ export class Messages extends APIResource {
     messageId: string,
     options?: Core.RequestOptions,
   ): Core.APIPromise<ThreadMessage> {
-    return this.get(`/threads/${threadId}/messages/${messageId}`, {
+    return this._client.get(`/threads/${threadId}/messages/${messageId}`, {
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
     });
@@ -48,7 +48,7 @@ export class Messages extends APIResource {
     body: MessageUpdateParams,
     options?: Core.RequestOptions,
   ): Core.APIPromise<ThreadMessage> {
-    return this.post(`/threads/${threadId}/messages/${messageId}`, {
+    return this._client.post(`/threads/${threadId}/messages/${messageId}`, {
       body,
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
@@ -72,7 +72,7 @@ export class Messages extends APIResource {
     if (isRequestOptions(query)) {
       return this.list(threadId, {}, query);
     }
-    return this.getAPIList(`/threads/${threadId}/messages`, ThreadMessagesPage, {
+    return this._client.getAPIList(`/threads/${threadId}/messages`, ThreadMessagesPage, {
       query,
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
