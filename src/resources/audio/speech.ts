@@ -10,7 +10,7 @@ export class Speech extends APIResource {
    * Generates audio from the input text.
    */
   create(body: SpeechCreateParams, options?: Core.RequestOptions): Core.APIPromise<Response> {
-    return this.post('/audio/speech', { body, ...options, __binaryResponse: true });
+    return this._client.post('/audio/speech', { body, ...options, __binaryResponse: true });
   }
 }
 

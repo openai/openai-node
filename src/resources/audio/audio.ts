@@ -6,9 +6,9 @@ import * as TranscriptionsAPI from 'openai/resources/audio/transcriptions';
 import * as TranslationsAPI from 'openai/resources/audio/translations';
 
 export class Audio extends APIResource {
-  transcriptions: TranscriptionsAPI.Transcriptions = new TranscriptionsAPI.Transcriptions(this.client);
-  translations: TranslationsAPI.Translations = new TranslationsAPI.Translations(this.client);
-  speech: SpeechAPI.Speech = new SpeechAPI.Speech(this.client);
+  transcriptions: TranscriptionsAPI.Transcriptions = new TranscriptionsAPI.Transcriptions(this._client);
+  translations: TranslationsAPI.Translations = new TranslationsAPI.Translations(this._client);
+  speech: SpeechAPI.Speech = new SpeechAPI.Speech(this._client);
 }
 
 export namespace Audio {

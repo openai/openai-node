@@ -9,8 +9,8 @@ import * as MessagesAPI from 'openai/resources/beta/threads/messages/messages';
 import * as RunsAPI from 'openai/resources/beta/threads/runs/runs';
 
 export class Threads extends APIResource {
-  runs: RunsAPI.Runs = new RunsAPI.Runs(this.client);
-  messages: MessagesAPI.Messages = new MessagesAPI.Messages(this.client);
+  runs: RunsAPI.Runs = new RunsAPI.Runs(this._client);
+  messages: MessagesAPI.Messages = new MessagesAPI.Messages(this._client);
 
   /**
    * Create a thread.
@@ -24,7 +24,7 @@ export class Threads extends APIResource {
     if (isRequestOptions(body)) {
       return this.create({}, body);
     }
-    return this.post('/threads', {
+    return this._client.post('/threads', {
       body,
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
@@ -35,7 +35,7 @@ export class Threads extends APIResource {
    * Retrieves a thread.
    */
   retrieve(threadId: string, options?: Core.RequestOptions): Core.APIPromise<Thread> {
-    return this.get(`/threads/${threadId}`, {
+    return this._client.get(`/threads/${threadId}`, {
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
     });
@@ -45,7 +45,7 @@ export class Threads extends APIResource {
    * Modifies a thread.
    */
   update(threadId: string, body: ThreadUpdateParams, options?: Core.RequestOptions): Core.APIPromise<Thread> {
-    return this.post(`/threads/${threadId}`, {
+    return this._client.post(`/threads/${threadId}`, {
       body,
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
@@ -56,7 +56,7 @@ export class Threads extends APIResource {
    * Delete a thread.
    */
   del(threadId: string, options?: Core.RequestOptions): Core.APIPromise<ThreadDeleted> {
-    return this.delete(`/threads/${threadId}`, {
+    return this._client.delete(`/threads/${threadId}`, {
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
     });
@@ -66,7 +66,7 @@ export class Threads extends APIResource {
    * Create a thread and run it in one request.
    */
   createAndRun(body: ThreadCreateAndRunParams, options?: Core.RequestOptions): Core.APIPromise<RunsAPI.Run> {
-    return this.post('/threads/runs', {
+    return this._client.post('/threads/runs', {
       body,
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },

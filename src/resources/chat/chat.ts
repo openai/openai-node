@@ -4,7 +4,7 @@ import { APIResource } from 'openai/resource';
 import * as CompletionsAPI from 'openai/resources/chat/completions';
 
 export class Chat extends APIResource {
-  completions: CompletionsAPI.Completions = new CompletionsAPI.Completions(this.client);
+  completions: CompletionsAPI.Completions = new CompletionsAPI.Completions(this._client);
 }
 
 export namespace Chat {

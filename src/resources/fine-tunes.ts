@@ -18,7 +18,7 @@ export class FineTunes extends APIResource {
    * [Learn more about fine-tuning](https://platform.openai.com/docs/guides/legacy-fine-tuning)
    */
   create(body: FineTuneCreateParams, options?: Core.RequestOptions): Core.APIPromise<FineTune> {
-    return this.post('/fine-tunes', { body, ...options });
+    return this._client.post('/fine-tunes', { body, ...options });
   }
 
   /**
@@ -27,21 +27,21 @@ export class FineTunes extends APIResource {
    * [Learn more about fine-tuning](https://platform.openai.com/docs/guides/legacy-fine-tuning)
    */
   retrieve(fineTuneId: string, options?: Core.RequestOptions): Core.APIPromise<FineTune> {
-    return this.get(`/fine-tunes/${fineTuneId}`, options);
+    return this._client.get(`/fine-tunes/${fineTuneId}`, options);
   }
 
   /**
    * List your organization's fine-tuning jobs
    */
   list(options?: Core.RequestOptions): Core.PagePromise<FineTunesPage, FineTune> {
-    return this.getAPIList('/fine-tunes', FineTunesPage, options);
+    return this._client.getAPIList('/fine-tunes', FineTunesPage, options);
   }
 
   /**
    * Immediately cancel a fine-tune job.
    */
   cancel(fineTuneId: string, options?: Core.RequestOptions): Core.APIPromise<FineTune> {
-    return this.post(`/fine-tunes/${fineTuneId}/cancel`, options);
+    return this._client.post(`/fine-tunes/${fineTuneId}/cancel`, options);
   }
 
   /**
@@ -67,7 +67,7 @@ export class FineTunes extends APIResource {
     query?: FineTuneListEventsParams | undefined,
     options?: Core.RequestOptions,
   ): APIPromise<FineTuneEventsListResponse> | APIPromise<Stream<FineTuneEvent>> {
-    return this.get(`/fine-tunes/${fineTuneId}/events`, {
+    return this._client.get(`/fine-tunes/${fineTuneId}/events`, {
       query,
       timeout: 86400000,
       ...options,

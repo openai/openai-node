@@ -14,7 +14,7 @@ export class Edits extends APIResource {
    * https://openai.com/blog/gpt-4-api-general-availability#deprecation-of-the-edits-api
    */
   create(body: EditCreateParams, options?: Core.RequestOptions): Core.APIPromise<Edit> {
-    return this.post('/edits', { body, ...options });
+    return this._client.post('/edits', { body, ...options });
   }
 }
 

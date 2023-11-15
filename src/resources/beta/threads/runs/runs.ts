@@ -9,13 +9,13 @@ import * as StepsAPI from 'openai/resources/beta/threads/runs/steps';
 import { CursorPage, type CursorPageParams } from 'openai/pagination';
 
 export class Runs extends APIResource {
-  steps: StepsAPI.Steps = new StepsAPI.Steps(this.client);
+  steps: StepsAPI.Steps = new StepsAPI.Steps(this._client);
 
   /**
    * Create a run.
    */
   create(threadId: string, body: RunCreateParams, options?: Core.RequestOptions): Core.APIPromise<Run> {
-    return this.post(`/threads/${threadId}/runs`, {
+    return this._client.post(`/threads/${threadId}/runs`, {
       body,
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
@@ -26,7 +26,7 @@ export class Runs extends APIResource {
    * Retrieves a run.
    */
   retrieve(threadId: string, runId: string, options?: Core.RequestOptions): Core.APIPromise<Run> {
-    return this.get(`/threads/${threadId}/runs/${runId}`, {
+    return this._client.get(`/threads/${threadId}/runs/${runId}`, {
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
     });
@@ -41,7 +41,7 @@ export class Runs extends APIResource {
     body: RunUpdateParams,
     options?: Core.RequestOptions,
   ): Core.APIPromise<Run> {
-    return this.post(`/threads/${threadId}/runs/${runId}`, {
+    return this._client.post(`/threads/${threadId}/runs/${runId}`, {
       body,
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
@@ -65,7 +65,7 @@ export class Runs extends APIResource {
     if (isRequestOptions(query)) {
       return this.list(threadId, {}, query);
     }
-    return this.getAPIList(`/threads/${threadId}/runs`, RunsPage, {
+    return this._client.getAPIList(`/threads/${threadId}/runs`, RunsPage, {
       query,
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
@@ -76,7 +76,7 @@ export class Runs extends APIResource {
    * Cancels a run that is `in_progress`.
    */
   cancel(threadId: string, runId: string, options?: Core.RequestOptions): Core.APIPromise<Run> {
-    return this.post(`/threads/${threadId}/runs/${runId}/cancel`, {
+    return this._client.post(`/threads/${threadId}/runs/${runId}/cancel`, {
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
     });
@@ -94,7 +94,7 @@ export class Runs extends APIResource {
     body: RunSubmitToolOutputsParams,
     options?: Core.RequestOptions,
   ): Core.APIPromise<Run> {
-    return this.post(`/threads/${threadId}/runs/${runId}/submit_tool_outputs`, {
+    return this._client.post(`/threads/${threadId}/runs/${runId}/submit_tool_outputs`, {
       body,
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
