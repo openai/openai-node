@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.19.0 (2023-11-15)
+
+Full Changelog: [v4.18.0...v4.19.0](https://github.com/openai/openai-node/compare/v4.18.0...v4.19.0)
+
+### Features
+
+* **api:** updates ([#501](https://github.com/openai/openai-node/issues/501)) ([944d58e](https://github.com/openai/openai-node/commit/944d58e5fc46f1a0671aaa2b809d28e67edf6023))
+
 ## 4.18.0 (2023-11-14)
 
 Full Changelog: [v4.17.5...v4.18.0](https://github.com/openai/openai-node/compare/v4.17.5...v4.18.0)

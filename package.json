@@ -1,6 +1,6 @@
 {
   "name": "openai",
-  "version": "4.18.0",
+  "version": "4.19.0",
   "description": "Client library for the OpenAI API",
   "author": "OpenAI <support@openai.com>",
   "types": "dist/index.d.ts",
