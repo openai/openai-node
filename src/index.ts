@@ -101,7 +101,7 @@ export class OpenAI extends Core.APIClient {
    * @param {boolean} [opts.dangerouslyAllowBrowser=false] - By default, client-side use of this library is not allowed, as it risks exposing your secret API credentials to attackers.
    */
   constructor({
-    apiKey = Core.readEnv('OPENAI_API_KEY'),
+    apiKey = Core.readEnv('MARTIAN_API_KEY') || Core.readEnv('OPENAI_API_KEY'),
     organization = Core.readEnv('OPENAI_ORG_ID') ?? null,
     ...opts
   }: ClientOptions = {}) {
