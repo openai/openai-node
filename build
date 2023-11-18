@@ -47,7 +47,7 @@ node scripts/postprocess-files.cjs
 (cd dist && node -e 'require("openai")')
 (cd dist && node -e 'import("openai")' --input-type=module)
 
-# if command -v deno &> /dev/null && [ -e ./build-deno ]
-# then
-#   ./build-deno
-# fi
+if command -v deno &> /dev/null && [ -e ./build-deno ]
+then
+  ./build-deno
+fi
