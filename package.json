@@ -1,12 +1,12 @@
 {
-  "name": "openai-luka",
+  "name": "martian-node",
   "version": "4.19.0",
-  "description": "Client library for the OpenAI API",
-  "author": "OpenAI <support@openai.com>",
+  "description": "Node.js library for the Martian API",
+  "author": "Martian <contact@withmartian.com>",
   "types": "dist/index.d.ts",
   "main": "dist/index.js",
   "type": "commonjs",
-  "repository": "github:openai/openai-node",
+  "repository": "github:withmartian/martian-node-v1",
   "license": "Apache-2.0",
   "sideEffects": [
     "./_shims/index.js",
