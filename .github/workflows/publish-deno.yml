@@ -11,6 +11,15 @@ jobs:
     environment: publish
 
     steps:
+      - name: Generate a token
+        id: generate_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: 'openai'
+          repositories: 'openai-node,openai-deno-build'
+
       - uses: actions/checkout@v3
 
       - name: Set up Node
@@ -27,17 +36,9 @@ jobs:
         run: |
           yarn install
 
-      - name: Generate a token
-        id: generate_token
-        uses: actions/create-github-app-token@v1
-        with:
-          app-id: ${{ secrets.APP_ID }}
-          private-key: ${{ secrets.APP_PRIVATE_KEY }}
-
       - name: Publish to Deno
         run: |
           bash ./scripts/git-publish-deno.sh
         env:
-          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
-          DENO_PUSH_REMOTE_URL: git@github.com:openai/openai-deno-build.git
+          DENO_PUSH_REMOTE_URL: https://username:${{ steps.generate_token.outputs.token }}@github.com/openai/openai-deno-build.git
           DENO_PUSH_BRANCH: main

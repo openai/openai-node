@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -exuo pipefail
 
-# This script pushes the contents of the `deno`` directory to the `deno` branch,
+# This script pushes the contents of the `deno` directory to the `deno` branch,
 # and creates a `vx.x.x-deno` tag, so that Deno users can
 # import OpenAI from "https://raw.githubusercontent.com/openai/openai-node/vx.x.x-deno/mod.ts"
 
