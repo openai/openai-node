@@ -8,6 +8,7 @@ jobs:
   publish:
     name: publish
     runs-on: ubuntu-latest
+    environment: publish
 
     steps:
       - uses: actions/checkout@v3
@@ -16,11 +17,6 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: '16'
-
-      - name: Set up Deno
-        uses: denoland/setup-deno@v1
-        with:
-          deno-version: v1.x
 
       - name: Install dependencies
         run: |
@@ -31,8 +27,3 @@ jobs:
           bash ./bin/publish-npm
         env:
           NPM_TOKEN: ${{ secrets.OPENAI_NPM_TOKEN || secrets.NPM_TOKEN }}
-
-      - name: Publish to Deno
-        run: |
-          bash ./scripts/git-publish-deno.sh
-        env: {}
