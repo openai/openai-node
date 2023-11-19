@@ -1,0 +1,44 @@
+# workflow for re-running publishing to Deno in case it fails for some reason
+# you can run this workflow by navigating to https://www.github.com/openai/openai-node/actions/workflows/publish-deno.yml
+name: Publish Deno
+on:
+  workflow_dispatch:
+
+jobs:
+  publish:
+    name: publish
+    runs-on: ubuntu-latest
+    environment: publish
+
+    steps:
+      - name: Generate a token
+        id: generate_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: 'openai'
+          repositories: 'openai-node,openai-deno-build'
+
+      - uses: actions/checkout@v3
+
+      - name: Set up Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+
+      - name: Set up Deno
+        uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+
+      - name: Install dependencies
+        run: |
+          yarn install
+
+      - name: Publish to Deno
+        run: |
+          bash ./scripts/git-publish-deno.sh
+        env:
+          DENO_PUSH_REMOTE_URL: https://username:${{ steps.generate_token.outputs.token }}@github.com/openai/openai-deno-build.git
+          DENO_PUSH_BRANCH: main
