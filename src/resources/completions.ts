@@ -131,7 +131,7 @@ export interface CompletionCreateParamsBase {
    * [Model overview](https://platform.openai.com/docs/models/overview) for
    * descriptions of them.
    */
-  model:
+  model?:
     | (string & {})
     | 'babbage-002'
     | 'davinci-002'
