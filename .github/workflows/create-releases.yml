@@ -20,6 +20,15 @@ jobs:
           repo: ${{ github.event.repository.full_name }}
           stainless-api-key: ${{ secrets.STAINLESS_API_KEY }}
 
+      - name: Generate a token
+        id: generate_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: 'openai'
+          repositories: 'openai-node,openai-deno-build'
+
       - name: Set up Node
         if: ${{ steps.release.outputs.releases_created }}
         uses: actions/setup-node@v3
@@ -48,4 +57,6 @@ jobs:
         if: ${{ steps.release.outputs.releases_created }}
         run: |
           bash ./scripts/git-publish-deno.sh
-        env: {}
+        env:
+          DENO_PUSH_REMOTE_URL: https://username:${{ steps.generate_token.outputs.token }}@github.com/openai/openai-deno-build.git
+          DENO_PUSH_BRANCH: main

@@ -11,6 +11,8 @@ jobs:
     environment: publish
 
     steps:
+      - uses: actions/checkout@v3
+
       - name: Generate a token
         id: generate_token
         uses: actions/create-github-app-token@v1
@@ -19,8 +21,6 @@ jobs:
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
           owner: 'openai'
           repositories: 'openai-node,openai-deno-build'
-
-      - uses: actions/checkout@v3
 
       - name: Set up Node
         uses: actions/setup-node@v3
