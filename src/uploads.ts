@@ -7,6 +7,7 @@ import {
   getMultipartRequestOptions,
   type FsReadStream,
   isFsReadStream,
+  isReadableStream,
 } from './_shims/index';
 import { MultipartBody } from './_shims/MultipartBody';
 export { fileFromPath } from './_shims/index';
@@ -85,7 +86,7 @@ export const isBlobLike = (value: any): value is BlobLike & { arrayBuffer(): Pro
   typeof value.arrayBuffer === 'function';
 
 export const isUploadable = (value: any): value is Uploadable => {
-  return isFileLike(value) || isResponseLike(value) || isFsReadStream(value);
+  return isFileLike(value) || isResponseLike(value) || isFsReadStream(value) || isReadableStream(value);
 };
 
 export type ToFileInput = Uploadable | Exclude<BlobLikePart, string> | AsyncIterable<BlobLikePart>;

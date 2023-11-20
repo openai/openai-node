@@ -79,5 +79,6 @@ export function getRuntime(): Shims {
     getDefaultAgent: (url: string): Agent => (url.startsWith('https') ? defaultHttpsAgent : defaultHttpAgent),
     fileFromPath,
     isFsReadStream: (value: any): value is FsReadStream => value instanceof FsReadStream,
+    isReadableStream: (value: any): value is ReadableStream => value instanceof Readable,
   };
 }
