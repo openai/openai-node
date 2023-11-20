@@ -10,7 +10,7 @@ jobs:
     name: release doctor
     runs-on: ubuntu-latest
     environment: publish
-    if: github.repository == 'openai/openai-node' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'release-please') || github.head_ref == 'next')
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'release-please') || github.head_ref == 'next')
 
     steps:
       - uses: actions/checkout@v3
