@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.19.1 (2023-11-20)
+
+Full Changelog: [v4.19.0...v4.19.1](https://github.com/openai/openai-node/compare/v4.19.0...v4.19.1)
+
 ## 4.19.0 (2023-11-15)
 
 Full Changelog: [v4.18.0...v4.19.0](https://github.com/openai/openai-node/compare/v4.18.0...v4.19.0)
