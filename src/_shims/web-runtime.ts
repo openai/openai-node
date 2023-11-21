@@ -1,6 +1,7 @@
 /**
  * Disclaimer: modules in _shims aren't intended to be imported by SDK users.
  */
+import 'openai/shims/node'; // MARTIAN
 import { MultipartBody } from './MultipartBody';
 import { type RequestOptions } from '../core';
 import { type Shims } from './registry';
