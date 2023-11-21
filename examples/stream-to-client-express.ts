@@ -3,7 +3,7 @@
 // This file demonstrates how to stream from the server the chunks as
 // a new-line separated JSON-encoded stream.
 
-import OpenAI from 'openai';
+import OpenAI from 'martian-node';
 import express, { Request, Response } from 'express';
 
 const openai = new OpenAI();

@@ -44,8 +44,8 @@ node scripts/postprocess-files.cjs
 
 # make sure that nothing crashes when we require the output CJS or
 # import the output ESM
-(cd dist && node -e 'require("openai")')
-(cd dist && node -e 'import("openai")' --input-type=module)
+(cd dist && node -e 'require("martian-node")')
+(cd dist && node -e 'import("martian-node")' --input-type=module)
 
 if command -v deno &> /dev/null && [ -e ./build-deno ]
 then

@@ -1,9 +1,9 @@
 // File generated from our OpenAPI spec by Stainless.
 
-import * as Core from 'openai/core';
-import { APIResource } from 'openai/resource';
-import { type Response } from 'openai/_shims/index';
-import * as SpeechAPI from 'openai/resources/audio/speech';
+import * as Core from 'martian-node/core';
+import { APIResource } from 'martian-node/resource';
+import { type Response } from 'martian-node/_shims/index';
+import * as SpeechAPI from 'martian-node/resources/audio/speech';
 
 export class Speech extends APIResource {
   /**

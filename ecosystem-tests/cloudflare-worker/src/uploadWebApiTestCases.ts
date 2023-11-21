@@ -1,6 +1,6 @@
-import OpenAI, { toFile } from 'openai';
-import { TranscriptionCreateParams } from 'openai/resources/audio/transcriptions';
-import { ChatCompletion } from 'openai/resources/chat/completions';
+import OpenAI, { toFile } from 'martian-node';
+import { TranscriptionCreateParams } from 'martian-node/resources/audio/transcriptions';
+import { ChatCompletion } from 'martian-node/resources/chat/completions';
 
 /**
  * Tests uploads using various Web API data objects.

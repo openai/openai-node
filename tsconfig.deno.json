@@ -7,8 +7,8 @@
     "lib": ["es2020", "DOM"],
     "paths": {
       "openai/_shims/auto/*": ["deno/_shims/auto/*-deno"],
-      "openai/*": ["deno/*"],
-      "openai": ["deno/index.ts"],
+      "martian-node/*": ["deno/*"],
+      "martian-node": ["deno/index.ts"],
       "digest-fetch": ["./typings/digest-fetch"]
     },
     "noEmit": true,

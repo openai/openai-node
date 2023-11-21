@@ -1,6 +1,6 @@
-import { multipartFormRequestOptions, createForm } from 'openai/core';
-import { Blob } from 'openai/_shims/index';
-import { toFile } from 'openai';
+import { multipartFormRequestOptions, createForm } from 'martian-node/core';
+import { Blob } from 'martian-node/_shims/index';
+import { toFile } from 'martian-node';
 
 describe('form data validation', () => {
   test('valid values do not error', async () => {

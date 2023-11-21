@@ -1,7 +1,7 @@
-import 'openai/shims/web';
-import OpenAI, { toFile } from 'openai';
+import 'martian-node/shims/web';
+import OpenAI, { toFile } from 'martian-node';
 import { distance } from 'fastest-levenshtein';
-import { ChatCompletion } from 'openai/resources/chat/completions';
+import { ChatCompletion } from 'martian-node/resources/chat/completions';
 
 type TestCase = {
   path: string[];

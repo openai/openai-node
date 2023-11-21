@@ -1,6 +1,6 @@
 // File generated from our OpenAPI spec by Stainless.
 
-import OpenAI, { toFile } from 'openai';
+import OpenAI, { toFile } from 'martian-node';
 import { Response } from 'node-fetch';
 
 const openai = new OpenAI({

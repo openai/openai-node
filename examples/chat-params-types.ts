@@ -1,7 +1,7 @@
 #!/usr/bin/env -S npm run tsn -T
 
-import OpenAI from 'openai';
-import { Stream } from 'openai/streaming';
+import OpenAI from 'martian-node';
+import { Stream } from 'martian-node/streaming';
 
 // gets API Key from environment variable OPENAI_API_KEY
 const openai = new OpenAI();

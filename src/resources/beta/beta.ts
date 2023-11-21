@@ -1,9 +1,9 @@
 // File generated from our OpenAPI spec by Stainless.
 
-import { APIResource } from 'openai/resource';
-import * as AssistantsAPI from 'openai/resources/beta/assistants/assistants';
-import * as ChatAPI from 'openai/resources/beta/chat/chat';
-import * as ThreadsAPI from 'openai/resources/beta/threads/threads';
+import { APIResource } from 'martian-node/resource';
+import * as AssistantsAPI from 'martian-node/resources/beta/assistants/assistants';
+import * as ChatAPI from 'martian-node/resources/beta/chat/chat';
+import * as ThreadsAPI from 'martian-node/resources/beta/threads/threads';
 
 export class Beta extends APIResource {
   chat: ChatAPI.Chat = new ChatAPI.Chat(this._client);

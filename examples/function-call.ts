@@ -1,7 +1,7 @@
 #!/usr/bin/env -S npm run tsn -T
 
-import OpenAI from 'openai';
-import { ChatCompletionMessage, ChatCompletionMessageParam } from 'openai/resources/chat';
+import OpenAI from 'martian-node';
+import { ChatCompletionMessage, ChatCompletionMessageParam } from 'martian-node/resources/chat';
 
 // gets API Key from environment variable OPENAI_API_KEY
 const openai = new OpenAI();

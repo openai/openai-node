@@ -3,7 +3,7 @@
 // This file demonstrates how to stream from the server as a text/plain
 // response with express and the stream async iterator.
 
-import OpenAI from 'openai';
+import OpenAI from 'martian-node';
 import express, { Request, Response } from 'express';
 
 const openai = new OpenAI();

@@ -1,31 +1,31 @@
 // File generated from our OpenAPI spec by Stainless.
 
-import * as Core from 'openai/core';
-import { APIResource } from 'openai/resource';
-import { ChatCompletionRunner, ChatCompletionFunctionRunnerParams } from 'openai/lib/ChatCompletionRunner';
-export { ChatCompletionRunner, ChatCompletionFunctionRunnerParams } from 'openai/lib/ChatCompletionRunner';
+import * as Core from 'martian-node/core';
+import { APIResource } from 'martian-node/resource';
+import { ChatCompletionRunner, ChatCompletionFunctionRunnerParams } from 'martian-node/lib/ChatCompletionRunner';
+export { ChatCompletionRunner, ChatCompletionFunctionRunnerParams } from 'martian-node/lib/ChatCompletionRunner';
 import {
   ChatCompletionStreamingRunner,
   ChatCompletionStreamingFunctionRunnerParams,
-} from 'openai/lib/ChatCompletionStreamingRunner';
+} from 'martian-node/lib/ChatCompletionStreamingRunner';
 export {
   ChatCompletionStreamingRunner,
   ChatCompletionStreamingFunctionRunnerParams,
-} from 'openai/lib/ChatCompletionStreamingRunner';
-import { BaseFunctionsArgs } from 'openai/lib/RunnableFunction';
+} from 'martian-node/lib/ChatCompletionStreamingRunner';
+import { BaseFunctionsArgs } from 'martian-node/lib/RunnableFunction';
 export {
   RunnableFunction,
   RunnableFunctions,
   RunnableFunctionWithParse,
   RunnableFunctionWithoutParse,
   ParsingFunction,
-} from 'openai/lib/RunnableFunction';
-import { ChatCompletionToolRunnerParams } from 'openai/lib/ChatCompletionRunner';
-export { ChatCompletionToolRunnerParams } from 'openai/lib/ChatCompletionRunner';
-import { ChatCompletionStreamingToolRunnerParams } from 'openai/lib/ChatCompletionStreamingRunner';
-export { ChatCompletionStreamingToolRunnerParams } from 'openai/lib/ChatCompletionStreamingRunner';
-import { ChatCompletionStream, type ChatCompletionStreamParams } from 'openai/lib/ChatCompletionStream';
-export { ChatCompletionStream, type ChatCompletionStreamParams } from 'openai/lib/ChatCompletionStream';
+} from 'martian-node/lib/RunnableFunction';
+import { ChatCompletionToolRunnerParams } from 'martian-node/lib/ChatCompletionRunner';
+export { ChatCompletionToolRunnerParams } from 'martian-node/lib/ChatCompletionRunner';
+import { ChatCompletionStreamingToolRunnerParams } from 'martian-node/lib/ChatCompletionStreamingRunner';
+export { ChatCompletionStreamingToolRunnerParams } from 'martian-node/lib/ChatCompletionStreamingRunner';
+import { ChatCompletionStream, type ChatCompletionStreamParams } from 'martian-node/lib/ChatCompletionStream';
+export { ChatCompletionStream, type ChatCompletionStreamParams } from 'martian-node/lib/ChatCompletionStream';
 
 export class Completions extends APIResource {
   /**

@@ -1,6 +1,6 @@
 #!/usr/bin/env -S yarn tsn -T
 
-import OpenAI from 'openai';
+import OpenAI from 'martian-node';
 
 // gets API Key from environment variable OPENAI_API_KEY
 const client = new OpenAI();

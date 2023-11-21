@@ -1,7 +1,7 @@
 #!/usr/bin/env -S npm run tsn -T
 
-import OpenAI from 'openai';
-import { RunnableToolFunction } from 'openai/lib/RunnableFunction';
+import OpenAI from 'martian-node';
+import { RunnableToolFunction } from 'martian-node/lib/RunnableFunction';
 
 // gets API Key from environment variable OPENAI_API_KEY
 const openai = new OpenAI();

@@ -15,8 +15,8 @@ getting the wrong raw `Response` type from `.asResponse()`, for example.
 
 The user can work around these issues by manually importing one of:
 
-- `import 'openai/shims/node'`
-- `import 'openai/shims/web'`
+- `import 'martian-node/shims/node'`
+- `import 'martian-node/shims/web'`
 
 All of the code here in `_shims` handles selecting the automatic default shims or manual overrides.
 

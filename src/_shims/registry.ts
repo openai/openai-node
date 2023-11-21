@@ -42,11 +42,11 @@ export let isFsReadStream: Shims['isFsReadStream'] | undefined = undefined;
 export function setShims(shims: Shims, options: { auto: boolean } = { auto: false }) {
   if (auto) {
     throw new Error(
-      `you must \`import 'openai/shims/${shims.kind}'\` before importing anything else from openai`,
+      `you must \`import 'martian-node/shims/${shims.kind}'\` before importing anything else from openai`,
     );
   }
   if (kind) {
-    throw new Error(`can't \`import 'openai/shims/${shims.kind}'\` after \`import 'openai/shims/${kind}'\``);
+    throw new Error(`can't \`import 'martian-node/shims/${shims.kind}'\` after \`import 'martian-node/shims/${kind}'\``);
   }
   auto = options.auto;
   kind = shims.kind;

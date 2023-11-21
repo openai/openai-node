@@ -1,9 +1,9 @@
 // File generated from our OpenAPI spec by Stainless.
 
-import * as Core from 'openai/core';
-import { APIResource } from 'openai/resource';
-import * as TranscriptionsAPI from 'openai/resources/audio/transcriptions';
-import { type Uploadable, multipartFormRequestOptions } from 'openai/core';
+import * as Core from 'martian-node/core';
+import { APIResource } from 'martian-node/resource';
+import * as TranscriptionsAPI from 'martian-node/resources/audio/transcriptions';
+import { type Uploadable, multipartFormRequestOptions } from 'martian-node/core';
 
 export class Transcriptions extends APIResource {
   /**

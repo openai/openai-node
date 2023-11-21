@@ -1,5 +1,5 @@
-import OpenAI from 'openai';
-import { OpenAIError } from 'openai/error';
+import OpenAI from 'martian-node';
+import { OpenAIError } from 'martian-node/error';
 import { PassThrough } from 'stream';
 import {
   ParsingFunction,
@@ -7,10 +7,10 @@ import {
   type ChatCompletionFunctionRunnerParams,
   ChatCompletionStreamingRunner,
   type ChatCompletionStreamingFunctionRunnerParams,
-} from 'openai/resources/beta/chat/completions';
-import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
+} from 'martian-node/resources/beta/chat/completions';
+import type { ChatCompletionMessageParam } from 'martian-node/resources/chat/completions';
 
-import { type RequestInfo, type RequestInit } from 'openai/_shims/index';
+import { type RequestInfo, type RequestInit } from 'martian-node/_shims/index';
 import { Response } from 'node-fetch';
 import { isAssistantMessage } from './chatCompletionUtils';
 

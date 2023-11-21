@@ -1,12 +1,12 @@
 // File generated from our OpenAPI spec by Stainless.
 
-import * as Core from 'openai/core';
-import { APIPromise } from 'openai/core';
-import { APIResource } from 'openai/resource';
-import * as FineTunesAPI from 'openai/resources/fine-tunes';
-import * as FilesAPI from 'openai/resources/files';
-import { Page } from 'openai/pagination';
-import { Stream } from 'openai/streaming';
+import * as Core from 'martian-node/core';
+import { APIPromise } from 'martian-node/core';
+import { APIResource } from 'martian-node/resource';
+import * as FineTunesAPI from 'martian-node/resources/fine-tunes';
+import * as FilesAPI from 'martian-node/resources/files';
+import { Page } from 'martian-node/pagination';
+import { Stream } from 'martian-node/streaming';
 
 export class FineTunes extends APIResource {
   /**

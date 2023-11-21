@@ -5,7 +5,7 @@ import * as Pagination from './pagination';
 import * as Errors from './error';
 import { type Agent } from './_shims/index';
 import * as Uploads from './uploads';
-import * as API from 'openai/resources/index';
+import * as API from 'martian-node/resources/index';
 
 export interface ClientOptions {
   /**

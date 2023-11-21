@@ -1,14 +1,14 @@
 // File generated from our OpenAPI spec by Stainless.
 
-import * as Core from 'openai/core';
-import { APIResource } from 'openai/resource';
-import { isRequestOptions } from 'openai/core';
-import { type Response } from 'openai/_shims/index';
-import { sleep } from 'openai/core';
-import { APIConnectionTimeoutError } from 'openai/error';
-import * as FilesAPI from 'openai/resources/files';
-import { type Uploadable, multipartFormRequestOptions } from 'openai/core';
-import { Page } from 'openai/pagination';
+import * as Core from 'martian-node/core';
+import { APIResource } from 'martian-node/resource';
+import { isRequestOptions } from 'martian-node/core';
+import { type Response } from 'martian-node/_shims/index';
+import { sleep } from 'martian-node/core';
+import { APIConnectionTimeoutError } from 'martian-node/error';
+import * as FilesAPI from 'martian-node/resources/files';
+import { type Uploadable, multipartFormRequestOptions } from 'martian-node/core';
+import { Page } from 'martian-node/pagination';
 
 export class Files extends APIResource {
   /**

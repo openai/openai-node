@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
+import OpenAI from 'martian-node';
 
 export const config = {
   runtime: 'edge',

@@ -1,5 +1,5 @@
-import OpenAI, { APIUserAbortError, toFile } from 'openai';
-import { TranscriptionCreateParams } from 'openai/resources/audio/transcriptions';
+import OpenAI, { APIUserAbortError, toFile } from 'martian-node';
+import { TranscriptionCreateParams } from 'martian-node/resources/audio/transcriptions';
 import fetch from 'node-fetch';
 import { File as FormDataFile, Blob as FormDataBlob } from 'formdata-node';
 import * as fs from 'fs';

@@ -1,5 +1,5 @@
-import { createResponseHeaders } from 'openai/core';
-import { Headers } from 'openai/_shims/index';
+import { createResponseHeaders } from 'martian-node/core';
+import { Headers } from 'martian-node/_shims/index';
 
 describe('response parsing', () => {
   // TODO: test unicode characters

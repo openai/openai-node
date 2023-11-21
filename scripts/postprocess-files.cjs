@@ -105,11 +105,11 @@ async function postprocess() {
 
     let transformed = mapModulePaths(code, (importPath) => {
       if (file.startsWith(distSrcDir)) {
-        if (importPath.startsWith('openai/')) {
+        if (importPath.startsWith('martian-node/')) {
           // convert self-references in dist/src to relative paths
           let relativePath = path.relative(
             path.dirname(file),
-            path.join(distSrcDir, importPath.substring('openai/'.length)),
+            path.join(distSrcDir, importPath.substring('martian-node/'.length)),
           );
           if (!relativePath.startsWith('.')) relativePath = `./${relativePath}`;
           return relativePath;
@@ -137,7 +137,7 @@ async function postprocess() {
 
     if (file.endsWith('.d.ts')) {
       // work around bad tsc behavior
-      // if we have `import { type Readable } from 'openai/_shims/index'`,
+      // if we have `import { type Readable } from 'martian-node/_shims/index'`,
       // tsc sometimes replaces `Readable` with `import("stream").Readable` inline
       // in the output .d.ts
       transformed = transformed.replace(/import\("stream"\).Readable/g, 'Readable');

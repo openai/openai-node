@@ -1,6 +1,6 @@
 // File generated from our OpenAPI spec by Stainless.
 
-import OpenAI from 'openai';
+import OpenAI from 'martian-node';
 
 const openai = new OpenAI({
   apiKey: 'My API Key',

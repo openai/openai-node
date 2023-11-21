@@ -1,11 +1,11 @@
 // File generated from our OpenAPI spec by Stainless.
 
-import * as Core from 'openai/core';
-import { APIResource } from 'openai/resource';
-import { isRequestOptions } from 'openai/core';
-import * as MessagesAPI from 'openai/resources/beta/threads/messages/messages';
-import * as FilesAPI from 'openai/resources/beta/threads/messages/files';
-import { CursorPage, type CursorPageParams } from 'openai/pagination';
+import * as Core from 'martian-node/core';
+import { APIResource } from 'martian-node/resource';
+import { isRequestOptions } from 'martian-node/core';
+import * as MessagesAPI from 'martian-node/resources/beta/threads/messages/messages';
+import * as FilesAPI from 'martian-node/resources/beta/threads/messages/files';
+import { CursorPage, type CursorPageParams } from 'martian-node/pagination';
 
 export class Messages extends APIResource {
   files: FilesAPI.Files = new FilesAPI.Files(this._client);

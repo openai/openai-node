@@ -1,5 +1,5 @@
-import * as Core from 'openai/core';
-import { type CompletionUsage } from 'openai/resources/completions';
+import * as Core from 'martian-node/core';
+import { type CompletionUsage } from 'martian-node/resources/completions';
 import {
   type Completions,
   type ChatCompletion,
@@ -8,8 +8,8 @@ import {
   type ChatCompletionCreateParams,
   type ChatCompletionAssistantMessageParam,
   type ChatCompletionTool,
-} from 'openai/resources/chat/completions';
-import { APIUserAbortError, OpenAIError } from 'openai/error';
+} from 'martian-node/resources/chat/completions';
+import { APIUserAbortError, OpenAIError } from 'martian-node/error';
 import {
   type RunnableFunction,
   isRunnableFunctionWithParse,

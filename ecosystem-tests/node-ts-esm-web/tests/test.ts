@@ -1,8 +1,8 @@
 // shouldn't need extension, but Jest's ESM module resolution is broken
-import 'openai/shims/web.mjs';
-import OpenAI, { toFile } from 'openai';
+import 'martian-node/shims/web.mjs';
+import OpenAI, { toFile } from 'martian-node';
 import { distance } from 'fastest-levenshtein';
-import { ChatCompletion } from 'openai/resources/chat/completions';
+import { ChatCompletion } from 'martian-node/resources/chat/completions';
 
 const url = 'https://audio-samples.github.io/samples/mp3/blizzard_biased/sample-1.mp3';
 const filename = 'sample-1.mp3';

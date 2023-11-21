@@ -1,4 +1,4 @@
-import OpenAI from 'openai';
+import OpenAI from 'martian-node';
 
 const client = new OpenAI();
 

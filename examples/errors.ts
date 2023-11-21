@@ -1,6 +1,6 @@
 #!/usr/bin/env -S npm run tsn -T
 
-import OpenAI, { NotFoundError } from 'openai';
+import OpenAI, { NotFoundError } from 'martian-node';
 
 // gets API Key from environment variable OPENAI_API_KEY
 const client = new OpenAI();

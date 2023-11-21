@@ -1,6 +1,6 @@
 #!/usr/bin/env -S npm run tsn -T
 
-import OpenAI from 'openai';
+import OpenAI from 'martian-node';
 
 const openai = new OpenAI();
 

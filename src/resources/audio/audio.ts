@@ -1,9 +1,9 @@
 // File generated from our OpenAPI spec by Stainless.
 
-import { APIResource } from 'openai/resource';
-import * as SpeechAPI from 'openai/resources/audio/speech';
-import * as TranscriptionsAPI from 'openai/resources/audio/transcriptions';
-import * as TranslationsAPI from 'openai/resources/audio/translations';
+import { APIResource } from 'martian-node/resource';
+import * as SpeechAPI from 'martian-node/resources/audio/speech';
+import * as TranscriptionsAPI from 'martian-node/resources/audio/transcriptions';
+import * as TranslationsAPI from 'martian-node/resources/audio/translations';
 
 export class Audio extends APIResource {
   transcriptions: TranscriptionsAPI.Transcriptions = new TranscriptionsAPI.Transcriptions(this._client);

@@ -1,12 +1,12 @@
 // File generated from our OpenAPI spec by Stainless.
 
-import * as Core from 'openai/core';
-import { APIPromise } from 'openai/core';
-import { APIResource } from 'openai/resource';
-import * as ChatCompletionsAPI from 'openai/resources/chat/completions';
-import * as CompletionsAPI from 'openai/resources/completions';
-import * as Shared from 'openai/resources/shared';
-import { Stream } from 'openai/streaming';
+import * as Core from 'martian-node/core';
+import { APIPromise } from 'martian-node/core';
+import { APIResource } from 'martian-node/resource';
+import * as ChatCompletionsAPI from 'martian-node/resources/chat/completions';
+import * as CompletionsAPI from 'martian-node/resources/completions';
+import * as Shared from 'martian-node/resources/shared';
+import { Stream } from 'martian-node/streaming';
 
 export class Completions extends APIResource {
   /**
@@ -557,7 +557,7 @@ export interface ChatCompletionCreateParamsBase {
    * [model endpoint compatibility](https://platform.openai.com/docs/models/model-endpoint-compatibility)
    * table for details on which models work with the Chat API.
    */
-  model:
+  model?:
     | (string & {})
     | 'gpt-4-1106-preview'
     | 'gpt-4-vision-preview'

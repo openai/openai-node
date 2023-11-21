@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI, { toFile } from 'openai';
-import { TranscriptionCreateParams } from 'openai/resources/audio';
+import OpenAI, { toFile } from 'martian-node';
+import { TranscriptionCreateParams } from 'martian-node/resources/audio';
 
 export const config = {
   runtime: 'edge',

@@ -1,8 +1,8 @@
 /**
  * @jest-environment jsdom
  */
-import 'openai/shims/node';
-import OpenAI, { toFile } from 'openai';
+import 'martian-node/shims/node';
+import OpenAI, { toFile } from 'martian-node';
 import fetch from 'node-fetch';
 import { distance } from 'fastest-levenshtein';
 // @ts-ignore

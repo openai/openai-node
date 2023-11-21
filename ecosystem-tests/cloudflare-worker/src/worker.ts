@@ -40,7 +40,7 @@ export default {
 		if (url.pathname !== '/test') return new Response(null, { status: 404 });
 		try {
 			console.error('importing openai');
-			const { default: OpenAI } = await import('openai');
+			const { default: OpenAI } = await import('martian-node');
 			console.error('importing test cases');
 			const { uploadWebApiTestCases } = await import('./uploadWebApiTestCases.js');
 			console.error('creating client');

@@ -1,12 +1,12 @@
 // File generated from our OpenAPI spec by Stainless.
 
-import * as Core from 'openai/core';
-import { APIResource } from 'openai/resource';
-import { isRequestOptions } from 'openai/core';
-import * as AssistantsAPI from 'openai/resources/beta/assistants/assistants';
-import * as Shared from 'openai/resources/shared';
-import * as FilesAPI from 'openai/resources/beta/assistants/files';
-import { CursorPage, type CursorPageParams } from 'openai/pagination';
+import * as Core from 'martian-node/core';
+import { APIResource } from 'martian-node/resource';
+import { isRequestOptions } from 'martian-node/core';
+import * as AssistantsAPI from 'martian-node/resources/beta/assistants/assistants';
+import * as Shared from 'martian-node/resources/shared';
+import * as FilesAPI from 'martian-node/resources/beta/assistants/files';
+import { CursorPage, type CursorPageParams } from 'martian-node/pagination';
 
 export class Assistants extends APIResource {
   files: FilesAPI.Files = new FilesAPI.Files(this._client);

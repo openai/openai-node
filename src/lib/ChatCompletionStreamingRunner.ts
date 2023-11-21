@@ -2,9 +2,9 @@ import {
   Completions,
   type ChatCompletionChunk,
   type ChatCompletionCreateParamsStreaming,
-} from 'openai/resources/chat/completions';
+} from 'martian-node/resources/chat/completions';
 import { RunnerOptions, type AbstractChatCompletionRunnerEvents } from './AbstractChatCompletionRunner';
-import { type ReadableStream } from 'openai/_shims/index';
+import { type ReadableStream } from 'martian-node/_shims/index';
 import { RunnableTools, type BaseFunctionsArgs, type RunnableFunctions } from './RunnableFunction';
 import { ChatCompletionSnapshot, ChatCompletionStream } from './ChatCompletionStream';
 

@@ -1,4 +1,4 @@
-import OpenAI from 'openai';
+import OpenAI from 'martian-node';
 import { OpenAIStream, StreamingTextResponse } from 'ai';
 import { NextRequest } from 'next/server';
 

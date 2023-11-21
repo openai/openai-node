@@ -1,4 +1,4 @@
-import { APIClient } from 'openai/core';
+import { APIClient } from 'martian-node/core';
 
 const { stringifyQuery } = APIClient.prototype as any;
 

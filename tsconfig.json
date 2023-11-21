@@ -9,9 +9,9 @@
     "esModuleInterop": true,
     "baseUrl": "./",
     "paths": {
-      "openai/_shims/auto/*": ["src/_shims/auto/*-node"],
-      "openai/*": ["src/*"],
-      "openai": ["src/index.ts"],
+      "martian-node/_shims/auto/*": ["src/_shims/auto/*-node"],
+      "martian-node/*": ["src/*"],
+      "martian-node": ["src/index.ts"],
       "digest-fetch": ["./typings/digest-fetch"]
     },
     "noEmit": true,

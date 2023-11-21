@@ -1,7 +1,6 @@
 /**
  * Disclaimer: modules in _shims aren't intended to be imported by SDK users.
  */
-import 'openai/shims/node'; // MARTIAN
 import { MultipartBody } from './MultipartBody';
 import { type RequestOptions } from '../core';
 import { type Shims } from './registry';
@@ -10,9 +9,9 @@ export function getRuntime({ manuallyImported }: { manuallyImported?: boolean } 
   const recommendation =
     manuallyImported ?
       `You may need to use polyfills`
-    : `Add one of these imports before your first \`import … from 'openai'\`:
-- \`import 'openai/shims/node'\` (if you're running on Node)
-- \`import 'openai/shims/web'\` (otherwise)
+    : `Add one of these imports before your first \`import … from 'martian-node'\`:
+- \`import 'martian-node/shims/node'\` (if you're running on Node)
+- \`import 'martian-node/shims/web'\` (otherwise)
 `;
 
   let _fetch, _Request, _Response, _Headers;

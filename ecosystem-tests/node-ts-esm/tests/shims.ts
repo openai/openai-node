@@ -1,7 +1,7 @@
 // shouldn't need extension, but Jest's ESM module resolution is broken
-import 'openai/shims/node.mjs';
-import * as shims from 'openai/_shims/index';
+import 'martian-node/shims/node.mjs';
+import * as shims from 'martian-node/_shims/index';
 
-test('openai/shims/node', () => {
+test('martian-node/shims/node', () => {
   expect(shims.kind).toEqual('node');
 });

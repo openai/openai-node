@@ -3,7 +3,7 @@ import {
   type ChatCompletionFunctionMessageParam,
   type ChatCompletionMessageParam,
   type ChatCompletionToolMessageParam,
-} from 'openai/resources';
+} from 'martian-node/resources';
 
 export const isAssistantMessage = (
   message: ChatCompletionMessageParam | null | undefined,

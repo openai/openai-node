@@ -9,7 +9,7 @@
  * a console.log or UI display.
  */
 import fetch from 'node-fetch';
-import { ChatCompletionStream } from 'openai/lib/ChatCompletionStream';
+import { ChatCompletionStream } from 'martian-node/lib/ChatCompletionStream';
 
 fetch('http://localhost:3000', {
   method: 'POST',

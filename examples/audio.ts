@@ -1,6 +1,6 @@
 #!/usr/bin/env -S npm run tsn -T
 
-import OpenAI, { toFile } from 'openai';
+import OpenAI, { toFile } from 'martian-node';
 import fs from 'fs/promises';
 import path from 'path';
 

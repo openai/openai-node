@@ -1,12 +1,12 @@
 // File generated from our OpenAPI spec by Stainless.
 
-import * as Core from 'openai/core';
-import { APIResource } from 'openai/resource';
-import { isRequestOptions } from 'openai/core';
-import * as ThreadsAPI from 'openai/resources/beta/threads/threads';
-import * as Shared from 'openai/resources/shared';
-import * as MessagesAPI from 'openai/resources/beta/threads/messages/messages';
-import * as RunsAPI from 'openai/resources/beta/threads/runs/runs';
+import * as Core from 'martian-node/core';
+import { APIResource } from 'martian-node/resource';
+import { isRequestOptions } from 'martian-node/core';
+import * as ThreadsAPI from 'martian-node/resources/beta/threads/threads';
+import * as Shared from 'martian-node/resources/shared';
+import * as MessagesAPI from 'martian-node/resources/beta/threads/messages/messages';
+import * as RunsAPI from 'martian-node/resources/beta/threads/runs/runs';
 
 export class Threads extends APIResource {
   runs: RunsAPI.Runs = new RunsAPI.Runs(this._client);

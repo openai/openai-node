@@ -1,6 +1,6 @@
 #!/usr/bin/env -S npm run tsn -T
 
-import OpenAI from 'openai';
+import OpenAI from 'martian-node';
 
 // The name of your Azure OpenAI Resource.
 // https://learn.microsoft.com/en-us/azure/cognitive-services/openai/how-to/create-resource?pivots=web-portal#create-a-resource

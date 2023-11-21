@@ -1,5 +1,5 @@
-import * as shims from 'openai/_shims/index';
+import * as shims from 'martian-node/_shims/index';
 
-test('openai/shims/node', () => {
+test('martian-node/shims/node', () => {
   expect(shims.kind).toEqual('node');
 });

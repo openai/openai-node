@@ -1,9 +1,9 @@
 // File generated from our OpenAPI spec by Stainless.
 
-import * as Core from 'openai/core';
-import { APIResource } from 'openai/resource';
-import * as ModelsAPI from 'openai/resources/models';
-import { Page } from 'openai/pagination';
+import * as Core from 'martian-node/core';
+import { APIResource } from 'martian-node/resource';
+import * as ModelsAPI from 'martian-node/resources/models';
+import { Page } from 'martian-node/pagination';
 
 export class Models extends APIResource {
   /**

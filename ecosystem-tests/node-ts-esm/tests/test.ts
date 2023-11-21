@@ -1,7 +1,7 @@
 // shouldn't need extension, but Jest's ESM module resolution is broken
-import 'openai/shims/node.mjs';
-import OpenAI, { toFile } from 'openai';
-import { TranscriptionCreateParams } from 'openai/resources/audio/transcriptions';
+import 'martian-node/shims/node.mjs';
+import OpenAI, { toFile } from 'martian-node';
+import { TranscriptionCreateParams } from 'martian-node/resources/audio/transcriptions';
 import fetch from 'node-fetch';
 import { File as FormDataFile, Blob as FormDataBlob } from 'formdata-node';
 import * as fs from 'fs';

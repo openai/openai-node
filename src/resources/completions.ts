@@ -1,10 +1,10 @@
 // File generated from our OpenAPI spec by Stainless.
 
-import * as Core from 'openai/core';
-import { APIPromise } from 'openai/core';
-import { APIResource } from 'openai/resource';
-import * as CompletionsAPI from 'openai/resources/completions';
-import { Stream } from 'openai/streaming';
+import * as Core from 'martian-node/core';
+import { APIPromise } from 'martian-node/core';
+import { APIResource } from 'martian-node/resource';
+import * as CompletionsAPI from 'martian-node/resources/completions';
+import { Stream } from 'martian-node/streaming';
 
 export class Completions extends APIResource {
   /**

@@ -1,4 +1,4 @@
-import OpenAI from 'openai';
+import OpenAI from 'martian-node';
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 // This file demonstrates how to stream from a Next.JS server as
