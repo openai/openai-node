@@ -1,6 +1,7 @@
 import fs from 'fs';
 import { toFile, type ResponseLike } from 'openai/uploads';
 import { File } from 'openai/_shims/index';
+import { Readable } from 'node:stream';
 
 class MyClass {
   name: string = 'foo';
@@ -49,9 +50,19 @@ describe('toFile', () => {
     expect(file.name).toEqual('input.jsonl');
   });
 
-  it('extracts a file name from a ReadStream', async () => {
+  it('extracts a file name from a FsReadStream', async () => {
     const input = fs.createReadStream('tests/uploads.test.ts');
     const file = await toFile(input);
     expect(file.name).toEqual('uploads.test.ts');
+  });
+
+  it('extracts a file name from a ReadableStream', async () => {
+    const input = new Readable({
+      read() {
+        this.push(null);
+      },
+    });
+    const file = await toFile(input);
+    expect(file.name).toEqual('unknown_file');
   });
 });
