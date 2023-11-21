@@ -4,7 +4,7 @@ The Martin Node library is a drop in replacement for OpenAI package
 
 ## Documentation
 
-The API documentation can be found [here](https://docs.withmartian.com/martian-api/).
+The API documentation can be found [here](https://docs.withmartian.com/).
 
 ## Installation
 
