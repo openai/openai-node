@@ -7,7 +7,7 @@ on:
 jobs:
   release:
     name: release
-    if: github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/master' && github.repository == 'openai/openai-node'
     runs-on: ubuntu-latest
     environment: publish
 
