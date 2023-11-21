@@ -224,6 +224,7 @@ Request parameters that correspond to file uploads can be passed in many differe
 - `File` (or an object with the same structure)
 - a `fetch` `Response` (or an object with the same structure)
 - an `fs.ReadStream`
+- an `stream.Readable`
 - the return value of our `toFile` helper
 
 ```ts
