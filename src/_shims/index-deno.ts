@@ -85,6 +85,8 @@ export function fileFromPath() {
 
 export const isFsReadStream = (value: any) => false;
 
+export const isReadableStream = (value: any) => false;
+
 export declare class Readable {
   readable: boolean;
   readonly readableEnded: boolean;

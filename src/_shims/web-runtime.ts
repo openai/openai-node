@@ -99,5 +99,6 @@ export function getRuntime({ manuallyImported }: { manuallyImported?: boolean } 
       );
     },
     isFsReadStream: (value: any) => false,
+    isReadableStream: (value: any) => false,
   };
 }
