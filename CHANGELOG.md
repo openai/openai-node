@@ -1,5 +1,18 @@
 # Changelog
 
+## 4.20.0 (2023-11-22)
+
+Full Changelog: [v4.19.1...v4.20.0](https://github.com/openai/openai-node/compare/v4.19.1...v4.20.0)
+
+### Features
+
+* allow installing package directly from github ([#522](https://github.com/openai/openai-node/issues/522)) ([51926d7](https://github.com/openai/openai-node/commit/51926d7a0092744e49de39f4988feddf313adafa))
+
+
+### Chores
+
+* **internal:** don't call prepare in dist ([#525](https://github.com/openai/openai-node/issues/525)) ([d09411e](https://github.com/openai/openai-node/commit/d09411ebaa28d6610e1b880d03339d520b4a1833))
+
 ## 4.19.1 (2023-11-20)
 
 Full Changelog: [v4.19.0...v4.19.1](https://github.com/openai/openai-node/compare/v4.19.0...v4.19.1)
