@@ -28,7 +28,7 @@ import OpenAI from 'https://deno.land/x/openai@v4.19.1/mod.ts';
 
 ## Usage
 
-The full API of this library can be found in [api.md file](https://github.com/openai/openai-node/blob/master/api.md). The code below shows how to get started using the chat completions API.
+The full API of this library can be found in [api.md file](api.md) along with many [code examples](https://github.com/openai/openai-node/tree/master/examples). The code below shows how to get started using the chat completions API.
 
 ```js
 import OpenAI from 'openai';
@@ -215,7 +215,7 @@ main();
 Like with `.stream()`, we provide a variety of [helpers and events](helpers.md#events).
 
 Read more about various examples such as with integrating with [zod](helpers.md#integrate-with-zod),
-[next.js](helpers.md#integrate-wtih-next-js), and [proxying a stream to the browser](helpers.md#proxy-streaming to-a-browser).
+[next.js](helpers.md#integrate-wtih-next-js), and [proxying a stream to the browser](helpers.md#proxy-streaming-to-a-browser).
 
 ## File Uploads
 
