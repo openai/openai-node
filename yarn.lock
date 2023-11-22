@@ -3063,7 +3063,7 @@ onetime@^5.1.2:
     mimic-fn "^2.1.0"
 
 "openai@file:.":
-  version "4.19.1"
+  version "4.20.0"
   dependencies:
     "@types/node" "^18.11.18"
     "@types/node-fetch" "^2.6.4"
