@@ -18,7 +18,7 @@ fetch('http://localhost:3000', {
 }).then(async (res) => {
   // @ts-ignore ReadableStream on different environments can be strange
   const runner = ChatCompletionStream.fromReadableStream(res.body);
-
+  await runner.finalChatCompletion();
   runner.on('content', (delta, snapshot) => {
     process.stdout.write(delta);
     // or, in a browser, you might display like this:
