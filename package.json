@@ -15,7 +15,7 @@
     "prepack": "echo 'to pack, run yarn build && (cd dist; yarn pack)' && exit 1",
     "prepublishOnly": "echo 'to publish, run yarn build && (cd dist; yarn publish)' && exit 1",
     "format": "prettier --write --cache  --cache-strategy metadata . !dist",
-    "prepare": "npm run build",
+    "prepare": "if [ $(basename $(dirname $PWD)) = 'node_modules' ]; then npm run build; fi",
     "tsn": "ts-node -r tsconfig-paths/register",
     "lint": "eslint --ext ts,js .",
     "fix": "eslint --fix --ext ts,js ."
@@ -39,7 +39,6 @@
     "eslint-plugin-prettier": "^4.0.0",
     "eslint-plugin-unused-imports": "^2.0.0",
     "jest": "^29.4.0",
-    "openai": "file:.",
     "prettier": "rattrayalex/prettier#postfix-ternaries",
     "ts-jest": "^29.1.0",
     "ts-morph": "^19.0.0",
@@ -56,6 +55,10 @@
     "./shims/web.js",
     "./shims/web.mjs"
   ],
+  "imports": {
+    "openai": ".",
+    "openai/*": "./src/*"
+  },
   "exports": {
     "./_shims/auto/*": {
       "deno": {
