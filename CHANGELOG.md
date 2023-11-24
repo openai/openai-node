@@ -1,5 +1,18 @@
 # Changelog
 
+## 4.20.1 (2023-11-24)
+
+Full Changelog: [v4.20.0...v4.20.1](https://github.com/openai/openai-node/compare/v4.20.0...v4.20.1)
+
+### Chores
+
+* **internal:** remove file import and conditionally run prepare ([#533](https://github.com/openai/openai-node/issues/533)) ([48cb729](https://github.com/openai/openai-node/commit/48cb729bfc484ce3d04273be417b307a0d20644f))
+
+
+### Documentation
+
+* **readme:** fix typo and add examples link ([#529](https://github.com/openai/openai-node/issues/529)) ([cf959b1](https://github.com/openai/openai-node/commit/cf959b17db0a4f8dd7eb59add333c4a461b02459))
+
 ## 4.20.0 (2023-11-22)
 
 Full Changelog: [v4.19.1...v4.20.0](https://github.com/openai/openai-node/compare/v4.19.1...v4.20.0)
