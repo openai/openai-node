@@ -545,6 +545,23 @@ export type ChatCompletionCreateParams =
   | ChatCompletionCreateParamsNonStreaming
   | ChatCompletionCreateParamsStreaming;
 
+export type ModelType =
+  | (string & {})
+  | 'gpt-4-1106-preview'
+  | 'gpt-4-vision-preview'
+  | 'gpt-4'
+  | 'gpt-4-0314'
+  | 'gpt-4-0613'
+  | 'gpt-4-32k'
+  | 'gpt-4-32k-0314'
+  | 'gpt-4-32k-0613'
+  | 'gpt-3.5-turbo-1106'
+  | 'gpt-3.5-turbo'
+  | 'gpt-3.5-turbo-16k'
+  | 'gpt-3.5-turbo-0301'
+  | 'gpt-3.5-turbo-0613'
+  | 'gpt-3.5-turbo-16k-0613';
+
 export interface ChatCompletionCreateParamsBase {
   /**
    * A list of messages comprising the conversation so far.
@@ -557,22 +574,7 @@ export interface ChatCompletionCreateParamsBase {
    * [model endpoint compatibility](https://platform.openai.com/docs/models/model-endpoint-compatibility)
    * table for details on which models work with the Chat API.
    */
-  model?:
-    | (string & {})
-    | 'gpt-4-1106-preview'
-    | 'gpt-4-vision-preview'
-    | 'gpt-4'
-    | 'gpt-4-0314'
-    | 'gpt-4-0613'
-    | 'gpt-4-32k'
-    | 'gpt-4-32k-0314'
-    | 'gpt-4-32k-0613'
-    | 'gpt-3.5-turbo-1106'
-    | 'gpt-3.5-turbo'
-    | 'gpt-3.5-turbo-16k'
-    | 'gpt-3.5-turbo-0301'
-    | 'gpt-3.5-turbo-0613'
-    | 'gpt-3.5-turbo-16k-0613';
+  model?: ModelType | ModelType[];
 
   /**
    * Number between -2.0 and 2.0. Positive values penalize new tokens based on their
