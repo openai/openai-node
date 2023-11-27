@@ -123,6 +123,8 @@ export interface CompletionUsage {
 
 export type CompletionCreateParams = CompletionCreateParamsNonStreaming | CompletionCreateParamsStreaming;
 
+export type ModelType = (string & {}) | 'llama-2-70b' | 'gpt-3.5-turbo-instruct';
+
 export interface CompletionCreateParamsBase {
   /**
    * ID of the model to use. You can use the
@@ -131,18 +133,7 @@ export interface CompletionCreateParamsBase {
    * [Model overview](https://platform.openai.com/docs/models/overview) for
    * descriptions of them.
    */
-  model:
-    | (string & {})
-    | 'babbage-002'
-    | 'davinci-002'
-    | 'gpt-3.5-turbo-instruct'
-    | 'text-davinci-003'
-    | 'text-davinci-002'
-    | 'text-davinci-001'
-    | 'code-davinci-002'
-    | 'text-curie-001'
-    | 'text-babbage-001'
-    | 'text-ada-001';
+  model?: ModelType | ModelType[];
 
   /**
    * The prompt(s) to generate completions for, encoded as a string, array of
