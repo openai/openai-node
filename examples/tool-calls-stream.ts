@@ -11,43 +11,53 @@ import {
 // gets API Key from environment variable OPENAI_API_KEY
 const openai = new OpenAI();
 
-const functions: OpenAI.Chat.ChatCompletionCreateParams.Function[] = [
+const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
-    name: 'list',
-    description: 'list queries books by genre, and returns a list of names of books',
-    parameters: {
-      type: 'object',
-      properties: {
-        genre: { type: 'string', enum: ['mystery', 'nonfiction', 'memoir', 'romance', 'historical'] },
+    type: 'function',
+    function: {
+      name: 'list',
+      description: 'list queries books by genre, and returns a list of names of books',
+      parameters: {
+        type: 'object',
+        properties: {
+          genre: { type: 'string', enum: ['mystery', 'nonfiction', 'memoir', 'romance', 'historical'] },
+        },
       },
     },
   },
   {
-    name: 'search',
-    description: 'search queries books by their name and returns a list of book names and their ids',
-    parameters: {
-      type: 'object',
-      properties: {
-        name: { type: 'string' },
+    type: 'function',
+    function: {
+      name: 'search',
+      description: 'search queries books by their name and returns a list of book names and their ids',
+      parameters: {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+        },
       },
     },
   },
   {
-    name: 'get',
-    description:
-      "get returns a book's detailed information based on the id of the book. Note that this does not accept names, and only IDs, which you can get by using search.",
-    parameters: {
-      type: 'object',
-      properties: {
-        id: { type: 'string' },
+    type: 'function',
+    function: {
+      name: 'get',
+      description:
+        "get returns a book's detailed information based on the id of the book. Note that this does not accept names, and only IDs, which you can get by using search.",
+      parameters: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+        },
       },
     },
-  },
+  }  
 ];
 
-async function callFunction(function_call: ChatCompletionMessage.FunctionCall): Promise<any> {
-  const args = JSON.parse(function_call.arguments!);
-  switch (function_call.name) {
+async function callTool(tool_call: OpenAI.Chat.Completions.ChatCompletionMessageToolCall): Promise<any> {
+  if (tool_call.type !== 'function') throw new Error("Unexpected tool_call type:" + tool_call.type)
+  const args = JSON.parse(tool_call.function.arguments);
+  switch (tool_call.function.name) {
     case 'list':
       return await list(args['genre']);
 
@@ -76,6 +86,7 @@ async function main() {
     },
   ];
   console.log(messages[0]);
+  console.log();
   console.log(messages[1]);
   console.log();
 
@@ -83,7 +94,7 @@ async function main() {
     const stream = await openai.chat.completions.create({
       model: 'gpt-3.5-turbo',
       messages,
-      functions: functions,
+      tools: tools,
       stream: true,
     });
 
@@ -100,54 +111,83 @@ async function main() {
     console.log();
     messages.push(message);
 
-    // If there is no function call, we're done and can exit this loop
-    if (!message.function_call) {
+    // If there are no tool calls, we're done and can exit this loop
+    if (!message.tool_calls) {
       return;
     }
 
-    // If there is a function call, we generate a new message with the role 'function'.
-    const result = await callFunction(message.function_call);
-    const newMessage = {
-      role: 'function' as const,
-      name: message.function_call.name!,
-      content: JSON.stringify(result),
-    };
-    messages.push(newMessage);
-
-    console.log(newMessage);
+    // If there are tool calls, we generate a new message with the role 'tool' for each tool call.
+    for (const toolCall of message.tool_calls) {
+      const result = await callTool(toolCall);
+      const newMessage = {
+        tool_call_id: toolCall.id,
+        role: "tool" as const,
+        name: toolCall.function.name,
+        content: JSON.stringify(result),
+      };
+      console.log(newMessage);
+      messages.push(newMessage);
+    }    
     console.log();
   }
 }
 
 function messageReducer(previous: ChatCompletionMessage, item: ChatCompletionChunk): ChatCompletionMessage {
-  const reduce = (acc: any, delta: any) => {
+  const reduce = (acc: any, delta: ChatCompletionChunk.Choice.Delta) => {
     acc = { ...acc };
     for (const [key, value] of Object.entries(delta)) {
       if (acc[key] === undefined || acc[key] === null) {
         acc[key] = value;
-      } else if (typeof acc[key] === 'string' && typeof value === 'string') {
-        (acc[key] as string) += value;
-      } else if (typeof acc[key] === 'object' && !Array.isArray(acc[key])) {
+        //  OpenAI.Chat.Completions.ChatCompletionMessageToolCall does not have a key, .index
+        if (Array.isArray(acc[key])) {
+          for (const arr of acc[key]) {
+            delete arr.index;
+          }
+        }
+      } else if (typeof acc[key] === "string" && typeof value === "string") {
+        acc[key] += value;
+      } else if (typeof acc[key] === "number" && typeof value === "number") {
+        acc[key] = value;
+      } else if (Array.isArray(acc[key]) && Array.isArray(value)) {
+        const accArray = acc[key];
+        for (let i = 0; i < value.length; i++) {
+          const { index, ...chunkTool } = value[i];
+          if (index - accArray.length > 1) {
+            throw new Error(`Error: An array has an empty value when tool_calls are constructed. tool_calls: ${accArray}; tool: ${value}`);
+          }
+          accArray[index] = reduce(accArray[index], chunkTool);
+        }
+      } else if (typeof acc[key] === "object" && typeof value === "object") {
         acc[key] = reduce(acc[key], value);
       }
     }
     return acc;
   };
-
-  return reduce(previous, item.choices[0]!.delta) as ChatCompletionMessage;
+  return reduce(previous, item.choices[0].delta) as ChatCompletionMessage;
 }
 
 function lineRewriter() {
-  let lastMessageLength = 0;
+  let lastMessageLines = 0;
   return function write(value: any) {
     process.stdout.cursorTo(0);
-    process.stdout.moveCursor(0, -Math.floor((lastMessageLength - 1) / process.stdout.columns));
-    lastMessageLength = util.formatWithOptions({ colors: false, breakLength: Infinity }, value).length;
-    process.stdout.write(util.formatWithOptions({ colors: true, breakLength: Infinity }, value));
+    process.stdout.moveCursor(0, -lastMessageLines);
+
+    // calculate where to move cursor back for the next move.
+    const text = util.formatWithOptions({ colors: false, breakLength: Infinity, depth: 4 }, value)
+    const __LINE_BREAK_PLACE_HOLDER__ = '__LINE_BREAK_PLACE_HOLDER__';
+    const lines = text.replaceAll('\\n', __LINE_BREAK_PLACE_HOLDER__).split('\n').map(line => line.replaceAll(__LINE_BREAK_PLACE_HOLDER__, '\\n'))
+    lastMessageLines = -1;
+    for (const line of lines) {
+      const linelength = line.length
+      lastMessageLines += Math.ceil(linelength / process.stdout.columns)
+    }
+    lastMessageLines = Math.max(lastMessageLines, 0)
+
+    process.stdout.clearScreenDown();
+    process.stdout.write(util.formatWithOptions({ colors: true, breakLength: Infinity, depth: 4 }, value));
   };
 }
-
-const db = [
+const db: {id: string, name: string, genre: string, description: string}[] = [
   {
     id: 'a1',
     name: 'To Kill a Mockingbird',
