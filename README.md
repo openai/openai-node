@@ -341,7 +341,7 @@ On timeout, an `APIConnectionTimeoutError` is thrown.
 
 Note that requests which time out will be [retried twice by default](#retries).
 
-## Auto-pagination
+## Auto-pagination 🔄
 
 List methods in the OpenAI API are paginated.
 You can use `for await … of` syntax to iterate through items across all pages:
