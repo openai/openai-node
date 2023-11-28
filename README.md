@@ -435,7 +435,7 @@ const client = new OpenAI({
 Note that if given a `DEBUG=true` environment variable, this library will log all requests and responses automatically.
 This is intended for debugging purposes only and may change in the future without notice.
 
-## Configuring an HTTP(S) Agent (e.g., for proxies)
+## Configuring an HTTP(S) Agent (e.g., for proxies) 🌐
 
 By default, this library uses a stable agent for all http/https requests to reuse TCP connections, eliminating many TCP & TLS handshakes and shaving around 100ms off most requests.
 
