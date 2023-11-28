@@ -33,7 +33,7 @@ jobs:
         if: ${{ steps.release.outputs.releases_created }}
         uses: actions/setup-node@v3
         with:
-          node-version: '16'
+          node-version: '18'
 
       - name: Set up Deno
         if: ${{ steps.release.outputs.releases_created }}
