@@ -372,7 +372,7 @@ while (page.hasNextPage()) {
 }
 ```
 
-## Advanced Usage
+## Advanced Usage 🚀
 
 ### Accessing raw Response data (e.g., headers)
 
