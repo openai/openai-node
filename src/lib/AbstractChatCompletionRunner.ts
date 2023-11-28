@@ -90,7 +90,11 @@ export abstract class AbstractChatCompletionRunner<
   }
 
   protected _addMessage(message: ChatCompletionMessageParam, emit = true) {
+    // @ts-expect-error this works around a bug in the Azure OpenAI API in which `content` is missing instead of null.
+    if (!('content' in message)) message.content = null;
+
     this.messages.push(message);
+
     if (emit) {
       this._emit('message', message);
       if ((isFunctionMessage(message) || isToolMessage(message)) && message.content) {
