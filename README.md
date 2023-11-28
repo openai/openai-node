@@ -470,7 +470,7 @@ We take backwards-compatibility seriously and work hard to ensure you can rely o
 
 We are keen for your feedback; please open an [issue](https://www.github.com/openai/openai-node/issues) with questions, bugs, or suggestions.
 
-## Requirements
+## Requirements ✅
 
 TypeScript >= 4.5 is supported.
 
