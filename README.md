@@ -26,7 +26,7 @@ import OpenAI from 'https://deno.land/x/openai@v4.20.1/mod.ts';
 
 <!-- x-release-please-end -->
 
-## Usage
+## Usage 📖
 
 The full API of this library can be found in [api.md file](api.md) along with many [code examples](https://github.com/openai/openai-node/tree/master/examples). The code below shows how to get started using the chat completions API.
 
