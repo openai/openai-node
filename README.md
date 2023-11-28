@@ -217,7 +217,7 @@ Like with `.stream()`, we provide a variety of [helpers and events](helpers.md#e
 Read more about various examples such as with integrating with [zod](helpers.md#integrate-with-zod),
 [next.js](helpers.md#integrate-wtih-next-js), and [proxying a stream to the browser](helpers.md#proxy-streaming-to-a-browser).
 
-## File Uploads
+## File Uploads 📤
 
 Request parameters that correspond to file uploads can be passed in many different forms:
 
