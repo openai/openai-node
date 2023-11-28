@@ -396,7 +396,7 @@ console.log(raw.headers.get('X-My-Header'));
 console.log(chatCompletion);
 ```
 
-## Customizing the fetch client
+## Customizing the fetch client 🛠️
 
 By default, this library uses `node-fetch` in Node, and expects a global `fetch` function in other environments.
 
