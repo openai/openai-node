@@ -8,7 +8,7 @@ It is generated from our [OpenAPI specification](https://github.com/openai/opena
 
 To learn how to use the OpenAI API, check out our [API Reference](https://platform.openai.com/docs/api-reference) and [Documentation](https://platform.openai.com/docs).
 
-## Installation
+## Installation 🔧
 
 ```sh
 npm install --save openai
