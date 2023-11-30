@@ -132,6 +132,21 @@ describe('instantiate client', () => {
       const client = new OpenAI({ baseURL: 'http://localhost:5000/custom/path', apiKey: 'My API Key' });
       expect(client.buildURL('/foo', null)).toEqual('http://localhost:5000/custom/path/foo');
     });
+
+    afterEach(() => {
+      process.env['SINK_BASE_URL'] = undefined;
+    });
+
+    test('explicit option', () => {
+      const client = new OpenAI({ baseURL: 'https://example.com', apiKey: 'My API Key' });
+      expect(client.baseURL).toEqual('https://example.com');
+    });
+
+    test('env variable', () => {
+      process.env['OPENAI_BASE_URL'] = 'https://example.com/from_env';
+      const client = new OpenAI({ apiKey: 'My API Key' });
+      expect(client.baseURL).toEqual('https://example.com/from_env');
+    });
   });
 
   test('maxRetries option is correctly set', () => {
