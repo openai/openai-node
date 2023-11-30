@@ -34,7 +34,7 @@ The full API of this library can be found in [api.md file](api.md) along with ma
 import OpenAI from 'openai';
 
 const openai = new OpenAI({
-  apiKey: 'My API Key', // defaults to process.env["OPENAI_API_KEY"]
+  apiKey: process.env['OPENAI_API_KEY'], // This is the default and can be omitted
 });
 
 async function main() {
@@ -81,7 +81,7 @@ This library includes TypeScript definitions for all request params and response
 import OpenAI from 'openai';
 
 const openai = new OpenAI({
-  apiKey: 'My API Key', // defaults to process.env["OPENAI_API_KEY"]
+  apiKey: process.env['OPENAI_API_KEY'], // This is the default and can be omitted
 });
 
 async function main() {
