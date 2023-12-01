@@ -123,7 +123,7 @@ export interface CompletionUsage {
 
 export type CompletionCreateParams = CompletionCreateParamsNonStreaming | CompletionCreateParamsStreaming;
 
-export type ModelType = (string & {}) | 'llama-2-70b' | 'gpt-3.5-turbo-instruct';
+export type ModelType = (string & {}) | 'router' | 'llama-2-70b' | 'gpt-3.5-turbo-instruct';
 
 export interface CompletionCreateParamsBase {
   /**

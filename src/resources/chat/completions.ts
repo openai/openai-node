@@ -547,6 +547,7 @@ export type ChatCompletionCreateParams =
 
 export type ModelType =
   | (string & {})
+  | 'router'
   | 'claude-v1'
   | 'claude-v2'
   | 'claude-instant-v1'
