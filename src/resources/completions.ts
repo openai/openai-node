@@ -133,7 +133,7 @@ export interface CompletionCreateParamsBase {
    * [Model overview](https://platform.openai.com/docs/models/overview) for
    * descriptions of them.
    */
-  model?: ModelType | ModelType[];
+  model: ModelType | ModelType[];
 
   /**
    * The prompt(s) to generate completions for, encoded as a string, array of

@@ -569,7 +569,7 @@ export interface ChatCompletionCreateParamsBase {
    * [model endpoint compatibility](https://platform.openai.com/docs/models/model-endpoint-compatibility)
    * table for details on which models work with the Chat API.
    */
-  model?: ModelType | ModelType[];
+  model: ModelType | ModelType[];
 
   /**
    * Number between -2.0 and 2.0. Positive values penalize new tokens based on their
