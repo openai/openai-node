@@ -4,7 +4,7 @@ import OpenAI, { toFile } from 'martian-node';
 import fs from 'fs/promises';
 import path from 'path';
 
-// gets API Key from environment variable OPENAI_API_KEY
+// gets API Key from environment variable MARTIAN_API_KEY
 const openai = new OpenAI();
 
 const speechFile = path.resolve(__dirname, './speech.mp3');

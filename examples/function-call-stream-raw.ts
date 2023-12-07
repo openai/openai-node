@@ -8,7 +8,7 @@ import {
   ChatCompletionMessageParam,
 } from 'martian-node/resources/chat';
 
-// gets API Key from environment variable OPENAI_API_KEY
+// gets API Key from environment variable MARTIAN_API_KEY
 const openai = new OpenAI();
 
 const functions: OpenAI.Chat.ChatCompletionCreateParams.Function[] = [

@@ -16,7 +16,7 @@ const correctAnswer =
   'It was anxious to find him no one that expectation of a man who were giving his father enjoyment. But he was avoided in sight in the minister to which indeed,';
 const model = 'whisper-1';
 
-const client = new OpenAI({ apiKey: process.env['OPENAI_API_KEY'], dangerouslyAllowBrowser: true });
+const client = new OpenAI({ apiKey: process.env['MARTIAN_API_KEY'], dangerouslyAllowBrowser: true });
 
 async function typeTests() {
   // @ts-expect-error this should error if the `Uploadable` type was resolved correctly

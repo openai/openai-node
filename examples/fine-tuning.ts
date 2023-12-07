@@ -11,7 +11,7 @@ import fs from 'fs';
 import OpenAI from 'martian-node';
 import { FineTuningJobEvent } from 'martian-node/resources/fine-tuning';
 
-// Gets the API Key from the environment variable `OPENAI_API_KEY`
+// Gets the API Key from the environment variable `MARTIAN_API_KEY`
 const client = new OpenAI();
 
 async function main() {

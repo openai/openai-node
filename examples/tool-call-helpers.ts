@@ -3,7 +3,7 @@
 import OpenAI from 'martian-node';
 import { RunnableToolFunction } from 'martian-node/lib/RunnableFunction';
 
-// gets API Key from environment variable OPENAI_API_KEY
+// gets API Key from environment variable MARTIAN_API_KEY
 const openai = new OpenAI();
 
 const tools: RunnableToolFunction<any>[] = [

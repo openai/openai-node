@@ -3,7 +3,7 @@
 import OpenAI from 'martian-node';
 import { Stream } from 'martian-node/streaming';
 
-// gets API Key from environment variable OPENAI_API_KEY
+// gets API Key from environment variable MARTIAN_API_KEY
 const openai = new OpenAI();
 
 async function main() {

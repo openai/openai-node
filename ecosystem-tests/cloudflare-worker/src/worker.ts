@@ -26,7 +26,7 @@ export interface Env {
 	// Example binding to a Queue. Learn more at https://developers.cloudflare.com/queues/javascript-apis/
 	// MY_QUEUE: Queue;
 
-	OPENAI_API_KEY: string;
+	MARTIAN_API_KEY: string;
 }
 
 type Test = { description: string; handler: () => Promise<void> };
@@ -44,7 +44,7 @@ export default {
 			console.error('importing test cases');
 			const { uploadWebApiTestCases } = await import('./uploadWebApiTestCases.js');
 			console.error('creating client');
-			const client = new OpenAI({ apiKey: env.OPENAI_API_KEY });
+			const client = new OpenAI({ apiKey: env.MARTIAN_API_KEY });
 			console.error('created client');
 
 			const tests: Test[] = [];

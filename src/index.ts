@@ -9,7 +9,7 @@ import * as API from 'martian-node/resources/index';
 
 export interface ClientOptions {
   /**
-   * Defaults to process.env['OPENAI_API_KEY'].
+   * Defaults to process.env['MARTIAN_API_KEY'].
    */
   apiKey?: string;
 
@@ -89,7 +89,7 @@ export class OpenAI extends Core.APIClient {
   /**
    * API Client for interfacing with the OpenAI API.
    *
-   * @param {string} [opts.apiKey==process.env['OPENAI_API_KEY'] ?? undefined]
+   * @param {string} [opts.apiKey==process.env['MARTIAN_API_KEY'] ?? undefined]
    * @param {string | null} [opts.organization==process.env['OPENAI_ORG_ID'] ?? null]
    * @param {string} [opts.baseURL] - Override the default base URL for the API.
    * @param {number} [opts.timeout=10 minutes] - The maximum amount of time (in milliseconds) the client will wait for a response before timing out.
@@ -101,13 +101,13 @@ export class OpenAI extends Core.APIClient {
    * @param {boolean} [opts.dangerouslyAllowBrowser=false] - By default, client-side use of this library is not allowed, as it risks exposing your secret API credentials to attackers.
    */
   constructor({
-    apiKey = Core.readEnv('MARTIAN_API_KEY') || Core.readEnv('OPENAI_API_KEY'),
+    apiKey = Core.readEnv('MARTIAN_API_KEY'),
     organization = Core.readEnv('OPENAI_ORG_ID') ?? null,
     ...opts
   }: ClientOptions = {}) {
     if (apiKey === undefined) {
       throw new Errors.OpenAIError(
-        "The OPENAI_API_KEY environment variable is missing or empty; either provide it, or instantiate the OpenAI client with an apiKey option, like new OpenAI({ apiKey: 'My API Key' }).",
+        "The MARTIAN_API_KEY environment variable is missing or empty; either provide it, or instantiate the OpenAI client with an apiKey option, like new OpenAI({ apiKey: 'My API Key' }).",
       );
     }
 
@@ -115,7 +115,7 @@ export class OpenAI extends Core.APIClient {
       apiKey,
       organization,
       ...opts,
-      baseURL: opts.baseURL ?? 'https://route.withmartian.com/api/openai/v1',
+      baseURL: opts.baseURL ?? 'https://withmartian.com/api/openai/v1',
     };
 
     if (!options.dangerouslyAllowBrowser && Core.isRunningInBrowser()) {
