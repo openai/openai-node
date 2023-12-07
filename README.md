@@ -25,7 +25,8 @@ async function main() {
   const chatCompletion = await openai.chat.completions.create({
     messages: [{ role: 'user', content: 'Say this is a test' }],
     model: 'router',
-    // model: ['gpt-3.5-turbo', 'claude-v1'], // If more than one is specified, the router chooses the best among them
+    // If more than one model is specified, the router chooses the best among them
+    // model: ['gpt-3.5-turbo', 'claude-v1'],
   });
 }
 
