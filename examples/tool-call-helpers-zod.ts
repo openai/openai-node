@@ -1,73 +1,63 @@
 #!/usr/bin/env -S npm run tsn -T
 
 import OpenAI from 'openai';
-import { RunnableToolFunction } from 'openai/lib/RunnableFunction';
+import { RunnableToolFunctionWithParse } from 'openai/lib/RunnableFunction';
+import { JSONSchema } from 'openai/lib/jsonschema';
+import { ZodSchema, z } from 'zod';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 
 // gets API Key from environment variable OPENAI_API_KEY
 const openai = new OpenAI();
 
-/**
- * Note, this will automatically ensure the model returns valid JSON,
- * but won't ensure it conforms to your schema.
- *
- * For that functionality, please see the `tool-call-helpers-zod.ts` example,
- * which shows a fully typesafe, schema-validating version.
- */
-const tools: RunnableToolFunction<any>[] = [
-  {
-    type: 'function',
-    function: {
-      name: 'list',
-      description: 'list queries books by genre, and returns a list of names of books',
-      parameters: {
-        type: 'object',
-        properties: {
-          genre: { type: 'string', enum: ['mystery', 'nonfiction', 'memoir', 'romance', 'historical'] },
-        },
-      },
-      function: list,
-      parse: JSON.parse,
-    },
-  } as RunnableToolFunction<{ genre: string }>,
-  {
-    type: 'function',
-    function: {
-      name: 'search',
-      description: 'search queries books by their name and returns a list of book names and their ids',
-      parameters: {
-        type: 'object',
-        properties: {
-          name: { type: 'string' },
-        },
-      },
-      function: search,
-      parse: JSON.parse,
-    },
-  } as RunnableToolFunction<{ name: string }>,
-  {
-    type: 'function',
-    function: {
-      name: 'get',
-      description:
-        "get returns a book's detailed information based on the id of the book. Note that this does not accept names, and only IDs, which you can get by using search.",
-      parameters: {
-        type: 'object',
-        properties: {
-          id: { type: 'string' },
-        },
-      },
-      function: get,
-      parse: JSON.parse,
-    },
-  } as RunnableToolFunction<{ id: string }>,
-];
+// Define your functions, alongside zod schemas.
+
+const ListParams = z.object({
+  genre: z.enum(['mystery', 'nonfiction', 'memoir', 'romance', 'historical']),
+});
+type ListParams = z.infer<typeof ListParams>;
+async function listBooks({ genre }: ListParams) {
+  return db.filter((item) => item.genre === genre).map((item) => ({ name: item.name, id: item.id }));
+}
+
+const SearchParams = z.object({
+  name: z.string(),
+});
+type SearchParams = z.infer<typeof SearchParams>;
+async function searchBooks({ name }: SearchParams) {
+  return db.filter((item) => item.name.includes(name)).map((item) => ({ name: item.name, id: item.id }));
+}
+
+const GetParams = z.object({
+  id: z.string(),
+});
+type GetParams = z.infer<typeof GetParams>;
+async function getBook({ id }: GetParams) {
+  return db.find((item) => item.id === id)!;
+}
 
 async function main() {
   const runner = await openai.beta.chat.completions
     .runTools({
       model: 'gpt-4-1106-preview',
       stream: true,
-      tools,
+      tools: [
+        zodFunction({
+          function: listBooks,
+          schema: ListParams,
+          description: 'List queries books by genre, and returns a list of names of books',
+        }),
+        zodFunction({
+          function: searchBooks,
+          schema: SearchParams,
+          description: 'Search queries books by their name and returns a list of book names and their ids',
+        }),
+        zodFunction({
+          function: getBook,
+          schema: GetParams,
+          description:
+            "Get returns a book's detailed information based on the id of the book. Note that this does not accept names, and only IDs, which you can get by using search.",
+        }),
+      ],
       messages: [
         {
           role: 'system',
@@ -118,16 +108,37 @@ But Kya is not what they say. A born naturalist with just one day of school, she
   },
 ];
 
-async function list({ genre }: { genre: string }) {
-  return db.filter((item) => item.genre === genre).map((item) => ({ name: item.name, id: item.id }));
-}
-
-async function search({ name }: { name: string }) {
-  return db.filter((item) => item.name.includes(name)).map((item) => ({ name: item.name, id: item.id }));
-}
-
-async function get({ id }: { id: string }) {
-  return db.find((item) => item.id === id)!;
+/**
+ * A generic utility function that returns a RunnableFunction
+ * you can pass to `.runTools()`,
+ * with a fully validated, typesafe parameters schema.
+ *
+ * You are encouraged to copy/paste this into your codebase!
+ */
+function zodFunction<T extends object>({
+  function: fn,
+  schema,
+  description = '',
+  name,
+}: {
+  function: (args: T) => Promise<object>;
+  schema: ZodSchema<T>;
+  description?: string;
+  name?: string;
+}): RunnableToolFunctionWithParse<T> {
+  return {
+    type: 'function',
+    function: {
+      function: fn,
+      name: name ?? fn.name,
+      description: description,
+      parameters: zodToJsonSchema(schema) as JSONSchema,
+      parse(input: string): T {
+        const obj = JSON.parse(input);
+        return schema.parse(obj);
+      },
+    },
+  };
 }
 
 main();
