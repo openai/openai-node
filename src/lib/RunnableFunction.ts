@@ -61,9 +61,18 @@ export type RunnableFunction<Args extends object | string> =
   : Args extends object ? RunnableFunctionWithParse<Args>
   : never;
 
-export type RunnableToolFunction<Args extends object | string> = {
+export type RunnableToolFunction<Args extends object | string> =
+  Args extends string ? RunnableToolFunctionWithoutParse
+  : Args extends object ? RunnableToolFunctionWithParse<Args>
+  : never;
+
+export type RunnableToolFunctionWithoutParse = {
   type: 'function';
-  function: RunnableFunction<Args>;
+  function: RunnableFunctionWithoutParse;
+};
+export type RunnableToolFunctionWithParse<Args extends object> = {
+  type: 'function';
+  function: RunnableFunctionWithParse<Args>;
 };
 
 export function isRunnableFunctionWithParse<Args extends object>(
@@ -91,8 +100,16 @@ export type RunnableTools<FunctionsArgs extends BaseFunctionsArgs> =
 /**
  * This is helper class for passing a `function` and `parse` where the `function`
  * argument type matches the `parse` return type.
+ *
+ * @deprecated - please use ParsingToolFunction instead.
  */
 export class ParsingFunction<Args extends object> {
+  function: RunnableFunctionWithParse<Args>['function'];
+  parse: RunnableFunctionWithParse<Args>['parse'];
+  parameters: RunnableFunctionWithParse<Args>['parameters'];
+  description: RunnableFunctionWithParse<Args>['description'];
+  name?: RunnableFunctionWithParse<Args>['name'];
+
   constructor(input: RunnableFunctionWithParse<Args>) {
     this.function = input.function;
     this.parse = input.parse;
@@ -100,9 +117,18 @@ export class ParsingFunction<Args extends object> {
     this.description = input.description;
     this.name = input.name;
   }
-  function: RunnableFunctionWithParse<Args>['function'];
-  parse: RunnableFunctionWithParse<Args>['parse'];
-  parameters: RunnableFunctionWithParse<Args>['parameters'];
-  description: RunnableFunctionWithParse<Args>['description'];
-  name?: RunnableFunctionWithParse<Args>['name'];
+}
+
+/**
+ * This is helper class for passing a `function` and `parse` where the `function`
+ * argument type matches the `parse` return type.
+ */
+export class ParsingToolFunction<Args extends object> {
+  type: 'function';
+  function: RunnableFunctionWithParse<Args>;
+
+  constructor(input: RunnableFunctionWithParse<Args>) {
+    this.type = 'function';
+    this.function = input;
+  }
 }
