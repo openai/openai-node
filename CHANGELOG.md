@@ -1,5 +1,29 @@
 # Changelog
 
+## 4.21.0 (2023-12-11)
+
+Full Changelog: [v4.20.1...v4.21.0](https://github.com/openai/openai-node/compare/v4.20.1...v4.21.0)
+
+### Features
+
+* **client:** support reading the base url from an env variable ([#547](https://github.com/openai/openai-node/issues/547)) ([06fb68d](https://github.com/openai/openai-node/commit/06fb68de1ff80983e349b6715d1037e2072c8dd4))
+
+
+### Bug Fixes
+
+* correct some runTools behavior and deprecate runFunctions ([#562](https://github.com/openai/openai-node/issues/562)) ([f5cdd0f](https://github.com/openai/openai-node/commit/f5cdd0f704d3d075cdfc5bc2df1f7a8bae5cd9f1))
+* prevent 400 when using runTools/runFunctions with Azure OpenAI API ([#544](https://github.com/openai/openai-node/issues/544)) ([735d9b8](https://github.com/openai/openai-node/commit/735d9b86acdc067e1ee6ebe1ea50de2955431050))
+
+
+### Documentation
+
+* **readme:** update example snippets ([#546](https://github.com/openai/openai-node/issues/546)) ([566d290](https://github.com/openai/openai-node/commit/566d290006920f536788bb77f4d24a6906e2971f))
+
+
+### Build System
+
+* specify `packageManager: yarn` ([#561](https://github.com/openai/openai-node/issues/561)) ([935b898](https://github.com/openai/openai-node/commit/935b8983c74f7b03b67d22f4d194989838f963f3))
+
 ## 4.20.1 (2023-11-24)
 
 Full Changelog: [v4.20.0...v4.20.1](https://github.com/openai/openai-node/compare/v4.20.0...v4.20.1)
