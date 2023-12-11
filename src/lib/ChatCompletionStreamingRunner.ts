@@ -37,18 +37,18 @@ export class ChatCompletionStreamingRunner
     return runner;
   }
 
+  /** @deprecated - please use `runTools` instead. */
   static runFunctions<T extends (string | object)[]>(
     completions: Completions,
     params: ChatCompletionStreamingFunctionRunnerParams<T>,
     options?: RunnerOptions,
   ): ChatCompletionStreamingRunner {
     const runner = new ChatCompletionStreamingRunner();
-    runner._run(() =>
-      runner._runFunctions(completions, params, {
-        ...options,
-        headers: { ...options?.headers, 'X-Stainless-Helper-Method': 'runFunctions' },
-      }),
-    );
+    const opts = {
+      ...options,
+      headers: { ...options?.headers, 'X-Stainless-Helper-Method': 'runFunctions' },
+    };
+    runner._run(() => runner._runFunctions(completions, params, opts));
     return runner;
   }
 
@@ -58,12 +58,11 @@ export class ChatCompletionStreamingRunner
     options?: RunnerOptions,
   ): ChatCompletionStreamingRunner {
     const runner = new ChatCompletionStreamingRunner();
-    runner._run(() =>
-      runner._runTools(completions, params, {
-        ...options,
-        headers: { ...options?.headers, 'X-Stainless-Helper-Method': 'runTools' },
-      }),
-    );
+    const opts = {
+      ...options,
+      headers: { ...options?.headers, 'X-Stainless-Helper-Method': 'runTools' },
+    };
+    runner._run(() => runner._runTools(completions, params, opts));
     return runner;
   }
 }
