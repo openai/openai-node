@@ -652,10 +652,10 @@ type CustomEvents<Event extends string> = {
   : (...args: any[]) => void;
 };
 
-type ListenerForEvent<
-  Events extends CustomEvents<any>,
-  Event extends keyof Events,
-> = Event extends keyof AbstractChatCompletionRunnerEvents ? AbstractChatCompletionRunnerEvents[Event]
+type ListenerForEvent<Events extends CustomEvents<any>, Event extends keyof Events> = Event extends (
+  keyof AbstractChatCompletionRunnerEvents
+) ?
+  AbstractChatCompletionRunnerEvents[Event]
 : Events[Event];
 
 type ListenersForEvent<Events extends CustomEvents<any>, Event extends keyof Events> = Array<{
