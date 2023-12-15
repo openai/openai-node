@@ -1,5 +1,18 @@
 # Changelog
 
+## 4.22.0 (2023-12-15)
+
+Full Changelog: [v4.21.0...v4.22.0](https://github.com/openai/openai-node/compare/v4.21.0...v4.22.0)
+
+### Features
+
+* **api:** add optional `name` argument + improve docs ([#569](https://github.com/openai/openai-node/issues/569)) ([3b68ace](https://github.com/openai/openai-node/commit/3b68ace533976aedbf642d9b018d0de8d9a8bb88))
+
+
+### Chores
+
+* update prettier ([#567](https://github.com/openai/openai-node/issues/567)) ([83dec2a](https://github.com/openai/openai-node/commit/83dec2af62c481d7de16d8a3644aa239ded9e30c))
+
 ## 4.21.0 (2023-12-11)
 
 Full Changelog: [v4.20.1...v4.21.0](https://github.com/openai/openai-node/compare/v4.20.1...v4.21.0)
