@@ -143,17 +143,17 @@ If you need to cancel a stream, you can `break` from a `for await` loop or call 
 
 ### Automated function calls
 
-We provide `openai.beta.chat.completions.runFunctions({…})` and `openai.beta.chat.completions.runTools({…})`
-convenience helpers for using function calls with the `/chat/completions` endpoint
+We provide the `openai.beta.chat.completions.runTools({…})`
+convenience helper for using function tool calls with the `/chat/completions` endpoint
 which automatically call the JavaScript functions you provide
 and sends their results back to the `/chat/completions` endpoint,
-looping as long as the model requests function calls.
+looping as long as the model requests tool calls.
 
 If you pass a `parse` function, it will automatically parse the `arguments` for you
 and returns any parsing errors to the model to attempt auto-recovery.
 Otherwise, the args will be passed to the function you provide as a string.
 
-If you pass `function_call: {name: …}` or `tool_choice: {function: {name: …}}` instead of `auto`,
+If you pass `tool_choice: {function: {name: …}}` instead of `auto`,
 it returns immediately after calling that function (and only loops to auto-recover parsing errors).
 
 ```ts
@@ -163,21 +163,27 @@ const client = new OpenAI();
 
 async function main() {
   const runner = client.beta.chat.completions
-    .runFunctions({
+    .runTools({
       model: 'gpt-3.5-turbo',
       messages: [{ role: 'user', content: 'How is the weather this week?' }],
-      functions: [
+      tools: [
         {
-          function: getCurrentLocation,
-          parameters: { type: 'object', properties: {} },
+          type: 'function',
+          function: {
+            function: getCurrentLocation,
+            parameters: { type: 'object', properties: {} },
+          },
         },
         {
-          function: getWeather,
-          parse: JSON.parse, // or use a validation library like zod for typesafe parsing.
-          parameters: {
-            type: 'object',
-            properties: {
-              location: { type: 'string' },
+          type: 'function',
+          function: {
+            function: getWeather,
+            parse: JSON.parse, // or use a validation library like zod for typesafe parsing.
+            parameters: {
+              type: 'object',
+              properties: {
+                location: { type: 'string' },
+              },
             },
           },
         },
@@ -203,16 +209,18 @@ async function getWeather(args: { location: string }) {
 main();
 
 // {role: "user",      content: "How's the weather this week?"}
-// {role: "assistant", function_call: "getCurrentLocation", arguments: "{}"}
-// {role: "function",  name: "getCurrentLocation", content: "Boston"}
-// {role: "assistant", function_call: "getWeather", arguments: '{"location": "Boston"}'}
-// {role: "function",  name: "getWeather", content: '{"temperature": "50degF", "preciptation": "high"}'}
+// {role: "assistant", tool_calls: [{type: "function", function: {name: "getCurrentLocation", arguments: "{}"}, id: "123"}
+// {role: "tool",      name: "getCurrentLocation", content: "Boston", tool_call_id: "123"}
+// {role: "assistant", tool_calls: [{type: "function", function: {name: "getWeather", arguments: '{"location": "Boston"}'}, id: "1234"}]}
+// {role: "tool",      name: "getWeather", content: '{"temperature": "50degF", "preciptation": "high"}', tool_call_id: "1234"}
 // {role: "assistant", content: "It's looking cold and rainy - you might want to wear a jacket!"}
 //
 // Final content: "It's looking cold and rainy - you might want to wear a jacket!"
 ```
 
 Like with `.stream()`, we provide a variety of [helpers and events](helpers.md#events).
+
+Note that `runFunctions` was previously available as well, but has been deprecated in favor of `runTools`.
 
 Read more about various examples such as with integrating with [zod](helpers.md#integrate-with-zod),
 [next.js](helpers.md#integrate-wtih-next-js), and [proxying a stream to the browser](helpers.md#proxy-streaming-to-a-browser).
