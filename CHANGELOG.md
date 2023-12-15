@@ -1,5 +1,18 @@
 # Changelog
 
+## 4.22.1 (2023-12-15)
+
+Full Changelog: [v4.22.0...v4.22.1](https://github.com/openai/openai-node/compare/v4.22.0...v4.22.1)
+
+### Chores
+
+* update dependencies ([#572](https://github.com/openai/openai-node/issues/572)) ([a51e620](https://github.com/openai/openai-node/commit/a51e62065224a516b17dd850ae564f5436d8db52))
+
+
+### Documentation
+
+* replace runFunctions with runTools in readme ([#570](https://github.com/openai/openai-node/issues/570)) ([c3b9ad5](https://github.com/openai/openai-node/commit/c3b9ad58e5f74d3339889aeb1d758c8c18f54de7))
+
 ## 4.22.0 (2023-12-15)
 
 Full Changelog: [v4.21.0...v4.22.0](https://github.com/openai/openai-node/compare/v4.21.0...v4.22.0)
