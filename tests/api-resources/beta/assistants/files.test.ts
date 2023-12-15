@@ -10,9 +10,7 @@ const openai = new OpenAI({
 
 describe('resource files', () => {
   test('create: only required params', async () => {
-    const responsePromise = openai.beta.assistants.files.create('file-AF1WoRqd3aJAHsqc9NY7iL8F', {
-      file_id: 'string',
-    });
+    const responsePromise = openai.beta.assistants.files.create('file-abc123', { file_id: 'string' });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -23,9 +21,7 @@ describe('resource files', () => {
   });
 
   test('create: required and optional params', async () => {
-    const response = await openai.beta.assistants.files.create('file-AF1WoRqd3aJAHsqc9NY7iL8F', {
-      file_id: 'string',
-    });
+    const response = await openai.beta.assistants.files.create('file-abc123', { file_id: 'string' });
   });
 
   test('retrieve', async () => {
