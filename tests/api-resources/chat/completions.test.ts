@@ -25,7 +25,7 @@ describe('resource completions', () => {
 
   test('create: required and optional params', async () => {
     const response = await openai.chat.completions.create({
-      messages: [{ content: 'string', role: 'system' }],
+      messages: [{ content: 'string', role: 'system', name: 'string' }],
       model: 'gpt-3.5-turbo',
       frequency_penalty: -2,
       function_call: 'none',
