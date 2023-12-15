@@ -6,7 +6,6 @@ import {
   type ChatCompletionMessage,
   type ChatCompletionMessageParam,
   type ChatCompletionCreateParams,
-  type ChatCompletionAssistantMessageParam,
   type ChatCompletionTool,
 } from 'openai/resources/chat/completions';
 import { APIUserAbortError, OpenAIError } from 'openai/error';
@@ -90,7 +89,6 @@ export abstract class AbstractChatCompletionRunner<
   }
 
   protected _addMessage(message: ChatCompletionMessageParam, emit = true) {
-    // @ts-expect-error this works around a bug in the Azure OpenAI API in which `content` is missing instead of null.
     if (!('content' in message)) message.content = null;
 
     this.messages.push(message);
@@ -217,7 +215,7 @@ export abstract class AbstractChatCompletionRunner<
   }
 
   #getFinalContent(): string | null {
-    return this.#getFinalMessage().content;
+    return this.#getFinalMessage().content ?? null;
   }
 
   /**
@@ -229,12 +227,12 @@ export abstract class AbstractChatCompletionRunner<
     return this.#getFinalContent();
   }
 
-  #getFinalMessage(): ChatCompletionAssistantMessageParam {
+  #getFinalMessage(): ChatCompletionMessage {
     let i = this.messages.length;
     while (i-- > 0) {
       const message = this.messages[i];
       if (isAssistantMessage(message)) {
-        return message;
+        return { ...message, content: message.content ?? null };
       }
     }
     throw new OpenAIError('stream ended without producing a ChatCompletionMessage with role=assistant');
