@@ -16,6 +16,7 @@ export {
   ChatCompletionNamedToolChoice,
   ChatCompletionRole,
   ChatCompletionSystemMessageParam,
+  ChatCompletionTokenLogprob,
   ChatCompletionTool,
   ChatCompletionToolChoiceOption,
   ChatCompletionToolMessageParam,
