@@ -1,5 +1,18 @@
 # Changelog
 
+## 4.23.0 (2023-12-17)
+
+Full Changelog: [v4.22.1...v4.23.0](https://github.com/openai/openai-node/compare/v4.22.1...v4.23.0)
+
+### Features
+
+* **api:** add token logprobs to chat completions ([#576](https://github.com/openai/openai-node/issues/576)) ([8d4292e](https://github.com/openai/openai-node/commit/8d4292e6358920b2c9d8df49c6a154231c468512))
+
+
+### Chores
+
+* **ci:** run release workflow once per day ([#574](https://github.com/openai/openai-node/issues/574)) ([529f09f](https://github.com/openai/openai-node/commit/529f09f827a675d6e851590acff4e6f4f2af2d26))
+
 ## 4.22.1 (2023-12-15)
 
 Full Changelog: [v4.22.0...v4.22.1](https://github.com/openai/openai-node/compare/v4.22.0...v4.22.1)
