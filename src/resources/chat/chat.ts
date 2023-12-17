@@ -23,6 +23,7 @@ export namespace Chat {
   export import ChatCompletionNamedToolChoice = CompletionsAPI.ChatCompletionNamedToolChoice;
   export import ChatCompletionRole = CompletionsAPI.ChatCompletionRole;
   export import ChatCompletionSystemMessageParam = CompletionsAPI.ChatCompletionSystemMessageParam;
+  export import ChatCompletionTokenLogprob = CompletionsAPI.ChatCompletionTokenLogprob;
   export import ChatCompletionTool = CompletionsAPI.ChatCompletionTool;
   export import ChatCompletionToolChoiceOption = CompletionsAPI.ChatCompletionToolChoiceOption;
   export import ChatCompletionToolMessageParam = CompletionsAPI.ChatCompletionToolMessageParam;
