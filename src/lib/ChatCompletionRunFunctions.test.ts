@@ -146,6 +146,7 @@ function* contentChoiceDeltas(
     yield {
       index,
       finish_reason: i === deltas.length - 1 ? 'stop' : null,
+      logprobs: null,
       delta: {
         role,
         content: deltas[i] ? `${deltas[i]}${i === deltas.length - 1 ? '' : ' '}` : null,
@@ -593,6 +594,7 @@ describe('resource completions', () => {
             {
               index: 0,
               finish_reason: 'function_call',
+              logprobs: null,
               message: {
                 role: 'assistant',
                 content: null,
@@ -645,6 +647,7 @@ describe('resource completions', () => {
             {
               index: 0,
               finish_reason: 'stop',
+              logprobs: null,
               message: {
                 role: 'assistant',
                 content: `it's raining`,
@@ -716,6 +719,7 @@ describe('resource completions', () => {
             {
               index: 0,
               finish_reason: 'function_call',
+              logprobs: null,
               message: {
                 role: 'assistant',
                 content: null,
@@ -808,6 +812,7 @@ describe('resource completions', () => {
             {
               index: 0,
               finish_reason: 'function_call',
+              logprobs: null,
               message: {
                 role: 'assistant',
                 content: null,
@@ -867,6 +872,7 @@ describe('resource completions', () => {
             {
               index: 0,
               finish_reason: 'stop',
+              logprobs: null,
               message: {
                 role: 'assistant',
                 content: `there are 3 properties in {"a": 1, "b": 2, "c": 3}`,
@@ -953,6 +959,7 @@ describe('resource completions', () => {
               {
                 index: 0,
                 finish_reason: 'function_call',
+                logprobs: null,
                 message: {
                   role: 'assistant',
                   content: null,
@@ -1006,6 +1013,7 @@ describe('resource completions', () => {
               {
                 index: 0,
                 finish_reason: 'function_call',
+                logprobs: null,
                 message: {
                   role: 'assistant',
                   content: null,
@@ -1078,6 +1086,7 @@ describe('resource completions', () => {
               {
                 index: 0,
                 finish_reason: 'stop',
+                logprobs: null,
                 message: {
                   role: 'assistant',
                   content: `there are 3 properties in {"a": 1, "b": 2, "c": 3}`,
@@ -1164,6 +1173,7 @@ describe('resource completions', () => {
               {
                 index: 0,
                 finish_reason: 'function_call',
+                logprobs: null,
                 message: {
                   role: 'assistant',
                   content: null,
@@ -1241,6 +1251,7 @@ describe('resource completions', () => {
               {
                 index: 0,
                 finish_reason: 'function_call',
+                logprobs: null,
                 message: {
                   role: 'assistant',
                   content: null,
@@ -1291,6 +1302,7 @@ describe('resource completions', () => {
               {
                 index: 0,
                 finish_reason: 'function_call',
+                logprobs: null,
                 message: {
                   role: 'assistant',
                   content: null,
@@ -1360,6 +1372,7 @@ describe('resource completions', () => {
               {
                 index: 0,
                 finish_reason: 'stop',
+                logprobs: null,
                 message: {
                   role: 'assistant',
                   content: `it's raining`,
@@ -1436,6 +1449,7 @@ describe('resource completions', () => {
               {
                 index: 0,
                 finish_reason: 'function_call',
+                logprobs: null,
                 delta: {
                   role: 'assistant',
                   content: null,
@@ -2071,6 +2085,7 @@ describe('resource completions', () => {
               {
                 index: 0,
                 finish_reason: 'function_call',
+                logprobs: null,
                 delta: {
                   role: 'assistant',
                   content: null,

@@ -31,6 +31,7 @@ describe('resource completions', () => {
       function_call: 'none',
       functions: [{ description: 'string', name: 'string', parameters: { foo: 'bar' } }],
       logit_bias: { foo: 0 },
+      logprobs: true,
       max_tokens: 0,
       n: 1,
       presence_penalty: -2,
@@ -45,6 +46,7 @@ describe('resource completions', () => {
         { type: 'function', function: { description: 'string', name: 'string', parameters: { foo: 'bar' } } },
         { type: 'function', function: { description: 'string', name: 'string', parameters: { foo: 'bar' } } },
       ],
+      top_logprobs: 0,
       top_p: 1,
       user: 'user-1234',
     });

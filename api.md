@@ -37,6 +37,7 @@ Types:
 - <code><a href="./src/resources/chat/completions.ts">ChatCompletionNamedToolChoice</a></code>
 - <code><a href="./src/resources/chat/completions.ts">ChatCompletionRole</a></code>
 - <code><a href="./src/resources/chat/completions.ts">ChatCompletionSystemMessageParam</a></code>
+- <code><a href="./src/resources/chat/completions.ts">ChatCompletionTokenLogprob</a></code>
 - <code><a href="./src/resources/chat/completions.ts">ChatCompletionTool</a></code>
 - <code><a href="./src/resources/chat/completions.ts">ChatCompletionToolChoiceOption</a></code>
 - <code><a href="./src/resources/chat/completions.ts">ChatCompletionToolMessageParam</a></code>
