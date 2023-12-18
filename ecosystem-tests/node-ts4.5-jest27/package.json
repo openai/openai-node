@@ -15,7 +15,7 @@
   "devDependencies": {
     "@types/node": "^20.4.2",
     "@types/node-fetch": "^2.6.1",
-    "@types/jest": "27.4.1",
+    "@types/jest": "27.5.2",
     "@types/ws": "^8.5.4",
     "fastest-levenshtein": "^1.0.16",
     "jest": "27.5.1",
