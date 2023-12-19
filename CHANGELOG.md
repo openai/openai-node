@@ -1,5 +1,27 @@
 # Changelog
 
+## 4.24.0 (2023-12-19)
+
+Full Changelog: [v4.23.0...v4.24.0](https://github.com/openai/openai-node/compare/v4.23.0...v4.24.0)
+
+### Features
+
+* **api:** add additional instructions for runs ([#586](https://github.com/openai/openai-node/issues/586)) ([401d93e](https://github.com/openai/openai-node/commit/401d93ea39fe0e90088799858299322035c0a7e8))
+
+
+### Chores
+
+* **deps:** update dependency start-server-and-test to v2.0.3 ([#580](https://github.com/openai/openai-node/issues/580)) ([8e1aca1](https://github.com/openai/openai-node/commit/8e1aca1f8be6e583483919ed9ef9b04fab076066))
+* **deps:** update dependency ts-jest to v29.1.1 ([#578](https://github.com/openai/openai-node/issues/578)) ([a6edb7b](https://github.com/openai/openai-node/commit/a6edb7bc3cfc447d0c55ae23cc1c2219105d3666))
+* **deps:** update jest ([#582](https://github.com/openai/openai-node/issues/582)) ([e49e471](https://github.com/openai/openai-node/commit/e49e471ec7a136f2cbaf82551ccaaea366c87a91))
+* **internal:** bump deps ([#583](https://github.com/openai/openai-node/issues/583)) ([2e07b4c](https://github.com/openai/openai-node/commit/2e07b4c66ab1fdbb353fdd00994e293f93e981db))
+* **internal:** update deps ([#581](https://github.com/openai/openai-node/issues/581)) ([7b690dc](https://github.com/openai/openai-node/commit/7b690dca67ee8c3b0a89caf7f786ede5dc612a76))
+
+
+### Documentation
+
+* upgrade models in examples to latest version ([#585](https://github.com/openai/openai-node/issues/585)) ([60101a4](https://github.com/openai/openai-node/commit/60101a4117b1a8223d09fb9fe21d89af32431939))
+
 ## 4.23.0 (2023-12-17)
 
 Full Changelog: [v4.22.1...v4.23.0](https://github.com/openai/openai-node/compare/v4.22.1...v4.23.0)
