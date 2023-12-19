@@ -11,7 +11,7 @@ async function main() {
     const response = await client.completions
       .create({
         prompt: 'Say this is a test',
-        model: 'text-davinci-003',
+        model: 'gpt-3.5-turbo-instruct',
       })
       .asResponse();
     console.log(`response headers: `, Object.fromEntries(response.headers.entries()));
@@ -23,7 +23,7 @@ async function main() {
     const { data: completion, response } = await client.completions
       .create({
         prompt: 'Say this is a test',
-        model: 'text-davinci-003',
+        model: 'gpt-3.5-turbo-instruct',
       })
       .withResponse();
     console.log(`response headers: `, Object.fromEntries(response.headers.entries()));
