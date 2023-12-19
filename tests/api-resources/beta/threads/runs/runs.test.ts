@@ -23,6 +23,7 @@ describe('resource runs', () => {
   test('create: required and optional params', async () => {
     const response = await openai.beta.threads.runs.create('string', {
       assistant_id: 'string',
+      additional_instructions: 'string',
       instructions: 'string',
       metadata: {},
       model: 'string',
