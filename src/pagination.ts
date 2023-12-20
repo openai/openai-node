@@ -5,7 +5,7 @@ import { AbstractPage, Response, APIClient, FinalRequestOptions, PageInfo } from
 export interface PageResponse<Item> {
   data: Array<Item>;
 
-  object: 'list';
+  object: string;
 }
 
 /**
@@ -14,17 +14,17 @@ export interface PageResponse<Item> {
 export class Page<Item> extends AbstractPage<Item> implements PageResponse<Item> {
   data: Array<Item>;
 
-  object: 'list';
+  object: string;
 
   constructor(client: APIClient, response: Response, body: PageResponse<Item>, options: FinalRequestOptions) {
     super(client, response, body, options);
 
-    this.data = body.data;
+    this.data = body.data || [];
     this.object = body.object;
   }
 
   getPaginatedItems(): Item[] {
-    return this.data;
+    return this.data ?? [];
   }
 
   // @deprecated Please use `nextPageInfo()` instead
@@ -46,14 +46,8 @@ export interface CursorPageResponse<Item> {
 }
 
 export interface CursorPageParams {
-  /**
-   * Identifier for the last job from the previous pagination request.
-   */
   after?: string;
 
-  /**
-   * Number of fine-tuning jobs to retrieve.
-   */
   limit?: number;
 }
 
@@ -71,11 +65,11 @@ export class CursorPage<Item extends { id: string }>
   ) {
     super(client, response, body, options);
 
-    this.data = body.data;
+    this.data = body.data || [];
   }
 
   getPaginatedItems(): Item[] {
-    return this.data;
+    return this.data ?? [];
   }
 
   // @deprecated Please use `nextPageInfo()` instead
@@ -89,12 +83,16 @@ export class CursorPage<Item extends { id: string }>
   }
 
   nextPageInfo(): PageInfo | null {
-    if (!this.data?.length) {
+    const data = this.getPaginatedItems();
+    if (!data.length) {
       return null;
     }
 
-    const next = this.data[this.data.length - 1]?.id;
-    if (!next) return null;
-    return { params: { after: next } };
+    const id = data[data.length - 1]?.id;
+    if (!id) {
+      return null;
+    }
+
+    return { params: { after: id } };
   }
 }
