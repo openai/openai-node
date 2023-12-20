@@ -21,14 +21,11 @@ See an example of streaming helpers in action in [`examples/stream.ts`](examples
 ## Automated Function Calls
 
 ```ts
-openai.chat.completions.runFunctions({ stream: false, … }, options?): ChatCompletionRunner
-openai.chat.completions.runFunctions({ stream: true, … }, options?): ChatCompletionStreamingRunner
-
 openai.chat.completions.runTools({ stream: false, … }, options?): ChatCompletionRunner
 openai.chat.completions.runTools({ stream: true, … }, options?): ChatCompletionStreamingRunner
 ```
 
-`openai.chat.completions.runFunctions()` and `openai.chat.completions.runTools()` return a Runner
+`openai.chat.completions.runTools()` returns a Runner
 for automating function calls with chat completions.
 The runner automatically calls the JavaScript functions you provide and sends their results back
 to the API, looping as long as the model requests function calls.
@@ -36,24 +33,6 @@ to the API, looping as long as the model requests function calls.
 If you pass a `parse` function, it will automatically parse the `arguments` for you and returns any parsing
 errors to the model to attempt auto-recovery. Otherwise, the args will be passed to the function you provide
 as a string.
-
-```ts
-client.chat.completions.runFunctions({
-  model: 'gpt-3.5-turbo',
-  messages: [{ role: 'user', content: 'How is the weather this week?' }],
-  functions: [{
-    function: getWeather as (args: { location: string, time: Date}) => any,
-    parse: parseFunction as (args: strings) => { location: string, time: Date }.
-    parameters: {
-      type: 'object',
-      properties: {
-        location: { type: 'string' },
-        time: { type: 'string', format: 'date-time' },
-      },
-    },
-  }],
-});
-```
 
 ```ts
 client.chat.completions.runTools({
@@ -76,7 +55,6 @@ client.chat.completions.runTools({
 });
 ```
 
-
 If you pass `function_call: {name: …}` instead of `auto`, it returns immediately after calling that
 function (and only loops to auto-recover parsing errors).
 
@@ -86,6 +64,8 @@ chat completion request, not for the entire call run.
 
 See an example of automated function calls in action in
 [`examples/function-call-helpers.ts`](examples/function-call-helpers.ts).
+
+Note, `runFunctions` was also previously available, but has been deprecated in favor of `runTools`.
 
 ## Runner API
 
@@ -108,7 +88,7 @@ The event fired when a chat completion is returned or done being streamed by the
 #### `.on('message', (message: ChatCompletionMessageParam) => …)`
 
 The event fired when a new message is either sent or received from the API. Does not fire for the messages
-sent as the parameter to either `.runFunctions()` or `.stream()`
+sent as the parameter to either `.runTools()` or `.stream()`
 
 #### `.on('content', (content: string) => …)` (without `stream`)
 
@@ -232,19 +212,18 @@ const client = new OpenAI();
 
 async function main() {
   const runner = client.chat.completions
-    .runFunctions({
+    .runTools({
       model: 'gpt-3.5-turbo',
       messages: [{ role: 'user', content: "How's the weather this week in Los Angeles?" }],
-      functions: [
+      tools: [
         {
-          function: function queryDatabase(props) { … },
-          …
-        },
-        {
-          function: function updateDatabase(props, runner) {
-            runner.abort()
-          },
-          …
+          type: 'function',
+          function: {
+            function: function updateDatabase(props, runner) {
+              runner.abort()
+            },
+            …
+          }
         },
       ],
     })
@@ -272,15 +251,18 @@ const client = new OpenAI();
 
 async function main() {
   const runner = client.chat.completions
-    .runFunctions({
+    .runTools({
       model: 'gpt-3.5-turbo',
       messages: [{ role: 'user', content: "How's the weather this week in Los Angeles?" }],
-      functions: [
+      tools: [
         {
-          function: getWeather,
-          parse: GetWeatherParameters.parse,
-          parameters: zodToJsonSchema(GetWeatherParameters),
-        },
+          type: 'function',
+          function: {
+            function: getWeather,
+            parse: GetWeatherParameters.parse,
+            parameters: zodToJsonSchema(GetWeatherParameters),
+          }
+        }
       ],
     })
     .on('message', (message) => console.log(message));

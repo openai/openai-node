@@ -1,5 +1,120 @@
 # Changelog
 
+## 4.24.0 (2023-12-19)
+
+Full Changelog: [v4.23.0...v4.24.0](https://github.com/openai/openai-node/compare/v4.23.0...v4.24.0)
+
+### Features
+
+* **api:** add additional instructions for runs ([#586](https://github.com/openai/openai-node/issues/586)) ([401d93e](https://github.com/openai/openai-node/commit/401d93ea39fe0e90088799858299322035c0a7e8))
+
+
+### Chores
+
+* **deps:** update dependency start-server-and-test to v2.0.3 ([#580](https://github.com/openai/openai-node/issues/580)) ([8e1aca1](https://github.com/openai/openai-node/commit/8e1aca1f8be6e583483919ed9ef9b04fab076066))
+* **deps:** update dependency ts-jest to v29.1.1 ([#578](https://github.com/openai/openai-node/issues/578)) ([a6edb7b](https://github.com/openai/openai-node/commit/a6edb7bc3cfc447d0c55ae23cc1c2219105d3666))
+* **deps:** update jest ([#582](https://github.com/openai/openai-node/issues/582)) ([e49e471](https://github.com/openai/openai-node/commit/e49e471ec7a136f2cbaf82551ccaaea366c87a91))
+* **internal:** bump deps ([#583](https://github.com/openai/openai-node/issues/583)) ([2e07b4c](https://github.com/openai/openai-node/commit/2e07b4c66ab1fdbb353fdd00994e293f93e981db))
+* **internal:** update deps ([#581](https://github.com/openai/openai-node/issues/581)) ([7b690dc](https://github.com/openai/openai-node/commit/7b690dca67ee8c3b0a89caf7f786ede5dc612a76))
+
+
+### Documentation
+
+* upgrade models in examples to latest version ([#585](https://github.com/openai/openai-node/issues/585)) ([60101a4](https://github.com/openai/openai-node/commit/60101a4117b1a8223d09fb9fe21d89af32431939))
+
+## 4.23.0 (2023-12-17)
+
+Full Changelog: [v4.22.1...v4.23.0](https://github.com/openai/openai-node/compare/v4.22.1...v4.23.0)
+
+### Features
+
+* **api:** add token logprobs to chat completions ([#576](https://github.com/openai/openai-node/issues/576)) ([8d4292e](https://github.com/openai/openai-node/commit/8d4292e6358920b2c9d8df49c6a154231c468512))
+
+
+### Chores
+
+* **ci:** run release workflow once per day ([#574](https://github.com/openai/openai-node/issues/574)) ([529f09f](https://github.com/openai/openai-node/commit/529f09f827a675d6e851590acff4e6f4f2af2d26))
+
+## 4.22.1 (2023-12-15)
+
+Full Changelog: [v4.22.0...v4.22.1](https://github.com/openai/openai-node/compare/v4.22.0...v4.22.1)
+
+### Chores
+
+* update dependencies ([#572](https://github.com/openai/openai-node/issues/572)) ([a51e620](https://github.com/openai/openai-node/commit/a51e62065224a516b17dd850ae564f5436d8db52))
+
+
+### Documentation
+
+* replace runFunctions with runTools in readme ([#570](https://github.com/openai/openai-node/issues/570)) ([c3b9ad5](https://github.com/openai/openai-node/commit/c3b9ad58e5f74d3339889aeb1d758c8c18f54de7))
+
+## 4.22.0 (2023-12-15)
+
+Full Changelog: [v4.21.0...v4.22.0](https://github.com/openai/openai-node/compare/v4.21.0...v4.22.0)
+
+### Features
+
+* **api:** add optional `name` argument + improve docs ([#569](https://github.com/openai/openai-node/issues/569)) ([3b68ace](https://github.com/openai/openai-node/commit/3b68ace533976aedbf642d9b018d0de8d9a8bb88))
+
+
+### Chores
+
+* update prettier ([#567](https://github.com/openai/openai-node/issues/567)) ([83dec2a](https://github.com/openai/openai-node/commit/83dec2af62c481d7de16d8a3644aa239ded9e30c))
+
+## 4.21.0 (2023-12-11)
+
+Full Changelog: [v4.20.1...v4.21.0](https://github.com/openai/openai-node/compare/v4.20.1...v4.21.0)
+
+### Features
+
+* **client:** support reading the base url from an env variable ([#547](https://github.com/openai/openai-node/issues/547)) ([06fb68d](https://github.com/openai/openai-node/commit/06fb68de1ff80983e349b6715d1037e2072c8dd4))
+
+
+### Bug Fixes
+
+* correct some runTools behavior and deprecate runFunctions ([#562](https://github.com/openai/openai-node/issues/562)) ([f5cdd0f](https://github.com/openai/openai-node/commit/f5cdd0f704d3d075cdfc5bc2df1f7a8bae5cd9f1))
+* prevent 400 when using runTools/runFunctions with Azure OpenAI API ([#544](https://github.com/openai/openai-node/issues/544)) ([735d9b8](https://github.com/openai/openai-node/commit/735d9b86acdc067e1ee6ebe1ea50de2955431050))
+
+
+### Documentation
+
+* **readme:** update example snippets ([#546](https://github.com/openai/openai-node/issues/546)) ([566d290](https://github.com/openai/openai-node/commit/566d290006920f536788bb77f4d24a6906e2971f))
+
+
+### Build System
+
+* specify `packageManager: yarn` ([#561](https://github.com/openai/openai-node/issues/561)) ([935b898](https://github.com/openai/openai-node/commit/935b8983c74f7b03b67d22f4d194989838f963f3))
+
+## 4.20.1 (2023-11-24)
+
+Full Changelog: [v4.20.0...v4.20.1](https://github.com/openai/openai-node/compare/v4.20.0...v4.20.1)
+
+### Chores
+
+* **internal:** remove file import and conditionally run prepare ([#533](https://github.com/openai/openai-node/issues/533)) ([48cb729](https://github.com/openai/openai-node/commit/48cb729bfc484ce3d04273be417b307a0d20644f))
+
+
+### Documentation
+
+* **readme:** fix typo and add examples link ([#529](https://github.com/openai/openai-node/issues/529)) ([cf959b1](https://github.com/openai/openai-node/commit/cf959b17db0a4f8dd7eb59add333c4a461b02459))
+
+## 4.20.0 (2023-11-22)
+
+Full Changelog: [v4.19.1...v4.20.0](https://github.com/openai/openai-node/compare/v4.19.1...v4.20.0)
+
+### Features
+
+* allow installing package directly from github ([#522](https://github.com/openai/openai-node/issues/522)) ([51926d7](https://github.com/openai/openai-node/commit/51926d7a0092744e49de39f4988feddf313adafa))
+
+
+### Chores
+
+* **internal:** don't call prepare in dist ([#525](https://github.com/openai/openai-node/issues/525)) ([d09411e](https://github.com/openai/openai-node/commit/d09411ebaa28d6610e1b880d03339d520b4a1833))
+
+## 4.19.1 (2023-11-20)
+
+Full Changelog: [v4.19.0...v4.19.1](https://github.com/openai/openai-node/compare/v4.19.0...v4.19.1)
+
 ## 4.19.0 (2023-11-15)
 
 Full Changelog: [v4.18.0...v4.19.0](https://github.com/openai/openai-node/compare/v4.18.0...v4.19.0)

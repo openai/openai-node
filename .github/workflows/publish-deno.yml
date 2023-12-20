@@ -11,6 +11,8 @@ jobs:
     environment: publish
 
     steps:
+      - uses: actions/checkout@v3
+
       - name: Generate a token
         id: generate_token
         uses: actions/create-github-app-token@v1
@@ -20,12 +22,10 @@ jobs:
           owner: 'openai'
           repositories: 'openai-node,openai-deno-build'
 
-      - uses: actions/checkout@v3
-
       - name: Set up Node
         uses: actions/setup-node@v3
         with:
-          node-version: '16'
+          node-version: '18'
 
       - name: Set up Deno
         uses: denoland/setup-deno@v1

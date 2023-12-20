@@ -343,8 +343,16 @@ export interface RunCreateParams {
   assistant_id: string;
 
   /**
-   * Override the default system message of the assistant. This is useful for
-   * modifying the behavior on a per-run basis.
+   * Appends additional instructions at the end of the instructions for the run. This
+   * is useful for modifying the behavior on a per-run basis without overriding other
+   * instructions.
+   */
+  additional_instructions?: string | null;
+
+  /**
+   * Overrides the
+   * [instructions](https://platform.openai.com/docs/api-reference/assistants/createAssistant)
+   * of the assistant. This is useful for modifying the behavior on a per-run basis.
    */
   instructions?: string | null;
 

@@ -30,13 +30,18 @@ export type ChatCompletionToolRunnerParams<FunctionsArgs extends BaseFunctionsAr
 };
 
 export class ChatCompletionRunner extends AbstractChatCompletionRunner<ChatCompletionRunnerEvents> {
+  /** @deprecated - please use `runTools` instead. */
   static runFunctions(
     completions: Completions,
     params: ChatCompletionFunctionRunnerParams<any[]>,
     options?: RunnerOptions,
   ): ChatCompletionRunner {
     const runner = new ChatCompletionRunner();
-    runner._run(() => runner._runFunctions(completions, params, options));
+    const opts = {
+      ...options,
+      headers: { ...options?.headers, 'X-Stainless-Helper-Method': 'runFunctions' },
+    };
+    runner._run(() => runner._runFunctions(completions, params, opts));
     return runner;
   }
 
@@ -46,7 +51,11 @@ export class ChatCompletionRunner extends AbstractChatCompletionRunner<ChatCompl
     options?: RunnerOptions,
   ): ChatCompletionRunner {
     const runner = new ChatCompletionRunner();
-    runner._run(() => runner._runTools(completions, params, options));
+    const opts = {
+      ...options,
+      headers: { ...options?.headers, 'X-Stainless-Helper-Method': 'runTools' },
+    };
+    runner._run(() => runner._runTools(completions, params, opts));
     return runner;
   }
 

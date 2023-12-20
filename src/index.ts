@@ -20,8 +20,10 @@ export interface ClientOptions {
 
   /**
    * Override the default base URL for the API, e.g., "https://api.example.com/v2/"
+   *
+   * Defaults to process.env['OPENAI_BASE_URL'].
    */
-  baseURL?: string;
+  baseURL?: string | null | undefined;
 
   /**
    * The maximum amount of time (in milliseconds) that the client should wait for a response
@@ -91,7 +93,7 @@ export class OpenAI extends Core.APIClient {
    *
    * @param {string} [opts.apiKey==process.env['MARTIAN_API_KEY'] ?? undefined]
    * @param {string | null} [opts.organization==process.env['OPENAI_ORG_ID'] ?? null]
-   * @param {string} [opts.baseURL] - Override the default base URL for the API.
+   * @param {string} [opts.baseURL=process.env['OPENAI_BASE_URL'] ?? https://withmartian.com/api/openai/v1] - Override the default base URL for the API.
    * @param {number} [opts.timeout=10 minutes] - The maximum amount of time (in milliseconds) the client will wait for a response before timing out.
    * @param {number} [opts.httpAgent] - An HTTP agent used to manage HTTP(s) connections.
    * @param {Core.Fetch} [opts.fetch] - Specify a custom `fetch` function implementation.
@@ -101,7 +103,7 @@ export class OpenAI extends Core.APIClient {
    * @param {boolean} [opts.dangerouslyAllowBrowser=false] - By default, client-side use of this library is not allowed, as it risks exposing your secret API credentials to attackers.
    */
   constructor({
-    apiKey = Core.readEnv('MARTIAN_API_KEY'),
+    apiKey = Core.readEnv('OPENAI_API_KEY'),
     organization = Core.readEnv('OPENAI_ORG_ID') ?? null,
     ...opts
   }: ClientOptions = {}) {
@@ -239,6 +241,7 @@ export namespace OpenAI {
   export import ChatCompletionNamedToolChoice = API.ChatCompletionNamedToolChoice;
   export import ChatCompletionRole = API.ChatCompletionRole;
   export import ChatCompletionSystemMessageParam = API.ChatCompletionSystemMessageParam;
+  export import ChatCompletionTokenLogprob = API.ChatCompletionTokenLogprob;
   export import ChatCompletionTool = API.ChatCompletionTool;
   export import ChatCompletionToolChoiceOption = API.ChatCompletionToolChoiceOption;
   export import ChatCompletionToolMessageParam = API.ChatCompletionToolMessageParam;

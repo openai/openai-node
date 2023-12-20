@@ -19,6 +19,7 @@ export {
   RunnableFunctionWithParse,
   RunnableFunctionWithoutParse,
   ParsingFunction,
+  ParsingToolFunction
 } from 'martian-node/lib/RunnableFunction';
 import { ChatCompletionToolRunnerParams } from 'martian-node/lib/ChatCompletionRunner';
 export { ChatCompletionToolRunnerParams } from 'martian-node/lib/ChatCompletionRunner';
@@ -29,13 +30,7 @@ export { ChatCompletionStream, type ChatCompletionStreamParams } from 'martian-n
 
 export class Completions extends APIResource {
   /**
-   * A convenience helper for using function calls with the /chat/completions
-   * endpoint which automatically calls the JavaScript functions you provide and
-   * sends their results back to the /chat/completions endpoint, looping as long as
-   * the model requests function calls.
-   *
-   * For more details and examples, see
-   * [the docs](https://github.com/openai/openai-node#automated-function-calls)
+   * @deprecated - use `runTools` instead.
    */
   runFunctions<FunctionsArgs extends BaseFunctionsArgs>(
     body: ChatCompletionFunctionRunnerParams<FunctionsArgs>,

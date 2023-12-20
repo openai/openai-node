@@ -2,7 +2,7 @@ import OpenAI from 'martian-node';
 import { OpenAIError } from 'martian-node/error';
 import { PassThrough } from 'stream';
 import {
-  ParsingFunction,
+  ParsingToolFunction,
   type ChatCompletionRunner,
   type ChatCompletionFunctionRunnerParams,
   ChatCompletionStreamingRunner,
@@ -63,10 +63,13 @@ function mockFetch(): { fetch: Fetch; handleRequest: (handle: Fetch) => Promise<
   }
 
   function handleRequest(handle: typeof fetch): Promise<void> {
-    return new Promise<void>((resolve) => {
+    return new Promise<void>((resolve, reject) => {
       fetchQueue.shift()?.(async (req, init) => {
         try {
           return await handle(req, init);
+        } catch (err) {
+          reject(err);
+          return err as any;
         } finally {
           resolve();
         }
@@ -143,6 +146,7 @@ function* contentChoiceDeltas(
     yield {
       index,
       finish_reason: i === deltas.length - 1 ? 'stop' : null,
+      logprobs: null,
       delta: {
         role,
         content: deltas[i] ? `${deltas[i]}${i === deltas.length - 1 ? '' : ' '}` : null,
@@ -157,10 +161,12 @@ function* functionCallDeltas(
   args: string,
   {
     index = 0,
+    id = '123',
     name,
     role = 'assistant',
   }: {
     name: string;
+    id?: string;
     index?: number;
     role?: NonNullable<OpenAI.Chat.ChatCompletionChunk.Choice.Delta['role']>;
   },
@@ -172,10 +178,17 @@ function* functionCallDeltas(
       finish_reason: i === deltas.length - 1 ? 'function_call' : null,
       delta: {
         role,
-        function_call: {
-          arguments: `${deltas[i] || ''}${i === deltas.length - 1 ? '' : ' '}`,
-          ...(i === deltas.length - 1 ? { name } : null),
-        },
+        tool_calls: [
+          {
+            type: 'function',
+            index: 0,
+            id,
+            function: {
+              arguments: `${deltas[i] || ''}${i === deltas.length - 1 ? '' : ' '}`,
+              ...(i === deltas.length - 1 ? { name } : null),
+            },
+          },
+        ],
       },
     };
   }
@@ -215,7 +228,7 @@ class RunnerListener {
       .on('finalFunctionCallResult', (result) => (this.finalFunctionCallResult = result))
       .on('totalUsage', (usage) => (this.totalUsage = usage))
       .on('error', (error) => (this.error = error))
-      .on('abort', () => (this.gotAbort = true))
+      .on('abort', (error) => ((this.error = error), (this.gotAbort = true)))
       .on('end', () => (this.gotEnd = true))
       .once('message', () => this.onceMessageCallCount++);
   }
@@ -262,7 +275,7 @@ class RunnerListener {
       .map((m) => m.content as string)
       .filter(Boolean);
     expect(this.contents).toEqual(expectedContents);
-    expect(this.finalMessage).toEqual(this.messages[this.messages.length - 1]);
+    expect(this.finalMessage).toEqual([...this.messages].reverse().find((x) => x.role === 'assistant'));
     expect(await this.runner.finalMessage()).toEqual(this.finalMessage);
     expect(this.finalContent).toEqual(expectedContents[expectedContents.length - 1] ?? null);
     expect(await this.runner.finalContent()).toEqual(this.finalContent);
@@ -329,6 +342,7 @@ class StreamingRunnerListener {
       .on('finalFunctionCall', (functionCall) => (this.finalFunctionCall = functionCall))
       .on('finalFunctionCallResult', (result) => (this.finalFunctionCallResult = result))
       .on('error', (error) => (this.error = error))
+      .on('abort', (abort) => (this.error = abort))
       .on('end', () => (this.gotEnd = true));
   }
 
@@ -365,7 +379,7 @@ class StreamingRunnerListener {
     if (error) return;
 
     if (this.eventContents.length) expect(this.eventChunks.length).toBeGreaterThan(0);
-    expect(this.finalMessage).toEqual(this.eventMessages[this.eventMessages.length - 1]);
+    expect(this.finalMessage).toEqual([...this.eventMessages].reverse().find((x) => x.role === 'assistant'));
     expect(await this.runner.finalMessage()).toEqual(this.finalMessage);
     expect(this.finalContent).toEqual(this.eventContents[this.eventContents.length - 1]?.[1] ?? null);
     expect(await this.runner.finalContent()).toEqual(this.finalContent);
@@ -393,45 +407,54 @@ class StreamingRunnerListener {
 function _typeTests() {
   const openai = new OpenAI();
 
-  openai.beta.chat.completions.runFunctions({
+  openai.beta.chat.completions.runTools({
     messages: [
       { role: 'user', content: 'can you tell me how many properties are in {"a": 1, "b": 2, "c": 3}' },
     ],
     model: 'gpt-3.5-turbo',
-    functions: [
+    tools: [
       {
-        name: 'numProperties',
-        function: (obj: object) => String(Object.keys(obj).length),
-        parameters: { type: 'object' },
-        parse: (str: string): object => {
-          const result = JSON.parse(str);
-          if (!(result instanceof Object) || Array.isArray(result)) {
-            throw new Error('must be an object');
-          }
-          return result;
+        type: 'function',
+        function: {
+          name: 'numProperties',
+          function: (obj: object) => String(Object.keys(obj).length),
+          parameters: { type: 'object' },
+          parse: (str: string): object => {
+            const result = JSON.parse(str);
+            if (!(result instanceof Object) || Array.isArray(result)) {
+              throw new Error('must be an object');
+            }
+            return result;
+          },
+          description: 'gets the number of properties on an object',
         },
-        description: 'gets the number of properties on an object',
       },
       {
-        function: (str: string) => String(str.length),
-        parameters: { type: 'string' },
-        description: 'gets the length of a string',
+        type: 'function',
+        function: {
+          function: (str: string) => String(str.length),
+          parameters: { type: 'string' },
+          description: 'gets the length of a string',
+        },
       },
-      // @ts-expect-error function must accept string if parse is omitted
       {
-        function: (obj: object) => String(Object.keys(obj).length),
-        parameters: { type: 'object' },
-        description: 'gets the number of properties on an object',
+        type: 'function',
+        // @ts-expect-error function must accept string if parse is omitted
+        function: {
+          function: (obj: object) => String(Object.keys(obj).length),
+          parameters: { type: 'object' },
+          description: 'gets the number of properties on an object',
+        },
       },
     ],
   });
-  openai.beta.chat.completions.runFunctions({
+  openai.beta.chat.completions.runTools({
     messages: [
       { role: 'user', content: 'can you tell me how many properties are in {"a": 1, "b": 2, "c": 3}' },
     ],
     model: 'gpt-3.5-turbo',
-    functions: [
-      new ParsingFunction({
+    tools: [
+      new ParsingToolFunction({
         name: 'numProperties',
         // @ts-expect-error parse and function don't match
         parse: (str: string) => str,
@@ -441,13 +464,13 @@ function _typeTests() {
       }),
     ],
   });
-  openai.beta.chat.completions.runFunctions({
+  openai.beta.chat.completions.runTools({
     messages: [
       { role: 'user', content: 'can you tell me how many properties are in {"a": 1, "b": 2, "c": 3}' },
     ],
     model: 'gpt-3.5-turbo',
-    functions: [
-      new ParsingFunction({
+    tools: [
+      new ParsingToolFunction({
         name: 'numProperties',
         parse: (str: string): object => {
           const result = JSON.parse(str);
@@ -460,7 +483,7 @@ function _typeTests() {
         parameters: { type: 'object' },
         description: 'gets the number of properties on an object',
       }),
-      new ParsingFunction({
+      new ParsingToolFunction({
         name: 'keys',
         parse: (str: string): object => {
           const result = JSON.parse(str);
@@ -473,7 +496,7 @@ function _typeTests() {
         parameters: { type: 'object' },
         description: 'gets the number of properties on an object',
       }),
-      new ParsingFunction({
+      new ParsingToolFunction({
         name: 'len2',
         // @ts-expect-error parse and function don't match
         parse: (str: string) => str,
@@ -483,140 +506,179 @@ function _typeTests() {
       }),
     ],
   });
-  openai.beta.chat.completions.runFunctions({
+  openai.beta.chat.completions.runTools({
     messages: [
       { role: 'user', content: 'can you tell me how many properties are in {"a": 1, "b": 2, "c": 3}' },
     ],
     model: 'gpt-3.5-turbo',
     // @ts-ignore error occurs here in TS 4
-    functions: [
+    tools: [
       {
-        name: 'numProperties',
-        parse: (str: string): object => {
-          const result = JSON.parse(str);
-          if (!(result instanceof Object) || Array.isArray(result)) {
-            throw new Error('must be an object');
-          }
-          return result;
+        type: 'function',
+        function: {
+          name: 'numProperties',
+          parse: (str: string): object => {
+            const result = JSON.parse(str);
+            if (!(result instanceof Object) || Array.isArray(result)) {
+              throw new Error('must be an object');
+            }
+            return result;
+          },
+          function: (obj: object) => String(Object.keys(obj).length),
+          parameters: { type: 'object' },
+          description: 'gets the number of properties on an object',
         },
-        function: (obj: object) => String(Object.keys(obj).length),
-        parameters: { type: 'object' },
-        description: 'gets the number of properties on an object',
       },
       {
-        name: 'keys',
-        parse: (str: string): object => {
-          const result = JSON.parse(str);
-          if (!(result instanceof Object)) {
-            throw new Error('must be an Object');
-          }
-          return result;
+        type: 'function',
+        function: {
+          name: 'keys',
+          parse: (str: string): object => {
+            const result = JSON.parse(str);
+            if (!(result instanceof Object)) {
+              throw new Error('must be an Object');
+            }
+            return result;
+          },
+          function: (obj: object) => Object.keys(obj).join(', '),
+          parameters: { type: 'object' },
+          description: 'gets the number of properties on an object',
         },
-        function: (obj: object) => Object.keys(obj).join(', '),
-        parameters: { type: 'object' },
-        description: 'gets the number of properties on an object',
       },
       {
-        name: 'len2',
-        parse: (str: string) => str,
-        // @ts-ignore error occurs here in TS 5
-        // function input doesn't match parse output
-        function: (obj: object) => String(Object.keys(obj).length),
-        parameters: { type: 'object' },
-        description: 'gets the number of properties on an object',
+        type: 'function',
+        function: {
+          name: 'len2',
+          parse: (str: string) => str,
+          // @ts-ignore error occurs here in TS 5
+          // function input doesn't match parse output
+          function: (obj: object) => String(Object.keys(obj).length),
+          parameters: { type: 'object' },
+          description: 'gets the number of properties on an object',
+        },
       },
     ] as const,
   });
 }
 
 describe('resource completions', () => {
-  // TODO: re-enable
-  describe.skip('runFunctions with stream: false', () => {
+  describe('runTools with stream: false', () => {
     test('successful flow', async () => {
       const { fetch, handleRequest } = mockChatCompletionFetch();
 
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
-      const runner = openai.beta.chat.completions.runFunctions({
+      const runner = openai.beta.chat.completions.runTools({
         messages: [{ role: 'user', content: 'tell me what the weather is like' }],
         model: 'gpt-3.5-turbo',
-        functions: [
+        tools: [
           {
-            function: function getWeather() {
-              return `it's raining`;
+            type: 'function',
+            function: {
+              function: function getWeather() {
+                return `it's raining`;
+              },
+              parameters: {},
+              description: 'gets the weather',
             },
-            parameters: {},
-            description: 'gets the weather',
           },
         ],
       });
       const listener = new RunnerListener(runner);
 
-      await Promise.all([
-        handleRequest(async (request) => {
-          expect(request.messages).toEqual([{ role: 'user', content: 'tell me what the weather is like' }]);
-          return {
-            id: '1',
-            choices: [
-              {
-                index: 0,
-                finish_reason: 'function_call',
-                message: {
-                  role: 'assistant',
-                  content: null,
-                  function_call: {
-                    arguments: '',
-                    name: 'getWeather',
+      await handleRequest(async (request) => {
+        expect(request.messages).toEqual([{ role: 'user', content: 'tell me what the weather is like' }]);
+        return {
+          id: '1',
+          choices: [
+            {
+              index: 0,
+              finish_reason: 'function_call',
+              logprobs: null,
+              message: {
+                role: 'assistant',
+                content: null,
+                tool_calls: [
+                  {
+                    type: 'function',
+                    id: '123',
+                    function: {
+                      arguments: '',
+                      name: 'getWeather',
+                    },
                   },
+                ],
+              },
+            },
+          ],
+          created: Math.floor(Date.now() / 1000),
+          model: 'gpt-3.5-turbo',
+          object: 'chat.completion',
+        };
+      });
+
+      await handleRequest(async (request) => {
+        expect(request.messages).toEqual([
+          { role: 'user', content: 'tell me what the weather is like' },
+          {
+            role: 'assistant',
+            content: null,
+            tool_calls: [
+              {
+                type: 'function',
+                id: '123',
+                function: {
+                  arguments: '',
+                  name: 'getWeather',
                 },
               },
             ],
-            created: Math.floor(Date.now() / 1000),
-            model: 'gpt-3.5-turbo',
-            object: 'chat.completion',
-          };
-        }),
-        handleRequest(async (request) => {
-          expect(request.messages).toEqual([
-            { role: 'user', content: 'tell me what the weather is like' },
+          },
+          {
+            role: 'tool',
+            content: `it's raining`,
+            tool_call_id: '123',
+          },
+        ]);
+
+        return {
+          id: '2',
+          choices: [
             {
-              role: 'assistant',
-              content: null,
-              function_call: {
+              index: 0,
+              finish_reason: 'stop',
+              logprobs: null,
+              message: {
+                role: 'assistant',
+                content: `it's raining`,
+              },
+            },
+          ],
+          created: Math.floor(Date.now() / 1000),
+          model: 'gpt-3.5-turbo',
+          object: 'chat.completion',
+        };
+      });
+
+      await runner.done();
+
+      expect(listener.messages).toEqual([
+        { role: 'user', content: 'tell me what the weather is like' },
+        {
+          role: 'assistant',
+          content: null,
+          tool_calls: [
+            {
+              type: 'function',
+              id: '123',
+              function: {
                 arguments: '',
                 name: 'getWeather',
               },
             },
-            {
-              role: 'function',
-              content: `it's raining`,
-              name: 'getWeather',
-            },
-          ]);
-          return {
-            id: '2',
-            choices: [
-              {
-                index: 0,
-                finish_reason: 'stop',
-                message: {
-                  role: 'assistant',
-                  content: `it's raining`,
-                },
-              },
-            ],
-            created: Math.floor(Date.now() / 1000),
-            model: 'gpt-3.5-turbo',
-            object: 'chat.completion',
-          };
-        }),
-        runner.done(),
-      ]);
-
-      expect(listener.messages).toEqual([
-        { role: 'user', content: 'tell me what the weather is like' },
-        { role: 'assistant', content: null, function_call: { name: 'getWeather', arguments: '' } },
-        { role: 'function', content: `it's raining`, name: 'getWeather' },
+          ],
+        },
+        { role: 'tool', content: `it's raining`, tool_call_id: '123' },
         { role: 'assistant', content: "it's raining" },
       ]);
       expect(listener.functionCallResults).toEqual([`it's raining`]);
@@ -628,17 +690,20 @@ describe('resource completions', () => {
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
       const controller = new AbortController();
-      const runner = openai.beta.chat.completions.runFunctions(
+      const runner = openai.beta.chat.completions.runTools(
         {
           messages: [{ role: 'user', content: 'tell me what the weather is like' }],
           model: 'gpt-3.5-turbo',
-          functions: [
+          tools: [
             {
-              function: function getWeather() {
-                return `it's raining`;
+              type: 'function',
+              function: {
+                function: function getWeather() {
+                  return `it's raining`;
+                },
+                parameters: {},
+                description: 'gets the weather',
               },
-              parameters: {},
-              description: 'gets the weather',
             },
           ],
         },
@@ -654,13 +719,20 @@ describe('resource completions', () => {
             {
               index: 0,
               finish_reason: 'function_call',
+              logprobs: null,
               message: {
                 role: 'assistant',
                 content: null,
-                function_call: {
-                  arguments: '',
-                  name: 'getWeather',
-                },
+                tool_calls: [
+                  {
+                    type: 'function',
+                    id: '123',
+                    function: {
+                      arguments: '',
+                      name: 'getWeather',
+                    },
+                  },
+                ],
               },
             },
           ],
@@ -676,8 +748,21 @@ describe('resource completions', () => {
 
       expect(listener.messages).toEqual([
         { role: 'user', content: 'tell me what the weather is like' },
-        { role: 'assistant', content: null, function_call: { name: 'getWeather', arguments: '' } },
-        { role: 'function', content: `it's raining`, name: 'getWeather' },
+        {
+          role: 'assistant',
+          content: null,
+          tool_calls: [
+            {
+              type: 'function',
+              id: '123',
+              function: {
+                arguments: '',
+                name: 'getWeather',
+              },
+            },
+          ],
+        },
+        { role: 'tool', content: `it's raining`, tool_call_id: '123' },
       ]);
       expect(listener.functionCallResults).toEqual([`it's raining`]);
       await listener.sanityCheck({ error: 'Request was aborted.' });
@@ -688,7 +773,7 @@ describe('resource completions', () => {
 
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
-      const runner = openai.beta.chat.completions.runFunctions({
+      const runner = openai.beta.chat.completions.runTools({
         messages: [
           {
             role: 'user',
@@ -696,8 +781,8 @@ describe('resource completions', () => {
           },
         ],
         model: 'gpt-3.5-turbo',
-        functions: [
-          new ParsingFunction({
+        tools: [
+          new ParsingToolFunction({
             name: 'numProperties',
             function: (obj: object) => String(Object.keys(obj).length),
             parameters: { type: 'object' },
@@ -714,86 +799,98 @@ describe('resource completions', () => {
       });
       const listener = new RunnerListener(runner);
 
-      await Promise.all([
-        handleRequest(async (request) => {
-          expect(request.messages).toEqual([
+      await handleRequest(async (request) => {
+        expect(request.messages).toEqual([
+          {
+            role: 'user',
+            content: 'can you tell me how many properties are in {"a": 1, "b": 2, "c": 3}',
+          },
+        ]);
+        return {
+          id: '1',
+          choices: [
             {
-              role: 'user',
-              content: 'can you tell me how many properties are in {"a": 1, "b": 2, "c": 3}',
-            },
-          ]);
-          return {
-            id: '1',
-            choices: [
-              {
-                index: 0,
-                finish_reason: 'function_call',
-                message: {
-                  role: 'assistant',
-                  content: null,
-                  function_call: {
-                    arguments: '{"a": 1, "b": 2, "c": 3}',
-                    name: 'numProperties',
+              index: 0,
+              finish_reason: 'function_call',
+              logprobs: null,
+              message: {
+                role: 'assistant',
+                content: null,
+                tool_calls: [
+                  {
+                    type: 'function',
+                    id: '123',
+                    function: {
+                      arguments: '{"a": 1, "b": 2, "c": 3}',
+                      name: 'numProperties',
+                    },
                   },
-                },
+                ],
               },
-            ],
-            created: Math.floor(Date.now() / 1000),
-            model: 'gpt-3.5-turbo',
-            object: 'chat.completion',
-            usage: {
-              completion_tokens: 5,
-              prompt_tokens: 20,
-              total_tokens: 25,
             },
-          };
-        }),
+          ],
+          created: Math.floor(Date.now() / 1000),
+          model: 'gpt-3.5-turbo',
+          object: 'chat.completion',
+          usage: {
+            completion_tokens: 5,
+            prompt_tokens: 20,
+            total_tokens: 25,
+          },
+        };
+      });
 
-        handleRequest(async (request) => {
-          expect(request.messages).toEqual([
-            {
-              role: 'user',
-              content: 'can you tell me how many properties are in {"a": 1, "b": 2, "c": 3}',
-            },
-            {
-              role: 'assistant',
-              content: null,
-              function_call: {
-                arguments: '{"a": 1, "b": 2, "c": 3}',
-                name: 'numProperties',
-              },
-            },
-            {
-              role: 'function',
-              content: '3',
-              name: 'numProperties',
-            },
-          ]);
-          return {
-            id: '2',
-            choices: [
+      await handleRequest(async (request) => {
+        expect(request.messages).toEqual([
+          {
+            role: 'user',
+            content: 'can you tell me how many properties are in {"a": 1, "b": 2, "c": 3}',
+          },
+          {
+            role: 'assistant',
+            content: null,
+            tool_calls: [
               {
-                index: 0,
-                finish_reason: 'stop',
-                message: {
-                  role: 'assistant',
-                  content: `there are 3 properties in {"a": 1, "b": 2, "c": 3}`,
+                type: 'function',
+                id: '123',
+                function: {
+                  arguments: '{"a": 1, "b": 2, "c": 3}',
+                  name: 'numProperties',
                 },
               },
             ],
-            created: Math.floor(Date.now() / 1000),
-            model: 'gpt-3.5-turbo',
-            object: 'chat.completion',
-            usage: {
-              completion_tokens: 10,
-              prompt_tokens: 25,
-              total_tokens: 35,
+          },
+          {
+            role: 'tool',
+            content: '3',
+            tool_call_id: '123',
+          },
+        ]);
+        return {
+          id: '2',
+          choices: [
+            {
+              index: 0,
+              finish_reason: 'stop',
+              logprobs: null,
+              message: {
+                role: 'assistant',
+                content: `there are 3 properties in {"a": 1, "b": 2, "c": 3}`,
+              },
             },
-          };
-        }),
+          ],
+          created: Math.floor(Date.now() / 1000),
+          model: 'gpt-3.5-turbo',
+          object: 'chat.completion',
+          usage: {
+            completion_tokens: 10,
+            prompt_tokens: 25,
+            total_tokens: 35,
+          },
+        };
+      });
 
-        runner.done(),
-      ]);
+      await runner.done();
 
       expect(listener.messages).toEqual([
         {
@@ -803,9 +900,15 @@ describe('resource completions', () => {
         {
           role: 'assistant',
           content: null,
-          function_call: { name: 'numProperties', arguments: '{"a": 1, "b": 2, "c": 3}' },
+          tool_calls: [
+            {
+              type: 'function',
+              id: '123',
+              function: { name: 'numProperties', arguments: '{"a": 1, "b": 2, "c": 3}' },
+            },
+          ],
         },
-        { role: 'function', content: '3', name: 'numProperties' },
+        { role: 'tool', content: '3', tool_call_id: '123' },
         { role: 'assistant', content: 'there are 3 properties in {"a": 1, "b": 2, "c": 3}' },
       ]);
       expect(listener.functionCallResults).toEqual(['3']);
@@ -816,7 +919,7 @@ describe('resource completions', () => {
 
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
-      const runner = openai.beta.chat.completions.runFunctions({
+      const runner = openai.beta.chat.completions.runTools({
         messages: [
           {
             role: 'user',
@@ -824,8 +927,8 @@ describe('resource completions', () => {
           },
         ],
         model: 'gpt-3.5-turbo',
-        functions: [
-          new ParsingFunction({
+        tools: [
+          new ParsingToolFunction({
             name: 'numProperties',
             function: (obj: object) => String(Object.keys(obj).length),
             parameters: { type: 'object' },
@@ -856,13 +959,20 @@ describe('resource completions', () => {
               {
                 index: 0,
                 finish_reason: 'function_call',
+                logprobs: null,
                 message: {
                   role: 'assistant',
                   content: null,
-                  function_call: {
-                    arguments: '[{"a": 1, "b": 2, "c": 3}]',
-                    name: 'numProperties',
-                  },
+                  tool_calls: [
+                    {
+                      type: 'function',
+                      id: '123',
+                      function: {
+                        arguments: '[{"a": 1, "b": 2, "c": 3}]',
+                        name: 'numProperties',
+                      },
+                    },
+                  ],
                 },
               },
             ],
@@ -880,15 +990,21 @@ describe('resource completions', () => {
             {
               role: 'assistant',
               content: null,
-              function_call: {
-                arguments: '[{"a": 1, "b": 2, "c": 3}]',
-                name: 'numProperties',
-              },
+              tool_calls: [
+                {
+                  type: 'function',
+                  id: '123',
+                  function: {
+                    arguments: '[{"a": 1, "b": 2, "c": 3}]',
+                    name: 'numProperties',
+                  },
+                },
+              ],
             },
             {
-              role: 'function',
+              role: 'tool',
               content: `must be an object`,
-              name: 'numProperties',
+              tool_call_id: '123',
             },
           ]);
           return {
@@ -897,13 +1013,20 @@ describe('resource completions', () => {
               {
                 index: 0,
                 finish_reason: 'function_call',
+                logprobs: null,
                 message: {
                   role: 'assistant',
                   content: null,
-                  function_call: {
-                    arguments: '{"a": 1, "b": 2, "c": 3}',
-                    name: 'numProperties',
-                  },
+                  tool_calls: [
+                    {
+                      type: 'function',
+                      id: '1234',
+                      function: {
+                        arguments: '{"a": 1, "b": 2, "c": 3}',
+                        name: 'numProperties',
+                      },
+                    },
+                  ],
                 },
               },
             ],
@@ -921,28 +1044,40 @@ describe('resource completions', () => {
             {
               role: 'assistant',
               content: null,
-              function_call: {
-                arguments: '[{"a": 1, "b": 2, "c": 3}]',
-                name: 'numProperties',
-              },
+              tool_calls: [
+                {
+                  type: 'function',
+                  id: '123',
+                  function: {
+                    arguments: '[{"a": 1, "b": 2, "c": 3}]',
+                    name: 'numProperties',
+                  },
+                },
+              ],
             },
             {
-              role: 'function',
+              role: 'tool',
               content: `must be an object`,
-              name: 'numProperties',
+              tool_call_id: '123',
             },
             {
               role: 'assistant',
               content: null,
-              function_call: {
-                arguments: '{"a": 1, "b": 2, "c": 3}',
-                name: 'numProperties',
-              },
+              tool_calls: [
+                {
+                  type: 'function',
+                  id: '1234',
+                  function: {
+                    arguments: '{"a": 1, "b": 2, "c": 3}',
+                    name: 'numProperties',
+                  },
+                },
+              ],
             },
             {
-              role: 'function',
+              role: 'tool',
               content: '3',
-              name: 'numProperties',
+              tool_call_id: '1234',
             },
           ]);
           return {
@@ -951,6 +1086,7 @@ describe('resource completions', () => {
               {
                 index: 0,
                 finish_reason: 'stop',
+                logprobs: null,
                 message: {
                   role: 'assistant',
                   content: `there are 3 properties in {"a": 1, "b": 2, "c": 3}`,
@@ -973,15 +1109,27 @@ describe('resource completions', () => {
         {
           role: 'assistant',
           content: null,
-          function_call: { name: 'numProperties', arguments: '[{"a": 1, "b": 2, "c": 3}]' },
+          tool_calls: [
+            {
+              type: 'function',
+              id: '123',
+              function: { name: 'numProperties', arguments: '[{"a": 1, "b": 2, "c": 3}]' },
+            },
+          ],
         },
-        { role: 'function', content: `must be an object`, name: 'numProperties' },
+        { role: 'tool', content: `must be an object`, tool_call_id: '123' },
         {
           role: 'assistant',
           content: null,
-          function_call: { name: 'numProperties', arguments: '{"a": 1, "b": 2, "c": 3}' },
+          tool_calls: [
+            {
+              type: 'function',
+              id: '1234',
+              function: { name: 'numProperties', arguments: '{"a": 1, "b": 2, "c": 3}' },
+            },
+          ],
         },
-        { role: 'function', content: '3', name: 'numProperties' },
+        { role: 'tool', content: '3', tool_call_id: '1234' },
         { role: 'assistant', content: 'there are 3 properties in {"a": 1, "b": 2, "c": 3}' },
       ]);
       expect(listener.functionCallResults).toEqual([`must be an object`, '3']);
@@ -992,19 +1140,25 @@ describe('resource completions', () => {
 
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
-      const runner = openai.beta.chat.completions.runFunctions({
+      const runner = openai.beta.chat.completions.runTools({
         messages: [{ role: 'user', content: 'tell me what the weather is like' }],
         model: 'gpt-3.5-turbo',
-        function_call: {
-          name: 'getWeather',
+        tool_choice: {
+          type: 'function',
+          function: {
+            name: 'getWeather',
+          },
         },
-        functions: [
+        tools: [
           {
-            function: function getWeather() {
-              return `it's raining`;
+            type: 'function',
+            function: {
+              function: function getWeather() {
+                return `it's raining`;
+              },
+              parameters: {},
+              description: 'gets the weather',
             },
-            parameters: {},
-            description: 'gets the weather',
           },
         ],
       });
@@ -1019,13 +1173,20 @@ describe('resource completions', () => {
               {
                 index: 0,
                 finish_reason: 'function_call',
+                logprobs: null,
                 message: {
                   role: 'assistant',
                   content: null,
-                  function_call: {
-                    arguments: '',
-                    name: 'getWeather',
-                  },
+                  tool_calls: [
+                    {
+                      type: 'function',
+                      id: '123',
+                      function: {
+                        arguments: '',
+                        name: 'getWeather',
+                      },
+                    },
+                  ],
                 },
               },
             ],
@@ -1039,8 +1200,21 @@ describe('resource completions', () => {
 
       expect(listener.messages).toEqual([
         { role: 'user', content: 'tell me what the weather is like' },
-        { role: 'assistant', content: null, function_call: { name: 'getWeather', arguments: '' } },
-        { role: 'function', content: `it's raining`, name: 'getWeather' },
+        {
+          role: 'assistant',
+          content: null,
+          tool_calls: [
+            {
+              type: 'function',
+              id: '123',
+              function: {
+                arguments: '',
+                name: 'getWeather',
+              },
+            },
+          ],
+        },
+        { role: 'tool', content: `it's raining`, tool_call_id: '123' },
       ]);
       expect(listener.functionCallResults).toEqual([`it's raining`]);
       await listener.sanityCheck();
@@ -1050,16 +1224,19 @@ describe('resource completions', () => {
 
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
-      const runner = openai.beta.chat.completions.runFunctions({
+      const runner = openai.beta.chat.completions.runTools({
         messages: [{ role: 'user', content: 'tell me what the weather is like' }],
         model: 'gpt-3.5-turbo',
-        functions: [
+        tools: [
           {
-            function: function getWeather() {
-              return `it's raining`;
+            type: 'function',
+            function: {
+              function: function getWeather() {
+                return `it's raining`;
+              },
+              parameters: {},
+              description: 'gets the weather',
             },
-            parameters: {},
-            description: 'gets the weather',
           },
         ],
       });
@@ -1074,13 +1251,20 @@ describe('resource completions', () => {
               {
                 index: 0,
                 finish_reason: 'function_call',
+                logprobs: null,
                 message: {
                   role: 'assistant',
                   content: null,
-                  function_call: {
-                    arguments: '',
-                    name: 'get_weather',
-                  },
+                  tool_calls: [
+                    {
+                      type: 'function',
+                      id: '123',
+                      function: {
+                        arguments: '',
+                        name: 'get_weather',
+                      },
+                    },
+                  ],
                 },
               },
             ],
@@ -1095,15 +1279,21 @@ describe('resource completions', () => {
             {
               role: 'assistant',
               content: null,
-              function_call: {
-                arguments: '',
-                name: 'get_weather',
-              },
+              tool_calls: [
+                {
+                  type: 'function',
+                  id: '123',
+                  function: {
+                    arguments: '',
+                    name: 'get_weather',
+                  },
+                },
+              ],
             },
             {
-              role: 'function',
-              content: `Invalid function_call: "get_weather". Available options are: "getWeather". Please try again`,
-              name: 'get_weather',
+              role: 'tool',
+              content: `Invalid tool_call: "get_weather". Available options are: "getWeather". Please try again`,
+              tool_call_id: '123',
             },
           ]);
           return {
@@ -1112,13 +1302,20 @@ describe('resource completions', () => {
               {
                 index: 0,
                 finish_reason: 'function_call',
+                logprobs: null,
                 message: {
                   role: 'assistant',
                   content: null,
-                  function_call: {
-                    arguments: '',
-                    name: 'getWeather',
-                  },
+                  tool_calls: [
+                    {
+                      type: 'function',
+                      id: '1234',
+                      function: {
+                        arguments: '',
+                        name: 'getWeather',
+                      },
+                    },
+                  ],
                 },
               },
             ],
@@ -1133,28 +1330,40 @@ describe('resource completions', () => {
             {
               role: 'assistant',
               content: null,
-              function_call: {
-                arguments: '',
-                name: 'get_weather',
-              },
+              tool_calls: [
+                {
+                  type: 'function',
+                  id: '123',
+                  function: {
+                    arguments: '',
+                    name: 'get_weather',
+                  },
+                },
+              ],
             },
             {
-              role: 'function',
-              content: `Invalid function_call: "get_weather". Available options are: "getWeather". Please try again`,
-              name: 'get_weather',
+              role: 'tool',
+              content: `Invalid tool_call: "get_weather". Available options are: "getWeather". Please try again`,
+              tool_call_id: '123',
             },
             {
               role: 'assistant',
               content: null,
-              function_call: {
-                arguments: '',
-                name: 'getWeather',
-              },
+              tool_calls: [
+                {
+                  type: 'function',
+                  id: '1234',
+                  function: {
+                    arguments: '',
+                    name: 'getWeather',
+                  },
+                },
+              ],
             },
             {
-              role: 'function',
+              role: 'tool',
               content: `it's raining`,
-              name: 'getWeather',
+              tool_call_id: '1234',
             },
           ]);
           return {
@@ -1163,6 +1372,7 @@ describe('resource completions', () => {
               {
                 index: 0,
                 finish_reason: 'stop',
+                logprobs: null,
                 message: {
                   role: 'assistant',
                   content: `it's raining`,
@@ -1179,106 +1389,52 @@ describe('resource completions', () => {
 
       expect(listener.messages).toEqual([
         { role: 'user', content: 'tell me what the weather is like' },
-        { role: 'assistant', content: null, function_call: { name: 'get_weather', arguments: '' } },
         {
-          role: 'function',
-          content: `Invalid function_call: "get_weather". Available options are: "getWeather". Please try again`,
-          name: 'get_weather',
+          role: 'assistant',
+          content: null,
+          tool_calls: [{ type: 'function', id: '123', function: { name: 'get_weather', arguments: '' } }],
         },
-        { role: 'assistant', content: null, function_call: { name: 'getWeather', arguments: '' } },
-        { role: 'function', content: `it's raining`, name: 'getWeather' },
+        {
+          role: 'tool',
+          content: `Invalid tool_call: "get_weather". Available options are: "getWeather". Please try again`,
+          tool_call_id: '123',
+        },
+        {
+          role: 'assistant',
+          content: null,
+          tool_calls: [{ type: 'function', id: '1234', function: { name: 'getWeather', arguments: '' } }],
+        },
+        { role: 'tool', content: `it's raining`, tool_call_id: '1234' },
         { role: 'assistant', content: "it's raining" },
       ]);
       expect(listener.functionCallResults).toEqual([
-        `Invalid function_call: "get_weather". Available options are: "getWeather". Please try again`,
+        `Invalid tool_call: "get_weather". Available options are: "getWeather". Please try again`,
         `it's raining`,
-      ]);
-      await listener.sanityCheck();
-    });
-    test('wrong function name with single function call', async () => {
-      const { fetch, handleRequest } = mockChatCompletionFetch();
-
-      const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
-
-      const runner = openai.beta.chat.completions.runFunctions({
-        messages: [{ role: 'user', content: 'tell me what the weather is like' }],
-        model: 'gpt-3.5-turbo',
-        function_call: {
-          name: 'getWeather',
-        },
-        functions: [
-          {
-            function: function getWeather() {
-              return `it's raining`;
-            },
-            parameters: {},
-            description: 'gets the weather',
-          },
-        ],
-      });
-      const listener = new RunnerListener(runner);
-
-      await Promise.all([
-        handleRequest(async (request) => {
-          expect(request.messages).toEqual([{ role: 'user', content: 'tell me what the weather is like' }]);
-          return {
-            id: '1',
-            choices: [
-              {
-                index: 0,
-                finish_reason: 'function_call',
-                message: {
-                  role: 'assistant',
-                  content: null,
-                  function_call: {
-                    arguments: '',
-                    name: 'get_weather',
-                  },
-                },
-              },
-            ],
-            created: Math.floor(Date.now() / 1000),
-            model: 'gpt-3.5-turbo',
-            object: 'chat.completion',
-          };
-        }),
-        runner.done(),
-      ]);
-
-      expect(listener.messages).toEqual([
-        { role: 'user', content: 'tell me what the weather is like' },
-        { role: 'assistant', content: null, function_call: { name: 'get_weather', arguments: '' } },
-        {
-          role: 'function',
-          content: `Invalid function_call: "get_weather". Available options are: "getWeather". Please try again`,
-          name: 'get_weather',
-        },
-      ]);
-      expect(listener.functionCallResults).toEqual([
-        `Invalid function_call: "get_weather". Available options are: "getWeather". Please try again`,
       ]);
       await listener.sanityCheck();
     });
   });
 
-  // TODO: re-enable
-  describe.skip('runFunctions with stream: true', () => {
+  describe('runTools with stream: true', () => {
     test('successful flow', async () => {
       const { fetch, handleRequest } = mockStreamingChatCompletionFetch();
 
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
-      const runner = openai.beta.chat.completions.runFunctions({
+      const runner = openai.beta.chat.completions.runTools({
         stream: true,
         messages: [{ role: 'user', content: 'tell me what the weather is like' }],
         model: 'gpt-3.5-turbo',
-        functions: [
+        tools: [
           {
-            function: function getWeather() {
-              return `it's raining`;
+            type: 'function',
+            function: {
+              function: function getWeather() {
+                return `it's raining`;
+              },
+              parameters: {},
+              description: 'gets the weather',
             },
-            parameters: {},
-            description: 'gets the weather',
           },
         ],
       });
@@ -1293,13 +1449,21 @@ describe('resource completions', () => {
               {
                 index: 0,
                 finish_reason: 'function_call',
+                logprobs: null,
                 delta: {
                   role: 'assistant',
                   content: null,
-                  function_call: {
-                    arguments: '',
-                    name: 'getWeather',
-                  },
+                  tool_calls: [
+                    {
+                      type: 'function',
+                      index: 0,
+                      id: '123',
+                      function: {
+                        arguments: '',
+                        name: 'getWeather',
+                      },
+                    },
+                  ],
                 },
               },
             ],
@@ -1314,15 +1478,21 @@ describe('resource completions', () => {
             {
               role: 'assistant',
               content: null,
-              function_call: {
-                arguments: '',
-                name: 'getWeather',
-              },
+              tool_calls: [
+                {
+                  type: 'function',
+                  id: '123',
+                  function: {
+                    arguments: '',
+                    name: 'getWeather',
+                  },
+                },
+              ],
             },
             {
-              role: 'function',
+              role: 'tool',
               content: `it's raining`,
-              name: 'getWeather',
+              tool_call_id: '123',
             },
           ]);
           for (const choice of contentChoiceDeltas(`it's raining`)) {
@@ -1339,8 +1509,21 @@ describe('resource completions', () => {
       ]);
 
       expect(listener.eventMessages).toEqual([
-        { role: 'assistant', content: null, function_call: { name: 'getWeather', arguments: '' } },
-        { role: 'function', content: `it's raining`, name: 'getWeather' },
+        {
+          role: 'assistant',
+          content: null,
+          tool_calls: [
+            {
+              type: 'function',
+              id: '123',
+              function: {
+                arguments: '',
+                name: 'getWeather',
+              },
+            },
+          ],
+        },
+        { role: 'tool', content: `it's raining`, tool_call_id: '123' },
         { role: 'assistant', content: "it's raining" },
       ]);
       expect(listener.eventFunctionCallResults).toEqual([`it's raining`]);
@@ -1352,18 +1535,21 @@ describe('resource completions', () => {
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
       const controller = new AbortController();
-      const runner = openai.beta.chat.completions.runFunctions(
+      const runner = openai.beta.chat.completions.runTools(
         {
           stream: true,
           messages: [{ role: 'user', content: 'tell me what the weather is like' }],
           model: 'gpt-3.5-turbo',
-          functions: [
+          tools: [
             {
-              function: function getWeather() {
-                return `it's raining`;
+              type: 'function',
+              function: {
+                function: function getWeather() {
+                  return `it's raining`;
+                },
+                parameters: {},
+                description: 'gets the weather',
               },
-              parameters: {},
-              description: 'gets the weather',
             },
           ],
         },
@@ -1383,10 +1569,17 @@ describe('resource completions', () => {
               delta: {
                 role: 'assistant',
                 content: null,
-                function_call: {
-                  arguments: '',
-                  name: 'getWeather',
-                },
+                tool_calls: [
+                  {
+                    type: 'function',
+                    index: 0,
+                    id: '123',
+                    function: {
+                      arguments: '',
+                      name: 'getWeather',
+                    },
+                  },
+                ],
               },
             },
           ],
@@ -1399,8 +1592,21 @@ describe('resource completions', () => {
       await runner.done().catch(() => {});
 
       expect(listener.eventMessages).toEqual([
-        { role: 'assistant', content: null, function_call: { name: 'getWeather', arguments: '' } },
-        { role: 'function', content: `it's raining`, name: 'getWeather' },
+        {
+          role: 'assistant',
+          content: null,
+          tool_calls: [
+            {
+              type: 'function',
+              id: '123',
+              function: {
+                arguments: '',
+                name: 'getWeather',
+              },
+            },
+          ],
+        },
+        { role: 'tool', content: `it's raining`, tool_call_id: '123' },
       ]);
       expect(listener.eventFunctionCallResults).toEqual([`it's raining`]);
       await listener.sanityCheck({ error: 'Request was aborted.' });
@@ -1411,7 +1617,7 @@ describe('resource completions', () => {
 
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
-      const runner = openai.beta.chat.completions.runFunctions({
+      const runner = openai.beta.chat.completions.runTools({
         stream: true,
         messages: [
           {
@@ -1420,8 +1626,8 @@ describe('resource completions', () => {
           },
         ],
         model: 'gpt-3.5-turbo',
-        functions: [
-          new ParsingFunction({
+        tools: [
+          new ParsingToolFunction({
             name: 'numProperties',
             function: (obj: object) => String(Object.keys(obj).length),
             parameters: { type: 'object' },
@@ -1455,10 +1661,17 @@ describe('resource completions', () => {
                 delta: {
                   role: 'assistant',
                   content: null,
-                  function_call: {
-                    arguments: '{"a": 1, "b": 2, "c": 3}',
-                    name: 'numProperties',
-                  },
+                  tool_calls: [
+                    {
+                      type: 'function',
+                      id: '123',
+                      index: 0,
+                      function: {
+                        arguments: '{"a": 1, "b": 2, "c": 3}',
+                        name: 'numProperties',
+                      },
+                    },
+                  ],
                 },
               },
             ],
@@ -1476,15 +1689,21 @@ describe('resource completions', () => {
             {
               role: 'assistant',
               content: null,
-              function_call: {
-                arguments: '{"a": 1, "b": 2, "c": 3}',
-                name: 'numProperties',
-              },
+              tool_calls: [
+                {
+                  type: 'function',
+                  id: '123',
+                  function: {
+                    arguments: '{"a": 1, "b": 2, "c": 3}',
+                    name: 'numProperties',
+                  },
+                },
+              ],
             },
             {
-              role: 'function',
+              role: 'tool',
               content: '3',
-              name: 'numProperties',
+              tool_call_id: '123',
             },
           ]);
           for (const choice of contentChoiceDeltas(`there are 3 properties in {"a": 1, "b": 2, "c": 3}`)) {
@@ -1504,9 +1723,15 @@ describe('resource completions', () => {
         {
           role: 'assistant',
           content: null,
-          function_call: { name: 'numProperties', arguments: '{"a": 1, "b": 2, "c": 3}' },
+          tool_calls: [
+            {
+              type: 'function',
+              id: '123',
+              function: { name: 'numProperties', arguments: '{"a": 1, "b": 2, "c": 3}' },
+            },
+          ],
         },
-        { role: 'function', content: '3', name: 'numProperties' },
+        { role: 'tool', content: '3', tool_call_id: '123' },
         { role: 'assistant', content: 'there are 3 properties in {"a": 1, "b": 2, "c": 3}' },
       ]);
       expect(listener.eventFunctionCallResults).toEqual(['3']);
@@ -1517,7 +1742,7 @@ describe('resource completions', () => {
 
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
-      const runner = openai.beta.chat.completions.runFunctions({
+      const runner = openai.beta.chat.completions.runTools({
         stream: true,
         messages: [
           {
@@ -1526,8 +1751,8 @@ describe('resource completions', () => {
           },
         ],
         model: 'gpt-3.5-turbo',
-        functions: [
-          new ParsingFunction({
+        tools: [
+          new ParsingToolFunction({
             name: 'numProperties',
             function: (obj: object) => String(Object.keys(obj).length),
             parameters: { type: 'object' },
@@ -1552,7 +1777,10 @@ describe('resource completions', () => {
               content: 'can you tell me how many properties are in {"a": 1, "b": 2, "c": 3}',
             },
           ]);
-          for (const choice of functionCallDeltas('[{"a": 1, "b": 2, "c": 3}]', { name: 'numProperties' })) {
+          for (const choice of functionCallDeltas('[{"a": 1, "b": 2, "c": 3}]', {
+            name: 'numProperties',
+            id: '123',
+          })) {
             yield {
               id: '1',
               choices: [choice],
@@ -1571,18 +1799,27 @@ describe('resource completions', () => {
             {
               role: 'assistant',
               content: null,
-              function_call: {
-                arguments: '[{"a": 1, "b": 2, "c": 3}]',
-                name: 'numProperties',
-              },
+              tool_calls: [
+                {
+                  type: 'function',
+                  id: '123',
+                  function: {
+                    arguments: '[{"a": 1, "b": 2, "c": 3}]',
+                    name: 'numProperties',
+                  },
+                },
+              ],
             },
             {
-              role: 'function',
+              role: 'tool',
               content: `must be an object`,
-              name: 'numProperties',
+              tool_call_id: '123',
             },
           ]);
-          for (const choice of functionCallDeltas('{"a": 1, "b": 2, "c": 3}', { name: 'numProperties' })) {
+          for (const choice of functionCallDeltas('{"a": 1, "b": 2, "c": 3}', {
+            name: 'numProperties',
+            id: '1234',
+          })) {
             yield {
               id: '2',
               choices: [choice],
@@ -1601,28 +1838,40 @@ describe('resource completions', () => {
             {
               role: 'assistant',
               content: null,
-              function_call: {
-                arguments: '[{"a": 1, "b": 2, "c": 3}]',
-                name: 'numProperties',
-              },
+              tool_calls: [
+                {
+                  type: 'function',
+                  id: '123',
+                  function: {
+                    arguments: '[{"a": 1, "b": 2, "c": 3}]',
+                    name: 'numProperties',
+                  },
+                },
+              ],
             },
             {
-              role: 'function',
+              role: 'tool',
               content: `must be an object`,
-              name: 'numProperties',
+              tool_call_id: '123',
             },
             {
               role: 'assistant',
               content: null,
-              function_call: {
-                arguments: '{"a": 1, "b": 2, "c": 3}',
-                name: 'numProperties',
-              },
+              tool_calls: [
+                {
+                  type: 'function',
+                  id: '1234',
+                  function: {
+                    arguments: '{"a": 1, "b": 2, "c": 3}',
+                    name: 'numProperties',
+                  },
+                },
+              ],
             },
             {
-              role: 'function',
+              role: 'tool',
               content: '3',
-              name: 'numProperties',
+              tool_call_id: '1234',
             },
           ]);
           for (const choice of contentChoiceDeltas(`there are 3 properties in {"a": 1, "b": 2, "c": 3}`)) {
@@ -1642,15 +1891,27 @@ describe('resource completions', () => {
         {
           role: 'assistant',
           content: null,
-          function_call: { name: 'numProperties', arguments: '[{"a": 1, "b": 2, "c": 3}]' },
+          tool_calls: [
+            {
+              type: 'function',
+              id: '123',
+              function: { name: 'numProperties', arguments: '[{"a": 1, "b": 2, "c": 3}]' },
+            },
+          ],
         },
-        { role: 'function', content: `must be an object`, name: 'numProperties' },
+        { role: 'tool', content: `must be an object`, tool_call_id: '123' },
         {
           role: 'assistant',
           content: null,
-          function_call: { name: 'numProperties', arguments: '{"a": 1, "b": 2, "c": 3}' },
+          tool_calls: [
+            {
+              type: 'function',
+              id: '1234',
+              function: { name: 'numProperties', arguments: '{"a": 1, "b": 2, "c": 3}' },
+            },
+          ],
         },
-        { role: 'function', content: '3', name: 'numProperties' },
+        { role: 'tool', content: '3', tool_call_id: '1234' },
         { role: 'assistant', content: 'there are 3 properties in {"a": 1, "b": 2, "c": 3}' },
       ]);
       expect(listener.eventFunctionCallResults).toEqual([`must be an object`, '3']);
@@ -1661,20 +1922,26 @@ describe('resource completions', () => {
 
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
-      const runner = openai.beta.chat.completions.runFunctions({
+      const runner = openai.beta.chat.completions.runTools({
         stream: true,
         messages: [{ role: 'user', content: 'tell me what the weather is like' }],
         model: 'gpt-3.5-turbo',
-        function_call: {
-          name: 'getWeather',
+        tool_choice: {
+          type: 'function',
+          function: {
+            name: 'getWeather',
+          },
         },
-        functions: [
+        tools: [
           {
-            function: function getWeather() {
-              return `it's raining`;
+            type: 'function',
+            function: {
+              function: function getWeather() {
+                return `it's raining`;
+              },
+              parameters: {},
+              description: 'gets the weather',
             },
-            parameters: {},
-            description: 'gets the weather',
           },
         ],
       });
@@ -1692,10 +1959,17 @@ describe('resource completions', () => {
                 delta: {
                   role: 'assistant',
                   content: null,
-                  function_call: {
-                    arguments: '',
-                    name: 'getWeather',
-                  },
+                  tool_calls: [
+                    {
+                      type: 'function',
+                      index: 0,
+                      id: '123',
+                      function: {
+                        arguments: '',
+                        name: 'getWeather',
+                      },
+                    },
+                  ],
                 },
               },
             ],
@@ -1708,8 +1982,21 @@ describe('resource completions', () => {
       ]);
 
       expect(listener.eventMessages).toEqual([
-        { role: 'assistant', content: null, function_call: { name: 'getWeather', arguments: '' } },
-        { role: 'function', content: `it's raining`, name: 'getWeather' },
+        {
+          role: 'assistant',
+          content: null,
+          tool_calls: [
+            {
+              type: 'function',
+              id: '123',
+              function: {
+                arguments: '',
+                name: 'getWeather',
+              },
+            },
+          ],
+        },
+        { role: 'tool', tool_call_id: '123', content: `it's raining` },
       ]);
       expect(listener.eventFunctionCallResults).toEqual([`it's raining`]);
       await listener.sanityCheck();
@@ -1719,17 +2006,20 @@ describe('resource completions', () => {
 
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
-      const runner = openai.beta.chat.completions.runFunctions({
+      const runner = openai.beta.chat.completions.runTools({
         stream: true,
         messages: [{ role: 'user', content: 'tell me what the weather is like' }],
         model: 'gpt-3.5-turbo',
-        functions: [
+        tools: [
           {
-            function: function getWeather() {
-              return `it's raining`;
+            type: 'function',
+            function: {
+              function: function getWeather() {
+                return `it's raining`;
+              },
+              parameters: {},
+              description: 'gets the weather',
             },
-            parameters: {},
-            description: 'gets the weather',
           },
         ],
       });
@@ -1747,10 +2037,17 @@ describe('resource completions', () => {
                 delta: {
                   role: 'assistant',
                   content: null,
-                  function_call: {
-                    arguments: '',
-                    name: 'get_weather',
-                  },
+                  tool_calls: [
+                    {
+                      type: 'function',
+                      index: 0,
+                      id: '123',
+                      function: {
+                        arguments: '',
+                        name: 'get_weather',
+                      },
+                    },
+                  ],
                 },
               },
             ],
@@ -1765,15 +2062,21 @@ describe('resource completions', () => {
             {
               role: 'assistant',
               content: null,
-              function_call: {
-                arguments: '',
-                name: 'get_weather',
-              },
+              tool_calls: [
+                {
+                  type: 'function',
+                  id: '123',
+                  function: {
+                    arguments: '',
+                    name: 'get_weather',
+                  },
+                },
+              ],
             },
             {
-              role: 'function',
-              content: `Invalid function_call: "get_weather". Available options are: "getWeather". Please try again`,
-              name: 'get_weather',
+              role: 'tool',
+              content: `Invalid tool_call: "get_weather". Available options are: "getWeather". Please try again`,
+              tool_call_id: '123',
             },
           ]);
           yield {
@@ -1782,13 +2085,21 @@ describe('resource completions', () => {
               {
                 index: 0,
                 finish_reason: 'function_call',
+                logprobs: null,
                 delta: {
                   role: 'assistant',
                   content: null,
-                  function_call: {
-                    arguments: '',
-                    name: 'getWeather',
-                  },
+                  tool_calls: [
+                    {
+                      type: 'function',
+                      index: 0,
+                      id: '1234',
+                      function: {
+                        arguments: '',
+                        name: 'getWeather',
+                      },
+                    },
+                  ],
                 },
               },
             ],
@@ -1803,28 +2114,40 @@ describe('resource completions', () => {
             {
               role: 'assistant',
               content: null,
-              function_call: {
-                arguments: '',
-                name: 'get_weather',
-              },
+              tool_calls: [
+                {
+                  type: 'function',
+                  id: '123',
+                  function: {
+                    arguments: '',
+                    name: 'get_weather',
+                  },
+                },
+              ],
             },
             {
-              role: 'function',
-              content: `Invalid function_call: "get_weather". Available options are: "getWeather". Please try again`,
-              name: 'get_weather',
+              role: 'tool',
+              content: `Invalid tool_call: "get_weather". Available options are: "getWeather". Please try again`,
+              tool_call_id: '123',
             },
             {
               role: 'assistant',
               content: null,
-              function_call: {
-                arguments: '',
-                name: 'getWeather',
-              },
+              tool_calls: [
+                {
+                  type: 'function',
+                  id: '1234',
+                  function: {
+                    arguments: '',
+                    name: 'getWeather',
+                  },
+                },
+              ],
             },
             {
-              role: 'function',
+              role: 'tool',
               content: `it's raining`,
-              name: 'getWeather',
+              tool_call_id: '1234',
             },
           ]);
           for (const choice of contentChoiceDeltas(`it's raining`)) {
@@ -1841,83 +2164,45 @@ describe('resource completions', () => {
       ]);
 
       expect(listener.eventMessages).toEqual([
-        { role: 'assistant', content: null, function_call: { name: 'get_weather', arguments: '' } },
         {
-          role: 'function',
-          content: `Invalid function_call: "get_weather". Available options are: "getWeather". Please try again`,
-          name: 'get_weather',
+          role: 'assistant',
+          content: null,
+          tool_calls: [
+            {
+              type: 'function',
+              id: '123',
+              function: {
+                arguments: '',
+                name: 'get_weather',
+              },
+            },
+          ],
         },
-        { role: 'assistant', content: null, function_call: { name: 'getWeather', arguments: '' } },
-        { role: 'function', content: `it's raining`, name: 'getWeather' },
+        {
+          role: 'tool',
+          content: `Invalid tool_call: "get_weather". Available options are: "getWeather". Please try again`,
+          tool_call_id: '123',
+        },
+        {
+          role: 'assistant',
+          content: null,
+          tool_calls: [
+            {
+              type: 'function',
+              id: '1234',
+              function: {
+                arguments: '',
+                name: 'getWeather',
+              },
+            },
+          ],
+        },
+        { role: 'tool', content: `it's raining`, tool_call_id: '1234' },
         { role: 'assistant', content: "it's raining" },
       ]);
       expect(listener.eventFunctionCallResults).toEqual([
-        `Invalid function_call: "get_weather". Available options are: "getWeather". Please try again`,
+        `Invalid tool_call: "get_weather". Available options are: "getWeather". Please try again`,
         `it's raining`,
-      ]);
-      await listener.sanityCheck();
-    });
-    test('wrong function name with single function call', async () => {
-      const { fetch, handleRequest } = mockStreamingChatCompletionFetch();
-
-      const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
-
-      const runner = openai.beta.chat.completions.runFunctions({
-        stream: true,
-        messages: [{ role: 'user', content: 'tell me what the weather is like' }],
-        model: 'gpt-3.5-turbo',
-        function_call: {
-          name: 'getWeather',
-        },
-        functions: [
-          {
-            function: function getWeather() {
-              return `it's raining`;
-            },
-            parameters: {},
-            description: 'gets the weather',
-          },
-        ],
-      });
-      const listener = new StreamingRunnerListener(runner);
-
-      await Promise.all([
-        handleRequest(async function* (request): AsyncIterable<OpenAI.Chat.ChatCompletionChunk> {
-          expect(request.messages).toEqual([{ role: 'user', content: 'tell me what the weather is like' }]);
-          yield {
-            id: '1',
-            choices: [
-              {
-                index: 0,
-                finish_reason: 'function_call',
-                delta: {
-                  role: 'assistant',
-                  content: null,
-                  function_call: {
-                    arguments: '',
-                    name: 'get_weather',
-                  },
-                },
-              },
-            ],
-            created: Math.floor(Date.now() / 1000),
-            model: 'gpt-3.5-turbo',
-            object: 'chat.completion.chunk',
-          };
-        }),
-        runner.done(),
-      ]);
-
-      expect(listener.eventMessages).toEqual([
-        { role: 'assistant', content: null, function_call: { name: 'get_weather', arguments: '' } },
-        {
-          role: 'function',
-          content: `Invalid function_call: "get_weather". Available options are: "getWeather". Please try again`,
-          name: 'get_weather',
-        },
-      ]);
-      expect(listener.eventFunctionCallResults).toEqual([
-        `Invalid function_call: "get_weather". Available options are: "getWeather". Please try again`,
       ]);
       await listener.sanityCheck();
     });

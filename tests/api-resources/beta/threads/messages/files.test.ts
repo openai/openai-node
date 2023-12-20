@@ -11,9 +11,9 @@ const openai = new OpenAI({
 describe('resource files', () => {
   test('retrieve', async () => {
     const responsePromise = openai.beta.threads.messages.files.retrieve(
-      'thread_AF1WoRqd3aJAHsqc9NY7iL8F',
-      'msg_AF1WoRqd3aJAHsqc9NY7iL8F',
-      'file-AF1WoRqd3aJAHsqc9NY7iL8F',
+      'thread_abc123',
+      'msg_abc123',
+      'file-abc123',
     );
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
@@ -27,12 +27,9 @@ describe('resource files', () => {
   test('retrieve: request options instead of params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openai.beta.threads.messages.files.retrieve(
-        'thread_AF1WoRqd3aJAHsqc9NY7iL8F',
-        'msg_AF1WoRqd3aJAHsqc9NY7iL8F',
-        'file-AF1WoRqd3aJAHsqc9NY7iL8F',
-        { path: '/_stainless_unknown_path' },
-      ),
+      openai.beta.threads.messages.files.retrieve('thread_abc123', 'msg_abc123', 'file-abc123', {
+        path: '/_stainless_unknown_path',
+      }),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 

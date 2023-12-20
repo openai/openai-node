@@ -18,7 +18,7 @@ export default async (request: NextRequest) => {
 
   const stream = await openai.completions.create({
     prompt: 'Say this is a test',
-    model: 'text-davinci-003',
+    model: 'gpt-3.5-turbo-instruct',
     stream: true,
   });
 
