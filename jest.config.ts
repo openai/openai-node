@@ -1,6 +1,7 @@
-/** @type {import('ts-jest/dist/types').InitialOptionsTsJest} */
-module.exports = {
-  preset: 'ts-jest',
+import type { JestConfigWithTsJest } from 'ts-jest';
+
+const config: JestConfigWithTsJest = {
+  preset: 'ts-jest/presets/default-esm',
   testEnvironment: 'node',
   moduleNameMapper: {
     '^openai$': '<rootDir>/src/index.ts',
@@ -14,3 +15,5 @@ module.exports = {
     '<rootDir>/deno_tests/',
   ],
 };
+
+export default config;
