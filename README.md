@@ -30,6 +30,7 @@ import OpenAI from 'https://deno.land/x/openai@v4.24.0/mod.ts';
 
 The full API of this library can be found in [api.md file](api.md) along with many [code examples](https://github.com/openai/openai-node/tree/master/examples). The code below shows how to get started using the chat completions API.
 
+<!-- prettier-ignore -->
 ```js
 import OpenAI from 'openai';
 
@@ -77,6 +78,7 @@ or call `stream.controller.abort()`.
 
 This library includes TypeScript definitions for all request params and response fields. You may import and use them like so:
 
+<!-- prettier-ignore -->
 ```ts
 import OpenAI from 'openai';
 
@@ -267,6 +269,7 @@ When the library is unable to connect to the API,
 or if the API returns a non-success status code (i.e., 4xx or 5xx response),
 a subclass of `APIError` will be thrown:
 
+<!-- prettier-ignore -->
 ```ts
 async function main() {
   const fineTune = await openai.fineTunes
@@ -388,6 +391,7 @@ The "raw" `Response` returned by `fetch()` can be accessed through the `.asRespo
 
 You can also use the `.withResponse()` method to get the raw `Response` along with the parsed data.
 
+<!-- prettier-ignore -->
 ```ts
 const openai = new OpenAI();
 
@@ -412,12 +416,11 @@ If you would prefer to use a global, web-standards-compliant `fetch` function ev
 (for example, if you are running Node with `--experimental-fetch` or using NextJS which polyfills with `undici`),
 add the following import before your first import `from "OpenAI"`:
 
-<!-- prettier-ignore -->
 ```ts
 // Tell TypeScript and the package to use the global web fetch instead of node-fetch.
 // Note, despite the name, this does not add any polyfills, but expects them to be provided if needed.
-import "openai/shims/web";
-import OpenAI from "openai";
+import 'openai/shims/web';
+import OpenAI from 'openai';
 ```
 
 To do the inverse, add `import "openai/shims/node"` (which does import polyfills).
