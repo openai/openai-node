@@ -1019,6 +1019,31 @@ export function debug(action: string, ...args: any[]) {
   }
 }
 
+/** This function removes any properties that are undefined or empty string,
+ * This can be used with headers, as to not send empty header properties if there are any, 
+ * provided by the user.
+ */
+export function cleanObject<T>(options: T) {
+  const cleanedOptions: Partial<T> = {};
+  type keyType = keyof typeof options;
+
+  for (const key in options) {
+    if (Object.prototype.hasOwnProperty.call(options, key)) {
+      const value = options[key as keyType];
+
+      // Check if the value is not an empty string or undefined
+      if (
+        (typeof value != "undefined" && typeof value !== "string") ||
+        value !== ""
+      ) {
+        cleanedOptions[key as keyType] = value; // Copy non-empty properties to the cleaned object
+      }
+    }
+  }
+
+  return cleanedOptions;
+}
+
 /**
  * https://stackoverflow.com/a/2117523
  */

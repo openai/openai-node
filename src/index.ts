@@ -158,11 +158,11 @@ export class OpenAI extends Core.APIClient {
   }
 
   protected override defaultHeaders(opts: Core.FinalRequestOptions): Core.Headers {
-    return {
+    return Core.cleanObject({
       ...super.defaultHeaders(opts),
       'OpenAI-Organization': this.organization,
       ...this._options.defaultHeaders,
-    };
+    });
   }
 
   protected override authHeaders(opts: Core.FinalRequestOptions): Core.Headers {
