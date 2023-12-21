@@ -11,7 +11,7 @@ iterator, and exposes helper methods to accumulate chunks into a convenient shap
 about the conversation.
 
 Alternatively, you can use `openai.chat.completions.create({ stream: true, … })` which returns an async
-iteratable of the chunks in the stream and uses less memory (most notably, it does not accumulate a final chat
+iterable of the chunks in the stream and uses less memory (most notably, it does not accumulate a final chat
 completion object for you).
 
 If you need to cancel a stream, you can `break` from a `for await` loop or call `stream.abort()`.
