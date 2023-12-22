@@ -1,5 +1,24 @@
 # Changelog
 
+## 4.24.1 (2023-12-22)
+
+Full Changelog: [v4.24.0...v4.24.1](https://github.com/openai/openai-node/compare/v4.24.0...v4.24.1)
+
+### Bug Fixes
+
+* **pagination:** correct type annotation object field ([#590](https://github.com/openai/openai-node/issues/590)) ([4066eda](https://github.com/openai/openai-node/commit/4066edad4b5305e82e610f44f4720843f2b69d39))
+
+
+### Documentation
+
+* **messages:** improvements to helpers reference + typos ([#595](https://github.com/openai/openai-node/issues/595)) ([96a59b9](https://github.com/openai/openai-node/commit/96a59b91c424db67b8a5bdb7cab5da68c57282d4))
+* reformat README.md ([#592](https://github.com/openai/openai-node/issues/592)) ([8ffc7f8](https://github.com/openai/openai-node/commit/8ffc7f876cc8f4b7afaf68a37f94f826ef22a6b8))
+
+
+### Refactors
+
+* write jest config in typescript ([#588](https://github.com/openai/openai-node/issues/588)) ([eb6ceeb](https://github.com/openai/openai-node/commit/eb6ceebf90ba45ec5b803f32b9b080829f6a973a))
+
 ## 4.24.0 (2023-12-19)
 
 Full Changelog: [v4.23.0...v4.24.0](https://github.com/openai/openai-node/compare/v4.23.0...v4.24.0)
