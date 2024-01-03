@@ -227,6 +227,30 @@ Note that `runFunctions` was previously available as well, but has been deprecat
 Read more about various examples such as with integrating with [zod](helpers.md#integrate-with-zod),
 [next.js](helpers.md#integrate-wtih-next-js), and [proxying a stream to the browser](helpers.md#proxy-streaming-to-a-browser).
 
+## Embedding Creation
+
+This library includes TypeScript definitions for creating embeddings. You may import and use them like so:
+
+<!-- prettier-ignore -->
+```ts
+import OpenAI from 'openai';
+
+const openai = new OpenAI({
+  apiKey: process.env['OPENAI_API_KEY'],
+});
+
+async function main() {
+  const text = 'Your input text here'; // replace with actual input text
+  const result = await openai.embeddings.create({
+    model: "text-embedding-ada-002",
+    input: text,
+  });
+  console.log(result);
+}
+
+main();
+```
+
 ## File Uploads
 
 Request parameters that correspond to file uploads can be passed in many different forms:
