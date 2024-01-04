@@ -301,18 +301,7 @@ export abstract class APIClient {
       headers[this.idempotencyHeader] = options.idempotencyKey;
     }
 
-    const reqHeaders: Record<string, string> = {
-      ...(contentLength && { 'Content-Length': contentLength }),
-      ...this.defaultHeaders(options),
-      ...headers,
-    };
-    // let builtin fetch set the Content-Type for multipart bodies
-    if (isMultipartBody(options.body) && shimsKind !== 'node') {
-      delete reqHeaders['Content-Type'];
-    }
-
-    // Strip any headers being explicitly omitted with null
-    Object.keys(reqHeaders).forEach((key) => reqHeaders[key] === null && delete reqHeaders[key]);
+    const reqHeaders = this.buildHeaders({ options, headers, contentLength });
 
     const req: RequestInit = {
       method,
@@ -324,9 +313,35 @@ export abstract class APIClient {
       signal: options.signal ?? null,
     };
 
+    return { req, url, timeout };
+  }
+
+  private buildHeaders({
+    options,
+    headers,
+    contentLength,
+  }: {
+    options: FinalRequestOptions;
+    headers: Record<string, string | null | undefined>;
+    contentLength: string | null | undefined;
+  }): Record<string, string> {
+    const reqHeaders: Record<string, string> = {};
+    if (contentLength) {
+      reqHeaders['content-length'] = contentLength;
+    }
+
+    const defaultHeaders = this.defaultHeaders(options);
+    applyHeadersMut(reqHeaders, defaultHeaders);
+    applyHeadersMut(reqHeaders, headers);
+
+    // let builtin fetch set the Content-Type for multipart bodies
+    if (isMultipartBody(options.body) && shimsKind !== 'node') {
+      delete reqHeaders['content-type'];
+    }
+
     this.validateHeaders(reqHeaders, headers);
 
-    return { req, url, timeout };
+    return reqHeaders;
   }
 
   /**
@@ -1011,6 +1026,28 @@ export function isEmptyObj(obj: Object | null | undefined): boolean {
 // https://eslint.org/docs/latest/rules/no-prototype-builtins
 export function hasOwn(obj: Object, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(obj, key);
+}
+
+/**
+ * Copies headers from "newHeaders" onto "targetHeaders",
+ * using lower-case for all properties,
+ * ignoring any keys with undefined values,
+ * and deleting any keys with null values.
+ */
+function applyHeadersMut(targetHeaders: Headers, newHeaders: Headers): void {
+  for (const k in newHeaders) {
+    if (!hasOwn(newHeaders, k)) continue;
+    const lowerKey = k.toLowerCase();
+    if (!lowerKey) continue;
+
+    const val = newHeaders[k];
+
+    if (val === null) {
+      delete targetHeaders[lowerKey];
+    } else if (val !== undefined) {
+      targetHeaders[lowerKey] = val;
+    }
+  }
 }
 
 export function debug(action: string, ...args: any[]) {
