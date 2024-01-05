@@ -13,7 +13,7 @@ export interface Shims {
   Blob: any;
   File: any;
   ReadableStream: any;
-  getMultipartRequestOptions: <T extends {} = Record<string, unknown>>(
+  getMultipartRequestOptions: <T = Record<string, unknown>>(
     form: Shims['FormData'],
     opts: RequestOptions<T>,
   ) => Promise<RequestOptions<T>>;

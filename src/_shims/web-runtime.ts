@@ -84,7 +84,7 @@ export function getRuntime({ manuallyImported }: { manuallyImported?: boolean } 
           }
         }
       ),
-    getMultipartRequestOptions: async <T extends {} = Record<string, unknown>>(
+    getMultipartRequestOptions: async <T = Record<string, unknown>>(
       // @ts-ignore
       form: FormData,
       opts: RequestOptions<T>,

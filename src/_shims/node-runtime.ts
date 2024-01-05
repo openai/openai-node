@@ -43,7 +43,7 @@ async function fileFromPath(path: string, ...args: any[]): Promise<File> {
 const defaultHttpAgent: Agent = new KeepAliveAgent({ keepAlive: true, timeout: 5 * 60 * 1000 });
 const defaultHttpsAgent: Agent = new KeepAliveAgent.HttpsAgent({ keepAlive: true, timeout: 5 * 60 * 1000 });
 
-async function getMultipartRequestOptions<T extends {} = Record<string, unknown>>(
+async function getMultipartRequestOptions<T = Record<string, unknown>>(
   form: fd.FormData,
   opts: RequestOptions<T>,
 ): Promise<RequestOptions<T>> {

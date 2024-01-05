@@ -184,7 +184,7 @@ export const isMultipartBody = (body: any): body is MultipartBody =>
  * Returns a multipart/form-data request if any part of the given request body contains a File / Blob value.
  * Otherwise returns the request as is.
  */
-export const maybeMultipartFormRequestOptions = async <T extends {} = Record<string, unknown>>(
+export const maybeMultipartFormRequestOptions = async <T = Record<string, unknown>>(
   opts: RequestOptions<T>,
 ): Promise<RequestOptions<T | MultipartBody>> => {
   if (!hasUploadableValue(opts.body)) return opts;
@@ -193,7 +193,7 @@ export const maybeMultipartFormRequestOptions = async <T extends {} = Record<str
   return getMultipartRequestOptions(form, opts);
 };
 
-export const multipartFormRequestOptions = async <T extends {} = Record<string, unknown>>(
+export const multipartFormRequestOptions = async <T = Record<string, unknown>>(
   opts: RequestOptions<T>,
 ): Promise<RequestOptions<T | MultipartBody>> => {
   const form = await createForm(opts.body);
