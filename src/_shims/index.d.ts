@@ -65,7 +65,7 @@ export type ReadableStream = SelectType<manual.ReadableStream, auto.ReadableStre
 // @ts-ignore
 export const ReadableStream: SelectType<typeof manual.ReadableStream, typeof auto.ReadableStream>;
 
-export function getMultipartRequestOptions<T extends {} = Record<string, unknown>>(
+export function getMultipartRequestOptions<T = Record<string, unknown>>(
   form: FormData,
   opts: RequestOptions<T>,
 ): Promise<RequestOptions<T>>;
