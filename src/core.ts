@@ -217,27 +217,27 @@ export abstract class APIClient {
     return `stainless-node-retry-${uuid4()}`;
   }
 
-  get<Req extends {}, Rsp>(path: string, opts?: PromiseOrValue<RequestOptions<Req>>): APIPromise<Rsp> {
+  get<Req, Rsp>(path: string, opts?: PromiseOrValue<RequestOptions<Req>>): APIPromise<Rsp> {
     return this.methodRequest('get', path, opts);
   }
 
-  post<Req extends {}, Rsp>(path: string, opts?: PromiseOrValue<RequestOptions<Req>>): APIPromise<Rsp> {
+  post<Req, Rsp>(path: string, opts?: PromiseOrValue<RequestOptions<Req>>): APIPromise<Rsp> {
     return this.methodRequest('post', path, opts);
   }
 
-  patch<Req extends {}, Rsp>(path: string, opts?: PromiseOrValue<RequestOptions<Req>>): APIPromise<Rsp> {
+  patch<Req, Rsp>(path: string, opts?: PromiseOrValue<RequestOptions<Req>>): APIPromise<Rsp> {
     return this.methodRequest('patch', path, opts);
   }
 
-  put<Req extends {}, Rsp>(path: string, opts?: PromiseOrValue<RequestOptions<Req>>): APIPromise<Rsp> {
+  put<Req, Rsp>(path: string, opts?: PromiseOrValue<RequestOptions<Req>>): APIPromise<Rsp> {
     return this.methodRequest('put', path, opts);
   }
 
-  delete<Req extends {}, Rsp>(path: string, opts?: PromiseOrValue<RequestOptions<Req>>): APIPromise<Rsp> {
+  delete<Req, Rsp>(path: string, opts?: PromiseOrValue<RequestOptions<Req>>): APIPromise<Rsp> {
     return this.methodRequest('delete', path, opts);
   }
 
-  private methodRequest<Req extends {}, Rsp>(
+  private methodRequest<Req, Rsp>(
     method: HTTPMethod,
     path: string,
     opts?: PromiseOrValue<RequestOptions<Req>>,
@@ -269,9 +269,7 @@ export abstract class APIClient {
     return null;
   }
 
-  buildRequest<Req extends {}>(
-    options: FinalRequestOptions<Req>,
-  ): { req: RequestInit; url: string; timeout: number } {
+  buildRequest<Req>(options: FinalRequestOptions<Req>): { req: RequestInit; url: string; timeout: number } {
     const { method, path, query, headers: headers = {} } = options;
 
     const body =
@@ -373,15 +371,15 @@ export abstract class APIClient {
     return APIError.generate(status, error, message, headers);
   }
 
-  request<Req extends {}, Rsp>(
+  request<Req, Rsp>(
     options: PromiseOrValue<FinalRequestOptions<Req>>,
     remainingRetries: number | null = null,
   ): APIPromise<Rsp> {
     return new APIPromise(this.makeRequest(options, remainingRetries));
   }
 
-  private async makeRequest(
-    optionsInput: PromiseOrValue<FinalRequestOptions>,
+  private async makeRequest<Req>(
+    optionsInput: PromiseOrValue<FinalRequestOptions<Req>>,
     retriesRemaining: number | null,
   ): Promise<APIResponseProps> {
     const options = await optionsInput;
@@ -443,7 +441,7 @@ export abstract class APIClient {
     return new PagePromise<PageClass, Item>(this, request, Page);
   }
 
-  buildURL<Req extends Record<string, unknown>>(path: string, query: Req | null | undefined): string {
+  buildURL<Req>(path: string, query: Req | null | undefined): string {
     const url =
       isAbsoluteURL(path) ?
         new URL(path)
@@ -617,7 +615,7 @@ export abstract class AbstractPage<Item> implements AsyncIterable<Item> {
       );
     }
     const nextOptions = { ...this.options };
-    if ('params' in nextInfo) {
+    if ('params' in nextInfo && typeof nextOptions.query === 'object') {
       nextOptions.query = { ...nextOptions.query, ...nextInfo.params };
     } else if ('url' in nextInfo) {
       const params = [...Object.entries(nextOptions.query || {}), ...nextInfo.url.searchParams.entries()];
@@ -715,7 +713,7 @@ export type Headers = Record<string, string | null | undefined>;
 export type DefaultQuery = Record<string, string | undefined>;
 export type KeysEnum<T> = { [P in keyof Required<T>]: true };
 
-export type RequestOptions<Req extends {} = Record<string, unknown> | Readable> = {
+export type RequestOptions<Req = unknown | Record<string, unknown> | Readable> = {
   method?: HTTPMethod;
   path?: string;
   query?: Req | undefined;
@@ -752,7 +750,7 @@ const requestOptionsKeys: KeysEnum<RequestOptions> = {
   __binaryResponse: true,
 };
 
-export const isRequestOptions = (obj: unknown): obj is RequestOptions<Record<string, unknown> | Readable> => {
+export const isRequestOptions = (obj: unknown): obj is RequestOptions => {
   return (
     typeof obj === 'object' &&
     obj !== null &&
@@ -761,7 +759,7 @@ export const isRequestOptions = (obj: unknown): obj is RequestOptions<Record<str
   );
 };
 
-export type FinalRequestOptions<Req extends {} = Record<string, unknown> | Readable> = RequestOptions<Req> & {
+export type FinalRequestOptions<Req = unknown | Record<string, unknown> | Readable> = RequestOptions<Req> & {
   method: HTTPMethod;
   path: string;
 };
