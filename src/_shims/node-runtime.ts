@@ -71,7 +71,6 @@ export function getRuntime(): Shims {
     FormData: fd.FormData,
     Blob: fd.Blob,
     File: fd.File,
-    ReadableStream,
     getMultipartRequestOptions,
     getDefaultAgent: (url: string): Agent => (url.startsWith('https') ? defaultHttpsAgent : defaultHttpAgent),
     fileFromPath,
