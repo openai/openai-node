@@ -1,4 +1,4 @@
-import { ReadableStream, type Response } from './_shims/index';
+import { type Response } from './_shims/index';
 import { OpenAIError } from './error';
 
 import { APIError } from 'openai/error';

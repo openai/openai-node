@@ -5,7 +5,6 @@ import * as nf from 'node-fetch';
 import * as fd from 'formdata-node';
 import { type File, type FilePropertyBag } from 'formdata-node';
 import KeepAliveAgent from 'agentkeepalive';
-import { AbortController as AbortControllerPolyfill } from 'abort-controller';
 import { ReadStream as FsReadStream } from 'node:fs';
 import { type Agent } from 'node:http';
 import { FormDataEncoder } from 'form-data-encoder';
@@ -57,11 +56,6 @@ async function getMultipartRequestOptions<T = Record<string, unknown>>(
 }
 
 export function getRuntime(): Shims {
-  // Polyfill global object if needed.
-  if (typeof AbortController === 'undefined') {
-    // @ts-expect-error (the types are subtly different, but compatible in practice)
-    globalThis.AbortController = AbortControllerPolyfill;
-  }
   return {
     kind: 'node',
     fetch: nf.default,

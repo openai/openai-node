@@ -60,10 +60,6 @@ export const Blob: SelectType<typeof manual.Blob, typeof auto.Blob>;
 export type Readable = SelectType<manual.Readable, auto.Readable>;
 // @ts-ignore
 export type FsReadStream = SelectType<manual.FsReadStream, auto.FsReadStream>;
-// @ts-ignore
-export type ReadableStream = SelectType<manual.ReadableStream, auto.ReadableStream>;
-// @ts-ignore
-export const ReadableStream: SelectType<typeof manual.ReadableStream, typeof auto.ReadableStream>;
 
 export function getMultipartRequestOptions<T = Record<string, unknown>>(
   form: FormData,

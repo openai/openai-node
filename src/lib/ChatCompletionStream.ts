@@ -11,7 +11,6 @@ import {
   AbstractChatCompletionRunner,
   type AbstractChatCompletionRunnerEvents,
 } from './AbstractChatCompletionRunner';
-import { type ReadableStream } from 'openai/_shims/index';
 import { Stream } from 'openai/streaming';
 
 export interface ChatCompletionStreamEvents extends AbstractChatCompletionRunnerEvents {
