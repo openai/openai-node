@@ -44,7 +44,5 @@ declare module '../_shims/manual-types' {
     export type Readable = types.Readable;
     // @ts-ignore
     export type FsReadStream = types.FsReadStream;
-    // @ts-ignore
-    export import ReadableStream = types.ReadableStream;
   }
 }

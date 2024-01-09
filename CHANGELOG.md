@@ -1,5 +1,26 @@
 # Changelog
 
+## 4.24.2 (2024-01-08)
+
+Full Changelog: [v4.24.1...v4.24.2](https://github.com/openai/openai-node/compare/v4.24.1...v4.24.2)
+
+### Bug Fixes
+
+* **headers:** always send lowercase headers and strip undefined (BREAKING in rare cases) ([#608](https://github.com/openai/openai-node/issues/608)) ([4ea159f](https://github.com/openai/openai-node/commit/4ea159f0aa9a1f4c365c74ee726714fe692ddf9f))
+
+
+### Chores
+
+* add .keep files for examples and custom code directories ([#612](https://github.com/openai/openai-node/issues/612)) ([5e0f733](https://github.com/openai/openai-node/commit/5e0f733d3cd3c8e6d41659141168cd0708e017a3))
+* **internal:** bump license ([#605](https://github.com/openai/openai-node/issues/605)) ([045ee74](https://github.com/openai/openai-node/commit/045ee74fd3ffba9e6d1301fe1ffd8bd3c63720a2))
+* **internal:** improve type signatures ([#609](https://github.com/openai/openai-node/issues/609)) ([e1ccc82](https://github.com/openai/openai-node/commit/e1ccc82e4991262a631dcffa4d09bdc553e50fbb))
+
+
+### Documentation
+
+* fix docstring typos ([#600](https://github.com/openai/openai-node/issues/600)) ([1934fa1](https://github.com/openai/openai-node/commit/1934fa15f654ea89e226457f76febe6015616f6c))
+* improve audio example to show how to stream to a file ([#598](https://github.com/openai/openai-node/issues/598)) ([e950ad9](https://github.com/openai/openai-node/commit/e950ad969e845d608ed71bd3e3095cd6c941d93d))
+
 ## 4.24.1 (2023-12-22)
 
 Full Changelog: [v4.24.0...v4.24.1](https://github.com/openai/openai-node/compare/v4.24.0...v4.24.1)

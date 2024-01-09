@@ -64,7 +64,7 @@ const _Blob = Blob;
 type _Blob = Blob;
 export { _Blob as Blob };
 
-export async function getMultipartRequestOptions<T extends {} = Record<string, unknown>>(
+export async function getMultipartRequestOptions<T = Record<string, unknown>>(
   form: FormData,
   opts: RequestOptions<T>,
 ): Promise<RequestOptions<T>> {
