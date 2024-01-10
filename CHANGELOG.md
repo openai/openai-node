@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.24.3 (2024-01-10)
+
+Full Changelog: [v4.24.2...v4.24.3](https://github.com/openai/openai-node/compare/v4.24.2...v4.24.3)
+
+### Bug Fixes
+
+* use default base url if BASE_URL env var is blank ([#615](https://github.com/openai/openai-node/issues/615)) ([a27ad3d](https://github.com/openai/openai-node/commit/a27ad3d4e06f2202daa169668d0e7d89e87a38a7))
+
 ## 4.24.2 (2024-01-08)
 
 Full Changelog: [v4.24.1...v4.24.2](https://github.com/openai/openai-node/compare/v4.24.1...v4.24.2)
