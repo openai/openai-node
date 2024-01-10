@@ -118,7 +118,7 @@ export class OpenAI extends Core.APIClient {
       apiKey,
       organization,
       ...opts,
-      baseURL: baseURL ?? `https://api.openai.com/v1`,
+      baseURL: baseURL || `https://api.openai.com/v1`,
     };
 
     if (!options.dangerouslyAllowBrowser && Core.isRunningInBrowser()) {
