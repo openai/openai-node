@@ -452,8 +452,8 @@ export abstract class APIClient {
       query = { ...defaultQuery, ...query } as Req;
     }
 
-    if (query) {
-      url.search = this.stringifyQuery(query);
+    if (typeof query === 'object' && query && !Array.isArray(query)) {
+      url.search = this.stringifyQuery(query as Record<string, unknown>);
     }
 
     return url.toString();
