@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.24.4 (2024-01-11)
+
+Full Changelog: [v4.24.3...v4.24.4](https://github.com/openai/openai-node/compare/v4.24.3...v4.24.4)
+
+### Chores
+
+* **internal:** narrow type into stringifyQuery ([#619](https://github.com/openai/openai-node/issues/619)) ([88fb9cd](https://github.com/openai/openai-node/commit/88fb9cd1bb415850b0b4868944617282d0b92e2a))
+
 ## 4.24.3 (2024-01-10)
 
 Full Changelog: [v4.24.2...v4.24.3](https://github.com/openai/openai-node/compare/v4.24.2...v4.24.3)
