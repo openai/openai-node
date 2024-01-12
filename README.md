@@ -434,8 +434,8 @@ import { fetch } from 'undici'; // as one example
 import OpenAI from 'openai';
 
 const client = new OpenAI({
-  fetch: async (url: RequestInfo, init?: RequestInfo): Response => {
-    console.log('About to make request', url, init);
+  fetch: async (url: RequestInfo, init?: RequestInfo): Promise<Response> => {
+    console.log('About to make a request', url, init);
     const response = await fetch(url, init);
     console.log('Got response', response);
     return response;
