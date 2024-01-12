@@ -130,7 +130,7 @@ if (typeof Blob !== 'undefined') {
       ),
       purpose: 'fine-tune',
     });
-    expect(result.filename).toEqual('finetunes.jsonl');
+    expect(result.filename).toEqual('finetune.jsonl');
   });
 }
 test('toFile handles Uint8Array', async function () {
@@ -142,7 +142,7 @@ test('toFile handles Uint8Array', async function () {
     ),
     purpose: 'fine-tune',
   });
-  expect(result.filename).toEqual('finetunes.jsonl');
+  expect(result.filename).toEqual('finetune.jsonl');
 });
 test('toFile handles ArrayBuffer', async function () {
   const result = await client.files.create({
@@ -153,7 +153,7 @@ test('toFile handles ArrayBuffer', async function () {
     ),
     purpose: 'fine-tune',
   });
-  expect(result.filename).toEqual('finetunes.jsonl');
+  expect(result.filename).toEqual('finetune.jsonl');
 });
 test('toFile handles DataView', async function () {
   const result = await client.files.create({
@@ -164,5 +164,5 @@ test('toFile handles DataView', async function () {
     ),
     purpose: 'fine-tune',
   });
-  expect(result.filename).toEqual('finetunes.jsonl');
+  expect(result.filename).toEqual('finetune.jsonl');
 });
