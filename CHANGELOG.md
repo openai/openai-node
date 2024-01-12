@@ -1,5 +1,14 @@
 # Changelog
 
+## 4.24.6 (2024-01-12)
+
+Full Changelog: [v4.24.5...v4.24.6](https://github.com/openai/openai-node/compare/v4.24.5...v4.24.6)
+
+### Chores
+
+* **ecosystem-tests:** fix flaky tests and remove fine tuning calls ([#623](https://github.com/openai/openai-node/issues/623)) ([258d79f](https://github.com/openai/openai-node/commit/258d79f52bb31f4f3723f6f4b97ebe8f3fa187bd))
+* **ecosystem-tests:** fix flaky tests and remove fine tuning calls ([#625](https://github.com/openai/openai-node/issues/625)) ([58e5fd8](https://github.com/openai/openai-node/commit/58e5fd8f27052be6ac9587256b161f4bf3a3805f))
+
 ## 4.24.5 (2024-01-12)
 
 Full Changelog: [v4.24.4...v4.24.5](https://github.com/openai/openai-node/compare/v4.24.4...v4.24.5)
