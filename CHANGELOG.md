@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.24.5 (2024-01-12)
+
+Full Changelog: [v4.24.4...v4.24.5](https://github.com/openai/openai-node/compare/v4.24.4...v4.24.5)
+
+### Refactors
+
+* **api:** remove deprecated endpoints ([#621](https://github.com/openai/openai-node/issues/621)) ([2054d71](https://github.com/openai/openai-node/commit/2054d71e6b0d407229a4c5aecd75e38c336c2c02))
+
 ## 4.24.4 (2024-01-11)
 
 Full Changelog: [v4.24.3...v4.24.4](https://github.com/openai/openai-node/compare/v4.24.3...v4.24.4)
