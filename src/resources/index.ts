@@ -14,7 +14,6 @@ export {
   Completions,
 } from './completions';
 export { CreateEmbeddingResponse, Embedding, EmbeddingCreateParams, Embeddings } from './embeddings';
-export { Edit, EditCreateParams, Edits } from './edits';
 export {
   FileContent,
   FileDeleted,
@@ -24,17 +23,6 @@ export {
   FileObjectsPage,
   Files,
 } from './files';
-export {
-  FineTune,
-  FineTuneEvent,
-  FineTuneEventsListResponse,
-  FineTuneCreateParams,
-  FineTuneListEventsParams,
-  FineTuneListEventsParamsNonStreaming,
-  FineTuneListEventsParamsStreaming,
-  FineTunesPage,
-  FineTunes,
-} from './fine-tunes';
 export { FineTuning } from './fine-tuning/fine-tuning';
 export {
   Image,
