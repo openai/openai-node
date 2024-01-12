@@ -48,16 +48,6 @@ Methods:
 
 - <code title="post /chat/completions">client.chat.completions.<a href="./src/resources/chat/completions.ts">create</a>({ ...params }) -> ChatCompletion</code>
 
-# Edits
-
-Types:
-
-- <code><a href="./src/resources/edits.ts">Edit</a></code>
-
-Methods:
-
-- <code title="post /edits">client.edits.<a href="./src/resources/edits.ts">create</a>({ ...params }) -> Edit</code>
-
 # Embeddings
 
 Types:
@@ -168,22 +158,6 @@ Methods:
 - <code title="get /fine_tuning/jobs">client.fineTuning.jobs.<a href="./src/resources/fine-tuning/jobs.ts">list</a>({ ...params }) -> FineTuningJobsPage</code>
 - <code title="post /fine_tuning/jobs/{fine_tuning_job_id}/cancel">client.fineTuning.jobs.<a href="./src/resources/fine-tuning/jobs.ts">cancel</a>(fineTuningJobId) -> FineTuningJob</code>
 - <code title="get /fine_tuning/jobs/{fine_tuning_job_id}/events">client.fineTuning.jobs.<a href="./src/resources/fine-tuning/jobs.ts">listEvents</a>(fineTuningJobId, { ...params }) -> FineTuningJobEventsPage</code>
-
-# FineTunes
-
-Types:
-
-- <code><a href="./src/resources/fine-tunes.ts">FineTune</a></code>
-- <code><a href="./src/resources/fine-tunes.ts">FineTuneEvent</a></code>
-- <code><a href="./src/resources/fine-tunes.ts">FineTuneEventsListResponse</a></code>
-
-Methods:
-
-- <code title="post /fine-tunes">client.fineTunes.<a href="./src/resources/fine-tunes.ts">create</a>({ ...params }) -> FineTune</code>
-- <code title="get /fine-tunes/{fine_tune_id}">client.fineTunes.<a href="./src/resources/fine-tunes.ts">retrieve</a>(fineTuneId) -> FineTune</code>
-- <code title="get /fine-tunes">client.fineTunes.<a href="./src/resources/fine-tunes.ts">list</a>() -> FineTunesPage</code>
-- <code title="post /fine-tunes/{fine_tune_id}/cancel">client.fineTunes.<a href="./src/resources/fine-tunes.ts">cancel</a>(fineTuneId) -> FineTune</code>
-- <code title="get /fine-tunes/{fine_tune_id}/events">client.fineTunes.<a href="./src/resources/fine-tunes.ts">listEvents</a>(fineTuneId, { ...params }) -> FineTuneEventsListResponse</code>
 
 # Beta
 

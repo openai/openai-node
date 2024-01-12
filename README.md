@@ -272,8 +272,8 @@ a subclass of `APIError` will be thrown:
 <!-- prettier-ignore -->
 ```ts
 async function main() {
-  const fineTune = await openai.fineTunes
-    .create({ training_file: 'file-XGinujblHPwGLSztz8cPS8XY' })
+  const job = await openai.fineTuning.jobs
+    .create({ model: 'gpt-3.5-turbo', training_file: 'file-abc123' })
     .catch((err) => {
       if (err instanceof OpenAI.APIError) {
         console.log(err.status); // 400
