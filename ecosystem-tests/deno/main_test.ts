@@ -123,7 +123,7 @@ Deno.test(async function toFileHandlesArrayBuffer() {
 });
 Deno.test(async function toFileHandlesDataView() {
   const result = await client.files.create({
-    file: await toFile(new DataView(new TextEncoder().encode(fineTune).buffer), 'finetune.json'),
+    file: await toFile(new DataView(new TextEncoder().encode(fineTune).buffer), 'finetune.jsonl'),
     purpose: 'fine-tune',
   });
   assertEquals(result.filename, 'finetune.jsonl');
