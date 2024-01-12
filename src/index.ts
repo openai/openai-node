@@ -142,7 +142,6 @@ export class OpenAI extends Core.APIClient {
 
   completions: API.Completions = new API.Completions(this);
   chat: API.Chat = new API.Chat(this);
-  edits: API.Edits = new API.Edits(this);
   embeddings: API.Embeddings = new API.Embeddings(this);
   files: API.Files = new API.Files(this);
   images: API.Images = new API.Images(this);
@@ -150,7 +149,6 @@ export class OpenAI extends Core.APIClient {
   moderations: API.Moderations = new API.Moderations(this);
   models: API.Models = new API.Models(this);
   fineTuning: API.FineTuning = new API.FineTuning(this);
-  fineTunes: API.FineTunes = new API.FineTunes(this);
   beta: API.Beta = new API.Beta(this);
 
   protected override defaultQuery(): Core.DefaultQuery | undefined {
@@ -251,10 +249,6 @@ export namespace OpenAI {
   export import ChatCompletionCreateParamsNonStreaming = API.ChatCompletionCreateParamsNonStreaming;
   export import ChatCompletionCreateParamsStreaming = API.ChatCompletionCreateParamsStreaming;
 
-  export import Edits = API.Edits;
-  export import Edit = API.Edit;
-  export import EditCreateParams = API.EditCreateParams;
-
   export import Embeddings = API.Embeddings;
   export import CreateEmbeddingResponse = API.CreateEmbeddingResponse;
   export import Embedding = API.Embedding;
@@ -288,16 +282,6 @@ export namespace OpenAI {
   export import ModelsPage = API.ModelsPage;
 
   export import FineTuning = API.FineTuning;
-
-  export import FineTunes = API.FineTunes;
-  export import FineTune = API.FineTune;
-  export import FineTuneEvent = API.FineTuneEvent;
-  export import FineTuneEventsListResponse = API.FineTuneEventsListResponse;
-  export import FineTunesPage = API.FineTunesPage;
-  export import FineTuneCreateParams = API.FineTuneCreateParams;
-  export import FineTuneListEventsParams = API.FineTuneListEventsParams;
-  export import FineTuneListEventsParamsNonStreaming = API.FineTuneListEventsParamsNonStreaming;
-  export import FineTuneListEventsParamsStreaming = API.FineTuneListEventsParamsStreaming;
 
   export import Beta = API.Beta;
 
