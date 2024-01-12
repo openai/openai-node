@@ -147,28 +147,28 @@ export function uploadWebApiTestCases({
     // @ts-ignore this only doesn't error in vercel build...
     const file = await toFile(fineTune, 'finetune.jsonl');
     const result = await client.files.create({ file, purpose: 'fine-tune' });
-    expectEqual(result.status, 'uploaded');
+    expectEqual(result.filename, 'finetune.jsonl');
   });
   it('toFile handles Blob', async () => {
     const result = await client.files.create({
       file: await toFile(new Blob([fineTune]), 'finetune.jsonl'),
       purpose: 'fine-tune',
     });
-    expectEqual(result.status, 'uploaded');
+    expectEqual(result.filename, 'finetune.jsonl');
   });
   it('toFile handles Uint8Array', async () => {
     const result = await client.files.create({
       file: await toFile(new TextEncoder().encode(fineTune), 'finetune.jsonl'),
       purpose: 'fine-tune',
     });
-    expectEqual(result.status, 'uploaded');
+    expectEqual(result.filename, 'finetune.jsonl');
   });
   it('toFile handles ArrayBuffer', async () => {
     const result = await client.files.create({
       file: await toFile(new TextEncoder().encode(fineTune).buffer, 'finetune.jsonl'),
       purpose: 'fine-tune',
     });
-    expectEqual(result.status, 'uploaded');
+    expectEqual(result.filename, 'finetune.jsonl');
   });
   if (runtime !== 'edge') {
     // this fails in edge for some reason
@@ -177,7 +177,7 @@ export function uploadWebApiTestCases({
         file: await toFile(new DataView(new TextEncoder().encode(fineTune).buffer), 'finetune.jsonl'),
         purpose: 'fine-tune',
       });
-      expectEqual(result.status, 'uploaded');
+      expectEqual(result.filename, 'finetune.jsonl');
     });
   }
 }

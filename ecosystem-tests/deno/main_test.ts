@@ -105,26 +105,26 @@ Deno.test(async function toFileHandlesBlob() {
     file: await toFile(new Blob([fineTune]), 'finetune.jsonl'),
     purpose: 'fine-tune',
   });
-  assertEquals(result.status, 'uploaded');
+  assertEquals(result.filename, 'finetune.jsonl');
 });
 Deno.test(async function toFileHandlesUint8Array() {
   const result = await client.files.create({
     file: await toFile(new TextEncoder().encode(fineTune), 'finetune.jsonl'),
     purpose: 'fine-tune',
   });
-  assertEquals(result.status, 'uploaded');
+  assertEquals(result.filename, 'finetune.jsonl');
 });
 Deno.test(async function toFileHandlesArrayBuffer() {
   const result = await client.files.create({
     file: await toFile(new TextEncoder().encode(fineTune).buffer, 'finetune.jsonl'),
     purpose: 'fine-tune',
   });
-  assertEquals(result.status, 'uploaded');
+  assertEquals(result.filename, 'finetune.jsonl');
 });
 Deno.test(async function toFileHandlesDataView() {
   const result = await client.files.create({
     file: await toFile(new DataView(new TextEncoder().encode(fineTune).buffer), 'finetune.json'),
     purpose: 'fine-tune',
   });
-  assertEquals(result.status, 'uploaded');
+  assertEquals(result.filename, 'finetune.jsonl');
 });
