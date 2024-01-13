@@ -1,5 +1,14 @@
 # Changelog
 
+## 4.24.7 (2024-01-13)
+
+Full Changelog: [v4.24.6...v4.24.7](https://github.com/openai/openai-node/compare/v4.24.6...v4.24.7)
+
+### Chores
+
+* **ecosystem-tests:** fix flaky vercel-edge, cloudflare-worker, and deno tests ([#626](https://github.com/openai/openai-node/issues/626)) ([ae412a5](https://github.com/openai/openai-node/commit/ae412a5f12e701e07e71bd9791c55a56858e8383))
+* **ecosystem-tests:** fix typo in deno test ([#628](https://github.com/openai/openai-node/issues/628)) ([048ec94](https://github.com/openai/openai-node/commit/048ec943f8d12acba9829c35ebf0b2d3f24930c8))
+
 ## 4.24.6 (2024-01-12)
 
 Full Changelog: [v4.24.5...v4.24.6](https://github.com/openai/openai-node/compare/v4.24.5...v4.24.6)
