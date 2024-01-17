@@ -2,7 +2,7 @@
 
 import * as Core from 'openai/core';
 import { APIResource } from 'openai/resource';
-import * as API from './index';
+import * as TranscriptionsAPI from 'openai/resources/audio/transcriptions';
 import { type Uploadable, multipartFormRequestOptions } from 'openai/core';
 
 export class Transcriptions extends APIResource {
@@ -10,7 +10,7 @@ export class Transcriptions extends APIResource {
    * Transcribes audio into the input language.
    */
   create(body: TranscriptionCreateParams, options?: Core.RequestOptions): Core.APIPromise<Transcription> {
-    return this.post('/audio/transcriptions', multipartFormRequestOptions({ body, ...options }));
+    return this._client.post('/audio/transcriptions', multipartFormRequestOptions({ body, ...options }));
   }
 }
 
@@ -39,14 +39,15 @@ export interface TranscriptionCreateParams {
 
   /**
    * An optional text to guide the model's style or continue a previous audio
-   * segment. The [prompt](/docs/guides/speech-to-text/prompting) should match the
-   * audio language.
+   * segment. The
+   * [prompt](https://platform.openai.com/docs/guides/speech-to-text/prompting)
+   * should match the audio language.
    */
   prompt?: string;
 
   /**
-   * The format of the transcript output, in one of these options: json, text, srt,
-   * verbose_json, or vtt.
+   * The format of the transcript output, in one of these options: `json`, `text`,
+   * `srt`, `verbose_json`, or `vtt`.
    */
   response_format?: 'json' | 'text' | 'srt' | 'verbose_json' | 'vtt';
 
@@ -61,6 +62,6 @@ export interface TranscriptionCreateParams {
 }
 
 export namespace Transcriptions {
-  export import Transcription = API.Transcription;
-  export import TranscriptionCreateParams = API.TranscriptionCreateParams;
+  export import Transcription = TranscriptionsAPI.Transcription;
+  export import TranscriptionCreateParams = TranscriptionsAPI.TranscriptionCreateParams;
 }

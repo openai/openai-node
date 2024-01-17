@@ -2,7 +2,7 @@
 
 import * as Core from 'openai/core';
 import { APIResource } from 'openai/resource';
-import * as API from './index';
+import * as ModelsAPI from 'openai/resources/models';
 import { Page } from 'openai/pagination';
 
 export class Models extends APIResource {
@@ -11,7 +11,7 @@ export class Models extends APIResource {
    * the owner and permissioning.
    */
   retrieve(model: string, options?: Core.RequestOptions): Core.APIPromise<Model> {
-    return this.get(`/models/${model}`, options);
+    return this._client.get(`/models/${model}`, options);
   }
 
   /**
@@ -19,14 +19,15 @@ export class Models extends APIResource {
    * one such as the owner and availability.
    */
   list(options?: Core.RequestOptions): Core.PagePromise<ModelsPage, Model> {
-    return this.getAPIList('/models', ModelsPage, options);
+    return this._client.getAPIList('/models', ModelsPage, options);
   }
 
   /**
-   * Delete a fine-tuned model. You must have the Owner role in your organization.
+   * Delete a fine-tuned model. You must have the Owner role in your organization to
+   * delete a model.
    */
   del(model: string, options?: Core.RequestOptions): Core.APIPromise<ModelDeleted> {
-    return this.delete(`/models/${model}`, options);
+    return this._client.delete(`/models/${model}`, options);
   }
 }
 
@@ -34,8 +35,6 @@ export class Models extends APIResource {
  * Note: no pagination actually occurs yet, this is for forwards-compatibility.
  */
 export class ModelsPage extends Page<Model> {}
-// alias so we can export it in the namespace
-type _ModelsPage = ModelsPage;
 
 /**
  * Describes an OpenAI model offering that can be used with the API.
@@ -47,14 +46,14 @@ export interface Model {
   id: string;
 
   /**
-   * The date and time when the model was created.
+   * The Unix timestamp (in seconds) when the model was created.
    */
   created: number;
 
   /**
    * The object type, which is always "model".
    */
-  object: string;
+  object: 'model';
 
   /**
    * The organization that owns the model.
@@ -71,7 +70,7 @@ export interface ModelDeleted {
 }
 
 export namespace Models {
-  export import Model = API.Model;
-  export import ModelDeleted = API.ModelDeleted;
-  export type ModelsPage = _ModelsPage;
+  export import Model = ModelsAPI.Model;
+  export import ModelDeleted = ModelsAPI.ModelDeleted;
+  export import ModelsPage = ModelsAPI.ModelsPage;
 }

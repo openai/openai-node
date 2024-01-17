@@ -1,4 +1,5 @@
 {
+  "include": ["*.ts"],
   "compilerOptions": {
     "lib": ["ESNext"],
     "module": "esnext",
@@ -8,7 +9,7 @@
     "allowImportingTsExtensions": true,
     "strict": true,
     "downlevelIteration": true,
-    "skipLibCheck": true,
+    "skipLibCheck": false,
     "jsx": "preserve",
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,

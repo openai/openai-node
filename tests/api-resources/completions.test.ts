@@ -3,7 +3,10 @@
 import OpenAI from 'openai';
 import { Response } from 'node-fetch';
 
-const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010' });
+const openai = new OpenAI({
+  apiKey: 'My API Key',
+  baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
+});
 
 describe('resource completions', () => {
   test('create: only required params', async () => {
@@ -29,6 +32,7 @@ describe('resource completions', () => {
       max_tokens: 16,
       n: 1,
       presence_penalty: -2,
+      seed: -9223372036854776000,
       stop: '\n',
       stream: false,
       suffix: 'test.',

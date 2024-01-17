@@ -1,5 +1,7 @@
 name: Create releases
 on:
+  schedule:
+    - cron: '0 5 * * *' # every day at 5am UTC
   push:
     branches:
       - master
@@ -20,11 +22,26 @@ jobs:
           repo: ${{ github.event.repository.full_name }}
           stainless-api-key: ${{ secrets.STAINLESS_API_KEY }}
 
+      - name: Generate a token
+        id: generate_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: 'openai'
+          repositories: 'openai-node,openai-deno-build'
+
       - name: Set up Node
         if: ${{ steps.release.outputs.releases_created }}
         uses: actions/setup-node@v3
         with:
-          node-version: '16'
+          node-version: '18'
+
+      - name: Set up Deno
+        if: ${{ steps.release.outputs.releases_created }}
+        uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
 
       - name: Install dependencies
         if: ${{ steps.release.outputs.releases_created }}
@@ -36,4 +53,12 @@ jobs:
         run: |
           bash ./bin/publish-npm
         env:
-          NPM_TOKEN: ${{ secrets.OPENAI_NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.OPENAI_NPM_TOKEN || secrets.NPM_TOKEN }}
+
+      - name: Publish to Deno
+        if: ${{ steps.release.outputs.releases_created }}
+        run: |
+          bash ./scripts/git-publish-deno.sh
+        env:
+          DENO_PUSH_REMOTE_URL: https://username:${{ steps.generate_token.outputs.token }}@github.com/openai/openai-deno-build.git
+          DENO_PUSH_BRANCH: main

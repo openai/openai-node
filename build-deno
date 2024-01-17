@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+
+set -exuo pipefail
+
+rm -rf deno; mkdir deno
+cp -rp src/* deno
+
+# x-release-please-start-version
+cat << EOF > deno/README.md
+# OpenAI Node API Library - Deno build
+
+This is a build produced from https://github.com/openai/openai-node – please go there to read the source and docs, file issues, etc.
+
+Usage:
+
+\`\`\`ts
+import OpenAI from "https://deno.land/x/openai@v4.24.7/mod.ts";
+
+const client = new OpenAI();
+\`\`\`
+
+Note that in most Deno environments, you can also do this:
+
+\`\`\`ts
+import OpenAI from "npm:openai";
+\`\`\`
+EOF
+# x-release-please-end
+
+rm deno/_shims/auto/*-node.ts
+for dir in deno/_shims deno/_shims/auto; do
+  rm "${dir}"/*.{d.ts,js,mjs}
+  for file in "${dir}"/*-deno.ts; do
+    mv -- "$file" "${file%-deno.ts}.ts"
+  done
+done
+for file in LICENSE CHANGELOG.md; do
+  if [ -e "${file}" ]; then cp "${file}" deno; fi
+done
+npm exec ts-node -T -- scripts/denoify.ts
+deno fmt deno
+deno check deno/mod.ts
+if [ -e deno_tests ]; then
+  deno test deno_tests --allow-env
+fi
+
+# make sure that nothing crashes when we load the Deno module
+(cd deno && deno run mod.ts)

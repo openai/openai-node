@@ -1,3 +1,5 @@
+// shouldn't need extension, but Jest's ESM module resolution is broken
+import 'openai/shims/node.mjs';
 import OpenAI, { toFile } from 'openai';
 import { TranscriptionCreateParams } from 'openai/resources/audio/transcriptions';
 import fetch from 'node-fetch';
@@ -121,7 +123,7 @@ describe('toFile', () => {
       ),
       purpose: 'fine-tune',
     });
-    expect(result.status).toEqual('uploaded');
+    expect(result.filename).toEqual('finetune.jsonl');
   });
   // @ts-ignore avoid DOM lib for testing purposes
   if (typeof Blob !== 'undefined') {
@@ -134,7 +136,7 @@ describe('toFile', () => {
         ),
         purpose: 'fine-tune',
       });
-      expect(result.status).toEqual('uploaded');
+      expect(result.filename).toEqual('finetune.jsonl');
     });
   }
   it('handles Uint8Array', async function () {
@@ -146,7 +148,7 @@ describe('toFile', () => {
       ),
       purpose: 'fine-tune',
     });
-    expect(result.status).toEqual('uploaded');
+    expect(result.filename).toEqual('finetune.jsonl');
   });
   it('handles ArrayBuffer', async function () {
     const result = await client.files.create({
@@ -157,7 +159,7 @@ describe('toFile', () => {
       ),
       purpose: 'fine-tune',
     });
-    expect(result.status).toEqual('uploaded');
+    expect(result.filename).toEqual('finetune.jsonl');
   });
   it('handles DataView', async function () {
     const result = await client.files.create({
@@ -168,6 +170,6 @@ describe('toFile', () => {
       ),
       purpose: 'fine-tune',
     });
-    expect(result.status).toEqual('uploaded');
+    expect(result.filename).toEqual('finetune.jsonl');
   });
 });

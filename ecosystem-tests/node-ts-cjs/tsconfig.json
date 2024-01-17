@@ -1,5 +1,6 @@
 {
-  "exclude": ["node_modules"],
+  "include": ["tests/*.ts"],
+  "exclude": ["tests/*-shim-errors.ts"],
 
   "compilerOptions": {
     /* Visit https://aka.ms/tsconfig.json to read more about this file */
@@ -7,8 +8,8 @@
     "incremental": true,
 
     /* Language and Environment */
-    "target": "ES2022",
-    "lib": ["ES2022"],
+    "target": "ES2015",
+    "lib": ["ES2015"],
     "jsx": "react",
 
     /* Modules */

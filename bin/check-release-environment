@@ -3,11 +3,11 @@
 errors=()
 
 if [ -z "${STAINLESS_API_KEY}" ]; then
-  errors+=("The STAINLESS_API_KEY secret has not been set. Please contact Stainless for an API key & set it in your organisation secrets on GitHub.")
+  errors+=("The STAINLESS_API_KEY secret has not been set. Please contact Stainless for an API key & set it in your organization secrets on GitHub.")
 fi
 
 if [ -z "${NPM_TOKEN}" ]; then
-  errors+=("The OPENAI_NPM_TOKEN secret has not been set. Please set it in either this repository's secrets or your organisation secrets")
+  errors+=("The OPENAI_NPM_TOKEN secret has not been set. Please set it in either this repository's secrets or your organization secrets")
 fi
 
 len=${#errors[@]}

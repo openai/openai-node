@@ -6,8 +6,9 @@
   "include-v-in-tag": true,
   "include-component-in-tag": false,
   "bump-minor-pre-major": true,
-  "bump-patch-for-minor-pre-major": true,
+  "bump-patch-for-minor-pre-major": false,
   "pull-request-header": "Automated Release PR",
+  "pull-request-title-pattern": "release: ${version}",
   "changelog-sections": [
     {
       "type": "feat",
@@ -57,5 +58,9 @@
     }
   ],
   "release-type": "node",
-  "extra-files": ["src/version.ts"]
+  "extra-files": [
+    "src/version.ts",
+    "README.md",
+    "build-deno"
+  ]
 }

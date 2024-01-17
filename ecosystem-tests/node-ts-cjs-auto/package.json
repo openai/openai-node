@@ -1,0 +1,24 @@
+{
+  "name": "node-ts-cjs-auto",
+  "version": "0.0.1",
+  "main": "index.js",
+  "private": true,
+  "scripts": {
+    "tsc": "tsc && tsc -p tsconfig.nodenext.json",
+    "test": "jest"
+  },
+  "dependencies": {
+    "formdata-node": "^4.4.1",
+    "node-fetch": "^2.6.1",
+    "tsconfig-paths": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.4.2",
+    "@types/node-fetch": "^2.6.1",
+    "@types/ws": "^8.5.4",
+    "fastest-levenshtein": "^1.0.16",
+    "jest": "^28.1.3",
+    "ts-jest": "^28.0.8",
+    "typescript": "4.7.4"
+  }
+}

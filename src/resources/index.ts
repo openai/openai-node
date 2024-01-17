@@ -1,7 +1,9 @@
 // File generated from our OpenAPI spec by Stainless.
 
+export * from './chat/index';
+export * from './shared';
 export { Audio } from './audio/audio';
-export { Chat } from './chat/chat';
+export { Beta } from './beta/beta';
 export {
   Completion,
   CompletionChoice,
@@ -12,19 +14,15 @@ export {
   Completions,
 } from './completions';
 export { CreateEmbeddingResponse, Embedding, EmbeddingCreateParams, Embeddings } from './embeddings';
-export { Edit, EditCreateParams, Edits } from './edits';
-export { FileContent, FileDeleted, FileObject, FileCreateParams, FileObjectsPage, Files } from './files';
 export {
-  FineTune,
-  FineTuneEvent,
-  FineTuneEventsListResponse,
-  FineTuneCreateParams,
-  FineTuneListEventsParams,
-  FineTuneListEventsParamsNonStreaming,
-  FineTuneListEventsParamsStreaming,
-  FineTunesPage,
-  FineTunes,
-} from './fine-tunes';
+  FileContent,
+  FileDeleted,
+  FileObject,
+  FileCreateParams,
+  FileListParams,
+  FileObjectsPage,
+  Files,
+} from './files';
 export { FineTuning } from './fine-tuning/fine-tuning';
 export {
   Image,

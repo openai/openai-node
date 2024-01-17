@@ -2,7 +2,7 @@
 
 import * as Core from 'openai/core';
 import { APIResource } from 'openai/resource';
-import * as API from './index';
+import * as TranslationsAPI from 'openai/resources/audio/translations';
 import { type Uploadable, multipartFormRequestOptions } from 'openai/core';
 
 export class Translations extends APIResource {
@@ -10,7 +10,7 @@ export class Translations extends APIResource {
    * Translates audio into English.
    */
   create(body: TranslationCreateParams, options?: Core.RequestOptions): Core.APIPromise<Translation> {
-    return this.post('/audio/translations', multipartFormRequestOptions({ body, ...options }));
+    return this._client.post('/audio/translations', multipartFormRequestOptions({ body, ...options }));
   }
 }
 
@@ -32,14 +32,15 @@ export interface TranslationCreateParams {
 
   /**
    * An optional text to guide the model's style or continue a previous audio
-   * segment. The [prompt](/docs/guides/speech-to-text/prompting) should be in
-   * English.
+   * segment. The
+   * [prompt](https://platform.openai.com/docs/guides/speech-to-text/prompting)
+   * should be in English.
    */
   prompt?: string;
 
   /**
-   * The format of the transcript output, in one of these options: json, text, srt,
-   * verbose_json, or vtt.
+   * The format of the transcript output, in one of these options: `json`, `text`,
+   * `srt`, `verbose_json`, or `vtt`.
    */
   response_format?: string;
 
@@ -54,6 +55,6 @@ export interface TranslationCreateParams {
 }
 
 export namespace Translations {
-  export import Translation = API.Translation;
-  export import TranslationCreateParams = API.TranslationCreateParams;
+  export import Translation = TranslationsAPI.Translation;
+  export import TranslationCreateParams = TranslationsAPI.TranslationCreateParams;
 }

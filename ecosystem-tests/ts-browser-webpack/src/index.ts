@@ -1,5 +1,7 @@
+import 'openai/shims/web';
 import OpenAI, { toFile } from 'openai';
 import { distance } from 'fastest-levenshtein';
+import { ChatCompletion } from 'openai/resources/chat/completions';
 
 type TestCase = {
   path: string[];
@@ -104,6 +106,39 @@ async function typeTests() {
   await client.audio.transcriptions.create({ file: 'test', model: 'whisper-1' });
 }
 
+it(`raw response`, async function () {
+  const response = await client.chat.completions
+    .create({
+      model: 'gpt-4',
+      messages: [{ role: 'user', content: 'Say this is a test' }],
+    })
+    .asResponse();
+
+  // test that we can use web Response API
+  const { body } = response;
+  if (!body) throw new Error('expected response.body to be defined');
+
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let result;
+  do {
+    result = await reader.read();
+    if (!result.done) chunks.push(result.value);
+  } while (!result.done);
+
+  reader.releaseLock();
+
+  let offset = 0;
+  const merged = new Uint8Array(chunks.reduce((total, chunk) => total + chunk.length, 0));
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.length;
+  }
+
+  const json: ChatCompletion = JSON.parse(new TextDecoder().decode(merged));
+  expect(json.choices[0]?.message.content || '').toBeSimilarTo('This is a test', 10);
+});
+
 it(`streaming works`, async function () {
   const stream = await client.chat.completions.create({
     model: 'gpt-4',
@@ -148,7 +183,7 @@ describe('toFile', () => {
         ),
         purpose: 'fine-tune',
       });
-      expect(result.status).toEqual('uploaded');
+      expect(result.filename).toEqual('finetune.jsonl');
     });
   }
   it('handles Uint8Array', async function () {
@@ -156,21 +191,21 @@ describe('toFile', () => {
       file: await toFile(new TextEncoder().encode(fineTune), 'finetune.jsonl'),
       purpose: 'fine-tune',
     });
-    expect(result.status).toEqual('uploaded');
+    expect(result.filename).toEqual('finetune.jsonl');
   });
   it('handles ArrayBuffer', async function () {
     const result = await client.files.create({
       file: await toFile(new TextEncoder().encode(fineTune).buffer, 'finetune.jsonl'),
       purpose: 'fine-tune',
     });
-    expect(result.status).toEqual('uploaded');
+    expect(result.filename).toEqual('finetune.jsonl');
   });
   it('handles DataView', async function () {
     const result = await client.files.create({
       file: await toFile(new DataView(new TextEncoder().encode(fineTune).buffer), 'finetune.jsonl'),
       purpose: 'fine-tune',
     });
-    expect(result.status).toEqual('uploaded');
+    expect(result.filename).toEqual('finetune.jsonl');
   });
 });
 

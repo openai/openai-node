@@ -14,7 +14,7 @@ export const config = {
 export default async (request: NextRequest) => {
   const openai = new OpenAI();
 
-  const result = await openai.fineTunes.listEvents('ft-Gj8mUJrEPe9sIsnxJdbzye0Z', { stream: false });
+  const result = await openai.beta.assistants.list({ limit: 10 });
 
   return NextResponse.json(result);
 };

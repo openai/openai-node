@@ -2,7 +2,7 @@
 
 import * as Core from 'openai/core';
 import { APIResource } from 'openai/resource';
-import * as API from './index';
+import * as EmbeddingsAPI from 'openai/resources/embeddings';
 
 export class Embeddings extends APIResource {
   /**
@@ -12,7 +12,7 @@ export class Embeddings extends APIResource {
     body: EmbeddingCreateParams,
     options?: Core.RequestOptions,
   ): Core.APIPromise<CreateEmbeddingResponse> {
-    return this.post('/embeddings', { body, ...options });
+    return this._client.post('/embeddings', { body, ...options });
   }
 }
 
@@ -28,9 +28,9 @@ export interface CreateEmbeddingResponse {
   model: string;
 
   /**
-   * The object type, which is always "embedding".
+   * The object type, which is always "list".
    */
-  object: string;
+  object: 'list';
 
   /**
    * The usage information for the request.
@@ -61,7 +61,8 @@ export namespace CreateEmbeddingResponse {
 export interface Embedding {
   /**
    * The embedding vector, which is a list of floats. The length of vector depends on
-   * the model as listed in the [embedding guide](/docs/guides/embeddings).
+   * the model as listed in the
+   * [embedding guide](https://platform.openai.com/docs/guides/embeddings).
    */
   embedding: Array<number>;
 
@@ -73,37 +74,46 @@ export interface Embedding {
   /**
    * The object type, which is always "embedding".
    */
-  object: string;
+  object: 'embedding';
 }
 
 export interface EmbeddingCreateParams {
   /**
    * Input text to embed, encoded as a string or array of tokens. To embed multiple
    * inputs in a single request, pass an array of strings or array of token arrays.
-   * Each input must not exceed the max input tokens for the model (8191 tokens for
-   * `text-embedding-ada-002`).
-   * [Example Python code](https://github.com/openai/openai-cookbook/blob/main/examples/How_to_count_tokens_with_tiktoken.ipynb)
+   * The input must not exceed the max input tokens for the model (8192 tokens for
+   * `text-embedding-ada-002`), cannot be an empty string, and any array must be 2048
+   * dimensions or less.
+   * [Example Python code](https://cookbook.openai.com/examples/how_to_count_tokens_with_tiktoken)
    * for counting tokens.
    */
   input: string | Array<string> | Array<number> | Array<Array<number>>;
 
   /**
    * ID of the model to use. You can use the
-   * [List models](/docs/api-reference/models/list) API to see all of your available
-   * models, or see our [Model overview](/docs/models/overview) for descriptions of
-   * them.
+   * [List models](https://platform.openai.com/docs/api-reference/models/list) API to
+   * see all of your available models, or see our
+   * [Model overview](https://platform.openai.com/docs/models/overview) for
+   * descriptions of them.
    */
   model: (string & {}) | 'text-embedding-ada-002';
 
   /**
+   * The format to return the embeddings in. Can be either `float` or
+   * [`base64`](https://pypi.org/project/pybase64/).
+   */
+  encoding_format?: 'float' | 'base64';
+
+  /**
    * A unique identifier representing your end-user, which can help OpenAI to monitor
-   * and detect abuse. [Learn more](/docs/guides/safety-best-practices/end-user-ids).
+   * and detect abuse.
+   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices/end-user-ids).
    */
   user?: string;
 }
 
 export namespace Embeddings {
-  export import CreateEmbeddingResponse = API.CreateEmbeddingResponse;
-  export import Embedding = API.Embedding;
-  export import EmbeddingCreateParams = API.EmbeddingCreateParams;
+  export import CreateEmbeddingResponse = EmbeddingsAPI.CreateEmbeddingResponse;
+  export import Embedding = EmbeddingsAPI.Embedding;
+  export import EmbeddingCreateParams = EmbeddingsAPI.EmbeddingCreateParams;
 }

@@ -2,50 +2,104 @@
 
 import * as Core from 'openai/core';
 import { APIResource } from 'openai/resource';
-import * as API from './index';
+import { isRequestOptions } from 'openai/core';
+import { type Response } from 'openai/_shims/index';
+import { sleep } from 'openai/core';
+import { APIConnectionTimeoutError } from 'openai/error';
+import * as FilesAPI from 'openai/resources/files';
 import { type Uploadable, multipartFormRequestOptions } from 'openai/core';
 import { Page } from 'openai/pagination';
 
 export class Files extends APIResource {
   /**
-   * Upload a file that contains document(s) to be used across various
-   * endpoints/features. Currently, the size of all the files uploaded by one
-   * organization can be up to 1 GB. Please contact us if you need to increase the
-   * storage limit.
+   * Upload a file that can be used across various endpoints. The size of all the
+   * files uploaded by one organization can be up to 100 GB.
+   *
+   * The size of individual files can be a maximum of 512 MB or 2 million tokens for
+   * Assistants. See the
+   * [Assistants Tools guide](https://platform.openai.com/docs/assistants/tools) to
+   * learn more about the types of files supported. The Fine-tuning API only supports
+   * `.jsonl` files.
+   *
+   * Please [contact us](https://help.openai.com/) if you need to increase these
+   * storage limits.
    */
   create(body: FileCreateParams, options?: Core.RequestOptions): Core.APIPromise<FileObject> {
-    return this.post('/files', multipartFormRequestOptions({ body, ...options }));
+    return this._client.post('/files', multipartFormRequestOptions({ body, ...options }));
   }
 
   /**
    * Returns information about a specific file.
    */
   retrieve(fileId: string, options?: Core.RequestOptions): Core.APIPromise<FileObject> {
-    return this.get(`/files/${fileId}`, options);
+    return this._client.get(`/files/${fileId}`, options);
   }
 
   /**
    * Returns a list of files that belong to the user's organization.
    */
-  list(options?: Core.RequestOptions): Core.PagePromise<FileObjectsPage, FileObject> {
-    return this.getAPIList('/files', FileObjectsPage, options);
+  list(query?: FileListParams, options?: Core.RequestOptions): Core.PagePromise<FileObjectsPage, FileObject>;
+  list(options?: Core.RequestOptions): Core.PagePromise<FileObjectsPage, FileObject>;
+  list(
+    query: FileListParams | Core.RequestOptions = {},
+    options?: Core.RequestOptions,
+  ): Core.PagePromise<FileObjectsPage, FileObject> {
+    if (isRequestOptions(query)) {
+      return this.list({}, query);
+    }
+    return this._client.getAPIList('/files', FileObjectsPage, { query, ...options });
   }
 
   /**
    * Delete a file.
    */
   del(fileId: string, options?: Core.RequestOptions): Core.APIPromise<FileDeleted> {
-    return this.delete(`/files/${fileId}`, options);
+    return this._client.delete(`/files/${fileId}`, options);
   }
 
   /**
-   * Returns the contents of the specified file
+   * Returns the contents of the specified file.
+   */
+  content(fileId: string, options?: Core.RequestOptions): Core.APIPromise<Response> {
+    return this._client.get(`/files/${fileId}/content`, { ...options, __binaryResponse: true });
+  }
+
+  /**
+   * Returns the contents of the specified file.
+   *
+   * @deprecated The `.content()` method should be used instead
    */
   retrieveContent(fileId: string, options?: Core.RequestOptions): Core.APIPromise<string> {
-    return this.get(`/files/${fileId}/content`, {
+    return this._client.get(`/files/${fileId}/content`, {
       ...options,
       headers: { Accept: 'application/json', ...options?.headers },
     });
+  }
+
+  /**
+   * Waits for the given file to be processed, default timeout is 30 mins.
+   */
+  async waitForProcessing(
+    id: string,
+    { pollInterval = 5000, maxWait = 30 * 60 * 1000 }: { pollInterval?: number; maxWait?: number } = {},
+  ): Promise<FileObject> {
+    const TERMINAL_STATES = new Set(['processed', 'error', 'deleted']);
+
+    const start = Date.now();
+    let file = await this.retrieve(id);
+
+    while (!file.status || !TERMINAL_STATES.has(file.status)) {
+      await sleep(pollInterval);
+
+      file = await this.retrieve(id);
+      if (Date.now() - start > maxWait) {
+        throw new APIConnectionTimeoutError({
+          message: `Giving up on waiting for file ${id} to finish processing after ${maxWait} milliseconds.`,
+        });
+      }
+    }
+
+    return file;
   }
 }
 
@@ -53,8 +107,6 @@ export class Files extends APIResource {
  * Note: no pagination actually occurs yet, this is for forwards-compatibility.
  */
 export class FileObjectsPage extends Page<FileObject> {}
-// alias so we can export it in the namespace
-type _FileObjectsPage = FileObjectsPage;
 
 export type FileContent = string;
 
@@ -63,7 +115,7 @@ export interface FileDeleted {
 
   deleted: boolean;
 
-  object: string;
+  object: 'file';
 }
 
 /**
@@ -76,12 +128,12 @@ export interface FileObject {
   id: string;
 
   /**
-   * The size of the file in bytes.
+   * The size of the file, in bytes.
    */
   bytes: number;
 
   /**
-   * The unix timestamp for when the file was created.
+   * The Unix timestamp (in seconds) for when the file was created.
    */
   created_at: number;
 
@@ -91,50 +143,60 @@ export interface FileObject {
   filename: string;
 
   /**
-   * The object type, which is always "file".
+   * The object type, which is always `file`.
    */
-  object: string;
+  object: 'file';
 
   /**
-   * The intended purpose of the file. Currently, only "fine-tune" is supported.
+   * The intended purpose of the file. Supported values are `fine-tune`,
+   * `fine-tune-results`, `assistants`, and `assistants_output`.
    */
-  purpose: string;
+  purpose: 'fine-tune' | 'fine-tune-results' | 'assistants' | 'assistants_output';
 
   /**
-   * The current status of the file, which can be either `uploaded`, `processed`,
-   * `pending`, `error`, `deleting` or `deleted`.
+   * Deprecated. The current status of the file, which can be either `uploaded`,
+   * `processed`, or `error`.
    */
-  status?: string;
+  status: 'uploaded' | 'processed' | 'error';
 
   /**
-   * Additional details about the status of the file. If the file is in the `error`
-   * state, this will include a message describing the error.
+   * Deprecated. For details on why a fine-tuning training file failed validation,
+   * see the `error` field on `fine_tuning.job`.
    */
-  status_details?: string | null;
+  status_details?: string;
 }
 
 export interface FileCreateParams {
   /**
-   * Name of the [JSON Lines](https://jsonlines.readthedocs.io/en/latest/) file to be
-   * uploaded.
-   *
-   * If the `purpose` is set to "fine-tune", the file will be used for fine-tuning.
+   * The File object (not file name) to be uploaded.
    */
   file: Uploadable;
 
   /**
-   * The intended purpose of the uploaded documents.
+   * The intended purpose of the uploaded file.
    *
-   * Use "fine-tune" for [fine-tuning](/docs/api-reference/fine-tuning). This allows
-   * us to validate the format of the uploaded file.
+   * Use "fine-tune" for
+   * [Fine-tuning](https://platform.openai.com/docs/api-reference/fine-tuning) and
+   * "assistants" for
+   * [Assistants](https://platform.openai.com/docs/api-reference/assistants) and
+   * [Messages](https://platform.openai.com/docs/api-reference/messages). This allows
+   * us to validate the format of the uploaded file is correct for fine-tuning.
    */
-  purpose: string;
+  purpose: 'fine-tune' | 'assistants';
+}
+
+export interface FileListParams {
+  /**
+   * Only return files with the given purpose.
+   */
+  purpose?: string;
 }
 
 export namespace Files {
-  export import FileContent = API.FileContent;
-  export import FileDeleted = API.FileDeleted;
-  export import FileObject = API.FileObject;
-  export type FileObjectsPage = _FileObjectsPage;
-  export import FileCreateParams = API.FileCreateParams;
+  export import FileContent = FilesAPI.FileContent;
+  export import FileDeleted = FilesAPI.FileDeleted;
+  export import FileObject = FilesAPI.FileObject;
+  export import FileObjectsPage = FilesAPI.FileObjectsPage;
+  export import FileCreateParams = FilesAPI.FileCreateParams;
+  export import FileListParams = FilesAPI.FileListParams;
 }

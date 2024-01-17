@@ -2,7 +2,9 @@
 
 import { castToError, Headers } from './core';
 
-export class APIError extends Error {
+export class OpenAIError extends Error {}
+
+export class APIError extends OpenAIError {
   readonly status: number | undefined;
   readonly headers: Headers | undefined;
   readonly error: Object | undefined;
@@ -17,7 +19,7 @@ export class APIError extends Error {
     message: string | undefined,
     headers: Headers | undefined,
   ) {
-    super(APIError.makeMessage(error, message));
+    super(`${APIError.makeMessage(status, error, message)}`);
     this.status = status;
     this.headers = headers;
 
@@ -28,14 +30,25 @@ export class APIError extends Error {
     this.type = data?.['type'];
   }
 
-  private static makeMessage(error: any, message: string | undefined) {
-    return (
+  private static makeMessage(status: number | undefined, error: any, message: string | undefined) {
+    const msg =
       error?.message ?
-        typeof error.message === 'string' ? error.message
+        typeof error.message === 'string' ?
+          error.message
         : JSON.stringify(error.message)
       : error ? JSON.stringify(error)
-      : message || 'Unknown error occurred'
-    );
+      : message;
+
+    if (status && msg) {
+      return `${status} ${msg}`;
+    }
+    if (status) {
+      return `${status} status code (no body)`;
+    }
+    if (msg) {
+      return msg;
+    }
+    return '(no status code or body)';
   }
 
   static generate(
@@ -106,8 +119,8 @@ export class APIConnectionError extends APIError {
 }
 
 export class APIConnectionTimeoutError extends APIConnectionError {
-  constructor() {
-    super({ message: 'Request timed out.' });
+  constructor({ message }: { message?: string } = {}) {
+    super({ message: message ?? 'Request timed out.' });
   }
 }
 

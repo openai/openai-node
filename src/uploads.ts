@@ -1,12 +1,15 @@
 import { type RequestOptions } from './core';
-import { type Readable } from 'openai/_shims/node-readable';
-import { type BodyInit } from 'openai/_shims/fetch';
-import { FormData, File, type Blob, type FilePropertyBag } from 'openai/_shims/formdata';
-import { getMultipartRequestOptions } from 'openai/_shims/getMultipartRequestOptions';
-import { fileFromPath } from 'openai/_shims/fileFromPath';
-import { type FsReadStream, isFsReadStream } from 'openai/_shims/node-readable';
-
-export { fileFromPath };
+import {
+  FormData,
+  File,
+  type Blob,
+  type FilePropertyBag,
+  getMultipartRequestOptions,
+  type FsReadStream,
+  isFsReadStream,
+} from './_shims/index';
+import { MultipartBody } from './_shims/MultipartBody';
+export { fileFromPath } from './_shims/index';
 
 type BlobLikePart = string | ArrayBuffer | ArrayBufferView | BlobLike | Uint8Array | DataView;
 export type BlobPart = string | ArrayBuffer | ArrayBufferView | Blob | Uint8Array | DataView;
@@ -143,9 +146,8 @@ async function getBytes(value: ToFileInput): Promise<Array<BlobPart>> {
     }
   } else {
     throw new Error(
-      `Unexpected data type: ${typeof value}; constructor: ${
-        value?.constructor?.name
-      }; props: ${propsForError(value)}`,
+      `Unexpected data type: ${typeof value}; constructor: ${value?.constructor
+        ?.name}; props: ${propsForError(value)}`,
     );
   }
 
@@ -175,13 +177,6 @@ const getStringFromMaybeBuffer = (x: string | Buffer | unknown): string | undefi
 const isAsyncIterableIterator = (value: any): value is AsyncIterableIterator<unknown> =>
   value != null && typeof value === 'object' && typeof value[Symbol.asyncIterator] === 'function';
 
-export class MultipartBody {
-  constructor(public body: Readable | BodyInit) {}
-  get [Symbol.toStringTag](): string {
-    return 'MultipartBody';
-  }
-}
-
 export const isMultipartBody = (body: any): body is MultipartBody =>
   body && typeof body === 'object' && body.body && body[Symbol.toStringTag] === 'MultipartBody';
 
@@ -189,7 +184,7 @@ export const isMultipartBody = (body: any): body is MultipartBody =>
  * Returns a multipart/form-data request if any part of the given request body contains a File / Blob value.
  * Otherwise returns the request as is.
  */
-export const maybeMultipartFormRequestOptions = async <T extends {} = Record<string, unknown>>(
+export const maybeMultipartFormRequestOptions = async <T = Record<string, unknown>>(
   opts: RequestOptions<T>,
 ): Promise<RequestOptions<T | MultipartBody>> => {
   if (!hasUploadableValue(opts.body)) return opts;
@@ -198,7 +193,7 @@ export const maybeMultipartFormRequestOptions = async <T extends {} = Record<str
   return getMultipartRequestOptions(form, opts);
 };
 
-export const multipartFormRequestOptions = async <T extends {} = Record<string, unknown>>(
+export const multipartFormRequestOptions = async <T = Record<string, unknown>>(
   opts: RequestOptions<T>,
 ): Promise<RequestOptions<T | MultipartBody>> => {
   const form = await createForm(opts.body);

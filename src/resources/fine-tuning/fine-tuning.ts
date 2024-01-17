@@ -1,20 +1,19 @@
 // File generated from our OpenAPI spec by Stainless.
 
 import { APIResource } from 'openai/resource';
-import { Jobs } from './jobs';
-import * as API from './index';
+import * as JobsAPI from 'openai/resources/fine-tuning/jobs';
 
 export class FineTuning extends APIResource {
-  jobs: Jobs = new Jobs(this.client);
+  jobs: JobsAPI.Jobs = new JobsAPI.Jobs(this._client);
 }
 
 export namespace FineTuning {
-  export import Jobs = API.Jobs;
-  export import FineTuningJob = API.FineTuningJob;
-  export import FineTuningJobEvent = API.FineTuningJobEvent;
-  export import FineTuningJobsPage = API.FineTuningJobsPage;
-  export import FineTuningJobEventsPage = API.FineTuningJobEventsPage;
-  export import JobCreateParams = API.JobCreateParams;
-  export import JobListParams = API.JobListParams;
-  export import JobListEventsParams = API.JobListEventsParams;
+  export import Jobs = JobsAPI.Jobs;
+  export import FineTuningJob = JobsAPI.FineTuningJob;
+  export import FineTuningJobEvent = JobsAPI.FineTuningJobEvent;
+  export import FineTuningJobsPage = JobsAPI.FineTuningJobsPage;
+  export import FineTuningJobEventsPage = JobsAPI.FineTuningJobEventsPage;
+  export import JobCreateParams = JobsAPI.JobCreateParams;
+  export import JobListParams = JobsAPI.JobListParams;
+  export import JobListEventsParams = JobsAPI.JobListEventsParams;
 }

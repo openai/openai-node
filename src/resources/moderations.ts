@@ -2,7 +2,7 @@
 
 import * as Core from 'openai/core';
 import { APIResource } from 'openai/resource';
-import * as API from './index';
+import * as ModerationsAPI from 'openai/resources/moderations';
 
 export class Moderations extends APIResource {
   /**
@@ -12,7 +12,7 @@ export class Moderations extends APIResource {
     body: ModerationCreateParams,
     options?: Core.RequestOptions,
   ): Core.APIPromise<ModerationCreateResponse> {
-    return this.post('/moderations', { body, ...options });
+    return this._client.post('/moderations', { body, ...options });
   }
 }
 
@@ -55,7 +55,7 @@ export namespace Moderation {
      * Content that expresses, incites, or promotes hate based on race, gender,
      * ethnicity, religion, nationality, sexual orientation, disability status, or
      * caste. Hateful content aimed at non-protected groups (e.g., chess players) is
-     * harrassment.
+     * harassment.
      */
     hate: boolean;
 
@@ -210,7 +210,7 @@ export interface ModerationCreateParams {
 }
 
 export namespace Moderations {
-  export import Moderation = API.Moderation;
-  export import ModerationCreateResponse = API.ModerationCreateResponse;
-  export import ModerationCreateParams = API.ModerationCreateParams;
+  export import Moderation = ModerationsAPI.Moderation;
+  export import ModerationCreateResponse = ModerationsAPI.ModerationCreateResponse;
+  export import ModerationCreateParams = ModerationsAPI.ModerationCreateParams;
 }

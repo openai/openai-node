@@ -3,7 +3,10 @@
 import OpenAI from 'openai';
 import { Response } from 'node-fetch';
 
-const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010' });
+const openai = new OpenAI({
+  apiKey: 'My API Key',
+  baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
+});
 
 describe('resource jobs', () => {
   test('create: only required params', async () => {
@@ -24,7 +27,7 @@ describe('resource jobs', () => {
     const response = await openai.fineTuning.jobs.create({
       model: 'gpt-3.5-turbo',
       training_file: 'file-abc123',
-      hyperparameters: { n_epochs: 'auto' },
+      hyperparameters: { batch_size: 'auto', learning_rate_multiplier: 'auto', n_epochs: 'auto' },
       suffix: 'x',
       validation_file: 'file-abc123',
     });
