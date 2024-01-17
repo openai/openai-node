@@ -11,12 +11,12 @@ export interface ClientOptions {
   /**
    * Defaults to process.env['OPENAI_API_KEY'].
    */
-  apiKey?: string;
+  apiKey?: string | undefined;
 
   /**
    * Defaults to process.env['OPENAI_ORG_ID'].
    */
-  organization?: string | null;
+  organization?: string | null | undefined;
 
   /**
    * Override the default base URL for the API, e.g., "https://api.example.com/v2/"
@@ -91,8 +91,8 @@ export class OpenAI extends Core.APIClient {
   /**
    * API Client for interfacing with the OpenAI API.
    *
-   * @param {string} [opts.apiKey=process.env['OPENAI_API_KEY'] ?? undefined]
-   * @param {string | null} [opts.organization=process.env['OPENAI_ORG_ID'] ?? null]
+   * @param {string | undefined} [opts.apiKey=process.env['OPENAI_API_KEY'] ?? undefined]
+   * @param {string | null | undefined} [opts.organization=process.env['OPENAI_ORG_ID'] ?? null]
    * @param {string} [opts.baseURL=process.env['OPENAI_BASE_URL'] ?? https://api.openai.com/v1] - Override the default base URL for the API.
    * @param {number} [opts.timeout=10 minutes] - The maximum amount of time (in milliseconds) the client will wait for a response before timing out.
    * @param {number} [opts.httpAgent] - An HTTP agent used to manage HTTP(s) connections.
