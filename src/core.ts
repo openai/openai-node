@@ -725,7 +725,7 @@ export type RequestOptions<Req = unknown | Record<string, unknown> | Readable> =
   method?: HTTPMethod;
   path?: string;
   query?: Req | undefined;
-  body?: Req | undefined;
+  body?: Req | null | undefined;
   headers?: Headers | undefined;
 
   maxRetries?: number;
