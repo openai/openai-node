@@ -156,16 +156,19 @@ export class ChatCompletionStream
     for (const { delta, finish_reason, index, logprobs = null, ...other } of chunk.choices) {
       let choice = snapshot.choices[index];
       if (!choice) {
-        snapshot.choices[index] = { finish_reason, index, message: delta, logprobs, ...other };
-        continue;
+        choice = snapshot.choices[index] = { finish_reason, index, message: {}, logprobs, ...other };
       }
 
       if (logprobs) {
         if (!choice.logprobs) {
-          choice.logprobs = logprobs;
-        } else if (logprobs.content) {
-          choice.logprobs.content ??= [];
-          choice.logprobs.content.push(...logprobs.content);
+          choice.logprobs = Object.assign({}, logprobs);
+        } else {
+          const { content, ...rest } = logprobs;
+          Object.assign(choice.logprobs, rest);
+          if (content) {
+            choice.logprobs.content ??= [];
+            choice.logprobs.content.push(...content);
+          }
         }
       }
 
@@ -173,7 +176,8 @@ export class ChatCompletionStream
       Object.assign(choice, other);
 
       if (!delta) continue; // Shouldn't happen; just in case.
-      const { content, function_call, role, tool_calls } = delta;
+      const { content, function_call, role, tool_calls, ...rest } = delta;
+      Object.assign(choice.message, rest);
 
       if (content) choice.message.content = (choice.message.content || '') + content;
       if (role) choice.message.role = role;
@@ -190,8 +194,9 @@ export class ChatCompletionStream
       }
       if (tool_calls) {
         if (!choice.message.tool_calls) choice.message.tool_calls = [];
-        for (const { index, id, type, function: fn } of tool_calls) {
+        for (const { index, id, type, function: fn, ...rest } of tool_calls) {
           const tool_call = (choice.message.tool_calls[index] ??= {});
+          Object.assign(tool_call, rest);
           if (id) tool_call.id = id;
           if (type) tool_call.type = type;
           if (fn) tool_call.function ??= { arguments: '' };
@@ -248,59 +253,72 @@ export class ChatCompletionStream
 }
 
 function finalizeChatCompletion(snapshot: ChatCompletionSnapshot): ChatCompletion {
-  const { id, choices, created, model } = snapshot;
+  const { id, choices, created, model, system_fingerprint, ...rest } = snapshot;
   return {
+    ...rest,
     id,
-    choices: choices.map(({ message, finish_reason, index, logprobs }): ChatCompletion.Choice => {
-      if (!finish_reason) throw new OpenAIError(`missing finish_reason for choice ${index}`);
-      const { content = null, function_call, tool_calls } = message;
-      const role = message.role as 'assistant'; // this is what we expect; in theory it could be different which would make our types a slight lie but would be fine.
-      if (!role) throw new OpenAIError(`missing role for choice ${index}`);
-      if (function_call) {
-        const { arguments: args, name } = function_call;
-        if (args == null) throw new OpenAIError(`missing function_call.arguments for choice ${index}`);
-        if (!name) throw new OpenAIError(`missing function_call.name for choice ${index}`);
-        return {
-          message: { content, function_call: { arguments: args, name }, role },
-          finish_reason,
-          index,
-          logprobs,
-        };
-      }
-      if (tool_calls) {
-        return {
-          index,
-          finish_reason,
-          logprobs,
-          message: {
-            role,
-            content,
-            tool_calls: tool_calls.map((tool_call, i) => {
-              const { function: fn, type, id } = tool_call;
-              const { arguments: args, name } = fn || {};
-              if (id == null)
-                throw new OpenAIError(`missing choices[${index}].tool_calls[${i}].id\n${str(snapshot)}`);
-              if (type == null)
-                throw new OpenAIError(`missing choices[${index}].tool_calls[${i}].type\n${str(snapshot)}`);
-              if (name == null)
-                throw new OpenAIError(
-                  `missing choices[${index}].tool_calls[${i}].function.name\n${str(snapshot)}`,
-                );
-              if (args == null)
-                throw new OpenAIError(
-                  `missing choices[${index}].tool_calls[${i}].function.arguments\n${str(snapshot)}`,
-                );
+    choices: choices.map(
+      ({ message, finish_reason, index, logprobs, ...choiceRest }): ChatCompletion.Choice => {
+        if (!finish_reason) throw new OpenAIError(`missing finish_reason for choice ${index}`);
+        const { content = null, function_call, tool_calls, ...messageRest } = message;
+        const role = message.role as 'assistant'; // this is what we expect; in theory it could be different which would make our types a slight lie but would be fine.
+        if (!role) throw new OpenAIError(`missing role for choice ${index}`);
+        if (function_call) {
+          const { arguments: args, name } = function_call;
+          if (args == null) throw new OpenAIError(`missing function_call.arguments for choice ${index}`);
+          if (!name) throw new OpenAIError(`missing function_call.name for choice ${index}`);
+          return {
+            ...choiceRest,
+            message: { content, function_call: { arguments: args, name }, role },
+            finish_reason,
+            index,
+            logprobs,
+          };
+        }
+        if (tool_calls) {
+          return {
+            ...choiceRest,
+            index,
+            finish_reason,
+            logprobs,
+            message: {
+              ...messageRest,
+              role,
+              content,
+              tool_calls: tool_calls.map((tool_call, i) => {
+                const { function: fn, type, id, ...toolRest } = tool_call;
+                const { arguments: args, name, ...fnRest } = fn || {};
+                if (id == null)
+                  throw new OpenAIError(`missing choices[${index}].tool_calls[${i}].id\n${str(snapshot)}`);
+                if (type == null)
+                  throw new OpenAIError(`missing choices[${index}].tool_calls[${i}].type\n${str(snapshot)}`);
+                if (name == null)
+                  throw new OpenAIError(
+                    `missing choices[${index}].tool_calls[${i}].function.name\n${str(snapshot)}`,
+                  );
+                if (args == null)
+                  throw new OpenAIError(
+                    `missing choices[${index}].tool_calls[${i}].function.arguments\n${str(snapshot)}`,
+                  );
 
-              return { id, type, function: { name, arguments: args } };
-            }),
-          },
+                return { ...toolRest, id, type, function: { ...fnRest, name, arguments: args } };
+              }),
+            },
+          };
+        }
+        return {
+          ...choiceRest,
+          message: { ...messageRest, content, role },
+          finish_reason,
+          index,
+          logprobs,
         };
-      }
-      return { message: { content: content, role }, finish_reason, index, logprobs };
-    }),
+      },
+    ),
     created,
     model,
     object: 'chat.completion',
+    ...(system_fingerprint ? { system_fingerprint } : {}),
   };
 }
 
@@ -333,6 +351,18 @@ export interface ChatCompletionSnapshot {
    * The model to generate the completion.
    */
   model: string;
+
+  // Note we do not include an "object" type on the snapshot,
+  // because the object is not a valid "chat.completion" until finalized.
+  // object: 'chat.completion';
+
+  /**
+   * This fingerprint represents the backend configuration that the model runs with.
+   *
+   * Can be used in conjunction with the `seed` request parameter to understand when
+   * backend changes have been made that might impact determinism.
+   */
+  system_fingerprint?: string;
 }
 
 export namespace ChatCompletionSnapshot {
