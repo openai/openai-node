@@ -300,6 +300,12 @@ export interface RunStep {
    * The type of run step, which can be either `message_creation` or `tool_calls`.
    */
   type: 'message_creation' | 'tool_calls';
+
+  /**
+   * Usage statistics related to the run step. This value will be `null` while the
+   * run step's status is `in_progress`.
+   */
+  usage: RunStep.Usage | null;
 }
 
 export namespace RunStep {
@@ -317,6 +323,27 @@ export namespace RunStep {
      * A human-readable description of the error.
      */
     message: string;
+  }
+
+  /**
+   * Usage statistics related to the run step. This value will be `null` while the
+   * run step's status is `in_progress`.
+   */
+  export interface Usage {
+    /**
+     * Number of completion tokens used over the course of the run step.
+     */
+    completion_tokens: number;
+
+    /**
+     * Number of prompt tokens used over the course of the run step.
+     */
+    prompt_tokens: number;
+
+    /**
+     * Total number of tokens used (prompt + completion).
+     */
+    total_tokens: number;
   }
 }
 
