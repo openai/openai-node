@@ -264,6 +264,12 @@ export interface Run {
    * this run.
    */
   tools: Array<Run.AssistantToolsCode | Run.AssistantToolsRetrieval | Run.AssistantToolsFunction>;
+
+  /**
+   * Usage statistics related to the run. This value will be `null` if the run is not
+   * in a terminal state (i.e. `in_progress`, `queued`, etc.).
+   */
+  usage: Run.Usage | null;
 }
 
 export namespace Run {
@@ -331,6 +337,27 @@ export namespace Run {
      * The type of tool being defined: `function`
      */
     type: 'function';
+  }
+
+  /**
+   * Usage statistics related to the run. This value will be `null` if the run is not
+   * in a terminal state (i.e. `in_progress`, `queued`, etc.).
+   */
+  export interface Usage {
+    /**
+     * Number of completion tokens used over the course of the run.
+     */
+    completion_tokens: number;
+
+    /**
+     * Number of prompt tokens used over the course of the run.
+     */
+    prompt_tokens: number;
+
+    /**
+     * Total number of tokens used (prompt + completion).
+     */
+    total_tokens: number;
   }
 }
 
