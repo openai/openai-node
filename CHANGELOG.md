@@ -1,5 +1,26 @@
 # Changelog
 
+## 4.25.0 (2024-01-21)
+
+Full Changelog: [v4.24.7...v4.25.0](https://github.com/openai/openai-node/compare/v4.24.7...v4.25.0)
+
+### Features
+
+* **api:** add usage to runs and run steps ([#640](https://github.com/openai/openai-node/issues/640)) ([3caa416](https://github.com/openai/openai-node/commit/3caa4166b8abb5bffb4c8be1495834b7f16af32d))
+
+
+### Bug Fixes
+
+* allow body type in RequestOptions to be null ([#637](https://github.com/openai/openai-node/issues/637)) ([c4f8a36](https://github.com/openai/openai-node/commit/c4f8a3698dc1d80439131c5097975d6a5db1b4e2))
+* handle system_fingerprint in streaming helpers ([#636](https://github.com/openai/openai-node/issues/636)) ([f273530](https://github.com/openai/openai-node/commit/f273530ac491300842aef463852821a1a27805fb))
+* **types:** accept undefined for optional client options ([#635](https://github.com/openai/openai-node/issues/635)) ([e48cd57](https://github.com/openai/openai-node/commit/e48cd57931cd0e81a77b55653cb1f663111dd733))
+
+
+### Chores
+
+* **internal:** debug logging for retries; speculative retry-after-ms support ([#633](https://github.com/openai/openai-node/issues/633)) ([fd64971](https://github.com/openai/openai-node/commit/fd64971612d1d7fcbd8a63885d333485bff68ab1))
+* **internal:** update comment ([#631](https://github.com/openai/openai-node/issues/631)) ([e109d40](https://github.com/openai/openai-node/commit/e109d40a5c02c5bf4586e54d92bf0e355d254c1b))
+
 ## 4.24.7 (2024-01-13)
 
 Full Changelog: [v4.24.6...v4.24.7](https://github.com/openai/openai-node/compare/v4.24.6...v4.24.7)
