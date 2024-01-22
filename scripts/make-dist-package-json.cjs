@@ -1,4 +1,4 @@
-const pkgJson = require('../package.json');
+const pkgJson = require(process.env['PKG_JSON_PATH'] || '../package.json');
 
 function processExportMap(m) {
   for (const key in m) {
