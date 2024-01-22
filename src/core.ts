@@ -343,6 +343,11 @@ export abstract class APIClient {
   }
 
   /**
+   * Used as a callback for mutating the given `FinalRequestOptions` object.
+   */
+  protected async prepareOptions(options: FinalRequestOptions): Promise<void> {}
+
+  /**
    * Used as a callback for mutating the given `RequestInit` object.
    *
    * This is useful for cases where you want to add certain headers based off of
@@ -386,6 +391,8 @@ export abstract class APIClient {
     if (retriesRemaining == null) {
       retriesRemaining = options.maxRetries ?? this.maxRetries;
     }
+
+    await this.prepareOptions(options);
 
     const { req, url, timeout } = this.buildRequest(options);
 
@@ -1139,3 +1146,7 @@ export const toBase64 = (str: string | null | undefined): string => {
 
   throw new OpenAIError('Cannot generate b64 string; Expected `Buffer` or `btoa` to be defined');
 };
+
+export function isObj(obj: unknown): obj is Record<string, unknown> {
+  return obj != null && typeof obj === 'object' && !Array.isArray(obj);
+}

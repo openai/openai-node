@@ -38,20 +38,22 @@ as a string.
 client.chat.completions.runTools({
   model: 'gpt-3.5-turbo',
   messages: [{ role: 'user', content: 'How is the weather this week?' }],
-  tools: [{
-    type: 'function',
-    function: {
-      function: getWeather as (args: { location: string, time: Date}) => any,
-      parse: parseFunction as (args: strings) => { location: string, time: Date },
-      parameters: {
-        type: 'object',
-        properties: {
-          location: { type: 'string' },
-          time: { type: 'string', format: 'date-time' },
+  tools: [
+    {
+      type: 'function',
+      function: {
+        function: getWeather as (args: { location: string; time: Date }) => any,
+        parse: parseFunction as (args: strings) => { location: string; time: Date },
+        parameters: {
+          type: 'object',
+          properties: {
+            location: { type: 'string' },
+            time: { type: 'string', format: 'date-time' },
+          },
         },
       },
-    }
-  }],
+    },
+  ],
 });
 ```
 
@@ -236,7 +238,6 @@ async function main() {
 main();
 ```
 
-
 ### Integrate with `zod`
 
 [`zod`](https://www.npmjs.com/package/zod) is a schema validation library which can help with validating the
@@ -261,8 +262,8 @@ async function main() {
             function: getWeather,
             parse: GetWeatherParameters.parse,
             parameters: zodToJsonSchema(GetWeatherParameters),
-          }
-        }
+          },
+        },
       ],
     })
     .on('message', (message) => console.log(message));
@@ -293,4 +294,3 @@ See an example of a Next.JS integration here [`examples/stream-to-client-next.ts
 ### Proxy Streaming to a Browser
 
 See an example of using express to stream to a browser here [`examples/stream-to-client-express.ts`](examples/stream-to-client-express.ts).
-
