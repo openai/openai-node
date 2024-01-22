@@ -2,7 +2,12 @@ const fs = require('fs');
 const path = require('path');
 const { parse } = require('@typescript-eslint/parser');
 
-const distDir = path.resolve(__dirname, '..', 'dist');
+const pkgImportPath = process.env['PKG_IMPORT_PATH'] ?? 'openai/'
+
+const distDir =
+  process.env['DIST_PATH'] ?
+    path.resolve(process.env['DIST_PATH'])
+  : path.resolve(__dirname, '..', 'dist');
 const distSrcDir = path.join(distDir, 'src');
 
 /**
@@ -105,11 +110,11 @@ async function postprocess() {
 
     let transformed = mapModulePaths(code, (importPath) => {
       if (file.startsWith(distSrcDir)) {
-        if (importPath.startsWith('openai/')) {
+        if (importPath.startsWith(pkgImportPath)) {
           // convert self-references in dist/src to relative paths
           let relativePath = path.relative(
             path.dirname(file),
-            path.join(distSrcDir, importPath.substring('openai/'.length)),
+            path.join(distSrcDir, importPath.substring(pkgImportPath.length)),
           );
           if (!relativePath.startsWith('.')) relativePath = `./${relativePath}`;
           return relativePath;
