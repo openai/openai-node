@@ -3,7 +3,7 @@ import { OpenAIError } from './error';
 
 import { APIError } from 'openai/error';
 
-export type Bytes = string | ArrayBuffer | Uint8Array | Buffer | null | undefined;
+type Bytes = string | ArrayBuffer | Uint8Array | Buffer | null | undefined;
 
 export type ServerSentEvent = {
   event: string | null;
