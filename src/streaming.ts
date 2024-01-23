@@ -3,9 +3,9 @@ import { OpenAIError } from './error';
 
 import { APIError } from 'openai/error';
 
-type Bytes = string | ArrayBuffer | Uint8Array | Buffer | null | undefined;
+export type Bytes = string | ArrayBuffer | Uint8Array | Buffer | null | undefined;
 
-type ServerSentEvent = {
+export type ServerSentEvent = {
   event: string | null;
   data: string;
   raw: string[];
@@ -381,7 +381,7 @@ function partition(str: string, delimiter: string): [string, string, string] {
  *
  * This polyfill was pulled from https://github.com/MattiasBuelens/web-streams-polyfill/pull/122#issuecomment-1627354490
  */
-function readableStreamAsyncIterable<T>(stream: any): AsyncIterableIterator<T> {
+export function readableStreamAsyncIterable<T>(stream: any): AsyncIterableIterator<T> {
   if (stream[Symbol.asyncIterator]) return stream;
 
   const reader = stream.getReader();
