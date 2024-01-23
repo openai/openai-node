@@ -6,6 +6,7 @@ import path from 'path';
 
 const TAR_NAME = 'openai.tgz';
 const PACK_FILE = `.pack/${TAR_NAME}`;
+const IS_CI = Boolean(process.env['CI'] && process.env['CI'] !== 'false');
 
 async function defaultNodeRunner() {
   await installPackage();
@@ -249,10 +250,11 @@ async function main() {
             runningProjects.delete(project);
           }
 
-          for (const { dest, data } of chunks) {
-            if (dest === 'stdout') process.stdout.write(data);
-            else process.stderr.write(data);
+          if (IS_CI) console.log(`::group::${failed.includes(project) ? '❌' : '✅'} ${project}`);
+          for (const { data } of chunks) {
+            process.stdout.write(data);
           }
+          if (IS_CI) console.log('::endgroup::');
         }
       }),
     );
@@ -271,7 +273,7 @@ async function main() {
         try {
           await withRetry(fn, project, state.retry);
           console.error('\n');
-          console.error(banner(`✅ ${project}`));
+          console.error(`✅ ${project}`);
         } catch (err) {
           if (err && (err as any).shortMessage) {
             console.error((err as any).shortMessage);
@@ -279,7 +281,7 @@ async function main() {
             console.error(err);
           }
           console.error('\n');
-          console.error(banner(`❌ ${project}`));
+          console.error(`❌ ${project}`);
           failed.push(project);
         }
         console.error('\n');
