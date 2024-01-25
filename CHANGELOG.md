@@ -1,5 +1,23 @@
 # Changelog
 
+## 4.26.0 (2024-01-25)
+
+Full Changelog: [v4.25.0...v4.26.0](https://github.com/openai/openai-node/compare/v4.25.0...v4.26.0)
+
+### Features
+
+* **api:** add text embeddings dimensions param ([#650](https://github.com/openai/openai-node/issues/650)) ([1b5a977](https://github.com/openai/openai-node/commit/1b5a977d0eef7f5cf97daf27333cbbeb6bb479f3))
+
+
+### Chores
+
+* **internal:** add internal helpers & improve build scripts ([#643](https://github.com/openai/openai-node/issues/643)) ([9392f50](https://github.com/openai/openai-node/commit/9392f50e47f26b16632c9eb12187ea7f8a565e09))
+* **internal:** adjust ecosystem-tests logging in CI ([#646](https://github.com/openai/openai-node/issues/646)) ([156084b](https://github.com/openai/openai-node/commit/156084b8734194a5856612378115b948c82ec6e4))
+* **internal:** don't re-export streaming type ([#648](https://github.com/openai/openai-node/issues/648)) ([4c4be94](https://github.com/openai/openai-node/commit/4c4be945fa3f54036183e2d0877060db47ea564b))
+* **internal:** fix binary files ([#645](https://github.com/openai/openai-node/issues/645)) ([e1fbc39](https://github.com/openai/openai-node/commit/e1fbc396f4d1dd8ba980c25ba03b670dfed887a0))
+* **internal:** minor streaming updates ([#647](https://github.com/openai/openai-node/issues/647)) ([2f073e4](https://github.com/openai/openai-node/commit/2f073e4e6c9cd0ff3ad434907da710704765a005))
+* **internal:** pin deno version ([#649](https://github.com/openai/openai-node/issues/649)) ([7e4b903](https://github.com/openai/openai-node/commit/7e4b9039320e4ccbafb45f57dce273bedc9b7cb3))
+
 ## 4.25.0 (2024-01-21)
 
 Full Changelog: [v4.24.7...v4.25.0](https://github.com/openai/openai-node/compare/v4.24.7...v4.25.0)
