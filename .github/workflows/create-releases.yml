@@ -41,7 +41,7 @@ jobs:
         if: ${{ steps.release.outputs.releases_created }}
         uses: denoland/setup-deno@v1
         with:
-          deno-version: v1.x
+          deno-version: v1.35.1
 
       - name: Install dependencies
         if: ${{ steps.release.outputs.releases_created }}
