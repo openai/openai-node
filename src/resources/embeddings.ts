@@ -96,7 +96,13 @@ export interface EmbeddingCreateParams {
    * [Model overview](https://platform.openai.com/docs/models/overview) for
    * descriptions of them.
    */
-  model: (string & {}) | 'text-embedding-ada-002';
+  model: (string & {}) | 'text-embedding-ada-002' | 'text-embedding-3-small' | 'text-embedding-3-large';
+
+  /**
+   * The number of dimensions the resulting output embeddings should have. Only
+   * supported in `text-embedding-3` and later models.
+   */
+  dimensions?: number;
 
   /**
    * The format to return the embeddings in. Can be either `float` or
