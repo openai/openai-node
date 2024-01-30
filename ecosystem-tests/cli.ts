@@ -142,9 +142,14 @@ function parseArgs() {
         description: 'number of parallel jobs to run',
       },
       retry: {
-        type: 'number',
+        type: 'count',
         default: 0,
         description: 'number of times to retry failing jobs',
+      },
+      retryDelay: {
+        type: 'number',
+        default: 100,
+        description: 'delay between retries in ms',
       },
       parallel: {
         type: 'boolean',
@@ -271,7 +276,7 @@ async function main() {
         console.error('\n');
 
         try {
-          await withRetry(fn, project, state.retry);
+          await withRetry(fn, project, state.retry, state.retryDelay);
           console.error('\n');
           console.error(`✅ ${project}`);
         } catch (err) {
@@ -297,13 +302,21 @@ async function main() {
   process.exit(0);
 }
 
-async function withRetry(fn: () => Promise<void>, identifier: string, retryAmount: number): Promise<void> {
+async function withRetry(
+  fn: () => Promise<void>,
+  identifier: string,
+  retryAmount: number,
+  retryDelayMs: number,
+): Promise<void> {
   do {
     try {
       return await fn();
     } catch (err) {
       if (--retryAmount <= 0) throw err;
-      console.error(`${identifier} failed due to ${err}; retries left ${retryAmount}`);
+      console.error(
+        `${identifier} failed due to ${err}; retries left ${retryAmount}, next retry in ${retryDelayMs}ms`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
     }
   } while (retryAmount > 0);
 }
