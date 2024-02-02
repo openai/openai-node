@@ -9,6 +9,9 @@
   "repository": "github:openai/openai-node",
   "license": "Apache-2.0",
   "packageManager": "yarn@1.22.21",
+  "files": [
+    "*"
+  ],
   "private": false,
   "scripts": {
     "test": "bin/check-test-server && yarn jest",
@@ -16,7 +19,7 @@
     "prepack": "echo 'to pack, run yarn build && (cd dist; yarn pack)' && exit 1",
     "prepublishOnly": "echo 'to publish, run yarn build && (cd dist; yarn publish)' && exit 1",
     "format": "prettier --write --cache --cache-strategy metadata . !dist",
-    "prepare": "if [ $(basename $(dirname $PWD)) = 'node_modules' ]; then npm run build; fi",
+    "prepare": "if ./scripts/check-is-in-git-install.sh; then npm run build; fi",
     "tsn": "ts-node -r tsconfig-paths/register",
     "lint": "eslint --ext ts,js .",
     "fix": "eslint --fix --ext ts,js ."
