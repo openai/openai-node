@@ -1,5 +1,21 @@
 # Changelog
 
+## 4.26.1 (2024-02-05)
+
+Full Changelog: [v4.26.0...v4.26.1](https://github.com/openai/openai-node/compare/v4.26.0...v4.26.1)
+
+### Chores
+
+* **internal:** enable building when git installed ([#657](https://github.com/openai/openai-node/issues/657)) ([8c80a7d](https://github.com/openai/openai-node/commit/8c80a7d6d36155901a19d1f9cd1fec17b89e261e))
+* **internal:** re-order pagination import ([#656](https://github.com/openai/openai-node/issues/656)) ([21ae54e](https://github.com/openai/openai-node/commit/21ae54ea2cc2779e440909782a6ac8b70f88ec1f))
+* **internal:** support pre-release versioning ([#653](https://github.com/openai/openai-node/issues/653)) ([0c3859f](https://github.com/openai/openai-node/commit/0c3859f88164ae3eb6ec8c29e8889a50861cb35b))
+* **test:** add delay between ecosystem tests retry ([#651](https://github.com/openai/openai-node/issues/651)) ([6a4cc5c](https://github.com/openai/openai-node/commit/6a4cc5cea36ae408c8c1eb2ea0ea02f96ffb77b7))
+
+
+### Documentation
+
+* add a CONTRIBUTING.md ([#659](https://github.com/openai/openai-node/issues/659)) ([8ea58b0](https://github.com/openai/openai-node/commit/8ea58b0b9e7382a3b3af852a9a3a288a485ad33a))
+
 ## 4.26.0 (2024-01-25)
 
 Full Changelog: [v4.25.0...v4.26.0](https://github.com/openai/openai-node/compare/v4.25.0...v4.26.0)
