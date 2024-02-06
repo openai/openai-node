@@ -142,13 +142,13 @@ function parseArgs() {
         description: 'number of parallel jobs to run',
       },
       retry: {
-        type: 'count',
+        type: 'number',
         default: 0,
         description: 'number of times to retry failing jobs',
       },
       retryDelay: {
         type: 'number',
-        default: 100,
+        default: 1000,
         description: 'delay between retries in ms',
       },
       parallel: {
