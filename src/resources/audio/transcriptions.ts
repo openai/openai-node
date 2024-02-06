@@ -59,6 +59,13 @@ export interface TranscriptionCreateParams {
    * automatically increase the temperature until certain thresholds are hit.
    */
   temperature?: number;
+
+  /**
+   * The timestamp granularities to populate for this transcription. Any of these
+   * options: `word`, or `segment`. Note: There is no additional latency for segment
+   * timestamps, but generating word timestamps incurs additional latency.
+   */
+  timestamp_granularities?: Array<'word' | 'segment'>;
 }
 
 export namespace Transcriptions {
