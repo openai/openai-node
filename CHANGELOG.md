@@ -1,5 +1,19 @@
 # Changelog
 
+## 4.27.0 (2024-02-08)
+
+Full Changelog: [v4.26.1...v4.27.0](https://github.com/openai/openai-node/compare/v4.26.1...v4.27.0)
+
+### Features
+
+* **api:** add `timestamp_granularities`, add `gpt-3.5-turbo-0125` model ([#661](https://github.com/openai/openai-node/issues/661)) ([5016806](https://github.com/openai/openai-node/commit/50168066862f66b529bae29f4564741300303246))
+
+
+### Chores
+
+* **internal:** fix retry mechanism for ecosystem-test ([#663](https://github.com/openai/openai-node/issues/663)) ([0eb7ed5](https://github.com/openai/openai-node/commit/0eb7ed5ca3f7c7b29c316fc7d725d834cee73989))
+* respect `application/vnd.api+json` content-type header ([#664](https://github.com/openai/openai-node/issues/664)) ([f4fad54](https://github.com/openai/openai-node/commit/f4fad549c5c366d8dd8b936b7699639b895e82a1))
+
 ## 4.26.1 (2024-02-05)
 
 Full Changelog: [v4.26.0...v4.26.1](https://github.com/openai/openai-node/compare/v4.26.0...v4.26.1)
