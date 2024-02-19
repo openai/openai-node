@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.28.2 (2024-02-19)
+
+Full Changelog: [v4.28.1...v4.28.2](https://github.com/openai/openai-node/compare/v4.28.1...v4.28.2)
+
+### Bug Fixes
+
+* **api:** remove non-GA instance_id param ([#677](https://github.com/openai/openai-node/issues/677)) ([4d0d4da](https://github.com/openai/openai-node/commit/4d0d4daf3bfca0089c5258a136542513e6b372e6))
+
 ## 4.28.1 (2024-02-19)
 
 Full Changelog: [v4.28.0...v4.28.1](https://github.com/openai/openai-node/compare/v4.28.0...v4.28.1)
