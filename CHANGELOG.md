@@ -1,5 +1,14 @@
 # Changelog
 
+## 4.28.1 (2024-02-19)
+
+Full Changelog: [v4.28.0...v4.28.1](https://github.com/openai/openai-node/compare/v4.28.0...v4.28.1)
+
+### Chores
+
+* **ci:** move github release logic to github app ([#671](https://github.com/openai/openai-node/issues/671)) ([ecca6bc](https://github.com/openai/openai-node/commit/ecca6bc2eea391ee53f1a1d6cac9665199447ae0))
+* **internal:** refactor release environment script ([#674](https://github.com/openai/openai-node/issues/674)) ([27d3770](https://github.com/openai/openai-node/commit/27d37705d17e05c3761ccefcf09c4e2018eb5772))
+
 ## 4.28.0 (2024-02-13)
 
 Full Changelog: [v4.27.1...v4.28.0](https://github.com/openai/openai-node/compare/v4.27.1...v4.28.0)
