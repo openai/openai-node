@@ -709,12 +709,6 @@ export interface ChatCompletionCreateParamsBase {
   functions?: Array<ChatCompletionCreateParams.Function>;
 
   /**
-   * An unique identifier to a custom instance to execute the request. The requesting
-   * organization is required to have access to the instance.
-   */
-  instance_id?: string | null;
-
-  /**
    * Modify the likelihood of specified tokens appearing in the completion.
    *
    * Accepts a JSON object that maps tokens (specified by their token ID in the
