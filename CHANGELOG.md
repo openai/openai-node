@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.28.3 (2024-02-20)
+
+Full Changelog: [v4.28.2...v4.28.3](https://github.com/openai/openai-node/compare/v4.28.2...v4.28.3)
+
+### Bug Fixes
+
+* **ci:** revert "move github release logic to github app" ([#680](https://github.com/openai/openai-node/issues/680)) ([8b4009a](https://github.com/openai/openai-node/commit/8b4009af05a2e0824f99d3cf8cd9063f234ae470))
+
 ## 4.28.2 (2024-02-19)
 
 Full Changelog: [v4.28.1...v4.28.2](https://github.com/openai/openai-node/compare/v4.28.1...v4.28.2)
