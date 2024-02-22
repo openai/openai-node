@@ -242,15 +242,7 @@ export interface Run {
    * `requires_action`, `cancelling`, `cancelled`, `failed`, `completed`, or
    * `expired`.
    */
-  status:
-    | 'queued'
-    | 'in_progress'
-    | 'requires_action'
-    | 'cancelling'
-    | 'cancelled'
-    | 'failed'
-    | 'completed'
-    | 'expired';
+  status: RunStatus;
 
   /**
    * The ID of the [thread](https://platform.openai.com/docs/api-reference/threads)
@@ -360,6 +352,21 @@ export namespace Run {
     total_tokens: number;
   }
 }
+
+/**
+ * The status of the run, which can be either `queued`, `in_progress`,
+ * `requires_action`, `cancelling`, `cancelled`, `failed`, `completed`, or
+ * `expired`.
+ */
+export type RunStatus =
+  | 'queued'
+  | 'in_progress'
+  | 'requires_action'
+  | 'cancelling'
+  | 'cancelled'
+  | 'failed'
+  | 'completed'
+  | 'expired';
 
 export interface RunCreateParams {
   /**
@@ -486,6 +493,7 @@ export namespace RunSubmitToolOutputsParams {
 export namespace Runs {
   export import RequiredActionFunctionToolCall = RunsAPI.RequiredActionFunctionToolCall;
   export import Run = RunsAPI.Run;
+  export import RunStatus = RunsAPI.RunStatus;
   export import RunsPage = RunsAPI.RunsPage;
   export import RunCreateParams = RunsAPI.RunCreateParams;
   export import RunUpdateParams = RunsAPI.RunUpdateParams;

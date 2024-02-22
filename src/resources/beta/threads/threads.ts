@@ -298,6 +298,7 @@ export namespace Threads {
   export import Runs = RunsAPI.Runs;
   export import RequiredActionFunctionToolCall = RunsAPI.RequiredActionFunctionToolCall;
   export import Run = RunsAPI.Run;
+  export import RunStatus = RunsAPI.RunStatus;
   export import RunsPage = RunsAPI.RunsPage;
   export import RunCreateParams = RunsAPI.RunCreateParams;
   export import RunUpdateParams = RunsAPI.RunUpdateParams;

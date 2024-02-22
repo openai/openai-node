@@ -221,6 +221,7 @@ Types:
 
 - <code><a href="./src/resources/beta/threads/runs/runs.ts">RequiredActionFunctionToolCall</a></code>
 - <code><a href="./src/resources/beta/threads/runs/runs.ts">Run</a></code>
+- <code><a href="./src/resources/beta/threads/runs/runs.ts">RunStatus</a></code>
 
 Methods:
 
