@@ -14,6 +14,7 @@ export {
 export {
   RequiredActionFunctionToolCall,
   Run,
+  RunStatus,
   RunCreateParams,
   RunUpdateParams,
   RunListParams,
