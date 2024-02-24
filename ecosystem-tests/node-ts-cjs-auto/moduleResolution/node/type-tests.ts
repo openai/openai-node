@@ -9,6 +9,5 @@ async function typeTests() {
       model: 'whisper-1',
     })
     .asResponse();
-  // @ts-expect-error this doesn't work with "moduleResolution": "node"
   response.body;
 }
