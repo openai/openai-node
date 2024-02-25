@@ -119,7 +119,7 @@ async function main() {
   });
 
   stream.on('chunk', (delta, snapshot) => {
-    process.stdout.write(chunk.choices[0]?.delta?.content || '');
+    process.stdout.write(delta.choices[0]?.delta?.content || '');
   });
 
   // or, equivalently:
