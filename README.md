@@ -118,8 +118,8 @@ async function main() {
     stream: true,
   });
 
-  stream.on('chunk', (delta, snapshot) => {
-    process.stdout.write(delta.choices[0]?.delta?.content || '');
+  stream.on('chunk', (chunk, snapshot) => {
+    process.stdout.write(chunk.choices[0]?.delta?.content || '');
   });
 
   // or, equivalently:
