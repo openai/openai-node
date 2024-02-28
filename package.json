@@ -1,12 +1,12 @@
 {
-  "name": "openai",
+  "name": "@cognos/openai",
   "version": "4.28.3",
-  "description": "The official TypeScript library for the OpenAI API",
-  "author": "OpenAI <support@openai.com>",
+  "description": "A fork of the official TypeScript library for the OpenAI API to provide additional Cognos functionality",
+  "author": "Cognos <support@cognos.io>",
   "types": "dist/index.d.ts",
   "main": "dist/index.js",
   "type": "commonjs",
-  "repository": "github:openai/openai-node",
+  "repository": "github:cognos-io/openai-node",
   "license": "Apache-2.0",
   "packageManager": "yarn@1.22.21",
   "files": [
