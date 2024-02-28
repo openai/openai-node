@@ -1,5 +1,24 @@
 # Changelog
 
+## 4.28.4 (2024-02-28)
+
+Full Changelog: [v4.28.3...v4.28.4](https://github.com/openai/openai-node/compare/v4.28.3...v4.28.4)
+
+### Features
+
+* **api:** add wav and pcm to response_format ([#691](https://github.com/openai/openai-node/issues/691)) ([b1c6171](https://github.com/openai/openai-node/commit/b1c61711961a62a4d7b47909a68ecd65231a66af))
+
+
+### Chores
+
+* **ci:** update actions/setup-node action to v4 ([#685](https://github.com/openai/openai-node/issues/685)) ([f2704d5](https://github.com/openai/openai-node/commit/f2704d5f1580c0f1d31584ef88702cde8f6804d4))
+* **internal:** fix ecosystem tests ([#693](https://github.com/openai/openai-node/issues/693)) ([616624d](https://github.com/openai/openai-node/commit/616624d3d9fd10ce254ce0d435b2b73ed11679f2))
+* **types:** extract run status to a named type ([#686](https://github.com/openai/openai-node/issues/686)) ([b3b3b8e](https://github.com/openai/openai-node/commit/b3b3b8ea20e0f311d3bd53dfd22ccc04f5dce5f7))
+* update @types/react to 18.2.58, @types/react-dom to 18.2.19 ([#688](https://github.com/openai/openai-node/issues/688)) ([2a0d0b1](https://github.com/openai/openai-node/commit/2a0d0b1cb197eef25e42bbba88ee90c37d623f24))
+* update dependency @types/node to v20.11.20 ([#690](https://github.com/openai/openai-node/issues/690)) ([4ca005b](https://github.com/openai/openai-node/commit/4ca005be082d6c50fe95da6148896b62080bfe07))
+* update dependency @types/ws to v8.5.10 ([#683](https://github.com/openai/openai-node/issues/683)) ([a617268](https://github.com/openai/openai-node/commit/a6172683a3390422984ad282ac4940781493e772))
+* update dependency next to v13.5.6 ([#689](https://github.com/openai/openai-node/issues/689)) ([abb3b66](https://github.com/openai/openai-node/commit/abb3b6674b8f9f8ff9c2cc61629a31883ae4d8c8))
+
 ## 4.28.3 (2024-02-20)
 
 Full Changelog: [v4.28.2...v4.28.3](https://github.com/openai/openai-node/compare/v4.28.2...v4.28.3)
