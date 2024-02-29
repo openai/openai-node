@@ -4,18 +4,42 @@ import * as Core from 'openai/core';
 import { APIResource } from 'openai/resource';
 import * as TranslationsAPI from 'openai/resources/audio/translations';
 import { type Uploadable, multipartFormRequestOptions } from 'openai/core';
+import { WhisperSegment } from './types';
 
 export class Translations extends APIResource {
   /**
    * Translates audio into English.
    */
-  create(body: TranslationCreateParams, options?: Core.RequestOptions): Core.APIPromise<Translation> {
+  create(
+    body: TranslationCreateParams & { response_format: 'json' },
+    options?: Core.RequestOptions,
+  ): Core.APIPromise<Translation>;
+  create(
+    body: TranslationCreateParams & { response_format: 'verbose_json' },
+    options?: Core.RequestOptions,
+  ): Core.APIPromise<VerboseTranslation>;
+  create(
+    body: TranslationCreateParams & { response_format: 'srt' | 'text' | 'vtt' },
+    options?: Core.RequestOptions,
+  ): Core.APIPromise<string>;
+  create(
+    body: TranslationCreateParams,
+    options?: Core.RequestOptions,
+  ): Core.APIPromise<Translation | VerboseTranslation | string> {
     return this._client.post('/audio/translations', multipartFormRequestOptions({ body, ...options }));
   }
 }
 
 export interface Translation {
   text: string;
+}
+
+export interface VerboseTranslation extends Translation {
+  text: string;
+  task: 'translate';
+  language: string;
+  duration: number;
+  segments: WhisperSegment[];
 }
 
 export interface TranslationCreateParams {
