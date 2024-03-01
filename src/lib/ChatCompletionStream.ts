@@ -210,13 +210,16 @@ export class ChatCompletionStream
 
   [Symbol.asyncIterator](): AsyncIterator<ChatCompletionChunk> {
     const pushQueue: ChatCompletionChunk[] = [];
-    const readQueue: ((chunk: ChatCompletionChunk | undefined) => void)[] = [];
+    const readQueue: {
+      resolve: (chunk: ChatCompletionChunk | undefined) => void;
+      reject: (err: unknown) => void;
+    }[] = [];
     let done = false;
 
     this.on('chunk', (chunk) => {
       const reader = readQueue.shift();
       if (reader) {
-        reader(chunk);
+        reader.resolve(chunk);
       } else {
         pushQueue.push(chunk);
       }
@@ -225,7 +228,23 @@ export class ChatCompletionStream
     this.on('end', () => {
       done = true;
       for (const reader of readQueue) {
-        reader(undefined);
+        reader.resolve(undefined);
+      }
+      readQueue.length = 0;
+    });
+
+    this.on('abort', (err) => {
+      done = true;
+      for (const reader of readQueue) {
+        reader.reject(err);
+      }
+      readQueue.length = 0;
+    });
+
+    this.on('error', (err) => {
+      done = true;
+      for (const reader of readQueue) {
+        reader.reject(err);
       }
       readQueue.length = 0;
     });
@@ -236,12 +255,16 @@ export class ChatCompletionStream
           if (done) {
             return { value: undefined, done: true };
           }
-          return new Promise<ChatCompletionChunk | undefined>((resolve) => readQueue.push(resolve)).then(
-            (chunk) => (chunk ? { value: chunk, done: false } : { value: undefined, done: true }),
-          );
+          return new Promise<ChatCompletionChunk | undefined>((resolve, reject) =>
+            readQueue.push({ resolve, reject }),
+          ).then((chunk) => (chunk ? { value: chunk, done: false } : { value: undefined, done: true }));
         }
         const chunk = pushQueue.shift()!;
         return { value: chunk, done: false };
+      },
+      return: async () => {
+        this.abort();
+        return { value: undefined, done: true };
       },
     };
   }
