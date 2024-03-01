@@ -43,6 +43,8 @@ To install via git:
 
 ```bash
 npm install --save git+ssh://git@github.com:openai/openai-node.git
+# or
+yarn add git+ssh://git@github.com:openai/openai-node.git
 ```
 
 Alternatively, to link a local copy of the repo:
