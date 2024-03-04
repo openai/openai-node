@@ -275,7 +275,7 @@ a subclass of `APIError` will be thrown:
 async function main() {
   const job = await openai.fineTuning.jobs
     .create({ model: 'gpt-3.5-turbo', training_file: 'file-abc123' })
-    .catch((err) => {
+    .catch(async (err) => {
       if (err instanceof OpenAI.APIError) {
         console.log(err.status); // 400
         console.log(err.name); // BadRequestError
