@@ -14,7 +14,14 @@ export class Transcriptions extends APIResource {
   }
 }
 
+/**
+ * Represents a transcription response returned by model, based on the provided
+ * input.
+ */
 export interface Transcription {
+  /**
+   * The transcribed text.
+   */
   text: string;
 }
 
@@ -26,7 +33,8 @@ export interface TranscriptionCreateParams {
   file: Uploadable;
 
   /**
-   * ID of the model to use. Only `whisper-1` is currently available.
+   * ID of the model to use. Only `whisper-1` (which is powered by our open source
+   * Whisper V2 model) is currently available.
    */
   model: (string & {}) | 'whisper-1';
 
@@ -61,9 +69,11 @@ export interface TranscriptionCreateParams {
   temperature?: number;
 
   /**
-   * The timestamp granularities to populate for this transcription. Any of these
-   * options: `word`, or `segment`. Note: There is no additional latency for segment
-   * timestamps, but generating word timestamps incurs additional latency.
+   * The timestamp granularities to populate for this transcription.
+   * `response_format` must be set `verbose_json` to use timestamp granularities.
+   * Either or both of these options are supported: `word`, or `segment`. Note: There
+   * is no additional latency for segment timestamps, but generating word timestamps
+   * incurs additional latency.
    */
   timestamp_granularities?: Array<'word' | 'segment'>;
 }
