@@ -546,7 +546,9 @@ export interface ChatCompletionTokenLogprob {
   bytes: Array<number> | null;
 
   /**
-   * The log probability of this token.
+   * The log probability of this token, if it is within the top 20 most likely
+   * tokens. Otherwise, the value `-9999.0` is used to signify that the token is very
+   * unlikely.
    */
   logprob: number;
 
@@ -574,7 +576,9 @@ export namespace ChatCompletionTokenLogprob {
     bytes: Array<number> | null;
 
     /**
-     * The log probability of this token.
+     * The log probability of this token, if it is within the top 20 most likely
+     * tokens. Otherwise, the value `-9999.0` is used to signify that the token is very
+     * unlikely.
      */
     logprob: number;
   }
@@ -827,9 +831,9 @@ export interface ChatCompletionCreateParamsBase {
   tools?: Array<ChatCompletionTool>;
 
   /**
-   * An integer between 0 and 5 specifying the number of most likely tokens to return
-   * at each token position, each with an associated log probability. `logprobs` must
-   * be set to `true` if this parameter is used.
+   * An integer between 0 and 20 specifying the number of most likely tokens to
+   * return at each token position, each with an associated log probability.
+   * `logprobs` must be set to `true` if this parameter is used.
    */
   top_logprobs?: number | null;
 
