@@ -11,10 +11,7 @@ To learn how to use the OpenAI API, check out our [API Reference](https://platfo
 ## Installation
 
 ```sh
-# install from NPM
-npm install --save openai
-# or
-yarn add openai
+npm install openai
 ```
 
 You can import in Deno via:
