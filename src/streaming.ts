@@ -267,7 +267,7 @@ class SSEDecoder {
  *
  * https://github.com/encode/httpx/blob/920333ea98118e9cf617f246905d7b202510941c/httpx/_decoders.py#L258
  */
-class LineDecoder {
+export class LineDecoder {
   // prettier-ignore
   static NEWLINE_CHARS = new Set(['\n', '\r', '\x0b', '\x0c', '\x1c', '\x1d', '\x1e', '\x85', '\u2028', '\u2029']);
   static NEWLINE_REGEXP = /\r\n|[\n\r\x0b\x0c\x1c\x1d\x1e\x85\u2028\u2029]/g;
@@ -299,6 +299,12 @@ class LineDecoder {
 
     const trailingNewline = LineDecoder.NEWLINE_CHARS.has(text[text.length - 1] || '');
     let lines = text.split(LineDecoder.NEWLINE_REGEXP);
+
+    // if there is a trailing new line then the last entry will be an empty
+    // string which we don't care about
+    if (trailingNewline) {
+      lines.pop();
+    }
 
     if (lines.length === 1 && !trailingNewline) {
       this.buffer.push(lines[0]!);
