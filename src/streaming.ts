@@ -267,7 +267,7 @@ class SSEDecoder {
  *
  * https://github.com/encode/httpx/blob/920333ea98118e9cf617f246905d7b202510941c/httpx/_decoders.py#L258
  */
-export class LineDecoder {
+class LineDecoder {
   // prettier-ignore
   static NEWLINE_CHARS = new Set(['\n', '\r', '\x0b', '\x0c', '\x1c', '\x1d', '\x1e', '\x85', '\u2028', '\u2029']);
   static NEWLINE_REGEXP = /\r\n|[\n\r\x0b\x0c\x1c\x1d\x1e\x85\u2028\u2029]/g;
@@ -370,6 +370,17 @@ export class LineDecoder {
     this.trailingCR = false;
     return lines;
   }
+}
+
+/** This is an internal helper function that's just used for testing */
+export function _decodeChunks(chunks: string[]): string[] {
+  const decoder = new LineDecoder();
+  const lines = [];
+  for (const chunk of chunks) {
+    lines.push(...decoder.decode(chunk));
+  }
+
+  return lines;
 }
 
 function partition(str: string, delimiter: string): [string, string, string] {
