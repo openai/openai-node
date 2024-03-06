@@ -1,17 +1,4 @@
-import { LineDecoder } from 'openai/streaming';
-
-function decodeChunks(chunks: string[], decoder?: LineDecoder): string[] {
-  if (!decoder) {
-    decoder = new LineDecoder();
-  }
-
-  const lines = [];
-  for (const chunk of chunks) {
-    lines.push(...decoder.decode(chunk));
-  }
-
-  return lines;
-}
+import { _decodeChunks as decodeChunks } from 'openai/streaming';
 
 describe('line decoder', () => {
   test('basic', () => {
