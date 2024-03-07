@@ -375,7 +375,7 @@ class LineDecoder {
 /** This is an internal helper function that's just used for testing */
 export function _decodeChunks(chunks: string[]): string[] {
   const decoder = new LineDecoder();
-  const lines = [];
+  const lines: string[] = [];
   for (const chunk of chunks) {
     lines.push(...decoder.decode(chunk));
   }
