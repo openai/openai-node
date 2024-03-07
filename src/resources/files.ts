@@ -154,14 +154,14 @@ export interface FileObject {
   purpose: 'fine-tune' | 'fine-tune-results' | 'assistants' | 'assistants_output';
 
   /**
-   * Deprecated. The current status of the file, which can be either `uploaded`,
-   * `processed`, or `error`.
+   * @deprecated: Deprecated. The current status of the file, which can be either
+   * `uploaded`, `processed`, or `error`.
    */
   status: 'uploaded' | 'processed' | 'error';
 
   /**
-   * Deprecated. For details on why a fine-tuning training file failed validation,
-   * see the `error` field on `fine_tuning.job`.
+   * @deprecated: Deprecated. For details on why a fine-tuning training file failed
+   * validation, see the `error` field on `fine_tuning.job`.
    */
   status_details?: string;
 }
