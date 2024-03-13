@@ -17,7 +17,7 @@ export class Messages extends APIResource {
     threadId: string,
     body: MessageCreateParams,
     options?: Core.RequestOptions,
-  ): Core.APIPromise<ThreadMessage> {
+  ): Core.APIPromise<Message> {
     return this._client.post(`/threads/${threadId}/messages`, {
       body,
       ...options,
@@ -28,11 +28,7 @@ export class Messages extends APIResource {
   /**
    * Retrieve a message.
    */
-  retrieve(
-    threadId: string,
-    messageId: string,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<ThreadMessage> {
+  retrieve(threadId: string, messageId: string, options?: Core.RequestOptions): Core.APIPromise<Message> {
     return this._client.get(`/threads/${threadId}/messages/${messageId}`, {
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
@@ -47,7 +43,7 @@ export class Messages extends APIResource {
     messageId: string,
     body: MessageUpdateParams,
     options?: Core.RequestOptions,
-  ): Core.APIPromise<ThreadMessage> {
+  ): Core.APIPromise<Message> {
     return this._client.post(`/threads/${threadId}/messages/${messageId}`, {
       body,
       ...options,
@@ -62,17 +58,17 @@ export class Messages extends APIResource {
     threadId: string,
     query?: MessageListParams,
     options?: Core.RequestOptions,
-  ): Core.PagePromise<ThreadMessagesPage, ThreadMessage>;
-  list(threadId: string, options?: Core.RequestOptions): Core.PagePromise<ThreadMessagesPage, ThreadMessage>;
+  ): Core.PagePromise<MessagesPage, Message>;
+  list(threadId: string, options?: Core.RequestOptions): Core.PagePromise<MessagesPage, Message>;
   list(
     threadId: string,
     query: MessageListParams | Core.RequestOptions = {},
     options?: Core.RequestOptions,
-  ): Core.PagePromise<ThreadMessagesPage, ThreadMessage> {
+  ): Core.PagePromise<MessagesPage, Message> {
     if (isRequestOptions(query)) {
       return this.list(threadId, {}, query);
     }
-    return this._client.getAPIList(`/threads/${threadId}/messages`, ThreadMessagesPage, {
+    return this._client.getAPIList(`/threads/${threadId}/messages`, MessagesPage, {
       query,
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
@@ -80,14 +76,182 @@ export class Messages extends APIResource {
   }
 }
 
-export class ThreadMessagesPage extends CursorPage<ThreadMessage> {}
+export class MessagesPage extends CursorPage<Message> {}
+
+/**
+ * A citation within the message that points to a specific quote from a specific
+ * File associated with the assistant or the message. Generated when the assistant
+ * uses the "retrieval" tool to search files.
+ */
+export type Annotation = FileCitationAnnotation | FilePathAnnotation;
+
+/**
+ * A citation within the message that points to a specific quote from a specific
+ * File associated with the assistant or the message. Generated when the assistant
+ * uses the "retrieval" tool to search files.
+ */
+export type AnnotationDelta = FileCitationDeltaAnnotation | FilePathDeltaAnnotation;
+
+/**
+ * A citation within the message that points to a specific quote from a specific
+ * File associated with the assistant or the message. Generated when the assistant
+ * uses the "retrieval" tool to search files.
+ */
+export interface FileCitationAnnotation {
+  end_index: number;
+
+  file_citation: FileCitationAnnotation.FileCitation;
+
+  start_index: number;
+
+  /**
+   * The text in the message content that needs to be replaced.
+   */
+  text: string;
+
+  /**
+   * Always `file_citation`.
+   */
+  type: 'file_citation';
+}
+
+export namespace FileCitationAnnotation {
+  export interface FileCitation {
+    /**
+     * The ID of the specific File the citation is from.
+     */
+    file_id: string;
+
+    /**
+     * The specific quote in the file.
+     */
+    quote: string;
+  }
+}
+
+/**
+ * A citation within the message that points to a specific quote from a specific
+ * File associated with the assistant or the message. Generated when the assistant
+ * uses the "retrieval" tool to search files.
+ */
+export interface FileCitationDeltaAnnotation {
+  /**
+   * The index of the annotation in the text content part.
+   */
+  index: number;
+
+  /**
+   * Always `file_citation`.
+   */
+  type: 'file_citation';
+
+  end_index?: number;
+
+  file_citation?: FileCitationDeltaAnnotation.FileCitation;
+
+  start_index?: number;
+
+  /**
+   * The text in the message content that needs to be replaced.
+   */
+  text?: string;
+}
+
+export namespace FileCitationDeltaAnnotation {
+  export interface FileCitation {
+    /**
+     * The ID of the specific File the citation is from.
+     */
+    file_id?: string;
+
+    /**
+     * The specific quote in the file.
+     */
+    quote?: string;
+  }
+}
+
+/**
+ * A URL for the file that's generated when the assistant used the
+ * `code_interpreter` tool to generate a file.
+ */
+export interface FilePathAnnotation {
+  end_index: number;
+
+  file_path: FilePathAnnotation.FilePath;
+
+  start_index: number;
+
+  /**
+   * The text in the message content that needs to be replaced.
+   */
+  text: string;
+
+  /**
+   * Always `file_path`.
+   */
+  type: 'file_path';
+}
+
+export namespace FilePathAnnotation {
+  export interface FilePath {
+    /**
+     * The ID of the file that was generated.
+     */
+    file_id: string;
+  }
+}
+
+/**
+ * A URL for the file that's generated when the assistant used the
+ * `code_interpreter` tool to generate a file.
+ */
+export interface FilePathDeltaAnnotation {
+  /**
+   * The index of the annotation in the text content part.
+   */
+  index: number;
+
+  /**
+   * Always `file_path`.
+   */
+  type: 'file_path';
+
+  end_index?: number;
+
+  file_path?: FilePathDeltaAnnotation.FilePath;
+
+  start_index?: number;
+
+  /**
+   * The text in the message content that needs to be replaced.
+   */
+  text?: string;
+}
+
+export namespace FilePathDeltaAnnotation {
+  export interface FilePath {
+    /**
+     * The ID of the file that was generated.
+     */
+    file_id?: string;
+  }
+}
+
+export interface ImageFile {
+  /**
+   * The [File](https://platform.openai.com/docs/api-reference/files) ID of the image
+   * in the message content.
+   */
+  file_id: string;
+}
 
 /**
  * References an image [File](https://platform.openai.com/docs/api-reference/files)
  * in the content of a message.
  */
-export interface MessageContentImageFile {
-  image_file: MessageContentImageFile.ImageFile;
+export interface ImageFileContentBlock {
+  image_file: ImageFile;
 
   /**
    * Always `image_file`.
@@ -95,114 +259,37 @@ export interface MessageContentImageFile {
   type: 'image_file';
 }
 
-export namespace MessageContentImageFile {
-  export interface ImageFile {
-    /**
-     * The [File](https://platform.openai.com/docs/api-reference/files) ID of the image
-     * in the message content.
-     */
-    file_id: string;
-  }
+export interface ImageFileDelta {
+  /**
+   * The [File](https://platform.openai.com/docs/api-reference/files) ID of the image
+   * in the message content.
+   */
+  file_id?: string;
 }
 
 /**
- * The text content that is part of a message.
+ * References an image [File](https://platform.openai.com/docs/api-reference/files)
+ * in the content of a message.
  */
-export interface MessageContentText {
-  text: MessageContentText.Text;
+export interface ImageFileDeltaBlock {
+  /**
+   * The index of the content part in the message.
+   */
+  index: number;
 
   /**
-   * Always `text`.
+   * Always `image_file`.
    */
-  type: 'text';
-}
+  type: 'image_file';
 
-export namespace MessageContentText {
-  export interface Text {
-    annotations: Array<Text.FileCitation | Text.FilePath>;
-
-    /**
-     * The data that makes up the text.
-     */
-    value: string;
-  }
-
-  export namespace Text {
-    /**
-     * A citation within the message that points to a specific quote from a specific
-     * File associated with the assistant or the message. Generated when the assistant
-     * uses the "retrieval" tool to search files.
-     */
-    export interface FileCitation {
-      end_index: number;
-
-      file_citation: FileCitation.FileCitation;
-
-      start_index: number;
-
-      /**
-       * The text in the message content that needs to be replaced.
-       */
-      text: string;
-
-      /**
-       * Always `file_citation`.
-       */
-      type: 'file_citation';
-    }
-
-    export namespace FileCitation {
-      export interface FileCitation {
-        /**
-         * The ID of the specific File the citation is from.
-         */
-        file_id: string;
-
-        /**
-         * The specific quote in the file.
-         */
-        quote: string;
-      }
-    }
-
-    /**
-     * A URL for the file that's generated when the assistant used the
-     * `code_interpreter` tool to generate a file.
-     */
-    export interface FilePath {
-      end_index: number;
-
-      file_path: FilePath.FilePath;
-
-      start_index: number;
-
-      /**
-       * The text in the message content that needs to be replaced.
-       */
-      text: string;
-
-      /**
-       * Always `file_path`.
-       */
-      type: 'file_path';
-    }
-
-    export namespace FilePath {
-      export interface FilePath {
-        /**
-         * The ID of the file that was generated.
-         */
-        file_id: string;
-      }
-    }
-  }
+  image_file?: ImageFileDelta;
 }
 
 /**
  * Represents a message within a
  * [thread](https://platform.openai.com/docs/api-reference/threads).
  */
-export interface ThreadMessage {
+export interface Message {
   /**
    * The identifier, which can be referenced in API endpoints.
    */
@@ -216,9 +303,14 @@ export interface ThreadMessage {
   assistant_id: string | null;
 
   /**
+   * The Unix timestamp (in seconds) for when the message was completed.
+   */
+  completed_at: number | null;
+
+  /**
    * The content of the message in array of text and/or images.
    */
-  content: Array<MessageContentImageFile | MessageContentText>;
+  content: Array<MessageContent>;
 
   /**
    * The Unix timestamp (in seconds) for when the message was created.
@@ -231,6 +323,16 @@ export interface ThreadMessage {
    * that can access files. A maximum of 10 files can be attached to a message.
    */
   file_ids: Array<string>;
+
+  /**
+   * The Unix timestamp (in seconds) for when the message was marked as incomplete.
+   */
+  incomplete_at: number | null;
+
+  /**
+   * On an incomplete message, details about why the message is incomplete.
+   */
+  incomplete_details: Message.IncompleteDetails | null;
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
@@ -258,18 +360,138 @@ export interface ThreadMessage {
   run_id: string | null;
 
   /**
+   * The status of the message, which can be either `in_progress`, `incomplete`, or
+   * `completed`.
+   */
+  status: 'in_progress' | 'incomplete' | 'completed';
+
+  /**
    * The [thread](https://platform.openai.com/docs/api-reference/threads) ID that
    * this message belongs to.
    */
   thread_id: string;
 }
 
-export interface ThreadMessageDeleted {
+export namespace Message {
+  /**
+   * On an incomplete message, details about why the message is incomplete.
+   */
+  export interface IncompleteDetails {
+    /**
+     * The reason the message is incomplete.
+     */
+    reason: 'content_filter' | 'max_tokens' | 'run_cancelled' | 'run_expired' | 'run_failed';
+  }
+}
+
+/**
+ * References an image [File](https://platform.openai.com/docs/api-reference/files)
+ * in the content of a message.
+ */
+export type MessageContent = ImageFileContentBlock | TextContentBlock;
+
+/**
+ * References an image [File](https://platform.openai.com/docs/api-reference/files)
+ * in the content of a message.
+ */
+export type MessageContentDelta = ImageFileDeltaBlock | TextDeltaBlock;
+
+export interface MessageDeleted {
   id: string;
 
   deleted: boolean;
 
   object: 'thread.message.deleted';
+}
+
+/**
+ * The delta containing the fields that have changed on the Message.
+ */
+export interface MessageDelta {
+  /**
+   * The content of the message in array of text and/or images.
+   */
+  content?: Array<MessageContentDelta>;
+
+  /**
+   * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs that
+   * the assistant should use. Useful for tools like retrieval and code_interpreter
+   * that can access files. A maximum of 10 files can be attached to a message.
+   */
+  file_ids?: Array<string>;
+
+  /**
+   * The entity that produced the message. One of `user` or `assistant`.
+   */
+  role?: 'user' | 'assistant';
+}
+
+/**
+ * Represents a message delta i.e. any changed fields on a message during
+ * streaming.
+ */
+export interface MessageDeltaEvent {
+  /**
+   * The identifier of the message, which can be referenced in API endpoints.
+   */
+  id: string;
+
+  /**
+   * The delta containing the fields that have changed on the Message.
+   */
+  delta: MessageDelta;
+
+  /**
+   * The object type, which is always `thread.message.delta`.
+   */
+  object: 'thread.message.delta';
+}
+
+export interface Text {
+  annotations: Array<Annotation>;
+
+  /**
+   * The data that makes up the text.
+   */
+  value: string;
+}
+
+/**
+ * The text content that is part of a message.
+ */
+export interface TextContentBlock {
+  text: Text;
+
+  /**
+   * Always `text`.
+   */
+  type: 'text';
+}
+
+export interface TextDelta {
+  annotations?: Array<AnnotationDelta>;
+
+  /**
+   * The data that makes up the text.
+   */
+  value?: string;
+}
+
+/**
+ * The text content that is part of a message.
+ */
+export interface TextDeltaBlock {
+  /**
+   * The index of the content part in the message.
+   */
+  index: number;
+
+  /**
+   * Always `text`.
+   */
+  type: 'text';
+
+  text?: TextDelta;
 }
 
 export interface MessageCreateParams {
@@ -328,11 +550,27 @@ export interface MessageListParams extends CursorPageParams {
 }
 
 export namespace Messages {
-  export import MessageContentImageFile = MessagesAPI.MessageContentImageFile;
-  export import MessageContentText = MessagesAPI.MessageContentText;
-  export import ThreadMessage = MessagesAPI.ThreadMessage;
-  export import ThreadMessageDeleted = MessagesAPI.ThreadMessageDeleted;
-  export import ThreadMessagesPage = MessagesAPI.ThreadMessagesPage;
+  export import Annotation = MessagesAPI.Annotation;
+  export import AnnotationDelta = MessagesAPI.AnnotationDelta;
+  export import FileCitationAnnotation = MessagesAPI.FileCitationAnnotation;
+  export import FileCitationDeltaAnnotation = MessagesAPI.FileCitationDeltaAnnotation;
+  export import FilePathAnnotation = MessagesAPI.FilePathAnnotation;
+  export import FilePathDeltaAnnotation = MessagesAPI.FilePathDeltaAnnotation;
+  export import ImageFile = MessagesAPI.ImageFile;
+  export import ImageFileContentBlock = MessagesAPI.ImageFileContentBlock;
+  export import ImageFileDelta = MessagesAPI.ImageFileDelta;
+  export import ImageFileDeltaBlock = MessagesAPI.ImageFileDeltaBlock;
+  export import Message = MessagesAPI.Message;
+  export import MessageContent = MessagesAPI.MessageContent;
+  export import MessageContentDelta = MessagesAPI.MessageContentDelta;
+  export import MessageDeleted = MessagesAPI.MessageDeleted;
+  export import MessageDelta = MessagesAPI.MessageDelta;
+  export import MessageDeltaEvent = MessagesAPI.MessageDeltaEvent;
+  export import Text = MessagesAPI.Text;
+  export import TextContentBlock = MessagesAPI.TextContentBlock;
+  export import TextDelta = MessagesAPI.TextDelta;
+  export import TextDeltaBlock = MessagesAPI.TextDeltaBlock;
+  export import MessagesPage = MessagesAPI.MessagesPage;
   export import MessageCreateParams = MessagesAPI.MessageCreateParams;
   export import MessageUpdateParams = MessagesAPI.MessageUpdateParams;
   export import MessageListParams = MessagesAPI.MessageListParams;

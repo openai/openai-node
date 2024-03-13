@@ -1,12 +1,16 @@
 // File generated from our OpenAPI spec by Stainless.
 
 import * as Core from 'openai/core';
+import { APIPromise } from 'openai/core';
 import { APIResource } from 'openai/resource';
 import { isRequestOptions } from 'openai/core';
+import { AssistantStream, RunCreateParamsBaseStream } from 'openai/lib/AssistantStream';
+import { RunSubmitToolOutputsParamsStream } from 'openai/lib/AssistantStream';
 import * as RunsAPI from 'openai/resources/beta/threads/runs/runs';
-import * as Shared from 'openai/resources/shared';
+import * as AssistantsAPI from 'openai/resources/beta/assistants/assistants';
 import * as StepsAPI from 'openai/resources/beta/threads/runs/steps';
 import { CursorPage, type CursorPageParams } from 'openai/pagination';
+import { Stream } from 'openai/streaming';
 
 export class Runs extends APIResource {
   steps: StepsAPI.Steps = new StepsAPI.Steps(this._client);
@@ -14,12 +18,28 @@ export class Runs extends APIResource {
   /**
    * Create a run.
    */
-  create(threadId: string, body: RunCreateParams, options?: Core.RequestOptions): Core.APIPromise<Run> {
+  create(threadId: string, body: RunCreateParamsNonStreaming, options?: Core.RequestOptions): APIPromise<Run>;
+  create(
+    threadId: string,
+    body: RunCreateParamsStreaming,
+    options?: Core.RequestOptions,
+  ): APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
+  create(
+    threadId: string,
+    body: RunCreateParamsBase,
+    options?: Core.RequestOptions,
+  ): APIPromise<Stream<AssistantsAPI.AssistantStreamEvent> | Run>;
+  create(
+    threadId: string,
+    body: RunCreateParams,
+    options?: Core.RequestOptions,
+  ): APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>> {
     return this._client.post(`/threads/${threadId}/runs`, {
       body,
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
-    });
+      stream: body.stream ?? false,
+    }) as APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
   }
 
   /**
@@ -83,6 +103,17 @@ export class Runs extends APIResource {
   }
 
   /**
+   * Create a Run stream
+   */
+  createAndStream(
+    threadId: string,
+    body: RunCreateParamsBaseStream,
+    options?: Core.RequestOptions,
+  ): AssistantStream {
+    return AssistantStream.createAssistantStream(threadId, this._client.beta.threads.runs, body, options);
+  }
+
+  /**
    * When a run has the `status: "requires_action"` and `required_action.type` is
    * `submit_tool_outputs`, this endpoint can be used to submit the outputs from the
    * tool calls once they're all completed. All outputs must be submitted in a single
@@ -91,14 +122,52 @@ export class Runs extends APIResource {
   submitToolOutputs(
     threadId: string,
     runId: string,
+    body: RunSubmitToolOutputsParamsNonStreaming,
+    options?: Core.RequestOptions,
+  ): APIPromise<Run>;
+  submitToolOutputs(
+    threadId: string,
+    runId: string,
+    body: RunSubmitToolOutputsParamsStreaming,
+    options?: Core.RequestOptions,
+  ): APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
+  submitToolOutputs(
+    threadId: string,
+    runId: string,
+    body: RunSubmitToolOutputsParamsBase,
+    options?: Core.RequestOptions,
+  ): APIPromise<Stream<AssistantsAPI.AssistantStreamEvent> | Run>;
+  submitToolOutputs(
+    threadId: string,
+    runId: string,
     body: RunSubmitToolOutputsParams,
     options?: Core.RequestOptions,
-  ): Core.APIPromise<Run> {
+  ): APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>> {
     return this._client.post(`/threads/${threadId}/runs/${runId}/submit_tool_outputs`, {
       body,
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
-    });
+      stream: body.stream ?? false,
+    }) as APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
+  }
+
+  /**
+   * Submit the tool outputs from a previous run and stream the run to a terminal
+   * state.
+   */
+  submitToolOutputsStream(
+    threadId: string,
+    runId: string,
+    body: RunSubmitToolOutputsParamsStream,
+    options?: Core.RequestOptions,
+  ): AssistantStream {
+    return AssistantStream.createToolAssistantStream(
+      threadId,
+      runId,
+      this._client.beta.threads.runs,
+      body,
+      options,
+    );
   }
 }
 
@@ -180,7 +249,7 @@ export interface Run {
   /**
    * The Unix timestamp (in seconds) for when the run will expire.
    */
-  expires_at: number;
+  expires_at: number | null;
 
   /**
    * The Unix timestamp (in seconds) for when the run failed.
@@ -255,7 +324,7 @@ export interface Run {
    * [assistant](https://platform.openai.com/docs/api-reference/assistants) used for
    * this run.
    */
-  tools: Array<Run.AssistantToolsCode | Run.AssistantToolsRetrieval | Run.AssistantToolsFunction>;
+  tools: Array<AssistantsAPI.AssistantTool>;
 
   /**
    * Usage statistics related to the run. This value will be `null` if the run is not
@@ -308,29 +377,6 @@ export namespace Run {
     }
   }
 
-  export interface AssistantToolsCode {
-    /**
-     * The type of tool being defined: `code_interpreter`
-     */
-    type: 'code_interpreter';
-  }
-
-  export interface AssistantToolsRetrieval {
-    /**
-     * The type of tool being defined: `retrieval`
-     */
-    type: 'retrieval';
-  }
-
-  export interface AssistantToolsFunction {
-    function: Shared.FunctionDefinition;
-
-    /**
-     * The type of tool being defined: `function`
-     */
-    type: 'function';
-  }
-
   /**
    * Usage statistics related to the run. This value will be `null` if the run is not
    * in a terminal state (i.e. `in_progress`, `queued`, etc.).
@@ -368,7 +414,110 @@ export type RunStatus =
   | 'completed'
   | 'expired';
 
-export interface RunCreateParams {
+export type RunCreateParams = RunCreateParamsNonStreaming | RunCreateParamsStreaming;
+
+export interface RunCreateParamsBase {
+  /**
+   * The ID of the
+   * [assistant](https://platform.openai.com/docs/api-reference/assistants) to use to
+   * execute this run.
+   */
+  assistant_id: string;
+
+  /**
+   * Appends additional instructions at the end of the instructions for the run. This
+   * is useful for modifying the behavior on a per-run basis without overriding other
+   * instructions.
+   */
+  additional_instructions?: string | null;
+
+  /**
+   * Overrides the
+   * [instructions](https://platform.openai.com/docs/api-reference/assistants/createAssistant)
+   * of the assistant. This is useful for modifying the behavior on a per-run basis.
+   */
+  instructions?: string | null;
+
+  /**
+   * Set of 16 key-value pairs that can be attached to an object. This can be useful
+   * for storing additional information about the object in a structured format. Keys
+   * can be a maximum of 64 characters long and values can be a maxium of 512
+   * characters long.
+   */
+  metadata?: unknown | null;
+
+  /**
+   * The ID of the [Model](https://platform.openai.com/docs/api-reference/models) to
+   * be used to execute this run. If a value is provided here, it will override the
+   * model associated with the assistant. If not, the model associated with the
+   * assistant will be used.
+   */
+  model?: string | null;
+
+  /**
+   * If `true`, returns a stream of events that happen during the Run as server-sent
+   * events, terminating when the Run enters a terminal state with a `data: [DONE]`
+   * message.
+   */
+  stream?: boolean | null;
+
+  /**
+   * Override the tools the assistant can use for this run. This is useful for
+   * modifying the behavior on a per-run basis.
+   */
+  tools?: Array<AssistantsAPI.AssistantTool> | null;
+}
+
+export namespace RunCreateParams {
+  export type RunCreateParamsNonStreaming = RunsAPI.RunCreateParamsNonStreaming;
+  export type RunCreateParamsStreaming = RunsAPI.RunCreateParamsStreaming;
+}
+
+export interface RunCreateParamsNonStreaming extends RunCreateParamsBase {
+  /**
+   * If `true`, returns a stream of events that happen during the Run as server-sent
+   * events, terminating when the Run enters a terminal state with a `data: [DONE]`
+   * message.
+   */
+  stream?: false | null;
+}
+
+export interface RunCreateParamsStreaming extends RunCreateParamsBase {
+  /**
+   * If `true`, returns a stream of events that happen during the Run as server-sent
+   * events, terminating when the Run enters a terminal state with a `data: [DONE]`
+   * message.
+   */
+  stream: true;
+}
+
+export interface RunUpdateParams {
+  /**
+   * Set of 16 key-value pairs that can be attached to an object. This can be useful
+   * for storing additional information about the object in a structured format. Keys
+   * can be a maximum of 64 characters long and values can be a maxium of 512
+   * characters long.
+   */
+  metadata?: unknown | null;
+}
+
+export interface RunListParams extends CursorPageParams {
+  /**
+   * A cursor for use in pagination. `before` is an object ID that defines your place
+   * in the list. For instance, if you make a list request and receive 100 objects,
+   * ending with obj_foo, your subsequent call can include before=obj_foo in order to
+   * fetch the previous page of the list.
+   */
+  before?: string;
+
+  /**
+   * Sort order by the `created_at` timestamp of the objects. `asc` for ascending
+   * order and `desc` for descending order.
+   */
+  order?: 'asc' | 'desc';
+}
+
+export interface RunCreateAndStreamParams {
   /**
    * The ID of the
    * [assistant](https://platform.openai.com/docs/api-reference/assistants) to use to
@@ -410,72 +559,71 @@ export interface RunCreateParams {
    * Override the tools the assistant can use for this run. This is useful for
    * modifying the behavior on a per-run basis.
    */
-  tools?: Array<
-    | RunCreateParams.AssistantToolsCode
-    | RunCreateParams.AssistantToolsRetrieval
-    | RunCreateParams.AssistantToolsFunction
-  > | null;
+  tools?: Array<AssistantsAPI.AssistantTool> | null;
 }
 
-export namespace RunCreateParams {
-  export interface AssistantToolsCode {
-    /**
-     * The type of tool being defined: `code_interpreter`
-     */
-    type: 'code_interpreter';
-  }
+export type RunSubmitToolOutputsParams =
+  | RunSubmitToolOutputsParamsNonStreaming
+  | RunSubmitToolOutputsParamsStreaming;
 
-  export interface AssistantToolsRetrieval {
-    /**
-     * The type of tool being defined: `retrieval`
-     */
-    type: 'retrieval';
-  }
-
-  export interface AssistantToolsFunction {
-    function: Shared.FunctionDefinition;
-
-    /**
-     * The type of tool being defined: `function`
-     */
-    type: 'function';
-  }
-}
-
-export interface RunUpdateParams {
-  /**
-   * Set of 16 key-value pairs that can be attached to an object. This can be useful
-   * for storing additional information about the object in a structured format. Keys
-   * can be a maximum of 64 characters long and values can be a maxium of 512
-   * characters long.
-   */
-  metadata?: unknown | null;
-}
-
-export interface RunListParams extends CursorPageParams {
-  /**
-   * A cursor for use in pagination. `before` is an object ID that defines your place
-   * in the list. For instance, if you make a list request and receive 100 objects,
-   * ending with obj_foo, your subsequent call can include before=obj_foo in order to
-   * fetch the previous page of the list.
-   */
-  before?: string;
-
-  /**
-   * Sort order by the `created_at` timestamp of the objects. `asc` for ascending
-   * order and `desc` for descending order.
-   */
-  order?: 'asc' | 'desc';
-}
-
-export interface RunSubmitToolOutputsParams {
+export interface RunSubmitToolOutputsParamsBase {
   /**
    * A list of tools for which the outputs are being submitted.
    */
   tool_outputs: Array<RunSubmitToolOutputsParams.ToolOutput>;
+
+  /**
+   * If `true`, returns a stream of events that happen during the Run as server-sent
+   * events, terminating when the Run enters a terminal state with a `data: [DONE]`
+   * message.
+   */
+  stream?: boolean | null;
 }
 
 export namespace RunSubmitToolOutputsParams {
+  export interface ToolOutput {
+    /**
+     * The output of the tool call to be submitted to continue the run.
+     */
+    output?: string;
+
+    /**
+     * The ID of the tool call in the `required_action` object within the run object
+     * the output is being submitted for.
+     */
+    tool_call_id?: string;
+  }
+
+  export type RunSubmitToolOutputsParamsNonStreaming = RunsAPI.RunSubmitToolOutputsParamsNonStreaming;
+  export type RunSubmitToolOutputsParamsStreaming = RunsAPI.RunSubmitToolOutputsParamsStreaming;
+}
+
+export interface RunSubmitToolOutputsParamsNonStreaming extends RunSubmitToolOutputsParamsBase {
+  /**
+   * If `true`, returns a stream of events that happen during the Run as server-sent
+   * events, terminating when the Run enters a terminal state with a `data: [DONE]`
+   * message.
+   */
+  stream?: false | null;
+}
+
+export interface RunSubmitToolOutputsParamsStreaming extends RunSubmitToolOutputsParamsBase {
+  /**
+   * If `true`, returns a stream of events that happen during the Run as server-sent
+   * events, terminating when the Run enters a terminal state with a `data: [DONE]`
+   * message.
+   */
+  stream: true;
+}
+
+export interface RunSubmitToolOutputsStreamParams {
+  /**
+   * A list of tools for which the outputs are being submitted.
+   */
+  tool_outputs: Array<RunSubmitToolOutputsStreamParams.ToolOutput>;
+}
+
+export namespace RunSubmitToolOutputsStreamParams {
   export interface ToolOutput {
     /**
      * The output of the tool call to be submitted to continue the run.
@@ -496,15 +644,32 @@ export namespace Runs {
   export import RunStatus = RunsAPI.RunStatus;
   export import RunsPage = RunsAPI.RunsPage;
   export import RunCreateParams = RunsAPI.RunCreateParams;
+  export import RunCreateParamsNonStreaming = RunsAPI.RunCreateParamsNonStreaming;
+  export import RunCreateParamsStreaming = RunsAPI.RunCreateParamsStreaming;
   export import RunUpdateParams = RunsAPI.RunUpdateParams;
   export import RunListParams = RunsAPI.RunListParams;
+  export import RunCreateAndStreamParams = RunsAPI.RunCreateAndStreamParams;
   export import RunSubmitToolOutputsParams = RunsAPI.RunSubmitToolOutputsParams;
+  export import RunSubmitToolOutputsParamsNonStreaming = RunsAPI.RunSubmitToolOutputsParamsNonStreaming;
+  export import RunSubmitToolOutputsParamsStreaming = RunsAPI.RunSubmitToolOutputsParamsStreaming;
+  export import RunSubmitToolOutputsStreamParams = RunsAPI.RunSubmitToolOutputsStreamParams;
   export import Steps = StepsAPI.Steps;
-  export import CodeToolCall = StepsAPI.CodeToolCall;
+  export import CodeInterpreterLogs = StepsAPI.CodeInterpreterLogs;
+  export import CodeInterpreterOutputImage = StepsAPI.CodeInterpreterOutputImage;
+  export import CodeInterpreterToolCall = StepsAPI.CodeInterpreterToolCall;
+  export import CodeInterpreterToolCallDelta = StepsAPI.CodeInterpreterToolCallDelta;
   export import FunctionToolCall = StepsAPI.FunctionToolCall;
+  export import FunctionToolCallDelta = StepsAPI.FunctionToolCallDelta;
   export import MessageCreationStepDetails = StepsAPI.MessageCreationStepDetails;
   export import RetrievalToolCall = StepsAPI.RetrievalToolCall;
+  export import RetrievalToolCallDelta = StepsAPI.RetrievalToolCallDelta;
   export import RunStep = StepsAPI.RunStep;
+  export import RunStepDelta = StepsAPI.RunStepDelta;
+  export import RunStepDeltaEvent = StepsAPI.RunStepDeltaEvent;
+  export import RunStepDeltaMessageDelta = StepsAPI.RunStepDeltaMessageDelta;
+  export import ToolCall = StepsAPI.ToolCall;
+  export import ToolCallDelta = StepsAPI.ToolCallDelta;
+  export import ToolCallDeltaObject = StepsAPI.ToolCallDeltaObject;
   export import ToolCallsStepDetails = StepsAPI.ToolCallsStepDetails;
   export import RunStepsPage = StepsAPI.RunStepsPage;
   export import StepListParams = StepsAPI.StepListParams;

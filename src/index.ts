@@ -285,6 +285,7 @@ export namespace OpenAI {
 
   export import Beta = API.Beta;
 
+  export import ErrorObject = API.ErrorObject;
   export import FunctionDefinition = API.FunctionDefinition;
   export import FunctionParameters = API.FunctionParameters;
 }

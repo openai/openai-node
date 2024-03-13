@@ -829,7 +829,7 @@ export interface ChatCompletionCreateParamsBase {
   /**
    * A list of tools the model may call. Currently, only functions are supported as a
    * tool. Use this to provide a list of functions the model may generate JSON inputs
-   * for.
+   * for. A max of 128 functions are supported.
    */
   tools?: Array<ChatCompletionTool>;
 
