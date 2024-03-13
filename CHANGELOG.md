@@ -1,5 +1,32 @@
 # Changelog
 
+## 4.28.5 (2024-03-13)
+
+Full Changelog: [v4.28.4...v4.28.5](https://github.com/openai/openai-node/compare/v4.28.4...v4.28.5)
+
+### Bug Fixes
+
+* **ChatCompletionStream:** abort on async iterator break and handle errors ([#699](https://github.com/openai/openai-node/issues/699)) ([ac417a2](https://github.com/openai/openai-node/commit/ac417a2db31919d2b52f2eb2e38f9c67a8f73254))
+* **streaming:** correctly handle trailing new lines in byte chunks ([#708](https://github.com/openai/openai-node/issues/708)) ([4753be2](https://github.com/openai/openai-node/commit/4753be272b1d1dade7a769cf350b829fc639f36e))
+
+
+### Chores
+
+* **api:** update docs ([#703](https://github.com/openai/openai-node/issues/703)) ([e1db98b](https://github.com/openai/openai-node/commit/e1db98bef29d200e2e401e3f5d7b2db6839c7836))
+* **docs:** mention install from git repo ([#700](https://github.com/openai/openai-node/issues/700)) ([c081bdb](https://github.com/openai/openai-node/commit/c081bdbb55585e63370496d324dc6f94d86424d1))
+* fix error handler in readme ([#704](https://github.com/openai/openai-node/issues/704)) ([4ff790a](https://github.com/openai/openai-node/commit/4ff790a67cf876191e04ad0e369e447e080b78a7))
+* **internal:** add explicit type annotation to decoder ([#712](https://github.com/openai/openai-node/issues/712)) ([d728e99](https://github.com/openai/openai-node/commit/d728e9923554e4c72c9efa3bd528561400d50ad8))
+* **types:** fix accidental exposure of Buffer type to cloudflare ([#709](https://github.com/openai/openai-node/issues/709)) ([0323ecb](https://github.com/openai/openai-node/commit/0323ecb98ddbd8910fc5719c8bab5175b945d2ab))
+
+
+### Documentation
+
+* **contributing:** improve wording ([#696](https://github.com/openai/openai-node/issues/696)) ([940d569](https://github.com/openai/openai-node/commit/940d5695f4cacddbb58e3bfc50fec28c468c7e63))
+* **readme:** fix https proxy example ([#705](https://github.com/openai/openai-node/issues/705)) ([d144789](https://github.com/openai/openai-node/commit/d1447890a556d37928b628f6449bb80de224d207))
+* **readme:** fix typo in custom fetch implementation ([#698](https://github.com/openai/openai-node/issues/698)) ([64041fd](https://github.com/openai/openai-node/commit/64041fd33da569eccae64afe4e50ee803017b20b))
+* remove extraneous --save and yarn install instructions ([#710](https://github.com/openai/openai-node/issues/710)) ([8ec216d](https://github.com/openai/openai-node/commit/8ec216d6b72ee4d67e26786f06c93af18d042117))
+* use [@deprecated](https://github.com/deprecated) decorator for deprecated params ([#711](https://github.com/openai/openai-node/issues/711)) ([4688ef4](https://github.com/openai/openai-node/commit/4688ef4b36e9f383a3abf6cdb31d498163a7bb9e))
+
 ## 4.28.4 (2024-02-28)
 
 Full Changelog: [v4.28.3...v4.28.4](https://github.com/openai/openai-node/compare/v4.28.3...v4.28.4)
