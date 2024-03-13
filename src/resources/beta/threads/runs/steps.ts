@@ -56,9 +56,53 @@ export class Steps extends APIResource {
 export class RunStepsPage extends CursorPage<RunStep> {}
 
 /**
+ * Text output from the Code Interpreter tool call as part of a run step.
+ */
+export interface CodeInterpreterLogs {
+  /**
+   * The index of the output in the outputs array.
+   */
+  index: number;
+
+  /**
+   * Always `logs`.
+   */
+  type: 'logs';
+
+  /**
+   * The text output from the Code Interpreter tool call.
+   */
+  logs?: string;
+}
+
+export interface CodeInterpreterOutputImage {
+  /**
+   * The index of the output in the outputs array.
+   */
+  index: number;
+
+  /**
+   * Always `image`.
+   */
+  type: 'image';
+
+  image?: CodeInterpreterOutputImage.Image;
+}
+
+export namespace CodeInterpreterOutputImage {
+  export interface Image {
+    /**
+     * The [file](https://platform.openai.com/docs/api-reference/files) ID of the
+     * image.
+     */
+    file_id?: string;
+  }
+}
+
+/**
  * Details of the Code Interpreter tool call the run step was involved in.
  */
-export interface CodeToolCall {
+export interface CodeInterpreterToolCall {
   /**
    * The ID of the tool call.
    */
@@ -67,7 +111,7 @@ export interface CodeToolCall {
   /**
    * The Code Interpreter tool call definition.
    */
-  code_interpreter: CodeToolCall.CodeInterpreter;
+  code_interpreter: CodeInterpreterToolCall.CodeInterpreter;
 
   /**
    * The type of tool call. This is always going to be `code_interpreter` for this
@@ -76,7 +120,7 @@ export interface CodeToolCall {
   type: 'code_interpreter';
 }
 
-export namespace CodeToolCall {
+export namespace CodeInterpreterToolCall {
   /**
    * The Code Interpreter tool call definition.
    */
@@ -131,6 +175,51 @@ export namespace CodeToolCall {
   }
 }
 
+/**
+ * Details of the Code Interpreter tool call the run step was involved in.
+ */
+export interface CodeInterpreterToolCallDelta {
+  /**
+   * The index of the tool call in the tool calls array.
+   */
+  index: number;
+
+  /**
+   * The type of tool call. This is always going to be `code_interpreter` for this
+   * type of tool call.
+   */
+  type: 'code_interpreter';
+
+  /**
+   * The ID of the tool call.
+   */
+  id?: string;
+
+  /**
+   * The Code Interpreter tool call definition.
+   */
+  code_interpreter?: CodeInterpreterToolCallDelta.CodeInterpreter;
+}
+
+export namespace CodeInterpreterToolCallDelta {
+  /**
+   * The Code Interpreter tool call definition.
+   */
+  export interface CodeInterpreter {
+    /**
+     * The input to the Code Interpreter tool call.
+     */
+    input?: string;
+
+    /**
+     * The outputs from the Code Interpreter tool call. Code Interpreter can output one
+     * or more items, including text (`logs`) or images (`image`). Each of these are
+     * represented by a different object type.
+     */
+    outputs?: Array<StepsAPI.CodeInterpreterLogs | StepsAPI.CodeInterpreterOutputImage>;
+  }
+}
+
 export interface FunctionToolCall {
   /**
    * The ID of the tool call object.
@@ -173,6 +262,53 @@ export namespace FunctionToolCall {
   }
 }
 
+export interface FunctionToolCallDelta {
+  /**
+   * The index of the tool call in the tool calls array.
+   */
+  index: number;
+
+  /**
+   * The type of tool call. This is always going to be `function` for this type of
+   * tool call.
+   */
+  type: 'function';
+
+  /**
+   * The ID of the tool call object.
+   */
+  id?: string;
+
+  /**
+   * The definition of the function that was called.
+   */
+  function?: FunctionToolCallDelta.Function;
+}
+
+export namespace FunctionToolCallDelta {
+  /**
+   * The definition of the function that was called.
+   */
+  export interface Function {
+    /**
+     * The arguments passed to the function.
+     */
+    arguments?: string;
+
+    /**
+     * The name of the function.
+     */
+    name?: string;
+
+    /**
+     * The output of the function. This will be `null` if the outputs have not been
+     * [submitted](https://platform.openai.com/docs/api-reference/runs/submitToolOutputs)
+     * yet.
+     */
+    output?: string | null;
+  }
+}
+
 /**
  * Details of the message creation by the run step.
  */
@@ -210,6 +346,29 @@ export interface RetrievalToolCall {
    * tool call.
    */
   type: 'retrieval';
+}
+
+export interface RetrievalToolCallDelta {
+  /**
+   * The index of the tool call in the tool calls array.
+   */
+  index: number;
+
+  /**
+   * The type of tool call. This is always going to be `retrieval` for this type of
+   * tool call.
+   */
+  type: 'retrieval';
+
+  /**
+   * The ID of the tool call object.
+   */
+  id?: string;
+
+  /**
+   * For now, this is always going to be an empty object.
+   */
+  retrieval?: unknown;
 }
 
 /**
@@ -348,6 +507,85 @@ export namespace RunStep {
 }
 
 /**
+ * The delta containing the fields that have changed on the run step.
+ */
+export interface RunStepDelta {
+  /**
+   * The details of the run step.
+   */
+  step_details?: RunStepDeltaMessageDelta | ToolCallDeltaObject;
+}
+
+/**
+ * Represents a run step delta i.e. any changed fields on a run step during
+ * streaming.
+ */
+export interface RunStepDeltaEvent {
+  /**
+   * The identifier of the run step, which can be referenced in API endpoints.
+   */
+  id: string;
+
+  /**
+   * The delta containing the fields that have changed on the run step.
+   */
+  delta: RunStepDelta;
+
+  /**
+   * The object type, which is always `thread.run.step.delta`.
+   */
+  object: 'thread.run.step.delta';
+}
+
+/**
+ * Details of the message creation by the run step.
+ */
+export interface RunStepDeltaMessageDelta {
+  /**
+   * Always `message_creation`.
+   */
+  type: 'message_creation';
+
+  message_creation?: RunStepDeltaMessageDelta.MessageCreation;
+}
+
+export namespace RunStepDeltaMessageDelta {
+  export interface MessageCreation {
+    /**
+     * The ID of the message that was created by this run step.
+     */
+    message_id?: string;
+  }
+}
+
+/**
+ * Details of the Code Interpreter tool call the run step was involved in.
+ */
+export type ToolCall = CodeInterpreterToolCall | RetrievalToolCall | FunctionToolCall;
+
+/**
+ * Details of the Code Interpreter tool call the run step was involved in.
+ */
+export type ToolCallDelta = CodeInterpreterToolCallDelta | RetrievalToolCallDelta | FunctionToolCallDelta;
+
+/**
+ * Details of the tool call.
+ */
+export interface ToolCallDeltaObject {
+  /**
+   * Always `tool_calls`.
+   */
+  type: 'tool_calls';
+
+  /**
+   * An array of tool calls the run step was involved in. These can be associated
+   * with one of three types of tools: `code_interpreter`, `retrieval`, or
+   * `function`.
+   */
+  tool_calls?: Array<ToolCallDelta>;
+}
+
+/**
  * Details of the tool call.
  */
 export interface ToolCallsStepDetails {
@@ -356,7 +594,7 @@ export interface ToolCallsStepDetails {
    * with one of three types of tools: `code_interpreter`, `retrieval`, or
    * `function`.
    */
-  tool_calls: Array<CodeToolCall | RetrievalToolCall | FunctionToolCall>;
+  tool_calls: Array<ToolCall>;
 
   /**
    * Always `tool_calls`.
@@ -381,11 +619,22 @@ export interface StepListParams extends CursorPageParams {
 }
 
 export namespace Steps {
-  export import CodeToolCall = StepsAPI.CodeToolCall;
+  export import CodeInterpreterLogs = StepsAPI.CodeInterpreterLogs;
+  export import CodeInterpreterOutputImage = StepsAPI.CodeInterpreterOutputImage;
+  export import CodeInterpreterToolCall = StepsAPI.CodeInterpreterToolCall;
+  export import CodeInterpreterToolCallDelta = StepsAPI.CodeInterpreterToolCallDelta;
   export import FunctionToolCall = StepsAPI.FunctionToolCall;
+  export import FunctionToolCallDelta = StepsAPI.FunctionToolCallDelta;
   export import MessageCreationStepDetails = StepsAPI.MessageCreationStepDetails;
   export import RetrievalToolCall = StepsAPI.RetrievalToolCall;
+  export import RetrievalToolCallDelta = StepsAPI.RetrievalToolCallDelta;
   export import RunStep = StepsAPI.RunStep;
+  export import RunStepDelta = StepsAPI.RunStepDelta;
+  export import RunStepDeltaEvent = StepsAPI.RunStepDeltaEvent;
+  export import RunStepDeltaMessageDelta = StepsAPI.RunStepDeltaMessageDelta;
+  export import ToolCall = StepsAPI.ToolCall;
+  export import ToolCallDelta = StepsAPI.ToolCallDelta;
+  export import ToolCallDeltaObject = StepsAPI.ToolCallDeltaObject;
   export import ToolCallsStepDetails = StepsAPI.ToolCallsStepDetails;
   export import RunStepsPage = StepsAPI.RunStepsPage;
   export import StepListParams = StepsAPI.StepListParams;

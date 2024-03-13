@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.29.0 (2024-03-13)
+
+Full Changelog: [v4.28.5...v4.29.0](https://github.com/openai/openai-node/compare/v4.28.5...v4.29.0)
+
+### Features
+
+* **assistants:** add support for streaming ([#714](https://github.com/openai/openai-node/issues/714)) ([7d27d28](https://github.com/openai/openai-node/commit/7d27d286876d0a575d91a4752f401126fe93d2a3))
+
 ## 4.28.5 (2024-03-13)
 
 Full Changelog: [v4.28.4...v4.28.5](https://github.com/openai/openai-node/compare/v4.28.4...v4.28.5)

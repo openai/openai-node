@@ -1,5 +1,15 @@
 // File generated from our OpenAPI spec by Stainless.
 
+export interface ErrorObject {
+  code: string | null;
+
+  message: string;
+
+  param: string | null;
+
+  type: string;
+}
+
 export interface FunctionDefinition {
   /**
    * The name of the function to be called. Must be a-z, A-Z, 0-9, or contain
