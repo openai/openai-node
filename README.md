@@ -14,7 +14,7 @@ To learn how to use the OpenAI API, check out our [API Reference](https://platfo
 npm install openai
 ```
 
-You can import in Deno via:
+You can import in Demo via:
 
 <!-- x-release-please-start-version -->
 
