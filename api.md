@@ -2,6 +2,7 @@
 
 Types:
 
+- <code><a href="./src/resources/shared.ts">ErrorObject</a></code>
 - <code><a href="./src/resources/shared.ts">FunctionDefinition</a></code>
 - <code><a href="./src/resources/shared.ts">FunctionParameters</a></code>
 
@@ -177,6 +178,15 @@ Types:
 
 - <code><a href="./src/resources/beta/assistants/assistants.ts">Assistant</a></code>
 - <code><a href="./src/resources/beta/assistants/assistants.ts">AssistantDeleted</a></code>
+- <code><a href="./src/resources/beta/assistants/assistants.ts">AssistantStreamEvent</a></code>
+- <code><a href="./src/resources/beta/assistants/assistants.ts">AssistantTool</a></code>
+- <code><a href="./src/resources/beta/assistants/assistants.ts">CodeInterpreterTool</a></code>
+- <code><a href="./src/resources/beta/assistants/assistants.ts">FunctionTool</a></code>
+- <code><a href="./src/resources/beta/assistants/assistants.ts">MessageStreamEvent</a></code>
+- <code><a href="./src/resources/beta/assistants/assistants.ts">RetrievalTool</a></code>
+- <code><a href="./src/resources/beta/assistants/assistants.ts">RunStepStreamEvent</a></code>
+- <code><a href="./src/resources/beta/assistants/assistants.ts">RunStreamEvent</a></code>
+- <code><a href="./src/resources/beta/assistants/assistants.ts">ThreadStreamEvent</a></code>
 
 Methods:
 
@@ -214,6 +224,7 @@ Methods:
 - <code title="post /threads/{thread_id}">client.beta.threads.<a href="./src/resources/beta/threads/threads.ts">update</a>(threadId, { ...params }) -> Thread</code>
 - <code title="delete /threads/{thread_id}">client.beta.threads.<a href="./src/resources/beta/threads/threads.ts">del</a>(threadId) -> ThreadDeleted</code>
 - <code title="post /threads/runs">client.beta.threads.<a href="./src/resources/beta/threads/threads.ts">createAndRun</a>({ ...params }) -> Run</code>
+- <code>client.beta.threads.<a href="./src/resources/beta/threads/threads.ts">createAndRunStream</a>(body, options?) -> AssistantStream</code>
 
 ### Runs
 
@@ -231,16 +242,29 @@ Methods:
 - <code title="get /threads/{thread_id}/runs">client.beta.threads.runs.<a href="./src/resources/beta/threads/runs/runs.ts">list</a>(threadId, { ...params }) -> RunsPage</code>
 - <code title="post /threads/{thread_id}/runs/{run_id}/cancel">client.beta.threads.runs.<a href="./src/resources/beta/threads/runs/runs.ts">cancel</a>(threadId, runId) -> Run</code>
 - <code title="post /threads/{thread_id}/runs/{run_id}/submit_tool_outputs">client.beta.threads.runs.<a href="./src/resources/beta/threads/runs/runs.ts">submitToolOutputs</a>(threadId, runId, { ...params }) -> Run</code>
+- <code>client.beta.threads.runs.<a href="./src/resources/beta/threads/runs/runs.ts">createAndStream</a>(threadId, body, options?) -> AssistantStream</code>
+- <code>client.beta.threads.runs.<a href="./src/resources/beta/threads/runs/runs.ts">submitToolOutputsStream</a>(threadId, runId, body, options?) -> AssistantStream</code>
 
 #### Steps
 
 Types:
 
-- <code><a href="./src/resources/beta/threads/runs/steps.ts">CodeToolCall</a></code>
+- <code><a href="./src/resources/beta/threads/runs/steps.ts">CodeInterpreterLogs</a></code>
+- <code><a href="./src/resources/beta/threads/runs/steps.ts">CodeInterpreterOutputImage</a></code>
+- <code><a href="./src/resources/beta/threads/runs/steps.ts">CodeInterpreterToolCall</a></code>
+- <code><a href="./src/resources/beta/threads/runs/steps.ts">CodeInterpreterToolCallDelta</a></code>
 - <code><a href="./src/resources/beta/threads/runs/steps.ts">FunctionToolCall</a></code>
+- <code><a href="./src/resources/beta/threads/runs/steps.ts">FunctionToolCallDelta</a></code>
 - <code><a href="./src/resources/beta/threads/runs/steps.ts">MessageCreationStepDetails</a></code>
 - <code><a href="./src/resources/beta/threads/runs/steps.ts">RetrievalToolCall</a></code>
+- <code><a href="./src/resources/beta/threads/runs/steps.ts">RetrievalToolCallDelta</a></code>
 - <code><a href="./src/resources/beta/threads/runs/steps.ts">RunStep</a></code>
+- <code><a href="./src/resources/beta/threads/runs/steps.ts">RunStepDelta</a></code>
+- <code><a href="./src/resources/beta/threads/runs/steps.ts">RunStepDeltaEvent</a></code>
+- <code><a href="./src/resources/beta/threads/runs/steps.ts">RunStepDeltaMessageDelta</a></code>
+- <code><a href="./src/resources/beta/threads/runs/steps.ts">ToolCall</a></code>
+- <code><a href="./src/resources/beta/threads/runs/steps.ts">ToolCallDelta</a></code>
+- <code><a href="./src/resources/beta/threads/runs/steps.ts">ToolCallDeltaObject</a></code>
 - <code><a href="./src/resources/beta/threads/runs/steps.ts">ToolCallsStepDetails</a></code>
 
 Methods:
@@ -252,17 +276,33 @@ Methods:
 
 Types:
 
-- <code><a href="./src/resources/beta/threads/messages/messages.ts">MessageContentImageFile</a></code>
-- <code><a href="./src/resources/beta/threads/messages/messages.ts">MessageContentText</a></code>
-- <code><a href="./src/resources/beta/threads/messages/messages.ts">ThreadMessage</a></code>
-- <code><a href="./src/resources/beta/threads/messages/messages.ts">ThreadMessageDeleted</a></code>
+- <code><a href="./src/resources/beta/threads/messages/messages.ts">Annotation</a></code>
+- <code><a href="./src/resources/beta/threads/messages/messages.ts">AnnotationDelta</a></code>
+- <code><a href="./src/resources/beta/threads/messages/messages.ts">FileCitationAnnotation</a></code>
+- <code><a href="./src/resources/beta/threads/messages/messages.ts">FileCitationDeltaAnnotation</a></code>
+- <code><a href="./src/resources/beta/threads/messages/messages.ts">FilePathAnnotation</a></code>
+- <code><a href="./src/resources/beta/threads/messages/messages.ts">FilePathDeltaAnnotation</a></code>
+- <code><a href="./src/resources/beta/threads/messages/messages.ts">ImageFile</a></code>
+- <code><a href="./src/resources/beta/threads/messages/messages.ts">ImageFileContentBlock</a></code>
+- <code><a href="./src/resources/beta/threads/messages/messages.ts">ImageFileDelta</a></code>
+- <code><a href="./src/resources/beta/threads/messages/messages.ts">ImageFileDeltaBlock</a></code>
+- <code><a href="./src/resources/beta/threads/messages/messages.ts">Message</a></code>
+- <code><a href="./src/resources/beta/threads/messages/messages.ts">MessageContent</a></code>
+- <code><a href="./src/resources/beta/threads/messages/messages.ts">MessageContentDelta</a></code>
+- <code><a href="./src/resources/beta/threads/messages/messages.ts">MessageDeleted</a></code>
+- <code><a href="./src/resources/beta/threads/messages/messages.ts">MessageDelta</a></code>
+- <code><a href="./src/resources/beta/threads/messages/messages.ts">MessageDeltaEvent</a></code>
+- <code><a href="./src/resources/beta/threads/messages/messages.ts">Text</a></code>
+- <code><a href="./src/resources/beta/threads/messages/messages.ts">TextContentBlock</a></code>
+- <code><a href="./src/resources/beta/threads/messages/messages.ts">TextDelta</a></code>
+- <code><a href="./src/resources/beta/threads/messages/messages.ts">TextDeltaBlock</a></code>
 
 Methods:
 
-- <code title="post /threads/{thread_id}/messages">client.beta.threads.messages.<a href="./src/resources/beta/threads/messages/messages.ts">create</a>(threadId, { ...params }) -> ThreadMessage</code>
-- <code title="get /threads/{thread_id}/messages/{message_id}">client.beta.threads.messages.<a href="./src/resources/beta/threads/messages/messages.ts">retrieve</a>(threadId, messageId) -> ThreadMessage</code>
-- <code title="post /threads/{thread_id}/messages/{message_id}">client.beta.threads.messages.<a href="./src/resources/beta/threads/messages/messages.ts">update</a>(threadId, messageId, { ...params }) -> ThreadMessage</code>
-- <code title="get /threads/{thread_id}/messages">client.beta.threads.messages.<a href="./src/resources/beta/threads/messages/messages.ts">list</a>(threadId, { ...params }) -> ThreadMessagesPage</code>
+- <code title="post /threads/{thread_id}/messages">client.beta.threads.messages.<a href="./src/resources/beta/threads/messages/messages.ts">create</a>(threadId, { ...params }) -> Message</code>
+- <code title="get /threads/{thread_id}/messages/{message_id}">client.beta.threads.messages.<a href="./src/resources/beta/threads/messages/messages.ts">retrieve</a>(threadId, messageId) -> Message</code>
+- <code title="post /threads/{thread_id}/messages/{message_id}">client.beta.threads.messages.<a href="./src/resources/beta/threads/messages/messages.ts">update</a>(threadId, messageId, { ...params }) -> Message</code>
+- <code title="get /threads/{thread_id}/messages">client.beta.threads.messages.<a href="./src/resources/beta/threads/messages/messages.ts">list</a>(threadId, { ...params }) -> MessagesPage</code>
 
 #### Files
 
