@@ -1,5 +1,3 @@
-// File generated from our OpenAPI spec by Stainless.
-
 import * as Core from '../../core';
 import * as Errors from '../../error';
 import OpenAI, { ClientOptions } from 'openai/index';
