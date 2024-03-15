@@ -25,12 +25,12 @@ export interface AzureClientOptions extends ClientOptions {
   /**
    * A function that returns a Microsoft Entra (formerly known as Azure Active Directory) access token, will be invoked on every request.
    */
-  azureEntraTokenProvider?: (() => string) | undefined;
+  microsoftEntraTokenProvider?: (() => string) | undefined;
 }
 
 /** API Client for interfacing with the Azure OpenAI API. */
 export class AzureOpenAI extends OpenAI {
-  private _azureEntraTokenProvider: (() => string) | undefined;
+  private _microsoftEntraTokenProvider: (() => string) | undefined;
   /**
    * API Client for interfacing with the Azure OpenAI API.
    *
@@ -53,7 +53,7 @@ export class AzureOpenAI extends OpenAI {
     apiVersion = Core.readEnv('OPENAI_API_VERSION'),
     endpoint,
     deployment,
-    azureEntraTokenProvider,
+    microsoftEntraTokenProvider,
     dangerouslyAllowBrowser,
     ...opts
   }: AzureClientOptions = {}) {
@@ -63,19 +63,19 @@ export class AzureOpenAI extends OpenAI {
       );
     }
 
-    if (typeof azureEntraTokenProvider === 'function') {
+    if (typeof microsoftEntraTokenProvider === 'function') {
       dangerouslyAllowBrowser = true;
     }
 
-    if (!azureEntraTokenProvider && !apiKey) {
+    if (!microsoftEntraTokenProvider && !apiKey) {
       throw new Errors.OpenAIError(
-        'Missing credentials. Please pass one of `apiKey` and `azureEntraTokenProvider`, or set the `AZURE_OPENAI_API_KEY` environment variable.',
+        'Missing credentials. Please pass one of `apiKey` and `microsoftEntraTokenProvider`, or set the `AZURE_OPENAI_API_KEY` environment variable.',
       );
     }
 
-    if (azureEntraTokenProvider && apiKey) {
+    if (microsoftEntraTokenProvider && apiKey) {
       throw new Errors.OpenAIError(
-        'The `apiKey` and `azureEntraTokenProvider` arguments are mutually exclusive; Only one can be passed at a time.',
+        'The `apiKey` and `microsoftEntraTokenProvider` arguments are mutually exclusive; Only one can be passed at a time.',
       );
     }
 
@@ -113,7 +113,7 @@ export class AzureOpenAI extends OpenAI {
       ...(dangerouslyAllowBrowser !== undefined ? { dangerouslyAllowBrowser } : {}),
     });
 
-    this._azureEntraTokenProvider = azureEntraTokenProvider;
+    this._microsoftEntraTokenProvider = microsoftEntraTokenProvider;
   }
 
   override buildRequest(options: Core.FinalRequestOptions<unknown>): {
@@ -126,7 +126,7 @@ export class AzureOpenAI extends OpenAI {
         throw new Error('Expected request body to be an object');
       }
       const model = options.body['model'];
-      options.body['model'] = undefined;
+      delete options.body['model'];
       if (model !== undefined && !this.baseURL.includes('/deployments')) {
         options.path = `/deployments/${model}${options.path}`;
       }
@@ -134,12 +134,12 @@ export class AzureOpenAI extends OpenAI {
     return super.buildRequest(options);
   }
 
-  private _getAzureEntraToken(): string | undefined {
-    if (typeof this._azureEntraTokenProvider === 'function') {
-      const token = this._azureEntraTokenProvider();
+  private _getMicrosoftEntraToken(): string | undefined {
+    if (typeof this._microsoftEntraTokenProvider === 'function') {
+      const token = this._microsoftEntraTokenProvider();
       if (!token || typeof token !== 'string') {
         throw new Errors.OpenAIError(
-          `Expected 'azureEntraTokenProvider' argument to return a string but it returned ${token}`,
+          `Expected 'microsoftEntraTokenProvider' argument to return a string but it returned ${token}`,
         );
       }
       return token;
@@ -151,7 +151,7 @@ export class AzureOpenAI extends OpenAI {
     options.headers ??= {};
 
     if (!options.headers['Authorization']) {
-      const token = this._getAzureEntraToken();
+      const token = this._getMicrosoftEntraToken();
       if (token) {
         options.headers['Authorization'] = `Bearer ${token}`;
       }
