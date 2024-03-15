@@ -123,7 +123,7 @@ export class AzureOpenAI extends OpenAI {
   } {
     if (options.path in _deployments_endpoints && options.method === 'post' && options.body !== undefined) {
       if (!Core.isObj(options.body)) {
-        throw new Error('Expected request body to be an object for post /v1/messages');
+        throw new Error('Expected request body to be an object');
       }
       const model = options.body['model'];
       options.body['model'] = undefined;
