@@ -34,10 +34,11 @@ export class AzureOpenAI extends OpenAI {
   /**
    * API Client for interfacing with the Azure OpenAI API.
    *
-   * @param {string | undefined} [opts.endpoint=process.env['OPENAI_API_VERSION'] ?? undefined]
-   * @param {string | undefined} [opts.apiVersion=process.env['AZURE_OPENAI_ENDPOINT'] ?? undefined] - Your Azure endpoint, including the resource, e.g. `https://example-resource.azure.openai.com/`
+   * @param {string | undefined} [opts.apiVersion=process.env['OPENAI_API_VERSION'] ?? undefined]
+   * @param {string | undefined} [opts.endpoint=process.env['AZURE_OPENAI_ENDPOINT'] ?? undefined] - Your Azure endpoint, including the resource, e.g. `https://example-resource.azure.openai.com/`
    * @param {string | undefined} [opts.apiKey=process.env['AZURE_OPENAI_API_KEY'] ?? undefined]
-   * @param {string | undefined} opts.deployment - A model deployment, if given, sets the base client URL to include `/deployments/{deployment}`.   * @param {string | null | undefined} [opts.organization=process.env['OPENAI_ORG_ID'] ?? null]
+   * @param {string | undefined} opts.deployment - A model deployment, if given, sets the base client URL to include `/deployments/{deployment}`.
+   * @param {string | null | undefined} [opts.organization=process.env['OPENAI_ORG_ID'] ?? null]
    * @param {string} [opts.baseURL=process.env['OPENAI_BASE_URL']] - Sets the base URL for the API.
    * @param {number} [opts.timeout=10 minutes] - The maximum amount of time (in milliseconds) the client will wait for a response before timing out.
    * @param {number} [opts.httpAgent] - An HTTP agent used to manage HTTP(s) connections.
@@ -75,7 +76,7 @@ export class AzureOpenAI extends OpenAI {
 
     if (microsoftEntraTokenProvider && apiKey) {
       throw new Errors.OpenAIError(
-        'The `apiKey` and `microsoftEntraTokenProvider` arguments are mutually exclusive; Only one can be passed at a time.',
+        'The `apiKey` and `microsoftEntraTokenProvider` arguments are mutually exclusive; only one can be passed at a time.',
       );
     }
 
