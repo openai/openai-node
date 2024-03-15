@@ -31,7 +31,6 @@ export interface AzureClientOptions extends ClientOptions {
 /** API Client for interfacing with the Azure OpenAI API. */
 export class AzureOpenAI extends OpenAI {
   private _azureEntraTokenProvider: (() => string) | undefined;
-  private _apiVersion: string;
   /**
    * API Client for interfacing with the Azure OpenAI API.
    *
@@ -55,6 +54,7 @@ export class AzureOpenAI extends OpenAI {
     endpoint,
     deployment,
     azureEntraTokenProvider,
+    dangerouslyAllowBrowser,
     ...opts
   }: AzureClientOptions = {}) {
     if (apiVersion === undefined) {
@@ -64,7 +64,7 @@ export class AzureOpenAI extends OpenAI {
     }
 
     if (typeof azureEntraTokenProvider === 'function') {
-      opts.dangerouslyAllowBrowser = true;
+      dangerouslyAllowBrowser = true;
     }
 
     if (!azureEntraTokenProvider && !apiKey) {
@@ -110,19 +110,23 @@ export class AzureOpenAI extends OpenAI {
       apiKey,
       baseURL,
       ...opts,
+      ...(dangerouslyAllowBrowser !== undefined ? { dangerouslyAllowBrowser } : {}),
     });
 
-    this._apiVersion = apiVersion;
     this._azureEntraTokenProvider = azureEntraTokenProvider;
   }
 
-  override buildRequest<Req>(options: Core.FinalRequestOptions<Req>): {
+  override buildRequest(options: Core.FinalRequestOptions<unknown>): {
     req: RequestInit;
     url: string;
     timeout: number;
   } {
-    if (options.path in _deployments_endpoints) {
-      const model = (options.body as any | undefined | null)?.model;
+    if (options.path in _deployments_endpoints && options.method === 'post' && options.body !== undefined) {
+      if (!Core.isObj(options.body)) {
+        throw new Error('Expected request body to be an object for post /v1/messages');
+      }
+      const model = options.body['model'];
+      options.body['model'] = undefined;
       if (model !== undefined && !this.baseURL.includes('/deployments')) {
         options.path = `/deployments/${model}${options.path}`;
       }
@@ -130,28 +134,33 @@ export class AzureOpenAI extends OpenAI {
     return super.buildRequest(options);
   }
 
-  private _getAzureEntraToken(): string {
-    const token = this._azureEntraTokenProvider?.();
-    if (!token || typeof token !== 'string') {
-      throw new Error(
-        `Expected 'azureEntraTokenProvider' argument to defined and to return a string but it returned ${token}`,
-      );
+  private _getAzureEntraToken(): string | undefined {
+    if (typeof this._azureEntraTokenProvider === 'function') {
+      const token = this._azureEntraTokenProvider();
+      if (!token || typeof token !== 'string') {
+        throw new Errors.OpenAIError(
+          `Expected 'azureEntraTokenProvider' argument to return a string but it returned ${token}`,
+        );
+      }
+      return token;
     }
-    return token;
+    return undefined;
   }
 
   protected override async prepareOptions(options: Core.FinalRequestOptions<unknown>): Promise<void> {
     options.headers ??= {};
 
-    const token = this._getAzureEntraToken();
     if (!options.headers['Authorization']) {
-      options.headers['Authorization'] = `Bearer ${token}`;
+      const token = this._getAzureEntraToken();
+      if (token) {
+        options.headers['Authorization'] = `Bearer ${token}`;
+      }
     } else if (this.apiKey !== API_KEY_SENTINEL) {
       if (!options.headers['api-key']) {
         options.headers['api-key'] = this.apiKey;
       }
     } else {
-      throw new Error('Unable to handle auth');
+      throw new Errors.OpenAIError('Unable to handle auth');
     }
     return super.prepareOptions(options);
   }
