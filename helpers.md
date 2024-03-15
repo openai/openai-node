@@ -1,6 +1,140 @@
-# Chat Completion Helpers
+# Streaming Helpers
 
-## Streaming Responses
+OpenAI supports streaming responses when interacting with the [Chat](#chat-streaming) or [Assistant](#assistant-streaming-api) APIs.
+
+## Assistant Streaming API
+
+OpenAI supports streaming responses from Assistants. The SDK provides convenience wrappers around the API
+so you can subscribe to the types of events you are interested in as well as receive accumulated responses.
+
+More information can be found in the documentation: [Assistant Streaming](https://platform.openai.com/docs/assistants/overview?lang=node.js)
+
+#### An example of creating a run and subscribing to some events
+
+```ts
+const run = openai.beta.threads.runs
+  .createAndStream(thread.id, {
+    assistant_id: assistant.id,
+  })
+  .on('textCreated', (text) => process.stdout.write('\nassistant > '))
+  .on('textDelta', (textDelta, snapshot) => process.stdout.write(textDelta.value))
+  .on('toolCallCreated', (toolCall) => process.stdout.write(`\nassistant > ${toolCall.type}\n\n`))
+  .on('toolCallDelta', (toolCallDelta, snapshot) => {
+    if (toolCallDelta.type === 'code_interpreter') {
+      if (toolCallDelta.code_interpreter.input) {
+        process.stdout.write(toolCallDelta.code_interpreter.input);
+      }
+      if (toolCallDelta.code_interpreter.outputs) {
+        process.stdout.write('\noutput >\n');
+        toolCallDelta.code_interpreter.outputs.forEach((output) => {
+          if (output.type === 'logs') {
+            process.stdout.write(`\n${output.logs}\n`);
+          }
+        });
+      }
+    }
+  });
+```
+
+### Assistant Events
+
+The assistant API provides events you can subscribe to for the following events.
+
+```ts
+.on('event', (event: AssistantStreamEvent) => ...)
+```
+
+This allows you to subscribe to all the possible raw events sent by the OpenAI streaming API.
+In many cases it will be more convenient to subscribe to a more specific set of events for your use case.
+
+More information on the types of events can be found here: [Events](https://platform.openai.com/docs/api-reference/assistants-streaming/events)
+
+```ts
+.on('runStepCreated', (runStep: RunStep) => ...)
+.on('runStepDelta', (delta: RunStepDelta, snapshot: RunStep) => ...)
+.on('runStepDone', (runStep: RunStep) => ...)
+```
+
+These events allow you to subscribe to the creation, delta and completion of a RunStep.
+
+For more information on how Runs and RunSteps work see the documentation [Runs and RunSteps](https://platform.openai.com/docs/assistants/how-it-works/runs-and-run-steps)
+
+```ts
+.on('messageCreated', (message: Message) => ...)
+.on('messageDelta', (delta: MessageDelta, snapshot: Message) => ...)
+.on('messageDone', (message: Message) => ...)
+```
+
+This allows you to subscribe to Message creation, delta and completion events. Messages can contain
+different types of content that can be sent from a model (and events are available for specific content types).
+For convenience, the delta event includes both the incremental update and an accumulated snapshot of the content.
+
+More information on messages can be found
+on in the documentation page [Message](https://platform.openai.com/docs/api-reference/messages/object).
+
+```ts
+.on('textCreated', (content: Text) => ...)
+.on('textDelta', (delta: RunStepDelta, snapshot: Text) => ...)
+.on('textDone', (content: Text, snapshot: Message) => ...)
+```
+
+These events allow you to subscribe to the creation, delta and completion of a Text content (a specific type of message).
+For convenience, the delta event includes both the incremental update and an accumulated snapshot of the content.
+
+```ts
+.on('imageFileDone', (content: ImageFile, snapshot: Message) => ...)
+```
+
+Image files are not sent incrementally so an event is provided for when a image file is available.
+
+```ts
+.on('toolCallCreated', (toolCall: ToolCall) => ...)
+.on('toolCallDelta', (delta: RunStepDelta, snapshot: ToolCall) => ...)
+.on('toolCallDone', (toolCall: ToolCall) => ...)
+```
+
+These events allow you to subscribe to events for the creation, delta and completion of a ToolCall.
+
+More information on tools can be found here [Tools](https://platform.openai.com/docs/assistants/tools)
+
+```ts
+.on('end', () => ...)
+```
+
+The last event send when a stream ends.
+
+### Assistant Methods
+
+The assistant streaming object also provides a few methods for convenience:
+
+```ts
+.currentEvent()
+
+.currentRun()
+
+.currentMessageSnapshot()
+
+.currentRunStepSnapshot()
+```
+
+These methods are provided to allow you to access additional context from within event handlers. In many cases
+the handlers should include all the information you need for processing, but if additional context is required it
+can be accessed.
+
+Note: There is not always a relevant context in certain situations (these will be undefined in those cases).
+
+```ts
+await.finalMessages();
+
+await.finalRunSteps();
+```
+
+These methods are provided for convenience to collect information at the end of a stream. Calling these events
+will trigger consumption of the stream until completion and then return the relevant accumulated objects.
+
+## Chat Streaming
+
+### Streaming Responses
 
 ```ts
 openai.chat.completions.stream({ stream?: false, … }, options?): ChatCompletionStreamingRunner
@@ -18,7 +152,7 @@ If you need to cancel a stream, you can `break` from a `for await` loop or call 
 
 See an example of streaming helpers in action in [`examples/stream.ts`](examples/stream.ts).
 
-## Automated Function Calls
+### Automated Function Calls
 
 ```ts
 openai.chat.completions.runTools({ stream: false, … }, options?): ChatCompletionRunner
@@ -69,9 +203,7 @@ See an example of automated function calls in action in
 
 Note, `runFunctions` was also previously available, but has been deprecated in favor of `runTools`.
 
-## Runner API
-
-### Events
+### Chat Events
 
 #### `.on('connect', () => …)`
 
@@ -148,7 +280,7 @@ The event fired at the end, returning the total usage of the call.
 
 The last event fired in the stream.
 
-### Methods
+### Chat Methods
 
 #### `.abort()`
 
@@ -190,7 +322,7 @@ A promise which resolves with the last message with a `role: "function"`. Throws
 
 A promise which resolves with the total usage.
 
-### Fields
+### Chat Fields
 
 #### `.messages`
 
@@ -200,9 +332,9 @@ A mutable array of all messages in the conversation.
 
 The underlying `AbortController` for the runner.
 
-## Examples
+### Chat Examples
 
-### Abort on a function call
+#### Abort on a function call
 
 If you have a function call flow which you intend to _end_ with a certain function call, then you can use the second
 argument `runner` given to the function to either mutate `runner.messages` or call `runner.abort()`.
@@ -238,7 +370,7 @@ async function main() {
 main();
 ```
 
-### Integrate with `zod`
+#### Integrate with `zod`
 
 [`zod`](https://www.npmjs.com/package/zod) is a schema validation library which can help with validating the
 assistant's response to make sure it conforms to a schema. Paired with [`zod-to-json-schema`](https://www.npmjs.com/package/zod-to-json-schema), the validation schema also acts as the `parameters` JSON Schema passed to the API.
@@ -287,10 +419,10 @@ main();
 
 See a more fully-fledged example in [`examples/function-call-helpers-zod.ts`](examples/function-call-helpers-zod.ts).
 
-### Integrate with Next.JS
+#### Integrate with Next.JS
 
 See an example of a Next.JS integration here [`examples/stream-to-client-next.ts`](examples/stream-to-client-next.ts).
 
-### Proxy Streaming to a Browser
+#### Proxy Streaming to a Browser
 
 See an example of using express to stream to a browser here [`examples/stream-to-client-express.ts`](examples/stream-to-client-express.ts).
