@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.29.1 (2024-03-15)
+
+Full Changelog: [v4.29.0...v4.29.1](https://github.com/openai/openai-node/compare/v4.29.0...v4.29.1)
+
+### Documentation
+
+* **readme:** assistant streaming ([#719](https://github.com/openai/openai-node/issues/719)) ([bc9a1ca](https://github.com/openai/openai-node/commit/bc9a1ca308020a88c29d409edc06cdfca8cbf8f5))
+
 ## 4.29.0 (2024-03-13)
 
 Full Changelog: [v4.28.5...v4.29.0](https://github.com/openai/openai-node/compare/v4.28.5...v4.29.0)
