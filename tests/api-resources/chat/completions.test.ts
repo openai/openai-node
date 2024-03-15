@@ -30,7 +30,6 @@ describe('resource completions', () => {
       frequency_penalty: -2,
       function_call: 'none',
       functions: [{ description: 'string', name: 'string', parameters: { foo: 'bar' } }],
-      instance_id: 'string',
       logit_bias: { foo: 0 },
       logprobs: true,
       max_tokens: 0,
