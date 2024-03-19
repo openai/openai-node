@@ -19,7 +19,7 @@ You can import in Deno via:
 <!-- x-release-please-start-version -->
 
 ```ts
-import OpenAI from 'https://deno.land/x/openai@v4.29.1/mod.ts';
+import OpenAI from 'https://deno.land/x/openai@v4.29.2/mod.ts';
 ```
 
 <!-- x-release-please-end -->
@@ -99,6 +99,37 @@ Documentation for each method, request param, and response field are available i
 
 > [!IMPORTANT]
 > Previous versions of this SDK used a `Configuration` class. See the [v3 to v4 migration guide](https://github.com/openai/openai-node/discussions/217).
+
+### Streaming Helpers
+
+The SDK also includes helpers to process streams and handle the incoming events.
+
+```ts
+const run = openai.beta.threads.runs
+  .createAndStream(thread.id, {
+    assistant_id: assistant.id,
+  })
+  .on('textCreated', (text) => process.stdout.write('\nassistant > '))
+  .on('textDelta', (textDelta, snapshot) => process.stdout.write(textDelta.value))
+  .on('toolCallCreated', (toolCall) => process.stdout.write(`\nassistant > ${toolCall.type}\n\n`))
+  .on('toolCallDelta', (toolCallDelta, snapshot) => {
+    if (toolCallDelta.type === 'code_interpreter') {
+      if (toolCallDelta.code_interpreter.input) {
+        process.stdout.write(toolCallDelta.code_interpreter.input);
+      }
+      if (toolCallDelta.code_interpreter.outputs) {
+        process.stdout.write('\noutput >\n');
+        toolCallDelta.code_interpreter.outputs.forEach((output) => {
+          if (output.type === 'logs') {
+            process.stdout.write(`\n${output.logs}\n`);
+          }
+        });
+      }
+    }
+  });
+```
+
+More information on streaming helpers can be found in the dedicated documentation: [helpers.md](helpers.md)
 
 ### Streaming responses
 

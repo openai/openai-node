@@ -36,6 +36,29 @@ const run = openai.beta.threads.runs
   });
 ```
 
+### Starting a stream
+
+There are three helper methods for creating streams:
+
+```ts
+openai.beta.threads.runs.createAndStream();
+```
+
+This method can be used to start and stream the response to an existing run with an associated thread
+that is already populated with messages.
+
+```ts
+openai.beta.threads.createAndRunStream();
+```
+
+This method can be used to add a message to a thread, start a run and then stream the response.
+
+```ts
+openai.beta.threads.runs.submitToolOutputsStream();
+```
+
+This method can be used to submit a tool output to a run waiting on the output and start a stream.
+
 ### Assistant Events
 
 The assistant API provides events you can subscribe to for the following events.
@@ -108,25 +131,25 @@ The last event send when a stream ends.
 The assistant streaming object also provides a few methods for convenience:
 
 ```ts
-.currentEvent()
+.currentEvent(): AssistantStreamEvent | undefined
 
-.currentRun()
+.currentRun(): Run | undefined
 
-.currentMessageSnapshot()
+.currentMessageSnapshot(): Message
 
-.currentRunStepSnapshot()
+.currentRunStepSnapshot(): Runs.RunStep
 ```
 
 These methods are provided to allow you to access additional context from within event handlers. In many cases
 the handlers should include all the information you need for processing, but if additional context is required it
 can be accessed.
 
-Note: There is not always a relevant context in certain situations (these will be undefined in those cases).
+Note: There is not always a relevant context in certain situations (these will be `undefined` in those cases).
 
 ```ts
-await.finalMessages();
+await .finalMessages() : Promise<Message[]>
 
-await.finalRunSteps();
+await .finalRunSteps(): Promise<RunStep[]>
 ```
 
 These methods are provided for convenience to collect information at the end of a stream. Calling these events
