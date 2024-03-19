@@ -1,5 +1,19 @@
 # Changelog
 
+## 4.29.2 (2024-03-19)
+
+Full Changelog: [v4.29.1...v4.29.2](https://github.com/openai/openai-node/compare/v4.29.1...v4.29.2)
+
+### Chores
+
+* **internal:** update generated pragma comment ([#724](https://github.com/openai/openai-node/issues/724)) ([139e205](https://github.com/openai/openai-node/commit/139e205ed1ed30cb1df982d852a093dcea945aba))
+
+
+### Documentation
+
+* assistant improvements ([#725](https://github.com/openai/openai-node/issues/725)) ([6a2c41b](https://github.com/openai/openai-node/commit/6a2c41b0ce833eba0cdea6a7d221697f3be26abb))
+* fix typo in CONTRIBUTING.md ([#722](https://github.com/openai/openai-node/issues/722)) ([05ff8f7](https://github.com/openai/openai-node/commit/05ff8f7671fe6ce5d9517034f76a166a0bd27803))
+
 ## 4.29.1 (2024-03-15)
 
 Full Changelog: [v4.29.0...v4.29.1](https://github.com/openai/openai-node/compare/v4.29.0...v4.29.1)
