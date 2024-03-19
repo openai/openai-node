@@ -178,7 +178,7 @@ export abstract class APIClient {
     fetch: overridenFetch,
   }: {
     baseURL: string;
-    maxRetries?: number | undefined;
+    maxRetries: number | undefined;
     timeout: number | undefined;
     httpAgent: Agent | undefined;
     fetch: Fetch | undefined;
