@@ -46,7 +46,7 @@ async function main() {
 main();
 ```
 
-## Streaming Responses
+## Streaming responses
 
 We provide support for streaming responses using Server Sent Events (SSE).
 
@@ -256,7 +256,7 @@ Note that `runFunctions` was previously available as well, but has been deprecat
 Read more about various examples such as with integrating with [zod](helpers.md#integrate-with-zod),
 [next.js](helpers.md#integrate-wtih-next-js), and [proxying a stream to the browser](helpers.md#proxy-streaming-to-a-browser).
 
-## File Uploads
+## File uploads
 
 Request parameters that correspond to file uploads can be passed in many different forms:
 
@@ -497,7 +497,7 @@ await openai.models.list({
 });
 ```
 
-## Semantic Versioning
+## Semantic versioning
 
 This package generally follows [SemVer](https://semver.org/spec/v2.0.0.html) conventions, though certain backwards-incompatible changes may be released as minor versions:
 
