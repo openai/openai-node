@@ -45,3 +45,13 @@ export interface FunctionDefinition {
  * Omitting `parameters` defines a function with an empty parameter list.
  */
 export type FunctionParameters = Record<string, unknown>;
+
+/**
+ * Additional metadata that can be added to requests.
+ */
+export interface Metadata {
+  /**
+   * Metadata is a free-form object that can be used to pass additional information.
+   */
+  [key: string]: unknown;
+}

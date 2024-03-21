@@ -855,6 +855,8 @@ export interface ChatCompletionCreateParamsBase {
    * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices/end-user-ids).
    */
   user?: string;
+
+  metadata?: Shared.Metadata;
 }
 
 export namespace ChatCompletionCreateParams {
