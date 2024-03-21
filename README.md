@@ -437,7 +437,51 @@ console.log(raw.headers.get('X-My-Header'));
 console.log(chatCompletion);
 ```
 
-## Customizing the fetch client
+### Making custom/undocumented requests
+
+This library is typed for convenient access to the documented API. If you need to access undocumented
+endpoints, params, or response properties, the library can still be used.
+
+#### Undocumented endpoints
+
+To make requests to undocumented endpoints, you can use `client.get`, `client.post`, and other HTTP verbs.
+Options on the client, such as retries, will be respected when making these requests.
+
+```ts
+await client.post('/some/path', {
+  body: { some_prop: 'foo' },
+  query: { some_query_arg: 'bar' },
+});
+```
+
+#### Undocumented params
+
+To make requests using undocumented parameters, you may use `// @ts-expect-error` on the undocumented
+parameter. This library doesn't validate at runtime that the request matches the type, so any extra values you
+send will be sent as-is.
+
+```ts
+client.foo.create({
+  foo: 'my_param',
+  bar: 12,
+  // @ts-expect-error baz is not yet public
+  baz: 'undocumented option',
+});
+```
+
+For requests with the `GET` verb, any extra params will be in the query, all other requests will send the
+extra param in the body.
+
+If you want to explicitly send an extra argument, you can do so with the `query`, `body`, and `headers` request
+options.
+
+#### Undocumented properties
+
+To access undocumented response properties, you may access the response object with `// @ts-expect-error` on
+the response object, or cast the response object to the requisite type. Like the request params, we do not
+validate or strip extra properties from the response from the API.
+
+### Customizing the fetch client
 
 By default, this library uses `node-fetch` in Node, and expects a global `fetch` function in other environments.
 
@@ -454,6 +498,8 @@ import OpenAI from 'openai';
 
 To do the inverse, add `import "openai/shims/node"` (which does import polyfills).
 This can also be useful if you are getting the wrong TypeScript types for `Response` ([more details](https://github.com/openai/openai-node/tree/master/src/_shims#readme)).
+
+### Logging and middleware
 
 You may also provide a custom `fetch` function when instantiating the client,
 which can be used to inspect or alter the `Request` or `Response` before/after each request:
@@ -475,7 +521,7 @@ const client = new OpenAI({
 Note that if given a `DEBUG=true` environment variable, this library will log all requests and responses automatically.
 This is intended for debugging purposes only and may change in the future without notice.
 
-## Configuring an HTTP(S) Agent (e.g., for proxies)
+### Configuring an HTTP(S) Agent (e.g., for proxies)
 
 By default, this library uses a stable agent for all http/https requests to reuse TCP connections, eliminating many TCP & TLS handshakes and shaving around 100ms off most requests.
 
