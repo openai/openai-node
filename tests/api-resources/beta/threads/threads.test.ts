@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless.
+// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import OpenAI from 'openai';
 import { Response } from 'node-fetch';
@@ -108,6 +108,7 @@ describe('resource threads', () => {
       instructions: 'string',
       metadata: {},
       model: 'string',
+      stream: false,
       thread: {
         messages: [
           { role: 'user', content: 'x', file_ids: ['string'], metadata: {} },

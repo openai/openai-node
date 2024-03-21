@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless.
+// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import * as Core from 'openai/core';
 import { APIPromise } from 'openai/core';
@@ -253,6 +253,8 @@ export interface CompletionCreateParamsBase {
 
   /**
    * The suffix that comes after a completion of inserted text.
+   *
+   * This parameter is only supported for `gpt-3.5-turbo-instruct`.
    */
   suffix?: string | null;
 

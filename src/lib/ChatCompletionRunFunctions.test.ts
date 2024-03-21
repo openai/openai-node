@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { OpenAIError } from 'openai/error';
+import { OpenAIError, APIConnectionError } from 'openai/error';
 import { PassThrough } from 'stream';
 import {
   ParsingToolFunction,
@@ -2207,6 +2207,7 @@ describe('resource completions', () => {
       await listener.sanityCheck();
     });
   });
+
   describe('stream', () => {
     test('successful flow', async () => {
       const { fetch, handleRequest } = mockStreamingChatCompletionFetch();
@@ -2272,6 +2273,56 @@ describe('resource completions', () => {
 
       expect(listener.finalMessage).toEqual({ role: 'assistant', content: 'The weather is great today!' });
       await listener.sanityCheck();
+    });
+    test('handles network errors', async () => {
+      const { fetch, handleRequest } = mockFetch();
+
+      const openai = new OpenAI({ apiKey: '...', fetch });
+
+      const stream = openai.beta.chat.completions.stream(
+        {
+          max_tokens: 1024,
+          model: 'gpt-3.5-turbo',
+          messages: [{ role: 'user', content: 'Say hello there!' }],
+        },
+        { maxRetries: 0 },
+      );
+
+      handleRequest(async () => {
+        throw new Error('mock request error');
+      }).catch(() => {});
+
+      async function runStream() {
+        await stream.done();
+      }
+
+      await expect(runStream).rejects.toThrow(APIConnectionError);
+    });
+    test('handles network errors on async iterator', async () => {
+      const { fetch, handleRequest } = mockFetch();
+
+      const openai = new OpenAI({ apiKey: '...', fetch });
+
+      const stream = openai.beta.chat.completions.stream(
+        {
+          max_tokens: 1024,
+          model: 'gpt-3.5-turbo',
+          messages: [{ role: 'user', content: 'Say hello there!' }],
+        },
+        { maxRetries: 0 },
+      );
+
+      handleRequest(async () => {
+        throw new Error('mock request error');
+      }).catch(() => {});
+
+      async function runStream() {
+        for await (const _event of stream) {
+          continue;
+        }
+      }
+
+      await expect(runStream).rejects.toThrow(APIConnectionError);
     });
   });
 });

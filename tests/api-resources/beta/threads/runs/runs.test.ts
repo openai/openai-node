@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless.
+// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import OpenAI from 'openai';
 import { Response } from 'node-fetch';
@@ -27,6 +27,7 @@ describe('resource runs', () => {
       instructions: 'string',
       metadata: {},
       model: 'string',
+      stream: false,
       tools: [{ type: 'code_interpreter' }, { type: 'code_interpreter' }, { type: 'code_interpreter' }],
     });
   });
@@ -127,6 +128,7 @@ describe('resource runs', () => {
         { tool_call_id: 'string', output: 'string' },
         { tool_call_id: 'string', output: 'string' },
       ],
+      stream: false,
     });
   });
 });

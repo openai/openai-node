@@ -1,6 +1,6 @@
 {
   "name": "@cognos/openai",
-  "version": "4.28.3",
+  "version": "4.29.2",
   "description": "A fork of the official TypeScript library for the OpenAI API to provide additional Cognos functionality",
   "author": "Cognos <support@cognos.io>",
   "types": "dist/index.d.ts",

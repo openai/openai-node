@@ -78,6 +78,20 @@ export class Stream<Item> implements AsyncIterable<Item> {
             }
 
             yield data;
+          } else {
+            let data;
+            try {
+              data = JSON.parse(sse.data);
+            } catch (e) {
+              console.error(`Could not parse message into JSON:`, sse.data);
+              console.error(`From chunk:`, sse.raw);
+              throw e;
+            }
+            // TODO: Is this where the error should be thrown?
+            if (sse.event == 'error') {
+              throw new APIError(undefined, data.error, data.message, undefined);
+            }
+            yield { event: sse.event, data: data } as any;
           }
         }
         done = true;
@@ -300,6 +314,12 @@ class LineDecoder {
     const trailingNewline = LineDecoder.NEWLINE_CHARS.has(text[text.length - 1] || '');
     let lines = text.split(LineDecoder.NEWLINE_REGEXP);
 
+    // if there is a trailing new line then the last entry will be an empty
+    // string which we don't care about
+    if (trailingNewline) {
+      lines.pop();
+    }
+
     if (lines.length === 1 && !trailingNewline) {
       this.buffer.push(lines[0]!);
       return [];
@@ -364,6 +384,17 @@ class LineDecoder {
     this.trailingCR = false;
     return lines;
   }
+}
+
+/** This is an internal helper function that's just used for testing */
+export function _decodeChunks(chunks: string[]): string[] {
+  const decoder = new LineDecoder();
+  const lines: string[] = [];
+  for (const chunk of chunks) {
+    lines.push(...decoder.decode(chunk));
+  }
+
+  return lines;
 }
 
 function partition(str: string, delimiter: string): [string, string, string] {

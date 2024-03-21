@@ -1,4 +1,14 @@
-// File generated from our OpenAPI spec by Stainless.
+// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+
+export interface ErrorObject {
+  code: string | null;
+
+  message: string;
+
+  param: string | null;
+
+  type: string;
+}
 
 export interface FunctionDefinition {
   /**

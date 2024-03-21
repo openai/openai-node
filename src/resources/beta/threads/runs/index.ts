@@ -1,11 +1,22 @@
-// File generated from our OpenAPI spec by Stainless.
+// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 export {
-  CodeToolCall,
+  CodeInterpreterLogs,
+  CodeInterpreterOutputImage,
+  CodeInterpreterToolCall,
+  CodeInterpreterToolCallDelta,
   FunctionToolCall,
+  FunctionToolCallDelta,
   MessageCreationStepDetails,
   RetrievalToolCall,
+  RetrievalToolCallDelta,
   RunStep,
+  RunStepDelta,
+  RunStepDeltaEvent,
+  RunStepDeltaMessageDelta,
+  ToolCall,
+  ToolCallDelta,
+  ToolCallDeltaObject,
   ToolCallsStepDetails,
   StepListParams,
   RunStepsPage,
@@ -14,10 +25,17 @@ export {
 export {
   RequiredActionFunctionToolCall,
   Run,
+  RunStatus,
   RunCreateParams,
+  RunCreateParamsNonStreaming,
+  RunCreateParamsStreaming,
   RunUpdateParams,
   RunListParams,
+  RunCreateAndStreamParams,
   RunSubmitToolOutputsParams,
+  RunSubmitToolOutputsParamsNonStreaming,
+  RunSubmitToolOutputsParamsStreaming,
+  RunSubmitToolOutputsStreamParams,
   RunsPage,
   Runs,
 } from './runs';

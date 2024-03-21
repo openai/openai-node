@@ -11,9 +11,7 @@ To learn how to use the OpenAI API, check out our [API Reference](https://platfo
 ## Installation
 
 ```sh
-npm install --save openai
-# or
-yarn add openai
+npm install openai
 ```
 
 You can import in Deno via:
@@ -21,7 +19,7 @@ You can import in Deno via:
 <!-- x-release-please-start-version -->
 
 ```ts
-import OpenAI from 'https://deno.land/x/openai@v4.28.3/mod.ts';
+import OpenAI from 'https://deno.land/x/openai@v4.29.2/mod.ts';
 ```
 
 <!-- x-release-please-end -->
@@ -101,6 +99,37 @@ Documentation for each method, request param, and response field are available i
 
 > [!IMPORTANT]
 > Previous versions of this SDK used a `Configuration` class. See the [v3 to v4 migration guide](https://github.com/openai/openai-node/discussions/217).
+
+### Streaming Helpers
+
+The SDK also includes helpers to process streams and handle the incoming events.
+
+```ts
+const run = openai.beta.threads.runs
+  .createAndStream(thread.id, {
+    assistant_id: assistant.id,
+  })
+  .on('textCreated', (text) => process.stdout.write('\nassistant > '))
+  .on('textDelta', (textDelta, snapshot) => process.stdout.write(textDelta.value))
+  .on('toolCallCreated', (toolCall) => process.stdout.write(`\nassistant > ${toolCall.type}\n\n`))
+  .on('toolCallDelta', (toolCallDelta, snapshot) => {
+    if (toolCallDelta.type === 'code_interpreter') {
+      if (toolCallDelta.code_interpreter.input) {
+        process.stdout.write(toolCallDelta.code_interpreter.input);
+      }
+      if (toolCallDelta.code_interpreter.outputs) {
+        process.stdout.write('\noutput >\n');
+        toolCallDelta.code_interpreter.outputs.forEach((output) => {
+          if (output.type === 'logs') {
+            process.stdout.write(`\n${output.logs}\n`);
+          }
+        });
+      }
+    }
+  });
+```
+
+More information on streaming helpers can be found in the dedicated documentation: [helpers.md](helpers.md)
 
 ### Streaming responses
 
@@ -274,7 +303,7 @@ a subclass of `APIError` will be thrown:
 async function main() {
   const job = await openai.fineTuning.jobs
     .create({ model: 'gpt-3.5-turbo', training_file: 'file-abc123' })
-    .catch((err) => {
+    .catch(async (err) => {
       if (err instanceof OpenAI.APIError) {
         console.log(err.status); // 400
         console.log(err.name); // BadRequestError
@@ -424,7 +453,7 @@ import OpenAI from 'openai';
 ```
 
 To do the inverse, add `import "openai/shims/node"` (which does import polyfills).
-This can also be useful if you are getting the wrong TypeScript types for `Response` - more details [here](https://github.com/openai/openai-node/tree/master/src/_shims#readme).
+This can also be useful if you are getting the wrong TypeScript types for `Response` ([more details](https://github.com/openai/openai-node/tree/master/src/_shims#readme)).
 
 You may also provide a custom `fetch` function when instantiating the client,
 which can be used to inspect or alter the `Request` or `Response` before/after each request:
@@ -434,7 +463,7 @@ import { fetch } from 'undici'; // as one example
 import OpenAI from 'openai';
 
 const client = new OpenAI({
-  fetch: async (url: RequestInfo, init?: RequestInfo): Promise<Response> => {
+  fetch: async (url: RequestInfo, init?: RequestInit): Promise<Response> => {
     console.log('About to make a request', url, init);
     const response = await fetch(url, init);
     console.log('Got response', response);
@@ -455,7 +484,7 @@ If you would like to disable or customize this behavior, for example to use the 
 <!-- prettier-ignore -->
 ```ts
 import http from 'http';
-import HttpsProxyAgent from 'https-proxy-agent';
+import { HttpsProxyAgent } from 'https-proxy-agent';
 
 // Configure the default for all requests:
 const openai = new OpenAI({
@@ -464,9 +493,8 @@ const openai = new OpenAI({
 
 // Override per-request:
 await openai.models.list({
-  baseURL: 'http://localhost:8080/test-api',
   httpAgent: new http.Agent({ keepAlive: false }),
-})
+});
 ```
 
 ## Semantic Versioning

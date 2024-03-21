@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless.
+// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import * as Core from 'openai/core';
 import { APIResource } from 'openai/resource';
@@ -26,7 +26,8 @@ export interface TranslationCreateParams {
   file: Uploadable;
 
   /**
-   * ID of the model to use. Only `whisper-1` is currently available.
+   * ID of the model to use. Only `whisper-1` (which is powered by our open source
+   * Whisper V2 model) is currently available.
    */
   model: (string & {}) | 'whisper-1';
 

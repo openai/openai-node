@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless.
+// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import * as Core from 'openai/core';
 import { APIResource } from 'openai/resource';
@@ -6,7 +6,7 @@ import * as ModerationsAPI from 'openai/resources/moderations';
 
 export class Moderations extends APIResource {
   /**
-   * Classifies if text violates OpenAI's Content Policy
+   * Classifies if text is potentially harmful.
    */
   create(
     body: ModerationCreateParams,
@@ -28,8 +28,7 @@ export interface Moderation {
   category_scores: Moderation.CategoryScores;
 
   /**
-   * Whether the content violates
-   * [OpenAI's usage policies](/policies/usage-policies).
+   * Whether any of the below categories are flagged.
    */
   flagged: boolean;
 }
@@ -170,8 +169,7 @@ export namespace Moderation {
 }
 
 /**
- * Represents policy compliance report by OpenAI's content moderation model against
- * a given input.
+ * Represents if a given text input is potentially harmful.
  */
 export interface ModerationCreateResponse {
   /**

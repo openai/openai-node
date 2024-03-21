@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless.
+// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import * as Core from 'openai/core';
 import { APIResource } from 'openai/resource';
@@ -80,7 +80,8 @@ export interface ImageCreateVariationParams {
 
   /**
    * The format in which the generated images are returned. Must be one of `url` or
-   * `b64_json`.
+   * `b64_json`. URLs are only valid for 60 minutes after the image has been
+   * generated.
    */
   response_format?: 'url' | 'b64_json' | null;
 
@@ -131,7 +132,8 @@ export interface ImageEditParams {
 
   /**
    * The format in which the generated images are returned. Must be one of `url` or
-   * `b64_json`.
+   * `b64_json`. URLs are only valid for 60 minutes after the image has been
+   * generated.
    */
   response_format?: 'url' | 'b64_json' | null;
 
@@ -176,7 +178,8 @@ export interface ImageGenerateParams {
 
   /**
    * The format in which the generated images are returned. Must be one of `url` or
-   * `b64_json`.
+   * `b64_json`. URLs are only valid for 60 minutes after the image has been
+   * generated.
    */
   response_format?: 'url' | 'b64_json' | null;
 
