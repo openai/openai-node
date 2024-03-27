@@ -158,6 +158,32 @@ export class AssistantStream
     };
   }
 
+  static fromReadableStream(stream: ReadableStream): AssistantStream {
+    const runner = new AssistantStream();
+    runner._run(() => runner._fromReadableStream(stream));
+    return runner;
+  }
+
+  protected async _fromReadableStream(
+    readableStream: ReadableStream,
+    options?: Core.RequestOptions,
+  ): Promise<Run> {
+    const signal = options?.signal;
+    if (signal) {
+      if (signal.aborted) this.controller.abort();
+      signal.addEventListener('abort', () => this.controller.abort());
+    }
+    this._connected();
+    const stream = Stream.fromReadableStream<AssistantStreamEvent>(readableStream, this.controller);
+    for await (const event of stream) {
+      this.#handleEvent(event);
+    }
+    if (stream.controller.signal?.aborted) {
+      throw new APIUserAbortError();
+    }
+    return this._addRun(this.#endRequest());
+  }
+
   toReadableStream(): ReadableStream {
     const stream = new Stream(this[Symbol.asyncIterator].bind(this), this.controller);
     return stream.toReadableStream();
@@ -385,7 +411,7 @@ export class AssistantStream
       throw new OpenAIError(`stream has ended, this shouldn't happen`);
     }
 
-    if (!this.#finalRun) throw Error('Final run has been been received');
+    if (!this.#finalRun) throw Error('Final run has not been received');
 
     return this.#finalRun;
   }
