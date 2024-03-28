@@ -1,3 +1,5 @@
+#!/usr/bin/env -S npm run tsn -T
+
 import OpenAI from 'openai';
 
 const openai = new OpenAI();
@@ -27,7 +29,7 @@ async function main() {
   for await (const event of stream) {
     if (event.event === 'thread.message.delta') {
       const chunk = event.data.delta.content?.[0];
-      if (chunk && 'text' in chunk) {
+      if (chunk && 'text' in chunk && chunk.text.value) {
         process.stdout.write(chunk.text.value);
       }
     }
