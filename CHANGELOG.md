@@ -1,5 +1,32 @@
 # Changelog
 
+## 4.30.0 (2024-03-28)
+
+Full Changelog: [v4.29.2...v4.30.0](https://github.com/openai/openai-node/compare/v4.29.2...v4.30.0)
+
+### Features
+
+* assistant fromReadableStream ([#738](https://github.com/openai/openai-node/issues/738)) ([8f4ba18](https://github.com/openai/openai-node/commit/8f4ba18268797d6c54c393d701b13c7ff2aa71bc))
+
+
+### Bug Fixes
+
+* **client:** correctly send deno version header ([#736](https://github.com/openai/openai-node/issues/736)) ([b7ea175](https://github.com/openai/openai-node/commit/b7ea175b2854909de77b920dd25613f1d2daefd6))
+* **example:** correcting example ([#739](https://github.com/openai/openai-node/issues/739)) ([a819551](https://github.com/openai/openai-node/commit/a81955175da24e196490a38850bbf6f9b6779ea8))
+* handle process.env being undefined in debug func ([#733](https://github.com/openai/openai-node/issues/733)) ([2baa149](https://github.com/openai/openai-node/commit/2baa1491f7834f779ca49c3027d2344ead412dd2))
+* **internal:** make toFile use input file's options ([#727](https://github.com/openai/openai-node/issues/727)) ([15880d7](https://github.com/openai/openai-node/commit/15880d77b6c1cf58a6b9cfdbf7ae4442cdbddbd6))
+
+
+### Chores
+
+* **internal:** add type ([#737](https://github.com/openai/openai-node/issues/737)) ([18c1989](https://github.com/openai/openai-node/commit/18c19891f783019517d7961fe03c4d98de0fcf93))
+
+
+### Documentation
+
+* **readme:** consistent use of sentence case in headings ([#729](https://github.com/openai/openai-node/issues/729)) ([7e515fd](https://github.com/openai/openai-node/commit/7e515fde433ebfb7871d75d53915eef05a08a916))
+* **readme:** document how to make undocumented requests ([#730](https://github.com/openai/openai-node/issues/730)) ([a06d861](https://github.com/openai/openai-node/commit/a06d861a015eeee411fa2c6ed9bf3000313cfc03))
+
 ## 4.29.2 (2024-03-19)
 
 Full Changelog: [v4.29.1...v4.29.2](https://github.com/openai/openai-node/compare/v4.29.1...v4.29.2)
