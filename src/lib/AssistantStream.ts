@@ -176,7 +176,7 @@ export class AssistantStream
     this._connected();
     const stream = Stream.fromReadableStream<AssistantStreamEvent>(readableStream, this.controller);
     for await (const event of stream) {
-      this.#handleEvent(event);
+      this.#addEvent(event);
     }
     if (stream.controller.signal?.aborted) {
       throw new APIUserAbortError();
