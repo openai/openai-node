@@ -109,6 +109,7 @@ describe('resource threads', () => {
       metadata: {},
       model: 'string',
       stream: false,
+      temperature: 1,
       thread: {
         messages: [
           { role: 'user', content: 'x', file_ids: ['string'], metadata: {} },

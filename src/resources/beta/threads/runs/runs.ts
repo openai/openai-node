@@ -331,6 +331,11 @@ export interface Run {
    * in a terminal state (i.e. `in_progress`, `queued`, etc.).
    */
   usage: Run.Usage | null;
+
+  /**
+   * The sampling temperature used for this run. If not set, defaults to 1.
+   */
+  temperature?: number | null;
 }
 
 export namespace Run {
@@ -462,6 +467,13 @@ export interface RunCreateParamsBase {
   stream?: boolean | null;
 
   /**
+   * What sampling temperature to use, between 0 and 2. Higher values like 0.8 will
+   * make the output more random, while lower values like 0.2 will make it more
+   * focused and deterministic.
+   */
+  temperature?: number | null;
+
+  /**
    * Override the tools the assistant can use for this run. This is useful for
    * modifying the behavior on a per-run basis.
    */
@@ -554,6 +566,13 @@ export interface RunCreateAndStreamParams {
    * assistant will be used.
    */
   model?: string | null;
+
+  /**
+   * What sampling temperature to use, between 0 and 2. Higher values like 0.8 will
+   * make the output more random, while lower values like 0.2 will make it more
+   * focused and deterministic.
+   */
+  temperature?: number | null;
 
   /**
    * Override the tools the assistant can use for this run. This is useful for
