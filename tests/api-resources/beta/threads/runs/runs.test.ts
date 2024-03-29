@@ -28,6 +28,7 @@ describe('resource runs', () => {
       metadata: {},
       model: 'string',
       stream: false,
+      temperature: 1,
       tools: [{ type: 'code_interpreter' }, { type: 'code_interpreter' }, { type: 'code_interpreter' }],
     });
   });
