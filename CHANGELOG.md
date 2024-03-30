@@ -1,5 +1,18 @@
 # Changelog
 
+## 4.31.0 (2024-03-30)
+
+Full Changelog: [v4.30.0...v4.31.0](https://github.com/openai/openai-node/compare/v4.30.0...v4.31.0)
+
+### Features
+
+* **api:** adding temperature parameter ([#742](https://github.com/openai/openai-node/issues/742)) ([b173b05](https://github.com/openai/openai-node/commit/b173b05eb52266d8f2c835ec4ed71cba8cdc609b))
+
+
+### Bug Fixes
+
+* **streaming:** trigger all event handlers with fromReadableStream ([#741](https://github.com/openai/openai-node/issues/741)) ([7b1e593](https://github.com/openai/openai-node/commit/7b1e5937d97b309ed51928b4388dcde74abda8dc))
+
 ## 4.30.0 (2024-03-28)
 
 Full Changelog: [v4.29.2...v4.30.0](https://github.com/openai/openai-node/compare/v4.29.2...v4.30.0)
