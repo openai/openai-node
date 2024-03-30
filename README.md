@@ -454,7 +454,7 @@ await client.post('/some/path', {
 });
 ```
 
-#### Undocumented params
+#### Undocumented request params
 
 To make requests using undocumented parameters, you may use `// @ts-expect-error` on the undocumented
 parameter. This library doesn't validate at runtime that the request matches the type, so any extra values you
@@ -475,7 +475,7 @@ extra param in the body.
 If you want to explicitly send an extra argument, you can do so with the `query`, `body`, and `headers` request
 options.
 
-#### Undocumented properties
+#### Undocumented response properties
 
 To access undocumented response properties, you may access the response object with `// @ts-expect-error` on
 the response object, or cast the response object to the requisite type. Like the request params, we do not
