@@ -551,6 +551,11 @@ export interface MessageListParams extends CursorPageParams {
    * order and `desc` for descending order.
    */
   order?: 'asc' | 'desc';
+
+  /**
+   * Filter messages by the run ID that generated them.
+   */
+  run_id?: string;
 }
 
 export namespace Messages {
