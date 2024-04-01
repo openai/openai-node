@@ -1,5 +1,29 @@
 # Changelog
 
+## 4.32.0 (2024-04-01)
+
+Full Changelog: [v4.31.0...v4.32.0](https://github.com/openai/openai-node/compare/v4.31.0...v4.32.0)
+
+### Features
+
+* **api:** add support for filtering messages by run_id ([#747](https://github.com/openai/openai-node/issues/747)) ([9a397ac](https://github.com/openai/openai-node/commit/9a397acffa9f10c3f48e86e3bdb3851770f87b42))
+* **api:** run polling helpers ([#749](https://github.com/openai/openai-node/issues/749)) ([02920ae](https://github.com/openai/openai-node/commit/02920ae082480fc7a7ffe9fa583d053a40dc7120))
+
+
+### Chores
+
+* **deps:** remove unused dependency digest-fetch ([#748](https://github.com/openai/openai-node/issues/748)) ([5376837](https://github.com/openai/openai-node/commit/537683734d39dd956a7dcef4339c1167ce6fe13c))
+
+
+### Documentation
+
+* **readme:** change undocumented params wording ([#744](https://github.com/openai/openai-node/issues/744)) ([8796691](https://github.com/openai/openai-node/commit/87966911045275db86844dfdcde59653edaef264))
+
+
+### Refactors
+
+* rename createAndStream to stream ([02920ae](https://github.com/openai/openai-node/commit/02920ae082480fc7a7ffe9fa583d053a40dc7120))
+
 ## 4.31.0 (2024-03-30)
 
 Full Changelog: [v4.30.0...v4.31.0](https://github.com/openai/openai-node/compare/v4.30.0...v4.31.0)
