@@ -100,13 +100,30 @@ Documentation for each method, request param, and response field are available i
 > [!IMPORTANT]
 > Previous versions of this SDK used a `Configuration` class. See the [v3 to v4 migration guide](https://github.com/openai/openai-node/discussions/217).
 
+### Polling Helpers
+
+When interacting with the API some actions such as starting a Run may take time to complete. The SDK includes
+helper functions which will poll the status until it reaches a terminal state and then return the resulting object.
+If an API method results in an action which could benefit from polling there will be a corresponding version of the
+method ending in 'AndPoll'.
+
+For instance to create a Run and poll until it reaches a terminal state you can run:
+
+```ts
+const run = await openai.beta.threads.runs.createAndPoll(thread.id, {
+  assistant_id: assistantId,
+});
+```
+
+More information on the lifecycle of a Run can be found in the [Run Lifecycle Documentation](https://platform.openai.com/docs/assistants/how-it-works/run-lifecycle)
+
 ### Streaming Helpers
 
 The SDK also includes helpers to process streams and handle the incoming events.
 
 ```ts
 const run = openai.beta.threads.runs
-  .createAndStream(thread.id, {
+  .stream(thread.id, {
     assistant_id: assistant.id,
   })
   .on('textCreated', (text) => process.stdout.write('\nassistant > '))
