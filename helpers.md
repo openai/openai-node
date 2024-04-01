@@ -13,7 +13,7 @@ More information can be found in the documentation: [Assistant Streaming](https:
 
 ```ts
 const run = openai.beta.threads.runs
-  .createAndStream(thread.id, {
+  .stream(thread.id, {
     assistant_id: assistant.id,
   })
   .on('textCreated', (text) => process.stdout.write('\nassistant > '))
@@ -41,7 +41,7 @@ const run = openai.beta.threads.runs
 There are three helper methods for creating streams:
 
 ```ts
-openai.beta.threads.runs.createAndStream();
+openai.beta.threads.runs.stream();
 ```
 
 This method can be used to start and stream the response to an existing run with an associated thread

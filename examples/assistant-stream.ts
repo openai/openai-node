@@ -31,7 +31,7 @@ async function main() {
   console.log('Created thread with Id: ' + threadId);
 
   const run = openai.beta.threads.runs
-    .createAndStream(threadId, {
+    .stream(threadId, {
       assistant_id: assistantId,
     })
     //Subscribe to streaming events and log them
