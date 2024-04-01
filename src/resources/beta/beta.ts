@@ -37,5 +37,6 @@ export namespace Beta {
   export import ThreadCreateAndRunParams = ThreadsAPI.ThreadCreateAndRunParams;
   export import ThreadCreateAndRunParamsNonStreaming = ThreadsAPI.ThreadCreateAndRunParamsNonStreaming;
   export import ThreadCreateAndRunParamsStreaming = ThreadsAPI.ThreadCreateAndRunParamsStreaming;
+  export import ThreadCreateAndRunPollParams = ThreadsAPI.ThreadCreateAndRunPollParams;
   export import ThreadCreateAndRunStreamParams = ThreadsAPI.ThreadCreateAndRunStreamParams;
 }

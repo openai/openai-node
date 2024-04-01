@@ -5,6 +5,7 @@ import { APIPromise } from 'openai/core';
 import { APIResource } from 'openai/resource';
 import { isRequestOptions } from 'openai/core';
 import { AssistantStream, RunCreateParamsBaseStream } from 'openai/lib/AssistantStream';
+import { sleep } from 'openai/core';
 import { RunSubmitToolOutputsParamsStream } from 'openai/lib/AssistantStream';
 import * as RunsAPI from 'openai/resources/beta/threads/runs/runs';
 import * as AssistantsAPI from 'openai/resources/beta/assistants/assistants';
@@ -103,13 +104,89 @@ export class Runs extends APIResource {
   }
 
   /**
+   * A helper to create a run an poll for a terminal state. More information on Run
+   * lifecycles can be found here:
+   * https://platform.openai.com/docs/assistants/how-it-works/runs-and-run-steps
+   */
+  async createAndPoll(
+    threadId: string,
+    body: RunCreateParamsNonStreaming,
+    options?: Core.RequestOptions & { pollIntervalMs?: number },
+  ): Promise<Run> {
+    const run = await this.create(threadId, body, options);
+    return await this.poll(threadId, run.id, options);
+  }
+
+  /**
    * Create a Run stream
+   *
+   * @deprecated use `stream` instead
    */
   createAndStream(
     threadId: string,
     body: RunCreateParamsBaseStream,
     options?: Core.RequestOptions,
   ): AssistantStream {
+    return AssistantStream.createAssistantStream(threadId, this._client.beta.threads.runs, body, options);
+  }
+
+  /**
+   * A helper to poll a run status until it reaches a terminal state. More
+   * information on Run lifecycles can be found here:
+   * https://platform.openai.com/docs/assistants/how-it-works/runs-and-run-steps
+   */
+  async poll(
+    threadId: string,
+    runId: string,
+    options?: Core.RequestOptions & { pollIntervalMs?: number },
+  ): Promise<Run> {
+    const headers: { [key: string]: string } = { ...options?.headers, 'X-Stainless-Poll-Helper': 'true' };
+
+    if (options?.pollIntervalMs) {
+      headers['X-Stainless-Custom-Poll-Interval'] = options.pollIntervalMs.toString();
+    }
+
+    while (true) {
+      const { data: run, response } = await this.retrieve(threadId, runId, {
+        ...options,
+        headers: { ...options?.headers, ...headers },
+      }).withResponse();
+
+      switch (run.status) {
+        //If we are in any sort of intermediate state we poll
+        case 'queued':
+        case 'in_progress':
+        case 'cancelling':
+          let sleepInterval = 5000;
+
+          if (options?.pollIntervalMs) {
+            sleepInterval = options.pollIntervalMs;
+          } else {
+            const headerInterval = response.headers.get('openai-poll-after-ms');
+            if (headerInterval) {
+              const headerIntervalMs = parseInt(headerInterval);
+              if (!isNaN(headerIntervalMs)) {
+                sleepInterval = headerIntervalMs;
+              }
+            }
+          }
+          await sleep(sleepInterval);
+          break;
+        //We return the run in any terminal state.
+        case 'requires_action':
+        case 'cancelled':
+        case 'completed':
+        case 'failed':
+        case 'expired':
+          return run;
+      }
+    }
+  }
+
+  /**
+   * Create a Run stream
+   */
+  stream(threadId: string, body: RunCreateParamsBaseStream, options?: Core.RequestOptions): AssistantStream {
     return AssistantStream.createAssistantStream(threadId, this._client.beta.threads.runs, body, options);
   }
 
@@ -152,8 +229,24 @@ export class Runs extends APIResource {
   }
 
   /**
+   * A helper to submit a tool output to a run and poll for a terminal run state.
+   * More information on Run lifecycles can be found here:
+   * https://platform.openai.com/docs/assistants/how-it-works/runs-and-run-steps
+   */
+  async submitToolOutputsAndPoll(
+    threadId: string,
+    runId: string,
+    body: RunSubmitToolOutputsParamsNonStreaming,
+    options?: Core.RequestOptions & { pollIntervalMs?: number },
+  ): Promise<Run> {
+    const run = await this.submitToolOutputs(threadId, runId, body, options);
+    return await this.poll(threadId, run.id, options);
+  }
+
+  /**
    * Submit the tool outputs from a previous run and stream the run to a terminal
-   * state.
+   * state. More information on Run lifecycles can be found here:
+   * https://platform.openai.com/docs/assistants/how-it-works/runs-and-run-steps
    */
   submitToolOutputsStream(
     threadId: string,
@@ -529,7 +622,111 @@ export interface RunListParams extends CursorPageParams {
   order?: 'asc' | 'desc';
 }
 
+export interface RunCreateAndPollParams {
+  /**
+   * The ID of the
+   * [assistant](https://platform.openai.com/docs/api-reference/assistants) to use to
+   * execute this run.
+   */
+  assistant_id: string;
+
+  /**
+   * Appends additional instructions at the end of the instructions for the run. This
+   * is useful for modifying the behavior on a per-run basis without overriding other
+   * instructions.
+   */
+  additional_instructions?: string | null;
+
+  /**
+   * Overrides the
+   * [instructions](https://platform.openai.com/docs/api-reference/assistants/createAssistant)
+   * of the assistant. This is useful for modifying the behavior on a per-run basis.
+   */
+  instructions?: string | null;
+
+  /**
+   * Set of 16 key-value pairs that can be attached to an object. This can be useful
+   * for storing additional information about the object in a structured format. Keys
+   * can be a maximum of 64 characters long and values can be a maxium of 512
+   * characters long.
+   */
+  metadata?: unknown | null;
+
+  /**
+   * The ID of the [Model](https://platform.openai.com/docs/api-reference/models) to
+   * be used to execute this run. If a value is provided here, it will override the
+   * model associated with the assistant. If not, the model associated with the
+   * assistant will be used.
+   */
+  model?: string | null;
+
+  /**
+   * What sampling temperature to use, between 0 and 2. Higher values like 0.8 will
+   * make the output more random, while lower values like 0.2 will make it more
+   * focused and deterministic.
+   */
+  temperature?: number | null;
+
+  /**
+   * Override the tools the assistant can use for this run. This is useful for
+   * modifying the behavior on a per-run basis.
+   */
+  tools?: Array<AssistantsAPI.AssistantTool> | null;
+}
+
 export interface RunCreateAndStreamParams {
+  /**
+   * The ID of the
+   * [assistant](https://platform.openai.com/docs/api-reference/assistants) to use to
+   * execute this run.
+   */
+  assistant_id: string;
+
+  /**
+   * Appends additional instructions at the end of the instructions for the run. This
+   * is useful for modifying the behavior on a per-run basis without overriding other
+   * instructions.
+   */
+  additional_instructions?: string | null;
+
+  /**
+   * Overrides the
+   * [instructions](https://platform.openai.com/docs/api-reference/assistants/createAssistant)
+   * of the assistant. This is useful for modifying the behavior on a per-run basis.
+   */
+  instructions?: string | null;
+
+  /**
+   * Set of 16 key-value pairs that can be attached to an object. This can be useful
+   * for storing additional information about the object in a structured format. Keys
+   * can be a maximum of 64 characters long and values can be a maxium of 512
+   * characters long.
+   */
+  metadata?: unknown | null;
+
+  /**
+   * The ID of the [Model](https://platform.openai.com/docs/api-reference/models) to
+   * be used to execute this run. If a value is provided here, it will override the
+   * model associated with the assistant. If not, the model associated with the
+   * assistant will be used.
+   */
+  model?: string | null;
+
+  /**
+   * What sampling temperature to use, between 0 and 2. Higher values like 0.8 will
+   * make the output more random, while lower values like 0.2 will make it more
+   * focused and deterministic.
+   */
+  temperature?: number | null;
+
+  /**
+   * Override the tools the assistant can use for this run. This is useful for
+   * modifying the behavior on a per-run basis.
+   */
+  tools?: Array<AssistantsAPI.AssistantTool> | null;
+}
+
+export interface RunStreamParams {
   /**
    * The ID of the
    * [assistant](https://platform.openai.com/docs/api-reference/assistants) to use to
@@ -635,6 +832,28 @@ export interface RunSubmitToolOutputsParamsStreaming extends RunSubmitToolOutput
   stream: true;
 }
 
+export interface RunSubmitToolOutputsAndPollParams {
+  /**
+   * A list of tools for which the outputs are being submitted.
+   */
+  tool_outputs: Array<RunSubmitToolOutputsAndPollParams.ToolOutput>;
+}
+
+export namespace RunSubmitToolOutputsAndPollParams {
+  export interface ToolOutput {
+    /**
+     * The output of the tool call to be submitted to continue the run.
+     */
+    output?: string;
+
+    /**
+     * The ID of the tool call in the `required_action` object within the run object
+     * the output is being submitted for.
+     */
+    tool_call_id?: string;
+  }
+}
+
 export interface RunSubmitToolOutputsStreamParams {
   /**
    * A list of tools for which the outputs are being submitted.
@@ -667,10 +886,13 @@ export namespace Runs {
   export import RunCreateParamsStreaming = RunsAPI.RunCreateParamsStreaming;
   export import RunUpdateParams = RunsAPI.RunUpdateParams;
   export import RunListParams = RunsAPI.RunListParams;
+  export import RunCreateAndPollParams = RunsAPI.RunCreateAndPollParams;
   export import RunCreateAndStreamParams = RunsAPI.RunCreateAndStreamParams;
+  export import RunStreamParams = RunsAPI.RunStreamParams;
   export import RunSubmitToolOutputsParams = RunsAPI.RunSubmitToolOutputsParams;
   export import RunSubmitToolOutputsParamsNonStreaming = RunsAPI.RunSubmitToolOutputsParamsNonStreaming;
   export import RunSubmitToolOutputsParamsStreaming = RunsAPI.RunSubmitToolOutputsParamsStreaming;
+  export import RunSubmitToolOutputsAndPollParams = RunsAPI.RunSubmitToolOutputsAndPollParams;
   export import RunSubmitToolOutputsStreamParams = RunsAPI.RunSubmitToolOutputsStreamParams;
   export import Steps = StepsAPI.Steps;
   export import CodeInterpreterLogs = StepsAPI.CodeInterpreterLogs;

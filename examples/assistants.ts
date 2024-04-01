@@ -1,7 +1,6 @@
 #!/usr/bin/env -S npm run tsn -T
 
 import OpenAI from 'openai';
-import { sleep } from 'openai/core';
 
 /**
  * Example of polling for a complete response from an assistant
@@ -32,24 +31,17 @@ async function main() {
   let threadId = thread.id;
   console.log('Created thread with Id: ' + threadId);
 
-  const run = await openai.beta.threads.runs.create(thread.id, {
+  const run = await openai.beta.threads.runs.createAndPoll(thread.id, {
     assistant_id: assistantId,
     additional_instructions: 'Please address the user as Jane Doe. The user has a premium account.',
   });
 
-  console.log('Created run with Id: ' + run.id);
+  console.log('Run finished with status: ' + run.status);
 
-  while (true) {
-    const result = await openai.beta.threads.runs.retrieve(thread.id, run.id);
-    if (result.status == 'completed') {
-      const messages = await openai.beta.threads.messages.list(thread.id);
-      for (const message of messages.getPaginatedItems()) {
-        console.log(message);
-      }
-      break;
-    } else {
-      console.log('Waiting for completion. Current status: ' + result.status);
-      await sleep(5000);
+  if (run.status == 'completed') {
+    const messages = await openai.beta.threads.messages.list(thread.id);
+    for (const message of messages.getPaginatedItems()) {
+      console.log(message);
     }
   }
 }
