@@ -81,7 +81,7 @@ describe('resource messages', () => {
     await expect(
       openai.beta.threads.messages.list(
         'string',
-        { after: 'string', before: 'string', limit: 0, order: 'asc' },
+        { after: 'string', before: 'string', limit: 0, order: 'asc', run_id: 'string' },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);
