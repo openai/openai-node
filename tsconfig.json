@@ -12,7 +12,6 @@
       "openai/_shims/auto/*": ["src/_shims/auto/*-node"],
       "openai/*": ["src/*"],
       "openai": ["src/index.ts"],
-      "digest-fetch": ["./typings/digest-fetch"]
     },
     "noEmit": true,
 
