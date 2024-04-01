@@ -7,7 +7,6 @@
     "paths": {
       "openai/*": ["dist/src/*"],
       "openai": ["dist/src/index.ts"],
-      "digest-fetch": ["./typings/digest-fetch"]
     },
     "noEmit": false,
     "declaration": true,
