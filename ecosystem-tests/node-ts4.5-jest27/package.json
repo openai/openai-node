@@ -13,13 +13,13 @@
     "tsconfig-paths": "^4.0.0"
   },
   "devDependencies": {
-    "@types/node": "^20.4.2",
+    "@types/node": "20.11.20",
     "@types/node-fetch": "^2.6.1",
     "@types/jest": "27.5.2",
     "@types/ws": "^8.5.4",
     "fastest-levenshtein": "^1.0.16",
     "jest": "27.5.1",
     "ts-jest": "27.1.5",
-    "typescript": "4.5.4"
+    "typescript": "4.5.5"
   }
 }
