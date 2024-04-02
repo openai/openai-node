@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.32.1 (2024-04-02)
+
+Full Changelog: [v4.32.0...v4.32.1](https://github.com/openai/openai-node/compare/v4.32.0...v4.32.1)
+
+### Chores
+
+* **deps:** bump yarn to v1.22.22 ([#751](https://github.com/openai/openai-node/issues/751)) ([5b41d10](https://github.com/openai/openai-node/commit/5b41d1077f219b8feb7557cfab98caf7b5de560d))
+
 ## 4.32.0 (2024-04-01)
 
 Full Changelog: [v4.31.0...v4.32.0](https://github.com/openai/openai-node/compare/v4.31.0...v4.32.0)
