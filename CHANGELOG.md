@@ -1,5 +1,19 @@
 # Changelog
 
+## 4.32.2 (2024-04-04)
+
+Full Changelog: [v4.32.1...v4.32.2](https://github.com/openai/openai-node/compare/v4.32.1...v4.32.2)
+
+### Bug Fixes
+
+* **streaming:** handle special line characters and fix multi-byte character decoding ([#757](https://github.com/openai/openai-node/issues/757)) ([8dcdda2](https://github.com/openai/openai-node/commit/8dcdda2b0d1d86486eea5fd47d24a8d26fde4c19))
+* **tests:** update wrangler to v3.19.0 (CVE-2023-7080) ([#755](https://github.com/openai/openai-node/issues/755)) ([47ca41d](https://github.com/openai/openai-node/commit/47ca41da9a739b2e04b721cb1fe843e5dd152465))
+
+
+### Chores
+
+* **tests:** bump ecosystem tests dependencies ([#753](https://github.com/openai/openai-node/issues/753)) ([3f86ea2](https://github.com/openai/openai-node/commit/3f86ea2205c90e05bcbe582491a4bed01075a5b1))
+
 ## 4.32.1 (2024-04-02)
 
 Full Changelog: [v4.32.0...v4.32.1](https://github.com/openai/openai-node/compare/v4.32.0...v4.32.1)
