@@ -24,6 +24,11 @@ describe('resource runs', () => {
     const response = await openai.beta.threads.runs.create('string', {
       assistant_id: 'string',
       additional_instructions: 'string',
+      additional_messages: [
+        { role: 'user', content: 'x', file_ids: ['string'], metadata: {} },
+        { role: 'user', content: 'x', file_ids: ['string'], metadata: {} },
+        { role: 'user', content: 'x', file_ids: ['string'], metadata: {} },
+      ],
       instructions: 'string',
       metadata: {},
       model: 'string',
