@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.33.0 (2024-04-05)
+
+Full Changelog: [v4.32.2...v4.33.0](https://github.com/openai/openai-node/compare/v4.32.2...v4.33.0)
+
+### Features
+
+* **api:** add additional messages when creating thread run ([#759](https://github.com/openai/openai-node/issues/759)) ([f1fdb41](https://github.com/openai/openai-node/commit/f1fdb410e087f9b94faeda0558de573ec1118601))
+
 ## 4.32.2 (2024-04-04)
 
 Full Changelog: [v4.32.1...v4.32.2](https://github.com/openai/openai-node/compare/v4.32.1...v4.32.2)
