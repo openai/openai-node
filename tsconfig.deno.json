@@ -9,7 +9,6 @@
       "openai/_shims/auto/*": ["deno/_shims/auto/*-deno"],
       "openai/*": ["deno/*"],
       "openai": ["deno/index.ts"],
-      "digest-fetch": ["./typings/digest-fetch"]
     },
     "noEmit": true,
     "declaration": true,

@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless.
+// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import OpenAI from 'openai';
 import { Response } from 'node-fetch';
@@ -24,10 +24,16 @@ describe('resource runs', () => {
     const response = await openai.beta.threads.runs.create('string', {
       assistant_id: 'string',
       additional_instructions: 'string',
+      additional_messages: [
+        { role: 'user', content: 'x', file_ids: ['string'], metadata: {} },
+        { role: 'user', content: 'x', file_ids: ['string'], metadata: {} },
+        { role: 'user', content: 'x', file_ids: ['string'], metadata: {} },
+      ],
       instructions: 'string',
       metadata: {},
       model: 'string',
       stream: false,
+      temperature: 1,
       tools: [{ type: 'code_interpreter' }, { type: 'code_interpreter' }, { type: 'code_interpreter' }],
     });
   });
