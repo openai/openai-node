@@ -3,5 +3,9 @@
     "install": "deno install --node-modules-dir main_test.ts -f",
     "check": "deno lint && deno check main_test.ts",
     "test": "deno test --allow-env --allow-net --allow-read --node-modules-dir"
+  },
+  "imports": {
+    "openai": "../../deno/mod.ts",
+    "openai/": "../../deno/"
   }
 }
