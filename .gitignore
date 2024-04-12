@@ -5,3 +5,8 @@ dist
 /deno
 /*.tgz
 .idea/
+tmp
+.pack
+ecosystem-tests/deno/package.json
+ecosystem-tests/*/openai.tgz
+

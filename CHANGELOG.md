@@ -1,5 +1,14 @@
 # Changelog
 
+## 4.33.1 (2024-04-12)
+
+Full Changelog: [v4.33.0...v4.33.1](https://github.com/openai/openai-node/compare/v4.33.0...v4.33.1)
+
+### Chores
+
+* **internal:** formatting ([#763](https://github.com/openai/openai-node/issues/763)) ([b6acf54](https://github.com/openai/openai-node/commit/b6acf54baab7e6cbf6ce3ad1d6c70197cc0181d0))
+* **internal:** improve ecosystem tests ([#761](https://github.com/openai/openai-node/issues/761)) ([fcf748d](https://github.com/openai/openai-node/commit/fcf748dbbd23f972ff9fd81a8b2a35232a2d6e5c))
+
 ## 4.33.0 (2024-04-05)
 
 Full Changelog: [v4.32.2...v4.33.0](https://github.com/openai/openai-node/compare/v4.32.2...v4.33.0)
