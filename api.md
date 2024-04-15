@@ -149,16 +149,29 @@ Methods:
 
 Types:
 
-- <code><a href="./src/resources/fine-tuning/jobs.ts">FineTuningJob</a></code>
-- <code><a href="./src/resources/fine-tuning/jobs.ts">FineTuningJobEvent</a></code>
+- <code><a href="./src/resources/fine-tuning/jobs/jobs.ts">FineTuningJob</a></code>
+- <code><a href="./src/resources/fine-tuning/jobs/jobs.ts">FineTuningJobEvent</a></code>
+- <code><a href="./src/resources/fine-tuning/jobs/jobs.ts">FineTuningJobIntegration</a></code>
+- <code><a href="./src/resources/fine-tuning/jobs/jobs.ts">FineTuningJobWandbIntegration</a></code>
+- <code><a href="./src/resources/fine-tuning/jobs/jobs.ts">FineTuningJobWandbIntegrationObject</a></code>
 
 Methods:
 
-- <code title="post /fine_tuning/jobs">client.fineTuning.jobs.<a href="./src/resources/fine-tuning/jobs.ts">create</a>({ ...params }) -> FineTuningJob</code>
-- <code title="get /fine_tuning/jobs/{fine_tuning_job_id}">client.fineTuning.jobs.<a href="./src/resources/fine-tuning/jobs.ts">retrieve</a>(fineTuningJobId) -> FineTuningJob</code>
-- <code title="get /fine_tuning/jobs">client.fineTuning.jobs.<a href="./src/resources/fine-tuning/jobs.ts">list</a>({ ...params }) -> FineTuningJobsPage</code>
-- <code title="post /fine_tuning/jobs/{fine_tuning_job_id}/cancel">client.fineTuning.jobs.<a href="./src/resources/fine-tuning/jobs.ts">cancel</a>(fineTuningJobId) -> FineTuningJob</code>
-- <code title="get /fine_tuning/jobs/{fine_tuning_job_id}/events">client.fineTuning.jobs.<a href="./src/resources/fine-tuning/jobs.ts">listEvents</a>(fineTuningJobId, { ...params }) -> FineTuningJobEventsPage</code>
+- <code title="post /fine_tuning/jobs">client.fineTuning.jobs.<a href="./src/resources/fine-tuning/jobs/jobs.ts">create</a>({ ...params }) -> FineTuningJob</code>
+- <code title="get /fine_tuning/jobs/{fine_tuning_job_id}">client.fineTuning.jobs.<a href="./src/resources/fine-tuning/jobs/jobs.ts">retrieve</a>(fineTuningJobId) -> FineTuningJob</code>
+- <code title="get /fine_tuning/jobs">client.fineTuning.jobs.<a href="./src/resources/fine-tuning/jobs/jobs.ts">list</a>({ ...params }) -> FineTuningJobsPage</code>
+- <code title="post /fine_tuning/jobs/{fine_tuning_job_id}/cancel">client.fineTuning.jobs.<a href="./src/resources/fine-tuning/jobs/jobs.ts">cancel</a>(fineTuningJobId) -> FineTuningJob</code>
+- <code title="get /fine_tuning/jobs/{fine_tuning_job_id}/events">client.fineTuning.jobs.<a href="./src/resources/fine-tuning/jobs/jobs.ts">listEvents</a>(fineTuningJobId, { ...params }) -> FineTuningJobEventsPage</code>
+
+### Checkpoints
+
+Types:
+
+- <code><a href="./src/resources/fine-tuning/jobs/checkpoints.ts">FineTuningJobCheckpoint</a></code>
+
+Methods:
+
+- <code title="get /fine_tuning/jobs/{fine_tuning_job_id}/checkpoints">client.fineTuning.jobs.checkpoints.<a href="./src/resources/fine-tuning/jobs/checkpoints.ts">list</a>(fineTuningJobId, { ...params }) -> FineTuningJobCheckpointsPage</code>
 
 # Beta
 
@@ -214,6 +227,11 @@ Methods:
 
 Types:
 
+- <code><a href="./src/resources/beta/threads/threads.ts">AssistantResponseFormat</a></code>
+- <code><a href="./src/resources/beta/threads/threads.ts">AssistantResponseFormatOption</a></code>
+- <code><a href="./src/resources/beta/threads/threads.ts">AssistantToolChoice</a></code>
+- <code><a href="./src/resources/beta/threads/threads.ts">AssistantToolChoiceFunction</a></code>
+- <code><a href="./src/resources/beta/threads/threads.ts">AssistantToolChoiceOption</a></code>
 - <code><a href="./src/resources/beta/threads/threads.ts">Thread</a></code>
 - <code><a href="./src/resources/beta/threads/threads.ts">ThreadDeleted</a></code>
 

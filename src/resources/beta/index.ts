@@ -18,9 +18,12 @@ export {
   AssistantsPage,
   Assistants,
 } from './assistants/index';
-export { Beta } from './beta';
-export { Chat } from './chat/index';
 export {
+  AssistantResponseFormat,
+  AssistantResponseFormatOption,
+  AssistantToolChoice,
+  AssistantToolChoiceFunction,
+  AssistantToolChoiceOption,
   Thread,
   ThreadDeleted,
   ThreadCreateParams,
@@ -32,3 +35,5 @@ export {
   ThreadCreateAndRunStreamParams,
   Threads,
 } from './threads/index';
+export { Beta } from './beta';
+export { Chat } from './chat/index';
