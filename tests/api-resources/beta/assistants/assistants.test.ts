@@ -10,7 +10,7 @@ const openai = new OpenAI({
 
 describe('resource assistants', () => {
   test('create: only required params', async () => {
-    const responsePromise = openai.beta.assistants.create({ model: 'string' });
+    const responsePromise = openai.beta.assistants.create({ model: 'gpt-4-turbo' });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -22,7 +22,7 @@ describe('resource assistants', () => {
 
   test('create: required and optional params', async () => {
     const response = await openai.beta.assistants.create({
-      model: 'string',
+      model: 'gpt-4-turbo',
       description: 'string',
       file_ids: ['string', 'string', 'string'],
       instructions: 'string',

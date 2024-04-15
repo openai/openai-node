@@ -1,6 +1,5 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-export { FineTuning } from './fine-tuning';
 export {
   FineTuningJob,
   FineTuningJobEvent,
@@ -13,4 +12,10 @@ export {
   FineTuningJobsPage,
   FineTuningJobEventsPage,
   Jobs,
-} from './jobs/index';
+} from './jobs';
+export {
+  FineTuningJobCheckpoint,
+  CheckpointListParams,
+  FineTuningJobCheckpointsPage,
+  Checkpoints,
+} from './checkpoints';

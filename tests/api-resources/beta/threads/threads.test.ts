@@ -106,8 +106,11 @@ describe('resource threads', () => {
     const response = await openai.beta.threads.createAndRun({
       assistant_id: 'string',
       instructions: 'string',
+      max_completion_tokens: 256,
+      max_prompt_tokens: 256,
       metadata: {},
-      model: 'string',
+      model: 'gpt-4-turbo',
+      response_format: 'none',
       stream: false,
       temperature: 1,
       thread: {
@@ -118,7 +121,9 @@ describe('resource threads', () => {
         ],
         metadata: {},
       },
+      tool_choice: 'none',
       tools: [{ type: 'code_interpreter' }, { type: 'code_interpreter' }, { type: 'code_interpreter' }],
+      truncation_strategy: { type: 'auto', last_messages: 1 },
     });
   });
 });
