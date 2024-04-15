@@ -1,5 +1,14 @@
 # Changelog
 
+## 4.34.0 (2024-04-15)
+
+Full Changelog: [v4.33.1...v4.34.0](https://github.com/openai/openai-node/compare/v4.33.1...v4.34.0)
+
+### Features
+
+* **api:** add batch API ([#768](https://github.com/openai/openai-node/issues/768)) ([7fe34f2](https://github.com/openai/openai-node/commit/7fe34f2d0bda9c1cb116a593f02bd0cc15a52e12))
+* **api:** updates ([#766](https://github.com/openai/openai-node/issues/766)) ([52bcc47](https://github.com/openai/openai-node/commit/52bcc47043e4c3ffe15ae9e7ac0fa87e2493aad9))
+
 ## 4.33.1 (2024-04-12)
 
 Full Changelog: [v4.33.0...v4.33.1](https://github.com/openai/openai-node/compare/v4.33.0...v4.33.1)
