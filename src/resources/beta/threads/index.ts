@@ -28,6 +28,23 @@ export {
   Messages,
 } from './messages/index';
 export {
+  AssistantResponseFormat,
+  AssistantResponseFormatOption,
+  AssistantToolChoice,
+  AssistantToolChoiceFunction,
+  AssistantToolChoiceOption,
+  Thread,
+  ThreadDeleted,
+  ThreadCreateParams,
+  ThreadUpdateParams,
+  ThreadCreateAndRunParams,
+  ThreadCreateAndRunParamsNonStreaming,
+  ThreadCreateAndRunParamsStreaming,
+  ThreadCreateAndRunPollParams,
+  ThreadCreateAndRunStreamParams,
+  Threads,
+} from './threads';
+export {
   RequiredActionFunctionToolCall,
   Run,
   RunStatus,
@@ -47,15 +64,3 @@ export {
   RunsPage,
   Runs,
 } from './runs/index';
-export {
-  Thread,
-  ThreadDeleted,
-  ThreadCreateParams,
-  ThreadUpdateParams,
-  ThreadCreateAndRunParams,
-  ThreadCreateAndRunParamsNonStreaming,
-  ThreadCreateAndRunParamsStreaming,
-  ThreadCreateAndRunPollParams,
-  ThreadCreateAndRunStreamParams,
-  Threads,
-} from './threads';
