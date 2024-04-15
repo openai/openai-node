@@ -337,3 +337,17 @@ Methods:
 
 - <code title="get /threads/{thread_id}/messages/{message_id}/files/{file_id}">client.beta.threads.messages.files.<a href="./src/resources/beta/threads/messages/files.ts">retrieve</a>(threadId, messageId, fileId) -> MessageFile</code>
 - <code title="get /threads/{thread_id}/messages/{message_id}/files">client.beta.threads.messages.files.<a href="./src/resources/beta/threads/messages/files.ts">list</a>(threadId, messageId, { ...params }) -> MessageFilesPage</code>
+
+# Batches
+
+Types:
+
+- <code><a href="./src/resources/batches.ts">Batch</a></code>
+- <code><a href="./src/resources/batches.ts">BatchError</a></code>
+- <code><a href="./src/resources/batches.ts">BatchRequestCounts</a></code>
+
+Methods:
+
+- <code title="post /batches">client.batches.<a href="./src/resources/batches.ts">create</a>({ ...params }) -> Batch</code>
+- <code title="get /batches/{batch_id}">client.batches.<a href="./src/resources/batches.ts">retrieve</a>(batchId) -> Batch</code>
+- <code title="post /batches/{batch_id}/cancel">client.batches.<a href="./src/resources/batches.ts">cancel</a>(batchId) -> Batch</code>
