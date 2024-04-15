@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.35.0 (2024-04-15)
+
+Full Changelog: [v4.34.0...v4.35.0](https://github.com/openai/openai-node/compare/v4.34.0...v4.35.0)
+
+### Features
+
+* **errors:** add request_id property ([#769](https://github.com/openai/openai-node/issues/769)) ([43aa6a1](https://github.com/openai/openai-node/commit/43aa6a19cfb1448903dfaddc4da3def2eda9cbab))
+
 ## 4.34.0 (2024-04-15)
 
 Full Changelog: [v4.33.1...v4.34.0](https://github.com/openai/openai-node/compare/v4.33.1...v4.34.0)
