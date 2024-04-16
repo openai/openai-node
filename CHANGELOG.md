@@ -1,5 +1,19 @@
 # Changelog
 
+## 4.36.0 (2024-04-16)
+
+Full Changelog: [v4.35.0...v4.36.0](https://github.com/openai/openai-node/compare/v4.35.0...v4.36.0)
+
+### Features
+
+* **client:** add header OpenAI-Project ([#772](https://github.com/openai/openai-node/issues/772)) ([bb4df37](https://github.com/openai/openai-node/commit/bb4df3722082fb44b7d4feb7a47df796149150a2))
+* extract chat models to a named enum ([#775](https://github.com/openai/openai-node/issues/775)) ([141d2ed](https://github.com/openai/openai-node/commit/141d2ed308141dc751869353208e4d0632d3650c))
+
+
+### Build System
+
+* configure UTF-8 locale in devcontainer ([#774](https://github.com/openai/openai-node/issues/774)) ([bebf4f0](https://github.com/openai/openai-node/commit/bebf4f0ca1f884f8747caff0f0e065aafffde096))
+
 ## 4.35.0 (2024-04-15)
 
 Full Changelog: [v4.34.0...v4.35.0](https://github.com/openai/openai-node/compare/v4.34.0...v4.35.0)
