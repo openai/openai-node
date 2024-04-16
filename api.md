@@ -20,6 +20,10 @@ Methods:
 
 # Chat
 
+Types:
+
+- <code><a href="./src/resources/chat/chat.ts">ChatModel</a></code>
+
 ## Completions
 
 Types:
