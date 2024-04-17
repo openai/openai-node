@@ -179,6 +179,55 @@ Methods:
 
 # Beta
 
+## VectorStores
+
+Types:
+
+- <code><a href="./src/resources/beta/vector-stores/vector-stores.ts">VectorStore</a></code>
+- <code><a href="./src/resources/beta/vector-stores/vector-stores.ts">VectorStoreDeleted</a></code>
+
+Methods:
+
+- <code title="post /vector_stores">client.beta.vectorStores.<a href="./src/resources/beta/vector-stores/vector-stores.ts">create</a>({ ...params }) -> VectorStore</code>
+- <code title="get /vector_stores/{vector_store_id}">client.beta.vectorStores.<a href="./src/resources/beta/vector-stores/vector-stores.ts">retrieve</a>(vectorStoreId) -> VectorStore</code>
+- <code title="post /vector_stores/{vector_store_id}">client.beta.vectorStores.<a href="./src/resources/beta/vector-stores/vector-stores.ts">update</a>(vectorStoreId, { ...params }) -> VectorStore</code>
+- <code title="get /vector_stores">client.beta.vectorStores.<a href="./src/resources/beta/vector-stores/vector-stores.ts">list</a>({ ...params }) -> VectorStoresPage</code>
+- <code title="delete /vector_stores/{vector_store_id}">client.beta.vectorStores.<a href="./src/resources/beta/vector-stores/vector-stores.ts">del</a>(vectorStoreId) -> VectorStoreDeleted</code>
+
+### Files
+
+Types:
+
+- <code><a href="./src/resources/beta/vector-stores/files.ts">VectorStoreFile</a></code>
+- <code><a href="./src/resources/beta/vector-stores/files.ts">VectorStoreFileDeleted</a></code>
+
+Methods:
+
+- <code title="post /vector_stores/{vector_store_id}/files">client.beta.vectorStores.files.<a href="./src/resources/beta/vector-stores/files.ts">create</a>(vectorStoreId, { ...params }) -> VectorStoreFile</code>
+- <code title="get /vector_stores/{vector_store_id}/files/{file_id}">client.beta.vectorStores.files.<a href="./src/resources/beta/vector-stores/files.ts">retrieve</a>(vectorStoreId, fileId) -> VectorStoreFile</code>
+- <code title="get /vector_stores/{vector_store_id}/files">client.beta.vectorStores.files.<a href="./src/resources/beta/vector-stores/files.ts">list</a>(vectorStoreId, { ...params }) -> VectorStoreFilesPage</code>
+- <code title="delete /vector_stores/{vector_store_id}/files/{file_id}">client.beta.vectorStores.files.<a href="./src/resources/beta/vector-stores/files.ts">del</a>(vectorStoreId, fileId) -> VectorStoreFileDeleted</code>
+- <code>client.beta.vectorStores.files.<a href="./src/resources/beta/vector-stores/files.ts">createAndPoll</a>(vectorStoreId, body, options?) -> Promise&lt;VectorStoreFile&gt;</code>
+- <code>client.beta.vectorStores.files.<a href="./src/resources/beta/vector-stores/files.ts">poll</a>(vectorStoreId, fileId, options?) -> Promise&lt;VectorStoreFile&gt;</code>
+- <code>client.beta.vectorStores.files.<a href="./src/resources/beta/vector-stores/files.ts">upload</a>(vectorStoreId, file, options?) -> Promise&lt;VectorStoreFile&gt;</code>
+- <code>client.beta.vectorStores.files.<a href="./src/resources/beta/vector-stores/files.ts">uploadAndPoll</a>(vectorStoreId, file, options?) -> Promise&lt;VectorStoreFile&gt;</code>
+
+### FileBatches
+
+Types:
+
+- <code><a href="./src/resources/beta/vector-stores/file-batches.ts">VectorStoreFileBatch</a></code>
+
+Methods:
+
+- <code title="post /vector_stores/{vector_store_id}/file_batches">client.beta.vectorStores.fileBatches.<a href="./src/resources/beta/vector-stores/file-batches.ts">create</a>(vectorStoreId, { ...params }) -> VectorStoreFileBatch</code>
+- <code title="get /vector_stores/{vector_store_id}/file_batches/{batch_id}">client.beta.vectorStores.fileBatches.<a href="./src/resources/beta/vector-stores/file-batches.ts">retrieve</a>(vectorStoreId, batchId) -> VectorStoreFileBatch</code>
+- <code title="post /vector_stores/{vector_store_id}/file_batches/{batch_id}/cancel">client.beta.vectorStores.fileBatches.<a href="./src/resources/beta/vector-stores/file-batches.ts">cancel</a>(vectorStoreId, batchId) -> VectorStoreFileBatch</code>
+- <code title="get /vector_stores/{vector_store_id}/file_batches/{batch_id}/files">client.beta.vectorStores.fileBatches.<a href="./src/resources/beta/vector-stores/file-batches.ts">listFiles</a>(vectorStoreId, batchId, { ...params }) -> VectorStoreFilesPage</code>
+- <code>client.beta.vectorStores.fileBatches.<a href="./src/resources/beta/vector-stores/file-batches.ts">createAndPoll</a>(vectorStoreId, body, options?) -> Promise&lt;VectorStoreFileBatch&gt;</code>
+- <code>client.beta.vectorStores.fileBatches.<a href="./src/resources/beta/vector-stores/file-batches.ts">poll</a>(vectorStoreId, batchId, options?) -> Promise&lt;VectorStoreFileBatch&gt;</code>
+- <code>client.beta.vectorStores.fileBatches.<a href="./src/resources/beta/vector-stores/file-batches.ts">uploadAndPoll</a>(vectorStoreId, { files, fileIds = [] }, options?) -> Promise&lt;VectorStoreFileBatch&gt;</code>
+
 ## Chat
 
 ### Completions
@@ -193,39 +242,25 @@ Methods:
 
 Types:
 
-- <code><a href="./src/resources/beta/assistants/assistants.ts">Assistant</a></code>
-- <code><a href="./src/resources/beta/assistants/assistants.ts">AssistantDeleted</a></code>
-- <code><a href="./src/resources/beta/assistants/assistants.ts">AssistantStreamEvent</a></code>
-- <code><a href="./src/resources/beta/assistants/assistants.ts">AssistantTool</a></code>
-- <code><a href="./src/resources/beta/assistants/assistants.ts">CodeInterpreterTool</a></code>
-- <code><a href="./src/resources/beta/assistants/assistants.ts">FunctionTool</a></code>
-- <code><a href="./src/resources/beta/assistants/assistants.ts">MessageStreamEvent</a></code>
-- <code><a href="./src/resources/beta/assistants/assistants.ts">RetrievalTool</a></code>
-- <code><a href="./src/resources/beta/assistants/assistants.ts">RunStepStreamEvent</a></code>
-- <code><a href="./src/resources/beta/assistants/assistants.ts">RunStreamEvent</a></code>
-- <code><a href="./src/resources/beta/assistants/assistants.ts">ThreadStreamEvent</a></code>
+- <code><a href="./src/resources/beta/assistants.ts">Assistant</a></code>
+- <code><a href="./src/resources/beta/assistants.ts">AssistantDeleted</a></code>
+- <code><a href="./src/resources/beta/assistants.ts">AssistantStreamEvent</a></code>
+- <code><a href="./src/resources/beta/assistants.ts">AssistantTool</a></code>
+- <code><a href="./src/resources/beta/assistants.ts">CodeInterpreterTool</a></code>
+- <code><a href="./src/resources/beta/assistants.ts">FileSearchTool</a></code>
+- <code><a href="./src/resources/beta/assistants.ts">FunctionTool</a></code>
+- <code><a href="./src/resources/beta/assistants.ts">MessageStreamEvent</a></code>
+- <code><a href="./src/resources/beta/assistants.ts">RunStepStreamEvent</a></code>
+- <code><a href="./src/resources/beta/assistants.ts">RunStreamEvent</a></code>
+- <code><a href="./src/resources/beta/assistants.ts">ThreadStreamEvent</a></code>
 
 Methods:
 
-- <code title="post /assistants">client.beta.assistants.<a href="./src/resources/beta/assistants/assistants.ts">create</a>({ ...params }) -> Assistant</code>
-- <code title="get /assistants/{assistant_id}">client.beta.assistants.<a href="./src/resources/beta/assistants/assistants.ts">retrieve</a>(assistantId) -> Assistant</code>
-- <code title="post /assistants/{assistant_id}">client.beta.assistants.<a href="./src/resources/beta/assistants/assistants.ts">update</a>(assistantId, { ...params }) -> Assistant</code>
-- <code title="get /assistants">client.beta.assistants.<a href="./src/resources/beta/assistants/assistants.ts">list</a>({ ...params }) -> AssistantsPage</code>
-- <code title="delete /assistants/{assistant_id}">client.beta.assistants.<a href="./src/resources/beta/assistants/assistants.ts">del</a>(assistantId) -> AssistantDeleted</code>
-
-### Files
-
-Types:
-
-- <code><a href="./src/resources/beta/assistants/files.ts">AssistantFile</a></code>
-- <code><a href="./src/resources/beta/assistants/files.ts">FileDeleteResponse</a></code>
-
-Methods:
-
-- <code title="post /assistants/{assistant_id}/files">client.beta.assistants.files.<a href="./src/resources/beta/assistants/files.ts">create</a>(assistantId, { ...params }) -> AssistantFile</code>
-- <code title="get /assistants/{assistant_id}/files/{file_id}">client.beta.assistants.files.<a href="./src/resources/beta/assistants/files.ts">retrieve</a>(assistantId, fileId) -> AssistantFile</code>
-- <code title="get /assistants/{assistant_id}/files">client.beta.assistants.files.<a href="./src/resources/beta/assistants/files.ts">list</a>(assistantId, { ...params }) -> AssistantFilesPage</code>
-- <code title="delete /assistants/{assistant_id}/files/{file_id}">client.beta.assistants.files.<a href="./src/resources/beta/assistants/files.ts">del</a>(assistantId, fileId) -> FileDeleteResponse</code>
+- <code title="post /assistants">client.beta.assistants.<a href="./src/resources/beta/assistants.ts">create</a>({ ...params }) -> Assistant</code>
+- <code title="get /assistants/{assistant_id}">client.beta.assistants.<a href="./src/resources/beta/assistants.ts">retrieve</a>(assistantId) -> Assistant</code>
+- <code title="post /assistants/{assistant_id}">client.beta.assistants.<a href="./src/resources/beta/assistants.ts">update</a>(assistantId, { ...params }) -> Assistant</code>
+- <code title="get /assistants">client.beta.assistants.<a href="./src/resources/beta/assistants.ts">list</a>({ ...params }) -> AssistantsPage</code>
+- <code title="delete /assistants/{assistant_id}">client.beta.assistants.<a href="./src/resources/beta/assistants.ts">del</a>(assistantId) -> AssistantDeleted</code>
 
 ## Threads
 
@@ -280,11 +315,11 @@ Types:
 - <code><a href="./src/resources/beta/threads/runs/steps.ts">CodeInterpreterOutputImage</a></code>
 - <code><a href="./src/resources/beta/threads/runs/steps.ts">CodeInterpreterToolCall</a></code>
 - <code><a href="./src/resources/beta/threads/runs/steps.ts">CodeInterpreterToolCallDelta</a></code>
+- <code><a href="./src/resources/beta/threads/runs/steps.ts">FileSearchToolCall</a></code>
+- <code><a href="./src/resources/beta/threads/runs/steps.ts">FileSearchToolCallDelta</a></code>
 - <code><a href="./src/resources/beta/threads/runs/steps.ts">FunctionToolCall</a></code>
 - <code><a href="./src/resources/beta/threads/runs/steps.ts">FunctionToolCallDelta</a></code>
 - <code><a href="./src/resources/beta/threads/runs/steps.ts">MessageCreationStepDetails</a></code>
-- <code><a href="./src/resources/beta/threads/runs/steps.ts">RetrievalToolCall</a></code>
-- <code><a href="./src/resources/beta/threads/runs/steps.ts">RetrievalToolCallDelta</a></code>
 - <code><a href="./src/resources/beta/threads/runs/steps.ts">RunStep</a></code>
 - <code><a href="./src/resources/beta/threads/runs/steps.ts">RunStepDelta</a></code>
 - <code><a href="./src/resources/beta/threads/runs/steps.ts">RunStepDeltaEvent</a></code>
@@ -303,44 +338,33 @@ Methods:
 
 Types:
 
-- <code><a href="./src/resources/beta/threads/messages/messages.ts">Annotation</a></code>
-- <code><a href="./src/resources/beta/threads/messages/messages.ts">AnnotationDelta</a></code>
-- <code><a href="./src/resources/beta/threads/messages/messages.ts">FileCitationAnnotation</a></code>
-- <code><a href="./src/resources/beta/threads/messages/messages.ts">FileCitationDeltaAnnotation</a></code>
-- <code><a href="./src/resources/beta/threads/messages/messages.ts">FilePathAnnotation</a></code>
-- <code><a href="./src/resources/beta/threads/messages/messages.ts">FilePathDeltaAnnotation</a></code>
-- <code><a href="./src/resources/beta/threads/messages/messages.ts">ImageFile</a></code>
-- <code><a href="./src/resources/beta/threads/messages/messages.ts">ImageFileContentBlock</a></code>
-- <code><a href="./src/resources/beta/threads/messages/messages.ts">ImageFileDelta</a></code>
-- <code><a href="./src/resources/beta/threads/messages/messages.ts">ImageFileDeltaBlock</a></code>
-- <code><a href="./src/resources/beta/threads/messages/messages.ts">Message</a></code>
-- <code><a href="./src/resources/beta/threads/messages/messages.ts">MessageContent</a></code>
-- <code><a href="./src/resources/beta/threads/messages/messages.ts">MessageContentDelta</a></code>
-- <code><a href="./src/resources/beta/threads/messages/messages.ts">MessageDeleted</a></code>
-- <code><a href="./src/resources/beta/threads/messages/messages.ts">MessageDelta</a></code>
-- <code><a href="./src/resources/beta/threads/messages/messages.ts">MessageDeltaEvent</a></code>
-- <code><a href="./src/resources/beta/threads/messages/messages.ts">Text</a></code>
-- <code><a href="./src/resources/beta/threads/messages/messages.ts">TextContentBlock</a></code>
-- <code><a href="./src/resources/beta/threads/messages/messages.ts">TextDelta</a></code>
-- <code><a href="./src/resources/beta/threads/messages/messages.ts">TextDeltaBlock</a></code>
+- <code><a href="./src/resources/beta/threads/messages.ts">Annotation</a></code>
+- <code><a href="./src/resources/beta/threads/messages.ts">AnnotationDelta</a></code>
+- <code><a href="./src/resources/beta/threads/messages.ts">FileCitationAnnotation</a></code>
+- <code><a href="./src/resources/beta/threads/messages.ts">FileCitationDeltaAnnotation</a></code>
+- <code><a href="./src/resources/beta/threads/messages.ts">FilePathAnnotation</a></code>
+- <code><a href="./src/resources/beta/threads/messages.ts">FilePathDeltaAnnotation</a></code>
+- <code><a href="./src/resources/beta/threads/messages.ts">ImageFile</a></code>
+- <code><a href="./src/resources/beta/threads/messages.ts">ImageFileContentBlock</a></code>
+- <code><a href="./src/resources/beta/threads/messages.ts">ImageFileDelta</a></code>
+- <code><a href="./src/resources/beta/threads/messages.ts">ImageFileDeltaBlock</a></code>
+- <code><a href="./src/resources/beta/threads/messages.ts">Message</a></code>
+- <code><a href="./src/resources/beta/threads/messages.ts">MessageContent</a></code>
+- <code><a href="./src/resources/beta/threads/messages.ts">MessageContentDelta</a></code>
+- <code><a href="./src/resources/beta/threads/messages.ts">MessageDeleted</a></code>
+- <code><a href="./src/resources/beta/threads/messages.ts">MessageDelta</a></code>
+- <code><a href="./src/resources/beta/threads/messages.ts">MessageDeltaEvent</a></code>
+- <code><a href="./src/resources/beta/threads/messages.ts">Text</a></code>
+- <code><a href="./src/resources/beta/threads/messages.ts">TextContentBlock</a></code>
+- <code><a href="./src/resources/beta/threads/messages.ts">TextDelta</a></code>
+- <code><a href="./src/resources/beta/threads/messages.ts">TextDeltaBlock</a></code>
 
 Methods:
 
-- <code title="post /threads/{thread_id}/messages">client.beta.threads.messages.<a href="./src/resources/beta/threads/messages/messages.ts">create</a>(threadId, { ...params }) -> Message</code>
-- <code title="get /threads/{thread_id}/messages/{message_id}">client.beta.threads.messages.<a href="./src/resources/beta/threads/messages/messages.ts">retrieve</a>(threadId, messageId) -> Message</code>
-- <code title="post /threads/{thread_id}/messages/{message_id}">client.beta.threads.messages.<a href="./src/resources/beta/threads/messages/messages.ts">update</a>(threadId, messageId, { ...params }) -> Message</code>
-- <code title="get /threads/{thread_id}/messages">client.beta.threads.messages.<a href="./src/resources/beta/threads/messages/messages.ts">list</a>(threadId, { ...params }) -> MessagesPage</code>
-
-#### Files
-
-Types:
-
-- <code><a href="./src/resources/beta/threads/messages/files.ts">MessageFile</a></code>
-
-Methods:
-
-- <code title="get /threads/{thread_id}/messages/{message_id}/files/{file_id}">client.beta.threads.messages.files.<a href="./src/resources/beta/threads/messages/files.ts">retrieve</a>(threadId, messageId, fileId) -> MessageFile</code>
-- <code title="get /threads/{thread_id}/messages/{message_id}/files">client.beta.threads.messages.files.<a href="./src/resources/beta/threads/messages/files.ts">list</a>(threadId, messageId, { ...params }) -> MessageFilesPage</code>
+- <code title="post /threads/{thread_id}/messages">client.beta.threads.messages.<a href="./src/resources/beta/threads/messages.ts">create</a>(threadId, { ...params }) -> Message</code>
+- <code title="get /threads/{thread_id}/messages/{message_id}">client.beta.threads.messages.<a href="./src/resources/beta/threads/messages.ts">retrieve</a>(threadId, messageId) -> Message</code>
+- <code title="post /threads/{thread_id}/messages/{message_id}">client.beta.threads.messages.<a href="./src/resources/beta/threads/messages.ts">update</a>(threadId, messageId, { ...params }) -> Message</code>
+- <code title="get /threads/{thread_id}/messages">client.beta.threads.messages.<a href="./src/resources/beta/threads/messages.ts">list</a>(threadId, { ...params }) -> MessagesPage</code>
 
 # Batches
 
