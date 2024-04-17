@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.37.0 (2024-04-17)
+
+Full Changelog: [v4.36.0...v4.37.0](https://github.com/openai/openai-node/compare/v4.36.0...v4.37.0)
+
+### Features
+
+* **api:** add vector stores ([#776](https://github.com/openai/openai-node/issues/776)) ([8bb929b](https://github.com/openai/openai-node/commit/8bb929b2ee91c1bec0a00347bf4f7628652d1be3))
+
 ## 4.36.0 (2024-04-16)
 
 Full Changelog: [v4.35.0...v4.36.0](https://github.com/openai/openai-node/compare/v4.35.0...v4.36.0)
