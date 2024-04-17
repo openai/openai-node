@@ -9,12 +9,23 @@ const openai = new OpenAI({
 });
 
 describe('resource files', () => {
+  test('create: only required params', async () => {
+    const responsePromise = openai.beta.vectorStores.files.create('vs_abc123', { file_id: 'string' });
+    const rawResponse = await responsePromise.asResponse();
+    expect(rawResponse).toBeInstanceOf(Response);
+    const response = await responsePromise;
+    expect(response).not.toBeInstanceOf(Response);
+    const dataAndResponse = await responsePromise.withResponse();
+    expect(dataAndResponse.data).toBe(response);
+    expect(dataAndResponse.response).toBe(rawResponse);
+  });
+
+  test('create: required and optional params', async () => {
+    const response = await openai.beta.vectorStores.files.create('vs_abc123', { file_id: 'string' });
+  });
+
   test('retrieve', async () => {
-    const responsePromise = openai.beta.threads.messages.files.retrieve(
-      'thread_abc123',
-      'msg_abc123',
-      'file-abc123',
-    );
+    const responsePromise = openai.beta.vectorStores.files.retrieve('vs_abc123', 'file-abc123');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -27,14 +38,14 @@ describe('resource files', () => {
   test('retrieve: request options instead of params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openai.beta.threads.messages.files.retrieve('thread_abc123', 'msg_abc123', 'file-abc123', {
+      openai.beta.vectorStores.files.retrieve('vs_abc123', 'file-abc123', {
         path: '/_stainless_unknown_path',
       }),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
   test('list', async () => {
-    const responsePromise = openai.beta.threads.messages.files.list('string', 'string');
+    const responsePromise = openai.beta.vectorStores.files.list('string');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -47,19 +58,36 @@ describe('resource files', () => {
   test('list: request options instead of params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openai.beta.threads.messages.files.list('string', 'string', { path: '/_stainless_unknown_path' }),
+      openai.beta.vectorStores.files.list('string', { path: '/_stainless_unknown_path' }),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
   test('list: request options and params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openai.beta.threads.messages.files.list(
+      openai.beta.vectorStores.files.list(
         'string',
-        'string',
-        { after: 'string', before: 'string', limit: 0, order: 'asc' },
+        { after: 'string', before: 'string', filter: 'in_progress', limit: 0, order: 'asc' },
         { path: '/_stainless_unknown_path' },
       ),
+    ).rejects.toThrow(OpenAI.NotFoundError);
+  });
+
+  test('del', async () => {
+    const responsePromise = openai.beta.vectorStores.files.del('string', 'string');
+    const rawResponse = await responsePromise.asResponse();
+    expect(rawResponse).toBeInstanceOf(Response);
+    const response = await responsePromise;
+    expect(response).not.toBeInstanceOf(Response);
+    const dataAndResponse = await responsePromise.withResponse();
+    expect(dataAndResponse.data).toBe(response);
+    expect(dataAndResponse.response).toBe(rawResponse);
+  });
+
+  test('del: request options instead of params are passed correctly', async () => {
+    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
+    await expect(
+      openai.beta.vectorStores.files.del('string', 'string', { path: '/_stainless_unknown_path' }),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 });

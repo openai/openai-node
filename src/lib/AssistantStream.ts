@@ -7,7 +7,7 @@ import {
   ImageFile,
   TextDelta,
   Messages,
-} from 'openai/resources/beta/threads/messages/messages';
+} from 'openai/resources/beta/threads/messages';
 import * as Core from 'openai/core';
 import { RequestOptions } from 'openai/core';
 import {
@@ -30,7 +30,7 @@ import {
   MessageStreamEvent,
   RunStepStreamEvent,
   RunStreamEvent,
-} from 'openai/resources/beta/assistants/assistants';
+} from 'openai/resources/beta/assistants';
 import { RunStep, RunStepDelta, ToolCall, ToolCallDelta } from 'openai/resources/beta/threads/runs/steps';
 import { ThreadCreateAndRunParamsBase, Threads } from 'openai/resources/beta/threads/threads';
 import MessageDelta = Messages.MessageDelta;

@@ -102,7 +102,7 @@ Documentation for each method, request param, and response field are available i
 
 ### Polling Helpers
 
-When interacting with the API some actions such as starting a Run may take time to complete. The SDK includes
+When interacting with the API some actions such as starting a Run and adding files to vector stores are asynchronous and take time to complete. The SDK includes
 helper functions which will poll the status until it reaches a terminal state and then return the resulting object.
 If an API method results in an action which could benefit from polling there will be a corresponding version of the
 method ending in 'AndPoll'.
@@ -116,6 +116,20 @@ const run = await openai.beta.threads.runs.createAndPoll(thread.id, {
 ```
 
 More information on the lifecycle of a Run can be found in the [Run Lifecycle Documentation](https://platform.openai.com/docs/assistants/how-it-works/run-lifecycle)
+
+### Bulk Upload Helpers
+
+When creating an interacting with vector stores, you can use the polling helpers to monitor the status of operations.
+For convenience, we also provide a bulk upload helper to allow you to simultaneously upload several files at once.
+
+```ts
+const fileList = [
+  createReadStream('/home/data/example.pdf'),
+  ...
+];
+
+const batch = await openai.vectorStores.fileBatches.uploadAndPoll(vectorStore.id, fileList);
+```
 
 ### Streaming Helpers
 

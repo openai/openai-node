@@ -3,18 +3,15 @@
 import * as Core from 'openai/core';
 import { APIResource } from 'openai/resource';
 import { isRequestOptions } from 'openai/core';
-import * as AssistantsAPI from 'openai/resources/beta/assistants/assistants';
+import * as AssistantsAPI from 'openai/resources/beta/assistants';
 import * as Shared from 'openai/resources/shared';
-import * as FilesAPI from 'openai/resources/beta/assistants/files';
+import * as MessagesAPI from 'openai/resources/beta/threads/messages';
 import * as ThreadsAPI from 'openai/resources/beta/threads/threads';
-import * as MessagesAPI from 'openai/resources/beta/threads/messages/messages';
 import * as RunsAPI from 'openai/resources/beta/threads/runs/runs';
 import * as StepsAPI from 'openai/resources/beta/threads/runs/steps';
 import { CursorPage, type CursorPageParams } from 'openai/pagination';
 
 export class Assistants extends APIResource {
-  files: FilesAPI.Files = new FilesAPI.Files(this._client);
-
   /**
    * Create an assistant with a model and instructions.
    */
@@ -22,7 +19,7 @@ export class Assistants extends APIResource {
     return this._client.post('/assistants', {
       body,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
     });
   }
 
@@ -32,7 +29,7 @@ export class Assistants extends APIResource {
   retrieve(assistantId: string, options?: Core.RequestOptions): Core.APIPromise<Assistant> {
     return this._client.get(`/assistants/${assistantId}`, {
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
     });
   }
 
@@ -47,7 +44,7 @@ export class Assistants extends APIResource {
     return this._client.post(`/assistants/${assistantId}`, {
       body,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
     });
   }
 
@@ -69,7 +66,7 @@ export class Assistants extends APIResource {
     return this._client.getAPIList('/assistants', AssistantsPage, {
       query,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
     });
   }
 
@@ -79,7 +76,7 @@ export class Assistants extends APIResource {
   del(assistantId: string, options?: Core.RequestOptions): Core.APIPromise<AssistantDeleted> {
     return this._client.delete(`/assistants/${assistantId}`, {
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
     });
   }
 }
@@ -104,13 +101,6 @@ export interface Assistant {
    * The description of the assistant. The maximum length is 512 characters.
    */
   description: string | null;
-
-  /**
-   * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs
-   * attached to this assistant. There can be a maximum of 20 files attached to the
-   * assistant. Files are ordered by their creation date in ascending order.
-   */
-  file_ids: Array<string>;
 
   /**
    * The system instructions that the assistant uses. The maximum length is 256,000
@@ -147,9 +137,53 @@ export interface Assistant {
 
   /**
    * A list of tool enabled on the assistant. There can be a maximum of 128 tools per
-   * assistant. Tools can be of types `code_interpreter`, `retrieval`, or `function`.
+   * assistant. Tools can be of types `code_interpreter`, `file_search`, or
+   * `function`.
    */
   tools: Array<AssistantTool>;
+
+  /**
+   * A set of resources that are used by the assistant's tools. The resources are
+   * specific to the type of tool. For example, the `code_interpreter` tool requires
+   * a list of file IDs, while the `file_search` tool requires a list of vector store
+   * IDs.
+   */
+  tool_resources?: Assistant.ToolResources | null;
+}
+
+export namespace Assistant {
+  /**
+   * A set of resources that are used by the assistant's tools. The resources are
+   * specific to the type of tool. For example, the `code_interpreter` tool requires
+   * a list of file IDs, while the `file_search` tool requires a list of vector store
+   * IDs.
+   */
+  export interface ToolResources {
+    code_interpreter?: ToolResources.CodeInterpreter;
+
+    file_search?: ToolResources.FileSearch;
+  }
+
+  export namespace ToolResources {
+    export interface CodeInterpreter {
+      /**
+       * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs made
+       * available to the `code_interpreter`` tool. There can be a maximum of 20 files
+       * associated with the tool.
+       */
+      file_ids?: Array<string>;
+    }
+
+    export interface FileSearch {
+      /**
+       * The ID of the
+       * [vector store](https://platform.openai.com/docs/api-reference/vector-stores/object)
+       * attached to this assistant. There can be a maximum of 1 vector store attached to
+       * the assistant.
+       */
+      vector_store_ids?: Array<string>;
+    }
+  }
 }
 
 export interface AssistantDeleted {
@@ -535,13 +569,20 @@ export namespace AssistantStreamEvent {
   }
 }
 
-export type AssistantTool = CodeInterpreterTool | RetrievalTool | FunctionTool;
+export type AssistantTool = CodeInterpreterTool | FileSearchTool | FunctionTool;
 
 export interface CodeInterpreterTool {
   /**
    * The type of tool being defined: `code_interpreter`
    */
   type: 'code_interpreter';
+}
+
+export interface FileSearchTool {
+  /**
+   * The type of tool being defined: `file_search`
+   */
+  type: 'file_search';
 }
 
 export interface FunctionTool {
@@ -640,13 +681,6 @@ export namespace MessageStreamEvent {
 
     event: 'thread.message.incomplete';
   }
-}
-
-export interface RetrievalTool {
-  /**
-   * The type of tool being defined: `retrieval`
-   */
-  type: 'retrieval';
 }
 
 /**
@@ -957,13 +991,6 @@ export interface AssistantCreateParams {
   description?: string | null;
 
   /**
-   * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs
-   * attached to this assistant. There can be a maximum of 20 files attached to the
-   * assistant. Files are ordered by their creation date in ascending order.
-   */
-  file_ids?: Array<string>;
-
-  /**
    * The system instructions that the assistant uses. The maximum length is 256,000
    * characters.
    */
@@ -983,10 +1010,115 @@ export interface AssistantCreateParams {
   name?: string | null;
 
   /**
+   * Specifies the format that the model must output. Compatible with
+   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-and-gpt-4-turbo) and
+   * all GPT-3.5 Turbo models newer than `gpt-3.5-turbo-1106`.
+   *
+   * Setting to `{ "type": "json_object" }` enables JSON mode, which guarantees the
+   * message the model generates is valid JSON.
+   *
+   * **Important:** when using JSON mode, you **must** also instruct the model to
+   * produce JSON yourself via a system or user message. Without this, the model may
+   * generate an unending stream of whitespace until the generation reaches the token
+   * limit, resulting in a long-running and seemingly "stuck" request. Also note that
+   * the message content may be partially cut off if `finish_reason="length"`, which
+   * indicates the generation exceeded `max_tokens` or the conversation exceeded the
+   * max context length.
+   */
+  response_format?: ThreadsAPI.AssistantResponseFormatOption | null;
+
+  /**
+   * What sampling temperature to use, between 0 and 2. Higher values like 0.8 will
+   * make the output more random, while lower values like 0.2 will make it more
+   * focused and deterministic.
+   */
+  temperature?: number | null;
+
+  /**
+   * A set of resources that are used by the assistant's tools. The resources are
+   * specific to the type of tool. For example, the `code_interpreter` tool requires
+   * a list of file IDs, while the `file_search` tool requires a list of vector store
+   * IDs.
+   */
+  tool_resources?: AssistantCreateParams.ToolResources | null;
+
+  /**
    * A list of tool enabled on the assistant. There can be a maximum of 128 tools per
-   * assistant. Tools can be of types `code_interpreter`, `retrieval`, or `function`.
+   * assistant. Tools can be of types `code_interpreter`, `file_search`, or
+   * `function`.
    */
   tools?: Array<AssistantTool>;
+
+  /**
+   * An alternative to sampling with temperature, called nucleus sampling, where the
+   * model considers the results of the tokens with top_p probability mass. So 0.1
+   * means only the tokens comprising the top 10% probability mass are considered.
+   *
+   * We generally recommend altering this or temperature but not both.
+   */
+  top_p?: number | null;
+}
+
+export namespace AssistantCreateParams {
+  /**
+   * A set of resources that are used by the assistant's tools. The resources are
+   * specific to the type of tool. For example, the `code_interpreter` tool requires
+   * a list of file IDs, while the `file_search` tool requires a list of vector store
+   * IDs.
+   */
+  export interface ToolResources {
+    code_interpreter?: ToolResources.CodeInterpreter;
+
+    file_search?: ToolResources.FileSearch;
+  }
+
+  export namespace ToolResources {
+    export interface CodeInterpreter {
+      /**
+       * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs made
+       * available to the `code_interpreter` tool. There can be a maximum of 20 files
+       * associated with the tool.
+       */
+      file_ids?: Array<string>;
+    }
+
+    export interface FileSearch {
+      /**
+       * The
+       * [vector store](https://platform.openai.com/docs/api-reference/vector-stores/object)
+       * attached to this assistant. There can be a maximum of 1 vector store attached to
+       * the assistant.
+       */
+      vector_store_ids?: Array<string>;
+
+      /**
+       * A helper to create a
+       * [vector store](https://platform.openai.com/docs/api-reference/vector-stores/object)
+       * with file_ids and attach it to this assistant. There can be a maximum of 1
+       * vector store attached to the assistant.
+       */
+      vector_stores?: Array<FileSearch.VectorStore>;
+    }
+
+    export namespace FileSearch {
+      export interface VectorStore {
+        /**
+         * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs to
+         * add to the vector store. There can be a maximum of 10000 files in a vector
+         * store.
+         */
+        file_ids?: Array<string>;
+
+        /**
+         * Set of 16 key-value pairs that can be attached to a vector store. This can be
+         * useful for storing additional information about the vector store in a structured
+         * format. Keys can be a maximum of 64 characters long and values can be a maxium
+         * of 512 characters long.
+         */
+        metadata?: unknown;
+      }
+    }
+  }
 }
 
 export interface AssistantUpdateParams {
@@ -994,15 +1126,6 @@ export interface AssistantUpdateParams {
    * The description of the assistant. The maximum length is 512 characters.
    */
   description?: string | null;
-
-  /**
-   * A list of [File](https://platform.openai.com/docs/api-reference/files) IDs
-   * attached to this assistant. There can be a maximum of 20 files attached to the
-   * assistant. Files are ordered by their creation date in ascending order. If a
-   * file was previously attached to the list but does not show up in the list, it
-   * will be deleted from the assistant.
-   */
-  file_ids?: Array<string>;
 
   /**
    * The system instructions that the assistant uses. The maximum length is 256,000
@@ -1033,10 +1156,89 @@ export interface AssistantUpdateParams {
   name?: string | null;
 
   /**
+   * Specifies the format that the model must output. Compatible with
+   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-and-gpt-4-turbo) and
+   * all GPT-3.5 Turbo models newer than `gpt-3.5-turbo-1106`.
+   *
+   * Setting to `{ "type": "json_object" }` enables JSON mode, which guarantees the
+   * message the model generates is valid JSON.
+   *
+   * **Important:** when using JSON mode, you **must** also instruct the model to
+   * produce JSON yourself via a system or user message. Without this, the model may
+   * generate an unending stream of whitespace until the generation reaches the token
+   * limit, resulting in a long-running and seemingly "stuck" request. Also note that
+   * the message content may be partially cut off if `finish_reason="length"`, which
+   * indicates the generation exceeded `max_tokens` or the conversation exceeded the
+   * max context length.
+   */
+  response_format?: ThreadsAPI.AssistantResponseFormatOption | null;
+
+  /**
+   * What sampling temperature to use, between 0 and 2. Higher values like 0.8 will
+   * make the output more random, while lower values like 0.2 will make it more
+   * focused and deterministic.
+   */
+  temperature?: number | null;
+
+  /**
+   * A set of resources that are used by the assistant's tools. The resources are
+   * specific to the type of tool. For example, the `code_interpreter` tool requires
+   * a list of file IDs, while the `file_search` tool requires a list of vector store
+   * IDs.
+   */
+  tool_resources?: AssistantUpdateParams.ToolResources | null;
+
+  /**
    * A list of tool enabled on the assistant. There can be a maximum of 128 tools per
-   * assistant. Tools can be of types `code_interpreter`, `retrieval`, or `function`.
+   * assistant. Tools can be of types `code_interpreter`, `file_search`, or
+   * `function`.
    */
   tools?: Array<AssistantTool>;
+
+  /**
+   * An alternative to sampling with temperature, called nucleus sampling, where the
+   * model considers the results of the tokens with top_p probability mass. So 0.1
+   * means only the tokens comprising the top 10% probability mass are considered.
+   *
+   * We generally recommend altering this or temperature but not both.
+   */
+  top_p?: number | null;
+}
+
+export namespace AssistantUpdateParams {
+  /**
+   * A set of resources that are used by the assistant's tools. The resources are
+   * specific to the type of tool. For example, the `code_interpreter` tool requires
+   * a list of file IDs, while the `file_search` tool requires a list of vector store
+   * IDs.
+   */
+  export interface ToolResources {
+    code_interpreter?: ToolResources.CodeInterpreter;
+
+    file_search?: ToolResources.FileSearch;
+  }
+
+  export namespace ToolResources {
+    export interface CodeInterpreter {
+      /**
+       * Overrides the list of
+       * [file](https://platform.openai.com/docs/api-reference/files) IDs made available
+       * to the `code_interpreter` tool. There can be a maximum of 20 files associated
+       * with the tool.
+       */
+      file_ids?: Array<string>;
+    }
+
+    export interface FileSearch {
+      /**
+       * Overrides the
+       * [vector store](https://platform.openai.com/docs/api-reference/vector-stores/object)
+       * attached to this assistant. There can be a maximum of 1 vector store attached to
+       * the assistant.
+       */
+      vector_store_ids?: Array<string>;
+    }
+  }
 }
 
 export interface AssistantListParams extends CursorPageParams {
@@ -1061,9 +1263,9 @@ export namespace Assistants {
   export import AssistantStreamEvent = AssistantsAPI.AssistantStreamEvent;
   export import AssistantTool = AssistantsAPI.AssistantTool;
   export import CodeInterpreterTool = AssistantsAPI.CodeInterpreterTool;
+  export import FileSearchTool = AssistantsAPI.FileSearchTool;
   export import FunctionTool = AssistantsAPI.FunctionTool;
   export import MessageStreamEvent = AssistantsAPI.MessageStreamEvent;
-  export import RetrievalTool = AssistantsAPI.RetrievalTool;
   export import RunStepStreamEvent = AssistantsAPI.RunStepStreamEvent;
   export import RunStreamEvent = AssistantsAPI.RunStreamEvent;
   export import ThreadStreamEvent = AssistantsAPI.ThreadStreamEvent;
@@ -1071,10 +1273,4 @@ export namespace Assistants {
   export import AssistantCreateParams = AssistantsAPI.AssistantCreateParams;
   export import AssistantUpdateParams = AssistantsAPI.AssistantUpdateParams;
   export import AssistantListParams = AssistantsAPI.AssistantListParams;
-  export import Files = FilesAPI.Files;
-  export import AssistantFile = FilesAPI.AssistantFile;
-  export import FileDeleteResponse = FilesAPI.FileDeleteResponse;
-  export import AssistantFilesPage = FilesAPI.AssistantFilesPage;
-  export import FileCreateParams = FilesAPI.FileCreateParams;
-  export import FileListParams = FilesAPI.FileListParams;
 }

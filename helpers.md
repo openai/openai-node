@@ -1,4 +1,4 @@
-# Streaming Helpers
+# Helpers
 
 OpenAI supports streaming responses when interacting with the [Chat](#chat-streaming) or [Assistant](#assistant-streaming-api) APIs.
 
@@ -449,3 +449,24 @@ See an example of a Next.JS integration here [`examples/stream-to-client-next.ts
 #### Proxy Streaming to a Browser
 
 See an example of using express to stream to a browser here [`examples/stream-to-client-express.ts`](examples/stream-to-client-express.ts).
+
+# Polling Helpers
+
+When interacting with the API some actions such as starting a Run and adding files to vector stores are asynchronous and take time to complete.
+The SDK includes helper functions which will poll the status until it reaches a terminal state and then return the resulting object.
+If an API method results in an action which could benefit from polling there will be a corresponding version of the
+method ending in `_AndPoll`.
+
+All methods also allow you to set the polling frequency, how often the API is checked for an update, via a function argument (`pollIntervalMs`).
+
+The polling methods are:
+
+```ts
+client.beta.threads.createAndRunPoll(...)
+client.beta.threads.runs.createAndPoll((...)
+client.beta.threads.runs.submitToolOutputsAndPoll((...)
+client.beta.vectorStores.files.uploadAndPoll((...)
+client.beta.vectorStores.files.createAndPoll((...)
+client.beta.vectorStores.fileBatches.createAndPoll((...)
+client.beta.vectorStores.fileBatches.uploadAndPoll((...)
+```
