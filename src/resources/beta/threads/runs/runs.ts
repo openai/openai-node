@@ -409,7 +409,7 @@ export interface Run {
   /**
    * Specifies the format that the model must output. Compatible with
    * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-and-gpt-4-turbo) and
-   * all GPT-3.5 Turbo models newer than `gpt-3.5-turbo-1106`.
+   * all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
    *
    * Setting to `{ "type": "json_object" }` enables JSON mode, which guarantees the
    * message the model generates is valid JSON.
@@ -446,7 +446,7 @@ export interface Run {
    * Controls which (if any) tool is called by the model. `none` means the model will
    * not call any tools and instead generates a message. `auto` is the default value
    * and means the model can pick between generating a message or calling a tool.
-   * Specifying a particular tool like `{"type": "TOOL_TYPE"}` or
+   * Specifying a particular tool like `{"type": "file_search"}` or
    * `{"type": "function", "function": {"name": "my_function"}}` forces the model to
    * call that tool.
    */
@@ -459,6 +459,10 @@ export interface Run {
    */
   tools: Array<AssistantsAPI.AssistantTool>;
 
+  /**
+   * Controls for how a thread will be truncated prior to the run. Use this to
+   * control the intial context window of the run.
+   */
   truncation_strategy: Run.TruncationStrategy | null;
 
   /**
@@ -534,6 +538,10 @@ export namespace Run {
     }
   }
 
+  /**
+   * Controls for how a thread will be truncated prior to the run. Use this to
+   * control the intial context window of the run.
+   */
   export interface TruncationStrategy {
     /**
      * The truncation strategy to use for the thread. The default is `auto`. If set to
@@ -620,7 +628,7 @@ export interface RunCreateParamsBase {
    * The maximum number of completion tokens that may be used over the course of the
    * run. The run will make a best effort to use only the number of completion tokens
    * specified, across multiple turns of the run. If the run exceeds the number of
-   * completion tokens specified, the run will end with status `complete`. See
+   * completion tokens specified, the run will end with status `incomplete`. See
    * `incomplete_details` for more info.
    */
   max_completion_tokens?: number | null;
@@ -629,7 +637,7 @@ export interface RunCreateParamsBase {
    * The maximum number of prompt tokens that may be used over the course of the run.
    * The run will make a best effort to use only the number of prompt tokens
    * specified, across multiple turns of the run. If the run exceeds the number of
-   * prompt tokens specified, the run will end with status `complete`. See
+   * prompt tokens specified, the run will end with status `incomplete`. See
    * `incomplete_details` for more info.
    */
   max_prompt_tokens?: number | null;
@@ -673,7 +681,7 @@ export interface RunCreateParamsBase {
   /**
    * Specifies the format that the model must output. Compatible with
    * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-and-gpt-4-turbo) and
-   * all GPT-3.5 Turbo models newer than `gpt-3.5-turbo-1106`.
+   * all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
    *
    * Setting to `{ "type": "json_object" }` enables JSON mode, which guarantees the
    * message the model generates is valid JSON.
@@ -706,7 +714,7 @@ export interface RunCreateParamsBase {
    * Controls which (if any) tool is called by the model. `none` means the model will
    * not call any tools and instead generates a message. `auto` is the default value
    * and means the model can pick between generating a message or calling a tool.
-   * Specifying a particular tool like `{"type": "TOOL_TYPE"}` or
+   * Specifying a particular tool like `{"type": "file_search"}` or
    * `{"type": "function", "function": {"name": "my_function"}}` forces the model to
    * call that tool.
    */
@@ -722,9 +730,15 @@ export interface RunCreateParamsBase {
    * An alternative to sampling with temperature, called nucleus sampling, where the
    * model considers the results of the tokens with top_p probability mass. So 0.1
    * means only the tokens comprising the top 10% probability mass are considered.
+   *
+   * We generally recommend altering this or temperature but not both.
    */
   top_p?: number | null;
 
+  /**
+   * Controls for how a thread will be truncated prior to the run. Use this to
+   * control the intial context window of the run.
+   */
   truncation_strategy?: RunCreateParams.TruncationStrategy | null;
 }
 
@@ -770,6 +784,10 @@ export namespace RunCreateParams {
     }
   }
 
+  /**
+   * Controls for how a thread will be truncated prior to the run. Use this to
+   * control the intial context window of the run.
+   */
   export interface TruncationStrategy {
     /**
      * The truncation strategy to use for the thread. The default is `auto`. If set to
@@ -865,7 +883,7 @@ export interface RunCreateAndPollParams {
    * The maximum number of completion tokens that may be used over the course of the
    * run. The run will make a best effort to use only the number of completion tokens
    * specified, across multiple turns of the run. If the run exceeds the number of
-   * completion tokens specified, the run will end with status `complete`. See
+   * completion tokens specified, the run will end with status `incomplete`. See
    * `incomplete_details` for more info.
    */
   max_completion_tokens?: number | null;
@@ -874,7 +892,7 @@ export interface RunCreateAndPollParams {
    * The maximum number of prompt tokens that may be used over the course of the run.
    * The run will make a best effort to use only the number of prompt tokens
    * specified, across multiple turns of the run. If the run exceeds the number of
-   * prompt tokens specified, the run will end with status `complete`. See
+   * prompt tokens specified, the run will end with status `incomplete`. See
    * `incomplete_details` for more info.
    */
   max_prompt_tokens?: number | null;
@@ -918,7 +936,7 @@ export interface RunCreateAndPollParams {
   /**
    * Specifies the format that the model must output. Compatible with
    * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-and-gpt-4-turbo) and
-   * all GPT-3.5 Turbo models newer than `gpt-3.5-turbo-1106`.
+   * all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
    *
    * Setting to `{ "type": "json_object" }` enables JSON mode, which guarantees the
    * message the model generates is valid JSON.
@@ -944,7 +962,7 @@ export interface RunCreateAndPollParams {
    * Controls which (if any) tool is called by the model. `none` means the model will
    * not call any tools and instead generates a message. `auto` is the default value
    * and means the model can pick between generating a message or calling a tool.
-   * Specifying a particular tool like `{"type": "TOOL_TYPE"}` or
+   * Specifying a particular tool like `{"type": "file_search"}` or
    * `{"type": "function", "function": {"name": "my_function"}}` forces the model to
    * call that tool.
    */
@@ -960,9 +978,15 @@ export interface RunCreateAndPollParams {
    * An alternative to sampling with temperature, called nucleus sampling, where the
    * model considers the results of the tokens with top_p probability mass. So 0.1
    * means only the tokens comprising the top 10% probability mass are considered.
+   *
+   * We generally recommend altering this or temperature but not both.
    */
   top_p?: number | null;
 
+  /**
+   * Controls for how a thread will be truncated prior to the run. Use this to
+   * control the intial context window of the run.
+   */
   truncation_strategy?: RunCreateAndPollParams.TruncationStrategy | null;
 }
 
@@ -1008,6 +1032,10 @@ export namespace RunCreateAndPollParams {
     }
   }
 
+  /**
+   * Controls for how a thread will be truncated prior to the run. Use this to
+   * control the intial context window of the run.
+   */
   export interface TruncationStrategy {
     /**
      * The truncation strategy to use for the thread. The default is `auto`. If set to
@@ -1056,7 +1084,7 @@ export interface RunCreateAndStreamParams {
    * The maximum number of completion tokens that may be used over the course of the
    * run. The run will make a best effort to use only the number of completion tokens
    * specified, across multiple turns of the run. If the run exceeds the number of
-   * completion tokens specified, the run will end with status `complete`. See
+   * completion tokens specified, the run will end with status `incomplete`. See
    * `incomplete_details` for more info.
    */
   max_completion_tokens?: number | null;
@@ -1065,7 +1093,7 @@ export interface RunCreateAndStreamParams {
    * The maximum number of prompt tokens that may be used over the course of the run.
    * The run will make a best effort to use only the number of prompt tokens
    * specified, across multiple turns of the run. If the run exceeds the number of
-   * prompt tokens specified, the run will end with status `complete`. See
+   * prompt tokens specified, the run will end with status `incomplete`. See
    * `incomplete_details` for more info.
    */
   max_prompt_tokens?: number | null;
@@ -1109,7 +1137,7 @@ export interface RunCreateAndStreamParams {
   /**
    * Specifies the format that the model must output. Compatible with
    * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-and-gpt-4-turbo) and
-   * all GPT-3.5 Turbo models newer than `gpt-3.5-turbo-1106`.
+   * all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
    *
    * Setting to `{ "type": "json_object" }` enables JSON mode, which guarantees the
    * message the model generates is valid JSON.
@@ -1135,7 +1163,7 @@ export interface RunCreateAndStreamParams {
    * Controls which (if any) tool is called by the model. `none` means the model will
    * not call any tools and instead generates a message. `auto` is the default value
    * and means the model can pick between generating a message or calling a tool.
-   * Specifying a particular tool like `{"type": "TOOL_TYPE"}` or
+   * Specifying a particular tool like `{"type": "file_search"}` or
    * `{"type": "function", "function": {"name": "my_function"}}` forces the model to
    * call that tool.
    */
@@ -1151,9 +1179,15 @@ export interface RunCreateAndStreamParams {
    * An alternative to sampling with temperature, called nucleus sampling, where the
    * model considers the results of the tokens with top_p probability mass. So 0.1
    * means only the tokens comprising the top 10% probability mass are considered.
+   *
+   * We generally recommend altering this or temperature but not both.
    */
   top_p?: number | null;
 
+  /**
+   * Controls for how a thread will be truncated prior to the run. Use this to
+   * control the intial context window of the run.
+   */
   truncation_strategy?: RunCreateAndStreamParams.TruncationStrategy | null;
 }
 
@@ -1199,6 +1233,10 @@ export namespace RunCreateAndStreamParams {
     }
   }
 
+  /**
+   * Controls for how a thread will be truncated prior to the run. Use this to
+   * control the intial context window of the run.
+   */
   export interface TruncationStrategy {
     /**
      * The truncation strategy to use for the thread. The default is `auto`. If set to
@@ -1247,7 +1285,7 @@ export interface RunStreamParams {
    * The maximum number of completion tokens that may be used over the course of the
    * run. The run will make a best effort to use only the number of completion tokens
    * specified, across multiple turns of the run. If the run exceeds the number of
-   * completion tokens specified, the run will end with status `complete`. See
+   * completion tokens specified, the run will end with status `incomplete`. See
    * `incomplete_details` for more info.
    */
   max_completion_tokens?: number | null;
@@ -1256,7 +1294,7 @@ export interface RunStreamParams {
    * The maximum number of prompt tokens that may be used over the course of the run.
    * The run will make a best effort to use only the number of prompt tokens
    * specified, across multiple turns of the run. If the run exceeds the number of
-   * prompt tokens specified, the run will end with status `complete`. See
+   * prompt tokens specified, the run will end with status `incomplete`. See
    * `incomplete_details` for more info.
    */
   max_prompt_tokens?: number | null;
@@ -1300,7 +1338,7 @@ export interface RunStreamParams {
   /**
    * Specifies the format that the model must output. Compatible with
    * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-and-gpt-4-turbo) and
-   * all GPT-3.5 Turbo models newer than `gpt-3.5-turbo-1106`.
+   * all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
    *
    * Setting to `{ "type": "json_object" }` enables JSON mode, which guarantees the
    * message the model generates is valid JSON.
@@ -1326,7 +1364,7 @@ export interface RunStreamParams {
    * Controls which (if any) tool is called by the model. `none` means the model will
    * not call any tools and instead generates a message. `auto` is the default value
    * and means the model can pick between generating a message or calling a tool.
-   * Specifying a particular tool like `{"type": "TOOL_TYPE"}` or
+   * Specifying a particular tool like `{"type": "file_search"}` or
    * `{"type": "function", "function": {"name": "my_function"}}` forces the model to
    * call that tool.
    */
@@ -1342,9 +1380,15 @@ export interface RunStreamParams {
    * An alternative to sampling with temperature, called nucleus sampling, where the
    * model considers the results of the tokens with top_p probability mass. So 0.1
    * means only the tokens comprising the top 10% probability mass are considered.
+   *
+   * We generally recommend altering this or temperature but not both.
    */
   top_p?: number | null;
 
+  /**
+   * Controls for how a thread will be truncated prior to the run. Use this to
+   * control the intial context window of the run.
+   */
   truncation_strategy?: RunStreamParams.TruncationStrategy | null;
 }
 
@@ -1390,6 +1434,10 @@ export namespace RunStreamParams {
     }
   }
 
+  /**
+   * Controls for how a thread will be truncated prior to the run. Use this to
+   * control the intial context window of the run.
+   */
   export interface TruncationStrategy {
     /**
      * The truncation strategy to use for the thread. The default is `auto`. If set to
