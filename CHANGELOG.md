@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.37.1 (2024-04-17)
+
+Full Changelog: [v4.37.0...v4.37.1](https://github.com/openai/openai-node/compare/v4.37.0...v4.37.1)
+
+### Chores
+
+* **api:** docs and response_format response property ([#778](https://github.com/openai/openai-node/issues/778)) ([78f5c35](https://github.com/openai/openai-node/commit/78f5c3568d95d8e854c04049dc7d5643aa49e93f))
+
 ## 4.37.0 (2024-04-17)
 
 Full Changelog: [v4.36.0...v4.37.0](https://github.com/openai/openai-node/compare/v4.36.0...v4.37.0)
