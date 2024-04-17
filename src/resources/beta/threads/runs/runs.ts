@@ -8,7 +8,7 @@ import { AssistantStream, RunCreateParamsBaseStream } from 'openai/lib/Assistant
 import { sleep } from 'openai/core';
 import { RunSubmitToolOutputsParamsStream } from 'openai/lib/AssistantStream';
 import * as RunsAPI from 'openai/resources/beta/threads/runs/runs';
-import * as AssistantsAPI from 'openai/resources/beta/assistants/assistants';
+import * as AssistantsAPI from 'openai/resources/beta/assistants';
 import * as ThreadsAPI from 'openai/resources/beta/threads/threads';
 import * as StepsAPI from 'openai/resources/beta/threads/runs/steps';
 import { CursorPage, type CursorPageParams } from 'openai/pagination';
@@ -39,7 +39,7 @@ export class Runs extends APIResource {
     return this._client.post(`/threads/${threadId}/runs`, {
       body,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
       stream: body.stream ?? false,
     }) as APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
   }
@@ -50,7 +50,7 @@ export class Runs extends APIResource {
   retrieve(threadId: string, runId: string, options?: Core.RequestOptions): Core.APIPromise<Run> {
     return this._client.get(`/threads/${threadId}/runs/${runId}`, {
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
     });
   }
 
@@ -66,7 +66,7 @@ export class Runs extends APIResource {
     return this._client.post(`/threads/${threadId}/runs/${runId}`, {
       body,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
     });
   }
 
@@ -90,7 +90,7 @@ export class Runs extends APIResource {
     return this._client.getAPIList(`/threads/${threadId}/runs`, RunsPage, {
       query,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
     });
   }
 
@@ -100,7 +100,7 @@ export class Runs extends APIResource {
   cancel(threadId: string, runId: string, options?: Core.RequestOptions): Core.APIPromise<Run> {
     return this._client.post(`/threads/${threadId}/runs/${runId}/cancel`, {
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
     });
   }
 
@@ -224,7 +224,7 @@ export class Runs extends APIResource {
     return this._client.post(`/threads/${threadId}/runs/${runId}/submit_tool_outputs`, {
       body,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
       stream: body.stream ?? false,
     }) as APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
   }
@@ -351,13 +351,6 @@ export interface Run {
   failed_at: number | null;
 
   /**
-   * The list of [File](https://platform.openai.com/docs/api-reference/files) IDs the
-   * [assistant](https://platform.openai.com/docs/api-reference/assistants) used for
-   * this run.
-   */
-  file_ids: Array<string>;
-
-  /**
    * Details on why the run is incomplete. Will be `null` if the run is not
    * incomplete.
    */
@@ -478,6 +471,11 @@ export interface Run {
    * The sampling temperature used for this run. If not set, defaults to 1.
    */
   temperature?: number | null;
+
+  /**
+   * The nucleus sampling value used for this run. If not set, defaults to 1.
+   */
+  top_p?: number | null;
 }
 
 export namespace Run {
@@ -720,6 +718,13 @@ export interface RunCreateParamsBase {
    */
   tools?: Array<AssistantsAPI.AssistantTool> | null;
 
+  /**
+   * An alternative to sampling with temperature, called nucleus sampling, where the
+   * model considers the results of the tokens with top_p probability mass. So 0.1
+   * means only the tokens comprising the top 10% probability mass are considered.
+   */
+  top_p?: number | null;
+
   truncation_strategy?: RunCreateParams.TruncationStrategy | null;
 }
 
@@ -741,12 +746,9 @@ export namespace RunCreateParams {
     role: 'user' | 'assistant';
 
     /**
-     * A list of [File](https://platform.openai.com/docs/api-reference/files) IDs that
-     * the message should use. There can be a maximum of 10 files attached to a
-     * message. Useful for tools like `retrieval` and `code_interpreter` that can
-     * access and use files.
+     * A list of files attached to the message, and the tools they should be added to.
      */
-    file_ids?: Array<string>;
+    attachments?: Array<AdditionalMessage.Attachment> | null;
 
     /**
      * Set of 16 key-value pairs that can be attached to an object. This can be useful
@@ -755,6 +757,17 @@ export namespace RunCreateParams {
      * characters long.
      */
     metadata?: unknown | null;
+  }
+
+  export namespace AdditionalMessage {
+    export interface Attachment {
+      add_to?: Array<'file_search' | 'code_interpreter'>;
+
+      /**
+       * The ID of the file to attach to the message.
+       */
+      file_id?: string;
+    }
   }
 
   export interface TruncationStrategy {
@@ -943,6 +956,13 @@ export interface RunCreateAndPollParams {
    */
   tools?: Array<AssistantsAPI.AssistantTool> | null;
 
+  /**
+   * An alternative to sampling with temperature, called nucleus sampling, where the
+   * model considers the results of the tokens with top_p probability mass. So 0.1
+   * means only the tokens comprising the top 10% probability mass are considered.
+   */
+  top_p?: number | null;
+
   truncation_strategy?: RunCreateAndPollParams.TruncationStrategy | null;
 }
 
@@ -964,12 +984,9 @@ export namespace RunCreateAndPollParams {
     role: 'user' | 'assistant';
 
     /**
-     * A list of [File](https://platform.openai.com/docs/api-reference/files) IDs that
-     * the message should use. There can be a maximum of 10 files attached to a
-     * message. Useful for tools like `retrieval` and `code_interpreter` that can
-     * access and use files.
+     * A list of files attached to the message, and the tools they should be added to.
      */
-    file_ids?: Array<string>;
+    attachments?: Array<AdditionalMessage.Attachment> | null;
 
     /**
      * Set of 16 key-value pairs that can be attached to an object. This can be useful
@@ -978,6 +995,17 @@ export namespace RunCreateAndPollParams {
      * characters long.
      */
     metadata?: unknown | null;
+  }
+
+  export namespace AdditionalMessage {
+    export interface Attachment {
+      add_to?: Array<'file_search' | 'code_interpreter'>;
+
+      /**
+       * The ID of the file to attach to the message.
+       */
+      file_id?: string;
+    }
   }
 
   export interface TruncationStrategy {
@@ -1119,6 +1147,13 @@ export interface RunCreateAndStreamParams {
    */
   tools?: Array<AssistantsAPI.AssistantTool> | null;
 
+  /**
+   * An alternative to sampling with temperature, called nucleus sampling, where the
+   * model considers the results of the tokens with top_p probability mass. So 0.1
+   * means only the tokens comprising the top 10% probability mass are considered.
+   */
+  top_p?: number | null;
+
   truncation_strategy?: RunCreateAndStreamParams.TruncationStrategy | null;
 }
 
@@ -1140,12 +1175,9 @@ export namespace RunCreateAndStreamParams {
     role: 'user' | 'assistant';
 
     /**
-     * A list of [File](https://platform.openai.com/docs/api-reference/files) IDs that
-     * the message should use. There can be a maximum of 10 files attached to a
-     * message. Useful for tools like `retrieval` and `code_interpreter` that can
-     * access and use files.
+     * A list of files attached to the message, and the tools they should be added to.
      */
-    file_ids?: Array<string>;
+    attachments?: Array<AdditionalMessage.Attachment> | null;
 
     /**
      * Set of 16 key-value pairs that can be attached to an object. This can be useful
@@ -1154,6 +1186,17 @@ export namespace RunCreateAndStreamParams {
      * characters long.
      */
     metadata?: unknown | null;
+  }
+
+  export namespace AdditionalMessage {
+    export interface Attachment {
+      add_to?: Array<'file_search' | 'code_interpreter'>;
+
+      /**
+       * The ID of the file to attach to the message.
+       */
+      file_id?: string;
+    }
   }
 
   export interface TruncationStrategy {
@@ -1295,6 +1338,13 @@ export interface RunStreamParams {
    */
   tools?: Array<AssistantsAPI.AssistantTool> | null;
 
+  /**
+   * An alternative to sampling with temperature, called nucleus sampling, where the
+   * model considers the results of the tokens with top_p probability mass. So 0.1
+   * means only the tokens comprising the top 10% probability mass are considered.
+   */
+  top_p?: number | null;
+
   truncation_strategy?: RunStreamParams.TruncationStrategy | null;
 }
 
@@ -1316,12 +1366,9 @@ export namespace RunStreamParams {
     role: 'user' | 'assistant';
 
     /**
-     * A list of [File](https://platform.openai.com/docs/api-reference/files) IDs that
-     * the message should use. There can be a maximum of 10 files attached to a
-     * message. Useful for tools like `retrieval` and `code_interpreter` that can
-     * access and use files.
+     * A list of files attached to the message, and the tools they should be added to.
      */
-    file_ids?: Array<string>;
+    attachments?: Array<AdditionalMessage.Attachment> | null;
 
     /**
      * Set of 16 key-value pairs that can be attached to an object. This can be useful
@@ -1330,6 +1377,17 @@ export namespace RunStreamParams {
      * characters long.
      */
     metadata?: unknown | null;
+  }
+
+  export namespace AdditionalMessage {
+    export interface Attachment {
+      add_to?: Array<'file_search' | 'code_interpreter'>;
+
+      /**
+       * The ID of the file to attach to the message.
+       */
+      file_id?: string;
+    }
   }
 
   export interface TruncationStrategy {
@@ -1470,11 +1528,11 @@ export namespace Runs {
   export import CodeInterpreterOutputImage = StepsAPI.CodeInterpreterOutputImage;
   export import CodeInterpreterToolCall = StepsAPI.CodeInterpreterToolCall;
   export import CodeInterpreterToolCallDelta = StepsAPI.CodeInterpreterToolCallDelta;
+  export import FileSearchToolCall = StepsAPI.FileSearchToolCall;
+  export import FileSearchToolCallDelta = StepsAPI.FileSearchToolCallDelta;
   export import FunctionToolCall = StepsAPI.FunctionToolCall;
   export import FunctionToolCallDelta = StepsAPI.FunctionToolCallDelta;
   export import MessageCreationStepDetails = StepsAPI.MessageCreationStepDetails;
-  export import RetrievalToolCall = StepsAPI.RetrievalToolCall;
-  export import RetrievalToolCallDelta = StepsAPI.RetrievalToolCallDelta;
   export import RunStep = StepsAPI.RunStep;
   export import RunStepDelta = StepsAPI.RunStepDelta;
   export import RunStepDeltaEvent = StepsAPI.RunStepDeltaEvent;

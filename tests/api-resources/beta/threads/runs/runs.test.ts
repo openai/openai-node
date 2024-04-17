@@ -25,9 +25,36 @@ describe('resource runs', () => {
       assistant_id: 'string',
       additional_instructions: 'string',
       additional_messages: [
-        { role: 'user', content: 'x', file_ids: ['string'], metadata: {} },
-        { role: 'user', content: 'x', file_ids: ['string'], metadata: {} },
-        { role: 'user', content: 'x', file_ids: ['string'], metadata: {} },
+        {
+          role: 'user',
+          content: 'x',
+          attachments: [
+            { file_id: 'string', add_to: ['file_search', 'code_interpreter'] },
+            { file_id: 'string', add_to: ['file_search', 'code_interpreter'] },
+            { file_id: 'string', add_to: ['file_search', 'code_interpreter'] },
+          ],
+          metadata: {},
+        },
+        {
+          role: 'user',
+          content: 'x',
+          attachments: [
+            { file_id: 'string', add_to: ['file_search', 'code_interpreter'] },
+            { file_id: 'string', add_to: ['file_search', 'code_interpreter'] },
+            { file_id: 'string', add_to: ['file_search', 'code_interpreter'] },
+          ],
+          metadata: {},
+        },
+        {
+          role: 'user',
+          content: 'x',
+          attachments: [
+            { file_id: 'string', add_to: ['file_search', 'code_interpreter'] },
+            { file_id: 'string', add_to: ['file_search', 'code_interpreter'] },
+            { file_id: 'string', add_to: ['file_search', 'code_interpreter'] },
+          ],
+          metadata: {},
+        },
       ],
       instructions: 'string',
       max_completion_tokens: 256,
@@ -39,6 +66,7 @@ describe('resource runs', () => {
       temperature: 1,
       tool_choice: 'none',
       tools: [{ type: 'code_interpreter' }, { type: 'code_interpreter' }, { type: 'code_interpreter' }],
+      top_p: 1,
       truncation_strategy: { type: 'auto', last_messages: 1 },
     });
   });

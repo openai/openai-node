@@ -26,7 +26,7 @@ export {
   MessageListParams,
   MessagesPage,
   Messages,
-} from './messages/index';
+} from './messages';
 export {
   AssistantResponseFormat,
   AssistantResponseFormatOption,

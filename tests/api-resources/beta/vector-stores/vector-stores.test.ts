@@ -8,9 +8,9 @@ const openai = new OpenAI({
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
-describe('resource assistants', () => {
-  test('create: only required params', async () => {
-    const responsePromise = openai.beta.assistants.create({ model: 'gpt-4-turbo' });
+describe('resource vectorStores', () => {
+  test('create', async () => {
+    const responsePromise = openai.beta.vectorStores.create({});
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -20,20 +20,8 @@ describe('resource assistants', () => {
     expect(dataAndResponse.response).toBe(rawResponse);
   });
 
-  test('create: required and optional params', async () => {
-    const response = await openai.beta.assistants.create({
-      model: 'gpt-4-turbo',
-      description: 'string',
-      file_ids: ['string', 'string', 'string'],
-      instructions: 'string',
-      metadata: {},
-      name: 'string',
-      tools: [{ type: 'code_interpreter' }, { type: 'code_interpreter' }, { type: 'code_interpreter' }],
-    });
-  });
-
   test('retrieve', async () => {
-    const responsePromise = openai.beta.assistants.retrieve('string');
+    const responsePromise = openai.beta.vectorStores.retrieve('string');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -46,12 +34,12 @@ describe('resource assistants', () => {
   test('retrieve: request options instead of params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openai.beta.assistants.retrieve('string', { path: '/_stainless_unknown_path' }),
+      openai.beta.vectorStores.retrieve('string', { path: '/_stainless_unknown_path' }),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
   test('update', async () => {
-    const responsePromise = openai.beta.assistants.update('string', {});
+    const responsePromise = openai.beta.vectorStores.update('string', {});
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -62,7 +50,7 @@ describe('resource assistants', () => {
   });
 
   test('list', async () => {
-    const responsePromise = openai.beta.assistants.list();
+    const responsePromise = openai.beta.vectorStores.list();
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -74,7 +62,7 @@ describe('resource assistants', () => {
 
   test('list: request options instead of params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(openai.beta.assistants.list({ path: '/_stainless_unknown_path' })).rejects.toThrow(
+    await expect(openai.beta.vectorStores.list({ path: '/_stainless_unknown_path' })).rejects.toThrow(
       OpenAI.NotFoundError,
     );
   });
@@ -82,7 +70,7 @@ describe('resource assistants', () => {
   test('list: request options and params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openai.beta.assistants.list(
+      openai.beta.vectorStores.list(
         { after: 'string', before: 'string', limit: 0, order: 'asc' },
         { path: '/_stainless_unknown_path' },
       ),
@@ -90,7 +78,7 @@ describe('resource assistants', () => {
   });
 
   test('del', async () => {
-    const responsePromise = openai.beta.assistants.del('string');
+    const responsePromise = openai.beta.vectorStores.del('string');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -102,8 +90,8 @@ describe('resource assistants', () => {
 
   test('del: request options instead of params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(openai.beta.assistants.del('string', { path: '/_stainless_unknown_path' })).rejects.toThrow(
-      OpenAI.NotFoundError,
-    );
+    await expect(
+      openai.beta.vectorStores.del('string', { path: '/_stainless_unknown_path' }),
+    ).rejects.toThrow(OpenAI.NotFoundError);
   });
 });

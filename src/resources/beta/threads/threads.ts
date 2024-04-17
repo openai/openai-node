@@ -6,8 +6,8 @@ import { APIResource } from 'openai/resource';
 import { isRequestOptions } from 'openai/core';
 import { AssistantStream, ThreadCreateAndRunParamsBaseStream } from 'openai/lib/AssistantStream';
 import * as ThreadsAPI from 'openai/resources/beta/threads/threads';
-import * as AssistantsAPI from 'openai/resources/beta/assistants/assistants';
-import * as MessagesAPI from 'openai/resources/beta/threads/messages/messages';
+import * as AssistantsAPI from 'openai/resources/beta/assistants';
+import * as MessagesAPI from 'openai/resources/beta/threads/messages';
 import * as RunsAPI from 'openai/resources/beta/threads/runs/runs';
 import { Stream } from 'openai/streaming';
 
@@ -30,7 +30,7 @@ export class Threads extends APIResource {
     return this._client.post('/threads', {
       body,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
     });
   }
 
@@ -40,7 +40,7 @@ export class Threads extends APIResource {
   retrieve(threadId: string, options?: Core.RequestOptions): Core.APIPromise<Thread> {
     return this._client.get(`/threads/${threadId}`, {
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
     });
   }
 
@@ -51,7 +51,7 @@ export class Threads extends APIResource {
     return this._client.post(`/threads/${threadId}`, {
       body,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
     });
   }
 
@@ -61,7 +61,7 @@ export class Threads extends APIResource {
   del(threadId: string, options?: Core.RequestOptions): Core.APIPromise<ThreadDeleted> {
     return this._client.delete(`/threads/${threadId}`, {
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
     });
   }
 
@@ -87,7 +87,7 @@ export class Threads extends APIResource {
     return this._client.post('/threads/runs', {
       body,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
       stream: body.stream ?? false,
     }) as APIPromise<RunsAPI.Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
   }
@@ -154,7 +154,7 @@ export interface AssistantToolChoice {
   /**
    * The type of the tool. If type is `function`, the function name must be set
    */
-  type: 'function' | 'code_interpreter' | 'retrieval';
+  type: 'function' | 'code_interpreter' | 'file_search';
 
   function?: AssistantToolChoiceFunction;
 }
@@ -203,6 +203,49 @@ export interface Thread {
    * The object type, which is always `thread`.
    */
   object: 'thread';
+
+  /**
+   * A set of resources that are made available to the assistant's tools in this
+   * thread. The resources are specific to the type of tool. For example, the
+   * `code_interpreter` tool requires a list of file IDs, while the `file_search`
+   * tool requires a list of vector store IDs.
+   */
+  tool_resources: Thread.ToolResources | null;
+}
+
+export namespace Thread {
+  /**
+   * A set of resources that are made available to the assistant's tools in this
+   * thread. The resources are specific to the type of tool. For example, the
+   * `code_interpreter` tool requires a list of file IDs, while the `file_search`
+   * tool requires a list of vector store IDs.
+   */
+  export interface ToolResources {
+    code_interpreter?: ToolResources.CodeInterpreter;
+
+    file_search?: ToolResources.FileSearch;
+  }
+
+  export namespace ToolResources {
+    export interface CodeInterpreter {
+      /**
+       * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs made
+       * available to the `code_interpreter` tool. There can be a maximum of 20 files
+       * associated with the tool.
+       */
+      file_ids?: Array<string>;
+    }
+
+    export interface FileSearch {
+      /**
+       * The
+       * [vector store](https://platform.openai.com/docs/api-reference/vector-stores/object)
+       * attached to this thread. There can be a maximum of 1 vector store attached to
+       * the thread.
+       */
+      vector_store_ids?: Array<string>;
+    }
+  }
 }
 
 export interface ThreadDeleted {
@@ -227,6 +270,14 @@ export interface ThreadCreateParams {
    * characters long.
    */
   metadata?: unknown | null;
+
+  /**
+   * A set of resources that are made available to the assistant's tools in this
+   * thread. The resources are specific to the type of tool. For example, the
+   * `code_interpreter` tool requires a list of file IDs, while the `file_search`
+   * tool requires a list of vector store IDs.
+   */
+  tool_resources?: ThreadCreateParams.ToolResources | null;
 }
 
 export namespace ThreadCreateParams {
@@ -247,12 +298,9 @@ export namespace ThreadCreateParams {
     role: 'user' | 'assistant';
 
     /**
-     * A list of [File](https://platform.openai.com/docs/api-reference/files) IDs that
-     * the message should use. There can be a maximum of 10 files attached to a
-     * message. Useful for tools like `retrieval` and `code_interpreter` that can
-     * access and use files.
+     * A list of files attached to the message, and the tools they should be added to.
      */
-    file_ids?: Array<string>;
+    attachments?: Array<Message.Attachment> | null;
 
     /**
      * Set of 16 key-value pairs that can be attached to an object. This can be useful
@@ -261,6 +309,77 @@ export namespace ThreadCreateParams {
      * characters long.
      */
     metadata?: unknown | null;
+  }
+
+  export namespace Message {
+    export interface Attachment {
+      add_to?: Array<'file_search' | 'code_interpreter'>;
+
+      /**
+       * The ID of the file to attach to the message.
+       */
+      file_id?: string;
+    }
+  }
+
+  /**
+   * A set of resources that are made available to the assistant's tools in this
+   * thread. The resources are specific to the type of tool. For example, the
+   * `code_interpreter` tool requires a list of file IDs, while the `file_search`
+   * tool requires a list of vector store IDs.
+   */
+  export interface ToolResources {
+    code_interpreter?: ToolResources.CodeInterpreter;
+
+    file_search?: ToolResources.FileSearch;
+  }
+
+  export namespace ToolResources {
+    export interface CodeInterpreter {
+      /**
+       * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs made
+       * available to the `code_interpreter` tool. There can be a maximum of 20 files
+       * associated with the tool.
+       */
+      file_ids?: Array<string>;
+    }
+
+    export interface FileSearch {
+      /**
+       * The
+       * [vector store](https://platform.openai.com/docs/api-reference/vector-stores/object)
+       * attached to this thread. There can be a maximum of 1 vector store attached to
+       * the thread.
+       */
+      vector_store_ids?: Array<string>;
+
+      /**
+       * A helper to create a
+       * [vector store](https://platform.openai.com/docs/api-reference/vector-stores/object)
+       * with file_ids and attach it to this thread. There can be a maximum of 1 vector
+       * store attached to the thread.
+       */
+      vector_stores?: Array<FileSearch.VectorStore>;
+    }
+
+    export namespace FileSearch {
+      export interface VectorStore {
+        /**
+         * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs to
+         * add to the vector store. There can be a maximum of 10000 files in a vector
+         * store.
+         */
+        file_ids?: Array<string>;
+
+        /**
+         * Set of 16 key-value pairs that can be attached to a vector store. This can be
+         * useful for storing additional information about the vector store in a structured
+         * format. Keys can be a maximum of 64 characters long and values can be a maxium
+         * of 512 characters long.
+         */
+        metadata?: unknown;
+      }
+    }
   }
 }
 
@@ -272,6 +391,49 @@ export interface ThreadUpdateParams {
    * characters long.
    */
   metadata?: unknown | null;
+
+  /**
+   * A set of resources that are made available to the assistant's tools in this
+   * thread. The resources are specific to the type of tool. For example, the
+   * `code_interpreter` tool requires a list of file IDs, while the `file_search`
+   * tool requires a list of vector store IDs.
+   */
+  tool_resources?: ThreadUpdateParams.ToolResources | null;
+}
+
+export namespace ThreadUpdateParams {
+  /**
+   * A set of resources that are made available to the assistant's tools in this
+   * thread. The resources are specific to the type of tool. For example, the
+   * `code_interpreter` tool requires a list of file IDs, while the `file_search`
+   * tool requires a list of vector store IDs.
+   */
+  export interface ToolResources {
+    code_interpreter?: ToolResources.CodeInterpreter;
+
+    file_search?: ToolResources.FileSearch;
+  }
+
+  export namespace ToolResources {
+    export interface CodeInterpreter {
+      /**
+       * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs made
+       * available to the `code_interpreter` tool. There can be a maximum of 20 files
+       * associated with the tool.
+       */
+      file_ids?: Array<string>;
+    }
+
+    export interface FileSearch {
+      /**
+       * The
+       * [vector store](https://platform.openai.com/docs/api-reference/vector-stores/object)
+       * attached to this thread. There can be a maximum of 1 vector store attached to
+       * the thread.
+       */
+      vector_store_ids?: Array<string>;
+    }
+  }
 }
 
 export type ThreadCreateAndRunParams =
@@ -296,7 +458,7 @@ export interface ThreadCreateAndRunParamsBase {
    * The maximum number of completion tokens that may be used over the course of the
    * run. The run will make a best effort to use only the number of completion tokens
    * specified, across multiple turns of the run. If the run exceeds the number of
-   * completion tokens specified, the run will end with status `complete`. See
+   * completion tokens specified, the run will end with status `incomplete`. See
    * `incomplete_details` for more info.
    */
   max_completion_tokens?: number | null;
@@ -305,7 +467,7 @@ export interface ThreadCreateAndRunParamsBase {
    * The maximum number of prompt tokens that may be used over the course of the run.
    * The run will make a best effort to use only the number of prompt tokens
    * specified, across multiple turns of the run. If the run exceeds the number of
-   * prompt tokens specified, the run will end with status `complete`. See
+   * prompt tokens specified, the run will end with status `incomplete`. See
    * `incomplete_details` for more info.
    */
   max_prompt_tokens?: number | null;
@@ -394,12 +556,27 @@ export interface ThreadCreateAndRunParamsBase {
   tool_choice?: AssistantToolChoiceOption | null;
 
   /**
+   * A set of resources that are used by the assistant's tools. The resources are
+   * specific to the type of tool. For example, the `code_interpreter` tool requires
+   * a list of file IDs, while the `file_search` tool requires a list of vector store
+   * IDs.
+   */
+  tool_resources?: ThreadCreateAndRunParams.ToolResources | null;
+
+  /**
    * Override the tools the assistant can use for this run. This is useful for
    * modifying the behavior on a per-run basis.
    */
   tools?: Array<
-    AssistantsAPI.CodeInterpreterTool | AssistantsAPI.RetrievalTool | AssistantsAPI.FunctionTool
+    AssistantsAPI.CodeInterpreterTool | AssistantsAPI.FileSearchTool | AssistantsAPI.FunctionTool
   > | null;
+
+  /**
+   * An alternative to sampling with temperature, called nucleus sampling, where the
+   * model considers the results of the tokens with top_p probability mass. So 0.1
+   * means only the tokens comprising the top 10% probability mass are considered.
+   */
+  top_p?: number | null;
 
   truncation_strategy?: ThreadCreateAndRunParams.TruncationStrategy | null;
 }
@@ -422,6 +599,14 @@ export namespace ThreadCreateAndRunParams {
      * characters long.
      */
     metadata?: unknown | null;
+
+    /**
+     * A set of resources that are made available to the assistant's tools in this
+     * thread. The resources are specific to the type of tool. For example, the
+     * `code_interpreter` tool requires a list of file IDs, while the `file_search`
+     * tool requires a list of vector store IDs.
+     */
+    tool_resources?: Thread.ToolResources | null;
   }
 
   export namespace Thread {
@@ -442,12 +627,9 @@ export namespace ThreadCreateAndRunParams {
       role: 'user' | 'assistant';
 
       /**
-       * A list of [File](https://platform.openai.com/docs/api-reference/files) IDs that
-       * the message should use. There can be a maximum of 10 files attached to a
-       * message. Useful for tools like `retrieval` and `code_interpreter` that can
-       * access and use files.
+       * A list of files attached to the message, and the tools they should be added to.
        */
-      file_ids?: Array<string>;
+      attachments?: Array<Message.Attachment> | null;
 
       /**
        * Set of 16 key-value pairs that can be attached to an object. This can be useful
@@ -456,6 +638,110 @@ export namespace ThreadCreateAndRunParams {
        * characters long.
        */
       metadata?: unknown | null;
+    }
+
+    export namespace Message {
+      export interface Attachment {
+        add_to?: Array<'file_search' | 'code_interpreter'>;
+
+        /**
+         * The ID of the file to attach to the message.
+         */
+        file_id?: string;
+      }
+    }
+
+    /**
+     * A set of resources that are made available to the assistant's tools in this
+     * thread. The resources are specific to the type of tool. For example, the
+     * `code_interpreter` tool requires a list of file IDs, while the `file_search`
+     * tool requires a list of vector store IDs.
+     */
+    export interface ToolResources {
+      code_interpreter?: ToolResources.CodeInterpreter;
+
+      file_search?: ToolResources.FileSearch;
+    }
+
+    export namespace ToolResources {
+      export interface CodeInterpreter {
+        /**
+         * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs made
+         * available to the `code_interpreter` tool. There can be a maximum of 20 files
+         * associated with the tool.
+         */
+        file_ids?: Array<string>;
+      }
+
+      export interface FileSearch {
+        /**
+         * The
+         * [vector store](https://platform.openai.com/docs/api-reference/vector-stores/object)
+         * attached to this thread. There can be a maximum of 1 vector store attached to
+         * the thread.
+         */
+        vector_store_ids?: Array<string>;
+
+        /**
+         * A helper to create a
+         * [vector store](https://platform.openai.com/docs/api-reference/vector-stores/object)
+         * with file_ids and attach it to this thread. There can be a maximum of 1 vector
+         * store attached to the thread.
+         */
+        vector_stores?: Array<FileSearch.VectorStore>;
+      }
+
+      export namespace FileSearch {
+        export interface VectorStore {
+          /**
+           * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs to
+           * add to the vector store. There can be a maximum of 10000 files in a vector
+           * store.
+           */
+          file_ids?: Array<string>;
+
+          /**
+           * Set of 16 key-value pairs that can be attached to a vector store. This can be
+           * useful for storing additional information about the vector store in a structured
+           * format. Keys can be a maximum of 64 characters long and values can be a maxium
+           * of 512 characters long.
+           */
+          metadata?: unknown;
+        }
+      }
+    }
+  }
+
+  /**
+   * A set of resources that are used by the assistant's tools. The resources are
+   * specific to the type of tool. For example, the `code_interpreter` tool requires
+   * a list of file IDs, while the `file_search` tool requires a list of vector store
+   * IDs.
+   */
+  export interface ToolResources {
+    code_interpreter?: ToolResources.CodeInterpreter;
+
+    file_search?: ToolResources.FileSearch;
+  }
+
+  export namespace ToolResources {
+    export interface CodeInterpreter {
+      /**
+       * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs made
+       * available to the `code_interpreter` tool. There can be a maximum of 20 files
+       * associated with the tool.
+       */
+      file_ids?: Array<string>;
+    }
+
+    export interface FileSearch {
+      /**
+       * The ID of the
+       * [vector store](https://platform.openai.com/docs/api-reference/vector-stores/object)
+       * attached to this assistant. There can be a maximum of 1 vector store attached to
+       * the assistant.
+       */
+      vector_store_ids?: Array<string>;
     }
   }
 
@@ -515,7 +801,7 @@ export interface ThreadCreateAndRunPollParams {
    * The maximum number of completion tokens that may be used over the course of the
    * run. The run will make a best effort to use only the number of completion tokens
    * specified, across multiple turns of the run. If the run exceeds the number of
-   * completion tokens specified, the run will end with status `complete`. See
+   * completion tokens specified, the run will end with status `incomplete`. See
    * `incomplete_details` for more info.
    */
   max_completion_tokens?: number | null;
@@ -524,7 +810,7 @@ export interface ThreadCreateAndRunPollParams {
    * The maximum number of prompt tokens that may be used over the course of the run.
    * The run will make a best effort to use only the number of prompt tokens
    * specified, across multiple turns of the run. If the run exceeds the number of
-   * prompt tokens specified, the run will end with status `complete`. See
+   * prompt tokens specified, the run will end with status `incomplete`. See
    * `incomplete_details` for more info.
    */
   max_prompt_tokens?: number | null;
@@ -606,12 +892,27 @@ export interface ThreadCreateAndRunPollParams {
   tool_choice?: AssistantToolChoiceOption | null;
 
   /**
+   * A set of resources that are used by the assistant's tools. The resources are
+   * specific to the type of tool. For example, the `code_interpreter` tool requires
+   * a list of file IDs, while the `file_search` tool requires a list of vector store
+   * IDs.
+   */
+  tool_resources?: ThreadCreateAndRunPollParams.ToolResources | null;
+
+  /**
    * Override the tools the assistant can use for this run. This is useful for
    * modifying the behavior on a per-run basis.
    */
   tools?: Array<
-    AssistantsAPI.CodeInterpreterTool | AssistantsAPI.RetrievalTool | AssistantsAPI.FunctionTool
+    AssistantsAPI.CodeInterpreterTool | AssistantsAPI.FileSearchTool | AssistantsAPI.FunctionTool
   > | null;
+
+  /**
+   * An alternative to sampling with temperature, called nucleus sampling, where the
+   * model considers the results of the tokens with top_p probability mass. So 0.1
+   * means only the tokens comprising the top 10% probability mass are considered.
+   */
+  top_p?: number | null;
 
   truncation_strategy?: ThreadCreateAndRunPollParams.TruncationStrategy | null;
 }
@@ -634,6 +935,14 @@ export namespace ThreadCreateAndRunPollParams {
      * characters long.
      */
     metadata?: unknown | null;
+
+    /**
+     * A set of resources that are made available to the assistant's tools in this
+     * thread. The resources are specific to the type of tool. For example, the
+     * `code_interpreter` tool requires a list of file IDs, while the `file_search`
+     * tool requires a list of vector store IDs.
+     */
+    tool_resources?: Thread.ToolResources | null;
   }
 
   export namespace Thread {
@@ -654,12 +963,9 @@ export namespace ThreadCreateAndRunPollParams {
       role: 'user' | 'assistant';
 
       /**
-       * A list of [File](https://platform.openai.com/docs/api-reference/files) IDs that
-       * the message should use. There can be a maximum of 10 files attached to a
-       * message. Useful for tools like `retrieval` and `code_interpreter` that can
-       * access and use files.
+       * A list of files attached to the message, and the tools they should be added to.
        */
-      file_ids?: Array<string>;
+      attachments?: Array<Message.Attachment> | null;
 
       /**
        * Set of 16 key-value pairs that can be attached to an object. This can be useful
@@ -668,6 +974,110 @@ export namespace ThreadCreateAndRunPollParams {
        * characters long.
        */
       metadata?: unknown | null;
+    }
+
+    export namespace Message {
+      export interface Attachment {
+        add_to?: Array<'file_search' | 'code_interpreter'>;
+
+        /**
+         * The ID of the file to attach to the message.
+         */
+        file_id?: string;
+      }
+    }
+
+    /**
+     * A set of resources that are made available to the assistant's tools in this
+     * thread. The resources are specific to the type of tool. For example, the
+     * `code_interpreter` tool requires a list of file IDs, while the `file_search`
+     * tool requires a list of vector store IDs.
+     */
+    export interface ToolResources {
+      code_interpreter?: ToolResources.CodeInterpreter;
+
+      file_search?: ToolResources.FileSearch;
+    }
+
+    export namespace ToolResources {
+      export interface CodeInterpreter {
+        /**
+         * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs made
+         * available to the `code_interpreter` tool. There can be a maximum of 20 files
+         * associated with the tool.
+         */
+        file_ids?: Array<string>;
+      }
+
+      export interface FileSearch {
+        /**
+         * The
+         * [vector store](https://platform.openai.com/docs/api-reference/vector-stores/object)
+         * attached to this thread. There can be a maximum of 1 vector store attached to
+         * the thread.
+         */
+        vector_store_ids?: Array<string>;
+
+        /**
+         * A helper to create a
+         * [vector store](https://platform.openai.com/docs/api-reference/vector-stores/object)
+         * with file_ids and attach it to this thread. There can be a maximum of 1 vector
+         * store attached to the thread.
+         */
+        vector_stores?: Array<FileSearch.VectorStore>;
+      }
+
+      export namespace FileSearch {
+        export interface VectorStore {
+          /**
+           * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs to
+           * add to the vector store. There can be a maximum of 10000 files in a vector
+           * store.
+           */
+          file_ids?: Array<string>;
+
+          /**
+           * Set of 16 key-value pairs that can be attached to a vector store. This can be
+           * useful for storing additional information about the vector store in a structured
+           * format. Keys can be a maximum of 64 characters long and values can be a maxium
+           * of 512 characters long.
+           */
+          metadata?: unknown;
+        }
+      }
+    }
+  }
+
+  /**
+   * A set of resources that are used by the assistant's tools. The resources are
+   * specific to the type of tool. For example, the `code_interpreter` tool requires
+   * a list of file IDs, while the `file_search` tool requires a list of vector store
+   * IDs.
+   */
+  export interface ToolResources {
+    code_interpreter?: ToolResources.CodeInterpreter;
+
+    file_search?: ToolResources.FileSearch;
+  }
+
+  export namespace ToolResources {
+    export interface CodeInterpreter {
+      /**
+       * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs made
+       * available to the `code_interpreter` tool. There can be a maximum of 20 files
+       * associated with the tool.
+       */
+      file_ids?: Array<string>;
+    }
+
+    export interface FileSearch {
+      /**
+       * The ID of the
+       * [vector store](https://platform.openai.com/docs/api-reference/vector-stores/object)
+       * attached to this assistant. There can be a maximum of 1 vector store attached to
+       * the assistant.
+       */
+      vector_store_ids?: Array<string>;
     }
   }
 
@@ -706,7 +1116,7 @@ export interface ThreadCreateAndRunStreamParams {
    * The maximum number of completion tokens that may be used over the course of the
    * run. The run will make a best effort to use only the number of completion tokens
    * specified, across multiple turns of the run. If the run exceeds the number of
-   * completion tokens specified, the run will end with status `complete`. See
+   * completion tokens specified, the run will end with status `incomplete`. See
    * `incomplete_details` for more info.
    */
   max_completion_tokens?: number | null;
@@ -715,7 +1125,7 @@ export interface ThreadCreateAndRunStreamParams {
    * The maximum number of prompt tokens that may be used over the course of the run.
    * The run will make a best effort to use only the number of prompt tokens
    * specified, across multiple turns of the run. If the run exceeds the number of
-   * prompt tokens specified, the run will end with status `complete`. See
+   * prompt tokens specified, the run will end with status `incomplete`. See
    * `incomplete_details` for more info.
    */
   max_prompt_tokens?: number | null;
@@ -797,12 +1207,27 @@ export interface ThreadCreateAndRunStreamParams {
   tool_choice?: AssistantToolChoiceOption | null;
 
   /**
+   * A set of resources that are used by the assistant's tools. The resources are
+   * specific to the type of tool. For example, the `code_interpreter` tool requires
+   * a list of file IDs, while the `file_search` tool requires a list of vector store
+   * IDs.
+   */
+  tool_resources?: ThreadCreateAndRunStreamParams.ToolResources | null;
+
+  /**
    * Override the tools the assistant can use for this run. This is useful for
    * modifying the behavior on a per-run basis.
    */
   tools?: Array<
-    AssistantsAPI.CodeInterpreterTool | AssistantsAPI.RetrievalTool | AssistantsAPI.FunctionTool
+    AssistantsAPI.CodeInterpreterTool | AssistantsAPI.FileSearchTool | AssistantsAPI.FunctionTool
   > | null;
+
+  /**
+   * An alternative to sampling with temperature, called nucleus sampling, where the
+   * model considers the results of the tokens with top_p probability mass. So 0.1
+   * means only the tokens comprising the top 10% probability mass are considered.
+   */
+  top_p?: number | null;
 
   truncation_strategy?: ThreadCreateAndRunStreamParams.TruncationStrategy | null;
 }
@@ -825,6 +1250,14 @@ export namespace ThreadCreateAndRunStreamParams {
      * characters long.
      */
     metadata?: unknown | null;
+
+    /**
+     * A set of resources that are made available to the assistant's tools in this
+     * thread. The resources are specific to the type of tool. For example, the
+     * `code_interpreter` tool requires a list of file IDs, while the `file_search`
+     * tool requires a list of vector store IDs.
+     */
+    tool_resources?: Thread.ToolResources | null;
   }
 
   export namespace Thread {
@@ -845,12 +1278,9 @@ export namespace ThreadCreateAndRunStreamParams {
       role: 'user' | 'assistant';
 
       /**
-       * A list of [File](https://platform.openai.com/docs/api-reference/files) IDs that
-       * the message should use. There can be a maximum of 10 files attached to a
-       * message. Useful for tools like `retrieval` and `code_interpreter` that can
-       * access and use files.
+       * A list of files attached to the message, and the tools they should be added to.
        */
-      file_ids?: Array<string>;
+      attachments?: Array<Message.Attachment> | null;
 
       /**
        * Set of 16 key-value pairs that can be attached to an object. This can be useful
@@ -859,6 +1289,110 @@ export namespace ThreadCreateAndRunStreamParams {
        * characters long.
        */
       metadata?: unknown | null;
+    }
+
+    export namespace Message {
+      export interface Attachment {
+        add_to?: Array<'file_search' | 'code_interpreter'>;
+
+        /**
+         * The ID of the file to attach to the message.
+         */
+        file_id?: string;
+      }
+    }
+
+    /**
+     * A set of resources that are made available to the assistant's tools in this
+     * thread. The resources are specific to the type of tool. For example, the
+     * `code_interpreter` tool requires a list of file IDs, while the `file_search`
+     * tool requires a list of vector store IDs.
+     */
+    export interface ToolResources {
+      code_interpreter?: ToolResources.CodeInterpreter;
+
+      file_search?: ToolResources.FileSearch;
+    }
+
+    export namespace ToolResources {
+      export interface CodeInterpreter {
+        /**
+         * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs made
+         * available to the `code_interpreter` tool. There can be a maximum of 20 files
+         * associated with the tool.
+         */
+        file_ids?: Array<string>;
+      }
+
+      export interface FileSearch {
+        /**
+         * The
+         * [vector store](https://platform.openai.com/docs/api-reference/vector-stores/object)
+         * attached to this thread. There can be a maximum of 1 vector store attached to
+         * the thread.
+         */
+        vector_store_ids?: Array<string>;
+
+        /**
+         * A helper to create a
+         * [vector store](https://platform.openai.com/docs/api-reference/vector-stores/object)
+         * with file_ids and attach it to this thread. There can be a maximum of 1 vector
+         * store attached to the thread.
+         */
+        vector_stores?: Array<FileSearch.VectorStore>;
+      }
+
+      export namespace FileSearch {
+        export interface VectorStore {
+          /**
+           * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs to
+           * add to the vector store. There can be a maximum of 10000 files in a vector
+           * store.
+           */
+          file_ids?: Array<string>;
+
+          /**
+           * Set of 16 key-value pairs that can be attached to a vector store. This can be
+           * useful for storing additional information about the vector store in a structured
+           * format. Keys can be a maximum of 64 characters long and values can be a maxium
+           * of 512 characters long.
+           */
+          metadata?: unknown;
+        }
+      }
+    }
+  }
+
+  /**
+   * A set of resources that are used by the assistant's tools. The resources are
+   * specific to the type of tool. For example, the `code_interpreter` tool requires
+   * a list of file IDs, while the `file_search` tool requires a list of vector store
+   * IDs.
+   */
+  export interface ToolResources {
+    code_interpreter?: ToolResources.CodeInterpreter;
+
+    file_search?: ToolResources.FileSearch;
+  }
+
+  export namespace ToolResources {
+    export interface CodeInterpreter {
+      /**
+       * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs made
+       * available to the `code_interpreter` tool. There can be a maximum of 20 files
+       * associated with the tool.
+       */
+      file_ids?: Array<string>;
+    }
+
+    export interface FileSearch {
+      /**
+       * The ID of the
+       * [vector store](https://platform.openai.com/docs/api-reference/vector-stores/object)
+       * attached to this assistant. There can be a maximum of 1 vector store attached to
+       * the assistant.
+       */
+      vector_store_ids?: Array<string>;
     }
   }
 

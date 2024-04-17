@@ -33,11 +33,45 @@ describe('resource threads', () => {
       openai.beta.threads.create(
         {
           messages: [
-            { role: 'user', content: 'x', file_ids: ['string'], metadata: {} },
-            { role: 'user', content: 'x', file_ids: ['string'], metadata: {} },
-            { role: 'user', content: 'x', file_ids: ['string'], metadata: {} },
+            {
+              role: 'user',
+              content: 'x',
+              attachments: [
+                { file_id: 'string', add_to: ['file_search', 'code_interpreter'] },
+                { file_id: 'string', add_to: ['file_search', 'code_interpreter'] },
+                { file_id: 'string', add_to: ['file_search', 'code_interpreter'] },
+              ],
+              metadata: {},
+            },
+            {
+              role: 'user',
+              content: 'x',
+              attachments: [
+                { file_id: 'string', add_to: ['file_search', 'code_interpreter'] },
+                { file_id: 'string', add_to: ['file_search', 'code_interpreter'] },
+                { file_id: 'string', add_to: ['file_search', 'code_interpreter'] },
+              ],
+              metadata: {},
+            },
+            {
+              role: 'user',
+              content: 'x',
+              attachments: [
+                { file_id: 'string', add_to: ['file_search', 'code_interpreter'] },
+                { file_id: 'string', add_to: ['file_search', 'code_interpreter'] },
+                { file_id: 'string', add_to: ['file_search', 'code_interpreter'] },
+              ],
+              metadata: {},
+            },
           ],
           metadata: {},
+          tool_resources: {
+            code_interpreter: { file_ids: ['string', 'string', 'string'] },
+            file_search: {
+              vector_store_ids: ['string'],
+              vector_stores: [{ file_ids: ['string', 'string', 'string'], metadata: {} }],
+            },
+          },
         },
         { path: '/_stainless_unknown_path' },
       ),
@@ -115,14 +149,53 @@ describe('resource threads', () => {
       temperature: 1,
       thread: {
         messages: [
-          { role: 'user', content: 'x', file_ids: ['string'], metadata: {} },
-          { role: 'user', content: 'x', file_ids: ['string'], metadata: {} },
-          { role: 'user', content: 'x', file_ids: ['string'], metadata: {} },
+          {
+            role: 'user',
+            content: 'x',
+            attachments: [
+              { file_id: 'string', add_to: ['file_search', 'code_interpreter'] },
+              { file_id: 'string', add_to: ['file_search', 'code_interpreter'] },
+              { file_id: 'string', add_to: ['file_search', 'code_interpreter'] },
+            ],
+            metadata: {},
+          },
+          {
+            role: 'user',
+            content: 'x',
+            attachments: [
+              { file_id: 'string', add_to: ['file_search', 'code_interpreter'] },
+              { file_id: 'string', add_to: ['file_search', 'code_interpreter'] },
+              { file_id: 'string', add_to: ['file_search', 'code_interpreter'] },
+            ],
+            metadata: {},
+          },
+          {
+            role: 'user',
+            content: 'x',
+            attachments: [
+              { file_id: 'string', add_to: ['file_search', 'code_interpreter'] },
+              { file_id: 'string', add_to: ['file_search', 'code_interpreter'] },
+              { file_id: 'string', add_to: ['file_search', 'code_interpreter'] },
+            ],
+            metadata: {},
+          },
         ],
+        tool_resources: {
+          code_interpreter: { file_ids: ['string', 'string', 'string'] },
+          file_search: {
+            vector_store_ids: ['string'],
+            vector_stores: [{ file_ids: ['string', 'string', 'string'], metadata: {} }],
+          },
+        },
         metadata: {},
       },
       tool_choice: 'none',
+      tool_resources: {
+        code_interpreter: { file_ids: ['string', 'string', 'string'] },
+        file_search: { vector_store_ids: ['string'] },
+      },
       tools: [{ type: 'code_interpreter' }, { type: 'code_interpreter' }, { type: 'code_interpreter' }],
+      top_p: 1,
       truncation_strategy: { type: 'auto', last_messages: 1 },
     });
   });
