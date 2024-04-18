@@ -25,9 +25,9 @@ describe('resource messages', () => {
       content: 'x',
       role: 'user',
       attachments: [
-        { file_id: 'string', add_to: ['file_search', 'code_interpreter'] },
-        { file_id: 'string', add_to: ['file_search', 'code_interpreter'] },
-        { file_id: 'string', add_to: ['file_search', 'code_interpreter'] },
+        { file_id: 'string', tools: ['file_search', 'code_interpreter'] },
+        { file_id: 'string', tools: ['file_search', 'code_interpreter'] },
+        { file_id: 'string', tools: ['file_search', 'code_interpreter'] },
       ],
       metadata: {},
     });
