@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.38.1 (2024-04-18)
+
+Full Changelog: [v4.38.0...v4.38.1](https://github.com/openai/openai-node/compare/v4.38.0...v4.38.1)
+
+### Bug Fixes
+
+* **api:** correct types for attachments ([#783](https://github.com/openai/openai-node/issues/783)) ([6893631](https://github.com/openai/openai-node/commit/6893631334f75e232ba130f5dd67f1230b1e5fa0))
+
 ## 4.38.0 (2024-04-18)
 
 Full Changelog: [v4.37.1...v4.38.0](https://github.com/openai/openai-node/compare/v4.37.1...v4.38.0)
