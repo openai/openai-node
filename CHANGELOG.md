@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.38.0 (2024-04-18)
+
+Full Changelog: [v4.37.1...v4.38.0](https://github.com/openai/openai-node/compare/v4.37.1...v4.38.0)
+
+### Features
+
+* **api:** batch list endpoint ([#781](https://github.com/openai/openai-node/issues/781)) ([d226759](https://github.com/openai/openai-node/commit/d226759164fbed33198d8bdc315c98e1052dade8))
+
 ## 4.37.1 (2024-04-17)
 
 Full Changelog: [v4.37.0...v4.37.1](https://github.com/openai/openai-node/compare/v4.37.0...v4.37.1)
