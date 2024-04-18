@@ -2,7 +2,9 @@
 
 import * as Core from 'openai/core';
 import { APIResource } from 'openai/resource';
+import { isRequestOptions } from 'openai/core';
 import * as BatchesAPI from 'openai/resources/batches';
+import { CursorPage, type CursorPageParams } from 'openai/pagination';
 
 export class Batches extends APIResource {
   /**
@@ -20,12 +22,29 @@ export class Batches extends APIResource {
   }
 
   /**
+   * List your organization's batches.
+   */
+  list(query?: BatchListParams, options?: Core.RequestOptions): Core.PagePromise<BatchesPage, Batch>;
+  list(options?: Core.RequestOptions): Core.PagePromise<BatchesPage, Batch>;
+  list(
+    query: BatchListParams | Core.RequestOptions = {},
+    options?: Core.RequestOptions,
+  ): Core.PagePromise<BatchesPage, Batch> {
+    if (isRequestOptions(query)) {
+      return this.list({}, query);
+    }
+    return this._client.getAPIList('/batches', BatchesPage, { query, ...options });
+  }
+
+  /**
    * Cancels an in-progress batch.
    */
   cancel(batchId: string, options?: Core.RequestOptions): Core.APIPromise<Batch> {
     return this._client.post(`/batches/${batchId}/cancel`, options);
   }
 }
+
+export class BatchesPage extends CursorPage<Batch> {}
 
 export interface Batch {
   id: string;
@@ -217,9 +236,13 @@ export interface BatchCreateParams {
   metadata?: Record<string, string> | null;
 }
 
+export interface BatchListParams extends CursorPageParams {}
+
 export namespace Batches {
   export import Batch = BatchesAPI.Batch;
   export import BatchError = BatchesAPI.BatchError;
   export import BatchRequestCounts = BatchesAPI.BatchRequestCounts;
+  export import BatchesPage = BatchesAPI.BatchesPage;
   export import BatchCreateParams = BatchesAPI.BatchCreateParams;
+  export import BatchListParams = BatchesAPI.BatchListParams;
 }
