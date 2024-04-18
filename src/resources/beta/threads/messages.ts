@@ -369,12 +369,12 @@ export interface Message {
 
 export namespace Message {
   export interface Attachment {
-    add_to?: Array<'file_search' | 'code_interpreter'>;
-
     /**
      * The ID of the file to attach to the message.
      */
     file_id?: string;
+
+    tools?: Array<'file_search' | 'code_interpreter'>;
   }
 
   /**
@@ -523,12 +523,12 @@ export interface MessageCreateParams {
 
 export namespace MessageCreateParams {
   export interface Attachment {
-    add_to?: Array<'file_search' | 'code_interpreter'>;
-
     /**
      * The ID of the file to attach to the message.
      */
     file_id?: string;
+
+    tools?: Array<'file_search' | 'code_interpreter'>;
   }
 }
 

@@ -775,12 +775,12 @@ export namespace RunCreateParams {
 
   export namespace AdditionalMessage {
     export interface Attachment {
-      add_to?: Array<'file_search' | 'code_interpreter'>;
-
       /**
        * The ID of the file to attach to the message.
        */
       file_id?: string;
+
+      tools?: Array<'file_search' | 'code_interpreter'>;
     }
   }
 
@@ -1023,12 +1023,12 @@ export namespace RunCreateAndPollParams {
 
   export namespace AdditionalMessage {
     export interface Attachment {
-      add_to?: Array<'file_search' | 'code_interpreter'>;
-
       /**
        * The ID of the file to attach to the message.
        */
       file_id?: string;
+
+      tools?: Array<'file_search' | 'code_interpreter'>;
     }
   }
 
@@ -1224,12 +1224,12 @@ export namespace RunCreateAndStreamParams {
 
   export namespace AdditionalMessage {
     export interface Attachment {
-      add_to?: Array<'file_search' | 'code_interpreter'>;
-
       /**
        * The ID of the file to attach to the message.
        */
       file_id?: string;
+
+      tools?: Array<'file_search' | 'code_interpreter'>;
     }
   }
 
@@ -1425,12 +1425,12 @@ export namespace RunStreamParams {
 
   export namespace AdditionalMessage {
     export interface Attachment {
-      add_to?: Array<'file_search' | 'code_interpreter'>;
-
       /**
        * The ID of the file to attach to the message.
        */
       file_id?: string;
+
+      tools?: Array<'file_search' | 'code_interpreter'>;
     }
   }
 
