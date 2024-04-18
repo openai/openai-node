@@ -3,7 +3,15 @@
 export * from './chat/index';
 export * from './shared';
 export { Audio } from './audio/audio';
-export { Batch, BatchError, BatchRequestCounts, BatchCreateParams, Batches } from './batches';
+export {
+  Batch,
+  BatchError,
+  BatchRequestCounts,
+  BatchCreateParams,
+  BatchListParams,
+  BatchesPage,
+  Batches,
+} from './batches';
 export { Beta } from './beta/beta';
 export {
   Completion,
