@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.38.2 (2024-04-19)
+
+Full Changelog: [v4.38.1...v4.38.2](https://github.com/openai/openai-node/compare/v4.38.1...v4.38.2)
+
+### Bug Fixes
+
+* **api:** correct types for message attachment tools ([#787](https://github.com/openai/openai-node/issues/787)) ([8626884](https://github.com/openai/openai-node/commit/8626884abd2494aa081db9e50a2f268b6cebc5df))
+
 ## 4.38.1 (2024-04-18)
 
 Full Changelog: [v4.38.0...v4.38.1](https://github.com/openai/openai-node/compare/v4.38.0...v4.38.1)
