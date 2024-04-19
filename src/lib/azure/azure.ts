@@ -1,7 +1,7 @@
 import * as Core from '../../core';
 import * as Errors from '../../error';
-import OpenAI, { ClientOptions } from 'openai/index';
-import { RequestInit } from 'node-fetch';
+import OpenAI, { ClientOptions } from '../../openai';
+import { type RequestInit } from '../../_shims/index';
 
 /** API Client for interfacing with the Azure OpenAI API. */
 export interface AzureClientOptions extends ClientOptions {
