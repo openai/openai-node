@@ -318,7 +318,10 @@ export namespace ThreadCreateParams {
        */
       file_id?: string;
 
-      tools?: Array<'file_search' | 'code_interpreter'>;
+      /**
+       * The tools to add this file to.
+       */
+      tools?: Array<AssistantsAPI.CodeInterpreterTool | AssistantsAPI.FileSearchTool>;
     }
   }
 
@@ -653,7 +656,10 @@ export namespace ThreadCreateAndRunParams {
          */
         file_id?: string;
 
-        tools?: Array<'file_search' | 'code_interpreter'>;
+        /**
+         * The tools to add this file to.
+         */
+        tools?: Array<AssistantsAPI.CodeInterpreterTool | AssistantsAPI.FileSearchTool>;
       }
     }
 
@@ -999,7 +1005,10 @@ export namespace ThreadCreateAndRunPollParams {
          */
         file_id?: string;
 
-        tools?: Array<'file_search' | 'code_interpreter'>;
+        /**
+         * The tools to add this file to.
+         */
+        tools?: Array<AssistantsAPI.CodeInterpreterTool | AssistantsAPI.FileSearchTool>;
       }
     }
 
@@ -1324,7 +1333,10 @@ export namespace ThreadCreateAndRunStreamParams {
          */
         file_id?: string;
 
-        tools?: Array<'file_search' | 'code_interpreter'>;
+        /**
+         * The tools to add this file to.
+         */
+        tools?: Array<AssistantsAPI.CodeInterpreterTool | AssistantsAPI.FileSearchTool>;
       }
     }
 
