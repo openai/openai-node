@@ -4,6 +4,7 @@ import * as Core from 'openai/core';
 import { APIResource } from 'openai/resource';
 import { isRequestOptions } from 'openai/core';
 import * as MessagesAPI from 'openai/resources/beta/threads/messages';
+import * as AssistantsAPI from 'openai/resources/beta/assistants';
 import { CursorPage, type CursorPageParams } from 'openai/pagination';
 
 export class Messages extends APIResource {
@@ -374,7 +375,10 @@ export namespace Message {
      */
     file_id?: string;
 
-    tools?: Array<'file_search' | 'code_interpreter'>;
+    /**
+     * The tools to add this file to.
+     */
+    tools?: Array<AssistantsAPI.CodeInterpreterTool | AssistantsAPI.FileSearchTool>;
   }
 
   /**
@@ -528,7 +532,10 @@ export namespace MessageCreateParams {
      */
     file_id?: string;
 
-    tools?: Array<'file_search' | 'code_interpreter'>;
+    /**
+     * The tools to add this file to.
+     */
+    tools?: Array<AssistantsAPI.CodeInterpreterTool | AssistantsAPI.FileSearchTool>;
   }
 }
 
