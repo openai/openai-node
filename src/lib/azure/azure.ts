@@ -31,6 +31,7 @@ export interface AzureClientOptions extends ClientOptions {
 /** API Client for interfacing with the Azure OpenAI API. */
 export class AzureOpenAI extends OpenAI {
   private _microsoftEntraTokenProvider: (() => string) | undefined;
+  apiVersion: string = '';
   /**
    * API Client for interfacing with the Azure OpenAI API.
    *
@@ -58,7 +59,7 @@ export class AzureOpenAI extends OpenAI {
     dangerouslyAllowBrowser,
     ...opts
   }: AzureClientOptions = {}) {
-    if (apiVersion === undefined) {
+    if (!apiVersion) {
       throw new Errors.OpenAIError(
         "The OPENAI_API_VERSION environment variable is missing or empty; either provide it, or instantiate the AzureOpenAI client with an apiVersion option, like new AzureOpenAI({ apiVersion: 'My API Version' }).",
       );
@@ -115,6 +116,7 @@ export class AzureOpenAI extends OpenAI {
     });
 
     this._microsoftEntraTokenProvider = microsoftEntraTokenProvider;
+    this.apiVersion = apiVersion;
   }
 
   override buildRequest(options: Core.FinalRequestOptions<unknown>): {
