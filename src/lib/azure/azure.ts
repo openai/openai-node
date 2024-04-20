@@ -124,7 +124,7 @@ export class AzureOpenAI extends OpenAI {
     url: string;
     timeout: number;
   } {
-    if (options.path in _deployments_endpoints && options.method === 'post' && options.body !== undefined) {
+    if (_deployments_endpoints.has(options.path) && options.method === 'post' && options.body !== undefined) {
       if (!Core.isObj(options.body)) {
         throw new Error('Expected request body to be an object');
       }

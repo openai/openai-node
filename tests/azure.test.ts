@@ -248,6 +248,23 @@ describe('instantiate azure client', () => {
       );
     });
   });
+
+  test('with endpoint', () => {
+    const client = new AzureOpenAI({ endpoint: 'https://example.com', apiKey: 'My API Key', apiVersion });
+    expect(client.baseURL).toEqual('https://example.com/openai');
+  });
+
+  test('baseURL and endpoint are mutually exclusive', () => {
+    expect(
+      () =>
+        new AzureOpenAI({
+          endpoint: 'https://example.com',
+          baseURL: 'https://anotherexample.com',
+          apiKey: 'My API Key',
+          apiVersion,
+        }),
+    ).toThrow(/baseURL and endpoint are mutually exclusive/);
+  });
 });
 
 describe('azure request building', () => {
