@@ -220,6 +220,34 @@ describe('instantiate azure client', () => {
     expect(client.apiKey).toBe('My API Key');
     expect(client.apiVersion).toBe(apiVersion);
   });
+
+  describe('Entra', () => {
+    test('with microsoftEntraTokenProvider', () => {
+      const client = new AzureOpenAI({
+        baseURL: 'http://localhost:5000/',
+        microsoftEntraTokenProvider: () => 'my token',
+        apiVersion,
+      });
+      expect(client.buildRequest({ method: 'post', path: 'https://example.com' }).req.headers).toHaveProperty(
+        'authorization',
+        'Bearer my token',
+      );
+    });
+
+    test('apiKey and microsoftEntraTokenProvider cant be combined', () => {
+      expect(
+        () =>
+          new AzureOpenAI({
+            baseURL: 'http://localhost:5000/',
+            microsoftEntraTokenProvider: () => 'my token',
+            apiKey: 'My API Key',
+            apiVersion,
+          }),
+      ).toThrow(
+        /The `apiKey` and `microsoftEntraTokenProvider` arguments are mutually exclusive; only one can be passed at a time./,
+      );
+    });
+  });
 });
 
 describe('azure request building', () => {

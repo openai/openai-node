@@ -150,22 +150,18 @@ export class AzureOpenAI extends OpenAI {
     return undefined;
   }
 
-  protected override async prepareOptions(options: Core.FinalRequestOptions<unknown>): Promise<void> {
-    options.headers ??= {};
-
-    if (!options.headers['Authorization']) {
-      const token = this._getMicrosoftEntraToken();
-      if (token) {
-        options.headers['Authorization'] = `Bearer ${token}`;
-      }
-    } else if (this.apiKey !== API_KEY_SENTINEL) {
-      if (!options.headers['api-key']) {
-        options.headers['api-key'] = this.apiKey;
-      }
-    } else {
-      throw new Errors.OpenAIError('Unable to handle auth');
+  protected override authHeaders(opts: Core.FinalRequestOptions): Core.Headers {
+    if (opts.headers?.['Authorization'] || opts.headers?.['api-key']) {
+      return {};
     }
-    return super.prepareOptions(options);
+    const token = this._getMicrosoftEntraToken();
+    if (token) {
+      return { Authorization: `Bearer ${token}` };
+    }
+    if (this.apiKey !== API_KEY_SENTINEL) {
+      return { 'api-key': this.apiKey };
+    }
+    throw new Errors.OpenAIError('Unable to handle auth');
   }
 }
 
