@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless.
+// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import OpenAI from 'openai';
 import { Response } from 'node-fetch';
@@ -33,11 +33,108 @@ describe('resource threads', () => {
       openai.beta.threads.create(
         {
           messages: [
-            { role: 'user', content: 'x', file_ids: ['string'], metadata: {} },
-            { role: 'user', content: 'x', file_ids: ['string'], metadata: {} },
-            { role: 'user', content: 'x', file_ids: ['string'], metadata: {} },
+            {
+              role: 'user',
+              content: 'x',
+              attachments: [
+                {
+                  file_id: 'string',
+                  tools: [
+                    { type: 'code_interpreter' },
+                    { type: 'code_interpreter' },
+                    { type: 'code_interpreter' },
+                  ],
+                },
+                {
+                  file_id: 'string',
+                  tools: [
+                    { type: 'code_interpreter' },
+                    { type: 'code_interpreter' },
+                    { type: 'code_interpreter' },
+                  ],
+                },
+                {
+                  file_id: 'string',
+                  tools: [
+                    { type: 'code_interpreter' },
+                    { type: 'code_interpreter' },
+                    { type: 'code_interpreter' },
+                  ],
+                },
+              ],
+              metadata: {},
+            },
+            {
+              role: 'user',
+              content: 'x',
+              attachments: [
+                {
+                  file_id: 'string',
+                  tools: [
+                    { type: 'code_interpreter' },
+                    { type: 'code_interpreter' },
+                    { type: 'code_interpreter' },
+                  ],
+                },
+                {
+                  file_id: 'string',
+                  tools: [
+                    { type: 'code_interpreter' },
+                    { type: 'code_interpreter' },
+                    { type: 'code_interpreter' },
+                  ],
+                },
+                {
+                  file_id: 'string',
+                  tools: [
+                    { type: 'code_interpreter' },
+                    { type: 'code_interpreter' },
+                    { type: 'code_interpreter' },
+                  ],
+                },
+              ],
+              metadata: {},
+            },
+            {
+              role: 'user',
+              content: 'x',
+              attachments: [
+                {
+                  file_id: 'string',
+                  tools: [
+                    { type: 'code_interpreter' },
+                    { type: 'code_interpreter' },
+                    { type: 'code_interpreter' },
+                  ],
+                },
+                {
+                  file_id: 'string',
+                  tools: [
+                    { type: 'code_interpreter' },
+                    { type: 'code_interpreter' },
+                    { type: 'code_interpreter' },
+                  ],
+                },
+                {
+                  file_id: 'string',
+                  tools: [
+                    { type: 'code_interpreter' },
+                    { type: 'code_interpreter' },
+                    { type: 'code_interpreter' },
+                  ],
+                },
+              ],
+              metadata: {},
+            },
           ],
           metadata: {},
+          tool_resources: {
+            code_interpreter: { file_ids: ['string', 'string', 'string'] },
+            file_search: {
+              vector_store_ids: ['string'],
+              vector_stores: [{ file_ids: ['string', 'string', 'string'], metadata: {} }],
+            },
+          },
         },
         { path: '/_stainless_unknown_path' },
       ),
@@ -106,17 +203,126 @@ describe('resource threads', () => {
     const response = await openai.beta.threads.createAndRun({
       assistant_id: 'string',
       instructions: 'string',
+      max_completion_tokens: 256,
+      max_prompt_tokens: 256,
       metadata: {},
-      model: 'string',
+      model: 'gpt-4-turbo',
+      response_format: 'none',
+      stream: false,
+      temperature: 1,
       thread: {
         messages: [
-          { role: 'user', content: 'x', file_ids: ['string'], metadata: {} },
-          { role: 'user', content: 'x', file_ids: ['string'], metadata: {} },
-          { role: 'user', content: 'x', file_ids: ['string'], metadata: {} },
+          {
+            role: 'user',
+            content: 'x',
+            attachments: [
+              {
+                file_id: 'string',
+                tools: [
+                  { type: 'code_interpreter' },
+                  { type: 'code_interpreter' },
+                  { type: 'code_interpreter' },
+                ],
+              },
+              {
+                file_id: 'string',
+                tools: [
+                  { type: 'code_interpreter' },
+                  { type: 'code_interpreter' },
+                  { type: 'code_interpreter' },
+                ],
+              },
+              {
+                file_id: 'string',
+                tools: [
+                  { type: 'code_interpreter' },
+                  { type: 'code_interpreter' },
+                  { type: 'code_interpreter' },
+                ],
+              },
+            ],
+            metadata: {},
+          },
+          {
+            role: 'user',
+            content: 'x',
+            attachments: [
+              {
+                file_id: 'string',
+                tools: [
+                  { type: 'code_interpreter' },
+                  { type: 'code_interpreter' },
+                  { type: 'code_interpreter' },
+                ],
+              },
+              {
+                file_id: 'string',
+                tools: [
+                  { type: 'code_interpreter' },
+                  { type: 'code_interpreter' },
+                  { type: 'code_interpreter' },
+                ],
+              },
+              {
+                file_id: 'string',
+                tools: [
+                  { type: 'code_interpreter' },
+                  { type: 'code_interpreter' },
+                  { type: 'code_interpreter' },
+                ],
+              },
+            ],
+            metadata: {},
+          },
+          {
+            role: 'user',
+            content: 'x',
+            attachments: [
+              {
+                file_id: 'string',
+                tools: [
+                  { type: 'code_interpreter' },
+                  { type: 'code_interpreter' },
+                  { type: 'code_interpreter' },
+                ],
+              },
+              {
+                file_id: 'string',
+                tools: [
+                  { type: 'code_interpreter' },
+                  { type: 'code_interpreter' },
+                  { type: 'code_interpreter' },
+                ],
+              },
+              {
+                file_id: 'string',
+                tools: [
+                  { type: 'code_interpreter' },
+                  { type: 'code_interpreter' },
+                  { type: 'code_interpreter' },
+                ],
+              },
+            ],
+            metadata: {},
+          },
         ],
+        tool_resources: {
+          code_interpreter: { file_ids: ['string', 'string', 'string'] },
+          file_search: {
+            vector_store_ids: ['string'],
+            vector_stores: [{ file_ids: ['string', 'string', 'string'], metadata: {} }],
+          },
+        },
         metadata: {},
       },
+      tool_choice: 'none',
+      tool_resources: {
+        code_interpreter: { file_ids: ['string', 'string', 'string'] },
+        file_search: { vector_store_ids: ['string'] },
+      },
       tools: [{ type: 'code_interpreter' }, { type: 'code_interpreter' }, { type: 'code_interpreter' }],
+      top_p: 1,
+      truncation_strategy: { type: 'auto', last_messages: 1 },
     });
   });
 });

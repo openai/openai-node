@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless.
+// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import * as Core from './core';
 import * as Errors from './error';
@@ -17,6 +17,11 @@ export interface ClientOptions {
    * Defaults to process.env['OPENAI_ORG_ID'].
    */
   organization?: string | null | undefined;
+
+  /**
+   * Defaults to process.env['OPENAI_PROJECT_ID'].
+   */
+  project?: string | null | undefined;
 
   /**
    * Override the default base URL for the API, e.g., "https://api.example.com/v2/"
@@ -85,6 +90,7 @@ export interface ClientOptions {
 export class OpenAI extends Core.APIClient {
   apiKey: string;
   organization: string | null;
+  project: string | null;
 
   private _options: ClientOptions;
 
@@ -93,6 +99,7 @@ export class OpenAI extends Core.APIClient {
    *
    * @param {string | undefined} [opts.apiKey=process.env['OPENAI_API_KEY'] ?? undefined]
    * @param {string | null | undefined} [opts.organization=process.env['OPENAI_ORG_ID'] ?? null]
+   * @param {string | null | undefined} [opts.project=process.env['OPENAI_PROJECT_ID'] ?? null]
    * @param {string} [opts.baseURL=process.env['OPENAI_BASE_URL'] ?? https://api.openai.com/v1] - Override the default base URL for the API.
    * @param {number} [opts.timeout=10 minutes] - The maximum amount of time (in milliseconds) the client will wait for a response before timing out.
    * @param {number} [opts.httpAgent] - An HTTP agent used to manage HTTP(s) connections.
@@ -106,6 +113,7 @@ export class OpenAI extends Core.APIClient {
     baseURL = Core.readEnv('OPENAI_BASE_URL'),
     apiKey = Core.readEnv('OPENAI_API_KEY'),
     organization = Core.readEnv('OPENAI_ORG_ID') ?? null,
+    project = Core.readEnv('OPENAI_PROJECT_ID') ?? null,
     ...opts
   }: ClientOptions = {}) {
     if (apiKey === undefined) {
@@ -117,6 +125,7 @@ export class OpenAI extends Core.APIClient {
     const options: ClientOptions = {
       apiKey,
       organization,
+      project,
       ...opts,
       baseURL: baseURL || `https://api.openai.com/v1`,
     };
@@ -138,6 +147,7 @@ export class OpenAI extends Core.APIClient {
 
     this.apiKey = apiKey;
     this.organization = organization;
+    this.project = project;
   }
 
   completions: API.Completions = new API.Completions(this);
@@ -150,6 +160,7 @@ export class OpenAI extends Core.APIClient {
   models: API.Models = new API.Models(this);
   fineTuning: API.FineTuning = new API.FineTuning(this);
   beta: API.Beta = new API.Beta(this);
+  batches: API.Batches = new API.Batches(this);
 
   protected override defaultQuery(): Core.DefaultQuery | undefined {
     return this._options.defaultQuery;
@@ -159,6 +170,7 @@ export class OpenAI extends Core.APIClient {
     return {
       ...super.defaultHeaders(opts),
       'OpenAI-Organization': this.organization,
+      'OpenAI-Project': this.project,
       ...this._options.defaultHeaders,
     };
   }
@@ -226,6 +238,7 @@ export namespace OpenAI {
   export import CompletionCreateParamsStreaming = API.CompletionCreateParamsStreaming;
 
   export import Chat = API.Chat;
+  export import ChatModel = API.ChatModel;
   export import ChatCompletion = API.ChatCompletion;
   export import ChatCompletionAssistantMessageParam = API.ChatCompletionAssistantMessageParam;
   export import ChatCompletionChunk = API.ChatCompletionChunk;
@@ -285,6 +298,15 @@ export namespace OpenAI {
 
   export import Beta = API.Beta;
 
+  export import Batches = API.Batches;
+  export import Batch = API.Batch;
+  export import BatchError = API.BatchError;
+  export import BatchRequestCounts = API.BatchRequestCounts;
+  export import BatchesPage = API.BatchesPage;
+  export import BatchCreateParams = API.BatchCreateParams;
+  export import BatchListParams = API.BatchListParams;
+
+  export import ErrorObject = API.ErrorObject;
   export import FunctionDefinition = API.FunctionDefinition;
   export import FunctionParameters = API.FunctionParameters;
 }

@@ -281,7 +281,7 @@ describe('azure request building', () => {
   });
 });
 
-describe.skip('retries', () => {
+describe('retries', () => {
   test('retry on timeout', async () => {
     let count = 0;
     const testFetch = async (url: RequestInfo, { signal }: RequestInit = {}): Promise<Response> => {

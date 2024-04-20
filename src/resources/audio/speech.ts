@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless.
+// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import * as Core from 'openai/core';
 import { APIResource } from 'openai/resource';
@@ -35,9 +35,10 @@ export interface SpeechCreateParams {
   voice: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
 
   /**
-   * The format to audio in. Supported formats are `mp3`, `opus`, `aac`, and `flac`.
+   * The format to audio in. Supported formats are `mp3`, `opus`, `aac`, `flac`,
+   * `wav`, and `pcm`.
    */
-  response_format?: 'mp3' | 'opus' | 'aac' | 'flac';
+  response_format?: 'mp3' | 'opus' | 'aac' | 'flac' | 'wav' | 'pcm';
 
   /**
    * The speed of the generated audio. Select a value from `0.25` to `4.0`. `1.0` is

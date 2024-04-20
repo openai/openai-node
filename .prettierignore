@@ -1,5 +1,5 @@
 CHANGELOG.md
-/ecosystem-tests
+/ecosystem-tests/*/**
 /node_modules
 /deno
 

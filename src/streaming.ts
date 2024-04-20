@@ -23,29 +23,6 @@ export class Stream<Item> implements AsyncIterable<Item> {
 
   static fromSSEResponse<Item>(response: Response, controller: AbortController) {
     let consumed = false;
-    const decoder = new SSEDecoder();
-
-    async function* iterMessages(): AsyncGenerator<ServerSentEvent, void, unknown> {
-      if (!response.body) {
-        controller.abort();
-        throw new OpenAIError(`Attempted to iterate over a response with no body`);
-      }
-
-      const lineDecoder = new LineDecoder();
-
-      const iter = readableStreamAsyncIterable<Bytes>(response.body);
-      for await (const chunk of iter) {
-        for (const line of lineDecoder.decode(chunk)) {
-          const sse = decoder.decode(line);
-          if (sse) yield sse;
-        }
-      }
-
-      for (const line of lineDecoder.flush()) {
-        const sse = decoder.decode(line);
-        if (sse) yield sse;
-      }
-    }
 
     async function* iterator(): AsyncIterator<Item, any, undefined> {
       if (consumed) {
@@ -54,7 +31,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
       consumed = true;
       let done = false;
       try {
-        for await (const sse of iterMessages()) {
+        for await (const sse of _iterSSEMessages(response, controller)) {
           if (done) continue;
 
           if (sse.data.startsWith('[DONE]')) {
@@ -78,6 +55,20 @@ export class Stream<Item> implements AsyncIterable<Item> {
             }
 
             yield data;
+          } else {
+            let data;
+            try {
+              data = JSON.parse(sse.data);
+            } catch (e) {
+              console.error(`Could not parse message into JSON:`, sse.data);
+              console.error(`From chunk:`, sse.raw);
+              throw e;
+            }
+            // TODO: Is this where the error should be thrown?
+            if (sse.event == 'error') {
+              throw new APIError(undefined, data.error, data.message, undefined);
+            }
+            yield { event: sse.event, data: data } as any;
           }
         }
         done = true;
@@ -187,7 +178,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
       async start() {
         iter = self[Symbol.asyncIterator]();
       },
-      async pull(ctrl) {
+      async pull(ctrl: any) {
         try {
           const { value, done } = await iter.next();
           if (done) return ctrl.close();
@@ -204,6 +195,97 @@ export class Stream<Item> implements AsyncIterable<Item> {
       },
     });
   }
+}
+
+export async function* _iterSSEMessages(
+  response: Response,
+  controller: AbortController,
+): AsyncGenerator<ServerSentEvent, void, unknown> {
+  if (!response.body) {
+    controller.abort();
+    throw new OpenAIError(`Attempted to iterate over a response with no body`);
+  }
+
+  const sseDecoder = new SSEDecoder();
+  const lineDecoder = new LineDecoder();
+
+  const iter = readableStreamAsyncIterable<Bytes>(response.body);
+  for await (const sseChunk of iterSSEChunks(iter)) {
+    for (const line of lineDecoder.decode(sseChunk)) {
+      const sse = sseDecoder.decode(line);
+      if (sse) yield sse;
+    }
+  }
+
+  for (const line of lineDecoder.flush()) {
+    const sse = sseDecoder.decode(line);
+    if (sse) yield sse;
+  }
+}
+
+/**
+ * Given an async iterable iterator, iterates over it and yields full
+ * SSE chunks, i.e. yields when a double new-line is encountered.
+ */
+async function* iterSSEChunks(iterator: AsyncIterableIterator<Bytes>): AsyncGenerator<Uint8Array> {
+  let data = new Uint8Array();
+
+  for await (const chunk of iterator) {
+    if (chunk == null) {
+      continue;
+    }
+
+    const binaryChunk =
+      chunk instanceof ArrayBuffer ? new Uint8Array(chunk)
+      : typeof chunk === 'string' ? new TextEncoder().encode(chunk)
+      : chunk;
+
+    let newData = new Uint8Array(data.length + binaryChunk.length);
+    newData.set(data);
+    newData.set(binaryChunk, data.length);
+    data = newData;
+
+    let patternIndex;
+    while ((patternIndex = findDoubleNewlineIndex(data)) !== -1) {
+      yield data.slice(0, patternIndex);
+      data = data.slice(patternIndex);
+    }
+  }
+
+  if (data.length > 0) {
+    yield data;
+  }
+}
+
+function findDoubleNewlineIndex(buffer: Uint8Array): number {
+  // This function searches the buffer for the end patterns (\r\r, \n\n, \r\n\r\n)
+  // and returns the index right after the first occurrence of any pattern,
+  // or -1 if none of the patterns are found.
+  const newline = 0x0a; // \n
+  const carriage = 0x0d; // \r
+
+  for (let i = 0; i < buffer.length - 2; i++) {
+    if (buffer[i] === newline && buffer[i + 1] === newline) {
+      // \n\n
+      return i + 2;
+    }
+    if (buffer[i] === carriage && buffer[i + 1] === carriage) {
+      // \r\r
+      return i + 2;
+    }
+    if (
+      buffer[i] === carriage &&
+      buffer[i + 1] === newline &&
+      i + 3 < buffer.length &&
+      buffer[i + 2] === carriage &&
+      buffer[i + 3] === newline
+    ) {
+      // \r\n\r\n
+      return i + 4;
+    }
+  }
+
+  return -1;
 }
 
 class SSEDecoder {
@@ -269,8 +351,8 @@ class SSEDecoder {
  */
 class LineDecoder {
   // prettier-ignore
-  static NEWLINE_CHARS = new Set(['\n', '\r', '\x0b', '\x0c', '\x1c', '\x1d', '\x1e', '\x85', '\u2028', '\u2029']);
-  static NEWLINE_REGEXP = /\r\n|[\n\r\x0b\x0c\x1c\x1d\x1e\x85\u2028\u2029]/g;
+  static NEWLINE_CHARS = new Set(['\n', '\r']);
+  static NEWLINE_REGEXP = /\r\n|[\n\r]/g;
 
   buffer: string[];
   trailingCR: boolean;
@@ -299,6 +381,12 @@ class LineDecoder {
 
     const trailingNewline = LineDecoder.NEWLINE_CHARS.has(text[text.length - 1] || '');
     let lines = text.split(LineDecoder.NEWLINE_REGEXP);
+
+    // if there is a trailing new line then the last entry will be an empty
+    // string which we don't care about
+    if (trailingNewline) {
+      lines.pop();
+    }
 
     if (lines.length === 1 && !trailingNewline) {
       this.buffer.push(lines[0]!);
@@ -364,6 +452,17 @@ class LineDecoder {
     this.trailingCR = false;
     return lines;
   }
+}
+
+/** This is an internal helper function that's just used for testing */
+export function _decodeChunks(chunks: string[]): string[] {
+  const decoder = new LineDecoder();
+  const lines: string[] = [];
+  for (const chunk of chunks) {
+    lines.push(...decoder.decode(chunk));
+  }
+
+  return lines;
 }
 
 function partition(str: string, delimiter: string): [string, string, string] {
