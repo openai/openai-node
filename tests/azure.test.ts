@@ -293,7 +293,13 @@ describe('retries', () => {
       return new Response(JSON.stringify({ a: 1 }), { headers: { 'Content-Type': 'application/json' } });
     };
 
-    const client = new AzureOpenAI({ apiKey: 'My API Key', apiVersion, timeout: 10, fetch: testFetch });
+    const client = new AzureOpenAI({
+      baseURL: 'https://example.com',
+      apiKey: 'My API Key',
+      apiVersion,
+      timeout: 10,
+      fetch: testFetch,
+    });
 
     expect(await client.request({ path: '/foo', method: 'get' })).toEqual({ a: 1 });
     expect(count).toEqual(2);
@@ -320,7 +326,12 @@ describe('retries', () => {
       return new Response(JSON.stringify({ a: 1 }), { headers: { 'Content-Type': 'application/json' } });
     };
 
-    const client = new AzureOpenAI({ apiKey: 'My API Key', apiVersion, fetch: testFetch });
+    const client = new AzureOpenAI({
+      baseURL: 'https://example.com',
+      apiKey: 'My API Key',
+      apiVersion,
+      fetch: testFetch,
+    });
 
     expect(await client.request({ path: '/foo', method: 'get' })).toEqual({ a: 1 });
     expect(count).toEqual(2);
@@ -347,7 +358,12 @@ describe('retries', () => {
       return new Response(JSON.stringify({ a: 1 }), { headers: { 'Content-Type': 'application/json' } });
     };
 
-    const client = new AzureOpenAI({ apiKey: 'My API Key', apiVersion, fetch: testFetch });
+    const client = new AzureOpenAI({
+      baseURL: 'https://example.com',
+      apiKey: 'My API Key',
+      apiVersion,
+      fetch: testFetch,
+    });
 
     expect(await client.request({ path: '/foo', method: 'get' })).toEqual({ a: 1 });
     expect(count).toEqual(2);
