@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.38.3 (2024-04-22)
+
+Full Changelog: [v4.38.2...v4.38.3](https://github.com/openai/openai-node/compare/v4.38.2...v4.38.3)
+
+### Chores
+
+* **internal:** use @swc/jest for running tests ([#793](https://github.com/openai/openai-node/issues/793)) ([8947f19](https://github.com/openai/openai-node/commit/8947f195b2dfab7ceebe1e0bb5c886e229cd541f))
+
 ## 4.38.2 (2024-04-19)
 
 Full Changelog: [v4.38.1...v4.38.2](https://github.com/openai/openai-node/compare/v4.38.1...v4.38.2)
