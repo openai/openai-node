@@ -119,7 +119,7 @@ More information on the lifecycle of a Run can be found in the [Run Lifecycle Do
 
 ### Bulk Upload Helpers
 
-When creating an interacting with vector stores, you can use the polling helpers to monitor the status of operations.
+When creating and interacting with vector stores, you can use the polling helpers to monitor the status of operations.
 For convenience, we also provide a bulk upload helper to allow you to simultaneously upload several files at once.
 
 ```ts
