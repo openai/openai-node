@@ -57,7 +57,7 @@ export interface Batch {
   /**
    * The Unix timestamp (in seconds) for when the batch was created.
    */
-  created_at: string;
+  created_at: number;
 
   /**
    * The OpenAI API endpoint used by the batch.
@@ -90,17 +90,17 @@ export interface Batch {
   /**
    * The Unix timestamp (in seconds) for when the batch was cancelled.
    */
-  cancelled_at?: string;
+  cancelled_at?: number;
 
   /**
    * The Unix timestamp (in seconds) for when the batch started cancelling.
    */
-  cancelling_at?: string;
+  cancelling_at?: number;
 
   /**
    * The Unix timestamp (in seconds) for when the batch was completed.
    */
-  completed_at?: string;
+  completed_at?: number;
 
   /**
    * The ID of the file containing the outputs of requests with errors.
@@ -112,27 +112,27 @@ export interface Batch {
   /**
    * The Unix timestamp (in seconds) for when the batch expired.
    */
-  expired_at?: string;
+  expired_at?: number;
 
   /**
    * The Unix timestamp (in seconds) for when the batch will expire.
    */
-  expires_at?: string;
+  expires_at?: number;
 
   /**
    * The Unix timestamp (in seconds) for when the batch failed.
    */
-  failed_at?: string;
+  failed_at?: number;
 
   /**
    * The Unix timestamp (in seconds) for when the batch started finalizing.
    */
-  finalizing_at?: string;
+  finalizing_at?: number;
 
   /**
    * The Unix timestamp (in seconds) for when the batch started processing.
    */
-  in_progress_at?: string;
+  in_progress_at?: number;
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
@@ -225,8 +225,9 @@ export interface BatchCreateParams {
    * See [upload file](https://platform.openai.com/docs/api-reference/files/create)
    * for how to upload a file.
    *
-   * Your input file must be formatted as a JSONL file, and must be uploaded with the
-   * purpose `batch`.
+   * Your input file must be formatted as a
+   * [JSONL file](https://platform.openai.com/docs/api-reference/batch/requestInput),
+   * and must be uploaded with the purpose `batch`.
    */
   input_file_id: string;
 

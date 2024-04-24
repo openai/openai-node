@@ -204,6 +204,12 @@ export interface VectorStoreFile {
   status: 'in_progress' | 'completed' | 'cancelled' | 'failed';
 
   /**
+   * The total vector store usage in bytes. Note that this may be different from the
+   * original file size.
+   */
+  usage_bytes: number;
+
+  /**
    * The ID of the
    * [vector store](https://platform.openai.com/docs/api-reference/vector-stores/object)
    * that the [File](https://platform.openai.com/docs/api-reference/files) is
