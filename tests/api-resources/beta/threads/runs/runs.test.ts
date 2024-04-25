@@ -29,9 +29,30 @@ describe('resource runs', () => {
           role: 'user',
           content: 'x',
           attachments: [
-            { file_id: 'string', tools: ['file_search', 'code_interpreter'] },
-            { file_id: 'string', tools: ['file_search', 'code_interpreter'] },
-            { file_id: 'string', tools: ['file_search', 'code_interpreter'] },
+            {
+              file_id: 'string',
+              tools: [
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+              ],
+            },
+            {
+              file_id: 'string',
+              tools: [
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+              ],
+            },
+            {
+              file_id: 'string',
+              tools: [
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+              ],
+            },
           ],
           metadata: {},
         },
@@ -39,9 +60,30 @@ describe('resource runs', () => {
           role: 'user',
           content: 'x',
           attachments: [
-            { file_id: 'string', tools: ['file_search', 'code_interpreter'] },
-            { file_id: 'string', tools: ['file_search', 'code_interpreter'] },
-            { file_id: 'string', tools: ['file_search', 'code_interpreter'] },
+            {
+              file_id: 'string',
+              tools: [
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+              ],
+            },
+            {
+              file_id: 'string',
+              tools: [
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+              ],
+            },
+            {
+              file_id: 'string',
+              tools: [
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+              ],
+            },
           ],
           metadata: {},
         },
@@ -49,9 +91,30 @@ describe('resource runs', () => {
           role: 'user',
           content: 'x',
           attachments: [
-            { file_id: 'string', tools: ['file_search', 'code_interpreter'] },
-            { file_id: 'string', tools: ['file_search', 'code_interpreter'] },
-            { file_id: 'string', tools: ['file_search', 'code_interpreter'] },
+            {
+              file_id: 'string',
+              tools: [
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+              ],
+            },
+            {
+              file_id: 'string',
+              tools: [
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+              ],
+            },
+            {
+              file_id: 'string',
+              tools: [
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+              ],
+            },
           ],
           metadata: {},
         },

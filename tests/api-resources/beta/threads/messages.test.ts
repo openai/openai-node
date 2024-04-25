@@ -25,9 +25,18 @@ describe('resource messages', () => {
       content: 'x',
       role: 'user',
       attachments: [
-        { file_id: 'string', tools: ['file_search', 'code_interpreter'] },
-        { file_id: 'string', tools: ['file_search', 'code_interpreter'] },
-        { file_id: 'string', tools: ['file_search', 'code_interpreter'] },
+        {
+          file_id: 'string',
+          tools: [{ type: 'code_interpreter' }, { type: 'code_interpreter' }, { type: 'code_interpreter' }],
+        },
+        {
+          file_id: 'string',
+          tools: [{ type: 'code_interpreter' }, { type: 'code_interpreter' }, { type: 'code_interpreter' }],
+        },
+        {
+          file_id: 'string',
+          tools: [{ type: 'code_interpreter' }, { type: 'code_interpreter' }, { type: 'code_interpreter' }],
+        },
       ],
       metadata: {},
     });
