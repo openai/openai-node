@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+
+function prism_is_running() {
+  curl --silent "http://localhost:4010" >/dev/null 2>&1
+}
+
+kill_server_on_port() {
+  pids=$(lsof -t -i tcp:"$1" || echo "")
+  if [ "$pids" != "" ]; then
+    kill "$pids"
+    echo "Stopped $pids."
+  fi
+}
+
+if ! prism_is_running; then
+  # When we exit this script, make sure to kill the background mock server process
+  trap 'kill_server_on_port 4010' EXIT
+
+  # Start the dev server
+  ./scripts/mock --daemon
+
+  # Sanity check and print a nice error message
+  if ! ./bin/check-test-server; then
+    exit
+  fi
+fi
+
+# Run tests
+./node_modules/.bin/jest
