@@ -1,5 +1,22 @@
 # Changelog
 
+## 4.38.5 (2024-04-24)
+
+Full Changelog: [v4.38.4...v4.38.5](https://github.com/openai/openai-node/compare/v4.38.4...v4.38.5)
+
+### Chores
+
+* **internal:** use actions/checkout@v4 for codeflow ([#799](https://github.com/openai/openai-node/issues/799)) ([5ab7780](https://github.com/openai/openai-node/commit/5ab7780ea8889818f403a9a89ab19585a7e8972e))
+
+## 4.38.4 (2024-04-24)
+
+Full Changelog: [v4.38.3...v4.38.4](https://github.com/openai/openai-node/compare/v4.38.3...v4.38.4)
+
+### Bug Fixes
+
+* **api:** change timestamps to unix integers ([#798](https://github.com/openai/openai-node/issues/798)) ([7271a6c](https://github.com/openai/openai-node/commit/7271a6cdc7d37151d2cae18fdd20b87d97624a84))
+* **docs:** doc improvements ([#796](https://github.com/openai/openai-node/issues/796)) ([49fcc86](https://github.com/openai/openai-node/commit/49fcc86b44958795a6f5e0901f369653dfbcc637))
+
 ## 4.38.3 (2024-04-22)
 
 Full Changelog: [v4.38.2...v4.38.3](https://github.com/openai/openai-node/compare/v4.38.2...v4.38.3)

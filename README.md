@@ -19,7 +19,7 @@ You can import in Deno via:
 <!-- x-release-please-start-version -->
 
 ```ts
-import OpenAI from 'https://deno.land/x/openai@v4.38.3/mod.ts';
+import OpenAI from 'https://deno.land/x/openai@v4.38.5/mod.ts';
 ```
 
 <!-- x-release-please-end -->
@@ -119,7 +119,7 @@ More information on the lifecycle of a Run can be found in the [Run Lifecycle Do
 
 ### Bulk Upload Helpers
 
-When creating an interacting with vector stores, you can use the polling helpers to monitor the status of operations.
+When creating and interacting with vector stores, you can use the polling helpers to monitor the status of operations.
 For convenience, we also provide a bulk upload helper to allow you to simultaneously upload several files at once.
 
 ```ts
