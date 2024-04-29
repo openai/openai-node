@@ -1,5 +1,18 @@
 # Changelog
 
+## 4.39.0 (2024-04-29)
+
+Full Changelog: [v4.38.5...v4.39.0](https://github.com/openai/openai-node/compare/v4.38.5...v4.39.0)
+
+### Features
+
+* **api:** add required tool_choice ([#803](https://github.com/openai/openai-node/issues/803)) ([99693e6](https://github.com/openai/openai-node/commit/99693e61debc67327a45dffb2c10c113341bffd6))
+
+
+### Chores
+
+* **internal:** add scripts/test and scripts/mock ([#801](https://github.com/openai/openai-node/issues/801)) ([6656105](https://github.com/openai/openai-node/commit/6656105fa1346a91d17e2b7a5e075f3091310c2f))
+
 ## 4.38.5 (2024-04-24)
 
 Full Changelog: [v4.38.4...v4.38.5](https://github.com/openai/openai-node/compare/v4.38.4...v4.38.5)
