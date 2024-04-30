@@ -1,5 +1,15 @@
 # Changelog
 
+## 4.39.1 (2024-04-30)
+
+Full Changelog: [v4.39.0...v4.39.1](https://github.com/openai/openai-node/compare/v4.39.0...v4.39.1)
+
+### Chores
+
+* **internal:** add link to openapi spec ([#810](https://github.com/openai/openai-node/issues/810)) ([61b5b83](https://github.com/openai/openai-node/commit/61b5b83e82dd723e9584232f3b805ed13e58e13d))
+* **internal:** fix release please for deno ([#808](https://github.com/openai/openai-node/issues/808)) ([ecc2eae](https://github.com/openai/openai-node/commit/ecc2eaec602eb9fe518f011920d8500e01fde01b))
+* **internal:** refactor scripts ([#806](https://github.com/openai/openai-node/issues/806)) ([9283519](https://github.com/openai/openai-node/commit/928351928054feb56f8797587c70f74d06c2737c))
+
 ## 4.39.0 (2024-04-29)
 
 Full Changelog: [v4.38.5...v4.39.0](https://github.com/openai/openai-node/compare/v4.38.5...v4.39.0)
