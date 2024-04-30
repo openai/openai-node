@@ -1,9 +1,9 @@
 import path from 'path';
 import * as tm from 'ts-morph';
-import { name as pkgName } from '../package.json';
+import { name as pkgName } from '../../package.json';
 import fs from 'fs';
 
-const rootDir = path.resolve(__dirname, '..');
+const rootDir = path.resolve(__dirname, '../..');
 const denoDir = path.join(rootDir, 'deno');
 const tsConfigFilePath = path.join(rootDir, 'tsconfig.deno.json');
 
