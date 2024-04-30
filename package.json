@@ -15,13 +15,13 @@
   "private": false,
   "scripts": {
     "test": "./scripts/test",
-    "build": "bash ./build",
+    "build": "./scripts/build",
     "prepack": "echo 'to pack, run yarn build && (cd dist; yarn pack)' && exit 1",
     "prepublishOnly": "echo 'to publish, run yarn build && (cd dist; yarn publish)' && exit 1",
     "format": "prettier --write --cache --cache-strategy metadata . !dist",
-    "prepare": "if ./scripts/check-is-in-git-install.sh; then npm run build; fi",
+    "prepare": "if ./scripts/utils/check-is-in-git-install.sh; then ./scripts/build; fi",
     "tsn": "ts-node -r tsconfig-paths/register",
-    "lint": "eslint --ext ts,js .",
+    "lint": "./scripts/lint",
     "fix": "eslint --fix --ext ts,js ."
   },
   "dependencies": {
