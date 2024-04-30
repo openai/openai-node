@@ -2,6 +2,8 @@
 
 set -exuo pipefail
 
+cd "$(dirname "$0")/.."
+
 rm -rf deno; mkdir deno
 cp -rp src/* deno
 
@@ -37,7 +39,7 @@ done
 for file in LICENSE CHANGELOG.md; do
   if [ -e "${file}" ]; then cp "${file}" deno; fi
 done
-npm exec ts-node -T -- scripts/denoify.ts
+npm exec ts-node -T -- scripts/utils/denoify.ts
 deno fmt deno
 deno check deno/mod.ts
 if [ -e deno_tests ]; then
