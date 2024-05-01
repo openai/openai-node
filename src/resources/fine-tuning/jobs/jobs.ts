@@ -181,6 +181,12 @@ export interface FineTuningJob {
   validation_file: string | null;
 
   /**
+   * The Unix timestamp (in seconds) for when the fine-tuning job is estimated to
+   * finish. The value will be null if the fine-tuning job is not running.
+   */
+  estimated_finish?: number | null;
+
+  /**
    * A list of integrations to enable for this fine-tuning job.
    */
   integrations?: Array<FineTuningJobWandbIntegrationObject> | null;

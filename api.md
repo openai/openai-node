@@ -365,6 +365,7 @@ Methods:
 - <code title="get /threads/{thread_id}/messages/{message_id}">client.beta.threads.messages.<a href="./src/resources/beta/threads/messages.ts">retrieve</a>(threadId, messageId) -> Message</code>
 - <code title="post /threads/{thread_id}/messages/{message_id}">client.beta.threads.messages.<a href="./src/resources/beta/threads/messages.ts">update</a>(threadId, messageId, { ...params }) -> Message</code>
 - <code title="get /threads/{thread_id}/messages">client.beta.threads.messages.<a href="./src/resources/beta/threads/messages.ts">list</a>(threadId, { ...params }) -> MessagesPage</code>
+- <code title="delete /threads/{thread_id}/messages/{message_id}">client.beta.threads.messages.<a href="./src/resources/beta/threads/messages.ts">del</a>(threadId, messageId) -> MessageDeleted</code>
 
 # Batches
 

@@ -214,10 +214,10 @@ export interface BatchCreateParams {
   completion_window: '24h';
 
   /**
-   * The endpoint to be used for all requests in the batch. Currently only
-   * `/v1/chat/completions` is supported.
+   * The endpoint to be used for all requests in the batch. Currently
+   * `/v1/chat/completions` and `/v1/embeddings` are supported.
    */
-  endpoint: '/v1/chat/completions';
+  endpoint: '/v1/chat/completions' | '/v1/embeddings';
 
   /**
    * The ID of an uploaded file that contains requests for the new batch.
