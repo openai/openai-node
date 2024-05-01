@@ -30,17 +30,20 @@ if ! is_overriding_api_base_url && ! prism_is_running ; then
   trap 'kill_server_on_port 4010' EXIT
 
   # Start the dev server
-  ./scripts/mock --daemon &> /dev/null
+  ./scripts/mock --daemon
 fi
 
-if ! prism_is_running ; then
+if is_overriding_api_base_url ; then
+  echo -e "${GREEN}✔ Running tests against ${TEST_API_BASE_URL}${NC}"
+  echo
+elif ! prism_is_running ; then
   echo -e "${RED}ERROR:${NC} The test suite will not run without a mock Prism server"
   echo -e "running against your OpenAPI spec."
   echo
   echo -e "To run the server, pass in the path or url of your OpenAPI"
   echo -e "spec to the prism command:"
   echo
-  echo -e "  \$ ${YELLOW}npm exec prism mock path/to/your.openapi.yml${NC}"
+  echo -e "  \$ ${YELLOW}npm exec --package=@stoplight/prism-cli@~5.3.2 -- prism mock path/to/your.openapi.yml${NC}"
   echo
 
   exit 1
@@ -50,4 +53,5 @@ else
 fi
 
 # Run tests
+echo "==> Running tests"
 ./node_modules/.bin/jest
