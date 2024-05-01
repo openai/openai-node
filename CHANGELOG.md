@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.40.0 (2024-05-01)
+
+Full Changelog: [v4.39.1...v4.40.0](https://github.com/openai/openai-node/compare/v4.39.1...v4.40.0)
+
+### Features
+
+* **api:** delete messages ([#811](https://github.com/openai/openai-node/issues/811)) ([9e37dbd](https://github.com/openai/openai-node/commit/9e37dbd554e4ca48fda1577b1aad612e9d30534d))
+
 ## 4.39.1 (2024-04-30)
 
 Full Changelog: [v4.39.0...v4.39.1](https://github.com/openai/openai-node/compare/v4.39.0...v4.39.1)
