@@ -54,4 +54,4 @@ fi
 
 # Run tests
 echo "==> Running tests"
-./node_modules/.bin/jest
+./node_modules/.bin/jest "$@"
