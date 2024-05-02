@@ -1,5 +1,14 @@
 # Changelog
 
+## 4.40.1 (2024-05-02)
+
+Full Changelog: [v4.40.0...v4.40.1](https://github.com/openai/openai-node/compare/v4.40.0...v4.40.1)
+
+### Chores
+
+* **internal:** bump prism version ([#813](https://github.com/openai/openai-node/issues/813)) ([81a6c28](https://github.com/openai/openai-node/commit/81a6c28c4773a0245ce9c505fc5b98d43df21beb))
+* **internal:** move client class to separate file ([#815](https://github.com/openai/openai-node/issues/815)) ([d0b915a](https://github.com/openai/openai-node/commit/d0b915a7514eda5b23d7d1e4420d1d1485ed8d0f))
+
 ## 4.40.0 (2024-05-01)
 
 Full Changelog: [v4.39.1...v4.40.0](https://github.com/openai/openai-node/compare/v4.39.1...v4.40.0)
