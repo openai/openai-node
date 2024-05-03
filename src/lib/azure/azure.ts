@@ -1,6 +1,6 @@
 import * as Core from '../../core';
 import * as Errors from '../../error';
-import { ClientOptions, OpenAI } from '../../client';
+import { ClientOptions, OpenAI } from '../../index';
 import type { RequestInit } from '../../_shims/index';
 
 /** API Client for interfacing with the Azure OpenAI API. */
