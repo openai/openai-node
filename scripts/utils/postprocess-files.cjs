@@ -2,12 +2,12 @@ const fs = require('fs');
 const path = require('path');
 const { parse } = require('@typescript-eslint/parser');
 
-const pkgImportPath = process.env['PKG_IMPORT_PATH'] ?? 'openai/'
+const pkgImportPath = process.env['PKG_IMPORT_PATH'] ?? 'openai/';
 
 const distDir =
   process.env['DIST_PATH'] ?
     path.resolve(process.env['DIST_PATH'])
-  : path.resolve(__dirname, '..', 'dist');
+  : path.resolve(__dirname, '..', '..', 'dist');
 const distSrcDir = path.join(distDir, 'src');
 
 /**
@@ -103,7 +103,7 @@ async function* walk(dir) {
 }
 
 async function postprocess() {
-  for await (const file of walk(path.resolve(__dirname, '..', 'dist'))) {
+  for await (const file of walk(path.resolve(__dirname, '..', '..', 'dist'))) {
     if (!/\.([cm]?js|(\.d)?[cm]?ts)$/.test(file)) continue;
 
     const code = await fs.promises.readFile(file, 'utf8');

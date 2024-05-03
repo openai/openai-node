@@ -1,5 +1,45 @@
 # Changelog
 
+## 4.40.1 (2024-05-02)
+
+Full Changelog: [v4.40.0...v4.40.1](https://github.com/openai/openai-node/compare/v4.40.0...v4.40.1)
+
+### Chores
+
+* **internal:** bump prism version ([#813](https://github.com/openai/openai-node/issues/813)) ([81a6c28](https://github.com/openai/openai-node/commit/81a6c28c4773a0245ce9c505fc5b98d43df21beb))
+* **internal:** move client class to separate file ([#815](https://github.com/openai/openai-node/issues/815)) ([d0b915a](https://github.com/openai/openai-node/commit/d0b915a7514eda5b23d7d1e4420d1d1485ed8d0f))
+
+## 4.40.0 (2024-05-01)
+
+Full Changelog: [v4.39.1...v4.40.0](https://github.com/openai/openai-node/compare/v4.39.1...v4.40.0)
+
+### Features
+
+* **api:** delete messages ([#811](https://github.com/openai/openai-node/issues/811)) ([9e37dbd](https://github.com/openai/openai-node/commit/9e37dbd554e4ca48fda1577b1aad612e9d30534d))
+
+## 4.39.1 (2024-04-30)
+
+Full Changelog: [v4.39.0...v4.39.1](https://github.com/openai/openai-node/compare/v4.39.0...v4.39.1)
+
+### Chores
+
+* **internal:** add link to openapi spec ([#810](https://github.com/openai/openai-node/issues/810)) ([61b5b83](https://github.com/openai/openai-node/commit/61b5b83e82dd723e9584232f3b805ed13e58e13d))
+* **internal:** fix release please for deno ([#808](https://github.com/openai/openai-node/issues/808)) ([ecc2eae](https://github.com/openai/openai-node/commit/ecc2eaec602eb9fe518f011920d8500e01fde01b))
+* **internal:** refactor scripts ([#806](https://github.com/openai/openai-node/issues/806)) ([9283519](https://github.com/openai/openai-node/commit/928351928054feb56f8797587c70f74d06c2737c))
+
+## 4.39.0 (2024-04-29)
+
+Full Changelog: [v4.38.5...v4.39.0](https://github.com/openai/openai-node/compare/v4.38.5...v4.39.0)
+
+### Features
+
+* **api:** add required tool_choice ([#803](https://github.com/openai/openai-node/issues/803)) ([99693e6](https://github.com/openai/openai-node/commit/99693e61debc67327a45dffb2c10c113341bffd6))
+
+
+### Chores
+
+* **internal:** add scripts/test and scripts/mock ([#801](https://github.com/openai/openai-node/issues/801)) ([6656105](https://github.com/openai/openai-node/commit/6656105fa1346a91d17e2b7a5e075f3091310c2f))
+
 ## 4.38.5 (2024-04-24)
 
 Full Changelog: [v4.38.4...v4.38.5](https://github.com/openai/openai-node/compare/v4.38.4...v4.38.5)

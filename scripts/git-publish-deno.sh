@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
+
 set -exuo pipefail
+
+cd "$(dirname "$0")/.."
 
 # This script pushes the contents of the `deno` directory to the `deno` branch,
 # and creates a `vx.x.x-deno` tag, so that Deno users can
@@ -38,7 +41,7 @@ else
   : "${DENO_PUSH_RELEASE_TAG:="v$DENO_PUSH_VERSION"}"
 fi
 
-if [ ! -e deno ]; then ./build; fi
+if [ ! -e deno ]; then ./scripts/build; fi
 
 # We want to commit and push a branch where everything inside the deno
 # directory is at root level in the branch.
