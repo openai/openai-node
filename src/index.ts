@@ -2,7 +2,7 @@
 
 import * as Core from './core';
 import * as Errors from './error';
-import type { Agent, RequestInit } from './_shims/index';
+import { type Agent } from './_shims/index';
 import * as Uploads from './uploads';
 import * as Pagination from 'openai/pagination';
 import * as API from 'openai/resources/index';
