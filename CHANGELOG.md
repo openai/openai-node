@@ -1,5 +1,14 @@
 # Changelog
 
+## 4.40.2 (2024-05-03)
+
+Full Changelog: [v4.40.1...v4.40.2](https://github.com/openai/openai-node/compare/v4.40.1...v4.40.2)
+
+### Bug Fixes
+
+* **package:** revert recent client file change ([#819](https://github.com/openai/openai-node/issues/819)) ([fa722c9](https://github.com/openai/openai-node/commit/fa722c97859e55a0e766332c3a2f0cb3673128a2))
+* **vectorStores:** correct uploadAndPoll method ([#817](https://github.com/openai/openai-node/issues/817)) ([d63f22c](https://github.com/openai/openai-node/commit/d63f22c303761710e6eac7ef883c45e34d223df1))
+
 ## 4.40.1 (2024-05-02)
 
 Full Changelog: [v4.40.0...v4.40.1](https://github.com/openai/openai-node/compare/v4.40.0...v4.40.1)
