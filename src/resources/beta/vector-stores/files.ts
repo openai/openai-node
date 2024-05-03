@@ -164,7 +164,7 @@ export class Files extends APIResource {
     file: Uploadable,
     options?: Core.RequestOptions & { pollIntervalMs?: number },
   ): Promise<VectorStoreFile> {
-    const fileInfo = await this._client.files.create({ file: file, purpose: 'assistants' }, options);
+    const fileInfo = await this.upload(vectorStoreId, file, options);
     return await this.poll(vectorStoreId, fileInfo.id, options);
   }
 }
