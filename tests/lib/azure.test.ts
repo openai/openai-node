@@ -222,10 +222,10 @@ describe('instantiate azure client', () => {
   });
 
   describe('Entra', () => {
-    test('with microsoftEntraTokenProvider', () => {
+    test('with azureAdTokenProvider', () => {
       const client = new AzureOpenAI({
         baseURL: 'http://localhost:5000/',
-        microsoftEntraTokenProvider: () => 'my token',
+        azureAdTokenProvider: () => 'my token',
         apiVersion,
       });
       expect(client.buildRequest({ method: 'post', path: 'https://example.com' }).req.headers).toHaveProperty(
@@ -234,17 +234,17 @@ describe('instantiate azure client', () => {
       );
     });
 
-    test('apiKey and microsoftEntraTokenProvider cant be combined', () => {
+    test('apiKey and azureAdTokenProvider cant be combined', () => {
       expect(
         () =>
           new AzureOpenAI({
             baseURL: 'http://localhost:5000/',
-            microsoftEntraTokenProvider: () => 'my token',
+            azureAdTokenProvider: () => 'my token',
             apiKey: 'My API Key',
             apiVersion,
           }),
       ).toThrow(
-        /The `apiKey` and `microsoftEntraTokenProvider` arguments are mutually exclusive; only one can be passed at a time./,
+        /The `apiKey` and `azureAdTokenProvider` arguments are mutually exclusive; only one can be passed at a time./,
       );
     });
   });
