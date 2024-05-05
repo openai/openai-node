@@ -144,6 +144,7 @@ export class Files extends APIResource {
 
   /**
    * Upload a file to the `files` API and then attach it to the given vector store.
+   *
    * Note the file will be asynchronously processed (you can use the alternative
    * polling helper method to wait for processing to complete).
    */
