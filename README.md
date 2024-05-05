@@ -19,7 +19,7 @@ You can import in Deno via:
 <!-- x-release-please-start-version -->
 
 ```ts
-import OpenAI from 'https://deno.land/x/openai@v4.40.2/mod.ts';
+import OpenAI from 'https://deno.land/x/openai@v4.41.0/mod.ts';
 ```
 
 <!-- x-release-please-end -->
@@ -361,14 +361,25 @@ Error codes are as followed:
 | >=500       | `InternalServerError`      |
 | N/A         | `APIConnectionError`       |
 
-### Azure OpenAI
+## Microsoft Azure OpenAI
 
-An example of using this library with Azure OpenAI can be found [here](https://github.com/openai/openai-node/blob/master/examples/azure.ts).
+To use this library with [Azure OpenAI](https://learn.microsoft.com/en-us/azure/ai-services/openai/overview), use the `AzureOpenAI`
+class instead of the `OpenAI` class.
 
-Please note there are subtle differences in API shape & behavior between the Azure OpenAI API and the OpenAI API,
-so using this library with Azure OpenAI may result in incorrect types, which can lead to bugs.
+> [!IMPORTANT]
+> The Azure API shape differs from the core API shape which means that the static types for responses / params
+> won't always be correct.
 
-See [`@azure/openai`](https://www.npmjs.com/package/@azure/openai) for an Azure-specific SDK provided by Microsoft.
+```ts
+const openai = new AzureOpenAI();
+
+const result = await openai.chat.completions.create({
+  model: 'gpt-4-1106-preview',
+  messages: [{ role: 'user', content: 'Say hello!' }],
+});
+
+console.log(result.choices[0]!.message?.content);
+```
 
 ### Retries
 

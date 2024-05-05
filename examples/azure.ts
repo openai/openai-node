@@ -1,35 +1,19 @@
 #!/usr/bin/env -S npm run tsn -T
 
-import OpenAI from 'openai';
+import { AzureOpenAI } from 'openai';
 
-// The name of your Azure OpenAI Resource.
-// https://learn.microsoft.com/en-us/azure/cognitive-services/openai/how-to/create-resource?pivots=web-portal#create-a-resource
-const resource = '<your resource name>';
-
-// Corresponds to your Model deployment within your OpenAI resource, e.g. my-gpt35-16k-deployment
+// Corresponds to your Model deployment within your OpenAI resource, e.g. gpt-4-1106-preview
 // Navigate to the Azure OpenAI Studio to deploy a model.
-const model = '<your model>';
+const deployment = 'gpt-4-1106-preview';
 
-// https://learn.microsoft.com/en-us/azure/ai-services/openai/reference#rest-api-versioning
-const apiVersion = '2023-06-01-preview';
-
-const apiKey = process.env['AZURE_OPENAI_API_KEY'];
-if (!apiKey) {
-  throw new Error('The AZURE_OPENAI_API_KEY environment variable is missing or empty.');
-}
-
-// Azure OpenAI requires a custom baseURL, api-version query param, and api-key header.
-const openai = new OpenAI({
-  apiKey,
-  baseURL: `https://${resource}.openai.azure.com/openai/deployments/${model}`,
-  defaultQuery: { 'api-version': apiVersion },
-  defaultHeaders: { 'api-key': apiKey },
-});
+// Make sure to set both AZURE_OPENAI_ENDPOINT with the endpoint of your Azure resource and AZURE_OPENAI_API_KEY with the API key.
+// You can find both information in the Azure Portal.
+const openai = new AzureOpenAI();
 
 async function main() {
   console.log('Non-streaming:');
   const result = await openai.chat.completions.create({
-    model,
+    model: deployment,
     messages: [{ role: 'user', content: 'Say hello!' }],
   });
   console.log(result.choices[0]!.message?.content);
@@ -37,7 +21,7 @@ async function main() {
   console.log();
   console.log('Streaming:');
   const stream = await openai.chat.completions.create({
-    model,
+    model: deployment,
     messages: [{ role: 'user', content: 'Say hello!' }],
     stream: true,
   });
