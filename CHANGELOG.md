@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.41.0 (2024-05-05)
+
+Full Changelog: [v4.40.2...v4.41.0](https://github.com/openai/openai-node/compare/v4.40.2...v4.41.0)
+
+### Features
+
+* **client:** add Azure client ([#822](https://github.com/openai/openai-node/issues/822)) ([92f9049](https://github.com/openai/openai-node/commit/92f90499f0bbee79ba9c8342c8d58dbcaf88bdd1))
+
 ## 4.40.2 (2024-05-03)
 
 Full Changelog: [v4.40.1...v4.40.2](https://github.com/openai/openai-node/compare/v4.40.1...v4.40.2)
