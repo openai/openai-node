@@ -39,6 +39,7 @@ describe('resource completions', () => {
       seed: -9223372036854776000,
       stop: 'string',
       stream: false,
+      stream_options: { include_usage: true },
       temperature: 1,
       tool_choice: 'none',
       tools: [

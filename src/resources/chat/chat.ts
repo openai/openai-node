@@ -45,6 +45,7 @@ export namespace Chat {
   export import ChatCompletionMessageToolCall = CompletionsAPI.ChatCompletionMessageToolCall;
   export import ChatCompletionNamedToolChoice = CompletionsAPI.ChatCompletionNamedToolChoice;
   export import ChatCompletionRole = CompletionsAPI.ChatCompletionRole;
+  export import ChatCompletionStreamOptions = CompletionsAPI.ChatCompletionStreamOptions;
   export import ChatCompletionSystemMessageParam = CompletionsAPI.ChatCompletionSystemMessageParam;
   export import ChatCompletionTokenLogprob = CompletionsAPI.ChatCompletionTokenLogprob;
   export import ChatCompletionTool = CompletionsAPI.ChatCompletionTool;
