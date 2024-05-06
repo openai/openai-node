@@ -222,16 +222,21 @@ describe('instantiate azure client', () => {
   });
 
   describe('Azure Active Directory (AD)', () => {
-    test('with azureADTokenProvider', () => {
+    test('with azureADTokenProvider', async () => {
+      const testFetch = async (url: RequestInfo, { headers }: RequestInit = {}): Promise<Response> => {
+        return new Response(JSON.stringify({ a: 1 }), { headers });
+      };
       const client = new AzureOpenAI({
         baseURL: 'http://localhost:5000/',
-        azureADTokenProvider: () => 'my token',
+        azureADTokenProvider: async () => 'my token',
         apiVersion,
+        fetch: testFetch,
       });
-      expect(client.buildRequest({ method: 'post', path: 'https://example.com' }).req.headers).toHaveProperty(
-        'authorization',
-        'Bearer my token',
-      );
+      expect(
+        (await client.request({ method: 'post', path: 'https://example.com' }).asResponse()).headers.get(
+          'authorization',
+        ),
+      ).toEqual('Bearer my token');
     });
 
     test('apiKey and azureADTokenProvider cant be combined', () => {
@@ -239,7 +244,7 @@ describe('instantiate azure client', () => {
         () =>
           new AzureOpenAI({
             baseURL: 'http://localhost:5000/',
-            azureADTokenProvider: () => 'my token',
+            azureADTokenProvider: async () => 'my token',
             apiKey: 'My API Key',
             apiVersion,
           }),
