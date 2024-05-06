@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.41.1 (2024-05-06)
+
+Full Changelog: [v4.41.0...v4.41.1](https://github.com/openai/openai-node/compare/v4.41.0...v4.41.1)
+
+### Bug Fixes
+
+* **azure:** update build script ([#825](https://github.com/openai/openai-node/issues/825)) ([8afc6e7](https://github.com/openai/openai-node/commit/8afc6e7b49507b3be0228e93913d51b4c3211add))
+
 ## 4.41.0 (2024-05-05)
 
 Full Changelog: [v4.40.2...v4.41.0](https://github.com/openai/openai-node/compare/v4.40.2...v4.41.0)
