@@ -183,8 +183,9 @@ export interface ChatCompletionChunk {
   id: string;
 
   /**
-   * A list of chat completion choices. Can be more than one if `n` is greater
-   * than 1.
+   * A list of chat completion choices. Can contain more than one elements if `n` is
+   * greater than 1. Can also be empty for the last chunk if you set
+   * `stream_options: {"include_usage": true}`.
    */
   choices: Array<ChatCompletionChunk.Choice>;
 
@@ -210,6 +211,14 @@ export interface ChatCompletionChunk {
    * backend changes have been made that might impact determinism.
    */
   system_fingerprint?: string;
+
+  /**
+   * An optional field that will only be present when you set
+   * `stream_options: {"include_usage": true}` in your request. When present, it
+   * contains a null value except for the last chunk which contains the token usage
+   * statistics for the entire request.
+   */
+  usage?: CompletionsAPI.CompletionUsage;
 }
 
 export namespace ChatCompletionChunk {
@@ -517,6 +526,19 @@ export namespace ChatCompletionNamedToolChoice {
  */
 export type ChatCompletionRole = 'system' | 'user' | 'assistant' | 'tool' | 'function';
 
+/**
+ * Options for streaming response. Only set this when you set `stream: true`.
+ */
+export interface ChatCompletionStreamOptions {
+  /**
+   * If set, an additional chunk will be streamed before the `data: [DONE]` message.
+   * The `usage` field on this chunk shows the token usage statistics for the entire
+   * request, and the `choices` field will always be an empty array. All other chunks
+   * will also include a `usage` field, but with a null value.
+   */
+  include_usage?: boolean;
+}
+
 export interface ChatCompletionSystemMessageParam {
   /**
    * The contents of the system message.
@@ -787,6 +809,11 @@ export interface ChatCompletionCreateParamsBase {
   stream?: boolean | null;
 
   /**
+   * Options for streaming response. Only set this when you set `stream: true`.
+   */
+  stream_options?: ChatCompletionStreamOptions | null;
+
+  /**
    * What sampling temperature to use, between 0 and 2. Higher values like 0.8 will
    * make the output more random, while lower values like 0.2 will make it more
    * focused and deterministic.
@@ -949,6 +976,7 @@ export namespace Completions {
   export import ChatCompletionMessageToolCall = ChatCompletionsAPI.ChatCompletionMessageToolCall;
   export import ChatCompletionNamedToolChoice = ChatCompletionsAPI.ChatCompletionNamedToolChoice;
   export import ChatCompletionRole = ChatCompletionsAPI.ChatCompletionRole;
+  export import ChatCompletionStreamOptions = ChatCompletionsAPI.ChatCompletionStreamOptions;
   export import ChatCompletionSystemMessageParam = ChatCompletionsAPI.ChatCompletionSystemMessageParam;
   export import ChatCompletionTokenLogprob = ChatCompletionsAPI.ChatCompletionTokenLogprob;
   export import ChatCompletionTool = ChatCompletionsAPI.ChatCompletionTool;

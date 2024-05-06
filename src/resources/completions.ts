@@ -4,6 +4,7 @@ import * as Core from 'openai/core';
 import { APIPromise } from 'openai/core';
 import { APIResource } from 'openai/resource';
 import * as CompletionsAPI from 'openai/resources/completions';
+import * as ChatCompletionsAPI from 'openai/resources/chat/completions';
 import { Stream } from 'openai/streaming';
 
 export class Completions extends APIResource {
@@ -250,6 +251,11 @@ export interface CompletionCreateParamsBase {
    * [Example Python code](https://cookbook.openai.com/examples/how_to_stream_completions).
    */
   stream?: boolean | null;
+
+  /**
+   * Options for streaming response. Only set this when you set `stream: true`.
+   */
+  stream_options?: ChatCompletionsAPI.ChatCompletionStreamOptions | null;
 
   /**
    * The suffix that comes after a completion of inserted text.
