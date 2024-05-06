@@ -339,12 +339,12 @@ export interface AzureClientOptions extends ClientOptions {
    * A function that returns an access token for Microsoft Entra (formerly known as Azure Active Directory),
    * which will be invoked on every request.
    */
-  azureADTokenProvider?: (() => string) | undefined;
+  azureADTokenProvider?: (() => Promise<string>) | undefined;
 }
 
 /** API Client for interfacing with the Azure OpenAI API. */
 export class AzureOpenAI extends OpenAI {
-  private _azureADTokenProvider: (() => string) | undefined;
+  private _azureADTokenProvider: (() => Promise<string>) | undefined;
   apiVersion: string = '';
   /**
    * API Client for interfacing with the Azure OpenAI API.
@@ -451,9 +451,9 @@ export class AzureOpenAI extends OpenAI {
     return super.buildRequest(options);
   }
 
-  private _getAzureADToken(): string | undefined {
+  private async _getAzureADToken(): Promise<string | undefined> {
     if (typeof this._azureADTokenProvider === 'function') {
-      const token = this._azureADTokenProvider();
+      const token = await this._azureADTokenProvider();
       if (!token || typeof token !== 'string') {
         throw new Errors.OpenAIError(
           `Expected 'azureADTokenProvider' argument to return a string but it returned ${token}`,
@@ -465,17 +465,23 @@ export class AzureOpenAI extends OpenAI {
   }
 
   protected override authHeaders(opts: Core.FinalRequestOptions): Core.Headers {
+    return {};
+  }
+
+  protected override async prepareOptions(opts: Core.FinalRequestOptions<unknown>): Promise<void> {
     if (opts.headers?.['Authorization'] || opts.headers?.['api-key']) {
-      return {};
+      return super.prepareOptions(opts);
     }
-    const token = this._getAzureADToken();
+    const token = await this._getAzureADToken();
+    opts.headers ??= {};
     if (token) {
-      return { Authorization: `Bearer ${token}` };
+      opts.headers['Authorization'] = `Bearer ${token}`;
+    } else if (this.apiKey !== API_KEY_SENTINEL) {
+      opts.headers['api-key'] = this.apiKey;
+    } else {
+      throw new Errors.OpenAIError('Unable to handle auth');
     }
-    if (this.apiKey !== API_KEY_SENTINEL) {
-      return { 'api-key': this.apiKey };
-    }
-    throw new Errors.OpenAIError('Unable to handle auth');
+    return super.prepareOptions(opts);
   }
 }
 
