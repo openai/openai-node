@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.43.0 (2024-05-08)
+
+Full Changelog: [v4.42.0...v4.43.0](https://github.com/openai/openai-node/compare/v4.42.0...v4.43.0)
+
+### Features
+
+* **api:** adding file purposes ([#831](https://github.com/openai/openai-node/issues/831)) ([a62b877](https://github.com/openai/openai-node/commit/a62b8779ff7261cdd6aa7bf72fb6407cc7e3fd21))
+
 ## 4.42.0 (2024-05-06)
 
 Full Changelog: [v4.41.1...v4.42.0](https://github.com/openai/openai-node/compare/v4.41.1...v4.42.0)
