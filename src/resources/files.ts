@@ -148,10 +148,11 @@ export interface FileObject {
   object: 'file';
 
   /**
-   * The intended purpose of the file. Supported values are `fine-tune`,
-   * `fine-tune-results`, `assistants`, and `assistants_output`.
+   * The intended purpose of the file. Supported values are `assistants`,
+   * `assistants_output`, `batch`, `batch_output`, `fine-tune`, and
+   * `fine-tune-results`.
    */
-  purpose: 'fine-tune' | 'fine-tune-results' | 'assistants' | 'assistants_output';
+  purpose: 'assistants' | 'assistants_output' | 'batch' | 'batch_output' | 'fine-tune' | 'fine-tune-results';
 
   /**
    * @deprecated: Deprecated. The current status of the file, which can be either
@@ -175,14 +176,13 @@ export interface FileCreateParams {
   /**
    * The intended purpose of the uploaded file.
    *
-   * Use "fine-tune" for
-   * [Fine-tuning](https://platform.openai.com/docs/api-reference/fine-tuning) and
-   * "assistants" for
+   * Use "assistants" for
    * [Assistants](https://platform.openai.com/docs/api-reference/assistants) and
-   * [Messages](https://platform.openai.com/docs/api-reference/messages). This allows
-   * us to validate the format of the uploaded file is correct for fine-tuning.
+   * [Messages](https://platform.openai.com/docs/api-reference/messages), "batch" for
+   * [Batch API](https://platform.openai.com/docs/guides/batch), and "fine-tune" for
+   * [Fine-tuning](https://platform.openai.com/docs/api-reference/fine-tuning).
    */
-  purpose: 'fine-tune' | 'assistants';
+  purpose: 'assistants' | 'batch' | 'fine-tune';
 }
 
 export interface FileListParams {
