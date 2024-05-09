@@ -35,7 +35,7 @@ describe('resource threads', () => {
           messages: [
             {
               role: 'user',
-              content: 'x',
+              content: 'string',
               attachments: [
                 {
                   file_id: 'string',
@@ -66,7 +66,7 @@ describe('resource threads', () => {
             },
             {
               role: 'user',
-              content: 'x',
+              content: 'string',
               attachments: [
                 {
                   file_id: 'string',
@@ -97,7 +97,7 @@ describe('resource threads', () => {
             },
             {
               role: 'user',
-              content: 'x',
+              content: 'string',
               attachments: [
                 {
                   file_id: 'string',
@@ -214,7 +214,7 @@ describe('resource threads', () => {
         messages: [
           {
             role: 'user',
-            content: 'x',
+            content: 'string',
             attachments: [
               {
                 file_id: 'string',
@@ -245,7 +245,7 @@ describe('resource threads', () => {
           },
           {
             role: 'user',
-            content: 'x',
+            content: 'string',
             attachments: [
               {
                 file_id: 'string',
@@ -276,7 +276,7 @@ describe('resource threads', () => {
           },
           {
             role: 'user',
-            content: 'x',
+            content: 'string',
             attachments: [
               {
                 file_id: 'string',

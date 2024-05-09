@@ -349,14 +349,20 @@ Types:
 - <code><a href="./src/resources/beta/threads/messages.ts">ImageFileContentBlock</a></code>
 - <code><a href="./src/resources/beta/threads/messages.ts">ImageFileDelta</a></code>
 - <code><a href="./src/resources/beta/threads/messages.ts">ImageFileDeltaBlock</a></code>
+- <code><a href="./src/resources/beta/threads/messages.ts">ImageURL</a></code>
+- <code><a href="./src/resources/beta/threads/messages.ts">ImageURLContentBlock</a></code>
+- <code><a href="./src/resources/beta/threads/messages.ts">ImageURLDelta</a></code>
+- <code><a href="./src/resources/beta/threads/messages.ts">ImageURLDeltaBlock</a></code>
 - <code><a href="./src/resources/beta/threads/messages.ts">Message</a></code>
 - <code><a href="./src/resources/beta/threads/messages.ts">MessageContent</a></code>
 - <code><a href="./src/resources/beta/threads/messages.ts">MessageContentDelta</a></code>
+- <code><a href="./src/resources/beta/threads/messages.ts">MessageContentPartParam</a></code>
 - <code><a href="./src/resources/beta/threads/messages.ts">MessageDeleted</a></code>
 - <code><a href="./src/resources/beta/threads/messages.ts">MessageDelta</a></code>
 - <code><a href="./src/resources/beta/threads/messages.ts">MessageDeltaEvent</a></code>
 - <code><a href="./src/resources/beta/threads/messages.ts">Text</a></code>
 - <code><a href="./src/resources/beta/threads/messages.ts">TextContentBlock</a></code>
+- <code><a href="./src/resources/beta/threads/messages.ts">TextContentBlockParam</a></code>
 - <code><a href="./src/resources/beta/threads/messages.ts">TextDelta</a></code>
 - <code><a href="./src/resources/beta/threads/messages.ts">TextDeltaBlock</a></code>
 
