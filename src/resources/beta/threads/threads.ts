@@ -284,9 +284,9 @@ export interface ThreadCreateParams {
 export namespace ThreadCreateParams {
   export interface Message {
     /**
-     * The content of the message.
+     * The text contents of the message.
      */
-    content: string;
+    content: string | Array<MessagesAPI.MessageContentPartParam>;
 
     /**
      * The role of the entity that is creating the message. Allowed values include:
@@ -623,9 +623,9 @@ export namespace ThreadCreateAndRunParams {
   export namespace Thread {
     export interface Message {
       /**
-       * The content of the message.
+       * The text contents of the message.
        */
-      content: string;
+      content: string | Array<MessagesAPI.MessageContentPartParam>;
 
       /**
        * The role of the entity that is creating the message. Allowed values include:
@@ -973,9 +973,9 @@ export namespace ThreadCreateAndRunPollParams {
   export namespace Thread {
     export interface Message {
       /**
-       * The content of the message.
+       * The text contents of the message.
        */
-      content: string;
+      content: string | Array<MessagesAPI.MessageContentPartParam>;
 
       /**
        * The role of the entity that is creating the message. Allowed values include:
@@ -1302,9 +1302,9 @@ export namespace ThreadCreateAndRunStreamParams {
   export namespace Thread {
     export interface Message {
       /**
-       * The content of the message.
+       * The text contents of the message.
        */
-      content: string;
+      content: string | Array<MessagesAPI.MessageContentPartParam>;
 
       /**
        * The role of the entity that is creating the message. Allowed values include:
@@ -1503,14 +1503,20 @@ export namespace Threads {
   export import ImageFileContentBlock = MessagesAPI.ImageFileContentBlock;
   export import ImageFileDelta = MessagesAPI.ImageFileDelta;
   export import ImageFileDeltaBlock = MessagesAPI.ImageFileDeltaBlock;
+  export import ImageURL = MessagesAPI.ImageURL;
+  export import ImageURLContentBlock = MessagesAPI.ImageURLContentBlock;
+  export import ImageURLDelta = MessagesAPI.ImageURLDelta;
+  export import ImageURLDeltaBlock = MessagesAPI.ImageURLDeltaBlock;
   export import Message = MessagesAPI.Message;
   export import MessageContent = MessagesAPI.MessageContent;
   export import MessageContentDelta = MessagesAPI.MessageContentDelta;
+  export import MessageContentPartParam = MessagesAPI.MessageContentPartParam;
   export import MessageDeleted = MessagesAPI.MessageDeleted;
   export import MessageDelta = MessagesAPI.MessageDelta;
   export import MessageDeltaEvent = MessagesAPI.MessageDeltaEvent;
   export import Text = MessagesAPI.Text;
   export import TextContentBlock = MessagesAPI.TextContentBlock;
+  export import TextContentBlockParam = MessagesAPI.TextContentBlockParam;
   export import TextDelta = MessagesAPI.TextDelta;
   export import TextDeltaBlock = MessagesAPI.TextDeltaBlock;
   export import MessagesPage = MessagesAPI.MessagesPage;

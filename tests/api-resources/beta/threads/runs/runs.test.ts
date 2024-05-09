@@ -27,7 +27,7 @@ describe('resource runs', () => {
       additional_messages: [
         {
           role: 'user',
-          content: 'x',
+          content: 'string',
           attachments: [
             {
               file_id: 'string',
@@ -58,7 +58,7 @@ describe('resource runs', () => {
         },
         {
           role: 'user',
-          content: 'x',
+          content: 'string',
           attachments: [
             {
               file_id: 'string',
@@ -89,7 +89,7 @@ describe('resource runs', () => {
         },
         {
           role: 'user',
-          content: 'x',
+          content: 'string',
           attachments: [
             {
               file_id: 'string',

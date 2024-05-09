@@ -7,6 +7,7 @@ import {
   ImageFile,
   TextDelta,
   Messages,
+  MessageContent,
 } from 'openai/resources/beta/threads/messages';
 import * as Core from 'openai/core';
 import { RequestOptions } from 'openai/core';
@@ -87,7 +88,7 @@ export class AssistantStream
   #messageSnapshot: Message | undefined;
   #finalRun: Run | undefined;
   #currentContentIndex: number | undefined;
-  #currentContent: TextContentBlock | ImageFileContentBlock | undefined;
+  #currentContent: MessageContent | undefined;
   #currentToolCallIndex: number | undefined;
   #currentToolCall: ToolCall | undefined;
 
@@ -624,10 +625,8 @@ export class AssistantStream
                 currentContent,
               );
             } else {
-              snapshot.content[contentElement.index] = contentElement as
-                | TextContentBlock
-                | ImageFileContentBlock;
-              //This is a new element
+              snapshot.content[contentElement.index] = contentElement as MessageContent;
+              // This is a new element
               newContent.push(contentElement);
             }
           }
@@ -650,7 +649,7 @@ export class AssistantStream
 
   #accumulateContent(
     contentElement: MessageContentDelta,
-    currentContent: TextContentBlock | ImageFileContentBlock | undefined,
+    currentContent: MessageContent | undefined,
   ): TextContentBlock | ImageFileContentBlock {
     return AssistantStream.accumulateDelta(currentContent as unknown as Record<any, any>, contentElement) as
       | TextContentBlock
