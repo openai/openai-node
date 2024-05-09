@@ -9,6 +9,7 @@ import { sleep } from 'openai/core';
 import { RunSubmitToolOutputsParamsStream } from 'openai/lib/AssistantStream';
 import * as RunsAPI from 'openai/resources/beta/threads/runs/runs';
 import * as AssistantsAPI from 'openai/resources/beta/assistants';
+import * as MessagesAPI from 'openai/resources/beta/threads/messages';
 import * as ThreadsAPI from 'openai/resources/beta/threads/threads';
 import * as StepsAPI from 'openai/resources/beta/threads/runs/steps';
 import { CursorPage, type CursorPageParams } from 'openai/pagination';
@@ -747,9 +748,9 @@ export interface RunCreateParamsBase {
 export namespace RunCreateParams {
   export interface AdditionalMessage {
     /**
-     * The content of the message.
+     * The text contents of the message.
      */
-    content: string;
+    content: string | Array<MessagesAPI.MessageContentPartParam>;
 
     /**
      * The role of the entity that is creating the message. Allowed values include:
@@ -999,9 +1000,9 @@ export interface RunCreateAndPollParams {
 export namespace RunCreateAndPollParams {
   export interface AdditionalMessage {
     /**
-     * The content of the message.
+     * The text contents of the message.
      */
-    content: string;
+    content: string | Array<MessagesAPI.MessageContentPartParam>;
 
     /**
      * The role of the entity that is creating the message. Allowed values include:
@@ -1204,9 +1205,9 @@ export interface RunCreateAndStreamParams {
 export namespace RunCreateAndStreamParams {
   export interface AdditionalMessage {
     /**
-     * The content of the message.
+     * The text contents of the message.
      */
-    content: string;
+    content: string | Array<MessagesAPI.MessageContentPartParam>;
 
     /**
      * The role of the entity that is creating the message. Allowed values include:
@@ -1409,9 +1410,9 @@ export interface RunStreamParams {
 export namespace RunStreamParams {
   export interface AdditionalMessage {
     /**
-     * The content of the message.
+     * The text contents of the message.
      */
-    content: string;
+    content: string | Array<MessagesAPI.MessageContentPartParam>;
 
     /**
      * The role of the entity that is creating the message. Allowed values include:

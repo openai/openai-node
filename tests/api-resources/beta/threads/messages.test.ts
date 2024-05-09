@@ -10,7 +10,10 @@ const openai = new OpenAI({
 
 describe('resource messages', () => {
   test('create: only required params', async () => {
-    const responsePromise = openai.beta.threads.messages.create('string', { content: 'x', role: 'user' });
+    const responsePromise = openai.beta.threads.messages.create('string', {
+      content: 'string',
+      role: 'user',
+    });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -22,7 +25,7 @@ describe('resource messages', () => {
 
   test('create: required and optional params', async () => {
     const response = await openai.beta.threads.messages.create('string', {
-      content: 'x',
+      content: 'string',
       role: 'user',
       attachments: [
         {
