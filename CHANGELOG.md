@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.44.0 (2024-05-09)
+
+Full Changelog: [v4.43.0...v4.44.0](https://github.com/openai/openai-node/compare/v4.43.0...v4.44.0)
+
+### Features
+
+* **api:** add message image content ([#834](https://github.com/openai/openai-node/issues/834)) ([7757b3e](https://github.com/openai/openai-node/commit/7757b3ea54a2c5cc251f55af0b676952ba12e8a6))
+
 ## 4.43.0 (2024-05-08)
 
 Full Changelog: [v4.42.0...v4.43.0](https://github.com/openai/openai-node/compare/v4.42.0...v4.43.0)
