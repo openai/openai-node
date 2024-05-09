@@ -1,5 +1,26 @@
 # Changelog
 
+## 4.43.0 (2024-05-08)
+
+Full Changelog: [v4.42.0...v4.43.0](https://github.com/openai/openai-node/compare/v4.42.0...v4.43.0)
+
+### Features
+
+* **api:** adding file purposes ([#831](https://github.com/openai/openai-node/issues/831)) ([a62b877](https://github.com/openai/openai-node/commit/a62b8779ff7261cdd6aa7bf72fb6407cc7e3fd21))
+
+## 4.42.0 (2024-05-06)
+
+Full Changelog: [v4.41.1...v4.42.0](https://github.com/openai/openai-node/compare/v4.41.1...v4.42.0)
+
+### Features
+
+* **api:** add usage metadata when streaming ([#829](https://github.com/openai/openai-node/issues/829)) ([6707f11](https://github.com/openai/openai-node/commit/6707f119a191ad98d634ad208be852f9f39c6c0e))
+
+
+### Bug Fixes
+
+* **example:** fix fine tuning example ([#827](https://github.com/openai/openai-node/issues/827)) ([6480a50](https://github.com/openai/openai-node/commit/6480a506c096a2664bd2ad296481e51017ff4185))
+
 ## 4.41.1 (2024-05-06)
 
 Full Changelog: [v4.41.0...v4.41.1](https://github.com/openai/openai-node/compare/v4.41.0...v4.41.1)
