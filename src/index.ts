@@ -346,6 +346,7 @@ export interface AzureClientOptions extends ClientOptions {
 /** API Client for interfacing with the Azure OpenAI API. */
 export class AzureOpenAI extends OpenAI {
   private _azureADTokenProvider: (() => Promise<string>) | undefined;
+  private _deployment: string | undefined;
   apiVersion: string = '';
   /**
    * API Client for interfacing with the Azure OpenAI API.
@@ -412,11 +413,7 @@ export class AzureOpenAI extends OpenAI {
         );
       }
 
-      if (deployment) {
-        baseURL = `${endpoint}/openai/deployments/${deployment}`;
-      } else {
-        baseURL = `${endpoint}/openai`;
-      }
+      baseURL = `${endpoint}/openai`;
     } else {
       if (endpoint) {
         throw new Errors.OpenAIError('baseURL and endpoint are mutually exclusive');
@@ -432,6 +429,7 @@ export class AzureOpenAI extends OpenAI {
 
     this._azureADTokenProvider = azureADTokenProvider;
     this.apiVersion = apiVersion;
+    this._deployment = deployment;
   }
 
   override buildRequest(options: Core.FinalRequestOptions<unknown>): {
@@ -443,7 +441,7 @@ export class AzureOpenAI extends OpenAI {
       if (!Core.isObj(options.body)) {
         throw new Error('Expected request body to be an object');
       }
-      const model = options.body['model'];
+      const model = this._deployment || options.body['model'];
       delete options.body['model'];
       if (model !== undefined && !this.baseURL.includes('/deployments')) {
         options.path = `/deployments/${model}${options.path}`;
@@ -494,6 +492,7 @@ const _deployments_endpoints = new Set([
   '/audio/translations',
   '/audio/speech',
   '/images/generations',
+  '/batches',
 ]);
 
 const API_KEY_SENTINEL = '<Missing Key>';
