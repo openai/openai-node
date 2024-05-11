@@ -1,5 +1,19 @@
 # Changelog
 
+## 4.45.0 (2024-05-11)
+
+Full Changelog: [v4.44.0...v4.45.0](https://github.com/openai/openai-node/compare/v4.44.0...v4.45.0)
+
+### Features
+
+* **azure:** batch api ([#839](https://github.com/openai/openai-node/issues/839)) ([e279f8c](https://github.com/openai/openai-node/commit/e279f8c51aa80cb913ccb6df647407bea1f2f071))
+
+
+### Chores
+
+* **dependency:** bumped Next.js version ([#836](https://github.com/openai/openai-node/issues/836)) ([babb140](https://github.com/openai/openai-node/commit/babb1404751059bdd171b792d03fd21272dd8f8b))
+* **docs:** add SECURITY.md ([#838](https://github.com/openai/openai-node/issues/838)) ([6e556d9](https://github.com/openai/openai-node/commit/6e556d9e12341155cc13fe226ab110d63858370e))
+
 ## 4.44.0 (2024-05-09)
 
 Full Changelog: [v4.43.0...v4.44.0](https://github.com/openai/openai-node/compare/v4.43.0...v4.44.0)

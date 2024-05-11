@@ -7,7 +7,7 @@
   "private": true,
   "dependencies": {
     "express": "^4.18.2",
-    "next": "^13.5.5",
+    "next": "^14.1.1",
     "openai": "file:..",
     "zod-to-json-schema": "^3.21.4"
   },
