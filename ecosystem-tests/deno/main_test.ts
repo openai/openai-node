@@ -1,7 +1,6 @@
 import { assertEquals, AssertionError } from 'https://deno.land/std@0.192.0/testing/asserts.ts';
-import OpenAI, { toFile } from 'npm:openai@3.3.0';
 import { distance } from 'https://deno.land/x/fastest_levenshtein/mod.ts';
-import { ChatCompletion } from 'npm:openai@3.3.0/resources/chat/completions';
+import OpenAI, { toFile } from 'openai';
 
 const url = 'https://audio-samples.github.io/samples/mp3/blizzard_biased/sample-1.mp3';
 const filename = 'sample-1.mp3';
@@ -66,7 +65,7 @@ Deno.test(async function rawResponse() {
     offset += chunk.length;
   }
 
-  const json: ChatCompletion = JSON.parse(new TextDecoder().decode(merged));
+  const json: OpenAI.ChatCompletion = JSON.parse(new TextDecoder().decode(merged));
   assertSimilar(json.choices[0]?.message.content || '', 'This is a test', 10);
 });
 

@@ -19,7 +19,7 @@ You can import in Deno via:
 <!-- x-release-please-start-version -->
 
 ```ts
-import OpenAI from 'https://deno.land/x/openai@v4.33.0/mod.ts';
+import OpenAI from 'https://deno.land/x/openai@v4.45.0/mod.ts';
 ```
 
 <!-- x-release-please-end -->
@@ -102,7 +102,7 @@ Documentation for each method, request param, and response field are available i
 
 ### Polling Helpers
 
-When interacting with the API some actions such as starting a Run may take time to complete. The SDK includes
+When interacting with the API some actions such as starting a Run and adding files to vector stores are asynchronous and take time to complete. The SDK includes
 helper functions which will poll the status until it reaches a terminal state and then return the resulting object.
 If an API method results in an action which could benefit from polling there will be a corresponding version of the
 method ending in 'AndPoll'.
@@ -116,6 +116,20 @@ const run = await openai.beta.threads.runs.createAndPoll(thread.id, {
 ```
 
 More information on the lifecycle of a Run can be found in the [Run Lifecycle Documentation](https://platform.openai.com/docs/assistants/how-it-works/run-lifecycle)
+
+### Bulk Upload Helpers
+
+When creating and interacting with vector stores, you can use the polling helpers to monitor the status of operations.
+For convenience, we also provide a bulk upload helper to allow you to simultaneously upload several files at once.
+
+```ts
+const fileList = [
+  createReadStream('/home/data/example.pdf'),
+  ...
+];
+
+const batch = await openai.vectorStores.fileBatches.uploadAndPoll(vectorStore.id, fileList);
+```
 
 ### Streaming Helpers
 
@@ -347,14 +361,25 @@ Error codes are as followed:
 | >=500       | `InternalServerError`      |
 | N/A         | `APIConnectionError`       |
 
-### Azure OpenAI
+## Microsoft Azure OpenAI
 
-An example of using this library with Azure OpenAI can be found [here](https://github.com/openai/openai-node/blob/master/examples/azure.ts).
+To use this library with [Azure OpenAI](https://learn.microsoft.com/en-us/azure/ai-services/openai/overview), use the `AzureOpenAI`
+class instead of the `OpenAI` class.
 
-Please note there are subtle differences in API shape & behavior between the Azure OpenAI API and the OpenAI API,
-so using this library with Azure OpenAI may result in incorrect types, which can lead to bugs.
+> [!IMPORTANT]
+> The Azure API shape differs from the core API shape which means that the static types for responses / params
+> won't always be correct.
 
-See [`@azure/openai`](https://www.npmjs.com/package/@azure/openai) for an Azure-specific SDK provided by Microsoft.
+```ts
+const openai = new AzureOpenAI();
+
+const result = await openai.chat.completions.create({
+  model: 'gpt-4-1106-preview',
+  messages: [{ role: 'user', content: 'Say hello!' }],
+});
+
+console.log(result.choices[0]!.message?.content);
+```
 
 ### Retries
 

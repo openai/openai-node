@@ -1,20 +1,14 @@
 {
-  "version": "2",
-  "remote": {
-    "https://deno.land/std@0.192.0/fmt/colors.ts": "d67e3cd9f472535241a8e410d33423980bec45047e343577554d3356e1f0ef4e",
-    "https://deno.land/std@0.192.0/testing/_diff.ts": "1a3c044aedf77647d6cac86b798c6417603361b66b54c53331b312caeb447aea",
-    "https://deno.land/std@0.192.0/testing/_format.ts": "a69126e8a469009adf4cf2a50af889aca364c349797e63174884a52ff75cf4c7",
-    "https://deno.land/std@0.192.0/testing/asserts.ts": "e16d98b4d73ffc4ed498d717307a12500ae4f2cbe668f1a215632d19fcffc22f"
-  },
-  "npm": {
+  "version": "3",
+  "packages": {
     "specifiers": {
-      "@types/node@^20.3.1": "@types/node@20.3.1",
-      "node-fetch@^3.0.0": "node-fetch@3.3.1",
-      "openai": "openai@3.3.0",
-      "ts-node@^10.9.1": "ts-node@10.9.1_@types+node@20.3.1_typescript@5.1.3",
-      "typescript@^5.1.3": "typescript@5.1.3"
+      "npm:@types/node@^20.3.1": "npm:@types/node@20.3.1",
+      "npm:node-fetch@^3.0.0": "npm:node-fetch@3.3.1",
+      "npm:openai": "npm:openai@3.3.0",
+      "npm:ts-node@^10.9.1": "npm:ts-node@10.9.1_@types+node@20.3.1_typescript@5.1.3",
+      "npm:typescript@^5.1.3": "npm:typescript@5.1.3"
     },
-    "packages": {
+    "npm": {
       "@cspotcode/source-map-support@0.8.1": {
         "integrity": "sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw==",
         "dependencies": {
@@ -195,5 +189,15 @@
         "dependencies": {}
       }
     }
+  },
+  "redirects": {
+    "https://deno.land/x/fastest_levenshtein/mod.ts": "https://deno.land/x/fastest_levenshtein@1.0.10/mod.ts"
+  },
+  "remote": {
+    "https://deno.land/std@0.192.0/fmt/colors.ts": "d67e3cd9f472535241a8e410d33423980bec45047e343577554d3356e1f0ef4e",
+    "https://deno.land/std@0.192.0/testing/_diff.ts": "1a3c044aedf77647d6cac86b798c6417603361b66b54c53331b312caeb447aea",
+    "https://deno.land/std@0.192.0/testing/_format.ts": "a69126e8a469009adf4cf2a50af889aca364c349797e63174884a52ff75cf4c7",
+    "https://deno.land/std@0.192.0/testing/asserts.ts": "e16d98b4d73ffc4ed498d717307a12500ae4f2cbe668f1a215632d19fcffc22f",
+    "https://deno.land/x/fastest_levenshtein@1.0.10/mod.ts": "aea49d54b6bb37082b2377da2ea068331da07b2a515621d8eff97538b7157b40"
   }
 }

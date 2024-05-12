@@ -1,6 +1,5 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-export { Chat } from './chat';
 export {
   ChatCompletion,
   ChatCompletionAssistantMessageParam,
@@ -15,6 +14,7 @@ export {
   ChatCompletionMessageToolCall,
   ChatCompletionNamedToolChoice,
   ChatCompletionRole,
+  ChatCompletionStreamOptions,
   ChatCompletionSystemMessageParam,
   ChatCompletionTokenLogprob,
   ChatCompletionTool,
@@ -30,3 +30,4 @@ export {
   CompletionCreateParamsStreaming,
   Completions,
 } from './completions';
+export { ChatModel, Chat } from './chat';

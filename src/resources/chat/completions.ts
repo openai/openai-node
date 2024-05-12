@@ -6,6 +6,7 @@ import { APIResource } from 'openai/resource';
 import * as ChatCompletionsAPI from 'openai/resources/chat/completions';
 import * as CompletionsAPI from 'openai/resources/completions';
 import * as Shared from 'openai/resources/shared';
+import * as ChatAPI from 'openai/resources/chat/chat';
 import { Stream } from 'openai/streaming';
 
 export class Completions extends APIResource {
@@ -182,8 +183,9 @@ export interface ChatCompletionChunk {
   id: string;
 
   /**
-   * A list of chat completion choices. Can be more than one if `n` is greater
-   * than 1.
+   * A list of chat completion choices. Can contain more than one elements if `n` is
+   * greater than 1. Can also be empty for the last chunk if you set
+   * `stream_options: {"include_usage": true}`.
    */
   choices: Array<ChatCompletionChunk.Choice>;
 
@@ -209,6 +211,14 @@ export interface ChatCompletionChunk {
    * backend changes have been made that might impact determinism.
    */
   system_fingerprint?: string;
+
+  /**
+   * An optional field that will only be present when you set
+   * `stream_options: {"include_usage": true}` in your request. When present, it
+   * contains a null value except for the last chunk which contains the token usage
+   * statistics for the entire request.
+   */
+  usage?: CompletionsAPI.CompletionUsage;
 }
 
 export namespace ChatCompletionChunk {
@@ -516,6 +526,19 @@ export namespace ChatCompletionNamedToolChoice {
  */
 export type ChatCompletionRole = 'system' | 'user' | 'assistant' | 'tool' | 'function';
 
+/**
+ * Options for streaming response. Only set this when you set `stream: true`.
+ */
+export interface ChatCompletionStreamOptions {
+  /**
+   * If set, an additional chunk will be streamed before the `data: [DONE]` message.
+   * The `usage` field on this chunk shows the token usage statistics for the entire
+   * request, and the `choices` field will always be an empty array. All other chunks
+   * will also include a `usage` field, but with a null value.
+   */
+  include_usage?: boolean;
+}
+
 export interface ChatCompletionSystemMessageParam {
   /**
    * The contents of the system message.
@@ -597,17 +620,17 @@ export interface ChatCompletionTool {
 }
 
 /**
- * Controls which (if any) function is called by the model. `none` means the model
- * will not call a function and instead generates a message. `auto` means the model
- * can pick between generating a message or calling a function. Specifying a
- * particular function via
+ * Controls which (if any) tool is called by the model. `none` means the model will
+ * not call any tool and instead generates a message. `auto` means the model can
+ * pick between generating a message or calling one or more tools. `required` means
+ * the model must call one or more tools. Specifying a particular tool via
  * `{"type": "function", "function": {"name": "my_function"}}` forces the model to
- * call that function.
+ * call that tool.
  *
- * `none` is the default when no functions are present. `auto` is the default if
- * functions are present.
+ * `none` is the default when no tools are present. `auto` is the default if tools
+ * are present.
  */
-export type ChatCompletionToolChoiceOption = 'none' | 'auto' | ChatCompletionNamedToolChoice;
+export type ChatCompletionToolChoiceOption = 'none' | 'auto' | 'required' | ChatCompletionNamedToolChoice;
 
 export interface ChatCompletionToolMessageParam {
   /**
@@ -665,25 +688,7 @@ export interface ChatCompletionCreateParamsBase {
    * [model endpoint compatibility](https://platform.openai.com/docs/models/model-endpoint-compatibility)
    * table for details on which models work with the Chat API.
    */
-  model:
-    | (string & {})
-    | 'gpt-4-0125-preview'
-    | 'gpt-4-turbo-preview'
-    | 'gpt-4-1106-preview'
-    | 'gpt-4-vision-preview'
-    | 'gpt-4'
-    | 'gpt-4-0314'
-    | 'gpt-4-0613'
-    | 'gpt-4-32k'
-    | 'gpt-4-32k-0314'
-    | 'gpt-4-32k-0613'
-    | 'gpt-3.5-turbo'
-    | 'gpt-3.5-turbo-16k'
-    | 'gpt-3.5-turbo-0301'
-    | 'gpt-3.5-turbo-0613'
-    | 'gpt-3.5-turbo-1106'
-    | 'gpt-3.5-turbo-0125'
-    | 'gpt-3.5-turbo-16k-0613';
+  model: (string & {}) | ChatAPI.ChatModel;
 
   /**
    * Number between -2.0 and 2.0. Positive values penalize new tokens based on their
@@ -730,8 +735,7 @@ export interface ChatCompletionCreateParamsBase {
   /**
    * Whether to return log probabilities of the output tokens or not. If true,
    * returns the log probabilities of each output token returned in the `content` of
-   * `message`. This option is currently not available on the `gpt-4-vision-preview`
-   * model.
+   * `message`.
    */
   logprobs?: boolean | null;
 
@@ -805,6 +809,11 @@ export interface ChatCompletionCreateParamsBase {
   stream?: boolean | null;
 
   /**
+   * Options for streaming response. Only set this when you set `stream: true`.
+   */
+  stream_options?: ChatCompletionStreamOptions | null;
+
+  /**
    * What sampling temperature to use, between 0 and 2. Higher values like 0.8 will
    * make the output more random, while lower values like 0.2 will make it more
    * focused and deterministic.
@@ -814,15 +823,15 @@ export interface ChatCompletionCreateParamsBase {
   temperature?: number | null;
 
   /**
-   * Controls which (if any) function is called by the model. `none` means the model
-   * will not call a function and instead generates a message. `auto` means the model
-   * can pick between generating a message or calling a function. Specifying a
-   * particular function via
+   * Controls which (if any) tool is called by the model. `none` means the model will
+   * not call any tool and instead generates a message. `auto` means the model can
+   * pick between generating a message or calling one or more tools. `required` means
+   * the model must call one or more tools. Specifying a particular tool via
    * `{"type": "function", "function": {"name": "my_function"}}` forces the model to
-   * call that function.
+   * call that tool.
    *
-   * `none` is the default when no functions are present. `auto` is the default if
-   * functions are present.
+   * `none` is the default when no tools are present. `auto` is the default if tools
+   * are present.
    */
   tool_choice?: ChatCompletionToolChoiceOption;
 
@@ -967,6 +976,7 @@ export namespace Completions {
   export import ChatCompletionMessageToolCall = ChatCompletionsAPI.ChatCompletionMessageToolCall;
   export import ChatCompletionNamedToolChoice = ChatCompletionsAPI.ChatCompletionNamedToolChoice;
   export import ChatCompletionRole = ChatCompletionsAPI.ChatCompletionRole;
+  export import ChatCompletionStreamOptions = ChatCompletionsAPI.ChatCompletionStreamOptions;
   export import ChatCompletionSystemMessageParam = ChatCompletionsAPI.ChatCompletionSystemMessageParam;
   export import ChatCompletionTokenLogprob = ChatCompletionsAPI.ChatCompletionTokenLogprob;
   export import ChatCompletionTool = ChatCompletionsAPI.ChatCompletionTool;

@@ -1,5 +1,218 @@
 # Changelog
 
+## 4.45.0 (2024-05-11)
+
+Full Changelog: [v4.44.0...v4.45.0](https://github.com/openai/openai-node/compare/v4.44.0...v4.45.0)
+
+### Features
+
+* **azure:** batch api ([#839](https://github.com/openai/openai-node/issues/839)) ([e279f8c](https://github.com/openai/openai-node/commit/e279f8c51aa80cb913ccb6df647407bea1f2f071))
+
+
+### Chores
+
+* **dependency:** bumped Next.js version ([#836](https://github.com/openai/openai-node/issues/836)) ([babb140](https://github.com/openai/openai-node/commit/babb1404751059bdd171b792d03fd21272dd8f8b))
+* **docs:** add SECURITY.md ([#838](https://github.com/openai/openai-node/issues/838)) ([6e556d9](https://github.com/openai/openai-node/commit/6e556d9e12341155cc13fe226ab110d63858370e))
+
+## 4.44.0 (2024-05-09)
+
+Full Changelog: [v4.43.0...v4.44.0](https://github.com/openai/openai-node/compare/v4.43.0...v4.44.0)
+
+### Features
+
+* **api:** add message image content ([#834](https://github.com/openai/openai-node/issues/834)) ([7757b3e](https://github.com/openai/openai-node/commit/7757b3ea54a2c5cc251f55af0b676952ba12e8a6))
+
+## 4.43.0 (2024-05-08)
+
+Full Changelog: [v4.42.0...v4.43.0](https://github.com/openai/openai-node/compare/v4.42.0...v4.43.0)
+
+### Features
+
+* **api:** adding file purposes ([#831](https://github.com/openai/openai-node/issues/831)) ([a62b877](https://github.com/openai/openai-node/commit/a62b8779ff7261cdd6aa7bf72fb6407cc7e3fd21))
+
+## 4.42.0 (2024-05-06)
+
+Full Changelog: [v4.41.1...v4.42.0](https://github.com/openai/openai-node/compare/v4.41.1...v4.42.0)
+
+### Features
+
+* **api:** add usage metadata when streaming ([#829](https://github.com/openai/openai-node/issues/829)) ([6707f11](https://github.com/openai/openai-node/commit/6707f119a191ad98d634ad208be852f9f39c6c0e))
+
+
+### Bug Fixes
+
+* **example:** fix fine tuning example ([#827](https://github.com/openai/openai-node/issues/827)) ([6480a50](https://github.com/openai/openai-node/commit/6480a506c096a2664bd2ad296481e51017ff4185))
+
+## 4.41.1 (2024-05-06)
+
+Full Changelog: [v4.41.0...v4.41.1](https://github.com/openai/openai-node/compare/v4.41.0...v4.41.1)
+
+### Bug Fixes
+
+* **azure:** update build script ([#825](https://github.com/openai/openai-node/issues/825)) ([8afc6e7](https://github.com/openai/openai-node/commit/8afc6e7b49507b3be0228e93913d51b4c3211add))
+
+## 4.41.0 (2024-05-05)
+
+Full Changelog: [v4.40.2...v4.41.0](https://github.com/openai/openai-node/compare/v4.40.2...v4.41.0)
+
+### Features
+
+* **client:** add Azure client ([#822](https://github.com/openai/openai-node/issues/822)) ([92f9049](https://github.com/openai/openai-node/commit/92f90499f0bbee79ba9c8342c8d58dbcaf88bdd1))
+
+## 4.40.2 (2024-05-03)
+
+Full Changelog: [v4.40.1...v4.40.2](https://github.com/openai/openai-node/compare/v4.40.1...v4.40.2)
+
+### Bug Fixes
+
+* **package:** revert recent client file change ([#819](https://github.com/openai/openai-node/issues/819)) ([fa722c9](https://github.com/openai/openai-node/commit/fa722c97859e55a0e766332c3a2f0cb3673128a2))
+* **vectorStores:** correct uploadAndPoll method ([#817](https://github.com/openai/openai-node/issues/817)) ([d63f22c](https://github.com/openai/openai-node/commit/d63f22c303761710e6eac7ef883c45e34d223df1))
+
+## 4.40.1 (2024-05-02)
+
+Full Changelog: [v4.40.0...v4.40.1](https://github.com/openai/openai-node/compare/v4.40.0...v4.40.1)
+
+### Chores
+
+* **internal:** bump prism version ([#813](https://github.com/openai/openai-node/issues/813)) ([81a6c28](https://github.com/openai/openai-node/commit/81a6c28c4773a0245ce9c505fc5b98d43df21beb))
+* **internal:** move client class to separate file ([#815](https://github.com/openai/openai-node/issues/815)) ([d0b915a](https://github.com/openai/openai-node/commit/d0b915a7514eda5b23d7d1e4420d1d1485ed8d0f))
+
+## 4.40.0 (2024-05-01)
+
+Full Changelog: [v4.39.1...v4.40.0](https://github.com/openai/openai-node/compare/v4.39.1...v4.40.0)
+
+### Features
+
+* **api:** delete messages ([#811](https://github.com/openai/openai-node/issues/811)) ([9e37dbd](https://github.com/openai/openai-node/commit/9e37dbd554e4ca48fda1577b1aad612e9d30534d))
+
+## 4.39.1 (2024-04-30)
+
+Full Changelog: [v4.39.0...v4.39.1](https://github.com/openai/openai-node/compare/v4.39.0...v4.39.1)
+
+### Chores
+
+* **internal:** add link to openapi spec ([#810](https://github.com/openai/openai-node/issues/810)) ([61b5b83](https://github.com/openai/openai-node/commit/61b5b83e82dd723e9584232f3b805ed13e58e13d))
+* **internal:** fix release please for deno ([#808](https://github.com/openai/openai-node/issues/808)) ([ecc2eae](https://github.com/openai/openai-node/commit/ecc2eaec602eb9fe518f011920d8500e01fde01b))
+* **internal:** refactor scripts ([#806](https://github.com/openai/openai-node/issues/806)) ([9283519](https://github.com/openai/openai-node/commit/928351928054feb56f8797587c70f74d06c2737c))
+
+## 4.39.0 (2024-04-29)
+
+Full Changelog: [v4.38.5...v4.39.0](https://github.com/openai/openai-node/compare/v4.38.5...v4.39.0)
+
+### Features
+
+* **api:** add required tool_choice ([#803](https://github.com/openai/openai-node/issues/803)) ([99693e6](https://github.com/openai/openai-node/commit/99693e61debc67327a45dffb2c10c113341bffd6))
+
+
+### Chores
+
+* **internal:** add scripts/test and scripts/mock ([#801](https://github.com/openai/openai-node/issues/801)) ([6656105](https://github.com/openai/openai-node/commit/6656105fa1346a91d17e2b7a5e075f3091310c2f))
+
+## 4.38.5 (2024-04-24)
+
+Full Changelog: [v4.38.4...v4.38.5](https://github.com/openai/openai-node/compare/v4.38.4...v4.38.5)
+
+### Chores
+
+* **internal:** use actions/checkout@v4 for codeflow ([#799](https://github.com/openai/openai-node/issues/799)) ([5ab7780](https://github.com/openai/openai-node/commit/5ab7780ea8889818f403a9a89ab19585a7e8972e))
+
+## 4.38.4 (2024-04-24)
+
+Full Changelog: [v4.38.3...v4.38.4](https://github.com/openai/openai-node/compare/v4.38.3...v4.38.4)
+
+### Bug Fixes
+
+* **api:** change timestamps to unix integers ([#798](https://github.com/openai/openai-node/issues/798)) ([7271a6c](https://github.com/openai/openai-node/commit/7271a6cdc7d37151d2cae18fdd20b87d97624a84))
+* **docs:** doc improvements ([#796](https://github.com/openai/openai-node/issues/796)) ([49fcc86](https://github.com/openai/openai-node/commit/49fcc86b44958795a6f5e0901f369653dfbcc637))
+
+## 4.38.3 (2024-04-22)
+
+Full Changelog: [v4.38.2...v4.38.3](https://github.com/openai/openai-node/compare/v4.38.2...v4.38.3)
+
+### Chores
+
+* **internal:** use @swc/jest for running tests ([#793](https://github.com/openai/openai-node/issues/793)) ([8947f19](https://github.com/openai/openai-node/commit/8947f195b2dfab7ceebe1e0bb5c886e229cd541f))
+
+## 4.38.2 (2024-04-19)
+
+Full Changelog: [v4.38.1...v4.38.2](https://github.com/openai/openai-node/compare/v4.38.1...v4.38.2)
+
+### Bug Fixes
+
+* **api:** correct types for message attachment tools ([#787](https://github.com/openai/openai-node/issues/787)) ([8626884](https://github.com/openai/openai-node/commit/8626884abd2494aa081db9e50a2f268b6cebc5df))
+
+## 4.38.1 (2024-04-18)
+
+Full Changelog: [v4.38.0...v4.38.1](https://github.com/openai/openai-node/compare/v4.38.0...v4.38.1)
+
+### Bug Fixes
+
+* **api:** correct types for attachments ([#783](https://github.com/openai/openai-node/issues/783)) ([6893631](https://github.com/openai/openai-node/commit/6893631334f75e232ba130f5dd67f1230b1e5fa0))
+
+## 4.38.0 (2024-04-18)
+
+Full Changelog: [v4.37.1...v4.38.0](https://github.com/openai/openai-node/compare/v4.37.1...v4.38.0)
+
+### Features
+
+* **api:** batch list endpoint ([#781](https://github.com/openai/openai-node/issues/781)) ([d226759](https://github.com/openai/openai-node/commit/d226759164fbed33198d8bdc315c98e1052dade8))
+
+## 4.37.1 (2024-04-17)
+
+Full Changelog: [v4.37.0...v4.37.1](https://github.com/openai/openai-node/compare/v4.37.0...v4.37.1)
+
+### Chores
+
+* **api:** docs and response_format response property ([#778](https://github.com/openai/openai-node/issues/778)) ([78f5c35](https://github.com/openai/openai-node/commit/78f5c3568d95d8e854c04049dc7d5643aa49e93f))
+
+## 4.37.0 (2024-04-17)
+
+Full Changelog: [v4.36.0...v4.37.0](https://github.com/openai/openai-node/compare/v4.36.0...v4.37.0)
+
+### Features
+
+* **api:** add vector stores ([#776](https://github.com/openai/openai-node/issues/776)) ([8bb929b](https://github.com/openai/openai-node/commit/8bb929b2ee91c1bec0a00347bf4f7628652d1be3))
+
+## 4.36.0 (2024-04-16)
+
+Full Changelog: [v4.35.0...v4.36.0](https://github.com/openai/openai-node/compare/v4.35.0...v4.36.0)
+
+### Features
+
+* **client:** add header OpenAI-Project ([#772](https://github.com/openai/openai-node/issues/772)) ([bb4df37](https://github.com/openai/openai-node/commit/bb4df3722082fb44b7d4feb7a47df796149150a2))
+* extract chat models to a named enum ([#775](https://github.com/openai/openai-node/issues/775)) ([141d2ed](https://github.com/openai/openai-node/commit/141d2ed308141dc751869353208e4d0632d3650c))
+
+
+### Build System
+
+* configure UTF-8 locale in devcontainer ([#774](https://github.com/openai/openai-node/issues/774)) ([bebf4f0](https://github.com/openai/openai-node/commit/bebf4f0ca1f884f8747caff0f0e065aafffde096))
+
+## 4.35.0 (2024-04-15)
+
+Full Changelog: [v4.34.0...v4.35.0](https://github.com/openai/openai-node/compare/v4.34.0...v4.35.0)
+
+### Features
+
+* **errors:** add request_id property ([#769](https://github.com/openai/openai-node/issues/769)) ([43aa6a1](https://github.com/openai/openai-node/commit/43aa6a19cfb1448903dfaddc4da3def2eda9cbab))
+
+## 4.34.0 (2024-04-15)
+
+Full Changelog: [v4.33.1...v4.34.0](https://github.com/openai/openai-node/compare/v4.33.1...v4.34.0)
+
+### Features
+
+* **api:** add batch API ([#768](https://github.com/openai/openai-node/issues/768)) ([7fe34f2](https://github.com/openai/openai-node/commit/7fe34f2d0bda9c1cb116a593f02bd0cc15a52e12))
+* **api:** updates ([#766](https://github.com/openai/openai-node/issues/766)) ([52bcc47](https://github.com/openai/openai-node/commit/52bcc47043e4c3ffe15ae9e7ac0fa87e2493aad9))
+
+## 4.33.1 (2024-04-12)
+
+Full Changelog: [v4.33.0...v4.33.1](https://github.com/openai/openai-node/compare/v4.33.0...v4.33.1)
+
+### Chores
+
+* **internal:** formatting ([#763](https://github.com/openai/openai-node/issues/763)) ([b6acf54](https://github.com/openai/openai-node/commit/b6acf54baab7e6cbf6ce3ad1d6c70197cc0181d0))
+* **internal:** improve ecosystem tests ([#761](https://github.com/openai/openai-node/issues/761)) ([fcf748d](https://github.com/openai/openai-node/commit/fcf748dbbd23f972ff9fd81a8b2a35232a2d6e5c))
+
 ## 4.33.0 (2024-04-05)
 
 Full Changelog: [v4.32.2...v4.33.0](https://github.com/openai/openai-node/compare/v4.32.2...v4.33.0)

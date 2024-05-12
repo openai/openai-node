@@ -6,9 +6,9 @@ export {
   AssistantStreamEvent,
   AssistantTool,
   CodeInterpreterTool,
+  FileSearchTool,
   FunctionTool,
   MessageStreamEvent,
-  RetrievalTool,
   RunStepStreamEvent,
   RunStreamEvent,
   ThreadStreamEvent,
@@ -17,10 +17,13 @@ export {
   AssistantListParams,
   AssistantsPage,
   Assistants,
-} from './assistants/index';
-export { Beta } from './beta';
-export { Chat } from './chat/index';
+} from './assistants';
 export {
+  AssistantResponseFormat,
+  AssistantResponseFormatOption,
+  AssistantToolChoice,
+  AssistantToolChoiceFunction,
+  AssistantToolChoiceOption,
   Thread,
   ThreadDeleted,
   ThreadCreateParams,
@@ -32,3 +35,14 @@ export {
   ThreadCreateAndRunStreamParams,
   Threads,
 } from './threads/index';
+export { Beta } from './beta';
+export { Chat } from './chat/index';
+export {
+  VectorStore,
+  VectorStoreDeleted,
+  VectorStoreCreateParams,
+  VectorStoreUpdateParams,
+  VectorStoreListParams,
+  VectorStoresPage,
+  VectorStores,
+} from './vector-stores/index';

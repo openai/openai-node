@@ -25,16 +25,112 @@ describe('resource runs', () => {
       assistant_id: 'string',
       additional_instructions: 'string',
       additional_messages: [
-        { role: 'user', content: 'x', file_ids: ['string'], metadata: {} },
-        { role: 'user', content: 'x', file_ids: ['string'], metadata: {} },
-        { role: 'user', content: 'x', file_ids: ['string'], metadata: {} },
+        {
+          role: 'user',
+          content: 'string',
+          attachments: [
+            {
+              file_id: 'string',
+              tools: [
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+              ],
+            },
+            {
+              file_id: 'string',
+              tools: [
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+              ],
+            },
+            {
+              file_id: 'string',
+              tools: [
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+              ],
+            },
+          ],
+          metadata: {},
+        },
+        {
+          role: 'user',
+          content: 'string',
+          attachments: [
+            {
+              file_id: 'string',
+              tools: [
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+              ],
+            },
+            {
+              file_id: 'string',
+              tools: [
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+              ],
+            },
+            {
+              file_id: 'string',
+              tools: [
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+              ],
+            },
+          ],
+          metadata: {},
+        },
+        {
+          role: 'user',
+          content: 'string',
+          attachments: [
+            {
+              file_id: 'string',
+              tools: [
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+              ],
+            },
+            {
+              file_id: 'string',
+              tools: [
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+              ],
+            },
+            {
+              file_id: 'string',
+              tools: [
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+              ],
+            },
+          ],
+          metadata: {},
+        },
       ],
       instructions: 'string',
+      max_completion_tokens: 256,
+      max_prompt_tokens: 256,
       metadata: {},
-      model: 'string',
+      model: 'gpt-4-turbo',
+      response_format: 'none',
       stream: false,
       temperature: 1,
+      tool_choice: 'none',
       tools: [{ type: 'code_interpreter' }, { type: 'code_interpreter' }, { type: 'code_interpreter' }],
+      top_p: 1,
+      truncation_strategy: { type: 'auto', last_messages: 1 },
     });
   });
 

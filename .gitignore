@@ -1,7 +1,13 @@
 node_modules
 yarn-error.log
 codegen.log
+Brewfile.lock.json
 dist
 /deno
 /*.tgz
 .idea/
+tmp
+.pack
+ecosystem-tests/deno/package.json
+ecosystem-tests/*/openai.tgz
+
