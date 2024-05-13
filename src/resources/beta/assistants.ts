@@ -1000,6 +1000,8 @@ export interface AssistantCreateParams {
    */
   model:
     | (string & {})
+    | 'gpt-4o'
+    | 'gpt-4o-2024-05-13'
     | 'gpt-4-turbo'
     | 'gpt-4-turbo-2024-04-09'
     | 'gpt-4-0125-preview'
