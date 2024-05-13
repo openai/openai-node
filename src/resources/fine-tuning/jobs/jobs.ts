@@ -1,11 +1,11 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import * as Core from 'openai/core';
-import { APIResource } from 'openai/resource';
-import { isRequestOptions } from 'openai/core';
-import * as JobsAPI from 'openai/resources/fine-tuning/jobs/jobs';
-import * as CheckpointsAPI from 'openai/resources/fine-tuning/jobs/checkpoints';
-import { CursorPage, type CursorPageParams } from 'openai/pagination';
+import * as Core from '../../../core';
+import { APIResource } from '../../../resource';
+import { isRequestOptions } from '../../../core';
+import * as JobsAPI from './jobs';
+import * as CheckpointsAPI from './checkpoints';
+import { CursorPage, type CursorPageParams } from '../../../pagination';
 
 export class Jobs extends APIResource {
   checkpoints: CheckpointsAPI.Checkpoints = new CheckpointsAPI.Checkpoints(this._client);

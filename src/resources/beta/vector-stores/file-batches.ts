@@ -1,15 +1,15 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import * as Core from 'openai/core';
-import { APIResource } from 'openai/resource';
-import { isRequestOptions } from 'openai/core';
-import { sleep } from 'openai/core';
-import { Uploadable } from 'openai/core';
-import { allSettledWithThrow } from 'openai/lib/Util';
-import * as FileBatchesAPI from 'openai/resources/beta/vector-stores/file-batches';
-import * as FilesAPI from 'openai/resources/beta/vector-stores/files';
-import { VectorStoreFilesPage } from 'openai/resources/beta/vector-stores/files';
-import { type CursorPageParams } from 'openai/pagination';
+import * as Core from '../../../core';
+import { APIResource } from '../../../resource';
+import { isRequestOptions } from '../../../core';
+import { sleep } from '../../../core';
+import { Uploadable } from '../../../core';
+import { allSettledWithThrow } from '../../../lib/Util';
+import * as FileBatchesAPI from './file-batches';
+import * as FilesAPI from './files';
+import { VectorStoreFilesPage } from './files';
+import { type CursorPageParams } from '../../../pagination';
 
 export class FileBatches extends APIResource {
   /**

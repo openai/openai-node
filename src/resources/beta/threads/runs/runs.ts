@@ -1,19 +1,19 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import * as Core from 'openai/core';
-import { APIPromise } from 'openai/core';
-import { APIResource } from 'openai/resource';
-import { isRequestOptions } from 'openai/core';
-import { AssistantStream, RunCreateParamsBaseStream } from 'openai/lib/AssistantStream';
-import { sleep } from 'openai/core';
-import { RunSubmitToolOutputsParamsStream } from 'openai/lib/AssistantStream';
-import * as RunsAPI from 'openai/resources/beta/threads/runs/runs';
-import * as AssistantsAPI from 'openai/resources/beta/assistants';
-import * as MessagesAPI from 'openai/resources/beta/threads/messages';
-import * as ThreadsAPI from 'openai/resources/beta/threads/threads';
-import * as StepsAPI from 'openai/resources/beta/threads/runs/steps';
-import { CursorPage, type CursorPageParams } from 'openai/pagination';
-import { Stream } from 'openai/streaming';
+import * as Core from '../../../../core';
+import { APIPromise } from '../../../../core';
+import { APIResource } from '../../../../resource';
+import { isRequestOptions } from '../../../../core';
+import { AssistantStream, RunCreateParamsBaseStream } from '../../../../lib/AssistantStream';
+import { sleep } from '../../../../core';
+import { RunSubmitToolOutputsParamsStream } from '../../../../lib/AssistantStream';
+import * as RunsAPI from './runs';
+import * as AssistantsAPI from '../../assistants';
+import * as MessagesAPI from '../messages';
+import * as ThreadsAPI from '../threads';
+import * as StepsAPI from './steps';
+import { CursorPage, type CursorPageParams } from '../../../../pagination';
+import { Stream } from '../../../../streaming';
 
 export class Runs extends APIResource {
   steps: StepsAPI.Steps = new StepsAPI.Steps(this._client);
