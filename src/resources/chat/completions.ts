@@ -1,13 +1,13 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import * as Core from 'openai/core';
-import { APIPromise } from 'openai/core';
-import { APIResource } from 'openai/resource';
-import * as ChatCompletionsAPI from 'openai/resources/chat/completions';
-import * as CompletionsAPI from 'openai/resources/completions';
-import * as Shared from 'openai/resources/shared';
-import * as ChatAPI from 'openai/resources/chat/chat';
-import { Stream } from 'openai/streaming';
+import * as Core from '../../core';
+import { APIPromise } from '../../core';
+import { APIResource } from '../../resource';
+import * as ChatCompletionsAPI from './completions';
+import * as CompletionsAPI from '../completions';
+import * as Shared from '../shared';
+import * as ChatAPI from './chat';
+import { Stream } from '../../streaming';
 
 export class Completions extends APIResource {
   /**

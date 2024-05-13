@@ -1,15 +1,15 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import * as Core from 'openai/core';
-import { APIResource } from 'openai/resource';
-import { isRequestOptions } from 'openai/core';
-import * as AssistantsAPI from 'openai/resources/beta/assistants';
-import * as Shared from 'openai/resources/shared';
-import * as MessagesAPI from 'openai/resources/beta/threads/messages';
-import * as ThreadsAPI from 'openai/resources/beta/threads/threads';
-import * as RunsAPI from 'openai/resources/beta/threads/runs/runs';
-import * as StepsAPI from 'openai/resources/beta/threads/runs/steps';
-import { CursorPage, type CursorPageParams } from 'openai/pagination';
+import * as Core from '../../core';
+import { APIResource } from '../../resource';
+import { isRequestOptions } from '../../core';
+import * as AssistantsAPI from './assistants';
+import * as Shared from '../shared';
+import * as MessagesAPI from './threads/messages';
+import * as ThreadsAPI from './threads/threads';
+import * as RunsAPI from './threads/runs/runs';
+import * as StepsAPI from './threads/runs/steps';
+import { CursorPage, type CursorPageParams } from '../../pagination';
 
 export class Assistants extends APIResource {
   /**

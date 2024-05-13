@@ -1,10 +1,10 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from 'openai/resource';
-import * as AssistantsAPI from 'openai/resources/beta/assistants';
-import * as ChatAPI from 'openai/resources/beta/chat/chat';
-import * as ThreadsAPI from 'openai/resources/beta/threads/threads';
-import * as VectorStoresAPI from 'openai/resources/beta/vector-stores/vector-stores';
+import { APIResource } from '../../resource';
+import * as AssistantsAPI from './assistants';
+import * as ChatAPI from './chat/chat';
+import * as ThreadsAPI from './threads/threads';
+import * as VectorStoresAPI from './vector-stores/vector-stores';
 
 export class Beta extends APIResource {
   vectorStores: VectorStoresAPI.VectorStores = new VectorStoresAPI.VectorStores(this._client);
