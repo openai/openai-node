@@ -2,5 +2,10 @@
 
 export { Audio } from './audio';
 export { SpeechCreateParams, Speech } from './speech';
-export { Transcription, TranscriptionCreateParams, Transcriptions } from './transcriptions';
-export { Translation, TranslationCreateParams, Translations } from './translations';
+export {
+  Transcription,
+  VerboseTranscription,
+  TranscriptionCreateParams,
+  Transcriptions,
+} from './transcriptions';
+export { Translation, VerboseTranslation, TranslationCreateParams, Translations } from './translations';

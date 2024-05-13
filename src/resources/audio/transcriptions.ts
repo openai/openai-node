@@ -4,12 +4,28 @@ import * as Core from 'openai/core';
 import { APIResource } from 'openai/resource';
 import * as TranscriptionsAPI from 'openai/resources/audio/transcriptions';
 import { type Uploadable, multipartFormRequestOptions } from 'openai/core';
+import { WhisperSegment } from './types';
 
 export class Transcriptions extends APIResource {
   /**
    * Transcribes audio into the input language.
    */
-  create(body: TranscriptionCreateParams, options?: Core.RequestOptions): Core.APIPromise<Transcription> {
+  create(
+    body: TranscriptionCreateParams & { response_format: 'json' },
+    options?: Core.RequestOptions,
+  ): Core.APIPromise<Transcription>;
+  create(
+    body: TranscriptionCreateParams & { response_format: 'verbose_json' },
+    options?: Core.RequestOptions,
+  ): Core.APIPromise<VerboseTranscription>;
+  create(
+    body: TranscriptionCreateParams & { response_format: 'srt' | 'text' | 'vtt' },
+    options?: Core.RequestOptions,
+  ): Core.APIPromise<string>;
+  create(
+    body: TranscriptionCreateParams,
+    options?: Core.RequestOptions,
+  ): Core.APIPromise<Transcription | VerboseTranscription | string> {
     return this._client.post('/audio/transcriptions', multipartFormRequestOptions({ body, ...options }));
   }
 }
@@ -23,6 +39,14 @@ export interface Transcription {
    * The transcribed text.
    */
   text: string;
+}
+
+export interface VerboseTranscription extends Transcription {
+  text: string;
+  task: 'transcribe';
+  language: string;
+  duration: number;
+  segments: WhisperSegment[];
 }
 
 export interface TranscriptionCreateParams {
