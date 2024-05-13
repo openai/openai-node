@@ -1,8 +1,8 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import * as Core from 'openai/core';
-import { APIResource } from 'openai/resource';
-import * as ModerationsAPI from 'openai/resources/moderations';
+import * as Core from '../core';
+import { APIResource } from '../resource';
+import * as ModerationsAPI from './moderations';
 
 export class Moderations extends APIResource {
   /**

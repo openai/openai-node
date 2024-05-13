@@ -1,9 +1,9 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from 'openai/resource';
-import * as SpeechAPI from 'openai/resources/audio/speech';
-import * as TranscriptionsAPI from 'openai/resources/audio/transcriptions';
-import * as TranslationsAPI from 'openai/resources/audio/translations';
+import { APIResource } from '../../resource';
+import * as SpeechAPI from './speech';
+import * as TranscriptionsAPI from './transcriptions';
+import * as TranslationsAPI from './translations';
 
 export class Audio extends APIResource {
   transcriptions: TranscriptionsAPI.Transcriptions = new TranscriptionsAPI.Transcriptions(this._client);

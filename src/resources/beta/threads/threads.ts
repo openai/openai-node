@@ -1,15 +1,15 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import * as Core from 'openai/core';
-import { APIPromise } from 'openai/core';
-import { APIResource } from 'openai/resource';
-import { isRequestOptions } from 'openai/core';
-import { AssistantStream, ThreadCreateAndRunParamsBaseStream } from 'openai/lib/AssistantStream';
-import * as ThreadsAPI from 'openai/resources/beta/threads/threads';
-import * as AssistantsAPI from 'openai/resources/beta/assistants';
-import * as MessagesAPI from 'openai/resources/beta/threads/messages';
-import * as RunsAPI from 'openai/resources/beta/threads/runs/runs';
-import { Stream } from 'openai/streaming';
+import * as Core from '../../../core';
+import { APIPromise } from '../../../core';
+import { APIResource } from '../../../resource';
+import { isRequestOptions } from '../../../core';
+import { AssistantStream, ThreadCreateAndRunParamsBaseStream } from '../../../lib/AssistantStream';
+import * as ThreadsAPI from './threads';
+import * as AssistantsAPI from '../assistants';
+import * as MessagesAPI from './messages';
+import * as RunsAPI from './runs/runs';
+import { Stream } from '../../../streaming';
 
 export class Threads extends APIResource {
   runs: RunsAPI.Runs = new RunsAPI.Runs(this._client);
