@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.46.1 (2024-05-13)
+
+Full Changelog: [v4.46.0...v4.46.1](https://github.com/openai/openai-node/compare/v4.46.0...v4.46.1)
+
+### Refactors
+
+* change import paths to be relative ([#843](https://github.com/openai/openai-node/issues/843)) ([7913574](https://github.com/openai/openai-node/commit/7913574bdb6fcbcf68e56e8def351add6c43310a))
+
 ## 4.46.0 (2024-05-13)
 
 Full Changelog: [v4.45.0...v4.46.0](https://github.com/openai/openai-node/compare/v4.45.0...v4.46.0)
