@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.46.0 (2024-05-13)
+
+Full Changelog: [v4.45.0...v4.46.0](https://github.com/openai/openai-node/compare/v4.45.0...v4.46.0)
+
+### Features
+
+* **api:** add gpt-4o model ([#841](https://github.com/openai/openai-node/issues/841)) ([c818ed1](https://github.com/openai/openai-node/commit/c818ed139bfba81af6ca3c4eda08d52366758529))
+
 ## 4.45.0 (2024-05-11)
 
 Full Changelog: [v4.44.0...v4.45.0](https://github.com/openai/openai-node/compare/v4.44.0...v4.45.0)
