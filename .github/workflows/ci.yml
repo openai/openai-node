@@ -22,12 +22,10 @@ jobs:
           node-version: '18'
 
       - name: Install dependencies
-        run: |
-          yarn install
+        run: yarn install
 
       - name: Check types
-        run: |
-          yarn build
+        run: ./scripts/lint
   test:
     name: test
     runs-on: ubuntu-latest
