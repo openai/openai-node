@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.47.0 (2024-05-14)
+
+Full Changelog: [v4.46.1...v4.47.0](https://github.com/openai/openai-node/compare/v4.46.1...v4.47.0)
+
+### Features
+
+* **api:** add incomplete state ([#846](https://github.com/openai/openai-node/issues/846)) ([5f663a1](https://github.com/openai/openai-node/commit/5f663a167361b905c6d0c1242e8a78037a7e4a57))
+
 ## 4.46.1 (2024-05-13)
 
 Full Changelog: [v4.46.0...v4.46.1](https://github.com/openai/openai-node/compare/v4.46.0...v4.46.1)
