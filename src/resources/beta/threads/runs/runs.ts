@@ -176,6 +176,7 @@ export class Runs extends APIResource {
           break;
         //We return the run in any terminal state.
         case 'requires_action':
+        case 'incomplete':
         case 'cancelled':
         case 'completed':
         case 'failed':
@@ -409,8 +410,9 @@ export interface Run {
 
   /**
    * Specifies the format that the model must output. Compatible with
-   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-and-gpt-4-turbo) and
-   * all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
+   * [GPT-4o](https://platform.openai.com/docs/models/gpt-4o),
+   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4),
+   * and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
    *
    * Setting to `{ "type": "json_object" }` enables JSON mode, which guarantees the
    * message the model generates is valid JSON.
@@ -432,8 +434,8 @@ export interface Run {
 
   /**
    * The status of the run, which can be either `queued`, `in_progress`,
-   * `requires_action`, `cancelling`, `cancelled`, `failed`, `completed`, or
-   * `expired`.
+   * `requires_action`, `cancelling`, `cancelled`, `failed`, `completed`,
+   * `incomplete`, or `expired`.
    */
   status: RunStatus;
 
@@ -584,8 +586,8 @@ export namespace Run {
 
 /**
  * The status of the run, which can be either `queued`, `in_progress`,
- * `requires_action`, `cancelling`, `cancelled`, `failed`, `completed`, or
- * `expired`.
+ * `requires_action`, `cancelling`, `cancelled`, `failed`, `completed`,
+ * `incomplete`, or `expired`.
  */
 export type RunStatus =
   | 'queued'
@@ -595,6 +597,7 @@ export type RunStatus =
   | 'cancelled'
   | 'failed'
   | 'completed'
+  | 'incomplete'
   | 'expired';
 
 export type RunCreateParams = RunCreateParamsNonStreaming | RunCreateParamsStreaming;
@@ -684,8 +687,9 @@ export interface RunCreateParamsBase {
 
   /**
    * Specifies the format that the model must output. Compatible with
-   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-and-gpt-4-turbo) and
-   * all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
+   * [GPT-4o](https://platform.openai.com/docs/models/gpt-4o),
+   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4),
+   * and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
    *
    * Setting to `{ "type": "json_object" }` enables JSON mode, which guarantees the
    * message the model generates is valid JSON.
@@ -945,8 +949,9 @@ export interface RunCreateAndPollParams {
 
   /**
    * Specifies the format that the model must output. Compatible with
-   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-and-gpt-4-turbo) and
-   * all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
+   * [GPT-4o](https://platform.openai.com/docs/models/gpt-4o),
+   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4),
+   * and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
    *
    * Setting to `{ "type": "json_object" }` enables JSON mode, which guarantees the
    * message the model generates is valid JSON.
@@ -1152,8 +1157,9 @@ export interface RunCreateAndStreamParams {
 
   /**
    * Specifies the format that the model must output. Compatible with
-   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-and-gpt-4-turbo) and
-   * all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
+   * [GPT-4o](https://platform.openai.com/docs/models/gpt-4o),
+   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4),
+   * and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
    *
    * Setting to `{ "type": "json_object" }` enables JSON mode, which guarantees the
    * message the model generates is valid JSON.
@@ -1359,8 +1365,9 @@ export interface RunStreamParams {
 
   /**
    * Specifies the format that the model must output. Compatible with
-   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-and-gpt-4-turbo) and
-   * all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
+   * [GPT-4o](https://platform.openai.com/docs/models/gpt-4o),
+   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4),
+   * and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
    *
    * Setting to `{ "type": "json_object" }` enables JSON mode, which guarantees the
    * message the model generates is valid JSON.
