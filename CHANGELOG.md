@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.47.1 (2024-05-14)
+
+Full Changelog: [v4.47.0...v4.47.1](https://github.com/openai/openai-node/compare/v4.47.0...v4.47.1)
+
+### Chores
+
+* **internal:** add slightly better logging to scripts ([#848](https://github.com/openai/openai-node/issues/848)) ([139e690](https://github.com/openai/openai-node/commit/139e690546775b3568934dd990dd329fce2fbc2f))
+
 ## 4.47.0 (2024-05-14)
 
 Full Changelog: [v4.46.1...v4.47.0](https://github.com/openai/openai-node/compare/v4.46.1...v4.47.0)

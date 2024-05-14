@@ -4,4 +4,5 @@ set -e
 
 cd "$(dirname "$0")/.."
 
+echo "==> Running eslint"
 ./node_modules/.bin/eslint --ext ts,js .
