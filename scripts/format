@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+
+set -e
+
+cd "$(dirname "$0")/.."
+
+echo "==> Running eslint --fix"
+./node_modules/.bin/eslint --fix --ext ts,js .
