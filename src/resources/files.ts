@@ -194,7 +194,7 @@ export interface FileCreateParams {
    * [Batch API](https://platform.openai.com/docs/guides/batch), and "fine-tune" for
    * [Fine-tuning](https://platform.openai.com/docs/api-reference/fine-tuning).
    */
-  purpose: 'assistants' | 'batch' | 'fine-tune';
+  purpose: 'assistants' | 'batch' | 'fine-tune' | 'vision';
 }
 
 export interface FileListParams {
