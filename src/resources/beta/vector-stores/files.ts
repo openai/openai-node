@@ -3,7 +3,6 @@
 import * as Core from '../../../core';
 import { APIResource } from '../../../resource';
 import { isRequestOptions } from '../../../core';
-import { sleep, Uploadable } from '../../../core';
 import * as FilesAPI from './files';
 import { CursorPage, type CursorPageParams } from '../../../pagination';
 
@@ -81,92 +80,6 @@ export class Files extends APIResource {
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
     });
-  }
-
-  /**
-   * Attach a file to the given vector store and wait for it to be processed.
-   */
-  async createAndPoll(
-    vectorStoreId: string,
-    body: FileCreateParams,
-    options?: Core.RequestOptions & { pollIntervalMs?: number },
-  ): Promise<VectorStoreFile> {
-    const file = await this.create(vectorStoreId, body, options);
-    return await this.poll(vectorStoreId, file.id, options);
-  }
-
-  /**
-   * Wait for the vector store file to finish processing.
-   *
-   * Note: this will return even if the file failed to process, you need to check
-   * file.last_error and file.status to handle these cases
-   */
-  async poll(
-    vectorStoreId: string,
-    fileId: string,
-    options?: Core.RequestOptions & { pollIntervalMs?: number },
-  ): Promise<VectorStoreFile> {
-    const headers: { [key: string]: string } = { ...options?.headers, 'X-Stainless-Poll-Helper': 'true' };
-    if (options?.pollIntervalMs) {
-      headers['X-Stainless-Custom-Poll-Interval'] = options.pollIntervalMs.toString();
-    }
-    while (true) {
-      const fileResponse = await this.retrieve(vectorStoreId, fileId, {
-        ...options,
-        headers,
-      }).withResponse();
-
-      const file = fileResponse.data;
-
-      switch (file.status) {
-        case 'in_progress':
-          let sleepInterval = 5000;
-
-          if (options?.pollIntervalMs) {
-            sleepInterval = options.pollIntervalMs;
-          } else {
-            const headerInterval = fileResponse.response.headers.get('openai-poll-after-ms');
-            if (headerInterval) {
-              const headerIntervalMs = parseInt(headerInterval);
-              if (!isNaN(headerIntervalMs)) {
-                sleepInterval = headerIntervalMs;
-              }
-            }
-          }
-          await sleep(sleepInterval);
-          break;
-        case 'failed':
-        case 'completed':
-          return file;
-      }
-    }
-  }
-
-  /**
-   * Upload a file to the `files` API and then attach it to the given vector store.
-   *
-   * Note the file will be asynchronously processed (you can use the alternative
-   * polling helper method to wait for processing to complete).
-   */
-  async upload(
-    vectorStoreId: string,
-    file: Uploadable,
-    options?: Core.RequestOptions,
-  ): Promise<VectorStoreFile> {
-    const fileInfo = await this._client.files.create({ file: file, purpose: 'assistants' }, options);
-    return this.create(vectorStoreId, { file_id: fileInfo.id }, options);
-  }
-
-  /**
-   * Add a file to a vector store and poll until processing is complete.
-   */
-  async uploadAndPoll(
-    vectorStoreId: string,
-    file: Uploadable,
-    options?: Core.RequestOptions & { pollIntervalMs?: number },
-  ): Promise<VectorStoreFile> {
-    const fileInfo = await this.upload(vectorStoreId, file, options);
-    return await this.poll(vectorStoreId, fileInfo.id, options);
   }
 }
 

@@ -81,7 +81,6 @@ Methods:
 - <code title="delete /files/{file_id}">client.files.<a href="./src/resources/files.ts">del</a>(fileId) -> FileDeleted</code>
 - <code title="get /files/{file_id}/content">client.files.<a href="./src/resources/files.ts">content</a>(fileId) -> Response</code>
 - <code title="get /files/{file_id}/content">client.files.<a href="./src/resources/files.ts">retrieveContent</a>(fileId) -> string</code>
-- <code>client.files.<a href="./src/resources/files.ts">waitForProcessing</a>(id, { pollInterval = 5000, maxWait = 30 _ 60 _ 1000 }) -> Promise&lt;FileObject&gt;</code>
 
 # Images
 
@@ -208,10 +207,6 @@ Methods:
 - <code title="get /vector_stores/{vector_store_id}/files/{file_id}">client.beta.vectorStores.files.<a href="./src/resources/beta/vector-stores/files.ts">retrieve</a>(vectorStoreId, fileId) -> VectorStoreFile</code>
 - <code title="get /vector_stores/{vector_store_id}/files">client.beta.vectorStores.files.<a href="./src/resources/beta/vector-stores/files.ts">list</a>(vectorStoreId, { ...params }) -> VectorStoreFilesPage</code>
 - <code title="delete /vector_stores/{vector_store_id}/files/{file_id}">client.beta.vectorStores.files.<a href="./src/resources/beta/vector-stores/files.ts">del</a>(vectorStoreId, fileId) -> VectorStoreFileDeleted</code>
-- <code>client.beta.vectorStores.files.<a href="./src/resources/beta/vector-stores/files.ts">createAndPoll</a>(vectorStoreId, body, options?) -> Promise&lt;VectorStoreFile&gt;</code>
-- <code>client.beta.vectorStores.files.<a href="./src/resources/beta/vector-stores/files.ts">poll</a>(vectorStoreId, fileId, options?) -> Promise&lt;VectorStoreFile&gt;</code>
-- <code>client.beta.vectorStores.files.<a href="./src/resources/beta/vector-stores/files.ts">upload</a>(vectorStoreId, file, options?) -> Promise&lt;VectorStoreFile&gt;</code>
-- <code>client.beta.vectorStores.files.<a href="./src/resources/beta/vector-stores/files.ts">uploadAndPoll</a>(vectorStoreId, file, options?) -> Promise&lt;VectorStoreFile&gt;</code>
 
 ### FileBatches
 
@@ -225,19 +220,6 @@ Methods:
 - <code title="get /vector_stores/{vector_store_id}/file_batches/{batch_id}">client.beta.vectorStores.fileBatches.<a href="./src/resources/beta/vector-stores/file-batches.ts">retrieve</a>(vectorStoreId, batchId) -> VectorStoreFileBatch</code>
 - <code title="post /vector_stores/{vector_store_id}/file_batches/{batch_id}/cancel">client.beta.vectorStores.fileBatches.<a href="./src/resources/beta/vector-stores/file-batches.ts">cancel</a>(vectorStoreId, batchId) -> VectorStoreFileBatch</code>
 - <code title="get /vector_stores/{vector_store_id}/file_batches/{batch_id}/files">client.beta.vectorStores.fileBatches.<a href="./src/resources/beta/vector-stores/file-batches.ts">listFiles</a>(vectorStoreId, batchId, { ...params }) -> VectorStoreFilesPage</code>
-- <code>client.beta.vectorStores.fileBatches.<a href="./src/resources/beta/vector-stores/file-batches.ts">createAndPoll</a>(vectorStoreId, body, options?) -> Promise&lt;VectorStoreFileBatch&gt;</code>
-- <code>client.beta.vectorStores.fileBatches.<a href="./src/resources/beta/vector-stores/file-batches.ts">poll</a>(vectorStoreId, batchId, options?) -> Promise&lt;VectorStoreFileBatch&gt;</code>
-- <code>client.beta.vectorStores.fileBatches.<a href="./src/resources/beta/vector-stores/file-batches.ts">uploadAndPoll</a>(vectorStoreId, { files, fileIds = [] }, options?) -> Promise&lt;VectorStoreFileBatch&gt;</code>
-
-## Chat
-
-### Completions
-
-Methods:
-
-- <code>client.beta.chat.completions.<a href="./src/resources/beta/chat/completions.ts">runFunctions</a>(body, options?) -> ChatCompletionRunner | ChatCompletionStreamingRunner</code>
-- <code>client.beta.chat.completions.<a href="./src/resources/beta/chat/completions.ts">runTools</a>(body, options?) -> ChatCompletionRunner | ChatCompletionStreamingRunner</code>
-- <code>client.beta.chat.completions.<a href="./src/resources/beta/chat/completions.ts">stream</a>(body, options?) -> ChatCompletionStream</code>
 
 ## Assistants
 
@@ -282,8 +264,6 @@ Methods:
 - <code title="post /threads/{thread_id}">client.beta.threads.<a href="./src/resources/beta/threads/threads.ts">update</a>(threadId, { ...params }) -> Thread</code>
 - <code title="delete /threads/{thread_id}">client.beta.threads.<a href="./src/resources/beta/threads/threads.ts">del</a>(threadId) -> ThreadDeleted</code>
 - <code title="post /threads/runs">client.beta.threads.<a href="./src/resources/beta/threads/threads.ts">createAndRun</a>({ ...params }) -> Run</code>
-- <code>client.beta.threads.<a href="./src/resources/beta/threads/threads.ts">createAndRunPoll</a>(body, options?) -> Promise&lt;Threads.Run&gt;</code>
-- <code>client.beta.threads.<a href="./src/resources/beta/threads/threads.ts">createAndRunStream</a>(body, options?) -> AssistantStream</code>
 
 ### Runs
 
@@ -301,12 +281,6 @@ Methods:
 - <code title="get /threads/{thread_id}/runs">client.beta.threads.runs.<a href="./src/resources/beta/threads/runs/runs.ts">list</a>(threadId, { ...params }) -> RunsPage</code>
 - <code title="post /threads/{thread_id}/runs/{run_id}/cancel">client.beta.threads.runs.<a href="./src/resources/beta/threads/runs/runs.ts">cancel</a>(threadId, runId) -> Run</code>
 - <code title="post /threads/{thread_id}/runs/{run_id}/submit_tool_outputs">client.beta.threads.runs.<a href="./src/resources/beta/threads/runs/runs.ts">submitToolOutputs</a>(threadId, runId, { ...params }) -> Run</code>
-- <code>client.beta.threads.runs.<a href="./src/resources/beta/threads/runs/runs.ts">createAndPoll</a>(threadId, body, options?) -> Promise&lt;Run&gt;</code>
-- <code>client.beta.threads.runs.<a href="./src/resources/beta/threads/runs/runs.ts">createAndStream</a>(threadId, body, options?) -> AssistantStream</code>
-- <code>client.beta.threads.runs.<a href="./src/resources/beta/threads/runs/runs.ts">poll</a>(threadId, runId, options?) -> Promise&lt;Run&gt;</code>
-- <code>client.beta.threads.runs.<a href="./src/resources/beta/threads/runs/runs.ts">stream</a>(threadId, body, options?) -> AssistantStream</code>
-- <code>client.beta.threads.runs.<a href="./src/resources/beta/threads/runs/runs.ts">submitToolOutputsAndPoll</a>(threadId, runId, body, options?) -> Promise&lt;Run&gt;</code>
-- <code>client.beta.threads.runs.<a href="./src/resources/beta/threads/runs/runs.ts">submitToolOutputsStream</a>(threadId, runId, body, options?) -> AssistantStream</code>
 
 #### Steps
 
