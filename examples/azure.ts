@@ -11,8 +11,8 @@ const credential = new DefaultAzureCredential();
 const scope = 'https://cognitiveservices.azure.com/.default';
 const azureADTokenProvider = getBearerTokenProvider(credential, scope);
 
-// Make sure to set both AZURE_OPENAI_ENDPOINT with the endpoint of your Azure resource and AZURE_OPENAI_API_KEY with the API key.
-// You can find both information in the Azure Portal.
+// Make sure to set AZURE_OPENAI_ENDPOINT with the endpoint of your Azure resource.
+// You can find it in the Azure Portal.
 const openai = new AzureOpenAI({ azureADTokenProvider });
 
 async function main() {
