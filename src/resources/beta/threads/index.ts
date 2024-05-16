@@ -46,8 +46,6 @@ export {
   ThreadCreateAndRunParams,
   ThreadCreateAndRunParamsNonStreaming,
   ThreadCreateAndRunParamsStreaming,
-  ThreadCreateAndRunPollParams,
-  ThreadCreateAndRunStreamParams,
   Threads,
 } from './threads';
 export {
@@ -59,14 +57,9 @@ export {
   RunCreateParamsStreaming,
   RunUpdateParams,
   RunListParams,
-  RunCreateAndPollParams,
-  RunCreateAndStreamParams,
-  RunStreamParams,
   RunSubmitToolOutputsParams,
   RunSubmitToolOutputsParamsNonStreaming,
   RunSubmitToolOutputsParamsStreaming,
-  RunSubmitToolOutputsAndPollParams,
-  RunSubmitToolOutputsStreamParams,
   RunsPage,
   Runs,
 } from './runs/index';
