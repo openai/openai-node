@@ -1,15 +1,15 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import * as Core from 'openai/core';
-import { APIPromise } from 'openai/core';
-import { APIResource } from 'openai/resource';
-import { isRequestOptions } from 'openai/core';
-import { AssistantStream, ThreadCreateAndRunParamsBaseStream } from 'openai/lib/AssistantStream';
-import * as ThreadsAPI from 'openai/resources/beta/threads/threads';
-import * as AssistantsAPI from 'openai/resources/beta/assistants';
-import * as MessagesAPI from 'openai/resources/beta/threads/messages';
-import * as RunsAPI from 'openai/resources/beta/threads/runs/runs';
-import { Stream } from 'openai/streaming';
+import * as Core from '../../../core';
+import { APIPromise } from '../../../core';
+import { APIResource } from '../../../resource';
+import { isRequestOptions } from '../../../core';
+import { AssistantStream, ThreadCreateAndRunParamsBaseStream } from '../../../lib/AssistantStream';
+import * as ThreadsAPI from './threads';
+import * as AssistantsAPI from '../assistants';
+import * as MessagesAPI from './messages';
+import * as RunsAPI from './runs/runs';
+import { Stream } from '../../../streaming';
 
 export class Threads extends APIResource {
   runs: RunsAPI.Runs = new RunsAPI.Runs(this._client);
@@ -130,8 +130,9 @@ export interface AssistantResponseFormat {
 
 /**
  * Specifies the format that the model must output. Compatible with
- * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-and-gpt-4-turbo) and
- * all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
+ * [GPT-4o](https://platform.openai.com/docs/models/gpt-4o),
+ * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4),
+ * and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
  *
  * Setting to `{ "type": "json_object" }` enables JSON mode, which guarantees the
  * message the model generates is valid JSON.
@@ -492,6 +493,8 @@ export interface ThreadCreateAndRunParamsBase {
    */
   model?:
     | (string & {})
+    | 'gpt-4o'
+    | 'gpt-4o-2024-05-13'
     | 'gpt-4-turbo'
     | 'gpt-4-turbo-2024-04-09'
     | 'gpt-4-0125-preview'
@@ -514,8 +517,9 @@ export interface ThreadCreateAndRunParamsBase {
 
   /**
    * Specifies the format that the model must output. Compatible with
-   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-and-gpt-4-turbo) and
-   * all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
+   * [GPT-4o](https://platform.openai.com/docs/models/gpt-4o),
+   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4),
+   * and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
    *
    * Setting to `{ "type": "json_object" }` enables JSON mode, which guarantees the
    * message the model generates is valid JSON.
@@ -849,6 +853,8 @@ export interface ThreadCreateAndRunPollParams {
    */
   model?:
     | (string & {})
+    | 'gpt-4o'
+    | 'gpt-4o-2024-05-13'
     | 'gpt-4-turbo'
     | 'gpt-4-turbo-2024-04-09'
     | 'gpt-4-0125-preview'
@@ -871,8 +877,9 @@ export interface ThreadCreateAndRunPollParams {
 
   /**
    * Specifies the format that the model must output. Compatible with
-   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-and-gpt-4-turbo) and
-   * all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
+   * [GPT-4o](https://platform.openai.com/docs/models/gpt-4o),
+   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4),
+   * and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
    *
    * Setting to `{ "type": "json_object" }` enables JSON mode, which guarantees the
    * message the model generates is valid JSON.
@@ -1178,6 +1185,8 @@ export interface ThreadCreateAndRunStreamParams {
    */
   model?:
     | (string & {})
+    | 'gpt-4o'
+    | 'gpt-4o-2024-05-13'
     | 'gpt-4-turbo'
     | 'gpt-4-turbo-2024-04-09'
     | 'gpt-4-0125-preview'
@@ -1200,8 +1209,9 @@ export interface ThreadCreateAndRunStreamParams {
 
   /**
    * Specifies the format that the model must output. Compatible with
-   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-and-gpt-4-turbo) and
-   * all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
+   * [GPT-4o](https://platform.openai.com/docs/models/gpt-4o),
+   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4),
+   * and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
    *
    * Setting to `{ "type": "json_object" }` enables JSON mode, which guarantees the
    * message the model generates is valid JSON.

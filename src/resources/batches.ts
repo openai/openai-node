@@ -1,10 +1,10 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import * as Core from 'openai/core';
-import { APIResource } from 'openai/resource';
-import { isRequestOptions } from 'openai/core';
-import * as BatchesAPI from 'openai/resources/batches';
-import { CursorPage, type CursorPageParams } from 'openai/pagination';
+import * as Core from '../core';
+import { APIResource } from '../resource';
+import { isRequestOptions } from '../core';
+import * as BatchesAPI from './batches';
+import { CursorPage, type CursorPageParams } from '../pagination';
 
 export class Batches extends APIResource {
   /**
@@ -215,9 +215,11 @@ export interface BatchCreateParams {
 
   /**
    * The endpoint to be used for all requests in the batch. Currently
-   * `/v1/chat/completions` and `/v1/embeddings` are supported.
+   * `/v1/chat/completions`, `/v1/embeddings`, and `/v1/completions` are supported.
+   * Note that `/v1/embeddings` batches are also restricted to a maximum of 50,000
+   * embedding inputs across all requests in the batch.
    */
-  endpoint: '/v1/chat/completions' | '/v1/embeddings';
+  endpoint: '/v1/chat/completions' | '/v1/embeddings' | '/v1/completions';
 
   /**
    * The ID of an uploaded file that contains requests for the new batch.
@@ -227,7 +229,8 @@ export interface BatchCreateParams {
    *
    * Your input file must be formatted as a
    * [JSONL file](https://platform.openai.com/docs/api-reference/batch/requestInput),
-   * and must be uploaded with the purpose `batch`.
+   * and must be uploaded with the purpose `batch`. The file can contain up to 50,000
+   * requests, and can be up to 100 MB in size.
    */
   input_file_id: string;
 

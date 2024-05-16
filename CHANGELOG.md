@@ -1,5 +1,37 @@
 # Changelog
 
+## 4.47.1 (2024-05-14)
+
+Full Changelog: [v4.47.0...v4.47.1](https://github.com/openai/openai-node/compare/v4.47.0...v4.47.1)
+
+### Chores
+
+* **internal:** add slightly better logging to scripts ([#848](https://github.com/openai/openai-node/issues/848)) ([139e690](https://github.com/openai/openai-node/commit/139e690546775b3568934dd990dd329fce2fbc2f))
+
+## 4.47.0 (2024-05-14)
+
+Full Changelog: [v4.46.1...v4.47.0](https://github.com/openai/openai-node/compare/v4.46.1...v4.47.0)
+
+### Features
+
+* **api:** add incomplete state ([#846](https://github.com/openai/openai-node/issues/846)) ([5f663a1](https://github.com/openai/openai-node/commit/5f663a167361b905c6d0c1242e8a78037a7e4a57))
+
+## 4.46.1 (2024-05-13)
+
+Full Changelog: [v4.46.0...v4.46.1](https://github.com/openai/openai-node/compare/v4.46.0...v4.46.1)
+
+### Refactors
+
+* change import paths to be relative ([#843](https://github.com/openai/openai-node/issues/843)) ([7913574](https://github.com/openai/openai-node/commit/7913574bdb6fcbcf68e56e8def351add6c43310a))
+
+## 4.46.0 (2024-05-13)
+
+Full Changelog: [v4.45.0...v4.46.0](https://github.com/openai/openai-node/compare/v4.45.0...v4.46.0)
+
+### Features
+
+* **api:** add gpt-4o model ([#841](https://github.com/openai/openai-node/issues/841)) ([c818ed1](https://github.com/openai/openai-node/commit/c818ed139bfba81af6ca3c4eda08d52366758529))
+
 ## 4.45.0 (2024-05-11)
 
 Full Changelog: [v4.44.0...v4.45.0](https://github.com/openai/openai-node/compare/v4.44.0...v4.45.0)

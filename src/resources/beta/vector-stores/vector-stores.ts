@@ -1,12 +1,12 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import * as Core from 'openai/core';
-import { APIResource } from 'openai/resource';
-import { isRequestOptions } from 'openai/core';
-import * as VectorStoresAPI from 'openai/resources/beta/vector-stores/vector-stores';
-import * as FileBatchesAPI from 'openai/resources/beta/vector-stores/file-batches';
-import * as FilesAPI from 'openai/resources/beta/vector-stores/files';
-import { CursorPage, type CursorPageParams } from 'openai/pagination';
+import * as Core from '../../../core';
+import { APIResource } from '../../../resource';
+import { isRequestOptions } from '../../../core';
+import * as VectorStoresAPI from './vector-stores';
+import * as FileBatchesAPI from './file-batches';
+import * as FilesAPI from './files';
+import { CursorPage, type CursorPageParams } from '../../../pagination';
 
 export class VectorStores extends APIResource {
   files: FilesAPI.Files = new FilesAPI.Files(this._client);

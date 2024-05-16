@@ -1,8 +1,8 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import * as Core from 'openai/core';
-import { APIResource } from 'openai/resource';
-import * as EmbeddingsAPI from 'openai/resources/embeddings';
+import * as Core from '../core';
+import { APIResource } from '../resource';
+import * as EmbeddingsAPI from './embeddings';
 
 export class Embeddings extends APIResource {
   /**

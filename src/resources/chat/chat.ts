@@ -1,14 +1,16 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from 'openai/resource';
-import * as ChatAPI from 'openai/resources/chat/chat';
-import * as CompletionsAPI from 'openai/resources/chat/completions';
+import { APIResource } from '../../resource';
+import * as ChatAPI from './chat';
+import * as CompletionsAPI from './completions';
 
 export class Chat extends APIResource {
   completions: CompletionsAPI.Completions = new CompletionsAPI.Completions(this._client);
 }
 
 export type ChatModel =
+  | 'gpt-4o'
+  | 'gpt-4o-2024-05-13'
   | 'gpt-4-turbo'
   | 'gpt-4-turbo-2024-04-09'
   | 'gpt-4-0125-preview'

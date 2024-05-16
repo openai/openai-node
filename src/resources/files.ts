@@ -1,25 +1,29 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import * as Core from 'openai/core';
-import { APIResource } from 'openai/resource';
-import { isRequestOptions } from 'openai/core';
-import { type Response } from 'openai/_shims/index';
-import { sleep } from 'openai/core';
-import { APIConnectionTimeoutError } from 'openai/error';
-import * as FilesAPI from 'openai/resources/files';
-import { type Uploadable, multipartFormRequestOptions } from 'openai/core';
-import { Page } from 'openai/pagination';
+import * as Core from '../core';
+import { APIResource } from '../resource';
+import { isRequestOptions } from '../core';
+import { type Response } from '../_shims/index';
+import { sleep } from '../core';
+import { APIConnectionTimeoutError } from '../error';
+import * as FilesAPI from './files';
+import { type Uploadable, multipartFormRequestOptions } from '../core';
+import { Page } from '../pagination';
 
 export class Files extends APIResource {
   /**
-   * Upload a file that can be used across various endpoints. The size of all the
-   * files uploaded by one organization can be up to 100 GB.
+   * Upload a file that can be used across various endpoints. Individual files can be
+   * up to 512 MB, and the size of all files uploaded by one organization can be up
+   * to 100 GB.
    *
-   * The size of individual files can be a maximum of 512 MB or 2 million tokens for
-   * Assistants. See the
-   * [Assistants Tools guide](https://platform.openai.com/docs/assistants/tools) to
-   * learn more about the types of files supported. The Fine-tuning API only supports
-   * `.jsonl` files.
+   * The Assistants API supports files up to 2 million tokens and of specific file
+   * types. See the
+   * [Assistants Tools guide](https://platform.openai.com/docs/assistants/tools) for
+   * details.
+   *
+   * The Fine-tuning API only supports `.jsonl` files.
+   *
+   * The Batch API only supports `.jsonl` files up to 100 MB in size.
    *
    * Please [contact us](https://help.openai.com/) if you need to increase these
    * storage limits.

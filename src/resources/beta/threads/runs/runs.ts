@@ -1,19 +1,19 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import * as Core from 'openai/core';
-import { APIPromise } from 'openai/core';
-import { APIResource } from 'openai/resource';
-import { isRequestOptions } from 'openai/core';
-import { AssistantStream, RunCreateParamsBaseStream } from 'openai/lib/AssistantStream';
-import { sleep } from 'openai/core';
-import { RunSubmitToolOutputsParamsStream } from 'openai/lib/AssistantStream';
-import * as RunsAPI from 'openai/resources/beta/threads/runs/runs';
-import * as AssistantsAPI from 'openai/resources/beta/assistants';
-import * as MessagesAPI from 'openai/resources/beta/threads/messages';
-import * as ThreadsAPI from 'openai/resources/beta/threads/threads';
-import * as StepsAPI from 'openai/resources/beta/threads/runs/steps';
-import { CursorPage, type CursorPageParams } from 'openai/pagination';
-import { Stream } from 'openai/streaming';
+import * as Core from '../../../../core';
+import { APIPromise } from '../../../../core';
+import { APIResource } from '../../../../resource';
+import { isRequestOptions } from '../../../../core';
+import { AssistantStream, RunCreateParamsBaseStream } from '../../../../lib/AssistantStream';
+import { sleep } from '../../../../core';
+import { RunSubmitToolOutputsParamsStream } from '../../../../lib/AssistantStream';
+import * as RunsAPI from './runs';
+import * as AssistantsAPI from '../../assistants';
+import * as MessagesAPI from '../messages';
+import * as ThreadsAPI from '../threads';
+import * as StepsAPI from './steps';
+import { CursorPage, type CursorPageParams } from '../../../../pagination';
+import { Stream } from '../../../../streaming';
 
 export class Runs extends APIResource {
   steps: StepsAPI.Steps = new StepsAPI.Steps(this._client);
@@ -176,6 +176,7 @@ export class Runs extends APIResource {
           break;
         //We return the run in any terminal state.
         case 'requires_action':
+        case 'incomplete':
         case 'cancelled':
         case 'completed':
         case 'failed':
@@ -409,8 +410,9 @@ export interface Run {
 
   /**
    * Specifies the format that the model must output. Compatible with
-   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-and-gpt-4-turbo) and
-   * all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
+   * [GPT-4o](https://platform.openai.com/docs/models/gpt-4o),
+   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4),
+   * and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
    *
    * Setting to `{ "type": "json_object" }` enables JSON mode, which guarantees the
    * message the model generates is valid JSON.
@@ -432,8 +434,8 @@ export interface Run {
 
   /**
    * The status of the run, which can be either `queued`, `in_progress`,
-   * `requires_action`, `cancelling`, `cancelled`, `failed`, `completed`, or
-   * `expired`.
+   * `requires_action`, `cancelling`, `cancelled`, `failed`, `completed`,
+   * `incomplete`, or `expired`.
    */
   status: RunStatus;
 
@@ -584,8 +586,8 @@ export namespace Run {
 
 /**
  * The status of the run, which can be either `queued`, `in_progress`,
- * `requires_action`, `cancelling`, `cancelled`, `failed`, `completed`, or
- * `expired`.
+ * `requires_action`, `cancelling`, `cancelled`, `failed`, `completed`,
+ * `incomplete`, or `expired`.
  */
 export type RunStatus =
   | 'queued'
@@ -595,6 +597,7 @@ export type RunStatus =
   | 'cancelled'
   | 'failed'
   | 'completed'
+  | 'incomplete'
   | 'expired';
 
 export type RunCreateParams = RunCreateParamsNonStreaming | RunCreateParamsStreaming;
@@ -660,6 +663,8 @@ export interface RunCreateParamsBase {
    */
   model?:
     | (string & {})
+    | 'gpt-4o'
+    | 'gpt-4o-2024-05-13'
     | 'gpt-4-turbo'
     | 'gpt-4-turbo-2024-04-09'
     | 'gpt-4-0125-preview'
@@ -682,8 +687,9 @@ export interface RunCreateParamsBase {
 
   /**
    * Specifies the format that the model must output. Compatible with
-   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-and-gpt-4-turbo) and
-   * all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
+   * [GPT-4o](https://platform.openai.com/docs/models/gpt-4o),
+   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4),
+   * and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
    *
    * Setting to `{ "type": "json_object" }` enables JSON mode, which guarantees the
    * message the model generates is valid JSON.
@@ -919,6 +925,8 @@ export interface RunCreateAndPollParams {
    */
   model?:
     | (string & {})
+    | 'gpt-4o'
+    | 'gpt-4o-2024-05-13'
     | 'gpt-4-turbo'
     | 'gpt-4-turbo-2024-04-09'
     | 'gpt-4-0125-preview'
@@ -941,8 +949,9 @@ export interface RunCreateAndPollParams {
 
   /**
    * Specifies the format that the model must output. Compatible with
-   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-and-gpt-4-turbo) and
-   * all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
+   * [GPT-4o](https://platform.openai.com/docs/models/gpt-4o),
+   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4),
+   * and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
    *
    * Setting to `{ "type": "json_object" }` enables JSON mode, which guarantees the
    * message the model generates is valid JSON.
@@ -1124,6 +1133,8 @@ export interface RunCreateAndStreamParams {
    */
   model?:
     | (string & {})
+    | 'gpt-4o'
+    | 'gpt-4o-2024-05-13'
     | 'gpt-4-turbo'
     | 'gpt-4-turbo-2024-04-09'
     | 'gpt-4-0125-preview'
@@ -1146,8 +1157,9 @@ export interface RunCreateAndStreamParams {
 
   /**
    * Specifies the format that the model must output. Compatible with
-   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-and-gpt-4-turbo) and
-   * all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
+   * [GPT-4o](https://platform.openai.com/docs/models/gpt-4o),
+   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4),
+   * and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
    *
    * Setting to `{ "type": "json_object" }` enables JSON mode, which guarantees the
    * message the model generates is valid JSON.
@@ -1329,6 +1341,8 @@ export interface RunStreamParams {
    */
   model?:
     | (string & {})
+    | 'gpt-4o'
+    | 'gpt-4o-2024-05-13'
     | 'gpt-4-turbo'
     | 'gpt-4-turbo-2024-04-09'
     | 'gpt-4-0125-preview'
@@ -1351,8 +1365,9 @@ export interface RunStreamParams {
 
   /**
    * Specifies the format that the model must output. Compatible with
-   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-and-gpt-4-turbo) and
-   * all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
+   * [GPT-4o](https://platform.openai.com/docs/models/gpt-4o),
+   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4),
+   * and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
    *
    * Setting to `{ "type": "json_object" }` enables JSON mode, which guarantees the
    * message the model generates is valid JSON.

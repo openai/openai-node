@@ -1,15 +1,15 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import * as Core from 'openai/core';
-import { APIResource } from 'openai/resource';
-import { isRequestOptions } from 'openai/core';
-import * as AssistantsAPI from 'openai/resources/beta/assistants';
-import * as Shared from 'openai/resources/shared';
-import * as MessagesAPI from 'openai/resources/beta/threads/messages';
-import * as ThreadsAPI from 'openai/resources/beta/threads/threads';
-import * as RunsAPI from 'openai/resources/beta/threads/runs/runs';
-import * as StepsAPI from 'openai/resources/beta/threads/runs/steps';
-import { CursorPage, type CursorPageParams } from 'openai/pagination';
+import * as Core from '../../core';
+import { APIResource } from '../../resource';
+import { isRequestOptions } from '../../core';
+import * as AssistantsAPI from './assistants';
+import * as Shared from '../shared';
+import * as MessagesAPI from './threads/messages';
+import * as ThreadsAPI from './threads/threads';
+import * as RunsAPI from './threads/runs/runs';
+import * as StepsAPI from './threads/runs/steps';
+import { CursorPage, type CursorPageParams } from '../../pagination';
 
 export class Assistants extends APIResource {
   /**
@@ -144,8 +144,9 @@ export interface Assistant {
 
   /**
    * Specifies the format that the model must output. Compatible with
-   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-and-gpt-4-turbo) and
-   * all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
+   * [GPT-4o](https://platform.openai.com/docs/models/gpt-4o),
+   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4),
+   * and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
    *
    * Setting to `{ "type": "json_object" }` enables JSON mode, which guarantees the
    * message the model generates is valid JSON.
@@ -1000,6 +1001,8 @@ export interface AssistantCreateParams {
    */
   model:
     | (string & {})
+    | 'gpt-4o'
+    | 'gpt-4o-2024-05-13'
     | 'gpt-4-turbo'
     | 'gpt-4-turbo-2024-04-09'
     | 'gpt-4-0125-preview'
@@ -1045,8 +1048,9 @@ export interface AssistantCreateParams {
 
   /**
    * Specifies the format that the model must output. Compatible with
-   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-and-gpt-4-turbo) and
-   * all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
+   * [GPT-4o](https://platform.openai.com/docs/models/gpt-4o),
+   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4),
+   * and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
    *
    * Setting to `{ "type": "json_object" }` enables JSON mode, which guarantees the
    * message the model generates is valid JSON.
@@ -1191,8 +1195,9 @@ export interface AssistantUpdateParams {
 
   /**
    * Specifies the format that the model must output. Compatible with
-   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-and-gpt-4-turbo) and
-   * all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
+   * [GPT-4o](https://platform.openai.com/docs/models/gpt-4o),
+   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4),
+   * and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
    *
    * Setting to `{ "type": "json_object" }` enables JSON mode, which guarantees the
    * message the model generates is valid JSON.
