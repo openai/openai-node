@@ -1,5 +1,14 @@
 # Changelog
 
+## 4.47.2 (2024-05-16)
+
+Full Changelog: [v4.47.1...v4.47.2](https://github.com/openai/openai-node/compare/v4.47.1...v4.47.2)
+
+### Chores
+
+* **internal:** add back reverted code ([f1aafc6](https://github.com/openai/openai-node/commit/f1aafc6418df8a532ddb8d384266a6d09c8ef5df))
+* **internal:** temporarily remove some code for migration ([#853](https://github.com/openai/openai-node/issues/853)) ([e9dfe9b](https://github.com/openai/openai-node/commit/e9dfe9b45410c89fdaa38c5ed909c67a978fb42b))
+
 ## 4.47.1 (2024-05-14)
 
 Full Changelog: [v4.47.0...v4.47.1](https://github.com/openai/openai-node/compare/v4.47.0...v4.47.1)
