@@ -1,0 +1,16 @@
+{
+  "name": "openai-bun-test",
+  "module": "index.ts",
+  "type": "module",
+  "engines": {
+    "bun": ">=1.0.0"
+  },
+  "scripts": {
+    "tsc": "tsc"
+  },
+  "devDependencies": {
+    "fastest-levenshtein": "^1.0.16",
+    "bun-types": "latest",
+    "typescript": "5.0.4"
+  }
+}

@@ -31,9 +31,12 @@ export {
   ThreadCreateAndRunParams,
   ThreadCreateAndRunParamsNonStreaming,
   ThreadCreateAndRunParamsStreaming,
+  ThreadCreateAndRunPollParams,
+  ThreadCreateAndRunStreamParams,
   Threads,
 } from './threads/index';
 export { Beta } from './beta';
+export { Chat } from './chat/index';
 export {
   VectorStore,
   VectorStoreDeleted,

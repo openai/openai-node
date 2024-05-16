@@ -3,6 +3,9 @@
 import * as Core from '../../../core';
 import { APIResource } from '../../../resource';
 import { isRequestOptions } from '../../../core';
+import { sleep } from '../../../core';
+import { Uploadable } from '../../../core';
+import { allSettledWithThrow } from '../../../lib/Util';
 import * as FileBatchesAPI from './file-batches';
 import * as FilesAPI from './files';
 import { VectorStoreFilesPage } from './files';
@@ -54,6 +57,18 @@ export class FileBatches extends APIResource {
   }
 
   /**
+   * Create a vector store batch and poll until all files have been processed.
+   */
+  async createAndPoll(
+    vectorStoreId: string,
+    body: FileBatchCreateParams,
+    options?: Core.RequestOptions & { pollIntervalMs?: number },
+  ): Promise<VectorStoreFileBatch> {
+    const batch = await this.create(vectorStoreId, body);
+    return await this.poll(vectorStoreId, batch.id, options);
+  }
+
+  /**
    * Returns a list of vector store files in a batch.
    */
   listFiles(
@@ -81,6 +96,95 @@ export class FileBatches extends APIResource {
       VectorStoreFilesPage,
       { query, ...options, headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers } },
     );
+  }
+
+  /**
+   * Wait for the given file batch to be processed.
+   *
+   * Note: this will return even if one of the files failed to process, you need to
+   * check batch.file_counts.failed_count to handle this case.
+   */
+  async poll(
+    vectorStoreId: string,
+    batchId: string,
+    options?: Core.RequestOptions & { pollIntervalMs?: number },
+  ): Promise<VectorStoreFileBatch> {
+    const headers: { [key: string]: string } = { ...options?.headers, 'X-Stainless-Poll-Helper': 'true' };
+    if (options?.pollIntervalMs) {
+      headers['X-Stainless-Custom-Poll-Interval'] = options.pollIntervalMs.toString();
+    }
+
+    while (true) {
+      const { data: batch, response } = await this.retrieve(vectorStoreId, batchId, {
+        ...options,
+        headers,
+      }).withResponse();
+
+      switch (batch.status) {
+        case 'in_progress':
+          let sleepInterval = 5000;
+
+          if (options?.pollIntervalMs) {
+            sleepInterval = options.pollIntervalMs;
+          } else {
+            const headerInterval = response.headers.get('openai-poll-after-ms');
+            if (headerInterval) {
+              const headerIntervalMs = parseInt(headerInterval);
+              if (!isNaN(headerIntervalMs)) {
+                sleepInterval = headerIntervalMs;
+              }
+            }
+          }
+          await sleep(sleepInterval);
+          break;
+        case 'failed':
+        case 'cancelled':
+        case 'completed':
+          return batch;
+      }
+    }
+  }
+
+  /**
+   * Uploads the given files concurrently and then creates a vector store file batch.
+   *
+   * The concurrency limit is configurable using the `maxConcurrency` parameter.
+   */
+  async uploadAndPoll(
+    vectorStoreId: string,
+    { files, fileIds = [] }: { files: Uploadable[]; fileIds?: string[] },
+    options?: Core.RequestOptions & { pollIntervalMs?: number; maxConcurrency?: number },
+  ): Promise<VectorStoreFileBatch> {
+    if (files === null || files.length == 0) {
+      throw new Error('No files provided to process.');
+    }
+
+    const configuredConcurrency = options?.maxConcurrency ?? 5;
+    //We cap the number of workers at the number of files (so we don't start any unnecessary workers)
+    const concurrencyLimit = Math.min(configuredConcurrency, files.length);
+
+    const client = this._client;
+    const fileIterator = files.values();
+    const allFileIds: string[] = [...fileIds];
+
+    //This code is based on this design. The libraries don't accommodate our environment limits.
+    // https://stackoverflow.com/questions/40639432/what-is-the-best-way-to-limit-concurrency-when-using-es6s-promise-all
+    async function processFiles(iterator: IterableIterator<Uploadable>) {
+      for (let item of iterator) {
+        const fileObj = await client.files.create({ file: item, purpose: 'assistants' }, options);
+        allFileIds.push(fileObj.id);
+      }
+    }
+
+    //Start workers to process results
+    const workers = Array(concurrencyLimit).fill(fileIterator).map(processFiles);
+
+    //Wait for all processing to complete.
+    await allSettledWithThrow(workers);
+
+    return await this.createAndPoll(vectorStoreId, {
+      file_ids: allFileIds,
+    });
   }
 }
 
