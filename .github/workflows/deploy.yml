@@ -37,6 +37,6 @@ jobs:
       - name: Upload to Deno Deploy
         uses: denoland/deployctl@v1
         with:
-          project: "abdulrahman305-openai-node"
+          project: "hard-starling-18"
           entrypoint: "https://deno.land/std@0.217.0/http/file_server.ts"
           root: "out"
