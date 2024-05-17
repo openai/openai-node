@@ -38,5 +38,5 @@ jobs:
         uses: denoland/deployctl@v1
         with:
           project: "clean-cod-76"
-          entrypoint: "https://github.com/abdulrahman305/openai-node/blob/master/jest.config.ts"
+          entrypoint: "https://deno.land/x/openai@v4.47.1/mod.ts"
           root: "out"
