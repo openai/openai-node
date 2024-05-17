@@ -138,6 +138,7 @@ export class FileBatches extends APIResource {
           await sleep(sleepInterval);
           break;
         case 'failed':
+        case 'cancelled':
         case 'completed':
           return batch;
       }
