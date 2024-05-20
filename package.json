@@ -1,12 +1,12 @@
 {
-  "name": "openai",
+  "name": "@janhq/openai-node",
   "version": "4.47.1",
-  "description": "The official TypeScript library for the OpenAI API",
-  "author": "OpenAI <support@openai.com>",
+  "description": "Forked version of the OpenAI Node.js client library",
+  "author": "Jan <service@jan.ai>",
   "types": "dist/index.d.ts",
   "main": "dist/index.js",
   "type": "commonjs",
-  "repository": "github:openai/openai-node",
+  "repository": "github:janhq/cortex-node",
   "license": "Apache-2.0",
   "packageManager": "yarn@1.22.22",
   "files": [
