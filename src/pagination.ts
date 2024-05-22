@@ -87,8 +87,8 @@ export class CursorPage<Item extends { id: string }>
     if (!data.length) {
       return null;
     }
-
-    const id = data[data.length - 1]?.id;
+    const lastindexofdata =  data.length - 1;
+    const id = data[lastindexofdata]?.id;
     if (!id) {
       return null;
     }
