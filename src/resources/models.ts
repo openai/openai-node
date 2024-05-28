@@ -29,6 +29,13 @@ export class Models extends APIResource {
   del(model: string, options?: Core.RequestOptions): Core.APIPromise<ModelDeleted> {
     return this._client.delete(`/models/${model}`, options);
   }
+
+   /**
+   * Start a model instance, providing basic information about the model such as the
+   */
+   start(model: string, options?: Core.RequestOptions): Core.APIPromise<Model> {
+    return this._client.post(`/models/${model}/start`, options);
+  }
 }
 
 /**
