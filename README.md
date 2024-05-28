@@ -1,6 +1,6 @@
 # OpenAI Node API Library
 
-[![NPM version](https://img.shields.io/npm/v/openai.svg)](https://npmjs.org/package/openai)
+[![NPM version](https://img.shields.io/npm/v/openai.svg)](https://npmjs.org/package/openai) ![npm bundle size](https://img.shields.io/bundlephobia/minzip/openai)
 
 This library provides convenient access to the OpenAI REST API from TypeScript or JavaScript.
 
