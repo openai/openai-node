@@ -500,3 +500,4 @@ const API_KEY_SENTINEL = '<Missing Key>';
 // ---------------------- End Azure ----------------------
 
 export default OpenAI;
+export { OpenAI as Cortex };

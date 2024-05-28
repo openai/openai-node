@@ -10,6 +10,12 @@ import * as AssistantsAPI from '../assistants';
 import * as MessagesAPI from './messages';
 import * as RunsAPI from './runs/runs';
 import { Stream } from '../../../streaming';
+import { Page } from 'openai/pagination';
+
+/**
+ * Note: no pagination actually occurs yet, this is for forwards-compatibility.
+ */
+export class ThreadsPage extends Page<Thread> {}
 
 export class Threads extends APIResource {
   runs: RunsAPI.Runs = new RunsAPI.Runs(this._client);
@@ -32,6 +38,13 @@ export class Threads extends APIResource {
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
     });
+  }
+
+  /**
+   * Lists threads
+   */
+  list(options?: Core.RequestOptions): Core.PagePromise<ThreadsPage, Thread> {
+    return this._client.getAPIList('/threads', ThreadsPage, options);
   }
 
   /**
