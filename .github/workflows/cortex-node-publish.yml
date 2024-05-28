@@ -1,0 +1,36 @@
+name: Publish cortex js Package to npmjs
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+
+jobs:
+  build-and-publish-plugins:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: "0"
+
+      - name: Install jq
+        uses: dcarbone/install-jq-action@v2.0.1
+
+      - name: "Update version by tag"
+        run: |
+          # Remove the v prefix
+          new_version=${GITHUB_REF#refs/tags/v}
+
+          # Replace the old version with the new version in package.json
+          jq --arg version "$new_version" '.version = $version' ./package.json > /tmp/package.json && mv /tmp/package.json ./package.json
+
+          # Print the new version
+          echo "Updated package.json version to: $new_version"
+
+      # Setup .npmrc file to publish to npm
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "20.x"
+          registry-url: "https://registry.npmjs.org"
+      - run: yarn install
+      - run: bash ./bin/publish-npm
+        env:
+            NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
