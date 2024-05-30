@@ -35,7 +35,7 @@ async function main() {
   console.log('Created thread with Id: ' + thread.id);
 
   const run = await openai.beta.threads.runs.createAndPoll(thread.id, {
-    assistant_id: assistantId,
+    assistant_id: assistant.id,
     additional_instructions: 'Please address the user as Jane Doe. The user has a premium account.',
   });
 
