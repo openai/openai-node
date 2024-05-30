@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.47.2 (2024-05-28)
+
+Full Changelog: [v4.47.1...v4.47.2](https://github.com/openai/openai-node/compare/v4.47.1...v4.47.2)
+
+### Documentation
+
+* **readme:** add bundle size badge ([#869](https://github.com/openai/openai-node/issues/869)) ([e252132](https://github.com/openai/openai-node/commit/e2521327b7b4f5abe97e4c58c417b37d00079ef8))
+
 ## 4.47.1 (2024-05-14)
 
 Full Changelog: [v4.47.0...v4.47.1](https://github.com/openai/openai-node/compare/v4.47.0...v4.47.1)
