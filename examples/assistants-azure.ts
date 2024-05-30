@@ -1,18 +1,20 @@
 #!/usr/bin/env -S npm run tsn -T
 
 import { AzureOpenAI } from 'openai';
+import { getBearerTokenProvider, DefaultAzureCredential } from '@azure/identity';
+
+const credential = new DefaultAzureCredential();
+const scope = 'https://cognitiveservices.azure.com/.default';
+const azureADTokenProvider = getBearerTokenProvider(credential, scope);
+
+const apiVersion = '2024-05-01-preview';
+// Make sure to set AZURE_OPENAI_ENDPOINT with the endpoint of your Azure resource.
+// You can find it in the Azure Portal.
+const openai = new AzureOpenAI({ azureADTokenProvider, apiVersion });
 
 /**
  * Example of polling for a complete response from an assistant
  */
-const apiVersion = '2024-05-01-preview';
-const openai = new AzureOpenAI({
-  endpoint:'https://YOUR_AZURE_OPENAI_RESOURCE_NAME.openai.azure.com/',
-  apiKey: 'YOUR_AZURE_API_KEY',
-  apiVersion
-});
-
-
 async function main() {
   const assistant = await openai.beta.assistants.create({
     model: 'gpt-4',
