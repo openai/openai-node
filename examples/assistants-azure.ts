@@ -18,7 +18,6 @@ async function main() {
     model: 'gpt-4',
     name: 'Math Tutor',
     instructions: 'You are a personal math tutor. Write and run code to answer math questions.',
-    // tools = [],
   });
 
   console.log('Created Assistant with Id: ' + assistant.id);
