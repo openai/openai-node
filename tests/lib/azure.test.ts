@@ -290,7 +290,7 @@ describe('azure request building', () => {
         fetch: testFetch,
       });
 
-      test('handles Batch', async () => {
+      test('handles batch', async () => {
         expect(
           await client.batches.create({
             completion_window: '24h',
@@ -298,7 +298,7 @@ describe('azure request building', () => {
             input_file_id: 'file-id',
           }),
         ).toStrictEqual({
-          url: `https://example.com/openai/deployments/${deployment}/batches?api-version=${apiVersion}`,
+          url: `https://example.com/openai/batches?api-version=${apiVersion}`,
         });
       });
 
@@ -423,7 +423,7 @@ describe('azure request building', () => {
         fetch: testFetch,
       });
 
-      test('Batch is not handled', async () => {
+      test('handles batch', async () => {
         expect(
           await client.batches.create({
             completion_window: '24h',
