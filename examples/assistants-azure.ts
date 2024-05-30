@@ -42,7 +42,7 @@ async function main() {
 
   if (run.status == 'completed') {
     const messages = await openai.beta.threads.messages.list(thread.id);
-    for (const message of messages.getPaginatedItems()) {
+    for await (const message of messages) {
       console.log(message);
     }
   }
