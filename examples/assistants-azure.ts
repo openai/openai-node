@@ -5,7 +5,7 @@ import { AzureOpenAI } from 'openai';
 /**
  * Example of polling for a complete response from an assistant
  */
-const apiVersion = '2024-02-15-preview';
+const apiVersion = '2024-05-01-preview';
 const openai = new AzureOpenAI({
   endpoint:'https://YOUR_AZURE_OPENAI_RESOURCE_NAME.openai.azure.com/',
   apiKey: 'YOUR_AZURE_API_KEY',
