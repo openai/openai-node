@@ -21,8 +21,7 @@ async function main() {
     // tools = [],
   });
 
-  let assistantId = assistant.id;
-  console.log('Created Assistant with Id: ' + assistantId);
+  console.log('Created Assistant with Id: ' + assistant.id);
 
   const thread = await openai.beta.threads.create({
     messages: [
