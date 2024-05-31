@@ -16,7 +16,6 @@
   "scripts": {
     "test": "./scripts/test",
     "build": "./scripts/build",
-    "prepack": "echo 'to pack, run yarn build && (cd dist; yarn pack)' && exit 1",
     "prepublishOnly": "echo 'to publish, run yarn build && (cd dist; yarn publish)' && exit 1",
     "format": "prettier --write --cache --cache-strategy metadata . !dist",
     "prepare": "if ./scripts/utils/check-is-in-git-install.sh; then ./scripts/build; fi",
