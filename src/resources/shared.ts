@@ -25,8 +25,8 @@ export interface FunctionDefinition {
 
   /**
    * The parameters the functions accepts, described as a JSON Schema object. See the
-   * [guide](https://platform.openai.com/docs/guides/text-generation/function-calling)
-   * for examples, and the
+   * [guide](https://platform.openai.com/docs/guides/function-calling) for examples,
+   * and the
    * [JSON Schema reference](https://json-schema.org/understanding-json-schema/) for
    * documentation about the format.
    *
@@ -37,8 +37,8 @@ export interface FunctionDefinition {
 
 /**
  * The parameters the functions accepts, described as a JSON Schema object. See the
- * [guide](https://platform.openai.com/docs/guides/text-generation/function-calling)
- * for examples, and the
+ * [guide](https://platform.openai.com/docs/guides/function-calling) for examples,
+ * and the
  * [JSON Schema reference](https://json-schema.org/understanding-json-schema/) for
  * documentation about the format.
  *
