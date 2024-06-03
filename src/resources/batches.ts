@@ -37,7 +37,9 @@ export class Batches extends APIResource {
   }
 
   /**
-   * Cancels an in-progress batch.
+   * Cancels an in-progress batch. The batch will be in status `cancelling` for up to
+   * 10 minutes, before changing to `cancelled`, where it will have partial results
+   * (if any) available in the output file.
    */
   cancel(batchId: string, options?: Core.RequestOptions): Core.APIPromise<Batch> {
     return this._client.post(`/batches/${batchId}/cancel`, options);
@@ -228,7 +230,7 @@ export interface BatchCreateParams {
    * for how to upload a file.
    *
    * Your input file must be formatted as a
-   * [JSONL file](https://platform.openai.com/docs/api-reference/batch/requestInput),
+   * [JSONL file](https://platform.openai.com/docs/api-reference/batch/request-input),
    * and must be uploaded with the purpose `batch`. The file can contain up to 50,000
    * requests, and can be up to 100 MB in size.
    */

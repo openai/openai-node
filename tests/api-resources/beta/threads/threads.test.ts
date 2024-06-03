@@ -132,7 +132,13 @@ describe('resource threads', () => {
             code_interpreter: { file_ids: ['string', 'string', 'string'] },
             file_search: {
               vector_store_ids: ['string'],
-              vector_stores: [{ file_ids: ['string', 'string', 'string'], metadata: {} }],
+              vector_stores: [
+                {
+                  file_ids: ['string', 'string', 'string'],
+                  chunking_strategy: { type: 'auto' },
+                  metadata: {},
+                },
+              ],
             },
           },
         },
@@ -310,7 +316,9 @@ describe('resource threads', () => {
           code_interpreter: { file_ids: ['string', 'string', 'string'] },
           file_search: {
             vector_store_ids: ['string'],
-            vector_stores: [{ file_ids: ['string', 'string', 'string'], metadata: {} }],
+            vector_stores: [
+              { file_ids: ['string', 'string', 'string'], chunking_strategy: { type: 'auto' }, metadata: {} },
+            ],
           },
         },
         metadata: {},
