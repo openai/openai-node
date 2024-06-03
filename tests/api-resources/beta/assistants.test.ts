@@ -33,7 +33,9 @@ describe('resource assistants', () => {
         code_interpreter: { file_ids: ['string', 'string', 'string'] },
         file_search: {
           vector_store_ids: ['string'],
-          vector_stores: [{ file_ids: ['string', 'string', 'string'], metadata: {} }],
+          vector_stores: [
+            { file_ids: ['string', 'string', 'string'], chunking_strategy: { type: 'auto' }, metadata: {} },
+          ],
         },
       },
       tools: [{ type: 'code_interpreter' }, { type: 'code_interpreter' }, { type: 'code_interpreter' }],

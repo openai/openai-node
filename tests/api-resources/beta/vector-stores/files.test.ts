@@ -21,7 +21,10 @@ describe('resource files', () => {
   });
 
   test('create: required and optional params', async () => {
-    const response = await openai.beta.vectorStores.files.create('vs_abc123', { file_id: 'string' });
+    const response = await openai.beta.vectorStores.files.create('vs_abc123', {
+      file_id: 'string',
+      chunking_strategy: { type: 'auto' },
+    });
   });
 
   test('retrieve', async () => {
