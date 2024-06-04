@@ -1,5 +1,5 @@
-import * as Core from 'openai/core';
-import { APIUserAbortError, OpenAIError } from 'openai/error';
+import * as Core from '../core';
+import { APIUserAbortError, OpenAIError } from '../error';
 import { Run, RunSubmitToolOutputsParamsBase } from 'openai/resources/beta/threads/runs/runs';
 import { RunCreateParamsBase, Runs } from 'openai/resources/beta/threads/runs/runs';
 import { ThreadCreateAndRunParamsBase, Threads } from 'openai/resources/beta/threads/threads';

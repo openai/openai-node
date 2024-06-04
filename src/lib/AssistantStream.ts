@@ -9,8 +9,8 @@ import {
   Messages,
   MessageContent,
 } from 'openai/resources/beta/threads/messages';
-import * as Core from 'openai/core';
-import { RequestOptions } from 'openai/core';
+import * as Core from '../core';
+import { RequestOptions } from '../core';
 import {
   Run,
   RunCreateParamsBase,
@@ -24,8 +24,8 @@ import {
   AbstractAssistantStreamRunner,
 } from './AbstractAssistantStreamRunner';
 import { type ReadableStream } from 'openai/_shims/index';
-import { Stream } from 'openai/streaming';
-import { APIUserAbortError, OpenAIError } from 'openai/error';
+import { Stream } from '../streaming';
+import { APIUserAbortError, OpenAIError } from '../error';
 import {
   AssistantStreamEvent,
   MessageStreamEvent,

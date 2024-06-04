@@ -1,5 +1,5 @@
-import * as Core from 'openai/core';
-import { OpenAIError, APIUserAbortError } from 'openai/error';
+import * as Core from '../core';
+import { OpenAIError, APIUserAbortError } from '../error';
 import {
   Completions,
   type ChatCompletion,
@@ -12,7 +12,7 @@ import {
   type AbstractChatCompletionRunnerEvents,
 } from './AbstractChatCompletionRunner';
 import { type ReadableStream } from 'openai/_shims/index';
-import { Stream } from 'openai/streaming';
+import { Stream } from '../streaming';
 
 export interface ChatCompletionStreamEvents extends AbstractChatCompletionRunnerEvents {
   content: (contentDelta: string, contentSnapshot: string) => void;

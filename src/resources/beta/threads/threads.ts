@@ -10,7 +10,7 @@ import * as AssistantsAPI from '../assistants';
 import * as MessagesAPI from './messages';
 import * as RunsAPI from './runs/runs';
 import { Stream } from '../../../streaming';
-import { Page } from 'openai/pagination';
+import { Page } from '../../../pagination';
 
 /**
  * Note: no pagination actually occurs yet, this is for forwards-compatibility.
