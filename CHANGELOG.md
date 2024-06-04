@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.48.1 (2024-06-04)
+
+Full Changelog: [v4.48.0...v4.48.1](https://github.com/openai/openai-node/compare/v4.48.0...v4.48.1)
+
+### Bug Fixes
+
+* resolve typescript issue ([1129707](https://github.com/openai/openai-node/commit/11297073b1a370fc9c8676446f939a48071999b2))
+
 ## 4.48.0 (2024-06-03)
 
 Full Changelog: [v4.47.3...v4.48.0](https://github.com/openai/openai-node/compare/v4.47.3...v4.48.0)
