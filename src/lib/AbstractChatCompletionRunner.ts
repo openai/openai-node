@@ -1,25 +1,25 @@
 import * as Core from 'openai/core';
-import { type CompletionUsage } from 'openai/resources/completions';
-import {
-  type Completions,
-  type ChatCompletion,
-  type ChatCompletionMessage,
-  type ChatCompletionMessageParam,
-  type ChatCompletionCreateParams,
-  type ChatCompletionTool,
-} from 'openai/resources/chat/completions';
 import { APIUserAbortError, OpenAIError } from 'openai/error';
 import {
-  type RunnableFunction,
-  isRunnableFunctionWithParse,
-  type BaseFunctionsArgs,
-} from './RunnableFunction';
+  type ChatCompletion,
+  type ChatCompletionCreateParams,
+  type ChatCompletionMessage,
+  type ChatCompletionMessageParam,
+  type ChatCompletionTool,
+  type Completions,
+} from 'openai/resources/chat/completions';
+import { type CompletionUsage } from 'openai/resources/completions';
 import { ChatCompletionFunctionRunnerParams, ChatCompletionToolRunnerParams } from './ChatCompletionRunner';
 import {
   ChatCompletionStreamingFunctionRunnerParams,
   ChatCompletionStreamingToolRunnerParams,
 } from './ChatCompletionStreamingRunner';
 import { isAssistantMessage, isFunctionMessage, isToolMessage } from './chatCompletionUtils';
+import {
+  isRunnableFunctionWithParse,
+  type BaseFunctionsArgs,
+  type RunnableFunction,
+} from './RunnableFunction';
 
 const DEFAULT_MAX_CHAT_COMPLETIONS = 10;
 export interface RunnerOptions extends Core.RequestOptions {
@@ -232,7 +232,15 @@ export abstract class AbstractChatCompletionRunner<
     while (i-- > 0) {
       const message = this.messages[i];
       if (isAssistantMessage(message)) {
-        return { ...message, content: message.content ?? null };
+        return {
+          ...message,
+          content: message.content ?? null,
+          tool_calls: [],
+          function_call: {
+            name: '',
+            arguments: '',
+          },
+        };
       }
     }
     throw new OpenAIError('stream ended without producing a ChatCompletionMessage with role=assistant');
