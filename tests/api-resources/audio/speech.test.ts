@@ -12,7 +12,7 @@ describe('resource speech', () => {
   test.skip('create: required and optional params', async () => {
     const response = await openai.audio.speech.create({
       input: 'string',
-      model: 'string',
+      model: 'tts-1',
       voice: 'alloy',
       response_format: 'mp3',
       speed: 0.25,
