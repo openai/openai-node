@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.48.2 (2024-06-05)
+
+Full Changelog: [v4.48.1...v4.48.2](https://github.com/openai/openai-node/compare/v4.48.1...v4.48.2)
+
+### Chores
+
+* **internal:** minor change to tests ([#881](https://github.com/openai/openai-node/issues/881)) ([5e2d608](https://github.com/openai/openai-node/commit/5e2d608ca9a2bcb3f261ad13c848d327b60b6fb1))
+
 ## 4.48.1 (2024-06-04)
 
 Full Changelog: [v4.48.0...v4.48.1](https://github.com/openai/openai-node/compare/v4.48.0...v4.48.1)
