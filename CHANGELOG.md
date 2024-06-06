@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.48.3 (2024-06-06)
+
+Full Changelog: [v4.48.2...v4.48.3](https://github.com/openai/openai-node/compare/v4.48.2...v4.48.3)
+
+### Chores
+
+* **internal:** minor refactor of tests ([#884](https://github.com/openai/openai-node/issues/884)) ([0b71f2b](https://github.com/openai/openai-node/commit/0b71f2b2cb67e5714476b6f63b4ef93a0140bff2))
+
 ## 4.48.2 (2024-06-05)
 
 Full Changelog: [v4.48.1...v4.48.2](https://github.com/openai/openai-node/compare/v4.48.1...v4.48.2)
