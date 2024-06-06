@@ -124,6 +124,7 @@ describe('resource runs', () => {
       max_prompt_tokens: 256,
       metadata: {},
       model: 'gpt-4-turbo',
+      parallel_tool_calls: true,
       response_format: 'none',
       stream: false,
       temperature: 1,
