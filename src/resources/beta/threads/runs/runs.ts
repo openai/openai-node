@@ -403,6 +403,13 @@ export interface Run {
   object: 'thread.run';
 
   /**
+   * Whether to enable
+   * [parallel function calling](https://platform.openai.com/docs/guides/function-calling)
+   * during tool use.
+   */
+  parallel_tool_calls: boolean;
+
+  /**
    * Details on the action required to continue the run. Will be `null` if no action
    * is required.
    */
@@ -684,6 +691,13 @@ export interface RunCreateParamsBase {
     | 'gpt-3.5-turbo-0125'
     | 'gpt-3.5-turbo-16k-0613'
     | null;
+
+  /**
+   * Whether to enable
+   * [parallel function calling](https://platform.openai.com/docs/guides/function-calling)
+   * during tool use.
+   */
+  parallel_tool_calls?: boolean;
 
   /**
    * Specifies the format that the model must output. Compatible with

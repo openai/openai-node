@@ -561,6 +561,13 @@ export interface ThreadCreateAndRunParamsBase {
     | null;
 
   /**
+   * Whether to enable
+   * [parallel function calling](https://platform.openai.com/docs/guides/function-calling)
+   * during tool use.
+   */
+  parallel_tool_calls?: boolean;
+
+  /**
    * Specifies the format that the model must output. Compatible with
    * [GPT-4o](https://platform.openai.com/docs/models/gpt-4o),
    * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4),
