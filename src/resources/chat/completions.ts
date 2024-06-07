@@ -759,7 +759,7 @@ export interface ChatCompletionCreateParamsBase {
 
   /**
    * Whether to enable
-   * [parallel function calling](https://platform.openai.com/docs/guides/function-calling)
+   * [parallel function calling](https://platform.openai.com/docs/guides/function-calling/parallel-function-calling)
    * during tool use.
    */
   parallel_tool_calls?: boolean;
