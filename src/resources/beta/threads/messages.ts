@@ -459,7 +459,16 @@ export namespace Message {
     /**
      * The tools to add this file to.
      */
-    tools?: Array<AssistantsAPI.CodeInterpreterTool | AssistantsAPI.FileSearchTool>;
+    tools?: Array<AssistantsAPI.CodeInterpreterTool | Attachment.AssistantToolsFileSearchTypeOnly>;
+  }
+
+  export namespace Attachment {
+    export interface AssistantToolsFileSearchTypeOnly {
+      /**
+       * The type of tool being defined: `file_search`
+       */
+      type: 'file_search';
+    }
   }
 
   /**
@@ -637,7 +646,16 @@ export namespace MessageCreateParams {
     /**
      * The tools to add this file to.
      */
-    tools?: Array<AssistantsAPI.CodeInterpreterTool | AssistantsAPI.FileSearchTool>;
+    tools?: Array<AssistantsAPI.CodeInterpreterTool | Attachment.FileSearch>;
+  }
+
+  export namespace Attachment {
+    export interface FileSearch {
+      /**
+       * The type of tool being defined: `file_search`
+       */
+      type: 'file_search';
+    }
   }
 }
 
