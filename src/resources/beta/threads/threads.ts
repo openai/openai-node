@@ -299,7 +299,16 @@ export namespace ThreadCreateParams {
       /**
        * The tools to add this file to.
        */
-      tools?: Array<AssistantsAPI.CodeInterpreterTool | AssistantsAPI.FileSearchTool>;
+      tools?: Array<AssistantsAPI.CodeInterpreterTool | Attachment.FileSearch>;
+    }
+
+    export namespace Attachment {
+      export interface FileSearch {
+        /**
+         * The type of tool being defined: `file_search`
+         */
+        type: 'file_search';
+      }
     }
   }
 
@@ -538,7 +547,7 @@ export interface ThreadCreateAndRunParamsBase {
 
   /**
    * Whether to enable
-   * [parallel function calling](https://platform.openai.com/docs/guides/function-calling)
+   * [parallel function calling](https://platform.openai.com/docs/guides/function-calling/parallel-function-calling)
    * during tool use.
    */
   parallel_tool_calls?: boolean;
@@ -693,7 +702,16 @@ export namespace ThreadCreateAndRunParams {
         /**
          * The tools to add this file to.
          */
-        tools?: Array<AssistantsAPI.CodeInterpreterTool | AssistantsAPI.FileSearchTool>;
+        tools?: Array<AssistantsAPI.CodeInterpreterTool | Attachment.FileSearch>;
+      }
+
+      export namespace Attachment {
+        export interface FileSearch {
+          /**
+           * The type of tool being defined: `file_search`
+           */
+          type: 'file_search';
+        }
       }
     }
 
