@@ -956,7 +956,7 @@ export const safeJSON = (text: string) => {
 };
 
 // https://stackoverflow.com/a/19709846
-const startsWithSchemeRegexp = new RegExp('^(?:[a-z]{1,50}+:)?//', 'i');
+const startsWithSchemeRegexp = new RegExp('^(?:[a-z]{1,50}:)?//', 'i');
 const isAbsoluteURL = (url: string): boolean => {
   return startsWithSchemeRegexp.test(url);
 };
