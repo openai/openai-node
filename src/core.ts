@@ -19,7 +19,7 @@ import {
   type HeadersInit,
 } from './_shims/index';
 export { type Response };
-import { isMultipartBody } from './uploads';
+import { BlobLike, isBlobLike, isMultipartBody } from './uploads';
 export {
   maybeMultipartFormRequestOptions,
   multipartFormRequestOptions,
@@ -249,7 +249,17 @@ export abstract class APIClient {
     path: string,
     opts?: PromiseOrValue<RequestOptions<Req>>,
   ): APIPromise<Rsp> {
-    return this.request(Promise.resolve(opts).then((opts) => ({ method, path, ...opts })));
+    return this.request(
+      Promise.resolve(opts).then(async (opts) => {
+        const body =
+          opts && isBlobLike(opts?.body) ? new DataView(await opts.body.arrayBuffer())
+          : opts?.body instanceof DataView ? opts.body
+          : opts?.body instanceof ArrayBuffer ? new DataView(opts.body)
+          : opts && ArrayBuffer.isView(opts?.body) ? new DataView(opts.body.buffer)
+          : opts?.body;
+        return { method, path, ...opts, body };
+      }),
+    );
   }
 
   getAPIList<Item, PageClass extends AbstractPage<Item> = AbstractPage<Item>>(
@@ -271,6 +281,8 @@ export abstract class APIClient {
         const encoded = encoder.encode(body);
         return encoded.length.toString();
       }
+    } else if (ArrayBuffer.isView(body)) {
+      return body.byteLength.toString();
     }
 
     return null;
@@ -280,7 +292,9 @@ export abstract class APIClient {
     const { method, path, query, headers: headers = {} } = options;
 
     const body =
-      isMultipartBody(options.body) ? options.body.body
+      ArrayBuffer.isView(options.body) || (options.__binaryRequest && typeof options.body === 'string') ?
+        options.body
+      : isMultipartBody(options.body) ? options.body.body
       : options.body ? JSON.stringify(options.body, null, 2)
       : null;
     const contentLength = this.calculateContentLength(body);
@@ -735,7 +749,9 @@ export type Headers = Record<string, string | null | undefined>;
 export type DefaultQuery = Record<string, string | undefined>;
 export type KeysEnum<T> = { [P in keyof Required<T>]: true };
 
-export type RequestOptions<Req = unknown | Record<string, unknown> | Readable> = {
+export type RequestOptions<
+  Req = unknown | Record<string, unknown> | Readable | BlobLike | ArrayBufferView | ArrayBuffer,
+> = {
   method?: HTTPMethod;
   path?: string;
   query?: Req | undefined;
@@ -749,6 +765,7 @@ export type RequestOptions<Req = unknown | Record<string, unknown> | Readable> =
   signal?: AbortSignal | undefined | null;
   idempotencyKey?: string;
 
+  __binaryRequest?: boolean | undefined;
   __binaryResponse?: boolean | undefined;
   __streamClass?: typeof Stream;
 };
@@ -770,6 +787,7 @@ const requestOptionsKeys: KeysEnum<RequestOptions> = {
   signal: true,
   idempotencyKey: true,
 
+  __binaryRequest: true,
   __binaryResponse: true,
   __streamClass: true,
 };
@@ -783,10 +801,11 @@ export const isRequestOptions = (obj: unknown): obj is RequestOptions => {
   );
 };
 
-export type FinalRequestOptions<Req = unknown | Record<string, unknown> | Readable> = RequestOptions<Req> & {
-  method: HTTPMethod;
-  path: string;
-};
+export type FinalRequestOptions<Req = unknown | Record<string, unknown> | Readable | DataView> =
+  RequestOptions<Req> & {
+    method: HTTPMethod;
+    path: string;
+  };
 
 declare const Deno: any;
 declare const EdgeRuntime: any;
