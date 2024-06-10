@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.50.0 (2024-06-10)
+
+Full Changelog: [v4.49.1...v4.50.0](https://github.com/openai/openai-node/compare/v4.49.1...v4.50.0)
+
+### Features
+
+* support `application/octet-stream` request bodies ([#892](https://github.com/openai/openai-node/issues/892)) ([51661c8](https://github.com/openai/openai-node/commit/51661c8068d4990df6916becb6bb85353b54ef4d))
+
 ## 4.49.1 (2024-06-07)
 
 Full Changelog: [v4.49.0...v4.49.1](https://github.com/openai/openai-node/compare/v4.49.0...v4.49.1)
