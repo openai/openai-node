@@ -1489,6 +1489,7 @@ export namespace Threads {
   export import AssistantToolChoiceFunction = ThreadsAPI.AssistantToolChoiceFunction;
   export import AssistantToolChoiceOption = ThreadsAPI.AssistantToolChoiceOption;
   export import Thread = ThreadsAPI.Thread;
+  export import ThreadsPage = ThreadsAPI.ThreadsPage;
   export import ThreadDeleted = ThreadsAPI.ThreadDeleted;
   export import ThreadCreateParams = ThreadsAPI.ThreadCreateParams;
   export import ThreadUpdateParams = ThreadsAPI.ThreadUpdateParams;
