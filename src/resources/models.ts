@@ -50,6 +50,13 @@ export class Models extends APIResource {
   download(model: string) {
     return this._client.get(`/models/download/${model}`);
   }
+
+  /**
+   * Abort a model download.
+   */
+  abortDownload(downloadId: string) {
+    return this._client.get(`/models/abort-download/${downloadId}`);
+  }
 }
 
 /**
