@@ -57,6 +57,10 @@ export class Models extends APIResource {
   abortDownload(downloadId: string) {
     return this._client.get(`/models/abort-download/${downloadId}`);
   }
+
+  update(model: string, options: Record<string, unknown>) {
+    return this._client.patch(`/models/${model}`, options);
+  }
 }
 
 /**
