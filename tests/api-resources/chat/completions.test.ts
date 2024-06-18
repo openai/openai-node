@@ -38,6 +38,7 @@ describe('resource completions', () => {
       presence_penalty: -2,
       response_format: { type: 'json_object' },
       seed: -9223372036854776000,
+      service_tier: 'auto',
       stop: 'string',
       stream: false,
       stream_options: { include_usage: true },
