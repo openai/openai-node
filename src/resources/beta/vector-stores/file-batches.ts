@@ -261,6 +261,53 @@ export interface FileBatchCreateParams {
    * files.
    */
   file_ids: Array<string>;
+
+  /**
+   * The chunking strategy used to chunk the file(s). If not set, will use the `auto`
+   * strategy.
+   */
+  chunking_strategy?:
+    | FileBatchCreateParams.AutoChunkingStrategyRequestParam
+    | FileBatchCreateParams.StaticChunkingStrategyRequestParam;
+}
+
+export namespace FileBatchCreateParams {
+  /**
+   * The default strategy. This strategy currently uses a `max_chunk_size_tokens` of
+   * `800` and `chunk_overlap_tokens` of `400`.
+   */
+  export interface AutoChunkingStrategyRequestParam {
+    /**
+     * Always `auto`.
+     */
+    type: 'auto';
+  }
+
+  export interface StaticChunkingStrategyRequestParam {
+    static: StaticChunkingStrategyRequestParam.Static;
+
+    /**
+     * Always `static`.
+     */
+    type: 'static';
+  }
+
+  export namespace StaticChunkingStrategyRequestParam {
+    export interface Static {
+      /**
+       * The number of tokens that overlap between chunks. The default value is `400`.
+       *
+       * Note that the overlap must not exceed half of `max_chunk_size_tokens`.
+       */
+      chunk_overlap_tokens: number;
+
+      /**
+       * The maximum number of tokens in each chunk. The default value is `800`. The
+       * minimum value is `100` and the maximum value is `4096`.
+       */
+      max_chunk_size_tokens: number;
+    }
+  }
 }
 
 export interface FileBatchListFilesParams extends CursorPageParams {

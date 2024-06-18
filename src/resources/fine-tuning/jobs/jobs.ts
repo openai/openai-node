@@ -312,6 +312,11 @@ export interface JobCreateParams {
    * Your dataset must be formatted as a JSONL file. Additionally, you must upload
    * your file with the purpose `fine-tune`.
    *
+   * The contents of the file should differ depending on if the model uses the
+   * [chat](https://platform.openai.com/docs/api-reference/fine-tuning/chat-input) or
+   * [completions](https://platform.openai.com/docs/api-reference/fine-tuning/completions-input)
+   * format.
+   *
    * See the [fine-tuning guide](https://platform.openai.com/docs/guides/fine-tuning)
    * for more details.
    */

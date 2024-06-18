@@ -34,6 +34,7 @@ describe('resource completions', () => {
       logprobs: true,
       max_tokens: 0,
       n: 1,
+      parallel_tool_calls: true,
       presence_penalty: -2,
       response_format: { type: 'json_object' },
       seed: -9223372036854776000,

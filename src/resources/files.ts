@@ -21,9 +21,15 @@ export class Files extends APIResource {
    * [Assistants Tools guide](https://platform.openai.com/docs/assistants/tools) for
    * details.
    *
-   * The Fine-tuning API only supports `.jsonl` files.
+   * The Fine-tuning API only supports `.jsonl` files. The input also has certain
+   * required formats for fine-tuning
+   * [chat](https://platform.openai.com/docs/api-reference/fine-tuning/chat-input) or
+   * [completions](https://platform.openai.com/docs/api-reference/fine-tuning/completions-input)
+   * models.
    *
-   * The Batch API only supports `.jsonl` files up to 100 MB in size.
+   * The Batch API only supports `.jsonl` files up to 100 MB in size. The input also
+   * has a specific required
+   * [format](https://platform.openai.com/docs/api-reference/batch/request-input).
    *
    * Please [contact us](https://help.openai.com/) if you need to increase these
    * storage limits.
@@ -194,7 +200,7 @@ export interface FileCreateParams {
    * [Batch API](https://platform.openai.com/docs/guides/batch), and "fine-tune" for
    * [Fine-tuning](https://platform.openai.com/docs/api-reference/fine-tuning).
    */
-  purpose: 'assistants' | 'batch' | 'fine-tune';
+  purpose: 'assistants' | 'batch' | 'fine-tune' | 'vision';
 }
 
 export interface FileListParams {

@@ -19,7 +19,7 @@ You can import in Deno via:
 <!-- x-release-please-start-version -->
 
 ```ts
-import OpenAI from 'https://deno.land/x/openai@v4.47.2/mod.ts';
+import OpenAI from 'https://deno.land/x/openai@v4.51.0/mod.ts';
 ```
 
 <!-- x-release-please-end -->
@@ -367,11 +367,18 @@ To use this library with [Azure OpenAI](https://learn.microsoft.com/en-us/azure/
 class instead of the `OpenAI` class.
 
 > [!IMPORTANT]
-> The Azure API shape differs from the core API shape which means that the static types for responses / params
+> The Azure API shape slightly differs from the core API shape which means that the static types for responses / params
 > won't always be correct.
 
 ```ts
-const openai = new AzureOpenAI();
+import { AzureOpenAI } from 'openai';
+import { getBearerTokenProvider, DefaultAzureCredential } from '@azure/identity';
+
+const credential = new DefaultAzureCredential();
+const scope = 'https://cognitiveservices.azure.com/.default';
+const azureADTokenProvider = getBearerTokenProvider(credential, scope);
+
+const openai = new AzureOpenAI({ azureADTokenProvider });
 
 const result = await openai.chat.completions.create({
   model: 'gpt-4-1106-preview',

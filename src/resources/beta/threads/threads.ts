@@ -323,7 +323,16 @@ export namespace ThreadCreateParams {
       /**
        * The tools to add this file to.
        */
-      tools?: Array<AssistantsAPI.CodeInterpreterTool | AssistantsAPI.FileSearchTool>;
+      tools?: Array<AssistantsAPI.CodeInterpreterTool | Attachment.FileSearch>;
+    }
+
+    export namespace Attachment {
+      export interface FileSearch {
+        /**
+         * The type of tool being defined: `file_search`
+         */
+        type: 'file_search';
+      }
     }
   }
 
@@ -370,6 +379,12 @@ export namespace ThreadCreateParams {
     export namespace FileSearch {
       export interface VectorStore {
         /**
+         * The chunking strategy used to chunk the file(s). If not set, will use the `auto`
+         * strategy.
+         */
+        chunking_strategy?: VectorStore.Auto | VectorStore.Static;
+
+        /**
          * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs to
          * add to the vector store. There can be a maximum of 10000 files in a vector
          * store.
@@ -383,6 +398,45 @@ export namespace ThreadCreateParams {
          * of 512 characters long.
          */
         metadata?: unknown;
+      }
+
+      export namespace VectorStore {
+        /**
+         * The default strategy. This strategy currently uses a `max_chunk_size_tokens` of
+         * `800` and `chunk_overlap_tokens` of `400`.
+         */
+        export interface Auto {
+          /**
+           * Always `auto`.
+           */
+          type: 'auto';
+        }
+
+        export interface Static {
+          static: Static.Static;
+
+          /**
+           * Always `static`.
+           */
+          type: 'static';
+        }
+
+        export namespace Static {
+          export interface Static {
+            /**
+             * The number of tokens that overlap between chunks. The default value is `400`.
+             *
+             * Note that the overlap must not exceed half of `max_chunk_size_tokens`.
+             */
+            chunk_overlap_tokens: number;
+
+            /**
+             * The maximum number of tokens in each chunk. The default value is `800`. The
+             * minimum value is `100` and the maximum value is `4096`.
+             */
+            max_chunk_size_tokens: number;
+          }
+        }
       }
     }
   }
@@ -514,6 +568,13 @@ export interface ThreadCreateAndRunParamsBase {
     | 'gpt-3.5-turbo-0125'
     | 'gpt-3.5-turbo-16k-0613'
     | null;
+
+  /**
+   * Whether to enable
+   * [parallel function calling](https://platform.openai.com/docs/guides/function-calling/parallel-function-calling)
+   * during tool use.
+   */
+  parallel_tool_calls?: boolean;
 
   /**
    * Specifies the format that the model must output. Compatible with
@@ -665,7 +726,16 @@ export namespace ThreadCreateAndRunParams {
         /**
          * The tools to add this file to.
          */
-        tools?: Array<AssistantsAPI.CodeInterpreterTool | AssistantsAPI.FileSearchTool>;
+        tools?: Array<AssistantsAPI.CodeInterpreterTool | Attachment.FileSearch>;
+      }
+
+      export namespace Attachment {
+        export interface FileSearch {
+          /**
+           * The type of tool being defined: `file_search`
+           */
+          type: 'file_search';
+        }
       }
     }
 
@@ -712,6 +782,12 @@ export namespace ThreadCreateAndRunParams {
       export namespace FileSearch {
         export interface VectorStore {
           /**
+           * The chunking strategy used to chunk the file(s). If not set, will use the `auto`
+           * strategy.
+           */
+          chunking_strategy?: VectorStore.Auto | VectorStore.Static;
+
+          /**
            * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs to
            * add to the vector store. There can be a maximum of 10000 files in a vector
            * store.
@@ -725,6 +801,45 @@ export namespace ThreadCreateAndRunParams {
            * of 512 characters long.
            */
           metadata?: unknown;
+        }
+
+        export namespace VectorStore {
+          /**
+           * The default strategy. This strategy currently uses a `max_chunk_size_tokens` of
+           * `800` and `chunk_overlap_tokens` of `400`.
+           */
+          export interface Auto {
+            /**
+             * Always `auto`.
+             */
+            type: 'auto';
+          }
+
+          export interface Static {
+            static: Static.Static;
+
+            /**
+             * Always `static`.
+             */
+            type: 'static';
+          }
+
+          export namespace Static {
+            export interface Static {
+              /**
+               * The number of tokens that overlap between chunks. The default value is `400`.
+               *
+               * Note that the overlap must not exceed half of `max_chunk_size_tokens`.
+               */
+              chunk_overlap_tokens: number;
+
+              /**
+               * The maximum number of tokens in each chunk. The default value is `800`. The
+               * minimum value is `100` and the maximum value is `4096`.
+               */
+              max_chunk_size_tokens: number;
+            }
+          }
         }
       }
     }

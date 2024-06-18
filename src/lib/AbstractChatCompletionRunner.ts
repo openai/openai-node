@@ -232,7 +232,12 @@ export abstract class AbstractChatCompletionRunner<
     while (i-- > 0) {
       const message = this.messages[i];
       if (isAssistantMessage(message)) {
-        return { ...message, content: message.content ?? null };
+        const { function_call, ...rest } = message;
+        const ret: ChatCompletionMessage = { ...rest, content: message.content ?? null };
+        if (function_call) {
+          ret.function_call = function_call;
+        }
+        return ret;
       }
     }
     throw new OpenAIError('stream ended without producing a ChatCompletionMessage with role=assistant');
