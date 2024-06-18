@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.52.0 (2024-06-18)
+
+Full Changelog: [v4.51.0...v4.52.0](https://github.com/openai/openai-node/compare/v4.51.0...v4.52.0)
+
+### Features
+
+* **api:** add service tier argument for chat completions ([#900](https://github.com/openai/openai-node/issues/900)) ([91e6651](https://github.com/openai/openai-node/commit/91e66514037a8d6f9c39d3c96cd5769885925a4b))
+
 ## 4.51.0 (2024-06-12)
 
 Full Changelog: [v4.50.0...v4.51.0](https://github.com/openai/openai-node/compare/v4.50.0...v4.51.0)
