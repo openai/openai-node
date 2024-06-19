@@ -59,7 +59,7 @@ export class Models extends APIResource {
   }
 
   update(model: string, body: Record<string, unknown>, options?: Core.RequestOptions) {
-    return this._client.patch(`/models/${model}`, { body, ...options });
+    return this._client.post(`/models/${model}/config`, { body, ...options });
   }
 }
 
