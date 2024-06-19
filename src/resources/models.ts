@@ -58,8 +58,8 @@ export class Models extends APIResource {
     return this._client.get(`/models/abort-download/${downloadId}`);
   }
 
-  update(model: string, options: Record<string, unknown>) {
-    return this._client.patch(`/models/${model}`, options);
+  update(model: string, body: Record<string, unknown>, options?: Core.RequestOptions) {
+    return this._client.patch(`/models/${model}`, { body, ...options });
   }
 }
 
