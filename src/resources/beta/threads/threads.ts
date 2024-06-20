@@ -69,6 +69,13 @@ export class Threads extends APIResource {
   }
 
   /**
+   * Clean up a thread.
+   */
+  clean(threadId: string, options?: Core.RequestOptions): Core.APIPromise<Thread> {
+    return this._client.post(`/threads/${threadId}/clean`);
+  }
+
+  /**
    * Delete a thread.
    */
   del(threadId: string, options?: Core.RequestOptions): Core.APIPromise<ThreadDeleted> {
