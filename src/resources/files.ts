@@ -3,12 +3,12 @@
 import * as Core from '../core';
 import { APIResource } from '../resource';
 import { isRequestOptions } from '../core';
-import { type Response } from '../_shims/index';
 import { sleep } from '../core';
 import { APIConnectionTimeoutError } from '../error';
 import * as FilesAPI from './files';
 import { type Uploadable, multipartFormRequestOptions } from '../core';
 import { Page } from '../pagination';
+import { type Response } from '../_shims/index';
 
 export class Files extends APIResource {
   /**
