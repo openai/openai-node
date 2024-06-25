@@ -1,9 +1,9 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import * as Core from './core';
 import * as Errors from './error';
-import { type Agent, type RequestInit } from './_shims/index';
 import * as Uploads from './uploads';
+import { type Agent, type RequestInit } from './_shims/index';
+import * as Core from './core';
 import * as Pagination from './pagination';
 import * as API from './resources/index';
 
@@ -86,7 +86,9 @@ export interface ClientOptions {
   dangerouslyAllowBrowser?: boolean;
 }
 
-/** API Client for interfacing with the OpenAI API. */
+/**
+ * API Client for interfacing with the OpenAI API.
+ */
 export class OpenAI extends Core.APIClient {
   apiKey: string;
   organization: string | null;
@@ -143,6 +145,7 @@ export class OpenAI extends Core.APIClient {
       maxRetries: options.maxRetries,
       fetch: options.fetch,
     });
+
     this._options = options;
 
     this.apiKey = apiKey;

@@ -1,11 +1,11 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import * as Core from '../../../core';
 import { APIResource } from '../../../resource';
 import { isRequestOptions } from '../../../core';
 import { sleep } from '../../../core';
 import { Uploadable } from '../../../core';
 import { allSettledWithThrow } from '../../../lib/Util';
+import * as Core from '../../../core';
 import * as FileBatchesAPI from './file-batches';
 import * as FilesAPI from './files';
 import { VectorStoreFilesPage } from './files';
