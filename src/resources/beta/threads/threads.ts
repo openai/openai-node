@@ -1,10 +1,10 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import * as Core from '../../../core';
-import { APIPromise } from '../../../core';
 import { APIResource } from '../../../resource';
 import { isRequestOptions } from '../../../core';
 import { AssistantStream, ThreadCreateAndRunParamsBaseStream } from '../../../lib/AssistantStream';
+import { APIPromise } from '../../../core';
+import * as Core from '../../../core';
 import * as ThreadsAPI from './threads';
 import * as AssistantsAPI from '../assistants';
 import * as MessagesAPI from './messages';

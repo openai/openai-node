@@ -1,9 +1,9 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import * as Core from '../../../../core';
-import { APIPromise } from '../../../../core';
 import { APIResource } from '../../../../resource';
 import { isRequestOptions } from '../../../../core';
+import { APIPromise } from '../../../../core';
+import * as Core from '../../../../core';
 import { AssistantStream, RunCreateParamsBaseStream } from '../../../../lib/AssistantStream';
 import { sleep } from '../../../../core';
 import { RunSubmitToolOutputsParamsStream } from '../../../../lib/AssistantStream';

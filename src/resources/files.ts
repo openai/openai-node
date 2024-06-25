@@ -1,12 +1,11 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import * as Core from '../core';
 import { APIResource } from '../resource';
 import { isRequestOptions } from '../core';
 import { sleep } from '../core';
 import { APIConnectionTimeoutError } from '../error';
+import * as Core from '../core';
 import * as FilesAPI from './files';
-import { type Uploadable, multipartFormRequestOptions } from '../core';
 import { Page } from '../pagination';
 import { type Response } from '../_shims/index';
 
@@ -35,7 +34,7 @@ export class Files extends APIResource {
    * storage limits.
    */
   create(body: FileCreateParams, options?: Core.RequestOptions): Core.APIPromise<FileObject> {
-    return this._client.post('/files', multipartFormRequestOptions({ body, ...options }));
+    return this._client.post('/files', Core.multipartFormRequestOptions({ body, ...options }));
   }
 
   /**
@@ -188,7 +187,7 @@ export interface FileCreateParams {
   /**
    * The File object (not file name) to be uploaded.
    */
-  file: Uploadable;
+  file: Core.Uploadable;
 
   /**
    * The intended purpose of the uploaded file.
