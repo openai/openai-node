@@ -1,5 +1,15 @@
 # Changelog
 
+## 4.52.1 (2024-06-25)
+
+Full Changelog: [v4.52.0...v4.52.1](https://github.com/openai/openai-node/compare/v4.52.0...v4.52.1)
+
+### Chores
+
+* **doc:** clarify service tier default value ([#908](https://github.com/openai/openai-node/issues/908)) ([e4c8100](https://github.com/openai/openai-node/commit/e4c8100c7732bdc336b52a48d09945782c0fa2a3))
+* **internal:** minor reformatting ([#911](https://github.com/openai/openai-node/issues/911)) ([78c9377](https://github.com/openai/openai-node/commit/78c9377fcd563645081629a89f3fda2c1ff4e175))
+* **internal:** re-order some imports ([#904](https://github.com/openai/openai-node/issues/904)) ([dbd5c40](https://github.com/openai/openai-node/commit/dbd5c4053ba2f255dfc56676ced5b30381843c75))
+
 ## 4.52.0 (2024-06-18)
 
 Full Changelog: [v4.51.0...v4.52.0](https://github.com/openai/openai-node/compare/v4.51.0...v4.52.0)
