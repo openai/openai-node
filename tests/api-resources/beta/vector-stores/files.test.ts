@@ -68,8 +68,8 @@ describe('resource files', () => {
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
-  test('delete: only required params', async () => {
-    const responsePromise = openai.beta.vectorStores.files.delete('string', { vector_store_id: 'string' });
+  test('del: only required params', async () => {
+    const responsePromise = openai.beta.vectorStores.files.del('string', { vector_store_id: 'string' });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -79,7 +79,7 @@ describe('resource files', () => {
     expect(dataAndResponse.response).toBe(rawResponse);
   });
 
-  test('delete: required and optional params', async () => {
-    const response = await openai.beta.vectorStores.files.delete('string', { vector_store_id: 'string' });
+  test('del: required and optional params', async () => {
+    const response = await openai.beta.vectorStores.files.del('string', { vector_store_id: 'string' });
   });
 });

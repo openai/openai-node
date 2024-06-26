@@ -31,8 +31,8 @@ describe('resource models', () => {
     expect(dataAndResponse.response).toBe(rawResponse);
   });
 
-  test('delete', async () => {
-    const responsePromise = openai.models.delete('ft:gpt-3.5-turbo:acemeco:suffix:abc123');
+  test('del', async () => {
+    const responsePromise = openai.models.del('ft:gpt-3.5-turbo:acemeco:suffix:abc123');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;

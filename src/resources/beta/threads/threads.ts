@@ -48,7 +48,7 @@ export class Threads extends APIResource {
   /**
    * Delete a thread.
    */
-  delete(threadID: string, options?: RequestOptions): APIPromise<ThreadDeleted> {
+  del(threadID: string, options?: RequestOptions): APIPromise<ThreadDeleted> {
     return this._client.delete(`/threads/${threadID}`, {
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },

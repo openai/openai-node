@@ -27,7 +27,7 @@ export class Models extends APIResource {
    * Delete a fine-tuned model. You must have the Owner role in your organization to
    * delete a model.
    */
-  delete(model: string, options?: RequestOptions): APIPromise<ModelDeleted> {
+  del(model: string, options?: RequestOptions): APIPromise<ModelDeleted> {
     return this._client.delete(`/models/${model}`, options);
   }
 }

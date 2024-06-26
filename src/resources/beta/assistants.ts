@@ -61,7 +61,7 @@ export class Assistants extends APIResource {
   /**
    * Delete an assistant.
    */
-  delete(assistantID: string, options?: RequestOptions): APIPromise<AssistantDeleted> {
+  del(assistantID: string, options?: RequestOptions): APIPromise<AssistantDeleted> {
     return this._client.delete(`/assistants/${assistantID}`, {
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },

@@ -86,8 +86,8 @@ describe('resource assistants', () => {
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
-  test('delete', async () => {
-    const responsePromise = openai.beta.assistants.delete('string');
+  test('del', async () => {
+    const responsePromise = openai.beta.assistants.del('string');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;

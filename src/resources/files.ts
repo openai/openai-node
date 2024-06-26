@@ -56,7 +56,7 @@ export class Files extends APIResource {
   /**
    * Delete a file.
    */
-  delete(fileID: string, options?: RequestOptions): APIPromise<FileDeleted> {
+  del(fileID: string, options?: RequestOptions): APIPromise<FileDeleted> {
     return this._client.delete(`/files/${fileID}`, options);
   }
 

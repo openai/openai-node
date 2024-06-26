@@ -60,7 +60,7 @@ export class Files extends APIResource {
    * [delete file](https://platform.openai.com/docs/api-reference/files/delete)
    * endpoint.
    */
-  delete(
+  del(
     fileID: string,
     params: FileDeleteParams,
     options?: RequestOptions,

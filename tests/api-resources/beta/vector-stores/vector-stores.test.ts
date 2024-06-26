@@ -63,8 +63,8 @@ describe('resource vectorStores', () => {
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
-  test('delete', async () => {
-    const responsePromise = openai.beta.vectorStores.delete('string');
+  test('del', async () => {
+    const responsePromise = openai.beta.vectorStores.del('string');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;

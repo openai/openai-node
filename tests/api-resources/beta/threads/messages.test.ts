@@ -100,8 +100,8 @@ describe('resource messages', () => {
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
-  test('delete: only required params', async () => {
-    const responsePromise = openai.beta.threads.messages.delete('string', { thread_id: 'string' });
+  test('del: only required params', async () => {
+    const responsePromise = openai.beta.threads.messages.del('string', { thread_id: 'string' });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -111,7 +111,7 @@ describe('resource messages', () => {
     expect(dataAndResponse.response).toBe(rawResponse);
   });
 
-  test('delete: required and optional params', async () => {
-    const response = await openai.beta.threads.messages.delete('string', { thread_id: 'string' });
+  test('del: required and optional params', async () => {
+    const response = await openai.beta.threads.messages.del('string', { thread_id: 'string' });
   });
 });
