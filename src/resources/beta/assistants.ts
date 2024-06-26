@@ -1,20 +1,21 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../resource';
-import { isRequestOptions } from '../../core';
 import * as AssistantsAPI from './assistants';
 import * as Shared from '../shared';
 import * as MessagesAPI from './threads/messages';
 import * as ThreadsAPI from './threads/threads';
 import * as RunsAPI from './threads/runs/runs';
 import * as StepsAPI from './threads/runs/steps';
-import { CursorPage, type CursorPageParams } from '../../pagination';
+import { CursorPage, type CursorPageParams, PagePromise } from '../../pagination';
+import { APIPromise } from '../../internal/api-promise';
+import { RequestOptions } from '../../internal/request-options';
 
 export class Assistants extends APIResource {
   /**
    * Create an assistant with a model and instructions.
    */
-  create(body: AssistantCreateParams, options?: Core.RequestOptions): Core.APIPromise<Assistant> {
+  create(body: AssistantCreateParams, options?: RequestOptions): APIPromise<Assistant> {
     return this._client.post('/assistants', {
       body,
       ...options,
@@ -25,8 +26,8 @@ export class Assistants extends APIResource {
   /**
    * Retrieves an assistant.
    */
-  retrieve(assistantId: string, options?: Core.RequestOptions): Core.APIPromise<Assistant> {
-    return this._client.get(`/assistants/${assistantId}`, {
+  retrieve(assistantID: string, options?: RequestOptions): APIPromise<Assistant> {
+    return this._client.get(`/assistants/${assistantID}`, {
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
     });
@@ -35,12 +36,8 @@ export class Assistants extends APIResource {
   /**
    * Modifies an assistant.
    */
-  update(
-    assistantId: string,
-    body: AssistantUpdateParams,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<Assistant> {
-    return this._client.post(`/assistants/${assistantId}`, {
+  update(assistantID: string, body: AssistantUpdateParams, options?: RequestOptions): APIPromise<Assistant> {
+    return this._client.post(`/assistants/${assistantID}`, {
       body,
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
@@ -51,18 +48,10 @@ export class Assistants extends APIResource {
    * Returns a list of assistants.
    */
   list(
-    query?: AssistantListParams,
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<AssistantsPage, Assistant>;
-  list(options?: Core.RequestOptions): Core.PagePromise<AssistantsPage, Assistant>;
-  list(
-    query: AssistantListParams | Core.RequestOptions = {},
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<AssistantsPage, Assistant> {
-    if (isRequestOptions(query)) {
-      return this.list({}, query);
-    }
-    return this._client.getAPIList('/assistants', AssistantsPage, {
+    query: AssistantListParams | null | undefined = {},
+    options?: RequestOptions,
+  ): PagePromise<AssistantsPage, Assistant> {
+    return this._client.getAPIList('/assistants', CursorPage<Assistant>, {
       query,
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
@@ -80,7 +69,7 @@ export class Assistants extends APIResource {
   }
 }
 
-export class AssistantsPage extends CursorPage<Assistant> {}
+export type AssistantsPage = CursorPage<Assistant>;
 
 /**
  * Represents an `assistant` that can call the model and use tools.
@@ -257,6 +246,7 @@ export type AssistantStreamEvent =
   | AssistantStreamEvent.ThreadRunInProgress
   | AssistantStreamEvent.ThreadRunRequiresAction
   | AssistantStreamEvent.ThreadRunCompleted
+  | AssistantStreamEvent.ThreadRunIncomplete
   | AssistantStreamEvent.ThreadRunFailed
   | AssistantStreamEvent.ThreadRunCancelling
   | AssistantStreamEvent.ThreadRunCancelled
@@ -359,6 +349,20 @@ export namespace AssistantStreamEvent {
     data: RunsAPI.Run;
 
     event: 'thread.run.completed';
+  }
+
+  /**
+   * Occurs when a [run](https://platform.openai.com/docs/api-reference/runs/object)
+   * ends with status `incomplete`.
+   */
+  export interface ThreadRunIncomplete {
+    /**
+     * Represents an execution run on a
+     * [thread](https://platform.openai.com/docs/api-reference/threads).
+     */
+    data: RunsAPI.Run;
+
+    event: 'thread.run.incomplete';
   }
 
   /**
@@ -617,6 +621,30 @@ export interface FileSearchTool {
    * The type of tool being defined: `file_search`
    */
   type: 'file_search';
+
+  /**
+   * Overrides for the file search tool.
+   */
+  file_search?: FileSearchTool.FileSearch;
+}
+
+export namespace FileSearchTool {
+  /**
+   * Overrides for the file search tool.
+   */
+  export interface FileSearch {
+    /**
+     * The maximum number of results the file search tool should output. The default is
+     * 20 for gpt-4\* models and 5 for gpt-3.5-turbo. This number should be between 1
+     * and 50 inclusive.
+     *
+     * Note that the file search tool may output fewer than `max_num_results` results.
+     * See the
+     * [file search tool documentation](https://platform.openai.com/docs/assistants/tools/file-search/number-of-chunks-returned)
+     * for more information.
+     */
+    max_num_results?: number;
+  }
 }
 
 export interface FunctionTool {
@@ -842,6 +870,7 @@ export type RunStreamEvent =
   | RunStreamEvent.ThreadRunInProgress
   | RunStreamEvent.ThreadRunRequiresAction
   | RunStreamEvent.ThreadRunCompleted
+  | RunStreamEvent.ThreadRunIncomplete
   | RunStreamEvent.ThreadRunFailed
   | RunStreamEvent.ThreadRunCancelling
   | RunStreamEvent.ThreadRunCancelled
@@ -916,6 +945,20 @@ export namespace RunStreamEvent {
     data: RunsAPI.Run;
 
     event: 'thread.run.completed';
+  }
+
+  /**
+   * Occurs when a [run](https://platform.openai.com/docs/api-reference/runs/object)
+   * ends with status `incomplete`.
+   */
+  export interface ThreadRunIncomplete {
+    /**
+     * Represents an execution run on a
+     * [thread](https://platform.openai.com/docs/api-reference/threads).
+     */
+    data: RunsAPI.Run;
+
+    event: 'thread.run.incomplete';
   }
 
   /**
@@ -1140,6 +1183,12 @@ export namespace AssistantCreateParams {
     export namespace FileSearch {
       export interface VectorStore {
         /**
+         * The chunking strategy used to chunk the file(s). If not set, will use the `auto`
+         * strategy.
+         */
+        chunking_strategy?: VectorStore.Auto | VectorStore.Static;
+
+        /**
          * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs to
          * add to the vector store. There can be a maximum of 10000 files in a vector
          * store.
@@ -1153,6 +1202,45 @@ export namespace AssistantCreateParams {
          * of 512 characters long.
          */
         metadata?: unknown;
+      }
+
+      export namespace VectorStore {
+        /**
+         * The default strategy. This strategy currently uses a `max_chunk_size_tokens` of
+         * `800` and `chunk_overlap_tokens` of `400`.
+         */
+        export interface Auto {
+          /**
+           * Always `auto`.
+           */
+          type: 'auto';
+        }
+
+        export interface Static {
+          static: Static.Static;
+
+          /**
+           * Always `static`.
+           */
+          type: 'static';
+        }
+
+        export namespace Static {
+          export interface Static {
+            /**
+             * The number of tokens that overlap between chunks. The default value is `400`.
+             *
+             * Note that the overlap must not exceed half of `max_chunk_size_tokens`.
+             */
+            chunk_overlap_tokens: number;
+
+            /**
+             * The maximum number of tokens in each chunk. The default value is `800`. The
+             * minimum value is `100` and the maximum value is `4096`.
+             */
+            max_chunk_size_tokens: number;
+          }
+        }
       }
     }
   }
@@ -1307,7 +1395,7 @@ export namespace Assistants {
   export import RunStepStreamEvent = AssistantsAPI.RunStepStreamEvent;
   export import RunStreamEvent = AssistantsAPI.RunStreamEvent;
   export import ThreadStreamEvent = AssistantsAPI.ThreadStreamEvent;
-  export import AssistantsPage = AssistantsAPI.AssistantsPage;
+  export type AssistantsPage = AssistantsAPI.AssistantsPage;
   export import AssistantCreateParams = AssistantsAPI.AssistantCreateParams;
   export import AssistantUpdateParams = AssistantsAPI.AssistantUpdateParams;
   export import AssistantListParams = AssistantsAPI.AssistantListParams;

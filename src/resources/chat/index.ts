@@ -21,7 +21,6 @@ export {
   ChatCompletionToolChoiceOption,
   ChatCompletionToolMessageParam,
   ChatCompletionUserMessageParam,
-  CreateChatCompletionRequestMessage,
   ChatCompletionCreateParams,
   CompletionCreateParams,
   ChatCompletionCreateParamsNonStreaming,

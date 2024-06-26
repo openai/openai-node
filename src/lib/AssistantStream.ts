@@ -9,8 +9,7 @@ import {
   Messages,
   MessageContent,
 } from 'openai/resources/beta/threads/messages';
-import * as Core from 'openai/core';
-import { RequestOptions } from 'openai/core';
+import { RequestOptions } from 'openai/internal/request-options';
 import {
   Run,
   RunCreateParamsBase,
@@ -35,6 +34,7 @@ import {
 import { RunStep, RunStepDelta, ToolCall, ToolCallDelta } from 'openai/resources/beta/threads/runs/steps';
 import { ThreadCreateAndRunParamsBase, Threads } from 'openai/resources/beta/threads/threads';
 import MessageDelta = Messages.MessageDelta;
+import { isObj } from 'openai/internal/utils';
 
 export interface AssistantStreamEvents extends AbstractAssistantRunnerEvents {
   //New event structure
@@ -167,7 +167,7 @@ export class AssistantStream
 
   protected async _fromReadableStream(
     readableStream: ReadableStream,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): Promise<Run> {
     const signal = options?.signal;
     if (signal) {
@@ -212,7 +212,7 @@ export class AssistantStream
     threadId: string,
     runId: string,
     params: RunSubmitToolOutputsParamsStream,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): Promise<Run> {
     const signal = options?.signal;
     if (signal) {
@@ -307,7 +307,7 @@ export class AssistantStream
   protected override async _createThreadAssistantStream(
     thread: Threads,
     params: ThreadCreateAndRunParamsBase,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): Promise<Run> {
     const signal = options?.signal;
     if (signal) {
@@ -334,7 +334,7 @@ export class AssistantStream
     run: Runs,
     threadId: string,
     params: RunCreateParamsBase,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): Promise<Run> {
     const signal = options?.signal;
     if (signal) {
@@ -680,7 +680,7 @@ export class AssistantStream
         accValue += deltaValue;
       } else if (typeof accValue === 'number' && typeof deltaValue === 'number') {
         accValue += deltaValue;
-      } else if (Core.isObj(accValue) && Core.isObj(deltaValue)) {
+      } else if (isObj(accValue) && isObj(deltaValue)) {
         accValue = this.accumulateDelta(accValue as Record<string, any>, deltaValue as Record<string, any>);
       } else if (Array.isArray(accValue) && Array.isArray(deltaValue)) {
         if (accValue.every((x) => typeof x === 'string' || typeof x === 'number')) {

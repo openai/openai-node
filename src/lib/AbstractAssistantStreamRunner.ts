@@ -1,5 +1,5 @@
-import * as Core from 'openai/core';
 import { APIUserAbortError, OpenAIError } from 'openai/error';
+import { RequestOptions } from 'openai/internal/request-options';
 import { Run, RunSubmitToolOutputsParamsBase } from 'openai/resources/beta/threads/runs/runs';
 import { RunCreateParamsBase, Runs } from 'openai/resources/beta/threads/runs/runs';
 import { ThreadCreateAndRunParamsBase, Threads } from 'openai/resources/beta/threads/threads';
@@ -222,7 +222,7 @@ export abstract class AbstractAssistantStreamRunner<
   protected async _threadAssistantStream(
     body: ThreadCreateAndRunParamsBase,
     thread: Threads,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): Promise<Run> {
     return await this._createThreadAssistantStream(thread, body, options);
   }
@@ -231,7 +231,7 @@ export abstract class AbstractAssistantStreamRunner<
     threadId: string,
     runs: Runs,
     params: RunCreateParamsBase,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): Promise<Run> {
     return await this._createAssistantStream(runs, threadId, params, options);
   }
@@ -241,7 +241,7 @@ export abstract class AbstractAssistantStreamRunner<
     runId: string,
     runs: Runs,
     params: RunSubmitToolOutputsParamsBase,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): Promise<Run> {
     return await this._createToolAssistantStream(runs, threadId, runId, params, options);
   }
@@ -249,7 +249,7 @@ export abstract class AbstractAssistantStreamRunner<
   protected async _createThreadAssistantStream(
     thread: Threads,
     body: ThreadCreateAndRunParamsBase,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): Promise<Run> {
     const signal = options?.signal;
     if (signal) {
@@ -271,7 +271,7 @@ export abstract class AbstractAssistantStreamRunner<
     threadId: string,
     runId: string,
     params: RunSubmitToolOutputsParamsBase,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): Promise<Run> {
     const signal = options?.signal;
     if (signal) {
@@ -280,9 +280,8 @@ export abstract class AbstractAssistantStreamRunner<
     }
 
     const runResult = await run.submitToolOutputs(
-      threadId,
       runId,
-      { ...params, stream: false },
+      { ...params, thread_id: threadId, stream: false },
       { ...options, signal: this.controller.signal },
     );
     this._connected();
@@ -293,7 +292,7 @@ export abstract class AbstractAssistantStreamRunner<
     run: Runs,
     threadId: string,
     params: RunCreateParamsBase,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): Promise<Run> {
     const signal = options?.signal;
     if (signal) {

@@ -48,7 +48,6 @@ Types:
 - <code><a href="./src/resources/chat/completions.ts">ChatCompletionToolChoiceOption</a></code>
 - <code><a href="./src/resources/chat/completions.ts">ChatCompletionToolMessageParam</a></code>
 - <code><a href="./src/resources/chat/completions.ts">ChatCompletionUserMessageParam</a></code>
-- <code><a href="./src/resources/chat/completions.ts">CreateChatCompletionRequestMessage</a></code>
 
 Methods:
 

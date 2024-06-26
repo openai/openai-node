@@ -1,4 +1,4 @@
-import { type RequestOptions } from './core';
+import { type RequestOptions } from './internal/request-options';
 import {
   FormData,
   File,
@@ -9,7 +9,6 @@ import {
   isFsReadStream,
 } from './_shims/index';
 import { MultipartBody } from './_shims/MultipartBody';
-export { fileFromPath } from './_shims/index';
 
 type BlobLikePart = string | ArrayBuffer | ArrayBufferView | BlobLike | Uint8Array | DataView;
 export type BlobPart = string | ArrayBuffer | ArrayBufferView | Blob | Uint8Array | DataView;
@@ -26,7 +25,7 @@ export type BlobPart = string | ArrayBuffer | ArrayBufferView | Blob | Uint8Arra
 export type Uploadable = FileLike | ResponseLike | FsReadStream;
 
 /**
- * Intended to match web.Blob, node.Blob, node-fetch.Blob, etc.
+ * Intended to match web.Blob, node.Blob, undici.Blob, etc.
  */
 export interface BlobLike {
   /** [MDN Reference](https://developer.mozilla.org/docs/Web/API/Blob/size) */
@@ -37,11 +36,10 @@ export interface BlobLike {
   text(): Promise<string>;
   /** [MDN Reference](https://developer.mozilla.org/docs/Web/API/Blob/slice) */
   slice(start?: number, end?: number): BlobLike;
-  // unfortunately @types/node-fetch@^2.6.4 doesn't type the arrayBuffer method
 }
 
 /**
- * Intended to match web.File, node.File, node-fetch.File, etc.
+ * Intended to match web.File, node.File, undici.File, etc.
  */
 export interface FileLike extends BlobLike {
   /** [MDN Reference](https://developer.mozilla.org/docs/Web/API/File/lastModified) */
@@ -51,7 +49,7 @@ export interface FileLike extends BlobLike {
 }
 
 /**
- * Intended to match web.Response, node.Response, node-fetch.Response, etc.
+ * Intended to match web.Response, node.Response, undici.Response, etc.
  */
 export interface ResponseLike {
   url: string;
@@ -72,8 +70,7 @@ export const isFileLike = (value: any): value is FileLike =>
   isBlobLike(value);
 
 /**
- * The BlobLike type omits arrayBuffer() because @types/node-fetch@^2.6.4 lacks it; but this check
- * adds the arrayBuffer() method type because it is available and used at runtime
+ * This check adds the arrayBuffer() method type because it is available and used at runtime
  */
 export const isBlobLike = (value: any): value is BlobLike & { arrayBuffer(): Promise<ArrayBuffer> } =>
   value != null &&
@@ -128,7 +125,7 @@ export async function toFile(
     }
   }
 
-  return new File(bits, name, options);
+  return new File(bits as (string | Blob)[], name, options);
 }
 
 async function getBytes(value: ToFileInput): Promise<Array<BlobPart>> {

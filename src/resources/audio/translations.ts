@@ -1,15 +1,16 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import * as Core from '../../core';
 import { APIResource } from '../../resource';
 import * as TranslationsAPI from './translations';
-import { type Uploadable, multipartFormRequestOptions } from '../../core';
+import { type Uploadable, multipartFormRequestOptions } from '../../uploads';
+import { APIPromise } from '../../internal/api-promise';
+import { RequestOptions } from '../../internal/request-options';
 
 export class Translations extends APIResource {
   /**
    * Translates audio into English.
    */
-  create(body: TranslationCreateParams, options?: Core.RequestOptions): Core.APIPromise<Translation> {
+  create(body: TranslationCreateParams, options?: RequestOptions): APIPromise<Translation> {
     return this._client.post('/audio/translations', multipartFormRequestOptions({ body, ...options }));
   }
 }

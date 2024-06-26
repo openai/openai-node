@@ -2,16 +2,16 @@ name: CI
 on:
   push:
     branches:
-      - master
+      - main
   pull_request:
     branches:
-      - master
+      - main
 
 jobs:
   lint:
     name: lint
     runs-on: ubuntu-latest
-    if: github.repository == 'openai/openai-node'
+    if: github.repository == 'stainless-sdks/openai-typescript'
 
     steps:
       - uses: actions/checkout@v4
@@ -29,7 +29,7 @@ jobs:
   test:
     name: test
     runs-on: ubuntu-latest
-    if: github.repository == 'openai/openai-node'
+    if: github.repository == 'stainless-sdks/openai-typescript'
 
     steps:
       - uses: actions/checkout@v4

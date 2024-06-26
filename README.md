@@ -1,32 +1,23 @@
 # OpenAI TypeScript API Library
 
-[![NPM version](https://img.shields.io/npm/v/openai.svg)](https://npmjs.org/package/openai) ![npm bundle size](https://img.shields.io/bundlephobia/minzip/openai)
+[![NPM version](https://img.shields.io/npm/v/openai.svg)](https://npmjs.org/package/openai)
 
-This library provides convenient access to the OpenAI REST API from TypeScript or JavaScript.
+This library provides convenient access to the OpenAI REST API from server-side TypeScript or JavaScript.
 
-It is generated from our [OpenAPI specification](https://github.com/openai/openai-openapi) with [Stainless](https://stainlessapi.com/).
-
-To learn how to use the OpenAI API, check out our [API Reference](https://platform.openai.com/docs/api-reference) and [Documentation](https://platform.openai.com/docs).
+The REST API documentation can be found [on platform.openai.com](https://platform.openai.com/docs). The full API of this library can be found in [api.md](api.md).
 
 ## Installation
 
 ```sh
-npm install openai
+npm install git+ssh://git@github.com:stainless-sdks/openai-typescript.git
 ```
 
-You can import in Deno via:
-
-<!-- x-release-please-start-version -->
-
-```ts
-import OpenAI from 'https://deno.land/x/openai@v4.47.2/mod.ts';
-```
-
-<!-- x-release-please-end -->
+> [!NOTE]
+> Once this package is [published to npm](https://app.stainlessapi.com/docs/guides/publish), this will become: `npm install openai`
 
 ## Usage
 
-The full API of this library can be found in [api.md file](api.md) along with many [code examples](https://github.com/openai/openai-node/tree/master/examples). The code below shows how to get started using the chat completions API.
+The full API of this library can be found in [api.md](api.md).
 
 <!-- prettier-ignore -->
 ```js
@@ -298,7 +289,7 @@ Request parameters that correspond to file uploads can be passed in many differe
 
 ```ts
 import fs from 'fs';
-import fetch from 'node-fetch';
+import { fetch } from 'undici';
 import OpenAI, { toFile } from 'openai';
 
 const openai = new OpenAI();
@@ -532,21 +523,21 @@ validate or strip extra properties from the response from the API.
 
 ### Customizing the fetch client
 
-By default, this library uses `node-fetch` in Node, and expects a global `fetch` function in other environments.
+By default, this library uses `undici` in Node, and expects a global `fetch` function in other environments.
 
 If you would prefer to use a global, web-standards-compliant `fetch` function even in a Node environment,
 (for example, if you are running Node with `--experimental-fetch` or using NextJS which polyfills with `undici`),
 add the following import before your first import `from "OpenAI"`:
 
 ```ts
-// Tell TypeScript and the package to use the global web fetch instead of node-fetch.
+// Tell TypeScript and the package to use the global web fetch instead of undici.
 // Note, despite the name, this does not add any polyfills, but expects them to be provided if needed.
 import 'openai/shims/web';
 import OpenAI from 'openai';
 ```
 
 To do the inverse, add `import "openai/shims/node"` (which does import polyfills).
-This can also be useful if you are getting the wrong TypeScript types for `Response` ([more details](https://github.com/openai/openai-node/tree/master/src/_shims#readme)).
+This can also be useful if you are getting the wrong TypeScript types for `Response` ([more details](https://github.com/stainless-sdks/openai-typescript/tree/main/src/_shims#readme)).
 
 ### Logging and middleware
 
@@ -602,7 +593,7 @@ This package generally follows [SemVer](https://semver.org/spec/v2.0.0.html) con
 
 We take backwards-compatibility seriously and work hard to ensure you can rely on a smooth upgrade experience.
 
-We are keen for your feedback; please open an [issue](https://www.github.com/openai/openai-node/issues) with questions, bugs, or suggestions.
+We are keen for your feedback; please open an [issue](https://www.github.com/stainless-sdks/openai-typescript/issues) with questions, bugs, or suggestions.
 
 ## Requirements
 

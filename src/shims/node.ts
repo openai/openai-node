@@ -33,8 +33,6 @@ declare module '../_shims/manual-types' {
     // @ts-ignore
     export type FilePropertyBag = types.FilePropertyBag;
     // @ts-ignore
-    export type FileFromPathOptions = types.FileFromPathOptions;
-    // @ts-ignore
     export import FormData = types.FormData;
     // @ts-ignore
     export import File = types.File;

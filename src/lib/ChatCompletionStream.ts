@@ -1,4 +1,3 @@
-import * as Core from 'openai/core';
 import { OpenAIError, APIUserAbortError } from 'openai/error';
 import {
   Completions,
@@ -13,6 +12,7 @@ import {
 } from './AbstractChatCompletionRunner';
 import { type ReadableStream } from 'openai/_shims/index';
 import { Stream } from 'openai/streaming';
+import { RequestOptions } from 'openai/internal/request-options';
 
 export interface ChatCompletionStreamEvents extends AbstractChatCompletionRunnerEvents {
   content: (contentDelta: string, contentSnapshot: string) => void;
@@ -49,7 +49,7 @@ export class ChatCompletionStream
   static createChatCompletion(
     completions: Completions,
     params: ChatCompletionStreamParams,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): ChatCompletionStream {
     const runner = new ChatCompletionStream();
     runner._run(() =>
@@ -91,7 +91,7 @@ export class ChatCompletionStream
   protected override async _createChatCompletion(
     completions: Completions,
     params: ChatCompletionCreateParams,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): Promise<ChatCompletion> {
     const signal = options?.signal;
     if (signal) {
@@ -115,7 +115,7 @@ export class ChatCompletionStream
 
   protected async _fromReadableStream(
     readableStream: ReadableStream,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): Promise<ChatCompletion> {
     const signal = options?.signal;
     if (signal) {

@@ -1,32 +1,30 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import * as Core from '../core';
 import { APIResource } from '../resource';
 import * as ImagesAPI from './images';
-import { type Uploadable, multipartFormRequestOptions } from '../core';
+import { type Uploadable, multipartFormRequestOptions } from '../uploads';
+import { APIPromise } from '../internal/api-promise';
+import { RequestOptions } from '../internal/request-options';
 
 export class Images extends APIResource {
   /**
    * Creates a variation of a given image.
    */
-  createVariation(
-    body: ImageCreateVariationParams,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<ImagesResponse> {
+  createVariation(body: ImageCreateVariationParams, options?: RequestOptions): APIPromise<ImagesResponse> {
     return this._client.post('/images/variations', multipartFormRequestOptions({ body, ...options }));
   }
 
   /**
    * Creates an edited or extended image given an original image and a prompt.
    */
-  edit(body: ImageEditParams, options?: Core.RequestOptions): Core.APIPromise<ImagesResponse> {
+  edit(body: ImageEditParams, options?: RequestOptions): APIPromise<ImagesResponse> {
     return this._client.post('/images/edits', multipartFormRequestOptions({ body, ...options }));
   }
 
   /**
    * Creates an image given a prompt.
    */
-  generate(body: ImageGenerateParams, options?: Core.RequestOptions): Core.APIPromise<ImagesResponse> {
+  generate(body: ImageGenerateParams, options?: RequestOptions): APIPromise<ImagesResponse> {
     return this._client.post('/images/generations', { body, ...options });
   }
 }

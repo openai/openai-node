@@ -1,7 +1,7 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import OpenAI from 'openai';
-import { Response } from 'node-fetch';
+import { Response } from 'undici';
 
 const openai = new OpenAI({
   apiKey: 'My API Key',
@@ -18,13 +18,6 @@ describe('resource models', () => {
     const dataAndResponse = await responsePromise.withResponse();
     expect(dataAndResponse.data).toBe(response);
     expect(dataAndResponse.response).toBe(rawResponse);
-  });
-
-  test('retrieve: request options instead of params are passed correctly', async () => {
-    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(
-      openai.models.retrieve('gpt-3.5-turbo', { path: '/_stainless_unknown_path' }),
-    ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
   test('list', async () => {
@@ -47,12 +40,5 @@ describe('resource models', () => {
     const dataAndResponse = await responsePromise.withResponse();
     expect(dataAndResponse.data).toBe(response);
     expect(dataAndResponse.response).toBe(rawResponse);
-  });
-
-  test('del: request options instead of params are passed correctly', async () => {
-    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(
-      openai.models.del('ft:gpt-3.5-turbo:acemeco:suffix:abc123', { path: '/_stainless_unknown_path' }),
-    ).rejects.toThrow(OpenAI.NotFoundError);
   });
 });

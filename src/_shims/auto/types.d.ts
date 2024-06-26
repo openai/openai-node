@@ -54,8 +54,6 @@ export interface FilePropertyBag extends BlobPropertyBag {
   lastModified?: number;
 }
 
-export type FileFromPathOptions = Omit<FilePropertyBag, 'lastModified'>;
-
 // @ts-ignore
 type _FormData = unknown extends FormData ? never : FormData;
 // @ts-ignore

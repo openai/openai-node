@@ -1,12 +1,12 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import * as Core from '../../../core';
 import { APIResource } from '../../../resource';
-import { isRequestOptions } from '../../../core';
 import * as VectorStoresAPI from './vector-stores';
 import * as FileBatchesAPI from './file-batches';
 import * as FilesAPI from './files';
-import { CursorPage, type CursorPageParams } from '../../../pagination';
+import { CursorPage, type CursorPageParams, PagePromise } from '../../../pagination';
+import { APIPromise } from '../../../internal/api-promise';
+import { RequestOptions } from '../../../internal/request-options';
 
 export class VectorStores extends APIResource {
   files: FilesAPI.Files = new FilesAPI.Files(this._client);
@@ -15,7 +15,7 @@ export class VectorStores extends APIResource {
   /**
    * Create a vector store.
    */
-  create(body: VectorStoreCreateParams, options?: Core.RequestOptions): Core.APIPromise<VectorStore> {
+  create(body: VectorStoreCreateParams, options?: RequestOptions): APIPromise<VectorStore> {
     return this._client.post('/vector_stores', {
       body,
       ...options,
@@ -26,8 +26,8 @@ export class VectorStores extends APIResource {
   /**
    * Retrieves a vector store.
    */
-  retrieve(vectorStoreId: string, options?: Core.RequestOptions): Core.APIPromise<VectorStore> {
-    return this._client.get(`/vector_stores/${vectorStoreId}`, {
+  retrieve(vectorStoreID: string, options?: RequestOptions): APIPromise<VectorStore> {
+    return this._client.get(`/vector_stores/${vectorStoreID}`, {
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
     });
@@ -37,11 +37,11 @@ export class VectorStores extends APIResource {
    * Modifies a vector store.
    */
   update(
-    vectorStoreId: string,
+    vectorStoreID: string,
     body: VectorStoreUpdateParams,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<VectorStore> {
-    return this._client.post(`/vector_stores/${vectorStoreId}`, {
+    options?: RequestOptions,
+  ): APIPromise<VectorStore> {
+    return this._client.post(`/vector_stores/${vectorStoreID}`, {
       body,
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
@@ -52,18 +52,10 @@ export class VectorStores extends APIResource {
    * Returns a list of vector stores.
    */
   list(
-    query?: VectorStoreListParams,
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<VectorStoresPage, VectorStore>;
-  list(options?: Core.RequestOptions): Core.PagePromise<VectorStoresPage, VectorStore>;
-  list(
-    query: VectorStoreListParams | Core.RequestOptions = {},
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<VectorStoresPage, VectorStore> {
-    if (isRequestOptions(query)) {
-      return this.list({}, query);
-    }
-    return this._client.getAPIList('/vector_stores', VectorStoresPage, {
+    query: VectorStoreListParams | null | undefined = {},
+    options?: RequestOptions,
+  ): PagePromise<VectorStoresPage, VectorStore> {
+    return this._client.getAPIList('/vector_stores', CursorPage<VectorStore>, {
       query,
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
@@ -81,7 +73,7 @@ export class VectorStores extends APIResource {
   }
 }
 
-export class VectorStoresPage extends CursorPage<VectorStore> {}
+export type VectorStoresPage = CursorPage<VectorStore>;
 
 /**
  * A vector store is a collection of processed files can be used by the
@@ -201,6 +193,12 @@ export interface VectorStoreDeleted {
 
 export interface VectorStoreCreateParams {
   /**
+   * The chunking strategy used to chunk the file(s). If not set, will use the `auto`
+   * strategy. Only applicable if `file_ids` is non-empty.
+   */
+  chunking_strategy?: VectorStoreCreateParams.Auto | VectorStoreCreateParams.Static;
+
+  /**
    * The expiration policy for a vector store.
    */
   expires_after?: VectorStoreCreateParams.ExpiresAfter;
@@ -227,6 +225,43 @@ export interface VectorStoreCreateParams {
 }
 
 export namespace VectorStoreCreateParams {
+  /**
+   * The default strategy. This strategy currently uses a `max_chunk_size_tokens` of
+   * `800` and `chunk_overlap_tokens` of `400`.
+   */
+  export interface Auto {
+    /**
+     * Always `auto`.
+     */
+    type: 'auto';
+  }
+
+  export interface Static {
+    static: Static.Static;
+
+    /**
+     * Always `static`.
+     */
+    type: 'static';
+  }
+
+  export namespace Static {
+    export interface Static {
+      /**
+       * The number of tokens that overlap between chunks. The default value is `400`.
+       *
+       * Note that the overlap must not exceed half of `max_chunk_size_tokens`.
+       */
+      chunk_overlap_tokens: number;
+
+      /**
+       * The maximum number of tokens in each chunk. The default value is `800`. The
+       * minimum value is `100` and the maximum value is `4096`.
+       */
+      max_chunk_size_tokens: number;
+    }
+  }
+
   /**
    * The expiration policy for a vector store.
    */
@@ -301,18 +336,22 @@ export interface VectorStoreListParams extends CursorPageParams {
 export namespace VectorStores {
   export import VectorStore = VectorStoresAPI.VectorStore;
   export import VectorStoreDeleted = VectorStoresAPI.VectorStoreDeleted;
-  export import VectorStoresPage = VectorStoresAPI.VectorStoresPage;
+  export type VectorStoresPage = VectorStoresAPI.VectorStoresPage;
   export import VectorStoreCreateParams = VectorStoresAPI.VectorStoreCreateParams;
   export import VectorStoreUpdateParams = VectorStoresAPI.VectorStoreUpdateParams;
   export import VectorStoreListParams = VectorStoresAPI.VectorStoreListParams;
   export import Files = FilesAPI.Files;
   export import VectorStoreFile = FilesAPI.VectorStoreFile;
   export import VectorStoreFileDeleted = FilesAPI.VectorStoreFileDeleted;
-  export import VectorStoreFilesPage = FilesAPI.VectorStoreFilesPage;
+  export type VectorStoreFilesPage = FilesAPI.VectorStoreFilesPage;
   export import FileCreateParams = FilesAPI.FileCreateParams;
+  export import FileRetrieveParams = FilesAPI.FileRetrieveParams;
   export import FileListParams = FilesAPI.FileListParams;
+  export import FileDeleteParams = FilesAPI.FileDeleteParams;
   export import FileBatches = FileBatchesAPI.FileBatches;
   export import VectorStoreFileBatch = FileBatchesAPI.VectorStoreFileBatch;
   export import FileBatchCreateParams = FileBatchesAPI.FileBatchCreateParams;
+  export import FileBatchRetrieveParams = FileBatchesAPI.FileBatchRetrieveParams;
+  export import FileBatchCancelParams = FileBatchesAPI.FileBatchCancelParams;
   export import FileBatchListFilesParams = FileBatchesAPI.FileBatchListFilesParams;
 }
