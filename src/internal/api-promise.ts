@@ -7,6 +7,7 @@ import { type Response } from '../_shims/index';
 /**
  * A subclass of `Promise` providing additional helper methods
  * for interacting with the SDK.
+ *
  */
 export class APIPromise<T> extends Promise<T> {
   private parsedPromise: Promise<T> | undefined;
