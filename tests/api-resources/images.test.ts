@@ -1,7 +1,7 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import OpenAI, { toFile } from 'openai';
-import { Response } from 'undici';
+import { Response } from 'node-fetch';
 
 const openai = new OpenAI({
   apiKey: 'My API Key',

@@ -2,7 +2,7 @@
  * Disclaimer: modules in _shims aren't intended to be imported by SDK users.
  */
 import { MultipartBody } from './MultipartBody';
-import { type RequestOptions } from '../internal/request-options';
+import { type RequestOptions } from '../core';
 import { type Shims } from './registry';
 
 export function getRuntime({ manuallyImported }: { manuallyImported?: boolean } = {}): Shims {
@@ -92,9 +92,12 @@ export function getRuntime({ manuallyImported }: { manuallyImported?: boolean } 
       ...opts,
       body: new MultipartBody(form) as any,
     }),
-    getDefaultAgent: (_url: string) => undefined,
+    getDefaultAgent: (url: string) => undefined,
+    fileFromPath: () => {
+      throw new Error(
+        'The `fileFromPath` function is only supported in Node. See the README for more details: https://www.github.com/openai/openai-node#file-uploads',
+      );
+    },
     isFsReadStream: (value: any) => false,
-    isReadable: (_value: any) => false,
-    readableFromWeb: (value: any) => value, // assume web platform.
   };
 }

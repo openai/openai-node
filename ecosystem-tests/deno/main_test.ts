@@ -1,0 +1,129 @@
+import { assertEquals, AssertionError } from 'https://deno.land/std@0.192.0/testing/asserts.ts';
+import { distance } from 'https://deno.land/x/fastest_levenshtein/mod.ts';
+import OpenAI, { toFile } from 'openai';
+
+const url = 'https://audio-samples.github.io/samples/mp3/blizzard_biased/sample-1.mp3';
+const filename = 'sample-1.mp3';
+
+const correctAnswer =
+  'It was anxious to find him no one that expectation of a man who were giving his father enjoyment. But he was avoided in sight in the minister to which indeed,';
+const model = 'whisper-1';
+
+const client = new OpenAI({ apiKey: Deno.env.get('OPENAI_API_KEY') });
+
+async function _typeTests() {
+  // @ts-expect-error this should error if the `Uploadable` type was resolved correctly
+  await client.audio.transcriptions.create({ file: { foo: true }, model: 'whisper-1' });
+  // @ts-expect-error this should error if the `Uploadable` type was resolved correctly
+  await client.audio.transcriptions.create({ file: null, model: 'whisper-1' });
+  // @ts-expect-error this should error if the `Uploadable` type was resolved correctly
+  await client.audio.transcriptions.create({ file: 'test', model: 'whisper-1' });
+}
+
+function assertSimilar(received: string, expected: string, maxDistance: number) {
+  const receivedDistance = distance(received, expected);
+  if (receivedDistance < maxDistance) {
+    return;
+  }
+
+  const message = [
+    `Received: ${JSON.stringify(received)}`,
+    `Expected: ${JSON.stringify(expected)}`,
+    `Max distance: ${maxDistance}`,
+    `Received distance: ${receivedDistance}`,
+  ].join('\n');
+
+  throw new AssertionError(message);
+}
+
+Deno.test(async function rawResponse() {
+  const response = await client.chat.completions
+    .create({
+      model: 'gpt-4',
+      messages: [{ role: 'user', content: 'Say this is a test' }],
+    })
+    .asResponse();
+
+  // test that we can use web Response API
+  const { body } = response;
+  if (!body) throw new Error('expected response.body to be defined');
+
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let result;
+  do {
+    result = await reader.read();
+    if (!result.done) chunks.push(result.value);
+  } while (!result.done);
+
+  reader.releaseLock();
+
+  let offset = 0;
+  const merged = new Uint8Array(chunks.reduce((total, chunk) => total + chunk.length, 0));
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.length;
+  }
+
+  const json: OpenAI.ChatCompletion = JSON.parse(new TextDecoder().decode(merged));
+  assertSimilar(json.choices[0]?.message.content || '', 'This is a test', 10);
+});
+
+Deno.test(async function streamingWorks() {
+  const stream = await client.chat.completions.create({
+    model: 'gpt-4',
+    messages: [{ role: 'user', content: 'Say this is a test' }],
+    stream: true,
+  });
+  const chunks = [];
+  for await (const part of stream) {
+    chunks.push(part);
+  }
+  assertSimilar(chunks.map((c) => c.choices[0]?.delta.content || '').join(''), 'This is a test', 10);
+});
+
+Deno.test(async function handlesFile() {
+  const file = await fetch(url)
+    .then((x) => x.arrayBuffer())
+    .then((x) => new File([x], filename));
+
+  const result = await client.audio.transcriptions.create({ file, model });
+  assertSimilar(result.text, correctAnswer, 12);
+});
+Deno.test(async function handlesResponse() {
+  const file = await fetch(url);
+
+  const result = await client.audio.transcriptions.create({ file, model });
+  assertSimilar(result.text, correctAnswer, 12);
+});
+
+const fineTune = `{"prompt": "<prompt text>", "completion": "<ideal generated text>"}`;
+
+Deno.test(async function toFileHandlesBlob() {
+  const result = await client.files.create({
+    file: await toFile(new Blob([fineTune]), 'finetune.jsonl'),
+    purpose: 'fine-tune',
+  });
+  assertEquals(result.filename, 'finetune.jsonl');
+});
+Deno.test(async function toFileHandlesUint8Array() {
+  const result = await client.files.create({
+    file: await toFile(new TextEncoder().encode(fineTune), 'finetune.jsonl'),
+    purpose: 'fine-tune',
+  });
+  assertEquals(result.filename, 'finetune.jsonl');
+});
+Deno.test(async function toFileHandlesArrayBuffer() {
+  const result = await client.files.create({
+    file: await toFile(new TextEncoder().encode(fineTune).buffer, 'finetune.jsonl'),
+    purpose: 'fine-tune',
+  });
+  assertEquals(result.filename, 'finetune.jsonl');
+});
+Deno.test(async function toFileHandlesDataView() {
+  const result = await client.files.create({
+    file: await toFile(new DataView(new TextEncoder().encode(fineTune).buffer), 'finetune.jsonl'),
+    purpose: 'fine-tune',
+  });
+  assertEquals(result.filename, 'finetune.jsonl');
+});

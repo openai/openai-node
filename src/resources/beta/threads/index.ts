@@ -28,10 +28,8 @@ export {
   TextDelta,
   TextDeltaBlock,
   MessageCreateParams,
-  MessageRetrieveParams,
   MessageUpdateParams,
   MessageListParams,
-  MessageDeleteParams,
   MessagesPage,
   Messages,
 } from './messages';
@@ -48,6 +46,8 @@ export {
   ThreadCreateAndRunParams,
   ThreadCreateAndRunParamsNonStreaming,
   ThreadCreateAndRunParamsStreaming,
+  ThreadCreateAndRunPollParams,
+  ThreadCreateAndRunStreamParams,
   Threads,
 } from './threads';
 export {
@@ -57,13 +57,16 @@ export {
   RunCreateParams,
   RunCreateParamsNonStreaming,
   RunCreateParamsStreaming,
-  RunRetrieveParams,
   RunUpdateParams,
   RunListParams,
-  RunCancelParams,
+  RunCreateAndPollParams,
+  RunCreateAndStreamParams,
+  RunStreamParams,
   RunSubmitToolOutputsParams,
   RunSubmitToolOutputsParamsNonStreaming,
   RunSubmitToolOutputsParamsStreaming,
+  RunSubmitToolOutputsAndPollParams,
+  RunSubmitToolOutputsStreamParams,
   RunsPage,
   Runs,
 } from './runs/index';

@@ -3,7 +3,7 @@
  */
 import { manual } from './manual-types';
 import * as auto from 'openai/_shims/auto/types';
-import { type RequestOptions } from '../internal/request-options';
+import { type RequestOptions } from '../core';
 
 type SelectType<Manual, Auto> = unknown extends Manual ? Auto : Manual;
 
@@ -21,8 +21,6 @@ export type Request = SelectType<manual.Request, auto.Request>;
 export type RequestInfo = SelectType<manual.RequestInfo, auto.RequestInfo>;
 // @ts-ignore
 export type RequestInit = SelectType<manual.RequestInit, auto.RequestInit>;
-// @ts-ignore
-export type RequestDuplex = SelectType<manual.RequestDuplex, auto.RequestDuplex>;
 
 // @ts-ignore
 export type Response = SelectType<manual.Response, auto.Response>;
@@ -44,6 +42,8 @@ export type BlobPropertyBag = SelectType<manual.BlobPropertyBag, auto.BlobProper
 // @ts-ignore
 export type FilePropertyBag = SelectType<manual.FilePropertyBag, auto.FilePropertyBag>;
 // @ts-ignore
+export type FileFromPathOptions = SelectType<manual.FileFromPathOptions, auto.FileFromPathOptions>;
+// @ts-ignore
 export type FormData = SelectType<manual.FormData, auto.FormData>;
 // @ts-ignore
 export const FormData: SelectType<typeof manual.FormData, typeof auto.FormData>;
@@ -59,8 +59,6 @@ export const Blob: SelectType<typeof manual.Blob, typeof auto.Blob>;
 // @ts-ignore
 export type Readable = SelectType<manual.Readable, auto.Readable>;
 // @ts-ignore
-export const Readable: SelectType<typeof manual.Readable, typeof auto.Readable>;
-// @ts-ignore
 export type FsReadStream = SelectType<manual.FsReadStream, auto.FsReadStream>;
 // @ts-ignore
 export type ReadableStream = SelectType<manual.ReadableStream, auto.ReadableStream>;
@@ -74,6 +72,10 @@ export function getMultipartRequestOptions<T = Record<string, unknown>>(
 
 export function getDefaultAgent(url: string): any;
 
+// @ts-ignore
+export type FileFromPathOptions = SelectType<manual.FileFromPathOptions, auto.FileFromPathOptions>;
+
+export function fileFromPath(path: string, options?: FileFromPathOptions): Promise<File>;
+export function fileFromPath(path: string, filename?: string, options?: FileFromPathOptions): Promise<File>;
+
 export function isFsReadStream(value: any): value is FsReadStream;
-export function isReadable(value: any): value is Readable;
-export function readableFromWeb(value: ReadableStream): Readable;

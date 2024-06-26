@@ -1,23 +1,32 @@
 # OpenAI Node API Library
 
-[![NPM version](https://img.shields.io/npm/v/openai.svg)](https://npmjs.org/package/openai)
+[![NPM version](https://img.shields.io/npm/v/openai.svg)](https://npmjs.org/package/openai) ![npm bundle size](https://img.shields.io/bundlephobia/minzip/openai)
 
-This library provides convenient access to the OpenAI REST API from server-side TypeScript or JavaScript.
+This library provides convenient access to the OpenAI REST API from TypeScript or JavaScript.
 
-The REST API documentation can be found [on platform.openai.com](https://platform.openai.com/docs). The full API of this library can be found in [api.md](api.md).
+It is generated from our [OpenAPI specification](https://github.com/openai/openai-openapi) with [Stainless](https://stainlessapi.com/).
+
+To learn how to use the OpenAI API, check out our [API Reference](https://platform.openai.com/docs/api-reference) and [Documentation](https://platform.openai.com/docs).
 
 ## Installation
 
 ```sh
-npm install git+ssh://git@github.com:stainless-sdks/openai-typescript.git
+npm install openai
 ```
 
-> [!NOTE]
-> Once this package is [published to npm](https://app.stainlessapi.com/docs/guides/publish), this will become: `npm install openai`
+You can import in Deno via:
+
+<!-- x-release-please-start-version -->
+
+```ts
+import OpenAI from 'https://deno.land/x/openai@v4.47.2/mod.ts';
+```
+
+<!-- x-release-please-end -->
 
 ## Usage
 
-The full API of this library can be found in [api.md](api.md).
+The full API of this library can be found in [api.md file](api.md) along with many [code examples](https://github.com/openai/openai-node/tree/master/examples). The code below shows how to get started using the chat completions API.
 
 <!-- prettier-ignore -->
 ```js
@@ -46,14 +55,18 @@ import OpenAI from 'openai';
 
 const openai = new OpenAI();
 
-const stream = await openai.chat.completions.create({
-  messages: [{ role: 'user', content: 'Say this is a test' }],
-  model: 'gpt-3.5-turbo',
-  stream: true,
-});
-for await (const chatCompletionChunk of stream) {
-  console.log(chatCompletionChunk);
+async function main() {
+  const stream = await openai.chat.completions.create({
+    model: 'gpt-4',
+    messages: [{ role: 'user', content: 'Say this is a test' }],
+    stream: true,
+  });
+  for await (const chunk of stream) {
+    process.stdout.write(chunk.choices[0]?.delta?.content || '');
+  }
 }
+
+main();
 ```
 
 If you need to cancel a stream, you can `break` from the loop
@@ -84,6 +97,196 @@ main();
 
 Documentation for each method, request param, and response field are available in docstrings and will appear on hover in most modern editors.
 
+> [!IMPORTANT]
+> Previous versions of this SDK used a `Configuration` class. See the [v3 to v4 migration guide](https://github.com/openai/openai-node/discussions/217).
+
+### Polling Helpers
+
+When interacting with the API some actions such as starting a Run and adding files to vector stores are asynchronous and take time to complete. The SDK includes
+helper functions which will poll the status until it reaches a terminal state and then return the resulting object.
+If an API method results in an action which could benefit from polling there will be a corresponding version of the
+method ending in 'AndPoll'.
+
+For instance to create a Run and poll until it reaches a terminal state you can run:
+
+```ts
+const run = await openai.beta.threads.runs.createAndPoll(thread.id, {
+  assistant_id: assistantId,
+});
+```
+
+More information on the lifecycle of a Run can be found in the [Run Lifecycle Documentation](https://platform.openai.com/docs/assistants/how-it-works/run-lifecycle)
+
+### Bulk Upload Helpers
+
+When creating and interacting with vector stores, you can use the polling helpers to monitor the status of operations.
+For convenience, we also provide a bulk upload helper to allow you to simultaneously upload several files at once.
+
+```ts
+const fileList = [
+  createReadStream('/home/data/example.pdf'),
+  ...
+];
+
+const batch = await openai.vectorStores.fileBatches.uploadAndPoll(vectorStore.id, fileList);
+```
+
+### Streaming Helpers
+
+The SDK also includes helpers to process streams and handle the incoming events.
+
+```ts
+const run = openai.beta.threads.runs
+  .stream(thread.id, {
+    assistant_id: assistant.id,
+  })
+  .on('textCreated', (text) => process.stdout.write('\nassistant > '))
+  .on('textDelta', (textDelta, snapshot) => process.stdout.write(textDelta.value))
+  .on('toolCallCreated', (toolCall) => process.stdout.write(`\nassistant > ${toolCall.type}\n\n`))
+  .on('toolCallDelta', (toolCallDelta, snapshot) => {
+    if (toolCallDelta.type === 'code_interpreter') {
+      if (toolCallDelta.code_interpreter.input) {
+        process.stdout.write(toolCallDelta.code_interpreter.input);
+      }
+      if (toolCallDelta.code_interpreter.outputs) {
+        process.stdout.write('\noutput >\n');
+        toolCallDelta.code_interpreter.outputs.forEach((output) => {
+          if (output.type === 'logs') {
+            process.stdout.write(`\n${output.logs}\n`);
+          }
+        });
+      }
+    }
+  });
+```
+
+More information on streaming helpers can be found in the dedicated documentation: [helpers.md](helpers.md)
+
+### Streaming responses
+
+This library provides several conveniences for streaming chat completions, for example:
+
+```ts
+import OpenAI from 'openai';
+
+const openai = new OpenAI();
+
+async function main() {
+  const stream = await openai.beta.chat.completions.stream({
+    model: 'gpt-4',
+    messages: [{ role: 'user', content: 'Say this is a test' }],
+    stream: true,
+  });
+
+  stream.on('content', (delta, snapshot) => {
+    process.stdout.write(delta);
+  });
+
+  // or, equivalently:
+  for await (const chunk of stream) {
+    process.stdout.write(chunk.choices[0]?.delta?.content || '');
+  }
+
+  const chatCompletion = await stream.finalChatCompletion();
+  console.log(chatCompletion); // {id: "…", choices: […], …}
+}
+
+main();
+```
+
+Streaming with `openai.beta.chat.completions.stream({…})` exposes
+[various helpers for your convenience](helpers.md#events) including event handlers and promises.
+
+Alternatively, you can use `openai.chat.completions.create({ stream: true, … })`
+which only returns an async iterable of the chunks in the stream and thus uses less memory
+(it does not build up a final chat completion object for you).
+
+If you need to cancel a stream, you can `break` from a `for await` loop or call `stream.abort()`.
+
+### Automated function calls
+
+We provide the `openai.beta.chat.completions.runTools({…})`
+convenience helper for using function tool calls with the `/chat/completions` endpoint
+which automatically call the JavaScript functions you provide
+and sends their results back to the `/chat/completions` endpoint,
+looping as long as the model requests tool calls.
+
+If you pass a `parse` function, it will automatically parse the `arguments` for you
+and returns any parsing errors to the model to attempt auto-recovery.
+Otherwise, the args will be passed to the function you provide as a string.
+
+If you pass `tool_choice: {function: {name: …}}` instead of `auto`,
+it returns immediately after calling that function (and only loops to auto-recover parsing errors).
+
+```ts
+import OpenAI from 'openai';
+
+const client = new OpenAI();
+
+async function main() {
+  const runner = client.beta.chat.completions
+    .runTools({
+      model: 'gpt-3.5-turbo',
+      messages: [{ role: 'user', content: 'How is the weather this week?' }],
+      tools: [
+        {
+          type: 'function',
+          function: {
+            function: getCurrentLocation,
+            parameters: { type: 'object', properties: {} },
+          },
+        },
+        {
+          type: 'function',
+          function: {
+            function: getWeather,
+            parse: JSON.parse, // or use a validation library like zod for typesafe parsing.
+            parameters: {
+              type: 'object',
+              properties: {
+                location: { type: 'string' },
+              },
+            },
+          },
+        },
+      ],
+    })
+    .on('message', (message) => console.log(message));
+
+  const finalContent = await runner.finalContent();
+  console.log();
+  console.log('Final content:', finalContent);
+}
+
+async function getCurrentLocation() {
+  return 'Boston'; // Simulate lookup
+}
+
+async function getWeather(args: { location: string }) {
+  const { location } = args;
+  // … do lookup …
+  return { temperature, precipitation };
+}
+
+main();
+
+// {role: "user",      content: "How's the weather this week?"}
+// {role: "assistant", tool_calls: [{type: "function", function: {name: "getCurrentLocation", arguments: "{}"}, id: "123"}
+// {role: "tool",      name: "getCurrentLocation", content: "Boston", tool_call_id: "123"}
+// {role: "assistant", tool_calls: [{type: "function", function: {name: "getWeather", arguments: '{"location": "Boston"}'}, id: "1234"}]}
+// {role: "tool",      name: "getWeather", content: '{"temperature": "50degF", "preciptation": "high"}', tool_call_id: "1234"}
+// {role: "assistant", content: "It's looking cold and rainy - you might want to wear a jacket!"}
+//
+// Final content: "It's looking cold and rainy - you might want to wear a jacket!"
+```
+
+Like with `.stream()`, we provide a variety of [helpers and events](helpers.md#events).
+
+Note that `runFunctions` was previously available as well, but has been deprecated in favor of `runTools`.
+
+Read more about various examples such as with integrating with [zod](helpers.md#integrate-with-zod),
+[next.js](helpers.md#integrate-wtih-next-js), and [proxying a stream to the browser](helpers.md#proxy-streaming-to-a-browser).
+
 ## File uploads
 
 Request parameters that correspond to file uploads can be passed in many different forms:
@@ -95,7 +298,7 @@ Request parameters that correspond to file uploads can be passed in many differe
 
 ```ts
 import fs from 'fs';
-import { fetch } from 'undici';
+import fetch from 'node-fetch';
 import OpenAI, { toFile } from 'openai';
 
 const openai = new OpenAI();
@@ -329,21 +532,21 @@ validate or strip extra properties from the response from the API.
 
 ### Customizing the fetch client
 
-By default, this library uses `undici` in Node, and expects a global `fetch` function in other environments.
+By default, this library uses `node-fetch` in Node, and expects a global `fetch` function in other environments.
 
 If you would prefer to use a global, web-standards-compliant `fetch` function even in a Node environment,
 (for example, if you are running Node with `--experimental-fetch` or using NextJS which polyfills with `undici`),
 add the following import before your first import `from "OpenAI"`:
 
 ```ts
-// Tell TypeScript and the package to use the global web fetch instead of undici.
+// Tell TypeScript and the package to use the global web fetch instead of node-fetch.
 // Note, despite the name, this does not add any polyfills, but expects them to be provided if needed.
 import 'openai/shims/web';
 import OpenAI from 'openai';
 ```
 
 To do the inverse, add `import "openai/shims/node"` (which does import polyfills).
-This can also be useful if you are getting the wrong TypeScript types for `Response` ([more details](https://github.com/stainless-sdks/openai-typescript/tree/main/src/_shims#readme)).
+This can also be useful if you are getting the wrong TypeScript types for `Response` ([more details](https://github.com/openai/openai-node/tree/master/src/_shims#readme)).
 
 ### Logging and middleware
 
@@ -399,7 +602,7 @@ This package generally follows [SemVer](https://semver.org/spec/v2.0.0.html) con
 
 We take backwards-compatibility seriously and work hard to ensure you can rely on a smooth upgrade experience.
 
-We are keen for your feedback; please open an [issue](https://www.github.com/stainless-sdks/openai-typescript/issues) with questions, bugs, or suggestions.
+We are keen for your feedback; please open an [issue](https://www.github.com/openai/openai-node/issues) with questions, bugs, or suggestions.
 
 ## Requirements
 

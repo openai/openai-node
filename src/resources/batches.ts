@@ -1,47 +1,50 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
+import * as Core from '../core';
 import { APIResource } from '../resource';
+import { isRequestOptions } from '../core';
 import * as BatchesAPI from './batches';
-import { CursorPage, type CursorPageParams, PagePromise } from '../pagination';
-import { APIPromise } from '../internal/api-promise';
-import { RequestOptions } from '../internal/request-options';
+import { CursorPage, type CursorPageParams } from '../pagination';
 
 export class Batches extends APIResource {
   /**
    * Creates and executes a batch from an uploaded file of requests
    */
-  create(body: BatchCreateParams, options?: RequestOptions): APIPromise<Batch> {
+  create(body: BatchCreateParams, options?: Core.RequestOptions): Core.APIPromise<Batch> {
     return this._client.post('/batches', { body, ...options });
   }
 
   /**
    * Retrieves a batch.
    */
-  retrieve(batchID: string, options?: RequestOptions): APIPromise<Batch> {
-    return this._client.get(`/batches/${batchID}`, options);
+  retrieve(batchId: string, options?: Core.RequestOptions): Core.APIPromise<Batch> {
+    return this._client.get(`/batches/${batchId}`, options);
   }
 
   /**
    * List your organization's batches.
    */
+  list(query?: BatchListParams, options?: Core.RequestOptions): Core.PagePromise<BatchesPage, Batch>;
+  list(options?: Core.RequestOptions): Core.PagePromise<BatchesPage, Batch>;
   list(
-    query: BatchListParams | null | undefined = {},
-    options?: RequestOptions,
-  ): PagePromise<BatchesPage, Batch> {
-    return this._client.getAPIList('/batches', CursorPage<Batch>, { query, ...options });
+    query: BatchListParams | Core.RequestOptions = {},
+    options?: Core.RequestOptions,
+  ): Core.PagePromise<BatchesPage, Batch> {
+    if (isRequestOptions(query)) {
+      return this.list({}, query);
+    }
+    return this._client.getAPIList('/batches', BatchesPage, { query, ...options });
   }
 
   /**
-   * Cancels an in-progress batch. The batch will be in status `cancelling` for up to
-   * 10 minutes, before changing to `cancelled`, where it will have partial results
-   * (if any) available in the output file.
+   * Cancels an in-progress batch.
    */
-  cancel(batchID: string, options?: RequestOptions): APIPromise<Batch> {
-    return this._client.post(`/batches/${batchID}/cancel`, options);
+  cancel(batchId: string, options?: Core.RequestOptions): Core.APIPromise<Batch> {
+    return this._client.post(`/batches/${batchId}/cancel`, options);
   }
 }
 
-export type BatchesPage = CursorPage<Batch>;
+export class BatchesPage extends CursorPage<Batch> {}
 
 export interface Batch {
   id: string;
@@ -225,7 +228,7 @@ export interface BatchCreateParams {
    * for how to upload a file.
    *
    * Your input file must be formatted as a
-   * [JSONL file](https://platform.openai.com/docs/api-reference/batch/request-input),
+   * [JSONL file](https://platform.openai.com/docs/api-reference/batch/requestInput),
    * and must be uploaded with the purpose `batch`. The file can contain up to 50,000
    * requests, and can be up to 100 MB in size.
    */
@@ -243,7 +246,7 @@ export namespace Batches {
   export import Batch = BatchesAPI.Batch;
   export import BatchError = BatchesAPI.BatchError;
   export import BatchRequestCounts = BatchesAPI.BatchRequestCounts;
-  export type BatchesPage = BatchesAPI.BatchesPage;
+  export import BatchesPage = BatchesAPI.BatchesPage;
   export import BatchCreateParams = BatchesAPI.BatchCreateParams;
   export import BatchListParams = BatchesAPI.BatchListParams;
 }

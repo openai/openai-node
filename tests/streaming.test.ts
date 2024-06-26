@@ -1,4 +1,4 @@
-import { Response } from 'undici';
+import { Response } from 'node-fetch';
 import { PassThrough } from 'stream';
 import assert from 'assert';
 import { _iterSSEMessages, _decodeChunks as decodeChunks } from 'openai/streaming';

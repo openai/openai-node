@@ -14,8 +14,8 @@ export namespace FineTuning {
   export import FineTuningJobIntegration = JobsAPI.FineTuningJobIntegration;
   export import FineTuningJobWandbIntegration = JobsAPI.FineTuningJobWandbIntegration;
   export import FineTuningJobWandbIntegrationObject = JobsAPI.FineTuningJobWandbIntegrationObject;
-  export type FineTuningJobsPage = JobsAPI.FineTuningJobsPage;
-  export type FineTuningJobEventsPage = JobsAPI.FineTuningJobEventsPage;
+  export import FineTuningJobsPage = JobsAPI.FineTuningJobsPage;
+  export import FineTuningJobEventsPage = JobsAPI.FineTuningJobEventsPage;
   export import JobCreateParams = JobsAPI.JobCreateParams;
   export import JobListParams = JobsAPI.JobListParams;
   export import JobListEventsParams = JobsAPI.JobListEventsParams;

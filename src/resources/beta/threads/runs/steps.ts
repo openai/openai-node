@@ -1,18 +1,22 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
+import * as Core from '../../../../core';
 import { APIResource } from '../../../../resource';
+import { isRequestOptions } from '../../../../core';
 import * as StepsAPI from './steps';
-import { CursorPage, type CursorPageParams, PagePromise } from '../../../../pagination';
-import { APIPromise } from '../../../../internal/api-promise';
-import { RequestOptions } from '../../../../internal/request-options';
+import { CursorPage, type CursorPageParams } from '../../../../pagination';
 
 export class Steps extends APIResource {
   /**
    * Retrieves a run step.
    */
-  retrieve(stepID: string, params: StepRetrieveParams, options?: RequestOptions): APIPromise<RunStep> {
-    const { thread_id, run_id } = params;
-    return this._client.get(`/threads/${thread_id}/runs/${run_id}/steps/${stepID}`, {
+  retrieve(
+    threadId: string,
+    runId: string,
+    stepId: string,
+    options?: Core.RequestOptions,
+  ): Core.APIPromise<RunStep> {
+    return this._client.get(`/threads/${threadId}/runs/${runId}/steps/${stepId}`, {
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
     });
@@ -21,9 +25,27 @@ export class Steps extends APIResource {
   /**
    * Returns a list of run steps belonging to a run.
    */
-  list(runID: string, params: StepListParams, options?: RequestOptions): PagePromise<RunStepsPage, RunStep> {
-    const { thread_id, ...query } = params;
-    return this._client.getAPIList(`/threads/${thread_id}/runs/${runID}/steps`, CursorPage<RunStep>, {
+  list(
+    threadId: string,
+    runId: string,
+    query?: StepListParams,
+    options?: Core.RequestOptions,
+  ): Core.PagePromise<RunStepsPage, RunStep>;
+  list(
+    threadId: string,
+    runId: string,
+    options?: Core.RequestOptions,
+  ): Core.PagePromise<RunStepsPage, RunStep>;
+  list(
+    threadId: string,
+    runId: string,
+    query: StepListParams | Core.RequestOptions = {},
+    options?: Core.RequestOptions,
+  ): Core.PagePromise<RunStepsPage, RunStep> {
+    if (isRequestOptions(query)) {
+      return this.list(threadId, runId, {}, query);
+    }
+    return this._client.getAPIList(`/threads/${threadId}/runs/${runId}/steps`, RunStepsPage, {
       query,
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
@@ -31,7 +53,7 @@ export class Steps extends APIResource {
   }
 }
 
-export type RunStepsPage = CursorPage<RunStep>;
+export class RunStepsPage extends CursorPage<RunStep> {}
 
 /**
  * Text output from the Code Interpreter tool call as part of a run step.
@@ -580,35 +602,18 @@ export interface ToolCallsStepDetails {
   type: 'tool_calls';
 }
 
-export interface StepRetrieveParams {
-  /**
-   * The ID of the thread to which the run and run step belongs.
-   */
-  thread_id: string;
-
-  /**
-   * The ID of the run to which the run step belongs.
-   */
-  run_id: string;
-}
-
 export interface StepListParams extends CursorPageParams {
   /**
-   * Path param: The ID of the thread the run and run steps belong to.
-   */
-  thread_id: string;
-
-  /**
-   * Query param: A cursor for use in pagination. `before` is an object ID that
-   * defines your place in the list. For instance, if you make a list request and
-   * receive 100 objects, ending with obj_foo, your subsequent call can include
-   * before=obj_foo in order to fetch the previous page of the list.
+   * A cursor for use in pagination. `before` is an object ID that defines your place
+   * in the list. For instance, if you make a list request and receive 100 objects,
+   * ending with obj_foo, your subsequent call can include before=obj_foo in order to
+   * fetch the previous page of the list.
    */
   before?: string;
 
   /**
-   * Query param: Sort order by the `created_at` timestamp of the objects. `asc` for
-   * ascending order and `desc` for descending order.
+   * Sort order by the `created_at` timestamp of the objects. `asc` for ascending
+   * order and `desc` for descending order.
    */
   order?: 'asc' | 'desc';
 }
@@ -631,7 +636,6 @@ export namespace Steps {
   export import ToolCallDelta = StepsAPI.ToolCallDelta;
   export import ToolCallDeltaObject = StepsAPI.ToolCallDeltaObject;
   export import ToolCallsStepDetails = StepsAPI.ToolCallsStepDetails;
-  export type RunStepsPage = StepsAPI.RunStepsPage;
-  export import StepRetrieveParams = StepsAPI.StepRetrieveParams;
+  export import RunStepsPage = StepsAPI.RunStepsPage;
   export import StepListParams = StepsAPI.StepListParams;
 }

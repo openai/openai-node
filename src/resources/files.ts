@@ -1,12 +1,14 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
+import * as Core from '../core';
 import { APIResource } from '../resource';
-import * as FilesAPI from './files';
-import { Page, PagePromise } from '../pagination';
-import { type Uploadable, multipartFormRequestOptions } from '../uploads';
+import { isRequestOptions } from '../core';
 import { type Response } from '../_shims/index';
-import { APIPromise } from '../internal/api-promise';
-import { RequestOptions } from '../internal/request-options';
+import { sleep } from '../core';
+import { APIConnectionTimeoutError } from '../error';
+import * as FilesAPI from './files';
+import { type Uploadable, multipartFormRequestOptions } from '../core';
+import { Page } from '../pagination';
 
 export class Files extends APIResource {
   /**
@@ -19,38 +21,37 @@ export class Files extends APIResource {
    * [Assistants Tools guide](https://platform.openai.com/docs/assistants/tools) for
    * details.
    *
-   * The Fine-tuning API only supports `.jsonl` files. The input also has certain
-   * required formats for fine-tuning
-   * [chat](https://platform.openai.com/docs/api-reference/fine-tuning/chat-input) or
-   * [completions](https://platform.openai.com/docs/api-reference/fine-tuning/completions-input)
-   * models.
+   * The Fine-tuning API only supports `.jsonl` files.
    *
-   * The Batch API only supports `.jsonl` files up to 100 MB in size. The input also
-   * has a specific required
-   * [format](https://platform.openai.com/docs/api-reference/batch/request-input).
+   * The Batch API only supports `.jsonl` files up to 100 MB in size.
    *
    * Please [contact us](https://help.openai.com/) if you need to increase these
    * storage limits.
    */
-  create(body: FileCreateParams, options?: RequestOptions): APIPromise<FileObject> {
+  create(body: FileCreateParams, options?: Core.RequestOptions): Core.APIPromise<FileObject> {
     return this._client.post('/files', multipartFormRequestOptions({ body, ...options }));
   }
 
   /**
    * Returns information about a specific file.
    */
-  retrieve(fileID: string, options?: RequestOptions): APIPromise<FileObject> {
-    return this._client.get(`/files/${fileID}`, options);
+  retrieve(fileId: string, options?: Core.RequestOptions): Core.APIPromise<FileObject> {
+    return this._client.get(`/files/${fileId}`, options);
   }
 
   /**
    * Returns a list of files that belong to the user's organization.
    */
+  list(query?: FileListParams, options?: Core.RequestOptions): Core.PagePromise<FileObjectsPage, FileObject>;
+  list(options?: Core.RequestOptions): Core.PagePromise<FileObjectsPage, FileObject>;
   list(
-    query: FileListParams | null | undefined = {},
-    options?: RequestOptions,
-  ): PagePromise<FileObjectsPage, FileObject> {
-    return this._client.getAPIList('/files', Page<FileObject>, { query, ...options });
+    query: FileListParams | Core.RequestOptions = {},
+    options?: Core.RequestOptions,
+  ): Core.PagePromise<FileObjectsPage, FileObject> {
+    if (isRequestOptions(query)) {
+      return this.list({}, query);
+    }
+    return this._client.getAPIList('/files', FileObjectsPage, { query, ...options });
   }
 
   /**
@@ -63,13 +64,53 @@ export class Files extends APIResource {
   /**
    * Returns the contents of the specified file.
    */
-  content(fileID: string, options?: RequestOptions): APIPromise<Response> {
-    return this._client.get(`/files/${fileID}/content`, { ...options, __binaryResponse: true });
+  content(fileId: string, options?: Core.RequestOptions): Core.APIPromise<Response> {
+    return this._client.get(`/files/${fileId}/content`, { ...options, __binaryResponse: true });
+  }
+
+  /**
+   * Returns the contents of the specified file.
+   *
+   * @deprecated The `.content()` method should be used instead
+   */
+  retrieveContent(fileId: string, options?: Core.RequestOptions): Core.APIPromise<string> {
+    return this._client.get(`/files/${fileId}/content`, {
+      ...options,
+      headers: { Accept: 'application/json', ...options?.headers },
+    });
+  }
+
+  /**
+   * Waits for the given file to be processed, default timeout is 30 mins.
+   */
+  async waitForProcessing(
+    id: string,
+    { pollInterval = 5000, maxWait = 30 * 60 * 1000 }: { pollInterval?: number; maxWait?: number } = {},
+  ): Promise<FileObject> {
+    const TERMINAL_STATES = new Set(['processed', 'error', 'deleted']);
+
+    const start = Date.now();
+    let file = await this.retrieve(id);
+
+    while (!file.status || !TERMINAL_STATES.has(file.status)) {
+      await sleep(pollInterval);
+
+      file = await this.retrieve(id);
+      if (Date.now() - start > maxWait) {
+        throw new APIConnectionTimeoutError({
+          message: `Giving up on waiting for file ${id} to finish processing after ${maxWait} milliseconds.`,
+        });
+      }
+    }
+
+    return file;
   }
 }
 
-// Note: no pagination actually occurs yet, this is for forwards-compatibility.
-export type FileObjectsPage = Page<FileObject>;
+/**
+ * Note: no pagination actually occurs yet, this is for forwards-compatibility.
+ */
+export class FileObjectsPage extends Page<FileObject> {}
 
 export type FileContent = string;
 
@@ -153,7 +194,7 @@ export interface FileCreateParams {
    * [Batch API](https://platform.openai.com/docs/guides/batch), and "fine-tune" for
    * [Fine-tuning](https://platform.openai.com/docs/api-reference/fine-tuning).
    */
-  purpose: 'assistants' | 'batch' | 'fine-tune' | 'vision';
+  purpose: 'assistants' | 'batch' | 'fine-tune';
 }
 
 export interface FileListParams {
@@ -167,7 +208,7 @@ export namespace Files {
   export import FileContent = FilesAPI.FileContent;
   export import FileDeleted = FilesAPI.FileDeleted;
   export import FileObject = FilesAPI.FileObject;
-  export type FileObjectsPage = FilesAPI.FileObjectsPage;
+  export import FileObjectsPage = FilesAPI.FileObjectsPage;
   export import FileCreateParams = FilesAPI.FileCreateParams;
   export import FileListParams = FilesAPI.FileListParams;
 }

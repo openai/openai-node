@@ -1,11 +1,11 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
+import * as Core from '../../../core';
 import { APIResource } from '../../../resource';
+import { isRequestOptions } from '../../../core';
 import * as JobsAPI from './jobs';
 import * as CheckpointsAPI from './checkpoints';
-import { CursorPage, type CursorPageParams, PagePromise } from '../../../pagination';
-import { APIPromise } from '../../../internal/api-promise';
-import { RequestOptions } from '../../../internal/request-options';
+import { CursorPage, type CursorPageParams } from '../../../pagination';
 
 export class Jobs extends APIResource {
   checkpoints: CheckpointsAPI.Checkpoints = new CheckpointsAPI.Checkpoints(this._client);
@@ -19,7 +19,7 @@ export class Jobs extends APIResource {
    *
    * [Learn more about fine-tuning](https://platform.openai.com/docs/guides/fine-tuning)
    */
-  create(body: JobCreateParams, options?: RequestOptions): APIPromise<FineTuningJob> {
+  create(body: JobCreateParams, options?: Core.RequestOptions): Core.APIPromise<FineTuningJob> {
     return this._client.post('/fine_tuning/jobs', { body, ...options });
   }
 
@@ -28,46 +28,65 @@ export class Jobs extends APIResource {
    *
    * [Learn more about fine-tuning](https://platform.openai.com/docs/guides/fine-tuning)
    */
-  retrieve(fineTuningJobID: string, options?: RequestOptions): APIPromise<FineTuningJob> {
-    return this._client.get(`/fine_tuning/jobs/${fineTuningJobID}`, options);
+  retrieve(fineTuningJobId: string, options?: Core.RequestOptions): Core.APIPromise<FineTuningJob> {
+    return this._client.get(`/fine_tuning/jobs/${fineTuningJobId}`, options);
   }
 
   /**
    * List your organization's fine-tuning jobs
    */
   list(
-    query: JobListParams | null | undefined = {},
-    options?: RequestOptions,
-  ): PagePromise<FineTuningJobsPage, FineTuningJob> {
-    return this._client.getAPIList('/fine_tuning/jobs', CursorPage<FineTuningJob>, { query, ...options });
+    query?: JobListParams,
+    options?: Core.RequestOptions,
+  ): Core.PagePromise<FineTuningJobsPage, FineTuningJob>;
+  list(options?: Core.RequestOptions): Core.PagePromise<FineTuningJobsPage, FineTuningJob>;
+  list(
+    query: JobListParams | Core.RequestOptions = {},
+    options?: Core.RequestOptions,
+  ): Core.PagePromise<FineTuningJobsPage, FineTuningJob> {
+    if (isRequestOptions(query)) {
+      return this.list({}, query);
+    }
+    return this._client.getAPIList('/fine_tuning/jobs', FineTuningJobsPage, { query, ...options });
   }
 
   /**
    * Immediately cancel a fine-tune job.
    */
-  cancel(fineTuningJobID: string, options?: RequestOptions): APIPromise<FineTuningJob> {
-    return this._client.post(`/fine_tuning/jobs/${fineTuningJobID}/cancel`, options);
+  cancel(fineTuningJobId: string, options?: Core.RequestOptions): Core.APIPromise<FineTuningJob> {
+    return this._client.post(`/fine_tuning/jobs/${fineTuningJobId}/cancel`, options);
   }
 
   /**
    * Get status updates for a fine-tuning job.
    */
   listEvents(
-    fineTuningJobID: string,
-    query: JobListEventsParams | null | undefined = {},
-    options?: RequestOptions,
-  ): PagePromise<FineTuningJobEventsPage, FineTuningJobEvent> {
-    return this._client.getAPIList(
-      `/fine_tuning/jobs/${fineTuningJobID}/events`,
-      CursorPage<FineTuningJobEvent>,
-      { query, ...options },
-    );
+    fineTuningJobId: string,
+    query?: JobListEventsParams,
+    options?: Core.RequestOptions,
+  ): Core.PagePromise<FineTuningJobEventsPage, FineTuningJobEvent>;
+  listEvents(
+    fineTuningJobId: string,
+    options?: Core.RequestOptions,
+  ): Core.PagePromise<FineTuningJobEventsPage, FineTuningJobEvent>;
+  listEvents(
+    fineTuningJobId: string,
+    query: JobListEventsParams | Core.RequestOptions = {},
+    options?: Core.RequestOptions,
+  ): Core.PagePromise<FineTuningJobEventsPage, FineTuningJobEvent> {
+    if (isRequestOptions(query)) {
+      return this.listEvents(fineTuningJobId, {}, query);
+    }
+    return this._client.getAPIList(`/fine_tuning/jobs/${fineTuningJobId}/events`, FineTuningJobEventsPage, {
+      query,
+      ...options,
+    });
   }
 }
 
-export type FineTuningJobsPage = CursorPage<FineTuningJob>;
+export class FineTuningJobsPage extends CursorPage<FineTuningJob> {}
 
-export type FineTuningJobEventsPage = CursorPage<FineTuningJobEvent>;
+export class FineTuningJobEventsPage extends CursorPage<FineTuningJobEvent> {}
 
 /**
  * The `fine_tuning.job` object represents a fine-tuning job that has been created
@@ -293,11 +312,6 @@ export interface JobCreateParams {
    * Your dataset must be formatted as a JSONL file. Additionally, you must upload
    * your file with the purpose `fine-tune`.
    *
-   * The contents of the file should differ depending on if the model uses the
-   * [chat](https://platform.openai.com/docs/api-reference/fine-tuning/chat-input) or
-   * [completions](https://platform.openai.com/docs/api-reference/fine-tuning/completions-input)
-   * format.
-   *
    * See the [fine-tuning guide](https://platform.openai.com/docs/guides/fine-tuning)
    * for more details.
    */
@@ -432,13 +446,13 @@ export namespace Jobs {
   export import FineTuningJobIntegration = JobsAPI.FineTuningJobIntegration;
   export import FineTuningJobWandbIntegration = JobsAPI.FineTuningJobWandbIntegration;
   export import FineTuningJobWandbIntegrationObject = JobsAPI.FineTuningJobWandbIntegrationObject;
-  export type FineTuningJobsPage = JobsAPI.FineTuningJobsPage;
-  export type FineTuningJobEventsPage = JobsAPI.FineTuningJobEventsPage;
+  export import FineTuningJobsPage = JobsAPI.FineTuningJobsPage;
+  export import FineTuningJobEventsPage = JobsAPI.FineTuningJobEventsPage;
   export import JobCreateParams = JobsAPI.JobCreateParams;
   export import JobListParams = JobsAPI.JobListParams;
   export import JobListEventsParams = JobsAPI.JobListEventsParams;
   export import Checkpoints = CheckpointsAPI.Checkpoints;
   export import FineTuningJobCheckpoint = CheckpointsAPI.FineTuningJobCheckpoint;
-  export type FineTuningJobCheckpointsPage = CheckpointsAPI.FineTuningJobCheckpointsPage;
+  export import FineTuningJobCheckpointsPage = CheckpointsAPI.FineTuningJobCheckpointsPage;
   export import CheckpointListParams = CheckpointsAPI.CheckpointListParams;
 }

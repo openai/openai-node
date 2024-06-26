@@ -1,16 +1,15 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
+import * as Core from '../../core';
 import { APIResource } from '../../resource';
-import * as SpeechAPI from './speech';
 import { type Response } from '../../_shims/index';
-import { APIPromise } from '../../internal/api-promise';
-import { RequestOptions } from '../../internal/request-options';
+import * as SpeechAPI from './speech';
 
 export class Speech extends APIResource {
   /**
    * Generates audio from the input text.
    */
-  create(body: SpeechCreateParams, options?: RequestOptions): APIPromise<Response> {
+  create(body: SpeechCreateParams, options?: Core.RequestOptions): Core.APIPromise<Response> {
     return this._client.post('/audio/speech', { body, ...options, __binaryResponse: true });
   }
 }

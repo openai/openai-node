@@ -1,7 +1,7 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import OpenAI from 'openai';
-import { Response } from 'undici';
+import { Response } from 'node-fetch';
 
 const openai = new OpenAI({
   apiKey: 'My API Key',
@@ -9,11 +9,8 @@ const openai = new OpenAI({
 });
 
 describe('resource steps', () => {
-  test('retrieve: only required params', async () => {
-    const responsePromise = openai.beta.threads.runs.steps.retrieve('string', {
-      thread_id: 'string',
-      run_id: 'string',
-    });
+  test('retrieve', async () => {
+    const responsePromise = openai.beta.threads.runs.steps.retrieve('string', 'string', 'string');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -23,15 +20,17 @@ describe('resource steps', () => {
     expect(dataAndResponse.response).toBe(rawResponse);
   });
 
-  test('retrieve: required and optional params', async () => {
-    const response = await openai.beta.threads.runs.steps.retrieve('string', {
-      thread_id: 'string',
-      run_id: 'string',
-    });
+  test('retrieve: request options instead of params are passed correctly', async () => {
+    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
+    await expect(
+      openai.beta.threads.runs.steps.retrieve('string', 'string', 'string', {
+        path: '/_stainless_unknown_path',
+      }),
+    ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
-  test('list: only required params', async () => {
-    const responsePromise = openai.beta.threads.runs.steps.list('string', { thread_id: 'string' });
+  test('list', async () => {
+    const responsePromise = openai.beta.threads.runs.steps.list('string', 'string');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -41,13 +40,22 @@ describe('resource steps', () => {
     expect(dataAndResponse.response).toBe(rawResponse);
   });
 
-  test('list: required and optional params', async () => {
-    const response = await openai.beta.threads.runs.steps.list('string', {
-      thread_id: 'string',
-      after: 'string',
-      before: 'string',
-      limit: 0,
-      order: 'asc',
-    });
+  test('list: request options instead of params are passed correctly', async () => {
+    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
+    await expect(
+      openai.beta.threads.runs.steps.list('string', 'string', { path: '/_stainless_unknown_path' }),
+    ).rejects.toThrow(OpenAI.NotFoundError);
+  });
+
+  test('list: request options and params are passed correctly', async () => {
+    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
+    await expect(
+      openai.beta.threads.runs.steps.list(
+        'string',
+        'string',
+        { after: 'string', before: 'string', limit: 0, order: 'asc' },
+        { path: '/_stainless_unknown_path' },
+      ),
+    ).rejects.toThrow(OpenAI.NotFoundError);
   });
 });

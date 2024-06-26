@@ -1,15 +1,17 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
+import * as Core from '../core';
 import { APIResource } from '../resource';
 import * as EmbeddingsAPI from './embeddings';
-import { APIPromise } from '../internal/api-promise';
-import { RequestOptions } from '../internal/request-options';
 
 export class Embeddings extends APIResource {
   /**
    * Creates an embedding vector representing the input text.
    */
-  create(body: EmbeddingCreateParams, options?: RequestOptions): APIPromise<CreateEmbeddingResponse> {
+  create(
+    body: EmbeddingCreateParams,
+    options?: Core.RequestOptions,
+  ): Core.APIPromise<CreateEmbeddingResponse> {
     return this._client.post('/embeddings', { body, ...options });
   }
 }

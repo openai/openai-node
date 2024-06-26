@@ -54,6 +54,10 @@ export namespace Chat {
   export import ChatCompletionToolChoiceOption = CompletionsAPI.ChatCompletionToolChoiceOption;
   export import ChatCompletionToolMessageParam = CompletionsAPI.ChatCompletionToolMessageParam;
   export import ChatCompletionUserMessageParam = CompletionsAPI.ChatCompletionUserMessageParam;
+  /**
+   * @deprecated ChatCompletionMessageParam should be used instead
+   */
+  export import CreateChatCompletionRequestMessage = CompletionsAPI.CreateChatCompletionRequestMessage;
   export import ChatCompletionCreateParams = CompletionsAPI.ChatCompletionCreateParams;
   export import CompletionCreateParams = CompletionsAPI.CompletionCreateParams;
   export import ChatCompletionCreateParamsNonStreaming = CompletionsAPI.ChatCompletionCreateParamsNonStreaming;

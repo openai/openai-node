@@ -1,18 +1,22 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
+import * as Core from '../../../core';
 import { APIResource } from '../../../resource';
+import { isRequestOptions } from '../../../core';
 import * as MessagesAPI from './messages';
 import * as AssistantsAPI from '../assistants';
-import { CursorPage, type CursorPageParams, PagePromise } from '../../../pagination';
-import { APIPromise } from '../../../internal/api-promise';
-import { RequestOptions } from '../../../internal/request-options';
+import { CursorPage, type CursorPageParams } from '../../../pagination';
 
 export class Messages extends APIResource {
   /**
    * Create a message.
    */
-  create(threadID: string, body: MessageCreateParams, options?: RequestOptions): APIPromise<Message> {
-    return this._client.post(`/threads/${threadID}/messages`, {
+  create(
+    threadId: string,
+    body: MessageCreateParams,
+    options?: Core.RequestOptions,
+  ): Core.APIPromise<Message> {
+    return this._client.post(`/threads/${threadId}/messages`, {
       body,
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
@@ -22,9 +26,8 @@ export class Messages extends APIResource {
   /**
    * Retrieve a message.
    */
-  retrieve(messageID: string, params: MessageRetrieveParams, options?: RequestOptions): APIPromise<Message> {
-    const { thread_id } = params;
-    return this._client.get(`/threads/${thread_id}/messages/${messageID}`, {
+  retrieve(threadId: string, messageId: string, options?: Core.RequestOptions): Core.APIPromise<Message> {
+    return this._client.get(`/threads/${threadId}/messages/${messageId}`, {
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
     });
@@ -33,9 +36,13 @@ export class Messages extends APIResource {
   /**
    * Modifies a message.
    */
-  update(messageID: string, params: MessageUpdateParams, options?: RequestOptions): APIPromise<Message> {
-    const { thread_id, ...body } = params;
-    return this._client.post(`/threads/${thread_id}/messages/${messageID}`, {
+  update(
+    threadId: string,
+    messageId: string,
+    body: MessageUpdateParams,
+    options?: Core.RequestOptions,
+  ): Core.APIPromise<Message> {
+    return this._client.post(`/threads/${threadId}/messages/${messageId}`, {
       body,
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
@@ -46,11 +53,20 @@ export class Messages extends APIResource {
    * Returns a list of messages for a given thread.
    */
   list(
-    threadID: string,
-    query: MessageListParams | null | undefined = {},
-    options?: RequestOptions,
-  ): PagePromise<MessagesPage, Message> {
-    return this._client.getAPIList(`/threads/${threadID}/messages`, CursorPage<Message>, {
+    threadId: string,
+    query?: MessageListParams,
+    options?: Core.RequestOptions,
+  ): Core.PagePromise<MessagesPage, Message>;
+  list(threadId: string, options?: Core.RequestOptions): Core.PagePromise<MessagesPage, Message>;
+  list(
+    threadId: string,
+    query: MessageListParams | Core.RequestOptions = {},
+    options?: Core.RequestOptions,
+  ): Core.PagePromise<MessagesPage, Message> {
+    if (isRequestOptions(query)) {
+      return this.list(threadId, {}, query);
+    }
+    return this._client.getAPIList(`/threads/${threadId}/messages`, MessagesPage, {
       query,
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
@@ -69,7 +85,7 @@ export class Messages extends APIResource {
   }
 }
 
-export type MessagesPage = CursorPage<Message>;
+export class MessagesPage extends CursorPage<Message> {}
 
 /**
  * A citation within the message that points to a specific quote from a specific
@@ -114,6 +130,11 @@ export namespace FileCitationAnnotation {
      * The ID of the specific File the citation is from.
      */
     file_id: string;
+
+    /**
+     * The specific quote in the file.
+     */
+    quote: string;
   }
 }
 
@@ -439,16 +460,7 @@ export namespace Message {
     /**
      * The tools to add this file to.
      */
-    tools?: Array<AssistantsAPI.CodeInterpreterTool | Attachment.AssistantToolsFileSearchTypeOnly>;
-  }
-
-  export namespace Attachment {
-    export interface AssistantToolsFileSearchTypeOnly {
-      /**
-       * The type of tool being defined: `file_search`
-       */
-      type: 'file_search';
-    }
+    tools?: Array<AssistantsAPI.CodeInterpreterTool | AssistantsAPI.FileSearchTool>;
   }
 
   /**
@@ -626,38 +638,16 @@ export namespace MessageCreateParams {
     /**
      * The tools to add this file to.
      */
-    tools?: Array<AssistantsAPI.CodeInterpreterTool | Attachment.FileSearch>;
+    tools?: Array<AssistantsAPI.CodeInterpreterTool | AssistantsAPI.FileSearchTool>;
   }
-
-  export namespace Attachment {
-    export interface FileSearch {
-      /**
-       * The type of tool being defined: `file_search`
-       */
-      type: 'file_search';
-    }
-  }
-}
-
-export interface MessageRetrieveParams {
-  /**
-   * The ID of the [thread](https://platform.openai.com/docs/api-reference/threads)
-   * to which this message belongs.
-   */
-  thread_id: string;
 }
 
 export interface MessageUpdateParams {
   /**
-   * Path param: The ID of the thread to which this message belongs.
-   */
-  thread_id: string;
-
-  /**
-   * Body param: Set of 16 key-value pairs that can be attached to an object. This
-   * can be useful for storing additional information about the object in a
-   * structured format. Keys can be a maximum of 64 characters long and values can be
-   * a maxium of 512 characters long.
+   * Set of 16 key-value pairs that can be attached to an object. This can be useful
+   * for storing additional information about the object in a structured format. Keys
+   * can be a maximum of 64 characters long and values can be a maxium of 512
+   * characters long.
    */
   metadata?: unknown | null;
 }
@@ -681,13 +671,6 @@ export interface MessageListParams extends CursorPageParams {
    * Filter messages by the run ID that generated them.
    */
   run_id?: string;
-}
-
-export interface MessageDeleteParams {
-  /**
-   * The ID of the thread to which this message belongs.
-   */
-  thread_id: string;
 }
 
 export namespace Messages {
@@ -717,10 +700,8 @@ export namespace Messages {
   export import TextContentBlockParam = MessagesAPI.TextContentBlockParam;
   export import TextDelta = MessagesAPI.TextDelta;
   export import TextDeltaBlock = MessagesAPI.TextDeltaBlock;
-  export type MessagesPage = MessagesAPI.MessagesPage;
+  export import MessagesPage = MessagesAPI.MessagesPage;
   export import MessageCreateParams = MessagesAPI.MessageCreateParams;
-  export import MessageRetrieveParams = MessagesAPI.MessageRetrieveParams;
   export import MessageUpdateParams = MessagesAPI.MessageUpdateParams;
   export import MessageListParams = MessagesAPI.MessageListParams;
-  export import MessageDeleteParams = MessagesAPI.MessageDeleteParams;
 }

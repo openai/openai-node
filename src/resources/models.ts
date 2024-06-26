@@ -1,17 +1,16 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
+import * as Core from '../core';
 import { APIResource } from '../resource';
 import * as ModelsAPI from './models';
-import { Page, PagePromise } from '../pagination';
-import { APIPromise } from '../internal/api-promise';
-import { RequestOptions } from '../internal/request-options';
+import { Page } from '../pagination';
 
 export class Models extends APIResource {
   /**
    * Retrieves a model instance, providing basic information about the model such as
    * the owner and permissioning.
    */
-  retrieve(model: string, options?: RequestOptions): APIPromise<Model> {
+  retrieve(model: string, options?: Core.RequestOptions): Core.APIPromise<Model> {
     return this._client.get(`/models/${model}`, options);
   }
 
@@ -19,8 +18,8 @@ export class Models extends APIResource {
    * Lists the currently available models, and provides basic information about each
    * one such as the owner and availability.
    */
-  list(options?: RequestOptions): PagePromise<ModelsPage, Model> {
-    return this._client.getAPIList('/models', Page<Model>, options);
+  list(options?: Core.RequestOptions): Core.PagePromise<ModelsPage, Model> {
+    return this._client.getAPIList('/models', ModelsPage, options);
   }
 
   /**
@@ -32,8 +31,10 @@ export class Models extends APIResource {
   }
 }
 
-// Note: no pagination actually occurs yet, this is for forwards-compatibility.
-export type ModelsPage = Page<Model>;
+/**
+ * Note: no pagination actually occurs yet, this is for forwards-compatibility.
+ */
+export class ModelsPage extends Page<Model> {}
 
 /**
  * Describes an OpenAI model offering that can be used with the API.
@@ -71,5 +72,5 @@ export interface ModelDeleted {
 export namespace Models {
   export import Model = ModelsAPI.Model;
   export import ModelDeleted = ModelsAPI.ModelDeleted;
-  export type ModelsPage = ModelsAPI.ModelsPage;
+  export import ModelsPage = ModelsAPI.ModelsPage;
 }

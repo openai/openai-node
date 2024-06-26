@@ -1,7 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { castToError } from './internal/utils';
-import { type Headers } from './internal/types';
+import { castToError, Headers } from './core';
 
 export class OpenAIError extends Error {}
 

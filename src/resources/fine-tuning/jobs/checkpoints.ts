@@ -1,28 +1,41 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
+import * as Core from '../../../core';
 import { APIResource } from '../../../resource';
+import { isRequestOptions } from '../../../core';
 import * as CheckpointsAPI from './checkpoints';
-import { CursorPage, type CursorPageParams, PagePromise } from '../../../pagination';
-import { RequestOptions } from '../../../internal/request-options';
+import { CursorPage, type CursorPageParams } from '../../../pagination';
 
 export class Checkpoints extends APIResource {
   /**
    * List checkpoints for a fine-tuning job.
    */
   list(
-    fineTuningJobID: string,
-    query: CheckpointListParams | null | undefined = {},
-    options?: RequestOptions,
-  ): PagePromise<FineTuningJobCheckpointsPage, FineTuningJobCheckpoint> {
+    fineTuningJobId: string,
+    query?: CheckpointListParams,
+    options?: Core.RequestOptions,
+  ): Core.PagePromise<FineTuningJobCheckpointsPage, FineTuningJobCheckpoint>;
+  list(
+    fineTuningJobId: string,
+    options?: Core.RequestOptions,
+  ): Core.PagePromise<FineTuningJobCheckpointsPage, FineTuningJobCheckpoint>;
+  list(
+    fineTuningJobId: string,
+    query: CheckpointListParams | Core.RequestOptions = {},
+    options?: Core.RequestOptions,
+  ): Core.PagePromise<FineTuningJobCheckpointsPage, FineTuningJobCheckpoint> {
+    if (isRequestOptions(query)) {
+      return this.list(fineTuningJobId, {}, query);
+    }
     return this._client.getAPIList(
-      `/fine_tuning/jobs/${fineTuningJobID}/checkpoints`,
-      CursorPage<FineTuningJobCheckpoint>,
+      `/fine_tuning/jobs/${fineTuningJobId}/checkpoints`,
+      FineTuningJobCheckpointsPage,
       { query, ...options },
     );
   }
 }
 
-export type FineTuningJobCheckpointsPage = CursorPage<FineTuningJobCheckpoint>;
+export class FineTuningJobCheckpointsPage extends CursorPage<FineTuningJobCheckpoint> {}
 
 /**
  * The `fine_tuning.job.checkpoint` object represents a model checkpoint for a
@@ -90,6 +103,6 @@ export interface CheckpointListParams extends CursorPageParams {}
 
 export namespace Checkpoints {
   export import FineTuningJobCheckpoint = CheckpointsAPI.FineTuningJobCheckpoint;
-  export type FineTuningJobCheckpointsPage = CheckpointsAPI.FineTuningJobCheckpointsPage;
+  export import FineTuningJobCheckpointsPage = CheckpointsAPI.FineTuningJobCheckpointsPage;
   export import CheckpointListParams = CheckpointsAPI.CheckpointListParams;
 }

@@ -1,7 +1,7 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import OpenAI from 'openai';
-import { Response } from 'undici';
+import { Response } from 'node-fetch';
 
 const openai = new OpenAI({
   apiKey: 'My API Key',
@@ -18,6 +18,13 @@ describe('resource threads', () => {
     const dataAndResponse = await responsePromise.withResponse();
     expect(dataAndResponse.data).toBe(response);
     expect(dataAndResponse.response).toBe(rawResponse);
+  });
+
+  test('create: request options instead of params are passed correctly', async () => {
+    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
+    await expect(openai.beta.threads.create({ path: '/_stainless_unknown_path' })).rejects.toThrow(
+      OpenAI.NotFoundError,
+    );
   });
 
   test('create: request options and params are passed correctly', async () => {
@@ -125,13 +132,7 @@ describe('resource threads', () => {
             code_interpreter: { file_ids: ['string', 'string', 'string'] },
             file_search: {
               vector_store_ids: ['string'],
-              vector_stores: [
-                {
-                  file_ids: ['string', 'string', 'string'],
-                  chunking_strategy: { type: 'auto' },
-                  metadata: {},
-                },
-              ],
+              vector_stores: [{ file_ids: ['string', 'string', 'string'], metadata: {} }],
             },
           },
         },
@@ -149,6 +150,13 @@ describe('resource threads', () => {
     const dataAndResponse = await responsePromise.withResponse();
     expect(dataAndResponse.data).toBe(response);
     expect(dataAndResponse.response).toBe(rawResponse);
+  });
+
+  test('retrieve: request options instead of params are passed correctly', async () => {
+    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
+    await expect(
+      openai.beta.threads.retrieve('string', { path: '/_stainless_unknown_path' }),
+    ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
   test('update', async () => {
@@ -173,6 +181,13 @@ describe('resource threads', () => {
     expect(dataAndResponse.response).toBe(rawResponse);
   });
 
+  test('del: request options instead of params are passed correctly', async () => {
+    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
+    await expect(openai.beta.threads.del('string', { path: '/_stainless_unknown_path' })).rejects.toThrow(
+      OpenAI.NotFoundError,
+    );
+  });
+
   test('createAndRun: only required params', async () => {
     const responsePromise = openai.beta.threads.createAndRun({ assistant_id: 'string' });
     const rawResponse = await responsePromise.asResponse();
@@ -192,7 +207,6 @@ describe('resource threads', () => {
       max_prompt_tokens: 256,
       metadata: {},
       model: 'gpt-4-turbo',
-      parallel_tool_calls: true,
       response_format: 'none',
       stream: false,
       temperature: 1,
@@ -296,9 +310,7 @@ describe('resource threads', () => {
           code_interpreter: { file_ids: ['string', 'string', 'string'] },
           file_search: {
             vector_store_ids: ['string'],
-            vector_stores: [
-              { file_ids: ['string', 'string', 'string'], chunking_strategy: { type: 'auto' }, metadata: {} },
-            ],
+            vector_stores: [{ file_ids: ['string', 'string', 'string'], metadata: {} }],
           },
         },
         metadata: {},

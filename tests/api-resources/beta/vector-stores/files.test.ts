@@ -1,7 +1,7 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import OpenAI from 'openai';
-import { Response } from 'undici';
+import { Response } from 'node-fetch';
 
 const openai = new OpenAI({
   apiKey: 'My API Key',
@@ -21,16 +21,11 @@ describe('resource files', () => {
   });
 
   test('create: required and optional params', async () => {
-    const response = await openai.beta.vectorStores.files.create('vs_abc123', {
-      file_id: 'string',
-      chunking_strategy: { type: 'auto' },
-    });
+    const response = await openai.beta.vectorStores.files.create('vs_abc123', { file_id: 'string' });
   });
 
-  test('retrieve: only required params', async () => {
-    const responsePromise = openai.beta.vectorStores.files.retrieve('file-abc123', {
-      vector_store_id: 'vs_abc123',
-    });
+  test('retrieve', async () => {
+    const responsePromise = openai.beta.vectorStores.files.retrieve('vs_abc123', 'file-abc123');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -40,10 +35,13 @@ describe('resource files', () => {
     expect(dataAndResponse.response).toBe(rawResponse);
   });
 
-  test('retrieve: required and optional params', async () => {
-    const response = await openai.beta.vectorStores.files.retrieve('file-abc123', {
-      vector_store_id: 'vs_abc123',
-    });
+  test('retrieve: request options instead of params are passed correctly', async () => {
+    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
+    await expect(
+      openai.beta.vectorStores.files.retrieve('vs_abc123', 'file-abc123', {
+        path: '/_stainless_unknown_path',
+      }),
+    ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
   test('list', async () => {
@@ -55,6 +53,13 @@ describe('resource files', () => {
     const dataAndResponse = await responsePromise.withResponse();
     expect(dataAndResponse.data).toBe(response);
     expect(dataAndResponse.response).toBe(rawResponse);
+  });
+
+  test('list: request options instead of params are passed correctly', async () => {
+    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
+    await expect(
+      openai.beta.vectorStores.files.list('string', { path: '/_stainless_unknown_path' }),
+    ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
   test('list: request options and params are passed correctly', async () => {

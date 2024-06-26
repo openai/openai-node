@@ -1,16 +1,15 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
+import * as Core from '../../core';
 import { APIResource } from '../../resource';
 import * as TranscriptionsAPI from './transcriptions';
-import { type Uploadable, multipartFormRequestOptions } from '../../uploads';
-import { APIPromise } from '../../internal/api-promise';
-import { RequestOptions } from '../../internal/request-options';
+import { type Uploadable, multipartFormRequestOptions } from '../../core';
 
 export class Transcriptions extends APIResource {
   /**
    * Transcribes audio into the input language.
    */
-  create(body: TranscriptionCreateParams, options?: RequestOptions): APIPromise<Transcription> {
+  create(body: TranscriptionCreateParams, options?: Core.RequestOptions): Core.APIPromise<Transcription> {
     return this._client.post('/audio/transcriptions', multipartFormRequestOptions({ body, ...options }));
   }
 }
