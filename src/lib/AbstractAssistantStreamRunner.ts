@@ -237,13 +237,12 @@ export abstract class AbstractAssistantStreamRunner<
   }
 
   protected async _runToolAssistantStream(
-    threadId: string,
     runId: string,
     runs: Runs,
     params: RunSubmitToolOutputsParamsBase,
     options?: RequestOptions,
   ): Promise<Run> {
-    return await this._createToolAssistantStream(runs, threadId, runId, params, options);
+    return await this._createToolAssistantStream(runs, runId, params, options);
   }
 
   protected async _createThreadAssistantStream(
@@ -268,7 +267,6 @@ export abstract class AbstractAssistantStreamRunner<
 
   protected async _createToolAssistantStream(
     run: Runs,
-    threadId: string,
     runId: string,
     params: RunSubmitToolOutputsParamsBase,
     options?: RequestOptions,
@@ -281,7 +279,7 @@ export abstract class AbstractAssistantStreamRunner<
 
     const runResult = await run.submitToolOutputs(
       runId,
-      { ...params, thread_id: threadId, stream: false },
+      { ...params, stream: false },
       { ...options, signal: this.controller.signal },
     );
     this._connected();

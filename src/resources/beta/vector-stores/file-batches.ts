@@ -7,6 +7,9 @@ import { VectorStoreFilesPage } from './files';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../pagination';
 import { APIPromise } from '../../../internal/api-promise';
 import { RequestOptions } from '../../../internal/request-options';
+import { sleep } from 'openai/internal/utils';
+import { Uploadable } from 'openai/uploads';
+import { allSettledWithThrow } from 'openai/lib/Util';
 
 export class FileBatches extends APIResource {
   /**
@@ -61,7 +64,7 @@ export class FileBatches extends APIResource {
   async createAndPoll(
     vectorStoreId: string,
     body: FileBatchCreateParams,
-    options?: Core.RequestOptions & { pollIntervalMs?: number },
+    options?: RequestOptions & { pollIntervalMs?: number },
   ): Promise<VectorStoreFileBatch> {
     const batch = await this.create(vectorStoreId, body);
     return await this.poll(vectorStoreId, batch.id, options);
@@ -92,7 +95,7 @@ export class FileBatches extends APIResource {
   async poll(
     vectorStoreId: string,
     batchId: string,
-    options?: Core.RequestOptions & { pollIntervalMs?: number },
+    options?: RequestOptions & { pollIntervalMs?: number },
   ): Promise<VectorStoreFileBatch> {
     const headers: { [key: string]: string } = { ...options?.headers, 'X-Stainless-Poll-Helper': 'true' };
     if (options?.pollIntervalMs) {
@@ -100,10 +103,14 @@ export class FileBatches extends APIResource {
     }
 
     while (true) {
-      const { data: batch, response } = await this.retrieve(vectorStoreId, batchId, {
-        ...options,
-        headers,
-      }).withResponse();
+      const { data: batch, response } = await this.retrieve(
+        batchId,
+        { vector_store_id: vectorStoreId },
+        {
+          ...options,
+          headers,
+        },
+      ).withResponse();
 
       switch (batch.status) {
         case 'in_progress':
@@ -138,7 +145,7 @@ export class FileBatches extends APIResource {
   async uploadAndPoll(
     vectorStoreId: string,
     { files, fileIds = [] }: { files: Uploadable[]; fileIds?: string[] },
-    options?: Core.RequestOptions & { pollIntervalMs?: number; maxConcurrency?: number },
+    options?: RequestOptions & { pollIntervalMs?: number; maxConcurrency?: number },
   ): Promise<VectorStoreFileBatch> {
     if (files === null || files.length == 0) {
       throw new Error('No files provided to process.');

@@ -1,12 +1,9 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../../resource';
-import { ChatCompletionRunner, ChatCompletionFunctionRunnerParams } from '../../../lib/ChatCompletionRunner';
+import { ChatCompletionRunner } from '../../../lib/ChatCompletionRunner';
 export { ChatCompletionRunner, ChatCompletionFunctionRunnerParams } from '../../../lib/ChatCompletionRunner';
-import {
-  ChatCompletionStreamingRunner,
-  ChatCompletionStreamingFunctionRunnerParams,
-} from '../../../lib/ChatCompletionStreamingRunner';
+import { ChatCompletionStreamingRunner } from '../../../lib/ChatCompletionStreamingRunner';
 export {
   ChatCompletionStreamingRunner,
   ChatCompletionStreamingFunctionRunnerParams,

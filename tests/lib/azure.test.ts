@@ -1,7 +1,7 @@
 import { AzureOpenAI } from 'openai';
 import { APIUserAbortError } from 'openai';
 import { Headers } from 'openai/core';
-import defaultFetch, { Response, type RequestInit, type RequestInfo } from 'node-fetch';
+import { fetch as defaultFetch, Response, type RequestInit, type RequestInfo } from 'undici';
 
 const apiVersion = '2024-02-15-preview';
 const deployment = 'deployment';
@@ -226,7 +226,7 @@ describe('instantiate azure client', () => {
   describe('Azure Active Directory (AD)', () => {
     test('with azureADTokenProvider', async () => {
       const testFetch = async (url: RequestInfo, { headers }: RequestInit = {}): Promise<Response> => {
-        return new Response(JSON.stringify({ a: 1 }), { headers });
+        return new Response(JSON.stringify({ a: 1 }), { headers: headers ?? [] });
       };
       const client = new AzureOpenAI({
         baseURL: 'http://localhost:5000/',

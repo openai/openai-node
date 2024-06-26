@@ -11,7 +11,11 @@ import { Stream } from '../../../../streaming';
 import { APIPromise } from '../../../../internal/api-promise';
 import { RequestOptions } from '../../../../internal/request-options';
 import { sleep } from '../../../../internal/utils';
-import { AssistantStream, RunCreateParamsBaseStream } from '../../../../lib/AssistantStream';
+import {
+  AssistantStream,
+  RunCreateParamsBaseStream,
+  RunSubmitToolOutputsParamsStream,
+} from '../../../../lib/AssistantStream';
 
 export class Runs extends APIResource {
   steps: StepsAPI.Steps = new StepsAPI.Steps(this._client);
@@ -210,13 +214,12 @@ export class Runs extends APIResource {
    * https://platform.openai.com/docs/assistants/how-it-works/runs-and-run-steps
    */
   async submitToolOutputsAndPoll(
-    threadId: string,
     runId: string,
-    body: RunSubmitToolOutputsParamsNonStreaming,
-    options?: Core.RequestOptions & { pollIntervalMs?: number },
+    params: RunSubmitToolOutputsParamsNonStreaming,
+    options?: RequestOptions & { pollIntervalMs?: number },
   ): Promise<Run> {
-    const run = await this.submitToolOutputs(threadId, runId, body, options);
-    return await this.poll(threadId, run.id, options);
+    const run = await this.submitToolOutputs(runId, params, options);
+    return await this.poll(params.thread_id, run.id, options);
   }
 
   /**
@@ -225,18 +228,11 @@ export class Runs extends APIResource {
    * https://platform.openai.com/docs/assistants/how-it-works/runs-and-run-steps
    */
   submitToolOutputsStream(
-    threadId: string,
     runId: string,
     body: RunSubmitToolOutputsParamsStream,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): AssistantStream {
-    return AssistantStream.createToolAssistantStream(
-      threadId,
-      runId,
-      this._client.beta.threads.runs,
-      body,
-      options,
-    );
+    return AssistantStream.createToolAssistantStream(runId, this._client.beta.threads.runs, body, options);
   }
 }
 

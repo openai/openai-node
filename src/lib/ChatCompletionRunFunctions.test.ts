@@ -11,7 +11,7 @@ import {
 import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
 
 import { type RequestInfo, type RequestInit } from 'openai/_shims/index';
-import { Response } from 'node-fetch';
+import { Response } from 'undici';
 import { isAssistantMessage } from './chatCompletionUtils';
 
 type Fetch = (req: string | RequestInfo, init?: RequestInit) => Promise<Response>;

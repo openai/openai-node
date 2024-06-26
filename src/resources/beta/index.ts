@@ -31,8 +31,6 @@ export {
   ThreadCreateAndRunParams,
   ThreadCreateAndRunParamsNonStreaming,
   ThreadCreateAndRunParamsStreaming,
-  ThreadCreateAndRunPollParams,
-  ThreadCreateAndRunStreamParams,
   Threads,
 } from './threads/index';
 export { Beta } from './beta';

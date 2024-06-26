@@ -191,7 +191,6 @@ export class AssistantStream
   }
 
   static createToolAssistantStream(
-    threadId: string,
     runId: string,
     runs: Runs,
     body: RunSubmitToolOutputsParamsStream,
@@ -199,7 +198,7 @@ export class AssistantStream
   ) {
     const runner = new AssistantStream();
     runner._run(() =>
-      runner._runToolAssistantStream(threadId, runId, runs, body, {
+      runner._runToolAssistantStream(runId, runs, body, {
         ...options,
         headers: { ...options?.headers, 'X-Stainless-Helper-Method': 'stream' },
       }),
@@ -209,7 +208,6 @@ export class AssistantStream
 
   protected override async _createToolAssistantStream(
     run: Runs,
-    threadId: string,
     runId: string,
     params: RunSubmitToolOutputsParamsStream,
     options?: RequestOptions,
@@ -221,7 +219,7 @@ export class AssistantStream
     }
 
     const body: RunSubmitToolOutputsParamsStreaming = { ...params, stream: true };
-    const stream = await run.submitToolOutputs(threadId, runId, body, {
+    const stream = await run.submitToolOutputs(runId, body, {
       ...options,
       signal: this.controller.signal,
     });

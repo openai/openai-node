@@ -8,6 +8,7 @@ import * as RunsAPI from './runs/runs';
 import { Stream } from '../../../streaming';
 import { APIPromise } from '../../../internal/api-promise';
 import { RequestOptions } from '../../../internal/request-options';
+import { AssistantStream, ThreadCreateAndRunParamsBaseStream } from 'openai/lib/AssistantStream';
 
 export class Threads extends APIResource {
   runs: RunsAPI.Runs = new RunsAPI.Runs(this._client);
@@ -86,7 +87,7 @@ export class Threads extends APIResource {
    */
   async createAndRunPoll(
     body: ThreadCreateAndRunParamsNonStreaming,
-    options?: Core.RequestOptions & { pollIntervalMs?: number },
+    options?: RequestOptions & { pollIntervalMs?: number },
   ): Promise<Threads.Run> {
     const run = await this.createAndRun(body, options);
     return await this.runs.poll(run.thread_id, run.id, options);
@@ -95,10 +96,7 @@ export class Threads extends APIResource {
   /**
    * Create a thread and stream the run back
    */
-  createAndRunStream(
-    body: ThreadCreateAndRunParamsBaseStream,
-    options?: Core.RequestOptions,
-  ): AssistantStream {
+  createAndRunStream(body: ThreadCreateAndRunParamsBaseStream, options?: RequestOptions): AssistantStream {
     return AssistantStream.createThreadAssistantStream(body, this._client.beta.threads, options);
   }
 }
