@@ -1,6 +1,7 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../resource';
+import { APIPromise } from '../core';
 import * as CompletionsAPI from './completions';
 import * as ChatCompletionsAPI from './chat/completions';
 import { Stream } from '../streaming';
