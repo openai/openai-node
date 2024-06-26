@@ -1,11 +1,10 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import * as Core from '../../../core';
 import { APIResource } from '../../../resource';
-import { isRequestOptions } from '../../../core';
-import { sleep, Uploadable } from '../../../core';
 import * as FilesAPI from './files';
-import { CursorPage, type CursorPageParams } from '../../../pagination';
+import { CursorPage, type CursorPageParams, PagePromise } from '../../../pagination';
+import { APIPromise } from '../../../internal/api-promise';
+import { RequestOptions } from '../../../internal/request-options';
 
 export class Files extends APIResource {
   /**
@@ -14,11 +13,11 @@ export class Files extends APIResource {
    * [vector store](https://platform.openai.com/docs/api-reference/vector-stores/object).
    */
   create(
-    vectorStoreId: string,
+    vectorStoreID: string,
     body: FileCreateParams,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<VectorStoreFile> {
-    return this._client.post(`/vector_stores/${vectorStoreId}/files`, {
+    options?: RequestOptions,
+  ): APIPromise<VectorStoreFile> {
+    return this._client.post(`/vector_stores/${vectorStoreID}/files`, {
       body,
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
@@ -29,11 +28,12 @@ export class Files extends APIResource {
    * Retrieves a vector store file.
    */
   retrieve(
-    vectorStoreId: string,
-    fileId: string,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<VectorStoreFile> {
-    return this._client.get(`/vector_stores/${vectorStoreId}/files/${fileId}`, {
+    fileID: string,
+    params: FileRetrieveParams,
+    options?: RequestOptions,
+  ): APIPromise<VectorStoreFile> {
+    const { vector_store_id } = params;
+    return this._client.get(`/vector_stores/${vector_store_id}/files/${fileID}`, {
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
     });
@@ -43,23 +43,11 @@ export class Files extends APIResource {
    * Returns a list of vector store files.
    */
   list(
-    vectorStoreId: string,
-    query?: FileListParams,
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<VectorStoreFilesPage, VectorStoreFile>;
-  list(
-    vectorStoreId: string,
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<VectorStoreFilesPage, VectorStoreFile>;
-  list(
-    vectorStoreId: string,
-    query: FileListParams | Core.RequestOptions = {},
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<VectorStoreFilesPage, VectorStoreFile> {
-    if (isRequestOptions(query)) {
-      return this.list(vectorStoreId, {}, query);
-    }
-    return this._client.getAPIList(`/vector_stores/${vectorStoreId}/files`, VectorStoreFilesPage, {
+    vectorStoreID: string,
+    query: FileListParams | null | undefined = {},
+    options?: RequestOptions,
+  ): PagePromise<VectorStoreFilesPage, VectorStoreFile> {
+    return this._client.getAPIList(`/vector_stores/${vectorStoreID}/files`, CursorPage<VectorStoreFile>, {
       query,
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
@@ -72,105 +60,20 @@ export class Files extends APIResource {
    * [delete file](https://platform.openai.com/docs/api-reference/files/delete)
    * endpoint.
    */
-  del(
-    vectorStoreId: string,
-    fileId: string,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<VectorStoreFileDeleted> {
-    return this._client.delete(`/vector_stores/${vectorStoreId}/files/${fileId}`, {
+  delete(
+    fileID: string,
+    params: FileDeleteParams,
+    options?: RequestOptions,
+  ): APIPromise<VectorStoreFileDeleted> {
+    const { vector_store_id } = params;
+    return this._client.delete(`/vector_stores/${vector_store_id}/files/${fileID}`, {
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
     });
   }
-
-  /**
-   * Attach a file to the given vector store and wait for it to be processed.
-   */
-  async createAndPoll(
-    vectorStoreId: string,
-    body: FileCreateParams,
-    options?: Core.RequestOptions & { pollIntervalMs?: number },
-  ): Promise<VectorStoreFile> {
-    const file = await this.create(vectorStoreId, body, options);
-    return await this.poll(vectorStoreId, file.id, options);
-  }
-
-  /**
-   * Wait for the vector store file to finish processing.
-   *
-   * Note: this will return even if the file failed to process, you need to check
-   * file.last_error and file.status to handle these cases
-   */
-  async poll(
-    vectorStoreId: string,
-    fileId: string,
-    options?: Core.RequestOptions & { pollIntervalMs?: number },
-  ): Promise<VectorStoreFile> {
-    const headers: { [key: string]: string } = { ...options?.headers, 'X-Stainless-Poll-Helper': 'true' };
-    if (options?.pollIntervalMs) {
-      headers['X-Stainless-Custom-Poll-Interval'] = options.pollIntervalMs.toString();
-    }
-    while (true) {
-      const fileResponse = await this.retrieve(vectorStoreId, fileId, {
-        ...options,
-        headers,
-      }).withResponse();
-
-      const file = fileResponse.data;
-
-      switch (file.status) {
-        case 'in_progress':
-          let sleepInterval = 5000;
-
-          if (options?.pollIntervalMs) {
-            sleepInterval = options.pollIntervalMs;
-          } else {
-            const headerInterval = fileResponse.response.headers.get('openai-poll-after-ms');
-            if (headerInterval) {
-              const headerIntervalMs = parseInt(headerInterval);
-              if (!isNaN(headerIntervalMs)) {
-                sleepInterval = headerIntervalMs;
-              }
-            }
-          }
-          await sleep(sleepInterval);
-          break;
-        case 'failed':
-        case 'completed':
-          return file;
-      }
-    }
-  }
-
-  /**
-   * Upload a file to the `files` API and then attach it to the given vector store.
-   *
-   * Note the file will be asynchronously processed (you can use the alternative
-   * polling helper method to wait for processing to complete).
-   */
-  async upload(
-    vectorStoreId: string,
-    file: Uploadable,
-    options?: Core.RequestOptions,
-  ): Promise<VectorStoreFile> {
-    const fileInfo = await this._client.files.create({ file: file, purpose: 'assistants' }, options);
-    return this.create(vectorStoreId, { file_id: fileInfo.id }, options);
-  }
-
-  /**
-   * Add a file to a vector store and poll until processing is complete.
-   */
-  async uploadAndPoll(
-    vectorStoreId: string,
-    file: Uploadable,
-    options?: Core.RequestOptions & { pollIntervalMs?: number },
-  ): Promise<VectorStoreFile> {
-    const fileInfo = await this.upload(vectorStoreId, file, options);
-    return await this.poll(vectorStoreId, fileInfo.id, options);
-  }
 }
 
-export class VectorStoreFilesPage extends CursorPage<VectorStoreFile> {}
+export type VectorStoreFilesPage = CursorPage<VectorStoreFile>;
 
 /**
  * A list of files attached to a vector store.
@@ -217,6 +120,11 @@ export interface VectorStoreFile {
    * attached to.
    */
   vector_store_id: string;
+
+  /**
+   * The strategy used to chunk the file.
+   */
+  chunking_strategy?: VectorStoreFile.Static | VectorStoreFile.Other;
 }
 
 export namespace VectorStoreFile {
@@ -235,6 +143,44 @@ export namespace VectorStoreFile {
      */
     message: string;
   }
+
+  export interface Static {
+    static: Static.Static;
+
+    /**
+     * Always `static`.
+     */
+    type: 'static';
+  }
+
+  export namespace Static {
+    export interface Static {
+      /**
+       * The number of tokens that overlap between chunks. The default value is `400`.
+       *
+       * Note that the overlap must not exceed half of `max_chunk_size_tokens`.
+       */
+      chunk_overlap_tokens: number;
+
+      /**
+       * The maximum number of tokens in each chunk. The default value is `800`. The
+       * minimum value is `100` and the maximum value is `4096`.
+       */
+      max_chunk_size_tokens: number;
+    }
+  }
+
+  /**
+   * This is returned when the chunking strategy is unknown. Typically, this is
+   * because the file was indexed before the `chunking_strategy` concept was
+   * introduced in the API.
+   */
+  export interface Other {
+    /**
+     * Always `other`.
+     */
+    type: 'other';
+  }
 }
 
 export interface VectorStoreFileDeleted {
@@ -252,6 +198,60 @@ export interface FileCreateParams {
    * files.
    */
   file_id: string;
+
+  /**
+   * The chunking strategy used to chunk the file(s). If not set, will use the `auto`
+   * strategy.
+   */
+  chunking_strategy?:
+    | FileCreateParams.AutoChunkingStrategyRequestParam
+    | FileCreateParams.StaticChunkingStrategyRequestParam;
+}
+
+export namespace FileCreateParams {
+  /**
+   * The default strategy. This strategy currently uses a `max_chunk_size_tokens` of
+   * `800` and `chunk_overlap_tokens` of `400`.
+   */
+  export interface AutoChunkingStrategyRequestParam {
+    /**
+     * Always `auto`.
+     */
+    type: 'auto';
+  }
+
+  export interface StaticChunkingStrategyRequestParam {
+    static: StaticChunkingStrategyRequestParam.Static;
+
+    /**
+     * Always `static`.
+     */
+    type: 'static';
+  }
+
+  export namespace StaticChunkingStrategyRequestParam {
+    export interface Static {
+      /**
+       * The number of tokens that overlap between chunks. The default value is `400`.
+       *
+       * Note that the overlap must not exceed half of `max_chunk_size_tokens`.
+       */
+      chunk_overlap_tokens: number;
+
+      /**
+       * The maximum number of tokens in each chunk. The default value is `800`. The
+       * minimum value is `100` and the maximum value is `4096`.
+       */
+      max_chunk_size_tokens: number;
+    }
+  }
+}
+
+export interface FileRetrieveParams {
+  /**
+   * The ID of the vector store that the file belongs to.
+   */
+  vector_store_id: string;
 }
 
 export interface FileListParams extends CursorPageParams {
@@ -275,10 +275,19 @@ export interface FileListParams extends CursorPageParams {
   order?: 'asc' | 'desc';
 }
 
+export interface FileDeleteParams {
+  /**
+   * The ID of the vector store that the file belongs to.
+   */
+  vector_store_id: string;
+}
+
 export namespace Files {
   export import VectorStoreFile = FilesAPI.VectorStoreFile;
   export import VectorStoreFileDeleted = FilesAPI.VectorStoreFileDeleted;
-  export import VectorStoreFilesPage = FilesAPI.VectorStoreFilesPage;
+  export type VectorStoreFilesPage = FilesAPI.VectorStoreFilesPage;
   export import FileCreateParams = FilesAPI.FileCreateParams;
+  export import FileRetrieveParams = FilesAPI.FileRetrieveParams;
   export import FileListParams = FilesAPI.FileListParams;
+  export import FileDeleteParams = FilesAPI.FileDeleteParams;
 }

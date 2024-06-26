@@ -6,7 +6,7 @@
   "types": "dist/index.d.ts",
   "main": "dist/index.js",
   "type": "commonjs",
-  "repository": "github:openai/openai-node",
+  "repository": "github:stainless-sdks/openai-typescript",
   "license": "Apache-2.0",
   "packageManager": "yarn@1.22.22",
   "files": [
@@ -16,7 +16,6 @@
   "scripts": {
     "test": "./scripts/test",
     "build": "./scripts/build",
-    "prepack": "echo 'to pack, run yarn build && (cd dist; yarn pack)' && exit 1",
     "prepublishOnly": "echo 'to publish, run yarn build && (cd dist; yarn publish)' && exit 1",
     "format": "prettier --write --cache --cache-strategy metadata . !dist",
     "prepare": "if ./scripts/utils/check-is-in-git-install.sh; then ./scripts/build; fi",
@@ -26,13 +25,9 @@
   },
   "dependencies": {
     "@types/node": "^18.11.18",
-    "@types/node-fetch": "^2.6.4",
     "abort-controller": "^3.0.0",
     "agentkeepalive": "^4.2.1",
-    "form-data-encoder": "1.7.2",
-    "formdata-node": "^4.3.2",
-    "node-fetch": "^2.6.7",
-    "web-streams-polyfill": "^3.2.1"
+    "form-data-encoder": "1.7.2"
   },
   "devDependencies": {
     "@swc/core": "^1.3.102",
@@ -121,6 +116,5 @@
       "require": "./dist/*.js",
       "default": "./dist/*.mjs"
     }
-  },
-  "bin": "./bin/cli"
+  }
 }

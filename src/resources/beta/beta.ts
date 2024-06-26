@@ -2,13 +2,11 @@
 
 import { APIResource } from '../../resource';
 import * as AssistantsAPI from './assistants';
-import * as ChatAPI from './chat/chat';
 import * as ThreadsAPI from './threads/threads';
 import * as VectorStoresAPI from './vector-stores/vector-stores';
 
 export class Beta extends APIResource {
   vectorStores: VectorStoresAPI.VectorStores = new VectorStoresAPI.VectorStores(this._client);
-  chat: ChatAPI.Chat = new ChatAPI.Chat(this._client);
   assistants: AssistantsAPI.Assistants = new AssistantsAPI.Assistants(this._client);
   threads: ThreadsAPI.Threads = new ThreadsAPI.Threads(this._client);
 }
@@ -17,11 +15,10 @@ export namespace Beta {
   export import VectorStores = VectorStoresAPI.VectorStores;
   export import VectorStore = VectorStoresAPI.VectorStore;
   export import VectorStoreDeleted = VectorStoresAPI.VectorStoreDeleted;
-  export import VectorStoresPage = VectorStoresAPI.VectorStoresPage;
+  export type VectorStoresPage = VectorStoresAPI.VectorStoresPage;
   export import VectorStoreCreateParams = VectorStoresAPI.VectorStoreCreateParams;
   export import VectorStoreUpdateParams = VectorStoresAPI.VectorStoreUpdateParams;
   export import VectorStoreListParams = VectorStoresAPI.VectorStoreListParams;
-  export import Chat = ChatAPI.Chat;
   export import Assistants = AssistantsAPI.Assistants;
   export import Assistant = AssistantsAPI.Assistant;
   export import AssistantDeleted = AssistantsAPI.AssistantDeleted;
@@ -34,7 +31,7 @@ export namespace Beta {
   export import RunStepStreamEvent = AssistantsAPI.RunStepStreamEvent;
   export import RunStreamEvent = AssistantsAPI.RunStreamEvent;
   export import ThreadStreamEvent = AssistantsAPI.ThreadStreamEvent;
-  export import AssistantsPage = AssistantsAPI.AssistantsPage;
+  export type AssistantsPage = AssistantsAPI.AssistantsPage;
   export import AssistantCreateParams = AssistantsAPI.AssistantCreateParams;
   export import AssistantUpdateParams = AssistantsAPI.AssistantUpdateParams;
   export import AssistantListParams = AssistantsAPI.AssistantListParams;
@@ -51,6 +48,4 @@ export namespace Beta {
   export import ThreadCreateAndRunParams = ThreadsAPI.ThreadCreateAndRunParams;
   export import ThreadCreateAndRunParamsNonStreaming = ThreadsAPI.ThreadCreateAndRunParamsNonStreaming;
   export import ThreadCreateAndRunParamsStreaming = ThreadsAPI.ThreadCreateAndRunParamsStreaming;
-  export import ThreadCreateAndRunPollParams = ThreadsAPI.ThreadCreateAndRunPollParams;
-  export import ThreadCreateAndRunStreamParams = ThreadsAPI.ThreadCreateAndRunStreamParams;
 }

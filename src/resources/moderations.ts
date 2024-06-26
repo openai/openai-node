@@ -1,17 +1,15 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import * as Core from '../core';
 import { APIResource } from '../resource';
 import * as ModerationsAPI from './moderations';
+import { APIPromise } from '../internal/api-promise';
+import { RequestOptions } from '../internal/request-options';
 
 export class Moderations extends APIResource {
   /**
    * Classifies if text is potentially harmful.
    */
-  create(
-    body: ModerationCreateParams,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<ModerationCreateResponse> {
+  create(body: ModerationCreateParams, options?: RequestOptions): APIPromise<ModerationCreateResponse> {
     return this._client.post('/moderations', { body, ...options });
   }
 }

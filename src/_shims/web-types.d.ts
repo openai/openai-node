@@ -44,8 +44,6 @@ export interface FilePropertyBag extends BlobPropertyBag {
   lastModified?: number;
 }
 
-export type FileFromPathOptions = Omit<FilePropertyBag, 'lastModified'>;
-
 type _FormData = FormData;
 declare const _FormData: typeof FormData;
 export { _FormData as FormData };

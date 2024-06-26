@@ -1,5 +1,5 @@
 import { MultipartBody } from './MultipartBody';
-import { type RequestOptions } from '../core';
+import { type RequestOptions } from '../internal/request-options';
 
 export const kind: string = 'web';
 
@@ -46,11 +46,12 @@ export interface BlobPropertyBag {
   type?: string;
 }
 
+type _RequestDuplex = 'half';
+export { type _RequestDuplex as RequestDuplex };
+
 export interface FilePropertyBag extends BlobPropertyBag {
   lastModified?: number;
 }
-
-export type FileFromPathOptions = Omit<FilePropertyBag, 'lastModified'>;
 
 const _FormData = FormData;
 type _FormData = FormData;
@@ -77,13 +78,18 @@ export async function getMultipartRequestOptions<T = Record<string, unknown>>(
 export function getDefaultAgent(url: string) {
   return undefined;
 }
-export function fileFromPath() {
-  throw new Error(
-    'The `fileFromPath` function is only supported in Node. See the README for more details: https://www.github.com/openai/openai-node#file-uploads',
-  );
-}
 
 export const isFsReadStream = (value: any) => false;
+
+export const isReadable = (value: any) => {
+  // We declare our own class of Readable here, so it's not feasible to
+  // do an 'instanceof' check. Instead, check for Readable-like properties.
+  return !!value && value.readable === true && typeof value.read === 'function';
+};
+
+export const readableFromWeb = (value: any) => {
+  return value; // assume web platform.
+};
 
 export declare class Readable {
   readable: boolean;
