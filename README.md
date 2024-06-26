@@ -1,4 +1,4 @@
-# OpenAI Node API Library
+# OpenAI TypeScript API Library
 
 [![NPM version](https://img.shields.io/npm/v/openai.svg)](https://npmjs.org/package/openai) ![npm bundle size](https://img.shields.io/bundlephobia/minzip/openai)
 
