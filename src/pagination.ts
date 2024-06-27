@@ -4,8 +4,9 @@ import { OpenAI, Response, OpenAIError } from './index';
 import { FinalRequestOptions } from './internal/request-options';
 import { defaultParseResponse, APIResponseProps } from 'openai/internal/parse';
 import { APIPromise } from './internal/api-promise';
+import { maybeObj } from './internal/utils';
 
-export type PageInfo = { url: URL } | { params: Record<string, unknown> | null };
+export type PageRequestOptions = Pick<FinalRequestOptions, 'query' | 'headers' | 'body' | 'path' | 'method'>;
 
 export abstract class AbstractPage<Item> implements AsyncIterable<Item> {
   #client: OpenAI;
@@ -21,38 +22,24 @@ export abstract class AbstractPage<Item> implements AsyncIterable<Item> {
     this.body = body;
   }
 
-  /**
-   * @deprecated Use nextPageInfo instead
-   */
-  abstract nextPageParams(): Partial<Record<string, unknown>> | null;
-  abstract nextPageInfo(): PageInfo | null;
+  abstract nextPageRequestOptions(): PageRequestOptions | null;
 
   abstract getPaginatedItems(): Item[];
 
   hasNextPage(): boolean {
     const items = this.getPaginatedItems();
     if (!items.length) return false;
-    return this.nextPageInfo() != null;
+    return this.nextPageRequestOptions() != null;
   }
 
   async getNextPage(): Promise<this> {
-    const nextInfo = this.nextPageInfo();
-    if (!nextInfo) {
+    const nextOptions = this.nextPageRequestOptions();
+    if (!nextOptions) {
       throw new OpenAIError(
         'No next page expected; please check `.hasNextPage()` before calling `.getNextPage()`.',
       );
     }
-    const nextOptions = { ...this.options };
-    if ('params' in nextInfo && typeof nextOptions.query === 'object') {
-      nextOptions.query = { ...nextOptions.query, ...nextInfo.params };
-    } else if ('url' in nextInfo) {
-      const params = [...Object.entries(nextOptions.query || {}), ...nextInfo.url.searchParams.entries()];
-      for (const [key, value] of params) {
-        nextInfo.url.searchParams.set(key, value as any);
-      }
-      nextOptions.query = undefined;
-      nextOptions.path = nextInfo.url.toString();
-    }
+
     return await this.#client.requestAPIList(this.constructor as any, nextOptions);
   }
 
@@ -142,16 +129,7 @@ export class Page<Item> extends AbstractPage<Item> implements PageResponse<Item>
     return this.data ?? [];
   }
 
-  // @deprecated Please use `nextPageInfo()` instead
-  /**
-   * This page represents a response that isn't actually paginated at the API level
-   * so there will never be any next page params.
-   */
-  nextPageParams(): null {
-    return null;
-  }
-
-  nextPageInfo(): null {
+  nextPageRequestOptions(): PageRequestOptions | null {
     return null;
   }
 }
@@ -187,27 +165,19 @@ export class CursorPage<Item extends { id: string }>
     return this.data ?? [];
   }
 
-  // @deprecated Please use `nextPageInfo()` instead
-  nextPageParams(): Partial<CursorPageParams> | null {
-    const info = this.nextPageInfo();
-    if (!info) return null;
-    if ('params' in info) return info.params;
-    const params = Object.fromEntries(info.url.searchParams);
-    if (!Object.keys(params).length) return null;
-    return params;
-  }
-
-  nextPageInfo(): PageInfo | null {
+  nextPageRequestOptions(): PageRequestOptions | null {
     const data = this.getPaginatedItems();
-    if (!data.length) {
-      return null;
-    }
-
     const id = data[data.length - 1]?.id;
     if (!id) {
       return null;
     }
 
-    return { params: { after: id } };
+    return {
+      ...this.options,
+      query: {
+        ...maybeObj(this.options.query),
+        after: id,
+      },
+    };
   }
 }

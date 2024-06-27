@@ -4,6 +4,15 @@ import { OpenAIError } from '../error';
 
 declare const Deno: any;
 
+/** Returns an object if the given value isn't an object, otherwise returns as-is */
+export function maybeObj(x: unknown): object {
+  if (typeof x !== 'object') {
+    return {};
+  }
+
+  return x ?? {};
+}
+
 // https://stackoverflow.com/a/34491287
 export function isEmptyObj(obj: Object | null | undefined): boolean {
   if (!obj) return true;
