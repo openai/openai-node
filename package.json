@@ -1,5 +1,5 @@
 {
-  "name": "cortex-node",
+  "name": "cortexso-node",
   "version": "4.47.1",
   "description": "Forked version of the OpenAI Node.js client library",
   "author": "Jan <service@jan.ai>",
