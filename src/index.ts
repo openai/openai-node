@@ -293,6 +293,7 @@ export namespace OpenAI {
   export import Model = API.Model;
   export import ModelDeleted = API.ModelDeleted;
   export import ModelsPage = API.ModelsPage;
+  export import ThreadsPage = API.Beta.ThreadsPage;
 
   export import FineTuning = API.FineTuning;
 

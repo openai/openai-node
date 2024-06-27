@@ -10,7 +10,7 @@ import * as AssistantsAPI from '../assistants';
 import * as MessagesAPI from './messages';
 import * as RunsAPI from './runs/runs';
 import { Stream } from '../../../streaming';
-import { Page } from 'openai/pagination';
+import { Page } from '../../../pagination';
 
 /**
  * Note: no pagination actually occurs yet, this is for forwards-compatibility.
@@ -66,6 +66,13 @@ export class Threads extends APIResource {
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
     });
+  }
+
+  /**
+   * Clean up a thread.
+   */
+  clean(threadId: string, options?: Core.RequestOptions): Core.APIPromise<Thread> {
+    return this._client.post(`/threads/${threadId}/clean`);
   }
 
   /**
@@ -1489,6 +1496,7 @@ export namespace Threads {
   export import AssistantToolChoiceFunction = ThreadsAPI.AssistantToolChoiceFunction;
   export import AssistantToolChoiceOption = ThreadsAPI.AssistantToolChoiceOption;
   export import Thread = ThreadsAPI.Thread;
+  export import ThreadsPage = ThreadsAPI.ThreadsPage;
   export import ThreadDeleted = ThreadsAPI.ThreadDeleted;
   export import ThreadCreateParams = ThreadsAPI.ThreadCreateParams;
   export import ThreadUpdateParams = ThreadsAPI.ThreadUpdateParams;

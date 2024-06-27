@@ -43,6 +43,24 @@ export class Models extends APIResource {
   stop(model: string, options?: Core.RequestOptions): Core.APIPromise<Model> {
     return this._client.post(`/models/${model}/stop`, options);
   }
+
+  /**
+   * Download a model.
+   */
+  download(model: string) {
+    return this._client.get(`/models/download/${model}`);
+  }
+
+  /**
+   * Abort a model download.
+   */
+  abortDownload(downloadId: string) {
+    return this._client.get(`/models/abort-download/${downloadId}`);
+  }
+
+  update(model: string, body: Record<string, unknown>, options?: Core.RequestOptions) {
+    return this._client.post(`/models/${model}/config`, { body, ...options });
+  }
 }
 
 /**

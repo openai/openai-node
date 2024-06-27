@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { OpenAIError, APIConnectionError } from 'openai/error';
+import { OpenAIError, APIConnectionError } from '../error';
 import { PassThrough } from 'stream';
 import {
   ParsingToolFunction,

@@ -1,4 +1,4 @@
-import * as Core from 'openai/core';
+import * as Core from '../core';
 import { type CompletionUsage } from 'openai/resources/completions';
 import {
   type Completions,
@@ -8,7 +8,7 @@ import {
   type ChatCompletionCreateParams,
   type ChatCompletionTool,
 } from 'openai/resources/chat/completions';
-import { APIUserAbortError, OpenAIError } from 'openai/error';
+import { APIUserAbortError, OpenAIError } from '../error';
 import {
   type RunnableFunction,
   isRunnableFunctionWithParse,

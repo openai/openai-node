@@ -49,6 +49,7 @@ export {
   ThreadCreateAndRunPollParams,
   ThreadCreateAndRunStreamParams,
   Threads,
+  ThreadsPage,
 } from './threads';
 export {
   RequiredActionFunctionToolCall,

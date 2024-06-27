@@ -34,6 +34,7 @@ export {
   ThreadCreateAndRunPollParams,
   ThreadCreateAndRunStreamParams,
   Threads,
+  ThreadsPage,
 } from './threads/index';
 export { Beta } from './beta';
 export { Chat } from './chat/index';
