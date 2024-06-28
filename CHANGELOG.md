@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.52.2 (2024-06-28)
+
+Full Changelog: [v4.52.1...v4.52.2](https://github.com/openai/openai-node/compare/v4.52.1...v4.52.2)
+
+### Chores
+
+* gitignore test server logs ([#914](https://github.com/openai/openai-node/issues/914)) ([6316720](https://github.com/openai/openai-node/commit/6316720c3fdd0422965ae3890275062bc0fe3c2b))
+
 ## 4.52.1 (2024-06-25)
 
 Full Changelog: [v4.52.0...v4.52.1](https://github.com/openai/openai-node/compare/v4.52.0...v4.52.1)
