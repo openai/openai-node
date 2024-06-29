@@ -128,7 +128,7 @@ const fileList = [
   ...
 ];
 
-const batch = await openai.vectorStores.fileBatches.uploadAndPoll(vectorStore.id, fileList);
+const batch = await openai.beta.vectorStores.fileBatches.uploadAndPoll(vectorStore.id, { files: fileList });
 ```
 
 ### Streaming Helpers
