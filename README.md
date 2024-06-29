@@ -234,6 +234,7 @@ async function main() {
           function: {
             function: getCurrentLocation,
             parameters: { type: 'object', properties: {} },
+            description: "Get the user's current location",
           },
         },
         {
@@ -247,6 +248,7 @@ async function main() {
                 location: { type: 'string' },
               },
             },
+            description: "Get the weather for a location",
           },
         },
       ],
