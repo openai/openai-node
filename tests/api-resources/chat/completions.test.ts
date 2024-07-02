@@ -37,7 +37,7 @@ describe('resource completions', () => {
       parallel_tool_calls: true,
       presence_penalty: -2,
       response_format: { type: 'json_object' },
-      seed: -9223372036854776000,
+      seed: -9007199254740991,
       service_tier: 'auto',
       stop: 'string',
       stream: false,
