@@ -14,6 +14,11 @@ To learn how to use the OpenAI API, check out our [API Reference](https://platfo
 npm install openai
 ```
 
+You can install with bun using:
+```sh
+bun install openai
+```
+
 You can import in Deno via:
 
 <!-- x-release-please-start-version -->
