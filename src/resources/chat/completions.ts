@@ -29,9 +29,37 @@ export class Completions extends APIResource {
     body: ChatCompletionCreateParams,
     options?: Core.RequestOptions,
   ): APIPromise<ChatCompletion> | APIPromise<Stream<ChatCompletionChunk>> {
-    return this._client.post('/chat/completions', { body, ...options, stream: body.stream ?? false }) as
-      | APIPromise<ChatCompletion>
-      | APIPromise<Stream<ChatCompletionChunk>>;
+    const response = this._client.post('/chat/completions', {
+      body,
+      ...options,
+      stream: body.stream ?? false,
+    }) as APIPromise<ChatCompletion> | APIPromise<Stream<ChatCompletionChunk>>;
+
+    return response._thenUnwrap((data) => {
+      if (data instanceof Stream) return data;
+
+      for (const choice of data.choices) {
+        for (const tool_call of choice.message.tool_calls ?? []) {
+          if (tool_call.type === 'function') {
+            const inputTool = body.tools?.find(
+              (tool) => tool.type === 'function' && tool.function.name === tool_call.function.name,
+            );
+
+            if (
+              inputTool &&
+              inputTool.type === 'function' &&
+              inputTool.function.strict &&
+              inputTool.function.parameters
+            ) {
+              // TODO: Explore making this safer
+              tool_call.function.arguments = JSON.parse(tool_call.function.arguments);
+            }
+          }
+        }
+      }
+
+      return data;
+    }) as APIPromise<ChatCompletion> | APIPromise<Stream<ChatCompletionChunk>>;
   }
 }
 

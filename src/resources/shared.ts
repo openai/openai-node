@@ -33,6 +33,11 @@ export interface FunctionDefinition {
    * Omitting `parameters` defines a function with an empty parameter list.
    */
   parameters?: FunctionParameters;
+
+  /**
+   * TODO: This should be added when openapi is updated
+   */
+  strict: boolean;
 }
 
 /**

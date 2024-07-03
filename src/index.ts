@@ -165,6 +165,8 @@ export class OpenAI extends Core.APIClient {
   beta: API.Beta = new API.Beta(this);
   batches: API.Batches = new API.Batches(this);
 
+  zodFunction = API.zodFunction;
+
   protected override defaultQuery(): Core.DefaultQuery | undefined {
     return this._options.defaultQuery;
   }
@@ -312,6 +314,8 @@ export namespace OpenAI {
   export import ErrorObject = API.ErrorObject;
   export import FunctionDefinition = API.FunctionDefinition;
   export import FunctionParameters = API.FunctionParameters;
+
+  export import zodFunction = API.zodFunction;
 }
 
 // ---------------------- Azure ----------------------
