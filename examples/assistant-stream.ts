@@ -39,7 +39,6 @@ async function main() {
     .on('textDelta', (delta, snapshot) => console.log(snapshot))
     .on('messageDelta', (delta, snapshot) => console.log(snapshot))
     .on('run', (run) => console.log(run))
-    .on('messageDelta', (delta, snapshot) => console.log(snapshot))
     .on('connect', () => console.log());
   const result = await run.finalRun();
   console.log('Run Result' + result);
