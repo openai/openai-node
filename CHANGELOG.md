@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.52.4 (2024-07-08)
+
+Full Changelog: [v4.52.3...v4.52.4](https://github.com/openai/openai-node/compare/v4.52.3...v4.52.4)
+
+### Refactors
+
+* **examples:** removedduplicated 'messageDelta' streaming event. ([#909](https://github.com/openai/openai-node/issues/909)) ([7b0b3d2](https://github.com/openai/openai-node/commit/7b0b3d2e228532fca19f49390a2831a1abac72a4))
+
 ## 4.52.3 (2024-07-02)
 
 Full Changelog: [v4.52.2...v4.52.3](https://github.com/openai/openai-node/compare/v4.52.2...v4.52.3)
