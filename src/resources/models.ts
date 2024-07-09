@@ -47,8 +47,8 @@ export class Models extends APIResource {
   /**
    * Download a model.
    */
-  download(model: string) {
-    return this._client.get(`/models/download/${model}`);
+  download(model: string, options?: Core.RequestOptions) {
+    return this._client.get(`/models/download/${model}`, options);
   }
 
   /**
