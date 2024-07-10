@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.52.5 (2024-07-10)
+
+Full Changelog: [v4.52.4...v4.52.5](https://github.com/openai/openai-node/compare/v4.52.4...v4.52.5)
+
+### Bug Fixes
+
+* **vectorStores:** correctly handle missing `files` in `uploadAndPoll()` ([#926](https://github.com/openai/openai-node/issues/926)) ([945fca6](https://github.com/openai/openai-node/commit/945fca646b02b52bbc9163cb51f5d87e7db8afd6))
+
 ## 4.52.4 (2024-07-08)
 
 Full Changelog: [v4.52.3...v4.52.4](https://github.com/openai/openai-node/compare/v4.52.3...v4.52.4)
