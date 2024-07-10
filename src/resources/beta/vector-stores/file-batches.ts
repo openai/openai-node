@@ -155,19 +155,22 @@ export class FileBatches extends APIResource {
     { files, fileIds = [] }: { files: Uploadable[]; fileIds?: string[] },
     options?: Core.RequestOptions & { pollIntervalMs?: number; maxConcurrency?: number },
   ): Promise<VectorStoreFileBatch> {
-    if (files === null || files.length == 0) {
-      throw new Error('No files provided to process.');
+    if (files == null || files.length == 0) {
+      throw new Error(
+        `No \`files\` provided to process. If you've already uploaded files you should use \`.createAndPoll()\` instead`,
+      );
     }
 
     const configuredConcurrency = options?.maxConcurrency ?? 5;
-    //We cap the number of workers at the number of files (so we don't start any unnecessary workers)
+
+    // We cap the number of workers at the number of files (so we don't start any unnecessary workers)
     const concurrencyLimit = Math.min(configuredConcurrency, files.length);
 
     const client = this._client;
     const fileIterator = files.values();
     const allFileIds: string[] = [...fileIds];
 
-    //This code is based on this design. The libraries don't accommodate our environment limits.
+    // This code is based on this design. The libraries don't accommodate our environment limits.
     // https://stackoverflow.com/questions/40639432/what-is-the-best-way-to-limit-concurrency-when-using-es6s-promise-all
     async function processFiles(iterator: IterableIterator<Uploadable>) {
       for (let item of iterator) {
@@ -176,10 +179,10 @@ export class FileBatches extends APIResource {
       }
     }
 
-    //Start workers to process results
+    // Start workers to process results
     const workers = Array(concurrencyLimit).fill(fileIterator).map(processFiles);
 
-    //Wait for all processing to complete.
+    // Wait for all processing to complete.
     await allSettledWithThrow(workers);
 
     return await this.createAndPoll(vectorStoreId, {
