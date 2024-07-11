@@ -31,7 +31,7 @@ describe('resource files', () => {
   });
 
   test('retrieve', async () => {
-    const responsePromise = openai.files.retrieve('string');
+    const responsePromise = openai.files.retrieve('file_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -43,7 +43,7 @@ describe('resource files', () => {
 
   test('retrieve: request options instead of params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(openai.files.retrieve('string', { path: '/_stainless_unknown_path' })).rejects.toThrow(
+    await expect(openai.files.retrieve('file_id', { path: '/_stainless_unknown_path' })).rejects.toThrow(
       OpenAI.NotFoundError,
     );
   });
@@ -69,12 +69,12 @@ describe('resource files', () => {
   test('list: request options and params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openai.files.list({ purpose: 'string' }, { path: '/_stainless_unknown_path' }),
+      openai.files.list({ purpose: 'purpose' }, { path: '/_stainless_unknown_path' }),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
   test('del', async () => {
-    const responsePromise = openai.files.del('string');
+    const responsePromise = openai.files.del('file_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -86,20 +86,20 @@ describe('resource files', () => {
 
   test('del: request options instead of params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(openai.files.del('string', { path: '/_stainless_unknown_path' })).rejects.toThrow(
+    await expect(openai.files.del('file_id', { path: '/_stainless_unknown_path' })).rejects.toThrow(
       OpenAI.NotFoundError,
     );
   });
 
   test('content: request options instead of params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(openai.files.content('string', { path: '/_stainless_unknown_path' })).rejects.toThrow(
+    await expect(openai.files.content('file_id', { path: '/_stainless_unknown_path' })).rejects.toThrow(
       OpenAI.NotFoundError,
     );
   });
 
   test('retrieveContent', async () => {
-    const responsePromise = openai.files.retrieveContent('string');
+    const responsePromise = openai.files.retrieveContent('file_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -112,7 +112,7 @@ describe('resource files', () => {
   test('retrieveContent: request options instead of params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openai.files.retrieveContent('string', { path: '/_stainless_unknown_path' }),
+      openai.files.retrieveContent('file_id', { path: '/_stainless_unknown_path' }),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 });

@@ -50,7 +50,7 @@ describe('resource fileBatches', () => {
   });
 
   test('cancel', async () => {
-    const responsePromise = openai.beta.vectorStores.fileBatches.cancel('string', 'string');
+    const responsePromise = openai.beta.vectorStores.fileBatches.cancel('vector_store_id', 'batch_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -63,12 +63,14 @@ describe('resource fileBatches', () => {
   test('cancel: request options instead of params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openai.beta.vectorStores.fileBatches.cancel('string', 'string', { path: '/_stainless_unknown_path' }),
+      openai.beta.vectorStores.fileBatches.cancel('vector_store_id', 'batch_id', {
+        path: '/_stainless_unknown_path',
+      }),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
   test('listFiles', async () => {
-    const responsePromise = openai.beta.vectorStores.fileBatches.listFiles('string', 'string');
+    const responsePromise = openai.beta.vectorStores.fileBatches.listFiles('vector_store_id', 'batch_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -81,7 +83,7 @@ describe('resource fileBatches', () => {
   test('listFiles: request options instead of params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openai.beta.vectorStores.fileBatches.listFiles('string', 'string', {
+      openai.beta.vectorStores.fileBatches.listFiles('vector_store_id', 'batch_id', {
         path: '/_stainless_unknown_path',
       }),
     ).rejects.toThrow(OpenAI.NotFoundError);
@@ -91,9 +93,9 @@ describe('resource fileBatches', () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
       openai.beta.vectorStores.fileBatches.listFiles(
-        'string',
-        'string',
-        { after: 'string', before: 'string', filter: 'in_progress', limit: 0, order: 'asc' },
+        'vector_store_id',
+        'batch_id',
+        { after: 'after', before: 'before', filter: 'in_progress', limit: 0, order: 'asc' },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);
