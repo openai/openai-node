@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cafe Station</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-blue-900">
+    <div class="h-screen flex flex-col justify-center items-center">
+        <img src="path/to/logo.png" alt="Cafe Station Logo" class="mb-5">
+        <a href="login.html" class="text-white text-xl">Login</a>
+    </div>
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Cafe Station</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-blue-900">
+    <div class="h-screen flex flex-col justify-center items-center">
+        <h1 class="text-white text-3xl mb-8">Login</h1>
+        <form class="w-full max-w-sm">
+            <div class="mb-4">
+                <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700" id="username" type="text" placeholder="Username">
+            </div>
+            <div class="mb-4">
+                <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700" id="password" type="password" placeholder="Password">
+            </div>
+            <div class="flex items-center justify-between">
+                <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" type="button" onclick="login()">Login</button>
+                <a class="inline-block align-baseline font-bold text-sm text-blue-500 hover:text-blue-800" href="register.html">Create Account</a>
+            </div>
+        </form>
+    </div>
+    <script>
+        function login() {
+            // Handle login logic here
+            window.location.href = 'main.html';
+        }
+    </script>
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Cafe Station</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-blue-900">
+    <div class="h-screen flex flex-col justify-center items-center">
+        <h1 class="text-white text-3xl mb-8">Login</h1>
+        <form class="w-full max-w-sm">
+            <div class="mb-4">
+                <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700" id="username" type="text" placeholder="Username">
+            </div>
+            <div class="mb-4">
+                <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700" id="password" type="password" placeholder="Password">
+            </div>
+            <div class="flex items-center justify-between">
+                <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" type="button" onclick="login()">Login</button>
+                <a class="inline-block align-baseline font-bold text-sm text-blue-500 hover:text-blue-800" href="register.html">Create Account</a>
+            </div>
+        </form>
+    </div>
+    <script>
+        function login() {
+            // Handle login logic here
+            window.location.href = 'main.html';
+        }
+    </script>
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - Cafe Station</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-blue-900">
+    <div class="h-screen flex flex-col justify-center items-center">
+        <h1 class="text-white text-3xl mb-8">Create Account</h1>
+        <form class="w-full max-w-sm">
+            <div class="mb-4">
+                <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700" id="new-username" type="text" placeholder="Username">
+            </div>
+            <div class="mb-4">
+                <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700" id="new-password" type="password" placeholder="Password">
+            </div>
+            <div class="flex items-center justify-between">
+                <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" type="button" onclick="register()">Create Account</button>
+            </div>
+        </form>
+    </div>
+    <script>
+        function register() {
+            // Handle account creation logic here
+            window.location.href = 'login.html';
+        }
+    </script>
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Main - Cafe Station</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-blue-900">
+    <div class="h-screen flex flex-col justify-center items-center">
+        <div class="w-full max-w-lg bg-white p-8 rounded-lg shadow-md">
+            <h1 class="text-2xl font-bold mb-4">Welcome to Cafe Station</h1>
+            <div class="mb-4">
+                <label class="block text-gray-700">Name Branch</label>
+                <select id="branch" class="block w-full mt-2 border border-gray-300 rounded py-2 px-3">
+                    <option>Mansoura</option>
+                    <option>Maadi</option>
+                    <option>Alexandria</option>
+                    <option>ELtagamo3</option>
+                    <option>Zayed</option>
+                    <option>Sodic</option>
+                    <option>ELrehab</option>
+                    <option>Nasr City</option>
+                    <option>Sokhna</option>
+                    <option>ELsahel</option>
+                    <option>Elobour</option>
+                    <option>Madinaty</option>
+                </select>
+            </div>
+            <div class="mb-4">
+                <label class="block text-gray-700">Product Category</label>
+                <select id="category" class="block w-full mt-2 border border-gray-300 rounded py-2 px-3">
+                    <option>Dessert</option>
+                </select>
+            </div>
+            <div class="mb-4">
+                <label class="block text-gray-700">Product</label>
+                <select id="product" class="block w-full mt-2 border border-gray-300 rounded py-2 px-3">
+                    <option>Mega Brownies-SV</option>
+                    <option>Muffins</option>
+                    <option>Mini Tart Honey Cake-SV</option>
+                    <option>Mini Trat Louts-SV</option>
+                    <option>Mini Trat Kinder-SV</option>
+                    <option>Cakesicles</option>
+                    <option>Nutella Swiss Roll-SV</option>
+                    <option>Mini Trat Nutella-SV</option>
+                    <option>Sugar Cookies</option>
+                    <option>Mini Cookies</option>
+                    <option>Cupcake</option>
+                    <option>Molten Cake – Rana</option>
+                    <option>Nutella Ganesh Molten Cake</option>
+                    <option>Flavored Cheesecake</option>
+                    <option>Mini Donuts</option>
+                    <option>Cake Pops</option>
+                    <option>Louts Cheesecake</option>
+                    <option>Mini Trat Flutes-SV</option>
+                    <option>Nutty Brownies-SV</option>
+                    <option>Louts Volcano-SV</option>
+                    <option>Mini Tart Walnuts-SV</option>
+                    <option>Chocolate Muffins</option>
+                    <option>Nutella Volcano-SV</option>
+                </select>
+            </div>
+            <div class="mb-4">
+                <label class="block text-gray-700">Quantity</label>
+                <input type="number" id="quantity" class="block w-full mt-2 border border-gray-300 rounded py-2 px-3">
+            </div>
+            <div class="mb-4">
+                <label class="block text-gray-700">Unit</label>
+                <select id="unit" class="block w-full mt-2 border border-gray-300 rounded py-2 px-3">
+                    <option>ML</option>
+                    <option>GM</option>
+                    <option>EACH</option>
+                </select>
+            </div>
+            <div class="mb-4">
+                <label class="block text-gray-700">Price</label>
+                <input type="number" id="price" class="block w-full mt-2 border border-gray-300 rounded py-2 px-3">
+            </div>
+            <div class="mb-4">
+                <label class="block text-gray-700">Reason</label>
+                <input type="text" id="reason" class="block w-full mt-2 border border-gray-300 rounded py-2 px-3">
+            </div>
+            <div class="flex justify-between items-center">
+                <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" type="button" onclick="addItem()">Add Item</button>
+                <button class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded" type="button" onclick="logout()">Logout</button>
+            </div>
+            <div class="mt-8">
+                <h2 class="text-xl font-bold">Invoice</h2>
+                <div id="invoice" class="mt-4 bg-gray-100 p-4 rounded shadow-inner"></div>
+                <button class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded mt-4" type="button" onclick="printInvoice()">Print Invoice</button>
+            </div>
+        </div>
+    </div>
+    <script>
+        const items = [];
+
+        function addItem() {
+            const branch = document.getElementById('branch').value;
+            const category = document.getElementById('category').value;
+            const product = document.getElementById('product').value;
+            const quantity = document.getElementById('quantity').value;
+            const unit = document.getElementById('unit').value;
+            const price = document.getElementById('price').value;
+            const reason = document.getElementById('reason').value;
+
+            const item = {
+                branch,
+                category,
+                product,
+                quantity,
+                unit,
+                price,
+                reason
+            };
+
+            items.push(item);
+            updateInvoice();
+        }
+
+        function updateInvoice() {
+            const invoice = document.getElementById('invoice');
+            invoice.innerHTML = '';
+
+            items.forEach((item, index) => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'p-2 border-b border-gray-300';
+                itemDiv.innerHTML = `
+                    <p><strong>${item.product}</strong> (${item.category})</p>
+                    <p>Quantity: ${item.quantity} ${item.unit}</p>
+                    <p>Price: ${item.price}</p>
+                    <p>Reason: ${item.reason}</p>
+                `;
+                invoice.appendChild(itemDiv);
+            });
+        }
+
+        function printInvoice() {
+            const printContents = document.getElementById('invoice').innerHTML;
+            const originalContents = document.body.innerHTML;
+
+            document.body.innerHTML = printContents;
+
+            window.print();
+
+            document.body.innerHTML = originalContents;
+        }
+
+        function logout() {
+            window.location.href = 'login.html';
+        }
+    </script>
+</body>
+</html>
