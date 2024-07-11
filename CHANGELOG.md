@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.52.7 (2024-07-11)
+
+Full Changelog: [v4.52.6...v4.52.7](https://github.com/openai/openai-node/compare/v4.52.6...v4.52.7)
+
+### Documentation
+
+* **examples:** update example values ([#933](https://github.com/openai/openai-node/issues/933)) ([92512ab](https://github.com/openai/openai-node/commit/92512abcd7ab5d7c452dfae007c3a25041062656))
+
 ## 4.52.6 (2024-07-11)
 
 Full Changelog: [v4.52.5...v4.52.6](https://github.com/openai/openai-node/compare/v4.52.5...v4.52.6)
