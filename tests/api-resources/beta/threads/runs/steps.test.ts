@@ -10,9 +10,9 @@ const openai = new OpenAI({
 
 describe('resource steps', () => {
   test('retrieve: only required params', async () => {
-    const responsePromise = openai.beta.threads.runs.steps.retrieve('string', {
-      thread_id: 'string',
-      run_id: 'string',
+    const responsePromise = openai.beta.threads.runs.steps.retrieve('step_id', {
+      thread_id: 'thread_id',
+      run_id: 'run_id',
     });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
@@ -24,14 +24,14 @@ describe('resource steps', () => {
   });
 
   test('retrieve: required and optional params', async () => {
-    const response = await openai.beta.threads.runs.steps.retrieve('string', {
-      thread_id: 'string',
-      run_id: 'string',
+    const response = await openai.beta.threads.runs.steps.retrieve('step_id', {
+      thread_id: 'thread_id',
+      run_id: 'run_id',
     });
   });
 
   test('list: only required params', async () => {
-    const responsePromise = openai.beta.threads.runs.steps.list('string', { thread_id: 'string' });
+    const responsePromise = openai.beta.threads.runs.steps.list('run_id', { thread_id: 'thread_id' });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -42,10 +42,10 @@ describe('resource steps', () => {
   });
 
   test('list: required and optional params', async () => {
-    const response = await openai.beta.threads.runs.steps.list('string', {
-      thread_id: 'string',
-      after: 'string',
-      before: 'string',
+    const response = await openai.beta.threads.runs.steps.list('run_id', {
+      thread_id: 'thread_id',
+      after: 'after',
+      before: 'before',
       limit: 0,
       order: 'asc',
     });

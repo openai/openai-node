@@ -31,7 +31,7 @@ describe('resource threads', () => {
               content: 'string',
               attachments: [
                 {
-                  file_id: 'string',
+                  file_id: 'file_id',
                   tools: [
                     { type: 'code_interpreter' },
                     { type: 'code_interpreter' },
@@ -39,7 +39,7 @@ describe('resource threads', () => {
                   ],
                 },
                 {
-                  file_id: 'string',
+                  file_id: 'file_id',
                   tools: [
                     { type: 'code_interpreter' },
                     { type: 'code_interpreter' },
@@ -47,38 +47,7 @@ describe('resource threads', () => {
                   ],
                 },
                 {
-                  file_id: 'string',
-                  tools: [
-                    { type: 'code_interpreter' },
-                    { type: 'code_interpreter' },
-                    { type: 'code_interpreter' },
-                  ],
-                },
-              ],
-              metadata: {},
-            },
-            {
-              role: 'user',
-              content: 'string',
-              attachments: [
-                {
-                  file_id: 'string',
-                  tools: [
-                    { type: 'code_interpreter' },
-                    { type: 'code_interpreter' },
-                    { type: 'code_interpreter' },
-                  ],
-                },
-                {
-                  file_id: 'string',
-                  tools: [
-                    { type: 'code_interpreter' },
-                    { type: 'code_interpreter' },
-                    { type: 'code_interpreter' },
-                  ],
-                },
-                {
-                  file_id: 'string',
+                  file_id: 'file_id',
                   tools: [
                     { type: 'code_interpreter' },
                     { type: 'code_interpreter' },
@@ -93,7 +62,7 @@ describe('resource threads', () => {
               content: 'string',
               attachments: [
                 {
-                  file_id: 'string',
+                  file_id: 'file_id',
                   tools: [
                     { type: 'code_interpreter' },
                     { type: 'code_interpreter' },
@@ -101,7 +70,7 @@ describe('resource threads', () => {
                   ],
                 },
                 {
-                  file_id: 'string',
+                  file_id: 'file_id',
                   tools: [
                     { type: 'code_interpreter' },
                     { type: 'code_interpreter' },
@@ -109,7 +78,38 @@ describe('resource threads', () => {
                   ],
                 },
                 {
-                  file_id: 'string',
+                  file_id: 'file_id',
+                  tools: [
+                    { type: 'code_interpreter' },
+                    { type: 'code_interpreter' },
+                    { type: 'code_interpreter' },
+                  ],
+                },
+              ],
+              metadata: {},
+            },
+            {
+              role: 'user',
+              content: 'string',
+              attachments: [
+                {
+                  file_id: 'file_id',
+                  tools: [
+                    { type: 'code_interpreter' },
+                    { type: 'code_interpreter' },
+                    { type: 'code_interpreter' },
+                  ],
+                },
+                {
+                  file_id: 'file_id',
+                  tools: [
+                    { type: 'code_interpreter' },
+                    { type: 'code_interpreter' },
+                    { type: 'code_interpreter' },
+                  ],
+                },
+                {
+                  file_id: 'file_id',
                   tools: [
                     { type: 'code_interpreter' },
                     { type: 'code_interpreter' },
@@ -141,7 +141,7 @@ describe('resource threads', () => {
   });
 
   test('retrieve', async () => {
-    const responsePromise = openai.beta.threads.retrieve('string');
+    const responsePromise = openai.beta.threads.retrieve('thread_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -152,7 +152,7 @@ describe('resource threads', () => {
   });
 
   test('update', async () => {
-    const responsePromise = openai.beta.threads.update('string', {});
+    const responsePromise = openai.beta.threads.update('thread_id', {});
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -163,7 +163,7 @@ describe('resource threads', () => {
   });
 
   test('del', async () => {
-    const responsePromise = openai.beta.threads.del('string');
+    const responsePromise = openai.beta.threads.del('thread_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -174,7 +174,7 @@ describe('resource threads', () => {
   });
 
   test('createAndRun: only required params', async () => {
-    const responsePromise = openai.beta.threads.createAndRun({ assistant_id: 'string' });
+    const responsePromise = openai.beta.threads.createAndRun({ assistant_id: 'assistant_id' });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -186,8 +186,8 @@ describe('resource threads', () => {
 
   test('createAndRun: required and optional params', async () => {
     const response = await openai.beta.threads.createAndRun({
-      assistant_id: 'string',
-      instructions: 'string',
+      assistant_id: 'assistant_id',
+      instructions: 'instructions',
       max_completion_tokens: 256,
       max_prompt_tokens: 256,
       metadata: {},
@@ -203,7 +203,7 @@ describe('resource threads', () => {
             content: 'string',
             attachments: [
               {
-                file_id: 'string',
+                file_id: 'file_id',
                 tools: [
                   { type: 'code_interpreter' },
                   { type: 'code_interpreter' },
@@ -211,7 +211,7 @@ describe('resource threads', () => {
                 ],
               },
               {
-                file_id: 'string',
+                file_id: 'file_id',
                 tools: [
                   { type: 'code_interpreter' },
                   { type: 'code_interpreter' },
@@ -219,38 +219,7 @@ describe('resource threads', () => {
                 ],
               },
               {
-                file_id: 'string',
-                tools: [
-                  { type: 'code_interpreter' },
-                  { type: 'code_interpreter' },
-                  { type: 'code_interpreter' },
-                ],
-              },
-            ],
-            metadata: {},
-          },
-          {
-            role: 'user',
-            content: 'string',
-            attachments: [
-              {
-                file_id: 'string',
-                tools: [
-                  { type: 'code_interpreter' },
-                  { type: 'code_interpreter' },
-                  { type: 'code_interpreter' },
-                ],
-              },
-              {
-                file_id: 'string',
-                tools: [
-                  { type: 'code_interpreter' },
-                  { type: 'code_interpreter' },
-                  { type: 'code_interpreter' },
-                ],
-              },
-              {
-                file_id: 'string',
+                file_id: 'file_id',
                 tools: [
                   { type: 'code_interpreter' },
                   { type: 'code_interpreter' },
@@ -265,7 +234,7 @@ describe('resource threads', () => {
             content: 'string',
             attachments: [
               {
-                file_id: 'string',
+                file_id: 'file_id',
                 tools: [
                   { type: 'code_interpreter' },
                   { type: 'code_interpreter' },
@@ -273,7 +242,7 @@ describe('resource threads', () => {
                 ],
               },
               {
-                file_id: 'string',
+                file_id: 'file_id',
                 tools: [
                   { type: 'code_interpreter' },
                   { type: 'code_interpreter' },
@@ -281,7 +250,38 @@ describe('resource threads', () => {
                 ],
               },
               {
-                file_id: 'string',
+                file_id: 'file_id',
+                tools: [
+                  { type: 'code_interpreter' },
+                  { type: 'code_interpreter' },
+                  { type: 'code_interpreter' },
+                ],
+              },
+            ],
+            metadata: {},
+          },
+          {
+            role: 'user',
+            content: 'string',
+            attachments: [
+              {
+                file_id: 'file_id',
+                tools: [
+                  { type: 'code_interpreter' },
+                  { type: 'code_interpreter' },
+                  { type: 'code_interpreter' },
+                ],
+              },
+              {
+                file_id: 'file_id',
+                tools: [
+                  { type: 'code_interpreter' },
+                  { type: 'code_interpreter' },
+                  { type: 'code_interpreter' },
+                ],
+              },
+              {
+                file_id: 'file_id',
                 tools: [
                   { type: 'code_interpreter' },
                   { type: 'code_interpreter' },

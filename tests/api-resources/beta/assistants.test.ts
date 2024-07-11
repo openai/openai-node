@@ -23,10 +23,10 @@ describe('resource assistants', () => {
   test('create: required and optional params', async () => {
     const response = await openai.beta.assistants.create({
       model: 'gpt-4-turbo',
-      description: 'string',
-      instructions: 'string',
+      description: 'description',
+      instructions: 'instructions',
       metadata: {},
-      name: 'string',
+      name: 'name',
       response_format: 'none',
       temperature: 1,
       tool_resources: {
@@ -44,7 +44,7 @@ describe('resource assistants', () => {
   });
 
   test('retrieve', async () => {
-    const responsePromise = openai.beta.assistants.retrieve('string');
+    const responsePromise = openai.beta.assistants.retrieve('assistant_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -55,7 +55,7 @@ describe('resource assistants', () => {
   });
 
   test('update', async () => {
-    const responsePromise = openai.beta.assistants.update('string', {});
+    const responsePromise = openai.beta.assistants.update('assistant_id', {});
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -80,14 +80,14 @@ describe('resource assistants', () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
       openai.beta.assistants.list(
-        { after: 'string', before: 'string', limit: 0, order: 'asc' },
+        { after: 'after', before: 'before', limit: 0, order: 'asc' },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
   test('del', async () => {
-    const responsePromise = openai.beta.assistants.del('string');
+    const responsePromise = openai.beta.assistants.del('assistant_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;

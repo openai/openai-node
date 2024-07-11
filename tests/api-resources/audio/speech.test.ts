@@ -11,7 +11,7 @@ describe('resource speech', () => {
   // binary tests are currently broken
   test.skip('create: required and optional params', async () => {
     const response = await openai.audio.speech.create({
-      input: 'string',
+      input: 'input',
       model: 'string',
       voice: 'alloy',
       response_format: 'mp3',

@@ -49,8 +49,8 @@ describe('resource fileBatches', () => {
   });
 
   test('cancel: only required params', async () => {
-    const responsePromise = openai.beta.vectorStores.fileBatches.cancel('string', {
-      vector_store_id: 'string',
+    const responsePromise = openai.beta.vectorStores.fileBatches.cancel('batch_id', {
+      vector_store_id: 'vector_store_id',
     });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
@@ -62,14 +62,14 @@ describe('resource fileBatches', () => {
   });
 
   test('cancel: required and optional params', async () => {
-    const response = await openai.beta.vectorStores.fileBatches.cancel('string', {
-      vector_store_id: 'string',
+    const response = await openai.beta.vectorStores.fileBatches.cancel('batch_id', {
+      vector_store_id: 'vector_store_id',
     });
   });
 
   test('listFiles: only required params', async () => {
-    const responsePromise = openai.beta.vectorStores.fileBatches.listFiles('string', {
-      vector_store_id: 'string',
+    const responsePromise = openai.beta.vectorStores.fileBatches.listFiles('batch_id', {
+      vector_store_id: 'vector_store_id',
     });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
@@ -81,10 +81,10 @@ describe('resource fileBatches', () => {
   });
 
   test('listFiles: required and optional params', async () => {
-    const response = await openai.beta.vectorStores.fileBatches.listFiles('string', {
-      vector_store_id: 'string',
-      after: 'string',
-      before: 'string',
+    const response = await openai.beta.vectorStores.fileBatches.listFiles('batch_id', {
+      vector_store_id: 'vector_store_id',
+      after: 'after',
+      before: 'before',
       filter: 'in_progress',
       limit: 0,
       order: 'asc',

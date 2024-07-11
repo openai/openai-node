@@ -10,7 +10,7 @@ const openai = new OpenAI({
 
 describe('resource messages', () => {
   test('create: only required params', async () => {
-    const responsePromise = openai.beta.threads.messages.create('string', {
+    const responsePromise = openai.beta.threads.messages.create('thread_id', {
       content: 'string',
       role: 'user',
     });
@@ -24,20 +24,20 @@ describe('resource messages', () => {
   });
 
   test('create: required and optional params', async () => {
-    const response = await openai.beta.threads.messages.create('string', {
+    const response = await openai.beta.threads.messages.create('thread_id', {
       content: 'string',
       role: 'user',
       attachments: [
         {
-          file_id: 'string',
+          file_id: 'file_id',
           tools: [{ type: 'code_interpreter' }, { type: 'code_interpreter' }, { type: 'code_interpreter' }],
         },
         {
-          file_id: 'string',
+          file_id: 'file_id',
           tools: [{ type: 'code_interpreter' }, { type: 'code_interpreter' }, { type: 'code_interpreter' }],
         },
         {
-          file_id: 'string',
+          file_id: 'file_id',
           tools: [{ type: 'code_interpreter' }, { type: 'code_interpreter' }, { type: 'code_interpreter' }],
         },
       ],
@@ -46,7 +46,7 @@ describe('resource messages', () => {
   });
 
   test('retrieve: only required params', async () => {
-    const responsePromise = openai.beta.threads.messages.retrieve('string', { thread_id: 'string' });
+    const responsePromise = openai.beta.threads.messages.retrieve('message_id', { thread_id: 'thread_id' });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -57,11 +57,11 @@ describe('resource messages', () => {
   });
 
   test('retrieve: required and optional params', async () => {
-    const response = await openai.beta.threads.messages.retrieve('string', { thread_id: 'string' });
+    const response = await openai.beta.threads.messages.retrieve('message_id', { thread_id: 'thread_id' });
   });
 
   test('update: only required params', async () => {
-    const responsePromise = openai.beta.threads.messages.update('string', { thread_id: 'string' });
+    const responsePromise = openai.beta.threads.messages.update('message_id', { thread_id: 'thread_id' });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -72,14 +72,14 @@ describe('resource messages', () => {
   });
 
   test('update: required and optional params', async () => {
-    const response = await openai.beta.threads.messages.update('string', {
-      thread_id: 'string',
+    const response = await openai.beta.threads.messages.update('message_id', {
+      thread_id: 'thread_id',
       metadata: {},
     });
   });
 
   test('list', async () => {
-    const responsePromise = openai.beta.threads.messages.list('string');
+    const responsePromise = openai.beta.threads.messages.list('thread_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -93,15 +93,15 @@ describe('resource messages', () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
       openai.beta.threads.messages.list(
-        'string',
-        { after: 'string', before: 'string', limit: 0, order: 'asc', run_id: 'string' },
+        'thread_id',
+        { after: 'after', before: 'before', limit: 0, order: 'asc', run_id: 'run_id' },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
   test('del: only required params', async () => {
-    const responsePromise = openai.beta.threads.messages.del('string', { thread_id: 'string' });
+    const responsePromise = openai.beta.threads.messages.del('message_id', { thread_id: 'thread_id' });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -112,6 +112,6 @@ describe('resource messages', () => {
   });
 
   test('del: required and optional params', async () => {
-    const response = await openai.beta.threads.messages.del('string', { thread_id: 'string' });
+    const response = await openai.beta.threads.messages.del('message_id', { thread_id: 'thread_id' });
   });
 });

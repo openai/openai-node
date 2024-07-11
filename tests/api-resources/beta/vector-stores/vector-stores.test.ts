@@ -21,7 +21,7 @@ describe('resource vectorStores', () => {
   });
 
   test('retrieve', async () => {
-    const responsePromise = openai.beta.vectorStores.retrieve('string');
+    const responsePromise = openai.beta.vectorStores.retrieve('vector_store_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -32,7 +32,7 @@ describe('resource vectorStores', () => {
   });
 
   test('update', async () => {
-    const responsePromise = openai.beta.vectorStores.update('string', {});
+    const responsePromise = openai.beta.vectorStores.update('vector_store_id', {});
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -57,14 +57,14 @@ describe('resource vectorStores', () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
       openai.beta.vectorStores.list(
-        { after: 'string', before: 'string', limit: 0, order: 'asc' },
+        { after: 'after', before: 'before', limit: 0, order: 'asc' },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
   test('del', async () => {
-    const responsePromise = openai.beta.vectorStores.del('string');
+    const responsePromise = openai.beta.vectorStores.del('vector_store_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;

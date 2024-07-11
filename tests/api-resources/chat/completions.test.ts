@@ -11,7 +11,7 @@ const openai = new OpenAI({
 describe('resource completions', () => {
   test('create: only required params', async () => {
     const responsePromise = openai.chat.completions.create({
-      messages: [{ content: 'string', role: 'system' }],
+      messages: [{ content: 'content', role: 'system' }],
       model: 'gpt-4-turbo',
     });
     const rawResponse = await responsePromise.asResponse();
@@ -25,11 +25,11 @@ describe('resource completions', () => {
 
   test('create: required and optional params', async () => {
     const response = await openai.chat.completions.create({
-      messages: [{ content: 'string', role: 'system', name: 'string' }],
+      messages: [{ content: 'content', role: 'system', name: 'name' }],
       model: 'gpt-4-turbo',
       frequency_penalty: -2,
       function_call: 'none',
-      functions: [{ description: 'string', name: 'string', parameters: { foo: 'bar' } }],
+      functions: [{ description: 'description', name: 'name', parameters: { foo: 'bar' } }],
       logit_bias: { foo: 0 },
       logprobs: true,
       max_tokens: 0,
@@ -45,9 +45,18 @@ describe('resource completions', () => {
       temperature: 1,
       tool_choice: 'none',
       tools: [
-        { type: 'function', function: { description: 'string', name: 'string', parameters: { foo: 'bar' } } },
-        { type: 'function', function: { description: 'string', name: 'string', parameters: { foo: 'bar' } } },
-        { type: 'function', function: { description: 'string', name: 'string', parameters: { foo: 'bar' } } },
+        {
+          type: 'function',
+          function: { description: 'description', name: 'name', parameters: { foo: 'bar' } },
+        },
+        {
+          type: 'function',
+          function: { description: 'description', name: 'name', parameters: { foo: 'bar' } },
+        },
+        {
+          type: 'function',
+          function: { description: 'description', name: 'name', parameters: { foo: 'bar' } },
+        },
       ],
       top_logprobs: 0,
       top_p: 1,

@@ -10,7 +10,7 @@ const openai = new OpenAI({
 
 describe('resource files', () => {
   test('create: only required params', async () => {
-    const responsePromise = openai.beta.vectorStores.files.create('vs_abc123', { file_id: 'string' });
+    const responsePromise = openai.beta.vectorStores.files.create('vs_abc123', { file_id: 'file_id' });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -22,7 +22,7 @@ describe('resource files', () => {
 
   test('create: required and optional params', async () => {
     const response = await openai.beta.vectorStores.files.create('vs_abc123', {
-      file_id: 'string',
+      file_id: 'file_id',
       chunking_strategy: { type: 'auto' },
     });
   });
@@ -47,7 +47,7 @@ describe('resource files', () => {
   });
 
   test('list', async () => {
-    const responsePromise = openai.beta.vectorStores.files.list('string');
+    const responsePromise = openai.beta.vectorStores.files.list('vector_store_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -61,15 +61,17 @@ describe('resource files', () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
       openai.beta.vectorStores.files.list(
-        'string',
-        { after: 'string', before: 'string', filter: 'in_progress', limit: 0, order: 'asc' },
+        'vector_store_id',
+        { after: 'after', before: 'before', filter: 'in_progress', limit: 0, order: 'asc' },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
   test('del: only required params', async () => {
-    const responsePromise = openai.beta.vectorStores.files.del('string', { vector_store_id: 'string' });
+    const responsePromise = openai.beta.vectorStores.files.del('file_id', {
+      vector_store_id: 'vector_store_id',
+    });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -80,6 +82,8 @@ describe('resource files', () => {
   });
 
   test('del: required and optional params', async () => {
-    const response = await openai.beta.vectorStores.files.del('string', { vector_store_id: 'string' });
+    const response = await openai.beta.vectorStores.files.del('file_id', {
+      vector_store_id: 'vector_store_id',
+    });
   });
 });
