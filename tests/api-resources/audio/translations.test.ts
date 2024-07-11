@@ -27,8 +27,8 @@ describe('resource translations', () => {
     const response = await openai.audio.translations.create({
       file: await toFile(Buffer.from('# my file contents'), 'README.md'),
       model: 'whisper-1',
-      prompt: 'string',
-      response_format: 'string',
+      prompt: 'prompt',
+      response_format: 'response_format',
       temperature: 0,
     });
   });

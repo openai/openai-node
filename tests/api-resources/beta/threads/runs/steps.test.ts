@@ -10,7 +10,7 @@ const openai = new OpenAI({
 
 describe('resource steps', () => {
   test('retrieve', async () => {
-    const responsePromise = openai.beta.threads.runs.steps.retrieve('string', 'string', 'string');
+    const responsePromise = openai.beta.threads.runs.steps.retrieve('thread_id', 'run_id', 'step_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -23,14 +23,14 @@ describe('resource steps', () => {
   test('retrieve: request options instead of params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openai.beta.threads.runs.steps.retrieve('string', 'string', 'string', {
+      openai.beta.threads.runs.steps.retrieve('thread_id', 'run_id', 'step_id', {
         path: '/_stainless_unknown_path',
       }),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
   test('list', async () => {
-    const responsePromise = openai.beta.threads.runs.steps.list('string', 'string');
+    const responsePromise = openai.beta.threads.runs.steps.list('thread_id', 'run_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -43,7 +43,7 @@ describe('resource steps', () => {
   test('list: request options instead of params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openai.beta.threads.runs.steps.list('string', 'string', { path: '/_stainless_unknown_path' }),
+      openai.beta.threads.runs.steps.list('thread_id', 'run_id', { path: '/_stainless_unknown_path' }),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
@@ -51,9 +51,9 @@ describe('resource steps', () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
       openai.beta.threads.runs.steps.list(
-        'string',
-        'string',
-        { after: 'string', before: 'string', limit: 0, order: 'asc' },
+        'thread_id',
+        'run_id',
+        { after: 'after', before: 'before', limit: 0, order: 'asc' },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);
