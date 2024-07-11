@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.52.6 (2024-07-11)
+
+Full Changelog: [v4.52.5...v4.52.6](https://github.com/openai/openai-node/compare/v4.52.5...v4.52.6)
+
+### Chores
+
+* **ci:** also run workflows for PRs targeting `next` ([#931](https://github.com/openai/openai-node/issues/931)) ([e3f979a](https://github.com/openai/openai-node/commit/e3f979ae94b2252b9552d1e03de5b92d398a3e28))
+
 ## 4.52.5 (2024-07-10)
 
 Full Changelog: [v4.52.4...v4.52.5](https://github.com/openai/openai-node/compare/v4.52.4...v4.52.5)
