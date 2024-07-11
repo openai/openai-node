@@ -13,7 +13,7 @@ describe('resource batches', () => {
     const responsePromise = openai.batches.create({
       completion_window: '24h',
       endpoint: '/v1/chat/completions',
-      input_file_id: 'string',
+      input_file_id: 'input_file_id',
     });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
@@ -28,13 +28,13 @@ describe('resource batches', () => {
     const response = await openai.batches.create({
       completion_window: '24h',
       endpoint: '/v1/chat/completions',
-      input_file_id: 'string',
+      input_file_id: 'input_file_id',
       metadata: { foo: 'string' },
     });
   });
 
   test('retrieve', async () => {
-    const responsePromise = openai.batches.retrieve('string');
+    const responsePromise = openai.batches.retrieve('batch_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -46,7 +46,7 @@ describe('resource batches', () => {
 
   test('retrieve: request options instead of params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(openai.batches.retrieve('string', { path: '/_stainless_unknown_path' })).rejects.toThrow(
+    await expect(openai.batches.retrieve('batch_id', { path: '/_stainless_unknown_path' })).rejects.toThrow(
       OpenAI.NotFoundError,
     );
   });
@@ -72,12 +72,12 @@ describe('resource batches', () => {
   test('list: request options and params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openai.batches.list({ after: 'string', limit: 0 }, { path: '/_stainless_unknown_path' }),
+      openai.batches.list({ after: 'after', limit: 0 }, { path: '/_stainless_unknown_path' }),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
   test('cancel', async () => {
-    const responsePromise = openai.batches.cancel('string');
+    const responsePromise = openai.batches.cancel('batch_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -89,7 +89,7 @@ describe('resource batches', () => {
 
   test('cancel: request options instead of params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(openai.batches.cancel('string', { path: '/_stainless_unknown_path' })).rejects.toThrow(
+    await expect(openai.batches.cancel('batch_id', { path: '/_stainless_unknown_path' })).rejects.toThrow(
       OpenAI.NotFoundError,
     );
   });

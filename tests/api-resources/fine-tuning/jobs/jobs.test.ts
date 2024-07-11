@@ -33,8 +33,8 @@ describe('resource jobs', () => {
           type: 'wandb',
           wandb: {
             project: 'my-wandb-project',
-            name: 'string',
-            entity: 'string',
+            name: 'name',
+            entity: 'entity',
             tags: ['custom-tag', 'custom-tag', 'custom-tag'],
           },
         },
@@ -42,8 +42,8 @@ describe('resource jobs', () => {
           type: 'wandb',
           wandb: {
             project: 'my-wandb-project',
-            name: 'string',
-            entity: 'string',
+            name: 'name',
+            entity: 'entity',
             tags: ['custom-tag', 'custom-tag', 'custom-tag'],
           },
         },
@@ -51,8 +51,8 @@ describe('resource jobs', () => {
           type: 'wandb',
           wandb: {
             project: 'my-wandb-project',
-            name: 'string',
-            entity: 'string',
+            name: 'name',
+            entity: 'entity',
             tags: ['custom-tag', 'custom-tag', 'custom-tag'],
           },
         },
@@ -102,7 +102,7 @@ describe('resource jobs', () => {
   test('list: request options and params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openai.fineTuning.jobs.list({ after: 'string', limit: 0 }, { path: '/_stainless_unknown_path' }),
+      openai.fineTuning.jobs.list({ after: 'after', limit: 0 }, { path: '/_stainless_unknown_path' }),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
@@ -147,7 +147,7 @@ describe('resource jobs', () => {
     await expect(
       openai.fineTuning.jobs.listEvents(
         'ft-AF1WoRqd3aJAHsqc9NY7iL8F',
-        { after: 'string', limit: 0 },
+        { after: 'after', limit: 0 },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);
