@@ -77,8 +77,8 @@ Methods:
 - <code title="post /files">client.files.<a href="./src/resources/files.ts">create</a>({ ...params }) -> FileObject</code>
 - <code title="get /files/{file_id}">client.files.<a href="./src/resources/files.ts">retrieve</a>(fileId) -> FileObject</code>
 - <code title="get /files">client.files.<a href="./src/resources/files.ts">list</a>({ ...params }) -> FileObjectsPage</code>
-- <code title="delete /files/{file_id}">client.files.<a href="./src/resources/files.ts">del</a>(fileId) -> FileDeleted</code>
-- <code title="get /files/{file_id}/content">client.files.<a href="./src/resources/files.ts">content</a>(fileId) -> Response</code>
+- <code title="delete /files/{file_id}">client.files.<a href="./src/resources/files.ts">delete</a>(fileID) -> FileDeleted</code>
+- <code title="get /files/{file_id}/content">client.files.<a href="./src/resources/files.ts">content</a>(fileID) -> Response</code>
 - <code>client.files.<a href="./src/resources/files.ts">waitForProcessing</a>(id, { pollInterval = 5000, maxWait = 30 _ 60 _ 1000 }) -> Promise&lt;FileObject&gt;</code>
 
 # Images
@@ -144,7 +144,7 @@ Methods:
 
 - <code title="get /models/{model}">client.models.<a href="./src/resources/models.ts">retrieve</a>(model) -> Model</code>
 - <code title="get /models">client.models.<a href="./src/resources/models.ts">list</a>() -> ModelsPage</code>
-- <code title="delete /models/{model}">client.models.<a href="./src/resources/models.ts">del</a>(model) -> ModelDeleted</code>
+- <code title="delete /models/{model}">client.models.<a href="./src/resources/models.ts">delete</a>(model) -> ModelDeleted</code>
 
 # FineTuning
 
@@ -191,7 +191,7 @@ Methods:
 - <code title="get /vector_stores/{vector_store_id}">client.beta.vectorStores.<a href="./src/resources/beta/vector-stores/vector-stores.ts">retrieve</a>(vectorStoreId) -> VectorStore</code>
 - <code title="post /vector_stores/{vector_store_id}">client.beta.vectorStores.<a href="./src/resources/beta/vector-stores/vector-stores.ts">update</a>(vectorStoreId, { ...params }) -> VectorStore</code>
 - <code title="get /vector_stores">client.beta.vectorStores.<a href="./src/resources/beta/vector-stores/vector-stores.ts">list</a>({ ...params }) -> VectorStoresPage</code>
-- <code title="delete /vector_stores/{vector_store_id}">client.beta.vectorStores.<a href="./src/resources/beta/vector-stores/vector-stores.ts">del</a>(vectorStoreId) -> VectorStoreDeleted</code>
+- <code title="delete /vector_stores/{vector_store_id}">client.beta.vectorStores.<a href="./src/resources/beta/vector-stores/vector-stores.ts">delete</a>(vectorStoreID) -> VectorStoreDeleted</code>
 
 ### Files
 
@@ -202,10 +202,10 @@ Types:
 
 Methods:
 
-- <code title="post /vector_stores/{vector_store_id}/files">client.beta.vectorStores.files.<a href="./src/resources/beta/vector-stores/files.ts">create</a>(vectorStoreId, { ...params }) -> VectorStoreFile</code>
-- <code title="get /vector_stores/{vector_store_id}/files/{file_id}">client.beta.vectorStores.files.<a href="./src/resources/beta/vector-stores/files.ts">retrieve</a>(vectorStoreId, fileId) -> VectorStoreFile</code>
-- <code title="get /vector_stores/{vector_store_id}/files">client.beta.vectorStores.files.<a href="./src/resources/beta/vector-stores/files.ts">list</a>(vectorStoreId, { ...params }) -> VectorStoreFilesPage</code>
-- <code title="delete /vector_stores/{vector_store_id}/files/{file_id}">client.beta.vectorStores.files.<a href="./src/resources/beta/vector-stores/files.ts">del</a>(vectorStoreId, fileId) -> VectorStoreFileDeleted</code>
+- <code title="post /vector_stores/{vector_store_id}/files">client.beta.vectorStores.files.<a href="./src/resources/beta/vector-stores/files.ts">create</a>(vectorStoreID, { ...params }) -> VectorStoreFile</code>
+- <code title="get /vector_stores/{vector_store_id}/files/{file_id}">client.beta.vectorStores.files.<a href="./src/resources/beta/vector-stores/files.ts">retrieve</a>(fileID, { ...params }) -> VectorStoreFile</code>
+- <code title="get /vector_stores/{vector_store_id}/files">client.beta.vectorStores.files.<a href="./src/resources/beta/vector-stores/files.ts">list</a>(vectorStoreID, { ...params }) -> VectorStoreFilesPage</code>
+- <code title="delete /vector_stores/{vector_store_id}/files/{file_id}">client.beta.vectorStores.files.<a href="./src/resources/beta/vector-stores/files.ts">delete</a>(fileID, { ...params }) -> VectorStoreFileDeleted</code>
 - <code>client.beta.vectorStores.files.<a href="./src/resources/beta/vector-stores/files.ts">createAndPoll</a>(vectorStoreId, body, options?) -> Promise&lt;VectorStoreFile&gt;</code>
 - <code>client.beta.vectorStores.files.<a href="./src/resources/beta/vector-stores/files.ts">poll</a>(vectorStoreId, fileId, options?) -> Promise&lt;VectorStoreFile&gt;</code>
 - <code>client.beta.vectorStores.files.<a href="./src/resources/beta/vector-stores/files.ts">upload</a>(vectorStoreId, file, options?) -> Promise&lt;VectorStoreFile&gt;</code>
@@ -256,9 +256,10 @@ Types:
 Methods:
 
 - <code title="post /assistants">client.beta.assistants.<a href="./src/resources/beta/assistants.ts">create</a>({ ...params }) -> Assistant</code>
-- <code title="get /assistants/{assistant_id}">client.beta.assistants.<a href="./src/resources/beta/assistants.ts">retrieve</a>(assistantId) -> Assistant</code>
-- <code title="post /assistants/{assistant_id}">client.beta.assistants.<a href="./src/resources/beta/assistants.ts">update</a>(assistantId, { ...params }) -> Assistant</code>
-- <code title="get /assistants">client.beta.assistants.<a href="./src/resources/beta/assistants.ts">list</a>({ ...params }) -> AssistantsPage</code>- <code title="delete /assistants/{assistant_id}">client.beta.assistants.<a href="./src/resources/beta/assistants.ts">del</a>(assistantID) -> AssistantDeleted</code>
+- <code title="get /assistants/{assistant_id}">client.beta.assistants.<a href="./src/resources/beta/assistants.ts">retrieve</a>(assistantID) -> Assistant</code>
+- <code title="post /assistants/{assistant_id}">client.beta.assistants.<a href="./src/resources/beta/assistants.ts">update</a>(assistantID, { ...params }) -> Assistant</code>
+- <code title="get /assistants">client.beta.assistants.<a href="./src/resources/beta/assistants.ts">list</a>({ ...params }) -> AssistantsPage</code>
+- <code title="delete /assistants/{assistant_id}">client.beta.assistants.<a href="./src/resources/beta/assistants.ts">delete</a>(assistantID) -> AssistantDeleted</code>
 
 ## Threads
 
@@ -277,7 +278,7 @@ Methods:
 - <code title="post /threads">client.beta.threads.<a href="./src/resources/beta/threads/threads.ts">create</a>({ ...params }) -> Thread</code>
 - <code title="get /threads/{thread_id}">client.beta.threads.<a href="./src/resources/beta/threads/threads.ts">retrieve</a>(threadID) -> Thread</code>
 - <code title="post /threads/{thread_id}">client.beta.threads.<a href="./src/resources/beta/threads/threads.ts">update</a>(threadID, { ...params }) -> Thread</code>
-- <code title="delete /threads/{thread_id}">client.beta.threads.<a href="./src/resources/beta/threads/threads.ts">del</a>(threadID) -> ThreadDeleted</code>
+- <code title="delete /threads/{thread_id}">client.beta.threads.<a href="./src/resources/beta/threads/threads.ts">delete</a>(threadID) -> ThreadDeleted</code>
 - <code title="post /threads/runs">client.beta.threads.<a href="./src/resources/beta/threads/threads.ts">createAndRun</a>({ ...params }) -> Run</code>
 - <code>client.beta.threads.<a href="./src/resources/beta/threads/threads.ts">createAndRunPoll</a>(body, options?) -> Promise&lt;Threads.Run&gt;</code>
 - <code>client.beta.threads.<a href="./src/resources/beta/threads/threads.ts">createAndRunStream</a>(body, options?) -> AssistantStream</code>
@@ -369,7 +370,7 @@ Methods:
 - <code title="get /threads/{thread_id}/messages/{message_id}">client.beta.threads.messages.<a href="./src/resources/beta/threads/messages.ts">retrieve</a>(messageID, { ...params }) -> Message</code>
 - <code title="post /threads/{thread_id}/messages/{message_id}">client.beta.threads.messages.<a href="./src/resources/beta/threads/messages.ts">update</a>(messageID, { ...params }) -> Message</code>
 - <code title="get /threads/{thread_id}/messages">client.beta.threads.messages.<a href="./src/resources/beta/threads/messages.ts">list</a>(threadID, { ...params }) -> MessagesPage</code>
-- <code title="delete /threads/{thread_id}/messages/{message_id}">client.beta.threads.messages.<a href="./src/resources/beta/threads/messages.ts">del</a>(messageID, { ...params }) -> MessageDeleted</code>
+- <code title="delete /threads/{thread_id}/messages/{message_id}">client.beta.threads.messages.<a href="./src/resources/beta/threads/messages.ts">delete</a>(messageID, { ...params }) -> MessageDeleted</code>
 
 # Batches
 

@@ -65,7 +65,7 @@ export class VectorStores extends APIResource {
   /**
    * Delete a vector store.
    */
-  del(vectorStoreID: string, options?: RequestOptions): APIPromise<VectorStoreDeleted> {
+  delete(vectorStoreID: string, options?: RequestOptions): APIPromise<VectorStoreDeleted> {
     return this._client.delete(`/vector_stores/${vectorStoreID}`, {
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },

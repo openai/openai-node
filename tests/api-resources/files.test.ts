@@ -59,8 +59,8 @@ describe('resource files', () => {
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
-  test('del', async () => {
-    const responsePromise = openai.files.del('file_id');
+  test('delete', async () => {
+    const responsePromise = openai.files.delete('file_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;

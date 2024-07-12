@@ -162,8 +162,8 @@ describe('resource threads', () => {
     expect(dataAndResponse.response).toBe(rawResponse);
   });
 
-  test('del', async () => {
-    const responsePromise = openai.beta.threads.del('thread_id');
+  test('delete', async () => {
+    const responsePromise = openai.beta.threads.delete('thread_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;

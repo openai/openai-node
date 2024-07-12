@@ -60,7 +60,11 @@ export class Messages extends APIResource {
   /**
    * Deletes a message.
    */
-  del(messageID: string, params: MessageDeleteParams, options?: RequestOptions): APIPromise<MessageDeleted> {
+  delete(
+    messageID: string,
+    params: MessageDeleteParams,
+    options?: RequestOptions,
+  ): APIPromise<MessageDeleted> {
     const { thread_id } = params;
     return this._client.delete(`/threads/${thread_id}/messages/${messageID}`, {
       ...options,
