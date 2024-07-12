@@ -14,7 +14,7 @@ export class APIError extends OpenAIError {
   readonly param: string | null | undefined;
   readonly type: string | undefined;
 
-  readonly request_id: string | null | undefined;
+  readonly requestID: string | null | undefined;
 
   constructor(
     status: number | undefined,
@@ -25,7 +25,7 @@ export class APIError extends OpenAIError {
     super(`${APIError.makeMessage(status, error, message)}`);
     this.status = status;
     this.headers = headers;
-    this.request_id = headers?.['x-request-id'];
+    this.requestID = headers?.['x-request-id'];
 
     const data = error as Record<string, any>;
     this.error = data;
