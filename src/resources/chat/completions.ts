@@ -763,7 +763,7 @@ export interface ChatCompletionCreateParamsBase {
   max_tokens?: number | null;
 
   /**
-   * How many chat completion choices to generate for each input message. Note that
+   * How many chat completion choices to generate for this completion. Note that
    * you will be charged based on the number of generated tokens across all of the
    * choices. Keep `n` as `1` to minimize costs.
    */
