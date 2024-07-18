@@ -29,7 +29,9 @@ export type ChatCompletionToolRunnerParams<FunctionsArgs extends BaseFunctionsAr
   tools: RunnableTools<FunctionsArgs>;
 };
 
-export class ChatCompletionRunner extends AbstractChatCompletionRunner<ChatCompletionRunnerEvents> {
+export class ChatCompletionRunner extends AbstractChatCompletionRunner {
+  declare _Events: ChatCompletionRunnerEvents;
+
   /** @deprecated - please use `runTools` instead. */
   static runFunctions(
     completions: Completions,
@@ -59,7 +61,7 @@ export class ChatCompletionRunner extends AbstractChatCompletionRunner<ChatCompl
     return runner;
   }
 
-  override _addMessage(message: ChatCompletionMessageParam) {
+  override _addMessage(this: ChatCompletionRunner, message: ChatCompletionMessageParam) {
     super._addMessage(message);
     if (isAssistantMessage(message) && message.content) {
       this._emit('content', message.content as string);
