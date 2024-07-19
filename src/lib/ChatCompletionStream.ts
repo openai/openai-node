@@ -24,11 +24,9 @@ export type ChatCompletionStreamParams = Omit<ChatCompletionCreateParamsBase, 's
 };
 
 export class ChatCompletionStream
-  extends AbstractChatCompletionRunner
+  extends AbstractChatCompletionRunner<ChatCompletionStreamEvents>
   implements AsyncIterable<ChatCompletionChunk>
 {
-  declare _Events: ChatCompletionStreamEvents;
-
   #currentChatCompletionSnapshot: ChatCompletionSnapshot | undefined;
 
   get currentChatCompletionSnapshot(): ChatCompletionSnapshot | undefined {

@@ -1,8 +1,6 @@
 import { APIUserAbortError, OpenAIError } from 'openai/error';
 
-export class EventStream {
-  declare _Events: BaseEvents;
-
+export class EventStream<EventTypes extends BaseEvents> {
   controller: AbortController = new AbortController();
 
   #connectedPromise: Promise<void>;
@@ -14,7 +12,7 @@ export class EventStream {
   #rejectEndPromise: (error: OpenAIError) => void = () => {};
 
   #listeners: {
-    [Event in keyof (typeof this)['_Events']]?: EventListeners<(typeof this)['_Events'], Event>;
+    [Event in keyof EventTypes]?: EventListeners<EventTypes, Event>;
   } = {};
 
   #ended = false;
@@ -41,7 +39,7 @@ export class EventStream {
     this.#endPromise.catch(() => {});
   }
 
-  protected _run(this: EventStream, executor: () => Promise<any>) {
+  protected _run(this: EventStream<EventTypes>, executor: () => Promise<any>) {
     // Unfortunately if we call `executor()` immediately we get runtime errors about
     // references to `this` before the `super()` constructor call returns.
     setTimeout(() => {
@@ -52,7 +50,7 @@ export class EventStream {
     }, 0);
   }
 
-  protected _connected(this: EventStream) {
+  protected _connected(this: EventStream<EventTypes>) {
     if (this.ended) return;
     this.#resolveConnectedPromise();
     this._emit('connect');
@@ -81,11 +79,8 @@ export class EventStream {
    * called, multiple times.
    * @returns this ChatCompletionStream, so that calls can be chained
    */
-  on<Event extends keyof (typeof this)['_Events']>(
-    event: Event,
-    listener: EventListener<(typeof this)['_Events'], Event>,
-  ): this {
-    const listeners: EventListeners<(typeof this)['_Events'], Event> =
+  on<Event extends keyof EventTypes>(event: Event, listener: EventListener<EventTypes, Event>): this {
+    const listeners: EventListeners<EventTypes, Event> =
       this.#listeners[event] || (this.#listeners[event] = []);
     listeners.push({ listener });
     return this;
@@ -98,10 +93,7 @@ export class EventStream {
    * off() must be called multiple times to remove each instance.
    * @returns this ChatCompletionStream, so that calls can be chained
    */
-  off<Event extends keyof (typeof this)['_Events']>(
-    event: Event,
-    listener: EventListener<(typeof this)['_Events'], Event>,
-  ): this {
+  off<Event extends keyof EventTypes>(event: Event, listener: EventListener<EventTypes, Event>): this {
     const listeners = this.#listeners[event];
     if (!listeners) return this;
     const index = listeners.findIndex((l) => l.listener === listener);
@@ -114,11 +106,8 @@ export class EventStream {
    * this listener is removed and then invoked.
    * @returns this ChatCompletionStream, so that calls can be chained
    */
-  once<Event extends keyof (typeof this)['_Events']>(
-    event: Event,
-    listener: EventListener<(typeof this)['_Events'], Event>,
-  ): this {
-    const listeners: EventListeners<(typeof this)['_Events'], Event> =
+  once<Event extends keyof EventTypes>(event: Event, listener: EventListener<EventTypes, Event>): this {
+    const listeners: EventListeners<EventTypes, Event> =
       this.#listeners[event] || (this.#listeners[event] = []);
     listeners.push({ listener, once: true });
     return this;
@@ -135,12 +124,12 @@ export class EventStream {
    *
    *   const message = await stream.emitted('message') // rejects if the stream errors
    */
-  emitted<Event extends keyof (typeof this)['_Events']>(
+  emitted<Event extends keyof EventTypes>(
     event: Event,
   ): Promise<
-    EventParameters<(typeof this)['_Events'], Event> extends [infer Param] ? Param
-    : EventParameters<(typeof this)['_Events'], Event> extends [] ? void
-    : EventParameters<(typeof this)['_Events'], Event>
+    EventParameters<EventTypes, Event> extends [infer Param] ? Param
+    : EventParameters<EventTypes, Event> extends [] ? void
+    : EventParameters<EventTypes, Event>
   > {
     return new Promise((resolve, reject) => {
       this.#catchingPromiseCreated = true;
@@ -154,7 +143,7 @@ export class EventStream {
     await this.#endPromise;
   }
 
-  #handleError(this: EventStream, error: unknown) {
+  #handleError(this: EventStream<EventTypes>, error: unknown) {
     this.#errored = true;
     if (error instanceof Error && error.name === 'AbortError') {
       error = new APIUserAbortError();
@@ -175,14 +164,12 @@ export class EventStream {
     return this._emit('error', new OpenAIError(String(error)));
   }
 
-  _emit<Event extends keyof (typeof this)['_Events']>(
+  _emit<Event extends keyof BaseEvents>(event: Event, ...args: EventParameters<BaseEvents, Event>): void;
+  _emit<Event extends keyof EventTypes>(event: Event, ...args: EventParameters<EventTypes, Event>): void;
+  _emit<Event extends keyof EventTypes>(
+    this: EventStream<EventTypes>,
     event: Event,
-    ...args: EventParameters<(typeof this)['_Events'], Event>
-  ): void;
-  _emit<Event extends keyof (typeof this)['_Events']>(
-    this: EventStream,
-    event: Event,
-    ...args: EventParameters<(typeof this)['_Events'], Event>
+    ...args: EventParameters<EventTypes, Event>
   ) {
     // make sure we don't emit any events after end
     if (this.#ended) {
@@ -194,7 +181,7 @@ export class EventStream {
       this.#resolveEndPromise();
     }
 
-    const listeners: EventListeners<(typeof this)['_Events'], Event> | undefined = this.#listeners[event];
+    const listeners: EventListeners<EventTypes, Event> | undefined = this.#listeners[event];
     if (listeners) {
       this.#listeners[event] = listeners.filter((l) => !l.once) as any;
       listeners.forEach(({ listener }: any) => listener(...(args as any)));

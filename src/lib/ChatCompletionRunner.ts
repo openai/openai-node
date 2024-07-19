@@ -29,9 +29,7 @@ export type ChatCompletionToolRunnerParams<FunctionsArgs extends BaseFunctionsAr
   tools: RunnableTools<FunctionsArgs>;
 };
 
-export class ChatCompletionRunner extends AbstractChatCompletionRunner {
-  declare _Events: ChatCompletionRunnerEvents;
-
+export class ChatCompletionRunner extends AbstractChatCompletionRunner<ChatCompletionRunnerEvents> {
   /** @deprecated - please use `runTools` instead. */
   static runFunctions(
     completions: Completions,

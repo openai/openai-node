@@ -28,14 +28,15 @@ export interface RunnerOptions extends Core.RequestOptions {
   maxChatCompletions?: number;
 }
 
-export class AbstractChatCompletionRunner extends EventStream {
-  declare _Events: AbstractChatCompletionRunnerEvents;
+export class AbstractChatCompletionRunner<
+  EventTypes extends AbstractChatCompletionRunnerEvents,
+> extends EventStream<EventTypes> {
 
   protected _chatCompletions: ChatCompletion[] = [];
   messages: ChatCompletionMessageParam[] = [];
 
   protected _addChatCompletion(
-    this: AbstractChatCompletionRunner,
+    this: AbstractChatCompletionRunner<AbstractChatCompletionRunnerEvents>,
     chatCompletion: ChatCompletion,
   ): ChatCompletion {
     this._chatCompletions.push(chatCompletion);
@@ -46,7 +47,7 @@ export class AbstractChatCompletionRunner extends EventStream {
   }
 
   protected _addMessage(
-    this: AbstractChatCompletionRunner,
+    this: AbstractChatCompletionRunner<AbstractChatCompletionRunnerEvents>,
     message: ChatCompletionMessageParam,
     emit = true,
   ) {
@@ -195,7 +196,7 @@ export class AbstractChatCompletionRunner extends EventStream {
     return [...this._chatCompletions];
   }
 
-  protected override _emitFinal(this: AbstractChatCompletionRunner) {
+  protected override _emitFinal(this: AbstractChatCompletionRunner<AbstractChatCompletionRunnerEvents>) {
     const completion = this._chatCompletions[this._chatCompletions.length - 1];
     if (completion) this._emit('finalChatCompletion', completion);
     const finalMessage = this.#getFinalMessage();
