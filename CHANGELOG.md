@@ -1,5 +1,20 @@
 # Changelog
 
+## 4.53.0 (2024-07-22)
+
+Full Changelog: [v4.52.7...v4.53.0](https://github.com/openai/openai-node/compare/v4.52.7...v4.53.0)
+
+### Features
+
+* **api:** add new gpt-4o-mini models ([#942](https://github.com/openai/openai-node/issues/942)) ([7ac10dd](https://github.com/openai/openai-node/commit/7ac10ddbb87e9eb0e8e34d58a13a4775cbba1c24))
+* **api:** add uploads endpoints ([#946](https://github.com/openai/openai-node/issues/946)) ([8709ceb](https://github.com/openai/openai-node/commit/8709ceb0e01c5a1f96704c998f35ca1117ecadac))
+
+
+### Chores
+
+* **docs:** mention support of web browser runtimes ([#938](https://github.com/openai/openai-node/issues/938)) ([123d19d](https://github.com/openai/openai-node/commit/123d19d5a157110c8ada556c107caf0eb8b2ccc6))
+* **docs:** use client instead of package name in Node examples ([#941](https://github.com/openai/openai-node/issues/941)) ([8b5db1f](https://github.com/openai/openai-node/commit/8b5db1f53e66ce4b6e554f40a8dd2fd474085027))
+
 ## 4.52.7 (2024-07-11)
 
 Full Changelog: [v4.52.6...v4.52.7](https://github.com/openai/openai-node/compare/v4.52.6...v4.52.7)
