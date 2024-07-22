@@ -658,6 +658,7 @@ export class OpenAI extends BaseOpenAI {
   fineTuning: API.FineTuning = new API.FineTuning(this);
   beta: API.Beta = new API.Beta(this);
   batches: API.Batches = new API.Batches(this);
+  uploads: API.Uploads = new API.Uploads(this);
 }
 
 export {
@@ -774,6 +775,11 @@ export namespace OpenAI {
   export type BatchesPage = API.BatchesPage;
   export import BatchCreateParams = API.BatchCreateParams;
   export import BatchListParams = API.BatchListParams;
+
+  export import Uploads = API.Uploads;
+  export import Upload = API.Upload;
+  export import UploadCreateParams = API.UploadCreateParams;
+  export import UploadCompleteParams = API.UploadCompleteParams;
 
   export import ErrorObject = API.ErrorObject;
   export import FunctionDefinition = API.FunctionDefinition;
