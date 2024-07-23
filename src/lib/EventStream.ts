@@ -46,7 +46,7 @@ export class EventStream<EventTypes extends BaseEvents> {
       executor().then(() => {
         this._emitFinal();
         this._emit('end');
-      }, this.#handleError);
+      }, this.#handleError.bind(this));
     }, 0);
   }
 
