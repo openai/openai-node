@@ -10,7 +10,7 @@ const openai = new OpenAI({
 
 describe('resource messages', () => {
   test('create: only required params', async () => {
-    const responsePromise = openai.beta.threads.messages.create('string', {
+    const responsePromise = openai.beta.threads.messages.create('thread_id', {
       content: 'string',
       role: 'user',
     });
@@ -24,20 +24,20 @@ describe('resource messages', () => {
   });
 
   test('create: required and optional params', async () => {
-    const response = await openai.beta.threads.messages.create('string', {
+    const response = await openai.beta.threads.messages.create('thread_id', {
       content: 'string',
       role: 'user',
       attachments: [
         {
-          file_id: 'string',
+          file_id: 'file_id',
           tools: [{ type: 'code_interpreter' }, { type: 'code_interpreter' }, { type: 'code_interpreter' }],
         },
         {
-          file_id: 'string',
+          file_id: 'file_id',
           tools: [{ type: 'code_interpreter' }, { type: 'code_interpreter' }, { type: 'code_interpreter' }],
         },
         {
-          file_id: 'string',
+          file_id: 'file_id',
           tools: [{ type: 'code_interpreter' }, { type: 'code_interpreter' }, { type: 'code_interpreter' }],
         },
       ],
@@ -46,7 +46,7 @@ describe('resource messages', () => {
   });
 
   test('retrieve', async () => {
-    const responsePromise = openai.beta.threads.messages.retrieve('string', 'string');
+    const responsePromise = openai.beta.threads.messages.retrieve('thread_id', 'message_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -59,12 +59,12 @@ describe('resource messages', () => {
   test('retrieve: request options instead of params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openai.beta.threads.messages.retrieve('string', 'string', { path: '/_stainless_unknown_path' }),
+      openai.beta.threads.messages.retrieve('thread_id', 'message_id', { path: '/_stainless_unknown_path' }),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
   test('update', async () => {
-    const responsePromise = openai.beta.threads.messages.update('string', 'string', {});
+    const responsePromise = openai.beta.threads.messages.update('thread_id', 'message_id', {});
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -75,7 +75,7 @@ describe('resource messages', () => {
   });
 
   test('list', async () => {
-    const responsePromise = openai.beta.threads.messages.list('string');
+    const responsePromise = openai.beta.threads.messages.list('thread_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -88,7 +88,7 @@ describe('resource messages', () => {
   test('list: request options instead of params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openai.beta.threads.messages.list('string', { path: '/_stainless_unknown_path' }),
+      openai.beta.threads.messages.list('thread_id', { path: '/_stainless_unknown_path' }),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
@@ -96,15 +96,15 @@ describe('resource messages', () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
       openai.beta.threads.messages.list(
-        'string',
-        { after: 'string', before: 'string', limit: 0, order: 'asc', run_id: 'string' },
+        'thread_id',
+        { after: 'after', before: 'before', limit: 0, order: 'asc', run_id: 'run_id' },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
   test('del', async () => {
-    const responsePromise = openai.beta.threads.messages.del('string', 'string');
+    const responsePromise = openai.beta.threads.messages.del('thread_id', 'message_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -117,7 +117,7 @@ describe('resource messages', () => {
   test('del: request options instead of params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openai.beta.threads.messages.del('string', 'string', { path: '/_stainless_unknown_path' }),
+      openai.beta.threads.messages.del('thread_id', 'message_id', { path: '/_stainless_unknown_path' }),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 });

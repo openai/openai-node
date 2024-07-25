@@ -8,11 +8,10 @@ const openai = new OpenAI({
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
-describe('resource translations', () => {
+describe('resource parts', () => {
   test('create: only required params', async () => {
-    const responsePromise = openai.audio.translations.create({
-      file: await toFile(Buffer.from('# my file contents'), 'README.md'),
-      model: 'whisper-1',
+    const responsePromise = openai.uploads.parts.create('upload_abc123', {
+      data: await toFile(Buffer.from('# my file contents'), 'README.md'),
     });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
@@ -24,12 +23,8 @@ describe('resource translations', () => {
   });
 
   test('create: required and optional params', async () => {
-    const response = await openai.audio.translations.create({
-      file: await toFile(Buffer.from('# my file contents'), 'README.md'),
-      model: 'whisper-1',
-      prompt: 'prompt',
-      response_format: 'response_format',
-      temperature: 0,
+    const response = await openai.uploads.parts.create('upload_abc123', {
+      data: await toFile(Buffer.from('# my file contents'), 'README.md'),
     });
   });
 });

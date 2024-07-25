@@ -10,7 +10,7 @@ const openai = new OpenAI({
 
 describe('resource runs', () => {
   test('create: only required params', async () => {
-    const responsePromise = openai.beta.threads.runs.create('string', { assistant_id: 'string' });
+    const responsePromise = openai.beta.threads.runs.create('thread_id', { assistant_id: 'assistant_id' });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -21,16 +21,16 @@ describe('resource runs', () => {
   });
 
   test('create: required and optional params', async () => {
-    const response = await openai.beta.threads.runs.create('string', {
-      assistant_id: 'string',
-      additional_instructions: 'string',
+    const response = await openai.beta.threads.runs.create('thread_id', {
+      assistant_id: 'assistant_id',
+      additional_instructions: 'additional_instructions',
       additional_messages: [
         {
           role: 'user',
           content: 'string',
           attachments: [
             {
-              file_id: 'string',
+              file_id: 'file_id',
               tools: [
                 { type: 'code_interpreter' },
                 { type: 'code_interpreter' },
@@ -38,7 +38,7 @@ describe('resource runs', () => {
               ],
             },
             {
-              file_id: 'string',
+              file_id: 'file_id',
               tools: [
                 { type: 'code_interpreter' },
                 { type: 'code_interpreter' },
@@ -46,38 +46,7 @@ describe('resource runs', () => {
               ],
             },
             {
-              file_id: 'string',
-              tools: [
-                { type: 'code_interpreter' },
-                { type: 'code_interpreter' },
-                { type: 'code_interpreter' },
-              ],
-            },
-          ],
-          metadata: {},
-        },
-        {
-          role: 'user',
-          content: 'string',
-          attachments: [
-            {
-              file_id: 'string',
-              tools: [
-                { type: 'code_interpreter' },
-                { type: 'code_interpreter' },
-                { type: 'code_interpreter' },
-              ],
-            },
-            {
-              file_id: 'string',
-              tools: [
-                { type: 'code_interpreter' },
-                { type: 'code_interpreter' },
-                { type: 'code_interpreter' },
-              ],
-            },
-            {
-              file_id: 'string',
+              file_id: 'file_id',
               tools: [
                 { type: 'code_interpreter' },
                 { type: 'code_interpreter' },
@@ -92,7 +61,7 @@ describe('resource runs', () => {
           content: 'string',
           attachments: [
             {
-              file_id: 'string',
+              file_id: 'file_id',
               tools: [
                 { type: 'code_interpreter' },
                 { type: 'code_interpreter' },
@@ -100,7 +69,7 @@ describe('resource runs', () => {
               ],
             },
             {
-              file_id: 'string',
+              file_id: 'file_id',
               tools: [
                 { type: 'code_interpreter' },
                 { type: 'code_interpreter' },
@@ -108,7 +77,38 @@ describe('resource runs', () => {
               ],
             },
             {
-              file_id: 'string',
+              file_id: 'file_id',
+              tools: [
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+              ],
+            },
+          ],
+          metadata: {},
+        },
+        {
+          role: 'user',
+          content: 'string',
+          attachments: [
+            {
+              file_id: 'file_id',
+              tools: [
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+              ],
+            },
+            {
+              file_id: 'file_id',
+              tools: [
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+                { type: 'code_interpreter' },
+              ],
+            },
+            {
+              file_id: 'file_id',
               tools: [
                 { type: 'code_interpreter' },
                 { type: 'code_interpreter' },
@@ -119,7 +119,7 @@ describe('resource runs', () => {
           metadata: {},
         },
       ],
-      instructions: 'string',
+      instructions: 'instructions',
       max_completion_tokens: 256,
       max_prompt_tokens: 256,
       metadata: {},
@@ -136,7 +136,7 @@ describe('resource runs', () => {
   });
 
   test('retrieve', async () => {
-    const responsePromise = openai.beta.threads.runs.retrieve('string', 'string');
+    const responsePromise = openai.beta.threads.runs.retrieve('thread_id', 'run_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -149,12 +149,12 @@ describe('resource runs', () => {
   test('retrieve: request options instead of params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openai.beta.threads.runs.retrieve('string', 'string', { path: '/_stainless_unknown_path' }),
+      openai.beta.threads.runs.retrieve('thread_id', 'run_id', { path: '/_stainless_unknown_path' }),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
   test('update', async () => {
-    const responsePromise = openai.beta.threads.runs.update('string', 'string', {});
+    const responsePromise = openai.beta.threads.runs.update('thread_id', 'run_id', {});
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -165,7 +165,7 @@ describe('resource runs', () => {
   });
 
   test('list', async () => {
-    const responsePromise = openai.beta.threads.runs.list('string');
+    const responsePromise = openai.beta.threads.runs.list('thread_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -178,7 +178,7 @@ describe('resource runs', () => {
   test('list: request options instead of params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openai.beta.threads.runs.list('string', { path: '/_stainless_unknown_path' }),
+      openai.beta.threads.runs.list('thread_id', { path: '/_stainless_unknown_path' }),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
@@ -186,15 +186,15 @@ describe('resource runs', () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
       openai.beta.threads.runs.list(
-        'string',
-        { after: 'string', before: 'string', limit: 0, order: 'asc' },
+        'thread_id',
+        { after: 'after', before: 'before', limit: 0, order: 'asc' },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
   test('cancel', async () => {
-    const responsePromise = openai.beta.threads.runs.cancel('string', 'string');
+    const responsePromise = openai.beta.threads.runs.cancel('thread_id', 'run_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -207,12 +207,12 @@ describe('resource runs', () => {
   test('cancel: request options instead of params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openai.beta.threads.runs.cancel('string', 'string', { path: '/_stainless_unknown_path' }),
+      openai.beta.threads.runs.cancel('thread_id', 'run_id', { path: '/_stainless_unknown_path' }),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
   test('submitToolOutputs: only required params', async () => {
-    const responsePromise = openai.beta.threads.runs.submitToolOutputs('string', 'string', {
+    const responsePromise = openai.beta.threads.runs.submitToolOutputs('thread_id', 'run_id', {
       tool_outputs: [{}, {}, {}],
     });
     const rawResponse = await responsePromise.asResponse();
@@ -225,11 +225,11 @@ describe('resource runs', () => {
   });
 
   test('submitToolOutputs: required and optional params', async () => {
-    const response = await openai.beta.threads.runs.submitToolOutputs('string', 'string', {
+    const response = await openai.beta.threads.runs.submitToolOutputs('thread_id', 'run_id', {
       tool_outputs: [
-        { tool_call_id: 'string', output: 'string' },
-        { tool_call_id: 'string', output: 'string' },
-        { tool_call_id: 'string', output: 'string' },
+        { tool_call_id: 'tool_call_id', output: 'output' },
+        { tool_call_id: 'tool_call_id', output: 'output' },
+        { tool_call_id: 'tool_call_id', output: 'output' },
       ],
       stream: false,
     });

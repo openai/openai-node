@@ -34,7 +34,7 @@ describe('resource checkpoints', () => {
     await expect(
       openai.fineTuning.jobs.checkpoints.list(
         'ft-AF1WoRqd3aJAHsqc9NY7iL8F',
-        { after: 'string', limit: 0 },
+        { after: 'after', limit: 0 },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);

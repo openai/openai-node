@@ -19,7 +19,7 @@ You can import in Deno via:
 <!-- x-release-please-start-version -->
 
 ```ts
-import OpenAI from 'https://deno.land/x/openai@v4.52.4/mod.ts';
+import OpenAI from 'https://deno.land/x/openai@v4.53.0/mod.ts';
 ```
 
 <!-- x-release-please-end -->
@@ -32,7 +32,7 @@ The full API of this library can be found in [api.md file](api.md) along with ma
 ```js
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
+const client = new OpenAI({
   apiKey: process.env['OPENAI_API_KEY'], // This is the default and can be omitted
 });
 
@@ -53,7 +53,7 @@ We provide support for streaming responses using Server Sent Events (SSE).
 ```ts
 import OpenAI from 'openai';
 
-const openai = new OpenAI();
+const client = new OpenAI();
 
 async function main() {
   const stream = await openai.chat.completions.create({
@@ -80,7 +80,7 @@ This library includes TypeScript definitions for all request params and response
 ```ts
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
+const client = new OpenAI({
   apiKey: process.env['OPENAI_API_KEY'], // This is the default and can be omitted
 });
 
@@ -301,7 +301,7 @@ import fs from 'fs';
 import fetch from 'node-fetch';
 import OpenAI, { toFile } from 'openai';
 
-const openai = new OpenAI();
+const client = new OpenAI();
 
 // If you have access to Node `fs` we recommend using `fs.createReadStream()`:
 await openai.files.create({ file: fs.createReadStream('input.jsonl'), purpose: 'fine-tune' });
@@ -399,7 +399,7 @@ You can use the `maxRetries` option to configure or disable this:
 <!-- prettier-ignore -->
 ```js
 // Configure the default for all requests:
-const openai = new OpenAI({
+const client = new OpenAI({
   maxRetries: 0, // default is 2
 });
 
@@ -416,7 +416,7 @@ Requests time out after 10 minutes by default. You can configure this with a `ti
 <!-- prettier-ignore -->
 ```ts
 // Configure the default for all requests:
-const openai = new OpenAI({
+const client = new OpenAI({
   timeout: 20 * 1000, // 20 seconds (default is 10 minutes)
 });
 
@@ -471,7 +471,7 @@ You can also use the `.withResponse()` method to get the raw `Response` along wi
 
 <!-- prettier-ignore -->
 ```ts
-const openai = new OpenAI();
+const client = new OpenAI();
 
 const response = await openai.chat.completions
   .create({ messages: [{ role: 'user', content: 'Say this is a test' }], model: 'gpt-3.5-turbo' })
@@ -582,7 +582,7 @@ import http from 'http';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 
 // Configure the default for all requests:
-const openai = new OpenAI({
+const client = new OpenAI({
   httpAgent: new HttpsProxyAgent(process.env.PROXY_URL),
 });
 
@@ -617,6 +617,18 @@ The following runtimes are supported:
 - Vercel Edge Runtime.
 - Jest 28 or greater with the `"node"` environment (`"jsdom"` is not supported at this time).
 - Nitro v2.6 or greater.
+- Web browsers: disabled by default to avoid exposing your secret API credentials. Enable browser support by explicitly setting `dangerouslyAllowBrowser` to true'.
+<details>
+  <summary>More explanation</summary>
+  ### Why is this dangerous?
+  Enabling the `dangerouslyAllowBrowser` option can be dangerous because it exposes your secret API credentials in the client-side code. Web browsers are inherently less secure than server environments,
+  any user with access to the browser can potentially inspect, extract, and misuse these credentials. This could lead to unauthorized access using your credentials and potentially compromise sensitive data or functionality.
+  ### When might this not be dangerous?
+  In certain scenarios where enabling browser support might not pose significant risks:
+  - Internal Tools: If the application is used solely within a controlled internal environment where the users are trusted, the risk of credential exposure can be mitigated.
+  - Public APIs with Limited Scope: If your API has very limited scope and the exposed credentials do not grant access to sensitive data or critical operations, the potential impact of exposure is reduced.
+  - Development or debugging purpose: Enabling this feature temporarily might be acceptable, provided the credentials are short-lived, aren't also used in production environments, or are frequently rotated.
+</details>
 
 Note that React Native is not supported at this time.
 

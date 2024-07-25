@@ -388,3 +388,25 @@ Methods:
 - <code title="get /batches/{batch_id}">client.batches.<a href="./src/resources/batches.ts">retrieve</a>(batchId) -> Batch</code>
 - <code title="get /batches">client.batches.<a href="./src/resources/batches.ts">list</a>({ ...params }) -> BatchesPage</code>
 - <code title="post /batches/{batch_id}/cancel">client.batches.<a href="./src/resources/batches.ts">cancel</a>(batchId) -> Batch</code>
+
+# Uploads
+
+Types:
+
+- <code><a href="./src/resources/uploads/uploads.ts">Upload</a></code>
+
+Methods:
+
+- <code title="post /uploads">client.uploads.<a href="./src/resources/uploads/uploads.ts">create</a>({ ...params }) -> Upload</code>
+- <code title="post /uploads/{upload_id}/cancel">client.uploads.<a href="./src/resources/uploads/uploads.ts">cancel</a>(uploadId) -> Upload</code>
+- <code title="post /uploads/{upload_id}/complete">client.uploads.<a href="./src/resources/uploads/uploads.ts">complete</a>(uploadId, { ...params }) -> Upload</code>
+
+## Parts
+
+Types:
+
+- <code><a href="./src/resources/uploads/parts.ts">UploadPart</a></code>
+
+Methods:
+
+- <code title="post /uploads/{upload_id}/parts">client.uploads.parts.<a href="./src/resources/uploads/parts.ts">create</a>(uploadId, { ...params }) -> UploadPart</code>
