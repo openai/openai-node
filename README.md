@@ -37,7 +37,7 @@ const client = new OpenAI({
 });
 
 async function main() {
-  const chatCompletion = await openai.chat.completions.create({
+  const chatCompletion = await client.chat.completions.create({
     messages: [{ role: 'user', content: 'Say this is a test' }],
     model: 'gpt-3.5-turbo',
   });
@@ -56,7 +56,7 @@ import OpenAI from 'openai';
 const client = new OpenAI();
 
 async function main() {
-  const stream = await openai.chat.completions.create({
+  const stream = await client.chat.completions.create({
     model: 'gpt-4',
     messages: [{ role: 'user', content: 'Say this is a test' }],
     stream: true,
