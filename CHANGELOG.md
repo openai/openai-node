@@ -1,5 +1,18 @@
 # Changelog
 
+## 4.53.1 (2024-07-25)
+
+Full Changelog: [v4.53.0...v4.53.1](https://github.com/openai/openai-node/compare/v4.53.0...v4.53.1)
+
+### Bug Fixes
+
+* **compat:** remove ReadableStream polyfill redundant since node v16 ([#954](https://github.com/openai/openai-node/issues/954)) ([78b2a83](https://github.com/openai/openai-node/commit/78b2a83f085bb7ddf6a5f429636de1e3eef20f9d))
+
+
+### Chores
+
+* **tests:** update prism version ([#948](https://github.com/openai/openai-node/issues/948)) ([9202c91](https://github.com/openai/openai-node/commit/9202c91d697a116eb1b834e01f4073d254438149))
+
 ## 4.53.0 (2024-07-22)
 
 Full Changelog: [v4.52.7...v4.53.0](https://github.com/openai/openai-node/compare/v4.52.7...v4.53.0)
