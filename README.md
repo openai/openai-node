@@ -37,7 +37,7 @@ const client = new OpenAI({
 });
 
 async function main() {
-  const chatCompletion = await openai.chat.completions.create({
+  const chatCompletion = await client.chat.completions.create({
     messages: [{ role: 'user', content: 'Say this is a test' }],
     model: 'gpt-3.5-turbo',
   });
@@ -56,7 +56,7 @@ import OpenAI from 'openai';
 const client = new OpenAI();
 
 async function main() {
-  const stream = await openai.chat.completions.create({
+  const stream = await client.chat.completions.create({
     model: 'gpt-4',
     messages: [{ role: 'user', content: 'Say this is a test' }],
     stream: true,
@@ -89,7 +89,7 @@ async function main() {
     messages: [{ role: 'user', content: 'Say this is a test' }],
     model: 'gpt-3.5-turbo',
   };
-  const chatCompletion: OpenAI.Chat.ChatCompletion = await openai.chat.completions.create(params);
+  const chatCompletion: OpenAI.Chat.ChatCompletion = await client.chat.completions.create(params);
 }
 
 main();
@@ -304,20 +304,20 @@ import OpenAI, { toFile } from 'openai';
 const client = new OpenAI();
 
 // If you have access to Node `fs` we recommend using `fs.createReadStream()`:
-await openai.files.create({ file: fs.createReadStream('input.jsonl'), purpose: 'fine-tune' });
+await client.files.create({ file: fs.createReadStream('input.jsonl'), purpose: 'fine-tune' });
 
 // Or if you have the web `File` API you can pass a `File` instance:
-await openai.files.create({ file: new File(['my bytes'], 'input.jsonl'), purpose: 'fine-tune' });
+await client.files.create({ file: new File(['my bytes'], 'input.jsonl'), purpose: 'fine-tune' });
 
 // You can also pass a `fetch` `Response`:
-await openai.files.create({ file: await fetch('https://somesite/input.jsonl'), purpose: 'fine-tune' });
+await client.files.create({ file: await fetch('https://somesite/input.jsonl'), purpose: 'fine-tune' });
 
 // Finally, if none of the above are convenient, you can use our `toFile` helper:
-await openai.files.create({
+await client.files.create({
   file: await toFile(Buffer.from('my bytes'), 'input.jsonl'),
   purpose: 'fine-tune',
 });
-await openai.files.create({
+await client.files.create({
   file: await toFile(new Uint8Array([0, 1, 2]), 'input.jsonl'),
   purpose: 'fine-tune',
 });
@@ -332,7 +332,7 @@ a subclass of `APIError` will be thrown:
 <!-- prettier-ignore -->
 ```ts
 async function main() {
-  const job = await openai.fineTuning.jobs
+  const job = await client.fineTuning.jobs
     .create({ model: 'gpt-3.5-turbo', training_file: 'file-abc123' })
     .catch(async (err) => {
       if (err instanceof OpenAI.APIError) {
@@ -404,7 +404,7 @@ const client = new OpenAI({
 });
 
 // Or, configure per-request:
-await openai.chat.completions.create({ messages: [{ role: 'user', content: 'How can I get the name of the current day in Node.js?' }], model: 'gpt-3.5-turbo' }, {
+await client.chat.completions.create({ messages: [{ role: 'user', content: 'How can I get the name of the current day in Node.js?' }], model: 'gpt-3.5-turbo' }, {
   maxRetries: 5,
 });
 ```
@@ -421,7 +421,7 @@ const client = new OpenAI({
 });
 
 // Override per-request:
-await openai.chat.completions.create({ messages: [{ role: 'user', content: 'How can I list all files in a directory using Python?' }], model: 'gpt-3.5-turbo' }, {
+await client.chat.completions.create({ messages: [{ role: 'user', content: 'How can I list all files in a directory using Python?' }], model: 'gpt-3.5-turbo' }, {
   timeout: 5 * 1000,
 });
 ```
@@ -439,7 +439,7 @@ You can use `for await … of` syntax to iterate through items across all pages:
 async function fetchAllFineTuningJobs(params) {
   const allFineTuningJobs = [];
   // Automatically fetches more pages as needed.
-  for await (const fineTuningJob of openai.fineTuning.jobs.list({ limit: 20 })) {
+  for await (const fineTuningJob of client.fineTuning.jobs.list({ limit: 20 })) {
     allFineTuningJobs.push(fineTuningJob);
   }
   return allFineTuningJobs;
@@ -449,7 +449,7 @@ async function fetchAllFineTuningJobs(params) {
 Alternatively, you can make request a single page at a time:
 
 ```ts
-let page = await openai.fineTuning.jobs.list({ limit: 20 });
+let page = await client.fineTuning.jobs.list({ limit: 20 });
 for (const fineTuningJob of page.data) {
   console.log(fineTuningJob);
 }
@@ -473,13 +473,13 @@ You can also use the `.withResponse()` method to get the raw `Response` along wi
 ```ts
 const client = new OpenAI();
 
-const response = await openai.chat.completions
+const response = await client.chat.completions
   .create({ messages: [{ role: 'user', content: 'Say this is a test' }], model: 'gpt-3.5-turbo' })
   .asResponse();
 console.log(response.headers.get('X-My-Header'));
 console.log(response.statusText); // access the underlying Response object
 
-const { data: chatCompletion, response: raw } = await openai.chat.completions
+const { data: chatCompletion, response: raw } = await client.chat.completions
   .create({ messages: [{ role: 'user', content: 'Say this is a test' }], model: 'gpt-3.5-turbo' })
   .withResponse();
 console.log(raw.headers.get('X-My-Header'));
@@ -587,7 +587,7 @@ const client = new OpenAI({
 });
 
 // Override per-request:
-await openai.models.list({
+await client.models.list({
   httpAgent: new http.Agent({ keepAlive: false }),
 });
 ```

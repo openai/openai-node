@@ -3,14 +3,14 @@
 import OpenAI from 'openai';
 import { Response } from 'node-fetch';
 
-const openai = new OpenAI({
+const client = new OpenAI({
   apiKey: 'My API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
 describe('resource runs', () => {
   test('create: only required params', async () => {
-    const responsePromise = openai.beta.threads.runs.create('thread_id', { assistant_id: 'assistant_id' });
+    const responsePromise = client.beta.threads.runs.create('thread_id', { assistant_id: 'assistant_id' });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -21,7 +21,7 @@ describe('resource runs', () => {
   });
 
   test('create: required and optional params', async () => {
-    const response = await openai.beta.threads.runs.create('thread_id', {
+    const response = await client.beta.threads.runs.create('thread_id', {
       assistant_id: 'assistant_id',
       additional_instructions: 'additional_instructions',
       additional_messages: [
@@ -136,7 +136,7 @@ describe('resource runs', () => {
   });
 
   test('retrieve', async () => {
-    const responsePromise = openai.beta.threads.runs.retrieve('thread_id', 'run_id');
+    const responsePromise = client.beta.threads.runs.retrieve('thread_id', 'run_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -149,12 +149,12 @@ describe('resource runs', () => {
   test('retrieve: request options instead of params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openai.beta.threads.runs.retrieve('thread_id', 'run_id', { path: '/_stainless_unknown_path' }),
+      client.beta.threads.runs.retrieve('thread_id', 'run_id', { path: '/_stainless_unknown_path' }),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
   test('update', async () => {
-    const responsePromise = openai.beta.threads.runs.update('thread_id', 'run_id', {});
+    const responsePromise = client.beta.threads.runs.update('thread_id', 'run_id', {});
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -165,7 +165,7 @@ describe('resource runs', () => {
   });
 
   test('list', async () => {
-    const responsePromise = openai.beta.threads.runs.list('thread_id');
+    const responsePromise = client.beta.threads.runs.list('thread_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -178,14 +178,14 @@ describe('resource runs', () => {
   test('list: request options instead of params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openai.beta.threads.runs.list('thread_id', { path: '/_stainless_unknown_path' }),
+      client.beta.threads.runs.list('thread_id', { path: '/_stainless_unknown_path' }),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
   test('list: request options and params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openai.beta.threads.runs.list(
+      client.beta.threads.runs.list(
         'thread_id',
         { after: 'after', before: 'before', limit: 0, order: 'asc' },
         { path: '/_stainless_unknown_path' },
@@ -194,7 +194,7 @@ describe('resource runs', () => {
   });
 
   test('cancel', async () => {
-    const responsePromise = openai.beta.threads.runs.cancel('thread_id', 'run_id');
+    const responsePromise = client.beta.threads.runs.cancel('thread_id', 'run_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -207,12 +207,12 @@ describe('resource runs', () => {
   test('cancel: request options instead of params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openai.beta.threads.runs.cancel('thread_id', 'run_id', { path: '/_stainless_unknown_path' }),
+      client.beta.threads.runs.cancel('thread_id', 'run_id', { path: '/_stainless_unknown_path' }),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
   test('submitToolOutputs: only required params', async () => {
-    const responsePromise = openai.beta.threads.runs.submitToolOutputs('thread_id', 'run_id', {
+    const responsePromise = client.beta.threads.runs.submitToolOutputs('thread_id', 'run_id', {
       tool_outputs: [{}, {}, {}],
     });
     const rawResponse = await responsePromise.asResponse();
@@ -225,7 +225,7 @@ describe('resource runs', () => {
   });
 
   test('submitToolOutputs: required and optional params', async () => {
-    const response = await openai.beta.threads.runs.submitToolOutputs('thread_id', 'run_id', {
+    const response = await client.beta.threads.runs.submitToolOutputs('thread_id', 'run_id', {
       tool_outputs: [
         { tool_call_id: 'tool_call_id', output: 'output' },
         { tool_call_id: 'tool_call_id', output: 'output' },
