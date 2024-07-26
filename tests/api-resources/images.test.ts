@@ -3,14 +3,14 @@
 import OpenAI, { toFile } from 'openai';
 import { Response } from 'node-fetch';
 
-const openai = new OpenAI({
+const client = new OpenAI({
   apiKey: 'My API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
 describe('resource images', () => {
   test('createVariation: only required params', async () => {
-    const responsePromise = openai.images.createVariation({
+    const responsePromise = client.images.createVariation({
       image: await toFile(Buffer.from('# my file contents'), 'README.md'),
     });
     const rawResponse = await responsePromise.asResponse();
@@ -23,7 +23,7 @@ describe('resource images', () => {
   });
 
   test('createVariation: required and optional params', async () => {
-    const response = await openai.images.createVariation({
+    const response = await client.images.createVariation({
       image: await toFile(Buffer.from('# my file contents'), 'README.md'),
       model: 'dall-e-2',
       n: 1,
@@ -34,7 +34,7 @@ describe('resource images', () => {
   });
 
   test('edit: only required params', async () => {
-    const responsePromise = openai.images.edit({
+    const responsePromise = client.images.edit({
       image: await toFile(Buffer.from('# my file contents'), 'README.md'),
       prompt: 'A cute baby sea otter wearing a beret',
     });
@@ -48,7 +48,7 @@ describe('resource images', () => {
   });
 
   test('edit: required and optional params', async () => {
-    const response = await openai.images.edit({
+    const response = await client.images.edit({
       image: await toFile(Buffer.from('# my file contents'), 'README.md'),
       prompt: 'A cute baby sea otter wearing a beret',
       mask: await toFile(Buffer.from('# my file contents'), 'README.md'),
@@ -61,7 +61,7 @@ describe('resource images', () => {
   });
 
   test('generate: only required params', async () => {
-    const responsePromise = openai.images.generate({ prompt: 'A cute baby sea otter' });
+    const responsePromise = client.images.generate({ prompt: 'A cute baby sea otter' });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -72,7 +72,7 @@ describe('resource images', () => {
   });
 
   test('generate: required and optional params', async () => {
-    const response = await openai.images.generate({
+    const response = await client.images.generate({
       prompt: 'A cute baby sea otter',
       model: 'dall-e-3',
       n: 1,

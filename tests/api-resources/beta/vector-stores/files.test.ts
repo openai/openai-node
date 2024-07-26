@@ -3,14 +3,14 @@
 import OpenAI from 'openai';
 import { Response } from 'node-fetch';
 
-const openai = new OpenAI({
+const client = new OpenAI({
   apiKey: 'My API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
 describe('resource files', () => {
   test('create: only required params', async () => {
-    const responsePromise = openai.beta.vectorStores.files.create('vs_abc123', { file_id: 'file_id' });
+    const responsePromise = client.beta.vectorStores.files.create('vs_abc123', { file_id: 'file_id' });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -21,14 +21,14 @@ describe('resource files', () => {
   });
 
   test('create: required and optional params', async () => {
-    const response = await openai.beta.vectorStores.files.create('vs_abc123', {
+    const response = await client.beta.vectorStores.files.create('vs_abc123', {
       file_id: 'file_id',
       chunking_strategy: { type: 'auto' },
     });
   });
 
   test('retrieve', async () => {
-    const responsePromise = openai.beta.vectorStores.files.retrieve('vs_abc123', 'file-abc123');
+    const responsePromise = client.beta.vectorStores.files.retrieve('vs_abc123', 'file-abc123');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -41,14 +41,14 @@ describe('resource files', () => {
   test('retrieve: request options instead of params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openai.beta.vectorStores.files.retrieve('vs_abc123', 'file-abc123', {
+      client.beta.vectorStores.files.retrieve('vs_abc123', 'file-abc123', {
         path: '/_stainless_unknown_path',
       }),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
   test('list', async () => {
-    const responsePromise = openai.beta.vectorStores.files.list('vector_store_id');
+    const responsePromise = client.beta.vectorStores.files.list('vector_store_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -61,14 +61,14 @@ describe('resource files', () => {
   test('list: request options instead of params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openai.beta.vectorStores.files.list('vector_store_id', { path: '/_stainless_unknown_path' }),
+      client.beta.vectorStores.files.list('vector_store_id', { path: '/_stainless_unknown_path' }),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
   test('list: request options and params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openai.beta.vectorStores.files.list(
+      client.beta.vectorStores.files.list(
         'vector_store_id',
         { after: 'after', before: 'before', filter: 'in_progress', limit: 0, order: 'asc' },
         { path: '/_stainless_unknown_path' },
@@ -77,7 +77,7 @@ describe('resource files', () => {
   });
 
   test('del', async () => {
-    const responsePromise = openai.beta.vectorStores.files.del('vector_store_id', 'file_id');
+    const responsePromise = client.beta.vectorStores.files.del('vector_store_id', 'file_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -90,7 +90,7 @@ describe('resource files', () => {
   test('del: request options instead of params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openai.beta.vectorStores.files.del('vector_store_id', 'file_id', { path: '/_stainless_unknown_path' }),
+      client.beta.vectorStores.files.del('vector_store_id', 'file_id', { path: '/_stainless_unknown_path' }),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 });
