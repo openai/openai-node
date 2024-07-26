@@ -3,14 +3,14 @@
 import OpenAI from 'openai';
 import { Response } from 'undici';
 
-const openai = new OpenAI({
+const client = new OpenAI({
   apiKey: 'My API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
 describe('resource fileBatches', () => {
   test('create: only required params', async () => {
-    const responsePromise = openai.beta.vectorStores.fileBatches.create('vs_abc123', {
+    const responsePromise = client.beta.vectorStores.fileBatches.create('vs_abc123', {
       file_ids: ['string'],
     });
     const rawResponse = await responsePromise.asResponse();
@@ -23,14 +23,14 @@ describe('resource fileBatches', () => {
   });
 
   test('create: required and optional params', async () => {
-    const response = await openai.beta.vectorStores.fileBatches.create('vs_abc123', {
+    const response = await client.beta.vectorStores.fileBatches.create('vs_abc123', {
       file_ids: ['string'],
       chunking_strategy: { type: 'auto' },
     });
   });
 
   test('retrieve: only required params', async () => {
-    const responsePromise = openai.beta.vectorStores.fileBatches.retrieve('vsfb_abc123', {
+    const responsePromise = client.beta.vectorStores.fileBatches.retrieve('vsfb_abc123', {
       vector_store_id: 'vs_abc123',
     });
     const rawResponse = await responsePromise.asResponse();
@@ -43,13 +43,13 @@ describe('resource fileBatches', () => {
   });
 
   test('retrieve: required and optional params', async () => {
-    const response = await openai.beta.vectorStores.fileBatches.retrieve('vsfb_abc123', {
+    const response = await client.beta.vectorStores.fileBatches.retrieve('vsfb_abc123', {
       vector_store_id: 'vs_abc123',
     });
   });
 
   test('cancel: only required params', async () => {
-    const responsePromise = openai.beta.vectorStores.fileBatches.cancel('batch_id', {
+    const responsePromise = client.beta.vectorStores.fileBatches.cancel('batch_id', {
       vector_store_id: 'vector_store_id',
     });
     const rawResponse = await responsePromise.asResponse();
@@ -62,13 +62,13 @@ describe('resource fileBatches', () => {
   });
 
   test('cancel: required and optional params', async () => {
-    const response = await openai.beta.vectorStores.fileBatches.cancel('batch_id', {
+    const response = await client.beta.vectorStores.fileBatches.cancel('batch_id', {
       vector_store_id: 'vector_store_id',
     });
   });
 
   test('listFiles: only required params', async () => {
-    const responsePromise = openai.beta.vectorStores.fileBatches.listFiles('batch_id', {
+    const responsePromise = client.beta.vectorStores.fileBatches.listFiles('batch_id', {
       vector_store_id: 'vector_store_id',
     });
     const rawResponse = await responsePromise.asResponse();
@@ -81,7 +81,7 @@ describe('resource fileBatches', () => {
   });
 
   test('listFiles: required and optional params', async () => {
-    const response = await openai.beta.vectorStores.fileBatches.listFiles('batch_id', {
+    const response = await client.beta.vectorStores.fileBatches.listFiles('batch_id', {
       vector_store_id: 'vector_store_id',
       after: 'after',
       before: 'before',

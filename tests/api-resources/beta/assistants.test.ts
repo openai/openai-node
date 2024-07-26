@@ -3,14 +3,14 @@
 import OpenAI from 'openai';
 import { Response } from 'undici';
 
-const openai = new OpenAI({
+const client = new OpenAI({
   apiKey: 'My API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
 describe('resource assistants', () => {
   test('create: only required params', async () => {
-    const responsePromise = openai.beta.assistants.create({ model: 'gpt-4-turbo' });
+    const responsePromise = client.beta.assistants.create({ model: 'gpt-4-turbo' });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -21,7 +21,7 @@ describe('resource assistants', () => {
   });
 
   test('create: required and optional params', async () => {
-    const response = await openai.beta.assistants.create({
+    const response = await client.beta.assistants.create({
       model: 'gpt-4-turbo',
       description: 'description',
       instructions: 'instructions',
@@ -44,7 +44,7 @@ describe('resource assistants', () => {
   });
 
   test('retrieve', async () => {
-    const responsePromise = openai.beta.assistants.retrieve('assistant_id');
+    const responsePromise = client.beta.assistants.retrieve('assistant_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -55,7 +55,7 @@ describe('resource assistants', () => {
   });
 
   test('update', async () => {
-    const responsePromise = openai.beta.assistants.update('assistant_id', {});
+    const responsePromise = client.beta.assistants.update('assistant_id', {});
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -66,7 +66,7 @@ describe('resource assistants', () => {
   });
 
   test('list', async () => {
-    const responsePromise = openai.beta.assistants.list();
+    const responsePromise = client.beta.assistants.list();
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -79,7 +79,7 @@ describe('resource assistants', () => {
   test('list: request options and params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openai.beta.assistants.list(
+      client.beta.assistants.list(
         { after: 'after', before: 'before', limit: 0, order: 'asc' },
         { path: '/_stainless_unknown_path' },
       ),
@@ -87,7 +87,7 @@ describe('resource assistants', () => {
   });
 
   test('delete', async () => {
-    const responsePromise = openai.beta.assistants.delete('assistant_id');
+    const responsePromise = client.beta.assistants.delete('assistant_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;

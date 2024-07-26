@@ -3,14 +3,14 @@
 import OpenAI from 'openai';
 import { Response } from 'undici';
 
-const openai = new OpenAI({
+const client = new OpenAI({
   apiKey: 'My API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
 describe('resource embeddings', () => {
   test('create: only required params', async () => {
-    const responsePromise = openai.embeddings.create({
+    const responsePromise = client.embeddings.create({
       input: 'The quick brown fox jumped over the lazy dog',
       model: 'text-embedding-3-small',
     });
@@ -24,7 +24,7 @@ describe('resource embeddings', () => {
   });
 
   test('create: required and optional params', async () => {
-    const response = await openai.embeddings.create({
+    const response = await client.embeddings.create({
       input: 'The quick brown fox jumped over the lazy dog',
       model: 'text-embedding-3-small',
       dimensions: 1,

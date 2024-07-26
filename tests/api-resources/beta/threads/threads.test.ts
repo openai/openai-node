@@ -3,14 +3,14 @@
 import OpenAI from 'openai';
 import { Response } from 'undici';
 
-const openai = new OpenAI({
+const client = new OpenAI({
   apiKey: 'My API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
 describe('resource threads', () => {
   test('create', async () => {
-    const responsePromise = openai.beta.threads.create();
+    const responsePromise = client.beta.threads.create();
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -23,7 +23,7 @@ describe('resource threads', () => {
   test('create: request options and params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openai.beta.threads.create(
+      client.beta.threads.create(
         {
           messages: [
             {
@@ -141,7 +141,7 @@ describe('resource threads', () => {
   });
 
   test('retrieve', async () => {
-    const responsePromise = openai.beta.threads.retrieve('thread_id');
+    const responsePromise = client.beta.threads.retrieve('thread_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -152,7 +152,7 @@ describe('resource threads', () => {
   });
 
   test('update', async () => {
-    const responsePromise = openai.beta.threads.update('thread_id', {});
+    const responsePromise = client.beta.threads.update('thread_id', {});
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -163,7 +163,7 @@ describe('resource threads', () => {
   });
 
   test('delete', async () => {
-    const responsePromise = openai.beta.threads.delete('thread_id');
+    const responsePromise = client.beta.threads.delete('thread_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -174,7 +174,7 @@ describe('resource threads', () => {
   });
 
   test('createAndRun: only required params', async () => {
-    const responsePromise = openai.beta.threads.createAndRun({ assistant_id: 'assistant_id' });
+    const responsePromise = client.beta.threads.createAndRun({ assistant_id: 'assistant_id' });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -185,7 +185,7 @@ describe('resource threads', () => {
   });
 
   test('createAndRun: required and optional params', async () => {
-    const response = await openai.beta.threads.createAndRun({
+    const response = await client.beta.threads.createAndRun({
       assistant_id: 'assistant_id',
       instructions: 'instructions',
       max_completion_tokens: 256,

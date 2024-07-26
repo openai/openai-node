@@ -3,14 +3,14 @@
 import OpenAI, { toFile } from 'openai';
 import { Response } from 'undici';
 
-const openai = new OpenAI({
+const client = new OpenAI({
   apiKey: 'My API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
 describe('resource parts', () => {
   test('create: only required params', async () => {
-    const responsePromise = openai.uploads.parts.create('upload_abc123', {
+    const responsePromise = client.uploads.parts.create('upload_abc123', {
       data: await toFile(Buffer.from('# my file contents'), 'README.md'),
     });
     const rawResponse = await responsePromise.asResponse();
@@ -23,7 +23,7 @@ describe('resource parts', () => {
   });
 
   test('create: required and optional params', async () => {
-    const response = await openai.uploads.parts.create('upload_abc123', {
+    const response = await client.uploads.parts.create('upload_abc123', {
       data: await toFile(Buffer.from('# my file contents'), 'README.md'),
     });
   });

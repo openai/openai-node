@@ -3,14 +3,14 @@
 import OpenAI, { toFile } from 'openai';
 import { Response } from 'undici';
 
-const openai = new OpenAI({
+const client = new OpenAI({
   apiKey: 'My API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
 describe('resource files', () => {
   test('create: only required params', async () => {
-    const responsePromise = openai.files.create({
+    const responsePromise = client.files.create({
       file: await toFile(Buffer.from('# my file contents'), 'README.md'),
       purpose: 'assistants',
     });
@@ -24,14 +24,14 @@ describe('resource files', () => {
   });
 
   test('create: required and optional params', async () => {
-    const response = await openai.files.create({
+    const response = await client.files.create({
       file: await toFile(Buffer.from('# my file contents'), 'README.md'),
       purpose: 'assistants',
     });
   });
 
   test('retrieve', async () => {
-    const responsePromise = openai.files.retrieve('file_id');
+    const responsePromise = client.files.retrieve('file_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -42,7 +42,7 @@ describe('resource files', () => {
   });
 
   test('list', async () => {
-    const responsePromise = openai.files.list();
+    const responsePromise = client.files.list();
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -55,12 +55,12 @@ describe('resource files', () => {
   test('list: request options and params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openai.files.list({ purpose: 'purpose' }, { path: '/_stainless_unknown_path' }),
+      client.files.list({ purpose: 'purpose' }, { path: '/_stainless_unknown_path' }),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
   test('delete', async () => {
-    const responsePromise = openai.files.delete('file_id');
+    const responsePromise = client.files.delete('file_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;

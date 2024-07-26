@@ -3,14 +3,14 @@
 import OpenAI from 'openai';
 import { Response } from 'undici';
 
-const openai = new OpenAI({
+const client = new OpenAI({
   apiKey: 'My API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
 describe('resource models', () => {
   test('retrieve', async () => {
-    const responsePromise = openai.models.retrieve('gpt-3.5-turbo');
+    const responsePromise = client.models.retrieve('gpt-3.5-turbo');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -21,7 +21,7 @@ describe('resource models', () => {
   });
 
   test('list', async () => {
-    const responsePromise = openai.models.list();
+    const responsePromise = client.models.list();
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -32,7 +32,7 @@ describe('resource models', () => {
   });
 
   test('delete', async () => {
-    const responsePromise = openai.models.delete('ft:gpt-3.5-turbo:acemeco:suffix:abc123');
+    const responsePromise = client.models.delete('ft:gpt-3.5-turbo:acemeco:suffix:abc123');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;

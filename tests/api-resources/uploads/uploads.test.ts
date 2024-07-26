@@ -3,14 +3,14 @@
 import OpenAI from 'openai';
 import { Response } from 'undici';
 
-const openai = new OpenAI({
+const client = new OpenAI({
   apiKey: 'My API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
 describe('resource uploads', () => {
   test('create: only required params', async () => {
-    const responsePromise = openai.uploads.create({
+    const responsePromise = client.uploads.create({
       bytes: 0,
       filename: 'filename',
       mime_type: 'mime_type',
@@ -26,7 +26,7 @@ describe('resource uploads', () => {
   });
 
   test('create: required and optional params', async () => {
-    const response = await openai.uploads.create({
+    const response = await client.uploads.create({
       bytes: 0,
       filename: 'filename',
       mime_type: 'mime_type',
@@ -35,7 +35,7 @@ describe('resource uploads', () => {
   });
 
   test('cancel', async () => {
-    const responsePromise = openai.uploads.cancel('upload_abc123');
+    const responsePromise = client.uploads.cancel('upload_abc123');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -46,7 +46,7 @@ describe('resource uploads', () => {
   });
 
   test('complete: only required params', async () => {
-    const responsePromise = openai.uploads.complete('upload_abc123', {
+    const responsePromise = client.uploads.complete('upload_abc123', {
       part_ids: ['string', 'string', 'string'],
     });
     const rawResponse = await responsePromise.asResponse();
@@ -59,7 +59,7 @@ describe('resource uploads', () => {
   });
 
   test('complete: required and optional params', async () => {
-    const response = await openai.uploads.complete('upload_abc123', {
+    const response = await client.uploads.complete('upload_abc123', {
       part_ids: ['string', 'string', 'string'],
       md5: 'md5',
     });

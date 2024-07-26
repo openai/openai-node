@@ -3,14 +3,14 @@
 import OpenAI from 'openai';
 import { Response } from 'undici';
 
-const openai = new OpenAI({
+const client = new OpenAI({
   apiKey: 'My API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
 describe('resource jobs', () => {
   test('create: only required params', async () => {
-    const responsePromise = openai.fineTuning.jobs.create({
+    const responsePromise = client.fineTuning.jobs.create({
       model: 'gpt-3.5-turbo',
       training_file: 'file-abc123',
     });
@@ -24,7 +24,7 @@ describe('resource jobs', () => {
   });
 
   test('create: required and optional params', async () => {
-    const response = await openai.fineTuning.jobs.create({
+    const response = await client.fineTuning.jobs.create({
       model: 'gpt-3.5-turbo',
       training_file: 'file-abc123',
       hyperparameters: { batch_size: 'auto', learning_rate_multiplier: 'auto', n_epochs: 'auto' },
@@ -64,7 +64,7 @@ describe('resource jobs', () => {
   });
 
   test('retrieve', async () => {
-    const responsePromise = openai.fineTuning.jobs.retrieve('ft-AF1WoRqd3aJAHsqc9NY7iL8F');
+    const responsePromise = client.fineTuning.jobs.retrieve('ft-AF1WoRqd3aJAHsqc9NY7iL8F');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -75,7 +75,7 @@ describe('resource jobs', () => {
   });
 
   test('list', async () => {
-    const responsePromise = openai.fineTuning.jobs.list();
+    const responsePromise = client.fineTuning.jobs.list();
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -88,12 +88,12 @@ describe('resource jobs', () => {
   test('list: request options and params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openai.fineTuning.jobs.list({ after: 'after', limit: 0 }, { path: '/_stainless_unknown_path' }),
+      client.fineTuning.jobs.list({ after: 'after', limit: 0 }, { path: '/_stainless_unknown_path' }),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
   test('cancel', async () => {
-    const responsePromise = openai.fineTuning.jobs.cancel('ft-AF1WoRqd3aJAHsqc9NY7iL8F');
+    const responsePromise = client.fineTuning.jobs.cancel('ft-AF1WoRqd3aJAHsqc9NY7iL8F');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -104,7 +104,7 @@ describe('resource jobs', () => {
   });
 
   test('listEvents', async () => {
-    const responsePromise = openai.fineTuning.jobs.listEvents('ft-AF1WoRqd3aJAHsqc9NY7iL8F');
+    const responsePromise = client.fineTuning.jobs.listEvents('ft-AF1WoRqd3aJAHsqc9NY7iL8F');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -117,7 +117,7 @@ describe('resource jobs', () => {
   test('listEvents: request options and params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openai.fineTuning.jobs.listEvents(
+      client.fineTuning.jobs.listEvents(
         'ft-AF1WoRqd3aJAHsqc9NY7iL8F',
         { after: 'after', limit: 0 },
         { path: '/_stainless_unknown_path' },

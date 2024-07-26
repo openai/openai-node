@@ -3,14 +3,14 @@
 import OpenAI from 'openai';
 import { Response } from 'undici';
 
-const openai = new OpenAI({
+const client = new OpenAI({
   apiKey: 'My API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
 describe('resource vectorStores', () => {
   test('create', async () => {
-    const responsePromise = openai.beta.vectorStores.create({});
+    const responsePromise = client.beta.vectorStores.create({});
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -21,7 +21,7 @@ describe('resource vectorStores', () => {
   });
 
   test('retrieve', async () => {
-    const responsePromise = openai.beta.vectorStores.retrieve('vector_store_id');
+    const responsePromise = client.beta.vectorStores.retrieve('vector_store_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -32,7 +32,7 @@ describe('resource vectorStores', () => {
   });
 
   test('update', async () => {
-    const responsePromise = openai.beta.vectorStores.update('vector_store_id', {});
+    const responsePromise = client.beta.vectorStores.update('vector_store_id', {});
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -43,7 +43,7 @@ describe('resource vectorStores', () => {
   });
 
   test('list', async () => {
-    const responsePromise = openai.beta.vectorStores.list();
+    const responsePromise = client.beta.vectorStores.list();
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -56,7 +56,7 @@ describe('resource vectorStores', () => {
   test('list: request options and params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      openai.beta.vectorStores.list(
+      client.beta.vectorStores.list(
         { after: 'after', before: 'before', limit: 0, order: 'asc' },
         { path: '/_stainless_unknown_path' },
       ),
@@ -64,7 +64,7 @@ describe('resource vectorStores', () => {
   });
 
   test('delete', async () => {
-    const responsePromise = openai.beta.vectorStores.delete('vector_store_id');
+    const responsePromise = client.beta.vectorStores.delete('vector_store_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
