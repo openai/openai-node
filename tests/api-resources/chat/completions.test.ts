@@ -3,14 +3,14 @@
 import OpenAI from 'openai';
 import { Response } from 'node-fetch';
 
-const openai = new OpenAI({
+const client = new OpenAI({
   apiKey: 'My API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
 describe('resource completions', () => {
   test('create: only required params', async () => {
-    const responsePromise = openai.chat.completions.create({
+    const responsePromise = client.chat.completions.create({
       messages: [{ content: 'content', role: 'system' }],
       model: 'gpt-4-turbo',
     });
@@ -24,7 +24,7 @@ describe('resource completions', () => {
   });
 
   test('create: required and optional params', async () => {
-    const response = await openai.chat.completions.create({
+    const response = await client.chat.completions.create({
       messages: [{ content: 'content', role: 'system', name: 'name' }],
       model: 'gpt-4-turbo',
       frequency_penalty: -2,
