@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.53.2 (2024-07-26)
+
+Full Changelog: [v4.53.1...v4.53.2](https://github.com/openai/openai-node/compare/v4.53.1...v4.53.2)
+
+### Chores
+
+* **docs:** fix incorrect client var names ([#955](https://github.com/openai/openai-node/issues/955)) ([cc91be8](https://github.com/openai/openai-node/commit/cc91be867bf7042abb2ee6c6d5ef69082ac64280))
+
 ## 4.53.1 (2024-07-25)
 
 Full Changelog: [v4.53.0...v4.53.1](https://github.com/openai/openai-node/compare/v4.53.0...v4.53.1)
