@@ -184,6 +184,7 @@ export class OpenAI extends Core.APIClient {
   }
 
   static OpenAI = this;
+  static DEFAULT_TIMEOUT = 600000; // 10 minutes
 
   static OpenAIError = Errors.OpenAIError;
   static APIError = Errors.APIError;
