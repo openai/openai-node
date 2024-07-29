@@ -177,7 +177,7 @@ export class BaseOpenAI {
     }
 
     this.baseURL = options.baseURL!;
-    this.timeout = options.timeout ?? 600000 /* 10 minutes */;
+    this.timeout = options.timeout ?? OpenAI.DEFAULT_TIMEOUT /* 10 minutes */;
     this.httpAgent = options.httpAgent;
     this.maxRetries = options.maxRetries ?? 2;
     this.fetch = options.fetch ?? defaultFetch;
@@ -625,6 +625,7 @@ export class BaseOpenAI {
   }
 
   static OpenAI = this;
+  static DEFAULT_TIMEOUT = 600000; // 10 minutes
 
   static OpenAIError = Errors.OpenAIError;
   static APIError = Errors.APIError;
