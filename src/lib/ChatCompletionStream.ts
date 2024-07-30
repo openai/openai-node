@@ -66,7 +66,7 @@ export class ChatCompletionStream
     if (this.ended) return;
     this.#currentChatCompletionSnapshot = undefined;
   }
-  #addChunk(chunk: ChatCompletionChunk) {
+  #addChunk(this: ChatCompletionStream, chunk: ChatCompletionChunk) {
     if (this.ended) return;
     const completion = this.#accumulateChatCompletion(chunk);
     this._emit('chunk', chunk, completion);
@@ -208,7 +208,7 @@ export class ChatCompletionStream
     return snapshot;
   }
 
-  [Symbol.asyncIterator](): AsyncIterator<ChatCompletionChunk> {
+  [Symbol.asyncIterator](this: ChatCompletionStream): AsyncIterator<ChatCompletionChunk> {
     const pushQueue: ChatCompletionChunk[] = [];
     const readQueue: {
       resolve: (chunk: ChatCompletionChunk | undefined) => void;
