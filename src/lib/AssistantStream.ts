@@ -71,7 +71,10 @@ export type RunSubmitToolOutputsParamsStream = Omit<RunSubmitToolOutputsParamsBa
   stream?: true;
 };
 
-export class AssistantStream extends EventStream<AssistantStreamEvents> implements AsyncIterable<AssistantStreamEvent> {
+export class AssistantStream
+  extends EventStream<AssistantStreamEvents>
+  implements AsyncIterable<AssistantStreamEvent>
+{
   //Track all events in a single list for reference
   #events: AssistantStreamEvent[] = [];
 

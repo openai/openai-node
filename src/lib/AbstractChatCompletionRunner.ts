@@ -31,7 +31,6 @@ export interface RunnerOptions extends Core.RequestOptions {
 export class AbstractChatCompletionRunner<
   EventTypes extends AbstractChatCompletionRunnerEvents,
 > extends EventStream<EventTypes> {
-
   protected _chatCompletions: ChatCompletion[] = [];
   messages: ChatCompletionMessageParam[] = [];
 
