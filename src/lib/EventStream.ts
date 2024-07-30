@@ -1,12 +1,6 @@
-import * as Core from 'openai/core';
 import { APIUserAbortError, OpenAIError } from 'openai/error';
-import { Run, RunSubmitToolOutputsParamsBase } from 'openai/resources/beta/threads/runs/runs';
-import { RunCreateParamsBase, Runs } from 'openai/resources/beta/threads/runs/runs';
-import { ThreadCreateAndRunParamsBase, Threads } from 'openai/resources/beta/threads/threads';
 
-export abstract class AbstractAssistantStreamRunner<
-  Events extends CustomEvents<any> = AbstractAssistantRunnerEvents,
-> {
+export class EventStream<EventTypes extends BaseEvents> {
   controller: AbortController = new AbortController();
 
   #connectedPromise: Promise<void>;
@@ -17,7 +11,9 @@ export abstract class AbstractAssistantStreamRunner<
   #resolveEndPromise: () => void = () => {};
   #rejectEndPromise: (error: OpenAIError) => void = () => {};
 
-  #listeners: { [Event in keyof Events]?: ListenersForEvent<Events, Event> } = {};
+  #listeners: {
+    [Event in keyof EventTypes]?: EventListeners<EventTypes, Event>;
+  } = {};
 
   #ended = false;
   #errored = false;
@@ -43,22 +39,18 @@ export abstract class AbstractAssistantStreamRunner<
     this.#endPromise.catch(() => {});
   }
 
-  protected _run(executor: () => Promise<any>) {
+  protected _run(this: EventStream<EventTypes>, executor: () => Promise<any>) {
     // Unfortunately if we call `executor()` immediately we get runtime errors about
     // references to `this` before the `super()` constructor call returns.
     setTimeout(() => {
       executor().then(() => {
-        // this._emitFinal();
+        this._emitFinal();
         this._emit('end');
-      }, this.#handleError);
+      }, this.#handleError.bind(this));
     }, 0);
   }
 
-  protected _addRun(run: Run): Run {
-    return run;
-  }
-
-  protected _connected() {
+  protected _connected(this: EventStream<EventTypes>) {
     if (this.ended) return;
     this.#resolveConnectedPromise();
     this._emit('connect');
@@ -87,8 +79,8 @@ export abstract class AbstractAssistantStreamRunner<
    * called, multiple times.
    * @returns this ChatCompletionStream, so that calls can be chained
    */
-  on<Event extends keyof Events>(event: Event, listener: ListenerForEvent<Events, Event>): this {
-    const listeners: ListenersForEvent<Events, Event> =
+  on<Event extends keyof EventTypes>(event: Event, listener: EventListener<EventTypes, Event>): this {
+    const listeners: EventListeners<EventTypes, Event> =
       this.#listeners[event] || (this.#listeners[event] = []);
     listeners.push({ listener });
     return this;
@@ -101,7 +93,7 @@ export abstract class AbstractAssistantStreamRunner<
    * off() must be called multiple times to remove each instance.
    * @returns this ChatCompletionStream, so that calls can be chained
    */
-  off<Event extends keyof Events>(event: Event, listener: ListenerForEvent<Events, Event>): this {
+  off<Event extends keyof EventTypes>(event: Event, listener: EventListener<EventTypes, Event>): this {
     const listeners = this.#listeners[event];
     if (!listeners) return this;
     const index = listeners.findIndex((l) => l.listener === listener);
@@ -114,8 +106,8 @@ export abstract class AbstractAssistantStreamRunner<
    * this listener is removed and then invoked.
    * @returns this ChatCompletionStream, so that calls can be chained
    */
-  once<Event extends keyof Events>(event: Event, listener: ListenerForEvent<Events, Event>): this {
-    const listeners: ListenersForEvent<Events, Event> =
+  once<Event extends keyof EventTypes>(event: Event, listener: EventListener<EventTypes, Event>): this {
+    const listeners: EventListeners<EventTypes, Event> =
       this.#listeners[event] || (this.#listeners[event] = []);
     listeners.push({ listener, once: true });
     return this;
@@ -132,12 +124,12 @@ export abstract class AbstractAssistantStreamRunner<
    *
    *   const message = await stream.emitted('message') // rejects if the stream errors
    */
-  emitted<Event extends keyof Events>(
+  emitted<Event extends keyof EventTypes>(
     event: Event,
   ): Promise<
-    EventParameters<Events, Event> extends [infer Param] ? Param
-    : EventParameters<Events, Event> extends [] ? void
-    : EventParameters<Events, Event>
+    EventParameters<EventTypes, Event> extends [infer Param] ? Param
+    : EventParameters<EventTypes, Event> extends [] ? void
+    : EventParameters<EventTypes, Event>
   > {
     return new Promise((resolve, reject) => {
       this.#catchingPromiseCreated = true;
@@ -151,7 +143,7 @@ export abstract class AbstractAssistantStreamRunner<
     await this.#endPromise;
   }
 
-  #handleError = (error: unknown) => {
+  #handleError(this: EventStream<EventTypes>, error: unknown) {
     this.#errored = true;
     if (error instanceof Error && error.name === 'AbortError') {
       error = new APIUserAbortError();
@@ -170,9 +162,15 @@ export abstract class AbstractAssistantStreamRunner<
       return this._emit('error', openAIError);
     }
     return this._emit('error', new OpenAIError(String(error)));
-  };
+  }
 
-  protected _emit<Event extends keyof Events>(event: Event, ...args: EventParameters<Events, Event>) {
+  _emit<Event extends keyof BaseEvents>(event: Event, ...args: EventParameters<BaseEvents, Event>): void;
+  _emit<Event extends keyof EventTypes>(event: Event, ...args: EventParameters<EventTypes, Event>): void;
+  _emit<Event extends keyof EventTypes>(
+    this: EventStream<EventTypes>,
+    event: Event,
+    ...args: EventParameters<EventTypes, Event>
+  ) {
     // make sure we don't emit any events after end
     if (this.#ended) {
       return;
@@ -183,10 +181,10 @@ export abstract class AbstractAssistantStreamRunner<
       this.#resolveEndPromise();
     }
 
-    const listeners: ListenersForEvent<Events, Event> | undefined = this.#listeners[event];
+    const listeners: EventListeners<EventTypes, Event> | undefined = this.#listeners[event];
     if (listeners) {
       this.#listeners[event] = listeners.filter((l) => !l.once) as any;
-      listeners.forEach(({ listener }: any) => listener(...args));
+      listeners.forEach(({ listener }: any) => listener(...(args as any)));
     }
 
     if (event === 'abort') {
@@ -219,121 +217,22 @@ export abstract class AbstractAssistantStreamRunner<
     }
   }
 
-  protected async _threadAssistantStream(
-    body: ThreadCreateAndRunParamsBase,
-    thread: Threads,
-    options?: Core.RequestOptions,
-  ): Promise<Run> {
-    return await this._createThreadAssistantStream(thread, body, options);
-  }
-
-  protected async _runAssistantStream(
-    threadId: string,
-    runs: Runs,
-    params: RunCreateParamsBase,
-    options?: Core.RequestOptions,
-  ): Promise<Run> {
-    return await this._createAssistantStream(runs, threadId, params, options);
-  }
-
-  protected async _runToolAssistantStream(
-    threadId: string,
-    runId: string,
-    runs: Runs,
-    params: RunSubmitToolOutputsParamsBase,
-    options?: Core.RequestOptions,
-  ): Promise<Run> {
-    return await this._createToolAssistantStream(runs, threadId, runId, params, options);
-  }
-
-  protected async _createThreadAssistantStream(
-    thread: Threads,
-    body: ThreadCreateAndRunParamsBase,
-    options?: Core.RequestOptions,
-  ): Promise<Run> {
-    const signal = options?.signal;
-    if (signal) {
-      if (signal.aborted) this.controller.abort();
-      signal.addEventListener('abort', () => this.controller.abort());
-    }
-    // this.#validateParams(params);
-
-    const runResult = await thread.createAndRun(
-      { ...body, stream: false },
-      { ...options, signal: this.controller.signal },
-    );
-    this._connected();
-    return this._addRun(runResult as Run);
-  }
-
-  protected async _createToolAssistantStream(
-    run: Runs,
-    threadId: string,
-    runId: string,
-    params: RunSubmitToolOutputsParamsBase,
-    options?: Core.RequestOptions,
-  ): Promise<Run> {
-    const signal = options?.signal;
-    if (signal) {
-      if (signal.aborted) this.controller.abort();
-      signal.addEventListener('abort', () => this.controller.abort());
-    }
-
-    const runResult = await run.submitToolOutputs(
-      threadId,
-      runId,
-      { ...params, stream: false },
-      { ...options, signal: this.controller.signal },
-    );
-    this._connected();
-    return this._addRun(runResult as Run);
-  }
-
-  protected async _createAssistantStream(
-    run: Runs,
-    threadId: string,
-    params: RunCreateParamsBase,
-    options?: Core.RequestOptions,
-  ): Promise<Run> {
-    const signal = options?.signal;
-    if (signal) {
-      if (signal.aborted) this.controller.abort();
-      signal.addEventListener('abort', () => this.controller.abort());
-    }
-    // this.#validateParams(params);
-
-    const runResult = await run.create(
-      threadId,
-      { ...params, stream: false },
-      { ...options, signal: this.controller.signal },
-    );
-    this._connected();
-    return this._addRun(runResult as Run);
-  }
+  protected _emitFinal(): void {}
 }
 
-type CustomEvents<Event extends string> = {
-  [k in Event]: k extends keyof AbstractAssistantRunnerEvents ? AbstractAssistantRunnerEvents[k]
-  : (...args: any[]) => void;
-};
+type EventListener<Events, EventType extends keyof Events> = Events[EventType];
 
-type ListenerForEvent<Events extends CustomEvents<any>, Event extends keyof Events> = Event extends (
-  keyof AbstractAssistantRunnerEvents
-) ?
-  AbstractAssistantRunnerEvents[Event]
-: Events[Event];
-
-type ListenersForEvent<Events extends CustomEvents<any>, Event extends keyof Events> = Array<{
-  listener: ListenerForEvent<Events, Event>;
+type EventListeners<Events, EventType extends keyof Events> = Array<{
+  listener: EventListener<Events, EventType>;
   once?: boolean;
 }>;
-type EventParameters<Events extends CustomEvents<any>, Event extends keyof Events> = Parameters<
-  ListenerForEvent<Events, Event>
->;
 
-export interface AbstractAssistantRunnerEvents {
+export type EventParameters<Events, EventType extends keyof Events> = {
+  [Event in EventType]: EventListener<Events, EventType> extends (...args: infer P) => any ? P : never;
+}[EventType];
+
+export interface BaseEvents {
   connect: () => void;
-  run: (run: Run) => void;
   error: (error: OpenAIError) => void;
   abort: (error: APIUserAbortError) => void;
   end: () => void;
