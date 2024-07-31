@@ -2,8 +2,24 @@
 
 set -eux
 
-npm config set //registry.npmjs.org/:_authToken $NPM_TOKEN
+npm config set '//registry.npmjs.org/:_authToken' "$NPM_TOKEN"
 
+# Build the project
 yarn build
+
+# Navigate to the dist directory
 cd dist
-yarn publish --access public
+
+# Get the version from package.json
+VERSION="$(node -p "require('./package.json').version")"
+
+# Extract the pre-release tag if it exists
+if [[ "$VERSION" =~ -([a-zA-Z]+) ]]; then
+  # Extract the part before any dot in the pre-release identifier
+  TAG="${BASH_REMATCH[1]}"
+else
+  TAG="latest"
+fi
+
+# Publish with the appropriate tag
+yarn publish --access public --tag "$TAG"
