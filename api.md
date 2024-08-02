@@ -86,6 +86,7 @@ Methods:
 Types:
 
 - <code><a href="./src/resources/images.ts">Image</a></code>
+- <code><a href="./src/resources/images.ts">ImageModel</a></code>
 - <code><a href="./src/resources/images.ts">ImagesResponse</a></code>
 
 Methods:
@@ -95,6 +96,10 @@ Methods:
 - <code title="post /images/generations">client.images.<a href="./src/resources/images.ts">generate</a>({ ...params }) -> ImagesResponse</code>
 
 # Audio
+
+Types:
+
+- <code><a href="./src/resources/audio/audio.ts">AudioModel</a></code>
 
 ## Transcriptions
 
@@ -118,6 +123,10 @@ Methods:
 
 ## Speech
 
+Types:
+
+- <code><a href="./src/resources/audio/speech.ts">SpeechModel</a></code>
+
 Methods:
 
 - <code title="post /audio/speech">client.audio.speech.<a href="./src/resources/audio/speech.ts">create</a>({ ...params }) -> Response</code>
@@ -127,6 +136,7 @@ Methods:
 Types:
 
 - <code><a href="./src/resources/moderations.ts">Moderation</a></code>
+- <code><a href="./src/resources/moderations.ts">ModerationModel</a></code>
 - <code><a href="./src/resources/moderations.ts">ModerationCreateResponse</a></code>
 
 Methods:

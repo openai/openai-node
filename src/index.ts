@@ -748,15 +748,18 @@ export namespace OpenAI {
 
   export import Images = API.Images;
   export import Image = API.Image;
+  export import ImageModel = API.ImageModel;
   export import ImagesResponse = API.ImagesResponse;
   export import ImageCreateVariationParams = API.ImageCreateVariationParams;
   export import ImageEditParams = API.ImageEditParams;
   export import ImageGenerateParams = API.ImageGenerateParams;
 
   export import Audio = API.Audio;
+  export import AudioModel = API.AudioModel;
 
   export import Moderations = API.Moderations;
   export import Moderation = API.Moderation;
+  export import ModerationModel = API.ModerationModel;
   export import ModerationCreateResponse = API.ModerationCreateResponse;
   export import ModerationCreateParams = API.ModerationCreateParams;
 

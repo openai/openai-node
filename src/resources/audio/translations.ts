@@ -2,6 +2,7 @@
 
 import { APIResource } from '../../resource';
 import * as TranslationsAPI from './translations';
+import * as AudioAPI from './audio';
 import { type Uploadable, multipartFormRequestOptions } from '../../uploads';
 import { APIPromise } from '../../internal/api-promise';
 import { RequestOptions } from '../../internal/request-options';
@@ -30,7 +31,7 @@ export interface TranslationCreateParams {
    * ID of the model to use. Only `whisper-1` (which is powered by our open source
    * Whisper V2 model) is currently available.
    */
-  model: (string & {}) | 'whisper-1';
+  model: (string & {}) | AudioAPI.AudioModel;
 
   /**
    * An optional text to guide the model's style or continue a previous audio
