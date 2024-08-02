@@ -3,6 +3,7 @@
 import { APIResource } from '../../resource';
 import * as Core from '../../core';
 import * as TranscriptionsAPI from './transcriptions';
+import * as AudioAPI from './audio';
 
 export class Transcriptions extends APIResource {
   /**
@@ -35,7 +36,7 @@ export interface TranscriptionCreateParams {
    * ID of the model to use. Only `whisper-1` (which is powered by our open source
    * Whisper V2 model) is currently available.
    */
-  model: (string & {}) | 'whisper-1';
+  model: (string & {}) | AudioAPI.AudioModel;
 
   /**
    * The language of the input audio. Supplying the input language in
