@@ -1,5 +1,26 @@
 # Changelog
 
+## 4.54.0 (2024-08-02)
+
+Full Changelog: [v4.53.2...v4.54.0](https://github.com/openai/openai-node/compare/v4.53.2...v4.54.0)
+
+### Features
+
+* extract out `ImageModel`, `AudioModel`, `SpeechModel` ([#964](https://github.com/openai/openai-node/issues/964)) ([1edf957](https://github.com/openai/openai-node/commit/1edf957e1cb86c2a7b2d29e28f2b8f428ea0cd7d))
+* make enums not nominal ([#965](https://github.com/openai/openai-node/issues/965)) ([0dd0cd1](https://github.com/openai/openai-node/commit/0dd0cd158d6765c3a04ac983aad03c2ecad14502))
+
+
+### Chores
+
+* **ci:** correctly tag pre-release npm packages ([#963](https://github.com/openai/openai-node/issues/963)) ([f1a4a68](https://github.com/openai/openai-node/commit/f1a4a686bbf4a38919b8597f008d895d1b99d8df))
+* **internal:** add constant for default timeout ([#960](https://github.com/openai/openai-node/issues/960)) ([55c01f4](https://github.com/openai/openai-node/commit/55c01f4dc5d132c21713f9e8606b95abc76fcd44))
+* **internal:** cleanup event stream helpers ([#950](https://github.com/openai/openai-node/issues/950)) ([8f49956](https://github.com/openai/openai-node/commit/8f499566c47bd7d4799a8cbe0d980553348b8f48))
+
+
+### Documentation
+
+* **README:** link Lifecycle in Polling Helpers section ([#962](https://github.com/openai/openai-node/issues/962)) ([c610c81](https://github.com/openai/openai-node/commit/c610c813e8d7f96b5b8315ae194e0a9ff565f43d))
+
 ## 4.53.2 (2024-07-26)
 
 Full Changelog: [v4.53.1...v4.53.2](https://github.com/openai/openai-node/compare/v4.53.1...v4.53.2)
