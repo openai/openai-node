@@ -2,7 +2,7 @@
 
 export * from './chat/index';
 export * from './shared';
-export { Audio } from './audio/audio';
+export { AudioModel, Audio } from './audio/audio';
 export {
   Batch,
   BatchError,
@@ -35,6 +35,7 @@ export {
 export { FineTuning } from './fine-tuning/fine-tuning';
 export {
   Image,
+  ImageModel,
   ImagesResponse,
   ImageCreateVariationParams,
   ImageEditParams,
@@ -42,5 +43,11 @@ export {
   Images,
 } from './images';
 export { Model, ModelDeleted, ModelsPage, Models } from './models';
-export { Moderation, ModerationCreateResponse, ModerationCreateParams, Moderations } from './moderations';
+export {
+  Moderation,
+  ModerationModel,
+  ModerationCreateResponse,
+  ModerationCreateParams,
+  Moderations,
+} from './moderations';
 export { Upload, UploadCreateParams, UploadCompleteParams, Uploads } from './uploads/uploads';

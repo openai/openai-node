@@ -14,6 +14,8 @@ export class Speech extends APIResource {
   }
 }
 
+export type SpeechModel = 'tts-1' | 'tts-1-hd';
+
 export interface SpeechCreateParams {
   /**
    * The text to generate audio for. The maximum length is 4096 characters.
@@ -24,7 +26,7 @@ export interface SpeechCreateParams {
    * One of the available [TTS models](https://platform.openai.com/docs/models/tts):
    * `tts-1` or `tts-1-hd`
    */
-  model: (string & {}) | 'tts-1' | 'tts-1-hd';
+  model: (string & {}) | SpeechModel;
 
   /**
    * The voice to use when generating the audio. Supported voices are `alloy`,
@@ -48,5 +50,6 @@ export interface SpeechCreateParams {
 }
 
 export namespace Speech {
+  export import SpeechModel = SpeechAPI.SpeechModel;
   export import SpeechCreateParams = SpeechAPI.SpeechCreateParams;
 }
