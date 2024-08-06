@@ -232,7 +232,7 @@ export namespace VectorStoreFile {
     /**
      * One of `server_error` or `rate_limit_exceeded`.
      */
-    code: 'internal_error' | 'file_not_found' | 'parsing_error' | 'unhandled_mime_type';
+    code: 'server_error' | 'unsupported_file' | 'invalid_file';
 
     /**
      * A human-readable description of the error.

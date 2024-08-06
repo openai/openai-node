@@ -9,76 +9,9 @@ import {
   type ChatCompletionStreamingFunctionRunnerParams,
 } from 'openai/resources/beta/chat/completions';
 import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
-
-import { type RequestInfo, type RequestInit } from 'openai/_shims/index';
 import { Response } from 'node-fetch';
-import { isAssistantMessage } from './chatCompletionUtils';
-
-type Fetch = (req: string | RequestInfo, init?: RequestInit) => Promise<Response>;
-
-/**
- * Creates a mock `fetch` function and a `handleRequest` function for intercepting `fetch` calls.
- *
- * You call `handleRequest` with a callback function that handles the next `fetch` call.
- * It returns a Promise that:
- * - waits for the next call to `fetch`
- * - calls the callback with the `fetch` arguments
- * - resolves `fetch` with the callback output
- */
-function mockFetch(): { fetch: Fetch; handleRequest: (handle: Fetch) => Promise<void> } {
-  const fetchQueue: ((handler: typeof fetch) => void)[] = [];
-  const handlerQueue: Promise<typeof fetch>[] = [];
-
-  const enqueueHandler = () => {
-    handlerQueue.push(
-      new Promise<typeof fetch>((resolve) => {
-        fetchQueue.push((handle: typeof fetch) => {
-          enqueueHandler();
-          resolve(handle);
-        });
-      }),
-    );
-  };
-  enqueueHandler();
-
-  async function fetch(req: string | RequestInfo, init?: RequestInit): Promise<Response> {
-    const handler = await handlerQueue.shift();
-    if (!handler) throw new Error('expected handler to be defined');
-    const signal = init?.signal;
-    if (!signal) return await handler(req, init);
-    return await Promise.race([
-      handler(req, init),
-      new Promise<Response>((resolve, reject) => {
-        if (signal.aborted) {
-          // @ts-ignore does exist in Node
-          reject(new DOMException('The user aborted a request.', 'AbortError'));
-          return;
-        }
-        signal.addEventListener('abort', (e) => {
-          // @ts-ignore does exist in Node
-          reject(new DOMException('The user aborted a request.', 'AbortError'));
-        });
-      }),
-    ]);
-  }
-
-  function handleRequest(handle: typeof fetch): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      fetchQueue.shift()?.(async (req, init) => {
-        try {
-          return await handle(req, init);
-        } catch (err) {
-          reject(err);
-          return err as any;
-        } finally {
-          resolve();
-        }
-      });
-    });
-  }
-
-  return { fetch, handleRequest };
-}
+import { isAssistantMessage } from '../../src/lib/chatCompletionUtils';
+import { mockFetch } from '../utils/mock-fetch';
 
 // mockChatCompletionFetch is like mockFetch, but with better a more convenient handleRequest to mock
 // chat completion request/responses.
@@ -213,7 +146,7 @@ class RunnerListener {
 
   onceMessageCallCount = 0;
 
-  constructor(public runner: ChatCompletionRunner) {
+  constructor(public runner: ChatCompletionRunner<any>) {
     runner
       .on('connect', () => (this.gotConnect = true))
       .on('content', (content) => this.contents.push(content))
@@ -327,7 +260,7 @@ class StreamingRunnerListener {
   gotConnect = false;
   gotEnd = false;
 
-  constructor(public runner: ChatCompletionStreamingRunner) {
+  constructor(public runner: ChatCompletionStreamingRunner<any>) {
     runner
       .on('connect', () => (this.gotConnect = true))
       .on('chunk', (chunk) => this.eventChunks.push(chunk))
@@ -598,6 +531,8 @@ describe('resource completions', () => {
               message: {
                 role: 'assistant',
                 content: null,
+                refusal: null,
+                parsed: null,
                 tool_calls: [
                   {
                     type: 'function',
@@ -619,10 +554,15 @@ describe('resource completions', () => {
 
       await handleRequest(async (request) => {
         expect(request.messages).toEqual([
-          { role: 'user', content: 'tell me what the weather is like' },
+          {
+            role: 'user',
+            content: 'tell me what the weather is like',
+          },
           {
             role: 'assistant',
             content: null,
+            refusal: null,
+            parsed: null,
             tool_calls: [
               {
                 type: 'function',
@@ -630,6 +570,7 @@ describe('resource completions', () => {
                 function: {
                   arguments: '',
                   name: 'getWeather',
+                  parsed_arguments: null,
                 },
               },
             ],
@@ -651,6 +592,7 @@ describe('resource completions', () => {
               message: {
                 role: 'assistant',
                 content: `it's raining`,
+                refusal: null,
               },
             },
           ],
@@ -667,6 +609,8 @@ describe('resource completions', () => {
         {
           role: 'assistant',
           content: null,
+          parsed: null,
+          refusal: null,
           tool_calls: [
             {
               type: 'function',
@@ -674,12 +618,19 @@ describe('resource completions', () => {
               function: {
                 arguments: '',
                 name: 'getWeather',
+                parsed_arguments: null,
               },
             },
           ],
         },
         { role: 'tool', content: `it's raining`, tool_call_id: '123' },
-        { role: 'assistant', content: "it's raining" },
+        {
+          role: 'assistant',
+          content: "it's raining",
+          parsed: null,
+          refusal: null,
+          tool_calls: [],
+        },
       ]);
       expect(listener.functionCallResults).toEqual([`it's raining`]);
       await listener.sanityCheck();
@@ -723,6 +674,8 @@ describe('resource completions', () => {
               message: {
                 role: 'assistant',
                 content: null,
+                parsed: null,
+                refusal: null,
                 tool_calls: [
                   {
                     type: 'function',
@@ -751,6 +704,8 @@ describe('resource completions', () => {
         {
           role: 'assistant',
           content: null,
+          parsed: null,
+          refusal: null,
           tool_calls: [
             {
               type: 'function',
@@ -758,6 +713,7 @@ describe('resource completions', () => {
               function: {
                 arguments: '',
                 name: 'getWeather',
+                parsed_arguments: null,
               },
             },
           ],
@@ -816,6 +772,8 @@ describe('resource completions', () => {
               message: {
                 role: 'assistant',
                 content: null,
+                parsed: null,
+                refusal: null,
                 tool_calls: [
                   {
                     type: 'function',
@@ -849,6 +807,8 @@ describe('resource completions', () => {
           {
             role: 'assistant',
             content: null,
+            parsed: null,
+            refusal: null,
             tool_calls: [
               {
                 type: 'function',
@@ -856,6 +816,7 @@ describe('resource completions', () => {
                 function: {
                   arguments: '{"a": 1, "b": 2, "c": 3}',
                   name: 'numProperties',
+                  parsed_arguments: null,
                 },
               },
             ],
@@ -876,6 +837,7 @@ describe('resource completions', () => {
               message: {
                 role: 'assistant',
                 content: `there are 3 properties in {"a": 1, "b": 2, "c": 3}`,
+                refusal: null,
               },
             },
           ],
@@ -900,16 +862,28 @@ describe('resource completions', () => {
         {
           role: 'assistant',
           content: null,
+          parsed: null,
+          refusal: null,
           tool_calls: [
             {
               type: 'function',
               id: '123',
-              function: { name: 'numProperties', arguments: '{"a": 1, "b": 2, "c": 3}' },
+              function: {
+                name: 'numProperties',
+                arguments: '{"a": 1, "b": 2, "c": 3}',
+                parsed_arguments: null,
+              },
             },
           ],
         },
         { role: 'tool', content: '3', tool_call_id: '123' },
-        { role: 'assistant', content: 'there are 3 properties in {"a": 1, "b": 2, "c": 3}' },
+        {
+          role: 'assistant',
+          content: 'there are 3 properties in {"a": 1, "b": 2, "c": 3}',
+          parsed: null,
+          refusal: null,
+          tool_calls: [],
+        },
       ]);
       expect(listener.functionCallResults).toEqual(['3']);
       await listener.sanityCheck();
@@ -963,6 +937,8 @@ describe('resource completions', () => {
                 message: {
                   role: 'assistant',
                   content: null,
+                  parsed: null,
+                  refusal: null,
                   tool_calls: [
                     {
                       type: 'function',
@@ -990,6 +966,8 @@ describe('resource completions', () => {
             {
               role: 'assistant',
               content: null,
+              parsed: null,
+              refusal: null,
               tool_calls: [
                 {
                   type: 'function',
@@ -997,6 +975,7 @@ describe('resource completions', () => {
                   function: {
                     arguments: '[{"a": 1, "b": 2, "c": 3}]',
                     name: 'numProperties',
+                    parsed_arguments: null,
                   },
                 },
               ],
@@ -1017,6 +996,8 @@ describe('resource completions', () => {
                 message: {
                   role: 'assistant',
                   content: null,
+                  parsed: null,
+                  refusal: null,
                   tool_calls: [
                     {
                       type: 'function',
@@ -1044,6 +1025,8 @@ describe('resource completions', () => {
             {
               role: 'assistant',
               content: null,
+              parsed: null,
+              refusal: null,
               tool_calls: [
                 {
                   type: 'function',
@@ -1051,6 +1034,7 @@ describe('resource completions', () => {
                   function: {
                     arguments: '[{"a": 1, "b": 2, "c": 3}]',
                     name: 'numProperties',
+                    parsed_arguments: null,
                   },
                 },
               ],
@@ -1063,6 +1047,8 @@ describe('resource completions', () => {
             {
               role: 'assistant',
               content: null,
+              parsed: null,
+              refusal: null,
               tool_calls: [
                 {
                   type: 'function',
@@ -1070,6 +1056,7 @@ describe('resource completions', () => {
                   function: {
                     arguments: '{"a": 1, "b": 2, "c": 3}',
                     name: 'numProperties',
+                    parsed_arguments: null,
                   },
                 },
               ],
@@ -1090,6 +1077,7 @@ describe('resource completions', () => {
                 message: {
                   role: 'assistant',
                   content: `there are 3 properties in {"a": 1, "b": 2, "c": 3}`,
+                  refusal: null,
                 },
               },
             ],
@@ -1109,11 +1097,17 @@ describe('resource completions', () => {
         {
           role: 'assistant',
           content: null,
+          parsed: null,
+          refusal: null,
           tool_calls: [
             {
               type: 'function',
               id: '123',
-              function: { name: 'numProperties', arguments: '[{"a": 1, "b": 2, "c": 3}]' },
+              function: {
+                name: 'numProperties',
+                arguments: '[{"a": 1, "b": 2, "c": 3}]',
+                parsed_arguments: null,
+              },
             },
           ],
         },
@@ -1121,16 +1115,28 @@ describe('resource completions', () => {
         {
           role: 'assistant',
           content: null,
+          parsed: null,
+          refusal: null,
           tool_calls: [
             {
               type: 'function',
               id: '1234',
-              function: { name: 'numProperties', arguments: '{"a": 1, "b": 2, "c": 3}' },
+              function: {
+                name: 'numProperties',
+                arguments: '{"a": 1, "b": 2, "c": 3}',
+                parsed_arguments: null,
+              },
             },
           ],
         },
         { role: 'tool', content: '3', tool_call_id: '1234' },
-        { role: 'assistant', content: 'there are 3 properties in {"a": 1, "b": 2, "c": 3}' },
+        {
+          role: 'assistant',
+          content: 'there are 3 properties in {"a": 1, "b": 2, "c": 3}',
+          parsed: null,
+          refusal: null,
+          tool_calls: [],
+        },
       ]);
       expect(listener.functionCallResults).toEqual([`must be an object`, '3']);
       await listener.sanityCheck();
@@ -1177,6 +1183,8 @@ describe('resource completions', () => {
                 message: {
                   role: 'assistant',
                   content: null,
+                  parsed: null,
+                  refusal: null,
                   tool_calls: [
                     {
                       type: 'function',
@@ -1203,6 +1211,8 @@ describe('resource completions', () => {
         {
           role: 'assistant',
           content: null,
+          parsed: null,
+          refusal: null,
           tool_calls: [
             {
               type: 'function',
@@ -1210,6 +1220,7 @@ describe('resource completions', () => {
               function: {
                 arguments: '',
                 name: 'getWeather',
+                parsed_arguments: null,
               },
             },
           ],
@@ -1255,6 +1266,8 @@ describe('resource completions', () => {
                 message: {
                   role: 'assistant',
                   content: null,
+                  parsed: null,
+                  refusal: null,
                   tool_calls: [
                     {
                       type: 'function',
@@ -1279,6 +1292,8 @@ describe('resource completions', () => {
             {
               role: 'assistant',
               content: null,
+              parsed: null,
+              refusal: null,
               tool_calls: [
                 {
                   type: 'function',
@@ -1286,6 +1301,7 @@ describe('resource completions', () => {
                   function: {
                     arguments: '',
                     name: 'get_weather',
+                    parsed_arguments: null,
                   },
                 },
               ],
@@ -1306,6 +1322,8 @@ describe('resource completions', () => {
                 message: {
                   role: 'assistant',
                   content: null,
+                  parsed: null,
+                  refusal: null,
                   tool_calls: [
                     {
                       type: 'function',
@@ -1330,6 +1348,8 @@ describe('resource completions', () => {
             {
               role: 'assistant',
               content: null,
+              parsed: null,
+              refusal: null,
               tool_calls: [
                 {
                   type: 'function',
@@ -1337,6 +1357,7 @@ describe('resource completions', () => {
                   function: {
                     arguments: '',
                     name: 'get_weather',
+                    parsed_arguments: null,
                   },
                 },
               ],
@@ -1349,6 +1370,8 @@ describe('resource completions', () => {
             {
               role: 'assistant',
               content: null,
+              parsed: null,
+              refusal: null,
               tool_calls: [
                 {
                   type: 'function',
@@ -1356,6 +1379,7 @@ describe('resource completions', () => {
                   function: {
                     arguments: '',
                     name: 'getWeather',
+                    parsed_arguments: null,
                   },
                 },
               ],
@@ -1375,6 +1399,7 @@ describe('resource completions', () => {
                 logprobs: null,
                 message: {
                   role: 'assistant',
+                  refusal: null,
                   content: `it's raining`,
                 },
               },
@@ -1392,7 +1417,15 @@ describe('resource completions', () => {
         {
           role: 'assistant',
           content: null,
-          tool_calls: [{ type: 'function', id: '123', function: { name: 'get_weather', arguments: '' } }],
+          parsed: null,
+          refusal: null,
+          tool_calls: [
+            {
+              type: 'function',
+              id: '123',
+              function: { name: 'get_weather', arguments: '', parsed_arguments: null },
+            },
+          ],
         },
         {
           role: 'tool',
@@ -1402,10 +1435,28 @@ describe('resource completions', () => {
         {
           role: 'assistant',
           content: null,
-          tool_calls: [{ type: 'function', id: '1234', function: { name: 'getWeather', arguments: '' } }],
+          parsed: null,
+          refusal: null,
+          tool_calls: [
+            {
+              type: 'function',
+              id: '1234',
+              function: {
+                name: 'getWeather',
+                arguments: '',
+                parsed_arguments: null,
+              },
+            },
+          ],
         },
         { role: 'tool', content: `it's raining`, tool_call_id: '1234' },
-        { role: 'assistant', content: "it's raining" },
+        {
+          role: 'assistant',
+          content: "it's raining",
+          parsed: null,
+          refusal: null,
+          tool_calls: [],
+        },
       ]);
       expect(listener.functionCallResults).toEqual([
         `Invalid tool_call: "get_weather". Available options are: "getWeather". Please try again`,
@@ -1478,6 +1529,8 @@ describe('resource completions', () => {
             {
               role: 'assistant',
               content: null,
+              parsed: null,
+              refusal: null,
               tool_calls: [
                 {
                   type: 'function',
@@ -1512,6 +1565,8 @@ describe('resource completions', () => {
         {
           role: 'assistant',
           content: null,
+          parsed: null,
+          refusal: null,
           tool_calls: [
             {
               type: 'function',
@@ -1524,7 +1579,13 @@ describe('resource completions', () => {
           ],
         },
         { role: 'tool', content: `it's raining`, tool_call_id: '123' },
-        { role: 'assistant', content: "it's raining" },
+        {
+          role: 'assistant',
+          content: "it's raining",
+          parsed: null,
+          refusal: null,
+          tool_calls: [],
+        },
       ]);
       expect(listener.eventFunctionCallResults).toEqual([`it's raining`]);
       await listener.sanityCheck();
@@ -1595,6 +1656,8 @@ describe('resource completions', () => {
         {
           role: 'assistant',
           content: null,
+          parsed: null,
+          refusal: null,
           tool_calls: [
             {
               type: 'function',
@@ -1689,6 +1752,8 @@ describe('resource completions', () => {
             {
               role: 'assistant',
               content: null,
+              parsed: null,
+              refusal: null,
               tool_calls: [
                 {
                   type: 'function',
@@ -1723,16 +1788,27 @@ describe('resource completions', () => {
         {
           role: 'assistant',
           content: null,
+          parsed: null,
+          refusal: null,
           tool_calls: [
             {
               type: 'function',
               id: '123',
-              function: { name: 'numProperties', arguments: '{"a": 1, "b": 2, "c": 3}' },
+              function: {
+                name: 'numProperties',
+                arguments: '{"a": 1, "b": 2, "c": 3}',
+              },
             },
           ],
         },
         { role: 'tool', content: '3', tool_call_id: '123' },
-        { role: 'assistant', content: 'there are 3 properties in {"a": 1, "b": 2, "c": 3}' },
+        {
+          role: 'assistant',
+          content: 'there are 3 properties in {"a": 1, "b": 2, "c": 3}',
+          parsed: null,
+          refusal: null,
+          tool_calls: [],
+        },
       ]);
       expect(listener.eventFunctionCallResults).toEqual(['3']);
       await listener.sanityCheck();
@@ -1799,6 +1875,8 @@ describe('resource completions', () => {
             {
               role: 'assistant',
               content: null,
+              parsed: null,
+              refusal: null,
               tool_calls: [
                 {
                   type: 'function',
@@ -1838,6 +1916,8 @@ describe('resource completions', () => {
             {
               role: 'assistant',
               content: null,
+              parsed: null,
+              refusal: null,
               tool_calls: [
                 {
                   type: 'function',
@@ -1857,6 +1937,8 @@ describe('resource completions', () => {
             {
               role: 'assistant',
               content: null,
+              parsed: null,
+              refusal: null,
               tool_calls: [
                 {
                   type: 'function',
@@ -1891,11 +1973,16 @@ describe('resource completions', () => {
         {
           role: 'assistant',
           content: null,
+          parsed: null,
+          refusal: null,
           tool_calls: [
             {
               type: 'function',
               id: '123',
-              function: { name: 'numProperties', arguments: '[{"a": 1, "b": 2, "c": 3}]' },
+              function: {
+                name: 'numProperties',
+                arguments: '[{"a": 1, "b": 2, "c": 3}]',
+              },
             },
           ],
         },
@@ -1903,16 +1990,27 @@ describe('resource completions', () => {
         {
           role: 'assistant',
           content: null,
+          parsed: null,
+          refusal: null,
           tool_calls: [
             {
               type: 'function',
               id: '1234',
-              function: { name: 'numProperties', arguments: '{"a": 1, "b": 2, "c": 3}' },
+              function: {
+                name: 'numProperties',
+                arguments: '{"a": 1, "b": 2, "c": 3}',
+              },
             },
           ],
         },
         { role: 'tool', content: '3', tool_call_id: '1234' },
-        { role: 'assistant', content: 'there are 3 properties in {"a": 1, "b": 2, "c": 3}' },
+        {
+          role: 'assistant',
+          content: 'there are 3 properties in {"a": 1, "b": 2, "c": 3}',
+          parsed: null,
+          refusal: null,
+          tool_calls: [],
+        },
       ]);
       expect(listener.eventFunctionCallResults).toEqual([`must be an object`, '3']);
       await listener.sanityCheck();
@@ -1985,6 +2083,8 @@ describe('resource completions', () => {
         {
           role: 'assistant',
           content: null,
+          parsed: null,
+          refusal: null,
           tool_calls: [
             {
               type: 'function',
@@ -2062,6 +2162,8 @@ describe('resource completions', () => {
             {
               role: 'assistant',
               content: null,
+              parsed: null,
+              refusal: null,
               tool_calls: [
                 {
                   type: 'function',
@@ -2114,6 +2216,8 @@ describe('resource completions', () => {
             {
               role: 'assistant',
               content: null,
+              parsed: null,
+              refusal: null,
               tool_calls: [
                 {
                   type: 'function',
@@ -2133,6 +2237,8 @@ describe('resource completions', () => {
             {
               role: 'assistant',
               content: null,
+              parsed: null,
+              refusal: null,
               tool_calls: [
                 {
                   type: 'function',
@@ -2167,6 +2273,8 @@ describe('resource completions', () => {
         {
           role: 'assistant',
           content: null,
+          parsed: null,
+          refusal: null,
           tool_calls: [
             {
               type: 'function',
@@ -2186,6 +2294,8 @@ describe('resource completions', () => {
         {
           role: 'assistant',
           content: null,
+          parsed: null,
+          refusal: null,
           tool_calls: [
             {
               type: 'function',
@@ -2198,7 +2308,13 @@ describe('resource completions', () => {
           ],
         },
         { role: 'tool', content: `it's raining`, tool_call_id: '1234' },
-        { role: 'assistant', content: "it's raining" },
+        {
+          role: 'assistant',
+          content: "it's raining",
+          parsed: null,
+          refusal: null,
+          tool_calls: [],
+        },
       ]);
       expect(listener.eventFunctionCallResults).toEqual([
         `Invalid tool_call: "get_weather". Available options are: "getWeather". Please try again`,
@@ -2238,7 +2354,13 @@ describe('resource completions', () => {
         runner.done(),
       ]);
 
-      expect(listener.finalMessage).toEqual({ role: 'assistant', content: 'The weather is great today!' });
+      expect(listener.finalMessage).toEqual({
+        role: 'assistant',
+        content: 'The weather is great today!',
+        parsed: null,
+        refusal: null,
+        tool_calls: [],
+      });
       await listener.sanityCheck();
     });
     test('toReadableStream and fromReadableStream', async () => {
@@ -2271,7 +2393,13 @@ describe('resource completions', () => {
         proxied.done(),
       ]);
 
-      expect(listener.finalMessage).toEqual({ role: 'assistant', content: 'The weather is great today!' });
+      expect(listener.finalMessage).toEqual({
+        role: 'assistant',
+        content: 'The weather is great today!',
+        parsed: null,
+        refusal: null,
+        tool_calls: [],
+      });
       await listener.sanityCheck();
     });
     test('handles network errors', async () => {

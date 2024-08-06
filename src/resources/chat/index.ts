@@ -6,6 +6,7 @@ export {
   ChatCompletionChunk,
   ChatCompletionContentPart,
   ChatCompletionContentPartImage,
+  ChatCompletionContentPartRefusal,
   ChatCompletionContentPartText,
   ChatCompletionFunctionCallOption,
   ChatCompletionFunctionMessageParam,

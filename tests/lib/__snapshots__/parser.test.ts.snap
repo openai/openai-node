@@ -1,0 +1,28 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`.parse() zod deserialises response_format 1`] = `
+"{
+  "id": "chatcmpl-9ro1LmtFYq4FuAudjIkDJUr8IYum3",
+  "object": "chat.completion",
+  "created": 1722610691,
+  "model": "gpt-4o-so",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\\"city\\":\\"San Francisco\\",\\"units\\":\\"f\\"}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 71,
+    "completion_tokens": 10,
+    "total_tokens": 81
+  },
+  "system_fingerprint": "fp_6dc10860e8"
+}
+"
+`;

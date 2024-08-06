@@ -39,7 +39,6 @@ export namespace Beta {
   export import AssistantUpdateParams = AssistantsAPI.AssistantUpdateParams;
   export import AssistantListParams = AssistantsAPI.AssistantListParams;
   export import Threads = ThreadsAPI.Threads;
-  export import AssistantResponseFormat = ThreadsAPI.AssistantResponseFormat;
   export import AssistantResponseFormatOption = ThreadsAPI.AssistantResponseFormatOption;
   export import AssistantToolChoice = ThreadsAPI.AssistantToolChoice;
   export import AssistantToolChoiceFunction = ThreadsAPI.AssistantToolChoiceFunction;

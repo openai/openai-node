@@ -299,9 +299,9 @@ export interface FineTuningJobWandbIntegrationObject {
 export interface JobCreateParams {
   /**
    * The name of the model to fine-tune. You can select one of the
-   * [supported models](https://platform.openai.com/docs/guides/fine-tuning/what-models-can-be-fine-tuned).
+   * [supported models](https://platform.openai.com/docs/guides/fine-tuning/which-models-can-be-fine-tuned).
    */
-  model: (string & {}) | 'babbage-002' | 'davinci-002' | 'gpt-3.5-turbo';
+  model: (string & {}) | 'babbage-002' | 'davinci-002' | 'gpt-3.5-turbo' | 'gpt-4o-mini';
 
   /**
    * The ID of an uploaded file that contains training data.
@@ -344,7 +344,7 @@ export interface JobCreateParams {
    * name.
    *
    * For example, a `suffix` of "custom-model-name" would produce a model name like
-   * `ft:gpt-3.5-turbo:openai:custom-model-name:7p4lURel`.
+   * `ft:gpt-4o-mini:openai:custom-model-name:7p4lURel`.
    */
   suffix?: string | null;
 
