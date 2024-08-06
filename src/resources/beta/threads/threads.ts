@@ -119,19 +119,6 @@ export class Threads extends APIResource {
 }
 
 /**
-<<<<<<< HEAD
- * An object describing the expected output of the model. If `json_object` or
- * `json_schema`, only `function` type `tools` are allowed to be passed to the Run.
- * If `text` the model can return text or any value needed.
- */
-export interface AssistantResponseFormat {
-  /**
-   * Must be one of `text`, `json_object` or `json_schema`.
-   */
-  type?: 'text' | 'json_object' | 'json_schema';
-}
-
-/**
  * Specifies the format that the model must output. Compatible with
  * [GPT-4o](https://platform.openai.com/docs/models/gpt-4o),
  * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4),
