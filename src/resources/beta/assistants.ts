@@ -137,6 +137,11 @@ export interface Assistant {
    * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4),
    * and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
    *
+   * Setting to `{ "type": "json_schema", "json_schema": {...} }` enables Structured
+   * Outputs which guarantees the model will match your supplied JSON schema. Learn
+   * more in the
+   * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+   *
    * Setting to `{ "type": "json_object" }` enables JSON mode, which guarantees the
    * message the model generates is valid JSON.
    *
@@ -636,8 +641,8 @@ export namespace FileSearchTool {
   export interface FileSearch {
     /**
      * The maximum number of results the file search tool should output. The default is
-     * 20 for gpt-4\* models and 5 for gpt-3.5-turbo. This number should be between 1
-     * and 50 inclusive.
+     * 20 for `gpt-4*` models and 5 for `gpt-3.5-turbo`. This number should be between
+     * 1 and 50 inclusive.
      *
      * Note that the file search tool may output fewer than `max_num_results` results.
      * See the
@@ -1074,6 +1079,11 @@ export interface AssistantCreateParams {
    * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4),
    * and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
    *
+   * Setting to `{ "type": "json_schema", "json_schema": {...} }` enables Structured
+   * Outputs which guarantees the model will match your supplied JSON schema. Learn
+   * more in the
+   * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+   *
    * Setting to `{ "type": "json_object" }` enables JSON mode, which guarantees the
    * message the model generates is valid JSON.
    *
@@ -1265,6 +1275,11 @@ export interface AssistantUpdateParams {
    * [GPT-4o](https://platform.openai.com/docs/models/gpt-4o),
    * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4),
    * and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
+   *
+   * Setting to `{ "type": "json_schema", "json_schema": {...} }` enables Structured
+   * Outputs which guarantees the model will match your supplied JSON schema. Learn
+   * more in the
+   * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
    *
    * Setting to `{ "type": "json_object" }` enables JSON mode, which guarantees the
    * message the model generates is valid JSON.

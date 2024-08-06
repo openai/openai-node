@@ -191,9 +191,9 @@ describe('resource threads', () => {
       max_completion_tokens: 256,
       max_prompt_tokens: 256,
       metadata: {},
-      model: 'gpt-4-turbo',
+      model: 'gpt-4o',
       parallel_tool_calls: true,
-      response_format: 'none',
+      response_format: 'auto',
       stream: false,
       temperature: 1,
       thread: {

@@ -10,7 +10,7 @@ const client = new OpenAI({
 
 describe('resource models', () => {
   test('retrieve', async () => {
-    const responsePromise = client.models.retrieve('gpt-3.5-turbo');
+    const responsePromise = client.models.retrieve('gpt-4o-mini');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -32,7 +32,7 @@ describe('resource models', () => {
   });
 
   test('delete', async () => {
-    const responsePromise = client.models.delete('ft:gpt-3.5-turbo:acemeco:suffix:abc123');
+    const responsePromise = client.models.delete('ft:gpt-4o-mini:acemeco:suffix:abc123');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;

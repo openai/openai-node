@@ -11,8 +11,8 @@ const client = new OpenAI({
 describe('resource completions', () => {
   test('create: only required params', async () => {
     const responsePromise = client.chat.completions.create({
-      messages: [{ content: 'content', role: 'system' }],
-      model: 'gpt-4-turbo',
+      messages: [{ content: 'string', role: 'system' }],
+      model: 'gpt-4o',
     });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
@@ -25,8 +25,8 @@ describe('resource completions', () => {
 
   test('create: required and optional params', async () => {
     const response = await client.chat.completions.create({
-      messages: [{ content: 'content', role: 'system', name: 'name' }],
-      model: 'gpt-4-turbo',
+      messages: [{ content: 'string', role: 'system', name: 'name' }],
+      model: 'gpt-4o',
       frequency_penalty: -2,
       function_call: 'none',
       functions: [{ description: 'description', name: 'name', parameters: { foo: 'bar' } }],
@@ -36,7 +36,7 @@ describe('resource completions', () => {
       n: 1,
       parallel_tool_calls: true,
       presence_penalty: -2,
-      response_format: { type: 'json_object' },
+      response_format: { type: 'text' },
       seed: -9007199254740991,
       service_tier: 'auto',
       stop: 'string',
@@ -47,15 +47,15 @@ describe('resource completions', () => {
       tools: [
         {
           type: 'function',
-          function: { description: 'description', name: 'name', parameters: { foo: 'bar' } },
+          function: { description: 'description', name: 'name', parameters: { foo: 'bar' }, strict: true },
         },
         {
           type: 'function',
-          function: { description: 'description', name: 'name', parameters: { foo: 'bar' } },
+          function: { description: 'description', name: 'name', parameters: { foo: 'bar' }, strict: true },
         },
         {
           type: 'function',
-          function: { description: 'description', name: 'name', parameters: { foo: 'bar' } },
+          function: { description: 'description', name: 'name', parameters: { foo: 'bar' }, strict: true },
         },
       ],
       top_logprobs: 0,
