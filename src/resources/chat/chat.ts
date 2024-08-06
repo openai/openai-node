@@ -10,6 +10,7 @@ export class Chat extends APIResource {
 
 export type ChatModel =
   | 'gpt-4o'
+  | 'gpt-4o-2024-08-06'
   | 'gpt-4o-2024-05-13'
   | 'gpt-4o-2024-08-06'
   | 'chatgpt-4o-latest'

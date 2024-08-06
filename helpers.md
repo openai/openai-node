@@ -1,4 +1,133 @@
-# Helpers
+# Structured Outputs Parsing Helpers
+
+The OpenAI API supports extracting JSON from the model with the `response_format` request param, for more details on the API, see [this guide](https://platform.openai.com/docs/guides/structured-outputs).
+
+The SDK provides a `client.beta.chat.completions.parse()` method which is a wrapper over the `client.chat.completions.create()` that
+provides richer integrations with TS specific types & returns a `ParsedChatCompletion` object, which is an extension of the standard `ChatCompletion` type.
+
+## Auto-parsing response content with Zod schemas
+
+You can pass zod schemas wrapped with `zodResponseFormat()` to the `.parse()` method and the SDK will automatically conver the model
+into a JSON schema, send it to the API and parse the response content back using the given zod schema.
+
+```ts
+import { zodResponseFormat } from 'openai/helpers/zod';
+import OpenAI from 'openai/index';
+import { z } from 'zod';
+
+const Step = z.object({
+  explanation: z.string(),
+  output: z.string(),
+});
+
+const MathResponse = z.object({
+  steps: z.array(Step),
+  final_answer: z.string(),
+});
+
+const client = new OpenAI();
+
+const completion = await client.beta.chat.completions.parse({
+  model: 'gpt-4o-2024-08-06',
+  messages: [
+    { role: 'system', content: 'You are a helpful math tutor.' },
+    { role: 'user', content: 'solve 8x + 31 = 2' },
+  ],
+  response_format: zodResponseFormat(MathResponse, 'math_response'),
+});
+
+console.dir(completion, { depth: 5 });
+
+const message = completion.choices[0]?.message;
+if (message?.parsed) {
+  console.log(message.parsed.steps);
+  console.log(`answer: ${message.parsed.final_answer}`);
+}
+```
+
+## Auto-parsing function tool calls
+
+The `.parse()` method will also automatically parse `function` tool calls if:
+
+- You use the `zodFunctionTool()` helper method
+- You mark your tool schema with `"strict": True`
+
+For example:
+
+```ts
+import { zodFunction } from 'openai/helpers/zod';
+import OpenAI from 'openai/index';
+import { z } from 'zod';
+
+const Table = z.enum(['orders', 'customers', 'products']);
+
+const Column = z.enum([
+  'id',
+  'status',
+  'expected_delivery_date',
+  'delivered_at',
+  'shipped_at',
+  'ordered_at',
+  'canceled_at',
+]);
+
+const Operator = z.enum(['=', '>', '<', '<=', '>=', '!=']);
+
+const OrderBy = z.enum(['asc', 'desc']);
+
+const DynamicValue = z.object({
+  column_name: z.string(),
+});
+
+const Condition = z.object({
+  column: z.string(),
+  operator: Operator,
+  value: z.union([z.string(), z.number(), DynamicValue]),
+});
+
+const Query = z.object({
+  table_name: Table,
+  columns: z.array(Column),
+  conditions: z.array(Condition),
+  order_by: OrderBy,
+});
+
+const client = new OpenAI();
+const completion = await client.beta.chat.completions.parse({
+  model: 'gpt-4o-2024-08-06',
+  messages: [
+    {
+      role: 'system',
+      content:
+        'You are a helpful assistant. The current date is August 6, 2024. You help users query for the data they are looking for by calling the query function.',
+    },
+    {
+      role: 'user',
+      content: 'look up all my orders in november of last year that were fulfilled but not delivered on time',
+    },
+  ],
+  tools: [zodFunction({ name: 'query', parameters: Query })],
+});
+console.dir(completion, { depth: 10 });
+
+const toolCall = completion.choices[0]?.message.tool_calls?.[0];
+if (toolCall) {
+  const args = toolCall.function.parsed_arguments as z.infer<typeof Query>;
+  console.log(args);
+  console.log(args.table_name);
+}
+
+main();
+```
+
+### Differences from `.create()`
+
+The `beta.chat.completions.parse()` method imposes some additional restrictions on it's usage that `chat.completions.create()` does not.
+
+- If the completion completes with `finish_reason` set to `length` or `content_filter`, the `LengthFinishReasonError` / `ContentFilterFinishReasonError` errors will be raised.
+- Only strict function tools can be passed, e.g. `{type: 'function', function: {..., strict: true}}`
+
+# Streaming Helpers
 
 OpenAI supports streaming responses when interacting with the [Chat](#chat-streaming) or [Assistant](#assistant-streaming-api) APIs.
 
@@ -264,6 +393,69 @@ The event fired when a function call is made by the assistant.
 
 The event fired when the function runner responds to the function call with `role: "function"`. The `content` of the
 response is given as the first argument to the callback.
+
+#### `.on('content.delta', (props: ContentDeltaEvent) => ...)`
+
+The event fired for every chunk containing new content. The `props` object contains:
+- `delta`: The new content string received in this chunk
+- `snapshot`: The accumulated content so far
+- `parsed`: The partially parsed content (if applicable)
+
+#### `.on('content.done', (props: ContentDoneEvent<ParsedT>) => ...)`
+
+The event fired when the content generation is complete. The `props` object contains:
+- `content`: The full generated content
+- `parsed`: The fully parsed content (if applicable)
+
+#### `.on('refusal.delta', (props: RefusalDeltaEvent) => ...)`
+
+The event fired when a chunk contains part of a content refusal. The `props` object contains:
+- `delta`: The new refusal content string received in this chunk
+- `snapshot`: The accumulated refusal content string so far
+
+#### `.on('refusal.done', (props: RefusalDoneEvent) => ...)`
+
+The event fired when the refusal content is complete. The `props` object contains:
+- `refusal`: The full refusal content
+
+#### `.on('tool_calls.function.arguments.delta', (props: FunctionToolCallArgumentsDeltaEvent) => ...)`
+
+The event fired when a chunk contains part of a function tool call's arguments. The `props` object contains:
+- `name`: The name of the function being called
+- `index`: The index of the tool call
+- `arguments`: The accumulated raw JSON string of arguments
+- `parsed_arguments`: The partially parsed arguments object
+- `arguments_delta`: The new JSON string fragment received in this chunk
+
+#### `.on('tool_calls.function.arguments.done', (props: FunctionToolCallArgumentsDoneEvent) => ...)`
+
+The event fired when a function tool call's arguments are complete. The `props` object contains:
+- `name`: The name of the function being called
+- `index`: The index of the tool call
+- `arguments`: The full raw JSON string of arguments
+- `parsed_arguments`: The fully parsed arguments object
+
+#### `.on('logprobs.content.delta', (props: LogProbsContentDeltaEvent) => ...)`
+
+The event fired when a chunk contains new content log probabilities. The `props` object contains:
+- `content`: A list of the new log probabilities received in this chunk
+- `snapshot`: A list of the accumulated log probabilities so far
+
+#### `.on('logprobs.content.done', (props: LogProbsContentDoneEvent) => ...)`
+
+The event fired when all content log probabilities have been received. The `props` object contains:
+- `content`: The full list of token log probabilities for the content
+
+#### `.on('logprobs.refusal.delta', (props: LogProbsRefusalDeltaEvent) => ...)`
+
+The event fired when a chunk contains new refusal log probabilities. The `props` object contains:
+- `refusal`: A list of the new log probabilities received in this chunk
+- `snapshot`: A list of the accumulated log probabilities so far
+
+#### `.on('logprobs.refusal.done', (props: LogProbsRefusalDoneEvent) => ...)`
+
+The event fired when all refusal log probabilities have been received. The `props` object contains:
+- `refusal`: The full list of token log probabilities for the refusal
 
 #### `.on('finalChatCompletion', (completion: ChatCompletion) => …)`
 

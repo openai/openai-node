@@ -1,7 +1,7 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import OpenAI from 'openai';
-import { Response } from 'undici';
+import { Response } from 'node-fetch';
 
 const client = new OpenAI({
   apiKey: 'My API Key',
@@ -29,7 +29,7 @@ describe('resource completions', () => {
       model: 'gpt-4o',
       frequency_penalty: -2,
       function_call: 'none',
-      functions: [{ name: 'name', description: 'description', parameters: { foo: 'bar' } }],
+      functions: [{ description: 'description', name: 'name', parameters: { foo: 'bar' } }],
       logit_bias: { foo: 0 },
       logprobs: true,
       max_tokens: 0,
@@ -46,16 +46,16 @@ describe('resource completions', () => {
       tool_choice: 'none',
       tools: [
         {
-          function: { name: 'name', description: 'description', parameters: { foo: 'bar' }, strict: true },
           type: 'function',
+          function: { description: 'description', name: 'name', parameters: { foo: 'bar' }, strict: true },
         },
         {
-          function: { name: 'name', description: 'description', parameters: { foo: 'bar' }, strict: true },
           type: 'function',
+          function: { description: 'description', name: 'name', parameters: { foo: 'bar' }, strict: true },
         },
         {
-          function: { name: 'name', description: 'description', parameters: { foo: 'bar' }, strict: true },
           type: 'function',
+          function: { description: 'description', name: 'name', parameters: { foo: 'bar' }, strict: true },
         },
       ],
       top_logprobs: 0,

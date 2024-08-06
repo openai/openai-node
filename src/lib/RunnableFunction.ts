@@ -12,7 +12,7 @@ export type RunnableFunctionWithParse<Args extends object> = {
    */
   function: (
     args: Args,
-    runner: ChatCompletionRunner | ChatCompletionStreamingRunner,
+    runner: ChatCompletionRunner<unknown> | ChatCompletionStreamingRunner<unknown>,
   ) => PromiseOrValue<unknown>;
   /**
    * @param input the raw args from the OpenAI function call.
@@ -31,6 +31,7 @@ export type RunnableFunctionWithParse<Args extends object> = {
    * The name of the function to be called. Will default to function.name if omitted.
    */
   name?: string | undefined;
+  strict?: boolean | undefined;
 };
 
 export type RunnableFunctionWithoutParse = {
@@ -40,7 +41,7 @@ export type RunnableFunctionWithoutParse = {
    */
   function: (
     args: string,
-    runner: ChatCompletionRunner | ChatCompletionStreamingRunner,
+    runner: ChatCompletionRunner<unknown> | ChatCompletionStreamingRunner<unknown>,
   ) => PromiseOrValue<unknown>;
   /**
    * The parameters the function accepts, describes as a JSON Schema object.
@@ -54,6 +55,7 @@ export type RunnableFunctionWithoutParse = {
    * The name of the function to be called. Will default to function.name if omitted.
    */
   name?: string | undefined;
+  strict?: boolean | undefined;
 };
 
 export type RunnableFunction<Args extends object | string> =
