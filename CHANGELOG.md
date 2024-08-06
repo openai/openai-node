@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.55.0 (2024-08-06)
+
+Full Changelog: [v4.54.0...v4.55.0](https://github.com/openai/openai-node/compare/v4.54.0...v4.55.0)
+
+### Features
+
+* **api:** add structured outputs support ([573787c](https://github.com/openai/openai-node/commit/573787cf3ea8eea593eeeb5e24a9256951e2cc35))
+
 ## 4.54.0 (2024-08-02)
 
 Full Changelog: [v4.53.2...v4.54.0](https://github.com/openai/openai-node/compare/v4.53.2...v4.54.0)
