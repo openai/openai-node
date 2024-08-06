@@ -22,6 +22,8 @@ export {
   MessageDeleted,
   MessageDelta,
   MessageDeltaEvent,
+  RefusalContentBlock,
+  RefusalDeltaBlock,
   Text,
   TextContentBlock,
   TextContentBlockParam,
@@ -34,7 +36,6 @@ export {
   Messages,
 } from './messages';
 export {
-  AssistantResponseFormat,
   AssistantResponseFormatOption,
   AssistantToolChoice,
   AssistantToolChoiceFunction,

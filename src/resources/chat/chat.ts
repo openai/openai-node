@@ -10,6 +10,7 @@ export class Chat extends APIResource {
 
 export type ChatModel =
   | 'gpt-4o'
+  | 'gpt-4o-2024-08-06'
   | 'gpt-4o-2024-05-13'
   | 'gpt-4o-mini'
   | 'gpt-4o-mini-2024-07-18'
@@ -41,6 +42,7 @@ export namespace Chat {
   export import ChatCompletionChunk = CompletionsAPI.ChatCompletionChunk;
   export import ChatCompletionContentPart = CompletionsAPI.ChatCompletionContentPart;
   export import ChatCompletionContentPartImage = CompletionsAPI.ChatCompletionContentPartImage;
+  export import ChatCompletionContentPartRefusal = CompletionsAPI.ChatCompletionContentPartRefusal;
   export import ChatCompletionContentPartText = CompletionsAPI.ChatCompletionContentPartText;
   export import ChatCompletionFunctionCallOption = CompletionsAPI.ChatCompletionFunctionCallOption;
   export import ChatCompletionFunctionMessageParam = CompletionsAPI.ChatCompletionFunctionMessageParam;
