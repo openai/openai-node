@@ -1,7 +1,6 @@
 import * as Core from 'openai/core';
 import { type CompletionUsage } from 'openai/resources/completions';
 import {
-  type Completions,
   type ChatCompletion,
   type ChatCompletionMessage,
   type ChatCompletionMessageParam,
@@ -13,6 +12,7 @@ import {
   type RunnableFunction,
   isRunnableFunctionWithParse,
   type BaseFunctionsArgs,
+  RunnableToolFunction,
 } from './RunnableFunction';
 import { ChatCompletionFunctionRunnerParams, ChatCompletionToolRunnerParams } from './ChatCompletionRunner';
 import {
@@ -21,6 +21,9 @@ import {
 } from './ChatCompletionStreamingRunner';
 import { isAssistantMessage, isFunctionMessage, isToolMessage } from './chatCompletionUtils';
 import { BaseEvents, EventStream } from './EventStream';
+import { ParsedChatCompletion } from '../resources/beta/chat/completions';
+import OpenAI from '../index';
+import { isAutoParsableTool, parseChatCompletion } from 'openai/lib/parser';
 
 const DEFAULT_MAX_CHAT_COMPLETIONS = 10;
 export interface RunnerOptions extends Core.RequestOptions {
@@ -30,14 +33,15 @@ export interface RunnerOptions extends Core.RequestOptions {
 
 export class AbstractChatCompletionRunner<
   EventTypes extends AbstractChatCompletionRunnerEvents,
+  ParsedT,
 > extends EventStream<EventTypes> {
-  protected _chatCompletions: ChatCompletion[] = [];
+  protected _chatCompletions: ParsedChatCompletion<ParsedT>[] = [];
   messages: ChatCompletionMessageParam[] = [];
 
   protected _addChatCompletion(
-    this: AbstractChatCompletionRunner<AbstractChatCompletionRunnerEvents>,
-    chatCompletion: ChatCompletion,
-  ): ChatCompletion {
+    this: AbstractChatCompletionRunner<AbstractChatCompletionRunnerEvents, ParsedT>,
+    chatCompletion: ParsedChatCompletion<ParsedT>,
+  ): ParsedChatCompletion<ParsedT> {
     this._chatCompletions.push(chatCompletion);
     this._emit('chatCompletion', chatCompletion);
     const message = chatCompletion.choices[0]?.message;
@@ -46,7 +50,7 @@ export class AbstractChatCompletionRunner<
   }
 
   protected _addMessage(
-    this: AbstractChatCompletionRunner<AbstractChatCompletionRunnerEvents>,
+    this: AbstractChatCompletionRunner<AbstractChatCompletionRunnerEvents, ParsedT>,
     message: ChatCompletionMessageParam,
     emit = true,
   ) {
@@ -75,7 +79,7 @@ export class AbstractChatCompletionRunner<
    * @returns a promise that resolves with the final ChatCompletion, or rejects
    * if an error occurred or the stream ended prematurely without producing a ChatCompletion.
    */
-  async finalChatCompletion(): Promise<ChatCompletion> {
+  async finalChatCompletion(): Promise<ParsedChatCompletion<ParsedT>> {
     await this.done();
     const completion = this._chatCompletions[this._chatCompletions.length - 1];
     if (!completion) throw new OpenAIError('stream ended without producing a ChatCompletion');
@@ -101,7 +105,11 @@ export class AbstractChatCompletionRunner<
       const message = this.messages[i];
       if (isAssistantMessage(message)) {
         const { function_call, ...rest } = message;
-        const ret: ChatCompletionMessage = { ...rest, content: message.content ?? null };
+        const ret: ChatCompletionMessage = {
+          ...rest,
+          content: (message as ChatCompletionMessage).content ?? null,
+          refusal: (message as ChatCompletionMessage).refusal ?? null,
+        };
         if (function_call) {
           ret.function_call = function_call;
         }
@@ -152,6 +160,7 @@ export class AbstractChatCompletionRunner<
       if (
         isToolMessage(message) &&
         message.content != null &&
+        typeof message.content === 'string' &&
         this.messages.some(
           (x) =>
             x.role === 'assistant' &&
@@ -195,7 +204,9 @@ export class AbstractChatCompletionRunner<
     return [...this._chatCompletions];
   }
 
-  protected override _emitFinal(this: AbstractChatCompletionRunner<AbstractChatCompletionRunnerEvents>) {
+  protected override _emitFinal(
+    this: AbstractChatCompletionRunner<AbstractChatCompletionRunnerEvents, ParsedT>,
+  ) {
     const completion = this._chatCompletions[this._chatCompletions.length - 1];
     if (completion) this._emit('finalChatCompletion', completion);
     const finalMessage = this.#getFinalMessage();
@@ -223,10 +234,10 @@ export class AbstractChatCompletionRunner<
   }
 
   protected async _createChatCompletion(
-    completions: Completions,
+    client: OpenAI,
     params: ChatCompletionCreateParams,
     options?: Core.RequestOptions,
-  ): Promise<ChatCompletion> {
+  ): Promise<ParsedChatCompletion<ParsedT>> {
     const signal = options?.signal;
     if (signal) {
       if (signal.aborted) this.controller.abort();
@@ -234,27 +245,27 @@ export class AbstractChatCompletionRunner<
     }
     this.#validateParams(params);
 
-    const chatCompletion = await completions.create(
+    const chatCompletion = await client.chat.completions.create(
       { ...params, stream: false },
       { ...options, signal: this.controller.signal },
     );
     this._connected();
-    return this._addChatCompletion(chatCompletion);
+    return this._addChatCompletion(parseChatCompletion(chatCompletion, params));
   }
 
   protected async _runChatCompletion(
-    completions: Completions,
+    client: OpenAI,
     params: ChatCompletionCreateParams,
     options?: Core.RequestOptions,
   ): Promise<ChatCompletion> {
     for (const message of params.messages) {
       this._addMessage(message, false);
     }
-    return await this._createChatCompletion(completions, params, options);
+    return await this._createChatCompletion(client, params, options);
   }
 
   protected async _runFunctions<FunctionsArgs extends BaseFunctionsArgs>(
-    completions: Completions,
+    client: OpenAI,
     params:
       | ChatCompletionFunctionRunnerParams<FunctionsArgs>
       | ChatCompletionStreamingFunctionRunnerParams<FunctionsArgs>,
@@ -284,7 +295,7 @@ export class AbstractChatCompletionRunner<
 
     for (let i = 0; i < maxChatCompletions; ++i) {
       const chatCompletion: ChatCompletion = await this._createChatCompletion(
-        completions,
+        client,
         {
           ...restParams,
           function_call,
@@ -339,7 +350,7 @@ export class AbstractChatCompletionRunner<
   }
 
   protected async _runTools<FunctionsArgs extends BaseFunctionsArgs>(
-    completions: Completions,
+    client: OpenAI,
     params:
       | ChatCompletionToolRunnerParams<FunctionsArgs>
       | ChatCompletionStreamingToolRunnerParams<FunctionsArgs>,
@@ -350,8 +361,31 @@ export class AbstractChatCompletionRunner<
     const singleFunctionToCall = typeof tool_choice !== 'string' && tool_choice?.function?.name;
     const { maxChatCompletions = DEFAULT_MAX_CHAT_COMPLETIONS } = options || {};
 
+    // TODO(someday): clean this logic up
+    const inputTools = params.tools.map((tool): RunnableToolFunction<any> => {
+      if (isAutoParsableTool(tool)) {
+        if (!tool.$callback) {
+          throw new OpenAIError('Tool given to `.runTools()` that does not have an associated function');
+        }
+
+        return {
+          type: 'function',
+          function: {
+            function: tool.$callback,
+            name: tool.function.name,
+            description: tool.function.description || '',
+            parameters: tool.function.parameters as any,
+            parse: tool.$parseRaw,
+            strict: true,
+          },
+        };
+      }
+
+      return tool as any as RunnableToolFunction<any>;
+    });
+
     const functionsByName: Record<string, RunnableFunction<any>> = {};
-    for (const f of params.tools) {
+    for (const f of inputTools) {
       if (f.type === 'function') {
         functionsByName[f.function.name || f.function.function.name] = f.function;
       }
@@ -359,7 +393,7 @@ export class AbstractChatCompletionRunner<
 
     const tools: ChatCompletionTool[] =
       'tools' in params ?
-        params.tools.map((t) =>
+        inputTools.map((t) =>
           t.type === 'function' ?
             {
               type: 'function',
@@ -367,6 +401,7 @@ export class AbstractChatCompletionRunner<
                 name: t.function.name || t.function.function.name,
                 parameters: t.function.parameters as Record<string, unknown>,
                 description: t.function.description,
+                strict: t.function.strict,
               },
             }
           : (t as unknown as ChatCompletionTool),
@@ -379,7 +414,7 @@ export class AbstractChatCompletionRunner<
 
     for (let i = 0; i < maxChatCompletions; ++i) {
       const chatCompletion: ChatCompletion = await this._createChatCompletion(
-        completions,
+        client,
         {
           ...restParams,
           tool_choice,
@@ -392,7 +427,7 @@ export class AbstractChatCompletionRunner<
       if (!message) {
         throw new OpenAIError(`missing message in ChatCompletion response`);
       }
-      if (!message.tool_calls) {
+      if (!message.tool_calls?.length) {
         return;
       }
 
@@ -403,8 +438,10 @@ export class AbstractChatCompletionRunner<
         const fn = functionsByName[name];
 
         if (!fn) {
-          const content = `Invalid tool_call: ${JSON.stringify(name)}. Available options are: ${tools
-            .map((f) => JSON.stringify(f.function.name))
+          const content = `Invalid tool_call: ${JSON.stringify(name)}. Available options are: ${Object.keys(
+            functionsByName,
+          )
+            .map((name) => JSON.stringify(name))
             .join(', ')}. Please try again`;
 
           this._addMessage({ role, tool_call_id, content });

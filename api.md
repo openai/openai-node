@@ -5,6 +5,9 @@ Types:
 - <code><a href="./src/resources/shared.ts">ErrorObject</a></code>
 - <code><a href="./src/resources/shared.ts">FunctionDefinition</a></code>
 - <code><a href="./src/resources/shared.ts">FunctionParameters</a></code>
+- <code><a href="./src/resources/shared.ts">ResponseFormatJSONObject</a></code>
+- <code><a href="./src/resources/shared.ts">ResponseFormatJSONSchema</a></code>
+- <code><a href="./src/resources/shared.ts">ResponseFormatText</a></code>
 
 # Completions
 
@@ -33,6 +36,7 @@ Types:
 - <code><a href="./src/resources/chat/completions.ts">ChatCompletionChunk</a></code>
 - <code><a href="./src/resources/chat/completions.ts">ChatCompletionContentPart</a></code>
 - <code><a href="./src/resources/chat/completions.ts">ChatCompletionContentPartImage</a></code>
+- <code><a href="./src/resources/chat/completions.ts">ChatCompletionContentPartRefusal</a></code>
 - <code><a href="./src/resources/chat/completions.ts">ChatCompletionContentPartText</a></code>
 - <code><a href="./src/resources/chat/completions.ts">ChatCompletionFunctionCallOption</a></code>
 - <code><a href="./src/resources/chat/completions.ts">ChatCompletionFunctionMessageParam</a></code>
@@ -277,7 +281,6 @@ Methods:
 
 Types:
 
-- <code><a href="./src/resources/beta/threads/threads.ts">AssistantResponseFormat</a></code>
 - <code><a href="./src/resources/beta/threads/threads.ts">AssistantResponseFormatOption</a></code>
 - <code><a href="./src/resources/beta/threads/threads.ts">AssistantToolChoice</a></code>
 - <code><a href="./src/resources/beta/threads/threads.ts">AssistantToolChoiceFunction</a></code>
@@ -370,6 +373,8 @@ Types:
 - <code><a href="./src/resources/beta/threads/messages.ts">MessageDeleted</a></code>
 - <code><a href="./src/resources/beta/threads/messages.ts">MessageDelta</a></code>
 - <code><a href="./src/resources/beta/threads/messages.ts">MessageDeltaEvent</a></code>
+- <code><a href="./src/resources/beta/threads/messages.ts">RefusalContentBlock</a></code>
+- <code><a href="./src/resources/beta/threads/messages.ts">RefusalDeltaBlock</a></code>
 - <code><a href="./src/resources/beta/threads/messages.ts">Text</a></code>
 - <code><a href="./src/resources/beta/threads/messages.ts">TextContentBlock</a></code>
 - <code><a href="./src/resources/beta/threads/messages.ts">TextContentBlockParam</a></code>

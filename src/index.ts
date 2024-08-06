@@ -248,6 +248,7 @@ export namespace OpenAI {
   export import ChatCompletionChunk = API.ChatCompletionChunk;
   export import ChatCompletionContentPart = API.ChatCompletionContentPart;
   export import ChatCompletionContentPartImage = API.ChatCompletionContentPartImage;
+  export import ChatCompletionContentPartRefusal = API.ChatCompletionContentPartRefusal;
   export import ChatCompletionContentPartText = API.ChatCompletionContentPartText;
   export import ChatCompletionFunctionCallOption = API.ChatCompletionFunctionCallOption;
   export import ChatCompletionFunctionMessageParam = API.ChatCompletionFunctionMessageParam;
@@ -322,6 +323,9 @@ export namespace OpenAI {
   export import ErrorObject = API.ErrorObject;
   export import FunctionDefinition = API.FunctionDefinition;
   export import FunctionParameters = API.FunctionParameters;
+  export import ResponseFormatJSONObject = API.ResponseFormatJSONObject;
+  export import ResponseFormatJSONSchema = API.ResponseFormatJSONSchema;
+  export import ResponseFormatText = API.ResponseFormatText;
 }
 
 // ---------------------- Azure ----------------------

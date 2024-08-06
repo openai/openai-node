@@ -19,7 +19,6 @@ export {
   Assistants,
 } from './assistants';
 export {
-  AssistantResponseFormat,
   AssistantResponseFormatOption,
   AssistantToolChoice,
   AssistantToolChoiceFunction,

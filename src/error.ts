@@ -156,3 +156,15 @@ export class RateLimitError extends APIError {
 }
 
 export class InternalServerError extends APIError {}
+
+export class LengthFinishReasonError extends OpenAIError {
+  constructor() {
+    super(`Could not parse response content as the length limit was reached`);
+  }
+}
+
+export class ContentFilterFinishReasonError extends OpenAIError {
+  constructor() {
+    super(`Could not parse response content as the request was rejected by the content filter`);
+  }
+}

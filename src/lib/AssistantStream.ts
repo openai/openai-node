@@ -191,12 +191,12 @@ export class AssistantStream
     threadId: string,
     runId: string,
     runs: Runs,
-    body: RunSubmitToolOutputsParamsStream,
+    params: RunSubmitToolOutputsParamsStream,
     options: RequestOptions | undefined,
   ) {
     const runner = new AssistantStream();
     runner._run(() =>
-      runner._runToolAssistantStream(threadId, runId, runs, body, {
+      runner._runToolAssistantStream(threadId, runId, runs, params, {
         ...options,
         headers: { ...options?.headers, 'X-Stainless-Helper-Method': 'stream' },
       }),
@@ -236,13 +236,13 @@ export class AssistantStream
   }
 
   static createThreadAssistantStream(
-    body: ThreadCreateAndRunParamsBaseStream,
+    params: ThreadCreateAndRunParamsBaseStream,
     thread: Threads,
     options?: RequestOptions,
   ) {
     const runner = new AssistantStream();
     runner._run(() =>
-      runner._threadAssistantStream(body, thread, {
+      runner._threadAssistantStream(params, thread, {
         ...options,
         headers: { ...options?.headers, 'X-Stainless-Helper-Method': 'stream' },
       }),
@@ -723,11 +723,11 @@ export class AssistantStream
   }
 
   protected async _threadAssistantStream(
-    body: ThreadCreateAndRunParamsBase,
+    params: ThreadCreateAndRunParamsBase,
     thread: Threads,
     options?: Core.RequestOptions,
   ): Promise<Run> {
-    return await this._createThreadAssistantStream(thread, body, options);
+    return await this._createThreadAssistantStream(thread, params, options);
   }
 
   protected async _runAssistantStream(
