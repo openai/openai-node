@@ -683,6 +683,20 @@ export class AssistantStream
         if (accValue.every((x) => typeof x === 'string' || typeof x === 'number')) {
           accValue.push(...deltaValue); // Use spread syntax for efficient addition
           continue;
+        } else if (accValue.every((x) => Core.isObj(x))) {
+          deltaValue.forEach(item => {
+            if (item.hasOwnProperty('index')) {
+              const obj = accValue.find((x: any) => x['index'] === item['index']);
+              if (obj) {
+                accValue[accValue.indexOf(obj)] = this.accumulateDelta(obj, item);
+              } else {
+                accValue.push(item);
+              }
+            } else {
+              accValue.push(item);
+            }
+          });
+          continue;
         }
       } else {
         throw Error(`Unhandled record type: ${key}, deltaValue: ${deltaValue}, accValue: ${accValue}`);
