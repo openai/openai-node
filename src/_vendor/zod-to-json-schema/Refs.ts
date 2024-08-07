@@ -4,6 +4,12 @@ import { JsonSchema7Type } from './parseDef';
 
 export type Refs = {
   seen: Map<ZodTypeDef, Seen>;
+  /**
+   * Set of all the `$ref`s we created, e.g. `Set(['#/$defs/ui'])`
+   * this notable does not include any `definitions` that were
+   * explicitly given as an option.
+   */
+  seenRefs: Set<string>;
   currentPath: string[];
   propertyPath: string[] | undefined;
 } & Options<Targets>;
@@ -24,6 +30,7 @@ export const getRefs = (options?: string | Partial<Options<Targets>>): Refs => {
     ..._options,
     currentPath: currentPath,
     propertyPath: undefined,
+    seenRefs: new Set(),
     seen: new Map(
       Object.entries(_options.definitions).map(([name, def]) => [
         def._def,
