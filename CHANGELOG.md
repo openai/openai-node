@@ -1,5 +1,25 @@
 # Changelog
 
+## 4.55.1 (2024-08-07)
+
+Full Changelog: [v4.55.0...v4.55.1](https://github.com/openai/openai-node/compare/v4.55.0...v4.55.1)
+
+### Bug Fixes
+
+* **helpers/zod:** correct schema generation for recursive schemas ([cb54d93](https://github.com/openai/openai-node/commit/cb54d93162c86ecfd476733805a431aab25d86d6))
+
+
+### Chores
+
+* **api:** remove old `AssistantResponseFormat` type ([#967](https://github.com/openai/openai-node/issues/967)) ([9fd94bf](https://github.com/openai/openai-node/commit/9fd94bfc35128d3bc45fbf0a65e6a8d2ea4562d5))
+* **internal:** update test snapshots ([bceea60](https://github.com/openai/openai-node/commit/bceea60e461c40a9e59d52772122dd612a2ff1c4))
+* **vendor/zodJsonSchema:** add option to duplicate top-level ref ([84b8a38](https://github.com/openai/openai-node/commit/84b8a3820b0ce1c78bfd3db468d8d2962875b4ab))
+
+
+### Documentation
+
+* **examples:** add UI generation example script ([c75c017](https://github.com/openai/openai-node/commit/c75c017c16cbfe3fc60ea4ee5779782005e64463))
+
 ## 4.55.0 (2024-08-06)
 
 Full Changelog: [v4.54.0...v4.55.0](https://github.com/openai/openai-node/compare/v4.54.0...v4.55.0)
