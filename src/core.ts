@@ -640,6 +640,7 @@ export abstract class AbstractPage<Item> implements AsyncIterable<Item> {
   hasNextPage(): boolean {
     const items = this.getPaginatedItems();
     if (!items.length) return false;
+    if (!(this.body as any)?.has_more) return false;
     return this.nextPageInfo() != null;
   }
 
