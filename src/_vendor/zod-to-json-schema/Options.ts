@@ -27,7 +27,7 @@ export type Options<Target extends Targets = 'jsonSchema7'> = {
   applyRegexFlags: boolean;
   emailStrategy: 'format:email' | 'format:idn-email' | 'pattern:zod';
   base64Strategy: 'format:binary' | 'contentEncoding:base64' | 'pattern:zod';
-  nameStrategy: 'ref' | 'title';
+  nameStrategy: 'ref' | 'duplicate-ref' | 'title';
   override?: (
     def: ZodTypeDef,
     refs: Refs,
