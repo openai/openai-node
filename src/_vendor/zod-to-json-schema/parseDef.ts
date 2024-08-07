@@ -87,6 +87,10 @@ export function parseDef(
     const seenSchema = get$ref(seenItem, refs);
 
     if (seenSchema !== undefined) {
+      if ('$ref' in seenSchema) {
+        refs.seenRefs.add(seenSchema.$ref);
+      }
+
       return seenSchema;
     }
   }
