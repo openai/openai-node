@@ -2,27 +2,28 @@
 
 exports[`.parse() zod deserialises response_format 1`] = `
 "{
-  "id": "chatcmpl-9ro1LmtFYq4FuAudjIkDJUr8IYum3",
+  "id": "chatcmpl-9tZXFjiGKgtrHZeIxvkklWe51DYZp",
   "object": "chat.completion",
-  "created": 1722610691,
-  "model": "gpt-4o-so",
+  "created": 1723031665,
+  "model": "gpt-4o-2024-08-06",
   "choices": [
     {
       "index": 0,
       "message": {
         "role": "assistant",
-        "content": "{\\"city\\":\\"San Francisco\\",\\"units\\":\\"f\\"}"
+        "content": "{\\"city\\":\\"San Francisco\\",\\"units\\":\\"f\\"}",
+        "refusal": null
       },
       "logprobs": null,
       "finish_reason": "stop"
     }
   ],
   "usage": {
-    "prompt_tokens": 71,
+    "prompt_tokens": 17,
     "completion_tokens": 10,
-    "total_tokens": 81
+    "total_tokens": 27
   },
-  "system_fingerprint": "fp_6dc10860e8"
+  "system_fingerprint": "fp_2a322c9ffc"
 }
 "
 `;
