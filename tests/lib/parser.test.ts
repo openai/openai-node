@@ -37,6 +37,7 @@ describe('.parse()', () => {
               "city": "San Francisco",
               "units": "f",
             },
+            "refusal": null,
             "role": "assistant",
             "tool_calls": [],
           },
