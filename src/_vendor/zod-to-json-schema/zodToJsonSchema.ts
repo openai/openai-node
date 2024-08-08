@@ -2,6 +2,7 @@ import { ZodSchema } from 'zod';
 import { Options, Targets } from './Options';
 import { JsonSchema7Type, parseDef } from './parseDef';
 import { getRefs } from './Refs';
+import { zodDef, isEmptyObj } from './util';
 
 const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
   schema: ZodSchema<any>,
@@ -15,25 +16,6 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
   };
 } => {
   const refs = getRefs(options);
-
-  const definitions =
-    typeof options === 'object' && options.definitions ?
-      Object.entries(options.definitions).reduce(
-        (acc, [name, schema]) => ({
-          ...acc,
-          [name]:
-            parseDef(
-              schema._def,
-              {
-                ...refs,
-                currentPath: [...refs.basePath, refs.definitionPath, name],
-              },
-              true,
-            ) ?? {},
-        }),
-        {},
-      )
-    : undefined;
 
   const name =
     typeof options === 'string' ? options
@@ -60,6 +42,25 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
   if (title !== undefined) {
     main.title = title;
   }
+
+  const definitions =
+    !isEmptyObj(refs.definitions) ?
+      Object.entries(refs.definitions).reduce(
+        (acc, [name, schema]) => ({
+          ...acc,
+          [name]:
+            parseDef(
+              zodDef(schema),
+              {
+                ...refs,
+                currentPath: [...refs.basePath, refs.definitionPath, name],
+              },
+              true,
+            ) ?? {},
+        }),
+        {},
+      )
+    : undefined;
 
   const combined: ReturnType<typeof zodToJsonSchema<Target>> =
     name === undefined ?
