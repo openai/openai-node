@@ -1,5 +1,21 @@
 # Changelog
 
+## 4.55.2 (2024-08-08)
+
+Full Changelog: [v4.55.1...v4.55.2](https://github.com/openai/openai-node/compare/v4.55.1...v4.55.2)
+
+### Bug Fixes
+
+* **helpers/zod:** add `extract-to-root` ref strategy ([ef3c73c](https://github.com/openai/openai-node/commit/ef3c73cfdf1a8e45346417812168e476fea65690))
+* **helpers/zod:** add `nullableStrategy` option ([ad89892](https://github.com/openai/openai-node/commit/ad89892f4ac0daba161ce97267a165a12f67c341))
+* **helpers/zod:** correct logic for adding root schema to definitions ([e4a247a](https://github.com/openai/openai-node/commit/e4a247a2a87b4d3bde55891b31e07413d3a9f00d))
+
+
+### Chores
+
+* **internal:** add README for vendored zod-to-json-schema ([d8a80a9](https://github.com/openai/openai-node/commit/d8a80a915dfe723a59f512e7128aecf857324388))
+* **tests:** add more API request tests ([04c1590](https://github.com/openai/openai-node/commit/04c1590a64127c43898c3c88bcbdd624d54008f6))
+
 ## 4.55.1 (2024-08-07)
 
 Full Changelog: [v4.55.0...v4.55.1](https://github.com/openai/openai-node/compare/v4.55.0...v4.55.1)
