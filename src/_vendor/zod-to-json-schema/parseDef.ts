@@ -122,6 +122,24 @@ const get$ref = (
   switch (refs.$refStrategy) {
     case 'root':
       return { $ref: item.path.join('/') };
+    // this case is needed as OpenAI strict mode doesn't support top-level `$ref`s, i.e.
+    // the top-level schema *must* be `{"type": "object", "properties": {...}}` but if we ever
+    // need to define a `$ref`, relative `$ref`s aren't supported, so we need to extract
+    // the schema to `#/definitions/` and reference that.
+    //
+    // e.g. if we need to reference a schema at
+    // `["#","definitions","contactPerson","properties","person1","properties","name"]`
+    // then we'll extract it out to `contactPerson_properties_person1_properties_name`
+    case 'extract-to-root':
+      const name = item.path.slice(refs.basePath.length + 1).join('_');
+
+      // we don't need to extract the root schema in this case, as it's already
+      // been added to the definitions
+      if (name !== refs.name && refs.nameStrategy === 'duplicate-ref') {
+        refs.definitions[name] = item.def;
+      }
+
+      return { $ref: [...refs.basePath, refs.definitionPath, name].join('/') };
     case 'relative':
       return { $ref: getRelativePath(refs.currentPath, item.path) };
     case 'none':

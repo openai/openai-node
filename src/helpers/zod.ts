@@ -13,6 +13,7 @@ function zodToJsonSchema(schema: z.ZodType, options: { name: string }): Record<s
     openaiStrictMode: true,
     name: options.name,
     nameStrategy: 'duplicate-ref',
+    $refStrategy: 'extract-to-root',
   });
 }
 
