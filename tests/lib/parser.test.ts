@@ -352,10 +352,10 @@ describe('.parse()', () => {
                       "type": "string",
                     },
                     "name": {
-                      "$ref": "#/definitions/contactPerson/properties/person1/properties/name",
+                      "$ref": "#/definitions/contactPerson_properties_person1_properties_name",
                     },
                     "phone_number": {
-                      "$ref": "#/definitions/contactPerson/properties/person1/properties/phone_number",
+                      "$ref": "#/definitions/contactPerson_properties_person1_properties_phone_number",
                     },
                   },
                   "required": [
@@ -371,6 +371,15 @@ describe('.parse()', () => {
                 "person2",
               ],
               "type": "object",
+            },
+            "contactPerson_properties_person1_properties_name": {
+              "type": "string",
+            },
+            "contactPerson_properties_person1_properties_phone_number": {
+              "type": [
+                "string",
+                "null",
+              ],
             },
           },
           "properties": {
@@ -424,10 +433,10 @@ describe('.parse()', () => {
                   "type": "string",
                 },
                 "name": {
-                  "$ref": "#/definitions/contactPerson/properties/person1/properties/name",
+                  "$ref": "#/definitions/contactPerson_properties_person1_properties_name",
                 },
                 "phone_number": {
-                  "$ref": "#/definitions/contactPerson/properties/person1/properties/phone_number",
+                  "$ref": "#/definitions/contactPerson_properties_person1_properties_phone_number",
                 },
               },
               "required": [
