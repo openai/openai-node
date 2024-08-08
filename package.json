@@ -21,7 +21,7 @@
     "prepare": "if ./scripts/utils/check-is-in-git-install.sh; then ./scripts/build; fi",
     "tsn": "ts-node -r tsconfig-paths/register",
     "lint": "./scripts/lint",
-    "fix": "eslint --fix --ext ts,js ."
+    "fix": "./scripts/format"
   },
   "dependencies": {
     "@types/node": "^18.11.18",
