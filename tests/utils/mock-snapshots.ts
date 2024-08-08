@@ -5,7 +5,10 @@ import { RequestInfo } from 'openai/_shims/auto/types';
 import { mockFetch } from './mock-fetch';
 import { Readable } from 'stream';
 
-export async function makeSnapshotRequest<T>(requestFn: (client: OpenAI) => Promise<T>): Promise<T> {
+export async function makeSnapshotRequest<T>(
+  requestFn: (client: OpenAI) => Promise<T>,
+  snapshotIndex = 1,
+): Promise<T> {
   if (process.env['UPDATE_API_SNAPSHOTS'] === '1') {
     var capturedResponseContent: string | null = null;
 
@@ -27,7 +30,7 @@ export async function makeSnapshotRequest<T>(requestFn: (client: OpenAI) => Prom
     return result;
   }
 
-  const qualifiedSnapshotName = `${expect.getState().currentTestName} 1`;
+  const qualifiedSnapshotName = [expect.getState().currentTestName, snapshotIndex].join(' ');
   const snapshotState = expect.getState()['snapshotState'];
   (snapshotState._uncheckedKeys as Set<string>).delete(qualifiedSnapshotName);
 
