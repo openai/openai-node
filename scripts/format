@@ -5,4 +5,4 @@ set -e
 cd "$(dirname "$0")/.."
 
 echo "==> Running eslint --fix"
-./node_modules/.bin/eslint --fix --ext ts,js .
+ESLINT_USE_FLAT_CONFIG="false" ./node_modules/.bin/eslint --fix --ext ts,js .
