@@ -264,7 +264,7 @@ function findDoubleNewlineIndex(buffer: Uint8Array): number {
   const newline = 0x0a; // \n
   const carriage = 0x0d; // \r
 
-  for (let i = 0; i < buffer.length - 2; i++) {
+  for (let i = 0; i < buffer.length - 1; i++) {
     if (buffer[i] === newline && buffer[i + 1] === newline) {
       // \n\n
       return i + 2;
