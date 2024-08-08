@@ -444,6 +444,50 @@ describe('.parse()', () => {
           "type": "object",
         }
       `);
+
+      const completion = await makeSnapshotRequest(
+        (openai) =>
+          openai.beta.chat.completions.parse({
+            model: 'gpt-4o-2024-08-06',
+            messages: [
+              {
+                role: 'system',
+                content: 'You are a helpful assistant.',
+              },
+              {
+                role: 'user',
+                content:
+                  'jane doe, born nov 16, engineer at openai, jane@openai.com. john smith, born march 1, enigneer at openai, john@openai.com',
+              },
+            ],
+            response_format: zodResponseFormat(contactPersonSchema, 'contactPerson'),
+          }),
+        2,
+      );
+
+      expect(completion.choices[0]?.message).toMatchInlineSnapshot(`
+        {
+          "content": "{"person1":{"name":"Jane Doe","phone_number":"+1234567890","roles":["other"],"description":"Engineer at OpenAI. Email: jane@openai.com"},"person2":{"name":"John Smith","phone_number":"+0987654321","differentField":"Engineer at OpenAI. Email: john@openai.com"}}",
+          "parsed": {
+            "person1": {
+              "description": "Engineer at OpenAI. Email: jane@openai.com",
+              "name": "Jane Doe",
+              "phone_number": "+1234567890",
+              "roles": [
+                "other",
+              ],
+            },
+            "person2": {
+              "differentField": "Engineer at OpenAI. Email: john@openai.com",
+              "name": "John Smith",
+              "phone_number": "+0987654321",
+            },
+          },
+          "refusal": null,
+          "role": "assistant",
+          "tool_calls": [],
+        }
+      `);
     });
   });
 });
