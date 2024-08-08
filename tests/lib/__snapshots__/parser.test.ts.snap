@@ -28,6 +28,34 @@ exports[`.parse() zod deserialises response_format 1`] = `
 "
 `;
 
+exports[`.parse() zod merged schemas 2`] = `
+"{
+  "id": "chatcmpl-9tyPgktyF5JgREIZd0XZI4XgrBAD2",
+  "object": "chat.completion",
+  "created": 1723127296,
+  "model": "gpt-4o-2024-08-06",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\\"person1\\":{\\"name\\":\\"Jane Doe\\",\\"phone_number\\":\\"+1234567890\\",\\"roles\\":[\\"other\\"],\\"description\\":\\"Engineer at OpenAI. Email: jane@openai.com\\"},\\"person2\\":{\\"name\\":\\"John Smith\\",\\"phone_number\\":\\"+0987654321\\",\\"differentField\\":\\"Engineer at OpenAI. Email: john@openai.com\\"}}",
+        "refusal": null
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 61,
+    "completion_tokens": 72,
+    "total_tokens": 133
+  },
+  "system_fingerprint": "fp_845eaabc1f"
+}
+"
+`;
+
 exports[`.parse() zod top-level recursive schemas 1`] = `
 "{
   "id": "chatcmpl-9taiMDrRVRIkk1Xg1yE82UjnYuZjt",
