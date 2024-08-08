@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.55.3 (2024-08-08)
+
+Full Changelog: [v4.55.2...v4.55.3](https://github.com/openai/openai-node/compare/v4.55.2...v4.55.3)
+
+### Chores
+
+* **internal:** updates ([#975](https://github.com/openai/openai-node/issues/975)) ([313a190](https://github.com/openai/openai-node/commit/313a19059a61893887ac0b57bb488c24bc40f099))
+
 ## 4.55.2 (2024-08-08)
 
 Full Changelog: [v4.55.1...v4.55.2](https://github.com/openai/openai-node/compare/v4.55.1...v4.55.2)
