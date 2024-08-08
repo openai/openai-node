@@ -10,7 +10,7 @@ export const ignoreOverride = Symbol('Let zodToJsonSchema decide on which parser
 
 export type Options<Target extends Targets = 'jsonSchema7'> = {
   name: string | undefined;
-  $refStrategy: 'root' | 'relative' | 'none' | 'seen';
+  $refStrategy: 'root' | 'relative' | 'none' | 'seen' | 'extract-to-root';
   basePath: string[];
   effectStrategy: 'input' | 'any';
   pipeStrategy: 'input' | 'output' | 'all';
@@ -20,7 +20,7 @@ export type Options<Target extends Targets = 'jsonSchema7'> = {
   target: Target;
   strictUnions: boolean;
   definitionPath: string;
-  definitions: Record<string, ZodSchema>;
+  definitions: Record<string, ZodSchema | ZodTypeDef>;
   errorMessages: boolean;
   markdownDescription: boolean;
   patternStrategy: 'escape' | 'preserve';

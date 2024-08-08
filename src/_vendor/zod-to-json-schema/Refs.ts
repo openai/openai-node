@@ -1,6 +1,7 @@
-import { ZodTypeDef } from 'zod';
+import type { ZodTypeDef } from 'zod';
 import { getDefaultOptions, Options, Targets } from './Options';
 import { JsonSchema7Type } from './parseDef';
+import { zodDef } from './util';
 
 export type Refs = {
   seen: Map<ZodTypeDef, Seen>;
@@ -33,9 +34,9 @@ export const getRefs = (options?: string | Partial<Options<Targets>>): Refs => {
     seenRefs: new Set(),
     seen: new Map(
       Object.entries(_options.definitions).map(([name, def]) => [
-        def._def,
+        zodDef(def),
         {
-          def: def._def,
+          def: zodDef(def),
           path: [..._options.basePath, _options.definitionPath, name],
           // Resolution of references will be forced even though seen, so it's ok that the schema is undefined here for now.
           jsonSchema: undefined,
