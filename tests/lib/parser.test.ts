@@ -267,5 +267,184 @@ describe('.parse()', () => {
         }
       `);
     });
+
+    test('merged schemas', async () => {
+      const personSchema = z.object({
+        name: z.string(),
+        phone_number: z.string().nullable(),
+      });
+
+      const contactPersonSchema = z.object({
+        person1: personSchema.merge(
+          z.object({
+            roles: z
+              .array(z.enum(['parent', 'child', 'sibling', 'spouse', 'friend', 'other']))
+              .describe('Any roles for which the contact is important, use other for custom roles'),
+            description: z
+              .string()
+              .nullable()
+              .describe('Open text for any other relevant information about what the contact does.'),
+          }),
+        ),
+        person2: personSchema.merge(
+          z.object({
+            differentField: z.string(),
+          }),
+        ),
+      });
+
+      expect(zodResponseFormat(contactPersonSchema, 'contactPerson').json_schema.schema)
+        .toMatchInlineSnapshot(`
+        {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "additionalProperties": false,
+          "definitions": {
+            "contactPerson": {
+              "additionalProperties": false,
+              "properties": {
+                "person1": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "description": {
+                      "description": "Open text for any other relevant information about what the contact does.",
+                      "type": [
+                        "string",
+                        "null",
+                      ],
+                    },
+                    "name": {
+                      "type": "string",
+                    },
+                    "phone_number": {
+                      "type": [
+                        "string",
+                        "null",
+                      ],
+                    },
+                    "roles": {
+                      "description": "Any roles for which the contact is important, use other for custom roles",
+                      "items": {
+                        "enum": [
+                          "parent",
+                          "child",
+                          "sibling",
+                          "spouse",
+                          "friend",
+                          "other",
+                        ],
+                        "type": "string",
+                      },
+                      "type": "array",
+                    },
+                  },
+                  "required": [
+                    "name",
+                    "phone_number",
+                    "roles",
+                    "description",
+                  ],
+                  "type": "object",
+                },
+                "person2": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "differentField": {
+                      "type": "string",
+                    },
+                    "name": {
+                      "$ref": "#/definitions/contactPerson/properties/person1/properties/name",
+                    },
+                    "phone_number": {
+                      "$ref": "#/definitions/contactPerson/properties/person1/properties/phone_number",
+                    },
+                  },
+                  "required": [
+                    "name",
+                    "phone_number",
+                    "differentField",
+                  ],
+                  "type": "object",
+                },
+              },
+              "required": [
+                "person1",
+                "person2",
+              ],
+              "type": "object",
+            },
+          },
+          "properties": {
+            "person1": {
+              "additionalProperties": false,
+              "properties": {
+                "description": {
+                  "description": "Open text for any other relevant information about what the contact does.",
+                  "type": [
+                    "string",
+                    "null",
+                  ],
+                },
+                "name": {
+                  "type": "string",
+                },
+                "phone_number": {
+                  "type": [
+                    "string",
+                    "null",
+                  ],
+                },
+                "roles": {
+                  "description": "Any roles for which the contact is important, use other for custom roles",
+                  "items": {
+                    "enum": [
+                      "parent",
+                      "child",
+                      "sibling",
+                      "spouse",
+                      "friend",
+                      "other",
+                    ],
+                    "type": "string",
+                  },
+                  "type": "array",
+                },
+              },
+              "required": [
+                "name",
+                "phone_number",
+                "roles",
+                "description",
+              ],
+              "type": "object",
+            },
+            "person2": {
+              "additionalProperties": false,
+              "properties": {
+                "differentField": {
+                  "type": "string",
+                },
+                "name": {
+                  "$ref": "#/definitions/contactPerson/properties/person1/properties/name",
+                },
+                "phone_number": {
+                  "$ref": "#/definitions/contactPerson/properties/person1/properties/phone_number",
+                },
+              },
+              "required": [
+                "name",
+                "phone_number",
+                "differentField",
+              ],
+              "type": "object",
+            },
+          },
+          "required": [
+            "person1",
+            "person2",
+          ],
+          "type": "object",
+        }
+      `);
+    });
   });
 });
