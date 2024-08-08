@@ -14,6 +14,7 @@ function zodToJsonSchema(schema: z.ZodType, options: { name: string }): Record<s
     name: options.name,
     nameStrategy: 'duplicate-ref',
     $refStrategy: 'extract-to-root',
+    nullableStrategy: 'property',
   });
 }
 

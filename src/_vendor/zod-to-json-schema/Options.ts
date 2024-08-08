@@ -17,6 +17,7 @@ export type Options<Target extends Targets = 'jsonSchema7'> = {
   dateStrategy: DateStrategy | DateStrategy[];
   mapStrategy: 'entries' | 'record';
   removeAdditionalStrategy: 'passthrough' | 'strict';
+  nullableStrategy: 'from-target' | 'property';
   target: Target;
   strictUnions: boolean;
   definitionPath: string;
@@ -45,6 +46,7 @@ export const defaultOptions: Options = {
   pipeStrategy: 'all',
   dateStrategy: 'format:date-time',
   mapStrategy: 'entries',
+  nullableStrategy: 'from-target',
   removeAdditionalStrategy: 'passthrough',
   definitionPath: 'definitions',
   target: 'jsonSchema7',

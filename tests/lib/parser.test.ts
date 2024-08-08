@@ -307,19 +307,15 @@ describe('.parse()', () => {
                   "properties": {
                     "description": {
                       "description": "Open text for any other relevant information about what the contact does.",
-                      "type": [
-                        "string",
-                        "null",
-                      ],
+                      "nullable": true,
+                      "type": "string",
                     },
                     "name": {
                       "type": "string",
                     },
                     "phone_number": {
-                      "type": [
-                        "string",
-                        "null",
-                      ],
+                      "nullable": true,
+                      "type": "string",
                     },
                     "roles": {
                       "description": "Any roles for which the contact is important, use other for custom roles",
@@ -376,10 +372,8 @@ describe('.parse()', () => {
               "type": "string",
             },
             "contactPerson_properties_person1_properties_phone_number": {
-              "type": [
-                "string",
-                "null",
-              ],
+              "nullable": true,
+              "type": "string",
             },
           },
           "properties": {
@@ -388,19 +382,15 @@ describe('.parse()', () => {
               "properties": {
                 "description": {
                   "description": "Open text for any other relevant information about what the contact does.",
-                  "type": [
-                    "string",
-                    "null",
-                  ],
+                  "nullable": true,
+                  "type": "string",
                 },
                 "name": {
                   "type": "string",
                 },
                 "phone_number": {
-                  "type": [
-                    "string",
-                    "null",
-                  ],
+                  "nullable": true,
+                  "type": "string",
                 },
                 "roles": {
                   "description": "Any roles for which the contact is important, use other for custom roles",
