@@ -43,24 +43,24 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
     main.title = title;
   }
 
-  const definitions =
-    !isEmptyObj(refs.definitions) ?
-      Object.entries(refs.definitions).reduce(
-        (acc, [name, schema]) => ({
-          ...acc,
-          [name]:
-            parseDef(
-              zodDef(schema),
-              {
-                ...refs,
-                currentPath: [...refs.basePath, refs.definitionPath, name],
-              },
-              true,
-            ) ?? {},
-        }),
-        {},
-      )
-    : undefined;
+  const definitions = (() => {
+    if (isEmptyObj(refs.definitions)) {
+      return undefined;
+    }
+
+    const definitions: Record<string, any> = {};
+
+    for (const [name, zodSchema] of Object.entries(refs.definitions)) {
+      definitions[name] =
+        parseDef(
+          zodDef(zodSchema),
+          { ...refs, currentPath: [...refs.basePath, refs.definitionPath, name] },
+          true,
+        ) ?? {};
+    }
+
+    return definitions;
+  })();
 
   const combined: ReturnType<typeof zodToJsonSchema<Target>> =
     name === undefined ?
