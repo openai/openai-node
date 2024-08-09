@@ -50,3 +50,8 @@ jobs:
         if: always()
         run: |
           cat .prism.log
+
+      - name: debug 2
+        if: always()
+        run: |
+          yarn list
