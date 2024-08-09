@@ -54,4 +54,5 @@ jobs:
       - name: debug 2
         if: always()
         run: |
-          yarn list
+          npm install @stainless-api/prism-cli@5.8.4
+          npm ls @stainless-api/prism-cli@5.8.4
