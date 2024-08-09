@@ -2,16 +2,16 @@
 
 exports[`.parse() zod deserialises response_format 1`] = `
 "{
-  "id": "chatcmpl-9tZXFjiGKgtrHZeIxvkklWe51DYZp",
+  "id": "chatcmpl-9uLhvwLPvKOZoJ7hwaa666fYuxYif",
   "object": "chat.completion",
-  "created": 1723031665,
+  "created": 1723216839,
   "model": "gpt-4o-2024-08-06",
   "choices": [
     {
       "index": 0,
       "message": {
         "role": "assistant",
-        "content": "{\\"city\\":\\"San Francisco\\",\\"units\\":\\"f\\"}",
+        "content": "{\\"city\\":\\"San Francisco\\",\\"units\\":\\"c\\"}",
         "refusal": null
       },
       "logprobs": null,
@@ -30,16 +30,16 @@ exports[`.parse() zod deserialises response_format 1`] = `
 
 exports[`.parse() zod merged schemas 2`] = `
 "{
-  "id": "chatcmpl-9tyPgktyF5JgREIZd0XZI4XgrBAD2",
+  "id": "chatcmpl-9uLi0HJ6HYH0FM1VI1N6XCREiGvX1",
   "object": "chat.completion",
-  "created": 1723127296,
+  "created": 1723216844,
   "model": "gpt-4o-2024-08-06",
   "choices": [
     {
       "index": 0,
       "message": {
         "role": "assistant",
-        "content": "{\\"person1\\":{\\"name\\":\\"Jane Doe\\",\\"phone_number\\":\\"+1234567890\\",\\"roles\\":[\\"other\\"],\\"description\\":\\"Engineer at OpenAI. Email: jane@openai.com\\"},\\"person2\\":{\\"name\\":\\"John Smith\\",\\"phone_number\\":\\"+0987654321\\",\\"differentField\\":\\"Engineer at OpenAI. Email: john@openai.com\\"}}",
+        "content": "{\\"person1\\":{\\"name\\":\\"Jane Doe\\",\\"phone_number\\":\\".\\",\\"roles\\":[\\"other\\"],\\"description\\":\\"Engineer at OpenAI, born Nov 16, contact email: jane@openai.com\\"},\\"person2\\":{\\"name\\":\\"John Smith\\",\\"phone_number\\":\\"john@openai.com\\",\\"differentField\\":\\"Engineer at OpenAI, born March 1.\\"}}",
         "refusal": null
       },
       "logprobs": null,
@@ -51,23 +51,51 @@ exports[`.parse() zod merged schemas 2`] = `
     "completion_tokens": 72,
     "total_tokens": 133
   },
-  "system_fingerprint": "fp_845eaabc1f"
+  "system_fingerprint": "fp_2a322c9ffc"
 }
 "
 `;
 
-exports[`.parse() zod top-level recursive schemas 1`] = `
+exports[`.parse() zod nested schema extraction 2`] = `
 "{
-  "id": "chatcmpl-9taiMDrRVRIkk1Xg1yE82UjnYuZjt",
+  "id": "chatcmpl-9uLi6hkH6VcoaYiNEzy3h56QRAyns",
   "object": "chat.completion",
-  "created": 1723036198,
+  "created": 1723216850,
   "model": "gpt-4o-2024-08-06",
   "choices": [
     {
       "index": 0,
       "message": {
         "role": "assistant",
-        "content": "{\\"type\\":\\"form\\",\\"label\\":\\"User Profile Form\\",\\"children\\":[{\\"type\\":\\"field\\",\\"label\\":\\"Full Name\\",\\"children\\":[],\\"attributes\\":[{\\"name\\":\\"type\\",\\"value\\":\\"text\\"},{\\"name\\":\\"placeholder\\",\\"value\\":\\"Enter your full name\\"}]},{\\"type\\":\\"field\\",\\"label\\":\\"Email Address\\",\\"children\\":[],\\"attributes\\":[{\\"name\\":\\"type\\",\\"value\\":\\"email\\"},{\\"name\\":\\"placeholder\\",\\"value\\":\\"Enter your email address\\"}]},{\\"type\\":\\"field\\",\\"label\\":\\"Phone Number\\",\\"children\\":[],\\"attributes\\":[{\\"name\\":\\"type\\",\\"value\\":\\"tel\\"},{\\"name\\":\\"placeholder\\",\\"value\\":\\"Enter your phone number\\"}]},{\\"type\\":\\"button\\",\\"label\\":\\"Submit\\",\\"children\\":[],\\"attributes\\":[{\\"name\\":\\"type\\",\\"value\\":\\"submit\\"}]}],\\"attributes\\":[{\\"name\\":\\"method\\",\\"value\\":\\"post\\"},{\\"name\\":\\"action\\",\\"value\\":\\"/submit-profile\\"}]}",
+        "content": "{\\"name\\":\\"TodoApp\\",\\"fields\\":[{\\"type\\":\\"string\\",\\"name\\":\\"taskId\\",\\"metadata\\":{\\"foo\\":\\"unique identifier for each task\\"}},{\\"type\\":\\"string\\",\\"name\\":\\"title\\",\\"metadata\\":{\\"foo\\":\\"title of the task\\"}},{\\"type\\":\\"string\\",\\"name\\":\\"description\\",\\"metadata\\":{\\"foo\\":\\"detailed description of the task. This is optional.\\"}},{\\"type\\":\\"string\\",\\"name\\":\\"status\\",\\"metadata\\":{\\"foo\\":\\"status of the task, e.g., pending, completed, etc.\\"}},{\\"type\\":\\"string\\",\\"name\\":\\"dueDate\\",\\"metadata\\":null},{\\"type\\":\\"string\\",\\"name\\":\\"priority\\",\\"metadata\\":{\\"foo\\":\\"priority level of the task, e.g., low, medium, high\\"}},{\\"type\\":\\"string\\",\\"name\\":\\"creationDate\\",\\"metadata\\":{\\"foo\\":\\"date when the task was created\\"}},{\\"type\\":\\"string\\",\\"name\\":\\"lastModifiedDate\\",\\"metadata\\":{\\"foo\\":\\"date when the task was last modified\\"}},{\\"type\\":\\"string\\",\\"name\\":\\"tags\\",\\"metadata\\":{\\"foo\\":\\"tags associated with the task, for categorization\\"}}]}",
+        "refusal": null
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 36,
+    "completion_tokens": 208,
+    "total_tokens": 244
+  },
+  "system_fingerprint": "fp_2a322c9ffc"
+}
+"
+`;
+
+exports[`.parse() zod top-level recursive schemas 1`] = `
+"{
+  "id": "chatcmpl-9uLhw79ArBF4KsQQOlsoE68m6vh6v",
+  "object": "chat.completion",
+  "created": 1723216840,
+  "model": "gpt-4o-2024-08-06",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\\"type\\":\\"form\\",\\"label\\":\\"User Profile Form\\",\\"children\\":[{\\"type\\":\\"field\\",\\"label\\":\\"First Name\\",\\"children\\":[],\\"attributes\\":[{\\"name\\":\\"type\\",\\"value\\":\\"text\\"},{\\"name\\":\\"name\\",\\"value\\":\\"firstName\\"},{\\"name\\":\\"placeholder\\",\\"value\\":\\"Enter your first name\\"}]},{\\"type\\":\\"field\\",\\"label\\":\\"Last Name\\",\\"children\\":[],\\"attributes\\":[{\\"name\\":\\"type\\",\\"value\\":\\"text\\"},{\\"name\\":\\"name\\",\\"value\\":\\"lastName\\"},{\\"name\\":\\"placeholder\\",\\"value\\":\\"Enter your last name\\"}]},{\\"type\\":\\"field\\",\\"label\\":\\"Email Address\\",\\"children\\":[],\\"attributes\\":[{\\"name\\":\\"type\\",\\"value\\":\\"email\\"},{\\"name\\":\\"name\\",\\"value\\":\\"email\\"},{\\"name\\":\\"placeholder\\",\\"value\\":\\"Enter your email address\\"}]},{\\"type\\":\\"button\\",\\"label\\":\\"Submit\\",\\"children\\":[],\\"attributes\\":[{\\"name\\":\\"type\\",\\"value\\":\\"submit\\"}]}],\\"attributes\\":[]}",
         "refusal": null
       },
       "logprobs": null,
@@ -76,8 +104,8 @@ exports[`.parse() zod top-level recursive schemas 1`] = `
   ],
   "usage": {
     "prompt_tokens": 38,
-    "completion_tokens": 168,
-    "total_tokens": 206
+    "completion_tokens": 175,
+    "total_tokens": 213
   },
   "system_fingerprint": "fp_845eaabc1f"
 }
