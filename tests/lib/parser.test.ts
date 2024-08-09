@@ -32,10 +32,10 @@ describe('.parse()', () => {
           "index": 0,
           "logprobs": null,
           "message": {
-            "content": "{"city":"San Francisco","units":"f"}",
+            "content": "{"city":"San Francisco","units":"c"}",
             "parsed": {
               "city": "San Francisco",
-              "units": "f",
+              "units": "c",
             },
             "refusal": null,
             "role": "assistant",
@@ -76,18 +76,9 @@ describe('.parse()', () => {
 
       expect(completion.choices[0]?.message).toMatchInlineSnapshot(`
         {
-          "content": "{"type":"form","label":"User Profile Form","children":[{"type":"field","label":"Full Name","children":[],"attributes":[{"name":"type","value":"text"},{"name":"placeholder","value":"Enter your full name"}]},{"type":"field","label":"Email Address","children":[],"attributes":[{"name":"type","value":"email"},{"name":"placeholder","value":"Enter your email address"}]},{"type":"field","label":"Phone Number","children":[],"attributes":[{"name":"type","value":"tel"},{"name":"placeholder","value":"Enter your phone number"}]},{"type":"button","label":"Submit","children":[],"attributes":[{"name":"type","value":"submit"}]}],"attributes":[{"name":"method","value":"post"},{"name":"action","value":"/submit-profile"}]}",
+          "content": "{"type":"form","label":"User Profile Form","children":[{"type":"field","label":"First Name","children":[],"attributes":[{"name":"type","value":"text"},{"name":"name","value":"firstName"},{"name":"placeholder","value":"Enter your first name"}]},{"type":"field","label":"Last Name","children":[],"attributes":[{"name":"type","value":"text"},{"name":"name","value":"lastName"},{"name":"placeholder","value":"Enter your last name"}]},{"type":"field","label":"Email Address","children":[],"attributes":[{"name":"type","value":"email"},{"name":"name","value":"email"},{"name":"placeholder","value":"Enter your email address"}]},{"type":"button","label":"Submit","children":[],"attributes":[{"name":"type","value":"submit"}]}],"attributes":[]}",
           "parsed": {
-            "attributes": [
-              {
-                "name": "method",
-                "value": "post",
-              },
-              {
-                "name": "action",
-                "value": "/submit-profile",
-              },
-            ],
+            "attributes": [],
             "children": [
               {
                 "attributes": [
@@ -96,12 +87,35 @@ describe('.parse()', () => {
                     "value": "text",
                   },
                   {
+                    "name": "name",
+                    "value": "firstName",
+                  },
+                  {
                     "name": "placeholder",
-                    "value": "Enter your full name",
+                    "value": "Enter your first name",
                   },
                 ],
                 "children": [],
-                "label": "Full Name",
+                "label": "First Name",
+                "type": "field",
+              },
+              {
+                "attributes": [
+                  {
+                    "name": "type",
+                    "value": "text",
+                  },
+                  {
+                    "name": "name",
+                    "value": "lastName",
+                  },
+                  {
+                    "name": "placeholder",
+                    "value": "Enter your last name",
+                  },
+                ],
+                "children": [],
+                "label": "Last Name",
                 "type": "field",
               },
               {
@@ -111,27 +125,16 @@ describe('.parse()', () => {
                     "value": "email",
                   },
                   {
+                    "name": "name",
+                    "value": "email",
+                  },
+                  {
                     "name": "placeholder",
                     "value": "Enter your email address",
                   },
                 ],
                 "children": [],
                 "label": "Email Address",
-                "type": "field",
-              },
-              {
-                "attributes": [
-                  {
-                    "name": "type",
-                    "value": "tel",
-                  },
-                  {
-                    "name": "placeholder",
-                    "value": "Enter your phone number",
-                  },
-                ],
-                "children": [],
-                "label": "Phone Number",
                 "type": "field",
               },
               {
@@ -467,21 +470,312 @@ describe('.parse()', () => {
 
       expect(completion.choices[0]?.message).toMatchInlineSnapshot(`
         {
-          "content": "{"person1":{"name":"Jane Doe","phone_number":"+1234567890","roles":["other"],"description":"Engineer at OpenAI. Email: jane@openai.com"},"person2":{"name":"John Smith","phone_number":"+0987654321","differentField":"Engineer at OpenAI. Email: john@openai.com"}}",
+          "content": "{"person1":{"name":"Jane Doe","phone_number":".","roles":["other"],"description":"Engineer at OpenAI, born Nov 16, contact email: jane@openai.com"},"person2":{"name":"John Smith","phone_number":"john@openai.com","differentField":"Engineer at OpenAI, born March 1."}}",
           "parsed": {
             "person1": {
-              "description": "Engineer at OpenAI. Email: jane@openai.com",
+              "description": "Engineer at OpenAI, born Nov 16, contact email: jane@openai.com",
               "name": "Jane Doe",
-              "phone_number": "+1234567890",
+              "phone_number": ".",
               "roles": [
                 "other",
               ],
             },
             "person2": {
-              "differentField": "Engineer at OpenAI. Email: john@openai.com",
+              "differentField": "Engineer at OpenAI, born March 1.",
               "name": "John Smith",
-              "phone_number": "+0987654321",
+              "phone_number": "john@openai.com",
             },
+          },
+          "refusal": null,
+          "role": "assistant",
+          "tool_calls": [],
+        }
+      `);
+    });
+
+    test('nested schema extraction', async () => {
+      // optional object that can be on each field, mark it as nullable to comply with structured output restrictions
+      const metadata = z.nullable(
+        z.object({
+          foo: z.string(),
+        }),
+      );
+
+      // union element a
+      const fieldA = z.object({
+        type: z.literal('string'),
+        name: z.string(),
+        metadata,
+      });
+
+      // union element b, both referring to above nullable object
+      const fieldB = z.object({
+        type: z.literal('number'),
+        metadata,
+      });
+
+      // top level input object with array of union element
+      const model = z.object({
+        name: z.string(),
+        fields: z.array(z.union([fieldA, fieldB])),
+      });
+
+      expect(zodResponseFormat(model, 'query').json_schema.schema).toMatchInlineSnapshot(`
+        {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "additionalProperties": false,
+          "definitions": {
+            "contactPerson_properties_person1_properties_name": {
+              "type": "string",
+            },
+            "contactPerson_properties_person1_properties_phone_number": {
+              "nullable": true,
+              "type": "string",
+            },
+            "query": {
+              "additionalProperties": false,
+              "properties": {
+                "fields": {
+                  "items": {
+                    "anyOf": [
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "metadata": {
+                            "anyOf": [
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "foo": {
+                                    "type": "string",
+                                  },
+                                },
+                                "required": [
+                                  "foo",
+                                ],
+                                "type": "object",
+                              },
+                              {
+                                "type": "null",
+                              },
+                            ],
+                          },
+                          "name": {
+                            "type": "string",
+                          },
+                          "type": {
+                            "const": "string",
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "type",
+                          "name",
+                          "metadata",
+                        ],
+                        "type": "object",
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "metadata": {
+                            "$ref": "#/definitions/query_properties_fields_items_anyOf_0_properties_metadata",
+                          },
+                          "type": {
+                            "const": "number",
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "type",
+                          "metadata",
+                        ],
+                        "type": "object",
+                      },
+                    ],
+                  },
+                  "type": "array",
+                },
+                "name": {
+                  "type": "string",
+                },
+              },
+              "required": [
+                "name",
+                "fields",
+              ],
+              "type": "object",
+            },
+            "query_properties_fields_items_anyOf_0_properties_metadata": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/query_properties_fields_items_anyOf_0_properties_metadata_anyOf_0",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
+          },
+          "properties": {
+            "fields": {
+              "items": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "metadata": {
+                        "anyOf": [
+                          {
+                            "additionalProperties": false,
+                            "properties": {
+                              "foo": {
+                                "type": "string",
+                              },
+                            },
+                            "required": [
+                              "foo",
+                            ],
+                            "type": "object",
+                          },
+                          {
+                            "type": "null",
+                          },
+                        ],
+                      },
+                      "name": {
+                        "type": "string",
+                      },
+                      "type": {
+                        "const": "string",
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "type",
+                      "name",
+                      "metadata",
+                    ],
+                    "type": "object",
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "metadata": {
+                        "$ref": "#/definitions/query_properties_fields_items_anyOf_0_properties_metadata",
+                      },
+                      "type": {
+                        "const": "number",
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "type",
+                      "metadata",
+                    ],
+                    "type": "object",
+                  },
+                ],
+              },
+              "type": "array",
+            },
+            "name": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "name",
+            "fields",
+          ],
+          "type": "object",
+        }
+      `);
+
+      const completion = await makeSnapshotRequest(
+        (openai) =>
+          openai.beta.chat.completions.parse({
+            model: 'gpt-4o-2024-08-06',
+            messages: [
+              {
+                role: 'system',
+                content:
+                  "You are a helpful assistant. Generate a data model according to the user's instructions.",
+              },
+              { role: 'user', content: 'create a todo app data model' },
+            ],
+            response_format: zodResponseFormat(model, 'query'),
+          }),
+        2,
+      );
+
+      expect(completion.choices[0]?.message).toMatchInlineSnapshot(`
+        {
+          "content": "{"name":"TodoApp","fields":[{"type":"string","name":"taskId","metadata":{"foo":"unique identifier for each task"}},{"type":"string","name":"title","metadata":{"foo":"title of the task"}},{"type":"string","name":"description","metadata":{"foo":"detailed description of the task. This is optional."}},{"type":"string","name":"status","metadata":{"foo":"status of the task, e.g., pending, completed, etc."}},{"type":"string","name":"dueDate","metadata":null},{"type":"string","name":"priority","metadata":{"foo":"priority level of the task, e.g., low, medium, high"}},{"type":"string","name":"creationDate","metadata":{"foo":"date when the task was created"}},{"type":"string","name":"lastModifiedDate","metadata":{"foo":"date when the task was last modified"}},{"type":"string","name":"tags","metadata":{"foo":"tags associated with the task, for categorization"}}]}",
+          "parsed": {
+            "fields": [
+              {
+                "metadata": {
+                  "foo": "unique identifier for each task",
+                },
+                "name": "taskId",
+                "type": "string",
+              },
+              {
+                "metadata": {
+                  "foo": "title of the task",
+                },
+                "name": "title",
+                "type": "string",
+              },
+              {
+                "metadata": {
+                  "foo": "detailed description of the task. This is optional.",
+                },
+                "name": "description",
+                "type": "string",
+              },
+              {
+                "metadata": {
+                  "foo": "status of the task, e.g., pending, completed, etc.",
+                },
+                "name": "status",
+                "type": "string",
+              },
+              {
+                "metadata": null,
+                "name": "dueDate",
+                "type": "string",
+              },
+              {
+                "metadata": {
+                  "foo": "priority level of the task, e.g., low, medium, high",
+                },
+                "name": "priority",
+                "type": "string",
+              },
+              {
+                "metadata": {
+                  "foo": "date when the task was created",
+                },
+                "name": "creationDate",
+                "type": "string",
+              },
+              {
+                "metadata": {
+                  "foo": "date when the task was last modified",
+                },
+                "name": "lastModifiedDate",
+                "type": "string",
+              },
+              {
+                "metadata": {
+                  "foo": "tags associated with the task, for categorization",
+                },
+                "name": "tags",
+                "type": "string",
+              },
+            ],
+            "name": "TodoApp",
           },
           "refusal": null,
           "role": "assistant",
