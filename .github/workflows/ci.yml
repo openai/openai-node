@@ -45,3 +45,15 @@ jobs:
 
       - name: Run tests
         run: ./scripts/test
+
+      - name: debug
+        if: always()
+        run: |
+          cat .prism.log
+
+      - name: debug 2
+        if: always()
+        run: |
+          yarn add @stainless-api/prism-cli@5.8.4
+          # npm ls @stainless-api/prism-cli@5.8.4
+          yarn list
