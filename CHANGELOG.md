@@ -1,5 +1,19 @@
 # Changelog
 
+## 4.55.4 (2024-08-09)
+
+Full Changelog: [v4.55.3...v4.55.4](https://github.com/openai/openai-node/compare/v4.55.3...v4.55.4)
+
+### Bug Fixes
+
+* **helpers/zod:** nested union schema extraction ([#979](https://github.com/openai/openai-node/issues/979)) ([31b05aa](https://github.com/openai/openai-node/commit/31b05aa6fa0445141ae17a1b1eff533b83735f3a))
+
+
+### Chores
+
+* **ci:** bump prism mock server version ([#982](https://github.com/openai/openai-node/issues/982)) ([7442643](https://github.com/openai/openai-node/commit/7442643e8445eea15da54843a7c9d7580a402979))
+* **ci:** codeowners file ([#980](https://github.com/openai/openai-node/issues/980)) ([17a42b2](https://github.com/openai/openai-node/commit/17a42b2f6e2de2dce338358a48f6d7d4ed723f6f))
+
 ## 4.55.3 (2024-08-08)
 
 Full Changelog: [v4.55.2...v4.55.3](https://github.com/openai/openai-node/compare/v4.55.2...v4.55.3)
