@@ -34,7 +34,7 @@ describe('resource assistants', () => {
         file_search: {
           vector_store_ids: ['string'],
           vector_stores: [
-            { file_ids: ['string', 'string', 'string'], chunking_strategy: { type: 'auto' }, metadata: {} },
+            { chunking_strategy: { type: 'auto' }, file_ids: ['string', 'string', 'string'], metadata: {} },
           ],
         },
       },
