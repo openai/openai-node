@@ -34,8 +34,8 @@ describe('resource threads', () => {
         {
           messages: [
             {
-              role: 'user',
               content: 'string',
+              role: 'user',
               attachments: [
                 {
                   file_id: 'file_id',
@@ -65,8 +65,8 @@ describe('resource threads', () => {
               metadata: {},
             },
             {
-              role: 'user',
               content: 'string',
+              role: 'user',
               attachments: [
                 {
                   file_id: 'file_id',
@@ -96,8 +96,8 @@ describe('resource threads', () => {
               metadata: {},
             },
             {
-              role: 'user',
               content: 'string',
+              role: 'user',
               attachments: [
                 {
                   file_id: 'file_id',
@@ -134,8 +134,8 @@ describe('resource threads', () => {
               vector_store_ids: ['string'],
               vector_stores: [
                 {
-                  file_ids: ['string', 'string', 'string'],
                   chunking_strategy: { type: 'auto' },
+                  file_ids: ['string', 'string', 'string'],
                   metadata: {},
                 },
               ],
@@ -220,8 +220,8 @@ describe('resource threads', () => {
       thread: {
         messages: [
           {
-            role: 'user',
             content: 'string',
+            role: 'user',
             attachments: [
               {
                 file_id: 'file_id',
@@ -251,8 +251,8 @@ describe('resource threads', () => {
             metadata: {},
           },
           {
-            role: 'user',
             content: 'string',
+            role: 'user',
             attachments: [
               {
                 file_id: 'file_id',
@@ -282,8 +282,8 @@ describe('resource threads', () => {
             metadata: {},
           },
           {
-            role: 'user',
             content: 'string',
+            role: 'user',
             attachments: [
               {
                 file_id: 'file_id',
@@ -313,16 +313,16 @@ describe('resource threads', () => {
             metadata: {},
           },
         ],
+        metadata: {},
         tool_resources: {
           code_interpreter: { file_ids: ['string', 'string', 'string'] },
           file_search: {
             vector_store_ids: ['string'],
             vector_stores: [
-              { file_ids: ['string', 'string', 'string'], chunking_strategy: { type: 'auto' }, metadata: {} },
+              { chunking_strategy: { type: 'auto' }, file_ids: ['string', 'string', 'string'], metadata: {} },
             ],
           },
         },
-        metadata: {},
       },
       tool_choice: 'none',
       tool_resources: {
