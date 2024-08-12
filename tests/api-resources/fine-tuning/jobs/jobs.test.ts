@@ -33,8 +33,8 @@ describe('resource jobs', () => {
           type: 'wandb',
           wandb: {
             project: 'my-wandb-project',
-            name: 'name',
             entity: 'entity',
+            name: 'name',
             tags: ['custom-tag', 'custom-tag', 'custom-tag'],
           },
         },
@@ -42,8 +42,8 @@ describe('resource jobs', () => {
           type: 'wandb',
           wandb: {
             project: 'my-wandb-project',
-            name: 'name',
             entity: 'entity',
+            name: 'name',
             tags: ['custom-tag', 'custom-tag', 'custom-tag'],
           },
         },
@@ -51,8 +51,8 @@ describe('resource jobs', () => {
           type: 'wandb',
           wandb: {
             project: 'my-wandb-project',
-            name: 'name',
             entity: 'entity',
+            name: 'name',
             tags: ['custom-tag', 'custom-tag', 'custom-tag'],
           },
         },

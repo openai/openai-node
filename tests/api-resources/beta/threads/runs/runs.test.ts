@@ -26,8 +26,8 @@ describe('resource runs', () => {
       additional_instructions: 'additional_instructions',
       additional_messages: [
         {
-          role: 'user',
           content: 'string',
+          role: 'user',
           attachments: [
             {
               file_id: 'file_id',
@@ -57,8 +57,8 @@ describe('resource runs', () => {
           metadata: {},
         },
         {
-          role: 'user',
           content: 'string',
+          role: 'user',
           attachments: [
             {
               file_id: 'file_id',
@@ -88,8 +88,8 @@ describe('resource runs', () => {
           metadata: {},
         },
         {
-          role: 'user',
           content: 'string',
+          role: 'user',
           attachments: [
             {
               file_id: 'file_id',
@@ -223,9 +223,9 @@ describe('resource runs', () => {
     const response = await client.beta.threads.runs.submitToolOutputs('run_id', {
       thread_id: 'thread_id',
       tool_outputs: [
-        { tool_call_id: 'tool_call_id', output: 'output' },
-        { tool_call_id: 'tool_call_id', output: 'output' },
-        { tool_call_id: 'tool_call_id', output: 'output' },
+        { output: 'output', tool_call_id: 'tool_call_id' },
+        { output: 'output', tool_call_id: 'tool_call_id' },
+        { output: 'output', tool_call_id: 'tool_call_id' },
       ],
       stream: false,
     });
