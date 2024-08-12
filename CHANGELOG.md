@@ -1,5 +1,14 @@
 # Changelog
 
+## 4.55.5 (2024-08-12)
+
+Full Changelog: [v4.55.4...v4.55.5](https://github.com/openai/openai-node/compare/v4.55.4...v4.55.5)
+
+### Chores
+
+* **examples:** minor formatting changes ([#987](https://github.com/openai/openai-node/issues/987)) ([8e6b615](https://github.com/openai/openai-node/commit/8e6b615ada09fa4e50dc8e0b5decf662eed19856))
+* sync openapi url ([#989](https://github.com/openai/openai-node/issues/989)) ([02ff1c5](https://github.com/openai/openai-node/commit/02ff1c55b5eefd8b6193ba2bf10dd5515945bd7a))
+
 ## 4.55.4 (2024-08-09)
 
 Full Changelog: [v4.55.3...v4.55.4](https://github.com/openai/openai-node/compare/v4.55.3...v4.55.4)
