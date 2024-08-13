@@ -525,13 +525,6 @@ describe('.parse()', () => {
           "$schema": "http://json-schema.org/draft-07/schema#",
           "additionalProperties": false,
           "definitions": {
-            "contactPerson_properties_person1_properties_name": {
-              "type": "string",
-            },
-            "contactPerson_properties_person1_properties_phone_number": {
-              "nullable": true,
-              "type": "string",
-            },
             "query": {
               "additionalProperties": false,
               "properties": {
@@ -615,6 +608,21 @@ describe('.parse()', () => {
                   "type": "null",
                 },
               ],
+            },
+            "query_properties_fields_items_anyOf_0_properties_metadata_anyOf_0": {
+              "additionalProperties": false,
+              "properties": {
+                "foo": {
+                  "$ref": "#/definitions/query_properties_fields_items_anyOf_0_properties_metadata_anyOf_0_properties_foo",
+                },
+              },
+              "required": [
+                "foo",
+              ],
+              "type": "object",
+            },
+            "query_properties_fields_items_anyOf_0_properties_metadata_anyOf_0_properties_foo": {
+              "type": "string",
             },
           },
           "properties": {
@@ -776,6 +784,166 @@ describe('.parse()', () => {
               },
             ],
             "name": "TodoApp",
+          },
+          "refusal": null,
+          "role": "assistant",
+          "tool_calls": [],
+        }
+      `);
+    });
+
+    test('recursive schema extraction', async () => {
+      const baseLinkedListNodeSchema = z.object({
+        value: z.number(),
+      });
+      type LinkedListNode = z.infer<typeof baseLinkedListNodeSchema> & {
+        next: LinkedListNode | null;
+      };
+      const linkedListNodeSchema: z.ZodType<LinkedListNode> = baseLinkedListNodeSchema.extend({
+        next: z.lazy(() => z.union([linkedListNodeSchema, z.null()])),
+      });
+
+      // Define the main schema
+      const mainSchema = z.object({
+        linked_list: linkedListNodeSchema,
+      });
+
+      expect(zodResponseFormat(mainSchema, 'query').json_schema.schema).toMatchInlineSnapshot(`
+        {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "additionalProperties": false,
+          "definitions": {
+            "query": {
+              "additionalProperties": false,
+              "properties": {
+                "linked_list": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "next": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/definitions/query_properties_linked_list",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "value": {
+                      "type": "number",
+                    },
+                  },
+                  "required": [
+                    "value",
+                    "next",
+                  ],
+                  "type": "object",
+                },
+              },
+              "required": [
+                "linked_list",
+              ],
+              "type": "object",
+            },
+            "query_properties_linked_list": {
+              "additionalProperties": false,
+              "properties": {
+                "next": {
+                  "$ref": "#/definitions/query_properties_linked_list_properties_next",
+                },
+                "value": {
+                  "$ref": "#/definitions/query_properties_linked_list_properties_value",
+                },
+              },
+              "required": [
+                "value",
+                "next",
+              ],
+              "type": "object",
+            },
+            "query_properties_linked_list_properties_next": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/query_properties_linked_list",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
+            "query_properties_linked_list_properties_value": {
+              "type": "number",
+            },
+          },
+          "properties": {
+            "linked_list": {
+              "additionalProperties": false,
+              "properties": {
+                "next": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/query_properties_linked_list",
+                    },
+                    {
+                      "type": "null",
+                    },
+                  ],
+                },
+                "value": {
+                  "type": "number",
+                },
+              },
+              "required": [
+                "value",
+                "next",
+              ],
+              "type": "object",
+            },
+          },
+          "required": [
+            "linked_list",
+          ],
+          "type": "object",
+        }
+      `);
+
+      const completion = await makeSnapshotRequest(
+        (openai) =>
+          openai.beta.chat.completions.parse({
+            model: 'gpt-4o-2024-08-06',
+            messages: [
+              {
+                role: 'system',
+                content:
+                  "You are a helpful assistant. Generate a data model according to the user's instructions.",
+              },
+              { role: 'user', content: 'create a linklist from 1 to 5' },
+            ],
+            response_format: zodResponseFormat(mainSchema, 'query'),
+          }),
+        2,
+      );
+
+      expect(completion.choices[0]?.message).toMatchInlineSnapshot(`
+        {
+          "content": "{"linked_list":{"value":1,"next":{"value":2,"next":{"value":3,"next":{"value":4,"next":{"value":5,"next":null}}}}}}",
+          "parsed": {
+            "linked_list": {
+              "next": {
+                "next": {
+                  "next": {
+                    "next": {
+                      "next": null,
+                      "value": 5,
+                    },
+                    "value": 4,
+                  },
+                  "value": 3,
+                },
+                "value": 2,
+              },
+              "value": 1,
+            },
           },
           "refusal": null,
           "role": "assistant",
