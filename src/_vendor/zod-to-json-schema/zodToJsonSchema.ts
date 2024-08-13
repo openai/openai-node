@@ -49,14 +49,26 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
     }
 
     const definitions: Record<string, any> = {};
+    const processedKeys = new Set();
 
-    for (const [name, zodSchema] of Object.entries(refs.definitions)) {
-      definitions[name] =
-        parseDef(
-          zodDef(zodSchema),
-          { ...refs, currentPath: [...refs.basePath, refs.definitionPath, name] },
-          true,
-        ) ?? {};
+    // use while loop to add newly created definitions in `parseDef` to the list
+    while (true) {
+      const newKeys = Object.keys(refs.definitions).filter((key) => !processedKeys.has(key));
+
+      if (newKeys.length === 0) break;
+
+      for (const key of newKeys) {
+        const schema = refs.definitions[key];
+        if (schema) {
+          definitions[key] =
+            parseDef(
+              zodDef(schema),
+              { ...refs, currentPath: [...refs.basePath, refs.definitionPath, key] },
+              true,
+            ) ?? {};
+          processedKeys.add(key);
+        }
+      }
     }
 
     return definitions;

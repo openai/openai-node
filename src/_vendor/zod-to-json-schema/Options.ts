@@ -38,38 +38,45 @@ export type Options<Target extends Targets = 'jsonSchema7'> = {
   openaiStrictMode?: boolean;
 };
 
-export const defaultOptions: Options = {
-  name: undefined,
-  $refStrategy: 'root',
-  basePath: ['#'],
-  effectStrategy: 'input',
-  pipeStrategy: 'all',
-  dateStrategy: 'format:date-time',
-  mapStrategy: 'entries',
-  nullableStrategy: 'from-target',
-  removeAdditionalStrategy: 'passthrough',
-  definitionPath: 'definitions',
-  target: 'jsonSchema7',
-  strictUnions: false,
-  definitions: {},
-  errorMessages: false,
-  markdownDescription: false,
-  patternStrategy: 'escape',
-  applyRegexFlags: false,
-  emailStrategy: 'format:email',
-  base64Strategy: 'contentEncoding:base64',
-  nameStrategy: 'ref',
-};
-
 export const getDefaultOptions = <Target extends Targets>(
   options: Partial<Options<Target>> | string | undefined,
-) =>
-  (typeof options === 'string' ?
-    {
-      ...defaultOptions,
-      name: options,
-    }
-  : {
-      ...defaultOptions,
-      ...options,
-    }) as Options<Target>;
+) => {
+  // Move the default options into the function to prevent the 'definitions' being mutated in each run
+  const defaultOptions: Options = {
+    name: undefined,
+    $refStrategy: 'root',
+    basePath: ['#'],
+    effectStrategy: 'input',
+    pipeStrategy: 'all',
+    dateStrategy: 'format:date-time',
+    mapStrategy: 'entries',
+    nullableStrategy: 'from-target',
+    removeAdditionalStrategy: 'passthrough',
+    definitionPath: 'definitions',
+    target: 'jsonSchema7',
+    strictUnions: false,
+    definitions: {},
+    errorMessages: false,
+    markdownDescription: false,
+    patternStrategy: 'escape',
+    applyRegexFlags: false,
+    emailStrategy: 'format:email',
+    base64Strategy: 'contentEncoding:base64',
+    nameStrategy: 'ref',
+  };
+  return (
+    typeof options === 'string' ?
+      {
+        ...defaultOptions,
+        // Create a new object to avoid mutating the default options
+        basePath: ['#'],
+        definitions: {},
+        name: options,
+      }
+    : {
+        ...defaultOptions,
+        basePath: ['#'],
+        definitions: {},
+        ...options,
+      }) as Options<Target>;
+};
