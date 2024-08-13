@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.55.7 (2024-08-13)
+
+Full Changelog: [v4.55.6...v4.55.7](https://github.com/openai/openai-node/compare/v4.55.6...v4.55.7)
+
+### Bug Fixes
+
+* **json-schema:** correct handling of nested recursive schemas ([#992](https://github.com/openai/openai-node/issues/992)) ([ac309ab](https://github.com/openai/openai-node/commit/ac309abee3419594f45680c7d0ab11e13ce28c5b))
+
 ## 4.55.6 (2024-08-13)
 
 Full Changelog: [v4.55.5...v4.55.6](https://github.com/openai/openai-node/compare/v4.55.5...v4.55.6)
