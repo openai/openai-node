@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.55.6 (2024-08-13)
+
+Full Changelog: [v4.55.5...v4.55.6](https://github.com/openai/openai-node/compare/v4.55.5...v4.55.6)
+
+### Bug Fixes
+
+* **zod-to-json-schema:** correct licensing ([#986](https://github.com/openai/openai-node/issues/986)) ([bd2051e](https://github.com/openai/openai-node/commit/bd2051e501e2ceafcd095f82205c2e668e1d68d7))
+
 ## 4.55.5 (2024-08-12)
 
 Full Changelog: [v4.55.4...v4.55.5](https://github.com/openai/openai-node/compare/v4.55.4...v4.55.5)
