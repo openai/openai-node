@@ -143,7 +143,7 @@ export interface UploadCreateParams {
    * See the
    * [documentation on File purposes](https://platform.openai.com/docs/api-reference/files/create#files-create-purpose).
    */
-  purpose: 'assistants' | 'batch' | 'fine-tune' | 'vision';
+  purpose: FilesAPI.FilePurpose;
 }
 
 export interface UploadCompleteParams {
