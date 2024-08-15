@@ -277,6 +277,7 @@ export namespace OpenAI {
   export import FileContent = API.FileContent;
   export import FileDeleted = API.FileDeleted;
   export import FileObject = API.FileObject;
+  export import FilePurpose = API.FilePurpose;
   export import FileObjectsPage = API.FileObjectsPage;
   export import FileCreateParams = API.FileCreateParams;
   export import FileListParams = API.FileListParams;
