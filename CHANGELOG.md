@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.55.8 (2024-08-15)
+
+Full Changelog: [v4.55.7...v4.55.8](https://github.com/openai/openai-node/compare/v4.55.7...v4.55.8)
+
+### Chores
+
+* **types:** define FilePurpose enum ([#997](https://github.com/openai/openai-node/issues/997)) ([19b941b](https://github.com/openai/openai-node/commit/19b941be4ff3e4fa7e67b820a5aac51e5c8d4f60))
+
 ## 4.55.7 (2024-08-13)
 
 Full Changelog: [v4.55.6...v4.55.7](https://github.com/openai/openai-node/compare/v4.55.6...v4.55.7)
