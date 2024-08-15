@@ -76,6 +76,7 @@ Types:
 - <code><a href="./src/resources/files.ts">FileContent</a></code>
 - <code><a href="./src/resources/files.ts">FileDeleted</a></code>
 - <code><a href="./src/resources/files.ts">FileObject</a></code>
+- <code><a href="./src/resources/files.ts">FilePurpose</a></code>
 
 Methods:
 

@@ -183,6 +183,18 @@ export interface FileObject {
   status_details?: string;
 }
 
+/**
+ * The intended purpose of the uploaded file.
+ *
+ * Use "assistants" for
+ * [Assistants](https://platform.openai.com/docs/api-reference/assistants) and
+ * [Message](https://platform.openai.com/docs/api-reference/messages) files,
+ * "vision" for Assistants image file inputs, "batch" for
+ * [Batch API](https://platform.openai.com/docs/guides/batch), and "fine-tune" for
+ * [Fine-tuning](https://platform.openai.com/docs/api-reference/fine-tuning).
+ */
+export type FilePurpose = 'assistants' | 'batch' | 'fine-tune' | 'vision';
+
 export interface FileCreateParams {
   /**
    * The File object (not file name) to be uploaded.
@@ -199,7 +211,7 @@ export interface FileCreateParams {
    * [Batch API](https://platform.openai.com/docs/guides/batch), and "fine-tune" for
    * [Fine-tuning](https://platform.openai.com/docs/api-reference/fine-tuning).
    */
-  purpose: 'assistants' | 'batch' | 'fine-tune' | 'vision';
+  purpose: FilePurpose;
 }
 
 export interface FileListParams {
@@ -213,6 +225,7 @@ export namespace Files {
   export import FileContent = FilesAPI.FileContent;
   export import FileDeleted = FilesAPI.FileDeleted;
   export import FileObject = FilesAPI.FileObject;
+  export import FilePurpose = FilesAPI.FilePurpose;
   export import FileObjectsPage = FilesAPI.FileObjectsPage;
   export import FileCreateParams = FilesAPI.FileCreateParams;
   export import FileListParams = FilesAPI.FileListParams;

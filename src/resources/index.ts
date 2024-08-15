@@ -27,6 +27,7 @@ export {
   FileContent,
   FileDeleted,
   FileObject,
+  FilePurpose,
   FileCreateParams,
   FileListParams,
   FileObjectsPage,
