@@ -254,6 +254,43 @@ describe('instantiate azure client', () => {
         /The `apiKey` and `azureADTokenProvider` arguments are mutually exclusive; only one can be passed at a time./,
       );
     });
+
+    test('AAD token is refreshed', async () => {
+      let fail = true;
+      const testFetch = async (url: RequestInfo, req: RequestInit | undefined): Promise<Response> => {
+        if (fail) {
+          fail = false;
+          return new Response(undefined, {
+            status: 429,
+            headers: {
+              'Retry-After': '0.1',
+            },
+          });
+        }
+        return new Response(
+          JSON.stringify({ auth: (req?.headers as Record<string, string>)['authorization'] }),
+          { headers: { 'content-type': 'application/json' } },
+        );
+      };
+      let counter = 0;
+      async function azureADTokenProvider() {
+        return `token-${counter++}`;
+      }
+      const client = new AzureOpenAI({
+        baseURL: 'http://localhost:5000/',
+        azureADTokenProvider,
+        apiVersion,
+        fetch: testFetch,
+      });
+      expect(
+        await client.chat.completions.create({
+          model,
+          messages: [{ role: 'system', content: 'Hello' }],
+        }),
+      ).toStrictEqual({
+        auth: 'Bearer token-1',
+      });
+    });
   });
 
   test('with endpoint', () => {

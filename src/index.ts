@@ -485,7 +485,7 @@ export class AzureOpenAI extends OpenAI {
   }
 
   protected override async prepareOptions(opts: Core.FinalRequestOptions<unknown>): Promise<void> {
-    if (opts.headers?.['Authorization'] || opts.headers?.['api-key']) {
+    if (opts.headers?.['api-key']) {
       return super.prepareOptions(opts);
     }
     const token = await this._getAzureADToken();
