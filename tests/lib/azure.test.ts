@@ -278,8 +278,11 @@ describe('azure request building', () => {
   const client = new AzureOpenAI({ baseURL: 'https://example.com', apiKey: 'My API Key', apiVersion });
 
   describe('model to deployment mapping', function () {
-    const testFetch = async (url: RequestInfo): Promise<Response> => {
-      return new Response(JSON.stringify({ url }), { headers: { 'content-type': 'application/json' } });
+    const testFetch = async (url: RequestInfo, { body }: RequestInit = {}): Promise<Response> => {
+      console.log(`XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX: ${JSON.stringify(body)}`);
+      return new Response(JSON.stringify({ url, body }), {
+        headers: { 'content-type': 'application/json' },
+      });
     };
     describe('with client-level deployment', function () {
       const client = new AzureOpenAI({
@@ -291,127 +294,109 @@ describe('azure request building', () => {
       });
 
       test('handles batch', async () => {
-        expect(
-          await client.batches.create({
-            completion_window: '24h',
-            endpoint: '/v1/chat/completions',
-            input_file_id: 'file-id',
-          }),
-        ).toStrictEqual({
-          url: `https://example.com/openai/batches?api-version=${apiVersion}`,
-        });
+        const { url } = (await client.batches.create({
+          completion_window: '24h',
+          endpoint: '/v1/chat/completions',
+          input_file_id: 'file-id',
+        })) as any;
+        expect(url).toStrictEqual(`https://example.com/openai/batches?api-version=${apiVersion}`);
       });
 
       test('handles completions', async () => {
-        expect(
-          await client.completions.create({
-            model,
-            prompt: 'prompt',
-          }),
-        ).toStrictEqual({
-          url: `https://example.com/openai/deployments/${deployment}/completions?api-version=${apiVersion}`,
-        });
+        const { url } = (await client.completions.create({
+          model,
+          prompt: 'prompt',
+        })) as any;
+        expect(url).toStrictEqual(
+          `https://example.com/openai/deployments/${deployment}/completions?api-version=${apiVersion}`,
+        );
       });
 
       test('handles chat completions', async () => {
-        expect(
-          await client.chat.completions.create({
-            model,
-            messages: [{ role: 'system', content: 'Hello' }],
-          }),
-        ).toStrictEqual({
-          url: `https://example.com/openai/deployments/${deployment}/chat/completions?api-version=${apiVersion}`,
-        });
+        const { url } = (await client.chat.completions.create({
+          model,
+          messages: [{ role: 'system', content: 'Hello' }],
+        })) as any;
+        expect(url).toStrictEqual(
+          `https://example.com/openai/deployments/${deployment}/chat/completions?api-version=${apiVersion}`,
+        );
       });
 
       test('handles embeddings', async () => {
-        expect(
-          await client.embeddings.create({
-            model,
-            input: 'input',
-          }),
-        ).toStrictEqual({
-          url: `https://example.com/openai/deployments/${deployment}/embeddings?api-version=${apiVersion}`,
-        });
+        const { url } = (await client.embeddings.create({
+          model,
+          input: 'input',
+        })) as any;
+        expect(url).toStrictEqual(
+          `https://example.com/openai/deployments/${deployment}/embeddings?api-version=${apiVersion}`,
+        );
       });
 
       test('handles audio translations', async () => {
-        expect(
-          await client.audio.translations.create({
-            model,
-            file: { url: 'https://example.com', blob: () => 0 as any },
-          }),
-        ).toStrictEqual({
-          url: `https://example.com/openai/deployments/${deployment}/audio/translations?api-version=${apiVersion}`,
-        });
+        const { url } = (await client.audio.translations.create({
+          model,
+          file: { url: 'https://example.com', blob: () => 0 as any },
+        })) as any;
+        expect(url).toStrictEqual(
+          `https://example.com/openai/deployments/${deployment}/audio/translations?api-version=${apiVersion}`,
+        );
       });
 
       test('handles audio transcriptions', async () => {
-        expect(
-          await client.audio.transcriptions.create({
-            model,
-            file: { url: 'https://example.com', blob: () => 0 as any },
-          }),
-        ).toStrictEqual({
-          url: `https://example.com/openai/deployments/${deployment}/audio/transcriptions?api-version=${apiVersion}`,
-        });
+        const { url } = (await client.audio.transcriptions.create({
+          model,
+          file: { url: 'https://example.com', blob: () => 0 as any },
+        })) as any;
+        expect(url).toStrictEqual(
+          `https://example.com/openai/deployments/${deployment}/audio/transcriptions?api-version=${apiVersion}`,
+        );
       });
 
       test('handles text to speech', async () => {
-        expect(
-          await (
-            await client.audio.speech.create({
-              model,
-              input: '',
-              voice: 'alloy',
-            })
-          ).json(),
-        ).toStrictEqual({
-          url: `https://example.com/openai/deployments/${deployment}/audio/speech?api-version=${apiVersion}`,
-        });
+        const { url, body } = await (
+          await client.audio.speech.create({
+            model,
+            input: '',
+            voice: 'alloy',
+          })
+        ).json();
+        expect(url).toStrictEqual(
+          `https://example.com/openai/deployments/${deployment}/audio/speech?api-version=${apiVersion}`,
+        );
+        expect(body).toMatch(new RegExp(`"model": "${model}"`));
       });
 
       test('handles image generation', async () => {
-        expect(
-          await client.images.generate({
-            model,
-            prompt: 'prompt',
-          }),
-        ).toStrictEqual({
-          url: `https://example.com/openai/deployments/${deployment}/images/generations?api-version=${apiVersion}`,
-        });
+        const { url } = (await client.images.generate({
+          model,
+          prompt: 'prompt',
+        })) as any;
+        expect(url).toStrictEqual(
+          `https://example.com/openai/deployments/${deployment}/images/generations?api-version=${apiVersion}`,
+        );
       });
 
       test('handles assistants', async () => {
-        expect(
-          await client.beta.assistants.create({
-            model,
-          }),
-        ).toStrictEqual({
-          url: `https://example.com/openai/assistants?api-version=${apiVersion}`,
-        });
+        const { url } = (await client.beta.assistants.create({
+          model,
+        })) as any;
+        expect(url).toStrictEqual(`https://example.com/openai/assistants?api-version=${apiVersion}`);
       });
 
       test('handles files', async () => {
-        expect(
-          await client.files.create({
-            file: { url: 'https://example.com', blob: () => 0 as any },
-            purpose: 'assistants',
-          }),
-        ).toStrictEqual({
-          url: `https://example.com/openai/files?api-version=${apiVersion}`,
-        });
+        const { url } = (await client.files.create({
+          file: { url: 'https://example.com', blob: () => 0 as any },
+          purpose: 'assistants',
+        })) as any;
+        expect(url).toStrictEqual(`https://example.com/openai/files?api-version=${apiVersion}`);
       });
 
       test('handles fine tuning', async () => {
-        expect(
-          await client.fineTuning.jobs.create({
-            model,
-            training_file: '',
-          }),
-        ).toStrictEqual({
-          url: `https://example.com/openai/fine_tuning/jobs?api-version=${apiVersion}`,
-        });
+        const { url } = (await client.fineTuning.jobs.create({
+          model,
+          training_file: '',
+        })) as any;
+        expect(url).toStrictEqual(`https://example.com/openai/fine_tuning/jobs?api-version=${apiVersion}`);
       });
     });
 
@@ -424,127 +409,107 @@ describe('azure request building', () => {
       });
 
       test('handles batch', async () => {
-        expect(
-          await client.batches.create({
-            completion_window: '24h',
-            endpoint: '/v1/chat/completions',
-            input_file_id: 'file-id',
-          }),
-        ).toStrictEqual({
-          url: `https://example.com/openai/batches?api-version=${apiVersion}`,
-        });
+        const { url } = (await client.batches.create({
+          completion_window: '24h',
+          endpoint: '/v1/chat/completions',
+          input_file_id: 'file-id',
+        })) as any;
+        expect(url).toStrictEqual(`https://example.com/openai/batches?api-version=${apiVersion}`);
       });
 
       test('handles completions', async () => {
-        expect(
-          await client.completions.create({
-            model: deployment,
-            prompt: 'prompt',
-          }),
-        ).toStrictEqual({
-          url: `https://example.com/openai/deployments/${deployment}/completions?api-version=${apiVersion}`,
-        });
+        const { url } = (await client.completions.create({
+          model: deployment,
+          prompt: 'prompt',
+        })) as any;
+        expect(url).toStrictEqual(
+          `https://example.com/openai/deployments/${deployment}/completions?api-version=${apiVersion}`,
+        );
       });
 
       test('handles chat completions', async () => {
-        expect(
-          await client.chat.completions.create({
-            model: deployment,
-            messages: [{ role: 'system', content: 'Hello' }],
-          }),
-        ).toStrictEqual({
-          url: `https://example.com/openai/deployments/${deployment}/chat/completions?api-version=${apiVersion}`,
-        });
+        const { url } = (await client.chat.completions.create({
+          model: deployment,
+          messages: [{ role: 'system', content: 'Hello' }],
+        })) as any;
+        expect(url).toStrictEqual(
+          `https://example.com/openai/deployments/${deployment}/chat/completions?api-version=${apiVersion}`,
+        );
       });
 
       test('handles embeddings', async () => {
-        expect(
-          await client.embeddings.create({
-            model: deployment,
-            input: 'input',
-          }),
-        ).toStrictEqual({
-          url: `https://example.com/openai/deployments/${deployment}/embeddings?api-version=${apiVersion}`,
-        });
+        const { url } = (await client.embeddings.create({
+          model: deployment,
+          input: 'input',
+        })) as any;
+        expect(url).toStrictEqual(
+          `https://example.com/openai/deployments/${deployment}/embeddings?api-version=${apiVersion}`,
+        );
       });
 
       test('Audio translations is not handled', async () => {
-        expect(
-          await client.audio.translations.create({
-            model: deployment,
-            file: { url: 'https://example.com', blob: () => 0 as any },
-          }),
-        ).toStrictEqual({
-          url: `https://example.com/openai/audio/translations?api-version=${apiVersion}`,
-        });
+        const { url } = (await client.audio.translations.create({
+          model: deployment,
+          file: { url: 'https://example.com', blob: () => 0 as any },
+        })) as any;
+        expect(url).toStrictEqual(`https://example.com/openai/audio/translations?api-version=${apiVersion}`);
       });
 
       test('Audio transcriptions is not handled', async () => {
-        expect(
-          await client.audio.transcriptions.create({
-            model: deployment,
-            file: { url: 'https://example.com', blob: () => 0 as any },
-          }),
-        ).toStrictEqual({
-          url: `https://example.com/openai/audio/transcriptions?api-version=${apiVersion}`,
-        });
+        const { url } = (await client.audio.transcriptions.create({
+          model: deployment,
+          file: { url: 'https://example.com', blob: () => 0 as any },
+        })) as any;
+        expect(url).toStrictEqual(
+          `https://example.com/openai/audio/transcriptions?api-version=${apiVersion}`,
+        );
       });
 
       test('handles text to speech', async () => {
-        expect(
-          await (
-            await client.audio.speech.create({
-              model: deployment,
-              input: '',
-              voice: 'alloy',
-            })
-          ).json(),
-        ).toStrictEqual({
-          url: `https://example.com/openai/deployments/${deployment}/audio/speech?api-version=${apiVersion}`,
-        });
+        const { url, body } = await (
+          await client.audio.speech.create({
+            model: deployment,
+            input: '',
+            voice: 'alloy',
+          })
+        ).json();
+        expect(url).toStrictEqual(
+          `https://example.com/openai/deployments/${deployment}/audio/speech?api-version=${apiVersion}`,
+        );
+        expect(body).toMatch(new RegExp(`"model": "${deployment}"`));
       });
 
       test('handles image generation', async () => {
-        expect(
-          await client.images.generate({
-            model: deployment,
-            prompt: 'prompt',
-          }),
-        ).toStrictEqual({
-          url: `https://example.com/openai/deployments/${deployment}/images/generations?api-version=${apiVersion}`,
-        });
+        const { url } = (await client.images.generate({
+          model: deployment,
+          prompt: 'prompt',
+        })) as any;
+        expect(url).toStrictEqual(
+          `https://example.com/openai/deployments/${deployment}/images/generations?api-version=${apiVersion}`,
+        );
       });
 
       test('handles assistants', async () => {
-        expect(
-          await client.beta.assistants.create({
-            model,
-          }),
-        ).toStrictEqual({
-          url: `https://example.com/openai/assistants?api-version=${apiVersion}`,
-        });
+        const { url } = (await client.beta.assistants.create({
+          model,
+        })) as any;
+        expect(url).toStrictEqual(`https://example.com/openai/assistants?api-version=${apiVersion}`);
       });
 
       test('handles files', async () => {
-        expect(
-          await client.files.create({
-            file: { url: 'https://example.com', blob: () => 0 as any },
-            purpose: 'assistants',
-          }),
-        ).toStrictEqual({
-          url: `https://example.com/openai/files?api-version=${apiVersion}`,
-        });
+        const { url } = (await client.files.create({
+          file: { url: 'https://example.com', blob: () => 0 as any },
+          purpose: 'assistants',
+        })) as any;
+        expect(url).toStrictEqual(`https://example.com/openai/files?api-version=${apiVersion}`);
       });
 
       test('handles fine tuning', async () => {
-        expect(
-          await client.fineTuning.jobs.create({
-            model,
-            training_file: '',
-          }),
-        ).toStrictEqual({
-          url: `https://example.com/openai/fine_tuning/jobs?api-version=${apiVersion}`,
-        });
+        const { url } = (await client.fineTuning.jobs.create({
+          model: deployment,
+          training_file: '',
+        })) as any;
+        expect(url).toStrictEqual(`https://example.com/openai/fine_tuning/jobs?api-version=${apiVersion}`);
       });
     });
   });
