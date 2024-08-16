@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.55.9 (2024-08-16)
+
+Full Changelog: [v4.55.8...v4.55.9](https://github.com/openai/openai-node/compare/v4.55.8...v4.55.9)
+
+### Bug Fixes
+
+* **azure/tts:** avoid stripping model param ([#999](https://github.com/openai/openai-node/issues/999)) ([c3a7ccd](https://github.com/openai/openai-node/commit/c3a7ccdbd6d9a2576509c2dc6c1605bc73c6dde7))
+
 ## 4.55.8 (2024-08-15)
 
 Full Changelog: [v4.55.7...v4.55.8](https://github.com/openai/openai-node/compare/v4.55.7...v4.55.8)
