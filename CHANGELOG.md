@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.56.0 (2024-08-16)
+
+Full Changelog: [v4.55.9...v4.56.0](https://github.com/openai/openai-node/compare/v4.55.9...v4.56.0)
+
+### Features
+
+* **api:** add chatgpt-4o-latest model ([edc4398](https://github.com/openai/openai-node/commit/edc43986ba96a0fda48f7eea368efe706f68dcac))
+
 ## 4.55.9 (2024-08-16)
 
 Full Changelog: [v4.55.8...v4.55.9](https://github.com/openai/openai-node/compare/v4.55.8...v4.55.9)
