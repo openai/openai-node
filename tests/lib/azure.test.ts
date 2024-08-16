@@ -279,7 +279,6 @@ describe('azure request building', () => {
 
   describe('model to deployment mapping', function () {
     const testFetch = async (url: RequestInfo, { body }: RequestInit = {}): Promise<Response> => {
-      console.log(`XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX: ${JSON.stringify(body)}`);
       return new Response(JSON.stringify({ url, body }), {
         headers: { 'content-type': 'application/json' },
       });
