@@ -9,7 +9,7 @@ import {
   type ChatCompletionStreamingFunctionRunnerParams,
 } from 'openai/resources/beta/chat/completions';
 import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
-import { Response } from 'node-fetch';
+import { Response } from 'undici';
 import { isAssistantMessage } from '../../src/lib/chatCompletionUtils';
 import { mockFetch } from '../utils/mock-fetch';
 

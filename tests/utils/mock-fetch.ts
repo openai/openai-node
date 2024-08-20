@@ -1,5 +1,4 @@
-import { type RequestInfo, type RequestInit } from 'openai/_shims/index';
-import { Response } from 'node-fetch';
+import { type RequestInfo, type RequestInit, type Response } from 'openai/_shims/index';
 
 type Fetch = (req: string | RequestInfo, init?: RequestInit) => Promise<Response>;
 

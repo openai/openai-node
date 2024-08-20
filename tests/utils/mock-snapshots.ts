@@ -1,4 +1,4 @@
-import defaultFetch, { Response } from 'node-fetch';
+import { Response, fetch as defaultFetch } from 'undici';
 import OpenAI from 'openai/index';
 import { RequestInit } from 'openai/_shims/auto/types';
 import { RequestInfo } from 'openai/_shims/auto/types';
