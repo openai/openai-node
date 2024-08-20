@@ -1,10 +1,10 @@
-import * as Core from 'openai/core';
 import {
   OpenAIError,
   APIUserAbortError,
   LengthFinishReasonError,
   ContentFilterFinishReasonError,
 } from 'openai/error';
+import { RequestOptions } from 'openai/internal/request-options';
 import {
   ChatCompletionTokenLogprob,
   type ChatCompletion,
@@ -158,7 +158,7 @@ export class ChatCompletionStream<ParsedT = null>
   static createChatCompletion<ParsedT>(
     client: OpenAI,
     params: ChatCompletionStreamParams,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): ChatCompletionStream<ParsedT> {
     const runner = new ChatCompletionStream<ParsedT>(params as ChatCompletionCreateParamsStreaming);
     runner._run(() =>
@@ -368,7 +368,7 @@ export class ChatCompletionStream<ParsedT = null>
   protected override async _createChatCompletion(
     client: OpenAI,
     params: ChatCompletionCreateParams,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): Promise<ParsedChatCompletion<ParsedT>> {
     super._createChatCompletion;
     const signal = options?.signal;
@@ -394,7 +394,7 @@ export class ChatCompletionStream<ParsedT = null>
 
   protected async _fromReadableStream(
     readableStream: ReadableStream,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): Promise<ChatCompletion> {
     const signal = options?.signal;
     if (signal) {

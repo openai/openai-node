@@ -236,7 +236,7 @@ export class AbstractChatCompletionRunner<
   protected async _createChatCompletion(
     client: OpenAI,
     params: ChatCompletionCreateParams,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): Promise<ParsedChatCompletion<ParsedT>> {
     const signal = options?.signal;
     if (signal) {

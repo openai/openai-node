@@ -1,6 +1,6 @@
 import { AzureOpenAI } from 'openai';
 import { APIUserAbortError } from 'openai';
-import { Headers } from 'openai/core';
+import { type Headers } from 'openai/internal/types';
 import { fetch as defaultFetch, Response, type RequestInit, type RequestInfo } from 'undici';
 
 const apiVersion = '2024-02-15-preview';

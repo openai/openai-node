@@ -1,10 +1,9 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../../resource';
-import { isRequestOptions } from '../../../core';
+import { type RequestOptions, isRequestOptions } from '../../../internal/request-options';
 import { AssistantStream, ThreadCreateAndRunParamsBaseStream } from '../../../lib/AssistantStream';
-import { APIPromise } from '../../../core';
-import * as Core from '../../../core';
+import { APIPromise } from '../../../internal/api-promise';
 import * as ThreadsAPI from './threads';
 import * as Shared from '../../shared';
 import * as AssistantsAPI from '../assistants';
@@ -20,12 +19,9 @@ export class Threads extends APIResource {
   /**
    * Create a thread.
    */
-  create(body?: ThreadCreateParams, options?: Core.RequestOptions): Core.APIPromise<Thread>;
-  create(options?: Core.RequestOptions): Core.APIPromise<Thread>;
-  create(
-    body: ThreadCreateParams | Core.RequestOptions = {},
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<Thread> {
+  create(body?: ThreadCreateParams, options?: RequestOptions): APIPromise<Thread>;
+  create(options?: RequestOptions): APIPromise<Thread>;
+  create(body: ThreadCreateParams | RequestOptions = {}, options?: RequestOptions): APIPromise<Thread> {
     if (isRequestOptions(body)) {
       return this.create({}, body);
     }
@@ -39,7 +35,7 @@ export class Threads extends APIResource {
   /**
    * Retrieves a thread.
    */
-  retrieve(threadId: string, options?: Core.RequestOptions): Core.APIPromise<Thread> {
+  retrieve(threadId: string, options?: RequestOptions): APIPromise<Thread> {
     return this._client.get(`/threads/${threadId}`, {
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
@@ -49,7 +45,7 @@ export class Threads extends APIResource {
   /**
    * Modifies a thread.
    */
-  update(threadId: string, body: ThreadUpdateParams, options?: Core.RequestOptions): Core.APIPromise<Thread> {
+  update(threadId: string, body: ThreadUpdateParams, options?: RequestOptions): APIPromise<Thread> {
     return this._client.post(`/threads/${threadId}`, {
       body,
       ...options,
@@ -60,7 +56,7 @@ export class Threads extends APIResource {
   /**
    * Delete a thread.
    */
-  del(threadId: string, options?: Core.RequestOptions): Core.APIPromise<ThreadDeleted> {
+  del(threadId: string, options?: RequestOptions): APIPromise<ThreadDeleted> {
     return this._client.delete(`/threads/${threadId}`, {
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
@@ -70,21 +66,18 @@ export class Threads extends APIResource {
   /**
    * Create a thread and run it in one request.
    */
-  createAndRun(
-    body: ThreadCreateAndRunParamsNonStreaming,
-    options?: Core.RequestOptions,
-  ): APIPromise<RunsAPI.Run>;
+  createAndRun(body: ThreadCreateAndRunParamsNonStreaming, options?: RequestOptions): APIPromise<RunsAPI.Run>;
   createAndRun(
     body: ThreadCreateAndRunParamsStreaming,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
   createAndRun(
     body: ThreadCreateAndRunParamsBase,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): APIPromise<Stream<AssistantsAPI.AssistantStreamEvent> | RunsAPI.Run>;
   createAndRun(
     body: ThreadCreateAndRunParams,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): APIPromise<RunsAPI.Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>> {
     return this._client.post('/threads/runs', {
       body,
@@ -101,7 +94,7 @@ export class Threads extends APIResource {
    */
   async createAndRunPoll(
     body: ThreadCreateAndRunParamsNonStreaming,
-    options?: Core.RequestOptions & { pollIntervalMs?: number },
+    options?: RequestOptions & { pollIntervalMs?: number },
   ): Promise<Threads.Run> {
     const run = await this.createAndRun(body, options);
     return await this.runs.poll(run.thread_id, run.id, options);
@@ -110,10 +103,7 @@ export class Threads extends APIResource {
   /**
    * Create a thread and stream the run back
    */
-  createAndRunStream(
-    body: ThreadCreateAndRunParamsBaseStream,
-    options?: Core.RequestOptions,
-  ): AssistantStream {
+  createAndRunStream(body: ThreadCreateAndRunParamsBaseStream, options?: RequestOptions): AssistantStream {
     return AssistantStream.createThreadAssistantStream(body, this._client.beta.threads, options);
   }
 }
@@ -1603,14 +1593,9 @@ export namespace Threads {
   export import RunCreateParamsStreaming = RunsAPI.RunCreateParamsStreaming;
   export import RunUpdateParams = RunsAPI.RunUpdateParams;
   export import RunListParams = RunsAPI.RunListParams;
-  export import RunCreateAndPollParams = RunsAPI.RunCreateAndPollParams;
-  export import RunCreateAndStreamParams = RunsAPI.RunCreateAndStreamParams;
-  export import RunStreamParams = RunsAPI.RunStreamParams;
   export import RunSubmitToolOutputsParams = RunsAPI.RunSubmitToolOutputsParams;
   export import RunSubmitToolOutputsParamsNonStreaming = RunsAPI.RunSubmitToolOutputsParamsNonStreaming;
   export import RunSubmitToolOutputsParamsStreaming = RunsAPI.RunSubmitToolOutputsParamsStreaming;
-  export import RunSubmitToolOutputsAndPollParams = RunsAPI.RunSubmitToolOutputsAndPollParams;
-  export import RunSubmitToolOutputsStreamParams = RunsAPI.RunSubmitToolOutputsStreamParams;
   export import Messages = MessagesAPI.Messages;
   export import Annotation = MessagesAPI.Annotation;
   export import AnnotationDelta = MessagesAPI.AnnotationDelta;
