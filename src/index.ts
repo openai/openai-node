@@ -485,6 +485,12 @@ export class AzureOpenAI extends OpenAI {
   }
 
   protected override async prepareOptions(opts: Core.FinalRequestOptions<unknown>): Promise<void> {
+    /**
+     * The user should provide a bearer token provider if they want
+     * to use Azure AD authentication. The user shouldn't set the
+     * Authorization header manually because the header is overwritten
+     * with the Azure AD token if a bearer token provider is provided.
+     */
     if (opts.headers?.['api-key']) {
       return super.prepareOptions(opts);
     }
