@@ -54,13 +54,14 @@ it(`raw response`, async function () {
 
   // test that we can use node-fetch Response API
   const chunks: string[] = [];
-  const { body } = response;
-  if (!body) throw new Error(`expected response.body to be defined`);
-  body.on('data', (chunk) => chunks.push(chunk));
-  await new Promise<void>((resolve, reject) => {
-    body.once('end', resolve);
-    body.once('error', reject);
-  });
+  if (!response.body) throw new Error(`expected response.body to be defined`);
+
+  const decoder = new TextDecoder();
+
+  for await (const chunk of response.body) {
+    chunks.push(decoder.decode(chunk));
+  }
+
   const json: ChatCompletion = JSON.parse(chunks.join(''));
   expect(json.choices[0]?.message.content || '').toBeSimilarTo('This is a test', 10);
 });

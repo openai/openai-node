@@ -45,3 +45,32 @@ jobs:
 
       - name: Run tests
         run: ./scripts/test
+
+  ecosystem_tests:
+    name: ecosystem tests
+    runs-on: ubuntu-latest
+    if: github.repository == 'stainless-sdks/openai-typescript'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.39.0
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Bootstrap
+        run: ./scripts/bootstrap
+
+      - name: Run ecosystem tests
+        run: |
+          echo 'OPENAI_API_KEY = "'"${OPENAI_API_KEY}"'"' >> ecosystem-tests/cloudflare-worker/wrangler.toml
+          yarn tsn ecosystem-tests/cli.ts --live --verbose --parallel --jobs=4 --retry=3
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
