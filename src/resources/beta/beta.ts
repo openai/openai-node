@@ -17,7 +17,7 @@ export namespace Beta {
   export import VectorStores = VectorStoresAPI.VectorStores;
   export import VectorStore = VectorStoresAPI.VectorStore;
   export import VectorStoreDeleted = VectorStoresAPI.VectorStoreDeleted;
-  export import VectorStoresPage = VectorStoresAPI.VectorStoresPage;
+  export type VectorStoresPage = VectorStoresAPI.VectorStoresPage;
   export import VectorStoreCreateParams = VectorStoresAPI.VectorStoreCreateParams;
   export import VectorStoreUpdateParams = VectorStoresAPI.VectorStoreUpdateParams;
   export import VectorStoreListParams = VectorStoresAPI.VectorStoreListParams;
@@ -34,7 +34,7 @@ export namespace Beta {
   export import RunStepStreamEvent = AssistantsAPI.RunStepStreamEvent;
   export import RunStreamEvent = AssistantsAPI.RunStreamEvent;
   export import ThreadStreamEvent = AssistantsAPI.ThreadStreamEvent;
-  export import AssistantsPage = AssistantsAPI.AssistantsPage;
+  export type AssistantsPage = AssistantsAPI.AssistantsPage;
   export import AssistantCreateParams = AssistantsAPI.AssistantCreateParams;
   export import AssistantUpdateParams = AssistantsAPI.AssistantUpdateParams;
   export import AssistantListParams = AssistantsAPI.AssistantListParams;

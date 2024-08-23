@@ -1587,7 +1587,7 @@ export namespace Threads {
   export import RequiredActionFunctionToolCall = RunsAPI.RequiredActionFunctionToolCall;
   export import Run = RunsAPI.Run;
   export import RunStatus = RunsAPI.RunStatus;
-  export import RunsPage = RunsAPI.RunsPage;
+  export type RunsPage = RunsAPI.RunsPage;
   export import RunCreateParams = RunsAPI.RunCreateParams;
   export import RunCreateParamsNonStreaming = RunsAPI.RunCreateParamsNonStreaming;
   export import RunCreateParamsStreaming = RunsAPI.RunCreateParamsStreaming;
@@ -1625,7 +1625,7 @@ export namespace Threads {
   export import TextContentBlockParam = MessagesAPI.TextContentBlockParam;
   export import TextDelta = MessagesAPI.TextDelta;
   export import TextDeltaBlock = MessagesAPI.TextDeltaBlock;
-  export import MessagesPage = MessagesAPI.MessagesPage;
+  export type MessagesPage = MessagesAPI.MessagesPage;
   export import MessageCreateParams = MessagesAPI.MessageCreateParams;
   export import MessageUpdateParams = MessagesAPI.MessageUpdateParams;
   export import MessageListParams = MessagesAPI.MessageListParams;
