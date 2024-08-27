@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.56.1 (2024-08-27)
+
+Full Changelog: [v4.56.0...v4.56.1](https://github.com/openai/openai-node/compare/v4.56.0...v4.56.1)
+
+### Chores
+
+* **ci:** check for build errors ([#1013](https://github.com/openai/openai-node/issues/1013)) ([7ff2127](https://github.com/openai/openai-node/commit/7ff21273091a605e05173502654cfb9c90a4382e))
+
 ## 4.56.0 (2024-08-16)
 
 Full Changelog: [v4.55.9...v4.56.0](https://github.com/openai/openai-node/compare/v4.55.9...v4.56.0)
