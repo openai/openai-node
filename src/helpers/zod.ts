@@ -58,7 +58,7 @@ function zodToJsonSchema(schema: z.ZodType, options: { name: string }): Record<s
 export function zodResponseFormat<ZodInput extends z.ZodType>(
   zodObject: ZodInput,
   name: string,
-  props?: Omit<ResponseFormatJSONSchema, 'schema' | 'strict' | 'name'>,
+  props?: Omit<ResponseFormatJSONSchema.JSONSchema, 'schema' | 'strict' | 'name'>,
 ): AutoParseableResponseFormat<z.infer<ZodInput>> {
   return makeParseableResponseFormat(
     {
