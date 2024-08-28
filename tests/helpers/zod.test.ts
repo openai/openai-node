@@ -132,6 +132,18 @@ describe('zodResponseFormat', () => {
     `);
   });
 
+  it('allows description field to be passed in', () => {
+    expect(
+      zodResponseFormat(
+        z.object({
+          city: z.string(),
+        }),
+        'city',
+        { description: 'A city' },
+      ).json_schema,
+    ).toHaveProperty('description', 'A city');
+  });
+
   test('kitchen sink types', () => {
     const Table = z.enum(['orders', 'customers', 'products']);
 
