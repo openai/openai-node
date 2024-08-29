@@ -11,8 +11,9 @@ export class Steps extends APIResource {
    * Retrieves a run step.
    */
   retrieve(stepID: string, params: StepRetrieveParams, options?: RequestOptions): APIPromise<RunStep> {
-    const { thread_id, run_id } = params;
+    const { thread_id, run_id, ...query } = params;
     return this._client.get(`/threads/${thread_id}/runs/${run_id}/steps/${stepID}`, {
+      query,
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
     });
@@ -207,13 +208,89 @@ export interface FileSearchToolCall {
   /**
    * For now, this is always going to be an empty object.
    */
-  file_search: unknown;
+  file_search: FileSearchToolCall.FileSearch;
 
   /**
    * The type of tool call. This is always going to be `file_search` for this type of
    * tool call.
    */
   type: 'file_search';
+}
+
+export namespace FileSearchToolCall {
+  /**
+   * For now, this is always going to be an empty object.
+   */
+  export interface FileSearch {
+    /**
+     * The ranking options for the file search.
+     */
+    ranking_options?: FileSearch.RankingOptions;
+
+    /**
+     * The results of the file search.
+     */
+    results?: Array<FileSearch.Result>;
+  }
+
+  export namespace FileSearch {
+    /**
+     * The ranking options for the file search.
+     */
+    export interface RankingOptions {
+      /**
+       * The ranker used for the file search.
+       */
+      ranker: 'default_2024_08_21';
+
+      /**
+       * The score threshold for the file search. All values must be a floating point
+       * number between 0 and 1.
+       */
+      score_threshold: number;
+    }
+
+    /**
+     * A result instance of the file search.
+     */
+    export interface Result {
+      /**
+       * The ID of the file that result was found in.
+       */
+      file_id: string;
+
+      /**
+       * The name of the file that result was found in.
+       */
+      file_name: string;
+
+      /**
+       * The score of the result. All values must be a floating point number between 0
+       * and 1.
+       */
+      score: number;
+
+      /**
+       * The content of the result that was found. The content is only included if
+       * requested via the include query parameter.
+       */
+      content?: Array<Result.Content>;
+    }
+
+    export namespace Result {
+      export interface Content {
+        /**
+         * The text content of the file.
+         */
+        text?: string;
+
+        /**
+         * The type of the content.
+         */
+        type?: 'text';
+      }
+    }
+  }
 }
 
 export interface FileSearchToolCallDelta {
@@ -536,6 +613,8 @@ export namespace RunStepDeltaMessageDelta {
   }
 }
 
+export type RunStepInclude = 'step_details.tool_calls[*].file_search.results[*].content';
+
 /**
  * Details of the Code Interpreter tool call the run step was involved in.
  */
@@ -582,14 +661,26 @@ export interface ToolCallsStepDetails {
 
 export interface StepRetrieveParams {
   /**
-   * The ID of the thread to which the run and run step belongs.
+   * Path param: The ID of the thread to which the run and run step belongs.
    */
   thread_id: string;
 
   /**
-   * The ID of the run to which the run step belongs.
+   * Path param: The ID of the run to which the run step belongs.
    */
   run_id: string;
+
+  /**
+   * Query param: A list of additional fields to include in the response. Currently
+   * the only supported value is
+   * `step_details.tool_calls[*].file_search.results[*].content` to fetch the file
+   * search result content.
+   *
+   * See the
+   * [file search tool documentation](https://platform.openai.com/docs/assistants/tools/file-search/customizing-file-search-settings)
+   * for more information.
+   */
+  include?: Array<RunStepInclude>;
 }
 
 export interface StepListParams extends CursorPageParams {
@@ -605,6 +696,18 @@ export interface StepListParams extends CursorPageParams {
    * before=obj_foo in order to fetch the previous page of the list.
    */
   before?: string;
+
+  /**
+   * Query param: A list of additional fields to include in the response. Currently
+   * the only supported value is
+   * `step_details.tool_calls[*].file_search.results[*].content` to fetch the file
+   * search result content.
+   *
+   * See the
+   * [file search tool documentation](https://platform.openai.com/docs/assistants/tools/file-search/customizing-file-search-settings)
+   * for more information.
+   */
+  include?: Array<RunStepInclude>;
 
   /**
    * Query param: Sort order by the `created_at` timestamp of the objects. `asc` for
@@ -627,6 +730,7 @@ export namespace Steps {
   export import RunStepDelta = StepsAPI.RunStepDelta;
   export import RunStepDeltaEvent = StepsAPI.RunStepDeltaEvent;
   export import RunStepDeltaMessageDelta = StepsAPI.RunStepDeltaMessageDelta;
+  export import RunStepInclude = StepsAPI.RunStepInclude;
   export import ToolCall = StepsAPI.ToolCall;
   export import ToolCallDelta = StepsAPI.ToolCallDelta;
   export import ToolCallDeltaObject = StepsAPI.ToolCallDeltaObject;

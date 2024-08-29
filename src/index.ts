@@ -17,6 +17,7 @@ import {
 import { APIResponseProps } from './internal/parse';
 import { getPlatformHeaders } from './internal/platform';
 import * as Opts from './internal/request-options';
+import * as qs from 'qs';
 import { VERSION } from './version';
 import {
   kind as shimsKind,
@@ -214,24 +215,8 @@ export class BaseOpenAI {
     return { Authorization: `Bearer ${this.apiKey}` };
   }
 
-  /**
-   * Basic re-implementation of `qs.stringify` for primitive types.
-   */
   protected stringifyQuery(query: Record<string, unknown>): string {
-    return Object.entries(query)
-      .filter(([_, value]) => typeof value !== 'undefined')
-      .map(([key, value]) => {
-        if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-          return `${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
-        }
-        if (value === null) {
-          return `${encodeURIComponent(key)}=`;
-        }
-        throw new OpenAIError(
-          `Cannot stringify type ${typeof value}; Expected string, number, boolean, or null. If you need to pass nested query parameters, you can manually encode them, e.g. { query: { 'foo[key1]': value1, 'foo[key2]': value2 } }, and please open a GitHub issue requesting better support for your use case.`,
-        );
-      })
-      .join('&');
+    return qs.stringify(query, { arrayFormat: 'brackets' });
   }
 
   private getUserAgent(): string {

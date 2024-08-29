@@ -14,6 +14,7 @@ export {
   RunStepDelta,
   RunStepDeltaEvent,
   RunStepDeltaMessageDelta,
+  RunStepInclude,
   ToolCall,
   ToolCallDelta,
   ToolCallDeltaObject,

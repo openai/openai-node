@@ -429,8 +429,8 @@ export namespace AssistantStreamEvent {
 
   /**
    * Occurs when a
-   * [run step](https://platform.openai.com/docs/api-reference/runs/step-object) is
-   * created.
+   * [run step](https://platform.openai.com/docs/api-reference/run-steps/step-object)
+   * is created.
    */
   export interface ThreadRunStepCreated {
     /**
@@ -443,7 +443,7 @@ export namespace AssistantStreamEvent {
 
   /**
    * Occurs when a
-   * [run step](https://platform.openai.com/docs/api-reference/runs/step-object)
+   * [run step](https://platform.openai.com/docs/api-reference/run-steps/step-object)
    * moves to an `in_progress` state.
    */
   export interface ThreadRunStepInProgress {
@@ -457,8 +457,8 @@ export namespace AssistantStreamEvent {
 
   /**
    * Occurs when parts of a
-   * [run step](https://platform.openai.com/docs/api-reference/runs/step-object) are
-   * being streamed.
+   * [run step](https://platform.openai.com/docs/api-reference/run-steps/step-object)
+   * are being streamed.
    */
   export interface ThreadRunStepDelta {
     /**
@@ -472,8 +472,8 @@ export namespace AssistantStreamEvent {
 
   /**
    * Occurs when a
-   * [run step](https://platform.openai.com/docs/api-reference/runs/step-object) is
-   * completed.
+   * [run step](https://platform.openai.com/docs/api-reference/run-steps/step-object)
+   * is completed.
    */
   export interface ThreadRunStepCompleted {
     /**
@@ -486,7 +486,7 @@ export namespace AssistantStreamEvent {
 
   /**
    * Occurs when a
-   * [run step](https://platform.openai.com/docs/api-reference/runs/step-object)
+   * [run step](https://platform.openai.com/docs/api-reference/run-steps/step-object)
    * fails.
    */
   export interface ThreadRunStepFailed {
@@ -500,8 +500,8 @@ export namespace AssistantStreamEvent {
 
   /**
    * Occurs when a
-   * [run step](https://platform.openai.com/docs/api-reference/runs/step-object) is
-   * cancelled.
+   * [run step](https://platform.openai.com/docs/api-reference/run-steps/step-object)
+   * is cancelled.
    */
   export interface ThreadRunStepCancelled {
     /**
@@ -514,7 +514,7 @@ export namespace AssistantStreamEvent {
 
   /**
    * Occurs when a
-   * [run step](https://platform.openai.com/docs/api-reference/runs/step-object)
+   * [run step](https://platform.openai.com/docs/api-reference/run-steps/step-object)
    * expires.
    */
   export interface ThreadRunStepExpired {
@@ -646,10 +646,42 @@ export namespace FileSearchTool {
      *
      * Note that the file search tool may output fewer than `max_num_results` results.
      * See the
-     * [file search tool documentation](https://platform.openai.com/docs/assistants/tools/file-search/number-of-chunks-returned)
+     * [file search tool documentation](https://platform.openai.com/docs/assistants/tools/file-search/customizing-file-search-settings)
      * for more information.
      */
     max_num_results?: number;
+
+    /**
+     * The ranking options for the file search.
+     *
+     * See the
+     * [file search tool documentation](https://platform.openai.com/docs/assistants/tools/file-search/customizing-file-search-settings)
+     * for more information.
+     */
+    ranking_options?: FileSearch.RankingOptions;
+  }
+
+  export namespace FileSearch {
+    /**
+     * The ranking options for the file search.
+     *
+     * See the
+     * [file search tool documentation](https://platform.openai.com/docs/assistants/tools/file-search/customizing-file-search-settings)
+     * for more information.
+     */
+    export interface RankingOptions {
+      /**
+       * The ranker to use for the file search. If not specified will use the `auto`
+       * ranker.
+       */
+      ranker?: 'auto' | 'default_2024_08_21';
+
+      /**
+       * The score threshold for the file search. All values must be a floating point
+       * number between 0 and 1.
+       */
+      score_threshold?: number;
+    }
   }
 }
 
@@ -753,8 +785,8 @@ export namespace MessageStreamEvent {
 
 /**
  * Occurs when a
- * [run step](https://platform.openai.com/docs/api-reference/runs/step-object) is
- * created.
+ * [run step](https://platform.openai.com/docs/api-reference/run-steps/step-object)
+ * is created.
  */
 export type RunStepStreamEvent =
   | RunStepStreamEvent.ThreadRunStepCreated
@@ -768,8 +800,8 @@ export type RunStepStreamEvent =
 export namespace RunStepStreamEvent {
   /**
    * Occurs when a
-   * [run step](https://platform.openai.com/docs/api-reference/runs/step-object) is
-   * created.
+   * [run step](https://platform.openai.com/docs/api-reference/run-steps/step-object)
+   * is created.
    */
   export interface ThreadRunStepCreated {
     /**
@@ -782,7 +814,7 @@ export namespace RunStepStreamEvent {
 
   /**
    * Occurs when a
-   * [run step](https://platform.openai.com/docs/api-reference/runs/step-object)
+   * [run step](https://platform.openai.com/docs/api-reference/run-steps/step-object)
    * moves to an `in_progress` state.
    */
   export interface ThreadRunStepInProgress {
@@ -796,8 +828,8 @@ export namespace RunStepStreamEvent {
 
   /**
    * Occurs when parts of a
-   * [run step](https://platform.openai.com/docs/api-reference/runs/step-object) are
-   * being streamed.
+   * [run step](https://platform.openai.com/docs/api-reference/run-steps/step-object)
+   * are being streamed.
    */
   export interface ThreadRunStepDelta {
     /**
@@ -811,8 +843,8 @@ export namespace RunStepStreamEvent {
 
   /**
    * Occurs when a
-   * [run step](https://platform.openai.com/docs/api-reference/runs/step-object) is
-   * completed.
+   * [run step](https://platform.openai.com/docs/api-reference/run-steps/step-object)
+   * is completed.
    */
   export interface ThreadRunStepCompleted {
     /**
@@ -825,7 +857,7 @@ export namespace RunStepStreamEvent {
 
   /**
    * Occurs when a
-   * [run step](https://platform.openai.com/docs/api-reference/runs/step-object)
+   * [run step](https://platform.openai.com/docs/api-reference/run-steps/step-object)
    * fails.
    */
   export interface ThreadRunStepFailed {
@@ -839,8 +871,8 @@ export namespace RunStepStreamEvent {
 
   /**
    * Occurs when a
-   * [run step](https://platform.openai.com/docs/api-reference/runs/step-object) is
-   * cancelled.
+   * [run step](https://platform.openai.com/docs/api-reference/run-steps/step-object)
+   * is cancelled.
    */
   export interface ThreadRunStepCancelled {
     /**
@@ -853,7 +885,7 @@ export namespace RunStepStreamEvent {
 
   /**
    * Occurs when a
-   * [run step](https://platform.openai.com/docs/api-reference/runs/step-object)
+   * [run step](https://platform.openai.com/docs/api-reference/run-steps/step-object)
    * expires.
    */
   export interface ThreadRunStepExpired {

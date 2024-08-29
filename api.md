@@ -337,6 +337,7 @@ Types:
 - <code><a href="./src/resources/beta/threads/runs/steps.ts">RunStepDelta</a></code>
 - <code><a href="./src/resources/beta/threads/runs/steps.ts">RunStepDeltaEvent</a></code>
 - <code><a href="./src/resources/beta/threads/runs/steps.ts">RunStepDeltaMessageDelta</a></code>
+- <code><a href="./src/resources/beta/threads/runs/steps.ts">RunStepInclude</a></code>
 - <code><a href="./src/resources/beta/threads/runs/steps.ts">ToolCall</a></code>
 - <code><a href="./src/resources/beta/threads/runs/steps.ts">ToolCallDelta</a></code>
 - <code><a href="./src/resources/beta/threads/runs/steps.ts">ToolCallDeltaObject</a></code>

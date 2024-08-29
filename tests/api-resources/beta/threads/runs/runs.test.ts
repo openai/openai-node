@@ -23,6 +23,7 @@ describe('resource runs', () => {
   test('create: required and optional params', async () => {
     const response = await client.beta.threads.runs.create('thread_id', {
       assistant_id: 'assistant_id',
+      include: ['step_details.tool_calls[*].file_search.results[*].content'],
       additional_instructions: 'additional_instructions',
       additional_messages: [
         {

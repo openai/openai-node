@@ -27,6 +27,7 @@ describe('resource steps', () => {
     const response = await client.beta.threads.runs.steps.retrieve('step_id', {
       thread_id: 'thread_id',
       run_id: 'run_id',
+      include: ['step_details.tool_calls[*].file_search.results[*].content'],
     });
   });
 
@@ -46,6 +47,7 @@ describe('resource steps', () => {
       thread_id: 'thread_id',
       after: 'after',
       before: 'before',
+      include: ['step_details.tool_calls[*].file_search.results[*].content'],
       limit: 0,
       order: 'asc',
     });
