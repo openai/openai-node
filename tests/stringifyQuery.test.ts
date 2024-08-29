@@ -20,10 +20,4 @@ describe(stringifyQuery, () => {
       expect(stringifyQuery(input)).toEqual(expected);
     });
   }
-
-  for (const value of [[], {}, new Date()]) {
-    it(`${JSON.stringify(value)} -> <error>`, () => {
-      expect(() => stringifyQuery({ value })).toThrow(`Cannot stringify type ${typeof value}`);
-    });
-  }
 });

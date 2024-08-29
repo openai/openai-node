@@ -22,27 +22,33 @@ export class Runs extends APIResource {
   /**
    * Create a run.
    */
-  create(threadId: string, body: RunCreateParamsNonStreaming, options?: Core.RequestOptions): APIPromise<Run>;
   create(
     threadId: string,
-    body: RunCreateParamsStreaming,
+    params: RunCreateParamsNonStreaming,
+    options?: Core.RequestOptions,
+  ): APIPromise<Run>;
+  create(
+    threadId: string,
+    params: RunCreateParamsStreaming,
     options?: Core.RequestOptions,
   ): APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
   create(
     threadId: string,
-    body: RunCreateParamsBase,
+    params: RunCreateParamsBase,
     options?: Core.RequestOptions,
   ): APIPromise<Stream<AssistantsAPI.AssistantStreamEvent> | Run>;
   create(
     threadId: string,
-    body: RunCreateParams,
+    params: RunCreateParams,
     options?: Core.RequestOptions,
   ): APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>> {
+    const { include, ...body } = params;
     return this._client.post(`/threads/${threadId}/runs`, {
+      query: { include },
       body,
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
-      stream: body.stream ?? false,
+      stream: params.stream ?? false,
     }) as APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
   }
 
@@ -617,74 +623,87 @@ export type RunCreateParams = RunCreateParamsNonStreaming | RunCreateParamsStrea
 
 export interface RunCreateParamsBase {
   /**
-   * The ID of the
+   * Body param: The ID of the
    * [assistant](https://platform.openai.com/docs/api-reference/assistants) to use to
    * execute this run.
    */
   assistant_id: string;
 
   /**
-   * Appends additional instructions at the end of the instructions for the run. This
-   * is useful for modifying the behavior on a per-run basis without overriding other
-   * instructions.
+   * Query param: A list of additional fields to include in the response. Currently
+   * the only supported value is
+   * `step_details.tool_calls[*].file_search.results[*].content` to fetch the file
+   * search result content.
+   *
+   * See the
+   * [file search tool documentation](https://platform.openai.com/docs/assistants/tools/file-search/customizing-file-search-settings)
+   * for more information.
+   */
+  include?: Array<StepsAPI.RunStepInclude>;
+
+  /**
+   * Body param: Appends additional instructions at the end of the instructions for
+   * the run. This is useful for modifying the behavior on a per-run basis without
+   * overriding other instructions.
    */
   additional_instructions?: string | null;
 
   /**
-   * Adds additional messages to the thread before creating the run.
+   * Body param: Adds additional messages to the thread before creating the run.
    */
   additional_messages?: Array<RunCreateParams.AdditionalMessage> | null;
 
   /**
-   * Overrides the
+   * Body param: Overrides the
    * [instructions](https://platform.openai.com/docs/api-reference/assistants/createAssistant)
    * of the assistant. This is useful for modifying the behavior on a per-run basis.
    */
   instructions?: string | null;
 
   /**
-   * The maximum number of completion tokens that may be used over the course of the
-   * run. The run will make a best effort to use only the number of completion tokens
-   * specified, across multiple turns of the run. If the run exceeds the number of
-   * completion tokens specified, the run will end with status `incomplete`. See
-   * `incomplete_details` for more info.
+   * Body param: The maximum number of completion tokens that may be used over the
+   * course of the run. The run will make a best effort to use only the number of
+   * completion tokens specified, across multiple turns of the run. If the run
+   * exceeds the number of completion tokens specified, the run will end with status
+   * `incomplete`. See `incomplete_details` for more info.
    */
   max_completion_tokens?: number | null;
 
   /**
-   * The maximum number of prompt tokens that may be used over the course of the run.
-   * The run will make a best effort to use only the number of prompt tokens
-   * specified, across multiple turns of the run. If the run exceeds the number of
-   * prompt tokens specified, the run will end with status `incomplete`. See
-   * `incomplete_details` for more info.
+   * Body param: The maximum number of prompt tokens that may be used over the course
+   * of the run. The run will make a best effort to use only the number of prompt
+   * tokens specified, across multiple turns of the run. If the run exceeds the
+   * number of prompt tokens specified, the run will end with status `incomplete`.
+   * See `incomplete_details` for more info.
    */
   max_prompt_tokens?: number | null;
 
   /**
-   * Set of 16 key-value pairs that can be attached to an object. This can be useful
-   * for storing additional information about the object in a structured format. Keys
-   * can be a maximum of 64 characters long and values can be a maxium of 512
-   * characters long.
+   * Body param: Set of 16 key-value pairs that can be attached to an object. This
+   * can be useful for storing additional information about the object in a
+   * structured format. Keys can be a maximum of 64 characters long and values can be
+   * a maxium of 512 characters long.
    */
   metadata?: unknown | null;
 
   /**
-   * The ID of the [Model](https://platform.openai.com/docs/api-reference/models) to
-   * be used to execute this run. If a value is provided here, it will override the
-   * model associated with the assistant. If not, the model associated with the
-   * assistant will be used.
+   * Body param: The ID of the
+   * [Model](https://platform.openai.com/docs/api-reference/models) to be used to
+   * execute this run. If a value is provided here, it will override the model
+   * associated with the assistant. If not, the model associated with the assistant
+   * will be used.
    */
   model?: (string & {}) | ChatAPI.ChatModel | null;
 
   /**
-   * Whether to enable
+   * Body param: Whether to enable
    * [parallel function calling](https://platform.openai.com/docs/guides/function-calling/parallel-function-calling)
    * during tool use.
    */
   parallel_tool_calls?: boolean;
 
   /**
-   * Specifies the format that the model must output. Compatible with
+   * Body param: Specifies the format that the model must output. Compatible with
    * [GPT-4o](https://platform.openai.com/docs/models/gpt-4o),
    * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4),
    * and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
@@ -708,48 +727,50 @@ export interface RunCreateParamsBase {
   response_format?: ThreadsAPI.AssistantResponseFormatOption | null;
 
   /**
-   * If `true`, returns a stream of events that happen during the Run as server-sent
-   * events, terminating when the Run enters a terminal state with a `data: [DONE]`
-   * message.
+   * Body param: If `true`, returns a stream of events that happen during the Run as
+   * server-sent events, terminating when the Run enters a terminal state with a
+   * `data: [DONE]` message.
    */
   stream?: boolean | null;
 
   /**
-   * What sampling temperature to use, between 0 and 2. Higher values like 0.8 will
-   * make the output more random, while lower values like 0.2 will make it more
-   * focused and deterministic.
+   * Body param: What sampling temperature to use, between 0 and 2. Higher values
+   * like 0.8 will make the output more random, while lower values like 0.2 will make
+   * it more focused and deterministic.
    */
   temperature?: number | null;
 
   /**
-   * Controls which (if any) tool is called by the model. `none` means the model will
-   * not call any tools and instead generates a message. `auto` is the default value
-   * and means the model can pick between generating a message or calling one or more
-   * tools. `required` means the model must call one or more tools before responding
-   * to the user. Specifying a particular tool like `{"type": "file_search"}` or
+   * Body param: Controls which (if any) tool is called by the model. `none` means
+   * the model will not call any tools and instead generates a message. `auto` is the
+   * default value and means the model can pick between generating a message or
+   * calling one or more tools. `required` means the model must call one or more
+   * tools before responding to the user. Specifying a particular tool like
+   * `{"type": "file_search"}` or
    * `{"type": "function", "function": {"name": "my_function"}}` forces the model to
    * call that tool.
    */
   tool_choice?: ThreadsAPI.AssistantToolChoiceOption | null;
 
   /**
-   * Override the tools the assistant can use for this run. This is useful for
-   * modifying the behavior on a per-run basis.
+   * Body param: Override the tools the assistant can use for this run. This is
+   * useful for modifying the behavior on a per-run basis.
    */
   tools?: Array<AssistantsAPI.AssistantTool> | null;
 
   /**
-   * An alternative to sampling with temperature, called nucleus sampling, where the
-   * model considers the results of the tokens with top_p probability mass. So 0.1
-   * means only the tokens comprising the top 10% probability mass are considered.
+   * Body param: An alternative to sampling with temperature, called nucleus
+   * sampling, where the model considers the results of the tokens with top_p
+   * probability mass. So 0.1 means only the tokens comprising the top 10%
+   * probability mass are considered.
    *
    * We generally recommend altering this or temperature but not both.
    */
   top_p?: number | null;
 
   /**
-   * Controls for how a thread will be truncated prior to the run. Use this to
-   * control the intial context window of the run.
+   * Body param: Controls for how a thread will be truncated prior to the run. Use
+   * this to control the intial context window of the run.
    */
   truncation_strategy?: RunCreateParams.TruncationStrategy | null;
 }
@@ -834,18 +855,18 @@ export namespace RunCreateParams {
 
 export interface RunCreateParamsNonStreaming extends RunCreateParamsBase {
   /**
-   * If `true`, returns a stream of events that happen during the Run as server-sent
-   * events, terminating when the Run enters a terminal state with a `data: [DONE]`
-   * message.
+   * Body param: If `true`, returns a stream of events that happen during the Run as
+   * server-sent events, terminating when the Run enters a terminal state with a
+   * `data: [DONE]` message.
    */
   stream?: false | null;
 }
 
 export interface RunCreateParamsStreaming extends RunCreateParamsBase {
   /**
-   * If `true`, returns a stream of events that happen during the Run as server-sent
-   * events, terminating when the Run enters a terminal state with a `data: [DONE]`
-   * message.
+   * Body param: If `true`, returns a stream of events that happen during the Run as
+   * server-sent events, terminating when the Run enters a terminal state with a
+   * `data: [DONE]` message.
    */
   stream: true;
 }
@@ -1630,10 +1651,12 @@ export namespace Runs {
   export import RunStepDelta = StepsAPI.RunStepDelta;
   export import RunStepDeltaEvent = StepsAPI.RunStepDeltaEvent;
   export import RunStepDeltaMessageDelta = StepsAPI.RunStepDeltaMessageDelta;
+  export import RunStepInclude = StepsAPI.RunStepInclude;
   export import ToolCall = StepsAPI.ToolCall;
   export import ToolCallDelta = StepsAPI.ToolCallDelta;
   export import ToolCallDeltaObject = StepsAPI.ToolCallDeltaObject;
   export import ToolCallsStepDetails = StepsAPI.ToolCallsStepDetails;
   export import RunStepsPage = StepsAPI.RunStepsPage;
+  export import StepRetrieveParams = StepsAPI.StepRetrieveParams;
   export import StepListParams = StepsAPI.StepListParams;
 }
