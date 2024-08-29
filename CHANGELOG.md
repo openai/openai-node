@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.56.2 (2024-08-29)
+
+Full Changelog: [v4.56.1...v4.56.2](https://github.com/openai/openai-node/compare/v4.56.1...v4.56.2)
+
+### Chores
+
+* run tsc as part of lint script ([#1020](https://github.com/openai/openai-node/issues/1020)) ([4942347](https://github.com/openai/openai-node/commit/49423472f2b0a0b63961174bedfc00bfd99d47f9))
+
 ## 4.56.1 (2024-08-27)
 
 Full Changelog: [v4.56.0...v4.56.1](https://github.com/openai/openai-node/compare/v4.56.0...v4.56.1)
