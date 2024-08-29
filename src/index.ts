@@ -2,7 +2,10 @@
 
 import * as Errors from './error';
 import * as Uploads from './uploads';
+
 import { type Agent, type RequestInit } from './_shims/index';
+import * as qs from 'qs';
+
 import * as Core from './core';
 import * as Pagination from './pagination';
 import * as API from './resources/index';
@@ -181,6 +184,10 @@ export class OpenAI extends Core.APIClient {
 
   protected override authHeaders(opts: Core.FinalRequestOptions): Core.Headers {
     return { Authorization: `Bearer ${this.apiKey}` };
+  }
+
+  protected override stringifyQuery(query: Record<string, unknown>): string {
+    return qs.stringify(query, { arrayFormat: 'brackets' });
   }
 
   static OpenAI = this;

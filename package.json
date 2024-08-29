@@ -26,11 +26,13 @@
   "dependencies": {
     "@types/node": "^18.11.18",
     "@types/node-fetch": "^2.6.4",
+    "@types/qs": "^6.9.7",
     "abort-controller": "^3.0.0",
     "agentkeepalive": "^4.2.1",
     "form-data-encoder": "1.7.2",
     "formdata-node": "^4.3.2",
-    "node-fetch": "^2.6.7"
+    "node-fetch": "^2.6.7",
+    "qs": "^6.10.3"
   },
   "devDependencies": {
     "@swc/core": "^1.3.102",

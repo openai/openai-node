@@ -339,6 +339,7 @@ Types:
 - <code><a href="./src/resources/beta/threads/runs/steps.ts">RunStepDelta</a></code>
 - <code><a href="./src/resources/beta/threads/runs/steps.ts">RunStepDeltaEvent</a></code>
 - <code><a href="./src/resources/beta/threads/runs/steps.ts">RunStepDeltaMessageDelta</a></code>
+- <code><a href="./src/resources/beta/threads/runs/steps.ts">RunStepInclude</a></code>
 - <code><a href="./src/resources/beta/threads/runs/steps.ts">ToolCall</a></code>
 - <code><a href="./src/resources/beta/threads/runs/steps.ts">ToolCallDelta</a></code>
 - <code><a href="./src/resources/beta/threads/runs/steps.ts">ToolCallDeltaObject</a></code>
@@ -346,7 +347,7 @@ Types:
 
 Methods:
 
-- <code title="get /threads/{thread_id}/runs/{run_id}/steps/{step_id}">client.beta.threads.runs.steps.<a href="./src/resources/beta/threads/runs/steps.ts">retrieve</a>(threadId, runId, stepId) -> RunStep</code>
+- <code title="get /threads/{thread_id}/runs/{run_id}/steps/{step_id}">client.beta.threads.runs.steps.<a href="./src/resources/beta/threads/runs/steps.ts">retrieve</a>(threadId, runId, stepId, { ...params }) -> RunStep</code>
 - <code title="get /threads/{thread_id}/runs/{run_id}/steps">client.beta.threads.runs.steps.<a href="./src/resources/beta/threads/runs/steps.ts">list</a>(threadId, runId, { ...params }) -> RunStepsPage</code>
 
 ### Messages
