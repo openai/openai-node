@@ -13,7 +13,7 @@ async function main() {
       stream: true,
       logprobs: true,
     })
-    .on('logprob', (logprob) => {
+    .on('logprobs.content.delta', (logprob) => {
       console.log(logprob);
     });
 
