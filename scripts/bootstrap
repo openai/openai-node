@@ -16,3 +16,6 @@ echo "==> Installing Node dependencies…"
 PACKAGE_MANAGER=$(command -v yarn >/dev/null 2>&1 && echo "yarn" || echo "npm")
 
 $PACKAGE_MANAGER install
+
+cd "$(dirname "$0")/../examples"
+$PACKAGE_MANAGER install
