@@ -29,6 +29,19 @@ describe('resource steps', () => {
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
+  test('retrieve: request options and params are passed correctly', async () => {
+    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
+    await expect(
+      client.beta.threads.runs.steps.retrieve(
+        'thread_id',
+        'run_id',
+        'step_id',
+        { include: ['step_details.tool_calls[*].file_search.results[*].content'] },
+        { path: '/_stainless_unknown_path' },
+      ),
+    ).rejects.toThrow(OpenAI.NotFoundError);
+  });
+
   test('list', async () => {
     const responsePromise = client.beta.threads.runs.steps.list('thread_id', 'run_id');
     const rawResponse = await responsePromise.asResponse();
@@ -53,7 +66,13 @@ describe('resource steps', () => {
       client.beta.threads.runs.steps.list(
         'thread_id',
         'run_id',
-        { after: 'after', before: 'before', limit: 0, order: 'asc' },
+        {
+          after: 'after',
+          before: 'before',
+          include: ['step_details.tool_calls[*].file_search.results[*].content'],
+          limit: 0,
+          order: 'asc',
+        },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);
