@@ -1,5 +1,18 @@
 # Changelog
 
+## 4.57.0 (2024-08-29)
+
+Full Changelog: [v4.56.2...v4.57.0](https://github.com/openai/openai-node/compare/v4.56.2...v4.57.0)
+
+### Features
+
+* **api:** add file search result details to run steps ([#1023](https://github.com/openai/openai-node/issues/1023)) ([d9acd0a](https://github.com/openai/openai-node/commit/d9acd0a2c52b27983f8db6a8de6a776078b1d41b))
+
+
+### Bug Fixes
+
+* install examples deps as part of bootstrap script ([#1022](https://github.com/openai/openai-node/issues/1022)) ([eae8e36](https://github.com/openai/openai-node/commit/eae8e36fd5514eb60773646ec775badde50e783c))
+
 ## 4.56.2 (2024-08-29)
 
 Full Changelog: [v4.56.1...v4.56.2](https://github.com/openai/openai-node/compare/v4.56.1...v4.56.2)
