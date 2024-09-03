@@ -605,7 +605,6 @@ describe('resource completions', () => {
       await runner.done();
 
       expect(listener.messages).toEqual([
-        { role: 'user', content: 'tell me what the weather is like' },
         {
           role: 'assistant',
           content: null,
@@ -700,7 +699,6 @@ describe('resource completions', () => {
       await runner.done().catch(() => {});
 
       expect(listener.messages).toEqual([
-        { role: 'user', content: 'tell me what the weather is like' },
         {
           role: 'assistant',
           content: null,
@@ -855,10 +853,6 @@ describe('resource completions', () => {
       await runner.done();
 
       expect(listener.messages).toEqual([
-        {
-          role: 'user',
-          content: 'can you tell me how many properties are in {"a": 1, "b": 2, "c": 3}',
-        },
         {
           role: 'assistant',
           content: null,
@@ -1091,10 +1085,6 @@ describe('resource completions', () => {
 
       expect(listener.messages).toEqual([
         {
-          role: 'user',
-          content: 'can you tell me how many properties are in {"a": 1, "b": 2, "c": 3}',
-        },
-        {
           role: 'assistant',
           content: null,
           parsed: null,
@@ -1207,7 +1197,6 @@ describe('resource completions', () => {
       ]);
 
       expect(listener.messages).toEqual([
-        { role: 'user', content: 'tell me what the weather is like' },
         {
           role: 'assistant',
           content: null,
@@ -1413,7 +1402,6 @@ describe('resource completions', () => {
       ]);
 
       expect(listener.messages).toEqual([
-        { role: 'user', content: 'tell me what the weather is like' },
         {
           role: 'assistant',
           content: null,
