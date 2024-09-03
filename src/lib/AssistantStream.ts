@@ -684,6 +684,30 @@ export class AssistantStream
           accValue.push(...deltaValue); // Use spread syntax for efficient addition
           continue;
         }
+
+        for (const deltaEntry of deltaValue) {
+          if (!Core.isObj(deltaEntry)) {
+            throw new Error(`Expected array delta entry to be an object but got: ${deltaEntry}`);
+          }
+
+          const index = deltaEntry['index'];
+          if (index == null) {
+            console.error(deltaEntry);
+            throw new Error('Expected array delta entry to have an `index` property');
+          }
+
+          if (typeof index !== 'number') {
+            throw new Error(`Expected array delta entry \`index\` property to be a number but got ${index}`);
+          }
+
+          const accEntry = accValue[index];
+          if (accEntry == null) {
+            accValue.push(deltaEntry);
+          } else {
+            accValue[index] = this.accumulateDelta(accEntry, deltaEntry);
+          }
+        }
+        continue;
       } else {
         throw Error(`Unhandled record type: ${key}, deltaValue: ${deltaValue}, accValue: ${accValue}`);
       }
