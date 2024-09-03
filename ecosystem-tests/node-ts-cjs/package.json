@@ -13,7 +13,7 @@
     "tsconfig-paths": "^4.0.0"
   },
   "devDependencies": {
-    "@types/node": "^20.4.2",
+    "@types/node": "20.4.2",
     "@types/node-fetch": "^2.6.1",
     "@types/ws": "^8.5.4",
     "fastest-levenshtein": "^1.0.16",
@@ -22,5 +22,8 @@
     "text-encoding-polyfill": "^0.6.7",
     "ts-jest": "^29.1.0",
     "typescript": "4.7.4"
+  },
+  "overrides": {
+    "@types/node": "20.4.2"
   }
 }
