@@ -114,7 +114,12 @@ export async function toFile(
     const blob = await value.blob();
     name ||= new URL(value.url).pathname.split(/[\\/]/).pop() ?? 'unknown_file';
 
-    return new File([blob as any], name, options);
+    // we need to convert the `Blob` into an array buffer because the `Blob` class
+    // that `node-fetch` defines is incompatible with the web standard which results
+    // in `new File` interpreting it as a string instead of binary data.
+    const data = isBlobLike(blob) ? [(await blob.arrayBuffer()) as any] : [blob];
+
+    return new File(data, name, options);
   }
 
   const bits = await getBytes(value);
