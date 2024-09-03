@@ -683,21 +683,31 @@ export class AssistantStream
         if (accValue.every((x) => typeof x === 'string' || typeof x === 'number')) {
           accValue.push(...deltaValue); // Use spread syntax for efficient addition
           continue;
-        } else if (accValue.every((x) => Core.isObj(x))) {
-          deltaValue.forEach(item => {
-            if (item.hasOwnProperty('index')) {
-              const obj = accValue.find((x: any) => x['index'] === item['index']);
-              if (obj) {
-                accValue[accValue.indexOf(obj)] = this.accumulateDelta(obj, item);
-              } else {
-                accValue.push(item);
-              }
-            } else {
-              accValue.push(item);
-            }
-          });
-          continue;
         }
+
+        for (const deltaEntry of deltaValue) {
+          if (!Core.isObj(deltaEntry)) {
+            throw new Error(`Expected array delta entry to be an object but got: ${deltaEntry}`);
+          }
+
+          const index = deltaEntry['index'];
+          if (index == null) {
+            console.error(deltaEntry);
+            throw new Error('Expected array delta entry to have an `index` property');
+          }
+
+          if (typeof index !== 'number') {
+            throw new Error(`Expected array delta entry \`index\` property to be a number but got ${index}`);
+          }
+
+          const accEntry = accValue[index];
+          if (accEntry == null) {
+            accValue.push(deltaEntry);
+          } else {
+            accValue[index] = this.accumulateDelta(accEntry, deltaEntry);
+          }
+        }
+        continue;
       } else {
         throw Error(`Unhandled record type: ${key}, deltaValue: ${deltaValue}, accValue: ${accValue}`);
       }
