@@ -1,5 +1,20 @@
 # Changelog
 
+## 4.57.1 (2024-09-03)
+
+Full Changelog: [v4.57.0...v4.57.1](https://github.com/openai/openai-node/compare/v4.57.0...v4.57.1)
+
+### Bug Fixes
+
+* **assistants:** correctly accumulate tool calls when streaming ([#1031](https://github.com/openai/openai-node/issues/1031)) ([d935ad3](https://github.com/openai/openai-node/commit/d935ad3fa37b2701f4c9f6e433ada6074280a871))
+* **client:** correct File construction from node-fetch Responses ([#1029](https://github.com/openai/openai-node/issues/1029)) ([22ebdc2](https://github.com/openai/openai-node/commit/22ebdc2ca7d98e0f266110c4cf827e53a0a22026))
+* runTools without stream should not emit user message events ([#1005](https://github.com/openai/openai-node/issues/1005)) ([22ded4d](https://github.com/openai/openai-node/commit/22ded4d549a157482a8de2faf65e92c5be07fa95))
+
+
+### Chores
+
+* **internal/tests:** workaround bug in recent types/node release ([3c7bdfd](https://github.com/openai/openai-node/commit/3c7bdfdb373bff77db0e3fecd5d49ddfa4284cd9))
+
 ## 4.57.0 (2024-08-29)
 
 Full Changelog: [v4.56.2...v4.57.0](https://github.com/openai/openai-node/compare/v4.56.2...v4.57.0)
