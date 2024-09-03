@@ -1,0 +1,16 @@
+{
+  "name": "nodenext-tsup",
+  "module": "index.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsup",
+    "main": "npm run build && node dist/index.cjs"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "tsup": "^8.2.4"
+  },
+  "peerDependencies": {
+    "typescript": "^5.5.4"
+  }
+}

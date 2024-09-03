@@ -34,6 +34,14 @@ const projectRunners = {
     await installPackage();
     await run('node', ['test.js']);
   },
+  'nodenext-tsup': async () => {
+    await installPackage();
+    await run('npm', ['run', 'build']);
+
+    if (state.live) {
+      await run('npm', ['run', 'main']);
+    }
+  },
   'ts-browser-webpack': async () => {
     await installPackage();
 
