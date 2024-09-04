@@ -26,7 +26,7 @@
   "dependencies": {
     "@types/node": "^18.11.18",
     "@types/node-fetch": "^2.6.4",
-    "@types/qs": "^6.9.7",
+    "@types/qs": "^6.9.15",
     "abort-controller": "^3.0.0",
     "agentkeepalive": "^4.2.1",
     "form-data-encoder": "1.7.2",
