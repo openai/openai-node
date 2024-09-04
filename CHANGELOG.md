@@ -1,5 +1,18 @@
 # Changelog
 
+## 4.57.3 (2024-09-04)
+
+Full Changelog: [v4.57.2...v4.57.3](https://github.com/openai/openai-node/compare/v4.57.2...v4.57.3)
+
+### Bug Fixes
+
+* **helpers/zod:** avoid import issue in certain environments ([#1039](https://github.com/openai/openai-node/issues/1039)) ([e238daa](https://github.com/openai/openai-node/commit/e238daa7c12f3fb13369f58b9d405365f5efcc8f))
+
+
+### Chores
+
+* **internal:** minor bump qs version ([#1037](https://github.com/openai/openai-node/issues/1037)) ([8ec218e](https://github.com/openai/openai-node/commit/8ec218e9efb657927b3c0346822a96872aeaf137))
+
 ## 4.57.2 (2024-09-04)
 
 Full Changelog: [v4.57.1...v4.57.2](https://github.com/openai/openai-node/compare/v4.57.1...v4.57.2)
