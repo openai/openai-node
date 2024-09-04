@@ -1,0 +1,16 @@
+{
+  "name": "node-ts-es2020",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "tsc": "tsc && tsc -p tsconfig.nodenext.json && tsc -p node_modules/openai/src/tsconfig.json",
+    "main": "ts-node index.ts"
+  },
+  "dependencies": {
+    "ts-node": "^10.9.2",
+    "zod": "^3.23.8"
+  },
+  "overrides": {
+    "@types/node": "20.4.2"
+  }
+}

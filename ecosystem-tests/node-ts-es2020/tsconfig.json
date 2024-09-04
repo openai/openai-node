@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.base.json",
+  "ts-node": {
+    "swc": true,
+    "transpileOnly": true
+  },
+  "compilerOptions": {
+    "declaration": false,
+    "declarationMap": false,
+    "allowJs": true,
+    "checkJs": false,
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "types": ["node", "jest"],
+    "paths": {}
+  },
+  "include": ["index.ts", "tsconfig.json", "jest.config.ts", ".eslintrc.js"]
+}
