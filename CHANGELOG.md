@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.57.2 (2024-09-04)
+
+Full Changelog: [v4.57.1...v4.57.2](https://github.com/openai/openai-node/compare/v4.57.1...v4.57.2)
+
+### Chores
+
+* **internal:** dependency updates ([#1035](https://github.com/openai/openai-node/issues/1035)) ([e815fb6](https://github.com/openai/openai-node/commit/e815fb6dee75219563d3a7776774ba1c2984560e))
+
 ## 4.57.1 (2024-09-03)
 
 Full Changelog: [v4.57.0...v4.57.1](https://github.com/openai/openai-node/compare/v4.57.0...v4.57.1)
