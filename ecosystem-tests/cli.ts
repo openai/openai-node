@@ -25,6 +25,11 @@ const projectRunners = {
   'node-ts-esm': defaultNodeRunner,
   'node-ts-esm-web': defaultNodeRunner,
   'node-ts-esm-auto': defaultNodeRunner,
+  'node-ts-es2020': async () => {
+    await installPackage();
+    await run('npm', ['run', 'tsc']);
+    await run('npm', ['run', 'main']);
+  },
   'node-js': async () => {
     await installPackage();
     await run('node', ['test.js']);

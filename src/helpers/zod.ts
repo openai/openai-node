@@ -1,5 +1,5 @@
-import { ResponseFormatJSONSchema } from 'openai/resources';
-import type z from 'zod';
+import { ResponseFormatJSONSchema } from '../resources/index';
+import type { infer as zodInfer, ZodType } from 'zod';
 import {
   AutoParseableResponseFormat,
   AutoParseableTool,
@@ -8,7 +8,7 @@ import {
 } from '../lib/parser';
 import { zodToJsonSchema as _zodToJsonSchema } from '../_vendor/zod-to-json-schema';
 
-function zodToJsonSchema(schema: z.ZodType, options: { name: string }): Record<string, unknown> {
+function zodToJsonSchema(schema: ZodType, options: { name: string }): Record<string, unknown> {
   return _zodToJsonSchema(schema, {
     openaiStrictMode: true,
     name: options.name,
@@ -55,11 +55,11 @@ function zodToJsonSchema(schema: z.ZodType, options: { name: string }): Record<s
  * This can be passed directly to the `.create()` method but will not
  * result in any automatic parsing, you'll have to parse the response yourself.
  */
-export function zodResponseFormat<ZodInput extends z.ZodType>(
+export function zodResponseFormat<ZodInput extends ZodType>(
   zodObject: ZodInput,
   name: string,
   props?: Omit<ResponseFormatJSONSchema.JSONSchema, 'schema' | 'strict' | 'name'>,
-): AutoParseableResponseFormat<z.infer<ZodInput>> {
+): AutoParseableResponseFormat<zodInfer<ZodInput>> {
   return makeParseableResponseFormat(
     {
       type: 'json_schema',
@@ -79,15 +79,15 @@ export function zodResponseFormat<ZodInput extends z.ZodType>(
  * automatically by the chat completion `.runTools()` method or automatically
  * parsed by `.parse()` / `.stream()`.
  */
-export function zodFunction<Parameters extends z.ZodType>(options: {
+export function zodFunction<Parameters extends ZodType>(options: {
   name: string;
   parameters: Parameters;
-  function?: ((args: z.infer<Parameters>) => unknown | Promise<unknown>) | undefined;
+  function?: ((args: zodInfer<Parameters>) => unknown | Promise<unknown>) | undefined;
   description?: string | undefined;
 }): AutoParseableTool<{
   arguments: Parameters;
   name: string;
-  function: (args: z.infer<Parameters>) => unknown;
+  function: (args: zodInfer<Parameters>) => unknown;
 }> {
   // @ts-expect-error TODO
   return makeParseableTool<any>(
