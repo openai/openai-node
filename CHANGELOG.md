@@ -1,5 +1,18 @@
 # Changelog
 
+## 4.58.0 (2024-09-05)
+
+Full Changelog: [v4.57.3...v4.58.0](https://github.com/openai/openai-node/compare/v4.57.3...v4.58.0)
+
+### Features
+
+* **vector store:** improve chunking strategy type names ([#1041](https://github.com/openai/openai-node/issues/1041)) ([471cec3](https://github.com/openai/openai-node/commit/471cec3228886253f07c13a362827a31e9ec7b63))
+
+
+### Bug Fixes
+
+* **uploads:** avoid making redundant memory copies ([#1043](https://github.com/openai/openai-node/issues/1043)) ([271297b](https://github.com/openai/openai-node/commit/271297bd32393d4c5663023adf82f8fb19dc3d25))
+
 ## 4.57.3 (2024-09-04)
 
 Full Changelog: [v4.57.2...v4.57.3](https://github.com/openai/openai-node/compare/v4.57.2...v4.57.3)
