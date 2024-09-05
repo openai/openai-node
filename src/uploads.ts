@@ -107,8 +107,10 @@ export async function toFile(
   // If it's a promise, resolve it.
   value = await value;
 
-  // Use the file's options if there isn't one provided
-  options ??= isFileLike(value) ? { lastModified: value.lastModified, type: value.type } : {};
+  // If we've been given a `File` we don't need to do anything
+  if (isFileLike(value)) {
+    return value;
+  }
 
   if (isResponseLike(value)) {
     const blob = await value.blob();
@@ -126,7 +128,7 @@ export async function toFile(
 
   name ||= getName(value) ?? 'unknown_file';
 
-  if (!options.type) {
+  if (!options?.type) {
     const type = (bits[0] as any)?.type;
     if (typeof type === 'string') {
       options = { ...options, type };
