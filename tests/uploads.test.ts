@@ -54,4 +54,12 @@ describe('toFile', () => {
     const file = await toFile(input);
     expect(file.name).toEqual('uploads.test.ts');
   });
+
+  it('does not copy File objects', async () => {
+    const input = new File(['foo'], 'input.jsonl', { type: 'jsonl' });
+    const file = await toFile(input);
+    expect(file).toBe(input);
+    expect(file.name).toEqual('input.jsonl');
+    expect(file.type).toBe('jsonl');
+  });
 });
