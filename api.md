@@ -199,6 +199,13 @@ Methods:
 
 Types:
 
+- <code><a href="./src/resources/beta/vector-stores/vector-stores.ts">AutoFileChunkingStrategyParam</a></code>
+- <code><a href="./src/resources/beta/vector-stores/vector-stores.ts">FileChunkingStrategy</a></code>
+- <code><a href="./src/resources/beta/vector-stores/vector-stores.ts">FileChunkingStrategyParam</a></code>
+- <code><a href="./src/resources/beta/vector-stores/vector-stores.ts">OtherFileChunkingStrategyObject</a></code>
+- <code><a href="./src/resources/beta/vector-stores/vector-stores.ts">StaticFileChunkingStrategy</a></code>
+- <code><a href="./src/resources/beta/vector-stores/vector-stores.ts">StaticFileChunkingStrategyObject</a></code>
+- <code><a href="./src/resources/beta/vector-stores/vector-stores.ts">StaticFileChunkingStrategyParam</a></code>
 - <code><a href="./src/resources/beta/vector-stores/vector-stores.ts">VectorStore</a></code>
 - <code><a href="./src/resources/beta/vector-stores/vector-stores.ts">VectorStoreDeleted</a></code>
 

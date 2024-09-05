@@ -37,6 +37,13 @@ export {
 export { Beta } from './beta';
 export { Chat } from './chat/index';
 export {
+  AutoFileChunkingStrategyParam,
+  FileChunkingStrategy,
+  FileChunkingStrategyParam,
+  OtherFileChunkingStrategyObject,
+  StaticFileChunkingStrategy,
+  StaticFileChunkingStrategyObject,
+  StaticFileChunkingStrategyParam,
   VectorStore,
   VectorStoreDeleted,
   VectorStoreCreateParams,
