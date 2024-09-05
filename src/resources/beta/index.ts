@@ -32,8 +32,14 @@ export {
   ThreadCreateAndRunParamsStreaming,
   Threads,
 } from './threads/index';
-export { Beta } from './beta';
 export {
+  AutoFileChunkingStrategyParam,
+  FileChunkingStrategy,
+  FileChunkingStrategyParam,
+  OtherFileChunkingStrategyObject,
+  StaticFileChunkingStrategy,
+  StaticFileChunkingStrategyObject,
+  StaticFileChunkingStrategyParam,
   VectorStore,
   VectorStoreDeleted,
   VectorStoreCreateParams,
@@ -42,3 +48,4 @@ export {
   VectorStoresPage,
   VectorStores,
 } from './vector-stores/index';
+export { Beta } from './beta';
