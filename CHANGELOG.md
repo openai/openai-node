@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.58.1 (2024-09-06)
+
+Full Changelog: [v4.58.0...v4.58.1](https://github.com/openai/openai-node/compare/v4.58.0...v4.58.1)
+
+### Chores
+
+* **docs:** update browser support information ([#1045](https://github.com/openai/openai-node/issues/1045)) ([d326cc5](https://github.com/openai/openai-node/commit/d326cc54a77c450672fbf07d736cec80a9ba72fb))
+
 ## 4.58.0 (2024-09-05)
 
 Full Changelog: [v4.57.3...v4.58.0](https://github.com/openai/openai-node/compare/v4.57.3...v4.58.0)
