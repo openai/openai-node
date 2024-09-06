@@ -1,6 +1,13 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 export {
+  AutoFileChunkingStrategyParam,
+  FileChunkingStrategy,
+  FileChunkingStrategyParam,
+  OtherFileChunkingStrategyObject,
+  StaticFileChunkingStrategy,
+  StaticFileChunkingStrategyObject,
+  StaticFileChunkingStrategyParam,
   VectorStore,
   VectorStoreDeleted,
   VectorStoreCreateParams,
