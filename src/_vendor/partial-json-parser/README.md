@@ -1,3 +1,3 @@
 # Partial JSON Parser
 
-Vendored from https://www.npmjs.com/package/partial-json-parser and updated to use TypeScript.
+Vendored from https://www.npmjs.com/package/partial-json with some modifications
