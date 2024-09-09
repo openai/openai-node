@@ -994,6 +994,11 @@ const validatePositiveInteger = (name: string, n: unknown): number => {
 
 export const castToError = (err: any): Error => {
   if (err instanceof Error) return err;
+  if (typeof err === 'object' && err !== null) {
+    try {
+      return new Error(JSON.stringify(err));
+    } catch {}
+  }
   return new Error(err);
 };
 
