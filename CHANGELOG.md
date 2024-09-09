@@ -1,5 +1,18 @@
 # Changelog
 
+## 4.58.2 (2024-09-09)
+
+Full Changelog: [v4.58.1...v4.58.2](https://github.com/openai/openai-node/compare/v4.58.1...v4.58.2)
+
+### Bug Fixes
+
+* **errors:** pass message through to APIConnectionError ([#1050](https://github.com/openai/openai-node/issues/1050)) ([5a34316](https://github.com/openai/openai-node/commit/5a3431672e200a6bc161d39873e914434557801e))
+
+
+### Chores
+
+* better object fallback behaviour for casting errors ([#1053](https://github.com/openai/openai-node/issues/1053)) ([b7d4619](https://github.com/openai/openai-node/commit/b7d46190d2bb775145a9a3de6408c38abacfa055))
+
 ## 4.58.1 (2024-09-06)
 
 Full Changelog: [v4.58.0...v4.58.1](https://github.com/openai/openai-node/compare/v4.58.0...v4.58.1)
