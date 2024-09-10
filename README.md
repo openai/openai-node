@@ -376,9 +376,9 @@ import { getBearerTokenProvider, DefaultAzureCredential } from '@azure/identity'
 
 const credential = new DefaultAzureCredential();
 const scope = 'https://cognitiveservices.azure.com/.default';
-const tokenProvider = getBearerTokenProvider(credential, scope);
+const azureADTokenProvider = getBearerTokenProvider(credential, scope);
 
-const openai = new AzureOpenAI({ tokenProvider });
+const openai = new AzureOpenAI({ azureADTokenProvider });
 
 const result = await openai.chat.completions.create({
   model: 'gpt-4-1106-preview',
