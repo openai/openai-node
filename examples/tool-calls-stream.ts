@@ -184,6 +184,10 @@ function messageReducer(previous: ChatCompletionMessage, item: ChatCompletionChu
     }
     return acc;
   };
+
+  if (item.choices.length == 0) {
+    return previous;
+  }
   return reduce(previous, item.choices[0]!.delta) as ChatCompletionMessage;
 }
 
