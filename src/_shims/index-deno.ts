@@ -75,7 +75,7 @@ export async function getMultipartRequestOptions<T = Record<string, unknown>>(
   };
 }
 
-export function getDefaultAgent(url: string) {
+export function getDefaultAgent() {
   return undefined;
 }
 

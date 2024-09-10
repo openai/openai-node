@@ -1,5 +1,4 @@
 import { createResponseHeaders } from 'openai/internal/headers';
-import { Headers } from 'openai/_shims/index';
 
 describe('response parsing', () => {
   // TODO: test unicode characters

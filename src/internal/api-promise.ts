@@ -2,7 +2,6 @@
 
 import { type PromiseOrValue } from './types';
 import { APIResponseProps, defaultParseResponse } from './parse';
-import { type Response } from '../_shims/index';
 
 /**
  * A subclass of `Promise` providing additional helper methods

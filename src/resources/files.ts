@@ -4,7 +4,6 @@ import { APIResource } from '../resource';
 import * as FilesAPI from './files';
 import { Page, PagePromise } from '../pagination';
 import { type Uploadable, multipartFormRequestOptions } from '../uploads';
-import { type Response } from '../_shims/index';
 import { APIPromise } from '../internal/api-promise';
 import { RequestOptions } from '../internal/request-options';
 import { sleep } from 'openai/internal/utils';

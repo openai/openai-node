@@ -16,6 +16,7 @@ import {
 } from './internal/utils';
 import { APIResponseProps } from './internal/parse';
 import { getPlatformHeaders } from './internal/platform';
+import { getDefaultFetch as _getDefaultFetch } from './internal/shims';
 import * as Opts from './internal/request-options';
 import * as qs from 'qs';
 import { VERSION } from './version';
@@ -24,7 +25,6 @@ import {
   getDefaultAgent,
   type Agent,
   type RequestInfo,
-  type RequestInit,
   type HeadersInit,
   type RequestDuplex,
   isReadable,
@@ -35,7 +35,6 @@ import { applyHeadersMut } from './internal/headers';
 import * as Pagination from './pagination';
 import { AbstractPage } from './pagination';
 import * as API from './resources/index';
-import { type Response } from './_shims/index';
 import { APIPromise } from './internal/api-promise';
 import { isRunningInBrowser } from './internal/platform';
 import { FinalRequestOptions, RequestOptions } from './internal/request-options';
@@ -85,8 +84,7 @@ export interface ClientOptions {
   /**
    * Specify a custom `fetch` function implementation.
    *
-   * If not provided, we use `undici` on Node.js and otherwise expect that `fetch` is
-   * defined globally.
+   * If not provided, we expect that `fetch` is defined globally.
    */
   fetch?: Fetch | undefined;
 
@@ -181,7 +179,7 @@ export class BaseOpenAI {
     this.timeout = options.timeout ?? OpenAI.DEFAULT_TIMEOUT /* 10 minutes */;
     this.httpAgent = options.httpAgent;
     this.maxRetries = options.maxRetries ?? 2;
-    this.fetch = options.fetch ?? defaultFetch;
+    this.fetch = options.fetch ?? defaultFetch ?? _getDefaultFetch();
 
     this._options = options;
 
@@ -550,7 +548,7 @@ export class BaseOpenAI {
     const url = this.buildURL(path!, query);
     if ('timeout' in options) validatePositiveInteger('timeout', options.timeout);
     const timeout = options.timeout ?? this.timeout;
-    const httpAgent = options.httpAgent ?? this.httpAgent ?? getDefaultAgent(url);
+    const httpAgent = options.httpAgent ?? this.httpAgent ?? getDefaultAgent();
     const minAgentTimeout = timeout + 1000;
     if (
       typeof (httpAgent as any)?.options?.timeout === 'number' &&

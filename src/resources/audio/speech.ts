@@ -2,7 +2,6 @@
 
 import { APIResource } from '../../resource';
 import * as SpeechAPI from './speech';
-import { type Response } from '../../_shims/index';
 import { APIPromise } from '../../internal/api-promise';
 import { RequestOptions } from '../../internal/request-options';
 

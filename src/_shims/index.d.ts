@@ -9,33 +9,25 @@ type SelectType<Manual, Auto> = unknown extends Manual ? Auto : Manual;
 
 export const kind: string;
 
-// @ts-ignore
-export type Agent = SelectType<manual.Agent, auto.Agent>;
+// Note: shims will be removed in a follow-on PR
+// so we don't need to get this type correct right now
+export const fetch: any;
 
 // @ts-ignore
-export const fetch: SelectType<typeof manual.fetch, typeof auto.fetch>;
+export type Agent = SelectType<manual.Agent, auto.Agent>;
 
 // @ts-ignore
 export type Request = SelectType<manual.Request, auto.Request>;
 // @ts-ignore
 export type RequestInfo = SelectType<manual.RequestInfo, auto.RequestInfo>;
 // @ts-ignore
-export type RequestInit = SelectType<manual.RequestInit, auto.RequestInit>;
-// @ts-ignore
 export type RequestDuplex = SelectType<manual.RequestDuplex, auto.RequestDuplex>;
 
-// @ts-ignore
-export type Response = SelectType<manual.Response, auto.Response>;
-// @ts-ignore
-export type ResponseInit = SelectType<manual.ResponseInit, auto.ResponseInit>;
 // @ts-ignore
 export type ResponseType = SelectType<manual.ResponseType, auto.ResponseType>;
 // @ts-ignore
 export type BodyInit = SelectType<manual.BodyInit, auto.BodyInit>;
-// @ts-ignore
-export type Headers = SelectType<manual.Headers, auto.Headers>;
-// @ts-ignore
-export const Headers: SelectType<typeof manual.Headers, typeof auto.Headers>;
+
 // @ts-ignore
 export type HeadersInit = SelectType<manual.HeadersInit, auto.HeadersInit>;
 
@@ -72,7 +64,7 @@ export function getMultipartRequestOptions<T = Record<string, unknown>>(
   opts: RequestOptions<T>,
 ): Promise<RequestOptions<T>>;
 
-export function getDefaultAgent(url: string): any;
+export function getDefaultAgent(): any;
 
 export function isFsReadStream(value: any): value is FsReadStream;
 export function isReadable(value: any): value is Readable;

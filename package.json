@@ -24,9 +24,7 @@
     "fix": "./scripts/format"
   },
   "dependencies": {
-    "@types/node": "^18.11.18",
-    "@types/qs": "^6.9.15",
-    "abort-controller": "^3.0.0",
+    "@types/node": "^18.19.41",
     "agentkeepalive": "^4.2.1",
     "form-data-encoder": "1.7.2",
     "qs": "^6.13.0",
