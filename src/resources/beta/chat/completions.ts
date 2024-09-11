@@ -59,21 +59,21 @@ export interface ParsedChatCompletion<ParsedT> extends ChatCompletion {
 export type ChatCompletionParseParams = ChatCompletionCreateParamsNonStreaming;
 
 export class Completions extends APIResource {
-  async parse<Params extends ChatCompletionParseParams, ParsedT = ExtractParsedContentFromParams<Params>>(
+  parse<Params extends ChatCompletionParseParams, ParsedT = ExtractParsedContentFromParams<Params>>(
     body: Params,
     options?: Core.RequestOptions,
-  ): Promise<ParsedChatCompletion<ParsedT>> {
+  ): Core.APIPromise<ParsedChatCompletion<ParsedT>> {
     validateInputTools(body.tools);
 
-    const completion = await this._client.chat.completions.create(body, {
-      ...options,
-      headers: {
-        ...options?.headers,
-        'X-Stainless-Helper-Method': 'beta.chat.completions.parse',
-      },
-    });
-
-    return parseChatCompletion(completion, body);
+    return this._client.chat.completions
+      .create(body, {
+        ...options,
+        headers: {
+          ...options?.headers,
+          'X-Stainless-Helper-Method': 'beta.chat.completions.parse',
+        },
+      })
+      ._thenUnwrap((completion) => parseChatCompletion(completion, body));
   }
 
   /**
