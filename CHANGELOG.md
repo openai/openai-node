@@ -1,5 +1,19 @@
 # Changelog
 
+## 4.59.0 (2024-09-11)
+
+Full Changelog: [v4.58.2...v4.59.0](https://github.com/openai/openai-node/compare/v4.58.2...v4.59.0)
+
+### Features
+
+* **structured outputs:** support accessing raw responses ([#1058](https://github.com/openai/openai-node/issues/1058)) ([af17697](https://github.com/openai/openai-node/commit/af176979894ee95a51e09abc239a8fd3a639dcde))
+
+
+### Documentation
+
+* **azure:** example for custom base URL ([#1055](https://github.com/openai/openai-node/issues/1055)) ([20defc8](https://github.com/openai/openai-node/commit/20defc80801e1f1f489a07bd1264be71c56c586f))
+* **azure:** remove locale from docs link ([#1054](https://github.com/openai/openai-node/issues/1054)) ([f9b7eac](https://github.com/openai/openai-node/commit/f9b7eac58020cff0e367a15b9a2ca4e7c95cbb89))
+
 ## 4.58.2 (2024-09-09)
 
 Full Changelog: [v4.58.1...v4.58.2](https://github.com/openai/openai-node/compare/v4.58.1...v4.58.2)
