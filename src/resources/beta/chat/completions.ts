@@ -1,39 +1,45 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import * as Core from '../../../core';
-import { APIResource } from '../../../resource';
-import { ChatCompletionRunner, ChatCompletionFunctionRunnerParams } from '../../../lib/ChatCompletionRunner';
-export { ChatCompletionRunner, ChatCompletionFunctionRunnerParams } from '../../../lib/ChatCompletionRunner';
 import {
-  ChatCompletionStreamingRunner,
-  ChatCompletionStreamingFunctionRunnerParams,
-} from '../../../lib/ChatCompletionStreamingRunner';
-export {
-  ChatCompletionStreamingRunner,
-  ChatCompletionStreamingFunctionRunnerParams,
-} from '../../../lib/ChatCompletionStreamingRunner';
-import { BaseFunctionsArgs } from '../../../lib/RunnableFunction';
-export {
-  RunnableFunction,
-  RunnableFunctions,
-  RunnableFunctionWithParse,
-  RunnableFunctionWithoutParse,
-  ParsingFunction,
-  ParsingToolFunction,
-} from '../../../lib/RunnableFunction';
-import { ChatCompletionToolRunnerParams } from '../../../lib/ChatCompletionRunner';
-export { ChatCompletionToolRunnerParams } from '../../../lib/ChatCompletionRunner';
-import { ChatCompletionStreamingToolRunnerParams } from '../../../lib/ChatCompletionStreamingRunner';
-export { ChatCompletionStreamingToolRunnerParams } from '../../../lib/ChatCompletionStreamingRunner';
+  ChatCompletionFunctionRunnerParams,
+  ChatCompletionRunner,
+  ChatCompletionToolRunnerParams,
+} from '../../../lib/ChatCompletionRunner';
 import { ChatCompletionStream, type ChatCompletionStreamParams } from '../../../lib/ChatCompletionStream';
+import {
+  ChatCompletionStreamingFunctionRunnerParams,
+  ChatCompletionStreamingRunner,
+  ChatCompletionStreamingToolRunnerParams,
+} from '../../../lib/ChatCompletionStreamingRunner';
+import { ExtractParsedContentFromParams, parseChatCompletion, validateInputTools } from '../../../lib/parser';
+import { BaseFunctionsArgs } from '../../../lib/RunnableFunction';
+import { APIResource } from '../../../resource';
 import {
   ChatCompletion,
   ChatCompletionCreateParamsNonStreaming,
   ChatCompletionMessage,
   ChatCompletionMessageToolCall,
 } from '../../chat/completions';
-import { ExtractParsedContentFromParams, parseChatCompletion, validateInputTools } from '../../../lib/parser';
+export {
+  ChatCompletionFunctionRunnerParams,
+  ChatCompletionRunner,
+  ChatCompletionToolRunnerParams,
+} from '../../../lib/ChatCompletionRunner';
 export { ChatCompletionStream, type ChatCompletionStreamParams } from '../../../lib/ChatCompletionStream';
+export {
+  ChatCompletionStreamingFunctionRunnerParams,
+  ChatCompletionStreamingRunner,
+  ChatCompletionStreamingToolRunnerParams,
+} from '../../../lib/ChatCompletionStreamingRunner';
+export {
+  ParsingFunction,
+  ParsingToolFunction,
+  RunnableFunction,
+  RunnableFunctions,
+  RunnableFunctionWithoutParse,
+  RunnableFunctionWithParse,
+} from '../../../lib/RunnableFunction';
 
 export interface ParsedFunction extends ChatCompletionMessageToolCall.Function {
   parsed_arguments?: unknown;
@@ -74,6 +80,28 @@ export class Completions extends APIResource {
     });
 
     return parseChatCompletion(completion, body);
+  }
+
+  async parseWithResponse<
+    Params extends ChatCompletionParseParams,
+    ParsedT = ExtractParsedContentFromParams<Params>,
+  >(
+    body: Params,
+    options?: Core.RequestOptions,
+  ): Promise<{ parsedCompletion: ParsedChatCompletion<ParsedT>; response: Core.Response }> {
+    validateInputTools(body.tools);
+
+    const { data: completion, response } = await this._client.chat.completions
+      .create(body, {
+        ...options,
+        headers: {
+          ...options?.headers,
+          'X-Stainless-Helper-Method': 'beta.chat.completions.parse',
+        },
+      })
+      .withResponse();
+
+    return { parsedCompletion: parseChatCompletion(completion, body), response };
   }
 
   /**
