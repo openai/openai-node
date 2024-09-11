@@ -185,10 +185,12 @@ function messageReducer(previous: ChatCompletionMessage, item: ChatCompletionChu
     return acc;
   };
 
-  if (item.choices.length == 0) {
+  const choice = item.choices[0];
+  if (!choice) {
+    // chunk contains information about usage and token counts
     return previous;
   }
-  return reduce(previous, item.choices[0]!.delta) as ChatCompletionMessage;
+  return reduce(previous, choice.delta) as ChatCompletionMessage;
 }
 
 function lineRewriter() {
