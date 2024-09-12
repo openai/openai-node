@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.60.0 (2024-09-12)
+
+Full Changelog: [v4.59.0...v4.60.0](https://github.com/openai/openai-node/compare/v4.59.0...v4.60.0)
+
+### Features
+
+* **api:** add o1 models ([#1061](https://github.com/openai/openai-node/issues/1061)) ([224cc04](https://github.com/openai/openai-node/commit/224cc045200cd1ce1517b4376c505de9b9a74ccc))
+
 ## 4.59.0 (2024-09-11)
 
 Full Changelog: [v4.58.2...v4.59.0](https://github.com/openai/openai-node/compare/v4.58.2...v4.59.0)
