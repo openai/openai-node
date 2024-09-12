@@ -139,11 +139,11 @@ export interface Assistant {
    * and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
    *
    * Setting to `{ "type": "json_schema", "json_schema": {...} }` enables Structured
-   * Outputs which guarantees the model will match your supplied JSON schema. Learn
-   * more in the
+   * Outputs which ensures the model will match your supplied JSON schema. Learn more
+   * in the
    * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
    *
-   * Setting to `{ "type": "json_object" }` enables JSON mode, which guarantees the
+   * Setting to `{ "type": "json_object" }` enables JSON mode, which ensures the
    * message the model generates is valid JSON.
    *
    * **Important:** when using JSON mode, you **must** also instruct the model to
@@ -653,7 +653,8 @@ export namespace FileSearchTool {
     max_num_results?: number;
 
     /**
-     * The ranking options for the file search.
+     * The ranking options for the file search. If not specified, the file search tool
+     * will use the `auto` ranker and a score_threshold of 0.
      *
      * See the
      * [file search tool documentation](https://platform.openai.com/docs/assistants/tools/file-search/customizing-file-search-settings)
@@ -664,7 +665,8 @@ export namespace FileSearchTool {
 
   export namespace FileSearch {
     /**
-     * The ranking options for the file search.
+     * The ranking options for the file search. If not specified, the file search tool
+     * will use the `auto` ranker and a score_threshold of 0.
      *
      * See the
      * [file search tool documentation](https://platform.openai.com/docs/assistants/tools/file-search/customizing-file-search-settings)
@@ -672,16 +674,16 @@ export namespace FileSearchTool {
      */
     export interface RankingOptions {
       /**
+       * The score threshold for the file search. All values must be a floating point
+       * number between 0 and 1.
+       */
+      score_threshold: number;
+
+      /**
        * The ranker to use for the file search. If not specified will use the `auto`
        * ranker.
        */
       ranker?: 'auto' | 'default_2024_08_21';
-
-      /**
-       * The score threshold for the file search. All values must be a floating point
-       * number between 0 and 1.
-       */
-      score_threshold?: number;
     }
   }
 }
@@ -1113,11 +1115,11 @@ export interface AssistantCreateParams {
    * and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
    *
    * Setting to `{ "type": "json_schema", "json_schema": {...} }` enables Structured
-   * Outputs which guarantees the model will match your supplied JSON schema. Learn
-   * more in the
+   * Outputs which ensures the model will match your supplied JSON schema. Learn more
+   * in the
    * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
    *
-   * Setting to `{ "type": "json_object" }` enables JSON mode, which guarantees the
+   * Setting to `{ "type": "json_object" }` enables JSON mode, which ensures the
    * message the model generates is valid JSON.
    *
    * **Important:** when using JSON mode, you **must** also instruct the model to
@@ -1271,11 +1273,11 @@ export interface AssistantUpdateParams {
    * and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
    *
    * Setting to `{ "type": "json_schema", "json_schema": {...} }` enables Structured
-   * Outputs which guarantees the model will match your supplied JSON schema. Learn
-   * more in the
+   * Outputs which ensures the model will match your supplied JSON schema. Learn more
+   * in the
    * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
    *
-   * Setting to `{ "type": "json_object" }` enables JSON mode, which guarantees the
+   * Setting to `{ "type": "json_object" }` enables JSON mode, which ensures the
    * message the model generates is valid JSON.
    *
    * **Important:** when using JSON mode, you **must** also instruct the model to
