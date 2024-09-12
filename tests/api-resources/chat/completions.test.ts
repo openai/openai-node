@@ -32,6 +32,7 @@ describe('resource completions', () => {
       functions: [{ name: 'name', description: 'description', parameters: { foo: 'bar' } }],
       logit_bias: { foo: 0 },
       logprobs: true,
+      max_completion_tokens: 0,
       max_tokens: 0,
       n: 1,
       parallel_tool_calls: true,
