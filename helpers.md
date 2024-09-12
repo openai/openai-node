@@ -585,6 +585,42 @@ async function main() {
 main();
 ```
 
+#### Use afterComplete for multi-agent patterns
+
+The `afterComplete` callback allows for some powerful multi-agent patterns. By passing runner.messages to another LLM chat within afterComplete, you can easily have another model analyze the conversation and do things like conditionally inject web research or other targeting guidance to help the first model overcome problems.
+
+```ts
+import OpenAI from 'openai';
+
+const client = new OpenAI();
+
+async function main() {
+  let shouldInjectMessage = false // You can do any kind of conditional logic you want
+  const runner = client.chat.completions
+    .runTools({
+      model: 'gpt-3.5-turbo',
+      messages: [{ role: 'user', content: "How's the weather this week in Los Angeles?" }],
+      tools: [
+        // Whole bunch of tools...perhaps so many that we need to offload some cognitive overhead to another chat via afterCompletion...
+      ],
+    },
+    {
+      afterCompletion: async () => {
+        if (!shouldInjectMessage) {
+          runner._addMessage({
+            role: 'system',
+            content: `Here's some up-to-date information I've found from the web that can help you with your next response: 42.`,
+          });
+
+          shouldInjectMessage = true;
+        }
+      },
+    })
+}
+
+main();
+```
+
 #### Integrate with `zod`
 
 [`zod`](https://www.npmjs.com/package/zod) is a schema validation library which can help with validating the
