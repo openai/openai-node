@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.60.1 (2024-09-13)
+
+Full Changelog: [v4.60.0...v4.60.1](https://github.com/openai/openai-node/compare/v4.60.0...v4.60.1)
+
+### Bug Fixes
+
+* **zod:** correctly add $ref definitions for transformed schemas ([#1065](https://github.com/openai/openai-node/issues/1065)) ([9b93b24](https://github.com/openai/openai-node/commit/9b93b24b8ae267fe403fb9cd4876d9772f40878b))
+
 ## 4.60.0 (2024-09-12)
 
 Full Changelog: [v4.59.0...v4.60.0](https://github.com/openai/openai-node/compare/v4.59.0...v4.60.0)
