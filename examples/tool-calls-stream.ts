@@ -27,6 +27,9 @@ import {
   ChatCompletionMessageParam,
 } from 'openai/resources/chat';
 
+// Used so that the each chunk coming in is noticable
+const CHUNK_DELAY_MS = 100;
+
 // gets API Key from environment variable OPENAI_API_KEY
 const openai = new OpenAI();
 
@@ -126,6 +129,9 @@ async function main() {
     for await (const chunk of stream) {
       message = messageReducer(message, chunk);
       writeLine(message);
+
+      // Add a small delay so that the chunks coming in are noticablej
+      await new Promise((resolve) => setTimeout(resolve, CHUNK_DELAY_MS));
     }
     console.log();
     messages.push(message);
