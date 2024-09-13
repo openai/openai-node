@@ -585,9 +585,9 @@ async function main() {
 main();
 ```
 
-#### Use afterComplete for multi-agent patterns
+#### Use `afterCompletion` for multi-agent patterns
 
-The `afterComplete` callback allows for some powerful multi-agent patterns. By passing runner.messages to another LLM chat within afterComplete, you can easily have another model analyze the conversation and do things like conditionally inject web research or other targeting guidance to help the first model overcome problems.
+The `afterCompletion` callback allows for some powerful multi-agent patterns. By passing runner.messages to another LLM chat within `afterCompletion`, you can easily have another model analyze the conversation and do things like conditionally inject web research or other relevant data or guidance to help the first model overcome problems.
 
 ```ts
 import OpenAI from 'openai';
