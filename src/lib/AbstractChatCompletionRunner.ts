@@ -32,7 +32,7 @@ export interface RunnerOptions extends Core.RequestOptions {
   /** A callback to be run after each chat completion (and after any tools have been run for the completion).
    * Can be used, for example, to make an LLM call to analyze the conversation thus far and provide guidance
    * or supplemental information by injecting a message via runner._addMessage().
-   * Receives the chat completion that it was run after as an argument.
+   * Receives the chat completion that was just processed as an argument and runs after all tool calls have been handled.
    */
   afterCompletion?: (completion: ChatCompletion) => Promise<void>;
 }
