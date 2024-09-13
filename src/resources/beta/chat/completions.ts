@@ -21,7 +21,6 @@ export {
   ParsingFunction,
   ParsingToolFunction,
 } from '../../../lib/RunnableFunction';
-import { RunnerOptions } from '../../../lib/AbstractChatCompletionRunner';
 import { ChatCompletionToolRunnerParams } from '../../../lib/ChatCompletionRunner';
 export { ChatCompletionToolRunnerParams } from '../../../lib/ChatCompletionRunner';
 import { ChatCompletionStreamingToolRunnerParams } from '../../../lib/ChatCompletionStreamingRunner';
@@ -120,19 +119,19 @@ export class Completions extends APIResource {
   runTools<
     Params extends ChatCompletionToolRunnerParams<any>,
     ParsedT = ExtractParsedContentFromParams<Params>,
-  >(body: Params, options?: RunnerOptions): ChatCompletionRunner<ParsedT>;
+  >(body: Params, options?: Core.RequestOptions): ChatCompletionRunner<ParsedT>;
 
   runTools<
     Params extends ChatCompletionStreamingToolRunnerParams<any>,
     ParsedT = ExtractParsedContentFromParams<Params>,
-  >(body: Params, options?: RunnerOptions): ChatCompletionStreamingRunner<ParsedT>;
+  >(body: Params, options?: Core.RequestOptions): ChatCompletionStreamingRunner<ParsedT>;
 
   runTools<
     Params extends ChatCompletionToolRunnerParams<any> | ChatCompletionStreamingToolRunnerParams<any>,
     ParsedT = ExtractParsedContentFromParams<Params>,
   >(
     body: Params,
-    options?: RunnerOptions,
+    options?: Core.RequestOptions,
   ): ChatCompletionRunner<ParsedT> | ChatCompletionStreamingRunner<ParsedT> {
     if (body.stream) {
       return ChatCompletionStreamingRunner.runTools(
