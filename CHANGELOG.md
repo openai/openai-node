@@ -1,5 +1,24 @@
 # Changelog
 
+## 4.61.0 (2024-09-13)
+
+Full Changelog: [v4.60.1...v4.61.0](https://github.com/openai/openai-node/compare/v4.60.1...v4.61.0)
+
+### Bug Fixes
+
+* **client:** partial parsing update to handle strings ([46e8eb6](https://github.com/openai/openai-node/commit/46e8eb6a9a45b11f9e4c97474ed6c02b1faa43af))
+* **examples:** handle usage chunk in tool call streaming ([#1068](https://github.com/openai/openai-node/issues/1068)) ([e4188c4](https://github.com/openai/openai-node/commit/e4188c4ba443a21d1ef94658df5366f80f0e573b))
+
+
+### Chores
+
+* **examples:** add a small delay to tool-calls example streaming ([a3fc659](https://github.com/openai/openai-node/commit/a3fc65928af7085d1d8d785ad4765fedc3955641))
+
+
+### Documentation
+
+* update CONTRIBUTING.md ([#1071](https://github.com/openai/openai-node/issues/1071)) ([5de81c9](https://github.com/openai/openai-node/commit/5de81c95d7326602865e007715a76d5595824fd9))
+
 ## 4.60.1 (2024-09-13)
 
 Full Changelog: [v4.60.0...v4.60.1](https://github.com/openai/openai-node/compare/v4.60.0...v4.60.1)
