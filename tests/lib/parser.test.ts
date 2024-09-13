@@ -951,5 +951,119 @@ describe('.parse()', () => {
         }
       `);
     });
+
+    test('ref schemas with `.transform()`', async () => {
+      const Inner = z.object({
+        baz: z.boolean().transform((v) => v ?? true),
+      });
+
+      const Outer = z.object({
+        first: Inner,
+        second: Inner,
+      });
+
+      expect(zodResponseFormat(Outer, 'data').json_schema.schema).toMatchInlineSnapshot(`
+        {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "additionalProperties": false,
+          "definitions": {
+            "data": {
+              "additionalProperties": false,
+              "properties": {
+                "first": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "baz": {
+                      "type": "boolean",
+                    },
+                  },
+                  "required": [
+                    "baz",
+                  ],
+                  "type": "object",
+                },
+                "second": {
+                  "$ref": "#/definitions/data_properties_first",
+                },
+              },
+              "required": [
+                "first",
+                "second",
+              ],
+              "type": "object",
+            },
+            "data_properties_first": {
+              "additionalProperties": false,
+              "properties": {
+                "baz": {
+                  "$ref": "#/definitions/data_properties_first_properties_baz",
+                },
+              },
+              "required": [
+                "baz",
+              ],
+              "type": "object",
+            },
+            "data_properties_first_properties_baz": {
+              "type": "boolean",
+            },
+          },
+          "properties": {
+            "first": {
+              "additionalProperties": false,
+              "properties": {
+                "baz": {
+                  "type": "boolean",
+                },
+              },
+              "required": [
+                "baz",
+              ],
+              "type": "object",
+            },
+            "second": {
+              "$ref": "#/definitions/data_properties_first",
+            },
+          },
+          "required": [
+            "first",
+            "second",
+          ],
+          "type": "object",
+        }
+      `);
+
+      const completion = await makeSnapshotRequest(
+        (openai) =>
+          openai.beta.chat.completions.parse({
+            model: 'gpt-4o-2024-08-06',
+            messages: [
+              {
+                role: 'user',
+                content: 'can you generate fake data matching the given response format?',
+              },
+            ],
+            response_format: zodResponseFormat(Outer, 'fakeData'),
+          }),
+        2,
+      );
+
+      expect(completion.choices[0]?.message).toMatchInlineSnapshot(`
+        {
+          "content": "{"first":{"baz":true},"second":{"baz":false}}",
+          "parsed": {
+            "first": {
+              "baz": true,
+            },
+            "second": {
+              "baz": false,
+            },
+          },
+          "refusal": null,
+          "role": "assistant",
+          "tool_calls": [],
+        }
+      `);
+    });
   });
 });
