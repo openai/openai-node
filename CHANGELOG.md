@@ -1,5 +1,18 @@
 # Changelog
 
+## 4.61.1 (2024-09-16)
+
+Full Changelog: [v4.61.0...v4.61.1](https://github.com/openai/openai-node/compare/v4.61.0...v4.61.1)
+
+### Bug Fixes
+
+* **runTools:** correct request options type ([#1073](https://github.com/openai/openai-node/issues/1073)) ([399f971](https://github.com/openai/openai-node/commit/399f9710f9a1406fe2dd048a1d26418c0de7ff0c))
+
+
+### Chores
+
+* **internal:** update spec link ([#1076](https://github.com/openai/openai-node/issues/1076)) ([20f1bcc](https://github.com/openai/openai-node/commit/20f1bcce2b5d03c5185989212a5c5271a8d4209c))
+
 ## 4.61.0 (2024-09-13)
 
 Full Changelog: [v4.60.1...v4.61.0](https://github.com/openai/openai-node/compare/v4.60.1...v4.61.0)
