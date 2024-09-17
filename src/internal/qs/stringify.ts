@@ -204,7 +204,7 @@ function inner_stringify(
         strictNullHandling,
         skipNulls,
         encodeDotInKeys,
-        // @ts-expect-error
+        // @ts-ignore
         generateArrayPrefix === 'comma' && encodeValuesOnly && is_array(obj) ? null : encoder,
         filter,
         sort,
@@ -224,7 +224,7 @@ function inner_stringify(
 
 function normalize_stringify_options(
   opts: StringifyOptions = defaults,
-): NonNullableProperties<StringifyOptions> {
+): NonNullableProperties<Omit<StringifyOptions, 'indices'>> & { indices?: boolean } {
   if (typeof opts.allowEmptyArrays !== 'undefined' && typeof opts.allowEmptyArrays !== 'boolean') {
     throw new TypeError('`allowEmptyArrays` option can only be `true` or `false`, when provided');
   }
@@ -299,7 +299,7 @@ function normalize_stringify_options(
     formatter: formatter,
     serializeDate: typeof opts.serializeDate === 'function' ? opts.serializeDate : defaults.serializeDate,
     skipNulls: typeof opts.skipNulls === 'boolean' ? opts.skipNulls : defaults.skipNulls,
-    // @ts-expect-error
+    // @ts-ignore
     sort: typeof opts.sort === 'function' ? opts.sort : null,
     strictNullHandling:
       typeof opts.strictNullHandling === 'boolean' ? opts.strictNullHandling : defaults.strictNullHandling,
