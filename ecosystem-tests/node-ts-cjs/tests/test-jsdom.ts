@@ -144,3 +144,12 @@ describe.skip('toFile', () => {
     expect(result.filename).toEqual('finetune.jsonl');
   });
 });
+
+test('query strings', () => {
+  expect(
+    decodeURIComponent((client as any).stringifyQuery({ foo: { nested: { a: true, b: 'foo' } } })),
+  ).toEqual('foo[nested][a]=true&foo[nested][b]=foo');
+  expect(
+    decodeURIComponent((client as any).stringifyQuery({ foo: { nested: { a: ['hello', 'world'] } } })),
+  ).toEqual('foo[nested][a][]=hello&foo[nested][a][]=world');
+});

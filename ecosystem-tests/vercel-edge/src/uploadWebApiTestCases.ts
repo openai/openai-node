@@ -180,4 +180,15 @@ export function uploadWebApiTestCases({
       expectEqual(result.filename, 'finetune.jsonl');
     });
   }
+
+  it('handles query strings', async () => {
+    expectEqual(
+      decodeURIComponent((client as any).stringifyQuery({ foo: { nested: { a: true, b: 'foo' } } })),
+      'foo[nested][a]=true&foo[nested][b]=foo',
+    );
+    expectEqual(
+      decodeURIComponent((client as any).stringifyQuery({ foo: { nested: { a: ['hello', 'world'] } } })),
+      'foo[nested][a][]=hello&foo[nested][a][]=world',
+    );
+  });
 }
