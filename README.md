@@ -361,6 +361,17 @@ Error codes are as followed:
 | >=500       | `InternalServerError`      |
 | N/A         | `APIConnectionError`       |
 
+## Request IDs
+
+> For more information on debugging requests, see [these docs](https://platform.openai.com/docs/api-reference/debugging-requests)
+
+All object responses in the SDK provide a `_request_id` property which is added from the `x-request-id` response header so that you can quickly log failing requests and report them back to OpenAI.
+
+```ts
+const completion = await client.chat.completions.create({ messages: [{ role: 'user', content: 'Say this is a test' }], model: 'gpt-4' });
+console.log(completion._request_id) // req_123
+```
+
 ## Microsoft Azure OpenAI
 
 To use this library with [Azure OpenAI](https://learn.microsoft.com/azure/ai-services/openai/overview), use the `AzureOpenAI`
