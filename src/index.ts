@@ -18,7 +18,7 @@ import { APIResponseProps } from './internal/parse';
 import { getPlatformHeaders } from './internal/platform';
 import { getDefaultFetch as _getDefaultFetch } from './internal/shims';
 import * as Opts from './internal/request-options';
-import * as qs from 'qs';
+import * as qs from './internal/qs';
 import { VERSION } from './version';
 import {
   kind as shimsKind,
