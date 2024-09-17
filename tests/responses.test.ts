@@ -53,6 +53,7 @@ describe('request id', () => {
     const rsp = await client.chat.completions.create({ messages: [], model: 'gpt-4' });
     expect(rsp.id).toBe('bar');
     expect(rsp._request_id).toBe('req_id_xxx');
+    expect(JSON.stringify(rsp)).toBe('{"id":"bar"}');
   });
 
   test('envelope response', async () => {
