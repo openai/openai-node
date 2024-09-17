@@ -2,10 +2,8 @@
 
 import * as Errors from './error';
 import * as Uploads from './uploads';
-
 import { type Agent, type RequestInit } from './_shims/index';
-import * as qs from 'qs';
-
+import * as qs from './internal/qs';
 import * as Core from './core';
 import * as Pagination from './pagination';
 import * as API from './resources/index';

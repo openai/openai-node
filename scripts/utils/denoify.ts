@@ -102,9 +102,6 @@ async function denoify() {
       } else if (specifier.startsWith(pkgName + '/')) {
         // convert self-referencing module specifiers to relative paths
         specifier = file.getRelativePathAsModuleSpecifierTo(denoDir + specifier.substring(pkgName.length));
-      } else if (specifier === 'qs') {
-        decl.replaceWithText(`import { qs } from "https://deno.land/x/deno_qs@0.0.1/mod.ts"`);
-        continue;
       } else if (!decl.isModuleSpecifierRelative()) {
         specifier = `npm:${specifier}`;
       }
