@@ -1,5 +1,21 @@
 # Changelog
 
+## 4.62.0 (2024-09-17)
+
+Full Changelog: [v4.61.1...v4.62.0](https://github.com/openai/openai-node/compare/v4.61.1...v4.62.0)
+
+### Features
+
+* **client:** add ._request_id property to object responses ([#1078](https://github.com/openai/openai-node/issues/1078)) ([d5c2131](https://github.com/openai/openai-node/commit/d5c21314449091dd1c668c7358b25e041466f588))
+
+
+### Chores
+
+* **internal:** add ecosystem test for qs reproduction ([0199dd8](https://github.com/openai/openai-node/commit/0199dd85981497fac2b60f786acc00ea30683897))
+* **internal:** add query string encoder ([#1079](https://github.com/openai/openai-node/issues/1079)) ([f870682](https://github.com/openai/openai-node/commit/f870682d5c490182547c428b0b5c75da0e34d15a))
+* **internal:** fix some types ([#1082](https://github.com/openai/openai-node/issues/1082)) ([1ec41a7](https://github.com/openai/openai-node/commit/1ec41a7d768502a31abb33bf86b0539e5b4b6541))
+* **tests:** add query string tests to ecosystem tests ([36be724](https://github.com/openai/openai-node/commit/36be724384401bb697d8b07b0a1965be721cfa51))
+
 ## 4.61.1 (2024-09-16)
 
 Full Changelog: [v4.61.0...v4.61.1](https://github.com/openai/openai-node/compare/v4.61.0...v4.61.1)
