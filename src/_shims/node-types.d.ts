@@ -7,7 +7,7 @@ import * as fd from 'formdata-node';
 export { type Agent } from 'node:http';
 export { type Readable } from 'node:stream';
 export { type ReadStream as FsReadStream } from 'node:fs';
-export { ReadableStream } from 'web-streams-polyfill';
+export { ReadableStream } from 'node:stream/web';
 
 export const fetch: typeof nf.default;
 
