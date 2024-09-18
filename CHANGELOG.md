@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.62.1 (2024-09-18)
+
+Full Changelog: [v4.62.0...v4.62.1](https://github.com/openai/openai-node/compare/v4.62.0...v4.62.1)
+
+### Bug Fixes
+
+* **types:** remove leftover polyfill usage ([#1084](https://github.com/openai/openai-node/issues/1084)) ([b7c9538](https://github.com/openai/openai-node/commit/b7c9538981a11005fb0a00774683d979d3ca663a))
+
 ## 4.62.0 (2024-09-17)
 
 Full Changelog: [v4.61.1...v4.62.0](https://github.com/openai/openai-node/compare/v4.61.1...v4.62.0)
