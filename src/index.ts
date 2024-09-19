@@ -276,6 +276,7 @@ export namespace OpenAI {
   export import Embeddings = API.Embeddings;
   export import CreateEmbeddingResponse = API.CreateEmbeddingResponse;
   export import Embedding = API.Embedding;
+  export import EmbeddingModel = API.EmbeddingModel;
   export import EmbeddingCreateParams = API.EmbeddingCreateParams;
 
   export import Files = API.Files;
