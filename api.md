@@ -64,6 +64,7 @@ Types:
 
 - <code><a href="./src/resources/embeddings.ts">CreateEmbeddingResponse</a></code>
 - <code><a href="./src/resources/embeddings.ts">Embedding</a></code>
+- <code><a href="./src/resources/embeddings.ts">EmbeddingModel</a></code>
 
 Methods:
 
