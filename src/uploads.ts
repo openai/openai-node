@@ -39,6 +39,18 @@ export interface BlobLike {
 }
 
 /**
+ * This check adds the arrayBuffer() method type because it is available and used at runtime
+ */
+export const isBlobLike = (value: any): value is BlobLike & { arrayBuffer(): Promise<ArrayBuffer> } =>
+  value != null &&
+  typeof value === 'object' &&
+  typeof value.size === 'number' &&
+  typeof value.type === 'string' &&
+  typeof value.text === 'function' &&
+  typeof value.slice === 'function' &&
+  typeof value.arrayBuffer === 'function';
+
+/**
  * Intended to match web.File, node.File, undici.File, etc.
  */
 export interface FileLike extends BlobLike {
@@ -47,6 +59,13 @@ export interface FileLike extends BlobLike {
   /** [MDN Reference](https://developer.mozilla.org/docs/Web/API/File/name) */
   readonly name: string;
 }
+
+export const isFileLike = (value: any): value is FileLike =>
+  value != null &&
+  typeof value === 'object' &&
+  typeof value.name === 'string' &&
+  typeof value.lastModified === 'number' &&
+  isBlobLike(value);
 
 /**
  * Intended to match web.Response, node.Response, undici.Response, etc.
@@ -61,25 +80,6 @@ export const isResponseLike = (value: any): value is ResponseLike =>
   typeof value === 'object' &&
   typeof value.url === 'string' &&
   typeof value.blob === 'function';
-
-export const isFileLike = (value: any): value is FileLike =>
-  value != null &&
-  typeof value === 'object' &&
-  typeof value.name === 'string' &&
-  typeof value.lastModified === 'number' &&
-  isBlobLike(value);
-
-/**
- * This check adds the arrayBuffer() method type because it is available and used at runtime
- */
-export const isBlobLike = (value: any): value is BlobLike & { arrayBuffer(): Promise<ArrayBuffer> } =>
-  value != null &&
-  typeof value === 'object' &&
-  typeof value.size === 'number' &&
-  typeof value.type === 'string' &&
-  typeof value.text === 'function' &&
-  typeof value.slice === 'function' &&
-  typeof value.arrayBuffer === 'function';
 
 export const isUploadable = (value: any): value is Uploadable => {
   return isFileLike(value) || isResponseLike(value) || isFsReadStream(value);
