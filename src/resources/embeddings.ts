@@ -75,6 +75,8 @@ export interface Embedding {
   object: 'embedding';
 }
 
+export type EmbeddingModel = 'text-embedding-ada-002' | 'text-embedding-3-small' | 'text-embedding-3-large';
+
 export interface EmbeddingCreateParams {
   /**
    * Input text to embed, encoded as a string or array of tokens. To embed multiple
@@ -94,7 +96,7 @@ export interface EmbeddingCreateParams {
    * [Model overview](https://platform.openai.com/docs/models/overview) for
    * descriptions of them.
    */
-  model: (string & {}) | 'text-embedding-ada-002' | 'text-embedding-3-small' | 'text-embedding-3-large';
+  model: (string & {}) | EmbeddingModel;
 
   /**
    * The number of dimensions the resulting output embeddings should have. Only
@@ -119,5 +121,6 @@ export interface EmbeddingCreateParams {
 export namespace Embeddings {
   export import CreateEmbeddingResponse = EmbeddingsAPI.CreateEmbeddingResponse;
   export import Embedding = EmbeddingsAPI.Embedding;
+  export import EmbeddingModel = EmbeddingsAPI.EmbeddingModel;
   export import EmbeddingCreateParams = EmbeddingsAPI.EmbeddingCreateParams;
 }

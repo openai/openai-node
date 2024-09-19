@@ -22,7 +22,13 @@ export {
   CompletionCreateParamsStreaming,
   Completions,
 } from './completions';
-export { CreateEmbeddingResponse, Embedding, EmbeddingCreateParams, Embeddings } from './embeddings';
+export {
+  CreateEmbeddingResponse,
+  Embedding,
+  EmbeddingModel,
+  EmbeddingCreateParams,
+  Embeddings,
+} from './embeddings';
 export {
   FileContent,
   FileDeleted,
