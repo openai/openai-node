@@ -244,6 +244,31 @@ describe('retries', () => {
     expect(count).toEqual(3);
   });
 
+  test('retry count header', async () => {
+    let count = 0;
+    let capturedRequest: RequestInit | undefined;
+    const testFetch = async (url: string | URL | Request, init: RequestInit = {}): Promise<Response> => {
+      count++;
+      if (count <= 2) {
+        return new Response(undefined, {
+          status: 429,
+          headers: {
+            'Retry-After': '0.1',
+          },
+        });
+      }
+      capturedRequest = init;
+      return new Response(JSON.stringify({ a: 1 }), { headers: { 'Content-Type': 'application/json' } });
+    };
+
+    const client = new OpenAI({ apiKey: 'My API Key', fetch: testFetch, maxRetries: 4 });
+
+    expect(await client.request({ path: '/foo', method: 'get' })).toEqual({ a: 1 });
+
+    expect((capturedRequest!.headers as Headers)['x-stainless-retry-count']).toEqual('2');
+    expect(count).toEqual(3);
+  });
+
   test('retry on 429 with retry-after', async () => {
     let count = 0;
     const testFetch = async (
