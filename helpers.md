@@ -595,24 +595,25 @@ import OpenAI from 'openai';
 const client = new OpenAI();
 
 async function main() {
-  let shouldInjectMessage = false // You can do any kind of conditional logic you want
   const runner = client.chat.completions
     .runTools({
-      model: 'gpt-3.5-turbo',
-      messages: [{ role: 'user', content: "How's the weather this week in Los Angeles?" }],
+      model: 'gpt-4o',
+      // Let's say we have a code agent that can autonomously carry out code changes
+      messages: [systemMessage, { role: 'user', content: "Please setup [some awesome library with a complex setup] in my codebase." }],
       tools: [
-        // Whole bunch of tools...perhaps so many that we need to offload some cognitive overhead to another chat via afterCompletion...
+        // Whole bunch of tools...so many that we need to offload some cognitive overhead via afterCompletion
       ],
     },
     {
       afterCompletion: async () => {
-        if (!shouldInjectMessage) {
+        // Pass the last ten messages to a separate LLM flow and check if we should inject any web research to help the agent overcome any problems or gaps in knowledge
+        const webResearch = await optionallyPerformWebResearch(runner.messages.slice(-10))
+
+        if (webResearch) {
           runner._addMessage({
             role: 'system',
-            content: `Here's some up-to-date information I've found from the web that can help you with your next response: 42.`,
+            content: `You've been provided the following up-to-date web research and should use it to guide your next steps:\n\n${webResearch}.`,
           });
-
-          shouldInjectMessage = true;
         }
       },
     })
