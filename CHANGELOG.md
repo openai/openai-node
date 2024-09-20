@@ -1,5 +1,18 @@
 # Changelog
 
+## 4.63.0 (2024-09-20)
+
+Full Changelog: [v4.62.1...v4.63.0](https://github.com/openai/openai-node/compare/v4.62.1...v4.63.0)
+
+### Features
+
+* **client:** send retry count header ([#1087](https://github.com/openai/openai-node/issues/1087)) ([7bcebc0](https://github.com/openai/openai-node/commit/7bcebc0e3965c2decd1dffb1e67f5197260ca89e))
+
+
+### Chores
+
+* **types:** improve type name for embedding models ([#1089](https://github.com/openai/openai-node/issues/1089)) ([d6966d9](https://github.com/openai/openai-node/commit/d6966d9872a14b7fbee85a7bb1fae697852b8ce0))
+
 ## 4.62.1 (2024-09-18)
 
 Full Changelog: [v4.62.0...v4.62.1](https://github.com/openai/openai-node/compare/v4.62.0...v4.62.1)
