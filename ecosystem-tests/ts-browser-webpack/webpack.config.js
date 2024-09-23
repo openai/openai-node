@@ -25,13 +25,13 @@ module.exports = {
       {
         test: /\.ts$/,
         exclude: /node_modules/,
-        loader: 'ts-loader',
+        use: 'ts-loader',
       },
     ],
   },
 
   resolve: {
-    extensions: ['*', '.js', '.ts'],
+    extensions: ['.js', '.ts'],
   },
 
   devtool: 'eval',
@@ -42,4 +42,12 @@ module.exports = {
       filename: 'index.html',
     }),
   ],
+
+  devServer: {
+    static: {
+      directory: publicPath,
+    },
+    compress: true,
+    port: 8080,
+  },
 };
