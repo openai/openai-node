@@ -23,16 +23,12 @@
     "lint": "./scripts/lint",
     "fix": "./scripts/format"
   },
-  "dependencies": {
-    "@types/node": "^18.19.41",
-    "agentkeepalive": "^4.2.1",
-    "form-data-encoder": "1.7.2",
-    "undici-types": "^6.19.3"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@swc/core": "^1.3.102",
     "@swc/jest": "^0.2.29",
     "@types/jest": "^29.4.0",
+    "@types/node": "18.19.50",
     "@typescript-eslint/eslint-plugin": "^6.7.0",
     "@typescript-eslint/parser": "^6.7.0",
     "eslint": "^8.49.0",
@@ -50,54 +46,11 @@
     "typescript": "^4.8.2",
     "zod": "^3.23.8"
   },
-  "sideEffects": [
-    "./_shims/index.js",
-    "./_shims/index.mjs",
-    "./shims/node.js",
-    "./shims/node.mjs",
-    "./shims/web.js",
-    "./shims/web.mjs"
-  ],
   "imports": {
     "openai": ".",
     "openai/*": "./src/*"
   },
   "exports": {
-    "./_shims/auto/*": {
-      "deno": {
-        "types": "./dist/_shims/auto/*.d.ts",
-        "require": "./dist/_shims/auto/*.js",
-        "default": "./dist/_shims/auto/*.mjs"
-      },
-      "bun": {
-        "types": "./dist/_shims/auto/*.d.ts",
-        "require": "./dist/_shims/auto/*-bun.js",
-        "default": "./dist/_shims/auto/*-bun.mjs"
-      },
-      "browser": {
-        "types": "./dist/_shims/auto/*.d.ts",
-        "require": "./dist/_shims/auto/*.js",
-        "default": "./dist/_shims/auto/*.mjs"
-      },
-      "worker": {
-        "types": "./dist/_shims/auto/*.d.ts",
-        "require": "./dist/_shims/auto/*.js",
-        "default": "./dist/_shims/auto/*.mjs"
-      },
-      "workerd": {
-        "types": "./dist/_shims/auto/*.d.ts",
-        "require": "./dist/_shims/auto/*.js",
-        "default": "./dist/_shims/auto/*.mjs"
-      },
-      "node": {
-        "types": "./dist/_shims/auto/*-node.d.ts",
-        "require": "./dist/_shims/auto/*-node.js",
-        "default": "./dist/_shims/auto/*-node.mjs"
-      },
-      "types": "./dist/_shims/auto/*.d.ts",
-      "require": "./dist/_shims/auto/*.js",
-      "default": "./dist/_shims/auto/*.mjs"
-    },
     ".": {
       "require": {
         "types": "./dist/index.d.ts",

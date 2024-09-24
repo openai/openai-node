@@ -1,14 +1,7 @@
 import { type RequestOptions } from './internal/request-options';
-import {
-  FormData,
-  File,
-  type Blob,
-  type FilePropertyBag,
-  getMultipartRequestOptions,
-  type FsReadStream,
-  isFsReadStream,
-} from './_shims/index';
-import { MultipartBody } from './_shims/MultipartBody';
+import { type FilePropertyBag } from './internal/builtin-types';
+import * as Shims from './internal/shims';
+import { MultipartBody } from './internal/MultipartBody';
 
 type BlobLikePart = string | ArrayBuffer | ArrayBufferView | BlobLike | Uint8Array | DataView;
 export type BlobPart = string | ArrayBuffer | ArrayBufferView | Blob | Uint8Array | DataView;
@@ -22,7 +15,7 @@ export type BlobPart = string | ArrayBuffer | ArrayBufferView | Blob | Uint8Arra
  * For convenience, you can also pass a fetch Response, or in Node,
  * the result of fs.createReadStream().
  */
-export type Uploadable = FileLike | ResponseLike | FsReadStream;
+export type Uploadable = FileLike | ResponseLike | Shims.FsReadStreamLike;
 
 /**
  * Intended to match web.Blob, node.Blob, undici.Blob, etc.
@@ -59,6 +52,10 @@ export interface FileLike extends BlobLike {
   /** [MDN Reference](https://developer.mozilla.org/docs/Web/API/File/name) */
   readonly name: string;
 }
+declare var FileClass: {
+  prototype: FileLike;
+  new (fileBits: BlobPart[], fileName: string, options?: FilePropertyBag): FileLike;
+};
 
 export const isFileLike = (value: any): value is FileLike =>
   value != null &&
@@ -82,10 +79,26 @@ export const isResponseLike = (value: any): value is ResponseLike =>
   typeof value.blob === 'function';
 
 export const isUploadable = (value: any): value is Uploadable => {
-  return isFileLike(value) || isResponseLike(value) || isFsReadStream(value);
+  return isFileLike(value) || isResponseLike(value) || Shims.isFsReadStreamLike(value);
 };
 
 export type ToFileInput = Uploadable | Exclude<BlobLikePart, string> | AsyncIterable<BlobLikePart>;
+
+/**
+ * Construct a `File` instance. This is used to ensure a helpful error is thrown
+ * for environments that don't define a global `File` yet and so that we don't
+ * accidentally rely on a global `File` type in our annotations.
+ */
+function makeFile(fileBits: BlobPart[], fileName: string, options?: FilePropertyBag): FileLike {
+  const File = (globalThis as any).File as typeof FileClass | undefined;
+  if (typeof File === 'undefined') {
+    throw new Error(
+      '`File` is not defined as a global which is required for file uploads; https://github.com/stainless-sdks/openai-typescript/tree/main#how-do-i-setup-file-uploads-in-nodejs',
+    );
+  }
+
+  return new File(fileBits, fileName, options);
+}
 
 /**
  * Helper for creating a {@link File} to pass to an SDK upload method from a variety of different data formats
@@ -118,7 +131,7 @@ export async function toFile(
     // in `new File` interpreting it as a string instead of binary data.
     const data = isBlobLike(blob) ? [(await blob.arrayBuffer()) as any] : [blob];
 
-    return new File(data, name, options);
+    return makeFile(data, name, options);
   }
 
   const bits = await getBytes(value);
@@ -132,7 +145,7 @@ export async function toFile(
     }
   }
 
-  return new File(bits as (string | Blob)[], name, options);
+  return makeFile(bits, name, options);
 }
 
 async function getBytes(value: ToFileInput): Promise<Array<BlobPart>> {
@@ -197,14 +210,14 @@ export const maybeMultipartFormRequestOptions = async <T = Record<string, unknow
   if (!hasUploadableValue(opts.body)) return opts;
 
   const form = await createForm(opts.body);
-  return getMultipartRequestOptions(form, opts);
+  return { ...opts, body: new MultipartBody(form) };
 };
 
 export const multipartFormRequestOptions = async <T = Record<string, unknown>>(
   opts: RequestOptions<T>,
 ): Promise<RequestOptions<T | MultipartBody>> => {
   const form = await createForm(opts.body);
-  return getMultipartRequestOptions(form, opts);
+  return { ...opts, body: new MultipartBody(form) };
 };
 
 export const createForm = async <T = Record<string, unknown>>(body: T | undefined): Promise<FormData> => {
@@ -237,7 +250,7 @@ const addFormValue = async (form: FormData, key: string, value: unknown): Promis
     form.append(key, String(value));
   } else if (isUploadable(value)) {
     const file = await toFile(value);
-    form.append(key, file as File);
+    form.append(key, file as any);
   } else if (Array.isArray(value)) {
     await Promise.all(value.map((entry) => addFormValue(form, key + '[]', entry)));
   } else if (typeof value === 'object') {

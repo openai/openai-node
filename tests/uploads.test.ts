@@ -1,6 +1,5 @@
 import fs from 'fs';
 import { toFile, type ResponseLike } from 'openai/uploads';
-import { File } from 'openai/_shims/index';
 
 class MyClass {
   name: string = 'foo';
@@ -62,4 +61,15 @@ describe('toFile', () => {
     expect(file.name).toEqual('input.jsonl');
     expect(file.type).toBe('jsonl');
   });
+});
+
+test('missing File error message', async () => {
+  // @ts-ignore
+  globalThis.File = undefined;
+
+  await expect(
+    toFile(mockResponse({ url: 'https://example.com/my/audio.mp3' })),
+  ).rejects.toMatchInlineSnapshot(
+    `[Error: \`File\` is not defined as a global which is required for file uploads; https://github.com/stainless-sdks/openai-typescript/tree/main#how-do-i-setup-file-uploads-in-nodejs]`,
+  );
 });

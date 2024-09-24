@@ -1,19 +1,19 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { type Agent, type Readable } from '../_shims/index';
+import { type Agent, type ReadableLike } from './shims';
 import { BlobLike } from '../uploads';
 import { isEmptyObj, hasOwn } from './utils';
 import { Stream } from '../streaming';
 import { type Headers, type HTTPMethod, type KeysEnum } from './types';
 
-export type FinalRequestOptions<Req = unknown | Record<string, unknown> | Readable | DataView> =
+export type FinalRequestOptions<Req = unknown | Record<string, unknown> | ReadableLike | DataView> =
   RequestOptions<Req> & {
     method: HTTPMethod;
     path: string;
   };
 
 export type RequestOptions<
-  Req = unknown | Record<string, unknown> | Readable | BlobLike | ArrayBufferView | ArrayBuffer,
+  Req = unknown | Record<string, unknown> | ReadableLike | BlobLike | ArrayBufferView | ArrayBuffer,
 > = {
   method?: HTTPMethod;
   path?: string;

@@ -15,7 +15,6 @@ rm -rf dist; mkdir dist
 # Copy src to dist/src and build from dist/src into dist, so that
 # the source map for index.js.map will refer to ./src/index.ts etc
 cp -rp src README.md dist
-rm dist/src/_shims/*-deno.ts dist/src/_shims/auto/*-deno.ts
 for file in LICENSE CHANGELOG.md; do
   if [ -e "${file}" ]; then cp "${file}" dist; fi
 done
@@ -29,9 +28,6 @@ node scripts/utils/make-dist-package-json.cjs > dist/package.json
 
 # build to .js/.mjs/.d.ts files
 npm exec tsc-multi
-# copy over handwritten .js/.mjs/.d.ts files
-cp src/_shims/*.{d.ts,js,mjs,md} dist/_shims
-cp src/_shims/auto/*.{d.ts,js,mjs} dist/_shims/auto
 # we need to add exports = module.exports = OpenAI TypeScript to index.js;
 # No way to get that from index.ts because it would cause compile errors
 # when building .mjs
@@ -42,6 +38,7 @@ node scripts/utils/fix-index-exports.cjs
 # the same export default statement)
 cp dist/index.d.ts dist/index.d.mts
 cp tsconfig.dist-src.json dist/src/tsconfig.json
+cp src/internal/shim-types.d.ts dist/internal/shim-types.d.ts
 
 node scripts/utils/postprocess-files.cjs
 

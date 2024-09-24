@@ -1,4 +1,3 @@
-import { Blob } from 'openai/_shims/index';
 import { multipartFormRequestOptions, createForm, toFile } from 'openai';
 
 describe('form data validation', () => {

@@ -522,21 +522,23 @@ validate or strip extra properties from the response from the API.
 
 ### Customizing the fetch client
 
-By default, this library uses `undici` in Node, and expects a global `fetch` function in other environments.
+By default, this library expects a global `fetch` function is defined.
 
-If you would prefer to use a global, web-standards-compliant `fetch` function even in a Node environment,
-(for example, if you are running Node with `--experimental-fetch` or using NextJS which polyfills with `undici`),
-add the following import before your first import `from "OpenAI"`:
+If you want to use a different `fetch` function, you can either polyfill the global:
 
 ```ts
-// Tell TypeScript and the package to use the global web fetch instead of undici.
-// Note, despite the name, this does not add any polyfills, but expects them to be provided if needed.
-import 'openai/shims/web';
-import OpenAI from 'openai';
+import fetch from 'my-fetch';
+
+globalThis.fetch = fetch;
 ```
 
-To do the inverse, add `import "openai/shims/node"` (which does import polyfills).
-This can also be useful if you are getting the wrong TypeScript types for `Response` ([more details](https://github.com/stainless-sdks/openai-typescript/tree/main/src/_shims#readme)).
+Or pass it to the client:
+
+```ts
+import fetch from 'my-fetch';
+
+const client = new OpenAI({ fetch });
+```
 
 ### Logging and middleware
 
@@ -580,6 +582,27 @@ const client = new OpenAI({
 await client.models.list({
   httpAgent: new http.Agent({ keepAlive: false }),
 });
+```
+
+## Frequently Asked Questions
+
+### How do I setup file uploads in Node.js?
+
+In node.js v18 & v19, the `File` class isn't defined as a global which means you'll need to polyfill it to make any file uploads with this library.
+
+We provide a polyfill for `'node:buffer'.File` that you can import:
+
+```ts
+import 'openai/polyfill/node-file';
+```
+
+Or you could polyfill `File` yourself:
+
+```ts
+import { File } from 'node:buffer';
+
+// @ts-ignore
+globalThis.File = File;
 ```
 
 ## Semantic versioning

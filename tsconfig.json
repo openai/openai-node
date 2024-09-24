@@ -1,6 +1,6 @@
 {
   "include": ["src", "tests", "examples"],
-  "exclude": ["src/_shims/**/*-deno.ts"],
+  "exclude": [],
   "compilerOptions": {
     "target": "es2020",
     "lib": ["es2020"],
@@ -9,7 +9,6 @@
     "esModuleInterop": true,
     "baseUrl": "./",
     "paths": {
-      "openai/_shims/auto/*": ["src/_shims/auto/*-node"],
       "openai/*": ["src/*"],
       "openai": ["src/index.ts"],
     },

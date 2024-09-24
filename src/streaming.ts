@@ -1,5 +1,6 @@
-import { ReadableStream } from './_shims/index';
 import { OpenAIError } from './error';
+import { type ReadableStream } from './internal/shim-types';
+import { makeReadableStream } from './internal/shims';
 
 import { APIError } from 'openai/error';
 
@@ -174,7 +175,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
     let iter: AsyncIterator<Item>;
     const encoder = new TextEncoder();
 
-    return new ReadableStream({
+    return makeReadableStream({
       async start() {
         iter = self[Symbol.asyncIterator]();
       },

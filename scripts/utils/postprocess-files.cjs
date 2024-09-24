@@ -130,7 +130,7 @@ async function postprocess() {
       return importPath;
     });
 
-    if (file.startsWith(distSrcDir) && !file.endsWith('_shims/index.d.ts')) {
+    if (file.startsWith(distSrcDir)) {
       // strip out `unknown extends Foo ? never :` shim guards in dist/src
       // to prevent errors from appearing in Go To Source
       transformed = transformed.replace(
@@ -142,7 +142,7 @@ async function postprocess() {
 
     if (file.endsWith('.d.ts')) {
       // work around bad tsc behavior
-      // if we have `import { type Readable } from 'openai/_shims/index'`,
+      // if we have `import { type Readable } from 'openai/internal/shims'`,
       // tsc sometimes replaces `Readable` with `import("stream").Readable` inline
       // in the output .d.ts
       transformed = transformed.replace(/import\("stream"\).Readable/g, 'Readable');

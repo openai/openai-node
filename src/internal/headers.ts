@@ -1,20 +1,20 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import type { Fetch, Headers } from './types';
+import type { Fetch } from './builtin-types';
+import type { Headers } from './types';
 import { hasOwn } from './utils';
 
+// TODO: remove this, we should just use
+// the builtin Headers type
 export const createResponseHeaders = (
   headers: Awaited<ReturnType<Fetch>>['headers'],
 ): Record<string, string> => {
   return new Proxy(
-    Object.fromEntries(
-      // @ts-ignore
-      headers.entries(),
-    ),
+    {},
     {
-      get(target, name) {
+      get(_target, name) {
         const key = name.toString();
-        return target[key.toLowerCase()] || target[key];
+        return headers.get(key) ?? undefined;
       },
     },
   );
@@ -46,6 +46,7 @@ export interface HeadersProtocol {
   get: (header: string) => string | null | undefined;
 }
 export type HeadersLike = Record<string, string | string[] | undefined> | HeadersProtocol;
+export type HeadersInit = [string, string][] | Record<string, string> | Headers;
 
 export const isHeadersProtocol = (headers: any): headers is HeadersProtocol => {
   return typeof headers?.get === 'function';

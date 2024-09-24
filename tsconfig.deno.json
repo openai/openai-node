@@ -6,9 +6,8 @@
     "rootDir": "./deno",
     "lib": ["es2020", "DOM"],
     "paths": {
-      "openai/_shims/auto/*": ["deno/_shims/auto/*-deno"],
       "openai/*": ["deno/*"],
-      "openai": ["deno/index.ts"],
+      "openai": ["deno/index.ts"]
     },
     "noEmit": true,
     "declaration": true,
