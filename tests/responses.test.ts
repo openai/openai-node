@@ -41,6 +41,27 @@ describe('request id', () => {
     compareType<Awaited<APIPromise<Array<{ foo: string }>>>, Array<{ foo: string }>>(true);
   });
 
+  test('withResponse', async () => {
+    const client = new OpenAI({
+      apiKey: 'dummy',
+      fetch: async () =>
+        new Response(JSON.stringify({ id: 'bar' }), {
+          headers: { 'x-request-id': 'req_id_xxx', 'content-type': 'application/json' },
+        }),
+    });
+
+    const {
+      data: completion,
+      response,
+      request_id,
+    } = await client.chat.completions.create({ messages: [], model: 'gpt-4' }).withResponse();
+
+    expect(request_id).toBe('req_id_xxx');
+    expect(response.headers.get('x-request-id')).toBe('req_id_xxx');
+    expect(completion.id).toBe('bar');
+    expect(JSON.stringify(completion)).toBe('{"id":"bar"}');
+  });
+
   test('object response', async () => {
     const client = new OpenAI({
       apiKey: 'dummy',
