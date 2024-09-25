@@ -1,7 +1,6 @@
 import OpenAI, { toFile } from 'openai';
 import { TranscriptionCreateParams } from 'openai/resources/audio/transcriptions';
 import { ChatCompletion } from 'openai/resources/chat/completions';
-import * as nf from 'node-fetch';
 
 /**
  * Tests uploads using various Web API data objects.
@@ -58,18 +57,18 @@ export function uploadWebApiTestCases({
         })
         .asResponse();
 
-      // test that we can use node-fetch Response API
+      const decoder = new TextDecoder();
       const chunks: string[] = [];
-      // we can't have both node and web response types in one project,
-      // but the tests will work at runtime because they will be in different
-      // enrivonments.  So cast to any here
-      const { body } = response as any as nf.Response;
-      if (!body) throw new Error(`expected response.body to be defined`);
-      body.on('data', (chunk) => chunks.push(chunk));
-      await new Promise<void>((resolve, reject) => {
-        body.once('end', resolve);
-        body.once('error', reject);
-      });
+
+      // We need to cast to any as we're using both node types and web types.
+      // This works with the node types but to get this to work with web types
+      // we would need to bump `typescript` to ~5.5 and add `DOM.AsyncIterable`
+      // to `lib` but we want to test older ts versions
+      const body = response.body! as any;
+      for await (const chunk of body) {
+        chunks.push(decoder.decode(chunk));
+      }
+
       const json: ChatCompletion = JSON.parse(chunks.join(''));
       expectSimilar(json.choices[0]?.message.content || '', 'This is a test', 10);
     });

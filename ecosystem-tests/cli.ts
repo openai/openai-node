@@ -21,7 +21,7 @@ const projectRunners = {
   'node-ts-cjs': defaultNodeRunner,
   'node-ts-cjs-web': defaultNodeRunner,
   'node-ts-cjs-auto': defaultNodeRunner,
-  'node-ts4.5-jest27': defaultNodeRunner,
+  'node-ts4.5-jest28': defaultNodeRunner,
   'node-ts-esm': defaultNodeRunner,
   'node-ts-esm-web': defaultNodeRunner,
   'node-ts-esm-auto': defaultNodeRunner,

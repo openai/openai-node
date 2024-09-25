@@ -1,4 +1,3 @@
-import 'openai/shims/web';
 import OpenAI, { toFile } from 'openai';
 import { distance } from 'fastest-levenshtein';
 import { ChatCompletion } from 'openai/resources/chat/completions';

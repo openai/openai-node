@@ -1,13 +1,12 @@
-import 'openai/shims/node.mjs';
 import OpenAI from 'openai';
 import { distance } from 'fastest-levenshtein';
 import { ChatCompletion } from 'openai/resources/chat/completions';
-import * as shims from 'openai/_shims/index';
 
 // The tests in this file don't typecheck with "moduleResolution": "node"
 
-function typeTests(x: shims.Request) {
-  const url: string = x.url;
+async function typeTests(client: OpenAI) {
+  const response = await client.chat.completions.create({ model: 'gpt-4o', messages: [] }).asResponse();
+  const url: string = response.url;
 }
 
 const client = new OpenAI();

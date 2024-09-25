@@ -1,8 +1,7 @@
-// shouldn't need extension, but Jest's ESM module resolution is broken
-import 'openai/shims/web.mjs';
 import OpenAI, { toFile } from 'openai';
 import { distance } from 'fastest-levenshtein';
 import { ChatCompletion } from 'openai/resources/chat/completions';
+import { File } from 'openai/polyfill/node-file';
 
 const url = 'https://audio-samples.github.io/samples/mp3/blizzard_biased/sample-1.mp3';
 const filename = 'sample-1.mp3';
@@ -104,7 +103,16 @@ if (typeof File !== 'undefined') {
   it('handles builtinFile', async function () {
     const file = await fetch(url)
       .then((x) => x.arrayBuffer())
-      .then((x) => new File([x], filename));
+      .then(
+        (x) =>
+          new File(
+            [
+              // @ts-expect-error array buffer can't be passed to File at the type-level
+              x,
+            ],
+            filename,
+          ),
+      );
 
     const result = await client.audio.transcriptions.create({ file, model });
     expect(result.text).toBeSimilarTo(correctAnswer, 12);
