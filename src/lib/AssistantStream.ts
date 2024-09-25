@@ -18,7 +18,7 @@ import {
   RunSubmitToolOutputsParamsBase,
   RunSubmitToolOutputsParamsStreaming,
 } from 'openai/resources/beta/threads/runs/runs';
-import { type ReadableStream } from 'openai/_shims/index';
+import type { ReadableStream } from 'openai/internal/shim-types';
 import { Stream } from 'openai/streaming';
 import { APIUserAbortError, OpenAIError } from 'openai/error';
 import {

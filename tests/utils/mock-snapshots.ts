@@ -1,9 +1,9 @@
-import { Response, fetch as defaultFetch } from 'undici';
 import OpenAI from 'openai/index';
-import { RequestInit } from 'openai/_shims/auto/types';
-import { RequestInfo } from 'openai/_shims/auto/types';
+import { RequestInfo } from 'openai/internal/builtin-types';
 import { mockFetch } from './mock-fetch';
 import { Readable } from 'stream';
+
+const defaultFetch = fetch;
 
 export async function makeSnapshotRequest<T>(
   requestFn: (client: OpenAI) => Promise<T>,

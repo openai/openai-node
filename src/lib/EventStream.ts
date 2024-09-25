@@ -1,4 +1,5 @@
 import { APIUserAbortError, OpenAIError } from 'openai/error';
+import { isAbortError } from 'openai/internal/errors';
 
 export class EventStream<EventTypes extends BaseEvents> {
   controller: AbortController = new AbortController();
@@ -145,7 +146,7 @@ export class EventStream<EventTypes extends BaseEvents> {
 
   #handleError(this: EventStream<EventTypes>, error: unknown) {
     this.#errored = true;
-    if (error instanceof Error && error.name === 'AbortError') {
+    if (isAbortError(error)) {
       error = new APIUserAbortError();
     }
     if (error instanceof APIUserAbortError) {

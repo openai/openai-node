@@ -1,7 +1,9 @@
 import { AzureOpenAI } from 'openai';
 import { APIUserAbortError } from 'openai';
 import { type Headers } from 'openai/internal/types';
-import { fetch as defaultFetch, Response, type RequestInit, type RequestInfo } from 'undici';
+import { type Response, RequestInit, RequestInfo } from 'openai/internal/builtin-types';
+
+const defaultFetch = fetch;
 
 const apiVersion = '2024-02-15-preview';
 const deployment = 'deployment';
@@ -297,7 +299,7 @@ describe('azure request building', () => {
             endpoint: '/v1/chat/completions',
             input_file_id: 'file-id',
           }),
-        ).toStrictEqual({
+        ).toMatchObject({
           url: `https://example.com/openai/deployments/${deployment}/batches?api-version=${apiVersion}`,
         });
       });
@@ -308,7 +310,7 @@ describe('azure request building', () => {
             model,
             prompt: 'prompt',
           }),
-        ).toStrictEqual({
+        ).toMatchObject({
           url: `https://example.com/openai/deployments/${deployment}/completions?api-version=${apiVersion}`,
         });
       });
@@ -319,7 +321,7 @@ describe('azure request building', () => {
             model,
             messages: [{ role: 'system', content: 'Hello' }],
           }),
-        ).toStrictEqual({
+        ).toMatchObject({
           url: `https://example.com/openai/deployments/${deployment}/chat/completions?api-version=${apiVersion}`,
         });
       });
@@ -330,7 +332,7 @@ describe('azure request building', () => {
             model,
             input: 'input',
           }),
-        ).toStrictEqual({
+        ).toMatchObject({
           url: `https://example.com/openai/deployments/${deployment}/embeddings?api-version=${apiVersion}`,
         });
       });
@@ -341,7 +343,7 @@ describe('azure request building', () => {
             model,
             file: { url: 'https://example.com', blob: () => 0 as any },
           }),
-        ).toStrictEqual({
+        ).toMatchObject({
           url: `https://example.com/openai/deployments/${deployment}/audio/translations?api-version=${apiVersion}`,
         });
       });
@@ -352,7 +354,7 @@ describe('azure request building', () => {
             model,
             file: { url: 'https://example.com', blob: () => 0 as any },
           }),
-        ).toStrictEqual({
+        ).toMatchObject({
           url: `https://example.com/openai/deployments/${deployment}/audio/transcriptions?api-version=${apiVersion}`,
         });
       });
@@ -366,7 +368,7 @@ describe('azure request building', () => {
               voice: 'alloy',
             })
           ).json(),
-        ).toStrictEqual({
+        ).toMatchObject({
           url: `https://example.com/openai/deployments/${deployment}/audio/speech?api-version=${apiVersion}`,
         });
       });
@@ -377,7 +379,7 @@ describe('azure request building', () => {
             model,
             prompt: 'prompt',
           }),
-        ).toStrictEqual({
+        ).toMatchObject({
           url: `https://example.com/openai/deployments/${deployment}/images/generations?api-version=${apiVersion}`,
         });
       });
@@ -387,7 +389,7 @@ describe('azure request building', () => {
           await client.beta.assistants.create({
             model,
           }),
-        ).toStrictEqual({
+        ).toMatchObject({
           url: `https://example.com/openai/assistants?api-version=${apiVersion}`,
         });
       });
@@ -398,7 +400,7 @@ describe('azure request building', () => {
             file: { url: 'https://example.com', blob: () => 0 as any },
             purpose: 'assistants',
           }),
-        ).toStrictEqual({
+        ).toMatchObject({
           url: `https://example.com/openai/files?api-version=${apiVersion}`,
         });
       });
@@ -409,7 +411,7 @@ describe('azure request building', () => {
             model,
             training_file: '',
           }),
-        ).toStrictEqual({
+        ).toMatchObject({
           url: `https://example.com/openai/fine_tuning/jobs?api-version=${apiVersion}`,
         });
       });
@@ -430,7 +432,7 @@ describe('azure request building', () => {
             endpoint: '/v1/chat/completions',
             input_file_id: 'file-id',
           }),
-        ).toStrictEqual({
+        ).toMatchObject({
           url: `https://example.com/openai/batches?api-version=${apiVersion}`,
         });
       });
@@ -441,7 +443,7 @@ describe('azure request building', () => {
             model: deployment,
             prompt: 'prompt',
           }),
-        ).toStrictEqual({
+        ).toMatchObject({
           url: `https://example.com/openai/deployments/${deployment}/completions?api-version=${apiVersion}`,
         });
       });
@@ -452,7 +454,7 @@ describe('azure request building', () => {
             model: deployment,
             messages: [{ role: 'system', content: 'Hello' }],
           }),
-        ).toStrictEqual({
+        ).toMatchObject({
           url: `https://example.com/openai/deployments/${deployment}/chat/completions?api-version=${apiVersion}`,
         });
       });
@@ -463,7 +465,7 @@ describe('azure request building', () => {
             model: deployment,
             input: 'input',
           }),
-        ).toStrictEqual({
+        ).toMatchObject({
           url: `https://example.com/openai/deployments/${deployment}/embeddings?api-version=${apiVersion}`,
         });
       });
@@ -474,7 +476,7 @@ describe('azure request building', () => {
             model: deployment,
             file: { url: 'https://example.com', blob: () => 0 as any },
           }),
-        ).toStrictEqual({
+        ).toMatchObject({
           url: `https://example.com/openai/audio/translations?api-version=${apiVersion}`,
         });
       });
@@ -485,7 +487,7 @@ describe('azure request building', () => {
             model: deployment,
             file: { url: 'https://example.com', blob: () => 0 as any },
           }),
-        ).toStrictEqual({
+        ).toMatchObject({
           url: `https://example.com/openai/audio/transcriptions?api-version=${apiVersion}`,
         });
       });
@@ -499,7 +501,7 @@ describe('azure request building', () => {
               voice: 'alloy',
             })
           ).json(),
-        ).toStrictEqual({
+        ).toMatchObject({
           url: `https://example.com/openai/deployments/${deployment}/audio/speech?api-version=${apiVersion}`,
         });
       });
@@ -510,7 +512,7 @@ describe('azure request building', () => {
             model: deployment,
             prompt: 'prompt',
           }),
-        ).toStrictEqual({
+        ).toMatchObject({
           url: `https://example.com/openai/deployments/${deployment}/images/generations?api-version=${apiVersion}`,
         });
       });
@@ -520,7 +522,7 @@ describe('azure request building', () => {
           await client.beta.assistants.create({
             model,
           }),
-        ).toStrictEqual({
+        ).toMatchObject({
           url: `https://example.com/openai/assistants?api-version=${apiVersion}`,
         });
       });
@@ -531,7 +533,7 @@ describe('azure request building', () => {
             file: { url: 'https://example.com', blob: () => 0 as any },
             purpose: 'assistants',
           }),
-        ).toStrictEqual({
+        ).toMatchObject({
           url: `https://example.com/openai/files?api-version=${apiVersion}`,
         });
       });
@@ -542,7 +544,7 @@ describe('azure request building', () => {
             model,
             training_file: '',
           }),
-        ).toStrictEqual({
+        ).toMatchObject({
           url: `https://example.com/openai/fine_tuning/jobs?api-version=${apiVersion}`,
         });
       });

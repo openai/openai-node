@@ -493,8 +493,9 @@ async function run(command: string, args: string[], config?: RunOpts): Promise<e
     return await execa(command, args, config);
   } catch (error) {
     if (error instanceof Object && !state.verbose) {
-      const { stderr } = error as any;
+      const { stderr, stdout } = error as any;
       if (stderr) process.stderr.write(stderr);
+      if (stdout) process.stderr.write(stdout);
     }
     throw error;
   }

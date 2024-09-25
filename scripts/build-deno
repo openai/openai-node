@@ -29,16 +29,11 @@ import OpenAI from "npm:openai";
 EOF
 # x-release-please-end
 
-rm deno/_shims/auto/*-node.ts
-for dir in deno/_shims deno/_shims/auto; do
-  rm "${dir}"/*.{d.ts,js,mjs}
-  for file in "${dir}"/*-deno.ts; do
-    mv -- "$file" "${file%-deno.ts}.ts"
-  done
-done
 for file in LICENSE CHANGELOG.md; do
   if [ -e "${file}" ]; then cp "${file}" deno; fi
 done
+cp src/internal/shim-types.d.ts deno/internal/shim-types.ts
+
 npm exec ts-node -T -- scripts/utils/denoify.ts
 deno fmt deno
 deno check deno/mod.ts

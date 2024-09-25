@@ -3,7 +3,7 @@ import {
   type ChatCompletionCreateParamsStreaming,
 } from 'openai/resources/chat/completions';
 import { RunnerOptions, type AbstractChatCompletionRunnerEvents } from './AbstractChatCompletionRunner';
-import { type ReadableStream } from 'openai/_shims/index';
+import type { ReadableStream } from 'openai/internal/shim-types';
 import { RunnableTools, type BaseFunctionsArgs, type RunnableFunctions } from './RunnableFunction';
 import { ChatCompletionSnapshot, ChatCompletionStream } from './ChatCompletionStream';
 import OpenAI from 'openai/index';
