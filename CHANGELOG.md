@@ -1,5 +1,24 @@
 # Changelog
 
+## 4.64.0 (2024-09-25)
+
+Full Changelog: [v4.63.0...v4.64.0](https://github.com/openai/openai-node/compare/v4.63.0...v4.64.0)
+
+### Features
+
+* **client:** allow overriding retry count header ([#1098](https://github.com/openai/openai-node/issues/1098)) ([a466ff7](https://github.com/openai/openai-node/commit/a466ff78a436db82d79a8f53066a85a3b1dbe039))
+
+
+### Bug Fixes
+
+* **audio:** correct response_format translations type ([#1097](https://github.com/openai/openai-node/issues/1097)) ([9a5f461](https://github.com/openai/openai-node/commit/9a5f461306e84b62ce1ed8aedbfee90798def5fb))
+
+
+### Chores
+
+* **internal:** fix ecosystem tests error output ([#1096](https://github.com/openai/openai-node/issues/1096)) ([ecdb4e9](https://github.com/openai/openai-node/commit/ecdb4e923f94e828d8758559aea78c82417b8f12))
+* **internal:** fix slow ecosystem test ([#1093](https://github.com/openai/openai-node/issues/1093)) ([80ed9ec](https://github.com/openai/openai-node/commit/80ed9ecbd60129164cb407e46dddbc06ef1c54ab))
+
 ## 4.63.0 (2024-09-20)
 
 Full Changelog: [v4.62.1...v4.63.0](https://github.com/openai/openai-node/compare/v4.62.1...v4.63.0)
