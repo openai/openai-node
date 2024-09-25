@@ -20,7 +20,7 @@ import * as Shims from './internal/shims';
 import * as Opts from './internal/request-options';
 import * as qs from './internal/qs';
 import { VERSION } from './version';
-import { createResponseHeaders, type HeadersInit } from './internal/headers';
+import { createResponseHeaders, getHeader, type HeadersInit } from './internal/headers';
 import { isBlobLike, isMultipartBody } from './uploads';
 import { applyHeadersMut } from './internal/headers';
 import * as Pagination from './pagination';
@@ -600,7 +600,11 @@ export class BaseOpenAI {
       delete reqHeaders['content-type'];
     }
 
-    reqHeaders['x-stainless-retry-count'] = String(retryCount);
+    // Don't set the retry count header if it was already set or removed by the caller. We check "headers",
+    // which can contain nulls, instead of "reqHeaders" to account for the removal case.
+    if (getHeader(headers, 'x-stainless-retry-count') === undefined) {
+      reqHeaders['x-stainless-retry-count'] = String(retryCount);
+    }
 
     this.validateHeaders(reqHeaders, headers);
 

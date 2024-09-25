@@ -52,7 +52,15 @@ export const isHeadersProtocol = (headers: any): headers is HeadersProtocol => {
   return typeof headers?.get === 'function';
 };
 
-export const getRequiredHeader = (headers: HeadersLike, header: string): string => {
+export const getRequiredHeader = (headers: HeadersLike | Headers, header: string): string => {
+  const foundHeader = getHeader(headers, header);
+  if (foundHeader === undefined) {
+    throw new Error(`Could not find ${header} header`);
+  }
+  return foundHeader;
+};
+
+export const getHeader = (headers: HeadersLike | Headers, header: string): string | undefined => {
   const lowerCasedHeader = header.toLowerCase();
   if (isHeadersProtocol(headers)) {
     // to deal with the case where the header looks like Stainless-Event-Id
@@ -78,5 +86,5 @@ export const getRequiredHeader = (headers: HeadersLike, header: string): string 
     }
   }
 
-  throw new Error(`Could not find ${header} header`);
+  return undefined;
 };
