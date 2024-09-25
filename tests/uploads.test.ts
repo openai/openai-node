@@ -1,5 +1,6 @@
 import fs from 'fs';
 import { toFile, type ResponseLike } from 'openai/uploads';
+import { File } from 'openai/polyfill/node-file';
 
 class MyClass {
   name: string = 'foo';
