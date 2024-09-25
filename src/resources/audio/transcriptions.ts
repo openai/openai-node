@@ -54,10 +54,10 @@ export interface TranscriptionCreateParams {
   prompt?: string;
 
   /**
-   * The format of the transcript output, in one of these options: `json`, `text`,
-   * `srt`, `verbose_json`, or `vtt`.
+   * The format of the output, in one of these options: `json`, `text`, `srt`,
+   * `verbose_json`, or `vtt`.
    */
-  response_format?: 'json' | 'text' | 'srt' | 'verbose_json' | 'vtt';
+  response_format?: AudioAPI.AudioResponseFormat;
 
   /**
    * The sampling temperature, between 0 and 1. Higher values like 0.8 will make the

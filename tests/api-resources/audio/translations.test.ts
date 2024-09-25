@@ -28,7 +28,7 @@ describe('resource translations', () => {
       file: await toFile(Buffer.from('# my file contents'), 'README.md'),
       model: 'whisper-1',
       prompt: 'prompt',
-      response_format: 'response_format',
+      response_format: 'json',
       temperature: 0,
     });
   });
