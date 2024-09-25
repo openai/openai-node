@@ -2,7 +2,7 @@
 
 export * from './chat/index';
 export * from './shared';
-export { AudioModel, Audio } from './audio/audio';
+export { AudioModel, AudioResponseFormat, Audio } from './audio/audio';
 export {
   Batch,
   BatchError,
