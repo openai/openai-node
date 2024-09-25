@@ -106,6 +106,7 @@ Methods:
 Types:
 
 - <code><a href="./src/resources/audio/audio.ts">AudioModel</a></code>
+- <code><a href="./src/resources/audio/audio.ts">AudioResponseFormat</a></code>
 
 ## Transcriptions
 
