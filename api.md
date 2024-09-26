@@ -144,7 +144,10 @@ Methods:
 Types:
 
 - <code><a href="./src/resources/moderations.ts">Moderation</a></code>
+- <code><a href="./src/resources/moderations.ts">ModerationImageURLInput</a></code>
 - <code><a href="./src/resources/moderations.ts">ModerationModel</a></code>
+- <code><a href="./src/resources/moderations.ts">ModerationMultiModalInput</a></code>
+- <code><a href="./src/resources/moderations.ts">ModerationTextInput</a></code>
 - <code><a href="./src/resources/moderations.ts">ModerationCreateResponse</a></code>
 
 Methods:
