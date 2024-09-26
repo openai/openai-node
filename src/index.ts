@@ -302,7 +302,10 @@ export namespace OpenAI {
 
   export import Moderations = API.Moderations;
   export import Moderation = API.Moderation;
+  export import ModerationImageURLInput = API.ModerationImageURLInput;
   export import ModerationModel = API.ModerationModel;
+  export import ModerationMultiModalInput = API.ModerationMultiModalInput;
+  export import ModerationTextInput = API.ModerationTextInput;
   export import ModerationCreateResponse = API.ModerationCreateResponse;
   export import ModerationCreateParams = API.ModerationCreateParams;
 
