@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.65.0 (2024-09-26)
+
+Full Changelog: [v4.64.0...v4.65.0](https://github.com/openai/openai-node/compare/v4.64.0...v4.65.0)
+
+### Features
+
+* **api:** add omni-moderation model ([#1100](https://github.com/openai/openai-node/issues/1100)) ([66c0f21](https://github.com/openai/openai-node/commit/66c0f21fad3be9c57b810c4a7eebb71eb6ccbcc1))
+
 ## 4.64.0 (2024-09-25)
 
 Full Changelog: [v4.63.0...v4.64.0](https://github.com/openai/openai-node/compare/v4.63.0...v4.64.0)
