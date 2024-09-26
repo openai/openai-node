@@ -52,7 +52,10 @@ export {
 export { Model, ModelDeleted, ModelsPage, Models } from './models';
 export {
   Moderation,
+  ModerationImageURLInput,
   ModerationModel,
+  ModerationMultiModalInput,
+  ModerationTextInput,
   ModerationCreateResponse,
   ModerationCreateParams,
   Moderations,
