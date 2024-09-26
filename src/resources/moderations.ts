@@ -6,7 +6,8 @@ import * as ModerationsAPI from './moderations';
 
 export class Moderations extends APIResource {
   /**
-   * Classifies if text is potentially harmful.
+   * Classifies if text and/or image inputs are potentially harmful. Learn more in
+   * the [moderation guide](https://platform.openai.com/docs/guides/moderation).
    */
   create(
     body: ModerationCreateParams,
@@ -21,6 +22,11 @@ export interface Moderation {
    * A list of the categories, and whether they are flagged or not.
    */
   categories: Moderation.Categories;
+
+  /**
+   * A list of the categories along with the input type(s) that the score applies to.
+   */
+  category_applied_input_types: Moderation.CategoryAppliedInputTypes;
 
   /**
    * A list of the categories along with their scores as predicted by model.
@@ -66,6 +72,20 @@ export namespace Moderation {
     'hate/threatening': boolean;
 
     /**
+     * Content that includes instructions or advice that facilitate the planning or
+     * execution of wrongdoing, or that gives advice or instruction on how to commit
+     * illicit acts. For example, "how to shoplift" would fit this category.
+     */
+    illicit: boolean;
+
+    /**
+     * Content that includes instructions or advice that facilitate the planning or
+     * execution of wrongdoing that also includes violence, or that gives advice or
+     * instruction on the procurement of any weapon.
+     */
+    'illicit/violent': boolean;
+
+    /**
      * Content that promotes, encourages, or depicts acts of self-harm, such as
      * suicide, cutting, and eating disorders.
      */
@@ -108,6 +128,76 @@ export namespace Moderation {
   }
 
   /**
+   * A list of the categories along with the input type(s) that the score applies to.
+   */
+  export interface CategoryAppliedInputTypes {
+    /**
+     * The applied input type(s) for the category 'harassment'.
+     */
+    harassment: Array<'text'>;
+
+    /**
+     * The applied input type(s) for the category 'harassment/threatening'.
+     */
+    'harassment/threatening': Array<'text'>;
+
+    /**
+     * The applied input type(s) for the category 'hate'.
+     */
+    hate: Array<'text'>;
+
+    /**
+     * The applied input type(s) for the category 'hate/threatening'.
+     */
+    'hate/threatening': Array<'text'>;
+
+    /**
+     * The applied input type(s) for the category 'illicit'.
+     */
+    illicit: Array<'text'>;
+
+    /**
+     * The applied input type(s) for the category 'illicit/violent'.
+     */
+    'illicit/violent': Array<'text'>;
+
+    /**
+     * The applied input type(s) for the category 'self-harm'.
+     */
+    'self-harm': Array<'text' | 'image'>;
+
+    /**
+     * The applied input type(s) for the category 'self-harm/instructions'.
+     */
+    'self-harm/instructions': Array<'text' | 'image'>;
+
+    /**
+     * The applied input type(s) for the category 'self-harm/intent'.
+     */
+    'self-harm/intent': Array<'text' | 'image'>;
+
+    /**
+     * The applied input type(s) for the category 'sexual'.
+     */
+    sexual: Array<'text' | 'image'>;
+
+    /**
+     * The applied input type(s) for the category 'sexual/minors'.
+     */
+    'sexual/minors': Array<'text'>;
+
+    /**
+     * The applied input type(s) for the category 'violence'.
+     */
+    violence: Array<'text' | 'image'>;
+
+    /**
+     * The applied input type(s) for the category 'violence/graphic'.
+     */
+    'violence/graphic': Array<'text' | 'image'>;
+  }
+
+  /**
    * A list of the categories along with their scores as predicted by model.
    */
   export interface CategoryScores {
@@ -130,6 +220,16 @@ export namespace Moderation {
      * The score for the category 'hate/threatening'.
      */
     'hate/threatening': number;
+
+    /**
+     * The score for the category 'illicit'.
+     */
+    illicit: number;
+
+    /**
+     * The score for the category 'illicit/violent'.
+     */
+    'illicit/violent': number;
 
     /**
      * The score for the category 'self-harm'.
@@ -168,7 +268,58 @@ export namespace Moderation {
   }
 }
 
-export type ModerationModel = 'text-moderation-latest' | 'text-moderation-stable';
+/**
+ * An object describing an image to classify.
+ */
+export interface ModerationImageURLInput {
+  /**
+   * Contains either an image URL or a data URL for a base64 encoded image.
+   */
+  image_url: ModerationImageURLInput.ImageURL;
+
+  /**
+   * Always `image_url`.
+   */
+  type: 'image_url';
+}
+
+export namespace ModerationImageURLInput {
+  /**
+   * Contains either an image URL or a data URL for a base64 encoded image.
+   */
+  export interface ImageURL {
+    /**
+     * Either a URL of the image or the base64 encoded image data.
+     */
+    url: string;
+  }
+}
+
+export type ModerationModel =
+  | 'omni-moderation-latest'
+  | 'omni-moderation-2024-09-26'
+  | 'text-moderation-latest'
+  | 'text-moderation-stable';
+
+/**
+ * An object describing an image to classify.
+ */
+export type ModerationMultiModalInput = ModerationImageURLInput | ModerationTextInput;
+
+/**
+ * An object describing text to classify.
+ */
+export interface ModerationTextInput {
+  /**
+   * A string of text to classify.
+   */
+  text: string;
+
+  /**
+   * Always `text`.
+   */
+  type: 'text';
+}
 
 /**
  * Represents if a given text input is potentially harmful.
@@ -192,26 +343,26 @@ export interface ModerationCreateResponse {
 
 export interface ModerationCreateParams {
   /**
-   * The input text to classify
+   * Input (or inputs) to classify. Can be a single string, an array of strings, or
+   * an array of multi-modal input objects similar to other models.
    */
-  input: string | Array<string>;
+  input: string | Array<string> | Array<ModerationMultiModalInput>;
 
   /**
-   * Two content moderations models are available: `text-moderation-stable` and
-   * `text-moderation-latest`.
-   *
-   * The default is `text-moderation-latest` which will be automatically upgraded
-   * over time. This ensures you are always using our most accurate model. If you use
-   * `text-moderation-stable`, we will provide advanced notice before updating the
-   * model. Accuracy of `text-moderation-stable` may be slightly lower than for
-   * `text-moderation-latest`.
+   * The content moderation model you would like to use. Learn more in
+   * [the moderation guide](https://platform.openai.com/docs/guides/moderation), and
+   * learn about available models
+   * [here](https://platform.openai.com/docs/models/moderation).
    */
   model?: (string & {}) | ModerationModel;
 }
 
 export namespace Moderations {
   export import Moderation = ModerationsAPI.Moderation;
+  export import ModerationImageURLInput = ModerationsAPI.ModerationImageURLInput;
   export import ModerationModel = ModerationsAPI.ModerationModel;
+  export import ModerationMultiModalInput = ModerationsAPI.ModerationMultiModalInput;
+  export import ModerationTextInput = ModerationsAPI.ModerationTextInput;
   export import ModerationCreateResponse = ModerationsAPI.ModerationCreateResponse;
   export import ModerationCreateParams = ModerationsAPI.ModerationCreateParams;
 }
