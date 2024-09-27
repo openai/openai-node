@@ -10,10 +10,19 @@ export class Translations extends APIResource {
   /**
    * Translates audio into English.
    */
+  create(body: TranslationCreateParams<'json'>, options?: Core.RequestOptions): Core.APIPromise<Translation>;
+  create(
+    body: TranslationCreateParams<'verbose_json'>,
+    options?: Core.RequestOptions,
+  ): Core.APIPromise<TranslationVerbose>;
+  create(
+    body: TranslationCreateParams<'text' | 'srt' | 'vtt'>,
+    options?: Core.RequestOptions,
+  ): Core.APIPromise<string>;
   create(
     body: TranslationCreateParams,
     options?: Core.RequestOptions,
-  ): Core.APIPromise<TranslationCreateResponse> {
+  ): Core.APIPromise<TranslationCreateResponse | string> {
     return this._client.post('/audio/translations', Core.multipartFormRequestOptions({ body, ...options }));
   }
 }
@@ -46,7 +55,9 @@ export interface TranslationVerbose {
 
 export type TranslationCreateResponse = Translation | TranslationVerbose;
 
-export interface TranslationCreateParams {
+export interface TranslationCreateParams<
+  ResponseFormat extends AudioAPI.AudioResponseFormat = AudioAPI.AudioResponseFormat,
+> {
   /**
    * The audio file object (not file name) translate, in one of these formats: flac,
    * mp3, mp4, mpeg, mpga, m4a, ogg, wav, or webm.
@@ -71,7 +82,7 @@ export interface TranslationCreateParams {
    * The format of the output, in one of these options: `json`, `text`, `srt`,
    * `verbose_json`, or `vtt`.
    */
-  response_format?: AudioAPI.AudioResponseFormat;
+  response_format?: ResponseFormat;
 
   /**
    * The sampling temperature, between 0 and 1. Higher values like 0.8 will make the
