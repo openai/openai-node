@@ -138,8 +138,11 @@ export class APIPromise<T> extends Promise<WithRequestID<T>> {
   asResponse(): Promise<Response> {
     return this.responsePromise.then((p) => p.response);
   }
+
   /**
-   * Gets the parsed response data and the raw `Response` instance.
+   * Gets the parsed response data, the raw `Response` instance and the ID of the request,
+   * returned via the X-Request-ID header which is useful for debugging requests and reporting
+   * issues to OpenAI.
    *
    * If you just want to get the raw `Response` instance without parsing it,
    * you can use {@link asResponse()}.
@@ -151,9 +154,9 @@ export class APIPromise<T> extends Promise<WithRequestID<T>> {
    * - `import 'openai/shims/node'` (if you're running on Node)
    * - `import 'openai/shims/web'` (otherwise)
    */
-  async withResponse(): Promise<{ data: T; response: Response }> {
+  async withResponse(): Promise<{ data: T; response: Response; request_id: string | null | undefined }> {
     const [data, response] = await Promise.all([this.parse(), this.asResponse()]);
-    return { data, response };
+    return { data, response, request_id: response.headers.get('x-request-id') };
   }
 
   private parse(): Promise<WithRequestID<T>> {
