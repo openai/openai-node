@@ -2,5 +2,19 @@
 
 export { AudioModel, AudioResponseFormat, Audio } from './audio';
 export { SpeechModel, SpeechCreateParams, Speech } from './speech';
-export { Transcription, TranscriptionCreateParams, Transcriptions } from './transcriptions';
-export { Translation, TranslationCreateParams, Translations } from './translations';
+export {
+  Transcription,
+  TranscriptionSegment,
+  TranscriptionVerbose,
+  TranscriptionWord,
+  TranscriptionCreateResponse,
+  TranscriptionCreateParams,
+  Transcriptions,
+} from './transcriptions';
+export {
+  Translation,
+  TranslationVerbose,
+  TranslationCreateResponse,
+  TranslationCreateParams,
+  Translations,
+} from './translations';

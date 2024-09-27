@@ -25,9 +25,15 @@ export namespace Audio {
   export import AudioResponseFormat = AudioAPI.AudioResponseFormat;
   export import Transcriptions = TranscriptionsAPI.Transcriptions;
   export import Transcription = TranscriptionsAPI.Transcription;
+  export import TranscriptionSegment = TranscriptionsAPI.TranscriptionSegment;
+  export import TranscriptionVerbose = TranscriptionsAPI.TranscriptionVerbose;
+  export import TranscriptionWord = TranscriptionsAPI.TranscriptionWord;
+  export import TranscriptionCreateResponse = TranscriptionsAPI.TranscriptionCreateResponse;
   export import TranscriptionCreateParams = TranscriptionsAPI.TranscriptionCreateParams;
   export import Translations = TranslationsAPI.Translations;
   export import Translation = TranslationsAPI.Translation;
+  export import TranslationVerbose = TranslationsAPI.TranslationVerbose;
+  export import TranslationCreateResponse = TranslationsAPI.TranslationCreateResponse;
   export import TranslationCreateParams = TranslationsAPI.TranslationCreateParams;
   export import Speech = SpeechAPI.Speech;
   export import SpeechModel = SpeechAPI.SpeechModel;
