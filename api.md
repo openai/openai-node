@@ -115,20 +115,26 @@ Types:
 Types:
 
 - <code><a href="./src/resources/audio/transcriptions.ts">Transcription</a></code>
+- <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionSegment</a></code>
+- <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionVerbose</a></code>
+- <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionWord</a></code>
+- <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionCreateResponse</a></code>
 
 Methods:
 
-- <code title="post /audio/transcriptions">client.audio.transcriptions.<a href="./src/resources/audio/transcriptions.ts">create</a>({ ...params }) -> Transcription</code>
+- <code title="post /audio/transcriptions">client.audio.transcriptions.<a href="./src/resources/audio/transcriptions.ts">create</a>({ ...params }) -> TranscriptionCreateResponse</code>
 
 ## Translations
 
 Types:
 
 - <code><a href="./src/resources/audio/translations.ts">Translation</a></code>
+- <code><a href="./src/resources/audio/translations.ts">TranslationVerbose</a></code>
+- <code><a href="./src/resources/audio/translations.ts">TranslationCreateResponse</a></code>
 
 Methods:
 
-- <code title="post /audio/translations">client.audio.translations.<a href="./src/resources/audio/translations.ts">create</a>({ ...params }) -> Translation</code>
+- <code title="post /audio/translations">client.audio.translations.<a href="./src/resources/audio/translations.ts">create</a>({ ...params }) -> TranslationCreateResponse</code>
 
 ## Speech
 

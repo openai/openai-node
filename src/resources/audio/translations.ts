@@ -4,12 +4,16 @@ import { APIResource } from '../../resource';
 import * as Core from '../../core';
 import * as TranslationsAPI from './translations';
 import * as AudioAPI from './audio';
+import * as TranscriptionsAPI from './transcriptions';
 
 export class Translations extends APIResource {
   /**
    * Translates audio into English.
    */
-  create(body: TranslationCreateParams, options?: Core.RequestOptions): Core.APIPromise<Translation> {
+  create(
+    body: TranslationCreateParams,
+    options?: Core.RequestOptions,
+  ): Core.APIPromise<TranslationCreateResponse> {
     return this._client.post('/audio/translations', Core.multipartFormRequestOptions({ body, ...options }));
   }
 }
@@ -17,6 +21,30 @@ export class Translations extends APIResource {
 export interface Translation {
   text: string;
 }
+
+export interface TranslationVerbose {
+  /**
+   * The duration of the input audio.
+   */
+  duration: string;
+
+  /**
+   * The language of the output translation (always `english`).
+   */
+  language: string;
+
+  /**
+   * The translated text.
+   */
+  text: string;
+
+  /**
+   * Segments of the translated text and their corresponding details.
+   */
+  segments?: Array<TranscriptionsAPI.TranscriptionSegment>;
+}
+
+export type TranslationCreateResponse = Translation | TranslationVerbose;
 
 export interface TranslationCreateParams {
   /**
@@ -57,5 +85,7 @@ export interface TranslationCreateParams {
 
 export namespace Translations {
   export import Translation = TranslationsAPI.Translation;
+  export import TranslationVerbose = TranslationsAPI.TranslationVerbose;
+  export import TranslationCreateResponse = TranslationsAPI.TranslationCreateResponse;
   export import TranslationCreateParams = TranslationsAPI.TranslationCreateParams;
 }
