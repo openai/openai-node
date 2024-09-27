@@ -9,7 +9,22 @@ export class Transcriptions extends APIResource {
   /**
    * Transcribes audio into the input language.
    */
-  create(body: TranscriptionCreateParams, options?: Core.RequestOptions): Core.APIPromise<Transcription> {
+  create(
+    body: TranscriptionCreateParams<'json' | undefined>,
+    options?: Core.RequestOptions,
+  ): Core.APIPromise<Transcription>;
+  create(
+    body: TranscriptionCreateParams<'verbose_json'>,
+    options?: Core.RequestOptions,
+  ): Core.APIPromise<TranscriptionVerbose>;
+  create(
+    body: TranscriptionCreateParams<'srt' | 'vtt' | 'text'>,
+    options?: Core.RequestOptions,
+  ): Core.APIPromise<string>;
+  create(
+    body: TranscriptionCreateParams,
+    options?: Core.RequestOptions,
+  ): Core.APIPromise<TranscriptionCreateResponse | string> {
     return this._client.post('/audio/transcriptions', Core.multipartFormRequestOptions({ body, ...options }));
   }
 }
@@ -25,7 +40,118 @@ export interface Transcription {
   text: string;
 }
 
-export interface TranscriptionCreateParams {
+export interface TranscriptionSegment {
+  /**
+   * Unique identifier of the segment.
+   */
+  id: number;
+
+  /**
+   * Average logprob of the segment. If the value is lower than -1, consider the
+   * logprobs failed.
+   */
+  avg_logprob: number;
+
+  /**
+   * Compression ratio of the segment. If the value is greater than 2.4, consider the
+   * compression failed.
+   */
+  compression_ratio: number;
+
+  /**
+   * End time of the segment in seconds.
+   */
+  end: number;
+
+  /**
+   * Probability of no speech in the segment. If the value is higher than 1.0 and the
+   * `avg_logprob` is below -1, consider this segment silent.
+   */
+  no_speech_prob: number;
+
+  /**
+   * Seek offset of the segment.
+   */
+  seek: number;
+
+  /**
+   * Start time of the segment in seconds.
+   */
+  start: number;
+
+  /**
+   * Temperature parameter used for generating the segment.
+   */
+  temperature: number;
+
+  /**
+   * Text content of the segment.
+   */
+  text: string;
+
+  /**
+   * Array of token IDs for the text content.
+   */
+  tokens: Array<number>;
+}
+
+/**
+ * Represents a verbose json transcription response returned by model, based on the
+ * provided input.
+ */
+export interface TranscriptionVerbose {
+  /**
+   * The duration of the input audio.
+   */
+  duration: string;
+
+  /**
+   * The language of the input audio.
+   */
+  language: string;
+
+  /**
+   * The transcribed text.
+   */
+  text: string;
+
+  /**
+   * Segments of the transcribed text and their corresponding details.
+   */
+  segments?: Array<TranscriptionSegment>;
+
+  /**
+   * Extracted words and their corresponding timestamps.
+   */
+  words?: Array<TranscriptionWord>;
+}
+
+export interface TranscriptionWord {
+  /**
+   * End time of the word in seconds.
+   */
+  end: number;
+
+  /**
+   * Start time of the word in seconds.
+   */
+  start: number;
+
+  /**
+   * The text content of the word.
+   */
+  word: string;
+}
+
+/**
+ * Represents a transcription response returned by model, based on the provided
+ * input.
+ */
+export type TranscriptionCreateResponse = Transcription | TranscriptionVerbose;
+
+export interface TranscriptionCreateParams<
+  ResponseFormat extends AudioAPI.AudioResponseFormat | undefined = AudioAPI.AudioResponseFormat | undefined,
+> {
   /**
    * The audio file object (not file name) to transcribe, in one of these formats:
    * flac, mp3, mp4, mpeg, mpga, m4a, ogg, wav, or webm.
@@ -57,7 +183,7 @@ export interface TranscriptionCreateParams {
    * The format of the output, in one of these options: `json`, `text`, `srt`,
    * `verbose_json`, or `vtt`.
    */
-  response_format?: AudioAPI.AudioResponseFormat;
+  response_format?: ResponseFormat;
 
   /**
    * The sampling temperature, between 0 and 1. Higher values like 0.8 will make the
@@ -80,5 +206,9 @@ export interface TranscriptionCreateParams {
 
 export namespace Transcriptions {
   export import Transcription = TranscriptionsAPI.Transcription;
+  export import TranscriptionSegment = TranscriptionsAPI.TranscriptionSegment;
+  export import TranscriptionVerbose = TranscriptionsAPI.TranscriptionVerbose;
+  export import TranscriptionWord = TranscriptionsAPI.TranscriptionWord;
+  export import TranscriptionCreateResponse = TranscriptionsAPI.TranscriptionCreateResponse;
   export import TranscriptionCreateParams = TranscriptionsAPI.TranscriptionCreateParams;
 }
