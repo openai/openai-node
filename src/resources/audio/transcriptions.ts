@@ -10,7 +10,7 @@ export class Transcriptions extends APIResource {
    * Transcribes audio into the input language.
    */
   create(
-    body: TranscriptionCreateParams<'json'>,
+    body: TranscriptionCreateParams<'json' | undefined>,
     options?: Core.RequestOptions,
   ): Core.APIPromise<Transcription>;
   create(
@@ -150,7 +150,7 @@ export interface TranscriptionWord {
 export type TranscriptionCreateResponse = Transcription | TranscriptionVerbose;
 
 export interface TranscriptionCreateParams<
-  ResponseFormat extends AudioAPI.AudioResponseFormat = AudioAPI.AudioResponseFormat,
+  ResponseFormat extends AudioAPI.AudioResponseFormat | undefined = AudioAPI.AudioResponseFormat | undefined,
 > {
   /**
    * The audio file object (not file name) to transcribe, in one of these formats:

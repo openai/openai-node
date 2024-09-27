@@ -10,7 +10,10 @@ export class Translations extends APIResource {
   /**
    * Translates audio into English.
    */
-  create(body: TranslationCreateParams<'json'>, options?: Core.RequestOptions): Core.APIPromise<Translation>;
+  create(
+    body: TranslationCreateParams<'json' | undefined>,
+    options?: Core.RequestOptions,
+  ): Core.APIPromise<Translation>;
   create(
     body: TranslationCreateParams<'verbose_json'>,
     options?: Core.RequestOptions,
@@ -56,7 +59,7 @@ export interface TranslationVerbose {
 export type TranslationCreateResponse = Translation | TranslationVerbose;
 
 export interface TranslationCreateParams<
-  ResponseFormat extends AudioAPI.AudioResponseFormat = AudioAPI.AudioResponseFormat,
+  ResponseFormat extends AudioAPI.AudioResponseFormat | undefined = AudioAPI.AudioResponseFormat | undefined,
 > {
   /**
    * The audio file object (not file name) translate, in one of these formats: flac,
