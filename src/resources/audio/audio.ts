@@ -29,12 +29,20 @@ export namespace Audio {
   export import TranscriptionVerbose = TranscriptionsAPI.TranscriptionVerbose;
   export import TranscriptionWord = TranscriptionsAPI.TranscriptionWord;
   export import TranscriptionCreateResponse = TranscriptionsAPI.TranscriptionCreateResponse;
-  export import TranscriptionCreateParams = TranscriptionsAPI.TranscriptionCreateParams;
+  export type TranscriptionCreateParams<
+    ResponseFormat extends AudioAPI.AudioResponseFormat | undefined =
+      | AudioAPI.AudioResponseFormat
+      | undefined,
+  > = TranscriptionsAPI.TranscriptionCreateParams<ResponseFormat>;
   export import Translations = TranslationsAPI.Translations;
   export import Translation = TranslationsAPI.Translation;
   export import TranslationVerbose = TranslationsAPI.TranslationVerbose;
   export import TranslationCreateResponse = TranslationsAPI.TranslationCreateResponse;
-  export import TranslationCreateParams = TranslationsAPI.TranslationCreateParams;
+  export type TranslationCreateParams<
+    ResponseFormat extends AudioAPI.AudioResponseFormat | undefined =
+      | AudioAPI.AudioResponseFormat
+      | undefined,
+  > = TranslationsAPI.TranslationCreateParams<ResponseFormat>;
   export import Speech = SpeechAPI.Speech;
   export import SpeechModel = SpeechAPI.SpeechModel;
   export import SpeechCreateParams = SpeechAPI.SpeechCreateParams;
