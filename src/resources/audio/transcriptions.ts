@@ -21,6 +21,7 @@ export class Transcriptions extends APIResource {
     body: TranscriptionCreateParams<'srt' | 'vtt' | 'text'>,
     options?: Core.RequestOptions,
   ): Core.APIPromise<string>;
+  create(body: TranscriptionCreateParams, options?: Core.RequestOptions): Core.APIPromise<Transcription>;
   create(
     body: TranscriptionCreateParams,
     options?: Core.RequestOptions,
