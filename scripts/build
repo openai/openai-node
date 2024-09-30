@@ -50,7 +50,9 @@ node scripts/utils/postprocess-files.cjs
 (cd dist && node -e 'require("openai")')
 (cd dist && node -e 'import("openai")' --input-type=module)
 
-if [ "${OPENAI_DISABLE_DENO_BUILD:-0}" != "1" ] && command -v deno &> /dev/null && [ -e ./scripts/build-deno ]
-then
-  ./scripts/build-deno
-fi
+# temporarily disabled due to a bug in our `denoify.ts` script, we'll be
+# publishing to JSR soon which removes the need for the separate deno build script.
+# if [ "${OPENAI_DISABLE_DENO_BUILD:-0}" != "1" ] && command -v deno &> /dev/null && [ -e ./scripts/build-deno ]
+# then
+#   ./scripts/build-deno
+# fi
