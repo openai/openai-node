@@ -210,5 +210,9 @@ export namespace Transcriptions {
   export import TranscriptionVerbose = TranscriptionsAPI.TranscriptionVerbose;
   export import TranscriptionWord = TranscriptionsAPI.TranscriptionWord;
   export import TranscriptionCreateResponse = TranscriptionsAPI.TranscriptionCreateResponse;
-  export import TranscriptionCreateParams = TranscriptionsAPI.TranscriptionCreateParams;
+  export type TranscriptionCreateParams<
+    ResponseFormat extends AudioAPI.AudioResponseFormat | undefined =
+      | AudioAPI.AudioResponseFormat
+      | undefined,
+  > = TranscriptionsAPI.TranscriptionCreateParams<ResponseFormat>;
 }
