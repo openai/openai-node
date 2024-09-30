@@ -22,6 +22,7 @@ export class Translations extends APIResource {
     body: TranslationCreateParams<'text' | 'srt' | 'vtt'>,
     options?: Core.RequestOptions,
   ): Core.APIPromise<string>;
+  create(body: TranslationCreateParams, options?: Core.RequestOptions): Core.APIPromise<Translation>;
   create(
     body: TranslationCreateParams,
     options?: Core.RequestOptions,
