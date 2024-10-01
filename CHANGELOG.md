@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.67.0 (2024-10-01)
+
+Full Changelog: [v4.66.1...v4.67.0](https://github.com/openai/openai-node/compare/v4.66.1...v4.67.0)
+
+### Features
+
+* **api:** support storing chat completions, enabling evals and model distillation in the dashboard ([#1112](https://github.com/openai/openai-node/issues/1112)) ([6424924](https://github.com/openai/openai-node/commit/6424924b6361e54f07c04fce9075ab16fcb712fb))
+
 ## 4.66.1 (2024-09-30)
 
 Full Changelog: [v4.66.0...v4.66.1](https://github.com/openai/openai-node/compare/v4.66.0...v4.66.1)
