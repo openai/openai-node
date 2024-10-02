@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.67.1 (2024-10-02)
+
+Full Changelog: [v4.67.0...v4.67.1](https://github.com/openai/openai-node/compare/v4.67.0...v4.67.1)
+
+### Documentation
+
+* improve and reference contributing documentation ([#1115](https://github.com/openai/openai-node/issues/1115)) ([7fa30b3](https://github.com/openai/openai-node/commit/7fa30b3ebf276556141df95ba8e824a0276b61f8))
+
 ## 4.67.0 (2024-10-01)
 
 Full Changelog: [v4.66.1...v4.67.0](https://github.com/openai/openai-node/compare/v4.66.1...v4.67.0)
