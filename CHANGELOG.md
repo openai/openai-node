@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.67.2 (2024-10-07)
+
+Full Changelog: [v4.67.1...v4.67.2](https://github.com/openai/openai-node/compare/v4.67.1...v4.67.2)
+
+### Chores
+
+* **internal:** move LineDecoder to a separate file ([#1120](https://github.com/openai/openai-node/issues/1120)) ([0a4be65](https://github.com/openai/openai-node/commit/0a4be6506bf26d2b9552ff3fd13a22c04b53ea18))
+
 ## 4.67.1 (2024-10-02)
 
 Full Changelog: [v4.67.0...v4.67.1](https://github.com/openai/openai-node/compare/v4.67.0...v4.67.1)
