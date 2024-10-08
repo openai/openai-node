@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.67.3 (2024-10-08)
+
+Full Changelog: [v4.67.2...v4.67.3](https://github.com/openai/openai-node/compare/v4.67.2...v4.67.3)
+
+### Chores
+
+* **internal:** pass props through internal parser ([#1125](https://github.com/openai/openai-node/issues/1125)) ([5ef8aa8](https://github.com/openai/openai-node/commit/5ef8aa8d308f7374dd01d8079cd76e0d96999ec2))
+
 ## 4.67.2 (2024-10-07)
 
 Full Changelog: [v4.67.1...v4.67.2](https://github.com/openai/openai-node/compare/v4.67.1...v4.67.2)
