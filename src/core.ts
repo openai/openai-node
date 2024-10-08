@@ -116,9 +116,9 @@ export class APIPromise<T> extends Promise<WithRequestID<T>> {
     });
   }
 
-  _thenUnwrap<U>(transform: (data: T) => U): APIPromise<U> {
+  _thenUnwrap<U>(transform: (data: T, props: APIResponseProps) => U): APIPromise<U> {
     return new APIPromise(this.responsePromise, async (props) =>
-      _addRequestID(transform(await this.parseResponse(props)), props.response),
+      _addRequestID(transform(await this.parseResponse(props), props), props.response),
     );
   }
 
