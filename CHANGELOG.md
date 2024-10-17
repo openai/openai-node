@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.68.0 (2024-10-17)
+
+Full Changelog: [v4.67.3...v4.68.0](https://github.com/openai/openai-node/compare/v4.67.3...v4.68.0)
+
+### Features
+
+* **api:** add gpt-4o-audio-preview model for chat completions ([#1135](https://github.com/openai/openai-node/issues/1135)) ([17a623f](https://github.com/openai/openai-node/commit/17a623f70050bca4538ad2939055cd9d9b165f89))
+
 ## 4.67.3 (2024-10-08)
 
 Full Changelog: [v4.67.2...v4.67.3](https://github.com/openai/openai-node/compare/v4.67.2...v4.67.3)
