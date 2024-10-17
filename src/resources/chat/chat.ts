@@ -16,7 +16,10 @@ export type ChatModel =
   | 'gpt-4o'
   | 'gpt-4o-2024-08-06'
   | 'gpt-4o-2024-05-13'
+  | 'gpt-4o-realtime-preview'
   | 'gpt-4o-realtime-preview-2024-10-01'
+  | 'gpt-4o-audio-preview'
+  | 'gpt-4o-audio-preview-2024-10-01'
   | 'chatgpt-4o-latest'
   | 'gpt-4o-mini'
   | 'gpt-4o-mini-2024-07-18'
@@ -45,9 +48,12 @@ export namespace Chat {
   export import Completions = CompletionsAPI.Completions;
   export import ChatCompletion = CompletionsAPI.ChatCompletion;
   export import ChatCompletionAssistantMessageParam = CompletionsAPI.ChatCompletionAssistantMessageParam;
+  export import ChatCompletionAudio = CompletionsAPI.ChatCompletionAudio;
+  export import ChatCompletionAudioParam = CompletionsAPI.ChatCompletionAudioParam;
   export import ChatCompletionChunk = CompletionsAPI.ChatCompletionChunk;
   export import ChatCompletionContentPart = CompletionsAPI.ChatCompletionContentPart;
   export import ChatCompletionContentPartImage = CompletionsAPI.ChatCompletionContentPartImage;
+  export import ChatCompletionContentPartInputAudio = CompletionsAPI.ChatCompletionContentPartInputAudio;
   export import ChatCompletionContentPartRefusal = CompletionsAPI.ChatCompletionContentPartRefusal;
   export import ChatCompletionContentPartText = CompletionsAPI.ChatCompletionContentPartText;
   export import ChatCompletionFunctionCallOption = CompletionsAPI.ChatCompletionFunctionCallOption;
@@ -55,6 +61,7 @@ export namespace Chat {
   export import ChatCompletionMessage = CompletionsAPI.ChatCompletionMessage;
   export import ChatCompletionMessageParam = CompletionsAPI.ChatCompletionMessageParam;
   export import ChatCompletionMessageToolCall = CompletionsAPI.ChatCompletionMessageToolCall;
+  export import ChatCompletionModality = CompletionsAPI.ChatCompletionModality;
   export import ChatCompletionNamedToolChoice = CompletionsAPI.ChatCompletionNamedToolChoice;
   export import ChatCompletionRole = CompletionsAPI.ChatCompletionRole;
   export import ChatCompletionStreamOptions = CompletionsAPI.ChatCompletionStreamOptions;

@@ -105,7 +105,9 @@ export class AbstractChatCompletionRunner<
       const message = this.messages[i];
       if (isAssistantMessage(message)) {
         const { function_call, ...rest } = message;
-        const ret: ChatCompletionMessage = {
+
+        // TODO: support audio here
+        const ret: Omit<ChatCompletionMessage, 'audio'> = {
           ...rest,
           content: (message as ChatCompletionMessage).content ?? null,
           refusal: (message as ChatCompletionMessage).refusal ?? null,
