@@ -250,9 +250,12 @@ export namespace OpenAI {
   export import ChatModel = API.ChatModel;
   export import ChatCompletion = API.ChatCompletion;
   export import ChatCompletionAssistantMessageParam = API.ChatCompletionAssistantMessageParam;
+  export import ChatCompletionAudio = API.ChatCompletionAudio;
+  export import ChatCompletionAudioParam = API.ChatCompletionAudioParam;
   export import ChatCompletionChunk = API.ChatCompletionChunk;
   export import ChatCompletionContentPart = API.ChatCompletionContentPart;
   export import ChatCompletionContentPartImage = API.ChatCompletionContentPartImage;
+  export import ChatCompletionContentPartInputAudio = API.ChatCompletionContentPartInputAudio;
   export import ChatCompletionContentPartRefusal = API.ChatCompletionContentPartRefusal;
   export import ChatCompletionContentPartText = API.ChatCompletionContentPartText;
   export import ChatCompletionFunctionCallOption = API.ChatCompletionFunctionCallOption;
@@ -260,6 +263,7 @@ export namespace OpenAI {
   export import ChatCompletionMessage = API.ChatCompletionMessage;
   export import ChatCompletionMessageParam = API.ChatCompletionMessageParam;
   export import ChatCompletionMessageToolCall = API.ChatCompletionMessageToolCall;
+  export import ChatCompletionModality = API.ChatCompletionModality;
   export import ChatCompletionNamedToolChoice = API.ChatCompletionNamedToolChoice;
   export import ChatCompletionRole = API.ChatCompletionRole;
   export import ChatCompletionStreamOptions = API.ChatCompletionStreamOptions;
