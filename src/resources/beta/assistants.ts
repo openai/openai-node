@@ -286,6 +286,11 @@ export namespace AssistantStreamEvent {
     data: ThreadsAPI.Thread;
 
     event: 'thread.created';
+
+    /**
+     * Whether to enable input audio transcription.
+     */
+    enabled?: boolean;
   }
 
   /**
@@ -1072,6 +1077,11 @@ export interface ThreadStreamEvent {
   data: ThreadsAPI.Thread;
 
   event: 'thread.created';
+
+  /**
+   * Whether to enable input audio transcription.
+   */
+  enabled?: boolean;
 }
 
 export interface AssistantCreateParams {

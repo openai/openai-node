@@ -26,6 +26,7 @@ describe('resource completions', () => {
     const response = await client.chat.completions.create({
       messages: [{ content: 'string', role: 'system', name: 'name' }],
       model: 'gpt-4o',
+      audio: { format: 'wav', voice: 'alloy' },
       frequency_penalty: -2,
       function_call: 'none',
       functions: [{ description: 'description', name: 'name', parameters: { foo: 'bar' } }],
@@ -34,6 +35,7 @@ describe('resource completions', () => {
       max_completion_tokens: 0,
       max_tokens: 0,
       metadata: { foo: 'string' },
+      modalities: ['text', 'audio'],
       n: 1,
       parallel_tool_calls: true,
       presence_penalty: -2,
