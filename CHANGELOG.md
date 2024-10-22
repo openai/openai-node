@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.68.2 (2024-10-22)
+
+Full Changelog: [v4.68.1...v4.68.2](https://github.com/openai/openai-node/compare/v4.68.1...v4.68.2)
+
+### Chores
+
+* **internal:** update spec version ([#1141](https://github.com/openai/openai-node/issues/1141)) ([2ccb3e3](https://github.com/openai/openai-node/commit/2ccb3e357aa2f3eb0fa32c619d8336c3b94cc882))
+
 ## 4.68.1 (2024-10-18)
 
 Full Changelog: [v4.68.0...v4.68.1](https://github.com/openai/openai-node/compare/v4.68.0...v4.68.1)
