@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.68.3 (2024-10-23)
+
+Full Changelog: [v4.68.2...v4.68.3](https://github.com/openai/openai-node/compare/v4.68.2...v4.68.3)
+
+### Chores
+
+* **internal:** bumps eslint and related dependencies ([#1143](https://github.com/openai/openai-node/issues/1143)) ([2643f42](https://github.com/openai/openai-node/commit/2643f42a36208c36daf23470ffcd227a891284eb))
+
 ## 4.68.2 (2024-10-22)
 
 Full Changelog: [v4.68.1...v4.68.2](https://github.com/openai/openai-node/compare/v4.68.1...v4.68.2)
