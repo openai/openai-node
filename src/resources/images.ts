@@ -208,10 +208,10 @@ export interface ImageGenerateParams {
 }
 
 export namespace Images {
-  export type Image = ImagesAPI.Image;
-  export type ImageModel = ImagesAPI.ImageModel;
-  export type ImagesResponse = ImagesAPI.ImagesResponse;
-  export type ImageCreateVariationParams = ImagesAPI.ImageCreateVariationParams;
-  export type ImageEditParams = ImagesAPI.ImageEditParams;
-  export type ImageGenerateParams = ImagesAPI.ImageGenerateParams;
+  export import Image = ImagesAPI.Image;
+  export import ImageModel = ImagesAPI.ImageModel;
+  export import ImagesResponse = ImagesAPI.ImagesResponse;
+  export import ImageCreateVariationParams = ImagesAPI.ImageCreateVariationParams;
+  export import ImageEditParams = ImagesAPI.ImageEditParams;
+  export import ImageGenerateParams = ImagesAPI.ImageGenerateParams;
 }

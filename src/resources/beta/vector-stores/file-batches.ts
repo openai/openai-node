@@ -188,9 +188,9 @@ export interface FileBatchListFilesParams extends CursorPageParams {
 }
 
 export namespace FileBatches {
-  export type VectorStoreFileBatch = FileBatchesAPI.VectorStoreFileBatch;
-  export type FileBatchCreateParams = FileBatchesAPI.FileBatchCreateParams;
-  export type FileBatchListFilesParams = FileBatchesAPI.FileBatchListFilesParams;
+  export import VectorStoreFileBatch = FileBatchesAPI.VectorStoreFileBatch;
+  export import FileBatchCreateParams = FileBatchesAPI.FileBatchCreateParams;
+  export import FileBatchListFilesParams = FileBatchesAPI.FileBatchListFilesParams;
 }
 
 export { VectorStoreFilesPage };

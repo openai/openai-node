@@ -1397,19 +1397,19 @@ export interface AssistantListParams extends CursorPageParams {
 }
 
 export namespace Assistants {
-  export type Assistant = AssistantsAPI.Assistant;
-  export type AssistantDeleted = AssistantsAPI.AssistantDeleted;
-  export type AssistantStreamEvent = AssistantsAPI.AssistantStreamEvent;
-  export type AssistantTool = AssistantsAPI.AssistantTool;
-  export type CodeInterpreterTool = AssistantsAPI.CodeInterpreterTool;
-  export type FileSearchTool = AssistantsAPI.FileSearchTool;
-  export type FunctionTool = AssistantsAPI.FunctionTool;
-  export type MessageStreamEvent = AssistantsAPI.MessageStreamEvent;
-  export type RunStepStreamEvent = AssistantsAPI.RunStepStreamEvent;
-  export type RunStreamEvent = AssistantsAPI.RunStreamEvent;
-  export type ThreadStreamEvent = AssistantsAPI.ThreadStreamEvent;
+  export import Assistant = AssistantsAPI.Assistant;
+  export import AssistantDeleted = AssistantsAPI.AssistantDeleted;
+  export import AssistantStreamEvent = AssistantsAPI.AssistantStreamEvent;
+  export import AssistantTool = AssistantsAPI.AssistantTool;
+  export import CodeInterpreterTool = AssistantsAPI.CodeInterpreterTool;
+  export import FileSearchTool = AssistantsAPI.FileSearchTool;
+  export import FunctionTool = AssistantsAPI.FunctionTool;
+  export import MessageStreamEvent = AssistantsAPI.MessageStreamEvent;
+  export import RunStepStreamEvent = AssistantsAPI.RunStepStreamEvent;
+  export import RunStreamEvent = AssistantsAPI.RunStreamEvent;
+  export import ThreadStreamEvent = AssistantsAPI.ThreadStreamEvent;
   export import AssistantsPage = AssistantsAPI.AssistantsPage;
-  export type AssistantCreateParams = AssistantsAPI.AssistantCreateParams;
-  export type AssistantUpdateParams = AssistantsAPI.AssistantUpdateParams;
-  export type AssistantListParams = AssistantsAPI.AssistantListParams;
+  export import AssistantCreateParams = AssistantsAPI.AssistantCreateParams;
+  export import AssistantUpdateParams = AssistantsAPI.AssistantUpdateParams;
+  export import AssistantListParams = AssistantsAPI.AssistantListParams;
 }
