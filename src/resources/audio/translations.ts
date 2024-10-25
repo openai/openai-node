@@ -84,8 +84,8 @@ export interface TranslationCreateParams {
 }
 
 export namespace Translations {
-  export import Translation = TranslationsAPI.Translation;
-  export import TranslationVerbose = TranslationsAPI.TranslationVerbose;
-  export import TranslationCreateResponse = TranslationsAPI.TranslationCreateResponse;
-  export import TranslationCreateParams = TranslationsAPI.TranslationCreateParams;
+  export type Translation = TranslationsAPI.Translation;
+  export type TranslationVerbose = TranslationsAPI.TranslationVerbose;
+  export type TranslationCreateResponse = TranslationsAPI.TranslationCreateResponse;
+  export type TranslationCreateParams = TranslationsAPI.TranslationCreateParams;
 }

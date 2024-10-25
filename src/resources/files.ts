@@ -194,11 +194,11 @@ export interface FileListParams {
 }
 
 export namespace Files {
-  export import FileContent = FilesAPI.FileContent;
-  export import FileDeleted = FilesAPI.FileDeleted;
-  export import FileObject = FilesAPI.FileObject;
-  export import FilePurpose = FilesAPI.FilePurpose;
+  export type FileContent = FilesAPI.FileContent;
+  export type FileDeleted = FilesAPI.FileDeleted;
+  export type FileObject = FilesAPI.FileObject;
+  export type FilePurpose = FilesAPI.FilePurpose;
   export import FileObjectsPage = FilesAPI.FileObjectsPage;
-  export import FileCreateParams = FilesAPI.FileCreateParams;
-  export import FileListParams = FilesAPI.FileListParams;
+  export type FileCreateParams = FilesAPI.FileCreateParams;
+  export type FileListParams = FilesAPI.FileListParams;
 }

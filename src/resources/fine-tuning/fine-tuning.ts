@@ -9,14 +9,14 @@ export class FineTuning extends APIResource {
 
 export namespace FineTuning {
   export import Jobs = JobsAPI.Jobs;
-  export import FineTuningJob = JobsAPI.FineTuningJob;
-  export import FineTuningJobEvent = JobsAPI.FineTuningJobEvent;
-  export import FineTuningJobIntegration = JobsAPI.FineTuningJobIntegration;
-  export import FineTuningJobWandbIntegration = JobsAPI.FineTuningJobWandbIntegration;
-  export import FineTuningJobWandbIntegrationObject = JobsAPI.FineTuningJobWandbIntegrationObject;
+  export type FineTuningJob = JobsAPI.FineTuningJob;
+  export type FineTuningJobEvent = JobsAPI.FineTuningJobEvent;
+  export type FineTuningJobIntegration = JobsAPI.FineTuningJobIntegration;
+  export type FineTuningJobWandbIntegration = JobsAPI.FineTuningJobWandbIntegration;
+  export type FineTuningJobWandbIntegrationObject = JobsAPI.FineTuningJobWandbIntegrationObject;
   export import FineTuningJobsPage = JobsAPI.FineTuningJobsPage;
   export import FineTuningJobEventsPage = JobsAPI.FineTuningJobEventsPage;
-  export import JobCreateParams = JobsAPI.JobCreateParams;
-  export import JobListParams = JobsAPI.JobListParams;
-  export import JobListEventsParams = JobsAPI.JobListEventsParams;
+  export type JobCreateParams = JobsAPI.JobCreateParams;
+  export type JobListParams = JobsAPI.JobListParams;
+  export type JobListEventsParams = JobsAPI.JobListEventsParams;
 }

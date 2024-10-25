@@ -70,7 +70,7 @@ export interface ModelDeleted {
 }
 
 export namespace Models {
-  export import Model = ModelsAPI.Model;
-  export import ModelDeleted = ModelsAPI.ModelDeleted;
+  export type Model = ModelsAPI.Model;
+  export type ModelDeleted = ModelsAPI.ModelDeleted;
   export import ModelsPage = ModelsAPI.ModelsPage;
 }
