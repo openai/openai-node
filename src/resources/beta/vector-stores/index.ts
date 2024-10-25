@@ -1,32 +1,32 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 export {
-  AutoFileChunkingStrategyParam,
-  FileChunkingStrategy,
-  FileChunkingStrategyParam,
-  OtherFileChunkingStrategyObject,
-  StaticFileChunkingStrategy,
-  StaticFileChunkingStrategyObject,
-  StaticFileChunkingStrategyParam,
-  VectorStore,
-  VectorStoreDeleted,
-  VectorStoreCreateParams,
-  VectorStoreUpdateParams,
-  VectorStoreListParams,
-  VectorStoresPage,
-  VectorStores,
-} from './vector-stores';
+  FileBatches,
+  type VectorStoreFileBatch,
+  type FileBatchCreateParams,
+  type FileBatchListFilesParams,
+} from './file-batches';
 export {
-  VectorStoreFile,
-  VectorStoreFileDeleted,
-  FileCreateParams,
-  FileListParams,
   VectorStoreFilesPage,
   Files,
+  type VectorStoreFile,
+  type VectorStoreFileDeleted,
+  type FileCreateParams,
+  type FileListParams,
 } from './files';
 export {
-  VectorStoreFileBatch,
-  FileBatchCreateParams,
-  FileBatchListFilesParams,
-  FileBatches,
-} from './file-batches';
+  VectorStoresPage,
+  VectorStores,
+  type AutoFileChunkingStrategyParam,
+  type FileChunkingStrategy,
+  type FileChunkingStrategyParam,
+  type OtherFileChunkingStrategyObject,
+  type StaticFileChunkingStrategy,
+  type StaticFileChunkingStrategyObject,
+  type StaticFileChunkingStrategyParam,
+  type VectorStore,
+  type VectorStoreDeleted,
+  type VectorStoreCreateParams,
+  type VectorStoreUpdateParams,
+  type VectorStoreListParams,
+} from './vector-stores';

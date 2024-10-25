@@ -160,10 +160,10 @@ export interface UploadCompleteParams {
 }
 
 export namespace Uploads {
-  export import Upload = UploadsAPI.Upload;
-  export import UploadCreateParams = UploadsAPI.UploadCreateParams;
-  export import UploadCompleteParams = UploadsAPI.UploadCompleteParams;
+  export type Upload = UploadsAPI.Upload;
+  export type UploadCreateParams = UploadsAPI.UploadCreateParams;
+  export type UploadCompleteParams = UploadsAPI.UploadCompleteParams;
   export import Parts = PartsAPI.Parts;
-  export import UploadPart = PartsAPI.UploadPart;
-  export import PartCreateParams = PartsAPI.PartCreateParams;
+  export type UploadPart = PartsAPI.UploadPart;
+  export type PartCreateParams = PartsAPI.PartCreateParams;
 }
