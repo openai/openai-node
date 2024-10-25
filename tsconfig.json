@@ -11,7 +11,7 @@
     "paths": {
       "openai/_shims/auto/*": ["src/_shims/auto/*-node"],
       "openai/*": ["src/*"],
-      "openai": ["src/index.ts"]
+      "openai": ["src/index.ts"],
     },
     "noEmit": true,
 
@@ -32,7 +32,6 @@
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
     "noPropertyAccessFromIndexSignature": true,
-    "isolatedModules": true,
 
     "skipLibCheck": true
   }

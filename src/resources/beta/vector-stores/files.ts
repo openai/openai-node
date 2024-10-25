@@ -201,9 +201,9 @@ export interface FileListParams extends CursorPageParams {
 }
 
 export namespace Files {
-  export type VectorStoreFile = FilesAPI.VectorStoreFile;
-  export type VectorStoreFileDeleted = FilesAPI.VectorStoreFileDeleted;
+  export import VectorStoreFile = FilesAPI.VectorStoreFile;
+  export import VectorStoreFileDeleted = FilesAPI.VectorStoreFileDeleted;
   export import VectorStoreFilesPage = FilesAPI.VectorStoreFilesPage;
-  export type FileCreateParams = FilesAPI.FileCreateParams;
-  export type FileListParams = FilesAPI.FileListParams;
+  export import FileCreateParams = FilesAPI.FileCreateParams;
+  export import FileListParams = FilesAPI.FileListParams;
 }

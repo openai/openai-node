@@ -739,25 +739,25 @@ export interface StepListParams extends CursorPageParams {
 }
 
 export namespace Steps {
-  export type CodeInterpreterLogs = StepsAPI.CodeInterpreterLogs;
-  export type CodeInterpreterOutputImage = StepsAPI.CodeInterpreterOutputImage;
-  export type CodeInterpreterToolCall = StepsAPI.CodeInterpreterToolCall;
-  export type CodeInterpreterToolCallDelta = StepsAPI.CodeInterpreterToolCallDelta;
-  export type FileSearchToolCall = StepsAPI.FileSearchToolCall;
-  export type FileSearchToolCallDelta = StepsAPI.FileSearchToolCallDelta;
-  export type FunctionToolCall = StepsAPI.FunctionToolCall;
-  export type FunctionToolCallDelta = StepsAPI.FunctionToolCallDelta;
-  export type MessageCreationStepDetails = StepsAPI.MessageCreationStepDetails;
-  export type RunStep = StepsAPI.RunStep;
-  export type RunStepDelta = StepsAPI.RunStepDelta;
-  export type RunStepDeltaEvent = StepsAPI.RunStepDeltaEvent;
-  export type RunStepDeltaMessageDelta = StepsAPI.RunStepDeltaMessageDelta;
-  export type RunStepInclude = StepsAPI.RunStepInclude;
-  export type ToolCall = StepsAPI.ToolCall;
-  export type ToolCallDelta = StepsAPI.ToolCallDelta;
-  export type ToolCallDeltaObject = StepsAPI.ToolCallDeltaObject;
-  export type ToolCallsStepDetails = StepsAPI.ToolCallsStepDetails;
+  export import CodeInterpreterLogs = StepsAPI.CodeInterpreterLogs;
+  export import CodeInterpreterOutputImage = StepsAPI.CodeInterpreterOutputImage;
+  export import CodeInterpreterToolCall = StepsAPI.CodeInterpreterToolCall;
+  export import CodeInterpreterToolCallDelta = StepsAPI.CodeInterpreterToolCallDelta;
+  export import FileSearchToolCall = StepsAPI.FileSearchToolCall;
+  export import FileSearchToolCallDelta = StepsAPI.FileSearchToolCallDelta;
+  export import FunctionToolCall = StepsAPI.FunctionToolCall;
+  export import FunctionToolCallDelta = StepsAPI.FunctionToolCallDelta;
+  export import MessageCreationStepDetails = StepsAPI.MessageCreationStepDetails;
+  export import RunStep = StepsAPI.RunStep;
+  export import RunStepDelta = StepsAPI.RunStepDelta;
+  export import RunStepDeltaEvent = StepsAPI.RunStepDeltaEvent;
+  export import RunStepDeltaMessageDelta = StepsAPI.RunStepDeltaMessageDelta;
+  export import RunStepInclude = StepsAPI.RunStepInclude;
+  export import ToolCall = StepsAPI.ToolCall;
+  export import ToolCallDelta = StepsAPI.ToolCallDelta;
+  export import ToolCallDeltaObject = StepsAPI.ToolCallDeltaObject;
+  export import ToolCallsStepDetails = StepsAPI.ToolCallsStepDetails;
   export import RunStepsPage = StepsAPI.RunStepsPage;
-  export type StepRetrieveParams = StepsAPI.StepRetrieveParams;
-  export type StepListParams = StepsAPI.StepListParams;
+  export import StepRetrieveParams = StepsAPI.StepRetrieveParams;
+  export import StepListParams = StepsAPI.StepListParams;
 }

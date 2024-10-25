@@ -446,18 +446,18 @@ export interface JobListParams extends CursorPageParams {}
 export interface JobListEventsParams extends CursorPageParams {}
 
 export namespace Jobs {
-  export type FineTuningJob = JobsAPI.FineTuningJob;
-  export type FineTuningJobEvent = JobsAPI.FineTuningJobEvent;
-  export type FineTuningJobIntegration = JobsAPI.FineTuningJobIntegration;
-  export type FineTuningJobWandbIntegration = JobsAPI.FineTuningJobWandbIntegration;
-  export type FineTuningJobWandbIntegrationObject = JobsAPI.FineTuningJobWandbIntegrationObject;
+  export import FineTuningJob = JobsAPI.FineTuningJob;
+  export import FineTuningJobEvent = JobsAPI.FineTuningJobEvent;
+  export import FineTuningJobIntegration = JobsAPI.FineTuningJobIntegration;
+  export import FineTuningJobWandbIntegration = JobsAPI.FineTuningJobWandbIntegration;
+  export import FineTuningJobWandbIntegrationObject = JobsAPI.FineTuningJobWandbIntegrationObject;
   export import FineTuningJobsPage = JobsAPI.FineTuningJobsPage;
   export import FineTuningJobEventsPage = JobsAPI.FineTuningJobEventsPage;
-  export type JobCreateParams = JobsAPI.JobCreateParams;
-  export type JobListParams = JobsAPI.JobListParams;
-  export type JobListEventsParams = JobsAPI.JobListEventsParams;
+  export import JobCreateParams = JobsAPI.JobCreateParams;
+  export import JobListParams = JobsAPI.JobListParams;
+  export import JobListEventsParams = JobsAPI.JobListEventsParams;
   export import Checkpoints = CheckpointsAPI.Checkpoints;
-  export type FineTuningJobCheckpoint = CheckpointsAPI.FineTuningJobCheckpoint;
+  export import FineTuningJobCheckpoint = CheckpointsAPI.FineTuningJobCheckpoint;
   export import FineTuningJobCheckpointsPage = CheckpointsAPI.FineTuningJobCheckpointsPage;
-  export type CheckpointListParams = CheckpointsAPI.CheckpointListParams;
+  export import CheckpointListParams = CheckpointsAPI.CheckpointListParams;
 }
