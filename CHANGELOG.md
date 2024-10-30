@@ -1,5 +1,23 @@
 # Changelog
 
+## 4.69.0 (2024-10-30)
+
+Full Changelog: [v4.68.4...v4.69.0](https://github.com/openai/openai-node/compare/v4.68.4...v4.69.0)
+
+### Features
+
+* **api:** add new, expressive voices for Realtime and Audio in Chat Completions ([#1157](https://github.com/openai/openai-node/issues/1157)) ([12e501c](https://github.com/openai/openai-node/commit/12e501c8a215a2af29b9b8fceedc5935b6f2feef))
+
+
+### Bug Fixes
+
+* **internal:** support pnpm git installs ([#1156](https://github.com/openai/openai-node/issues/1156)) ([b744c5b](https://github.com/openai/openai-node/commit/b744c5b609533e9a6694d6cae0425fe9cd37e26c))
+
+
+### Documentation
+
+* **readme:** minor typo fixes ([#1154](https://github.com/openai/openai-node/issues/1154)) ([c6c9f9a](https://github.com/openai/openai-node/commit/c6c9f9aaf75f643016ad73574a7e24a228b5c60f))
+
 ## 4.68.4 (2024-10-23)
 
 Full Changelog: [v4.68.3...v4.68.4](https://github.com/openai/openai-node/compare/v4.68.3...v4.68.4)
