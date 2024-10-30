@@ -247,10 +247,10 @@ export interface ChatCompletionAudioParam {
   format: 'wav' | 'mp3' | 'flac' | 'opus' | 'pcm16';
 
   /**
-   * Specifies the voice type. Supported voices are `alloy`, `echo`, `fable`, `onyx`,
-   * `nova`, and `shimmer`.
+   * The voice the model uses to respond. Supported voices are `alloy`, `ash`,
+   * `ballad`, `coral`, `echo`, `sage`, `shimmer`, and `verse`.
    */
-  voice: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
+  voice: 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse';
 }
 
 /**
@@ -305,7 +305,7 @@ export interface ChatCompletionChunk {
    * contains a null value except for the last chunk which contains the token usage
    * statistics for the entire request.
    */
-  usage?: CompletionsAPI.CompletionUsage;
+  usage?: CompletionsAPI.CompletionUsage | null;
 }
 
 export namespace ChatCompletionChunk {
