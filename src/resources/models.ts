@@ -2,7 +2,6 @@
 
 import { APIResource } from '../resource';
 import * as Core from '../core';
-import * as ModelsAPI from './models';
 import { Page } from '../pagination';
 
 export class Models extends APIResource {
@@ -69,8 +68,8 @@ export interface ModelDeleted {
   object: string;
 }
 
-export namespace Models {
-  export import Model = ModelsAPI.Model;
-  export import ModelDeleted = ModelsAPI.ModelDeleted;
-  export import ModelsPage = ModelsAPI.ModelsPage;
+Models.ModelsPage = ModelsPage;
+
+export declare namespace Models {
+  export { type Model as Model, type ModelDeleted as ModelDeleted, ModelsPage as ModelsPage };
 }

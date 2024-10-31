@@ -2,62 +2,62 @@
 
 export * from './chat/index';
 export * from './shared';
-export { AudioModel, AudioResponseFormat, Audio } from './audio/audio';
+export { Audio, type AudioModel, type AudioResponseFormat } from './audio/audio';
 export {
-  Batch,
-  BatchError,
-  BatchRequestCounts,
-  BatchCreateParams,
-  BatchListParams,
   BatchesPage,
   Batches,
+  type Batch,
+  type BatchError,
+  type BatchRequestCounts,
+  type BatchCreateParams,
+  type BatchListParams,
 } from './batches';
 export { Beta } from './beta/beta';
 export {
-  Completion,
-  CompletionChoice,
-  CompletionUsage,
-  CompletionCreateParams,
-  CompletionCreateParamsNonStreaming,
-  CompletionCreateParamsStreaming,
   Completions,
+  type Completion,
+  type CompletionChoice,
+  type CompletionUsage,
+  type CompletionCreateParams,
+  type CompletionCreateParamsNonStreaming,
+  type CompletionCreateParamsStreaming,
 } from './completions';
 export {
-  CreateEmbeddingResponse,
-  Embedding,
-  EmbeddingModel,
-  EmbeddingCreateParams,
   Embeddings,
+  type CreateEmbeddingResponse,
+  type Embedding,
+  type EmbeddingModel,
+  type EmbeddingCreateParams,
 } from './embeddings';
 export {
-  FileContent,
-  FileDeleted,
-  FileObject,
-  FilePurpose,
-  FileCreateParams,
-  FileListParams,
   FileObjectsPage,
   Files,
+  type FileContent,
+  type FileDeleted,
+  type FileObject,
+  type FilePurpose,
+  type FileCreateParams,
+  type FileListParams,
 } from './files';
 export { FineTuning } from './fine-tuning/fine-tuning';
 export {
-  Image,
-  ImageModel,
-  ImagesResponse,
-  ImageCreateVariationParams,
-  ImageEditParams,
-  ImageGenerateParams,
   Images,
+  type Image,
+  type ImageModel,
+  type ImagesResponse,
+  type ImageCreateVariationParams,
+  type ImageEditParams,
+  type ImageGenerateParams,
 } from './images';
-export { Model, ModelDeleted, ModelsPage, Models } from './models';
+export { ModelsPage, Models, type Model, type ModelDeleted } from './models';
 export {
-  Moderation,
-  ModerationImageURLInput,
-  ModerationModel,
-  ModerationMultiModalInput,
-  ModerationTextInput,
-  ModerationCreateResponse,
-  ModerationCreateParams,
   Moderations,
+  type Moderation,
+  type ModerationImageURLInput,
+  type ModerationModel,
+  type ModerationMultiModalInput,
+  type ModerationTextInput,
+  type ModerationCreateResponse,
+  type ModerationCreateParams,
 } from './moderations';
-export { Upload, UploadCreateParams, UploadCompleteParams, Uploads } from './uploads/uploads';
+export { Uploads, type Upload, type UploadCreateParams, type UploadCompleteParams } from './uploads/uploads';

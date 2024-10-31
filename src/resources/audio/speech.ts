@@ -2,7 +2,6 @@
 
 import { APIResource } from '../../resource';
 import * as Core from '../../core';
-import * as SpeechAPI from './speech';
 import { type Response } from '../../_shims/index';
 
 export class Speech extends APIResource {
@@ -49,7 +48,6 @@ export interface SpeechCreateParams {
   speed?: number;
 }
 
-export namespace Speech {
-  export import SpeechModel = SpeechAPI.SpeechModel;
-  export import SpeechCreateParams = SpeechAPI.SpeechCreateParams;
+export declare namespace Speech {
+  export { type SpeechModel as SpeechModel, type SpeechCreateParams as SpeechCreateParams };
 }
