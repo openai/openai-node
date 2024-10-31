@@ -361,11 +361,13 @@ export interface CompletionCreateParamsStreaming extends CompletionCreateParamsB
   stream: true;
 }
 
-export namespace Completions {
-  export import Completion = CompletionsAPI.Completion;
-  export import CompletionChoice = CompletionsAPI.CompletionChoice;
-  export import CompletionUsage = CompletionsAPI.CompletionUsage;
-  export import CompletionCreateParams = CompletionsAPI.CompletionCreateParams;
-  export import CompletionCreateParamsNonStreaming = CompletionsAPI.CompletionCreateParamsNonStreaming;
-  export import CompletionCreateParamsStreaming = CompletionsAPI.CompletionCreateParamsStreaming;
+export declare namespace Completions {
+  export {
+    type Completion as Completion,
+    type CompletionChoice as CompletionChoice,
+    type CompletionUsage as CompletionUsage,
+    type CompletionCreateParams as CompletionCreateParams,
+    type CompletionCreateParamsNonStreaming as CompletionCreateParamsNonStreaming,
+    type CompletionCreateParamsStreaming as CompletionCreateParamsStreaming,
+  };
 }

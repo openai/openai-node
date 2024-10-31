@@ -2,7 +2,6 @@
 
 import { APIResource } from '../../resource';
 import * as Core from '../../core';
-import * as TranslationsAPI from './translations';
 import * as AudioAPI from './audio';
 import * as TranscriptionsAPI from './transcriptions';
 
@@ -83,9 +82,11 @@ export interface TranslationCreateParams {
   temperature?: number;
 }
 
-export namespace Translations {
-  export import Translation = TranslationsAPI.Translation;
-  export import TranslationVerbose = TranslationsAPI.TranslationVerbose;
-  export import TranslationCreateResponse = TranslationsAPI.TranslationCreateResponse;
-  export import TranslationCreateParams = TranslationsAPI.TranslationCreateParams;
+export declare namespace Translations {
+  export {
+    type Translation as Translation,
+    type TranslationVerbose as TranslationVerbose,
+    type TranslationCreateResponse as TranslationCreateResponse,
+    type TranslationCreateParams as TranslationCreateParams,
+  };
 }
