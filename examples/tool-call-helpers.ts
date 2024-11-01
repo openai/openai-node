@@ -65,7 +65,7 @@ const tools: RunnableToolFunction<any>[] = [
 async function main() {
   const runner = await openai.beta.chat.completions
     .runTools({
-      model: 'gpt-4-1106-preview',
+      model: 'gpt-4-32k',
       stream: true,
       tools,
       messages: [
@@ -113,7 +113,7 @@ const db = [
     id: 'a3',
     name: 'Where the Crawdads Sing',
     genre: 'historical',
-    description: `For years, rumors of the “Marsh Girl” haunted Barkley Cove, a quiet fishing village. Kya Clark is barefoot and wild; unfit for polite society. So in late 1969, when the popular Chase Andrews is found dead, locals immediately suspect her.
+    description: `For years, rumors of the "Marsh Girl" haunted Barkley Cove, a quiet fishing village. Kya Clark is barefoot and wild; unfit for polite society. So in late 1969, when the popular Chase Andrews is found dead, locals immediately suspect her.
 But Kya is not what they say. A born naturalist with just one day of school, she takes life's lessons from the land, learning the real ways of the world from the dishonest signals of fireflies. But while she has the skills to live in solitude forever, the time comes when she yearns to be touched and loved. Drawn to two young men from town, who are each intrigued by her wild beauty, Kya opens herself to a new and startling world—until the unthinkable happens.`,
   },
 ];
