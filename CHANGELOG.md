@@ -1,5 +1,23 @@
 # Changelog
 
+## 4.70.0 (2024-11-01)
+
+Full Changelog: [v4.69.0...v4.70.0](https://github.com/openai/openai-node/compare/v4.69.0...v4.70.0)
+
+### Features
+
+* publish to jsr ([#1165](https://github.com/openai/openai-node/issues/1165)) ([5aa93a7](https://github.com/openai/openai-node/commit/5aa93a7fe704ef1ad077787852db38dc29104534))
+
+
+### Chores
+
+* **internal:** fix isolated modules exports ([9cd1958](https://github.com/openai/openai-node/commit/9cd19584dcc6f4004ea1adcee917aa88a37d5f1c))
+
+
+### Refactors
+
+* use type imports for type-only imports ([#1159](https://github.com/openai/openai-node/issues/1159)) ([07bbaf6](https://github.com/openai/openai-node/commit/07bbaf6ecac9a5e36471a35488020853ddf9214f))
+
 ## 4.69.0 (2024-10-30)
 
 Full Changelog: [v4.68.4...v4.69.0](https://github.com/openai/openai-node/compare/v4.68.4...v4.69.0)
