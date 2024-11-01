@@ -2,7 +2,7 @@ import { ReadableStream, type Response } from './_shims/index';
 import { OpenAIError } from './error';
 import { LineDecoder } from './internal/decoders/line';
 
-import { APIError } from 'openai/error';
+import { APIError } from './error';
 
 type Bytes = string | ArrayBuffer | Uint8Array | Buffer | null | undefined;
 

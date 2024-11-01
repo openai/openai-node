@@ -50,7 +50,7 @@ node scripts/utils/postprocess-files.cjs
 (cd dist && node -e 'require("openai")')
 (cd dist && node -e 'import("openai")' --input-type=module)
 
-if [ "${OPENAI_DISABLE_DENO_BUILD:-0}" != "1" ] && command -v deno &> /dev/null && [ -e ./scripts/build-deno ]
+if [ "${OPENAI_DISABLE_DENO_BUILD:-0}" != "1" ] && [ -e ./scripts/build-deno ]
 then
   ./scripts/build-deno
 fi
