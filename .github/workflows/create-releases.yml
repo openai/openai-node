@@ -12,6 +12,9 @@ jobs:
     if: github.ref == 'refs/heads/master' && github.repository == 'openai/openai-node'
     runs-on: ubuntu-latest
     environment: publish
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - uses: actions/checkout@v4
