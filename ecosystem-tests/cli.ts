@@ -95,15 +95,16 @@ const projectRunners = {
       await run('bun', ['test']);
     }
   },
-  deno: async () => {
-    // we don't need to explicitly install the package here
-    // because our deno setup relies on `rootDir/deno` to exist
-    // which is an artifact produced from our build process
-    await run('deno', ['task', 'install']);
-    await run('deno', ['task', 'check']);
+  // Temporarily comment this out until we can test with JSR transformations end-to-end.
+  // deno: async () => {
+  //   // we don't need to explicitly install the package here
+  //   // because our deno setup relies on `rootDir/deno` to exist
+  //   // which is an artifact produced from our build process
+  //   await run('deno', ['task', 'install']);
+  //   await run('deno', ['task', 'check']);
 
-    if (state.live) await run('deno', ['task', 'test']);
-  },
+  //   if (state.live) await run('deno', ['task', 'test']);
+  // },
 };
 
 let projectNames = Object.keys(projectRunners) as Array<keyof typeof projectRunners>;
