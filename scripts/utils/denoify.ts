@@ -121,7 +121,7 @@ async function denoify() {
           }
         }
         // add explicit .ts file extensions to relative module specifiers
-        specifier = specifier.replace(/(\.[^./]*)?$/, '.ts');
+        if (!path.extname(specifier)) specifier += '.ts';
       }
       moduleSpecifier.replaceWithText(JSON.stringify(specifier));
     }
