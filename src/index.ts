@@ -1,12 +1,108 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import * as Errors from './error';
-import * as Uploads from './uploads';
 import { type Agent, type RequestInit } from './_shims/index';
 import * as qs from './internal/qs';
 import * as Core from './core';
+import * as Errors from './error';
 import * as Pagination from './pagination';
+import { type CursorPageParams, CursorPageResponse, PageResponse } from './pagination';
+import * as Uploads from './uploads';
 import * as API from './resources/index';
+import {
+  Batch,
+  BatchCreateParams,
+  BatchError,
+  BatchListParams,
+  BatchRequestCounts,
+  Batches,
+  BatchesPage,
+} from './resources/batches';
+import {
+  Completion,
+  CompletionChoice,
+  CompletionCreateParams,
+  CompletionCreateParamsNonStreaming,
+  CompletionCreateParamsStreaming,
+  CompletionUsage,
+  Completions,
+} from './resources/completions';
+import {
+  CreateEmbeddingResponse,
+  Embedding,
+  EmbeddingCreateParams,
+  EmbeddingModel,
+  Embeddings,
+} from './resources/embeddings';
+import {
+  FileContent,
+  FileCreateParams,
+  FileDeleted,
+  FileListParams,
+  FileObject,
+  FileObjectsPage,
+  FilePurpose,
+  Files,
+} from './resources/files';
+import {
+  Image,
+  ImageCreateVariationParams,
+  ImageEditParams,
+  ImageGenerateParams,
+  ImageModel,
+  Images,
+  ImagesResponse,
+} from './resources/images';
+import { Model, ModelDeleted, Models, ModelsPage } from './resources/models';
+import {
+  Moderation,
+  ModerationCreateParams,
+  ModerationCreateResponse,
+  ModerationImageURLInput,
+  ModerationModel,
+  ModerationMultiModalInput,
+  ModerationTextInput,
+  Moderations,
+} from './resources/moderations';
+import { Audio, AudioModel, AudioResponseFormat } from './resources/audio/audio';
+import { Beta } from './resources/beta/beta';
+import { Chat, ChatModel } from './resources/chat/chat';
+import {
+  ChatCompletion,
+  ChatCompletionAssistantMessageParam,
+  ChatCompletionAudio,
+  ChatCompletionAudioParam,
+  ChatCompletionChunk,
+  ChatCompletionContentPart,
+  ChatCompletionContentPartImage,
+  ChatCompletionContentPartInputAudio,
+  ChatCompletionContentPartRefusal,
+  ChatCompletionContentPartText,
+  ChatCompletionCreateParams,
+  ChatCompletionCreateParamsNonStreaming,
+  ChatCompletionCreateParamsStreaming,
+  ChatCompletionFunctionCallOption,
+  ChatCompletionFunctionMessageParam,
+  ChatCompletionMessage,
+  ChatCompletionMessageParam,
+  ChatCompletionMessageToolCall,
+  ChatCompletionModality,
+  ChatCompletionNamedToolChoice,
+  ChatCompletionRole,
+  ChatCompletionStreamOptions,
+  ChatCompletionSystemMessageParam,
+  ChatCompletionTokenLogprob,
+  ChatCompletionTool,
+  ChatCompletionToolChoiceOption,
+  ChatCompletionToolMessageParam,
+  ChatCompletionUserMessageParam,
+} from './resources/chat/completions';
+import { FineTuning } from './resources/fine-tuning/fine-tuning';
+import {
+  Upload,
+  UploadCompleteParams,
+  UploadCreateParams,
+  Uploads as UploadsAPIUploads,
+} from './resources/uploads/uploads';
 
 export interface ClientOptions {
   /**
@@ -209,138 +305,167 @@ export class OpenAI extends Core.APIClient {
   static fileFromPath = Uploads.fileFromPath;
 }
 
-export const {
-  OpenAIError,
-  APIError,
-  APIConnectionError,
-  APIConnectionTimeoutError,
-  APIUserAbortError,
-  NotFoundError,
-  ConflictError,
-  RateLimitError,
-  BadRequestError,
-  AuthenticationError,
-  InternalServerError,
-  PermissionDeniedError,
-  UnprocessableEntityError,
-} = Errors;
+export const OpenAIError = Errors.OpenAIError;
+export const APIError = Errors.APIError;
+export const APIConnectionError = Errors.APIConnectionError;
+export const APIConnectionTimeoutError = Errors.APIConnectionTimeoutError;
+export const APIUserAbortError = Errors.APIUserAbortError;
+export const NotFoundError = Errors.NotFoundError;
+export const ConflictError = Errors.ConflictError;
+export const RateLimitError = Errors.RateLimitError;
+export const BadRequestError = Errors.BadRequestError;
+export const AuthenticationError = Errors.AuthenticationError;
+export const InternalServerError = Errors.InternalServerError;
+export const PermissionDeniedError = Errors.PermissionDeniedError;
+export const UnprocessableEntityError = Errors.UnprocessableEntityError;
 
 export import toFile = Uploads.toFile;
 export import fileFromPath = Uploads.fileFromPath;
 
-export namespace OpenAI {
-  export import RequestOptions = Core.RequestOptions;
+OpenAI.Completions = Completions;
+OpenAI.Chat = Chat;
+OpenAI.Embeddings = Embeddings;
+OpenAI.Files = Files;
+OpenAI.FileObjectsPage = FileObjectsPage;
+OpenAI.Images = Images;
+OpenAI.Audio = Audio;
+OpenAI.Moderations = Moderations;
+OpenAI.Models = Models;
+OpenAI.ModelsPage = ModelsPage;
+OpenAI.FineTuning = FineTuning;
+OpenAI.Beta = Beta;
+OpenAI.Batches = Batches;
+OpenAI.BatchesPage = BatchesPage;
+OpenAI.Uploads = UploadsAPIUploads;
+
+export declare namespace OpenAI {
+  export type RequestOptions = Core.RequestOptions;
 
   export import Page = Pagination.Page;
-  export import PageResponse = Pagination.PageResponse;
+  export { type PageResponse as PageResponse };
 
   export import CursorPage = Pagination.CursorPage;
-  export import CursorPageParams = Pagination.CursorPageParams;
-  export import CursorPageResponse = Pagination.CursorPageResponse;
+  export { type CursorPageParams as CursorPageParams, type CursorPageResponse as CursorPageResponse };
 
-  export import Completions = API.Completions;
-  export import Completion = API.Completion;
-  export import CompletionChoice = API.CompletionChoice;
-  export import CompletionUsage = API.CompletionUsage;
-  export import CompletionCreateParams = API.CompletionCreateParams;
-  export import CompletionCreateParamsNonStreaming = API.CompletionCreateParamsNonStreaming;
-  export import CompletionCreateParamsStreaming = API.CompletionCreateParamsStreaming;
+  export {
+    Completions as Completions,
+    type Completion as Completion,
+    type CompletionChoice as CompletionChoice,
+    type CompletionUsage as CompletionUsage,
+    type CompletionCreateParams as CompletionCreateParams,
+    type CompletionCreateParamsNonStreaming as CompletionCreateParamsNonStreaming,
+    type CompletionCreateParamsStreaming as CompletionCreateParamsStreaming,
+  };
 
-  export import Chat = API.Chat;
-  export import ChatModel = API.ChatModel;
-  export import ChatCompletion = API.ChatCompletion;
-  export import ChatCompletionAssistantMessageParam = API.ChatCompletionAssistantMessageParam;
-  export import ChatCompletionAudio = API.ChatCompletionAudio;
-  export import ChatCompletionAudioParam = API.ChatCompletionAudioParam;
-  export import ChatCompletionChunk = API.ChatCompletionChunk;
-  export import ChatCompletionContentPart = API.ChatCompletionContentPart;
-  export import ChatCompletionContentPartImage = API.ChatCompletionContentPartImage;
-  export import ChatCompletionContentPartInputAudio = API.ChatCompletionContentPartInputAudio;
-  export import ChatCompletionContentPartRefusal = API.ChatCompletionContentPartRefusal;
-  export import ChatCompletionContentPartText = API.ChatCompletionContentPartText;
-  export import ChatCompletionFunctionCallOption = API.ChatCompletionFunctionCallOption;
-  export import ChatCompletionFunctionMessageParam = API.ChatCompletionFunctionMessageParam;
-  export import ChatCompletionMessage = API.ChatCompletionMessage;
-  export import ChatCompletionMessageParam = API.ChatCompletionMessageParam;
-  export import ChatCompletionMessageToolCall = API.ChatCompletionMessageToolCall;
-  export import ChatCompletionModality = API.ChatCompletionModality;
-  export import ChatCompletionNamedToolChoice = API.ChatCompletionNamedToolChoice;
-  export import ChatCompletionRole = API.ChatCompletionRole;
-  export import ChatCompletionStreamOptions = API.ChatCompletionStreamOptions;
-  export import ChatCompletionSystemMessageParam = API.ChatCompletionSystemMessageParam;
-  export import ChatCompletionTokenLogprob = API.ChatCompletionTokenLogprob;
-  export import ChatCompletionTool = API.ChatCompletionTool;
-  export import ChatCompletionToolChoiceOption = API.ChatCompletionToolChoiceOption;
-  export import ChatCompletionToolMessageParam = API.ChatCompletionToolMessageParam;
-  export import ChatCompletionUserMessageParam = API.ChatCompletionUserMessageParam;
-  export import ChatCompletionCreateParams = API.ChatCompletionCreateParams;
-  export import ChatCompletionCreateParamsNonStreaming = API.ChatCompletionCreateParamsNonStreaming;
-  export import ChatCompletionCreateParamsStreaming = API.ChatCompletionCreateParamsStreaming;
+  export {
+    Chat as Chat,
+    type ChatModel as ChatModel,
+    type ChatCompletion as ChatCompletion,
+    type ChatCompletionAssistantMessageParam as ChatCompletionAssistantMessageParam,
+    type ChatCompletionAudio as ChatCompletionAudio,
+    type ChatCompletionAudioParam as ChatCompletionAudioParam,
+    type ChatCompletionChunk as ChatCompletionChunk,
+    type ChatCompletionContentPart as ChatCompletionContentPart,
+    type ChatCompletionContentPartImage as ChatCompletionContentPartImage,
+    type ChatCompletionContentPartInputAudio as ChatCompletionContentPartInputAudio,
+    type ChatCompletionContentPartRefusal as ChatCompletionContentPartRefusal,
+    type ChatCompletionContentPartText as ChatCompletionContentPartText,
+    type ChatCompletionFunctionCallOption as ChatCompletionFunctionCallOption,
+    type ChatCompletionFunctionMessageParam as ChatCompletionFunctionMessageParam,
+    type ChatCompletionMessage as ChatCompletionMessage,
+    type ChatCompletionMessageParam as ChatCompletionMessageParam,
+    type ChatCompletionMessageToolCall as ChatCompletionMessageToolCall,
+    type ChatCompletionModality as ChatCompletionModality,
+    type ChatCompletionNamedToolChoice as ChatCompletionNamedToolChoice,
+    type ChatCompletionRole as ChatCompletionRole,
+    type ChatCompletionStreamOptions as ChatCompletionStreamOptions,
+    type ChatCompletionSystemMessageParam as ChatCompletionSystemMessageParam,
+    type ChatCompletionTokenLogprob as ChatCompletionTokenLogprob,
+    type ChatCompletionTool as ChatCompletionTool,
+    type ChatCompletionToolChoiceOption as ChatCompletionToolChoiceOption,
+    type ChatCompletionToolMessageParam as ChatCompletionToolMessageParam,
+    type ChatCompletionUserMessageParam as ChatCompletionUserMessageParam,
+    type ChatCompletionCreateParams as ChatCompletionCreateParams,
+    type ChatCompletionCreateParamsNonStreaming as ChatCompletionCreateParamsNonStreaming,
+    type ChatCompletionCreateParamsStreaming as ChatCompletionCreateParamsStreaming,
+  };
 
-  export import Embeddings = API.Embeddings;
-  export import CreateEmbeddingResponse = API.CreateEmbeddingResponse;
-  export import Embedding = API.Embedding;
-  export import EmbeddingModel = API.EmbeddingModel;
-  export import EmbeddingCreateParams = API.EmbeddingCreateParams;
+  export {
+    Embeddings as Embeddings,
+    type CreateEmbeddingResponse as CreateEmbeddingResponse,
+    type Embedding as Embedding,
+    type EmbeddingModel as EmbeddingModel,
+    type EmbeddingCreateParams as EmbeddingCreateParams,
+  };
 
-  export import Files = API.Files;
-  export import FileContent = API.FileContent;
-  export import FileDeleted = API.FileDeleted;
-  export import FileObject = API.FileObject;
-  export import FilePurpose = API.FilePurpose;
-  export import FileObjectsPage = API.FileObjectsPage;
-  export import FileCreateParams = API.FileCreateParams;
-  export import FileListParams = API.FileListParams;
+  export {
+    Files as Files,
+    type FileContent as FileContent,
+    type FileDeleted as FileDeleted,
+    type FileObject as FileObject,
+    type FilePurpose as FilePurpose,
+    FileObjectsPage as FileObjectsPage,
+    type FileCreateParams as FileCreateParams,
+    type FileListParams as FileListParams,
+  };
 
-  export import Images = API.Images;
-  export import Image = API.Image;
-  export import ImageModel = API.ImageModel;
-  export import ImagesResponse = API.ImagesResponse;
-  export import ImageCreateVariationParams = API.ImageCreateVariationParams;
-  export import ImageEditParams = API.ImageEditParams;
-  export import ImageGenerateParams = API.ImageGenerateParams;
+  export {
+    Images as Images,
+    type Image as Image,
+    type ImageModel as ImageModel,
+    type ImagesResponse as ImagesResponse,
+    type ImageCreateVariationParams as ImageCreateVariationParams,
+    type ImageEditParams as ImageEditParams,
+    type ImageGenerateParams as ImageGenerateParams,
+  };
 
-  export import Audio = API.Audio;
-  export import AudioModel = API.AudioModel;
-  export import AudioResponseFormat = API.AudioResponseFormat;
+  export { Audio as Audio, type AudioModel as AudioModel, type AudioResponseFormat as AudioResponseFormat };
 
-  export import Moderations = API.Moderations;
-  export import Moderation = API.Moderation;
-  export import ModerationImageURLInput = API.ModerationImageURLInput;
-  export import ModerationModel = API.ModerationModel;
-  export import ModerationMultiModalInput = API.ModerationMultiModalInput;
-  export import ModerationTextInput = API.ModerationTextInput;
-  export import ModerationCreateResponse = API.ModerationCreateResponse;
-  export import ModerationCreateParams = API.ModerationCreateParams;
+  export {
+    Moderations as Moderations,
+    type Moderation as Moderation,
+    type ModerationImageURLInput as ModerationImageURLInput,
+    type ModerationModel as ModerationModel,
+    type ModerationMultiModalInput as ModerationMultiModalInput,
+    type ModerationTextInput as ModerationTextInput,
+    type ModerationCreateResponse as ModerationCreateResponse,
+    type ModerationCreateParams as ModerationCreateParams,
+  };
 
-  export import Models = API.Models;
-  export import Model = API.Model;
-  export import ModelDeleted = API.ModelDeleted;
-  export import ModelsPage = API.ModelsPage;
+  export {
+    Models as Models,
+    type Model as Model,
+    type ModelDeleted as ModelDeleted,
+    ModelsPage as ModelsPage,
+  };
 
-  export import FineTuning = API.FineTuning;
+  export { FineTuning as FineTuning };
 
-  export import Beta = API.Beta;
+  export { Beta as Beta };
 
-  export import Batches = API.Batches;
-  export import Batch = API.Batch;
-  export import BatchError = API.BatchError;
-  export import BatchRequestCounts = API.BatchRequestCounts;
-  export import BatchesPage = API.BatchesPage;
-  export import BatchCreateParams = API.BatchCreateParams;
-  export import BatchListParams = API.BatchListParams;
+  export {
+    Batches as Batches,
+    type Batch as Batch,
+    type BatchError as BatchError,
+    type BatchRequestCounts as BatchRequestCounts,
+    BatchesPage as BatchesPage,
+    type BatchCreateParams as BatchCreateParams,
+    type BatchListParams as BatchListParams,
+  };
 
-  export import Uploads = API.Uploads;
-  export import Upload = API.Upload;
-  export import UploadCreateParams = API.UploadCreateParams;
-  export import UploadCompleteParams = API.UploadCompleteParams;
+  export {
+    UploadsAPIUploads as Uploads,
+    type Upload as Upload,
+    type UploadCreateParams as UploadCreateParams,
+    type UploadCompleteParams as UploadCompleteParams,
+  };
 
-  export import ErrorObject = API.ErrorObject;
-  export import FunctionDefinition = API.FunctionDefinition;
-  export import FunctionParameters = API.FunctionParameters;
-  export import ResponseFormatJSONObject = API.ResponseFormatJSONObject;
-  export import ResponseFormatJSONSchema = API.ResponseFormatJSONSchema;
-  export import ResponseFormatText = API.ResponseFormatText;
+  export type ErrorObject = API.ErrorObject;
+  export type FunctionDefinition = API.FunctionDefinition;
+  export type FunctionParameters = API.FunctionParameters;
+  export type ResponseFormatJSONObject = API.ResponseFormatJSONObject;
+  export type ResponseFormatJSONSchema = API.ResponseFormatJSONSchema;
+  export type ResponseFormatText = API.ResponseFormatText;
 }
 
 // ---------------------- Azure ----------------------

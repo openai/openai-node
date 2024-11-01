@@ -2,7 +2,6 @@
 
 import { APIResource } from '../../resource';
 import * as Core from '../../core';
-import * as PartsAPI from './parts';
 
 export class Parts extends APIResource {
   /**
@@ -62,7 +61,6 @@ export interface PartCreateParams {
   data: Core.Uploadable;
 }
 
-export namespace Parts {
-  export import UploadPart = PartsAPI.UploadPart;
-  export import PartCreateParams = PartsAPI.PartCreateParams;
+export declare namespace Parts {
+  export { type UploadPart as UploadPart, type PartCreateParams as PartCreateParams };
 }

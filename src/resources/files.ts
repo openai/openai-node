@@ -5,7 +5,6 @@ import { isRequestOptions } from '../core';
 import { sleep } from '../core';
 import { APIConnectionTimeoutError } from '../error';
 import * as Core from '../core';
-import * as FilesAPI from './files';
 import { Page } from '../pagination';
 import { type Response } from '../_shims/index';
 
@@ -221,12 +220,16 @@ export interface FileListParams {
   purpose?: string;
 }
 
-export namespace Files {
-  export import FileContent = FilesAPI.FileContent;
-  export import FileDeleted = FilesAPI.FileDeleted;
-  export import FileObject = FilesAPI.FileObject;
-  export import FilePurpose = FilesAPI.FilePurpose;
-  export import FileObjectsPage = FilesAPI.FileObjectsPage;
-  export import FileCreateParams = FilesAPI.FileCreateParams;
-  export import FileListParams = FilesAPI.FileListParams;
+Files.FileObjectsPage = FileObjectsPage;
+
+export declare namespace Files {
+  export {
+    type FileContent as FileContent,
+    type FileDeleted as FileDeleted,
+    type FileObject as FileObject,
+    type FilePurpose as FilePurpose,
+    FileObjectsPage as FileObjectsPage,
+    type FileCreateParams as FileCreateParams,
+    type FileListParams as FileListParams,
+  };
 }

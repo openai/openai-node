@@ -2,7 +2,6 @@
 
 import { APIResource } from '../resource';
 import * as Core from '../core';
-import * as ModerationsAPI from './moderations';
 
 export class Moderations extends APIResource {
   /**
@@ -357,12 +356,14 @@ export interface ModerationCreateParams {
   model?: (string & {}) | ModerationModel;
 }
 
-export namespace Moderations {
-  export import Moderation = ModerationsAPI.Moderation;
-  export import ModerationImageURLInput = ModerationsAPI.ModerationImageURLInput;
-  export import ModerationModel = ModerationsAPI.ModerationModel;
-  export import ModerationMultiModalInput = ModerationsAPI.ModerationMultiModalInput;
-  export import ModerationTextInput = ModerationsAPI.ModerationTextInput;
-  export import ModerationCreateResponse = ModerationsAPI.ModerationCreateResponse;
-  export import ModerationCreateParams = ModerationsAPI.ModerationCreateParams;
+export declare namespace Moderations {
+  export {
+    type Moderation as Moderation,
+    type ModerationImageURLInput as ModerationImageURLInput,
+    type ModerationModel as ModerationModel,
+    type ModerationMultiModalInput as ModerationMultiModalInput,
+    type ModerationTextInput as ModerationTextInput,
+    type ModerationCreateResponse as ModerationCreateResponse,
+    type ModerationCreateParams as ModerationCreateParams,
+  };
 }

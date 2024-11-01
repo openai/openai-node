@@ -3,7 +3,6 @@
 import { APIResource } from '../../../resource';
 import { sleep, Uploadable, isRequestOptions } from '../../../core';
 import * as Core from '../../../core';
-import * as FilesAPI from './files';
 import * as VectorStoresAPI from './vector-stores';
 import { CursorPage, type CursorPageParams } from '../../../pagination';
 
@@ -286,10 +285,14 @@ export interface FileListParams extends CursorPageParams {
   order?: 'asc' | 'desc';
 }
 
-export namespace Files {
-  export import VectorStoreFile = FilesAPI.VectorStoreFile;
-  export import VectorStoreFileDeleted = FilesAPI.VectorStoreFileDeleted;
-  export import VectorStoreFilesPage = FilesAPI.VectorStoreFilesPage;
-  export import FileCreateParams = FilesAPI.FileCreateParams;
-  export import FileListParams = FilesAPI.FileListParams;
+Files.VectorStoreFilesPage = VectorStoreFilesPage;
+
+export declare namespace Files {
+  export {
+    type VectorStoreFile as VectorStoreFile,
+    type VectorStoreFileDeleted as VectorStoreFileDeleted,
+    VectorStoreFilesPage as VectorStoreFilesPage,
+    type FileCreateParams as FileCreateParams,
+    type FileListParams as FileListParams,
+  };
 }
