@@ -6,7 +6,7 @@ import {
   Text,
   ImageFile,
   TextDelta,
-  Messages,
+  MessageDelta,
   MessageContent,
 } from 'openai/resources/beta/threads/messages';
 import * as Core from 'openai/core';
@@ -31,7 +31,6 @@ import {
 import { RunStep, RunStepDelta, ToolCall, ToolCallDelta } from 'openai/resources/beta/threads/runs/steps';
 import { ThreadCreateAndRunParamsBase, Threads } from 'openai/resources/beta/threads/threads';
 import { BaseEvents, EventStream } from './EventStream';
-import MessageDelta = Messages.MessageDelta;
 
 export interface AssistantStreamEvents extends BaseEvents {
   run: (run: Run) => void;

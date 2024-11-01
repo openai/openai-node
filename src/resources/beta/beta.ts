@@ -3,8 +3,59 @@
 import { APIResource } from '../../resource';
 import * as AssistantsAPI from './assistants';
 import * as ChatAPI from './chat/chat';
+import {
+  Assistant,
+  AssistantCreateParams,
+  AssistantDeleted,
+  AssistantListParams,
+  AssistantStreamEvent,
+  AssistantTool,
+  AssistantUpdateParams,
+  Assistants,
+  AssistantsPage,
+  CodeInterpreterTool,
+  FileSearchTool,
+  FunctionTool,
+  MessageStreamEvent,
+  RunStepStreamEvent,
+  RunStreamEvent,
+  ThreadStreamEvent,
+} from './assistants';
 import * as ThreadsAPI from './threads/threads';
+import {
+  AssistantResponseFormatOption,
+  AssistantToolChoice,
+  AssistantToolChoiceFunction,
+  AssistantToolChoiceOption,
+  Thread,
+  ThreadCreateAndRunParams,
+  ThreadCreateAndRunParamsNonStreaming,
+  ThreadCreateAndRunParamsStreaming,
+  ThreadCreateAndRunPollParams,
+  ThreadCreateAndRunStreamParams,
+  ThreadCreateParams,
+  ThreadDeleted,
+  ThreadUpdateParams,
+  Threads,
+} from './threads/threads';
 import * as VectorStoresAPI from './vector-stores/vector-stores';
+import {
+  AutoFileChunkingStrategyParam,
+  FileChunkingStrategy,
+  FileChunkingStrategyParam,
+  OtherFileChunkingStrategyObject,
+  StaticFileChunkingStrategy,
+  StaticFileChunkingStrategyObject,
+  StaticFileChunkingStrategyParam,
+  VectorStore,
+  VectorStoreCreateParams,
+  VectorStoreDeleted,
+  VectorStoreListParams,
+  VectorStoreUpdateParams,
+  VectorStores,
+  VectorStoresPage,
+} from './vector-stores/vector-stores';
+import { Chat } from './chat/chat';
 
 export class Beta extends APIResource {
   vectorStores: VectorStoresAPI.VectorStores = new VectorStoresAPI.VectorStores(this._client);
@@ -13,50 +64,65 @@ export class Beta extends APIResource {
   threads: ThreadsAPI.Threads = new ThreadsAPI.Threads(this._client);
 }
 
-export namespace Beta {
-  export import VectorStores = VectorStoresAPI.VectorStores;
-  export import AutoFileChunkingStrategyParam = VectorStoresAPI.AutoFileChunkingStrategyParam;
-  export import FileChunkingStrategy = VectorStoresAPI.FileChunkingStrategy;
-  export import FileChunkingStrategyParam = VectorStoresAPI.FileChunkingStrategyParam;
-  export import OtherFileChunkingStrategyObject = VectorStoresAPI.OtherFileChunkingStrategyObject;
-  export import StaticFileChunkingStrategy = VectorStoresAPI.StaticFileChunkingStrategy;
-  export import StaticFileChunkingStrategyObject = VectorStoresAPI.StaticFileChunkingStrategyObject;
-  export import StaticFileChunkingStrategyParam = VectorStoresAPI.StaticFileChunkingStrategyParam;
-  export import VectorStore = VectorStoresAPI.VectorStore;
-  export import VectorStoreDeleted = VectorStoresAPI.VectorStoreDeleted;
-  export import VectorStoresPage = VectorStoresAPI.VectorStoresPage;
-  export import VectorStoreCreateParams = VectorStoresAPI.VectorStoreCreateParams;
-  export import VectorStoreUpdateParams = VectorStoresAPI.VectorStoreUpdateParams;
-  export import VectorStoreListParams = VectorStoresAPI.VectorStoreListParams;
-  export import Chat = ChatAPI.Chat;
-  export import Assistants = AssistantsAPI.Assistants;
-  export import Assistant = AssistantsAPI.Assistant;
-  export import AssistantDeleted = AssistantsAPI.AssistantDeleted;
-  export import AssistantStreamEvent = AssistantsAPI.AssistantStreamEvent;
-  export import AssistantTool = AssistantsAPI.AssistantTool;
-  export import CodeInterpreterTool = AssistantsAPI.CodeInterpreterTool;
-  export import FileSearchTool = AssistantsAPI.FileSearchTool;
-  export import FunctionTool = AssistantsAPI.FunctionTool;
-  export import MessageStreamEvent = AssistantsAPI.MessageStreamEvent;
-  export import RunStepStreamEvent = AssistantsAPI.RunStepStreamEvent;
-  export import RunStreamEvent = AssistantsAPI.RunStreamEvent;
-  export import ThreadStreamEvent = AssistantsAPI.ThreadStreamEvent;
-  export import AssistantsPage = AssistantsAPI.AssistantsPage;
-  export import AssistantCreateParams = AssistantsAPI.AssistantCreateParams;
-  export import AssistantUpdateParams = AssistantsAPI.AssistantUpdateParams;
-  export import AssistantListParams = AssistantsAPI.AssistantListParams;
-  export import Threads = ThreadsAPI.Threads;
-  export import AssistantResponseFormatOption = ThreadsAPI.AssistantResponseFormatOption;
-  export import AssistantToolChoice = ThreadsAPI.AssistantToolChoice;
-  export import AssistantToolChoiceFunction = ThreadsAPI.AssistantToolChoiceFunction;
-  export import AssistantToolChoiceOption = ThreadsAPI.AssistantToolChoiceOption;
-  export import Thread = ThreadsAPI.Thread;
-  export import ThreadDeleted = ThreadsAPI.ThreadDeleted;
-  export import ThreadCreateParams = ThreadsAPI.ThreadCreateParams;
-  export import ThreadUpdateParams = ThreadsAPI.ThreadUpdateParams;
-  export import ThreadCreateAndRunParams = ThreadsAPI.ThreadCreateAndRunParams;
-  export import ThreadCreateAndRunParamsNonStreaming = ThreadsAPI.ThreadCreateAndRunParamsNonStreaming;
-  export import ThreadCreateAndRunParamsStreaming = ThreadsAPI.ThreadCreateAndRunParamsStreaming;
-  export import ThreadCreateAndRunPollParams = ThreadsAPI.ThreadCreateAndRunPollParams;
-  export import ThreadCreateAndRunStreamParams = ThreadsAPI.ThreadCreateAndRunStreamParams;
+Beta.VectorStores = VectorStores;
+Beta.VectorStoresPage = VectorStoresPage;
+Beta.Assistants = Assistants;
+Beta.AssistantsPage = AssistantsPage;
+Beta.Threads = Threads;
+
+export declare namespace Beta {
+  export {
+    VectorStores as VectorStores,
+    type AutoFileChunkingStrategyParam as AutoFileChunkingStrategyParam,
+    type FileChunkingStrategy as FileChunkingStrategy,
+    type FileChunkingStrategyParam as FileChunkingStrategyParam,
+    type OtherFileChunkingStrategyObject as OtherFileChunkingStrategyObject,
+    type StaticFileChunkingStrategy as StaticFileChunkingStrategy,
+    type StaticFileChunkingStrategyObject as StaticFileChunkingStrategyObject,
+    type StaticFileChunkingStrategyParam as StaticFileChunkingStrategyParam,
+    type VectorStore as VectorStore,
+    type VectorStoreDeleted as VectorStoreDeleted,
+    VectorStoresPage as VectorStoresPage,
+    type VectorStoreCreateParams as VectorStoreCreateParams,
+    type VectorStoreUpdateParams as VectorStoreUpdateParams,
+    type VectorStoreListParams as VectorStoreListParams,
+  };
+
+  export { Chat };
+
+  export {
+    Assistants as Assistants,
+    type Assistant as Assistant,
+    type AssistantDeleted as AssistantDeleted,
+    type AssistantStreamEvent as AssistantStreamEvent,
+    type AssistantTool as AssistantTool,
+    type CodeInterpreterTool as CodeInterpreterTool,
+    type FileSearchTool as FileSearchTool,
+    type FunctionTool as FunctionTool,
+    type MessageStreamEvent as MessageStreamEvent,
+    type RunStepStreamEvent as RunStepStreamEvent,
+    type RunStreamEvent as RunStreamEvent,
+    type ThreadStreamEvent as ThreadStreamEvent,
+    AssistantsPage as AssistantsPage,
+    type AssistantCreateParams as AssistantCreateParams,
+    type AssistantUpdateParams as AssistantUpdateParams,
+    type AssistantListParams as AssistantListParams,
+  };
+
+  export {
+    Threads as Threads,
+    type AssistantResponseFormatOption as AssistantResponseFormatOption,
+    type AssistantToolChoice as AssistantToolChoice,
+    type AssistantToolChoiceFunction as AssistantToolChoiceFunction,
+    type AssistantToolChoiceOption as AssistantToolChoiceOption,
+    type Thread as Thread,
+    type ThreadDeleted as ThreadDeleted,
+    type ThreadCreateParams as ThreadCreateParams,
+    type ThreadUpdateParams as ThreadUpdateParams,
+    type ThreadCreateAndRunParams as ThreadCreateAndRunParams,
+    type ThreadCreateAndRunParamsNonStreaming as ThreadCreateAndRunParamsNonStreaming,
+    type ThreadCreateAndRunParamsStreaming as ThreadCreateAndRunParamsStreaming,
+    type ThreadCreateAndRunPollParams,
+    type ThreadCreateAndRunStreamParams,
+  };
 }

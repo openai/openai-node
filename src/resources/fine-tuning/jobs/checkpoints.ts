@@ -3,7 +3,6 @@
 import { APIResource } from '../../../resource';
 import { isRequestOptions } from '../../../core';
 import * as Core from '../../../core';
-import * as CheckpointsAPI from './checkpoints';
 import { CursorPage, type CursorPageParams } from '../../../pagination';
 
 export class Checkpoints extends APIResource {
@@ -101,8 +100,12 @@ export namespace FineTuningJobCheckpoint {
 
 export interface CheckpointListParams extends CursorPageParams {}
 
-export namespace Checkpoints {
-  export import FineTuningJobCheckpoint = CheckpointsAPI.FineTuningJobCheckpoint;
-  export import FineTuningJobCheckpointsPage = CheckpointsAPI.FineTuningJobCheckpointsPage;
-  export import CheckpointListParams = CheckpointsAPI.CheckpointListParams;
+Checkpoints.FineTuningJobCheckpointsPage = FineTuningJobCheckpointsPage;
+
+export declare namespace Checkpoints {
+  export {
+    type FineTuningJobCheckpoint as FineTuningJobCheckpoint,
+    FineTuningJobCheckpointsPage as FineTuningJobCheckpointsPage,
+    type CheckpointListParams as CheckpointListParams,
+  };
 }

@@ -2,7 +2,6 @@
 
 import { APIResource } from '../../resource';
 import * as Core from '../../core';
-import * as TranscriptionsAPI from './transcriptions';
 import * as AudioAPI from './audio';
 
 export class Transcriptions extends APIResource {
@@ -205,15 +204,13 @@ export interface TranscriptionCreateParams<
   timestamp_granularities?: Array<'word' | 'segment'>;
 }
 
-export namespace Transcriptions {
-  export import Transcription = TranscriptionsAPI.Transcription;
-  export import TranscriptionSegment = TranscriptionsAPI.TranscriptionSegment;
-  export import TranscriptionVerbose = TranscriptionsAPI.TranscriptionVerbose;
-  export import TranscriptionWord = TranscriptionsAPI.TranscriptionWord;
-  export import TranscriptionCreateResponse = TranscriptionsAPI.TranscriptionCreateResponse;
-  export type TranscriptionCreateParams<
-    ResponseFormat extends AudioAPI.AudioResponseFormat | undefined =
-      | AudioAPI.AudioResponseFormat
-      | undefined,
-  > = TranscriptionsAPI.TranscriptionCreateParams<ResponseFormat>;
+export declare namespace Transcriptions {
+  export {
+    type Transcription as Transcription,
+    type TranscriptionSegment as TranscriptionSegment,
+    type TranscriptionVerbose as TranscriptionVerbose,
+    type TranscriptionWord as TranscriptionWord,
+    type TranscriptionCreateResponse as TranscriptionCreateResponse,
+    type TranscriptionCreateParams as TranscriptionCreateParams,
+  };
 }

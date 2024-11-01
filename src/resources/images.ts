@@ -2,7 +2,6 @@
 
 import { APIResource } from '../resource';
 import * as Core from '../core';
-import * as ImagesAPI from './images';
 
 export class Images extends APIResource {
   /**
@@ -207,11 +206,13 @@ export interface ImageGenerateParams {
   user?: string;
 }
 
-export namespace Images {
-  export import Image = ImagesAPI.Image;
-  export import ImageModel = ImagesAPI.ImageModel;
-  export import ImagesResponse = ImagesAPI.ImagesResponse;
-  export import ImageCreateVariationParams = ImagesAPI.ImageCreateVariationParams;
-  export import ImageEditParams = ImagesAPI.ImageEditParams;
-  export import ImageGenerateParams = ImagesAPI.ImageGenerateParams;
+export declare namespace Images {
+  export {
+    type Image as Image,
+    type ImageModel as ImageModel,
+    type ImagesResponse as ImagesResponse,
+    type ImageCreateVariationParams as ImageCreateVariationParams,
+    type ImageEditParams as ImageEditParams,
+    type ImageGenerateParams as ImageGenerateParams,
+  };
 }

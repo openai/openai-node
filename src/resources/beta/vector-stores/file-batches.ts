@@ -6,7 +6,6 @@ import { sleep } from '../../../core';
 import { Uploadable } from '../../../core';
 import { allSettledWithThrow } from '../../../lib/Util';
 import * as Core from '../../../core';
-import * as FileBatchesAPI from './file-batches';
 import * as FilesAPI from './files';
 import { VectorStoreFilesPage } from './files';
 import * as VectorStoresAPI from './vector-stores';
@@ -294,10 +293,12 @@ export interface FileBatchListFilesParams extends CursorPageParams {
   order?: 'asc' | 'desc';
 }
 
-export namespace FileBatches {
-  export import VectorStoreFileBatch = FileBatchesAPI.VectorStoreFileBatch;
-  export import FileBatchCreateParams = FileBatchesAPI.FileBatchCreateParams;
-  export import FileBatchListFilesParams = FileBatchesAPI.FileBatchListFilesParams;
+export declare namespace FileBatches {
+  export {
+    type VectorStoreFileBatch as VectorStoreFileBatch,
+    type FileBatchCreateParams as FileBatchCreateParams,
+    type FileBatchListFilesParams as FileBatchListFilesParams,
+  };
 }
 
 export { VectorStoreFilesPage };

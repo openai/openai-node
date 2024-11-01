@@ -2,9 +2,9 @@
 
 import { APIResource } from '../../resource';
 import * as Core from '../../core';
-import * as UploadsAPI from './uploads';
 import * as FilesAPI from '../files';
 import * as PartsAPI from './parts';
+import { PartCreateParams, Parts, UploadPart } from './parts';
 
 export class Uploads extends APIResource {
   parts: PartsAPI.Parts = new PartsAPI.Parts(this._client);
@@ -159,11 +159,14 @@ export interface UploadCompleteParams {
   md5?: string;
 }
 
-export namespace Uploads {
-  export import Upload = UploadsAPI.Upload;
-  export import UploadCreateParams = UploadsAPI.UploadCreateParams;
-  export import UploadCompleteParams = UploadsAPI.UploadCompleteParams;
-  export import Parts = PartsAPI.Parts;
-  export import UploadPart = PartsAPI.UploadPart;
-  export import PartCreateParams = PartsAPI.PartCreateParams;
+Uploads.Parts = Parts;
+
+export declare namespace Uploads {
+  export {
+    type Upload as Upload,
+    type UploadCreateParams as UploadCreateParams,
+    type UploadCompleteParams as UploadCompleteParams,
+  };
+
+  export { Parts as Parts, type UploadPart as UploadPart, type PartCreateParams as PartCreateParams };
 }
