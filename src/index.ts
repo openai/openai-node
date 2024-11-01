@@ -317,8 +317,8 @@ export class BaseOpenAI {
     error: Object | undefined,
     message: string | undefined,
     headers: Headers | undefined,
-  ) {
-    return APIError.generate(status, error, message, headers);
+  ): Errors.APIError {
+    return Errors.APIError.generate(status, error, message, headers);
   }
 
   buildURL<Req>(path: string, query: Req | null | undefined): string {
@@ -446,7 +446,7 @@ export class BaseOpenAI {
     debug('request', url, options, req.headers);
 
     if (options.signal?.aborted) {
-      throw new APIUserAbortError();
+      throw new Errors.APIUserAbortError();
     }
 
     const controller = new AbortController();
@@ -454,15 +454,15 @@ export class BaseOpenAI {
 
     if (response instanceof Error) {
       if (options.signal?.aborted) {
-        throw new APIUserAbortError();
+        throw new Errors.APIUserAbortError();
       }
       if (retriesRemaining) {
         return this.retryRequest(options, retriesRemaining);
       }
       if (response.name === 'AbortError') {
-        throw new APIConnectionTimeoutError();
+        throw new Errors.APIConnectionTimeoutError();
       }
-      throw new APIConnectionError({ cause: response });
+      throw new Errors.APIConnectionError({ cause: response });
     }
 
     const responseHeaders = createResponseHeaders(response.headers);
@@ -758,19 +758,21 @@ export { APIPromise } from './internal/api-promise';
 export { type Response } from './internal/builtin-types';
 export { PagePromise } from './pagination';
 
-export const OpenAIError = Errors.OpenAIError;
-export const APIError = Errors.APIError;
-export const APIConnectionError = Errors.APIConnectionError;
-export const APIConnectionTimeoutError = Errors.APIConnectionTimeoutError;
-export const APIUserAbortError = Errors.APIUserAbortError;
-export const NotFoundError = Errors.NotFoundError;
-export const ConflictError = Errors.ConflictError;
-export const RateLimitError = Errors.RateLimitError;
-export const BadRequestError = Errors.BadRequestError;
-export const AuthenticationError = Errors.AuthenticationError;
-export const InternalServerError = Errors.InternalServerError;
-export const PermissionDeniedError = Errors.PermissionDeniedError;
-export const UnprocessableEntityError = Errors.UnprocessableEntityError;
+export {
+  OpenAIError,
+  APIError,
+  APIConnectionError,
+  APIConnectionTimeoutError,
+  APIUserAbortError,
+  NotFoundError,
+  ConflictError,
+  RateLimitError,
+  BadRequestError,
+  AuthenticationError,
+  InternalServerError,
+  PermissionDeniedError,
+  UnprocessableEntityError,
+} from './error';
 
 export import toFile = Uploads.toFile;
 

@@ -44,9 +44,9 @@ export abstract class AbstractPage<Item> implements AsyncIterable<Item> {
     return await this.#client.requestAPIList(this.constructor as any, nextOptions);
   }
 
-  async *iterPages() {
+  async *iterPages(): AsyncGenerator<this> {
     // eslint-disable-next-line @typescript-eslint/no-this-alias
-    let page: AbstractPage<Item> = this;
+    let page: this = this;
     yield page;
     while (page.hasNextPage()) {
       page = await page.getNextPage();
@@ -54,7 +54,7 @@ export abstract class AbstractPage<Item> implements AsyncIterable<Item> {
     }
   }
 
-  async *[Symbol.asyncIterator]() {
+  async *[Symbol.asyncIterator](): AsyncGenerator<Item> {
     for await (const page of this.iterPages()) {
       for (const item of page.getPaginatedItems()) {
         yield item;

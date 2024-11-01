@@ -23,7 +23,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
     this.controller = controller;
   }
 
-  static fromSSEResponse<Item>(response: Response, controller: AbortController) {
+  static fromSSEResponse<Item>(response: Response, controller: AbortController): Stream<Item> {
     let consumed = false;
 
     async function* iterator(): AsyncIterator<Item, any, undefined> {
@@ -91,7 +91,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
    * Generates a Stream from a newline-separated ReadableStream
    * where each item is a JSON value.
    */
-  static fromReadableStream<Item>(readableStream: ReadableStream, controller: AbortController) {
+  static fromReadableStream<Item>(readableStream: ReadableStream, controller: AbortController): Stream<Item> {
     let consumed = false;
 
     async function* iterLines(): AsyncGenerator<string, void, unknown> {
