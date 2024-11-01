@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.70.1 (2024-11-01)
+
+Full Changelog: [v4.70.0...v4.70.1](https://github.com/openai/openai-node/compare/v4.70.0...v4.70.1)
+
+### Bug Fixes
+
+* don't require deno to run build-deno ([#1167](https://github.com/openai/openai-node/issues/1167)) ([9d857bc](https://github.com/openai/openai-node/commit/9d857bc531a0bb3939f7660e49b31ccc38f60dd3))
+
 ## 4.70.0 (2024-11-01)
 
 Full Changelog: [v4.69.0...v4.70.0](https://github.com/openai/openai-node/compare/v4.69.0...v4.70.0)
