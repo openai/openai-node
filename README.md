@@ -1,6 +1,6 @@
 # OpenAI Node API Library
 
-[![NPM version](https://img.shields.io/npm/v/openai.svg)](https://npmjs.org/package/openai) ![npm bundle size](https://img.shields.io/bundlephobia/minzip/openai)
+[![NPM version](https://img.shields.io/npm/v/openai.svg)](https://npmjs.org/package/openai) ![npm bundle size](https://img.shields.io/bundlephobia/minzip/openai) [![JSR Version](https://jsr.io/badges/@openai/openai)](https://jsr.io/@openai/openai)
 
 This library provides convenient access to the OpenAI REST API from server-side TypeScript or JavaScript.
 
@@ -12,12 +12,12 @@ The REST API documentation can be found on [platform.openai.com](https://platfor
 npm install openai
 ```
 
-You can import in Deno via:
+You can also import from jsr:
 
 <!-- x-release-please-start-version -->
 
 ```ts
-import OpenAI from 'https://deno.land/x/openai@v4.47.1/mod.ts';
+import OpenAI from 'jsr:@openai/openai';
 ```
 
 <!-- x-release-please-end -->
