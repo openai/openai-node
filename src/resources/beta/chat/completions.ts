@@ -3,29 +3,14 @@
 import * as Core from '../../../core';
 import { APIResource } from '../../../resource';
 import { ChatCompletionRunner, ChatCompletionFunctionRunnerParams } from '../../../lib/ChatCompletionRunner';
-export { ChatCompletionRunner, ChatCompletionFunctionRunnerParams } from '../../../lib/ChatCompletionRunner';
 import {
   ChatCompletionStreamingRunner,
   ChatCompletionStreamingFunctionRunnerParams,
 } from '../../../lib/ChatCompletionStreamingRunner';
-export {
-  ChatCompletionStreamingRunner,
-  ChatCompletionStreamingFunctionRunnerParams,
-} from '../../../lib/ChatCompletionStreamingRunner';
 import { BaseFunctionsArgs } from '../../../lib/RunnableFunction';
-export {
-  RunnableFunction,
-  RunnableFunctions,
-  RunnableFunctionWithParse,
-  RunnableFunctionWithoutParse,
-  ParsingFunction,
-  ParsingToolFunction,
-} from '../../../lib/RunnableFunction';
 import { RunnerOptions } from '../../../lib/AbstractChatCompletionRunner';
 import { ChatCompletionToolRunnerParams } from '../../../lib/ChatCompletionRunner';
-export { ChatCompletionToolRunnerParams } from '../../../lib/ChatCompletionRunner';
 import { ChatCompletionStreamingToolRunnerParams } from '../../../lib/ChatCompletionStreamingRunner';
-export { ChatCompletionStreamingToolRunnerParams } from '../../../lib/ChatCompletionStreamingRunner';
 import { ChatCompletionStream, type ChatCompletionStreamParams } from '../../../lib/ChatCompletionStream';
 import {
   ChatCompletion,
@@ -34,7 +19,26 @@ import {
   ChatCompletionMessageToolCall,
 } from '../../chat/completions';
 import { ExtractParsedContentFromParams, parseChatCompletion, validateInputTools } from '../../../lib/parser';
+
+export {
+  ChatCompletionStreamingRunner,
+  type ChatCompletionStreamingFunctionRunnerParams,
+} from '../../../lib/ChatCompletionStreamingRunner';
+export {
+  type RunnableFunction,
+  type RunnableFunctions,
+  type RunnableFunctionWithParse,
+  type RunnableFunctionWithoutParse,
+  ParsingFunction,
+  ParsingToolFunction,
+} from '../../../lib/RunnableFunction';
+export { type ChatCompletionToolRunnerParams } from '../../../lib/ChatCompletionRunner';
+export { type ChatCompletionStreamingToolRunnerParams } from '../../../lib/ChatCompletionStreamingRunner';
 export { ChatCompletionStream, type ChatCompletionStreamParams } from '../../../lib/ChatCompletionStream';
+export {
+  ChatCompletionRunner,
+  type ChatCompletionFunctionRunnerParams,
+} from '../../../lib/ChatCompletionRunner';
 
 export interface ParsedFunction extends ChatCompletionMessageToolCall.Function {
   parsed_arguments?: unknown;
