@@ -1,5 +1,14 @@
 # Changelog
 
+## 4.70.2 (2024-11-01)
+
+Full Changelog: [v4.70.1...v4.70.2](https://github.com/openai/openai-node/compare/v4.70.1...v4.70.2)
+
+### Bug Fixes
+
+* add permissions to github workflow ([ee75e00](https://github.com/openai/openai-node/commit/ee75e00b0fbf82553b219ee8948a8077e9c26a24))
+* skip deno ecosystem test ([5b181b0](https://github.com/openai/openai-node/commit/5b181b01b62139f8da35d426914c82b8425af141))
+
 ## 4.70.1 (2024-11-01)
 
 Full Changelog: [v4.70.0...v4.70.1](https://github.com/openai/openai-node/compare/v4.70.0...v4.70.1)
