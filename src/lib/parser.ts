@@ -13,7 +13,7 @@ import {
   ParsedFunctionToolCall,
 } from '../resources/beta/chat/completions';
 import { ResponseFormatJSONSchema } from '../resources/shared';
-import { ContentFilterFinishReasonError, LengthFinishReasonError, OpenAIError } from 'openai/error';
+import { ContentFilterFinishReasonError, LengthFinishReasonError, OpenAIError } from '../error';
 
 type AnyChatCompletionCreateParams =
   | ChatCompletionCreateParams

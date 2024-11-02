@@ -1,7 +1,7 @@
 import {
   type ChatCompletionMessageParam,
   type ChatCompletionCreateParamsNonStreaming,
-} from 'openai/resources/chat/completions';
+} from '../resources/chat/completions';
 import { type RunnableFunctions, type BaseFunctionsArgs, RunnableTools } from './RunnableFunction';
 import {
   AbstractChatCompletionRunner,
@@ -9,8 +9,8 @@ import {
   RunnerOptions,
 } from './AbstractChatCompletionRunner';
 import { isAssistantMessage } from './chatCompletionUtils';
-import OpenAI from 'openai/index';
-import { AutoParseableTool } from 'openai/lib/parser';
+import OpenAI from '../index';
+import { AutoParseableTool } from '../lib/parser';
 
 export interface ChatCompletionRunnerEvents extends AbstractChatCompletionRunnerEvents {
   content: (content: string) => void;

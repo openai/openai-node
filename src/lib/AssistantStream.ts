@@ -8,9 +8,9 @@ import {
   TextDelta,
   MessageDelta,
   MessageContent,
-} from 'openai/resources/beta/threads/messages';
-import * as Core from 'openai/core';
-import { RequestOptions } from 'openai/core';
+} from '../resources/beta/threads/messages';
+import * as Core from '../core';
+import { RequestOptions } from '../core';
 import {
   Run,
   RunCreateParamsBase,
@@ -18,18 +18,18 @@ import {
   Runs,
   RunSubmitToolOutputsParamsBase,
   RunSubmitToolOutputsParamsStreaming,
-} from 'openai/resources/beta/threads/runs/runs';
-import { type ReadableStream } from 'openai/_shims/index';
-import { Stream } from 'openai/streaming';
-import { APIUserAbortError, OpenAIError } from 'openai/error';
+} from '../resources/beta/threads/runs/runs';
+import { type ReadableStream } from '../_shims/index';
+import { Stream } from '../streaming';
+import { APIUserAbortError, OpenAIError } from '../error';
 import {
   AssistantStreamEvent,
   MessageStreamEvent,
   RunStepStreamEvent,
   RunStreamEvent,
-} from 'openai/resources/beta/assistants';
-import { RunStep, RunStepDelta, ToolCall, ToolCallDelta } from 'openai/resources/beta/threads/runs/steps';
-import { ThreadCreateAndRunParamsBase, Threads } from 'openai/resources/beta/threads/threads';
+} from '../resources/beta/assistants';
+import { RunStep, RunStepDelta, ToolCall, ToolCallDelta } from '../resources/beta/threads/runs/steps';
+import { ThreadCreateAndRunParamsBase, Threads } from '../resources/beta/threads/threads';
 import { BaseEvents, EventStream } from './EventStream';
 
 export interface AssistantStreamEvents extends BaseEvents {
@@ -192,7 +192,7 @@ export class AssistantStream
     runs: Runs,
     params: RunSubmitToolOutputsParamsStream,
     options: RequestOptions | undefined,
-  ) {
+  ): AssistantStream {
     const runner = new AssistantStream();
     runner._run(() =>
       runner._runToolAssistantStream(threadId, runId, runs, params, {
@@ -238,7 +238,7 @@ export class AssistantStream
     params: ThreadCreateAndRunParamsBaseStream,
     thread: Threads,
     options?: RequestOptions,
-  ) {
+  ): AssistantStream {
     const runner = new AssistantStream();
     runner._run(() =>
       runner._threadAssistantStream(params, thread, {
@@ -254,7 +254,7 @@ export class AssistantStream
     runs: Runs,
     params: RunCreateParamsBaseStream,
     options?: RequestOptions,
-  ) {
+  ): AssistantStream {
     const runner = new AssistantStream();
     runner._run(() =>
       runner._runAssistantStream(threadId, runs, params, {

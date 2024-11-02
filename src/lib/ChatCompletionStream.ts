@@ -1,10 +1,10 @@
-import * as Core from 'openai/core';
+import * as Core from '../core';
 import {
   OpenAIError,
   APIUserAbortError,
   LengthFinishReasonError,
   ContentFilterFinishReasonError,
-} from 'openai/error';
+} from '../error';
 import {
   ChatCompletionTokenLogprob,
   type ChatCompletion,
@@ -12,15 +12,15 @@ import {
   type ChatCompletionCreateParams,
   type ChatCompletionCreateParamsStreaming,
   type ChatCompletionCreateParamsBase,
-} from 'openai/resources/chat/completions';
+} from '../resources/chat/completions';
 import {
   AbstractChatCompletionRunner,
   type AbstractChatCompletionRunnerEvents,
 } from './AbstractChatCompletionRunner';
-import { type ReadableStream } from 'openai/_shims/index';
-import { Stream } from 'openai/streaming';
-import OpenAI from 'openai/index';
-import { ParsedChatCompletion } from 'openai/resources/beta/chat/completions';
+import { type ReadableStream } from '../_shims/index';
+import { Stream } from '../streaming';
+import OpenAI from '../index';
+import { ParsedChatCompletion } from '../resources/beta/chat/completions';
 import {
   AutoParseableResponseFormat,
   hasAutoParseableInput,
@@ -28,7 +28,7 @@ import {
   isAutoParsableTool,
   maybeParseChatCompletion,
   shouldParseToolCall,
-} from 'openai/lib/parser';
+} from '../lib/parser';
 import { partialParse } from '../_vendor/partial-json-parser/parser';
 
 export interface ContentDeltaEvent {
