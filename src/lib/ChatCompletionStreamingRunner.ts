@@ -1,13 +1,13 @@
 import {
   type ChatCompletionChunk,
   type ChatCompletionCreateParamsStreaming,
-} from 'openai/resources/chat/completions';
+} from '../resources/chat/completions';
 import { RunnerOptions, type AbstractChatCompletionRunnerEvents } from './AbstractChatCompletionRunner';
-import { type ReadableStream } from 'openai/_shims/index';
+import { type ReadableStream } from '../_shims/index';
 import { RunnableTools, type BaseFunctionsArgs, type RunnableFunctions } from './RunnableFunction';
 import { ChatCompletionSnapshot, ChatCompletionStream } from './ChatCompletionStream';
-import OpenAI from 'openai/index';
-import { AutoParseableTool } from 'openai/lib/parser';
+import OpenAI from '../index';
+import { AutoParseableTool } from '../lib/parser';
 
 export interface ChatCompletionStreamEvents extends AbstractChatCompletionRunnerEvents {
   content: (contentDelta: string, contentSnapshot: string) => void;
