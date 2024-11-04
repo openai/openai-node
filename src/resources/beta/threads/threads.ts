@@ -176,8 +176,8 @@ export class Threads extends APIResource {
 
 /**
  * Specifies the format that the model must output. Compatible with
- * [GPT-4o](https://platform.openai.com/docs/models/gpt-4o),
- * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4),
+ * [GPT-4o](https://platform.openai.com/docs/models#gpt-4o),
+ * [GPT-4 Turbo](https://platform.openai.com/docs/models#gpt-4-turbo-and-gpt-4),
  * and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
  *
  * Setting to `{ "type": "json_schema", "json_schema": {...} }` enables Structured
@@ -565,15 +565,15 @@ export interface ThreadCreateAndRunParamsBase {
 
   /**
    * Whether to enable
-   * [parallel function calling](https://platform.openai.com/docs/guides/function-calling/parallel-function-calling)
+   * [parallel function calling](https://platform.openai.com/docs/guides/function-calling#configuring-parallel-function-calling)
    * during tool use.
    */
   parallel_tool_calls?: boolean;
 
   /**
    * Specifies the format that the model must output. Compatible with
-   * [GPT-4o](https://platform.openai.com/docs/models/gpt-4o),
-   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4),
+   * [GPT-4o](https://platform.openai.com/docs/models#gpt-4o),
+   * [GPT-4 Turbo](https://platform.openai.com/docs/models#gpt-4-turbo-and-gpt-4),
    * and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
    *
    * Setting to `{ "type": "json_schema", "json_schema": {...} }` enables Structured

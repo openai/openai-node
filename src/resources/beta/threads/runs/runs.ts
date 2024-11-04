@@ -435,7 +435,7 @@ export interface Run {
 
   /**
    * Whether to enable
-   * [parallel function calling](https://platform.openai.com/docs/guides/function-calling/parallel-function-calling)
+   * [parallel function calling](https://platform.openai.com/docs/guides/function-calling#configuring-parallel-function-calling)
    * during tool use.
    */
   parallel_tool_calls: boolean;
@@ -448,8 +448,8 @@ export interface Run {
 
   /**
    * Specifies the format that the model must output. Compatible with
-   * [GPT-4o](https://platform.openai.com/docs/models/gpt-4o),
-   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4),
+   * [GPT-4o](https://platform.openai.com/docs/models#gpt-4o),
+   * [GPT-4 Turbo](https://platform.openai.com/docs/models#gpt-4-turbo-and-gpt-4),
    * and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
    *
    * Setting to `{ "type": "json_schema", "json_schema": {...} }` enables Structured
@@ -660,7 +660,7 @@ export interface RunCreateParamsBase {
    * search result content.
    *
    * See the
-   * [file search tool documentation](https://platform.openai.com/docs/assistants/tools/file-search/customizing-file-search-settings)
+   * [file search tool documentation](https://platform.openai.com/docs/assistants/tools/file-search#customizing-file-search-settings)
    * for more information.
    */
   include?: Array<StepsAPI.RunStepInclude>;
@@ -721,15 +721,15 @@ export interface RunCreateParamsBase {
 
   /**
    * Body param: Whether to enable
-   * [parallel function calling](https://platform.openai.com/docs/guides/function-calling/parallel-function-calling)
+   * [parallel function calling](https://platform.openai.com/docs/guides/function-calling#configuring-parallel-function-calling)
    * during tool use.
    */
   parallel_tool_calls?: boolean;
 
   /**
    * Body param: Specifies the format that the model must output. Compatible with
-   * [GPT-4o](https://platform.openai.com/docs/models/gpt-4o),
-   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4),
+   * [GPT-4o](https://platform.openai.com/docs/models#gpt-4o),
+   * [GPT-4 Turbo](https://platform.openai.com/docs/models#gpt-4-turbo-and-gpt-4),
    * and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
    *
    * Setting to `{ "type": "json_schema", "json_schema": {...} }` enables Structured
@@ -909,8 +909,8 @@ export interface RunListParams extends CursorPageParams {
   /**
    * A cursor for use in pagination. `before` is an object ID that defines your place
    * in the list. For instance, if you make a list request and receive 100 objects,
-   * ending with obj_foo, your subsequent call can include before=obj_foo in order to
-   * fetch the previous page of the list.
+   * starting with obj_foo, your subsequent call can include before=obj_foo in order
+   * to fetch the previous page of the list.
    */
   before?: string;
 
