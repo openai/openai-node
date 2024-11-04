@@ -304,7 +304,7 @@ export interface FineTuningJobWandbIntegrationObject {
 export interface JobCreateParams {
   /**
    * The name of the model to fine-tune. You can select one of the
-   * [supported models](https://platform.openai.com/docs/guides/fine-tuning/which-models-can-be-fine-tuned).
+   * [supported models](https://platform.openai.com/docs/guides/fine-tuning#which-models-can-be-fine-tuned).
    */
   model: (string & {}) | 'babbage-002' | 'davinci-002' | 'gpt-3.5-turbo' | 'gpt-4o-mini';
 

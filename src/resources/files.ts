@@ -3,7 +3,7 @@
 import { APIResource } from '../resource';
 import { isRequestOptions } from '../core';
 import * as Core from '../core';
-import { Page } from '../pagination';
+import { CursorPage, type CursorPageParams } from '../pagination';
 import { type Response } from '../_shims/index';
 
 export class Files extends APIResource {
@@ -42,7 +42,7 @@ export class Files extends APIResource {
   }
 
   /**
-   * Returns a list of files that belong to the user's organization.
+   * Returns a list of files.
    */
   list(query?: FileListParams, options?: Core.RequestOptions): Core.PagePromise<FileObjectsPage, FileObject>;
   list(options?: Core.RequestOptions): Core.PagePromise<FileObjectsPage, FileObject>;
@@ -83,10 +83,7 @@ export class Files extends APIResource {
   }
 }
 
-/**
- * Note: no pagination actually occurs yet, this is for forwards-compatibility.
- */
-export class FileObjectsPage extends Page<FileObject> {}
+export class FileObjectsPage extends CursorPage<FileObject> {}
 
 export type FileContent = string;
 
@@ -185,7 +182,13 @@ export interface FileCreateParams {
   purpose: FilePurpose;
 }
 
-export interface FileListParams {
+export interface FileListParams extends CursorPageParams {
+  /**
+   * Sort order by the `created_at` timestamp of the objects. `asc` for ascending
+   * order and `desc` for descending order.
+   */
+  order?: 'asc' | 'desc';
+
   /**
    * Only return files with the given purpose.
    */
