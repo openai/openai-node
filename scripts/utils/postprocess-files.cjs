@@ -123,8 +123,8 @@ async function postprocess() {
       }
       if (importPath.startsWith('.')) {
         // add explicit file extensions to relative imports
-        const { dir, name } = path.parse(importPath);
-        const ext = /\.mjs$/.test(file) ? '.mjs' : '.js';
+        let { dir, name, ext } = path.parse(importPath);
+        if (!ext) ext = /\.mjs$/.test(file) ? '.mjs' : '.js';
         return `${dir}/${name}${ext}`;
       }
       return importPath;

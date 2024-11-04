@@ -2,6 +2,7 @@ import { type RequestOptions } from './internal/request-options';
 import { type FilePropertyBag } from './internal/builtin-types';
 import { isFsReadStreamLike, type FsReadStreamLike } from './internal/shims';
 import { MultipartBody } from './internal/MultipartBody';
+import './internal/polyfill/file.node.js';
 
 type BlobLikePart = string | ArrayBuffer | ArrayBufferView | BlobLike | Uint8Array | DataView;
 export type BlobPart = string | ArrayBuffer | ArrayBufferView | Blob | Uint8Array | DataView;
@@ -92,9 +93,7 @@ export type ToFileInput = Uploadable | Exclude<BlobLikePart, string> | AsyncIter
 function makeFile(fileBits: BlobPart[], fileName: string, options?: FilePropertyBag): FileLike {
   const File = (globalThis as any).File as typeof FileClass | undefined;
   if (typeof File === 'undefined') {
-    throw new Error(
-      '`File` is not defined as a global which is required for file uploads; https://github.com/stainless-sdks/openai-typescript/tree/main#how-do-i-setup-file-uploads-in-nodejs',
-    );
+    throw new Error('`File` is not defined as a global which is required for file uploads');
   }
 
   return new File(fileBits, fileName, options);

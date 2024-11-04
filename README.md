@@ -586,25 +586,6 @@ await client.models.list({
 
 ## Frequently Asked Questions
 
-### How do I setup file uploads in Node.js?
-
-In node.js v18 & v19, the `File` class isn't defined as a global which means you'll need to polyfill it to make any file uploads with this library.
-
-We provide a polyfill for `'node:buffer'.File` that you can import:
-
-```ts
-import 'openai/polyfill/node-file';
-```
-
-Or you could polyfill `File` yourself:
-
-```ts
-import { File } from 'node:buffer';
-
-// @ts-ignore
-globalThis.File = File;
-```
-
 ## Semantic versioning
 
 This package generally follows [SemVer](https://semver.org/spec/v2.0.0.html) conventions, though certain backwards-incompatible changes may be released as minor versions:
