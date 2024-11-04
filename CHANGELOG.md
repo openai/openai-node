@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.70.3 (2024-11-04)
+
+Full Changelog: [v4.70.2...v4.70.3](https://github.com/openai/openai-node/compare/v4.70.2...v4.70.3)
+
+### Bug Fixes
+
+* change streaming helper imports to be relative ([e73b7cf](https://github.com/openai/openai-node/commit/e73b7cf84272bd02a39a67795d49db23db2d970f))
+
 ## 4.70.2 (2024-11-01)
 
 Full Changelog: [v4.70.1...v4.70.2](https://github.com/openai/openai-node/compare/v4.70.1...v4.70.2)
