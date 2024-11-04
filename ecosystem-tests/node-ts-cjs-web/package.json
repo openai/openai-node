@@ -13,7 +13,7 @@
     "tsconfig-paths": "^4.0.0"
   },
   "devDependencies": {
-    "@types/node": "^17.0.9",
+    "@types/node": "^18.0.0",
     "@types/node-fetch": "^2.6.1",
     "fastest-levenshtein": "^1.0.16",
     "formdata-polyfill": "^4.0.10",

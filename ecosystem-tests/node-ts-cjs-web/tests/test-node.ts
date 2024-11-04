@@ -1,7 +1,8 @@
 import OpenAI, { toFile } from 'openai';
 import { distance } from 'fastest-levenshtein';
 import { ChatCompletion } from 'openai/resources/chat/completions';
-import 'openai/polyfill/node-file';
+import { File } from 'node:buffer';
+if (!(globalThis as any).File) (globalThis as any).File = File;
 
 const url = 'https://audio-samples.github.io/samples/mp3/blizzard_biased/sample-1.mp3';
 const filename = 'sample-1.mp3';
@@ -103,6 +104,7 @@ if (typeof File !== 'undefined') {
   it('handles builtinFile', async function () {
     const file = await fetch(url)
       .then((x) => x.arrayBuffer())
+      // @ts-ignore
       .then((x) => new File([x], filename));
 
     const result = await client.audio.transcriptions.create({ file, model });
