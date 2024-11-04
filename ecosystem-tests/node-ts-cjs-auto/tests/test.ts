@@ -173,7 +173,7 @@ it('handles builtinFile', async function () {
       (x) =>
         new File(
           [
-            // @ts-expect-error array buffer can't be passed to File at the type-level
+            // @ts-ignore array buffer can't be passed to File at the type-level
             x,
           ],
           filename,
