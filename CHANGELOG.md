@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.71.0 (2024-11-04)
+
+Full Changelog: [v4.70.3...v4.71.0](https://github.com/openai/openai-node/compare/v4.70.3...v4.71.0)
+
+### Features
+
+* **api:** add support for predicted outputs ([#1172](https://github.com/openai/openai-node/issues/1172)) ([08a7bb4](https://github.com/openai/openai-node/commit/08a7bb4d4b751aeed9655bfcb9fa27fc79a767c4))
+
 ## 4.70.3 (2024-11-04)
 
 Full Changelog: [v4.70.2...v4.70.3](https://github.com/openai/openai-node/compare/v4.70.2...v4.70.3)
