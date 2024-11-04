@@ -1,7 +1,7 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../resource';
-import { Page, PagePromise } from '../pagination';
+import { CursorPage, type CursorPageParams, PagePromise } from '../pagination';
 import { type Uploadable, multipartFormRequestOptions } from '../uploads';
 import { APIPromise } from '../internal/api-promise';
 import { RequestOptions } from '../internal/request-options';
@@ -44,13 +44,13 @@ export class Files extends APIResource {
   }
 
   /**
-   * Returns a list of files that belong to the user's organization.
+   * Returns a list of files.
    */
   list(
     query: FileListParams | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<FileObjectsPage, FileObject> {
-    return this._client.getAPIList('/files', Page<FileObject>, { query, ...options });
+    return this._client.getAPIList('/files', CursorPage<FileObject>, { query, ...options });
   }
 
   /**
@@ -106,8 +106,7 @@ export class Files extends APIResource {
   }
 }
 
-// Note: no pagination actually occurs yet, this is for forwards-compatibility.
-export type FileObjectsPage = Page<FileObject>;
+export type FileObjectsPage = CursorPage<FileObject>;
 
 export type FileContent = string;
 
@@ -206,7 +205,13 @@ export interface FileCreateParams {
   purpose: FilePurpose;
 }
 
-export interface FileListParams {
+export interface FileListParams extends CursorPageParams {
+  /**
+   * Sort order by the `created_at` timestamp of the objects. `asc` for ascending
+   * order and `desc` for descending order.
+   */
+  order?: 'asc' | 'desc';
+
   /**
    * Only return files with the given purpose.
    */

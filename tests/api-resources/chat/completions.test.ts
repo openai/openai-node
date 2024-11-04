@@ -38,6 +38,7 @@ describe('resource completions', () => {
       modalities: ['text', 'audio'],
       n: 1,
       parallel_tool_calls: true,
+      prediction: { content: 'string', type: 'content' },
       presence_penalty: -2,
       response_format: { type: 'text' },
       seed: -9007199254740991,

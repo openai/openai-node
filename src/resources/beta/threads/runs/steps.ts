@@ -677,7 +677,7 @@ export interface StepRetrieveParams {
    * search result content.
    *
    * See the
-   * [file search tool documentation](https://platform.openai.com/docs/assistants/tools/file-search/customizing-file-search-settings)
+   * [file search tool documentation](https://platform.openai.com/docs/assistants/tools/file-search#customizing-file-search-settings)
    * for more information.
    */
   include?: Array<RunStepInclude>;
@@ -692,7 +692,7 @@ export interface StepListParams extends CursorPageParams {
   /**
    * Query param: A cursor for use in pagination. `before` is an object ID that
    * defines your place in the list. For instance, if you make a list request and
-   * receive 100 objects, ending with obj_foo, your subsequent call can include
+   * receive 100 objects, starting with obj_foo, your subsequent call can include
    * before=obj_foo in order to fetch the previous page of the list.
    */
   before?: string;
@@ -704,7 +704,7 @@ export interface StepListParams extends CursorPageParams {
    * search result content.
    *
    * See the
-   * [file search tool documentation](https://platform.openai.com/docs/assistants/tools/file-search/customizing-file-search-settings)
+   * [file search tool documentation](https://platform.openai.com/docs/assistants/tools/file-search#customizing-file-search-settings)
    * for more information.
    */
   include?: Array<RunStepInclude>;

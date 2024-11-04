@@ -109,8 +109,8 @@ export interface Assistant {
    * ID of the model to use. You can use the
    * [List models](https://platform.openai.com/docs/api-reference/models/list) API to
    * see all of your available models, or see our
-   * [Model overview](https://platform.openai.com/docs/models/overview) for
-   * descriptions of them.
+   * [Model overview](https://platform.openai.com/docs/models) for descriptions of
+   * them.
    */
   model: string;
 
@@ -133,8 +133,8 @@ export interface Assistant {
 
   /**
    * Specifies the format that the model must output. Compatible with
-   * [GPT-4o](https://platform.openai.com/docs/models/gpt-4o),
-   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4),
+   * [GPT-4o](https://platform.openai.com/docs/models#gpt-4o),
+   * [GPT-4 Turbo](https://platform.openai.com/docs/models#gpt-4-turbo-and-gpt-4),
    * and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
    *
    * Setting to `{ "type": "json_schema", "json_schema": {...} }` enables Structured
@@ -608,7 +608,7 @@ export namespace AssistantStreamEvent {
 
   /**
    * Occurs when an
-   * [error](https://platform.openai.com/docs/guides/error-codes/api-errors) occurs.
+   * [error](https://platform.openai.com/docs/guides/error-codes#api-errors) occurs.
    * This can happen due to an internal server error or a timeout.
    */
   export interface ErrorEvent {
@@ -651,7 +651,7 @@ export namespace FileSearchTool {
      *
      * Note that the file search tool may output fewer than `max_num_results` results.
      * See the
-     * [file search tool documentation](https://platform.openai.com/docs/assistants/tools/file-search/customizing-file-search-settings)
+     * [file search tool documentation](https://platform.openai.com/docs/assistants/tools/file-search#customizing-file-search-settings)
      * for more information.
      */
     max_num_results?: number;
@@ -661,7 +661,7 @@ export namespace FileSearchTool {
      * will use the `auto` ranker and a score_threshold of 0.
      *
      * See the
-     * [file search tool documentation](https://platform.openai.com/docs/assistants/tools/file-search/customizing-file-search-settings)
+     * [file search tool documentation](https://platform.openai.com/docs/assistants/tools/file-search#customizing-file-search-settings)
      * for more information.
      */
     ranking_options?: FileSearch.RankingOptions;
@@ -673,7 +673,7 @@ export namespace FileSearchTool {
      * will use the `auto` ranker and a score_threshold of 0.
      *
      * See the
-     * [file search tool documentation](https://platform.openai.com/docs/assistants/tools/file-search/customizing-file-search-settings)
+     * [file search tool documentation](https://platform.openai.com/docs/assistants/tools/file-search#customizing-file-search-settings)
      * for more information.
      */
     export interface RankingOptions {
@@ -1088,8 +1088,8 @@ export interface AssistantCreateParams {
    * ID of the model to use. You can use the
    * [List models](https://platform.openai.com/docs/api-reference/models/list) API to
    * see all of your available models, or see our
-   * [Model overview](https://platform.openai.com/docs/models/overview) for
-   * descriptions of them.
+   * [Model overview](https://platform.openai.com/docs/models) for descriptions of
+   * them.
    */
   model: (string & {}) | ChatAPI.ChatModel;
 
@@ -1119,8 +1119,8 @@ export interface AssistantCreateParams {
 
   /**
    * Specifies the format that the model must output. Compatible with
-   * [GPT-4o](https://platform.openai.com/docs/models/gpt-4o),
-   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4),
+   * [GPT-4o](https://platform.openai.com/docs/models#gpt-4o),
+   * [GPT-4 Turbo](https://platform.openai.com/docs/models#gpt-4-turbo-and-gpt-4),
    * and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
    *
    * Setting to `{ "type": "json_schema", "json_schema": {...} }` enables Structured
@@ -1265,8 +1265,8 @@ export interface AssistantUpdateParams {
    * ID of the model to use. You can use the
    * [List models](https://platform.openai.com/docs/api-reference/models/list) API to
    * see all of your available models, or see our
-   * [Model overview](https://platform.openai.com/docs/models/overview) for
-   * descriptions of them.
+   * [Model overview](https://platform.openai.com/docs/models) for descriptions of
+   * them.
    */
   model?: string;
 
@@ -1277,8 +1277,8 @@ export interface AssistantUpdateParams {
 
   /**
    * Specifies the format that the model must output. Compatible with
-   * [GPT-4o](https://platform.openai.com/docs/models/gpt-4o),
-   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4),
+   * [GPT-4o](https://platform.openai.com/docs/models#gpt-4o),
+   * [GPT-4 Turbo](https://platform.openai.com/docs/models#gpt-4-turbo-and-gpt-4),
    * and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
    *
    * Setting to `{ "type": "json_schema", "json_schema": {...} }` enables Structured
@@ -1371,8 +1371,8 @@ export interface AssistantListParams extends CursorPageParams {
   /**
    * A cursor for use in pagination. `before` is an object ID that defines your place
    * in the list. For instance, if you make a list request and receive 100 objects,
-   * ending with obj_foo, your subsequent call can include before=obj_foo in order to
-   * fetch the previous page of the list.
+   * starting with obj_foo, your subsequent call can include before=obj_foo in order
+   * to fetch the previous page of the list.
    */
   before?: string;
 
