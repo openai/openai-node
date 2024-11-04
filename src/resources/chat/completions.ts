@@ -469,7 +469,7 @@ export namespace ChatCompletionContentPartImage {
 
     /**
      * Specifies the detail level of the image. Learn more in the
-     * [Vision guide](https://platform.openai.com/docs/guides/vision/low-or-high-fidelity-image-understanding).
+     * [Vision guide](https://platform.openai.com/docs/guides/vision#low-or-high-fidelity-image-understanding).
      */
     detail?: 'auto' | 'low' | 'high';
   }
@@ -688,6 +688,25 @@ export namespace ChatCompletionNamedToolChoice {
 }
 
 /**
+ * Static predicted output content, such as the content of a text file that is
+ * being regenerated.
+ */
+export interface ChatCompletionPredictionContent {
+  /**
+   * The content that should be matched when generating a model response. If
+   * generated tokens would match this content, the entire model response can be
+   * returned much more quickly.
+   */
+  content: string | Array<ChatCompletionContentPartText>;
+
+  /**
+   * The type of the predicted content you want to provide. This type is currently
+   * always `content`.
+   */
+  type: 'content';
+}
+
+/**
  * The role of the author of a message
  */
 export type ChatCompletionRole = 'system' | 'user' | 'assistant' | 'tool' | 'function';
@@ -855,7 +874,7 @@ export interface ChatCompletionCreateParamsBase {
 
   /**
    * ID of the model to use. See the
-   * [model endpoint compatibility](https://platform.openai.com/docs/models/model-endpoint-compatibility)
+   * [model endpoint compatibility](https://platform.openai.com/docs/models#model-endpoint-compatibility)
    * table for details on which models work with the Chat API.
    */
   model: (string & {}) | ChatAPI.ChatModel;
@@ -872,7 +891,7 @@ export interface ChatCompletionCreateParamsBase {
    * existing frequency in the text so far, decreasing the model's likelihood to
    * repeat the same line verbatim.
    *
-   * [See more information about frequency and presence penalties.](https://platform.openai.com/docs/guides/text-generation/parameter-details)
+   * [See more information about frequency and presence penalties.](https://platform.openai.com/docs/guides/text-generation)
    */
   frequency_penalty?: number | null;
 
@@ -963,25 +982,31 @@ export interface ChatCompletionCreateParamsBase {
 
   /**
    * Whether to enable
-   * [parallel function calling](https://platform.openai.com/docs/guides/function-calling/parallel-function-calling)
+   * [parallel function calling](https://platform.openai.com/docs/guides/function-calling#configuring-parallel-function-calling)
    * during tool use.
    */
   parallel_tool_calls?: boolean;
+
+  /**
+   * Static predicted output content, such as the content of a text file that is
+   * being regenerated.
+   */
+  prediction?: ChatCompletionPredictionContent | null;
 
   /**
    * Number between -2.0 and 2.0. Positive values penalize new tokens based on
    * whether they appear in the text so far, increasing the model's likelihood to
    * talk about new topics.
    *
-   * [See more information about frequency and presence penalties.](https://platform.openai.com/docs/guides/text-generation/parameter-details)
+   * [See more information about frequency and presence penalties.](https://platform.openai.com/docs/guides/text-generation)
    */
   presence_penalty?: number | null;
 
   /**
    * An object specifying the format that the model must output. Compatible with
-   * [GPT-4o](https://platform.openai.com/docs/models/gpt-4o),
-   * [GPT-4o mini](https://platform.openai.com/docs/models/gpt-4o-mini),
-   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-and-gpt-4-turbo) and
+   * [GPT-4o](https://platform.openai.com/docs/models#gpt-4o),
+   * [GPT-4o mini](https://platform.openai.com/docs/models#gpt-4o-mini),
+   * [GPT-4 Turbo](https://platform.openai.com/docs/models#gpt-4-turbo-and-gpt-4) and
    * all GPT-3.5 Turbo models newer than `gpt-3.5-turbo-1106`.
    *
    * Setting to `{ "type": "json_schema", "json_schema": {...} }` enables Structured
@@ -1107,7 +1132,7 @@ export interface ChatCompletionCreateParamsBase {
   /**
    * A unique identifier representing your end-user, which can help OpenAI to monitor
    * and detect abuse.
-   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices/end-user-ids).
+   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#end-user-ids).
    */
   user?: string;
 }
@@ -1204,6 +1229,7 @@ export declare namespace Completions {
     type ChatCompletionMessageToolCall as ChatCompletionMessageToolCall,
     type ChatCompletionModality as ChatCompletionModality,
     type ChatCompletionNamedToolChoice as ChatCompletionNamedToolChoice,
+    type ChatCompletionPredictionContent as ChatCompletionPredictionContent,
     type ChatCompletionRole as ChatCompletionRole,
     type ChatCompletionStreamOptions as ChatCompletionStreamOptions,
     type ChatCompletionSystemMessageParam as ChatCompletionSystemMessageParam,

@@ -351,7 +351,7 @@ export interface ModerationCreateParams {
    * The content moderation model you would like to use. Learn more in
    * [the moderation guide](https://platform.openai.com/docs/guides/moderation), and
    * learn about available models
-   * [here](https://platform.openai.com/docs/models/moderation).
+   * [here](https://platform.openai.com/docs/models#moderation).
    */
   model?: (string & {}) | ModerationModel;
 }

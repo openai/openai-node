@@ -20,6 +20,7 @@ export {
   type ChatCompletionMessageToolCall,
   type ChatCompletionModality,
   type ChatCompletionNamedToolChoice,
+  type ChatCompletionPredictionContent,
   type ChatCompletionRole,
   type ChatCompletionStreamOptions,
   type ChatCompletionSystemMessageParam,
