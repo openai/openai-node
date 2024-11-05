@@ -14,6 +14,6 @@ for dir in dist-deno/_shims dist-deno/_shims/auto; do
     mv -- "$file" "${file%-deno.ts}.ts"
   done
 done
-for file in LICENSE CHANGELOG.md; do
+for file in README.md LICENSE CHANGELOG.md; do
   if [ -e "${file}" ]; then cp "${file}" dist-deno; fi
 done
