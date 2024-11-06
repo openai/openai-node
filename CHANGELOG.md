@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.71.1 (2024-11-06)
+
+Full Changelog: [v4.71.0...v4.71.1](https://github.com/openai/openai-node/compare/v4.71.0...v4.71.1)
+
+### Bug Fixes
+
+* change release please configuration for jsr.json ([#1174](https://github.com/openai/openai-node/issues/1174)) ([c39efba](https://github.com/openai/openai-node/commit/c39efba812209c8906315596cc0a56e54ae8590a))
+
 ## 4.71.0 (2024-11-04)
 
 Full Changelog: [v4.70.3...v4.71.0](https://github.com/openai/openai-node/compare/v4.70.3...v4.71.0)
