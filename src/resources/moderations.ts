@@ -1,7 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../resource';
-import * as ModerationsAPI from './moderations';
 import { APIPromise } from '../internal/api-promise';
 import { RequestOptions } from '../internal/request-options';
 
@@ -355,12 +354,14 @@ export interface ModerationCreateParams {
   model?: (string & {}) | ModerationModel;
 }
 
-export namespace Moderations {
-  export import Moderation = ModerationsAPI.Moderation;
-  export import ModerationImageURLInput = ModerationsAPI.ModerationImageURLInput;
-  export import ModerationModel = ModerationsAPI.ModerationModel;
-  export import ModerationMultiModalInput = ModerationsAPI.ModerationMultiModalInput;
-  export import ModerationTextInput = ModerationsAPI.ModerationTextInput;
-  export import ModerationCreateResponse = ModerationsAPI.ModerationCreateResponse;
-  export import ModerationCreateParams = ModerationsAPI.ModerationCreateParams;
+export declare namespace Moderations {
+  export {
+    type Moderation as Moderation,
+    type ModerationImageURLInput as ModerationImageURLInput,
+    type ModerationModel as ModerationModel,
+    type ModerationMultiModalInput as ModerationMultiModalInput,
+    type ModerationTextInput as ModerationTextInput,
+    type ModerationCreateResponse as ModerationCreateResponse,
+    type ModerationCreateParams as ModerationCreateParams,
+  };
 }

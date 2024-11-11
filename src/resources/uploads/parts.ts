@@ -1,7 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../resource';
-import * as PartsAPI from './parts';
 import { type Uploadable, multipartFormRequestOptions } from '../../uploads';
 import { APIPromise } from '../../internal/api-promise';
 import { RequestOptions } from '../../internal/request-options';
@@ -57,7 +56,6 @@ export interface PartCreateParams {
   data: Uploadable;
 }
 
-export namespace Parts {
-  export import UploadPart = PartsAPI.UploadPart;
-  export import PartCreateParams = PartsAPI.PartCreateParams;
+export declare namespace Parts {
+  export { type UploadPart as UploadPart, type PartCreateParams as PartCreateParams };
 }

@@ -10,7 +10,7 @@
     "baseUrl": "./",
     "paths": {
       "openai/*": ["src/*"],
-      "openai": ["src/index.ts"],
+      "openai": ["src/index.ts"]
     },
     "noEmit": true,
 

@@ -1,7 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../resource';
-import * as AssistantsAPI from './assistants';
 import * as Shared from '../shared';
 import * as ChatAPI from '../chat/chat';
 import * as MessagesAPI from './threads/messages';
@@ -1384,20 +1383,22 @@ export interface AssistantListParams extends CursorPageParams {
   order?: 'asc' | 'desc';
 }
 
-export namespace Assistants {
-  export import Assistant = AssistantsAPI.Assistant;
-  export import AssistantDeleted = AssistantsAPI.AssistantDeleted;
-  export import AssistantStreamEvent = AssistantsAPI.AssistantStreamEvent;
-  export import AssistantTool = AssistantsAPI.AssistantTool;
-  export import CodeInterpreterTool = AssistantsAPI.CodeInterpreterTool;
-  export import FileSearchTool = AssistantsAPI.FileSearchTool;
-  export import FunctionTool = AssistantsAPI.FunctionTool;
-  export import MessageStreamEvent = AssistantsAPI.MessageStreamEvent;
-  export import RunStepStreamEvent = AssistantsAPI.RunStepStreamEvent;
-  export import RunStreamEvent = AssistantsAPI.RunStreamEvent;
-  export import ThreadStreamEvent = AssistantsAPI.ThreadStreamEvent;
-  export type AssistantsPage = AssistantsAPI.AssistantsPage;
-  export import AssistantCreateParams = AssistantsAPI.AssistantCreateParams;
-  export import AssistantUpdateParams = AssistantsAPI.AssistantUpdateParams;
-  export import AssistantListParams = AssistantsAPI.AssistantListParams;
+export declare namespace Assistants {
+  export {
+    type Assistant as Assistant,
+    type AssistantDeleted as AssistantDeleted,
+    type AssistantStreamEvent as AssistantStreamEvent,
+    type AssistantTool as AssistantTool,
+    type CodeInterpreterTool as CodeInterpreterTool,
+    type FileSearchTool as FileSearchTool,
+    type FunctionTool as FunctionTool,
+    type MessageStreamEvent as MessageStreamEvent,
+    type RunStepStreamEvent as RunStepStreamEvent,
+    type RunStreamEvent as RunStreamEvent,
+    type ThreadStreamEvent as ThreadStreamEvent,
+    type AssistantsPage as AssistantsPage,
+    type AssistantCreateParams as AssistantCreateParams,
+    type AssistantUpdateParams as AssistantUpdateParams,
+    type AssistantListParams as AssistantListParams,
+  };
 }

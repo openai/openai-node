@@ -1,7 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../resource';
-import * as TranslationsAPI from './translations';
 import * as AudioAPI from './audio';
 import * as TranscriptionsAPI from './transcriptions';
 import { type Uploadable, multipartFormRequestOptions } from '../../uploads';
@@ -82,9 +81,11 @@ export interface TranslationCreateParams {
   temperature?: number;
 }
 
-export namespace Translations {
-  export import Translation = TranslationsAPI.Translation;
-  export import TranslationVerbose = TranslationsAPI.TranslationVerbose;
-  export import TranslationCreateResponse = TranslationsAPI.TranslationCreateResponse;
-  export import TranslationCreateParams = TranslationsAPI.TranslationCreateParams;
+export declare namespace Translations {
+  export {
+    type Translation as Translation,
+    type TranslationVerbose as TranslationVerbose,
+    type TranslationCreateResponse as TranslationCreateResponse,
+    type TranslationCreateParams as TranslationCreateParams,
+  };
 }

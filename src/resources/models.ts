@@ -1,7 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../resource';
-import * as ModelsAPI from './models';
 import { Page, PagePromise } from '../pagination';
 import { APIPromise } from '../internal/api-promise';
 import { RequestOptions } from '../internal/request-options';
@@ -68,8 +67,6 @@ export interface ModelDeleted {
   object: string;
 }
 
-export namespace Models {
-  export import Model = ModelsAPI.Model;
-  export import ModelDeleted = ModelsAPI.ModelDeleted;
-  export type ModelsPage = ModelsAPI.ModelsPage;
+export declare namespace Models {
+  export { type Model as Model, type ModelDeleted as ModelDeleted, type ModelsPage as ModelsPage };
 }

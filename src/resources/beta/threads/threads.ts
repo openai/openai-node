@@ -9,8 +9,62 @@ import * as Shared from '../../shared';
 import * as AssistantsAPI from '../assistants';
 import * as ChatAPI from '../../chat/chat';
 import * as MessagesAPI from './messages';
+import {
+  Annotation,
+  AnnotationDelta,
+  FileCitationAnnotation,
+  FileCitationDeltaAnnotation,
+  FilePathAnnotation,
+  FilePathDeltaAnnotation,
+  ImageFile,
+  ImageFileContentBlock,
+  ImageFileDelta,
+  ImageFileDeltaBlock,
+  ImageURL,
+  ImageURLContentBlock,
+  ImageURLDelta,
+  ImageURLDeltaBlock,
+  Message as MessagesAPIMessage,
+  MessageContent,
+  MessageContentDelta,
+  MessageContentPartParam,
+  MessageCreateParams,
+  MessageDeleteParams,
+  MessageDeleted,
+  MessageDelta,
+  MessageDeltaEvent,
+  MessageListParams,
+  MessageRetrieveParams,
+  MessageUpdateParams,
+  Messages,
+  MessagesPage,
+  RefusalContentBlock,
+  RefusalDeltaBlock,
+  Text,
+  TextContentBlock,
+  TextContentBlockParam,
+  TextDelta,
+  TextDeltaBlock,
+} from './messages';
 import * as VectorStoresAPI from '../vector-stores/vector-stores';
 import * as RunsAPI from './runs/runs';
+import {
+  RequiredActionFunctionToolCall,
+  Run,
+  RunCancelParams,
+  RunCreateParams,
+  RunCreateParamsNonStreaming,
+  RunCreateParamsStreaming,
+  RunListParams,
+  RunRetrieveParams,
+  RunStatus,
+  RunSubmitToolOutputsParams,
+  RunSubmitToolOutputsParamsNonStreaming,
+  RunSubmitToolOutputsParamsStreaming,
+  RunUpdateParams,
+  Runs,
+  RunsPage,
+} from './runs/runs';
 import { Stream } from '../../../streaming';
 
 export class Threads extends APIResource {
@@ -1491,68 +1545,79 @@ export namespace ThreadCreateAndRunStreamParams {
   }
 }
 
-export namespace Threads {
-  export import AssistantResponseFormatOption = ThreadsAPI.AssistantResponseFormatOption;
-  export import AssistantToolChoice = ThreadsAPI.AssistantToolChoice;
-  export import AssistantToolChoiceFunction = ThreadsAPI.AssistantToolChoiceFunction;
-  export import AssistantToolChoiceOption = ThreadsAPI.AssistantToolChoiceOption;
-  export import Thread = ThreadsAPI.Thread;
-  export import ThreadDeleted = ThreadsAPI.ThreadDeleted;
-  export import ThreadCreateParams = ThreadsAPI.ThreadCreateParams;
-  export import ThreadUpdateParams = ThreadsAPI.ThreadUpdateParams;
-  export import ThreadCreateAndRunParams = ThreadsAPI.ThreadCreateAndRunParams;
-  export import ThreadCreateAndRunParamsNonStreaming = ThreadsAPI.ThreadCreateAndRunParamsNonStreaming;
-  export import ThreadCreateAndRunParamsStreaming = ThreadsAPI.ThreadCreateAndRunParamsStreaming;
-  export import ThreadCreateAndRunPollParams = ThreadsAPI.ThreadCreateAndRunPollParams;
-  export import ThreadCreateAndRunStreamParams = ThreadsAPI.ThreadCreateAndRunStreamParams;
-  export import Runs = RunsAPI.Runs;
-  export import RequiredActionFunctionToolCall = RunsAPI.RequiredActionFunctionToolCall;
-  export import Run = RunsAPI.Run;
-  export import RunStatus = RunsAPI.RunStatus;
-  export type RunsPage = RunsAPI.RunsPage;
-  export import RunCreateParams = RunsAPI.RunCreateParams;
-  export import RunCreateParamsNonStreaming = RunsAPI.RunCreateParamsNonStreaming;
-  export import RunCreateParamsStreaming = RunsAPI.RunCreateParamsStreaming;
-  export import RunRetrieveParams = RunsAPI.RunRetrieveParams;
-  export import RunUpdateParams = RunsAPI.RunUpdateParams;
-  export import RunListParams = RunsAPI.RunListParams;
-  export import RunCancelParams = RunsAPI.RunCancelParams;
-  export import RunSubmitToolOutputsParams = RunsAPI.RunSubmitToolOutputsParams;
-  export import RunSubmitToolOutputsParamsNonStreaming = RunsAPI.RunSubmitToolOutputsParamsNonStreaming;
-  export import RunSubmitToolOutputsParamsStreaming = RunsAPI.RunSubmitToolOutputsParamsStreaming;
-  export import Messages = MessagesAPI.Messages;
-  export import Annotation = MessagesAPI.Annotation;
-  export import AnnotationDelta = MessagesAPI.AnnotationDelta;
-  export import FileCitationAnnotation = MessagesAPI.FileCitationAnnotation;
-  export import FileCitationDeltaAnnotation = MessagesAPI.FileCitationDeltaAnnotation;
-  export import FilePathAnnotation = MessagesAPI.FilePathAnnotation;
-  export import FilePathDeltaAnnotation = MessagesAPI.FilePathDeltaAnnotation;
-  export import ImageFile = MessagesAPI.ImageFile;
-  export import ImageFileContentBlock = MessagesAPI.ImageFileContentBlock;
-  export import ImageFileDelta = MessagesAPI.ImageFileDelta;
-  export import ImageFileDeltaBlock = MessagesAPI.ImageFileDeltaBlock;
-  export import ImageURL = MessagesAPI.ImageURL;
-  export import ImageURLContentBlock = MessagesAPI.ImageURLContentBlock;
-  export import ImageURLDelta = MessagesAPI.ImageURLDelta;
-  export import ImageURLDeltaBlock = MessagesAPI.ImageURLDeltaBlock;
-  export import Message = MessagesAPI.Message;
-  export import MessageContent = MessagesAPI.MessageContent;
-  export import MessageContentDelta = MessagesAPI.MessageContentDelta;
-  export import MessageContentPartParam = MessagesAPI.MessageContentPartParam;
-  export import MessageDeleted = MessagesAPI.MessageDeleted;
-  export import MessageDelta = MessagesAPI.MessageDelta;
-  export import MessageDeltaEvent = MessagesAPI.MessageDeltaEvent;
-  export import RefusalContentBlock = MessagesAPI.RefusalContentBlock;
-  export import RefusalDeltaBlock = MessagesAPI.RefusalDeltaBlock;
-  export import Text = MessagesAPI.Text;
-  export import TextContentBlock = MessagesAPI.TextContentBlock;
-  export import TextContentBlockParam = MessagesAPI.TextContentBlockParam;
-  export import TextDelta = MessagesAPI.TextDelta;
-  export import TextDeltaBlock = MessagesAPI.TextDeltaBlock;
-  export type MessagesPage = MessagesAPI.MessagesPage;
-  export import MessageCreateParams = MessagesAPI.MessageCreateParams;
-  export import MessageRetrieveParams = MessagesAPI.MessageRetrieveParams;
-  export import MessageUpdateParams = MessagesAPI.MessageUpdateParams;
-  export import MessageListParams = MessagesAPI.MessageListParams;
-  export import MessageDeleteParams = MessagesAPI.MessageDeleteParams;
+Threads.Runs = Runs;
+Threads.Messages = Messages;
+
+export declare namespace Threads {
+  export {
+    type AssistantResponseFormatOption as AssistantResponseFormatOption,
+    type AssistantToolChoice as AssistantToolChoice,
+    type AssistantToolChoiceFunction as AssistantToolChoiceFunction,
+    type AssistantToolChoiceOption as AssistantToolChoiceOption,
+    type Thread as Thread,
+    type ThreadDeleted as ThreadDeleted,
+    type ThreadCreateParams as ThreadCreateParams,
+    type ThreadUpdateParams as ThreadUpdateParams,
+    type ThreadCreateAndRunParams as ThreadCreateAndRunParams,
+    type ThreadCreateAndRunParamsNonStreaming as ThreadCreateAndRunParamsNonStreaming,
+    type ThreadCreateAndRunParamsStreaming as ThreadCreateAndRunParamsStreaming,
+    type ThreadCreateAndRunPollParams as ThreadCreateAndRunPollParams,
+    type ThreadCreateAndRunStreamParams as ThreadCreateAndRunStreamParams,
+  };
+
+  export {
+    Runs as Runs,
+    type RequiredActionFunctionToolCall as RequiredActionFunctionToolCall,
+    type Run as Run,
+    type RunStatus as RunStatus,
+    type RunsPage as RunsPage,
+    type RunCreateParams as RunCreateParams,
+    type RunCreateParamsNonStreaming as RunCreateParamsNonStreaming,
+    type RunCreateParamsStreaming as RunCreateParamsStreaming,
+    type RunRetrieveParams as RunRetrieveParams,
+    type RunUpdateParams as RunUpdateParams,
+    type RunListParams as RunListParams,
+    type RunCancelParams as RunCancelParams,
+    type RunSubmitToolOutputsParams as RunSubmitToolOutputsParams,
+    type RunSubmitToolOutputsParamsNonStreaming as RunSubmitToolOutputsParamsNonStreaming,
+    type RunSubmitToolOutputsParamsStreaming as RunSubmitToolOutputsParamsStreaming,
+  };
+
+  export {
+    Messages as Messages,
+    type Annotation as Annotation,
+    type AnnotationDelta as AnnotationDelta,
+    type FileCitationAnnotation as FileCitationAnnotation,
+    type FileCitationDeltaAnnotation as FileCitationDeltaAnnotation,
+    type FilePathAnnotation as FilePathAnnotation,
+    type FilePathDeltaAnnotation as FilePathDeltaAnnotation,
+    type ImageFile as ImageFile,
+    type ImageFileContentBlock as ImageFileContentBlock,
+    type ImageFileDelta as ImageFileDelta,
+    type ImageFileDeltaBlock as ImageFileDeltaBlock,
+    type ImageURL as ImageURL,
+    type ImageURLContentBlock as ImageURLContentBlock,
+    type ImageURLDelta as ImageURLDelta,
+    type ImageURLDeltaBlock as ImageURLDeltaBlock,
+    type MessagesAPIMessage as Message,
+    type MessageContent as MessageContent,
+    type MessageContentDelta as MessageContentDelta,
+    type MessageContentPartParam as MessageContentPartParam,
+    type MessageDeleted as MessageDeleted,
+    type MessageDelta as MessageDelta,
+    type MessageDeltaEvent as MessageDeltaEvent,
+    type RefusalContentBlock as RefusalContentBlock,
+    type RefusalDeltaBlock as RefusalDeltaBlock,
+    type Text as Text,
+    type TextContentBlock as TextContentBlock,
+    type TextContentBlockParam as TextContentBlockParam,
+    type TextDelta as TextDelta,
+    type TextDeltaBlock as TextDeltaBlock,
+    type MessagesPage as MessagesPage,
+    type MessageCreateParams as MessageCreateParams,
+    type MessageRetrieveParams as MessageRetrieveParams,
+    type MessageUpdateParams as MessageUpdateParams,
+    type MessageListParams as MessageListParams,
+    type MessageDeleteParams as MessageDeleteParams,
+  };
 }

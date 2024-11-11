@@ -1,7 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../../resource';
-import * as FilesAPI from './files';
 import * as VectorStoresAPI from './vector-stores';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../pagination';
 import { APIPromise } from '../../../internal/api-promise';
@@ -292,12 +291,14 @@ export interface FileDeleteParams {
   vector_store_id: string;
 }
 
-export namespace Files {
-  export import VectorStoreFile = FilesAPI.VectorStoreFile;
-  export import VectorStoreFileDeleted = FilesAPI.VectorStoreFileDeleted;
-  export type VectorStoreFilesPage = FilesAPI.VectorStoreFilesPage;
-  export import FileCreateParams = FilesAPI.FileCreateParams;
-  export import FileRetrieveParams = FilesAPI.FileRetrieveParams;
-  export import FileListParams = FilesAPI.FileListParams;
-  export import FileDeleteParams = FilesAPI.FileDeleteParams;
+export declare namespace Files {
+  export {
+    type VectorStoreFile as VectorStoreFile,
+    type VectorStoreFileDeleted as VectorStoreFileDeleted,
+    type VectorStoreFilesPage as VectorStoreFilesPage,
+    type FileCreateParams as FileCreateParams,
+    type FileRetrieveParams as FileRetrieveParams,
+    type FileListParams as FileListParams,
+    type FileDeleteParams as FileDeleteParams,
+  };
 }

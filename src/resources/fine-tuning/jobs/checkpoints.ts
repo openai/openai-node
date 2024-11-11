@@ -1,7 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../../resource';
-import * as CheckpointsAPI from './checkpoints';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../pagination';
 import { RequestOptions } from '../../../internal/request-options';
 
@@ -88,8 +87,10 @@ export namespace FineTuningJobCheckpoint {
 
 export interface CheckpointListParams extends CursorPageParams {}
 
-export namespace Checkpoints {
-  export import FineTuningJobCheckpoint = CheckpointsAPI.FineTuningJobCheckpoint;
-  export type FineTuningJobCheckpointsPage = CheckpointsAPI.FineTuningJobCheckpointsPage;
-  export import CheckpointListParams = CheckpointsAPI.CheckpointListParams;
+export declare namespace Checkpoints {
+  export {
+    type FineTuningJobCheckpoint as FineTuningJobCheckpoint,
+    type FineTuningJobCheckpointsPage as FineTuningJobCheckpointsPage,
+    type CheckpointListParams as CheckpointListParams,
+  };
 }

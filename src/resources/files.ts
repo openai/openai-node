@@ -1,7 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../resource';
-import * as FilesAPI from './files';
 import { Page, PagePromise } from '../pagination';
 import { type Uploadable, multipartFormRequestOptions } from '../uploads';
 import { APIPromise } from '../internal/api-promise';
@@ -214,12 +213,14 @@ export interface FileListParams {
   purpose?: string;
 }
 
-export namespace Files {
-  export import FileContent = FilesAPI.FileContent;
-  export import FileDeleted = FilesAPI.FileDeleted;
-  export import FileObject = FilesAPI.FileObject;
-  export import FilePurpose = FilesAPI.FilePurpose;
-  export type FileObjectsPage = FilesAPI.FileObjectsPage;
-  export import FileCreateParams = FilesAPI.FileCreateParams;
-  export import FileListParams = FilesAPI.FileListParams;
+export declare namespace Files {
+  export {
+    type FileContent as FileContent,
+    type FileDeleted as FileDeleted,
+    type FileObject as FileObject,
+    type FilePurpose as FilePurpose,
+    type FileObjectsPage as FileObjectsPage,
+    type FileCreateParams as FileCreateParams,
+    type FileListParams as FileListParams,
+  };
 }

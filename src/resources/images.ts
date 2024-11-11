@@ -1,7 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../resource';
-import * as ImagesAPI from './images';
 import { type Uploadable, multipartFormRequestOptions } from '../uploads';
 import { APIPromise } from '../internal/api-promise';
 import { RequestOptions } from '../internal/request-options';
@@ -206,11 +205,13 @@ export interface ImageGenerateParams {
   user?: string;
 }
 
-export namespace Images {
-  export import Image = ImagesAPI.Image;
-  export import ImageModel = ImagesAPI.ImageModel;
-  export import ImagesResponse = ImagesAPI.ImagesResponse;
-  export import ImageCreateVariationParams = ImagesAPI.ImageCreateVariationParams;
-  export import ImageEditParams = ImagesAPI.ImageEditParams;
-  export import ImageGenerateParams = ImagesAPI.ImageGenerateParams;
+export declare namespace Images {
+  export {
+    type Image as Image,
+    type ImageModel as ImageModel,
+    type ImagesResponse as ImagesResponse,
+    type ImageCreateVariationParams as ImageCreateVariationParams,
+    type ImageEditParams as ImageEditParams,
+    type ImageGenerateParams as ImageGenerateParams,
+  };
 }

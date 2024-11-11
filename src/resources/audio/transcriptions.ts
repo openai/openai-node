@@ -1,7 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../resource';
-import * as TranscriptionsAPI from './transcriptions';
 import * as AudioAPI from './audio';
 import { type Uploadable, multipartFormRequestOptions } from '../../uploads';
 import { APIPromise } from '../../internal/api-promise';
@@ -189,11 +188,13 @@ export interface TranscriptionCreateParams {
   timestamp_granularities?: Array<'word' | 'segment'>;
 }
 
-export namespace Transcriptions {
-  export import Transcription = TranscriptionsAPI.Transcription;
-  export import TranscriptionSegment = TranscriptionsAPI.TranscriptionSegment;
-  export import TranscriptionVerbose = TranscriptionsAPI.TranscriptionVerbose;
-  export import TranscriptionWord = TranscriptionsAPI.TranscriptionWord;
-  export import TranscriptionCreateResponse = TranscriptionsAPI.TranscriptionCreateResponse;
-  export import TranscriptionCreateParams = TranscriptionsAPI.TranscriptionCreateParams;
+export declare namespace Transcriptions {
+  export {
+    type Transcription as Transcription,
+    type TranscriptionSegment as TranscriptionSegment,
+    type TranscriptionVerbose as TranscriptionVerbose,
+    type TranscriptionWord as TranscriptionWord,
+    type TranscriptionCreateResponse as TranscriptionCreateResponse,
+    type TranscriptionCreateParams as TranscriptionCreateParams,
+  };
 }

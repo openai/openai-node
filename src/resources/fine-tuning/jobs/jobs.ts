@@ -1,8 +1,13 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../../resource';
-import * as JobsAPI from './jobs';
 import * as CheckpointsAPI from './checkpoints';
+import {
+  CheckpointListParams,
+  Checkpoints,
+  FineTuningJobCheckpoint,
+  FineTuningJobCheckpointsPage,
+} from './checkpoints';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../pagination';
 import { APIPromise } from '../../../internal/api-promise';
 import { RequestOptions } from '../../../internal/request-options';
@@ -426,19 +431,26 @@ export interface JobListParams extends CursorPageParams {}
 
 export interface JobListEventsParams extends CursorPageParams {}
 
-export namespace Jobs {
-  export import FineTuningJob = JobsAPI.FineTuningJob;
-  export import FineTuningJobEvent = JobsAPI.FineTuningJobEvent;
-  export import FineTuningJobIntegration = JobsAPI.FineTuningJobIntegration;
-  export import FineTuningJobWandbIntegration = JobsAPI.FineTuningJobWandbIntegration;
-  export import FineTuningJobWandbIntegrationObject = JobsAPI.FineTuningJobWandbIntegrationObject;
-  export type FineTuningJobsPage = JobsAPI.FineTuningJobsPage;
-  export type FineTuningJobEventsPage = JobsAPI.FineTuningJobEventsPage;
-  export import JobCreateParams = JobsAPI.JobCreateParams;
-  export import JobListParams = JobsAPI.JobListParams;
-  export import JobListEventsParams = JobsAPI.JobListEventsParams;
-  export import Checkpoints = CheckpointsAPI.Checkpoints;
-  export import FineTuningJobCheckpoint = CheckpointsAPI.FineTuningJobCheckpoint;
-  export type FineTuningJobCheckpointsPage = CheckpointsAPI.FineTuningJobCheckpointsPage;
-  export import CheckpointListParams = CheckpointsAPI.CheckpointListParams;
+Jobs.Checkpoints = Checkpoints;
+
+export declare namespace Jobs {
+  export {
+    type FineTuningJob as FineTuningJob,
+    type FineTuningJobEvent as FineTuningJobEvent,
+    type FineTuningJobIntegration as FineTuningJobIntegration,
+    type FineTuningJobWandbIntegration as FineTuningJobWandbIntegration,
+    type FineTuningJobWandbIntegrationObject as FineTuningJobWandbIntegrationObject,
+    type FineTuningJobsPage as FineTuningJobsPage,
+    type FineTuningJobEventsPage as FineTuningJobEventsPage,
+    type JobCreateParams as JobCreateParams,
+    type JobListParams as JobListParams,
+    type JobListEventsParams as JobListEventsParams,
+  };
+
+  export {
+    Checkpoints as Checkpoints,
+    type FineTuningJobCheckpoint as FineTuningJobCheckpoint,
+    type FineTuningJobCheckpointsPage as FineTuningJobCheckpointsPage,
+    type CheckpointListParams as CheckpointListParams,
+  };
 }

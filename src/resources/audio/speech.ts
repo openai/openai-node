@@ -1,7 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../resource';
-import * as SpeechAPI from './speech';
 import { APIPromise } from '../../internal/api-promise';
 import { RequestOptions } from '../../internal/request-options';
 
@@ -49,7 +48,6 @@ export interface SpeechCreateParams {
   speed?: number;
 }
 
-export namespace Speech {
-  export import SpeechModel = SpeechAPI.SpeechModel;
-  export import SpeechCreateParams = SpeechAPI.SpeechCreateParams;
+export declare namespace Speech {
+  export { type SpeechModel as SpeechModel, type SpeechCreateParams as SpeechCreateParams };
 }

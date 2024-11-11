@@ -7,6 +7,30 @@ import * as ChatAPI from '../../../chat/chat';
 import * as MessagesAPI from '../messages';
 import * as ThreadsAPI from '../threads';
 import * as StepsAPI from './steps';
+import {
+  CodeInterpreterLogs,
+  CodeInterpreterOutputImage,
+  CodeInterpreterToolCall,
+  CodeInterpreterToolCallDelta,
+  FileSearchToolCall,
+  FileSearchToolCallDelta,
+  FunctionToolCall,
+  FunctionToolCallDelta,
+  MessageCreationStepDetails,
+  RunStep,
+  RunStepDelta,
+  RunStepDeltaEvent,
+  RunStepDeltaMessageDelta,
+  RunStepInclude,
+  RunStepsPage,
+  StepListParams,
+  StepRetrieveParams,
+  Steps,
+  ToolCall,
+  ToolCallDelta,
+  ToolCallDeltaObject,
+  ToolCallsStepDetails,
+} from './steps';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../../pagination';
 import { Stream } from '../../../../streaming';
 import { APIPromise } from '../../../../internal/api-promise';
@@ -944,41 +968,48 @@ export interface RunSubmitToolOutputsParamsStreaming extends RunSubmitToolOutput
   stream: true;
 }
 
-export namespace Runs {
-  export import RequiredActionFunctionToolCall = RunsAPI.RequiredActionFunctionToolCall;
-  export import Run = RunsAPI.Run;
-  export import RunStatus = RunsAPI.RunStatus;
-  export type RunsPage = RunsAPI.RunsPage;
-  export import RunCreateParams = RunsAPI.RunCreateParams;
-  export import RunCreateParamsNonStreaming = RunsAPI.RunCreateParamsNonStreaming;
-  export import RunCreateParamsStreaming = RunsAPI.RunCreateParamsStreaming;
-  export import RunRetrieveParams = RunsAPI.RunRetrieveParams;
-  export import RunUpdateParams = RunsAPI.RunUpdateParams;
-  export import RunListParams = RunsAPI.RunListParams;
-  export import RunCancelParams = RunsAPI.RunCancelParams;
-  export import RunSubmitToolOutputsParams = RunsAPI.RunSubmitToolOutputsParams;
-  export import RunSubmitToolOutputsParamsNonStreaming = RunsAPI.RunSubmitToolOutputsParamsNonStreaming;
-  export import RunSubmitToolOutputsParamsStreaming = RunsAPI.RunSubmitToolOutputsParamsStreaming;
-  export import Steps = StepsAPI.Steps;
-  export import CodeInterpreterLogs = StepsAPI.CodeInterpreterLogs;
-  export import CodeInterpreterOutputImage = StepsAPI.CodeInterpreterOutputImage;
-  export import CodeInterpreterToolCall = StepsAPI.CodeInterpreterToolCall;
-  export import CodeInterpreterToolCallDelta = StepsAPI.CodeInterpreterToolCallDelta;
-  export import FileSearchToolCall = StepsAPI.FileSearchToolCall;
-  export import FileSearchToolCallDelta = StepsAPI.FileSearchToolCallDelta;
-  export import FunctionToolCall = StepsAPI.FunctionToolCall;
-  export import FunctionToolCallDelta = StepsAPI.FunctionToolCallDelta;
-  export import MessageCreationStepDetails = StepsAPI.MessageCreationStepDetails;
-  export import RunStep = StepsAPI.RunStep;
-  export import RunStepDelta = StepsAPI.RunStepDelta;
-  export import RunStepDeltaEvent = StepsAPI.RunStepDeltaEvent;
-  export import RunStepDeltaMessageDelta = StepsAPI.RunStepDeltaMessageDelta;
-  export import RunStepInclude = StepsAPI.RunStepInclude;
-  export import ToolCall = StepsAPI.ToolCall;
-  export import ToolCallDelta = StepsAPI.ToolCallDelta;
-  export import ToolCallDeltaObject = StepsAPI.ToolCallDeltaObject;
-  export import ToolCallsStepDetails = StepsAPI.ToolCallsStepDetails;
-  export type RunStepsPage = StepsAPI.RunStepsPage;
-  export import StepRetrieveParams = StepsAPI.StepRetrieveParams;
-  export import StepListParams = StepsAPI.StepListParams;
+Runs.Steps = Steps;
+
+export declare namespace Runs {
+  export {
+    type RequiredActionFunctionToolCall as RequiredActionFunctionToolCall,
+    type Run as Run,
+    type RunStatus as RunStatus,
+    type RunsPage as RunsPage,
+    type RunCreateParams as RunCreateParams,
+    type RunCreateParamsNonStreaming as RunCreateParamsNonStreaming,
+    type RunCreateParamsStreaming as RunCreateParamsStreaming,
+    type RunRetrieveParams as RunRetrieveParams,
+    type RunUpdateParams as RunUpdateParams,
+    type RunListParams as RunListParams,
+    type RunCancelParams as RunCancelParams,
+    type RunSubmitToolOutputsParams as RunSubmitToolOutputsParams,
+    type RunSubmitToolOutputsParamsNonStreaming as RunSubmitToolOutputsParamsNonStreaming,
+    type RunSubmitToolOutputsParamsStreaming as RunSubmitToolOutputsParamsStreaming,
+  };
+
+  export {
+    Steps as Steps,
+    type CodeInterpreterLogs as CodeInterpreterLogs,
+    type CodeInterpreterOutputImage as CodeInterpreterOutputImage,
+    type CodeInterpreterToolCall as CodeInterpreterToolCall,
+    type CodeInterpreterToolCallDelta as CodeInterpreterToolCallDelta,
+    type FileSearchToolCall as FileSearchToolCall,
+    type FileSearchToolCallDelta as FileSearchToolCallDelta,
+    type FunctionToolCall as FunctionToolCall,
+    type FunctionToolCallDelta as FunctionToolCallDelta,
+    type MessageCreationStepDetails as MessageCreationStepDetails,
+    type RunStep as RunStep,
+    type RunStepDelta as RunStepDelta,
+    type RunStepDeltaEvent as RunStepDeltaEvent,
+    type RunStepDeltaMessageDelta as RunStepDeltaMessageDelta,
+    type RunStepInclude as RunStepInclude,
+    type ToolCall as ToolCall,
+    type ToolCallDelta as ToolCallDelta,
+    type ToolCallDeltaObject as ToolCallDeltaObject,
+    type ToolCallsStepDetails as ToolCallsStepDetails,
+    type RunStepsPage as RunStepsPage,
+    type StepRetrieveParams as StepRetrieveParams,
+    type StepListParams as StepListParams,
+  };
 }

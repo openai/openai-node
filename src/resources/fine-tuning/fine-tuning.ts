@@ -2,21 +2,38 @@
 
 import { APIResource } from '../../resource';
 import * as JobsAPI from './jobs/jobs';
+import {
+  FineTuningJob,
+  FineTuningJobEvent,
+  FineTuningJobEventsPage,
+  FineTuningJobIntegration,
+  FineTuningJobWandbIntegration,
+  FineTuningJobWandbIntegrationObject,
+  FineTuningJobsPage,
+  JobCreateParams,
+  JobListEventsParams,
+  JobListParams,
+  Jobs,
+} from './jobs/jobs';
 
 export class FineTuning extends APIResource {
   jobs: JobsAPI.Jobs = new JobsAPI.Jobs(this._client);
 }
 
-export namespace FineTuning {
-  export import Jobs = JobsAPI.Jobs;
-  export import FineTuningJob = JobsAPI.FineTuningJob;
-  export import FineTuningJobEvent = JobsAPI.FineTuningJobEvent;
-  export import FineTuningJobIntegration = JobsAPI.FineTuningJobIntegration;
-  export import FineTuningJobWandbIntegration = JobsAPI.FineTuningJobWandbIntegration;
-  export import FineTuningJobWandbIntegrationObject = JobsAPI.FineTuningJobWandbIntegrationObject;
-  export type FineTuningJobsPage = JobsAPI.FineTuningJobsPage;
-  export type FineTuningJobEventsPage = JobsAPI.FineTuningJobEventsPage;
-  export import JobCreateParams = JobsAPI.JobCreateParams;
-  export import JobListParams = JobsAPI.JobListParams;
-  export import JobListEventsParams = JobsAPI.JobListEventsParams;
+FineTuning.Jobs = Jobs;
+
+export declare namespace FineTuning {
+  export {
+    Jobs as Jobs,
+    type FineTuningJob as FineTuningJob,
+    type FineTuningJobEvent as FineTuningJobEvent,
+    type FineTuningJobIntegration as FineTuningJobIntegration,
+    type FineTuningJobWandbIntegration as FineTuningJobWandbIntegration,
+    type FineTuningJobWandbIntegrationObject as FineTuningJobWandbIntegrationObject,
+    type FineTuningJobsPage as FineTuningJobsPage,
+    type FineTuningJobEventsPage as FineTuningJobEventsPage,
+    type JobCreateParams as JobCreateParams,
+    type JobListParams as JobListParams,
+    type JobListEventsParams as JobListEventsParams,
+  };
 }
