@@ -364,31 +364,31 @@ export interface VectorStoreListParams extends CursorPageParams {
 }
 
 export namespace VectorStores {
-  export type AutoFileChunkingStrategyParam = VectorStoresAPI.AutoFileChunkingStrategyParam;
-  export type FileChunkingStrategy = VectorStoresAPI.FileChunkingStrategy;
-  export type FileChunkingStrategyParam = VectorStoresAPI.FileChunkingStrategyParam;
-  export type OtherFileChunkingStrategyObject = VectorStoresAPI.OtherFileChunkingStrategyObject;
-  export type StaticFileChunkingStrategy = VectorStoresAPI.StaticFileChunkingStrategy;
-  export type StaticFileChunkingStrategyObject = VectorStoresAPI.StaticFileChunkingStrategyObject;
-  export type StaticFileChunkingStrategyParam = VectorStoresAPI.StaticFileChunkingStrategyParam;
-  export type VectorStore = VectorStoresAPI.VectorStore;
-  export type VectorStoreDeleted = VectorStoresAPI.VectorStoreDeleted;
+  export import AutoFileChunkingStrategyParam = VectorStoresAPI.AutoFileChunkingStrategyParam;
+  export import FileChunkingStrategy = VectorStoresAPI.FileChunkingStrategy;
+  export import FileChunkingStrategyParam = VectorStoresAPI.FileChunkingStrategyParam;
+  export import OtherFileChunkingStrategyObject = VectorStoresAPI.OtherFileChunkingStrategyObject;
+  export import StaticFileChunkingStrategy = VectorStoresAPI.StaticFileChunkingStrategy;
+  export import StaticFileChunkingStrategyObject = VectorStoresAPI.StaticFileChunkingStrategyObject;
+  export import StaticFileChunkingStrategyParam = VectorStoresAPI.StaticFileChunkingStrategyParam;
+  export import VectorStore = VectorStoresAPI.VectorStore;
+  export import VectorStoreDeleted = VectorStoresAPI.VectorStoreDeleted;
   export type VectorStoresPage = VectorStoresAPI.VectorStoresPage;
-  export type VectorStoreCreateParams = VectorStoresAPI.VectorStoreCreateParams;
-  export type VectorStoreUpdateParams = VectorStoresAPI.VectorStoreUpdateParams;
-  export type VectorStoreListParams = VectorStoresAPI.VectorStoreListParams;
+  export import VectorStoreCreateParams = VectorStoresAPI.VectorStoreCreateParams;
+  export import VectorStoreUpdateParams = VectorStoresAPI.VectorStoreUpdateParams;
+  export import VectorStoreListParams = VectorStoresAPI.VectorStoreListParams;
   export import Files = FilesAPI.Files;
-  export type VectorStoreFile = FilesAPI.VectorStoreFile;
-  export type VectorStoreFileDeleted = FilesAPI.VectorStoreFileDeleted;
+  export import VectorStoreFile = FilesAPI.VectorStoreFile;
+  export import VectorStoreFileDeleted = FilesAPI.VectorStoreFileDeleted;
   export type VectorStoreFilesPage = FilesAPI.VectorStoreFilesPage;
-  export type FileCreateParams = FilesAPI.FileCreateParams;
-  export type FileRetrieveParams = FilesAPI.FileRetrieveParams;
-  export type FileListParams = FilesAPI.FileListParams;
-  export type FileDeleteParams = FilesAPI.FileDeleteParams;
+  export import FileCreateParams = FilesAPI.FileCreateParams;
+  export import FileRetrieveParams = FilesAPI.FileRetrieveParams;
+  export import FileListParams = FilesAPI.FileListParams;
+  export import FileDeleteParams = FilesAPI.FileDeleteParams;
   export import FileBatches = FileBatchesAPI.FileBatches;
-  export type VectorStoreFileBatch = FileBatchesAPI.VectorStoreFileBatch;
-  export type FileBatchCreateParams = FileBatchesAPI.FileBatchCreateParams;
-  export type FileBatchRetrieveParams = FileBatchesAPI.FileBatchRetrieveParams;
-  export type FileBatchCancelParams = FileBatchesAPI.FileBatchCancelParams;
-  export type FileBatchListFilesParams = FileBatchesAPI.FileBatchListFilesParams;
+  export import VectorStoreFileBatch = FileBatchesAPI.VectorStoreFileBatch;
+  export import FileBatchCreateParams = FileBatchesAPI.FileBatchCreateParams;
+  export import FileBatchRetrieveParams = FileBatchesAPI.FileBatchRetrieveParams;
+  export import FileBatchCancelParams = FileBatchesAPI.FileBatchCancelParams;
+  export import FileBatchListFilesParams = FileBatchesAPI.FileBatchListFilesParams;
 }

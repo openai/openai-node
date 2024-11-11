@@ -356,11 +356,11 @@ export interface ModerationCreateParams {
 }
 
 export namespace Moderations {
-  export type Moderation = ModerationsAPI.Moderation;
-  export type ModerationImageURLInput = ModerationsAPI.ModerationImageURLInput;
-  export type ModerationModel = ModerationsAPI.ModerationModel;
-  export type ModerationMultiModalInput = ModerationsAPI.ModerationMultiModalInput;
-  export type ModerationTextInput = ModerationsAPI.ModerationTextInput;
-  export type ModerationCreateResponse = ModerationsAPI.ModerationCreateResponse;
-  export type ModerationCreateParams = ModerationsAPI.ModerationCreateParams;
+  export import Moderation = ModerationsAPI.Moderation;
+  export import ModerationImageURLInput = ModerationsAPI.ModerationImageURLInput;
+  export import ModerationModel = ModerationsAPI.ModerationModel;
+  export import ModerationMultiModalInput = ModerationsAPI.ModerationMultiModalInput;
+  export import ModerationTextInput = ModerationsAPI.ModerationTextInput;
+  export import ModerationCreateResponse = ModerationsAPI.ModerationCreateResponse;
+  export import ModerationCreateParams = ModerationsAPI.ModerationCreateParams;
 }

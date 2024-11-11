@@ -119,8 +119,8 @@ export interface EmbeddingCreateParams {
 }
 
 export namespace Embeddings {
-  export type CreateEmbeddingResponse = EmbeddingsAPI.CreateEmbeddingResponse;
-  export type Embedding = EmbeddingsAPI.Embedding;
-  export type EmbeddingModel = EmbeddingsAPI.EmbeddingModel;
-  export type EmbeddingCreateParams = EmbeddingsAPI.EmbeddingCreateParams;
+  export import CreateEmbeddingResponse = EmbeddingsAPI.CreateEmbeddingResponse;
+  export import Embedding = EmbeddingsAPI.Embedding;
+  export import EmbeddingModel = EmbeddingsAPI.EmbeddingModel;
+  export import EmbeddingCreateParams = EmbeddingsAPI.EmbeddingCreateParams;
 }

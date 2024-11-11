@@ -21,21 +21,21 @@ export type AudioModel = 'whisper-1';
 export type AudioResponseFormat = 'json' | 'text' | 'srt' | 'verbose_json' | 'vtt';
 
 export namespace Audio {
-  export type AudioModel = AudioAPI.AudioModel;
-  export type AudioResponseFormat = AudioAPI.AudioResponseFormat;
+  export import AudioModel = AudioAPI.AudioModel;
+  export import AudioResponseFormat = AudioAPI.AudioResponseFormat;
   export import Transcriptions = TranscriptionsAPI.Transcriptions;
-  export type Transcription = TranscriptionsAPI.Transcription;
-  export type TranscriptionSegment = TranscriptionsAPI.TranscriptionSegment;
-  export type TranscriptionVerbose = TranscriptionsAPI.TranscriptionVerbose;
-  export type TranscriptionWord = TranscriptionsAPI.TranscriptionWord;
-  export type TranscriptionCreateResponse = TranscriptionsAPI.TranscriptionCreateResponse;
-  export type TranscriptionCreateParams = TranscriptionsAPI.TranscriptionCreateParams;
+  export import Transcription = TranscriptionsAPI.Transcription;
+  export import TranscriptionSegment = TranscriptionsAPI.TranscriptionSegment;
+  export import TranscriptionVerbose = TranscriptionsAPI.TranscriptionVerbose;
+  export import TranscriptionWord = TranscriptionsAPI.TranscriptionWord;
+  export import TranscriptionCreateResponse = TranscriptionsAPI.TranscriptionCreateResponse;
+  export import TranscriptionCreateParams = TranscriptionsAPI.TranscriptionCreateParams;
   export import Translations = TranslationsAPI.Translations;
-  export type Translation = TranslationsAPI.Translation;
-  export type TranslationVerbose = TranslationsAPI.TranslationVerbose;
-  export type TranslationCreateResponse = TranslationsAPI.TranslationCreateResponse;
-  export type TranslationCreateParams = TranslationsAPI.TranslationCreateParams;
+  export import Translation = TranslationsAPI.Translation;
+  export import TranslationVerbose = TranslationsAPI.TranslationVerbose;
+  export import TranslationCreateResponse = TranslationsAPI.TranslationCreateResponse;
+  export import TranslationCreateParams = TranslationsAPI.TranslationCreateParams;
   export import Speech = SpeechAPI.Speech;
-  export type SpeechModel = SpeechAPI.SpeechModel;
-  export type SpeechCreateParams = SpeechAPI.SpeechCreateParams;
+  export import SpeechModel = SpeechAPI.SpeechModel;
+  export import SpeechCreateParams = SpeechAPI.SpeechCreateParams;
 }

@@ -58,6 +58,6 @@ export interface PartCreateParams {
 }
 
 export namespace Parts {
-  export type UploadPart = PartsAPI.UploadPart;
-  export type PartCreateParams = PartsAPI.PartCreateParams;
+  export import UploadPart = PartsAPI.UploadPart;
+  export import PartCreateParams = PartsAPI.PartCreateParams;
 }

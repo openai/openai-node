@@ -50,6 +50,6 @@ export interface SpeechCreateParams {
 }
 
 export namespace Speech {
-  export type SpeechModel = SpeechAPI.SpeechModel;
-  export type SpeechCreateParams = SpeechAPI.SpeechCreateParams;
+  export import SpeechModel = SpeechAPI.SpeechModel;
+  export import SpeechCreateParams = SpeechAPI.SpeechCreateParams;
 }

@@ -89,7 +89,7 @@ export namespace FineTuningJobCheckpoint {
 export interface CheckpointListParams extends CursorPageParams {}
 
 export namespace Checkpoints {
-  export type FineTuningJobCheckpoint = CheckpointsAPI.FineTuningJobCheckpoint;
+  export import FineTuningJobCheckpoint = CheckpointsAPI.FineTuningJobCheckpoint;
   export type FineTuningJobCheckpointsPage = CheckpointsAPI.FineTuningJobCheckpointsPage;
-  export type CheckpointListParams = CheckpointsAPI.CheckpointListParams;
+  export import CheckpointListParams = CheckpointsAPI.CheckpointListParams;
 }
