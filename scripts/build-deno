@@ -7,13 +7,21 @@ cd "$(dirname "$0")/.."
 rm -rf dist-deno; mkdir dist-deno
 cp -rp src/* jsr.json dist-deno
 
-rm dist-deno/_shims/auto/*-node.ts
-for dir in dist-deno/_shims dist-deno/_shims/auto; do
-  rm "${dir}"/*.{d.ts,js,mjs}
-  for file in "${dir}"/*-deno.ts; do
-    mv -- "$file" "${file%-deno.ts}.ts"
-  done
+rm -rf dist-deno/shims
+
+rm dist-deno/_shims/node*.{js,mjs,ts}
+rm dist-deno/_shims/manual*.{js,mjs,ts}
+rm dist-deno/_shims/index.{d.ts,js,mjs}
+for file in dist-deno/_shims/*-deno.ts; do
+	mv -- "$file" "${file%-deno.ts}.ts"
 done
+
+rm dist-deno/_shims/auto/*-node.ts
+rm dist-deno/_shims/auto/*.{d.ts,js,mjs}
+for file in dist-deno/_shims/auto/*-deno.ts; do
+	mv -- "$file" "${file%-deno.ts}.ts"
+done
+
 for file in README.md LICENSE CHANGELOG.md; do
   if [ -e "${file}" ]; then cp "${file}" dist-deno; fi
 done
