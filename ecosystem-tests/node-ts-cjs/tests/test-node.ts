@@ -5,8 +5,6 @@ import { File as FormDataFile, Blob as FormDataBlob } from 'formdata-node';
 import * as fs from 'fs';
 import { distance } from 'fastest-levenshtein';
 import { ChatCompletion } from 'openai/resources/chat/completions';
-import { File } from 'node:buffer';
-if (!(globalThis as any).File) (globalThis as any).File = File;
 import type { ReadableStream as WebReadableStream } from 'node:stream/web';
 
 const url = 'https://audio-samples.github.io/samples/mp3/blizzard_biased/sample-1.mp3';

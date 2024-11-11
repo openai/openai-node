@@ -4,8 +4,6 @@ import fetch from 'node-fetch';
 import { File as FormDataFile, Blob as FormDataBlob } from 'formdata-node';
 import * as fs from 'fs';
 import { distance } from 'fastest-levenshtein';
-import { File } from 'node:buffer';
-if (!(globalThis as any).File) (globalThis as any).File = File;
 
 const url = 'https://audio-samples.github.io/samples/mp3/blizzard_biased/sample-1.mp3';
 const filename = 'sample-1.mp3';

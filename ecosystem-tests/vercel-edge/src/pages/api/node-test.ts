@@ -2,8 +2,6 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { distance } from 'fastest-levenshtein';
 import OpenAI from 'openai';
 import { uploadWebApiTestCases } from '../../uploadWebApiTestCases';
-import { File } from 'node:buffer';
-if (!(globalThis as any).File) (globalThis as any).File = File;
 
 type Test = { description: string; handler: () => Promise<void> };
 
