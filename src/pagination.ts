@@ -1,8 +1,9 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { OpenAI, OpenAIError } from './index';
+import type { OpenAI } from './index';
+import { OpenAIError } from './error';
 import { FinalRequestOptions } from './internal/request-options';
-import { defaultParseResponse, APIResponseProps } from 'openai/internal/parse';
+import { defaultParseResponse, APIResponseProps } from './internal/parse';
 import { APIPromise } from './internal/api-promise';
 import { maybeObj } from './internal/utils';
 

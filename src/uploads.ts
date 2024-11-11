@@ -1,6 +1,6 @@
 import { type RequestOptions } from './internal/request-options';
 import { type FilePropertyBag } from './internal/builtin-types';
-import * as Shims from './internal/shims';
+import { isFsReadStreamLike, type FsReadStreamLike } from './internal/shims';
 import { MultipartBody } from './internal/MultipartBody';
 
 type BlobLikePart = string | ArrayBuffer | ArrayBufferView | BlobLike | Uint8Array | DataView;
@@ -15,7 +15,7 @@ export type BlobPart = string | ArrayBuffer | ArrayBufferView | Blob | Uint8Arra
  * For convenience, you can also pass a fetch Response, or in Node,
  * the result of fs.createReadStream().
  */
-export type Uploadable = FileLike | ResponseLike | Shims.FsReadStreamLike;
+export type Uploadable = FileLike | ResponseLike | FsReadStreamLike;
 
 /**
  * Intended to match web.Blob, node.Blob, undici.Blob, etc.
@@ -79,7 +79,7 @@ export const isResponseLike = (value: any): value is ResponseLike =>
   typeof value.blob === 'function';
 
 export const isUploadable = (value: any): value is Uploadable => {
-  return isFileLike(value) || isResponseLike(value) || Shims.isFsReadStreamLike(value);
+  return isFileLike(value) || isResponseLike(value) || isFsReadStreamLike(value);
 };
 
 export type ToFileInput = Uploadable | Exclude<BlobLikePart, string> | AsyncIterable<BlobLikePart>;

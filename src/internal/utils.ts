@@ -64,16 +64,6 @@ export function isObj(obj: unknown): obj is Record<string, unknown> {
 
 export const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export const castToError = (err: any): Error => {
-  if (err instanceof Error) return err;
-  if (typeof err === 'object' && err !== null) {
-    try {
-      return new Error(JSON.stringify(err));
-    } catch {}
-  }
-  return new Error(err);
-};
-
 export const ensurePresent = <T>(value: T | null | undefined): T => {
   if (value == null) {
     throw new OpenAIError(`Expected a value to be given but received ${value} instead.`);
