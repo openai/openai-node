@@ -31,9 +31,9 @@ import {
   ToolCallDeltaObject,
   ToolCallsStepDetails,
 } from './steps';
+import { APIPromise } from '../../../../api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../../pagination';
 import { Stream } from '../../../../streaming';
-import { APIPromise } from '../../../../internal/api-promise';
 import { RequestOptions } from '../../../../internal/request-options';
 import { sleep } from '../../../../internal/utils';
 import {

@@ -5,8 +5,8 @@ import * as ChatCompletionsAPI from './completions';
 import * as CompletionsAPI from '../completions';
 import * as Shared from '../shared';
 import * as ChatAPI from './chat';
+import { APIPromise } from '../../api-promise';
 import { Stream } from '../../streaming';
-import { APIPromise } from '../../internal/api-promise';
 import { RequestOptions } from '../../internal/request-options';
 
 export class Completions extends APIResource {

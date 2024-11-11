@@ -1,5 +1,7 @@
 import fs from 'fs';
 import { toFile, type ResponseLike } from 'openai/uploads';
+import type { File as File_ } from 'node:buffer';
+declare const File: typeof File_;
 
 class MyClass {
   name: string = 'foo';

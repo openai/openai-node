@@ -8,8 +8,8 @@ import * as ThreadsAPI from './threads/threads';
 import * as VectorStoresAPI from './vector-stores/vector-stores';
 import * as RunsAPI from './threads/runs/runs';
 import * as StepsAPI from './threads/runs/steps';
+import { APIPromise } from '../../api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../pagination';
-import { APIPromise } from '../../internal/api-promise';
 import { RequestOptions } from '../../internal/request-options';
 
 export class Assistants extends APIResource {

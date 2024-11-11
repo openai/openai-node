@@ -84,10 +84,8 @@ export declare namespace Beta {
     type VectorStoreUpdateParams as VectorStoreUpdateParams,
     type VectorStoreListParams as VectorStoreListParams,
   };
-  
-  export {
-    Chat as Chat,
-  };
+
+  export { Chat as Chat };
 
   export {
     Assistants as Assistants,

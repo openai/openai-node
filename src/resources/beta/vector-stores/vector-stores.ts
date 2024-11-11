@@ -21,8 +21,8 @@ import {
   VectorStoreFileDeleted,
   VectorStoreFilesPage,
 } from './files';
+import { APIPromise } from '../../../api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../pagination';
-import { APIPromise } from '../../../internal/api-promise';
 import { RequestOptions } from '../../../internal/request-options';
 
 export class VectorStores extends APIResource {

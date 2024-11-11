@@ -2,8 +2,8 @@
 
 import { APIResource } from '../../../resource';
 import * as VectorStoresAPI from './vector-stores';
+import { APIPromise } from '../../../api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../pagination';
-import { APIPromise } from '../../../internal/api-promise';
 import { RequestOptions } from '../../../internal/request-options';
 import { sleep } from 'openai/internal/utils';
 import { Uploadable } from 'openai/uploads';

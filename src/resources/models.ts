@@ -1,8 +1,8 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../resource';
+import { APIPromise } from '../api-promise';
 import { Page, PagePromise } from '../pagination';
-import { APIPromise } from '../internal/api-promise';
 import { RequestOptions } from '../internal/request-options';
 
 export class Models extends APIResource {

@@ -1,6 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import type { OpenAI } from './index';
+import type { OpenAI } from './client';
 
 export class APIResource {
   protected _client: OpenAI;

@@ -3,8 +3,8 @@
 import { APIResource } from '../../resource';
 import * as AudioAPI from './audio';
 import * as TranscriptionsAPI from './transcriptions';
+import { APIPromise } from '../../api-promise';
 import { type Uploadable, multipartFormRequestOptions } from '../../uploads';
-import { APIPromise } from '../../internal/api-promise';
 import { RequestOptions } from '../../internal/request-options';
 
 export class Translations extends APIResource {

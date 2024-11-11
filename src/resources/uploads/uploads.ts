@@ -4,7 +4,7 @@ import { APIResource } from '../../resource';
 import * as FilesAPI from '../files';
 import * as PartsAPI from './parts';
 import { PartCreateParams, Parts, UploadPart } from './parts';
-import { APIPromise } from '../../internal/api-promise';
+import { APIPromise } from '../../api-promise';
 import { RequestOptions } from '../../internal/request-options';
 
 export class Uploads extends APIResource {

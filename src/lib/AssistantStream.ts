@@ -30,7 +30,6 @@ import {
 import { RunStep, RunStepDelta, ToolCall, ToolCallDelta } from 'openai/resources/beta/threads/runs/steps';
 import { ThreadCreateAndRunParamsBase, Threads } from 'openai/resources/beta/threads/threads';
 import { BaseEvents, EventStream } from './EventStream';
-import MessageDelta = Messages.MessageDelta;
 import { isObj } from 'openai/internal/utils';
 
 export interface AssistantStreamEvents extends BaseEvents {
@@ -38,7 +37,7 @@ export interface AssistantStreamEvents extends BaseEvents {
 
   //New event structure
   messageCreated: (message: Message) => void;
-  messageDelta: (message: MessageDelta, snapshot: Message) => void;
+  messageDelta: (message: Messages.MessageDelta, snapshot: Message) => void;
   messageDone: (message: Message) => void;
 
   runStepCreated: (runStep: RunStep) => void;

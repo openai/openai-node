@@ -1,9 +1,7 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../../resource';
-import { type RequestOptions, isRequestOptions } from '../../../internal/request-options';
 import { AssistantStream, ThreadCreateAndRunParamsBaseStream } from '../../../lib/AssistantStream';
-import { APIPromise } from '../../../internal/api-promise';
 import * as ThreadsAPI from './threads';
 import * as Shared from '../../shared';
 import * as AssistantsAPI from '../assistants';
@@ -65,7 +63,9 @@ import {
   Runs,
   RunsPage,
 } from './runs/runs';
+import { APIPromise } from '../../../api-promise';
 import { Stream } from '../../../streaming';
+import { type RequestOptions, isRequestOptions } from '../../../internal/request-options';
 
 export class Threads extends APIResource {
   runs: RunsAPI.Runs = new RunsAPI.Runs(this._client);

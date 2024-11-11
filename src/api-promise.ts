@@ -1,7 +1,7 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { type PromiseOrValue } from './types';
-import { APIResponseProps, defaultParseResponse } from './parse';
+import { type PromiseOrValue } from './internal/types';
+import { APIResponseProps, defaultParseResponse } from './internal/parse';
 
 /**
  * A subclass of `Promise` providing additional helper methods

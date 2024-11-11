@@ -1,9 +1,9 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../resource';
+import { APIPromise } from '../api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../pagination';
 import { type Uploadable, multipartFormRequestOptions } from '../uploads';
-import { APIPromise } from '../internal/api-promise';
 import { RequestOptions } from '../internal/request-options';
 import { sleep } from 'openai/internal/utils';
 import { APIConnectionTimeoutError } from 'openai/error';
