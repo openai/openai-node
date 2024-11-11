@@ -1,25 +1,51 @@
-# OpenAI Node API Library
+# OpenAI Library for TypeScript and JavaScript
 
 [![NPM version](https://img.shields.io/npm/v/openai.svg)](https://npmjs.org/package/openai) ![npm bundle size](https://img.shields.io/bundlephobia/minzip/openai) [![JSR Version](https://jsr.io/badges/@openai/openai)](https://jsr.io/@openai/openai)
 
-This library provides convenient access to the OpenAI REST API from TypeScript or JavaScript.
-
-It is generated from our [OpenAPI specification](https://github.com/openai/openai-openapi) with [Stainless](https://stainlessapi.com/).
-
-To learn how to use the OpenAI API, check out our [API Reference](https://platform.openai.com/docs/api-reference) and [Documentation](https://platform.openai.com/docs).
+This library provides convenient access to the OpenAI REST API in server-side TypeScript or JavaScript applications. It is generated from our [OpenAPI specification](https://github.com/openai/openai-openapi) with [Stainless](https://stainlessapi.com/). To learn how to use the OpenAI API, check out our [API Reference](https://platform.openai.com/docs/api-reference) and [Documentation](https://platform.openai.com/docs).
 
 ## Installation
 
+This module is distributed on both the [npm](https://www.npmjs.com/package/openai) and [JSR](https://jsr.io/@openai/openai) registries.
+
+**Install from npm**
+
 ```sh
 npm install openai
+yarn add openai
+pnpm add openai
+bun install openai
 ```
 
-You can also import from jsr:
+These commands will make the module importable as the default export from 
+`openai` in JavaScript runtimes that use npm (Node.js, Cloudflare Workers, Bun, e.g.):
+
+```ts
+import OpenAI from 'openai';
+```
+
+**Install from JSR**
+
+```sh
+deno add jsr:@openai/openai
+npx jsr add @openai/openai
+yarn dlx jsr add @openai/openai
+pnpm dlx jsr add @openai/openai
+bunx jsr add @openai/openai
+```
+
+These commands will make the module importable from the `@openai` scope:
+
+```ts
+import OpenAI from "@openai/openai";
+```
+
+You can also [import directly from JSR](https://jsr.io/docs/using-packages#importing-with-jsr-specifiers) without an install step if you're using the Deno JavaScript runtime:
 
 <!-- x-release-please-start-version -->
 
 ```ts
-import OpenAI from 'jsr:@openai/openai';
+import OpenAI from "jsr:@openai/openai";
 ```
 
 <!-- x-release-please-end -->
@@ -39,7 +65,7 @@ const client = new OpenAI({
 async function main() {
   const chatCompletion = await client.chat.completions.create({
     messages: [{ role: 'user', content: 'Say this is a test' }],
-    model: 'gpt-3.5-turbo',
+    model: 'gpt-4o',
   });
 }
 
@@ -57,7 +83,7 @@ const client = new OpenAI();
 
 async function main() {
   const stream = await client.chat.completions.create({
-    model: 'gpt-4',
+    model: 'gpt-4o',
     messages: [{ role: 'user', content: 'Say this is a test' }],
     stream: true,
   });
@@ -87,7 +113,7 @@ const client = new OpenAI({
 async function main() {
   const params: OpenAI.Chat.ChatCompletionCreateParams = {
     messages: [{ role: 'user', content: 'Say this is a test' }],
-    model: 'gpt-3.5-turbo',
+    model: 'gpt-4o',
   };
   const chatCompletion: OpenAI.Chat.ChatCompletion = await client.chat.completions.create(params);
 }
@@ -173,7 +199,7 @@ const openai = new OpenAI();
 
 async function main() {
   const stream = await openai.beta.chat.completions.stream({
-    model: 'gpt-4',
+    model: 'gpt-4o',
     messages: [{ role: 'user', content: 'Say this is a test' }],
     stream: true,
   });
@@ -226,7 +252,7 @@ const client = new OpenAI();
 async function main() {
   const runner = client.beta.chat.completions
     .runTools({
-      model: 'gpt-3.5-turbo',
+      model: 'gpt-4o',
       messages: [{ role: 'user', content: 'How is the weather this week?' }],
       tools: [
         {
@@ -333,7 +359,7 @@ a subclass of `APIError` will be thrown:
 ```ts
 async function main() {
   const job = await client.fineTuning.jobs
-    .create({ model: 'gpt-3.5-turbo', training_file: 'file-abc123' })
+    .create({ model: 'gpt-4o', training_file: 'file-abc123' })
     .catch(async (err) => {
       if (err instanceof OpenAI.APIError) {
         console.log(err.status); // 400
@@ -368,7 +394,10 @@ Error codes are as followed:
 All object responses in the SDK provide a `_request_id` property which is added from the `x-request-id` response header so that you can quickly log failing requests and report them back to OpenAI.
 
 ```ts
-const completion = await client.chat.completions.create({ messages: [{ role: 'user', content: 'Say this is a test' }], model: 'gpt-4' });
+const completion = await client.chat.completions.create({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: 'Say this is a test' }],
+});
 console.log(completion._request_id) // req_123
 ```
 
@@ -392,7 +421,7 @@ const azureADTokenProvider = getBearerTokenProvider(credential, scope);
 const openai = new AzureOpenAI({ azureADTokenProvider });
 
 const result = await openai.chat.completions.create({
-  model: 'gpt-4-1106-preview',
+  model: 'gpt-4o',
   messages: [{ role: 'user', content: 'Say hello!' }],
 });
 
@@ -415,7 +444,15 @@ const client = new OpenAI({
 });
 
 // Or, configure per-request:
-await client.chat.completions.create({ messages: [{ role: 'user', content: 'How can I get the name of the current day in Node.js?' }], model: 'gpt-3.5-turbo' }, {
+await client.chat.completions.create({
+  model: 'gpt-4o',
+  messages: [
+    {
+      role: 'user',
+      content: 'How can I get the name of the current day in JavaScript?',
+    }
+  ]
+}, {
   maxRetries: 5,
 });
 ```
@@ -432,7 +469,15 @@ const client = new OpenAI({
 });
 
 // Override per-request:
-await client.chat.completions.create({ messages: [{ role: 'user', content: 'How can I list all files in a directory using Python?' }], model: 'gpt-3.5-turbo' }, {
+await client.chat.completions.create({
+  model: 'gpt-4o',
+  messages: [
+    {
+      role: 'user',
+      content: 'How can I list all files in a directory using Python?'
+    }
+  ]
+}, {
   timeout: 5 * 1000,
 });
 ```
@@ -485,13 +530,13 @@ You can also use the `.withResponse()` method to get the raw `Response` along wi
 const client = new OpenAI();
 
 const response = await client.chat.completions
-  .create({ messages: [{ role: 'user', content: 'Say this is a test' }], model: 'gpt-3.5-turbo' })
+  .create({ messages: [{ role: 'user', content: 'Say this is a test' }], model: 'gpt-4o' })
   .asResponse();
 console.log(response.headers.get('X-My-Header'));
 console.log(response.statusText); // access the underlying Response object
 
 const { data: chatCompletion, response: raw } = await client.chat.completions
-  .create({ messages: [{ role: 'user', content: 'Say this is a test' }], model: 'gpt-3.5-turbo' })
+  .create({ messages: [{ role: 'user', content: 'Say this is a test' }], model: 'gpt-4o' })
   .withResponse();
 console.log(raw.headers.get('X-My-Header'));
 console.log(chatCompletion);
@@ -622,7 +667,7 @@ TypeScript >= 4.5 is supported.
 The following runtimes are supported:
 
 - Node.js 18 LTS or later ([non-EOL](https://endoflife.date/nodejs)) versions.
-- Deno v1.28.0 or higher, using `import OpenAI from "npm:openai"`.
+- Deno v1.28.0 or higher.
 - Bun 1.0 or later.
 - Cloudflare Workers.
 - Vercel Edge Runtime.
