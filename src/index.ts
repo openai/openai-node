@@ -306,25 +306,6 @@ export class OpenAI extends Core.APIClient {
   static fileFromPath = Uploads.fileFromPath;
 }
 
-export {
-  OpenAIError,
-  APIError,
-  APIConnectionError,
-  APIConnectionTimeoutError,
-  APIUserAbortError,
-  NotFoundError,
-  ConflictError,
-  RateLimitError,
-  BadRequestError,
-  AuthenticationError,
-  InternalServerError,
-  PermissionDeniedError,
-  UnprocessableEntityError,
-} from './error';
-
-export import toFile = Uploads.toFile;
-export import fileFromPath = Uploads.fileFromPath;
-
 OpenAI.Completions = Completions;
 OpenAI.Chat = Chat;
 OpenAI.Embeddings = Embeddings;
@@ -340,7 +321,6 @@ OpenAI.Beta = Beta;
 OpenAI.Batches = Batches;
 OpenAI.BatchesPage = BatchesPage;
 OpenAI.Uploads = UploadsAPIUploads;
-
 export declare namespace OpenAI {
   export type RequestOptions = Core.RequestOptions;
 
@@ -471,5 +451,22 @@ export declare namespace OpenAI {
   export type ResponseFormatJSONSchema = API.ResponseFormatJSONSchema;
   export type ResponseFormatText = API.ResponseFormatText;
 }
+
+export { toFile, fileFromPath } from 'openai/uploads';
+export {
+  OpenAIError,
+  APIError,
+  APIConnectionError,
+  APIConnectionTimeoutError,
+  APIUserAbortError,
+  NotFoundError,
+  ConflictError,
+  RateLimitError,
+  BadRequestError,
+  AuthenticationError,
+  InternalServerError,
+  PermissionDeniedError,
+  UnprocessableEntityError,
+} from 'openai/error';
 
 export default OpenAI;
