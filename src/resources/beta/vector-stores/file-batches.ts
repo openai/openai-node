@@ -304,11 +304,11 @@ export interface FileBatchListFilesParams extends CursorPageParams {
 }
 
 export namespace FileBatches {
-  export import VectorStoreFileBatch = FileBatchesAPI.VectorStoreFileBatch;
-  export import FileBatchCreateParams = FileBatchesAPI.FileBatchCreateParams;
-  export import FileBatchRetrieveParams = FileBatchesAPI.FileBatchRetrieveParams;
-  export import FileBatchCancelParams = FileBatchesAPI.FileBatchCancelParams;
-  export import FileBatchListFilesParams = FileBatchesAPI.FileBatchListFilesParams;
+  export type VectorStoreFileBatch = FileBatchesAPI.VectorStoreFileBatch;
+  export type FileBatchCreateParams = FileBatchesAPI.FileBatchCreateParams;
+  export type FileBatchRetrieveParams = FileBatchesAPI.FileBatchRetrieveParams;
+  export type FileBatchCancelParams = FileBatchesAPI.FileBatchCancelParams;
+  export type FileBatchListFilesParams = FileBatchesAPI.FileBatchListFilesParams;
 }
 
-export { VectorStoreFilesPage };
+export { type VectorStoreFilesPage };

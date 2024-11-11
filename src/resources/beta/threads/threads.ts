@@ -110,7 +110,6 @@ export class Threads extends APIResource {
 }
 
 /**
-<<<<<<< HEAD
  * An object describing the expected output of the model. If `json_object` or
  * `json_schema`, only `function` type `tools` are allowed to be passed to the Run.
  * If `text` the model can return text or any value needed.
@@ -1493,63 +1492,67 @@ export namespace ThreadCreateAndRunStreamParams {
 }
 
 export namespace Threads {
-  export import AssistantResponseFormatOption = ThreadsAPI.AssistantResponseFormatOption;
-  export import AssistantToolChoice = ThreadsAPI.AssistantToolChoice;
-  export import AssistantToolChoiceFunction = ThreadsAPI.AssistantToolChoiceFunction;
-  export import AssistantToolChoiceOption = ThreadsAPI.AssistantToolChoiceOption;
-  export import Thread = ThreadsAPI.Thread;
-  export import ThreadDeleted = ThreadsAPI.ThreadDeleted;
-  export import ThreadCreateParams = ThreadsAPI.ThreadCreateParams;
-  export import ThreadUpdateParams = ThreadsAPI.ThreadUpdateParams;
-  export import ThreadCreateAndRunParams = ThreadsAPI.ThreadCreateAndRunParams;
-  export import ThreadCreateAndRunParamsNonStreaming = ThreadsAPI.ThreadCreateAndRunParamsNonStreaming;
-  export import ThreadCreateAndRunParamsStreaming = ThreadsAPI.ThreadCreateAndRunParamsStreaming;
-  export import ThreadCreateAndRunPollParams = ThreadsAPI.ThreadCreateAndRunPollParams;
-  export import ThreadCreateAndRunStreamParams = ThreadsAPI.ThreadCreateAndRunStreamParams;
+  export type AssistantResponseFormatOption = ThreadsAPI.AssistantResponseFormatOption;
+  export type AssistantToolChoice = ThreadsAPI.AssistantToolChoice;
+  export type AssistantToolChoiceFunction = ThreadsAPI.AssistantToolChoiceFunction;
+  export type AssistantToolChoiceOption = ThreadsAPI.AssistantToolChoiceOption;
+  export type Thread = ThreadsAPI.Thread;
+  export type ThreadDeleted = ThreadsAPI.ThreadDeleted;
+  export type ThreadCreateParams = ThreadsAPI.ThreadCreateParams;
+  export type ThreadUpdateParams = ThreadsAPI.ThreadUpdateParams;
+  export type ThreadCreateAndRunParams = ThreadsAPI.ThreadCreateAndRunParams;
+  export type ThreadCreateAndRunParamsNonStreaming = ThreadsAPI.ThreadCreateAndRunParamsNonStreaming;
+  export type ThreadCreateAndRunParamsStreaming = ThreadsAPI.ThreadCreateAndRunParamsStreaming;
+  export type ThreadCreateAndRunPollParams = ThreadsAPI.ThreadCreateAndRunPollParams;
+  export type ThreadCreateAndRunStreamParams = ThreadsAPI.ThreadCreateAndRunStreamParams;
   export import Runs = RunsAPI.Runs;
-  export import RequiredActionFunctionToolCall = RunsAPI.RequiredActionFunctionToolCall;
-  export import Run = RunsAPI.Run;
-  export import RunStatus = RunsAPI.RunStatus;
+  export type RequiredActionFunctionToolCall = RunsAPI.RequiredActionFunctionToolCall;
+  export type Run = RunsAPI.Run;
+  export type RunStatus = RunsAPI.RunStatus;
   export type RunsPage = RunsAPI.RunsPage;
-  export import RunCreateParams = RunsAPI.RunCreateParams;
-  export import RunCreateParamsNonStreaming = RunsAPI.RunCreateParamsNonStreaming;
-  export import RunCreateParamsStreaming = RunsAPI.RunCreateParamsStreaming;
-  export import RunUpdateParams = RunsAPI.RunUpdateParams;
-  export import RunListParams = RunsAPI.RunListParams;
-  export import RunSubmitToolOutputsParams = RunsAPI.RunSubmitToolOutputsParams;
-  export import RunSubmitToolOutputsParamsNonStreaming = RunsAPI.RunSubmitToolOutputsParamsNonStreaming;
-  export import RunSubmitToolOutputsParamsStreaming = RunsAPI.RunSubmitToolOutputsParamsStreaming;
+  export type RunCreateParams = RunsAPI.RunCreateParams;
+  export type RunCreateParamsNonStreaming = RunsAPI.RunCreateParamsNonStreaming;
+  export type RunCreateParamsStreaming = RunsAPI.RunCreateParamsStreaming;
+  export type RunRetrieveParams = RunsAPI.RunRetrieveParams;
+  export type RunUpdateParams = RunsAPI.RunUpdateParams;
+  export type RunListParams = RunsAPI.RunListParams;
+  export type RunCancelParams = RunsAPI.RunCancelParams;
+  export type RunSubmitToolOutputsParams = RunsAPI.RunSubmitToolOutputsParams;
+  export type RunSubmitToolOutputsParamsNonStreaming = RunsAPI.RunSubmitToolOutputsParamsNonStreaming;
+  export type RunSubmitToolOutputsParamsStreaming = RunsAPI.RunSubmitToolOutputsParamsStreaming;
   export import Messages = MessagesAPI.Messages;
-  export import Annotation = MessagesAPI.Annotation;
-  export import AnnotationDelta = MessagesAPI.AnnotationDelta;
-  export import FileCitationAnnotation = MessagesAPI.FileCitationAnnotation;
-  export import FileCitationDeltaAnnotation = MessagesAPI.FileCitationDeltaAnnotation;
-  export import FilePathAnnotation = MessagesAPI.FilePathAnnotation;
-  export import FilePathDeltaAnnotation = MessagesAPI.FilePathDeltaAnnotation;
-  export import ImageFile = MessagesAPI.ImageFile;
-  export import ImageFileContentBlock = MessagesAPI.ImageFileContentBlock;
-  export import ImageFileDelta = MessagesAPI.ImageFileDelta;
-  export import ImageFileDeltaBlock = MessagesAPI.ImageFileDeltaBlock;
-  export import ImageURL = MessagesAPI.ImageURL;
-  export import ImageURLContentBlock = MessagesAPI.ImageURLContentBlock;
-  export import ImageURLDelta = MessagesAPI.ImageURLDelta;
-  export import ImageURLDeltaBlock = MessagesAPI.ImageURLDeltaBlock;
-  export import Message = MessagesAPI.Message;
-  export import MessageContent = MessagesAPI.MessageContent;
-  export import MessageContentDelta = MessagesAPI.MessageContentDelta;
-  export import MessageContentPartParam = MessagesAPI.MessageContentPartParam;
-  export import MessageDeleted = MessagesAPI.MessageDeleted;
-  export import MessageDelta = MessagesAPI.MessageDelta;
-  export import MessageDeltaEvent = MessagesAPI.MessageDeltaEvent;
-  export import RefusalContentBlock = MessagesAPI.RefusalContentBlock;
-  export import RefusalDeltaBlock = MessagesAPI.RefusalDeltaBlock;
-  export import Text = MessagesAPI.Text;
-  export import TextContentBlock = MessagesAPI.TextContentBlock;
-  export import TextContentBlockParam = MessagesAPI.TextContentBlockParam;
-  export import TextDelta = MessagesAPI.TextDelta;
-  export import TextDeltaBlock = MessagesAPI.TextDeltaBlock;
+  export type Annotation = MessagesAPI.Annotation;
+  export type AnnotationDelta = MessagesAPI.AnnotationDelta;
+  export type FileCitationAnnotation = MessagesAPI.FileCitationAnnotation;
+  export type FileCitationDeltaAnnotation = MessagesAPI.FileCitationDeltaAnnotation;
+  export type FilePathAnnotation = MessagesAPI.FilePathAnnotation;
+  export type FilePathDeltaAnnotation = MessagesAPI.FilePathDeltaAnnotation;
+  export type ImageFile = MessagesAPI.ImageFile;
+  export type ImageFileContentBlock = MessagesAPI.ImageFileContentBlock;
+  export type ImageFileDelta = MessagesAPI.ImageFileDelta;
+  export type ImageFileDeltaBlock = MessagesAPI.ImageFileDeltaBlock;
+  export type ImageURL = MessagesAPI.ImageURL;
+  export type ImageURLContentBlock = MessagesAPI.ImageURLContentBlock;
+  export type ImageURLDelta = MessagesAPI.ImageURLDelta;
+  export type ImageURLDeltaBlock = MessagesAPI.ImageURLDeltaBlock;
+  export type Message = MessagesAPI.Message;
+  export type MessageContent = MessagesAPI.MessageContent;
+  export type MessageContentDelta = MessagesAPI.MessageContentDelta;
+  export type MessageContentPartParam = MessagesAPI.MessageContentPartParam;
+  export type MessageDeleted = MessagesAPI.MessageDeleted;
+  export type MessageDelta = MessagesAPI.MessageDelta;
+  export type MessageDeltaEvent = MessagesAPI.MessageDeltaEvent;
+  export type RefusalContentBlock = MessagesAPI.RefusalContentBlock;
+  export type RefusalDeltaBlock = MessagesAPI.RefusalDeltaBlock;
+  export type Text = MessagesAPI.Text;
+  export type TextContentBlock = MessagesAPI.TextContentBlock;
+  export type TextContentBlockParam = MessagesAPI.TextContentBlockParam;
+  export type TextDelta = MessagesAPI.TextDelta;
+  export type TextDeltaBlock = MessagesAPI.TextDeltaBlock;
   export type MessagesPage = MessagesAPI.MessagesPage;
-  export import MessageCreateParams = MessagesAPI.MessageCreateParams;
-  export import MessageUpdateParams = MessagesAPI.MessageUpdateParams;
-  export import MessageListParams = MessagesAPI.MessageListParams;
+  export type MessageCreateParams = MessagesAPI.MessageCreateParams;
+  export type MessageRetrieveParams = MessagesAPI.MessageRetrieveParams;
+  export type MessageUpdateParams = MessagesAPI.MessageUpdateParams;
+  export type MessageListParams = MessagesAPI.MessageListParams;
+  export type MessageDeleteParams = MessagesAPI.MessageDeleteParams;
 }

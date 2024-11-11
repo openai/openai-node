@@ -240,10 +240,10 @@ export interface BatchCreateParams {
 export interface BatchListParams extends CursorPageParams {}
 
 export namespace Batches {
-  export import Batch = BatchesAPI.Batch;
-  export import BatchError = BatchesAPI.BatchError;
-  export import BatchRequestCounts = BatchesAPI.BatchRequestCounts;
+  export type Batch = BatchesAPI.Batch;
+  export type BatchError = BatchesAPI.BatchError;
+  export type BatchRequestCounts = BatchesAPI.BatchRequestCounts;
   export type BatchesPage = BatchesAPI.BatchesPage;
-  export import BatchCreateParams = BatchesAPI.BatchCreateParams;
-  export import BatchListParams = BatchesAPI.BatchListParams;
+  export type BatchCreateParams = BatchesAPI.BatchCreateParams;
+  export type BatchListParams = BatchesAPI.BatchListParams;
 }

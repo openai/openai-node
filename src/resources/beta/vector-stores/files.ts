@@ -293,11 +293,11 @@ export interface FileDeleteParams {
 }
 
 export namespace Files {
-  export import VectorStoreFile = FilesAPI.VectorStoreFile;
-  export import VectorStoreFileDeleted = FilesAPI.VectorStoreFileDeleted;
+  export type VectorStoreFile = FilesAPI.VectorStoreFile;
+  export type VectorStoreFileDeleted = FilesAPI.VectorStoreFileDeleted;
   export type VectorStoreFilesPage = FilesAPI.VectorStoreFilesPage;
-  export import FileCreateParams = FilesAPI.FileCreateParams;
-  export import FileRetrieveParams = FilesAPI.FileRetrieveParams;
-  export import FileListParams = FilesAPI.FileListParams;
-  export import FileDeleteParams = FilesAPI.FileDeleteParams;
+  export type FileCreateParams = FilesAPI.FileCreateParams;
+  export type FileRetrieveParams = FilesAPI.FileRetrieveParams;
+  export type FileListParams = FilesAPI.FileListParams;
+  export type FileDeleteParams = FilesAPI.FileDeleteParams;
 }

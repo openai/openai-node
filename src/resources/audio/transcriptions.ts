@@ -190,10 +190,10 @@ export interface TranscriptionCreateParams {
 }
 
 export namespace Transcriptions {
-  export import Transcription = TranscriptionsAPI.Transcription;
-  export import TranscriptionSegment = TranscriptionsAPI.TranscriptionSegment;
-  export import TranscriptionVerbose = TranscriptionsAPI.TranscriptionVerbose;
-  export import TranscriptionWord = TranscriptionsAPI.TranscriptionWord;
-  export import TranscriptionCreateResponse = TranscriptionsAPI.TranscriptionCreateResponse;
-  export import TranscriptionCreateParams = TranscriptionsAPI.TranscriptionCreateParams;
+  export type Transcription = TranscriptionsAPI.Transcription;
+  export type TranscriptionSegment = TranscriptionsAPI.TranscriptionSegment;
+  export type TranscriptionVerbose = TranscriptionsAPI.TranscriptionVerbose;
+  export type TranscriptionWord = TranscriptionsAPI.TranscriptionWord;
+  export type TranscriptionCreateResponse = TranscriptionsAPI.TranscriptionCreateResponse;
+  export type TranscriptionCreateParams = TranscriptionsAPI.TranscriptionCreateParams;
 }
