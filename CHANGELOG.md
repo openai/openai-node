@@ -1,5 +1,18 @@
 # Changelog
 
+## 4.72.0 (2024-11-12)
+
+Full Changelog: [v4.71.1...v4.72.0](https://github.com/openai/openai-node/compare/v4.71.1...v4.72.0)
+
+### Features
+
+* add back deno runtime testing without type checks ([1626cf5](https://github.com/openai/openai-node/commit/1626cf57e94706e1fc8b2f9ff4f173fe486d5150))
+
+
+### Chores
+
+* **ecosystem-tests:** bump wrangler version ([#1178](https://github.com/openai/openai-node/issues/1178)) ([4dfb0c6](https://github.com/openai/openai-node/commit/4dfb0c6aa7c4530665bc7d6beebcd04aa1490e27))
+
 ## 4.71.1 (2024-11-06)
 
 Full Changelog: [v4.71.0...v4.71.1](https://github.com/openai/openai-node/compare/v4.71.0...v4.71.1)
