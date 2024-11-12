@@ -4,7 +4,7 @@
   "main": "index.js",
   "private": true,
   "scripts": {
-    "tsc": "tsc && tsc -p tsconfig.nodenext.json && tsc -p node_modules/openai/src/tsconfig.json",
+    "tsc": "tsc && tsc -p tsconfig.nodenext.json",
     "test": "jest"
   },
   "dependencies": {
