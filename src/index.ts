@@ -452,7 +452,7 @@ export declare namespace OpenAI {
   export type ResponseFormatText = API.ResponseFormatText;
 }
 
-export { toFile, fileFromPath } from 'openai/uploads';
+export { toFile, fileFromPath } from './uploads';
 export {
   OpenAIError,
   APIError,
@@ -467,6 +467,6 @@ export {
   InternalServerError,
   PermissionDeniedError,
   UnprocessableEntityError,
-} from 'openai/error';
+} from './error';
 
 export default OpenAI;
