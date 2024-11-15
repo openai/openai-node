@@ -47,7 +47,6 @@
     "prettier": "^3.0.0",
     "prettier-2": "npm:prettier@^2",
     "ts-jest": "^29.1.0",
-    "ts-morph": "^19.0.0",
     "ts-node": "^10.5.0",
     "tsc-multi": "^1.1.0",
     "tsconfig-paths": "^4.0.0",
