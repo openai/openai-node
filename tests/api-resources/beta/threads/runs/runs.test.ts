@@ -28,94 +28,7 @@ describe('resource runs', () => {
         {
           content: 'string',
           role: 'user',
-          attachments: [
-            {
-              file_id: 'file_id',
-              tools: [
-                { type: 'code_interpreter' },
-                { type: 'code_interpreter' },
-                { type: 'code_interpreter' },
-              ],
-            },
-            {
-              file_id: 'file_id',
-              tools: [
-                { type: 'code_interpreter' },
-                { type: 'code_interpreter' },
-                { type: 'code_interpreter' },
-              ],
-            },
-            {
-              file_id: 'file_id',
-              tools: [
-                { type: 'code_interpreter' },
-                { type: 'code_interpreter' },
-                { type: 'code_interpreter' },
-              ],
-            },
-          ],
-          metadata: {},
-        },
-        {
-          content: 'string',
-          role: 'user',
-          attachments: [
-            {
-              file_id: 'file_id',
-              tools: [
-                { type: 'code_interpreter' },
-                { type: 'code_interpreter' },
-                { type: 'code_interpreter' },
-              ],
-            },
-            {
-              file_id: 'file_id',
-              tools: [
-                { type: 'code_interpreter' },
-                { type: 'code_interpreter' },
-                { type: 'code_interpreter' },
-              ],
-            },
-            {
-              file_id: 'file_id',
-              tools: [
-                { type: 'code_interpreter' },
-                { type: 'code_interpreter' },
-                { type: 'code_interpreter' },
-              ],
-            },
-          ],
-          metadata: {},
-        },
-        {
-          content: 'string',
-          role: 'user',
-          attachments: [
-            {
-              file_id: 'file_id',
-              tools: [
-                { type: 'code_interpreter' },
-                { type: 'code_interpreter' },
-                { type: 'code_interpreter' },
-              ],
-            },
-            {
-              file_id: 'file_id',
-              tools: [
-                { type: 'code_interpreter' },
-                { type: 'code_interpreter' },
-                { type: 'code_interpreter' },
-              ],
-            },
-            {
-              file_id: 'file_id',
-              tools: [
-                { type: 'code_interpreter' },
-                { type: 'code_interpreter' },
-                { type: 'code_interpreter' },
-              ],
-            },
-          ],
+          attachments: [{ file_id: 'file_id', tools: [{ type: 'code_interpreter' }] }],
           metadata: {},
         },
       ],
@@ -129,7 +42,7 @@ describe('resource runs', () => {
       stream: false,
       temperature: 1,
       tool_choice: 'none',
-      tools: [{ type: 'code_interpreter' }, { type: 'code_interpreter' }, { type: 'code_interpreter' }],
+      tools: [{ type: 'code_interpreter' }],
       top_p: 1,
       truncation_strategy: { type: 'auto', last_messages: 1 },
     });
@@ -208,7 +121,7 @@ describe('resource runs', () => {
   test('submitToolOutputs: only required params', async () => {
     const responsePromise = client.beta.threads.runs.submitToolOutputs('run_id', {
       thread_id: 'thread_id',
-      tool_outputs: [{}, {}, {}],
+      tool_outputs: [{}],
     });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
@@ -222,11 +135,7 @@ describe('resource runs', () => {
   test('submitToolOutputs: required and optional params', async () => {
     const response = await client.beta.threads.runs.submitToolOutputs('run_id', {
       thread_id: 'thread_id',
-      tool_outputs: [
-        { output: 'output', tool_call_id: 'tool_call_id' },
-        { output: 'output', tool_call_id: 'tool_call_id' },
-        { output: 'output', tool_call_id: 'tool_call_id' },
-      ],
+      tool_outputs: [{ output: 'output', tool_call_id: 'tool_call_id' }],
       stream: false,
     });
   });

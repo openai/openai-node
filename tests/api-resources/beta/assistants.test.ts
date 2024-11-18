@@ -29,15 +29,13 @@ describe('resource assistants', () => {
       response_format: 'auto',
       temperature: 1,
       tool_resources: {
-        code_interpreter: { file_ids: ['string', 'string', 'string'] },
+        code_interpreter: { file_ids: ['string'] },
         file_search: {
           vector_store_ids: ['string'],
-          vector_stores: [
-            { chunking_strategy: { type: 'auto' }, file_ids: ['string', 'string', 'string'], metadata: {} },
-          ],
+          vector_stores: [{ chunking_strategy: { type: 'auto' }, file_ids: ['string'], metadata: {} }],
         },
       },
-      tools: [{ type: 'code_interpreter' }, { type: 'code_interpreter' }, { type: 'code_interpreter' }],
+      tools: [{ type: 'code_interpreter' }],
       top_p: 1,
     });
   });
