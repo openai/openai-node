@@ -27,20 +27,7 @@ describe('resource messages', () => {
     const response = await client.beta.threads.messages.create('thread_id', {
       content: 'string',
       role: 'user',
-      attachments: [
-        {
-          file_id: 'file_id',
-          tools: [{ type: 'code_interpreter' }, { type: 'code_interpreter' }, { type: 'code_interpreter' }],
-        },
-        {
-          file_id: 'file_id',
-          tools: [{ type: 'code_interpreter' }, { type: 'code_interpreter' }, { type: 'code_interpreter' }],
-        },
-        {
-          file_id: 'file_id',
-          tools: [{ type: 'code_interpreter' }, { type: 'code_interpreter' }, { type: 'code_interpreter' }],
-        },
-      ],
+      attachments: [{ file_id: 'file_id', tools: [{ type: 'code_interpreter' }] }],
       metadata: {},
     });
   });
