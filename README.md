@@ -30,7 +30,7 @@ const client = new OpenAI({
 async function main() {
   const chatCompletion = await client.chat.completions.create({
     messages: [{ role: 'user', content: 'Say this is a test' }],
-    model: 'gpt-3.5-turbo',
+    model: 'gpt-4o',
   });
 }
 
@@ -48,7 +48,7 @@ const client = new OpenAI();
 
 async function main() {
   const stream = await client.chat.completions.create({
-    model: 'gpt-4',
+    model: 'gpt-4o',
     messages: [{ role: 'user', content: 'Say this is a test' }],
     stream: true,
   });
@@ -78,7 +78,7 @@ const client = new OpenAI({
 async function main() {
   const params: OpenAI.Chat.ChatCompletionCreateParams = {
     messages: [{ role: 'user', content: 'Say this is a test' }],
-    model: 'gpt-3.5-turbo',
+    model: 'gpt-4o',
   };
   const chatCompletion: OpenAI.Chat.ChatCompletion = await client.chat.completions.create(params);
 }
@@ -323,7 +323,7 @@ a subclass of `APIError` will be thrown:
 ```ts
 async function main() {
   const job = await client.fineTuning.jobs
-    .create({ model: 'gpt-3.5-turbo', training_file: 'file-abc123' })
+    .create({ model: 'gpt-4o', training_file: 'file-abc123' })
     .catch(async (err) => {
       if (err instanceof OpenAI.APIError) {
         console.log(err.status); // 400
@@ -394,7 +394,7 @@ const client = new OpenAI({
 });
 
 // Or, configure per-request:
-await client.chat.completions.create({ messages: [{ role: 'user', content: 'How can I get the name of the current day in Node.js?' }], model: 'gpt-3.5-turbo' }, {
+await client.chat.completions.create({ messages: [{ role: 'user', content: 'How can I get the name of the current day in JavaScript?' }], model: 'gpt-4o' }, {
   maxRetries: 5,
 });
 ```
@@ -411,7 +411,7 @@ const client = new OpenAI({
 });
 
 // Override per-request:
-await client.chat.completions.create({ messages: [{ role: 'user', content: 'How can I list all files in a directory using Python?' }], model: 'gpt-3.5-turbo' }, {
+await client.chat.completions.create({ messages: [{ role: 'user', content: 'How can I list all files in a directory using Python?' }], model: 'gpt-4o' }, {
   timeout: 5 * 1000,
 });
 ```
@@ -464,13 +464,13 @@ You can also use the `.withResponse()` method to get the raw `Response` along wi
 const client = new OpenAI();
 
 const response = await client.chat.completions
-  .create({ messages: [{ role: 'user', content: 'Say this is a test' }], model: 'gpt-3.5-turbo' })
+  .create({ messages: [{ role: 'user', content: 'Say this is a test' }], model: 'gpt-4o' })
   .asResponse();
 console.log(response.headers.get('X-My-Header'));
 console.log(response.statusText); // access the underlying Response object
 
 const { data: chatCompletion, response: raw } = await client.chat.completions
-  .create({ messages: [{ role: 'user', content: 'Say this is a test' }], model: 'gpt-3.5-turbo' })
+  .create({ messages: [{ role: 'user', content: 'Say this is a test' }], model: 'gpt-4o' })
   .withResponse();
 console.log(raw.headers.get('X-My-Header'));
 console.log(chatCompletion);
