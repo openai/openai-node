@@ -19,7 +19,7 @@ import {
   ChatCompletionStreamingToolRunnerParams,
 } from './ChatCompletionStreamingRunner';
 import { isAssistantMessage, isFunctionMessage, isToolMessage } from './chatCompletionUtils';
-import { RequestOptions } from 'openai/internal/request-options';
+import { RequestOptions } from '../internal/request-options';
 import { BaseEvents, EventStream } from './EventStream';
 import { ParsedChatCompletion } from '../resources/beta/chat/completions';
 import OpenAI from '../index';

@@ -9,7 +9,7 @@ import {
   Messages,
   MessageContent,
 } from 'openai/resources/beta/threads/messages';
-import { RequestOptions } from 'openai/internal/request-options';
+import { RequestOptions } from '../internal/request-options';
 import {
   Run,
   RunCreateParamsBase,
@@ -18,7 +18,7 @@ import {
   RunSubmitToolOutputsParamsBase,
   RunSubmitToolOutputsParamsStreaming,
 } from 'openai/resources/beta/threads/runs/runs';
-import type { ReadableStream } from 'openai/internal/shim-types';
+import type { ReadableStream } from '../internal/shim-types';
 import { Stream } from 'openai/streaming';
 import { APIUserAbortError, OpenAIError } from 'openai/error';
 import {
@@ -30,7 +30,7 @@ import {
 import { RunStep, RunStepDelta, ToolCall, ToolCallDelta } from 'openai/resources/beta/threads/runs/steps';
 import { ThreadCreateAndRunParamsBase, Threads } from 'openai/resources/beta/threads/threads';
 import { BaseEvents, EventStream } from './EventStream';
-import { isObj } from 'openai/internal/utils';
+import { isObj } from '../internal/utils';
 
 export interface AssistantStreamEvents extends BaseEvents {
   run: (run: Run) => void;

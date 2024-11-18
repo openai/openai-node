@@ -1,5 +1,5 @@
 import { APIUserAbortError, OpenAIError } from 'openai/error';
-import { isAbortError } from 'openai/internal/errors';
+import { isAbortError } from '../internal/errors';
 
 export class EventStream<EventTypes extends BaseEvents> {
   controller: AbortController = new AbortController();

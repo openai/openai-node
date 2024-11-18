@@ -5,7 +5,7 @@ import { APIPromise } from '../api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../pagination';
 import { type Uploadable, multipartFormRequestOptions } from '../uploads';
 import { RequestOptions } from '../internal/request-options';
-import { sleep } from 'openai/internal/utils';
+import { sleep } from '../internal/utils';
 import { APIConnectionTimeoutError } from 'openai/error';
 
 export class Files extends APIResource {

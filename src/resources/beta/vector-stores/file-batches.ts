@@ -7,7 +7,7 @@ import * as VectorStoresAPI from './vector-stores';
 import { APIPromise } from '../../../api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../pagination';
 import { RequestOptions } from '../../../internal/request-options';
-import { sleep } from 'openai/internal/utils';
+import { sleep } from '../../../internal/utils';
 import { Uploadable } from 'openai/uploads';
 import { allSettledWithThrow } from 'openai/lib/Util';
 
