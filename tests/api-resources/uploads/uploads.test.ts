@@ -53,9 +53,7 @@ describe('resource uploads', () => {
   });
 
   test('complete: only required params', async () => {
-    const responsePromise = client.uploads.complete('upload_abc123', {
-      part_ids: ['string', 'string', 'string'],
-    });
+    const responsePromise = client.uploads.complete('upload_abc123', { part_ids: ['string'] });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -66,9 +64,6 @@ describe('resource uploads', () => {
   });
 
   test('complete: required and optional params', async () => {
-    const response = await client.uploads.complete('upload_abc123', {
-      part_ids: ['string', 'string', 'string'],
-      md5: 'md5',
-    });
+    const response = await client.uploads.complete('upload_abc123', { part_ids: ['string'], md5: 'md5' });
   });
 });
