@@ -8,11 +8,11 @@ export {
   Uploadable,
   createForm,
   toFile,
-} from 'openai/uploads';
-export { APIPromise } from 'openai/api-promise';
-export { OpenAI, ClientOptions } from 'openai/client';
-export { AzureOpenAI, AzureClientOptions } from 'openai/azure';
-export { PagePromise } from 'openai/pagination';
+} from './uploads';
+export { APIPromise } from './api-promise';
+export { OpenAI, ClientOptions } from './client';
+export { AzureOpenAI, AzureClientOptions } from './azure';
+export { PagePromise } from './pagination';
 export {
   OpenAIError,
   APIError,
@@ -27,4 +27,4 @@ export {
   InternalServerError,
   PermissionDeniedError,
   UnprocessableEntityError,
-} from 'openai/error';
+} from './error';
