@@ -199,7 +199,10 @@ export interface ClientOptions {
   dangerouslyAllowBrowser?: boolean;
 }
 
-export class BaseOpenAI {
+/**
+ * API Client for interfacing with the OpenAI API.
+ */
+export class OpenAI {
   apiKey: string;
   organization: string | null;
   project: string | null;
@@ -721,12 +724,7 @@ export class BaseOpenAI {
   static UnprocessableEntityError = Errors.UnprocessableEntityError;
 
   static toFile = Uploads.toFile;
-}
 
-/**
- * API Client for interfacing with the OpenAI API.
- */
-export class OpenAI extends BaseOpenAI {
   completions: API.Completions = new API.Completions(this);
   chat: API.Chat = new API.Chat(this);
   embeddings: API.Embeddings = new API.Embeddings(this);
