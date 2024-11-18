@@ -904,6 +904,17 @@
     semver "^7.5.4"
     ts-api-utils "^1.0.1"
 
+"@typescript-eslint/parser@^6.0.0":
+  version "6.21.0"
+  resolved "https://registry.yarnpkg.com/@typescript-eslint/parser/-/parser-6.21.0.tgz#af8fcf66feee2edc86bc5d1cf45e33b0630bf35b"
+  integrity sha512-tbsV1jPne5CkFQCgPBcDOt30ItF7aJoZL997JSF7MhGQqOeT3svWRYxiqlfA5RUdlHN6Fi+EI9bxqbdyAUZjYQ==
+  dependencies:
+    "@typescript-eslint/scope-manager" "6.21.0"
+    "@typescript-eslint/types" "6.21.0"
+    "@typescript-eslint/typescript-estree" "6.21.0"
+    "@typescript-eslint/visitor-keys" "6.21.0"
+    debug "^4.3.4"
+
 "@typescript-eslint/scope-manager@6.21.0":
   version "6.21.0"
   resolved "https://registry.yarnpkg.com/@typescript-eslint/scope-manager/-/scope-manager-6.21.0.tgz#ea8a9bfc8f1504a6ac5d59a6df308d3a0630a2b1"
