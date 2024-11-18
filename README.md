@@ -173,7 +173,7 @@ const openai = new OpenAI();
 
 async function main() {
   const stream = await openai.beta.chat.completions.stream({
-    model: 'gpt-4',
+    model: 'gpt-4o',
     messages: [{ role: 'user', content: 'Say this is a test' }],
     stream: true,
   });
@@ -226,7 +226,7 @@ const client = new OpenAI();
 async function main() {
   const runner = client.beta.chat.completions
     .runTools({
-      model: 'gpt-3.5-turbo',
+      model: 'gpt-4o',
       messages: [{ role: 'user', content: 'How is the weather this week?' }],
       tools: [
         {
@@ -368,7 +368,7 @@ Error codes are as followed:
 All object responses in the SDK provide a `_request_id` property which is added from the `x-request-id` response header so that you can quickly log failing requests and report them back to OpenAI.
 
 ```ts
-const completion = await client.chat.completions.create({ messages: [{ role: 'user', content: 'Say this is a test' }], model: 'gpt-4' });
+const completion = await client.chat.completions.create({ messages: [{ role: 'user', content: 'Say this is a test' }], model: 'gpt-4o' });
 console.log(completion._request_id) // req_123
 ```
 
@@ -392,7 +392,7 @@ const azureADTokenProvider = getBearerTokenProvider(credential, scope);
 const openai = new AzureOpenAI({ azureADTokenProvider });
 
 const result = await openai.chat.completions.create({
-  model: 'gpt-4-1106-preview',
+  model: 'gpt-4o',
   messages: [{ role: 'user', content: 'Say hello!' }],
 });
 
