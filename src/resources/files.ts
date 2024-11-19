@@ -5,8 +5,6 @@ import { APIPromise } from '../api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../pagination';
 import { type Uploadable, multipartFormRequestOptions } from '../uploads';
 import { RequestOptions } from '../internal/request-options';
-import { sleep } from '../internal/utils';
-import { APIConnectionTimeoutError } from 'openai/error';
 
 export class Files extends APIResource {
   /**
@@ -63,34 +61,8 @@ export class Files extends APIResource {
   /**
    * Returns the contents of the specified file.
    */
-  content(fileId: string, options?: RequestOptions): APIPromise<Response> {
-    return this._client.get(`/files/${fileId}/content`, { ...options, __binaryResponse: true });
-  }
-
-  /**
-   * Waits for the given file to be processed, default timeout is 30 mins.
-   */
-  async waitForProcessing(
-    id: string,
-    { pollInterval = 5000, maxWait = 30 * 60 * 1000 }: { pollInterval?: number; maxWait?: number } = {},
-  ): Promise<FileObject> {
-    const TERMINAL_STATES = new Set(['processed', 'error', 'deleted']);
-
-    const start = Date.now();
-    let file = await this.retrieve(id);
-
-    while (!file.status || !TERMINAL_STATES.has(file.status)) {
-      await sleep(pollInterval);
-
-      file = await this.retrieve(id);
-      if (Date.now() - start > maxWait) {
-        throw new APIConnectionTimeoutError({
-          message: `Giving up on waiting for file ${id} to finish processing after ${maxWait} milliseconds.`,
-        });
-      }
-    }
-
-    return file;
+  content(fileID: string, options?: RequestOptions): APIPromise<Response> {
+    return this._client.get(`/files/${fileID}/content`, { ...options, __binaryResponse: true });
   }
 
   /**

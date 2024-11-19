@@ -29,7 +29,7 @@ describe('resource completions', () => {
       audio: { format: 'wav', voice: 'alloy' },
       frequency_penalty: -2,
       function_call: 'none',
-      functions: [{ description: 'description', name: 'name', parameters: { foo: 'bar' } }],
+      functions: [{ name: 'name', description: 'description', parameters: { foo: 'bar' } }],
       logit_bias: { foo: 0 },
       logprobs: true,
       max_completion_tokens: 0,
@@ -51,8 +51,8 @@ describe('resource completions', () => {
       tool_choice: 'none',
       tools: [
         {
+          function: { name: 'name', description: 'description', parameters: { foo: 'bar' }, strict: true },
           type: 'function',
-          function: { description: 'description', name: 'name', parameters: { foo: 'bar' }, strict: true },
         },
       ],
       top_logprobs: 0,

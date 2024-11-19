@@ -20,8 +20,6 @@ import {
   RunStreamEvent,
   ThreadStreamEvent,
 } from './assistants';
-import * as ChatAPI from './chat/chat';
-import { Chat } from './chat/chat';
 import * as ThreadsAPI from './threads/threads';
 import {
   AssistantResponseFormatOption,
@@ -57,7 +55,6 @@ import {
 
 export class Beta extends APIResource {
   vectorStores: VectorStoresAPI.VectorStores = new VectorStoresAPI.VectorStores(this._client);
-  chat: ChatAPI.Chat = new ChatAPI.Chat(this._client);
   assistants: AssistantsAPI.Assistants = new AssistantsAPI.Assistants(this._client);
   threads: ThreadsAPI.Threads = new ThreadsAPI.Threads(this._client);
 }
@@ -65,7 +62,6 @@ export class Beta extends APIResource {
 Beta.VectorStores = VectorStores;
 Beta.Assistants = Assistants;
 Beta.Threads = Threads;
-Beta.Chat = Chat;
 
 export declare namespace Beta {
   export {
@@ -84,8 +80,6 @@ export declare namespace Beta {
     type VectorStoreUpdateParams as VectorStoreUpdateParams,
     type VectorStoreListParams as VectorStoreListParams,
   };
-
-  export { Chat as Chat };
 
   export {
     Assistants as Assistants,

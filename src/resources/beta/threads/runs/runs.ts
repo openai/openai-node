@@ -35,12 +35,6 @@ import { APIPromise } from '../../../../api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../../pagination';
 import { Stream } from '../../../../streaming';
 import { RequestOptions } from '../../../../internal/request-options';
-import { sleep } from '../../../../internal/utils';
-import {
-  AssistantStream,
-  RunCreateParamsBaseStream,
-  RunSubmitToolOutputsParamsStream,
-} from '../../../../lib/AssistantStream';
 
 export class Runs extends APIResource {
   steps: StepsAPI.Steps = new StepsAPI.Steps(this._client);
@@ -124,84 +118,7 @@ export class Runs extends APIResource {
   }
 
   /**
-   * A helper to create a run an poll for a terminal state. More information on Run
-   * lifecycles can be found here:
-   * https://platform.openai.com/docs/assistants/how-it-works/runs-and-run-steps
-   */
-  async createAndPoll(
-    threadId: string,
-    body: RunCreateParamsNonStreaming,
-    options?: RequestOptions & { pollIntervalMs?: number },
-  ): Promise<Run> {
-    const run = await this.create(threadId, body, options);
-    return await this.poll(threadId, run.id, options);
-  }
-  /**
-   * A helper to poll a run status until it reaches a terminal state. More
-   * information on Run lifecycles can be found here:
-   * https://platform.openai.com/docs/assistants/how-it-works/runs-and-run-steps
-   */
-  async poll(
-    threadId: string,
-    runId: string,
-    options?: RequestOptions & { pollIntervalMs?: number },
-  ): Promise<Run> {
-    const headers: { [key: string]: string } = { ...options?.headers, 'X-Stainless-Poll-Helper': 'true' };
-
-    if (options?.pollIntervalMs) {
-      headers['X-Stainless-Custom-Poll-Interval'] = options.pollIntervalMs.toString();
-    }
-
-    while (true) {
-      const { data: run, response } = await this.retrieve(
-        runId,
-        { thread_id: threadId },
-        {
-          ...options,
-          headers: { ...options?.headers, ...headers },
-        },
-      ).withResponse();
-
-      switch (run.status) {
-        //If we are in any sort of intermediate state we poll
-        case 'queued':
-        case 'in_progress':
-        case 'cancelling':
-          let sleepInterval = 5000;
-
-          if (options?.pollIntervalMs) {
-            sleepInterval = options.pollIntervalMs;
-          } else {
-            const headerInterval = response.headers.get('openai-poll-after-ms');
-            if (headerInterval) {
-              const headerIntervalMs = parseInt(headerInterval);
-              if (!isNaN(headerIntervalMs)) {
-                sleepInterval = headerIntervalMs;
-              }
-            }
-          }
-          await sleep(sleepInterval);
-          break;
-        //We return the run in any terminal state.
-        case 'requires_action':
-        case 'incomplete':
-        case 'cancelled':
-        case 'completed':
-        case 'failed':
-        case 'expired':
-          return run;
-      }
-    }
-  }
-
-  /**
-   * Create a Run stream
-   */
-  stream(threadId: string, body: RunCreateParamsBaseStream, options?: RequestOptions): AssistantStream {
-    return AssistantStream.createAssistantStream(threadId, this._client.beta.threads.runs, body, options);
-  }
-
-  /* When a run has the `status: "requires_action"` and `required_action.type` is
+   * When a run has the `status: "requires_action"` and `required_action.type` is
    * `submit_tool_outputs`, this endpoint can be used to submit the outputs from the
    * tool calls once they're all completed. All outputs must be submitted in a single
    * request.
@@ -233,33 +150,6 @@ export class Runs extends APIResource {
       headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
       stream: params.stream ?? false,
     }) as APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
-  }
-
-  /**
-   * A helper to submit a tool output to a run and poll for a terminal run state.
-   * More information on Run lifecycles can be found here:
-   * https://platform.openai.com/docs/assistants/how-it-works/runs-and-run-steps
-   */
-  async submitToolOutputsAndPoll(
-    runId: string,
-    params: RunSubmitToolOutputsParamsNonStreaming,
-    options?: RequestOptions & { pollIntervalMs?: number },
-  ): Promise<Run> {
-    const run = await this.submitToolOutputs(runId, params, options);
-    return await this.poll(params.thread_id, run.id, options);
-  }
-
-  /**
-   * Submit the tool outputs from a previous run and stream the run to a terminal
-   * state. More information on Run lifecycles can be found here:
-   * https://platform.openai.com/docs/assistants/how-it-works/runs-and-run-steps
-   */
-  submitToolOutputsStream(
-    runId: string,
-    body: RunSubmitToolOutputsParamsStream,
-    options?: RequestOptions,
-  ): AssistantStream {
-    return AssistantStream.createToolAssistantStream(runId, this._client.beta.threads.runs, body, options);
   }
 }
 

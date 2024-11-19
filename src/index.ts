@@ -11,7 +11,6 @@ export {
 } from './uploads';
 export { APIPromise } from './api-promise';
 export { OpenAI, ClientOptions } from './client';
-export { AzureOpenAI, AzureClientOptions } from './azure';
 export { PagePromise } from './pagination';
 export {
   OpenAIError,

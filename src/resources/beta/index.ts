@@ -33,7 +33,6 @@ export {
   type ThreadCreateAndRunParamsNonStreaming,
   type ThreadCreateAndRunParamsStreaming,
 } from './threads/index';
-export { Chat } from './chat/index';
 export {
   VectorStores,
   type AutoFileChunkingStrategyParam,

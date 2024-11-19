@@ -1,7 +1,0 @@
-{
-  "presets": [
-    "@babel/preset-env", // Automatically determines the Babel plugins and polyfills you need based on your target environments
-    "@babel/preset-typescript" // If you're using TypeScript, this preset will enable TypeScript transformation
-  ],
-  "plugins": []
-}

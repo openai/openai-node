@@ -1,8 +1,8 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import OpenAI from 'openai';
-import { type Headers } from 'openai/internal/types';
 import { APIUserAbortError } from 'openai';
+import { Headers } from 'openai/internal/types';
 const defaultFetch = fetch;
 
 describe('instantiate client', () => {
