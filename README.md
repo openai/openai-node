@@ -14,15 +14,20 @@ To learn how to use the OpenAI API, check out our [API Reference](https://platfo
 npm install openai
 ```
 
-You can also import from jsr:
+### Installation from JSR
 
-<!-- x-release-please-start-version -->
+```sh
+deno add jsr:@openai/openai
+npx jsr add @openai/openai
+```
+
+These commands will make the module importable from the `@openai/openai` scope:
+
+You can also [import directly from JSR](https://jsr.io/docs/using-packages#importing-with-jsr-specifiers) without an install step if you're using the Deno JavaScript runtime:
 
 ```ts
 import OpenAI from 'jsr:@openai/openai';
 ```
-
-<!-- x-release-please-end -->
 
 ## Usage
 
@@ -622,7 +627,7 @@ TypeScript >= 4.5 is supported.
 The following runtimes are supported:
 
 - Node.js 18 LTS or later ([non-EOL](https://endoflife.date/nodejs)) versions.
-- Deno v1.28.0 or higher, using `import OpenAI from "npm:openai"`.
+- Deno v1.28.0 or higher.
 - Bun 1.0 or later.
 - Cloudflare Workers.
 - Vercel Edge Runtime.
