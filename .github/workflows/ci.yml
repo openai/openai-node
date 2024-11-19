@@ -46,5 +46,22 @@ jobs:
 
       - name: Check build
         run: ./scripts/build
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    if: github.repository == 'stainless-sdks/openai-typescript'
 
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Bootstrap
+        run: ./scripts/bootstrap
+
+      - name: Run tests
+        run: ./scripts/test
 

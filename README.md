@@ -1,4 +1,4 @@
-# OpenAI TypeScript API Library
+# OpenAI TypeScript and JavaScript API Library
 
 [![NPM version](https://img.shields.io/npm/v/openai.svg)](https://npmjs.org/package/openai)
 

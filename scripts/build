@@ -28,7 +28,7 @@ node scripts/utils/make-dist-package-json.cjs > dist/package.json
 
 # build to .js/.mjs/.d.ts files
 npm exec tsc-multi
-# we need to add exports = module.exports = OpenAI TypeScript to index.js;
+# we need to add exports = module.exports = OpenAI to index.js;
 # No way to get that from index.ts because it would cause compile errors
 # when building .mjs
 node scripts/utils/fix-index-exports.cjs
