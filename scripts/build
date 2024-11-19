@@ -32,7 +32,7 @@ npm exec tsc-multi
 # copy over handwritten .js/.mjs/.d.ts files
 cp src/_shims/*.{d.ts,js,mjs,md} dist/_shims
 cp src/_shims/auto/*.{d.ts,js,mjs} dist/_shims/auto
-# we need to add exports = module.exports = OpenAI Node to index.js;
+# we need to add exports = module.exports = OpenAI to index.js;
 # No way to get that from index.ts because it would cause compile errors
 # when building .mjs
 node scripts/utils/fix-index-exports.cjs
