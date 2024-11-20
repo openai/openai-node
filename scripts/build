@@ -39,6 +39,7 @@ node scripts/utils/fix-index-exports.cjs
 cp dist/index.d.ts dist/index.d.mts
 cp tsconfig.dist-src.json dist/src/tsconfig.json
 cp src/internal/shim-types.d.ts dist/internal/shim-types.d.ts
+cp src/internal/shim-types.d.ts dist/internal/shim-types.d.mts
 mkdir -p dist/internal/polyfill
 cp src/internal/polyfill/*.{mjs,js,d.ts} dist/internal/polyfill
 

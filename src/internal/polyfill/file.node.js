@@ -6,7 +6,7 @@
  * as a global.
  */
 
-if (typeof require !== 'undefined' && typeof exports !== 'undefined') {
+if (typeof require !== 'undefined') {
   if (!globalThis.File) {
     try {
       // Use [require][0](...) and not require(...) so bundlers don't try to bundle the
@@ -14,5 +14,4 @@ if (typeof require !== 'undefined' && typeof exports !== 'undefined') {
       globalThis.File = [require][0]('node:buffer').File;
     } catch (e) {}
   }
-  exports.File = globalThis.File;
 }

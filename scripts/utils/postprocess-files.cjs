@@ -30,9 +30,7 @@ async function postprocess() {
     );
 
     if (transformed !== code) {
-      console.error(
-        `wrote ${path.relative(process.cwd(), file)}`,
-      );
+      console.error(`wrote ${path.relative(process.cwd(), file)}`);
       await fs.promises.writeFile(file, transformed, 'utf8');
     }
   }
@@ -52,32 +50,27 @@ async function postprocess() {
     if (entry.isDirectory() && entry.name !== 'src' && entry.name !== 'internal' && entry.name !== 'bin') {
       const subpath = './' + entry.name;
       newExports[subpath + '/*.mjs'] = {
-        types: subpath + '/*.d.ts',
         default: subpath + '/*.mjs',
       };
       newExports[subpath + '/*.js'] = {
-        types: subpath + '/*.d.ts',
         default: subpath + '/*.js',
       };
       newExports[subpath + '/*'] = {
-        types: subpath + '/*.d.ts',
+        import: subpath + '/*.mjs',
         require: subpath + '/*.js',
-        default: subpath + '/*.mjs',
       };
     } else if (entry.isFile() && /\.[cm]?js$/.test(entry.name)) {
       const { name, ext } = path.parse(entry.name);
       const subpathWithoutExt = './' + name;
       const subpath = './' + entry.name;
-      newExports[subpathWithoutExt] ||= {};
-      newExports[subpathWithoutExt].types ||= subpathWithoutExt + '.d.ts';
+      newExports[subpathWithoutExt] ||= { import: undefined, require: undefined };
       const isModule = ext[1] === 'm';
       if (isModule) {
-        newExports[subpathWithoutExt].default = subpath;
+        newExports[subpathWithoutExt].import = subpath;
       } else {
         newExports[subpathWithoutExt].require = subpath;
       }
       newExports[subpath] = {
-        types: subpathWithoutExt + '.d.ts',
         default: subpath,
       };
     }
