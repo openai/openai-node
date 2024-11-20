@@ -250,8 +250,9 @@ export interface ChatCompletionAudioParam {
   format: 'wav' | 'mp3' | 'flac' | 'opus' | 'pcm16';
 
   /**
-   * The voice the model uses to respond. Supported voices are `alloy`, `ash`,
-   * `ballad`, `coral`, `echo`, `sage`, `shimmer`, and `verse`.
+   * The voice the model uses to respond. Supported voices are `ash`, `ballad`,
+   * `coral`, `sage`, and `verse` (also supported but not recommended are `alloy`,
+   * `echo`, and `shimmer`; these voices are less expressive).
    */
   voice: 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse';
 }
