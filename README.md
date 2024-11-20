@@ -1,4 +1,4 @@
-# OpenAI Node API Library
+# OpenAI TypeScript and JavaScript API Library
 
 [![NPM version](https://img.shields.io/npm/v/openai.svg)](https://npmjs.org/package/openai) ![npm bundle size](https://img.shields.io/bundlephobia/minzip/openai) [![JSR Version](https://jsr.io/badges/@openai/openai)](https://jsr.io/@openai/openai)
 
@@ -14,15 +14,20 @@ To learn how to use the OpenAI API, check out our [API Reference](https://platfo
 npm install openai
 ```
 
-You can also import from jsr:
+### Installation from JSR
 
-<!-- x-release-please-start-version -->
+```sh
+deno add jsr:@openai/openai
+npx jsr add @openai/openai
+```
+
+These commands will make the module importable from the `@openai/openai` scope:
+
+You can also [import directly from JSR](https://jsr.io/docs/using-packages#importing-with-jsr-specifiers) without an install step if you're using the Deno JavaScript runtime:
 
 ```ts
 import OpenAI from 'jsr:@openai/openai';
 ```
-
-<!-- x-release-please-end -->
 
 ## Usage
 
@@ -39,7 +44,7 @@ const client = new OpenAI({
 async function main() {
   const chatCompletion = await client.chat.completions.create({
     messages: [{ role: 'user', content: 'Say this is a test' }],
-    model: 'gpt-3.5-turbo',
+    model: 'gpt-4o',
   });
 }
 
@@ -57,7 +62,7 @@ const client = new OpenAI();
 
 async function main() {
   const stream = await client.chat.completions.create({
-    model: 'gpt-4',
+    model: 'gpt-4o',
     messages: [{ role: 'user', content: 'Say this is a test' }],
     stream: true,
   });
@@ -87,7 +92,7 @@ const client = new OpenAI({
 async function main() {
   const params: OpenAI.Chat.ChatCompletionCreateParams = {
     messages: [{ role: 'user', content: 'Say this is a test' }],
-    model: 'gpt-3.5-turbo',
+    model: 'gpt-4o',
   };
   const chatCompletion: OpenAI.Chat.ChatCompletion = await client.chat.completions.create(params);
 }
@@ -128,7 +133,7 @@ const fileList = [
   ...
 ];
 
-const batch = await openai.vectorStores.fileBatches.uploadAndPoll(vectorStore.id, fileList);
+const batch = await openai.vectorStores.fileBatches.uploadAndPoll(vectorStore.id, {files: fileList});
 ```
 
 ### Streaming Helpers
@@ -173,7 +178,7 @@ const openai = new OpenAI();
 
 async function main() {
   const stream = await openai.beta.chat.completions.stream({
-    model: 'gpt-4',
+    model: 'gpt-4o',
     messages: [{ role: 'user', content: 'Say this is a test' }],
     stream: true,
   });
@@ -226,7 +231,7 @@ const client = new OpenAI();
 async function main() {
   const runner = client.beta.chat.completions
     .runTools({
-      model: 'gpt-3.5-turbo',
+      model: 'gpt-4o',
       messages: [{ role: 'user', content: 'How is the weather this week?' }],
       tools: [
         {
@@ -333,7 +338,7 @@ a subclass of `APIError` will be thrown:
 ```ts
 async function main() {
   const job = await client.fineTuning.jobs
-    .create({ model: 'gpt-3.5-turbo', training_file: 'file-abc123' })
+    .create({ model: 'gpt-4o', training_file: 'file-abc123' })
     .catch(async (err) => {
       if (err instanceof OpenAI.APIError) {
         console.log(err.status); // 400
@@ -368,7 +373,7 @@ Error codes are as followed:
 All object responses in the SDK provide a `_request_id` property which is added from the `x-request-id` response header so that you can quickly log failing requests and report them back to OpenAI.
 
 ```ts
-const completion = await client.chat.completions.create({ messages: [{ role: 'user', content: 'Say this is a test' }], model: 'gpt-4' });
+const completion = await client.chat.completions.create({ messages: [{ role: 'user', content: 'Say this is a test' }], model: 'gpt-4o' });
 console.log(completion._request_id) // req_123
 ```
 
@@ -392,7 +397,7 @@ const azureADTokenProvider = getBearerTokenProvider(credential, scope);
 const openai = new AzureOpenAI({ azureADTokenProvider });
 
 const result = await openai.chat.completions.create({
-  model: 'gpt-4-1106-preview',
+  model: 'gpt-4o',
   messages: [{ role: 'user', content: 'Say hello!' }],
 });
 
@@ -415,7 +420,7 @@ const client = new OpenAI({
 });
 
 // Or, configure per-request:
-await client.chat.completions.create({ messages: [{ role: 'user', content: 'How can I get the name of the current day in Node.js?' }], model: 'gpt-3.5-turbo' }, {
+await client.chat.completions.create({ messages: [{ role: 'user', content: 'How can I get the name of the current day in JavaScript?' }], model: 'gpt-4o' }, {
   maxRetries: 5,
 });
 ```
@@ -432,7 +437,7 @@ const client = new OpenAI({
 });
 
 // Override per-request:
-await client.chat.completions.create({ messages: [{ role: 'user', content: 'How can I list all files in a directory using Python?' }], model: 'gpt-3.5-turbo' }, {
+await client.chat.completions.create({ messages: [{ role: 'user', content: 'How can I list all files in a directory using Python?' }], model: 'gpt-4o' }, {
   timeout: 5 * 1000,
 });
 ```
@@ -467,7 +472,7 @@ for (const fineTuningJob of page.data) {
 
 // Convenience methods are provided for manually paginating:
 while (page.hasNextPage()) {
-  page = page.getNextPage();
+  page = await page.getNextPage();
   // ...
 }
 ```
@@ -485,13 +490,13 @@ You can also use the `.withResponse()` method to get the raw `Response` along wi
 const client = new OpenAI();
 
 const response = await client.chat.completions
-  .create({ messages: [{ role: 'user', content: 'Say this is a test' }], model: 'gpt-3.5-turbo' })
+  .create({ messages: [{ role: 'user', content: 'Say this is a test' }], model: 'gpt-4o' })
   .asResponse();
 console.log(response.headers.get('X-My-Header'));
 console.log(response.statusText); // access the underlying Response object
 
 const { data: chatCompletion, response: raw } = await client.chat.completions
-  .create({ messages: [{ role: 'user', content: 'Say this is a test' }], model: 'gpt-3.5-turbo' })
+  .create({ messages: [{ role: 'user', content: 'Say this is a test' }], model: 'gpt-4o' })
   .withResponse();
 console.log(raw.headers.get('X-My-Header'));
 console.log(chatCompletion);
@@ -622,7 +627,7 @@ TypeScript >= 4.5 is supported.
 The following runtimes are supported:
 
 - Node.js 18 LTS or later ([non-EOL](https://endoflife.date/nodejs)) versions.
-- Deno v1.28.0 or higher, using `import OpenAI from "npm:openai"`.
+- Deno v1.28.0 or higher.
 - Bun 1.0 or later.
 - Cloudflare Workers.
 - Vercel Edge Runtime.

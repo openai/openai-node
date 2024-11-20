@@ -306,25 +306,6 @@ export class OpenAI extends Core.APIClient {
   static fileFromPath = Uploads.fileFromPath;
 }
 
-export {
-  OpenAIError,
-  APIError,
-  APIConnectionError,
-  APIConnectionTimeoutError,
-  APIUserAbortError,
-  NotFoundError,
-  ConflictError,
-  RateLimitError,
-  BadRequestError,
-  AuthenticationError,
-  InternalServerError,
-  PermissionDeniedError,
-  UnprocessableEntityError,
-} from './error';
-
-export import toFile = Uploads.toFile;
-export import fileFromPath = Uploads.fileFromPath;
-
 OpenAI.Completions = Completions;
 OpenAI.Chat = Chat;
 OpenAI.Embeddings = Embeddings;
@@ -340,7 +321,6 @@ OpenAI.Beta = Beta;
 OpenAI.Batches = Batches;
 OpenAI.BatchesPage = BatchesPage;
 OpenAI.Uploads = UploadsAPIUploads;
-
 export declare namespace OpenAI {
   export type RequestOptions = Core.RequestOptions;
 
@@ -663,5 +643,22 @@ const _deployments_endpoints = new Set([
 const API_KEY_SENTINEL = '<Missing Key>';
 
 // ---------------------- End Azure ----------------------
+
+export { toFile, fileFromPath } from './uploads';
+export {
+  OpenAIError,
+  APIError,
+  APIConnectionError,
+  APIConnectionTimeoutError,
+  APIUserAbortError,
+  NotFoundError,
+  ConflictError,
+  RateLimitError,
+  BadRequestError,
+  AuthenticationError,
+  InternalServerError,
+  PermissionDeniedError,
+  UnprocessableEntityError,
+} from './error';
 
 export default OpenAI;

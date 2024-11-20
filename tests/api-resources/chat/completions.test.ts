@@ -36,7 +36,7 @@ describe('resource completions', () => {
       max_completion_tokens: 0,
       max_tokens: 0,
       metadata: { foo: 'string' },
-      modalities: ['text', 'audio'],
+      modalities: ['text'],
       n: 1,
       parallel_tool_calls: true,
       prediction: { content: 'string', type: 'content' },
@@ -51,14 +51,6 @@ describe('resource completions', () => {
       temperature: 1,
       tool_choice: 'none',
       tools: [
-        {
-          function: { name: 'name', description: 'description', parameters: { foo: 'bar' }, strict: true },
-          type: 'function',
-        },
-        {
-          function: { name: 'name', description: 'description', parameters: { foo: 'bar' }, strict: true },
-          type: 'function',
-        },
         {
           function: { name: 'name', description: 'description', parameters: { foo: 'bar' }, strict: true },
           type: 'function',

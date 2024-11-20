@@ -31,7 +31,7 @@ describe('resource transcriptions', () => {
       prompt: 'prompt',
       response_format: 'json',
       temperature: 0,
-      timestamp_granularities: ['word', 'segment'],
+      timestamp_granularities: ['word'],
     });
   });
 });

@@ -31,30 +31,7 @@ describe('resource jobs', () => {
       integrations: [
         {
           type: 'wandb',
-          wandb: {
-            project: 'my-wandb-project',
-            entity: 'entity',
-            name: 'name',
-            tags: ['custom-tag', 'custom-tag', 'custom-tag'],
-          },
-        },
-        {
-          type: 'wandb',
-          wandb: {
-            project: 'my-wandb-project',
-            entity: 'entity',
-            name: 'name',
-            tags: ['custom-tag', 'custom-tag', 'custom-tag'],
-          },
-        },
-        {
-          type: 'wandb',
-          wandb: {
-            project: 'my-wandb-project',
-            entity: 'entity',
-            name: 'name',
-            tags: ['custom-tag', 'custom-tag', 'custom-tag'],
-          },
+          wandb: { project: 'my-wandb-project', entity: 'entity', name: 'name', tags: ['custom-tag'] },
         },
       ],
       seed: 42,
