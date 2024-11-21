@@ -1,5 +1,34 @@
 # Changelog
 
+## 4.73.0 (2024-11-20)
+
+Full Changelog: [v4.72.0...v4.73.0](https://github.com/openai/openai-node/compare/v4.72.0...v4.73.0)
+
+### Features
+
+* **api:** add gpt-4o-2024-11-20 model ([#1201](https://github.com/openai/openai-node/issues/1201)) ([0feeafd](https://github.com/openai/openai-node/commit/0feeafd21ba4b6281cc3b9dafa2919b1e2e4d1c3))
+* bump model in all example snippets to gpt-4o ([6961c37](https://github.com/openai/openai-node/commit/6961c37f2e581bcc12ec2bbe77df2b9b260fe297))
+
+
+### Bug Fixes
+
+* **docs:** add missing await to pagination example ([#1190](https://github.com/openai/openai-node/issues/1190)) ([524b9e8](https://github.com/openai/openai-node/commit/524b9e82ae13a3b5093dcfbfd1169a798cf99ab4))
+
+
+### Chores
+
+* **client:** drop unused devDependency ([#1191](https://github.com/openai/openai-node/issues/1191)) ([8ee6c03](https://github.com/openai/openai-node/commit/8ee6c0335673f2ecf84ea11bdfc990adab607e20))
+* **internal:** spec update ([#1195](https://github.com/openai/openai-node/issues/1195)) ([12f9334](https://github.com/openai/openai-node/commit/12f93346857196b93f94865cc3744d769e5e519c))
+* **internal:** use reexports not destructuring ([#1181](https://github.com/openai/openai-node/issues/1181)) ([f555dd6](https://github.com/openai/openai-node/commit/f555dd6503bc4ccd4d13f4e1a1d36fbbfd51c369))
+
+
+### Documentation
+
+* bump models in example snippets to gpt-4o ([#1184](https://github.com/openai/openai-node/issues/1184)) ([4ec4027](https://github.com/openai/openai-node/commit/4ec402790cf3cfbccbf3ef9b61d577b0118977e8))
+* change readme title ([#1198](https://github.com/openai/openai-node/issues/1198)) ([e34981c](https://github.com/openai/openai-node/commit/e34981c00f2f0360baffe870bcc38786030671bf))
+* improve jsr documentation ([#1197](https://github.com/openai/openai-node/issues/1197)) ([ebdb4f7](https://github.com/openai/openai-node/commit/ebdb4f72cc01afbee649aca009fdaf413e61c507))
+* **readme:** fix incorrect fileBatches.uploadAndPoll params ([#1200](https://github.com/openai/openai-node/issues/1200)) ([3968ef1](https://github.com/openai/openai-node/commit/3968ef1c4fa860ff246e0e803808752b261c18ce))
+
 ## 4.72.0 (2024-11-12)
 
 Full Changelog: [v4.71.1...v4.72.0](https://github.com/openai/openai-node/compare/v4.71.1...v4.72.0)
