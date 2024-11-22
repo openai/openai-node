@@ -377,6 +377,18 @@ const completion = await client.chat.completions.create({ messages: [{ role: 'us
 console.log(completion._request_id) // req_123
 ```
 
+You can also access the Request ID using the `.withResponse()` method:
+
+```ts
+const { data: stream, request_id } = await openai.chat.completions
+  .create({
+    model: 'gpt-4',
+    messages: [{ role: 'user', content: 'Say this is a test' }],
+    stream: true,
+  })
+  .withResponse();
+```
+
 ## Microsoft Azure OpenAI
 
 To use this library with [Azure OpenAI](https://learn.microsoft.com/azure/ai-services/openai/overview), use the `AzureOpenAI`
