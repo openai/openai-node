@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.73.1 (2024-11-25)
+
+Full Changelog: [v4.73.0...v4.73.1](https://github.com/openai/openai-node/compare/v4.73.0...v4.73.1)
+
+### Documentation
+
+* **readme:** mention `.withResponse()` for streaming request ID ([#1202](https://github.com/openai/openai-node/issues/1202)) ([b6800d4](https://github.com/openai/openai-node/commit/b6800d4dea2729fe3b0864171ce8fb3b2cc1b21c))
+
 ## 4.73.0 (2024-11-20)
 
 Full Changelog: [v4.72.0...v4.73.0](https://github.com/openai/openai-node/compare/v4.72.0...v4.73.0)
