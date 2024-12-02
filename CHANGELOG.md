@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.74.0 (2024-12-02)
+
+Full Changelog: [v4.73.1...v4.74.0](https://github.com/openai/openai-node/compare/v4.73.1...v4.74.0)
+
+### Features
+
+* **internal:** make git install file structure match npm ([#1204](https://github.com/openai/openai-node/issues/1204)) ([e7c4c6d](https://github.com/openai/openai-node/commit/e7c4c6d23adbe52300053a8d35db6e341c438703))
+
 ## 4.73.1 (2024-11-25)
 
 Full Changelog: [v4.73.0...v4.73.1](https://github.com/openai/openai-node/compare/v4.73.0...v4.73.1)
