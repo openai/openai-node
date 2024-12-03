@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.75.0 (2024-12-03)
+
+Full Changelog: [v4.74.0...v4.75.0](https://github.com/openai/openai-node/compare/v4.74.0...v4.75.0)
+
+### Features
+
+* improve docs for jsr README.md ([#1208](https://github.com/openai/openai-node/issues/1208)) ([338527e](https://github.com/openai/openai-node/commit/338527e40361e2de899a63f280d4ec2db5e87f3c))
+
 ## 4.74.0 (2024-12-02)
 
 Full Changelog: [v4.73.1...v4.74.0](https://github.com/openai/openai-node/compare/v4.73.1...v4.74.0)
