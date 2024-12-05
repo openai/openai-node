@@ -1,5 +1,18 @@
 # Changelog
 
+## 4.76.0 (2024-12-05)
+
+Full Changelog: [v4.75.0...v4.76.0](https://github.com/openai/openai-node/compare/v4.75.0...v4.76.0)
+
+### Features
+
+* **api:** updates ([#1212](https://github.com/openai/openai-node/issues/1212)) ([e0fedf2](https://github.com/openai/openai-node/commit/e0fedf2c5a91d0c03d8dad6854b366f77eab4923))
+
+
+### Chores
+
+* bump openapi url ([#1210](https://github.com/openai/openai-node/issues/1210)) ([3fa95a4](https://github.com/openai/openai-node/commit/3fa95a429d4b2adecce35a7b96b73f6d5e88eeeb))
+
 ## 4.75.0 (2024-12-03)
 
 Full Changelog: [v4.74.0...v4.75.0](https://github.com/openai/openai-node/compare/v4.74.0...v4.75.0)
