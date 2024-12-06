@@ -103,7 +103,7 @@ export interface TranscriptionVerbose {
   /**
    * The duration of the input audio.
    */
-  duration: string;
+  duration: number;
 
   /**
    * The language of the input audio.
