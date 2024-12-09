@@ -1,7 +1,7 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import type { RequestInit, RequestInfo } from './internal/builtin-types';
-import type { HTTPMethod, PromiseOrValue, RequestClient } from './internal/types';
+import type { HTTPMethod, PromiseOrValue } from './internal/types';
 import { debug, sleep, safeJSON, isAbsoluteURL, uuid4, validatePositiveInteger } from './internal/utils';
 import { castToError } from './internal/errors';
 import type { APIResponseProps } from './internal/parse';
@@ -529,17 +529,11 @@ export class OpenAI {
     }
 
     return (
-      this.getRequestClient()
-        // use undefined this binding; fetch errors if bound to something else in browser/cloudflare
-        .fetch.call(undefined, url, fetchOptions)
-        .finally(() => {
-          clearTimeout(timeout);
-        })
+      // use undefined this binding; fetch errors if bound to something else in browser/cloudflare
+      this.fetch.call(undefined, url, fetchOptions).finally(() => {
+        clearTimeout(timeout);
+      })
     );
-  }
-
-  protected getRequestClient(): RequestClient {
-    return { fetch: this.fetch };
   }
 
   private shouldRetry(response: Response): boolean {
