@@ -537,17 +537,11 @@ export abstract class APIClient {
     const timeout = setTimeout(() => controller.abort(), ms);
 
     return (
-      this.getRequestClient()
-        // use undefined this binding; fetch errors if bound to something else in browser/cloudflare
-        .fetch.call(undefined, url, { signal: controller.signal as any, ...options })
-        .finally(() => {
-          clearTimeout(timeout);
-        })
+      // use undefined this binding; fetch errors if bound to something else in browser/cloudflare
+      this.fetch.call(undefined, url, { signal: controller.signal as any, ...options }).finally(() => {
+        clearTimeout(timeout);
+      })
     );
-  }
-
-  protected getRequestClient(): RequestClient {
-    return { fetch: this.fetch };
   }
 
   private shouldRetry(response: Response): boolean {
