@@ -88,6 +88,24 @@ describe('zodResponseFormat', () => {
     `);
   });
 
+  it('warns when using optional fields with OpenAI API', () => {
+    const consoleSpy = jest.spyOn(console, 'warn');
+
+    zodResponseFormat(
+      z.object({
+        required: z.string(),
+        optional: z.string().optional(),
+      }),
+      'test',
+    );
+
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining('uses .optional() which is not supported by OpenAI API Structured Outputs')
+    );
+
+    consoleSpy.mockRestore();
+  });
+
   it('automatically adds properties with defaults to `required`', () => {
     expect(
       zodResponseFormat(
