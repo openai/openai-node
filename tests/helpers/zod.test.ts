@@ -100,7 +100,7 @@ describe('zodResponseFormat', () => {
     );
 
     expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining('uses .optional() which is not supported by OpenAI API Structured Outputs')
+      expect.stringContaining('uses .optional() which is not supported by OpenAI API Structured Outputs'),
     );
 
     consoleSpy.mockRestore();
