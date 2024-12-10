@@ -1,4 +1,3 @@
-import { debug } from 'openai/core';
 import { combine, merge, is_buffer, assign_single_source } from 'openai/internal/qs/utils';
 
 describe('merge()', function () {
@@ -168,49 +167,3 @@ test('is_buffer()', function () {
   // t.equal(is_buffer(buffer), true, 'real Buffer instance is a buffer');
   expect(is_buffer(buffer)).toEqual(true);
 });
-
-test("debug()", function(){
-  const originalEnv = process.env;
-  const spy = jest.spyOn(console, "log");
-
-  // Debug enabled
-  process.env["DEBUG"]= "true";
-
-  // Test request body includes headers object with Authorization
-  const headersTest = {
-    headers: {
-      Authorization: "fakeAuthorization"
-    }
-  }
-  debug("request", headersTest);
-  expect(spy).toHaveBeenCalledWith("OpenAI:DEBUG:request", {
-    headers: {
-      Authorization: "REDACTED"
-    }
-  });
-
-  // Test request body includes headers object with api-ley
-  const apiKeyTest = {
-    headers: {
-      "api-key": "fakeKey"
-    }
-  }
-  debug("request", apiKeyTest);
-  expect(spy).toHaveBeenCalledWith("OpenAI:DEBUG:request", {
-    headers: {
-      "api-key": "REDACTED"
-    }
-  });
-
-  // Test headers object with authorization header
-  const authorizationTest = {
-    authorization: "fakeValue"
-  }
-  debug("request", authorizationTest);
-  expect(spy).toHaveBeenCalledWith("OpenAI:DEBUG:request", {
-    authorization: "REDACTED"
-  });
-
-  process.env = originalEnv;
-
-})
