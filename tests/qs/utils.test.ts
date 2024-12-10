@@ -170,7 +170,8 @@ test('is_buffer()', function () {
 });
 
 test("debug()", function(){
-  const originalEnv = process.env;
+  const originalDebugValue = process.env["DEBUG"];
+
   const spy = jest.spyOn(console, "log");
 
   // Debug enabled
@@ -211,6 +212,6 @@ test("debug()", function(){
     authorization: "REDACTED"
   });
 
-  process.env = originalEnv;
+  process.env["DEBUG"] = originalDebugValue;
 
 })
