@@ -130,7 +130,7 @@ export class APIPromise<T> extends Promise<WithRequestID<T>> {
    * instance, you can use {@link withResponse()}.
    *
    * 👋 Getting the wrong TypeScript type for `Response`?
-   * Try setting `"moduleResolution": "NodeNext"` if you can,
+   * Try setting `'moduleResolution': 'NodeNext'` if you can,
    * or add one of these imports before your first `import … from 'openai'`:
    * - `import 'openai/shims/node'` (if you're running on Node)
    * - `import 'openai/shims/web'` (otherwise)
@@ -149,7 +149,7 @@ export class APIPromise<T> extends Promise<WithRequestID<T>> {
    *
    *
    * 👋 Getting the wrong TypeScript type for `Response`?
-   * Try setting `"moduleResolution": "NodeNext"` if you can,
+   * Try setting `'moduleResolution': 'NodeNext'` if you can,
    * or add one of these imports before your first `import … from 'openai'`:
    * - `import 'openai/shims/node'` (if you're running on Node)
    * - `import 'openai/shims/web'` (otherwise)
@@ -1117,7 +1117,7 @@ export function hasOwn(obj: Object, key: string): boolean {
 }
 
 /**
- * Copies headers from "newHeaders" onto "targetHeaders",
+ * Copies headers from 'newHeaders' onto 'targetHeaders',
  * using lower-case for all properties,
  * ignoring any keys with undefined values,
  * and deleting any keys with null values.
@@ -1138,28 +1138,33 @@ function applyHeadersMut(targetHeaders: Headers, newHeaders: Headers): void {
   }
 }
 
+const SENSITIVE_HEADERS = new Set(['authorization', 'api-key']);
+
 export function debug(action: string, ...args: any[]) {
-  const sensitiveHeaders = ["authorization", "api-key"];
   if (typeof process !== 'undefined' && process?.env?.['DEBUG'] === 'true') {
-    for (const arg of args) {
+    const modifiedArgs = args.map((arg) => {
       if (!arg) {
-        break;
+        return arg;
       }
-      // Check for sensitive headers in request body "headers"
-      if (arg["headers"]) {
-        for (const header in arg["headers"]){
-          if (sensitiveHeaders.includes(header.toLowerCase())){
-            arg["headers"][header] = "REDACTED";
+
+      const modifiedArg = { ...arg };
+      // Check for sensitive headers in request body 'headers' object
+      if (modifiedArg['headers']) {
+        for (const header in modifiedArg['headers']){
+          if (SENSITIVE_HEADERS.has(header.toLowerCase())){
+            modifiedArg['headers'][header] = 'REDACTED';
           }
         }
       }
       // Check for sensitive headers in headers object
-      for (const header in arg){
-        if (sensitiveHeaders.includes(header.toLowerCase())){
-          arg[header] = "REDACTED";
+      for (const header in modifiedArg){
+        if (SENSITIVE_HEADERS.has(header.toLowerCase())){
+          modifiedArg[header] = 'REDACTED';
         }
       }
-    }
+      return modifiedArg;
+    })
+    console.log(`OpenAI:DEBUG:${action}`, ...modifiedArgs);
   }
 }
 
