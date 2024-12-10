@@ -1,5 +1,51 @@
 # Changelog
 
+## 4.76.1 (2024-12-10)
+
+Full Changelog: [v4.76.0...v4.76.1](https://github.com/openai/openai-node/compare/v4.76.0...v4.76.1)
+
+### Chores
+
+* **internal:** bump cross-spawn to v7.0.6 ([#1217](https://github.com/openai/openai-node/issues/1217)) ([c07ad29](https://github.com/openai/openai-node/commit/c07ad298d58e5aeaf816ee3de65fd59bf3fc8b66))
+* **internal:** remove unnecessary getRequestClient function ([#1215](https://github.com/openai/openai-node/issues/1215)) ([bef3925](https://github.com/openai/openai-node/commit/bef392526cd339f45c574bc476649c77be36c612))
+
+## 4.76.0 (2024-12-05)
+
+Full Changelog: [v4.75.0...v4.76.0](https://github.com/openai/openai-node/compare/v4.75.0...v4.76.0)
+
+### Features
+
+* **api:** updates ([#1212](https://github.com/openai/openai-node/issues/1212)) ([e0fedf2](https://github.com/openai/openai-node/commit/e0fedf2c5a91d0c03d8dad6854b366f77eab4923))
+
+
+### Chores
+
+* bump openapi url ([#1210](https://github.com/openai/openai-node/issues/1210)) ([3fa95a4](https://github.com/openai/openai-node/commit/3fa95a429d4b2adecce35a7b96b73f6d5e88eeeb))
+
+## 4.75.0 (2024-12-03)
+
+Full Changelog: [v4.74.0...v4.75.0](https://github.com/openai/openai-node/compare/v4.74.0...v4.75.0)
+
+### Features
+
+* improve docs for jsr README.md ([#1208](https://github.com/openai/openai-node/issues/1208)) ([338527e](https://github.com/openai/openai-node/commit/338527e40361e2de899a63f280d4ec2db5e87f3c))
+
+## 4.74.0 (2024-12-02)
+
+Full Changelog: [v4.73.1...v4.74.0](https://github.com/openai/openai-node/compare/v4.73.1...v4.74.0)
+
+### Features
+
+* **internal:** make git install file structure match npm ([#1204](https://github.com/openai/openai-node/issues/1204)) ([e7c4c6d](https://github.com/openai/openai-node/commit/e7c4c6d23adbe52300053a8d35db6e341c438703))
+
+## 4.73.1 (2024-11-25)
+
+Full Changelog: [v4.73.0...v4.73.1](https://github.com/openai/openai-node/compare/v4.73.0...v4.73.1)
+
+### Documentation
+
+* **readme:** mention `.withResponse()` for streaming request ID ([#1202](https://github.com/openai/openai-node/issues/1202)) ([b6800d4](https://github.com/openai/openai-node/commit/b6800d4dea2729fe3b0864171ce8fb3b2cc1b21c))
+
 ## 4.73.0 (2024-11-20)
 
 Full Changelog: [v4.72.0...v4.73.0](https://github.com/openai/openai-node/compare/v4.72.0...v4.73.0)
