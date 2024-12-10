@@ -309,10 +309,10 @@ export class OpenAI {
   }
 
   protected makeStatusError(
-    status: number | undefined,
-    error: Object | undefined,
+    status: number,
+    error: Object,
     message: string | undefined,
-    headers: Headers | undefined,
+    headers: Headers,
   ): Errors.APIError {
     return Errors.APIError.generate(status, error, message, headers);
   }
