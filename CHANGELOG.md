@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.76.1 (2024-12-10)
+
+Full Changelog: [v4.76.0...v4.76.1](https://github.com/openai/openai-node/compare/v4.76.0...v4.76.1)
+
+### Chores
+
+* **internal:** remove unnecessary getRequestClient function ([#1215](https://github.com/openai/openai-node/issues/1215)) ([bef3925](https://github.com/openai/openai-node/commit/bef392526cd339f45c574bc476649c77be36c612))
+
 ## 4.76.0 (2024-12-05)
 
 Full Changelog: [v4.75.0...v4.76.0](https://github.com/openai/openai-node/compare/v4.75.0...v4.76.0)
