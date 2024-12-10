@@ -130,7 +130,7 @@ export class APIPromise<T> extends Promise<WithRequestID<T>> {
    * instance, you can use {@link withResponse()}.
    *
    * 👋 Getting the wrong TypeScript type for `Response`?
-   * Try setting `'moduleResolution': 'NodeNext'` if you can,
+   * Try setting `"moduleResolution": "NodeNext"` if you can,
    * or add one of these imports before your first `import … from 'openai'`:
    * - `import 'openai/shims/node'` (if you're running on Node)
    * - `import 'openai/shims/web'` (otherwise)
@@ -149,7 +149,7 @@ export class APIPromise<T> extends Promise<WithRequestID<T>> {
    *
    *
    * 👋 Getting the wrong TypeScript type for `Response`?
-   * Try setting `'moduleResolution': 'NodeNext'` if you can,
+   * Try setting `"moduleResolution": "NodeNext"` if you can,
    * or add one of these imports before your first `import … from 'openai'`:
    * - `import 'openai/shims/node'` (if you're running on Node)
    * - `import 'openai/shims/web'` (otherwise)
@@ -1117,7 +1117,7 @@ export function hasOwn(obj: Object, key: string): boolean {
 }
 
 /**
- * Copies headers from 'newHeaders' onto 'targetHeaders',
+ * Copies headers from "newHeaders" onto "targetHeaders",
  * using lower-case for all properties,
  * ignoring any keys with undefined values,
  * and deleting any keys with null values.
