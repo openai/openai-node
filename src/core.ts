@@ -1139,8 +1139,27 @@ function applyHeadersMut(targetHeaders: Headers, newHeaders: Headers): void {
 }
 
 export function debug(action: string, ...args: any[]) {
+  const sensitiveHeaders = ["authorization", "api-key"];
   if (typeof process !== 'undefined' && process?.env?.['DEBUG'] === 'true') {
-    console.log(`OpenAI:DEBUG:${action}`, ...args);
+    for (const arg of args) {
+      if (!arg) {
+        break;
+      }
+      // Check for sensitive headers in request body "headers"
+      if (arg["headers"]) {
+        for (const header in arg["headers"]){
+          if (sensitiveHeaders.includes(header.toLowerCase())){
+            arg["headers"][header] = "REDACTED";
+          }
+        }
+      }
+      // Check for sensitive headers in headers object
+      for (const header in arg){
+        if (sensitiveHeaders.includes(header.toLowerCase())){
+          arg[header] = "REDACTED";
+        }
+      }
+    }
   }
 }
 
