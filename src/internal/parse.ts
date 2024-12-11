@@ -1,6 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { debug } from './utils';
+import { debug } from './utils/log';
 import { FinalRequestOptions } from './request-options';
 import { Stream } from '../streaming';
 

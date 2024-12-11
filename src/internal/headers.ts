@@ -2,7 +2,7 @@
 
 import type { Fetch } from './builtin-types';
 import type { Headers } from './types';
-import { hasOwn } from './utils';
+import { hasOwn } from './utils/values';
 
 // TODO: remove this, we should just use
 // the builtin Headers type

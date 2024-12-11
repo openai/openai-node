@@ -41,7 +41,7 @@
     "publint": "^0.2.12",
     "ts-jest": "^29.1.0",
     "ts-node": "^10.5.0",
-    "tsc-multi": "https://github.com/stainless-api/tsc-multi/releases/download/v1.1.2/tsc-multi.tgz",
+    "tsc-multi": "https://github.com/stainless-api/tsc-multi/releases/download/v1.1.3/tsc-multi.tgz",
     "tsconfig-paths": "^4.0.0",
     "typescript": "^4.8.2"
   },

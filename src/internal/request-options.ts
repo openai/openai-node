@@ -2,7 +2,7 @@
 
 import { type Agent, type ReadableLike } from './shims';
 import { BlobLike } from '../uploads';
-import { isEmptyObj, hasOwn } from './utils';
+import { isEmptyObj, hasOwn } from './utils/values';
 import { Stream } from '../streaming';
 import { type Headers, type HTTPMethod, type KeysEnum } from './types';
 
