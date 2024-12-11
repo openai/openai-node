@@ -877,7 +877,7 @@ const getPlatformProperties = (): PlatformProperties => {
       'X-Stainless-Arch': normalizeArch(Deno.build.arch),
       'X-Stainless-Runtime': 'deno',
       'X-Stainless-Runtime-Version':
-        typeof Deno.version === 'string' ? Deno.version : Deno.version?.deno ?? 'unknown',
+        typeof Deno.version === 'string' ? Deno.version : (Deno.version?.deno ?? 'unknown'),
     };
   }
   if (typeof EdgeRuntime !== 'undefined') {
@@ -1139,7 +1139,11 @@ function applyHeadersMut(targetHeaders: Headers, newHeaders: Headers): void {
 }
 
 export function debug(action: string, ...args: any[]) {
-  if (typeof process !== 'undefined' && process?.env?.['DEBUG'] === 'true') {
+  if (
+    typeof process !== 'undefined' &&
+    typeof process?.env?.['OPENAI_DISABLE_DEBUG'] !== 'string' &&
+    process?.env?.['DEBUG'] === 'true'
+  ) {
     console.log(`OpenAI:DEBUG:${action}`, ...args);
   }
 }
