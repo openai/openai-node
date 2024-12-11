@@ -1150,20 +1150,20 @@ export function debug(action: string, ...args: any[]) {
       const modifiedArg = { ...arg };
       // Check for sensitive headers in request body 'headers' object
       if (modifiedArg['headers']) {
-        for (const header in modifiedArg['headers']){
-          if (SENSITIVE_HEADERS.has(header.toLowerCase())){
+        for (const header in modifiedArg['headers']) {
+          if (SENSITIVE_HEADERS.has(header.toLowerCase())) {
             modifiedArg['headers'][header] = 'REDACTED';
           }
         }
       }
       // Check for sensitive headers in headers object
-      for (const header in modifiedArg){
-        if (SENSITIVE_HEADERS.has(header.toLowerCase())){
+      for (const header in modifiedArg) {
+        if (SENSITIVE_HEADERS.has(header.toLowerCase())) {
           modifiedArg[header] = 'REDACTED';
         }
       }
       return modifiedArg;
-    })
+    });
     console.log(`OpenAI:DEBUG:${action}`, ...modifiedArgs);
   }
 }
