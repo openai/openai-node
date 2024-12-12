@@ -1,5 +1,14 @@
 # Changelog
 
+## 4.76.2 (2024-12-12)
+
+Full Changelog: [v4.76.1...v4.76.2](https://github.com/openai/openai-node/compare/v4.76.1...v4.76.2)
+
+### Chores
+
+* **internal:** update isAbsoluteURL ([#1223](https://github.com/openai/openai-node/issues/1223)) ([e908ed7](https://github.com/openai/openai-node/commit/e908ed759996fb7706baf46d094fc77419423971))
+* **types:** nicer error class types + jsdocs ([#1219](https://github.com/openai/openai-node/issues/1219)) ([576d24c](https://github.com/openai/openai-node/commit/576d24cc4b3d766dfe28a6031bdc24ac1b711655))
+
 ## 4.76.1 (2024-12-10)
 
 Full Changelog: [v4.76.0...v4.76.1](https://github.com/openai/openai-node/compare/v4.76.0...v4.76.1)
