@@ -412,7 +412,7 @@ describe('retries', () => {
   });
 });
 
-describe('Debug', () => {
+describe('debug()', () => {
   const env = process.env;
   const spy = jest.spyOn(console, 'log');
 
@@ -462,6 +462,24 @@ describe('Debug', () => {
       authorization: 'fakeValue',
     };
     debug('request', authorizationTest);
+    expect(spy).toHaveBeenCalledWith('OpenAI:DEBUG:request', {
+      authorization: 'REDACTED',
+    });
+  });
+
+  test('input are not mutated', function () {
+    const authorizationTest = {
+      authorization: 'fakeValue',
+    };
+    const client = new OpenAI({
+      baseURL: 'http://localhost:5000/',
+      defaultHeaders: authorizationTest,
+      apiKey: 'api-key',
+    });
+
+    const { req } = client.buildRequest({ path: '/foo', method: 'post' });
+    debug('request', authorizationTest);
+    expect((req.headers as Headers)['authorization']).toEqual('fakeValue');
     expect(spy).toHaveBeenCalledWith('OpenAI:DEBUG:request', {
       authorization: 'REDACTED',
     });

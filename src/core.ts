@@ -1147,7 +1147,7 @@ export function debug(action: string, ...args: any[]) {
         return arg;
       }
 
-      const modifiedArg = { ...arg };
+      const modifiedArg = JSON.parse(JSON.stringify(arg));
       // Check for sensitive headers in request body 'headers' object
       if (modifiedArg['headers']) {
         for (const header in modifiedArg['headers']) {
