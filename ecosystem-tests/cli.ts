@@ -4,6 +4,10 @@ import yargs from 'yargs';
 import assert from 'assert';
 import path from 'path';
 
+// @ts-ignore
+var SegfaultHandler = require('segfault-handler');
+SegfaultHandler.registerHandler('crash.log');
+
 const TAR_NAME = 'openai.tgz';
 const PACK_FOLDER = '.pack';
 const PACK_FILE = `${PACK_FOLDER}/${TAR_NAME}`;
