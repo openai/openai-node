@@ -200,7 +200,7 @@ main();
 ```
 
 Streaming with `openai.beta.chat.completions.stream({…})` exposes
-[various helpers for your convenience](helpers.md#events) including event handlers and promises.
+[various helpers for your convenience](helpers.md#chat-events) including event handlers and promises.
 
 Alternatively, you can use `openai.chat.completions.create({ stream: true, … })`
 which only returns an async iterable of the chunks in the stream and thus uses less memory
@@ -285,12 +285,12 @@ main();
 // Final content: "It's looking cold and rainy - you might want to wear a jacket!"
 ```
 
-Like with `.stream()`, we provide a variety of [helpers and events](helpers.md#events).
+Like with `.stream()`, we provide a variety of [helpers and events](helpers.md#chat-events).
 
 Note that `runFunctions` was previously available as well, but has been deprecated in favor of `runTools`.
 
 Read more about various examples such as with integrating with [zod](helpers.md#integrate-with-zod),
-[next.js](helpers.md#integrate-wtih-next-js), and [proxying a stream to the browser](helpers.md#proxy-streaming-to-a-browser).
+[next.js](helpers.md#integrate-with-nextjs), and [proxying a stream to the browser](helpers.md#proxy-streaming-to-a-browser).
 
 ## File uploads
 
