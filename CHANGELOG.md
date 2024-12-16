@@ -1,5 +1,18 @@
 # Changelog
 
+## 4.76.3 (2024-12-13)
+
+Full Changelog: [v4.76.2...v4.76.3](https://github.com/openai/openai-node/compare/v4.76.2...v4.76.3)
+
+### Chores
+
+* **internal:** better ecosystem test debugging ([86fc0a8](https://github.com/openai/openai-node/commit/86fc0a81ede2780d3fcebaabff3d9fa9a36cc9c0))
+
+
+### Documentation
+
+* **README:** fix helpers section links ([#1224](https://github.com/openai/openai-node/issues/1224)) ([efbe30a](https://github.com/openai/openai-node/commit/efbe30a156cec1836d3db28f663066b33be57ba2))
+
 ## 4.76.2 (2024-12-12)
 
 Full Changelog: [v4.76.1...v4.76.2](https://github.com/openai/openai-node/compare/v4.76.1...v4.76.2)
