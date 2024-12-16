@@ -1147,27 +1147,32 @@ export function debug(action: string, ...args: any[]) {
         return arg;
       }
 
-      const modifiedArg = { ...arg };
-
       // Check for sensitive headers in request body 'headers' object
       if (arg['headers']) {
-        // shallow clone so we don't mutate
-        modifiedArg['headers'] = { ...arg['headers'] };
+        // clone so we don't mutate
+        const modifiedArg = { ...arg, headers: { ...arg['headers'] } };
 
         for (const header in arg['headers']) {
           if (SENSITIVE_HEADERS.has(header.toLowerCase())) {
             modifiedArg['headers'][header] = 'REDACTED';
           }
         }
+
+        return modifiedArg;
       }
 
+      let modifiedArg = null;
+
       // Check for sensitive headers in headers object
-      for (const header in modifiedArg) {
+      for (const header in arg) {
         if (SENSITIVE_HEADERS.has(header.toLowerCase())) {
+          // avoid making a copy until we need to
+          modifiedArg ??= { ...arg };
           modifiedArg[header] = 'REDACTED';
         }
       }
-      return modifiedArg;
+
+      return modifiedArg ?? arg;
     });
     console.log(`OpenAI:DEBUG:${action}`, ...modifiedArgs);
   }
