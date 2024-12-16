@@ -1147,15 +1147,20 @@ export function debug(action: string, ...args: any[]) {
         return arg;
       }
 
-      const modifiedArg = JSON.parse(JSON.stringify(arg));
+      const modifiedArg = { ...arg };
+
       // Check for sensitive headers in request body 'headers' object
-      if (modifiedArg['headers']) {
-        for (const header in modifiedArg['headers']) {
+      if (arg['headers']) {
+        // shallow clone so we don't mutate
+        modifiedArg['headers'] = { ...arg['headers'] };
+
+        for (const header in arg['headers']) {
           if (SENSITIVE_HEADERS.has(header.toLowerCase())) {
             modifiedArg['headers'][header] = 'REDACTED';
           }
         }
       }
+
       // Check for sensitive headers in headers object
       for (const header in modifiedArg) {
         if (SENSITIVE_HEADERS.has(header.toLowerCase())) {
