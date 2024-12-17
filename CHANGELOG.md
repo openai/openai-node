@@ -1,5 +1,19 @@
 # Changelog
 
+## 4.77.0 (2024-12-17)
+
+Full Changelog: [v4.76.3...v4.77.0](https://github.com/openai/openai-node/compare/v4.76.3...v4.77.0)
+
+### Features
+
+* **api:** new o1 and GPT-4o models + preference fine-tuning ([#1229](https://github.com/openai/openai-node/issues/1229)) ([2e872d4](https://github.com/openai/openai-node/commit/2e872d4ac3717ab8f61741efffb7a31acd798338))
+
+
+### Chores
+
+* **internal:** fix some typos ([#1227](https://github.com/openai/openai-node/issues/1227)) ([d51fcfe](https://github.com/openai/openai-node/commit/d51fcfe3a66550a684eeeb0e6f17e1d9825cdf78))
+* **internal:** spec update ([#1230](https://github.com/openai/openai-node/issues/1230)) ([ed2b61d](https://github.com/openai/openai-node/commit/ed2b61d32703b64d9f91223bc02627a607f60483))
+
 ## 4.76.3 (2024-12-13)
 
 Full Changelog: [v4.76.2...v4.76.3](https://github.com/openai/openai-node/compare/v4.76.2...v4.76.3)
