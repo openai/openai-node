@@ -15,6 +15,12 @@ export class Completions extends APIResource {
    * [text generation](https://platform.openai.com/docs/guides/text-generation),
    * [vision](https://platform.openai.com/docs/guides/vision), and
    * [audio](https://platform.openai.com/docs/guides/audio) guides.
+   *
+   * Parameter support can differ depending on the model used to generate the
+   * response, particularly for newer reasoning models. Parameters that are only
+   * supported for reasoning models are noted below. For the current state of
+   * unsupported parameters in reasoning models,
+   * [refer to the reasoning guide](https://platform.openai.com/docs/guides/reasoning).
    */
   create(
     body: ChatCompletionCreateParamsNonStreaming,
@@ -135,6 +141,9 @@ export namespace ChatCompletion {
   }
 }
 
+/**
+ * Messages sent by the model in response to user messages.
+ */
 export interface ChatCompletionAssistantMessageParam {
   /**
    * The role of the messages author, in this case `assistant`.
@@ -531,6 +540,29 @@ export interface ChatCompletionContentPartText {
 }
 
 /**
+ * Developer-provided instructions that the model should follow, regardless of
+ * messages sent by the user. With o1 models and newer, `developer` messages
+ * replace the previous `system` messages.
+ */
+export interface ChatCompletionDeveloperMessageParam {
+  /**
+   * The contents of the developer message.
+   */
+  content: string | Array<ChatCompletionContentPartText>;
+
+  /**
+   * The role of the messages author, in this case `developer`.
+   */
+  role: 'developer';
+
+  /**
+   * An optional name for the participant. Provides the model information to
+   * differentiate between participants of the same role.
+   */
+  name?: string;
+}
+
+/**
  * Specifying a particular function via `{"name": "my_function"}` forces the model
  * to call that function.
  */
@@ -620,7 +652,13 @@ export namespace ChatCompletionMessage {
   }
 }
 
+/**
+ * Developer-provided instructions that the model should follow, regardless of
+ * messages sent by the user. With o1 models and newer, `developer` messages
+ * replace the previous `system` messages.
+ */
 export type ChatCompletionMessageParam =
+  | ChatCompletionDeveloperMessageParam
   | ChatCompletionSystemMessageParam
   | ChatCompletionUserMessageParam
   | ChatCompletionAssistantMessageParam
@@ -708,6 +746,16 @@ export interface ChatCompletionPredictionContent {
 }
 
 /**
+ * **o1 models only**
+ *
+ * Constrains effort on reasoning for
+ * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
+ * supported values are `low`, `medium`, and `high`. Reducing reasoning effort can
+ * result in faster responses and fewer tokens used on reasoning in a response.
+ */
+export type ChatCompletionReasoningEffort = 'low' | 'medium' | 'high';
+
+/**
  * The role of the author of a message
  */
 export type ChatCompletionRole = 'system' | 'user' | 'assistant' | 'tool' | 'function';
@@ -725,6 +773,11 @@ export interface ChatCompletionStreamOptions {
   include_usage?: boolean;
 }
 
+/**
+ * Developer-provided instructions that the model should follow, regardless of
+ * messages sent by the user. With o1 models and newer, use `developer` messages
+ * for this purpose instead.
+ */
 export interface ChatCompletionSystemMessageParam {
   /**
    * The contents of the system message.
@@ -835,6 +888,10 @@ export interface ChatCompletionToolMessageParam {
   tool_call_id: string;
 }
 
+/**
+ * Messages sent by an end user, containing prompts or additional context
+ * information.
+ */
 export interface ChatCompletionUserMessageParam {
   /**
    * The contents of the user message.
@@ -891,19 +948,21 @@ export interface ChatCompletionCreateParamsBase {
    * Number between -2.0 and 2.0. Positive values penalize new tokens based on their
    * existing frequency in the text so far, decreasing the model's likelihood to
    * repeat the same line verbatim.
-   *
-   * [See more information about frequency and presence penalties.](https://platform.openai.com/docs/guides/text-generation)
    */
   frequency_penalty?: number | null;
 
   /**
    * Deprecated in favor of `tool_choice`.
    *
-   * Controls which (if any) function is called by the model. `none` means the model
-   * will not call a function and instead generates a message. `auto` means the model
-   * can pick between generating a message or calling a function. Specifying a
-   * particular function via `{"name": "my_function"}` forces the model to call that
+   * Controls which (if any) function is called by the model.
+   *
+   * `none` means the model will not call a function and instead generates a message.
+   *
+   * `auto` means the model can pick between generating a message or calling a
    * function.
+   *
+   * Specifying a particular function via `{"name": "my_function"}` forces the model
+   * to call that function.
    *
    * `none` is the default when no functions are present. `auto` is the default if
    * functions are present.
@@ -998,17 +1057,21 @@ export interface ChatCompletionCreateParamsBase {
    * Number between -2.0 and 2.0. Positive values penalize new tokens based on
    * whether they appear in the text so far, increasing the model's likelihood to
    * talk about new topics.
-   *
-   * [See more information about frequency and presence penalties.](https://platform.openai.com/docs/guides/text-generation)
    */
   presence_penalty?: number | null;
 
   /**
-   * An object specifying the format that the model must output. Compatible with
-   * [GPT-4o](https://platform.openai.com/docs/models#gpt-4o),
-   * [GPT-4o mini](https://platform.openai.com/docs/models#gpt-4o-mini),
-   * [GPT-4 Turbo](https://platform.openai.com/docs/models#gpt-4-turbo-and-gpt-4) and
-   * all GPT-3.5 Turbo models newer than `gpt-3.5-turbo-1106`.
+   * **o1 models only**
+   *
+   * Constrains effort on reasoning for
+   * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
+   * supported values are `low`, `medium`, and `high`. Reducing reasoning effort can
+   * result in faster responses and fewer tokens used on reasoning in a response.
+   */
+  reasoning_effort?: ChatCompletionReasoningEffort;
+
+  /**
+   * An object specifying the format that the model must output.
    *
    * Setting to `{ "type": "json_schema", "json_schema": {...} }` enables Structured
    * Outputs which ensures the model will match your supplied JSON schema. Learn more
@@ -1088,9 +1151,8 @@ export interface ChatCompletionCreateParamsBase {
   /**
    * What sampling temperature to use, between 0 and 2. Higher values like 0.8 will
    * make the output more random, while lower values like 0.2 will make it more
-   * focused and deterministic.
-   *
-   * We generally recommend altering this or `top_p` but not both.
+   * focused and deterministic. We generally recommend altering this or `top_p` but
+   * not both.
    */
   temperature?: number | null;
 
@@ -1223,6 +1285,7 @@ export declare namespace Completions {
     type ChatCompletionContentPartInputAudio as ChatCompletionContentPartInputAudio,
     type ChatCompletionContentPartRefusal as ChatCompletionContentPartRefusal,
     type ChatCompletionContentPartText as ChatCompletionContentPartText,
+    type ChatCompletionDeveloperMessageParam as ChatCompletionDeveloperMessageParam,
     type ChatCompletionFunctionCallOption as ChatCompletionFunctionCallOption,
     type ChatCompletionFunctionMessageParam as ChatCompletionFunctionMessageParam,
     type ChatCompletionMessage as ChatCompletionMessage,
@@ -1231,6 +1294,7 @@ export declare namespace Completions {
     type ChatCompletionModality as ChatCompletionModality,
     type ChatCompletionNamedToolChoice as ChatCompletionNamedToolChoice,
     type ChatCompletionPredictionContent as ChatCompletionPredictionContent,
+    type ChatCompletionReasoningEffort as ChatCompletionReasoningEffort,
     type ChatCompletionRole as ChatCompletionRole,
     type ChatCompletionStreamOptions as ChatCompletionStreamOptions,
     type ChatCompletionSystemMessageParam as ChatCompletionSystemMessageParam,
