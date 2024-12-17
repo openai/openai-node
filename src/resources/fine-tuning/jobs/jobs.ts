@@ -127,9 +127,8 @@ export interface FineTuningJob {
   finished_at: number | null;
 
   /**
-   * The hyperparameters used for the fine-tuning job. See the
-   * [fine-tuning guide](https://platform.openai.com/docs/guides/fine-tuning) for
-   * more details.
+   * The hyperparameters used for the fine-tuning job. This value will only be
+   * returned when running `supervised` jobs.
    */
   hyperparameters: FineTuningJob.Hyperparameters;
 
@@ -195,6 +194,11 @@ export interface FineTuningJob {
    * A list of integrations to enable for this fine-tuning job.
    */
   integrations?: Array<FineTuningJobWandbIntegrationObject> | null;
+
+  /**
+   * The method used for fine-tuning.
+   */
+  method?: FineTuningJob.Method;
 }
 
 export namespace FineTuningJob {
@@ -221,18 +225,125 @@ export namespace FineTuningJob {
   }
 
   /**
-   * The hyperparameters used for the fine-tuning job. See the
-   * [fine-tuning guide](https://platform.openai.com/docs/guides/fine-tuning) for
-   * more details.
+   * The hyperparameters used for the fine-tuning job. This value will only be
+   * returned when running `supervised` jobs.
    */
   export interface Hyperparameters {
     /**
-     * The number of epochs to train the model for. An epoch refers to one full cycle
-     * through the training dataset. "auto" decides the optimal number of epochs based
-     * on the size of the dataset. If setting the number manually, we support any
-     * number between 1 and 50 epochs.
+     * Number of examples in each batch. A larger batch size means that model
+     * parameters are updated less frequently, but with lower variance.
      */
-    n_epochs: 'auto' | number;
+    batch_size?: 'auto' | number;
+
+    /**
+     * Scaling factor for the learning rate. A smaller learning rate may be useful to
+     * avoid overfitting.
+     */
+    learning_rate_multiplier?: 'auto' | number;
+
+    /**
+     * The number of epochs to train the model for. An epoch refers to one full cycle
+     * through the training dataset.
+     */
+    n_epochs?: 'auto' | number;
+  }
+
+  /**
+   * The method used for fine-tuning.
+   */
+  export interface Method {
+    /**
+     * Configuration for the DPO fine-tuning method.
+     */
+    dpo?: Method.Dpo;
+
+    /**
+     * Configuration for the supervised fine-tuning method.
+     */
+    supervised?: Method.Supervised;
+
+    /**
+     * The type of method. Is either `supervised` or `dpo`.
+     */
+    type?: 'supervised' | 'dpo';
+  }
+
+  export namespace Method {
+    /**
+     * Configuration for the DPO fine-tuning method.
+     */
+    export interface Dpo {
+      /**
+       * The hyperparameters used for the fine-tuning job.
+       */
+      hyperparameters?: Dpo.Hyperparameters;
+    }
+
+    export namespace Dpo {
+      /**
+       * The hyperparameters used for the fine-tuning job.
+       */
+      export interface Hyperparameters {
+        /**
+         * Number of examples in each batch. A larger batch size means that model
+         * parameters are updated less frequently, but with lower variance.
+         */
+        batch_size?: 'auto' | number;
+
+        /**
+         * The beta value for the DPO method. A higher beta value will increase the weight
+         * of the penalty between the policy and reference model.
+         */
+        beta?: 'auto' | number;
+
+        /**
+         * Scaling factor for the learning rate. A smaller learning rate may be useful to
+         * avoid overfitting.
+         */
+        learning_rate_multiplier?: 'auto' | number;
+
+        /**
+         * The number of epochs to train the model for. An epoch refers to one full cycle
+         * through the training dataset.
+         */
+        n_epochs?: 'auto' | number;
+      }
+    }
+
+    /**
+     * Configuration for the supervised fine-tuning method.
+     */
+    export interface Supervised {
+      /**
+       * The hyperparameters used for the fine-tuning job.
+       */
+      hyperparameters?: Supervised.Hyperparameters;
+    }
+
+    export namespace Supervised {
+      /**
+       * The hyperparameters used for the fine-tuning job.
+       */
+      export interface Hyperparameters {
+        /**
+         * Number of examples in each batch. A larger batch size means that model
+         * parameters are updated less frequently, but with lower variance.
+         */
+        batch_size?: 'auto' | number;
+
+        /**
+         * Scaling factor for the learning rate. A smaller learning rate may be useful to
+         * avoid overfitting.
+         */
+        learning_rate_multiplier?: 'auto' | number;
+
+        /**
+         * The number of epochs to train the model for. An epoch refers to one full cycle
+         * through the training dataset.
+         */
+        n_epochs?: 'auto' | number;
+      }
+    }
   }
 }
 
@@ -240,15 +351,40 @@ export namespace FineTuningJob {
  * Fine-tuning job event object
  */
 export interface FineTuningJobEvent {
+  /**
+   * The object identifier.
+   */
   id: string;
 
+  /**
+   * The Unix timestamp (in seconds) for when the fine-tuning job was created.
+   */
   created_at: number;
 
+  /**
+   * The log level of the event.
+   */
   level: 'info' | 'warn' | 'error';
 
+  /**
+   * The message of the event.
+   */
   message: string;
 
+  /**
+   * The object type, which is always "fine_tuning.job.event".
+   */
   object: 'fine_tuning.job.event';
+
+  /**
+   * The data associated with the event.
+   */
+  data?: unknown;
+
+  /**
+   * The type of event.
+   */
+  type?: 'message' | 'metrics';
 }
 
 export type FineTuningJobIntegration = FineTuningJobWandbIntegrationObject;
@@ -318,8 +454,10 @@ export interface JobCreateParams {
    * your file with the purpose `fine-tune`.
    *
    * The contents of the file should differ depending on if the model uses the
-   * [chat](https://platform.openai.com/docs/api-reference/fine-tuning/chat-input) or
+   * [chat](https://platform.openai.com/docs/api-reference/fine-tuning/chat-input),
    * [completions](https://platform.openai.com/docs/api-reference/fine-tuning/completions-input)
+   * format, or if the fine-tuning method uses the
+   * [preference](https://platform.openai.com/docs/api-reference/fine-tuning/preference-input)
    * format.
    *
    * See the [fine-tuning guide](https://platform.openai.com/docs/guides/fine-tuning)
@@ -328,7 +466,8 @@ export interface JobCreateParams {
   training_file: string;
 
   /**
-   * The hyperparameters used for the fine-tuning job.
+   * The hyperparameters used for the fine-tuning job. This value is now deprecated
+   * in favor of `method`, and should be passed in under the `method` parameter.
    */
   hyperparameters?: JobCreateParams.Hyperparameters;
 
@@ -336,6 +475,11 @@ export interface JobCreateParams {
    * A list of integrations to enable for your fine-tuning job.
    */
   integrations?: Array<JobCreateParams.Integration> | null;
+
+  /**
+   * The method used for fine-tuning.
+   */
+  method?: JobCreateParams.Method;
 
   /**
    * The seed controls the reproducibility of the job. Passing in the same seed and
@@ -372,7 +516,9 @@ export interface JobCreateParams {
 
 export namespace JobCreateParams {
   /**
-   * The hyperparameters used for the fine-tuning job.
+   * @deprecated: The hyperparameters used for the fine-tuning job. This value is now
+   * deprecated in favor of `method`, and should be passed in under the `method`
+   * parameter.
    */
   export interface Hyperparameters {
     /**
@@ -442,6 +588,104 @@ export namespace JobCreateParams {
        * "openai/finetune", "openai/{base-model}", "openai/{ftjob-abcdef}".
        */
       tags?: Array<string>;
+    }
+  }
+
+  /**
+   * The method used for fine-tuning.
+   */
+  export interface Method {
+    /**
+     * Configuration for the DPO fine-tuning method.
+     */
+    dpo?: Method.Dpo;
+
+    /**
+     * Configuration for the supervised fine-tuning method.
+     */
+    supervised?: Method.Supervised;
+
+    /**
+     * The type of method. Is either `supervised` or `dpo`.
+     */
+    type?: 'supervised' | 'dpo';
+  }
+
+  export namespace Method {
+    /**
+     * Configuration for the DPO fine-tuning method.
+     */
+    export interface Dpo {
+      /**
+       * The hyperparameters used for the fine-tuning job.
+       */
+      hyperparameters?: Dpo.Hyperparameters;
+    }
+
+    export namespace Dpo {
+      /**
+       * The hyperparameters used for the fine-tuning job.
+       */
+      export interface Hyperparameters {
+        /**
+         * Number of examples in each batch. A larger batch size means that model
+         * parameters are updated less frequently, but with lower variance.
+         */
+        batch_size?: 'auto' | number;
+
+        /**
+         * The beta value for the DPO method. A higher beta value will increase the weight
+         * of the penalty between the policy and reference model.
+         */
+        beta?: 'auto' | number;
+
+        /**
+         * Scaling factor for the learning rate. A smaller learning rate may be useful to
+         * avoid overfitting.
+         */
+        learning_rate_multiplier?: 'auto' | number;
+
+        /**
+         * The number of epochs to train the model for. An epoch refers to one full cycle
+         * through the training dataset.
+         */
+        n_epochs?: 'auto' | number;
+      }
+    }
+
+    /**
+     * Configuration for the supervised fine-tuning method.
+     */
+    export interface Supervised {
+      /**
+       * The hyperparameters used for the fine-tuning job.
+       */
+      hyperparameters?: Supervised.Hyperparameters;
+    }
+
+    export namespace Supervised {
+      /**
+       * The hyperparameters used for the fine-tuning job.
+       */
+      export interface Hyperparameters {
+        /**
+         * Number of examples in each batch. A larger batch size means that model
+         * parameters are updated less frequently, but with lower variance.
+         */
+        batch_size?: 'auto' | number;
+
+        /**
+         * Scaling factor for the learning rate. A smaller learning rate may be useful to
+         * avoid overfitting.
+         */
+        learning_rate_multiplier?: 'auto' | number;
+
+        /**
+         * The number of epochs to train the model for. An epoch refers to one full cycle
+         * through the training dataset.
+         */
+        n_epochs?: 'auto' | number;
+      }
     }
   }
 }

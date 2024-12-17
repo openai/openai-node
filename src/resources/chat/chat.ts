@@ -16,6 +16,7 @@ import {
   ChatCompletionCreateParams,
   ChatCompletionCreateParamsNonStreaming,
   ChatCompletionCreateParamsStreaming,
+  ChatCompletionDeveloperMessageParam,
   ChatCompletionFunctionCallOption,
   ChatCompletionFunctionMessageParam,
   ChatCompletionMessage,
@@ -24,6 +25,7 @@ import {
   ChatCompletionModality,
   ChatCompletionNamedToolChoice,
   ChatCompletionPredictionContent,
+  ChatCompletionReasoningEffort,
   ChatCompletionRole,
   ChatCompletionStreamOptions,
   ChatCompletionSystemMessageParam,
@@ -44,6 +46,8 @@ export class Chat extends APIResource {
 }
 
 export type ChatModel =
+  | 'o1'
+  | 'o1-2024-12-17'
   | 'o1-preview'
   | 'o1-preview-2024-09-12'
   | 'o1-mini'
@@ -52,10 +56,11 @@ export type ChatModel =
   | 'gpt-4o-2024-11-20'
   | 'gpt-4o-2024-08-06'
   | 'gpt-4o-2024-05-13'
-  | 'gpt-4o-realtime-preview'
-  | 'gpt-4o-realtime-preview-2024-10-01'
   | 'gpt-4o-audio-preview'
   | 'gpt-4o-audio-preview-2024-10-01'
+  | 'gpt-4o-audio-preview-2024-12-17'
+  | 'gpt-4o-mini-audio-preview'
+  | 'gpt-4o-mini-audio-preview-2024-12-17'
   | 'chatgpt-4o-latest'
   | 'gpt-4o-mini'
   | 'gpt-4o-mini-2024-07-18'
@@ -96,6 +101,7 @@ export declare namespace Chat {
     type ChatCompletionContentPartInputAudio as ChatCompletionContentPartInputAudio,
     type ChatCompletionContentPartRefusal as ChatCompletionContentPartRefusal,
     type ChatCompletionContentPartText as ChatCompletionContentPartText,
+    type ChatCompletionDeveloperMessageParam as ChatCompletionDeveloperMessageParam,
     type ChatCompletionFunctionCallOption as ChatCompletionFunctionCallOption,
     type ChatCompletionFunctionMessageParam as ChatCompletionFunctionMessageParam,
     type ChatCompletionMessage as ChatCompletionMessage,
@@ -104,6 +110,7 @@ export declare namespace Chat {
     type ChatCompletionModality as ChatCompletionModality,
     type ChatCompletionNamedToolChoice as ChatCompletionNamedToolChoice,
     type ChatCompletionPredictionContent as ChatCompletionPredictionContent,
+    type ChatCompletionReasoningEffort as ChatCompletionReasoningEffort,
     type ChatCompletionRole as ChatCompletionRole,
     type ChatCompletionStreamOptions as ChatCompletionStreamOptions,
     type ChatCompletionSystemMessageParam as ChatCompletionSystemMessageParam,

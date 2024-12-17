@@ -41,6 +41,7 @@ Types:
 - <code><a href="./src/resources/chat/completions.ts">ChatCompletionContentPartInputAudio</a></code>
 - <code><a href="./src/resources/chat/completions.ts">ChatCompletionContentPartRefusal</a></code>
 - <code><a href="./src/resources/chat/completions.ts">ChatCompletionContentPartText</a></code>
+- <code><a href="./src/resources/chat/completions.ts">ChatCompletionDeveloperMessageParam</a></code>
 - <code><a href="./src/resources/chat/completions.ts">ChatCompletionFunctionCallOption</a></code>
 - <code><a href="./src/resources/chat/completions.ts">ChatCompletionFunctionMessageParam</a></code>
 - <code><a href="./src/resources/chat/completions.ts">ChatCompletionMessage</a></code>
@@ -49,6 +50,7 @@ Types:
 - <code><a href="./src/resources/chat/completions.ts">ChatCompletionModality</a></code>
 - <code><a href="./src/resources/chat/completions.ts">ChatCompletionNamedToolChoice</a></code>
 - <code><a href="./src/resources/chat/completions.ts">ChatCompletionPredictionContent</a></code>
+- <code><a href="./src/resources/chat/completions.ts">ChatCompletionReasoningEffort</a></code>
 - <code><a href="./src/resources/chat/completions.ts">ChatCompletionRole</a></code>
 - <code><a href="./src/resources/chat/completions.ts">ChatCompletionStreamOptions</a></code>
 - <code><a href="./src/resources/chat/completions.ts">ChatCompletionSystemMessageParam</a></code>
