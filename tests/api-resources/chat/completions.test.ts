@@ -10,7 +10,7 @@ const client = new OpenAI({
 describe('resource completions', () => {
   test('create: only required params', async () => {
     const responsePromise = client.chat.completions.create({
-      messages: [{ content: 'string', role: 'system' }],
+      messages: [{ content: 'string', role: 'developer' }],
       model: 'gpt-4o',
     });
     const rawResponse = await responsePromise.asResponse();
@@ -24,7 +24,7 @@ describe('resource completions', () => {
 
   test('create: required and optional params', async () => {
     const response = await client.chat.completions.create({
-      messages: [{ content: 'string', role: 'system', name: 'name' }],
+      messages: [{ content: 'string', role: 'developer', name: 'name' }],
       model: 'gpt-4o',
       audio: { format: 'wav', voice: 'alloy' },
       frequency_penalty: -2,
@@ -40,6 +40,7 @@ describe('resource completions', () => {
       parallel_tool_calls: true,
       prediction: { content: 'string', type: 'content' },
       presence_penalty: -2,
+      reasoning_effort: 'low',
       response_format: { type: 'text' },
       seed: -9007199254740991,
       service_tier: 'auto',
