@@ -31,6 +31,11 @@ describe('instantiate client', () => {
       expect((req.headers as Headers)['x-my-default-header']).toEqual('2');
     });
 
+    test('streaming request must have Accept header set to text/event-stream', () => {
+      const { req } = client.buildRequest({ path: '/', method: 'get', stream: true });
+      expect((req.headers as Headers)['accept']).toEqual('text/event-stream');
+    });
+
     test('can ignore `undefined` and leave the default', () => {
       const { req } = client.buildRequest({
         path: '/foo',
