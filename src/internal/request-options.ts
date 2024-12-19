@@ -1,26 +1,22 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { type Agent, type ReadableLike } from './shims';
-import { BlobLike } from '../uploads';
+import { NullableHeaders } from './headers';
+
+import type { Agent } from './shims';
+import type { BodyInit } from './builtin-types';
 import { isEmptyObj, hasOwn } from './utils/values';
 import { Stream } from '../streaming';
-import { type Headers, type HTTPMethod, type KeysEnum } from './types';
+import type { HTTPMethod, KeysEnum } from './types';
+import { type HeadersLike } from './headers';
 
-export type FinalRequestOptions<Req = unknown | Record<string, unknown> | ReadableLike | DataView> =
-  RequestOptions<Req> & {
-    method: HTTPMethod;
-    path: string;
-  };
+export type FinalRequestOptions = RequestOptions & { method: HTTPMethod; path: string };
 
-export type RequestOptions<
-  Req = unknown | Record<string, unknown> | ReadableLike | BlobLike | ArrayBufferView | ArrayBuffer,
-> = {
+export type RequestOptions = {
   method?: HTTPMethod;
   path?: string;
-  query?: Req | undefined;
-  body?: Req | null | undefined;
-  headers?: Headers | undefined;
-
+  query?: object | undefined | null;
+  body?: unknown;
+  headers?: HeadersLike;
   maxRetries?: number;
   stream?: boolean | undefined;
   timeout?: number;
@@ -28,7 +24,6 @@ export type RequestOptions<
   signal?: AbortSignal | undefined | null;
   idempotencyKey?: string;
 
-  __binaryRequest?: boolean | undefined;
   __binaryResponse?: boolean | undefined;
   __streamClass?: typeof Stream;
 };
@@ -50,7 +45,6 @@ const requestOptionsKeys: KeysEnum<RequestOptions> = {
   signal: true,
   idempotencyKey: true,
 
-  __binaryRequest: true,
   __binaryResponse: true,
   __streamClass: true,
 };
@@ -62,4 +56,16 @@ export const isRequestOptions = (obj: unknown): obj is RequestOptions => {
     !isEmptyObj(obj) &&
     Object.keys(obj).every((k) => hasOwn(requestOptionsKeys, k))
   );
+};
+
+export type EncodedContent = { bodyHeaders: HeadersLike; body: BodyInit };
+export type RequestEncoder = (request: { headers: NullableHeaders; body: unknown }) => EncodedContent;
+
+export const FallbackEncoder: RequestEncoder = ({ headers, body }) => {
+  return {
+    bodyHeaders: {
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  };
 };

@@ -1,7 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { castToError } from './internal/errors';
-import { type Headers } from './internal/types';
 
 export class OpenAIError extends Error {}
 
@@ -27,7 +26,7 @@ export class APIError<
     super(`${APIError.makeMessage(status, error, message)}`);
     this.status = status;
     this.headers = headers;
-    this.requestID = headers?.['x-request-id'];
+    this.requestID = headers?.get('x-request-id');
     this.error = error;
 
     const data = error as Record<string, any>;

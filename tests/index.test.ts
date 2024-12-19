@@ -1,8 +1,8 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
+import util from 'node:util';
 import OpenAI from 'openai';
 import { APIUserAbortError } from 'openai';
-import { Headers } from 'openai/internal/types';
 const defaultFetch = fetch;
 
 describe('instantiate client', () => {
@@ -28,7 +28,7 @@ describe('instantiate client', () => {
 
     test('they are used in the request', () => {
       const { req } = client.buildRequest({ path: '/foo', method: 'post' });
-      expect((req.headers as Headers)['x-my-default-header']).toEqual('2');
+      expect(req.headers.get('x-my-default-header')).toEqual('2');
     });
 
     test('can ignore `undefined` and leave the default', () => {
@@ -37,7 +37,7 @@ describe('instantiate client', () => {
         method: 'post',
         headers: { 'X-My-Default-Header': undefined },
       });
-      expect((req.headers as Headers)['x-my-default-header']).toEqual('2');
+      expect(req.headers.get('x-my-default-header')).toEqual('2');
     });
 
     test('can be removed with `null`', () => {
@@ -46,7 +46,7 @@ describe('instantiate client', () => {
         method: 'post',
         headers: { 'X-My-Default-Header': null },
       });
-      expect(req.headers as Headers).not.toHaveProperty('x-my-default-header');
+      expect(req.headers.has('x-my-default-header')).toBe(false);
     });
   });
 
@@ -188,18 +188,6 @@ describe('instantiate client', () => {
 describe('request building', () => {
   const client = new OpenAI({ apiKey: 'My API Key' });
 
-  describe('Content-Length', () => {
-    test('handles multi-byte characters', () => {
-      const { req } = client.buildRequest({ path: '/foo', method: 'post', body: { value: '—' } });
-      expect((req.headers as Record<string, string>)['content-length']).toEqual('20');
-    });
-
-    test('handles standard characters', () => {
-      const { req } = client.buildRequest({ path: '/foo', method: 'post', body: { value: 'hello' } });
-      expect((req.headers as Record<string, string>)['content-length']).toEqual('22');
-    });
-  });
-
   describe('custom headers', () => {
     test('handles undefined', () => {
       const { req } = client.buildRequest({
@@ -208,11 +196,82 @@ describe('request building', () => {
         body: { value: 'hello' },
         headers: { 'X-Foo': 'baz', 'x-foo': 'bar', 'x-Foo': undefined, 'x-baz': 'bam', 'X-Baz': null },
       });
-      expect((req.headers as Record<string, string>)['x-foo']).toEqual('bar');
-      expect((req.headers as Record<string, string>)['x-Foo']).toEqual(undefined);
-      expect((req.headers as Record<string, string>)['X-Foo']).toEqual(undefined);
-      expect((req.headers as Record<string, string>)['x-baz']).toEqual(undefined);
+      expect(req.headers.get('x-foo')).toEqual('bar');
+      expect(req.headers.get('x-Foo')).toEqual('bar');
+      expect(req.headers.get('X-Foo')).toEqual('bar');
+      expect(req.headers.get('x-baz')).toEqual(null);
     });
+  });
+});
+
+describe('default encoder', () => {
+  const client = new OpenAI({ apiKey: 'My API Key' });
+
+  class Serializable {
+    toJSON() {
+      return { $type: 'Serializable' };
+    }
+  }
+  class Collection<T> {
+    #things: T[];
+    constructor(things: T[]) {
+      this.#things = Array.from(things);
+    }
+    toJSON() {
+      return Array.from(this.#things);
+    }
+    [Symbol.iterator]() {
+      return this.#things[Symbol.iterator];
+    }
+  }
+  for (const jsonValue of [{}, [], { __proto__: null }, new Serializable(), new Collection(['item'])]) {
+    test(`serializes ${util.inspect(jsonValue)} as json`, () => {
+      const { req } = client.buildRequest({
+        path: '/foo',
+        method: 'post',
+        body: jsonValue,
+      });
+      expect(req.headers).toBeInstanceOf(Headers);
+      expect(req.headers.get('content-type')).toEqual('application/json');
+      expect(req.body).toBe(JSON.stringify(jsonValue));
+    });
+  }
+
+  const encoder = new TextEncoder();
+  const asyncIterable = (async function* () {
+    yield encoder.encode('a\n');
+    yield encoder.encode('b\n');
+    yield encoder.encode('c\n');
+  })();
+  for (const streamValue of [
+    [encoder.encode('a\nb\nc\n')][Symbol.iterator](),
+    new Response('a\nb\nc\n').body,
+    asyncIterable,
+  ]) {
+    test(`converts ${util.inspect(streamValue)} to ReadableStream`, async () => {
+      const { req } = client.buildRequest({
+        path: '/foo',
+        method: 'post',
+        body: streamValue,
+      });
+      expect(req.headers).toBeInstanceOf(Headers);
+      expect(req.headers.get('content-type')).toEqual(null);
+      expect(req.body).toBeInstanceOf(ReadableStream);
+      expect(await new Response(req.body).text()).toBe('a\nb\nc\n');
+    });
+  }
+
+  test(`can set content-type for ReadableStream`, async () => {
+    const { req } = client.buildRequest({
+      path: '/foo',
+      method: 'post',
+      body: new Response('a\nb\nc\n').body,
+      headers: { 'Content-Type': 'text/plain' },
+    });
+    expect(req.headers).toBeInstanceOf(Headers);
+    expect(req.headers.get('content-type')).toEqual('text/plain');
+    expect(req.body).toBeInstanceOf(ReadableStream);
+    expect(await new Response(req.body).text()).toBe('a\nb\nc\n');
   });
 });
 
@@ -265,7 +324,7 @@ describe('retries', () => {
 
     expect(await client.request({ path: '/foo', method: 'get' })).toEqual({ a: 1 });
 
-    expect((capturedRequest!.headers as Headers)['x-stainless-retry-count']).toEqual('2');
+    expect((capturedRequest!.headers as Headers).get('x-stainless-retry-count')).toEqual('2');
     expect(count).toEqual(3);
   });
 
@@ -295,7 +354,7 @@ describe('retries', () => {
       }),
     ).toEqual({ a: 1 });
 
-    expect(capturedRequest!.headers as Headers).not.toHaveProperty('x-stainless-retry-count');
+    expect((capturedRequest!.headers as Headers).has('x-stainless-retry-count')).toBe(false);
   });
 
   test('omit retry count header by default', async () => {
@@ -357,7 +416,7 @@ describe('retries', () => {
       }),
     ).toEqual({ a: 1 });
 
-    expect((capturedRequest!.headers as Headers)['x-stainless-retry-count']).toBe('42');
+    expect((capturedRequest!.headers as Headers).get('x-stainless-retry-count')).toEqual('42');
   });
 
   test('retry on 429 with retry-after', async () => {

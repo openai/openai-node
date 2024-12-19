@@ -1,90 +1,96 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import type { Fetch } from './builtin-types';
-import type { Headers } from './types';
-import { hasOwn } from './utils/values';
+type HeaderValue = string | undefined | null;
+export type HeadersLike =
+  | Headers
+  | readonly [string, HeaderValue][]
+  | Record<string, HeaderValue | readonly HeaderValue[]>
+  | undefined
+  | null
+  | NullableHeaders;
 
-// TODO: remove this, we should just use
-// the builtin Headers type
-export const createResponseHeaders = (
-  headers: Awaited<ReturnType<Fetch>>['headers'],
-): Record<string, string> => {
-  return new Proxy(
-    {},
-    {
-      get(_target, name) {
-        const key = name.toString();
-        return headers.get(key) ?? undefined;
-      },
-    },
-  );
-};
+const brand_privateNullableHeaders = Symbol('brand.privateNullableHeaders');
 
 /**
- * Copies headers from "newHeaders" onto "targetHeaders",
- * using lower-case for all properties,
- * ignoring any keys with undefined values,
- * and deleting any keys with null values.
+ * @internal
+ * Users can pass explicit nulls to unset default headers. When we parse them
+ * into a standard headers type we need to preserve that information.
  */
-export function applyHeadersMut(targetHeaders: Headers, newHeaders: Headers): void {
-  for (const k in newHeaders) {
-    if (!hasOwn(newHeaders, k)) continue;
-    const lowerKey = k.toLowerCase();
-    if (!lowerKey) continue;
+export type NullableHeaders = {
+  /** Brand check, prevent users from creating a NullableHeaders. */
+  [brand_privateNullableHeaders]: true;
+  /** Parsed headers. */
+  values: Headers;
+  /** Set of lowercase header names explicitly set to null. */
+  nulls: Set<string>;
+};
 
-    const val = newHeaders[k];
+const isArray = Array.isArray as (val: unknown) => val is readonly unknown[];
 
-    if (val === null) {
-      delete targetHeaders[lowerKey];
-    } else if (val !== undefined) {
-      targetHeaders[lowerKey] = val;
+function* iterateHeaders(headers: HeadersLike): IterableIterator<readonly [string, string | null]> {
+  if (!headers) return;
+
+  if (brand_privateNullableHeaders in headers) {
+    const { values, nulls } = headers;
+    yield* values.entries();
+    for (const name of nulls) {
+      yield [name, null];
+    }
+    return;
+  }
+
+  let shouldClear = false;
+  let iter: Iterable<readonly [string, HeaderValue | readonly HeaderValue[]]>;
+  if (headers instanceof Headers) {
+    iter = headers.entries();
+  } else if (isArray(headers)) {
+    iter = headers;
+  } else {
+    shouldClear = true;
+    iter = Object.entries(headers ?? {});
+  }
+  for (let row of iter) {
+    const name = row[0];
+    const values = isArray(row[1]) ? row[1] : [row[1]];
+    let didClear = false;
+    for (const value of values) {
+      if (value === undefined) continue;
+
+      // Objects keys always overwrite older headers, they never append.
+      // Yield a null to clear the header before adding the new values.
+      if (shouldClear && !didClear) {
+        didClear = true;
+        yield [name, null];
+      }
+      yield [name, value];
     }
   }
 }
 
-export interface HeadersProtocol {
-  get: (header: string) => string | null | undefined;
-}
-export type HeadersLike = Record<string, string | string[] | undefined> | HeadersProtocol;
-export type HeadersInit = [string, string][] | Record<string, string> | Headers;
-
-export const isHeadersProtocol = (headers: any): headers is HeadersProtocol => {
-  return typeof headers?.get === 'function';
-};
-
-export const getRequiredHeader = (headers: HeadersLike | Headers, header: string): string => {
-  const foundHeader = getHeader(headers, header);
-  if (foundHeader === undefined) {
-    throw new Error(`Could not find ${header} header`);
-  }
-  return foundHeader;
-};
-
-export const getHeader = (headers: HeadersLike | Headers, header: string): string | undefined => {
-  const lowerCasedHeader = header.toLowerCase();
-  if (isHeadersProtocol(headers)) {
-    // to deal with the case where the header looks like Stainless-Event-Id
-    const intercapsHeader =
-      header[0]?.toUpperCase() +
-      header.substring(1).replace(/([^\w])(\w)/g, (_m, g1, g2) => g1 + g2.toUpperCase());
-    for (const key of [header, lowerCasedHeader, header.toUpperCase(), intercapsHeader]) {
-      const value = headers.get(key);
-      if (value) {
-        return value;
+export const buildHeaders = (newHeaders: HeadersLike[]): NullableHeaders => {
+  const targetHeaders = new Headers();
+  const nullHeaders = new Set<string>();
+  const seenHeaders = new Set<string>();
+  for (const headers of newHeaders) {
+    for (const [name, value] of iterateHeaders(headers)) {
+      const lowerName = name.toLowerCase();
+      if (!seenHeaders.has(lowerName)) {
+        targetHeaders.delete(name);
+        seenHeaders.add(lowerName);
+      }
+      if (value === null) {
+        targetHeaders.delete(name);
+        nullHeaders.add(lowerName);
+      } else {
+        targetHeaders.append(name, value);
+        nullHeaders.delete(lowerName);
       }
     }
   }
+  return { [brand_privateNullableHeaders]: true, values: targetHeaders, nulls: nullHeaders };
+};
 
-  for (const [key, value] of Object.entries(headers)) {
-    if (key.toLowerCase() === lowerCasedHeader) {
-      if (Array.isArray(value)) {
-        if (value.length <= 1) return value[0];
-        console.warn(`Received ${value.length} entries for the ${header} header, using the first entry.`);
-        return value[0];
-      }
-      return value;
-    }
-  }
-
-  return undefined;
+export const isEmptyHeaders = (headers: HeadersLike) => {
+  for (const _ of iterateHeaders(headers)) return false;
+  return true;
 };

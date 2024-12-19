@@ -25,10 +25,30 @@ type _Response = Response;
  */
 type _RequestInfo = Request | URL | string;
 
-export type { _RequestInit as RequestInit, _Response as Response, _RequestInfo as RequestInfo };
+/**
+ * The type for constructing `RequestInit` Headers.
+ *
+ * https://developer.mozilla.org/docs/Web/API/RequestInit#setting_headers
+ */
+type _HeadersInit = RequestInit['headers'];
 
 /**
- * A copy of the builtin `EndingType` type as they aren't fully supported in certain
+ * The type for constructing `RequestInit` body.
+ *
+ * https://developer.mozilla.org/docs/Web/API/RequestInit#body
+ */
+type _BodyInit = RequestInit['body'];
+
+export type {
+  _BodyInit as BodyInit,
+  _HeadersInit as HeadersInit,
+  _RequestInfo as RequestInfo,
+  _RequestInit as RequestInit,
+  _Response as Response,
+};
+
+/**
+ * A copy of the builtin `EndingType` type as it isn't fully supported in certain
  * environments and attempting to reference the global version will error.
  *
  * https://github.com/microsoft/TypeScript/blob/49ad1a3917a0ea57f5ff248159256e12bb1cb705/src/lib/dom.generated.d.ts#L27941
@@ -36,7 +56,7 @@ export type { _RequestInit as RequestInit, _Response as Response, _RequestInfo a
 type EndingType = 'native' | 'transparent';
 
 /**
- * A copy of the builtin `BlobPropertyBag` type as they aren't fully supported in certain
+ * A copy of the builtin `BlobPropertyBag` type as it isn't fully supported in certain
  * environments and attempting to reference the global version will error.
  *
  * https://github.com/microsoft/TypeScript/blob/49ad1a3917a0ea57f5ff248159256e12bb1cb705/src/lib/dom.generated.d.ts#L154
@@ -48,7 +68,7 @@ export interface BlobPropertyBag {
 }
 
 /**
- * A copy of the builtin `FilePropertyBag` type as they aren't fully supported in certain
+ * A copy of the builtin `FilePropertyBag` type as it isn't fully supported in certain
  * environments and attempting to reference the global version will error.
  *
  * https://github.com/microsoft/TypeScript/blob/49ad1a3917a0ea57f5ff248159256e12bb1cb705/src/lib/dom.generated.d.ts#L503

@@ -1,7 +1,6 @@
 import { type RequestOptions } from './internal/request-options';
 import { type FilePropertyBag } from './internal/builtin-types';
 import { isFsReadStreamLike, type FsReadStreamLike } from './internal/shims';
-import { MultipartBody } from './internal/MultipartBody';
 import './internal/polyfill/file.node.js';
 
 type BlobLikePart = string | ArrayBuffer | ArrayBufferView | BlobLike | Uint8Array | DataView;
@@ -196,27 +195,22 @@ const getStringFromMaybeBuffer = (x: string | Buffer | unknown): string | undefi
 const isAsyncIterableIterator = (value: any): value is AsyncIterableIterator<unknown> =>
   value != null && typeof value === 'object' && typeof value[Symbol.asyncIterator] === 'function';
 
-export const isMultipartBody = (body: any): body is MultipartBody =>
-  body && typeof body === 'object' && body.body && body[Symbol.toStringTag] === 'MultipartBody';
-
 /**
  * Returns a multipart/form-data request if any part of the given request body contains a File / Blob value.
  * Otherwise returns the request as is.
  */
-export const maybeMultipartFormRequestOptions = async <T = Record<string, unknown>>(
-  opts: RequestOptions<T>,
-): Promise<RequestOptions<T | MultipartBody>> => {
+export const maybeMultipartFormRequestOptions = async (opts: RequestOptions): Promise<RequestOptions> => {
   if (!hasUploadableValue(opts.body)) return opts;
 
-  const form = await createForm(opts.body);
-  return { ...opts, body: new MultipartBody(form) };
+  return { ...opts, body: await createForm(opts.body) };
 };
 
-export const multipartFormRequestOptions = async <T = Record<string, unknown>>(
-  opts: RequestOptions<T>,
-): Promise<RequestOptions<T | MultipartBody>> => {
-  const form = await createForm(opts.body);
-  return { ...opts, body: new MultipartBody(form) };
+type MultipartFormRequestOptions = Omit<RequestOptions, 'body'> & { body: unknown };
+
+export const multipartFormRequestOptions = async (
+  opts: MultipartFormRequestOptions,
+): Promise<RequestOptions> => {
+  return { ...opts, body: await createForm(opts.body) };
 };
 
 export const createForm = async <T = Record<string, unknown>>(body: T | undefined): Promise<FormData> => {
