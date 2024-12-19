@@ -1,5 +1,18 @@
 # Changelog
 
+## 4.77.1 (2024-12-19)
+
+Full Changelog: [v4.77.0...v4.77.1](https://github.com/openai/openai-node/compare/v4.77.0...v4.77.1)
+
+### Bug Fixes
+
+* **client:** normalize method ([#1235](https://github.com/openai/openai-node/issues/1235)) ([4a213da](https://github.com/openai/openai-node/commit/4a213dad6f2104dc02a75724acc62134d25db472))
+
+
+### Chores
+
+* **internal:** spec update ([#1231](https://github.com/openai/openai-node/issues/1231)) ([a97ea73](https://github.com/openai/openai-node/commit/a97ea73cafcb56e94be7ff691c4022da575cf60e))
+
 ## 4.77.0 (2024-12-17)
 
 Full Changelog: [v4.76.3...v4.77.0](https://github.com/openai/openai-node/compare/v4.76.3...v4.77.0)
