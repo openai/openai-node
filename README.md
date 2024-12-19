@@ -379,7 +379,7 @@ We are keen for your feedback; please open an [issue](https://www.github.com/sta
 
 ## Requirements
 
-TypeScript >= 4.5 is supported.
+TypeScript >= 4.9 is supported.
 
 The following runtimes are supported:
 
