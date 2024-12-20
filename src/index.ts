@@ -27,3 +27,5 @@ export {
   PermissionDeniedError,
   UnprocessableEntityError,
 } from './error';
+
+export { AzureOpenAI } from './azure';
