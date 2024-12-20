@@ -1,8 +1,10 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../resource';
-import * as Core from '../../core';
 import * as AudioAPI from './audio';
+import { APIPromise } from '../../api-promise';
+import { type Uploadable, multipartFormRequestOptions } from '../../uploads';
+import { RequestOptions } from '../../internal/request-options';
 
 export class Transcriptions extends APIResource {
   /**
@@ -10,22 +12,22 @@ export class Transcriptions extends APIResource {
    */
   create(
     body: TranscriptionCreateParams<'json' | undefined>,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<Transcription>;
+    options?: RequestOptions,
+  ): APIPromise<Transcription>;
   create(
     body: TranscriptionCreateParams<'verbose_json'>,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<TranscriptionVerbose>;
+    options?: RequestOptions,
+  ): APIPromise<TranscriptionVerbose>;
   create(
     body: TranscriptionCreateParams<'srt' | 'vtt' | 'text'>,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<string>;
-  create(body: TranscriptionCreateParams, options?: Core.RequestOptions): Core.APIPromise<Transcription>;
+    options?: RequestOptions,
+  ): APIPromise<string>;
+  create(body: TranscriptionCreateParams, options?: RequestOptions): APIPromise<Transcription>;
   create(
     body: TranscriptionCreateParams,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<TranscriptionCreateResponse | string> {
-    return this._client.post('/audio/transcriptions', Core.multipartFormRequestOptions({ body, ...options }));
+    options?: RequestOptions,
+  ): APIPromise<TranscriptionCreateResponse | string> {
+    return this._client.post('/audio/transcriptions', multipartFormRequestOptions({ body, ...options }));
   }
 }
 
@@ -156,7 +158,7 @@ export interface TranscriptionCreateParams<
    * The audio file object (not file name) to transcribe, in one of these formats:
    * flac, mp3, mp4, mpeg, mpga, m4a, ogg, wav, or webm.
    */
-  file: Core.Uploadable;
+  file: Uploadable;
 
   /**
    * ID of the model to use. Only `whisper-1` (which is powered by our open source

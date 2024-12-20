@@ -4,13 +4,13 @@ export * from './chat/index';
 export * from './shared';
 export { Audio, type AudioModel, type AudioResponseFormat } from './audio/audio';
 export {
-  BatchesPage,
   Batches,
   type Batch,
   type BatchError,
   type BatchRequestCounts,
   type BatchCreateParams,
   type BatchListParams,
+  type BatchesPage,
 } from './batches';
 export { Beta } from './beta/beta';
 export {
@@ -30,7 +30,6 @@ export {
   type EmbeddingCreateParams,
 } from './embeddings';
 export {
-  FileObjectsPage,
   Files,
   type FileContent,
   type FileDeleted,
@@ -38,6 +37,7 @@ export {
   type FilePurpose,
   type FileCreateParams,
   type FileListParams,
+  type FileObjectsPage,
 } from './files';
 export { FineTuning } from './fine-tuning/fine-tuning';
 export {
@@ -49,7 +49,7 @@ export {
   type ImageEditParams,
   type ImageGenerateParams,
 } from './images';
-export { ModelsPage, Models, type Model, type ModelDeleted } from './models';
+export { Models, type Model, type ModelDeleted, type ModelsPage } from './models';
 export {
   Moderations,
   type Moderation,

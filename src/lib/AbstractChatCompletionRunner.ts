@@ -1,4 +1,3 @@
-import * as Core from '../core';
 import { type CompletionUsage } from '../resources/completions';
 import {
   type ChatCompletion,
@@ -24,9 +23,10 @@ import { BaseEvents, EventStream } from './EventStream';
 import { ParsedChatCompletion } from '../resources/beta/chat/completions';
 import OpenAI from '../index';
 import { isAutoParsableTool, parseChatCompletion } from '../lib/parser';
+import { RequestOptions } from '../internal/request-options';
 
 const DEFAULT_MAX_CHAT_COMPLETIONS = 10;
-export interface RunnerOptions extends Core.RequestOptions {
+export interface RunnerOptions extends RequestOptions {
   /** How many requests to make before canceling. Default 10. */
   maxChatCompletions?: number;
 }
@@ -238,7 +238,7 @@ export class AbstractChatCompletionRunner<
   protected async _createChatCompletion(
     client: OpenAI,
     params: ChatCompletionCreateParams,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): Promise<ParsedChatCompletion<ParsedT>> {
     const signal = options?.signal;
     if (signal) {
@@ -258,7 +258,7 @@ export class AbstractChatCompletionRunner<
   protected async _runChatCompletion(
     client: OpenAI,
     params: ChatCompletionCreateParams,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): Promise<ChatCompletion> {
     for (const message of params.messages) {
       this._addMessage(message, false);

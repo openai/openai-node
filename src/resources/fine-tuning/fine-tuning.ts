@@ -21,8 +21,6 @@ export class FineTuning extends APIResource {
 }
 
 FineTuning.Jobs = Jobs;
-FineTuning.FineTuningJobsPage = FineTuningJobsPage;
-FineTuning.FineTuningJobEventsPage = FineTuningJobEventsPage;
 
 export declare namespace FineTuning {
   export {
@@ -32,8 +30,8 @@ export declare namespace FineTuning {
     type FineTuningJobIntegration as FineTuningJobIntegration,
     type FineTuningJobWandbIntegration as FineTuningJobWandbIntegration,
     type FineTuningJobWandbIntegrationObject as FineTuningJobWandbIntegrationObject,
-    FineTuningJobsPage as FineTuningJobsPage,
-    FineTuningJobEventsPage as FineTuningJobEventsPage,
+    type FineTuningJobsPage as FineTuningJobsPage,
+    type FineTuningJobEventsPage as FineTuningJobEventsPage,
     type JobCreateParams as JobCreateParams,
     type JobListParams as JobListParams,
     type JobListEventsParams as JobListEventsParams,

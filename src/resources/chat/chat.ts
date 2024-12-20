@@ -38,7 +38,6 @@ import {
   CompletionCreateParamsNonStreaming,
   CompletionCreateParamsStreaming,
   Completions,
-  CreateChatCompletionRequestMessage,
 } from './completions';
 
 export class Chat extends APIResource {
@@ -119,7 +118,6 @@ export declare namespace Chat {
     type ChatCompletionToolChoiceOption as ChatCompletionToolChoiceOption,
     type ChatCompletionToolMessageParam as ChatCompletionToolMessageParam,
     type ChatCompletionUserMessageParam as ChatCompletionUserMessageParam,
-    type CreateChatCompletionRequestMessage as CreateChatCompletionRequestMessage,
     type ChatCompletionCreateParams as ChatCompletionCreateParams,
     type CompletionCreateParams as CompletionCreateParams,
     type ChatCompletionCreateParamsNonStreaming as ChatCompletionCreateParamsNonStreaming,

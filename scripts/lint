@@ -7,5 +7,12 @@ cd "$(dirname "$0")/.."
 echo "==> Running eslint"
 ESLINT_USE_FLAT_CONFIG="false" ./node_modules/.bin/eslint --ext ts,js .
 
-echo "==> Running tsc"
-./node_modules/.bin/tsc --noEmit
+echo "==> Building"
+./scripts/build # also checks types
+
+echo "==> Running Are The Types Wrong?"
+./node_modules/.bin/attw --pack dist -f json >.attw.json || true
+node scripts/utils/attw-report.cjs
+
+echo "==> Running publint"
+./node_modules/.bin/publint dist

@@ -2,8 +2,6 @@
 
 export { FineTuning } from './fine-tuning';
 export {
-  FineTuningJobsPage,
-  FineTuningJobEventsPage,
   Jobs,
   type FineTuningJob,
   type FineTuningJobEvent,
@@ -13,4 +11,6 @@ export {
   type JobCreateParams,
   type JobListParams,
   type JobListEventsParams,
+  type FineTuningJobsPage,
+  type FineTuningJobEventsPage,
 } from './jobs/index';

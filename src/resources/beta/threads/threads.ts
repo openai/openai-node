@@ -1,10 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../../resource';
-import { isRequestOptions } from '../../../core';
-import { AssistantStream, ThreadCreateAndRunParamsBaseStream } from '../../../lib/AssistantStream';
-import { APIPromise } from '../../../core';
-import * as Core from '../../../core';
 import * as ThreadsAPI from './threads';
 import * as Shared from '../../shared';
 import * as AssistantsAPI from '../assistants';
@@ -30,10 +26,12 @@ import {
   MessageContentDelta,
   MessageContentPartParam,
   MessageCreateParams,
+  MessageDeleteParams,
   MessageDeleted,
   MessageDelta,
   MessageDeltaEvent,
   MessageListParams,
+  MessageRetrieveParams,
   MessageUpdateParams,
   Messages,
   MessagesPage,
@@ -52,10 +50,12 @@ import {
   Run,
   RunCreateAndPollParams,
   RunCreateAndStreamParams,
+  RunCancelParams,
   RunCreateParams,
   RunCreateParamsNonStreaming,
   RunCreateParamsStreaming,
   RunListParams,
+  RunRetrieveParams,
   RunStatus,
   RunStreamParams,
   RunSubmitToolOutputsAndPollParams,
@@ -67,7 +67,10 @@ import {
   Runs,
   RunsPage,
 } from './runs/runs';
+import { APIPromise } from '../../../api-promise';
 import { Stream } from '../../../streaming';
+import { RequestOptions } from '../../../internal/request-options';
+import { AssistantStream, ThreadCreateAndRunParamsBaseStream } from '../../../lib/AssistantStream';
 
 export class Threads extends APIResource {
   runs: RunsAPI.Runs = new RunsAPI.Runs(this._client);
@@ -76,15 +79,7 @@ export class Threads extends APIResource {
   /**
    * Create a thread.
    */
-  create(body?: ThreadCreateParams, options?: Core.RequestOptions): Core.APIPromise<Thread>;
-  create(options?: Core.RequestOptions): Core.APIPromise<Thread>;
-  create(
-    body: ThreadCreateParams | Core.RequestOptions = {},
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<Thread> {
-    if (isRequestOptions(body)) {
-      return this.create({}, body);
-    }
+  create(body: ThreadCreateParams | null | undefined = {}, options?: RequestOptions): APIPromise<Thread> {
     return this._client.post('/threads', {
       body,
       ...options,
@@ -95,8 +90,8 @@ export class Threads extends APIResource {
   /**
    * Retrieves a thread.
    */
-  retrieve(threadId: string, options?: Core.RequestOptions): Core.APIPromise<Thread> {
-    return this._client.get(`/threads/${threadId}`, {
+  retrieve(threadID: string, options?: RequestOptions): APIPromise<Thread> {
+    return this._client.get(`/threads/${threadID}`, {
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
     });
@@ -105,8 +100,8 @@ export class Threads extends APIResource {
   /**
    * Modifies a thread.
    */
-  update(threadId: string, body: ThreadUpdateParams, options?: Core.RequestOptions): Core.APIPromise<Thread> {
-    return this._client.post(`/threads/${threadId}`, {
+  update(threadID: string, body: ThreadUpdateParams, options?: RequestOptions): APIPromise<Thread> {
+    return this._client.post(`/threads/${threadID}`, {
       body,
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
@@ -116,8 +111,8 @@ export class Threads extends APIResource {
   /**
    * Delete a thread.
    */
-  del(threadId: string, options?: Core.RequestOptions): Core.APIPromise<ThreadDeleted> {
-    return this._client.delete(`/threads/${threadId}`, {
+  delete(threadID: string, options?: RequestOptions): APIPromise<ThreadDeleted> {
+    return this._client.delete(`/threads/${threadID}`, {
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
     });
@@ -126,21 +121,18 @@ export class Threads extends APIResource {
   /**
    * Create a thread and run it in one request.
    */
-  createAndRun(
-    body: ThreadCreateAndRunParamsNonStreaming,
-    options?: Core.RequestOptions,
-  ): APIPromise<RunsAPI.Run>;
+  createAndRun(body: ThreadCreateAndRunParamsNonStreaming, options?: RequestOptions): APIPromise<RunsAPI.Run>;
   createAndRun(
     body: ThreadCreateAndRunParamsStreaming,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
   createAndRun(
     body: ThreadCreateAndRunParamsBase,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): APIPromise<Stream<AssistantsAPI.AssistantStreamEvent> | RunsAPI.Run>;
   createAndRun(
     body: ThreadCreateAndRunParams,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): APIPromise<RunsAPI.Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>> {
     return this._client.post('/threads/runs', {
       body,
@@ -157,19 +149,16 @@ export class Threads extends APIResource {
    */
   async createAndRunPoll(
     body: ThreadCreateAndRunParamsNonStreaming,
-    options?: Core.RequestOptions & { pollIntervalMs?: number },
+    options?: RequestOptions & { pollIntervalMs?: number },
   ): Promise<Threads.Run> {
     const run = await this.createAndRun(body, options);
-    return await this.runs.poll(run.thread_id, run.id, options);
+    return await this.runs.poll(run.id, { thread_id: run.thread_id }, options);
   }
 
   /**
    * Create a thread and stream the run back
    */
-  createAndRunStream(
-    body: ThreadCreateAndRunParamsBaseStream,
-    options?: Core.RequestOptions,
-  ): AssistantStream {
+  createAndRunStream(body: ThreadCreateAndRunParamsBaseStream, options?: RequestOptions): AssistantStream {
     return AssistantStream.createThreadAssistantStream(body, this._client.beta.threads, options);
   }
 }
@@ -1545,9 +1534,7 @@ export namespace ThreadCreateAndRunStreamParams {
 }
 
 Threads.Runs = Runs;
-Threads.RunsPage = RunsPage;
 Threads.Messages = Messages;
-Threads.MessagesPage = MessagesPage;
 
 export declare namespace Threads {
   export {
@@ -1571,12 +1558,14 @@ export declare namespace Threads {
     type RequiredActionFunctionToolCall as RequiredActionFunctionToolCall,
     type Run as Run,
     type RunStatus as RunStatus,
-    RunsPage as RunsPage,
+    type RunsPage as RunsPage,
     type RunCreateParams as RunCreateParams,
     type RunCreateParamsNonStreaming as RunCreateParamsNonStreaming,
     type RunCreateParamsStreaming as RunCreateParamsStreaming,
+    type RunRetrieveParams as RunRetrieveParams,
     type RunUpdateParams as RunUpdateParams,
     type RunListParams as RunListParams,
+    type RunCancelParams as RunCancelParams,
     type RunCreateAndPollParams,
     type RunCreateAndStreamParams,
     type RunStreamParams,
@@ -1617,9 +1606,11 @@ export declare namespace Threads {
     type TextContentBlockParam as TextContentBlockParam,
     type TextDelta as TextDelta,
     type TextDeltaBlock as TextDeltaBlock,
-    MessagesPage as MessagesPage,
+    type MessagesPage as MessagesPage,
     type MessageCreateParams as MessageCreateParams,
+    type MessageRetrieveParams as MessageRetrieveParams,
     type MessageUpdateParams as MessageUpdateParams,
     type MessageListParams as MessageListParams,
+    type MessageDeleteParams as MessageDeleteParams,
   };
 }

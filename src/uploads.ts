@@ -1,15 +1,7 @@
-import { type RequestOptions } from './core';
-import {
-  FormData,
-  File,
-  type Blob,
-  type FilePropertyBag,
-  getMultipartRequestOptions,
-  type FsReadStream,
-  isFsReadStream,
-} from './_shims/index';
-import { MultipartBody } from './_shims/MultipartBody';
-export { fileFromPath } from './_shims/index';
+import { type RequestOptions } from './internal/request-options';
+import { type FilePropertyBag } from './internal/builtin-types';
+import { isFsReadStreamLike, type FsReadStreamLike } from './internal/shims';
+import './internal/polyfill/file.node.js';
 
 type BlobLikePart = string | ArrayBuffer | ArrayBufferView | BlobLike | Uint8Array | DataView;
 export type BlobPart = string | ArrayBuffer | ArrayBufferView | Blob | Uint8Array | DataView;
@@ -23,10 +15,10 @@ export type BlobPart = string | ArrayBuffer | ArrayBufferView | Blob | Uint8Arra
  * For convenience, you can also pass a fetch Response, or in Node,
  * the result of fs.createReadStream().
  */
-export type Uploadable = FileLike | ResponseLike | FsReadStream;
+export type Uploadable = FileLike | ResponseLike | FsReadStreamLike;
 
 /**
- * Intended to match web.Blob, node.Blob, node-fetch.Blob, etc.
+ * Intended to match web.Blob, node.Blob, undici.Blob, etc.
  */
 export interface BlobLike {
   /** [MDN Reference](https://developer.mozilla.org/docs/Web/API/Blob/size) */
@@ -37,11 +29,22 @@ export interface BlobLike {
   text(): Promise<string>;
   /** [MDN Reference](https://developer.mozilla.org/docs/Web/API/Blob/slice) */
   slice(start?: number, end?: number): BlobLike;
-  // unfortunately @types/node-fetch@^2.6.4 doesn't type the arrayBuffer method
 }
 
 /**
- * Intended to match web.File, node.File, node-fetch.File, etc.
+ * This check adds the arrayBuffer() method type because it is available and used at runtime
+ */
+export const isBlobLike = (value: any): value is BlobLike & { arrayBuffer(): Promise<ArrayBuffer> } =>
+  value != null &&
+  typeof value === 'object' &&
+  typeof value.size === 'number' &&
+  typeof value.type === 'string' &&
+  typeof value.text === 'function' &&
+  typeof value.slice === 'function' &&
+  typeof value.arrayBuffer === 'function';
+
+/**
+ * Intended to match web.File, node.File, undici.File, etc.
  */
 export interface FileLike extends BlobLike {
   /** [MDN Reference](https://developer.mozilla.org/docs/Web/API/File/lastModified) */
@@ -49,9 +52,20 @@ export interface FileLike extends BlobLike {
   /** [MDN Reference](https://developer.mozilla.org/docs/Web/API/File/name) */
   readonly name: string;
 }
+declare var FileClass: {
+  prototype: FileLike;
+  new (fileBits: BlobPart[], fileName: string, options?: FilePropertyBag): FileLike;
+};
+
+export const isFileLike = (value: any): value is FileLike =>
+  value != null &&
+  typeof value === 'object' &&
+  typeof value.name === 'string' &&
+  typeof value.lastModified === 'number' &&
+  isBlobLike(value);
 
 /**
- * Intended to match web.Response, node.Response, node-fetch.Response, etc.
+ * Intended to match web.Response, node.Response, undici.Response, etc.
  */
 export interface ResponseLike {
   url: string;
@@ -64,31 +78,25 @@ export const isResponseLike = (value: any): value is ResponseLike =>
   typeof value.url === 'string' &&
   typeof value.blob === 'function';
 
-export const isFileLike = (value: any): value is FileLike =>
-  value != null &&
-  typeof value === 'object' &&
-  typeof value.name === 'string' &&
-  typeof value.lastModified === 'number' &&
-  isBlobLike(value);
-
-/**
- * The BlobLike type omits arrayBuffer() because @types/node-fetch@^2.6.4 lacks it; but this check
- * adds the arrayBuffer() method type because it is available and used at runtime
- */
-export const isBlobLike = (value: any): value is BlobLike & { arrayBuffer(): Promise<ArrayBuffer> } =>
-  value != null &&
-  typeof value === 'object' &&
-  typeof value.size === 'number' &&
-  typeof value.type === 'string' &&
-  typeof value.text === 'function' &&
-  typeof value.slice === 'function' &&
-  typeof value.arrayBuffer === 'function';
-
 export const isUploadable = (value: any): value is Uploadable => {
-  return isFileLike(value) || isResponseLike(value) || isFsReadStream(value);
+  return isFileLike(value) || isResponseLike(value) || isFsReadStreamLike(value);
 };
 
 export type ToFileInput = Uploadable | Exclude<BlobLikePart, string> | AsyncIterable<BlobLikePart>;
+
+/**
+ * Construct a `File` instance. This is used to ensure a helpful error is thrown
+ * for environments that don't define a global `File` yet and so that we don't
+ * accidentally rely on a global `File` type in our annotations.
+ */
+function makeFile(fileBits: BlobPart[], fileName: string, options?: FilePropertyBag): FileLike {
+  const File = (globalThis as any).File as typeof FileClass | undefined;
+  if (typeof File === 'undefined') {
+    throw new Error('`File` is not defined as a global which is required for file uploads');
+  }
+
+  return new File(fileBits, fileName, options);
+}
 
 /**
  * Helper for creating a {@link File} to pass to an SDK upload method from a variety of different data formats
@@ -121,7 +129,7 @@ export async function toFile(
     // in `new File` interpreting it as a string instead of binary data.
     const data = isBlobLike(blob) ? [(await blob.arrayBuffer()) as any] : [blob];
 
-    return new File(data, name, options);
+    return makeFile(data, name, options);
   }
 
   const bits = await getBytes(value);
@@ -135,7 +143,7 @@ export async function toFile(
     }
   }
 
-  return new File(bits, name, options);
+  return makeFile(bits, name, options);
 }
 
 async function getBytes(value: ToFileInput): Promise<Array<BlobPart>> {
@@ -187,27 +195,22 @@ const getStringFromMaybeBuffer = (x: string | Buffer | unknown): string | undefi
 const isAsyncIterableIterator = (value: any): value is AsyncIterableIterator<unknown> =>
   value != null && typeof value === 'object' && typeof value[Symbol.asyncIterator] === 'function';
 
-export const isMultipartBody = (body: any): body is MultipartBody =>
-  body && typeof body === 'object' && body.body && body[Symbol.toStringTag] === 'MultipartBody';
-
 /**
  * Returns a multipart/form-data request if any part of the given request body contains a File / Blob value.
  * Otherwise returns the request as is.
  */
-export const maybeMultipartFormRequestOptions = async <T = Record<string, unknown>>(
-  opts: RequestOptions<T>,
-): Promise<RequestOptions<T | MultipartBody>> => {
+export const maybeMultipartFormRequestOptions = async (opts: RequestOptions): Promise<RequestOptions> => {
   if (!hasUploadableValue(opts.body)) return opts;
 
-  const form = await createForm(opts.body);
-  return getMultipartRequestOptions(form, opts);
+  return { ...opts, body: await createForm(opts.body) };
 };
 
-export const multipartFormRequestOptions = async <T = Record<string, unknown>>(
-  opts: RequestOptions<T>,
-): Promise<RequestOptions<T | MultipartBody>> => {
-  const form = await createForm(opts.body);
-  return getMultipartRequestOptions(form, opts);
+type MultipartFormRequestOptions = Omit<RequestOptions, 'body'> & { body: unknown };
+
+export const multipartFormRequestOptions = async (
+  opts: MultipartFormRequestOptions,
+): Promise<RequestOptions> => {
+  return { ...opts, body: await createForm(opts.body) };
 };
 
 export const createForm = async <T = Record<string, unknown>>(body: T | undefined): Promise<FormData> => {
@@ -240,7 +243,7 @@ const addFormValue = async (form: FormData, key: string, value: unknown): Promis
     form.append(key, String(value));
   } else if (isUploadable(value)) {
     const file = await toFile(value);
-    form.append(key, file as File);
+    form.append(key, file as any);
   } else if (Array.isArray(value)) {
     await Promise.all(value.map((entry) => addFormValue(form, key + '[]', entry)));
   } else if (typeof value === 'object') {

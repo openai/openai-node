@@ -8,7 +8,6 @@ const config: JestConfigWithTsJest = {
   },
   moduleNameMapper: {
     '^openai$': '<rootDir>/src/index.ts',
-    '^openai/_shims/auto/(.*)$': '<rootDir>/src/_shims/auto/$1-node',
     '^openai/(.*)$': '<rootDir>/src/$1',
   },
   modulePathIgnorePatterns: [
@@ -18,7 +17,7 @@ const config: JestConfigWithTsJest = {
     '<rootDir>/deno_tests/',
   ],
   testPathIgnorePatterns: ['scripts'],
-  prettierPath: require.resolve('prettier-2'),
+  // prettierPath: require.resolve('prettier-2'),
 };
 
 export default config;

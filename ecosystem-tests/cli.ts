@@ -4,9 +4,11 @@ import yargs from 'yargs';
 import assert from 'assert';
 import path from 'path';
 
-// @ts-ignore
-var SegfaultHandler = require('segfault-handler');
-SegfaultHandler.registerHandler('crash.log');
+try {
+  // @ts-ignore
+  var SegfaultHandler = require('segfault-handler');
+  SegfaultHandler.registerHandler('crash.log');
+} catch (_) {}
 
 const TAR_NAME = 'openai.tgz';
 const PACK_FOLDER = '.pack';
@@ -25,32 +27,31 @@ const projectRunners = {
   'node-ts-cjs': defaultNodeRunner,
   'node-ts-cjs-web': defaultNodeRunner,
   'node-ts-cjs-auto': defaultNodeRunner,
-  'node-ts4.5-jest27': defaultNodeRunner,
+  'node-ts4.5-jest28': defaultNodeRunner,
   'node-ts-esm': defaultNodeRunner,
   'node-ts-esm-web': defaultNodeRunner,
   'node-ts-esm-auto': defaultNodeRunner,
-  'node-ts-es2020': async () => {
-    await installPackage();
-    await run('npm', ['run', 'tsc']);
-    await run('npm', ['run', 'main']);
-  },
   'node-js': async () => {
     await installPackage();
     await run('node', ['test.js']);
-  },
-  'nodenext-tsup': async () => {
-    await installPackage();
-    await run('npm', ['run', 'build']);
-
-    if (state.live) {
-      await run('npm', ['run', 'main']);
-    }
   },
   'ts-browser-webpack': async () => {
     await installPackage();
 
     await run('npm', ['run', 'tsc']);
     await run('npm', ['run', 'build']);
+
+    if (state.live) {
+      await run('npm', ['run', 'test:ci']);
+    }
+  },
+  'browser-direct-import': async () => {
+    await installPackage();
+
+    await fs.rm('public/node_modules', { force: true });
+    await fs.symlink('../node_modules', 'public/node_modules');
+
+    await run('npm', ['run', 'tsc']);
 
     if (state.live) {
       await run('npm', ['run', 'test:ci']);
@@ -74,6 +75,7 @@ const projectRunners = {
   'cloudflare-worker': async () => {
     await installPackage();
 
+    await fs.writeFile('.dev.vars', `OPENAI_API_KEY='${process.env['OPENAI_API_KEY']}'`);
     await run('npm', ['run', 'tsc']);
 
     if (state.live) {
@@ -99,14 +101,15 @@ const projectRunners = {
       await run('bun', ['test']);
     }
   },
-  deno: async () => {
-    // we don't need to explicitly install the package here
-    // because our deno setup relies on `rootDir/dist-deno` to exist
-    // which is an artifact produced from our build process
-    await run('deno', ['task', 'install', '--unstable-sloppy-imports']);
-
-    if (state.live) await run('deno', ['task', 'test']);
-  },
+  // deno: async () => {
+  //   // we don't need to explicitly install the package here
+  //   // because our deno setup relies on `rootDir/deno` to exist
+  //   // which is an artifact produced from our build process
+  //   await run('deno', ['task', 'install']);
+  //   await run('deno', ['task', 'check']);
+  //
+  //   if (state.live) await run('deno', ['task', 'test']);
+  // },
 };
 
 let projectNames = Object.keys(projectRunners) as Array<keyof typeof projectRunners>;
