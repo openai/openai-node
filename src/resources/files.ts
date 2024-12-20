@@ -1,12 +1,12 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../resource';
-import { isRequestOptions } from '../core';
-import { sleep } from '../core';
+import { APIPromise } from '../api-promise';
+import { CursorPage, type CursorPageParams, PagePromise } from '../pagination';
+import { type Uploadable, multipartFormRequestOptions } from '../uploads';
+import { RequestOptions } from '../internal/request-options';
+import { sleep } from '../internal/utils/sleep';
 import { APIConnectionTimeoutError } from '../error';
-import * as Core from '../core';
-import { CursorPage, type CursorPageParams } from '../pagination';
-import { type Response } from '../_shims/index';
 
 export class Files extends APIResource {
   /**
@@ -32,44 +32,39 @@ export class Files extends APIResource {
    * Please [contact us](https://help.openai.com/) if you need to increase these
    * storage limits.
    */
-  create(body: FileCreateParams, options?: Core.RequestOptions): Core.APIPromise<FileObject> {
-    return this._client.post('/files', Core.multipartFormRequestOptions({ body, ...options }));
+  create(body: FileCreateParams, options?: RequestOptions): APIPromise<FileObject> {
+    return this._client.post('/files', multipartFormRequestOptions({ body, ...options }));
   }
 
   /**
    * Returns information about a specific file.
    */
-  retrieve(fileId: string, options?: Core.RequestOptions): Core.APIPromise<FileObject> {
-    return this._client.get(`/files/${fileId}`, options);
+  retrieve(fileID: string, options?: RequestOptions): APIPromise<FileObject> {
+    return this._client.get(`/files/${fileID}`, options);
   }
 
   /**
    * Returns a list of files.
    */
-  list(query?: FileListParams, options?: Core.RequestOptions): Core.PagePromise<FileObjectsPage, FileObject>;
-  list(options?: Core.RequestOptions): Core.PagePromise<FileObjectsPage, FileObject>;
   list(
-    query: FileListParams | Core.RequestOptions = {},
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<FileObjectsPage, FileObject> {
-    if (isRequestOptions(query)) {
-      return this.list({}, query);
-    }
-    return this._client.getAPIList('/files', FileObjectsPage, { query, ...options });
+    query: FileListParams | null | undefined = {},
+    options?: RequestOptions,
+  ): PagePromise<FileObjectsPage, FileObject> {
+    return this._client.getAPIList('/files', CursorPage<FileObject>, { query, ...options });
   }
 
   /**
    * Delete a file.
    */
-  del(fileId: string, options?: Core.RequestOptions): Core.APIPromise<FileDeleted> {
-    return this._client.delete(`/files/${fileId}`, options);
+  delete(fileID: string, options?: RequestOptions): APIPromise<FileDeleted> {
+    return this._client.delete(`/files/${fileID}`, options);
   }
 
   /**
    * Returns the contents of the specified file.
    */
-  content(fileId: string, options?: Core.RequestOptions): Core.APIPromise<Response> {
-    return this._client.get(`/files/${fileId}/content`, { ...options, __binaryResponse: true });
+  content(fileID: string, options?: RequestOptions): APIPromise<Response> {
+    return this._client.get(`/files/${fileID}/content`, { ...options, __binaryResponse: true });
   }
 
   /**
@@ -77,8 +72,8 @@ export class Files extends APIResource {
    *
    * @deprecated The `.content()` method should be used instead
    */
-  retrieveContent(fileId: string, options?: Core.RequestOptions): Core.APIPromise<string> {
-    return this._client.get(`/files/${fileId}/content`, {
+  retrieveContent(fileID: string, options?: RequestOptions): APIPromise<string> {
+    return this._client.get(`/files/${fileID}/content`, {
       ...options,
       headers: { Accept: 'application/json', ...options?.headers },
     });
@@ -111,7 +106,7 @@ export class Files extends APIResource {
   }
 }
 
-export class FileObjectsPage extends CursorPage<FileObject> {}
+export type FileObjectsPage = CursorPage<FileObject>;
 
 export type FileContent = string;
 
@@ -195,7 +190,7 @@ export interface FileCreateParams {
   /**
    * The File object (not file name) to be uploaded.
    */
-  file: Core.Uploadable;
+  file: Uploadable;
 
   /**
    * The intended purpose of the uploaded file.
@@ -223,15 +218,13 @@ export interface FileListParams extends CursorPageParams {
   purpose?: string;
 }
 
-Files.FileObjectsPage = FileObjectsPage;
-
 export declare namespace Files {
   export {
     type FileContent as FileContent,
     type FileDeleted as FileDeleted,
     type FileObject as FileObject,
     type FilePurpose as FilePurpose,
-    FileObjectsPage as FileObjectsPage,
+    type FileObjectsPage as FileObjectsPage,
     type FileCreateParams as FileCreateParams,
     type FileListParams as FileListParams,
   };

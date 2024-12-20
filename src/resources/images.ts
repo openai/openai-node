@@ -1,30 +1,29 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../resource';
-import * as Core from '../core';
+import { APIPromise } from '../api-promise';
+import { type Uploadable, multipartFormRequestOptions } from '../uploads';
+import { RequestOptions } from '../internal/request-options';
 
 export class Images extends APIResource {
   /**
    * Creates a variation of a given image.
    */
-  createVariation(
-    body: ImageCreateVariationParams,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<ImagesResponse> {
-    return this._client.post('/images/variations', Core.multipartFormRequestOptions({ body, ...options }));
+  createVariation(body: ImageCreateVariationParams, options?: RequestOptions): APIPromise<ImagesResponse> {
+    return this._client.post('/images/variations', multipartFormRequestOptions({ body, ...options }));
   }
 
   /**
    * Creates an edited or extended image given an original image and a prompt.
    */
-  edit(body: ImageEditParams, options?: Core.RequestOptions): Core.APIPromise<ImagesResponse> {
-    return this._client.post('/images/edits', Core.multipartFormRequestOptions({ body, ...options }));
+  edit(body: ImageEditParams, options?: RequestOptions): APIPromise<ImagesResponse> {
+    return this._client.post('/images/edits', multipartFormRequestOptions({ body, ...options }));
   }
 
   /**
    * Creates an image given a prompt.
    */
-  generate(body: ImageGenerateParams, options?: Core.RequestOptions): Core.APIPromise<ImagesResponse> {
+  generate(body: ImageGenerateParams, options?: RequestOptions): APIPromise<ImagesResponse> {
     return this._client.post('/images/generations', { body, ...options });
   }
 }
@@ -64,7 +63,7 @@ export interface ImageCreateVariationParams {
    * The image to use as the basis for the variation(s). Must be a valid PNG file,
    * less than 4MB, and square.
    */
-  image: Core.Uploadable;
+  image: Uploadable;
 
   /**
    * The model to use for image generation. Only `dall-e-2` is supported at this
@@ -104,7 +103,7 @@ export interface ImageEditParams {
    * The image to edit. Must be a valid PNG file, less than 4MB, and square. If mask
    * is not provided, image must have transparency, which will be used as the mask.
    */
-  image: Core.Uploadable;
+  image: Uploadable;
 
   /**
    * A text description of the desired image(s). The maximum length is 1000
@@ -117,7 +116,7 @@ export interface ImageEditParams {
    * indicate where `image` should be edited. Must be a valid PNG file, less than
    * 4MB, and have the same dimensions as `image`.
    */
-  mask?: Core.Uploadable;
+  mask?: Uploadable;
 
   /**
    * The model to use for image generation. Only `dall-e-2` is supported at this

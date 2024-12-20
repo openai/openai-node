@@ -8,9 +8,9 @@ const config: JestConfigWithTsJest = {
   },
   moduleNameMapper: {
     '^openai$': '<rootDir>/src/index.ts',
-    '^openai/_shims/auto/(.*)$': '<rootDir>/src/_shims/auto/$1-node',
     '^openai/(.*)$': '<rootDir>/src/$1',
   },
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   modulePathIgnorePatterns: [
     '<rootDir>/ecosystem-tests/',
     '<rootDir>/dist/',

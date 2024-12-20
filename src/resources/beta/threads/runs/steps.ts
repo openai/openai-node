@@ -1,39 +1,18 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../../../resource';
-import { isRequestOptions } from '../../../../core';
-import * as Core from '../../../../core';
 import * as StepsAPI from './steps';
-import { CursorPage, type CursorPageParams } from '../../../../pagination';
+import { APIPromise } from '../../../../api-promise';
+import { CursorPage, type CursorPageParams, PagePromise } from '../../../../pagination';
+import { RequestOptions } from '../../../../internal/request-options';
 
 export class Steps extends APIResource {
   /**
    * Retrieves a run step.
    */
-  retrieve(
-    threadId: string,
-    runId: string,
-    stepId: string,
-    query?: StepRetrieveParams,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<RunStep>;
-  retrieve(
-    threadId: string,
-    runId: string,
-    stepId: string,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<RunStep>;
-  retrieve(
-    threadId: string,
-    runId: string,
-    stepId: string,
-    query: StepRetrieveParams | Core.RequestOptions = {},
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<RunStep> {
-    if (isRequestOptions(query)) {
-      return this.retrieve(threadId, runId, stepId, {}, query);
-    }
-    return this._client.get(`/threads/${threadId}/runs/${runId}/steps/${stepId}`, {
+  retrieve(stepID: string, params: StepRetrieveParams, options?: RequestOptions): APIPromise<RunStep> {
+    const { thread_id, run_id, ...query } = params;
+    return this._client.get(`/threads/${thread_id}/runs/${run_id}/steps/${stepID}`, {
       query,
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
@@ -43,27 +22,9 @@ export class Steps extends APIResource {
   /**
    * Returns a list of run steps belonging to a run.
    */
-  list(
-    threadId: string,
-    runId: string,
-    query?: StepListParams,
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<RunStepsPage, RunStep>;
-  list(
-    threadId: string,
-    runId: string,
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<RunStepsPage, RunStep>;
-  list(
-    threadId: string,
-    runId: string,
-    query: StepListParams | Core.RequestOptions = {},
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<RunStepsPage, RunStep> {
-    if (isRequestOptions(query)) {
-      return this.list(threadId, runId, {}, query);
-    }
-    return this._client.getAPIList(`/threads/${threadId}/runs/${runId}/steps`, RunStepsPage, {
+  list(runID: string, params: StepListParams, options?: RequestOptions): PagePromise<RunStepsPage, RunStep> {
+    const { thread_id, ...query } = params;
+    return this._client.getAPIList(`/threads/${thread_id}/runs/${runID}/steps`, CursorPage<RunStep>, {
       query,
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
@@ -71,7 +32,7 @@ export class Steps extends APIResource {
   }
 }
 
-export class RunStepsPage extends CursorPage<RunStep> {}
+export type RunStepsPage = CursorPage<RunStep>;
 
 /**
  * Text output from the Code Interpreter tool call as part of a run step.
@@ -700,9 +661,20 @@ export interface ToolCallsStepDetails {
 
 export interface StepRetrieveParams {
   /**
-   * A list of additional fields to include in the response. Currently the only
-   * supported value is `step_details.tool_calls[*].file_search.results[*].content`
-   * to fetch the file search result content.
+   * Path param: The ID of the thread to which the run and run step belongs.
+   */
+  thread_id: string;
+
+  /**
+   * Path param: The ID of the run to which the run step belongs.
+   */
+  run_id: string;
+
+  /**
+   * Query param: A list of additional fields to include in the response. Currently
+   * the only supported value is
+   * `step_details.tool_calls[*].file_search.results[*].content` to fetch the file
+   * search result content.
    *
    * See the
    * [file search tool documentation](https://platform.openai.com/docs/assistants/tools/file-search#customizing-file-search-settings)
@@ -713,17 +685,23 @@ export interface StepRetrieveParams {
 
 export interface StepListParams extends CursorPageParams {
   /**
-   * A cursor for use in pagination. `before` is an object ID that defines your place
-   * in the list. For instance, if you make a list request and receive 100 objects,
-   * starting with obj_foo, your subsequent call can include before=obj_foo in order
-   * to fetch the previous page of the list.
+   * Path param: The ID of the thread the run and run steps belong to.
+   */
+  thread_id: string;
+
+  /**
+   * Query param: A cursor for use in pagination. `before` is an object ID that
+   * defines your place in the list. For instance, if you make a list request and
+   * receive 100 objects, starting with obj_foo, your subsequent call can include
+   * before=obj_foo in order to fetch the previous page of the list.
    */
   before?: string;
 
   /**
-   * A list of additional fields to include in the response. Currently the only
-   * supported value is `step_details.tool_calls[*].file_search.results[*].content`
-   * to fetch the file search result content.
+   * Query param: A list of additional fields to include in the response. Currently
+   * the only supported value is
+   * `step_details.tool_calls[*].file_search.results[*].content` to fetch the file
+   * search result content.
    *
    * See the
    * [file search tool documentation](https://platform.openai.com/docs/assistants/tools/file-search#customizing-file-search-settings)
@@ -732,13 +710,11 @@ export interface StepListParams extends CursorPageParams {
   include?: Array<RunStepInclude>;
 
   /**
-   * Sort order by the `created_at` timestamp of the objects. `asc` for ascending
-   * order and `desc` for descending order.
+   * Query param: Sort order by the `created_at` timestamp of the objects. `asc` for
+   * ascending order and `desc` for descending order.
    */
   order?: 'asc' | 'desc';
 }
-
-Steps.RunStepsPage = RunStepsPage;
 
 export declare namespace Steps {
   export {
@@ -760,7 +736,7 @@ export declare namespace Steps {
     type ToolCallDelta as ToolCallDelta,
     type ToolCallDeltaObject as ToolCallDeltaObject,
     type ToolCallsStepDetails as ToolCallsStepDetails,
-    RunStepsPage as RunStepsPage,
+    type RunStepsPage as RunStepsPage,
     type StepRetrieveParams as StepRetrieveParams,
     type StepListParams as StepListParams,
   };

@@ -65,9 +65,7 @@ export class Beta extends APIResource {
 }
 
 Beta.VectorStores = VectorStores;
-Beta.VectorStoresPage = VectorStoresPage;
 Beta.Assistants = Assistants;
-Beta.AssistantsPage = AssistantsPage;
 Beta.Threads = Threads;
 
 export declare namespace Beta {
@@ -82,7 +80,7 @@ export declare namespace Beta {
     type StaticFileChunkingStrategyParam as StaticFileChunkingStrategyParam,
     type VectorStore as VectorStore,
     type VectorStoreDeleted as VectorStoreDeleted,
-    VectorStoresPage as VectorStoresPage,
+    type VectorStoresPage as VectorStoresPage,
     type VectorStoreCreateParams as VectorStoreCreateParams,
     type VectorStoreUpdateParams as VectorStoreUpdateParams,
     type VectorStoreListParams as VectorStoreListParams,
@@ -103,7 +101,7 @@ export declare namespace Beta {
     type RunStepStreamEvent as RunStepStreamEvent,
     type RunStreamEvent as RunStreamEvent,
     type ThreadStreamEvent as ThreadStreamEvent,
-    AssistantsPage as AssistantsPage,
+    type AssistantsPage as AssistantsPage,
     type AssistantCreateParams as AssistantCreateParams,
     type AssistantUpdateParams as AssistantUpdateParams,
     type AssistantListParams as AssistantListParams,

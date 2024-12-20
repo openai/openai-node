@@ -31,7 +31,6 @@ export {
   type ChatCompletionToolChoiceOption,
   type ChatCompletionToolMessageParam,
   type ChatCompletionUserMessageParam,
-  type CreateChatCompletionRequestMessage,
   type ChatCompletionCreateParams,
   type CompletionCreateParams,
   type ChatCompletionCreateParamsNonStreaming,

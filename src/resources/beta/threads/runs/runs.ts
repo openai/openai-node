@@ -1,12 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../../../resource';
-import { isRequestOptions } from '../../../../core';
-import { APIPromise } from '../../../../core';
-import * as Core from '../../../../core';
-import { AssistantStream, RunCreateParamsBaseStream } from '../../../../lib/AssistantStream';
-import { sleep } from '../../../../core';
-import { RunSubmitToolOutputsParamsStream } from '../../../../lib/AssistantStream';
 import * as RunsAPI from './runs';
 import * as AssistantsAPI from '../../assistants';
 import * as ChatAPI from '../../../chat/chat';
@@ -37,8 +31,13 @@ import {
   ToolCallDeltaObject,
   ToolCallsStepDetails,
 } from './steps';
-import { CursorPage, type CursorPageParams } from '../../../../pagination';
+import { APIPromise } from '../../../../api-promise';
+import { CursorPage, type CursorPageParams, PagePromise } from '../../../../pagination';
 import { Stream } from '../../../../streaming';
+import { RequestOptions } from '../../../../internal/request-options';
+import { AssistantStream, RunCreateParamsBaseStream } from '../../../../lib/AssistantStream';
+import { sleep } from '../../../../core';
+import { RunSubmitToolOutputsParamsStream } from '../../../../lib/AssistantStream';
 
 export class Runs extends APIResource {
   steps: StepsAPI.Steps = new StepsAPI.Steps(this._client);
@@ -46,28 +45,24 @@ export class Runs extends APIResource {
   /**
    * Create a run.
    */
+  create(threadID: string, params: RunCreateParamsNonStreaming, options?: RequestOptions): APIPromise<Run>;
   create(
-    threadId: string,
-    params: RunCreateParamsNonStreaming,
-    options?: Core.RequestOptions,
-  ): APIPromise<Run>;
-  create(
-    threadId: string,
+    threadID: string,
     params: RunCreateParamsStreaming,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
   create(
-    threadId: string,
+    threadID: string,
     params: RunCreateParamsBase,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): APIPromise<Stream<AssistantsAPI.AssistantStreamEvent> | Run>;
   create(
-    threadId: string,
+    threadID: string,
     params: RunCreateParams,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>> {
     const { include, ...body } = params;
-    return this._client.post(`/threads/${threadId}/runs`, {
+    return this._client.post(`/threads/${threadID}/runs`, {
       query: { include },
       body,
       ...options,
@@ -79,8 +74,9 @@ export class Runs extends APIResource {
   /**
    * Retrieves a run.
    */
-  retrieve(threadId: string, runId: string, options?: Core.RequestOptions): Core.APIPromise<Run> {
-    return this._client.get(`/threads/${threadId}/runs/${runId}`, {
+  retrieve(runID: string, params: RunRetrieveParams, options?: RequestOptions): APIPromise<Run> {
+    const { thread_id } = params;
+    return this._client.get(`/threads/${thread_id}/runs/${runID}`, {
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
     });
@@ -89,13 +85,9 @@ export class Runs extends APIResource {
   /**
    * Modifies a run.
    */
-  update(
-    threadId: string,
-    runId: string,
-    body: RunUpdateParams,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<Run> {
-    return this._client.post(`/threads/${threadId}/runs/${runId}`, {
+  update(runID: string, params: RunUpdateParams, options?: RequestOptions): APIPromise<Run> {
+    const { thread_id, ...body } = params;
+    return this._client.post(`/threads/${thread_id}/runs/${runID}`, {
       body,
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
@@ -106,20 +98,11 @@ export class Runs extends APIResource {
    * Returns a list of runs belonging to a thread.
    */
   list(
-    threadId: string,
-    query?: RunListParams,
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<RunsPage, Run>;
-  list(threadId: string, options?: Core.RequestOptions): Core.PagePromise<RunsPage, Run>;
-  list(
-    threadId: string,
-    query: RunListParams | Core.RequestOptions = {},
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<RunsPage, Run> {
-    if (isRequestOptions(query)) {
-      return this.list(threadId, {}, query);
-    }
-    return this._client.getAPIList(`/threads/${threadId}/runs`, RunsPage, {
+    threadID: string,
+    query: RunListParams | null | undefined = {},
+    options?: RequestOptions,
+  ): PagePromise<RunsPage, Run> {
+    return this._client.getAPIList(`/threads/${threadID}/runs`, CursorPage<Run>, {
       query,
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
@@ -129,8 +112,9 @@ export class Runs extends APIResource {
   /**
    * Cancels a run that is `in_progress`.
    */
-  cancel(threadId: string, runId: string, options?: Core.RequestOptions): Core.APIPromise<Run> {
-    return this._client.post(`/threads/${threadId}/runs/${runId}/cancel`, {
+  cancel(runID: string, params: RunCancelParams, options?: RequestOptions): APIPromise<Run> {
+    const { thread_id } = params;
+    return this._client.post(`/threads/${thread_id}/runs/${runID}/cancel`, {
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
     });
@@ -231,34 +215,31 @@ export class Runs extends APIResource {
    * request.
    */
   submitToolOutputs(
-    threadId: string,
-    runId: string,
-    body: RunSubmitToolOutputsParamsNonStreaming,
-    options?: Core.RequestOptions,
+    runID: string,
+    params: RunSubmitToolOutputsParamsNonStreaming,
+    options?: RequestOptions,
   ): APIPromise<Run>;
   submitToolOutputs(
-    threadId: string,
-    runId: string,
-    body: RunSubmitToolOutputsParamsStreaming,
-    options?: Core.RequestOptions,
+    runID: string,
+    params: RunSubmitToolOutputsParamsStreaming,
+    options?: RequestOptions,
   ): APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
   submitToolOutputs(
-    threadId: string,
-    runId: string,
-    body: RunSubmitToolOutputsParamsBase,
-    options?: Core.RequestOptions,
+    runID: string,
+    params: RunSubmitToolOutputsParamsBase,
+    options?: RequestOptions,
   ): APIPromise<Stream<AssistantsAPI.AssistantStreamEvent> | Run>;
   submitToolOutputs(
-    threadId: string,
-    runId: string,
-    body: RunSubmitToolOutputsParams,
-    options?: Core.RequestOptions,
+    runID: string,
+    params: RunSubmitToolOutputsParams,
+    options?: RequestOptions,
   ): APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>> {
-    return this._client.post(`/threads/${threadId}/runs/${runId}/submit_tool_outputs`, {
+    const { thread_id, ...body } = params;
+    return this._client.post(`/threads/${thread_id}/runs/${runID}/submit_tool_outputs`, {
       body,
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
-      stream: body.stream ?? false,
+      stream: params.stream ?? false,
     }) as APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
   }
 
@@ -298,7 +279,7 @@ export class Runs extends APIResource {
   }
 }
 
-export class RunsPage extends CursorPage<Run> {}
+export type RunsPage = CursorPage<Run>;
 
 /**
  * Tool call objects
@@ -895,12 +876,26 @@ export interface RunCreateParamsStreaming extends RunCreateParamsBase {
   stream: true;
 }
 
+export interface RunRetrieveParams {
+  /**
+   * The ID of the [thread](https://platform.openai.com/docs/api-reference/threads)
+   * that was run.
+   */
+  thread_id: string;
+}
+
 export interface RunUpdateParams {
   /**
-   * Set of 16 key-value pairs that can be attached to an object. This can be useful
-   * for storing additional information about the object in a structured format. Keys
-   * can be a maximum of 64 characters long and values can be a maxium of 512
-   * characters long.
+   * Path param: The ID of the
+   * [thread](https://platform.openai.com/docs/api-reference/threads) that was run.
+   */
+  thread_id: string;
+
+  /**
+   * Body param: Set of 16 key-value pairs that can be attached to an object. This
+   * can be useful for storing additional information about the object in a
+   * structured format. Keys can be a maximum of 64 characters long and values can be
+   * a maximum of 512 characters long.
    */
   metadata?: unknown | null;
 }
@@ -921,23 +916,37 @@ export interface RunListParams extends CursorPageParams {
   order?: 'asc' | 'desc';
 }
 
-export interface RunCreateAndPollParams {
+export interface RunCancelParams {
   /**
-   * The ID of the
-   * [assistant](https://platform.openai.com/docs/api-reference/assistants) to use to
-   * execute this run.
+   * The ID of the thread to which this run belongs.
    */
-  assistant_id: string;
+  thread_id: string;
+}
+
+export type RunSubmitToolOutputsParams =
+  | RunSubmitToolOutputsParamsNonStreaming
+  | RunSubmitToolOutputsParamsStreaming;
+
+// TODO
+// RunCreateAndPollParams
+
+export interface RunSubmitToolOutputsParamsBase {
+  /**
+   * Path param: The ID of the
+   * [thread](https://platform.openai.com/docs/api-reference/threads) to which this
+   * run belongs.
+   */
+  thread_id: string;
 
   /**
-   * Appends additional instructions at the end of the instructions for the run. This
-   * is useful for modifying the behavior on a per-run basis without overriding other
-   * instructions.
+   * Body param: A list of tools for which the outputs are being submitted.
    */
   additional_instructions?: string | null;
 
   /**
-   * Adds additional messages to the thread before creating the run.
+   * Body param: If `true`, returns a stream of events that happen during the Run as
+   * server-sent events, terminating when the Run enters a terminal state with a
+   * `data: [DONE]` message.
    */
   additional_messages?: Array<RunCreateAndPollParams.AdditionalMessage> | null;
 
@@ -1109,8 +1118,9 @@ export namespace RunCreateAndPollParams {
   }
 
   /**
-   * Controls for how a thread will be truncated prior to the run. Use this to
-   * control the intial context window of the run.
+   * Body param: If `true`, returns a stream of events that happen during the Run as
+   * server-sent events, terminating when the Run enters a terminal state with a
+   * `data: [DONE]` message.
    */
   export interface TruncationStrategy {
     /**
@@ -1136,7 +1146,6 @@ export interface RunCreateAndStreamParams {
    * execute this run.
    */
   assistant_id: string;
-
   /**
    * Appends additional instructions at the end of the instructions for the run. This
    * is useful for modifying the behavior on a per-run basis without overriding other
@@ -1643,19 +1652,18 @@ export namespace RunSubmitToolOutputsStreamParams {
   }
 }
 
-Runs.RunsPage = RunsPage;
 Runs.Steps = Steps;
-Runs.RunStepsPage = RunStepsPage;
 
 export declare namespace Runs {
   export {
     type RequiredActionFunctionToolCall as RequiredActionFunctionToolCall,
     type Run as Run,
     type RunStatus as RunStatus,
-    RunsPage as RunsPage,
+    type RunsPage as RunsPage,
     type RunCreateParams as RunCreateParams,
     type RunCreateParamsNonStreaming as RunCreateParamsNonStreaming,
     type RunCreateParamsStreaming as RunCreateParamsStreaming,
+    type RunRetrieveParams as RunRetrieveParams,
     type RunUpdateParams as RunUpdateParams,
     type RunListParams as RunListParams,
     type RunCreateAndPollParams,
@@ -1688,7 +1696,7 @@ export declare namespace Runs {
     type ToolCallDelta as ToolCallDelta,
     type ToolCallDeltaObject as ToolCallDeltaObject,
     type ToolCallsStepDetails as ToolCallsStepDetails,
-    RunStepsPage as RunStepsPage,
+    type RunStepsPage as RunStepsPage,
     type StepRetrieveParams as StepRetrieveParams,
     type StepListParams as StepListParams,
   };

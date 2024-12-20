@@ -1,13 +1,13 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../resource';
-import { APIPromise } from '../../core';
-import * as Core from '../../core';
 import * as ChatCompletionsAPI from './completions';
 import * as CompletionsAPI from '../completions';
 import * as Shared from '../shared';
 import * as ChatAPI from './chat';
+import { APIPromise } from '../../api-promise';
 import { Stream } from '../../streaming';
+import { RequestOptions } from '../../internal/request-options';
 
 export class Completions extends APIResource {
   /**
@@ -22,21 +22,18 @@ export class Completions extends APIResource {
    * unsupported parameters in reasoning models,
    * [refer to the reasoning guide](https://platform.openai.com/docs/guides/reasoning).
    */
-  create(
-    body: ChatCompletionCreateParamsNonStreaming,
-    options?: Core.RequestOptions,
-  ): APIPromise<ChatCompletion>;
+  create(body: ChatCompletionCreateParamsNonStreaming, options?: RequestOptions): APIPromise<ChatCompletion>;
   create(
     body: ChatCompletionCreateParamsStreaming,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): APIPromise<Stream<ChatCompletionChunk>>;
   create(
     body: ChatCompletionCreateParamsBase,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): APIPromise<Stream<ChatCompletionChunk> | ChatCompletion>;
   create(
     body: ChatCompletionCreateParams,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): APIPromise<ChatCompletion> | APIPromise<Stream<ChatCompletionChunk>> {
     return this._client.post('/chat/completions', { body, ...options, stream: body.stream ?? false }) as
       | APIPromise<ChatCompletion>
@@ -910,11 +907,6 @@ export interface ChatCompletionUserMessageParam {
   name?: string;
 }
 
-/**
- * @deprecated ChatCompletionMessageParam should be used instead
- */
-export type CreateChatCompletionRequestMessage = ChatCompletionMessageParam;
-
 export type ChatCompletionCreateParams =
   | ChatCompletionCreateParamsNonStreaming
   | ChatCompletionCreateParamsStreaming;
@@ -1303,7 +1295,6 @@ export declare namespace Completions {
     type ChatCompletionToolChoiceOption as ChatCompletionToolChoiceOption,
     type ChatCompletionToolMessageParam as ChatCompletionToolMessageParam,
     type ChatCompletionUserMessageParam as ChatCompletionUserMessageParam,
-    type CreateChatCompletionRequestMessage as CreateChatCompletionRequestMessage,
     type ChatCompletionCreateParams as ChatCompletionCreateParams,
     type CompletionCreateParams as CompletionCreateParams,
     type ChatCompletionCreateParamsNonStreaming as ChatCompletionCreateParamsNonStreaming,

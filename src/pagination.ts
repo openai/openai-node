@@ -1,6 +1,110 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { AbstractPage, Response, APIClient, FinalRequestOptions, PageInfo } from './core';
+import type { OpenAI } from './client';
+import { OpenAIError } from './error';
+import { FinalRequestOptions } from './internal/request-options';
+import { defaultParseResponse } from './internal/parse';
+import { APIPromise } from './api-promise';
+import { type APIResponseProps } from './internal/parse';
+import { maybeObj } from './internal/utils/values';
+
+export type PageRequestOptions = Pick<FinalRequestOptions, 'query' | 'headers' | 'body' | 'path' | 'method'>;
+
+export abstract class AbstractPage<Item> implements AsyncIterable<Item> {
+  #client: OpenAI;
+  protected options: FinalRequestOptions;
+
+  protected response: Response;
+  protected body: unknown;
+
+  constructor(client: OpenAI, response: Response, body: unknown, options: FinalRequestOptions) {
+    this.#client = client;
+    this.options = options;
+    this.response = response;
+    this.body = body;
+  }
+
+  abstract nextPageRequestOptions(): PageRequestOptions | null;
+
+  abstract getPaginatedItems(): Item[];
+
+  hasNextPage(): boolean {
+    const items = this.getPaginatedItems();
+    if (!items.length) return false;
+    return this.nextPageRequestOptions() != null;
+  }
+
+  async getNextPage(): Promise<this> {
+    const nextOptions = this.nextPageRequestOptions();
+    if (!nextOptions) {
+      throw new OpenAIError(
+        'No next page expected; please check `.hasNextPage()` before calling `.getNextPage()`.',
+      );
+    }
+
+    return await this.#client.requestAPIList(this.constructor as any, nextOptions);
+  }
+
+  async *iterPages(): AsyncGenerator<this> {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    let page: this = this;
+    yield page;
+    while (page.hasNextPage()) {
+      page = await page.getNextPage();
+      yield page;
+    }
+  }
+
+  async *[Symbol.asyncIterator](): AsyncGenerator<Item> {
+    for await (const page of this.iterPages()) {
+      for (const item of page.getPaginatedItems()) {
+        yield item;
+      }
+    }
+  }
+}
+
+/**
+ * This subclass of Promise will resolve to an instantiated Page once the request completes.
+ *
+ * It also implements AsyncIterable to allow auto-paginating iteration on an unawaited list call, eg:
+ *
+ *    for await (const item of client.items.list()) {
+ *      console.log(item)
+ *    }
+ */
+export class PagePromise<
+    PageClass extends AbstractPage<Item>,
+    Item = ReturnType<PageClass['getPaginatedItems']>[number],
+  >
+  extends APIPromise<PageClass>
+  implements AsyncIterable<Item>
+{
+  constructor(
+    client: OpenAI,
+    request: Promise<APIResponseProps>,
+    Page: new (...args: ConstructorParameters<typeof AbstractPage>) => PageClass,
+  ) {
+    super(
+      request,
+      async (props) => new Page(client, props.response, await defaultParseResponse(props), props.options),
+    );
+  }
+
+  /**
+   * Allow auto-paginating iteration on an unawaited list call, eg:
+   *
+   *    for await (const item of client.items.list()) {
+   *      console.log(item)
+   *    }
+   */
+  async *[Symbol.asyncIterator]() {
+    const page = await this;
+    for await (const item of page) {
+      yield item;
+    }
+  }
+}
 
 export interface PageResponse<Item> {
   data: Array<Item>;
@@ -16,7 +120,7 @@ export class Page<Item> extends AbstractPage<Item> implements PageResponse<Item>
 
   object: string;
 
-  constructor(client: APIClient, response: Response, body: PageResponse<Item>, options: FinalRequestOptions) {
+  constructor(client: OpenAI, response: Response, body: PageResponse<Item>, options: FinalRequestOptions) {
     super(client, response, body, options);
 
     this.data = body.data || [];
@@ -27,16 +131,7 @@ export class Page<Item> extends AbstractPage<Item> implements PageResponse<Item>
     return this.data ?? [];
   }
 
-  // @deprecated Please use `nextPageInfo()` instead
-  /**
-   * This page represents a response that isn't actually paginated at the API level
-   * so there will never be any next page params.
-   */
-  nextPageParams(): null {
-    return null;
-  }
-
-  nextPageInfo(): null {
+  nextPageRequestOptions(): PageRequestOptions | null {
     return null;
   }
 }
@@ -58,7 +153,7 @@ export class CursorPage<Item extends { id: string }>
   data: Array<Item>;
 
   constructor(
-    client: APIClient,
+    client: OpenAI,
     response: Response,
     body: CursorPageResponse<Item>,
     options: FinalRequestOptions,
@@ -72,27 +167,19 @@ export class CursorPage<Item extends { id: string }>
     return this.data ?? [];
   }
 
-  // @deprecated Please use `nextPageInfo()` instead
-  nextPageParams(): Partial<CursorPageParams> | null {
-    const info = this.nextPageInfo();
-    if (!info) return null;
-    if ('params' in info) return info.params;
-    const params = Object.fromEntries(info.url.searchParams);
-    if (!Object.keys(params).length) return null;
-    return params;
-  }
-
-  nextPageInfo(): PageInfo | null {
+  nextPageRequestOptions(): PageRequestOptions | null {
     const data = this.getPaginatedItems();
-    if (!data.length) {
-      return null;
-    }
-
     const id = data[data.length - 1]?.id;
     if (!id) {
       return null;
     }
 
-    return { params: { after: id } };
+    return {
+      ...this.options,
+      query: {
+        ...maybeObj(this.options.query),
+        after: id,
+      },
+    };
   }
 }

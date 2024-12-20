@@ -1,25 +1,29 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../../resource';
-import { isRequestOptions } from '../../../core';
-import * as Core from '../../../core';
 import * as FileBatchesAPI from './file-batches';
 import {
+  FileBatchCancelParams,
   FileBatchCreateParams,
   FileBatchListFilesParams,
+  FileBatchRetrieveParams,
   FileBatches,
   VectorStoreFileBatch,
 } from './file-batches';
 import * as FilesAPI from './files';
 import {
   FileCreateParams,
+  FileDeleteParams,
   FileListParams,
+  FileRetrieveParams,
   Files,
   VectorStoreFile,
   VectorStoreFileDeleted,
   VectorStoreFilesPage,
 } from './files';
-import { CursorPage, type CursorPageParams } from '../../../pagination';
+import { APIPromise } from '../../../api-promise';
+import { CursorPage, type CursorPageParams, PagePromise } from '../../../pagination';
+import { RequestOptions } from '../../../internal/request-options';
 
 export class VectorStores extends APIResource {
   files: FilesAPI.Files = new FilesAPI.Files(this._client);
@@ -28,7 +32,7 @@ export class VectorStores extends APIResource {
   /**
    * Create a vector store.
    */
-  create(body: VectorStoreCreateParams, options?: Core.RequestOptions): Core.APIPromise<VectorStore> {
+  create(body: VectorStoreCreateParams, options?: RequestOptions): APIPromise<VectorStore> {
     return this._client.post('/vector_stores', {
       body,
       ...options,
@@ -39,8 +43,8 @@ export class VectorStores extends APIResource {
   /**
    * Retrieves a vector store.
    */
-  retrieve(vectorStoreId: string, options?: Core.RequestOptions): Core.APIPromise<VectorStore> {
-    return this._client.get(`/vector_stores/${vectorStoreId}`, {
+  retrieve(vectorStoreID: string, options?: RequestOptions): APIPromise<VectorStore> {
+    return this._client.get(`/vector_stores/${vectorStoreID}`, {
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
     });
@@ -50,11 +54,11 @@ export class VectorStores extends APIResource {
    * Modifies a vector store.
    */
   update(
-    vectorStoreId: string,
+    vectorStoreID: string,
     body: VectorStoreUpdateParams,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<VectorStore> {
-    return this._client.post(`/vector_stores/${vectorStoreId}`, {
+    options?: RequestOptions,
+  ): APIPromise<VectorStore> {
+    return this._client.post(`/vector_stores/${vectorStoreID}`, {
       body,
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
@@ -65,18 +69,10 @@ export class VectorStores extends APIResource {
    * Returns a list of vector stores.
    */
   list(
-    query?: VectorStoreListParams,
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<VectorStoresPage, VectorStore>;
-  list(options?: Core.RequestOptions): Core.PagePromise<VectorStoresPage, VectorStore>;
-  list(
-    query: VectorStoreListParams | Core.RequestOptions = {},
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<VectorStoresPage, VectorStore> {
-    if (isRequestOptions(query)) {
-      return this.list({}, query);
-    }
-    return this._client.getAPIList('/vector_stores', VectorStoresPage, {
+    query: VectorStoreListParams | null | undefined = {},
+    options?: RequestOptions,
+  ): PagePromise<VectorStoresPage, VectorStore> {
+    return this._client.getAPIList('/vector_stores', CursorPage<VectorStore>, {
       query,
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
@@ -86,15 +82,15 @@ export class VectorStores extends APIResource {
   /**
    * Delete a vector store.
    */
-  del(vectorStoreId: string, options?: Core.RequestOptions): Core.APIPromise<VectorStoreDeleted> {
-    return this._client.delete(`/vector_stores/${vectorStoreId}`, {
+  delete(vectorStoreID: string, options?: RequestOptions): APIPromise<VectorStoreDeleted> {
+    return this._client.delete(`/vector_stores/${vectorStoreID}`, {
       ...options,
       headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
     });
   }
 }
 
-export class VectorStoresPage extends CursorPage<VectorStore> {}
+export type VectorStoresPage = CursorPage<VectorStore>;
 
 /**
  * The default strategy. This strategy currently uses a `max_chunk_size_tokens` of
@@ -384,9 +380,7 @@ export interface VectorStoreListParams extends CursorPageParams {
   order?: 'asc' | 'desc';
 }
 
-VectorStores.VectorStoresPage = VectorStoresPage;
 VectorStores.Files = Files;
-VectorStores.VectorStoreFilesPage = VectorStoreFilesPage;
 VectorStores.FileBatches = FileBatches;
 
 export declare namespace VectorStores {
@@ -400,7 +394,7 @@ export declare namespace VectorStores {
     type StaticFileChunkingStrategyParam as StaticFileChunkingStrategyParam,
     type VectorStore as VectorStore,
     type VectorStoreDeleted as VectorStoreDeleted,
-    VectorStoresPage as VectorStoresPage,
+    type VectorStoresPage as VectorStoresPage,
     type VectorStoreCreateParams as VectorStoreCreateParams,
     type VectorStoreUpdateParams as VectorStoreUpdateParams,
     type VectorStoreListParams as VectorStoreListParams,
@@ -410,15 +404,19 @@ export declare namespace VectorStores {
     Files as Files,
     type VectorStoreFile as VectorStoreFile,
     type VectorStoreFileDeleted as VectorStoreFileDeleted,
-    VectorStoreFilesPage as VectorStoreFilesPage,
+    type VectorStoreFilesPage as VectorStoreFilesPage,
     type FileCreateParams as FileCreateParams,
+    type FileRetrieveParams as FileRetrieveParams,
     type FileListParams as FileListParams,
+    type FileDeleteParams as FileDeleteParams,
   };
 
   export {
     FileBatches as FileBatches,
     type VectorStoreFileBatch as VectorStoreFileBatch,
     type FileBatchCreateParams as FileBatchCreateParams,
+    type FileBatchRetrieveParams as FileBatchRetrieveParams,
+    type FileBatchCancelParams as FileBatchCancelParams,
     type FileBatchListFilesParams as FileBatchListFilesParams,
   };
 }
