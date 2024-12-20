@@ -19,7 +19,7 @@ module.exports = {
   },
   overrides: [
     {
-      files: ['tests/**', 'examples/**'],
+      files: ['tests/**', 'examples/**', 'ecosystem-tests/**'],
       rules: {
         'no-restricted-imports': 'off',
       },

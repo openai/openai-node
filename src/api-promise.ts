@@ -62,7 +62,7 @@ export class APIPromise<T> extends Promise<WithRequestID<T>> {
    * Try setting `"moduleResolution": "NodeNext"` or add `"lib": ["DOM"]`
    * to your `tsconfig.json`.
    */
-  async withResponse(): Promise<{ data: T; response: Response }> {
+  async withResponse(): Promise<{ data: T; response: Response; request_id: string | null }> {
     const [data, response] = await Promise.all([this.parse(), this.asResponse()]);
     return { data, response, request_id: response.headers.get('x-request-id') };
   }

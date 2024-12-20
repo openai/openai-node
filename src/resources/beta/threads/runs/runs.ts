@@ -36,8 +36,9 @@ import { CursorPage, type CursorPageParams, PagePromise } from '../../../../pagi
 import { Stream } from '../../../../streaming';
 import { RequestOptions } from '../../../../internal/request-options';
 import { AssistantStream, RunCreateParamsBaseStream } from '../../../../lib/AssistantStream';
-import { sleep } from '../../../../core';
+import { sleep } from '../../../../internal/utils/sleep';
 import { RunSubmitToolOutputsParamsStream } from '../../../../lib/AssistantStream';
+import { buildHeaders } from '../../../../internal/headers';
 
 export class Runs extends APIResource {
   steps: StepsAPI.Steps = new StepsAPI.Steps(this._client);
@@ -128,10 +129,10 @@ export class Runs extends APIResource {
   async createAndPoll(
     threadId: string,
     body: RunCreateParamsNonStreaming,
-    options?: Core.RequestOptions & { pollIntervalMs?: number },
+    options?: RequestOptions & { pollIntervalMs?: number },
   ): Promise<Run> {
     const run = await this.create(threadId, body, options);
-    return await this.poll(threadId, run.id, options);
+    return await this.poll(run.id, { thread_id: threadId }, options);
   }
 
   /**
@@ -142,7 +143,7 @@ export class Runs extends APIResource {
   createAndStream(
     threadId: string,
     body: RunCreateParamsBaseStream,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): AssistantStream {
     return AssistantStream.createAssistantStream(threadId, this._client.beta.threads.runs, body, options);
   }
@@ -153,18 +154,20 @@ export class Runs extends APIResource {
    * https://platform.openai.com/docs/assistants/how-it-works/runs-and-run-steps
    */
   async poll(
-    threadId: string,
     runId: string,
-    options?: Core.RequestOptions & { pollIntervalMs?: number },
+    params: RunRetrieveParams,
+    options?: RequestOptions & { pollIntervalMs?: number },
   ): Promise<Run> {
-    const headers: { [key: string]: string } = { ...options?.headers, 'X-Stainless-Poll-Helper': 'true' };
-
-    if (options?.pollIntervalMs) {
-      headers['X-Stainless-Custom-Poll-Interval'] = options.pollIntervalMs.toString();
-    }
+    const headers = buildHeaders([
+      options?.headers,
+      {
+        'X-Stainless-Poll-Helper': 'true',
+        'X-Stainless-Custom-Poll-Interval': options?.pollIntervalMs?.toString() ?? undefined,
+      },
+    ]);
 
     while (true) {
-      const { data: run, response } = await this.retrieve(threadId, runId, {
+      const { data: run, response } = await this.retrieve(runId, params, {
         ...options,
         headers: { ...options?.headers, ...headers },
       }).withResponse();
@@ -204,7 +207,7 @@ export class Runs extends APIResource {
   /**
    * Create a Run stream
    */
-  stream(threadId: string, body: RunCreateParamsBaseStream, options?: Core.RequestOptions): AssistantStream {
+  stream(threadId: string, body: RunCreateParamsBaseStream, options?: RequestOptions): AssistantStream {
     return AssistantStream.createAssistantStream(threadId, this._client.beta.threads.runs, body, options);
   }
 
@@ -249,13 +252,12 @@ export class Runs extends APIResource {
    * https://platform.openai.com/docs/assistants/how-it-works/runs-and-run-steps
    */
   async submitToolOutputsAndPoll(
-    threadId: string,
     runId: string,
-    body: RunSubmitToolOutputsParamsNonStreaming,
-    options?: Core.RequestOptions & { pollIntervalMs?: number },
+    params: RunSubmitToolOutputsParamsNonStreaming,
+    options?: RequestOptions & { pollIntervalMs?: number },
   ): Promise<Run> {
-    const run = await this.submitToolOutputs(threadId, runId, body, options);
-    return await this.poll(threadId, run.id, options);
+    const run = await this.submitToolOutputs(runId, params, options);
+    return await this.poll(run.id, params, options);
   }
 
   /**
@@ -264,18 +266,11 @@ export class Runs extends APIResource {
    * https://platform.openai.com/docs/assistants/how-it-works/runs-and-run-steps
    */
   submitToolOutputsStream(
-    threadId: string,
     runId: string,
-    body: RunSubmitToolOutputsParamsStream,
-    options?: Core.RequestOptions,
+    params: RunSubmitToolOutputsParamsStream,
+    options?: RequestOptions,
   ): AssistantStream {
-    return AssistantStream.createToolAssistantStream(
-      threadId,
-      runId,
-      this._client.beta.threads.runs,
-      body,
-      options,
-    );
+    return AssistantStream.createToolAssistantStream(runId, this._client.beta.threads.runs, params, options);
   }
 }
 
@@ -1553,10 +1548,6 @@ export namespace RunStreamParams {
     last_messages?: number | null;
   }
 }
-
-export type RunSubmitToolOutputsParams =
-  | RunSubmitToolOutputsParamsNonStreaming
-  | RunSubmitToolOutputsParamsStreaming;
 
 export interface RunSubmitToolOutputsParamsBase {
   /**

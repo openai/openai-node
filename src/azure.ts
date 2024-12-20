@@ -124,11 +124,10 @@ export class AzureOpenAI extends OpenAI {
     this._deployment = deployment;
   }
 
-  override buildRequest(options: FinalRequestOptions<unknown>): {
-    req: RequestInit;
-    url: string;
-    timeout: number;
-  } {
+  override buildRequest(
+    options: FinalRequestOptions,
+    props: { retryCount?: number } = {},
+  ): { req: RequestInit & { headers: Headers }; url: string; timeout: number } {
     if (_deployments_endpoints.has(options.path) && options.method === 'post' && options.body !== undefined) {
       if (!isObj(options.body)) {
         throw new Error('Expected request body to be an object');
@@ -138,7 +137,7 @@ export class AzureOpenAI extends OpenAI {
         options.path = `/deployments/${model}${options.path}`;
       }
     }
-    return super.buildRequest(options);
+    return super.buildRequest(options, props);
   }
 
   private async _getAzureADToken(): Promise<string | undefined> {
@@ -159,21 +158,23 @@ export class AzureOpenAI extends OpenAI {
   }
 
   protected override async prepareOptions(opts: FinalRequestOptions): Promise<void> {
+    opts.headers = buildHeaders([opts.headers]);
+
     /**
      * The user should provide a bearer token provider if they want
      * to use Azure AD authentication. The user shouldn't set the
      * Authorization header manually because the header is overwritten
      * with the Azure AD token if a bearer token provider is provided.
      */
-    if (opts.headers?.['api-key']) {
+    if (opts.headers.values.get('Authorization') || opts.headers.values.get('api-key')) {
       return super.prepareOptions(opts);
     }
+
     const token = await this._getAzureADToken();
-    opts.headers ??= {};
     if (token) {
-      opts.headers['Authorization'] = `Bearer ${token}`;
+      opts.headers.values.set('Authorization', `Bearer ${token}`);
     } else if (this.apiKey !== API_KEY_SENTINEL) {
-      opts.headers['api-key'] = this.apiKey;
+      opts.headers.values.set('api-key', this.apiKey);
     } else {
       throw new Errors.OpenAIError('Unable to handle auth');
     }
@@ -189,6 +190,7 @@ const _deployments_endpoints = new Set([
   '/audio/translations',
   '/audio/speech',
   '/images/generations',
+  '/batches',
 ]);
 
 const API_KEY_SENTINEL = '<Missing Key>';

@@ -1,6 +1,5 @@
-import { APIPromise, createResponseHeaders } from 'openai/core';
+import { APIPromise } from 'openai/core';
 import OpenAI from 'openai/index';
-import { Headers } from 'openai/_shims/index';
 import { Response } from 'node-fetch';
 import { compareType } from './utils/typing';
 

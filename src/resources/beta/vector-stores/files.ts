@@ -5,6 +5,9 @@ import * as VectorStoresAPI from './vector-stores';
 import { APIPromise } from '../../../api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../pagination';
 import { RequestOptions } from '../../../internal/request-options';
+import { sleep } from '../../../internal/utils';
+import { Uploadable } from '../../../uploads';
+import { buildHeaders } from '../../../internal/headers';
 
 export class Files extends APIResource {
   /**
@@ -78,7 +81,7 @@ export class Files extends APIResource {
   async createAndPoll(
     vectorStoreId: string,
     body: FileCreateParams,
-    options?: Core.RequestOptions & { pollIntervalMs?: number },
+    options?: RequestOptions & { pollIntervalMs?: number },
   ): Promise<VectorStoreFile> {
     const file = await this.create(vectorStoreId, body, options);
     return await this.poll(vectorStoreId, file.id, options);
@@ -91,19 +94,26 @@ export class Files extends APIResource {
    * file.last_error and file.status to handle these cases
    */
   async poll(
-    vectorStoreId: string,
-    fileId: string,
-    options?: Core.RequestOptions & { pollIntervalMs?: number },
+    vectorStoreID: string,
+    fileID: string,
+    options?: RequestOptions & { pollIntervalMs?: number },
   ): Promise<VectorStoreFile> {
-    const headers: { [key: string]: string } = { ...options?.headers, 'X-Stainless-Poll-Helper': 'true' };
-    if (options?.pollIntervalMs) {
-      headers['X-Stainless-Custom-Poll-Interval'] = options.pollIntervalMs.toString();
-    }
+    const headers = buildHeaders([
+      options?.headers,
+      {
+        'X-Stainless-Poll-Helper': 'true',
+        'X-Stainless-Custom-Poll-Interval': options?.pollIntervalMs?.toString() ?? undefined,
+      },
+    ]);
+
     while (true) {
-      const fileResponse = await this.retrieve(vectorStoreId, fileId, {
-        ...options,
-        headers,
-      }).withResponse();
+      const fileResponse = await this.retrieve(
+        fileID,
+        {
+          vector_store_id: vectorStoreID,
+        },
+        { ...options, headers },
+      ).withResponse();
 
       const file = fileResponse.data;
 
@@ -137,11 +147,7 @@ export class Files extends APIResource {
    * Note the file will be asynchronously processed (you can use the alternative
    * polling helper method to wait for processing to complete).
    */
-  async upload(
-    vectorStoreId: string,
-    file: Uploadable,
-    options?: Core.RequestOptions,
-  ): Promise<VectorStoreFile> {
+  async upload(vectorStoreId: string, file: Uploadable, options?: RequestOptions): Promise<VectorStoreFile> {
     const fileInfo = await this._client.files.create({ file: file, purpose: 'assistants' }, options);
     return this.create(vectorStoreId, { file_id: fileInfo.id }, options);
   }
@@ -152,7 +158,7 @@ export class Files extends APIResource {
   async uploadAndPoll(
     vectorStoreId: string,
     file: Uploadable,
-    options?: Core.RequestOptions & { pollIntervalMs?: number },
+    options?: RequestOptions & { pollIntervalMs?: number },
   ): Promise<VectorStoreFile> {
     const fileInfo = await this.upload(vectorStoreId, file, options);
     return await this.poll(vectorStoreId, fileInfo.id, options);

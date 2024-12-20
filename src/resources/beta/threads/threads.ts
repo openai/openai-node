@@ -70,9 +70,7 @@ import {
 import { APIPromise } from '../../../api-promise';
 import { Stream } from '../../../streaming';
 import { RequestOptions } from '../../../internal/request-options';
-import { isRequestOptions } from '../../../core';
 import { AssistantStream, ThreadCreateAndRunParamsBaseStream } from '../../../lib/AssistantStream';
-import { APIPromise } from '../../../core';
 
 export class Threads extends APIResource {
   runs: RunsAPI.Runs = new RunsAPI.Runs(this._client);
@@ -151,19 +149,16 @@ export class Threads extends APIResource {
    */
   async createAndRunPoll(
     body: ThreadCreateAndRunParamsNonStreaming,
-    options?: Core.RequestOptions & { pollIntervalMs?: number },
+    options?: RequestOptions & { pollIntervalMs?: number },
   ): Promise<Threads.Run> {
     const run = await this.createAndRun(body, options);
-    return await this.runs.poll(run.thread_id, run.id, options);
+    return await this.runs.poll(run.id, { thread_id: run.thread_id }, options);
   }
 
   /**
    * Create a thread and stream the run back
    */
-  createAndRunStream(
-    body: ThreadCreateAndRunParamsBaseStream,
-    options?: Core.RequestOptions,
-  ): AssistantStream {
+  createAndRunStream(body: ThreadCreateAndRunParamsBaseStream, options?: RequestOptions): AssistantStream {
     return AssistantStream.createThreadAssistantStream(body, this._client.beta.threads, options);
   }
 }

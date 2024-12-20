@@ -7,9 +7,10 @@ import * as VectorStoresAPI from './vector-stores';
 import { APIPromise } from '../../../api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../pagination';
 import { RequestOptions } from '../../../internal/request-options';
-import { sleep } from '../../../core';
-import { Uploadable } from '../../../core';
+import { sleep } from '../../../internal/utils/sleep';
+import { type Uploadable } from '../../../uploads';
 import { allSettledWithThrow } from '../../../lib/Util';
+import { buildHeaders } from '../../../internal/headers';
 
 export class FileBatches extends APIResource {
   /**
@@ -64,7 +65,7 @@ export class FileBatches extends APIResource {
   async createAndPoll(
     vectorStoreId: string,
     body: FileBatchCreateParams,
-    options?: Core.RequestOptions & { pollIntervalMs?: number },
+    options?: RequestOptions & { pollIntervalMs?: number },
   ): Promise<VectorStoreFileBatch> {
     const batch = await this.create(vectorStoreId, body);
     return await this.poll(vectorStoreId, batch.id, options);
@@ -93,20 +94,27 @@ export class FileBatches extends APIResource {
    * check batch.file_counts.failed_count to handle this case.
    */
   async poll(
-    vectorStoreId: string,
-    batchId: string,
-    options?: Core.RequestOptions & { pollIntervalMs?: number },
+    vectorStoreID: string,
+    batchID: string,
+    options?: RequestOptions & { pollIntervalMs?: number },
   ): Promise<VectorStoreFileBatch> {
-    const headers: { [key: string]: string } = { ...options?.headers, 'X-Stainless-Poll-Helper': 'true' };
-    if (options?.pollIntervalMs) {
-      headers['X-Stainless-Custom-Poll-Interval'] = options.pollIntervalMs.toString();
-    }
+    const headers = buildHeaders([
+      options?.headers,
+      {
+        'X-Stainless-Poll-Helper': 'true',
+        'X-Stainless-Custom-Poll-Interval': options?.pollIntervalMs?.toString() ?? undefined,
+      },
+    ]);
 
     while (true) {
-      const { data: batch, response } = await this.retrieve(vectorStoreId, batchId, {
-        ...options,
-        headers,
-      }).withResponse();
+      const { data: batch, response } = await this.retrieve(
+        batchID,
+        { vector_store_id: vectorStoreID },
+        {
+          ...options,
+          headers,
+        },
+      ).withResponse();
 
       switch (batch.status) {
         case 'in_progress':
@@ -141,7 +149,7 @@ export class FileBatches extends APIResource {
   async uploadAndPoll(
     vectorStoreId: string,
     { files, fileIds = [] }: { files: Uploadable[]; fileIds?: string[] },
-    options?: Core.RequestOptions & { pollIntervalMs?: number; maxConcurrency?: number },
+    options?: RequestOptions & { pollIntervalMs?: number; maxConcurrency?: number },
   ): Promise<VectorStoreFileBatch> {
     if (files == null || files.length == 0) {
       throw new Error(

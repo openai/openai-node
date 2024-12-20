@@ -16,15 +16,11 @@ export {
   type RunSubmitToolOutputsParamsNonStreaming,
   type RunSubmitToolOutputsParamsStreaming,
   type RunsPage,
-  type RunStepInclude,
   type RunCreateAndPollParams,
   type RunCreateAndStreamParams,
   type RunStreamParams,
   type RunSubmitToolOutputsAndPollParams,
   type RunSubmitToolOutputsStreamParams,
-  type RunCreateAndPollParams,
-  type RunCreateAndStreamParams,
-  type RunStreamParams,
 } from './runs';
 export {
   Steps,
@@ -38,6 +34,7 @@ export {
   type FunctionToolCallDelta,
   type MessageCreationStepDetails,
   type RunStep,
+  type RunStepInclude,
   type RunStepDelta,
   type RunStepDeltaEvent,
   type RunStepDeltaMessageDelta,
