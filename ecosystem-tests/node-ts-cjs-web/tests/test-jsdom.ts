@@ -2,7 +2,6 @@
  * @jest-environment jsdom
  */
 import 'whatwg-fetch';
-import 'openai/shims/web';
 import OpenAI, { toFile } from 'openai';
 import { distance } from 'fastest-levenshtein';
 import { ChatCompletion } from 'openai/resources/chat/completions';
@@ -163,13 +162,4 @@ describe.skip('toFile', () => {
     });
     expect(result.filename).toEqual('finetune.jsonl');
   });
-});
-
-test('query strings', () => {
-  expect(
-    decodeURIComponent((client as any).stringifyQuery({ foo: { nested: { a: true, b: 'foo' } } })),
-  ).toEqual('foo[nested][a]=true&foo[nested][b]=foo');
-  expect(
-    decodeURIComponent((client as any).stringifyQuery({ foo: { nested: { a: ['hello', 'world'] } } })),
-  ).toEqual('foo[nested][a][]=hello&foo[nested][a][]=world');
 });
