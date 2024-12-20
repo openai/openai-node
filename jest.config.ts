@@ -10,7 +10,6 @@ const config: JestConfigWithTsJest = {
     '^openai$': '<rootDir>/src/index.ts',
     '^openai/(.*)$': '<rootDir>/src/$1',
   },
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   modulePathIgnorePatterns: [
     '<rootDir>/ecosystem-tests/',
     '<rootDir>/dist/',

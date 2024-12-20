@@ -1,6 +1,5 @@
-import { APIPromise } from 'openai/core';
+import { APIPromise } from 'openai/api-promise';
 import OpenAI from 'openai/index';
-import { Response } from 'node-fetch';
 import { compareType } from './utils/typing';
 
 describe('request id', () => {
