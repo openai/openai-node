@@ -509,7 +509,9 @@ export class ChatCompletionStream<ParsedT = null>
         choice.message.content = (choice.message.content || '') + content;
 
         if (!choice.message.refusal && this.#getAutoParseableResponseFormat()) {
-          choice.message.parsed = partialParse(choice.message.content);
+          // Even a partial parser does not accept empty string
+          const trimmed = choice.message.content.trimStart();
+          choice.message.parsed = trimmed ? partialParse(trimmed) : null;
         }
       }
 
