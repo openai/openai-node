@@ -2,7 +2,7 @@
 
 import OpenAI from 'openai';
 import { APIUserAbortError } from 'openai';
-import { Headers } from 'openai/core';
+import { debug, Headers } from 'openai/core';
 import defaultFetch, { Response, type RequestInit, type RequestInfo } from 'node-fetch';
 
 describe('instantiate client', () => {
@@ -422,5 +422,97 @@ describe('retries', () => {
         .then((r) => r.text()),
     ).toEqual(JSON.stringify({ a: 1 }));
     expect(count).toEqual(3);
+  });
+});
+
+describe('debug()', () => {
+  const env = process.env;
+  const spy = jest.spyOn(console, 'log');
+
+  beforeEach(() => {
+    jest.resetModules();
+    process.env = { ...env };
+    process.env['DEBUG'] = 'true';
+  });
+
+  afterEach(() => {
+    process.env = env;
+  });
+
+  test('body request object with Authorization header', function () {
+    // Test request body includes headers object with Authorization
+    const headersTest = {
+      headers: {
+        Authorization: 'fakeAuthorization',
+      },
+    };
+    debug('request', headersTest);
+    expect(spy).toHaveBeenCalledWith('OpenAI:DEBUG:request', {
+      headers: {
+        Authorization: 'REDACTED',
+      },
+    });
+  });
+
+  test('body request object with api-key header', function () {
+    // Test request body includes headers object with api-ley
+    const apiKeyTest = {
+      headers: {
+        'api-key': 'fakeKey',
+      },
+    };
+    debug('request', apiKeyTest);
+    expect(spy).toHaveBeenCalledWith('OpenAI:DEBUG:request', {
+      headers: {
+        'api-key': 'REDACTED',
+      },
+    });
+  });
+
+  test('header object with Authorization header', function () {
+    // Test headers object with authorization header
+    const authorizationTest = {
+      authorization: 'fakeValue',
+    };
+    debug('request', authorizationTest);
+    expect(spy).toHaveBeenCalledWith('OpenAI:DEBUG:request', {
+      authorization: 'REDACTED',
+    });
+  });
+
+  test('input args are not mutated', function () {
+    const authorizationTest = {
+      authorization: 'fakeValue',
+    };
+    const client = new OpenAI({
+      baseURL: 'http://localhost:5000/',
+      defaultHeaders: authorizationTest,
+      apiKey: 'api-key',
+    });
+
+    const { req } = client.buildRequest({ path: '/foo', method: 'post' });
+    debug('request', authorizationTest);
+    expect((req.headers as Headers)['authorization']).toEqual('fakeValue');
+    expect(spy).toHaveBeenCalledWith('OpenAI:DEBUG:request', {
+      authorization: 'REDACTED',
+    });
+  });
+
+  test('input headers are not mutated', function () {
+    const authorizationTest = {
+      authorization: 'fakeValue',
+    };
+    const client = new OpenAI({
+      baseURL: 'http://localhost:5000/',
+      defaultHeaders: authorizationTest,
+      apiKey: 'api-key',
+    });
+
+    const { req } = client.buildRequest({ path: '/foo', method: 'post' });
+    debug('request', { headers: req.headers });
+    expect((req.headers as Headers)['authorization']).toEqual('fakeValue');
+    expect(spy).toHaveBeenCalledWith('OpenAI:DEBUG:request', {
+      authorization: 'REDACTED',
+    });
   });
 });
