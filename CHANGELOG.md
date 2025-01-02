@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.77.2 (2025-01-02)
+
+Full Changelog: [v4.77.1...v4.77.2](https://github.com/openai/openai-node/compare/v4.77.1...v4.77.2)
+
+### Chores
+
+* bump license year ([#1246](https://github.com/openai/openai-node/issues/1246)) ([13197c1](https://github.com/openai/openai-node/commit/13197c1698f492529bd00b62d95f83c039ef0ac7))
+
 ## 4.77.1 (2024-12-21)
 
 Full Changelog: [v4.77.0...v4.77.1](https://github.com/openai/openai-node/compare/v4.77.0...v4.77.1)
