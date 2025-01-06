@@ -43,6 +43,20 @@ test(`basic request works`, async function () {
   expectSimilar(completion.choices[0]?.message?.content, 'This is a test', 10);
 });
 
+test(`proxied request works`, async function () {
+  const client = new OpenAI({
+    fetch(url, init) {
+      return fetch(url, { ...init, proxy: process.env['ECOSYSTEM_TESTS_PROXY'] });
+    },
+  });
+  
+  const completion = await client.chat.completions.create({
+    model: 'gpt-4',
+    messages: [{ role: 'user', content: 'Say this is a test' }],
+  });
+  expectSimilar(completion.choices[0]?.message?.content, 'This is a test', 10);
+});
+
 test(`raw response`, async function () {
   const response = await client.chat.completions
     .create({

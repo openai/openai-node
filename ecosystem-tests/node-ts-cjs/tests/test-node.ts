@@ -1,6 +1,6 @@
 import OpenAI, { toFile } from 'openai';
-import * as undici from 'undici';
 import { TranscriptionCreateParams } from 'openai/resources/audio/transcriptions';
+import * as undici from 'undici';
 import { File as FormDataFile, Blob as FormDataBlob } from 'formdata-node';
 import * as fs from 'fs';
 import { distance } from 'fastest-levenshtein';
