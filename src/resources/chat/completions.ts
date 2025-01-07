@@ -263,7 +263,7 @@ export interface ChatCompletionAudioParam {
    * `coral`, `sage`, and `verse` (also supported but not recommended are `alloy`,
    * `echo`, and `shimmer`; these voices are less expressive).
    */
-  voice: 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse';
+  voice: 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'nova' | 'sage' | 'shimmer' | 'verse';
 }
 
 /**
