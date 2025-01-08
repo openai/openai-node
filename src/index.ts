@@ -5,12 +5,12 @@ export { OpenAI as default } from './client';
 export {
   multipartFormRequestOptions,
   maybeMultipartFormRequestOptions,
-  Uploadable,
+  type Uploadable,
   createForm,
   toFile,
 } from './uploads';
 export { APIPromise } from './api-promise';
-export { OpenAI, ClientOptions } from './client';
+export { OpenAI, type ClientOptions } from './client';
 export { PagePromise } from './pagination';
 export {
   OpenAIError,
