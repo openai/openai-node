@@ -21,6 +21,8 @@ import {
   RunStreamEvent,
   ThreadStreamEvent,
 } from './assistants';
+import * as RealtimeAPI from './realtime/realtime';
+import { Realtime } from './realtime/realtime';
 import * as ThreadsAPI from './threads/threads';
 import {
   AssistantResponseFormatOption,
@@ -58,12 +60,14 @@ import {
 import { Chat } from './chat/chat';
 
 export class Beta extends APIResource {
+  realtime: RealtimeAPI.Realtime = new RealtimeAPI.Realtime(this._client);
   vectorStores: VectorStoresAPI.VectorStores = new VectorStoresAPI.VectorStores(this._client);
   chat: ChatAPI.Chat = new ChatAPI.Chat(this._client);
   assistants: AssistantsAPI.Assistants = new AssistantsAPI.Assistants(this._client);
   threads: ThreadsAPI.Threads = new ThreadsAPI.Threads(this._client);
 }
 
+Beta.Realtime = Realtime;
 Beta.VectorStores = VectorStores;
 Beta.VectorStoresPage = VectorStoresPage;
 Beta.Assistants = Assistants;
@@ -71,6 +75,8 @@ Beta.AssistantsPage = AssistantsPage;
 Beta.Threads = Threads;
 
 export declare namespace Beta {
+  export { Realtime as Realtime };
+
   export {
     VectorStores as VectorStores,
     type AutoFileChunkingStrategyParam as AutoFileChunkingStrategyParam,
