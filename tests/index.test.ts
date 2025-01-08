@@ -1,5 +1,7 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
+import { APIPromise } from 'openai/api-promise';
+
 import util from 'node:util';
 import OpenAI from 'openai';
 import { APIUserAbortError } from 'openai';
@@ -47,6 +49,87 @@ describe('instantiate client', () => {
         headers: { 'X-My-Default-Header': null },
       });
       expect(req.headers.has('x-my-default-header')).toBe(false);
+    });
+  });
+  describe('logging', () => {
+    afterEach(() => {
+      process.env['OPENAI_LOG'] = undefined;
+    });
+
+    const forceAPIResponseForClient = async (client: OpenAI) => {
+      await new APIPromise(
+        client,
+        Promise.resolve({
+          response: new Response(),
+          controller: new AbortController(),
+          options: {
+            method: 'get',
+            path: '/',
+          },
+        }),
+      );
+    };
+
+    test('debug logs when log level is debug', async () => {
+      const debugMock = jest.fn();
+      const logger = {
+        debug: debugMock,
+        info: jest.fn(),
+        warn: jest.fn(),
+        error: jest.fn(),
+      };
+
+      const client = new OpenAI({ logger: logger, logLevel: 'debug', apiKey: 'My API Key' });
+
+      await forceAPIResponseForClient(client);
+      expect(debugMock).toHaveBeenCalled();
+    });
+
+    test('debug logs are skipped when log level is info', async () => {
+      const debugMock = jest.fn();
+      const logger = {
+        debug: debugMock,
+        info: jest.fn(),
+        warn: jest.fn(),
+        error: jest.fn(),
+      };
+
+      const client = new OpenAI({ logger: logger, logLevel: 'info', apiKey: 'My API Key' });
+
+      await forceAPIResponseForClient(client);
+      expect(debugMock).not.toHaveBeenCalled();
+    });
+
+    test('debug logs happen with debug env var', async () => {
+      const debugMock = jest.fn();
+      const logger = {
+        debug: debugMock,
+        info: jest.fn(),
+        warn: jest.fn(),
+        error: jest.fn(),
+      };
+
+      process.env['OPENAI_LOG'] = 'debug';
+      const client = new OpenAI({ logger: logger, apiKey: 'My API Key' });
+
+      await forceAPIResponseForClient(client);
+      expect(debugMock).toHaveBeenCalled();
+    });
+
+    test('client log level overrides env var', async () => {
+      const debugMock = jest.fn();
+      const logger = {
+        debug: debugMock,
+        info: jest.fn(),
+        warn: jest.fn(),
+        error: jest.fn(),
+      };
+
+      process.env['OPENAI_LOG'] = 'debug';
+      const client = new OpenAI({ logger: logger, logLevel: 'off', apiKey: 'My API Key' });
+
+      await forceAPIResponseForClient(client);
+      expect(debugMock).not.toHaveBeenCalled();
     });
   });
 

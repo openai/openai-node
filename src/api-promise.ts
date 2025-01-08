@@ -1,5 +1,7 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
+import { type OpenAI } from './client';
+
 import { type PromiseOrValue } from './internal/types';
 import {
   type APIResponseProps,
@@ -14,10 +16,13 @@ import {
  */
 export class APIPromise<T> extends Promise<WithRequestID<T>> {
   private parsedPromise: Promise<WithRequestID<T>> | undefined;
+  #client: OpenAI;
 
   constructor(
+    client: OpenAI,
     private responsePromise: Promise<APIResponseProps>,
     private parseResponse: (
+      client: OpenAI,
       props: APIResponseProps,
     ) => PromiseOrValue<WithRequestID<T>> = defaultParseResponse,
   ) {
@@ -27,11 +32,12 @@ export class APIPromise<T> extends Promise<WithRequestID<T>> {
       // to parse the response
       resolve(null as any);
     });
+    this.#client = client;
   }
 
   _thenUnwrap<U>(transform: (data: T, props: APIResponseProps) => U): APIPromise<U> {
-    return new APIPromise(this.responsePromise, async (props) =>
-      addRequestID(transform(await this.parseResponse(props), props), props.response),
+    return new APIPromise(this.#client, this.responsePromise, async (client, props) =>
+      addRequestID(transform(await this.parseResponse(client, props), props), props.response),
     );
   }
 
@@ -69,7 +75,9 @@ export class APIPromise<T> extends Promise<WithRequestID<T>> {
 
   private parse(): Promise<WithRequestID<T>> {
     if (!this.parsedPromise) {
-      this.parsedPromise = this.responsePromise.then(this.parseResponse) as any as Promise<WithRequestID<T>>;
+      this.parsedPromise = this.responsePromise.then((data) =>
+        this.parseResponse(this.#client, data),
+      ) as any as Promise<WithRequestID<T>>;
     }
     return this.parsedPromise;
   }
