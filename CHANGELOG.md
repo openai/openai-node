@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.77.4 (2025-01-08)
+
+Full Changelog: [v4.77.3...v4.77.4](https://github.com/openai/openai-node/compare/v4.77.3...v4.77.4)
+
+### Documentation
+
+* **readme:** fix misplaced period ([#1252](https://github.com/openai/openai-node/issues/1252)) ([c2fe465](https://github.com/openai/openai-node/commit/c2fe46522d59d1611ba8bb2b7e070f9be7264df0))
+
 ## 4.77.3 (2025-01-03)
 
 Full Changelog: [v4.77.2...v4.77.3](https://github.com/openai/openai-node/compare/v4.77.2...v4.77.3)
