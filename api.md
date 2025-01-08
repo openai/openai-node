@@ -212,6 +212,66 @@ Methods:
 
 # Beta
 
+## Realtime
+
+Types:
+
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationCreatedEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItem</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItemContent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItemCreateEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItemCreatedEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItemDeleteEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItemDeletedEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItemInputAudioTranscriptionCompletedEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItemInputAudioTranscriptionFailedEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItemTruncateEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItemTruncatedEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ErrorEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">InputAudioBufferAppendEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">InputAudioBufferClearEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">InputAudioBufferClearedEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">InputAudioBufferCommitEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">InputAudioBufferCommittedEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">InputAudioBufferSpeechStartedEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">InputAudioBufferSpeechStoppedEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">RateLimitsUpdatedEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">RealtimeClientEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">RealtimeResponse</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">RealtimeResponseStatus</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">RealtimeResponseUsage</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">RealtimeServerEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ResponseAudioDeltaEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ResponseAudioDoneEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ResponseAudioTranscriptDeltaEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ResponseAudioTranscriptDoneEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ResponseCancelEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ResponseContentPartAddedEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ResponseContentPartDoneEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ResponseCreateEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ResponseCreatedEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ResponseDoneEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ResponseFunctionCallArgumentsDeltaEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ResponseFunctionCallArgumentsDoneEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ResponseOutputItemAddedEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ResponseOutputItemDoneEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ResponseTextDeltaEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ResponseTextDoneEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">SessionCreatedEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">SessionUpdateEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">SessionUpdatedEvent</a></code>
+
+### Sessions
+
+Types:
+
+- <code><a href="./src/resources/beta/realtime/sessions.ts">Session</a></code>
+- <code><a href="./src/resources/beta/realtime/sessions.ts">SessionCreateResponse</a></code>
+
+Methods:
+
+- <code title="post /realtime/sessions">client.beta.realtime.sessions.<a href="./src/resources/beta/realtime/sessions.ts">create</a>({ ...params }) -> SessionCreateResponse</code>
+
 ## VectorStores
 
 Types:
