@@ -19,6 +19,7 @@ export {
   type AssistantsPage,
 } from './assistants';
 export { Beta } from './beta';
+export { Realtime } from './realtime/index';
 export {
   Threads,
   type AssistantResponseFormatOption,
