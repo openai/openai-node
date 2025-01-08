@@ -1,10 +1,10 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import type { OpenAI } from './client';
 import { OpenAIError } from './error';
 import { FinalRequestOptions } from './internal/request-options';
 import { defaultParseResponse } from './internal/parse';
 import { APIPromise } from './api-promise';
+import { type OpenAI } from './client';
 import { type APIResponseProps } from './internal/parse';
 import { maybeObj } from './internal/utils/values';
 
@@ -86,8 +86,10 @@ export class PagePromise<
     Page: new (...args: ConstructorParameters<typeof AbstractPage>) => PageClass,
   ) {
     super(
+      client,
       request,
-      async (props) => new Page(client, props.response, await defaultParseResponse(props), props.options),
+      async (client, props) =>
+        new Page(client, props.response, await defaultParseResponse(client, props), props.options),
     );
   }
 

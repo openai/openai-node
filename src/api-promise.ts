@@ -1,5 +1,7 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
+import { type OpenAI } from './client';
+
 import { type PromiseOrValue } from './internal/types';
 import { APIResponseProps, defaultParseResponse } from './internal/parse';
 
@@ -9,10 +11,15 @@ import { APIResponseProps, defaultParseResponse } from './internal/parse';
  */
 export class APIPromise<T> extends Promise<T> {
   private parsedPromise: Promise<T> | undefined;
+  #client: OpenAI;
 
   constructor(
+    client: OpenAI,
     private responsePromise: Promise<APIResponseProps>,
-    private parseResponse: (props: APIResponseProps) => PromiseOrValue<T> = defaultParseResponse,
+    private parseResponse: (
+      client: OpenAI,
+      props: APIResponseProps,
+    ) => PromiseOrValue<T> = defaultParseResponse,
   ) {
     super((resolve) => {
       // this is maybe a bit weird but this has to be a no-op to not implicitly
@@ -20,11 +27,12 @@ export class APIPromise<T> extends Promise<T> {
       // to parse the response
       resolve(null as any);
     });
+    this.#client = client;
   }
 
   _thenUnwrap<U>(transform: (data: T, props: APIResponseProps) => U): APIPromise<U> {
-    return new APIPromise(this.responsePromise, async (props) =>
-      transform(await this.parseResponse(props), props),
+    return new APIPromise(this.#client, this.responsePromise, async (client, props) =>
+      transform(await this.parseResponse(client, props), props),
     );
   }
 
@@ -60,7 +68,7 @@ export class APIPromise<T> extends Promise<T> {
 
   private parse(): Promise<T> {
     if (!this.parsedPromise) {
-      this.parsedPromise = this.responsePromise.then(this.parseResponse);
+      this.parsedPromise = this.responsePromise.then((data) => this.parseResponse(this.#client, data));
     }
     return this.parsedPromise;
   }
