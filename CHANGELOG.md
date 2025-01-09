@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.78.0 (2025-01-09)
+
+Full Changelog: [v4.77.4...v4.78.0](https://github.com/openai/openai-node/compare/v4.77.4...v4.78.0)
+
+### Features
+
+* **client:** add realtime types ([#1254](https://github.com/openai/openai-node/issues/1254)) ([7130995](https://github.com/openai/openai-node/commit/71309957a9a0883cac84b8b57697b796a9df3503))
+
 ## 4.77.4 (2025-01-08)
 
 Full Changelog: [v4.77.3...v4.77.4](https://github.com/openai/openai-node/compare/v4.77.3...v4.77.4)
