@@ -62,7 +62,11 @@ export class Files extends APIResource {
    * Returns the contents of the specified file.
    */
   content(fileID: string, options?: RequestOptions): APIPromise<Response> {
-    return this._client.get(`/files/${fileID}/content`, { ...options, __binaryResponse: true });
+    return this._client.get(`/files/${fileID}/content`, {
+      ...options,
+      headers: { Accept: 'application/binary', ...options?.headers },
+      __binaryResponse: true,
+    });
   }
 
   /**
@@ -71,10 +75,7 @@ export class Files extends APIResource {
    * @deprecated The `.content()` method should be used instead
    */
   retrieveContent(fileID: string, options?: RequestOptions): APIPromise<string> {
-    return this._client.get(`/files/${fileID}/content`, {
-      ...options,
-      headers: { Accept: 'application/json', ...options?.headers },
-    });
+    return this._client.get(`/files/${fileID}/content`, options);
   }
 }
 
