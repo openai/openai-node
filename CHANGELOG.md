@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.78.1 (2025-01-10)
+
+Full Changelog: [v4.78.0...v4.78.1](https://github.com/openai/openai-node/compare/v4.78.0...v4.78.1)
+
+### Bug Fixes
+
+* send correct Accept header for certain endpoints ([#1257](https://github.com/openai/openai-node/issues/1257)) ([8756693](https://github.com/openai/openai-node/commit/8756693c5690b16045cdd8d33636fe7643d45f3a))
+
 ## 4.78.0 (2025-01-09)
 
 Full Changelog: [v4.77.4...v4.78.0](https://github.com/openai/openai-node/compare/v4.77.4...v4.78.0)
