@@ -1452,6 +1452,169 @@ describe('resource completions', () => {
       ]);
       await listener.sanityCheck();
     });
+    test('afterCompletion', async () => {
+      const { fetch, handleRequest } = mockChatCompletionFetch();
+
+      const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
+
+      let hasInjectedMessage = false;
+      const runner = openai.beta.chat.completions.runTools(
+        {
+          messages: [{ role: 'user', content: 'tell me what the weather is like' }],
+          model: 'gpt-3.5-turbo',
+          tools: [
+            {
+              type: 'function',
+              function: {
+                function: function getWeather() {
+                  return `it's raining`;
+                },
+                parameters: {},
+                description: 'gets the weather',
+              },
+            },
+          ],
+        },
+        {
+          afterCompletion: async () => {
+            // A simple example of conditionally injecting a message into the conversation during a runTools call
+            if (!hasInjectedMessage) {
+              runner._addMessage({
+                role: 'system',
+                content: `Here's some up-to-date information I've found from the web that can help you with your next response: 42.`,
+              });
+
+              hasInjectedMessage = true;
+            }
+          },
+        },
+      );
+
+      const listener = new RunnerListener(runner);
+
+      await handleRequest(async (request) => {
+        expect(request.messages).toEqual([{ role: 'user', content: 'tell me what the weather is like' }]);
+        return {
+          id: '1',
+          choices: [
+            {
+              index: 0,
+              finish_reason: 'function_call',
+              logprobs: null,
+              message: {
+                role: 'assistant',
+                content: null,
+                refusal: null,
+                parsed: null,
+                tool_calls: [
+                  {
+                    type: 'function',
+                    id: '123',
+                    function: {
+                      arguments: '',
+                      name: 'getWeather',
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+          created: Math.floor(Date.now() / 1000),
+          model: 'gpt-3.5-turbo',
+          object: 'chat.completion',
+        };
+      });
+
+      await handleRequest(async (request) => {
+        expect(request.messages).toEqual([
+          {
+            role: 'user',
+            content: 'tell me what the weather is like',
+          },
+          {
+            role: 'assistant',
+            content: null,
+            refusal: null,
+            parsed: null,
+            tool_calls: [
+              {
+                type: 'function',
+                id: '123',
+                function: {
+                  arguments: '',
+                  name: 'getWeather',
+                  parsed_arguments: null,
+                },
+              },
+            ],
+          },
+          {
+            role: 'tool',
+            content: `it's raining`,
+            tool_call_id: '123',
+          },
+          {
+            content: `Here's some up-to-date information I've found from the web that can help you with your next response: 42.`,
+            role: 'system',
+          },
+        ]);
+
+        return {
+          id: '2',
+          choices: [
+            {
+              index: 0,
+              finish_reason: 'stop',
+              logprobs: null,
+              message: {
+                role: 'assistant',
+                content: `it's raining`,
+                refusal: null,
+              },
+            },
+          ],
+          created: Math.floor(Date.now() / 1000),
+          model: 'gpt-3.5-turbo',
+          object: 'chat.completion',
+        };
+      });
+
+      await runner.done();
+
+      expect(listener.messages).toEqual([
+        {
+          role: 'assistant',
+          content: null,
+          parsed: null,
+          refusal: null,
+          tool_calls: [
+            {
+              type: 'function',
+              id: '123',
+              function: {
+                arguments: '',
+                name: 'getWeather',
+                parsed_arguments: null,
+              },
+            },
+          ],
+        },
+        { role: 'tool', content: `it's raining`, tool_call_id: '123' },
+        {
+          content: `Here's some up-to-date information I've found from the web that can help you with your next response: 42.`,
+          role: 'system',
+        },
+        {
+          role: 'assistant',
+          content: "it's raining",
+          parsed: null,
+          refusal: null,
+          tool_calls: [],
+        },
+      ]);
+      expect(listener.functionCallResults).toEqual([`it's raining`]);
+      await listener.sanityCheck();
+    });
   });
 
   describe('runTools with stream: true', () => {
@@ -2308,6 +2471,169 @@ describe('resource completions', () => {
         `Invalid tool_call: "get_weather". Available options are: "getWeather". Please try again`,
         `it's raining`,
       ]);
+      await listener.sanityCheck();
+    });
+    test('afterCompletion', async () => {
+      const { fetch, handleRequest } = mockChatCompletionFetch();
+
+      const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
+
+      let hasInjectedMessage = false;
+      const runner = openai.beta.chat.completions.runTools(
+        {
+          messages: [{ role: 'user', content: 'tell me what the weather is like' }],
+          model: 'gpt-3.5-turbo',
+          tools: [
+            {
+              type: 'function',
+              function: {
+                function: function getWeather() {
+                  return `it's raining`;
+                },
+                parameters: {},
+                description: 'gets the weather',
+              },
+            },
+          ],
+        },
+        {
+          afterCompletion: async () => {
+            // A simple example of conditionally injecting a message into the conversation during a runTools call
+            if (!hasInjectedMessage) {
+              runner._addMessage({
+                role: 'system',
+                content: `Here's some up-to-date information I've found from the web that can help you with your next response: 42.`,
+              });
+
+              hasInjectedMessage = true;
+            }
+          },
+        },
+      );
+
+      const listener = new RunnerListener(runner);
+
+      await handleRequest(async (request) => {
+        expect(request.messages).toEqual([{ role: 'user', content: 'tell me what the weather is like' }]);
+        return {
+          id: '1',
+          choices: [
+            {
+              index: 0,
+              finish_reason: 'function_call',
+              logprobs: null,
+              message: {
+                role: 'assistant',
+                content: null,
+                refusal: null,
+                parsed: null,
+                tool_calls: [
+                  {
+                    type: 'function',
+                    id: '123',
+                    function: {
+                      arguments: '',
+                      name: 'getWeather',
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+          created: Math.floor(Date.now() / 1000),
+          model: 'gpt-3.5-turbo',
+          object: 'chat.completion',
+        };
+      });
+
+      await handleRequest(async (request) => {
+        expect(request.messages).toEqual([
+          {
+            role: 'user',
+            content: 'tell me what the weather is like',
+          },
+          {
+            role: 'assistant',
+            content: null,
+            refusal: null,
+            parsed: null,
+            tool_calls: [
+              {
+                type: 'function',
+                id: '123',
+                function: {
+                  arguments: '',
+                  name: 'getWeather',
+                  parsed_arguments: null,
+                },
+              },
+            ],
+          },
+          {
+            role: 'tool',
+            content: `it's raining`,
+            tool_call_id: '123',
+          },
+          {
+            content: `Here's some up-to-date information I've found from the web that can help you with your next response: 42.`,
+            role: 'system',
+          },
+        ]);
+
+        return {
+          id: '2',
+          choices: [
+            {
+              index: 0,
+              finish_reason: 'stop',
+              logprobs: null,
+              message: {
+                role: 'assistant',
+                content: `it's raining`,
+                refusal: null,
+              },
+            },
+          ],
+          created: Math.floor(Date.now() / 1000),
+          model: 'gpt-3.5-turbo',
+          object: 'chat.completion',
+        };
+      });
+
+      await runner.done();
+
+      expect(listener.messages).toEqual([
+        {
+          role: 'assistant',
+          content: null,
+          parsed: null,
+          refusal: null,
+          tool_calls: [
+            {
+              type: 'function',
+              id: '123',
+              function: {
+                arguments: '',
+                name: 'getWeather',
+                parsed_arguments: null,
+              },
+            },
+          ],
+        },
+        { role: 'tool', content: `it's raining`, tool_call_id: '123' },
+        {
+          content: `Here's some up-to-date information I've found from the web that can help you with your next response: 42.`,
+          role: 'system',
+        },
+        {
+          role: 'assistant',
+          content: "it's raining",
+          parsed: null,
+          refusal: null,
+          tool_calls: [],
+        },
+      ]);
+      expect(listener.functionCallResults).toEqual([`it's raining`]);
       await listener.sanityCheck();
     });
   });
