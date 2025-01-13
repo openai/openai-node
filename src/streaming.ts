@@ -39,9 +39,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
           if (sse.data.startsWith('[DONE]')) {
             done = true;
             continue;
-          }
-
-          if (sse.event === null) {
+          } else {
             let data;
 
             try {
