@@ -38,7 +38,9 @@ export class Stream<Item> implements AsyncIterable<Item> {
           if (sse.data.startsWith('[DONE]')) {
             done = true;
             continue;
-          } else {
+          }
+
+          if (sse.event === null) {
             let data;
 
             try {
@@ -52,12 +54,22 @@ export class Stream<Item> implements AsyncIterable<Item> {
             if (data && data.error) {
               throw new APIError(undefined, data.error, undefined, undefined);
             }
+
+            yield data;
+          } else {
+            let data;
+            try {
+              data = JSON.parse(sse.data);
+            } catch (e) {
+              console.error(`Could not parse message into JSON:`, sse.data);
+              console.error(`From chunk:`, sse.raw);
+              throw e;
+            }
             // TODO: Is this where the error should be thrown?
             if (sse.event == 'error') {
               throw new APIError(undefined, data.error, data.message, undefined);
             }
-
-            yield data;
+            yield { event: sse.event, data: data } as any;
           }
         }
         done = true;
