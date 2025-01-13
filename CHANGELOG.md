@@ -1,5 +1,19 @@
 # Changelog
 
+## 4.78.2 (2025-01-13)
+
+Full Changelog: [v4.78.1...v4.78.2](https://github.com/openai/openai-node/compare/v4.78.1...v4.78.2)
+
+### Bug Fixes
+
+* **logs/azure:** redact sensitive header when DEBUG is set ([#1218](https://github.com/openai/openai-node/issues/1218)) ([6a72fd7](https://github.com/openai/openai-node/commit/6a72fd736733db19504a829bf203b39d5b9e3644))
+
+
+### Chores
+
+* fix streaming ([379c743](https://github.com/openai/openai-node/commit/379c7435ed5d508458e9cdc22386039b84fcec5e))
+* **internal:** streaming refactors ([#1261](https://github.com/openai/openai-node/issues/1261)) ([dd4af93](https://github.com/openai/openai-node/commit/dd4af939792583854a313367c5fe2f98eea2f3c8))
+
 ## 4.78.1 (2025-01-10)
 
 Full Changelog: [v4.78.0...v4.78.1](https://github.com/openai/openai-node/compare/v4.78.0...v4.78.1)
