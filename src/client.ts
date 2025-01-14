@@ -12,7 +12,6 @@ import * as Shims from './internal/shims';
 import * as Opts from './internal/request-options';
 import * as qs from './internal/qs';
 import { VERSION } from './version';
-import { isBlobLike } from './uploads';
 import { buildHeaders } from './internal/headers';
 import * as Errors from './error';
 import * as Pagination from './pagination';
@@ -443,14 +442,8 @@ export class OpenAI {
     opts?: PromiseOrValue<RequestOptions>,
   ): APIPromise<Rsp> {
     return this.request(
-      Promise.resolve(opts).then(async (opts) => {
-        const body =
-          opts && isBlobLike(opts?.body) ? new DataView(await opts.body.arrayBuffer())
-          : opts?.body instanceof DataView ? opts.body
-          : opts?.body instanceof ArrayBuffer ? new DataView(opts.body)
-          : opts && ArrayBuffer.isView(opts?.body) ? new DataView(opts.body.buffer)
-          : opts?.body;
-        return { method, path, ...opts, body };
+      Promise.resolve(opts).then((opts) => {
+        return { method, path, ...opts };
       }),
     );
   }
