@@ -116,7 +116,7 @@ export type FileChunkingStrategy = StaticFileChunkingStrategyObject | OtherFileC
  * The chunking strategy used to chunk the file(s). If not set, will use the `auto`
  * strategy. Only applicable if `file_ids` is non-empty.
  */
-export type FileChunkingStrategyParam = AutoFileChunkingStrategyParam | StaticFileChunkingStrategyParam;
+export type FileChunkingStrategyParam = AutoFileChunkingStrategyParam | StaticFileChunkingStrategyObjectParam;
 
 /**
  * This is returned when the chunking strategy is unknown. Typically, this is
@@ -154,7 +154,7 @@ export interface StaticFileChunkingStrategyObject {
   type: 'static';
 }
 
-export interface StaticFileChunkingStrategyParam {
+export interface StaticFileChunkingStrategyObjectParam {
   static: StaticFileChunkingStrategy;
 
   /**
@@ -397,7 +397,7 @@ export declare namespace VectorStores {
     type OtherFileChunkingStrategyObject as OtherFileChunkingStrategyObject,
     type StaticFileChunkingStrategy as StaticFileChunkingStrategy,
     type StaticFileChunkingStrategyObject as StaticFileChunkingStrategyObject,
-    type StaticFileChunkingStrategyParam as StaticFileChunkingStrategyParam,
+    type StaticFileChunkingStrategyObjectParam as StaticFileChunkingStrategyObjectParam,
     type VectorStore as VectorStore,
     type VectorStoreDeleted as VectorStoreDeleted,
     VectorStoresPage as VectorStoresPage,
