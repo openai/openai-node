@@ -1226,11 +1226,6 @@ export namespace ChatCompletionCreateParams {
   export type ChatCompletionCreateParamsStreaming = ChatCompletionsAPI.ChatCompletionCreateParamsStreaming;
 }
 
-/**
- * @deprecated Use ChatCompletionCreateParams instead
- */
-export type CompletionCreateParams = ChatCompletionCreateParams;
-
 export interface ChatCompletionCreateParamsNonStreaming extends ChatCompletionCreateParamsBase {
   /**
    * If set, partial message deltas will be sent, like in ChatGPT. Tokens will be
@@ -1243,11 +1238,6 @@ export interface ChatCompletionCreateParamsNonStreaming extends ChatCompletionCr
   stream?: false | null;
 }
 
-/**
- * @deprecated Use ChatCompletionCreateParamsNonStreaming instead
- */
-export type CompletionCreateParamsNonStreaming = ChatCompletionCreateParamsNonStreaming;
-
 export interface ChatCompletionCreateParamsStreaming extends ChatCompletionCreateParamsBase {
   /**
    * If set, partial message deltas will be sent, like in ChatGPT. Tokens will be
@@ -1259,11 +1249,6 @@ export interface ChatCompletionCreateParamsStreaming extends ChatCompletionCreat
    */
   stream: true;
 }
-
-/**
- * @deprecated Use ChatCompletionCreateParamsStreaming instead
- */
-export type CompletionCreateParamsStreaming = ChatCompletionCreateParamsStreaming;
 
 export declare namespace Completions {
   export {
@@ -1296,10 +1281,7 @@ export declare namespace Completions {
     type ChatCompletionToolMessageParam as ChatCompletionToolMessageParam,
     type ChatCompletionUserMessageParam as ChatCompletionUserMessageParam,
     type ChatCompletionCreateParams as ChatCompletionCreateParams,
-    type CompletionCreateParams as CompletionCreateParams,
     type ChatCompletionCreateParamsNonStreaming as ChatCompletionCreateParamsNonStreaming,
-    type CompletionCreateParamsNonStreaming as CompletionCreateParamsNonStreaming,
     type ChatCompletionCreateParamsStreaming as ChatCompletionCreateParamsStreaming,
-    type CompletionCreateParamsStreaming as CompletionCreateParamsStreaming,
   };
 }
