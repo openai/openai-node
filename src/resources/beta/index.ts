@@ -42,7 +42,7 @@ export {
   type OtherFileChunkingStrategyObject,
   type StaticFileChunkingStrategy,
   type StaticFileChunkingStrategyObject,
-  type StaticFileChunkingStrategyParam,
+  type StaticFileChunkingStrategyObjectParam,
   type VectorStore,
   type VectorStoreDeleted,
   type VectorStoreCreateParams,

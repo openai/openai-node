@@ -281,7 +281,7 @@ Types:
 - <code><a href="./src/resources/beta/vector-stores/vector-stores.ts">OtherFileChunkingStrategyObject</a></code>
 - <code><a href="./src/resources/beta/vector-stores/vector-stores.ts">StaticFileChunkingStrategy</a></code>
 - <code><a href="./src/resources/beta/vector-stores/vector-stores.ts">StaticFileChunkingStrategyObject</a></code>
-- <code><a href="./src/resources/beta/vector-stores/vector-stores.ts">StaticFileChunkingStrategyParam</a></code>
+- <code><a href="./src/resources/beta/vector-stores/vector-stores.ts">StaticFileChunkingStrategyObjectParam</a></code>
 - <code><a href="./src/resources/beta/vector-stores/vector-stores.ts">VectorStore</a></code>
 - <code><a href="./src/resources/beta/vector-stores/vector-stores.ts">VectorStoreDeleted</a></code>
 
