@@ -3,10 +3,11 @@
 import { APIResource } from '../resource';
 import { APIPromise } from '../api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../pagination';
-import { type Uploadable, multipartFormRequestOptions } from '../uploads';
+import { type Uploadable } from '../uploads';
 import { RequestOptions } from '../internal/request-options';
 import { sleep } from '../internal/utils/sleep';
 import { APIConnectionTimeoutError } from '../error';
+import { multipartFormRequestOptions } from '../internal/uploads';
 
 export class Files extends APIResource {
   /**

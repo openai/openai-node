@@ -4,8 +4,9 @@ import { APIResource } from '../../resource';
 import * as AudioAPI from './audio';
 import * as TranscriptionsAPI from './transcriptions';
 import { APIPromise } from '../../api-promise';
-import { type Uploadable, multipartFormRequestOptions } from '../../uploads';
+import { type Uploadable } from '../../uploads';
 import { RequestOptions } from '../../internal/request-options';
+import { multipartFormRequestOptions } from '../../internal/uploads';
 
 export class Translations extends APIResource {
   /**

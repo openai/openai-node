@@ -1,5 +1,6 @@
 import fs from 'fs';
-import { toFile, type ResponseLike } from 'openai/uploads';
+import type { ResponseLike } from 'openai/internal/uploads';
+import { toFile } from 'openai/uploads';
 
 class MyClass {
   name: string = 'foo';
@@ -8,7 +9,7 @@ class MyClass {
 function mockResponse({ url, content }: { url: string; content?: Blob }): ResponseLike {
   return {
     url,
-    blob: async () => content as any,
+    blob: async () => content || new Blob([]),
   };
 }
 
