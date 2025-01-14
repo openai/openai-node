@@ -34,9 +34,6 @@ import {
   ChatCompletionToolChoiceOption,
   ChatCompletionToolMessageParam,
   ChatCompletionUserMessageParam,
-  CompletionCreateParams,
-  CompletionCreateParamsNonStreaming,
-  CompletionCreateParamsStreaming,
   Completions,
 } from './completions';
 
@@ -119,10 +116,7 @@ export declare namespace Chat {
     type ChatCompletionToolMessageParam as ChatCompletionToolMessageParam,
     type ChatCompletionUserMessageParam as ChatCompletionUserMessageParam,
     type ChatCompletionCreateParams as ChatCompletionCreateParams,
-    type CompletionCreateParams as CompletionCreateParams,
     type ChatCompletionCreateParamsNonStreaming as ChatCompletionCreateParamsNonStreaming,
-    type CompletionCreateParamsNonStreaming as CompletionCreateParamsNonStreaming,
     type ChatCompletionCreateParamsStreaming as ChatCompletionCreateParamsStreaming,
-    type CompletionCreateParamsStreaming as CompletionCreateParamsStreaming,
   };
 }
