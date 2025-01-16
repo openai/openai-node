@@ -6,14 +6,15 @@
   "license": "MIT",
   "private": true,
   "dependencies": {
+    "@azure/identity": "^4.2.0",
     "express": "^4.18.2",
     "next": "^14.1.1",
     "openai": "file:..",
-    "zod-to-json-schema": "^3.21.4",
-    "@azure/identity": "^4.2.0"
+    "zod-to-json-schema": "^3.21.4"
   },
   "devDependencies": {
     "@types/body-parser": "^1.19.3",
-    "@types/express": "^4.17.19"
+    "@types/express": "^4.17.19",
+    "@types/web": "^0.0.194"
   }
 }
