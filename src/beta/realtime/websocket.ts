@@ -31,16 +31,18 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
   ) {
     super();
 
-    if (
-      !(props.dangerouslyAllowBrowser || (client as any)?._options?.dangerouslyAllowBrowser) &&
-      Core.isRunningInBrowser()
-    ) {
+    const dangerouslyAllowBrowser =
+      props.dangerouslyAllowBrowser ??
+      (client as any)?._options?.dangerouslyAllowBrowser ??
+      (client?.apiKey.startsWith('ek_') ? true : null);
+
+    if (!dangerouslyAllowBrowser && Core.isRunningInBrowser()) {
       throw new OpenAIError(
-        "It looks like you're running in a browser-like environment.\n\nThis is disabled by default, as it risks exposing your secret API credentials to attackers.\nIf you understand the risks and have appropriate mitigations in place,\nyou can set the `dangerouslyAllowBrowser` option to `true`, e.g.,\n\nnew OpenAIRealtimeWeb({ model, dangerouslyAllowBrowser: true });\n\nhttps://help.openai.com/en/articles/5112595-best-practices-for-api-key-safety\n",
+        "It looks like you're running in a browser-like environment.\n\nThis is disabled by default, as it risks exposing your secret API credentials to attackers.\n\nYou can avoid this error by creating an ephemeral session token:\nhttps://platform.openai.com/docs/api-reference/realtime-sessions\n",
       );
     }
 
-    client ??= new OpenAI({ dangerouslyAllowBrowser: props.dangerouslyAllowBrowser });
+    client ??= new OpenAI({ dangerouslyAllowBrowser });
 
     this.url = buildRealtimeURL({ baseURL: client.baseURL, model: props.model });
     // @ts-ignore

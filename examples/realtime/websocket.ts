@@ -9,13 +9,6 @@ async function main() {
     rt.send({
       type: 'session.update',
       session: {
-        modalities: ['foo'] as any,
-        model: 'gpt-4o-realtime-preview',
-      },
-    });
-    rt.send({
-      type: 'session.update',
-      session: {
         modalities: ['text'],
         model: 'gpt-4o-realtime-preview',
       },
