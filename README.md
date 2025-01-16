@@ -97,52 +97,48 @@ Basic text based example with `ws`:
 // requires `yarn add ws @types/ws`
 import { OpenAIRealtimeWS } from 'openai/beta/realtime/ws';
 
-async function main() {
-  const rt = new OpenAIRealtimeWS({ model: 'gpt-4o-realtime-preview-2024-12-17' });
+const rt = new OpenAIRealtimeWS({ model: 'gpt-4o-realtime-preview-2024-12-17' });
 
-  // access the underlying `ws.WebSocket` instance
-  rt.socket.on('open', () => {
-    console.log('Connection opened!');
-    rt.send({
-      type: 'session.update',
-      session: {
-        modalities: ['text'],
-        model: 'gpt-4o-realtime-preview',
-      },
-    });
-
-    rt.send({
-      type: 'conversation.item.create',
-      item: {
-        type: 'message',
-        role: 'user',
-        content: [{ type: 'input_text', text: 'Say a couple paragraphs!' }],
-      },
-    });
-
-    rt.send({ type: 'response.create' });
+// access the underlying `ws.WebSocket` instance
+rt.socket.on('open', () => {
+  console.log('Connection opened!');
+  rt.send({
+    type: 'session.update',
+    session: {
+      modalities: ['text'],
+      model: 'gpt-4o-realtime-preview',
+    },
   });
 
-  rt.on('error', (err) => {
-    // in a real world scenario this should be logged somewhere as you
-    // likely want to continue procesing events regardless of any errors
-    throw err;
+  rt.send({
+    type: 'conversation.item.create',
+    item: {
+      type: 'message',
+      role: 'user',
+      content: [{ type: 'input_text', text: 'Say a couple paragraphs!' }],
+    },
   });
 
-  rt.on('session.created', (event) => {
-    console.log('session created!', event.session);
-    console.log();
-  });
+  rt.send({ type: 'response.create' });
+});
 
-  rt.on('response.text.delta', (event) => process.stdout.write(event.delta));
-  rt.on('response.text.done', () => console.log());
+rt.on('error', (err) => {
+  // in a real world scenario this should be logged somewhere as you
+  // likely want to continue procesing events regardless of any errors
+  throw err;
+});
 
-  rt.on('response.done', () => rt.close());
+rt.on('session.created', (event) => {
+  console.log('session created!', event.session);
+  console.log();
+});
 
-  rt.socket.on('close', () => console.log('\nConnection closed!'));
-}
+rt.on('response.text.delta', (event) => process.stdout.write(event.delta));
+rt.on('response.text.done', () => console.log());
 
-main();
+rt.on('response.done', () => rt.close());
+
+rt.socket.on('close', () => console.log('\nConnection closed!'));
 ```
 
 To use the web API `WebSocket` implementation, replace `OpenAIRealtimeWS` with `OpenAIRealtimeWebSocket` and adjust any `rt.socket` access:
