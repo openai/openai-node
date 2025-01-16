@@ -1,7 +1,7 @@
 import { OpenAIRealtimeWebSocket } from 'openai/beta/realtime/websocket';
 
 async function main() {
-  const rt = new OpenAIRealtimeWebSocket({ model: 'gpt-4o-realtime-preview-2024-10-01' });
+  const rt = new OpenAIRealtimeWebSocket({ model: 'gpt-4o-realtime-preview-2024-12-17' });
 
   // access the underlying `ws.WebSocket` instance
   rt.socket.addEventListener('open', () => {

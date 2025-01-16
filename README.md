@@ -98,7 +98,7 @@ Basic text based example with `ws`:
 import { OpenAIRealtimeWS } from 'openai/beta/realtime/ws';
 
 async function main() {
-  const rt = new OpenAIRealtimeWS({ model: 'gpt-4o-realtime-preview-2024-10-01' });
+  const rt = new OpenAIRealtimeWS({ model: 'gpt-4o-realtime-preview-2024-12-17' });
 
   // access the underlying `ws.WebSocket` instance
   rt.socket.on('open', () => {
@@ -150,7 +150,7 @@ To use the web API `WebSocket` implementation, replace `OpenAIRealtimeWS` with `
 ```ts
 import { OpenAIRealtimeWebSocket } from 'openai/beta/realtime/websocket';
 
-const rt = new OpenAIRealtimeWebSocket({ model: 'gpt-4o-realtime-preview-2024-10-01' });
+const rt = new OpenAIRealtimeWebSocket({ model: 'gpt-4o-realtime-preview-2024-12-17' });
 // ...
 rt.socket.addEventListener('open', () => {
  // ...
@@ -166,7 +166,7 @@ When an error is encountered, either on the client side or returned from the ser
 It is **highly recommended** that you register an `error` event listener and handle errors approriately as typically the underlying connection is still usable.
 
 ```ts
-const rt = new OpenAIRealtimeWS({ model: 'gpt-4o-realtime-preview-2024-10-01' });
+const rt = new OpenAIRealtimeWS({ model: 'gpt-4o-realtime-preview-2024-12-17' });
 rt.on('error', (err) => {
   // in a real world scenario this should be logged somewhere as you
   // likely want to continue procesing events regardless of any errors

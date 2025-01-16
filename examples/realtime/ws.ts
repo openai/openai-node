@@ -1,7 +1,7 @@
 import { OpenAIRealtimeWS } from 'openai/beta/realtime/ws';
 
 async function main() {
-  const rt = new OpenAIRealtimeWS({ model: 'gpt-4o-realtime-preview-2024-10-01' });
+  const rt = new OpenAIRealtimeWS({ model: 'gpt-4o-realtime-preview-2024-12-17' });
 
   // access the underlying `ws.WebSocket` instance
   rt.socket.on('open', () => {
