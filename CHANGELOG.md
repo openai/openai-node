@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.79.1 (2025-01-17)
+
+Full Changelog: [v4.79.0...v4.79.1](https://github.com/openai/openai-node/compare/v4.79.0...v4.79.1)
+
+### Bug Fixes
+
+* **realtime:** correct import syntax ([#1267](https://github.com/openai/openai-node/issues/1267)) ([74702a7](https://github.com/openai/openai-node/commit/74702a739f566810d2b6c4e0832cfa17a1d1e272))
+
 ## 4.79.0 (2025-01-17)
 
 Full Changelog: [v4.78.1...v4.79.0](https://github.com/openai/openai-node/compare/v4.78.1...v4.79.0)
