@@ -1,4 +1,4 @@
-import WS from 'ws';
+import * as WS from 'ws';
 import { OpenAI } from '../../index';
 import type { RealtimeClientEvent, RealtimeServerEvent } from '../../resources/beta/realtime/realtime';
 import { OpenAIRealtimeEmitter, buildRealtimeURL } from './internal-base';
