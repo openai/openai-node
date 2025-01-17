@@ -1,7 +1,10 @@
 {
   "name": "@openai/openai",
   "version": "4.79.1",
-  "exports": "./index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./beta/realtime/websocket": "./beta/realtime/websocket.ts"
+  },
   "publish": {
     "exclude": [
       "!."
