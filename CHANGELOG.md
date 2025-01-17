@@ -1,5 +1,26 @@
 # Changelog
 
+## 4.79.0 (2025-01-17)
+
+Full Changelog: [v4.78.1...v4.79.0](https://github.com/openai/openai-node/compare/v4.78.1...v4.79.0)
+
+### Features
+
+* **client:** add Realtime API support ([#1266](https://github.com/openai/openai-node/issues/1266)) ([7160ebe](https://github.com/openai/openai-node/commit/7160ebe647769fbf48a600c9961d1a6f86dc9622))
+
+
+### Bug Fixes
+
+* **logs/azure:** redact sensitive header when DEBUG is set ([#1218](https://github.com/openai/openai-node/issues/1218)) ([6a72fd7](https://github.com/openai/openai-node/commit/6a72fd736733db19504a829bf203b39d5b9e3644))
+
+
+### Chores
+
+* fix streaming ([379c743](https://github.com/openai/openai-node/commit/379c7435ed5d508458e9cdc22386039b84fcec5e))
+* **internal:** streaming refactors ([#1261](https://github.com/openai/openai-node/issues/1261)) ([dd4af93](https://github.com/openai/openai-node/commit/dd4af939792583854a313367c5fe2f98eea2f3c8))
+* **types:** add `| undefined` to client options properties ([#1264](https://github.com/openai/openai-node/issues/1264)) ([5e56979](https://github.com/openai/openai-node/commit/5e569799b9ac8f915b16de90d91d38b568c1edce))
+* **types:** rename vector store chunking strategy ([#1263](https://github.com/openai/openai-node/issues/1263)) ([d31acee](https://github.com/openai/openai-node/commit/d31acee860c80ba945d4e70b956c7ed75f5f849a))
+
 ## 4.78.1 (2025-01-10)
 
 Full Changelog: [v4.78.0...v4.78.1](https://github.com/openai/openai-node/compare/v4.78.0...v4.78.1)
