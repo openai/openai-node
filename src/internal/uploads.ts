@@ -1,6 +1,7 @@
 import { type RequestOptions } from './request-options';
-import { type FilePropertyBag } from './builtin-types';
+import type { FilePropertyBag, Fetch } from './builtin-types';
 import { isFsReadStreamLike, type FsReadStreamLike } from './shims';
+import type { OpenAI } from '../client';
 import './polyfill/file.node.js';
 
 type BlobLikePart = string | ArrayBuffer | ArrayBufferView | BlobLike | DataView;
@@ -203,21 +204,65 @@ const isAsyncIterableIterator = (value: any): value is AsyncIterableIterator<unk
  * Returns a multipart/form-data request if any part of the given request body contains a File / Blob value.
  * Otherwise returns the request as is.
  */
-export const maybeMultipartFormRequestOptions = async (opts: RequestOptions): Promise<RequestOptions> => {
+export const maybeMultipartFormRequestOptions = async (
+  opts: RequestOptions,
+  fetch: OpenAI | Fetch,
+): Promise<RequestOptions> => {
   if (!hasUploadableValue(opts.body)) return opts;
 
-  return { ...opts, body: await createForm(opts.body) };
+  return { ...opts, body: await createForm(opts.body, fetch) };
 };
 
 type MultipartFormRequestOptions = Omit<RequestOptions, 'body'> & { body: unknown };
 
 export const multipartFormRequestOptions = async (
   opts: MultipartFormRequestOptions,
+  fetch: OpenAI | Fetch,
 ): Promise<RequestOptions> => {
-  return { ...opts, body: await createForm(opts.body) };
+  return { ...opts, body: await createForm(opts.body, fetch) };
 };
 
-export const createForm = async <T = Record<string, unknown>>(body: T | undefined): Promise<FormData> => {
+const supportsFormDataMap = new WeakMap<Fetch, Promise<boolean>>();
+
+/**
+ * node-fetch doesn't support the global FormData object in recent node versions. Instead of sending
+ * properly-encoded form data, it just stringifies the object, resulting in a request body of "[object FormData]".
+ * This function detects if the fetch function provided supports the global FormData object to avoid
+ * confusing error messages later on.
+ */
+function supportsFormData(fetchObject: OpenAI | Fetch): Promise<boolean> {
+  const fetch: Fetch = typeof fetchObject === 'function' ? fetchObject : (fetchObject as any).fetch;
+  const cached = supportsFormDataMap.get(fetch);
+  if (cached) return cached;
+  const promise = (async () => {
+    try {
+      const FetchResponse = (
+        'Response' in fetch ?
+          fetch.Response
+        : (await fetch('data:,')).constructor) as typeof Response;
+      const data = new FormData();
+      if (data.toString() === (await new FetchResponse(data).text())) {
+        return false;
+      }
+      return true;
+    } catch {
+      // avoid false negatives
+      return true;
+    }
+  })();
+  supportsFormDataMap.set(fetch, promise);
+  return promise;
+}
+
+export const createForm = async <T = Record<string, unknown>>(
+  body: T | undefined,
+  fetch: OpenAI | Fetch,
+): Promise<FormData> => {
+  if (!(await supportsFormData(fetch))) {
+    throw new TypeError(
+      'The provided fetch function does not support file uploads with the current global FormData class.',
+    );
+  }
   const form = new FormData();
   await Promise.all(Object.entries(body || {}).map(([key, value]) => addFormValue(form, key, value)));
   return form;

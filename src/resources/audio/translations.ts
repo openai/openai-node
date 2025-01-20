@@ -13,7 +13,10 @@ export class Translations extends APIResource {
    * Translates audio into English.
    */
   create(body: TranslationCreateParams, options?: RequestOptions): APIPromise<TranslationCreateResponse> {
-    return this._client.post('/audio/translations', multipartFormRequestOptions({ body, ...options }));
+    return this._client.post(
+      '/audio/translations',
+      multipartFormRequestOptions({ body, ...options }, this._client),
+    );
   }
 }
 

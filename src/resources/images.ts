@@ -11,14 +11,20 @@ export class Images extends APIResource {
    * Creates a variation of a given image.
    */
   createVariation(body: ImageCreateVariationParams, options?: RequestOptions): APIPromise<ImagesResponse> {
-    return this._client.post('/images/variations', multipartFormRequestOptions({ body, ...options }));
+    return this._client.post(
+      '/images/variations',
+      multipartFormRequestOptions({ body, ...options }, this._client),
+    );
   }
 
   /**
    * Creates an edited or extended image given an original image and a prompt.
    */
   edit(body: ImageEditParams, options?: RequestOptions): APIPromise<ImagesResponse> {
-    return this._client.post('/images/edits', multipartFormRequestOptions({ body, ...options }));
+    return this._client.post(
+      '/images/edits',
+      multipartFormRequestOptions({ body, ...options }, this._client),
+    );
   }
 
   /**

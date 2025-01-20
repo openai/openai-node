@@ -12,7 +12,10 @@ export class Transcriptions extends APIResource {
    * Transcribes audio into the input language.
    */
   create(body: TranscriptionCreateParams, options?: RequestOptions): APIPromise<TranscriptionCreateResponse> {
-    return this._client.post('/audio/transcriptions', multipartFormRequestOptions({ body, ...options }));
+    return this._client.post(
+      '/audio/transcriptions',
+      multipartFormRequestOptions({ body, ...options }, this._client),
+    );
   }
 }
 
