@@ -26,7 +26,10 @@ export class Translations extends APIResource {
     body: TranslationCreateParams,
     options?: RequestOptions,
   ): APIPromise<TranslationCreateResponse | string> {
-    return this._client.post('/audio/translations', multipartFormRequestOptions({ body, ...options }));
+    return this._client.post(
+      '/audio/translations',
+      multipartFormRequestOptions({ body, ...options }, this._client),
+    );
   }
 }
 

@@ -34,7 +34,7 @@ export class Files extends APIResource {
    * storage limits.
    */
   create(body: FileCreateParams, options?: RequestOptions): APIPromise<FileObject> {
-    return this._client.post('/files', multipartFormRequestOptions({ body, ...options }));
+    return this._client.post('/files', multipartFormRequestOptions({ body, ...options }, this._client));
   }
 
   /**
