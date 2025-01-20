@@ -10,18 +10,6 @@
 import { type Fetch } from './builtin-types';
 import { type ReadableStream } from './shim-types';
 
-/**
- * A minimal copy of the `Agent` type from `undici-types` so we can
- * use it in the `ClientOptions` type.
- *
- * https://nodejs.org/api/http.html#class-httpagent
- */
-export interface Agent {
-  dispatch(options: any, handler: any): boolean;
-  closed: boolean;
-  destroyed: boolean;
-}
-
 export function getDefaultFetch(): Fetch {
   if (typeof fetch !== 'undefined') {
     return fetch;
