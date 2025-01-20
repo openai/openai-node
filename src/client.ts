@@ -1,7 +1,7 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import type { RequestInit, RequestInfo, BodyInit } from './internal/builtin-types';
-import type { HTTPMethod, PromiseOrValue } from './internal/types';
+import type { HTTPMethod, PromiseOrValue, MergedRequestInit } from './internal/types';
 import { uuid4 } from './internal/utils/uuid';
 import { validatePositiveInteger, isAbsoluteURL } from './internal/utils/values';
 import { sleep } from './internal/utils/sleep';
@@ -183,14 +183,11 @@ export interface ClientOptions {
    * much longer than this timeout before the promise succeeds or fails.
    */
   timeout?: number | undefined;
-
   /**
-   * An HTTP agent used to manage HTTP(S) connections.
-   *
-   * If not provided, an agent will be constructed by default in the Node.js environment,
-   * otherwise no agent is used.
+   * Additional `RequestInit` options to be passed to `fetch` calls.
+   * Properties will be overridden by per-request `fetchOptions`.
    */
-  httpAgent?: Shims.Agent | undefined;
+  fetchOptions?: MergedRequestInit | undefined;
 
   /**
    * Specify a custom `fetch` function implementation.
@@ -259,7 +256,7 @@ export class OpenAI {
   timeout: number;
   logger: Logger | undefined;
   logLevel: LogLevel | undefined;
-  httpAgent: Shims.Agent | undefined;
+  fetchOptions: MergedRequestInit | undefined;
 
   private fetch: Fetch;
   #encoder: Opts.RequestEncoder;
@@ -274,7 +271,7 @@ export class OpenAI {
    * @param {string | null | undefined} [opts.project=process.env['OPENAI_PROJECT_ID'] ?? null]
    * @param {string} [opts.baseURL=process.env['OPENAI_BASE_URL'] ?? https://api.openai.com/v1] - Override the default base URL for the API.
    * @param {number} [opts.timeout=10 minutes] - The maximum amount of time (in milliseconds) the client will wait for a response before timing out.
-   * @param {number} [opts.httpAgent] - An HTTP agent used to manage HTTP(s) connections.
+   * @param {MergedRequestInit} [opts.fetchOptions] - Additional `RequestInit` options to be passed to `fetch` calls.
    * @param {Fetch} [opts.fetch] - Specify a custom `fetch` function implementation.
    * @param {number} [opts.maxRetries=2] - The maximum number of times the client will retry a request.
    * @param {HeadersLike} opts.defaultHeaders - Default headers to include with every request to the API.
@@ -319,7 +316,7 @@ export class OpenAI {
         this.logLevel = envLevel;
       }
     }
-    this.httpAgent = options.httpAgent;
+    this.fetchOptions = options.fetchOptions;
     this.maxRetries = options.maxRetries ?? 2;
     this.fetch = options.fetch ?? Shims.getDefaultFetch();
     this.#encoder = Opts.FallbackEncoder;
@@ -657,30 +654,18 @@ export class OpenAI {
     const url = this.buildURL(path!, query as Record<string, unknown>);
     if ('timeout' in options) validatePositiveInteger('timeout', options.timeout);
     const timeout = options.timeout ?? this.timeout;
-    const httpAgent = options.httpAgent ?? this.httpAgent;
-    const minAgentTimeout = timeout + 1000;
-    if (
-      typeof (httpAgent as any)?.options?.timeout === 'number' &&
-      minAgentTimeout > ((httpAgent as any).options.timeout ?? 0)
-    ) {
-      // Allow any given request to bump our agent active socket timeout.
-      // This may seem strange, but leaking active sockets should be rare and not particularly problematic,
-      // and without mutating agent we would need to create more of them.
-      // This tradeoff optimizes for performance.
-      (httpAgent as any).options.timeout = minAgentTimeout;
-    }
-
     const { bodyHeaders, body } = this.buildBody({ options });
     const reqHeaders = this.buildHeaders({ options, method, bodyHeaders, retryCount });
 
     const req: FinalizedRequestInit = {
       method,
       headers: reqHeaders,
-      ...(httpAgent && { agent: httpAgent }),
       ...(options.signal && { signal: options.signal }),
       ...((globalThis as any).ReadableStream &&
         body instanceof (globalThis as any).ReadableStream && { duplex: 'half' }),
       ...(body && { body }),
+      ...((this.fetchOptions as any) ?? {}),
+      ...((options.fetchOptions as any) ?? {}),
     };
 
     return { req, url, timeout };
