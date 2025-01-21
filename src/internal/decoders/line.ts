@@ -1,6 +1,6 @@
 import { OpenAIError } from '../../error';
 
-type Bytes = string | ArrayBuffer | Uint8Array | Buffer | null | undefined;
+export type Bytes = string | ArrayBuffer | Uint8Array | Buffer | null | undefined;
 
 /**
  * A re-implementation of httpx's `LineDecoder` in Python that handles incrementally
