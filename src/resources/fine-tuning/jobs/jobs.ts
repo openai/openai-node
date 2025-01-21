@@ -516,7 +516,7 @@ export interface JobCreateParams {
 
 export namespace JobCreateParams {
   /**
-   * @deprecated: The hyperparameters used for the fine-tuning job. This value is now
+   * @deprecated The hyperparameters used for the fine-tuning job. This value is now
    * deprecated in favor of `method`, and should be passed in under the `method`
    * parameter.
    */
