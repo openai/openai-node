@@ -1,5 +1,18 @@
 # Changelog
 
+## 4.79.2 (2025-01-21)
+
+Full Changelog: [v4.79.1...v4.79.2](https://github.com/openai/openai-node/compare/v4.79.1...v4.79.2)
+
+### Chores
+
+* **internal:** add test ([#1270](https://github.com/openai/openai-node/issues/1270)) ([b7c2d3d](https://github.com/openai/openai-node/commit/b7c2d3d9abd315f1452a578b0fd0d82e6ac4ff60))
+
+
+### Documentation
+
+* **readme:** fix Realtime API example link ([#1272](https://github.com/openai/openai-node/issues/1272)) ([d0653c7](https://github.com/openai/openai-node/commit/d0653c7fef48360d137a7411dfdfb95d477cdbc5))
+
 ## 4.79.1 (2025-01-17)
 
 Full Changelog: [v4.79.0...v4.79.1](https://github.com/openai/openai-node/compare/v4.79.0...v4.79.1)
