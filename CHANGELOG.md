@@ -1,5 +1,23 @@
 # Changelog
 
+## 4.79.4 (2025-01-21)
+
+Full Changelog: [v4.79.3...v4.79.4](https://github.com/openai/openai-node/compare/v4.79.3...v4.79.4)
+
+### Bug Fixes
+
+* **jsr:** correct zod config ([e45fa5f](https://github.com/openai/openai-node/commit/e45fa5f535ca74789636001e60e33edcad4db83c))
+
+
+### Chores
+
+* **internal:** minor restructuring ([#1278](https://github.com/openai/openai-node/issues/1278)) ([58ea92a](https://github.com/openai/openai-node/commit/58ea92a7464a04223f24ba31dbc0f7d0cf99cc19))
+
+
+### Documentation
+
+* update deprecation messages ([#1275](https://github.com/openai/openai-node/issues/1275)) ([1c6599e](https://github.com/openai/openai-node/commit/1c6599e47ef75a71cb309a1e14d97bc97bd036d0))
+
 ## 4.79.3 (2025-01-21)
 
 Full Changelog: [v4.79.2...v4.79.3](https://github.com/openai/openai-node/compare/v4.79.2...v4.79.3)
