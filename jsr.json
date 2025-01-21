@@ -3,6 +3,7 @@
   "version": "4.79.2",
   "exports": {
     ".": "./index.ts",
+    "./helpers/zod": "./helpers/zod.ts",
     "./beta/realtime/websocket": "./beta/realtime/websocket.ts"
   },
   "publish": {
