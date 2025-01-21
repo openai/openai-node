@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.79.3 (2025-01-21)
+
+Full Changelog: [v4.79.2...v4.79.3](https://github.com/openai/openai-node/compare/v4.79.2...v4.79.3)
+
+### Bug Fixes
+
+* **jsr:** export zod helpers ([9dc55b6](https://github.com/openai/openai-node/commit/9dc55b62b564ad5ad1d4a60fe520b68235d05296))
+
 ## 4.79.2 (2025-01-21)
 
 Full Changelog: [v4.79.1...v4.79.2](https://github.com/openai/openai-node/compare/v4.79.1...v4.79.2)
