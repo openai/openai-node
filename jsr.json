@@ -1,7 +1,10 @@
 {
   "name": "@openai/openai",
   "version": "5.0.0-alpha.0",
-  "exports": "./index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./helpers/zod": "./helpers/zod.ts"
+  },
   "publish": {
     "exclude": [
       "!."
