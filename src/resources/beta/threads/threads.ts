@@ -64,6 +64,7 @@ import {
 } from './runs/runs';
 import { APIPromise } from '../../../api-promise';
 import { Stream } from '../../../streaming';
+import { buildHeaders } from '../../../internal/headers';
 import { RequestOptions } from '../../../internal/request-options';
 
 export class Threads extends APIResource {
@@ -77,7 +78,7 @@ export class Threads extends APIResource {
     return this._client.post('/threads', {
       body,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 
@@ -87,7 +88,7 @@ export class Threads extends APIResource {
   retrieve(threadID: string, options?: RequestOptions): APIPromise<Thread> {
     return this._client.get(`/threads/${threadID}`, {
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 
@@ -98,7 +99,7 @@ export class Threads extends APIResource {
     return this._client.post(`/threads/${threadID}`, {
       body,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 
@@ -108,7 +109,7 @@ export class Threads extends APIResource {
   delete(threadID: string, options?: RequestOptions): APIPromise<ThreadDeleted> {
     return this._client.delete(`/threads/${threadID}`, {
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 
@@ -131,7 +132,7 @@ export class Threads extends APIResource {
     return this._client.post('/threads/runs', {
       body,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
       stream: body.stream ?? false,
     }) as APIPromise<RunsAPI.Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
   }

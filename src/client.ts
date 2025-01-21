@@ -12,7 +12,6 @@ import * as Shims from './internal/shims';
 import * as Opts from './internal/request-options';
 import * as qs from './internal/qs';
 import { VERSION } from './version';
-import { buildHeaders } from './internal/headers';
 import * as Errors from './error';
 import * as Pagination from './pagination';
 import { AbstractPage, type CursorPageParams, CursorPageResponse, PageResponse } from './pagination';
@@ -21,7 +20,7 @@ import * as API from './resources/index';
 import { APIPromise } from './api-promise';
 import { type Fetch } from './internal/builtin-types';
 import { isRunningInBrowser } from './internal/detect-platform';
-import { HeadersLike, NullableHeaders } from './internal/headers';
+import { HeadersLike, NullableHeaders, buildHeaders } from './internal/headers';
 import { FinalRequestOptions, RequestOptions } from './internal/request-options';
 import {
   Batch,
