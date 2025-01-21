@@ -153,7 +153,7 @@ rt.socket.addEventListener('open', () => {
 });
 ```
 
-A full example can be found [here](https://github.com/openai/openai-node/blob/master/examples/realtime/web.ts).
+A full example can be found [here](https://github.com/openai/openai-node/blob/master/examples/realtime/websocket.ts).
 
 ### Realtime error handling
 
