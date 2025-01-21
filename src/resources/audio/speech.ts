@@ -2,6 +2,7 @@
 
 import { APIResource } from '../../resource';
 import { APIPromise } from '../../api-promise';
+import { buildHeaders } from '../../internal/headers';
 import { RequestOptions } from '../../internal/request-options';
 
 export class Speech extends APIResource {
@@ -12,7 +13,7 @@ export class Speech extends APIResource {
     return this._client.post('/audio/speech', {
       body,
       ...options,
-      headers: { Accept: 'application/octet-stream', ...options?.headers },
+      headers: buildHeaders([{ Accept: 'application/octet-stream' }, options?.headers]),
       __binaryResponse: true,
     });
   }

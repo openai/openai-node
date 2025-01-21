@@ -6,11 +6,11 @@ import { VectorStoreFilesPage } from './files';
 import * as VectorStoresAPI from './vector-stores';
 import { APIPromise } from '../../../api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../pagination';
+import { buildHeaders } from '../../../internal/headers';
 import { RequestOptions } from '../../../internal/request-options';
 import { sleep } from '../../../internal/utils/sleep';
 import { type Uploadable } from '../../../uploads';
 import { allSettledWithThrow } from '../../../lib/Util';
-import { buildHeaders } from '../../../internal/headers';
 
 export class FileBatches extends APIResource {
   /**
@@ -24,7 +24,7 @@ export class FileBatches extends APIResource {
     return this._client.post(`/vector_stores/${vectorStoreID}/file_batches`, {
       body,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 
@@ -39,7 +39,7 @@ export class FileBatches extends APIResource {
     const { vector_store_id } = params;
     return this._client.get(`/vector_stores/${vector_store_id}/file_batches/${batchID}`, {
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 
@@ -55,7 +55,7 @@ export class FileBatches extends APIResource {
     const { vector_store_id } = params;
     return this._client.post(`/vector_stores/${vector_store_id}/file_batches/${batchID}/cancel`, {
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 
@@ -83,7 +83,7 @@ export class FileBatches extends APIResource {
     return this._client.getAPIList(
       `/vector_stores/${vector_store_id}/file_batches/${batchID}/files`,
       CursorPage<FilesAPI.VectorStoreFile>,
-      { query, ...options, headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers } },
+      { query, ...options, headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]) },
     );
   }
 

@@ -4,6 +4,7 @@ import { APIResource } from '../../../resource';
 import * as AssistantsAPI from '../assistants';
 import { APIPromise } from '../../../api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../pagination';
+import { buildHeaders } from '../../../internal/headers';
 import { RequestOptions } from '../../../internal/request-options';
 
 export class Messages extends APIResource {
@@ -14,7 +15,7 @@ export class Messages extends APIResource {
     return this._client.post(`/threads/${threadID}/messages`, {
       body,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 
@@ -25,7 +26,7 @@ export class Messages extends APIResource {
     const { thread_id } = params;
     return this._client.get(`/threads/${thread_id}/messages/${messageID}`, {
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 
@@ -37,7 +38,7 @@ export class Messages extends APIResource {
     return this._client.post(`/threads/${thread_id}/messages/${messageID}`, {
       body,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 
@@ -52,7 +53,7 @@ export class Messages extends APIResource {
     return this._client.getAPIList(`/threads/${threadID}/messages`, CursorPage<Message>, {
       query,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 
@@ -67,7 +68,7 @@ export class Messages extends APIResource {
     const { thread_id } = params;
     return this._client.delete(`/threads/${thread_id}/messages/${messageID}`, {
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 }

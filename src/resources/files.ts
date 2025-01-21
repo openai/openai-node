@@ -4,6 +4,7 @@ import { APIResource } from '../resource';
 import { APIPromise } from '../api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../pagination';
 import { type Uploadable } from '../uploads';
+import { buildHeaders } from '../internal/headers';
 import { RequestOptions } from '../internal/request-options';
 import { sleep } from '../internal/utils/sleep';
 import { APIConnectionTimeoutError } from '../error';
@@ -67,7 +68,7 @@ export class Files extends APIResource {
   content(fileID: string, options?: RequestOptions): APIPromise<Response> {
     return this._client.get(`/files/${fileID}/content`, {
       ...options,
-      headers: { Accept: 'application/binary', ...options?.headers },
+      headers: buildHeaders([{ Accept: 'application/binary' }, options?.headers]),
       __binaryResponse: true,
     });
   }

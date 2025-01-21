@@ -34,11 +34,11 @@ import {
 import { APIPromise } from '../../../../api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../../pagination';
 import { Stream } from '../../../../streaming';
+import { buildHeaders } from '../../../../internal/headers';
 import { RequestOptions } from '../../../../internal/request-options';
 import { AssistantStream, RunCreateParamsBaseStream } from '../../../../lib/AssistantStream';
 import { sleep } from '../../../../internal/utils/sleep';
 import { RunSubmitToolOutputsParamsStream } from '../../../../lib/AssistantStream';
-import { buildHeaders } from '../../../../internal/headers';
 
 export class Runs extends APIResource {
   steps: StepsAPI.Steps = new StepsAPI.Steps(this._client);
@@ -67,7 +67,7 @@ export class Runs extends APIResource {
       query: { include },
       body,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
       stream: params.stream ?? false,
     }) as APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
   }
@@ -79,7 +79,7 @@ export class Runs extends APIResource {
     const { thread_id } = params;
     return this._client.get(`/threads/${thread_id}/runs/${runID}`, {
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 
@@ -91,7 +91,7 @@ export class Runs extends APIResource {
     return this._client.post(`/threads/${thread_id}/runs/${runID}`, {
       body,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 
@@ -106,7 +106,7 @@ export class Runs extends APIResource {
     return this._client.getAPIList(`/threads/${threadID}/runs`, CursorPage<Run>, {
       query,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 
@@ -117,7 +117,7 @@ export class Runs extends APIResource {
     const { thread_id } = params;
     return this._client.post(`/threads/${thread_id}/runs/${runID}/cancel`, {
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 
@@ -241,7 +241,7 @@ export class Runs extends APIResource {
     return this._client.post(`/threads/${thread_id}/runs/${runID}/submit_tool_outputs`, {
       body,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
       stream: params.stream ?? false,
     }) as APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
   }

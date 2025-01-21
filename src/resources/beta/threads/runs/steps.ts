@@ -4,6 +4,7 @@ import { APIResource } from '../../../../resource';
 import * as StepsAPI from './steps';
 import { APIPromise } from '../../../../api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../../pagination';
+import { buildHeaders } from '../../../../internal/headers';
 import { RequestOptions } from '../../../../internal/request-options';
 
 export class Steps extends APIResource {
@@ -15,7 +16,7 @@ export class Steps extends APIResource {
     return this._client.get(`/threads/${thread_id}/runs/${run_id}/steps/${stepID}`, {
       query,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 
@@ -27,7 +28,7 @@ export class Steps extends APIResource {
     return this._client.getAPIList(`/threads/${thread_id}/runs/${runID}/steps`, CursorPage<RunStep>, {
       query,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 }

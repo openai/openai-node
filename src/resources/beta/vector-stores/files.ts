@@ -4,10 +4,10 @@ import { APIResource } from '../../../resource';
 import * as VectorStoresAPI from './vector-stores';
 import { APIPromise } from '../../../api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../pagination';
+import { buildHeaders } from '../../../internal/headers';
 import { RequestOptions } from '../../../internal/request-options';
 import { sleep } from '../../../internal/utils';
 import { Uploadable } from '../../../uploads';
-import { buildHeaders } from '../../../internal/headers';
 
 export class Files extends APIResource {
   /**
@@ -23,7 +23,7 @@ export class Files extends APIResource {
     return this._client.post(`/vector_stores/${vectorStoreID}/files`, {
       body,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 
@@ -38,7 +38,7 @@ export class Files extends APIResource {
     const { vector_store_id } = params;
     return this._client.get(`/vector_stores/${vector_store_id}/files/${fileID}`, {
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 
@@ -53,7 +53,7 @@ export class Files extends APIResource {
     return this._client.getAPIList(`/vector_stores/${vectorStoreID}/files`, CursorPage<VectorStoreFile>, {
       query,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 
@@ -71,7 +71,7 @@ export class Files extends APIResource {
     const { vector_store_id } = params;
     return this._client.delete(`/vector_stores/${vector_store_id}/files/${fileID}`, {
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 

@@ -2,6 +2,7 @@
 
 import { APIResource } from '../../../resource';
 import { APIPromise } from '../../../api-promise';
+import { buildHeaders } from '../../../internal/headers';
 import { RequestOptions } from '../../../internal/request-options';
 
 export class Sessions extends APIResource {
@@ -18,7 +19,7 @@ export class Sessions extends APIResource {
     return this._client.post('/realtime/sessions', {
       body,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 }
