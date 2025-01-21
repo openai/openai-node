@@ -2,6 +2,7 @@ import { OpenAIError } from './error';
 import { type ReadableStream } from './internal/shim-types';
 import { makeReadableStream } from './internal/shims';
 import { LineDecoder } from './internal/decoders/line';
+import { ReadableStreamToAsyncIterable } from './internal/shims';
 
 import { APIError } from './error';
 
@@ -81,7 +82,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
     async function* iterLines(): AsyncGenerator<string, void, unknown> {
       const lineDecoder = new LineDecoder();
 
-      const iter = readableStreamAsyncIterable<Bytes>(readableStream);
+      const iter = ReadableStreamToAsyncIterable<Bytes>(readableStream);
       for await (const chunk of iter) {
         for (const line of lineDecoder.decode(chunk)) {
           yield line;
@@ -195,7 +196,7 @@ export async function* _iterSSEMessages(
   const sseDecoder = new SSEDecoder();
   const lineDecoder = new LineDecoder();
 
-  const iter = readableStreamAsyncIterable<Bytes>(response.body);
+  const iter = ReadableStreamToAsyncIterable<Bytes>(response.body);
   for await (const sseChunk of iterSSEChunks(iter)) {
     for (const line of lineDecoder.decode(sseChunk)) {
       const sse = sseDecoder.decode(line);
@@ -347,37 +348,4 @@ function partition(str: string, delimiter: string): [string, string, string] {
   }
 
   return [str, '', ''];
-}
-
-/**
- * Most browsers don't yet have async iterable support for ReadableStream,
- * and Node has a very different way of reading bytes from its "ReadableStream".
- *
- * This polyfill was pulled from https://github.com/MattiasBuelens/web-streams-polyfill/pull/122#issuecomment-1627354490
- */
-export function readableStreamAsyncIterable<T>(stream: any): AsyncIterableIterator<T> {
-  if (stream[Symbol.asyncIterator]) return stream;
-
-  const reader = stream.getReader();
-  return {
-    async next() {
-      try {
-        const result = await reader.read();
-        if (result?.done) reader.releaseLock(); // release lock when stream becomes closed
-        return result;
-      } catch (e) {
-        reader.releaseLock(); // release lock when stream becomes errored
-        throw e;
-      }
-    },
-    async return() {
-      const cancelPromise = reader.cancel();
-      reader.releaseLock();
-      await cancelPromise;
-      return { done: true, value: undefined };
-    },
-    [Symbol.asyncIterator]() {
-      return this;
-    },
-  };
 }
