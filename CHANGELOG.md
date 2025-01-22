@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.80.0 (2025-01-22)
+
+Full Changelog: [v4.79.4...v4.80.0](https://github.com/openai/openai-node/compare/v4.79.4...v4.80.0)
+
+### Features
+
+* **api:** update enum values, comments, and examples ([#1280](https://github.com/openai/openai-node/issues/1280)) ([d38f2c2](https://github.com/openai/openai-node/commit/d38f2c2648b6990f217c3c7d83ca31f3739641d3))
+
 ## 4.79.4 (2025-01-21)
 
 Full Changelog: [v4.79.3...v4.79.4](https://github.com/openai/openai-node/compare/v4.79.3...v4.79.4)
