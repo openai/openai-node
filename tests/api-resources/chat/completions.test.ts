@@ -42,7 +42,7 @@ describe('resource completions', () => {
       presence_penalty: -2,
       reasoning_effort: 'low',
       response_format: { type: 'text' },
-      seed: -9007199254740991,
+      seed: 0,
       service_tier: 'auto',
       stop: 'string',
       store: true,
