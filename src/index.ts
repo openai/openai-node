@@ -491,7 +491,7 @@ export interface AzureClientOptions extends ClientOptions {
 /** API Client for interfacing with the Azure OpenAI API. */
 export class AzureOpenAI extends OpenAI {
   private _azureADTokenProvider: (() => Promise<string>) | undefined;
-  private _deployment: string | undefined;
+  deploymentName: string | undefined;
   apiVersion: string = '';
   /**
    * API Client for interfacing with the Azure OpenAI API.
@@ -574,7 +574,7 @@ export class AzureOpenAI extends OpenAI {
 
     this._azureADTokenProvider = azureADTokenProvider;
     this.apiVersion = apiVersion;
-    this._deployment = deployment;
+    this.deploymentName = deployment;
   }
 
   override buildRequest(
@@ -589,7 +589,7 @@ export class AzureOpenAI extends OpenAI {
       if (!Core.isObj(options.body)) {
         throw new Error('Expected request body to be an object');
       }
-      const model = this._deployment || options.body['model'];
+      const model = this.deploymentName || options.body['model'];
       if (model !== undefined && !this.baseURL.includes('/deployments')) {
         options.path = `/deployments/${model}${options.path}`;
       }
@@ -597,7 +597,7 @@ export class AzureOpenAI extends OpenAI {
     return super.buildRequest(options, props);
   }
 
-  private async _getAzureADToken(): Promise<string | undefined> {
+  async getAzureADToken(): Promise<string | undefined> {
     if (typeof this._azureADTokenProvider === 'function') {
       const token = await this._azureADTokenProvider();
       if (!token || typeof token !== 'string') {
@@ -624,7 +624,7 @@ export class AzureOpenAI extends OpenAI {
     if (opts.headers?.['api-key']) {
       return super.prepareOptions(opts);
     }
-    const token = await this._getAzureADToken();
+    const token = await this.getAzureADToken();
     opts.headers ??= {};
     if (token) {
       opts.headers['Authorization'] = `Bearer ${token}`;
