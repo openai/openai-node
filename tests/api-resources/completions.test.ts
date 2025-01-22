@@ -32,7 +32,7 @@ describe('resource completions', () => {
       max_tokens: 16,
       n: 1,
       presence_penalty: -2,
-      seed: -9007199254740991,
+      seed: 0,
       stop: '\n',
       stream: false,
       stream_options: { include_usage: true },
