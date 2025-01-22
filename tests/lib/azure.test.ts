@@ -51,6 +51,18 @@ describe('instantiate azure client', () => {
       });
       expect(req.headers as Headers).not.toHaveProperty('x-my-default-header');
     });
+
+    test('includes retry count', () => {
+      const { req } = client.buildRequest(
+        {
+          path: '/foo',
+          method: 'post',
+          headers: { 'X-My-Default-Header': null },
+        },
+        { retryCount: 1 },
+      );
+      expect((req.headers as Headers)['x-stainless-retry-count']).toEqual('1');
+    });
   });
 
   describe('defaultQuery', () => {

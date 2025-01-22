@@ -577,7 +577,10 @@ export class AzureOpenAI extends OpenAI {
     this._deployment = deployment;
   }
 
-  override buildRequest(options: Core.FinalRequestOptions<unknown>): {
+  override buildRequest(
+    options: Core.FinalRequestOptions<unknown>,
+    props: { retryCount?: number } = {},
+  ): {
     req: RequestInit;
     url: string;
     timeout: number;
@@ -591,7 +594,7 @@ export class AzureOpenAI extends OpenAI {
         options.path = `/deployments/${model}${options.path}`;
       }
     }
-    return super.buildRequest(options);
+    return super.buildRequest(options, props);
   }
 
   private async _getAzureADToken(): Promise<string | undefined> {
