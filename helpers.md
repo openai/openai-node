@@ -49,7 +49,7 @@ if (message?.parsed) {
 
 The `.parse()` method will also automatically parse `function` tool calls if:
 
-- You use the `zodFunctionTool()` helper method
+- You use the `zodFunction()` helper method
 - You mark your tool schema with `"strict": True`
 
 For example:
