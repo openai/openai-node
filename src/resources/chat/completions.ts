@@ -76,8 +76,7 @@ export interface ChatCompletion {
   object: 'chat.completion';
 
   /**
-   * The service tier used for processing the request. This field is only included if
-   * the `service_tier` parameter is specified in the request.
+   * The service tier used for processing the request.
    */
   service_tier?: 'scale' | 'default' | null;
 
@@ -300,8 +299,7 @@ export interface ChatCompletionChunk {
   object: 'chat.completion.chunk';
 
   /**
-   * The service tier used for processing the request. This field is only included if
-   * the `service_tier` parameter is specified in the request.
+   * The service tier used for processing the request.
    */
   service_tier?: 'scale' | 'default' | null;
 
@@ -1115,9 +1113,6 @@ export interface ChatCompletionCreateParamsBase {
    * - If set to 'default', the request will be processed using the default service
    *   tier with a lower uptime SLA and no latency guarentee.
    * - When not set, the default behavior is 'auto'.
-   *
-   * When this parameter is set, the response body will include the `service_tier`
-   * utilized.
    */
   service_tier?: 'auto' | 'default' | null;
 
