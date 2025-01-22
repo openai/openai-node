@@ -226,7 +226,7 @@ on in the documentation page [Message](https://platform.openai.com/docs/api-refe
 
 ```ts
 .on('textCreated', (content: Text) => ...)
-.on('textDelta', (delta: RunStepDelta, snapshot: Text) => ...)
+.on('textDelta', (delta: TextDelta, snapshot: Text) => ...)
 .on('textDone', (content: Text, snapshot: Message) => ...)
 ```
 
