@@ -86,7 +86,8 @@ export interface EmbeddingCreateParams {
    * `text-embedding-ada-002`), cannot be an empty string, and any array must be 2048
    * dimensions or less.
    * [Example Python code](https://cookbook.openai.com/examples/how_to_count_tokens_with_tiktoken)
-   * for counting tokens.
+   * for counting tokens. Some models may also impose a limit on total number of
+   * tokens summed across inputs.
    */
   input: string | Array<string> | Array<number> | Array<Array<number>>;
 

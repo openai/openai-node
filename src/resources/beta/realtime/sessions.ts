@@ -32,7 +32,9 @@ export interface Session {
   id?: string;
 
   /**
-   * The format of input audio. Options are `pcm16`, `g711_ulaw`, or `g711_alaw`.
+   * The format of input audio. Options are `pcm16`, `g711_ulaw`, or `g711_alaw`. For
+   * `pcm16`, input audio must be 16-bit PCM at a 24kHz sample rate, single channel
+   * (mono), and little-endian byte order.
    */
   input_audio_format?: 'pcm16' | 'g711_ulaw' | 'g711_alaw';
 
@@ -86,6 +88,7 @@ export interface Session {
 
   /**
    * The format of output audio. Options are `pcm16`, `g711_ulaw`, or `g711_alaw`.
+   * For `pcm16`, output audio is sampled at a rate of 24kHz.
    */
   output_audio_format?: 'pcm16' | 'g711_ulaw' | 'g711_alaw';
 
@@ -372,17 +375,9 @@ export namespace SessionCreateResponse {
 
 export interface SessionCreateParams {
   /**
-   * The Realtime model used for this session.
-   */
-  model:
-    | 'gpt-4o-realtime-preview'
-    | 'gpt-4o-realtime-preview-2024-10-01'
-    | 'gpt-4o-realtime-preview-2024-12-17'
-    | 'gpt-4o-mini-realtime-preview'
-    | 'gpt-4o-mini-realtime-preview-2024-12-17';
-
-  /**
-   * The format of input audio. Options are `pcm16`, `g711_ulaw`, or `g711_alaw`.
+   * The format of input audio. Options are `pcm16`, `g711_ulaw`, or `g711_alaw`. For
+   * `pcm16`, input audio must be 16-bit PCM at a 24kHz sample rate, single channel
+   * (mono), and little-endian byte order.
    */
   input_audio_format?: 'pcm16' | 'g711_ulaw' | 'g711_alaw';
 
@@ -424,7 +419,18 @@ export interface SessionCreateParams {
   modalities?: Array<'text' | 'audio'>;
 
   /**
+   * The Realtime model used for this session.
+   */
+  model?:
+    | 'gpt-4o-realtime-preview'
+    | 'gpt-4o-realtime-preview-2024-10-01'
+    | 'gpt-4o-realtime-preview-2024-12-17'
+    | 'gpt-4o-mini-realtime-preview'
+    | 'gpt-4o-mini-realtime-preview-2024-12-17';
+
+  /**
    * The format of output audio. Options are `pcm16`, `g711_ulaw`, or `g711_alaw`.
+   * For `pcm16`, output audio is sampled at a rate of 24kHz.
    */
   output_audio_format?: 'pcm16' | 'g711_ulaw' | 'g711_alaw';
 
