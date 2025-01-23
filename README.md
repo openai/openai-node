@@ -98,6 +98,7 @@ Basic text based example with `ws`:
 import { OpenAIRealtimeWS } from 'openai/beta/realtime/ws';
 
 const rt = new OpenAIRealtimeWS({ model: 'gpt-4o-realtime-preview-2024-12-17' });
+await rt.open();
 
 // access the underlying `ws.WebSocket` instance
 rt.socket.on('open', () => {
@@ -147,6 +148,7 @@ To use the web API `WebSocket` implementation, replace `OpenAIRealtimeWS` with `
 import { OpenAIRealtimeWebSocket } from 'openai/beta/realtime/websocket';
 
 const rt = new OpenAIRealtimeWebSocket({ model: 'gpt-4o-realtime-preview-2024-12-17' });
+await rt.open();
 // ...
 rt.socket.addEventListener('open', () => {
  // ...
@@ -163,6 +165,7 @@ It is **highly recommended** that you register an `error` event listener and han
 
 ```ts
 const rt = new OpenAIRealtimeWS({ model: 'gpt-4o-realtime-preview-2024-12-17' });
+await rt.open();
 rt.on('error', (err) => {
   // in a real world scenario this should be logged somewhere as you
   // likely want to continue procesing events regardless of any errors
@@ -499,7 +502,7 @@ const credential = new DefaultAzureCredential();
 const scope = 'https://cognitiveservices.azure.com/.default';
 const azureADTokenProvider = getBearerTokenProvider(credential, scope);
 
-const openai = new AzureOpenAI({ azureADTokenProvider });
+const openai = new AzureOpenAI({ azureADTokenProvider, apiVersion: "<The API version, e.g. 2024-10-01-preview>" });
 
 const result = await openai.chat.completions.create({
   model: 'gpt-4o',

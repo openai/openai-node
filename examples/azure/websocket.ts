@@ -1,7 +1,15 @@
 import { OpenAIRealtimeWebSocket } from 'openai/beta/realtime/websocket';
+import { AzureOpenAI } from 'openai';
+import { DefaultAzureCredential, getBearerTokenProvider } from '@azure/identity';
+import 'dotenv/config';
 
 async function main() {
-  const rt = new OpenAIRealtimeWebSocket({ model: 'gpt-4o-realtime-preview-2024-12-17' });
+  const cred = new DefaultAzureCredential();
+  const scope = 'https://cognitiveservices.azure.com/.default';
+  const deploymentName = 'gpt-4o-realtime-preview-1001';
+  const azureADTokenProvider = getBearerTokenProvider(cred, scope);
+  const client = new AzureOpenAI({ azureADTokenProvider, apiVersion: '2024-10-01-preview' });
+  const rt = new OpenAIRealtimeWebSocket({ model: deploymentName }, client);
   await rt.open();
 
   // access the underlying `ws.WebSocket` instance

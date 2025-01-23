@@ -1,4 +1,4 @@
-import { OpenAI } from '../../index';
+import { AzureOpenAI, OpenAI } from '../../index';
 import { OpenAIError } from '../../error';
 import * as Core from '../../core';
 import type { RealtimeClientEvent, RealtimeServerEvent } from '../../resources/beta/realtime/realtime';
@@ -27,7 +27,9 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
       model: string;
       dangerouslyAllowBrowser?: boolean;
     },
-    client?: Pick<OpenAI, 'apiKey' | 'baseURL'>,
+    private client: Pick<OpenAI, 'apiKey' | 'baseURL'> = new OpenAI({
+      dangerouslyAllowBrowser: props.dangerouslyAllowBrowser,
+    }),
   ) {
     super();
 
@@ -41,16 +43,31 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
         "It looks like you're running in a browser-like environment.\n\nThis is disabled by default, as it risks exposing your secret API credentials to attackers.\n\nYou can avoid this error by creating an ephemeral session token:\nhttps://platform.openai.com/docs/api-reference/realtime-sessions\n",
       );
     }
+    this.url = buildRealtimeURL(this.client, props.model);
+  }
 
-    client ??= new OpenAI({ dangerouslyAllowBrowser });
-
-    this.url = buildRealtimeURL({ baseURL: client.baseURL, model: props.model });
-    // @ts-ignore
-    this.socket = new WebSocket(this.url, [
-      'realtime',
-      `openai-insecure-api-key.${client.apiKey}`,
-      'openai-beta.realtime-v1',
-    ]);
+  async open(): Promise<void> {
+    if (this.client instanceof AzureOpenAI) {
+      if (this.client.apiKey !== '<Missing Key>') {
+        this.url.searchParams.set('api-key', this.client.apiKey);
+      } else {
+        const token = await this.client.getAzureADToken();
+        if (token) {
+          this.url.searchParams.set('Authorization', `Bearer ${token}`);
+        } else {
+          throw new Error('AzureOpenAI is not instantiated correctly. No API key or token provided.');
+        }
+      }
+      // @ts-ignore
+      this.socket = new WebSocket(this.url, ['realtime', 'openai-beta.realtime-v1']);
+    } else {
+      // @ts-ignore
+      this.socket = new WebSocket(this.url, [
+        'realtime',
+        `openai-insecure-api-key.${this.client.apiKey}`,
+        'openai-beta.realtime-v1',
+      ]);
+    }
 
     this.socket.addEventListener('message', (websocketEvent: MessageEvent) => {
       const event = (() => {
@@ -80,6 +97,9 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
   }
 
   send(event: RealtimeClientEvent) {
+    if (!this.socket) {
+      throw new Error('The socket is not open, call `open` first');
+    }
     try {
       this.socket.send(JSON.stringify(event));
     } catch (err) {

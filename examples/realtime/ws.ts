@@ -2,6 +2,7 @@ import { OpenAIRealtimeWS } from 'openai/beta/realtime/ws';
 
 async function main() {
   const rt = new OpenAIRealtimeWS({ model: 'gpt-4o-realtime-preview-2024-12-17' });
+  await rt.open();
 
   // access the underlying `ws.WebSocket` instance
   rt.socket.on('open', () => {
@@ -9,7 +10,7 @@ async function main() {
     rt.send({
       type: 'session.update',
       session: {
-        modalities: ['foo'] as any,
+        modalities: ['text'],
         model: 'gpt-4o-realtime-preview',
       },
     });

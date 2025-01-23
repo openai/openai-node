@@ -2,6 +2,7 @@
 
 import { AzureOpenAI } from 'openai';
 import { getBearerTokenProvider, DefaultAzureCredential } from '@azure/identity';
+import 'dotenv/config';
 
 // Corresponds to your Model deployment within your OpenAI resource, e.g. gpt-4-1106-preview
 // Navigate to the Azure OpenAI Studio to deploy a model.
@@ -13,7 +14,7 @@ const azureADTokenProvider = getBearerTokenProvider(credential, scope);
 
 // Make sure to set AZURE_OPENAI_ENDPOINT with the endpoint of your Azure resource.
 // You can find it in the Azure Portal.
-const openai = new AzureOpenAI({ azureADTokenProvider });
+const openai = new AzureOpenAI({ azureADTokenProvider, apiVersion: '2024-10-01-preview' });
 
 async function main() {
   console.log('Non-streaming:');

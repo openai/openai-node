@@ -1,12 +1,27 @@
-import { OpenAIRealtimeWebSocket } from 'openai/beta/realtime/websocket';
+import { DefaultAzureCredential, getBearerTokenProvider } from '@azure/identity';
+import { OpenAIRealtimeWS } from 'openai/beta/realtime/ws';
+import { AzureOpenAI } from 'openai';
+import 'dotenv/config';
 
 async function main() {
-  const rt = new OpenAIRealtimeWebSocket({ model: 'gpt-4o-realtime-preview-2024-12-17' });
+  const cred = new DefaultAzureCredential();
+  const scope = 'https://cognitiveservices.azure.com/.default';
+  const deploymentName = 'gpt-4o-realtime-preview-1001';
+  const azureADTokenProvider = getBearerTokenProvider(cred, scope);
+  const client = new AzureOpenAI({ azureADTokenProvider, apiVersion: '2024-10-01-preview' });
+  const rt = new OpenAIRealtimeWS({ model: deploymentName }, client);
   await rt.open();
 
   // access the underlying `ws.WebSocket` instance
-  rt.socket.addEventListener('open', () => {
+  rt.socket.on('open', () => {
     console.log('Connection opened!');
+    rt.send({
+      type: 'session.update',
+      session: {
+        modalities: ['text'],
+        model: 'gpt-4o-realtime-preview',
+      },
+    });
     rt.send({
       type: 'session.update',
       session: {
@@ -43,7 +58,7 @@ async function main() {
 
   rt.on('response.done', () => rt.close());
 
-  rt.socket.addEventListener('close', () => console.log('\nConnection closed!'));
+  rt.socket.on('close', () => console.log('\nConnection closed!'));
 }
 
 main();

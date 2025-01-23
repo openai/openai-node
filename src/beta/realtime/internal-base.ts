@@ -1,6 +1,7 @@
 import { RealtimeClientEvent, RealtimeServerEvent, ErrorEvent } from '../../resources/beta/realtime/realtime';
 import { EventEmitter } from '../../lib/EventEmitter';
 import { OpenAIError } from '../../error';
+import OpenAI, { AzureOpenAI } from 'openai';
 
 export class OpenAIRealtimeError extends OpenAIError {
   /**
@@ -73,11 +74,16 @@ export abstract class OpenAIRealtimeEmitter extends EventEmitter<RealtimeEvents>
   }
 }
 
-export function buildRealtimeURL(props: { baseURL: string; model: string }): URL {
+export function buildRealtimeURL(client: Pick<OpenAI, 'apiKey' | 'baseURL'>, model: string): URL {
   const path = '/realtime';
-
-  const url = new URL(props.baseURL + (props.baseURL.endsWith('/') ? path.slice(1) : path));
+  const baseURL = client.baseURL;
+  const url = new URL(baseURL + (baseURL.endsWith('/') ? path.slice(1) : path));
   url.protocol = 'wss';
-  url.searchParams.set('model', props.model);
+  if (client instanceof AzureOpenAI) {
+    url.searchParams.set('api-version', client.apiVersion);
+    url.searchParams.set('deployment', model);
+  } else {
+    url.searchParams.set('model', model);
+  }
   return url;
 }
