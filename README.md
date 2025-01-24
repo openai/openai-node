@@ -157,7 +157,7 @@ A full example can be found [here](https://github.com/openai/openai-node/blob/ma
 
 ### Realtime error handling
 
-When an error is encountered, either on the client side or returned from the server through the [`error` event](https://platform.openai.com/docs/guides/realtime/realtime-api-beta#handling-errors), the `error` event listener will be fired. However, if you haven't registered an `error` event listener then an `unhandled Promise rejection` error will be thrown.
+When an error is encountered, either on the client side or returned from the server through the [`error` event](https://platform.openai.com/docs/guides/realtime-model-capabilities#error-handling), the `error` event listener will be fired. However, if you haven't registered an `error` event listener then an `unhandled Promise rejection` error will be thrown.
 
 It is **highly recommended** that you register an `error` event listener and handle errors approriately as typically the underlying connection is still usable.
 
