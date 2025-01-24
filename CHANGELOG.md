@@ -1,5 +1,20 @@
 # Changelog
 
+## 4.80.1 (2025-01-24)
+
+Full Changelog: [v4.80.0...v4.80.1](https://github.com/openai/openai-node/compare/v4.80.0...v4.80.1)
+
+### Bug Fixes
+
+* **azure:** include retry count header ([3e0ba40](https://github.com/openai/openai-node/commit/3e0ba409e57ce276fb1f95cd11c801e4ccaad572))
+
+
+### Documentation
+
+* fix typo, "zodFunctionTool" -&gt; "zodFunction" ([#1128](https://github.com/openai/openai-node/issues/1128)) ([b7ab6bb](https://github.com/openai/openai-node/commit/b7ab6bb304973ade94830f37eb646e800226d5ef))
+* **helpers:** fix type annotation ([fc019df](https://github.com/openai/openai-node/commit/fc019df1d9cc276e8f8e689742853a09aa94991a))
+* **readme:** fix realtime errors docs link ([#1286](https://github.com/openai/openai-node/issues/1286)) ([d1d50c8](https://github.com/openai/openai-node/commit/d1d50c897c18cefea964e8057fe1acfd766ae2bf))
+
 ## 4.80.0 (2025-01-22)
 
 Full Changelog: [v4.79.4...v4.80.0](https://github.com/openai/openai-node/compare/v4.79.4...v4.80.0)
