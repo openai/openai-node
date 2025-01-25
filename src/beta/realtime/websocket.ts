@@ -48,10 +48,12 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
     this.url = buildRealtimeURL(client, props.model);
     props.onUrl?.(this.url);
 
+    const azureCheck = isAzure(client);
+
     // @ts-ignore
     this.socket = new WebSocket(this.url, [
       'realtime',
-      ...(isAzure(client) ? [] : [`openai-insecure-api-key.${client.apiKey}`]),
+      ...(azureCheck ? [] : [`openai-insecure-api-key.${client.apiKey}`]),
       'openai-beta.realtime-v1',
     ]);
 
@@ -81,7 +83,7 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
       this._onError(null, event.message, null);
     });
 
-    if (isAzure(client)) {
+    if (azureCheck) {
       if (this.url.searchParams.get('Authorization') !== null) {
         this.url.searchParams.set('Authorization', '<REDACTED>');
       } else {
