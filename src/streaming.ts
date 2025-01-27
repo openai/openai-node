@@ -6,7 +6,7 @@ import { ReadableStreamToAsyncIterable } from './internal/shims';
 
 import { APIError } from './error';
 
-type Bytes = string | ArrayBuffer | Uint8Array | Buffer | null | undefined;
+type Bytes = string | ArrayBuffer | Uint8Array | null | undefined;
 
 export type ServerSentEvent = {
   event: string | null;
@@ -159,7 +159,9 @@ export class Stream<Item> implements AsyncIterable<Item> {
   toReadableStream(): ReadableStream {
     const self = this;
     let iter: AsyncIterator<Item>;
-    const encoder = new TextEncoder();
+    const encoder: {
+      encode(str: string): Uint8Array;
+    } = new (globalThis as any).TextEncoder();
 
     return makeReadableStream({
       async start() {
@@ -224,7 +226,7 @@ async function* iterSSEChunks(iterator: AsyncIterableIterator<Bytes>): AsyncGene
 
     const binaryChunk =
       chunk instanceof ArrayBuffer ? new Uint8Array(chunk)
-      : typeof chunk === 'string' ? new TextEncoder().encode(chunk)
+      : typeof chunk === 'string' ? new (globalThis as any).TextEncoder().encode(chunk)
       : chunk;
 
     let newData = new Uint8Array(data.length + binaryChunk.length);

@@ -12,7 +12,7 @@ import { type ReadableStream } from './shim-types';
 
 export function getDefaultFetch(): Fetch {
   if (typeof fetch !== 'undefined') {
-    return fetch;
+    return fetch as any;
   }
 
   throw new Error(
@@ -97,7 +97,7 @@ export function ReadableStreamFrom<T>(iterable: Iterable<T> | AsyncIterable<T>):
 
   return makeReadableStream({
     start() {},
-    async pull(controller) {
+    async pull(controller: any) {
       const { done, value } = await iter.next();
       if (done) {
         controller.close();

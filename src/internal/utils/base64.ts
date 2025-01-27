@@ -2,18 +2,15 @@
 
 import { OpenAIError } from '../../error';
 
-// @ts-ignore
-declare const Buffer: typeof import('node:buffer').Buffer;
-
 export const toBase64 = (data: string | Uint8Array | null | undefined): string => {
   if (!data) return '';
 
   if (typeof data === 'string') {
-    data = new TextEncoder().encode(data);
+    data = new (globalThis as any).TextEncoder().encode(data);
   }
 
-  if (typeof Buffer !== 'undefined') {
-    return Buffer.from(data).toString('base64');
+  if (typeof (globalThis as any).Buffer !== 'undefined') {
+    return (globalThis as any).Buffer.from(data).toString('base64');
   }
 
   if (typeof btoa !== 'undefined') {
@@ -24,8 +21,8 @@ export const toBase64 = (data: string | Uint8Array | null | undefined): string =
 };
 
 export const fromBase64 = (str: string): Uint8Array => {
-  if (typeof Buffer !== 'undefined') {
-    return new Uint8Array(Buffer.from(str, 'base64'));
+  if (typeof (globalThis as any).Buffer !== 'undefined') {
+    return new Uint8Array((globalThis as any).Buffer.from(str, 'base64'));
   }
 
   if (typeof atob !== 'undefined') {
