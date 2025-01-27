@@ -380,12 +380,12 @@ export class OpenAI {
 
   private calculateContentLength(body: unknown): string | null {
     if (typeof body === 'string') {
-      if (typeof Buffer !== 'undefined') {
-        return Buffer.byteLength(body, 'utf8').toString();
+      if (typeof (globalThis as any).Buffer !== 'undefined') {
+        return (globalThis as any).Buffer.byteLength(body, 'utf8').toString();
       }
 
-      if (typeof TextEncoder !== 'undefined') {
-        const encoder = new TextEncoder();
+      if (typeof (globalThis as any).TextEncoder !== 'undefined') {
+        const encoder = new (globalThis as any).TextEncoder();
         const encoded = encoder.encode(body);
         return encoded.length.toString();
       }

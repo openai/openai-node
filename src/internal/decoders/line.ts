@@ -1,6 +1,6 @@
 import { OpenAIError } from '../../error';
 
-export type Bytes = string | ArrayBuffer | Uint8Array | Buffer | null | undefined;
+export type Bytes = string | ArrayBuffer | Uint8Array | null | undefined;
 
 /**
  * A re-implementation of httpx's `LineDecoder` in Python that handles incrementally
@@ -15,7 +15,11 @@ export class LineDecoder {
 
   buffer: string[];
   trailingCR: boolean;
-  textDecoder: any; // TextDecoder found in browsers; not typed to avoid pulling in either "dom" or "node" types.
+  textDecoder:
+    | undefined
+    | {
+        decode(buffer: Uint8Array | ArrayBuffer): string;
+      };
 
   constructor() {
     this.buffer = [];
@@ -69,12 +73,12 @@ export class LineDecoder {
     if (typeof bytes === 'string') return bytes;
 
     // Node:
-    if (typeof Buffer !== 'undefined') {
-      if (bytes instanceof Buffer) {
+    if (typeof (globalThis as any).Buffer !== 'undefined') {
+      if (bytes instanceof (globalThis as any).Buffer) {
         return bytes.toString();
       }
       if (bytes instanceof Uint8Array) {
-        return Buffer.from(bytes).toString();
+        return (globalThis as any).Buffer.from(bytes).toString();
       }
 
       throw new OpenAIError(
@@ -83,10 +87,10 @@ export class LineDecoder {
     }
 
     // Browser
-    if (typeof TextDecoder !== 'undefined') {
+    if (typeof (globalThis as any).TextDecoder !== 'undefined') {
       if (bytes instanceof Uint8Array || bytes instanceof ArrayBuffer) {
-        this.textDecoder ??= new TextDecoder('utf8');
-        return this.textDecoder.decode(bytes);
+        this.textDecoder ??= new (globalThis as any).TextDecoder('utf8');
+        return this.textDecoder!.decode(bytes);
       }
 
       throw new OpenAIError(
