@@ -1,1 +1,1 @@
-export { Uploadable, toFile } from './internal/uploads';
+export { type Uploadable, toFile } from './internal/uploads';
