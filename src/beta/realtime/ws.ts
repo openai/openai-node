@@ -1,7 +1,7 @@
 import * as WS from 'ws';
-import { OpenAI } from '../../index';
+import { AzureOpenAI, OpenAI } from '../../index';
 import type { RealtimeClientEvent, RealtimeServerEvent } from '../../resources/beta/realtime/realtime';
-import { OpenAIRealtimeEmitter, buildRealtimeURL } from './internal-base';
+import { OpenAIRealtimeEmitter, buildRealtimeURL, isAzure } from './internal-base';
 
 export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
   url: URL;
@@ -14,12 +14,12 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     super();
     client ??= new OpenAI();
 
-    this.url = buildRealtimeURL({ baseURL: client.baseURL, model: props.model });
+    this.url = buildRealtimeURL(client, props.model);
     this.socket = new WS.WebSocket(this.url, {
       ...props.options,
       headers: {
         ...props.options?.headers,
-        Authorization: `Bearer ${client.apiKey}`,
+        ...(isAzure(client) ? {} : { Authorization: `Bearer ${client.apiKey}` }),
         'OpenAI-Beta': 'realtime=v1',
       },
     });
@@ -51,6 +51,20 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     });
   }
 
+  static async azure(
+    client: AzureOpenAI,
+    options: { deploymentName?: string; options?: WS.ClientOptions | undefined } = {},
+  ): Promise<OpenAIRealtimeWS> {
+    const deploymentName = options.deploymentName ?? client.deploymentName;
+    if (!deploymentName) {
+      throw new Error('No deployment name provided');
+    }
+    return new OpenAIRealtimeWS(
+      { model: deploymentName, options: { headers: await getAzureHeaders(client) } },
+      client,
+    );
+  }
+
   send(event: RealtimeClientEvent) {
     try {
       this.socket.send(JSON.stringify(event));
@@ -64,6 +78,19 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
       this.socket.close(props?.code ?? 1000, props?.reason ?? 'OK');
     } catch (err) {
       this._onError(null, 'could not close the connection', err);
+    }
+  }
+}
+
+async function getAzureHeaders(client: AzureOpenAI) {
+  if (client.apiKey !== '<Missing Key>') {
+    return { 'api-key': client.apiKey };
+  } else {
+    const token = await client._getAzureADToken();
+    if (token) {
+      return { Authorization: `Bearer ${token}` };
+    } else {
+      throw new Error('AzureOpenAI is not instantiated correctly. No API key or token provided.');
     }
   }
 }
