@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.81.0 (2025-01-29)
+
+Full Changelog: [v4.80.1...v4.81.0](https://github.com/openai/openai-node/compare/v4.80.1...v4.81.0)
+
+### Features
+
+* **azure:** Realtime API support ([#1287](https://github.com/openai/openai-node/issues/1287)) ([fe090c0](https://github.com/openai/openai-node/commit/fe090c0a57570217eb0b431e2cce40bf61de2b75))
+
 ## 4.80.1 (2025-01-24)
 
 Full Changelog: [v4.80.0...v4.80.1](https://github.com/openai/openai-node/compare/v4.80.0...v4.80.1)
