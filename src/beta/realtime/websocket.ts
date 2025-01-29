@@ -26,7 +26,11 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
     props: {
       model: string;
       dangerouslyAllowBrowser?: boolean;
-      onUrl?: (url: URL) => void;
+      /**
+       * Callback to mutate the URL, needed for Azure.
+       * @internal
+       */
+      onURL?: (url: URL) => void;
     },
     client?: Pick<OpenAI, 'apiKey' | 'baseURL'>,
   ) {
@@ -46,14 +50,12 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
     client ??= new OpenAI({ dangerouslyAllowBrowser });
 
     this.url = buildRealtimeURL(client, props.model);
-    props.onUrl?.(this.url);
-
-    const azureCheck = isAzure(client);
+    props.onURL?.(this.url);
 
     // @ts-ignore
     this.socket = new WebSocket(this.url, [
       'realtime',
-      ...(azureCheck ? [] : [`openai-insecure-api-key.${client.apiKey}`]),
+      ...(isAzure(client) ? [] : [`openai-insecure-api-key.${client.apiKey}`]),
       'openai-beta.realtime-v1',
     ]);
 
@@ -83,7 +85,7 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
       this._onError(null, event.message, null);
     });
 
-    if (azureCheck) {
+    if (isAzure(client)) {
       if (this.url.searchParams.get('Authorization') !== null) {
         this.url.searchParams.set('Authorization', '<REDACTED>');
       } else {
@@ -97,7 +99,7 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
     options: { deploymentName?: string; dangerouslyAllowBrowser?: boolean } = {},
   ): Promise<OpenAIRealtimeWebSocket> {
     const token = await client._getAzureADToken();
-    function onUrl(url: URL) {
+    function onURL(url: URL) {
       if (client.apiKey !== '<Missing Key>') {
         url.searchParams.set('api-key', client.apiKey);
       } else {
@@ -114,7 +116,11 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
     }
     const { dangerouslyAllowBrowser } = options;
     return new OpenAIRealtimeWebSocket(
-      { model: deploymentName, onUrl, ...(dangerouslyAllowBrowser ? { dangerouslyAllowBrowser } : {}) },
+      {
+        model: deploymentName,
+        onURL,
+        ...(dangerouslyAllowBrowser ? { dangerouslyAllowBrowser } : {}),
+      },
       client,
     );
   }
