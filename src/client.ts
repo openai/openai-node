@@ -5,7 +5,7 @@ import type { HTTPMethod, PromiseOrValue, MergedRequestInit } from './internal/t
 import { uuid4 } from './internal/utils/uuid';
 import { validatePositiveInteger, isAbsoluteURL } from './internal/utils/values';
 import { sleep } from './internal/utils/sleep';
-import { castToError } from './internal/errors';
+import { castToError, isAbortError } from './internal/errors';
 import type { APIResponseProps } from './internal/parse';
 import { getPlatformHeaders } from './internal/detect-platform';
 import * as Shims from './internal/shims';
@@ -483,7 +483,7 @@ export class OpenAI {
       if (retriesRemaining) {
         return this.retryRequest(options, retriesRemaining);
       }
-      if (response.name === 'AbortError') {
+      if (isAbortError(response)) {
         throw new Errors.APIConnectionTimeoutError();
       }
       throw new Errors.APIConnectionError({ cause: response });

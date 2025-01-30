@@ -3,6 +3,7 @@ import { type ReadableStream } from './internal/shim-types';
 import { makeReadableStream } from './internal/shims';
 import { LineDecoder } from './internal/decoders/line';
 import { ReadableStreamToAsyncIterable } from './internal/shims';
+import { isAbortError } from './internal/errors';
 
 import { APIError } from './error';
 
@@ -77,7 +78,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
         done = true;
       } catch (e) {
         // If the user calls `stream.controller.abort()`, we should exit without throwing.
-        if (e instanceof Error && e.name === 'AbortError') return;
+        if (isAbortError(e)) return;
         throw e;
       } finally {
         // If the user `break`s, abort the ongoing request.
@@ -124,7 +125,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
         done = true;
       } catch (e) {
         // If the user calls `stream.controller.abort()`, we should exit without throwing.
-        if (e instanceof Error && e.name === 'AbortError') return;
+        if (isAbortError(e)) return;
         throw e;
       } finally {
         // If the user `break`s, abort the ongoing request.
@@ -208,6 +209,14 @@ export async function* _iterSSEMessages(
 ): AsyncGenerator<ServerSentEvent, void, unknown> {
   if (!response.body) {
     controller.abort();
+    if (
+      typeof (globalThis as any).navigator !== 'undefined' &&
+      (globalThis as any).navigator.product === 'ReactNative'
+    ) {
+      throw new OpenAIError(
+        `The default react-native fetch implementation does not support streaming. Please use expo/fetch: https://docs.expo.dev/versions/latest/sdk/expo/#expofetch-api`,
+      );
+    }
     throw new OpenAIError(`Attempted to iterate over a response with no body`);
   }
 
