@@ -25,13 +25,6 @@ async function main() {
         model: 'gpt-4o-realtime-preview',
       },
     });
-    rt.send({
-      type: 'session.update',
-      session: {
-        modalities: ['text'],
-        model: 'gpt-4o-realtime-preview',
-      },
-    });
 
     rt.send({
       type: 'conversation.item.create',
