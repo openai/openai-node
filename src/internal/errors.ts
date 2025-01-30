@@ -2,8 +2,12 @@
 
 export function isAbortError(err: unknown) {
   return (
-    (err instanceof Error && err.name === 'AbortError') ||
-    (typeof err === 'object' && err && 'name' in err && (err as any).name === 'AbortError')
+    typeof err === 'object' &&
+    err !== null &&
+    // Spec-compliant fetch implementations
+    (('name' in err && (err as any).name === 'AbortError') ||
+      // Expo fetch
+      ('message' in err && String((err as any).message).includes('FetchRequestCanceledException')))
   );
 }
 
