@@ -143,3 +143,20 @@ export function ReadableStreamToAsyncIterable<T>(stream: any): AsyncIterableIter
     },
   };
 }
+
+/**
+ * Cancel a ReadableStream we don't need to consume.
+ */
+export async function CancelReadableStream(stream: any): Promise<void> {
+  if (stream === null || typeof stream !== 'object') return;
+
+  if (stream[Symbol.asyncIterator]) {
+    await stream[Symbol.asyncIterator]().return?.();
+    return;
+  }
+
+  const reader = stream.getReader();
+  const cancelPromise = reader.cancel();
+  reader.releaseLock();
+  await cancelPromise;
+}
