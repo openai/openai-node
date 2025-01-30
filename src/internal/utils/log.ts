@@ -13,44 +13,37 @@ const levelNumbers = {
 
 function noop() {}
 
-function makeLogFn(fnLevel: keyof Logger, logger: Logger | undefined, logLevel: LogLevel) {
-  if (!logger || levelNumbers[fnLevel] > levelNumbers[logLevel]) {
+function logFn(logger: Logger | undefined, clientLevel: LogLevel | undefined, level: keyof Logger) {
+  if (!logger || levelNumbers[level] > levelNumbers[clientLevel!]!) {
     return noop;
   } else {
     // Don't wrap logger functions, we want the stacktrace intact!
-    return logger[fnLevel].bind(logger);
+    return logger[level].bind(logger);
   }
 }
 
-const noopLogger = {
-  error: noop,
-  warn: noop,
-  info: noop,
-  debug: noop,
-};
+let lastLogger: { deref(): Logger } | undefined;
+let lastLevel: LogLevel | undefined;
+let lastLevelLogger: Logger;
 
-let cachedLoggers = new WeakMap<Logger, [LogLevel, Logger]>();
-
-export function loggerFor(client: OpenAI): Logger {
-  const logger = client.logger;
-  const logLevel = client.logLevel ?? 'off';
-  if (!logger) {
-    return noopLogger;
+export function logger(client: OpenAI): Logger {
+  let { logger, logLevel: clientLevel } = client;
+  if (lastLevel === clientLevel && (logger === lastLogger || logger === lastLogger?.deref())) {
+    return lastLevelLogger;
   }
-
-  const cachedLogger = cachedLoggers.get(logger);
-  if (cachedLogger && cachedLogger[0] === logLevel) {
-    return cachedLogger[1];
-  }
-
   const levelLogger = {
-    error: makeLogFn('error', logger, logLevel),
-    warn: makeLogFn('warn', logger, logLevel),
-    info: makeLogFn('info', logger, logLevel),
-    debug: makeLogFn('debug', logger, logLevel),
+    error: logFn(logger, clientLevel, 'error'),
+    warn: logFn(logger, clientLevel, 'warn'),
+    info: logFn(logger, clientLevel, 'info'),
+    debug: logFn(logger, clientLevel, 'debug'),
   };
-
-  cachedLoggers.set(logger, [logLevel, levelLogger]);
-
+  const { WeakRef } = globalThis as any;
+  lastLogger =
+    logger ?
+      WeakRef ? new WeakRef(logger)
+      : { deref: () => logger }
+    : undefined;
+  lastLevel = clientLevel;
+  lastLevelLogger = levelLogger;
   return levelLogger;
 }

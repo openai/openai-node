@@ -3,7 +3,7 @@
 import type { RequestInit, RequestInfo, BodyInit } from './internal/builtin-types';
 import type { HTTPMethod, PromiseOrValue, MergedRequestInit } from './internal/types';
 import { uuid4 } from './internal/utils/uuid';
-import { validatePositiveInteger, isAbsoluteURL, hasOwn } from './internal/utils/values';
+import { validatePositiveInteger, isAbsoluteURL } from './internal/utils/values';
 import { sleep } from './internal/utils/sleep';
 import { castToError, isAbortError } from './internal/errors';
 import type { APIResponseProps } from './internal/parse';
@@ -78,7 +78,7 @@ import {
   Moderations,
 } from './resources/moderations';
 import { readEnv } from './internal/utils/env';
-import { loggerFor } from './internal/utils/log';
+import { logger } from './internal/utils/log';
 import { isEmptyObj } from './internal/utils/values';
 import { Audio, AudioModel, AudioResponseFormat } from './resources/audio/audio';
 import { Beta } from './resources/beta/beta';
@@ -140,14 +140,7 @@ export type Logger = {
   debug: LogFn;
 };
 export type LogLevel = 'off' | 'error' | 'warn' | 'info' | 'debug';
-const parseLogLevel = (
-  maybeLevel: string | undefined,
-  sourceName: string,
-  client: OpenAI,
-): LogLevel | undefined => {
-  if (!maybeLevel) {
-    return undefined;
-  }
+const isLogLevel = (key: string | undefined): key is LogLevel => {
   const levels: Record<LogLevel, true> = {
     off: true,
     error: true,
@@ -155,15 +148,7 @@ const parseLogLevel = (
     info: true,
     debug: true,
   };
-  if (hasOwn(levels, maybeLevel)) {
-    return maybeLevel;
-  }
-  loggerFor(client).warn(
-    `${sourceName} was set to ${JSON.stringify(maybeLevel)}, expected one of ${JSON.stringify(
-      Object.keys(levels),
-    )}`,
-  );
-  return undefined;
+  return key! in levels;
 };
 
 export interface ClientOptions {
@@ -243,16 +228,16 @@ export interface ClientOptions {
   /**
    * Set the log level.
    *
-   * Defaults to process.env['OPENAI_LOG'] or 'warn' if it isn't set.
+   * Defaults to process.env['OPENAI_LOG'].
    */
-  logLevel?: LogLevel | undefined;
+  logLevel?: LogLevel | undefined | null;
 
   /**
    * Set the logger.
    *
    * Defaults to globalThis.console.
    */
-  logger?: Logger | undefined;
+  logger?: Logger | undefined | null;
 }
 
 type FinalizedRequestInit = RequestInit & { headers: Headers };
@@ -322,13 +307,14 @@ export class OpenAI {
     this.baseURL = options.baseURL!;
     this.timeout = options.timeout ?? OpenAI.DEFAULT_TIMEOUT /* 10 minutes */;
     this.logger = options.logger ?? console;
-    const defaultLogLevel = 'warn';
-    // Set default logLevel early so that we can log a warning in parseLogLevel.
-    this.logLevel = defaultLogLevel;
-    this.logLevel =
-      parseLogLevel(options.logLevel, 'ClientOptions.logLevel', this) ??
-      parseLogLevel(readEnv('OPENAI_LOG'), "process.env['OPENAI_LOG']", this) ??
-      defaultLogLevel;
+    if (options.logLevel != null) {
+      this.logLevel = options.logLevel;
+    } else {
+      const envLevel = readEnv('OPENAI_LOG');
+      if (isLogLevel(envLevel)) {
+        this.logLevel = envLevel;
+      }
+    }
     this.fetchOptions = options.fetchOptions;
     this.maxRetries = options.maxRetries ?? 2;
     this.fetch = options.fetch ?? Shims.getDefaultFetch();
@@ -462,13 +448,12 @@ export class OpenAI {
     options: PromiseOrValue<FinalRequestOptions>,
     remainingRetries: number | null = null,
   ): APIPromise<Rsp> {
-    return new APIPromise(this, this.makeRequest(options, remainingRetries, undefined));
+    return new APIPromise(this, this.makeRequest(options, remainingRetries));
   }
 
   private async makeRequest(
     optionsInput: PromiseOrValue<FinalRequestOptions>,
     retriesRemaining: number | null,
-    retryOfRequestLogID: string | undefined,
   ): Promise<APIResponseProps> {
     const options = await optionsInput;
     const maxRetries = options.maxRetries ?? this.maxRetries;
@@ -482,19 +467,7 @@ export class OpenAI {
 
     await this.prepareRequest(req, { url, options });
 
-    /** Not an API request ID, just for correlating local log entries. */
-    const requestLogID = 'log_' + ((Math.random() * (1 << 24)) | 0).toString(16).padStart(6, '0');
-    const retryLogObj = retryOfRequestLogID === undefined ? {} : { retryOf: retryOfRequestLogID };
-    const retryLogStr = retryOfRequestLogID === undefined ? '' : `, retryOf: ${retryOfRequestLogID}`;
-    const startTime = Date.now();
-
-    loggerFor(this).debug(`[${requestLogID}] request sent`, {
-      ...retryLogObj,
-      method: options.method,
-      url,
-      options,
-      headers: [...req.headers],
-    });
+    logger(this).debug('request', url, options, req.headers);
 
     if (options.signal?.aborted) {
       throw new Errors.APIUserAbortError();
@@ -502,14 +475,13 @@ export class OpenAI {
 
     const controller = new AbortController();
     const response = await this.fetchWithTimeout(url, req, timeout, controller).catch(castToError);
-    const headersTime = Date.now();
 
     if (response instanceof Error) {
       if (options.signal?.aborted) {
         throw new Errors.APIUserAbortError();
       }
       if (retriesRemaining) {
-        return this.retryRequest(options, retriesRemaining, retryOfRequestLogID ?? requestLogID);
+        return this.retryRequest(options, retriesRemaining);
       }
       if (isAbortError(response)) {
         throw new Errors.APIConnectionTimeoutError();
@@ -517,67 +489,31 @@ export class OpenAI {
       throw new Errors.APIConnectionError({ cause: response });
     }
 
-    const requestID = response.headers.get('x-request-id');
-    const responseInfo = `[${requestLogID}${retryLogStr}${
-      requestID ? ', x-request-id: ' + JSON.stringify(requestID) : ''
-    }] ${req.method} ${url} ${response.ok ? 'succeeded' : 'failed'} with status ${response.status} in ${
-      headersTime - startTime
-    }ms`;
-
     if (!response.ok) {
-      const shouldRetry = this.shouldRetry(response);
-      if (retriesRemaining && shouldRetry) {
+      if (retriesRemaining && this.shouldRetry(response)) {
         const retryMessage = `retrying, ${retriesRemaining} attempts remaining`;
-
-        // We don't need the body of this response.
-        await Shims.CancelReadableStream(response.body);
-        loggerFor(this).info(`${responseInfo} - ${retryMessage}`);
-        loggerFor(this).debug(`[${requestLogID}] response error (${retryMessage})`, {
-          ...retryLogObj,
-          url: response.url,
-          status: response.status,
-          headers: [...response.headers],
-          durationMs: headersTime - startTime,
-        });
-        return this.retryRequest(
-          options,
-          retriesRemaining,
-          retryOfRequestLogID ?? requestLogID,
-          response.headers,
-        );
+        logger(this).debug(`response (error; ${retryMessage})`, response.status, url, response.headers);
+        return this.retryRequest(options, retriesRemaining, response.headers);
       }
-
-      const retryMessage = shouldRetry ? `error; no more retries left` : `error; not retryable`;
-
-      loggerFor(this).info(`${responseInfo} - ${retryMessage}`);
 
       const errText = await response.text().catch((err: any) => castToError(err).message);
       const errJSON = safeJSON(errText);
       const errMessage = errJSON ? undefined : errText;
+      const retryMessage = retriesRemaining ? `(error; no more retries left)` : `(error; not retryable)`;
 
-      loggerFor(this).debug(`[${requestLogID}] response error (${retryMessage})`, {
-        ...retryLogObj,
-        url: response.url,
-        status: response.status,
-        headers: [...response.headers],
-        message: errMessage,
-        durationMs: Date.now() - startTime,
-      });
+      logger(this).debug(
+        `response (error; ${retryMessage})`,
+        response.status,
+        url,
+        response.headers,
+        errMessage,
+      );
 
       const err = this.makeStatusError(response.status, errJSON, errMessage, response.headers);
       throw err;
     }
 
-    loggerFor(this).info(responseInfo);
-    loggerFor(this).debug(`[${requestLogID}] response start`, {
-      ...retryLogObj,
-      url: response.url,
-      status: response.status,
-      headers: [...response.headers],
-      durationMs: headersTime - startTime,
-    });
-
-    return { response, options, controller, requestLogID, retryOfRequestLogID, startTime };
+    return { response, options, controller };
   }
 
   getAPIList<Item, PageClass extends Pagination.AbstractPage<Item> = Pagination.AbstractPage<Item>>(
@@ -595,7 +531,7 @@ export class OpenAI {
     Page: new (...args: ConstructorParameters<typeof Pagination.AbstractPage>) => PageClass,
     options: FinalRequestOptions,
   ): Pagination.PagePromise<PageClass, Item> {
-    const request = this.makeRequest(options, null, undefined);
+    const request = this.makeRequest(options, null);
     return new Pagination.PagePromise<PageClass, Item>(this as any as OpenAI, request, Page);
   }
 
@@ -658,7 +594,6 @@ export class OpenAI {
   private async retryRequest(
     options: FinalRequestOptions,
     retriesRemaining: number,
-    requestLogID: string,
     responseHeaders?: Headers | undefined,
   ): Promise<APIResponseProps> {
     let timeoutMillis: number | undefined;
@@ -691,7 +626,7 @@ export class OpenAI {
     }
     await sleep(timeoutMillis);
 
-    return this.makeRequest(options, retriesRemaining - 1, requestLogID);
+    return this.makeRequest(options, retriesRemaining - 1);
   }
 
   private calculateDefaultRetryTimeoutMillis(retriesRemaining: number, maxRetries: number): number {
