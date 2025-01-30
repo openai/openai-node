@@ -486,6 +486,13 @@ export class OpenAI {
       if (isAbortError(response)) {
         throw new Errors.APIConnectionTimeoutError();
       }
+      // detect native connection timeout errors
+      // deno throws "TypeError: error sending request for url (https://example/): client error (Connect): tcp connect error: Operation timed out (os error 60): Operation timed out (os error 60)"
+      // undici throws "TypeError: fetch failed" with cause "ConnectTimeoutError: Connect Timeout Error (attempted address: example:443, timeout: 1ms)"
+      // others do not provide enough information to distinguish timeouts from other connection errors
+      if (/timed? ?out/i.test(String(response) + ('cause' in response ? String(response.cause) : ''))) {
+        throw new Errors.APIConnectionTimeoutError();
+      }
       throw new Errors.APIConnectionError({ cause: response });
     }
 
