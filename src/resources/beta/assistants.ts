@@ -111,11 +111,13 @@ export interface Assistant {
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
-   * for storing additional information about the object in a structured format. Keys
-   * can be a maximum of 64 characters long and values can be a maxium of 512
-   * characters long.
+   * for storing additional information about the object in a structured format, and
+   * querying for objects via API or the dashboard.
+   *
+   * Keys are strings with a maximum length of 64 characters. Values are strings with
+   * a maximum length of 512 characters.
    */
-  metadata: unknown | null;
+  metadata: Shared.Metadata | null;
 
   /**
    * ID of the model to use. You can use the
@@ -1118,11 +1120,13 @@ export interface AssistantCreateParams {
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
-   * for storing additional information about the object in a structured format. Keys
-   * can be a maximum of 64 characters long and values can be a maxium of 512
-   * characters long.
+   * for storing additional information about the object in a structured format, and
+   * querying for objects via API or the dashboard.
+   *
+   * Keys are strings with a maximum length of 64 characters. Values are strings with
+   * a maximum length of 512 characters.
    */
-  metadata?: unknown | null;
+  metadata?: Shared.Metadata | null;
 
   /**
    * The name of the assistant. The maximum length is 256 characters.
@@ -1242,12 +1246,14 @@ export namespace AssistantCreateParams {
         file_ids?: Array<string>;
 
         /**
-         * Set of 16 key-value pairs that can be attached to a vector store. This can be
-         * useful for storing additional information about the vector store in a structured
-         * format. Keys can be a maximum of 64 characters long and values can be a maxium
-         * of 512 characters long.
+         * Set of 16 key-value pairs that can be attached to an object. This can be useful
+         * for storing additional information about the object in a structured format, and
+         * querying for objects via API or the dashboard.
+         *
+         * Keys are strings with a maximum length of 64 characters. Values are strings with
+         * a maximum length of 512 characters.
          */
-        metadata?: unknown;
+        metadata?: Shared.Metadata | null;
       }
     }
   }
@@ -1267,11 +1273,13 @@ export interface AssistantUpdateParams {
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
-   * for storing additional information about the object in a structured format. Keys
-   * can be a maximum of 64 characters long and values can be a maxium of 512
-   * characters long.
+   * for storing additional information about the object in a structured format, and
+   * querying for objects via API or the dashboard.
+   *
+   * Keys are strings with a maximum length of 64 characters. Values are strings with
+   * a maximum length of 512 characters.
    */
-  metadata?: unknown | null;
+  metadata?: Shared.Metadata | null;
 
   /**
    * ID of the model to use. You can use the
