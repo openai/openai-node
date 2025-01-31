@@ -221,11 +221,13 @@ export interface Thread {
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
-   * for storing additional information about the object in a structured format. Keys
-   * can be a maximum of 64 characters long and values can be a maximum of 512
-   * characters long.
+   * for storing additional information about the object in a structured format, and
+   * querying for objects via API or the dashboard.
+   *
+   * Keys are strings with a maximum length of 64 characters. Values are strings with
+   * a maximum length of 512 characters.
    */
-  metadata: unknown | null;
+  metadata: Shared.Metadata | null;
 
   /**
    * The object type, which is always `thread`.
@@ -293,11 +295,13 @@ export interface ThreadCreateParams {
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
-   * for storing additional information about the object in a structured format. Keys
-   * can be a maximum of 64 characters long and values can be a maximum of 512
-   * characters long.
+   * for storing additional information about the object in a structured format, and
+   * querying for objects via API or the dashboard.
+   *
+   * Keys are strings with a maximum length of 64 characters. Values are strings with
+   * a maximum length of 512 characters.
    */
-  metadata?: unknown | null;
+  metadata?: Shared.Metadata | null;
 
   /**
    * A set of resources that are made available to the assistant's tools in this
@@ -332,11 +336,13 @@ export namespace ThreadCreateParams {
 
     /**
      * Set of 16 key-value pairs that can be attached to an object. This can be useful
-     * for storing additional information about the object in a structured format. Keys
-     * can be a maximum of 64 characters long and values can be a maximum of 512
-     * characters long.
+     * for storing additional information about the object in a structured format, and
+     * querying for objects via API or the dashboard.
+     *
+     * Keys are strings with a maximum length of 64 characters. Values are strings with
+     * a maximum length of 512 characters.
      */
-    metadata?: unknown | null;
+    metadata?: Shared.Metadata | null;
   }
 
   export namespace Message {
@@ -418,12 +424,14 @@ export namespace ThreadCreateParams {
         file_ids?: Array<string>;
 
         /**
-         * Set of 16 key-value pairs that can be attached to a vector store. This can be
-         * useful for storing additional information about the vector store in a structured
-         * format. Keys can be a maximum of 64 characters long and values can be a maximum
-         * of 512 characters long.
+         * Set of 16 key-value pairs that can be attached to an object. This can be useful
+         * for storing additional information about the object in a structured format, and
+         * querying for objects via API or the dashboard.
+         *
+         * Keys are strings with a maximum length of 64 characters. Values are strings with
+         * a maximum length of 512 characters.
          */
-        metadata?: unknown;
+        metadata?: Shared.Metadata | null;
       }
     }
   }
@@ -432,11 +440,13 @@ export namespace ThreadCreateParams {
 export interface ThreadUpdateParams {
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
-   * for storing additional information about the object in a structured format. Keys
-   * can be a maximum of 64 characters long and values can be a maximum of 512
-   * characters long.
+   * for storing additional information about the object in a structured format, and
+   * querying for objects via API or the dashboard.
+   *
+   * Keys are strings with a maximum length of 64 characters. Values are strings with
+   * a maximum length of 512 characters.
    */
-  metadata?: unknown | null;
+  metadata?: Shared.Metadata | null;
 
   /**
    * A set of resources that are made available to the assistant's tools in this
@@ -520,11 +530,13 @@ export interface ThreadCreateAndRunParamsBase {
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
-   * for storing additional information about the object in a structured format. Keys
-   * can be a maximum of 64 characters long and values can be a maximum of 512
-   * characters long.
+   * for storing additional information about the object in a structured format, and
+   * querying for objects via API or the dashboard.
+   *
+   * Keys are strings with a maximum length of 64 characters. Values are strings with
+   * a maximum length of 512 characters.
    */
-  metadata?: unknown | null;
+  metadata?: Shared.Metadata | null;
 
   /**
    * The ID of the [Model](https://platform.openai.com/docs/api-reference/models) to
@@ -580,7 +592,8 @@ export interface ThreadCreateAndRunParamsBase {
   temperature?: number | null;
 
   /**
-   * If no thread is provided, an empty thread will be created.
+   * Options to create a new thread. If no thread is provided when running a request,
+   * an empty thread will be created.
    */
   thread?: ThreadCreateAndRunParams.Thread;
 
@@ -629,7 +642,8 @@ export interface ThreadCreateAndRunParamsBase {
 
 export namespace ThreadCreateAndRunParams {
   /**
-   * If no thread is provided, an empty thread will be created.
+   * Options to create a new thread. If no thread is provided when running a request,
+   * an empty thread will be created.
    */
   export interface Thread {
     /**
@@ -640,11 +654,13 @@ export namespace ThreadCreateAndRunParams {
 
     /**
      * Set of 16 key-value pairs that can be attached to an object. This can be useful
-     * for storing additional information about the object in a structured format. Keys
-     * can be a maximum of 64 characters long and values can be a maximum of 512
-     * characters long.
+     * for storing additional information about the object in a structured format, and
+     * querying for objects via API or the dashboard.
+     *
+     * Keys are strings with a maximum length of 64 characters. Values are strings with
+     * a maximum length of 512 characters.
      */
-    metadata?: unknown | null;
+    metadata?: Shared.Metadata | null;
 
     /**
      * A set of resources that are made available to the assistant's tools in this
@@ -679,11 +695,13 @@ export namespace ThreadCreateAndRunParams {
 
       /**
        * Set of 16 key-value pairs that can be attached to an object. This can be useful
-       * for storing additional information about the object in a structured format. Keys
-       * can be a maximum of 64 characters long and values can be a maximum of 512
-       * characters long.
+       * for storing additional information about the object in a structured format, and
+       * querying for objects via API or the dashboard.
+       *
+       * Keys are strings with a maximum length of 64 characters. Values are strings with
+       * a maximum length of 512 characters.
        */
-      metadata?: unknown | null;
+      metadata?: Shared.Metadata | null;
     }
 
     export namespace Message {
@@ -765,12 +783,14 @@ export namespace ThreadCreateAndRunParams {
           file_ids?: Array<string>;
 
           /**
-           * Set of 16 key-value pairs that can be attached to a vector store. This can be
-           * useful for storing additional information about the vector store in a structured
-           * format. Keys can be a maximum of 64 characters long and values can be a maximum
-           * of 512 characters long.
+           * Set of 16 key-value pairs that can be attached to an object. This can be useful
+           * for storing additional information about the object in a structured format, and
+           * querying for objects via API or the dashboard.
+           *
+           * Keys are strings with a maximum length of 64 characters. Values are strings with
+           * a maximum length of 512 characters.
            */
-          metadata?: unknown;
+          metadata?: Shared.Metadata | null;
         }
       }
     }

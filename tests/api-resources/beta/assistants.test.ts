@@ -25,7 +25,7 @@ describe('resource assistants', () => {
       model: 'gpt-4o',
       description: 'description',
       instructions: 'instructions',
-      metadata: {},
+      metadata: { foo: 'string' },
       name: 'name',
       response_format: 'auto',
       temperature: 1,
@@ -33,7 +33,9 @@ describe('resource assistants', () => {
         code_interpreter: { file_ids: ['string'] },
         file_search: {
           vector_store_ids: ['string'],
-          vector_stores: [{ chunking_strategy: { type: 'auto' }, file_ids: ['string'], metadata: {} }],
+          vector_stores: [
+            { chunking_strategy: { type: 'auto' }, file_ids: ['string'], metadata: { foo: 'string' } },
+          ],
         },
       },
       tools: [{ type: 'code_interpreter' }],

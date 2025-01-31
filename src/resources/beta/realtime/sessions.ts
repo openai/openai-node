@@ -203,7 +203,7 @@ export interface SessionCreateResponse {
   /**
    * Ephemeral key returned by the API.
    */
-  client_secret?: SessionCreateResponse.ClientSecret;
+  client_secret: SessionCreateResponse.ClientSecret;
 
   /**
    * The format of input audio. Options are `pcm16`, `g711_ulaw`, or `g711_alaw`.
@@ -292,14 +292,14 @@ export namespace SessionCreateResponse {
      * Timestamp for when the token expires. Currently, all tokens expire after one
      * minute.
      */
-    expires_at?: number;
+    expires_at: number;
 
     /**
      * Ephemeral key usable in client environments to authenticate connections to the
      * Realtime API. Use this in client-side environments rather than a standard API
      * token, which should only be used server-side.
      */
-    value?: string;
+    value: string;
   }
 
   /**
@@ -385,8 +385,11 @@ export interface SessionCreateParams {
    * Configuration for input audio transcription, defaults to off and can be set to
    * `null` to turn off once on. Input audio transcription is not native to the
    * model, since the model consumes audio directly. Transcription runs
-   * asynchronously through Whisper and should be treated as rough guidance rather
-   * than the representation understood by the model.
+   * asynchronously through
+   * [OpenAI Whisper transcription](https://platform.openai.com/docs/api-reference/audio/createTranscription)
+   * and should be treated as rough guidance rather than the representation
+   * understood by the model. The client can optionally set the language and prompt
+   * for transcription, these fields will be passed to the Whisper API.
    */
   input_audio_transcription?: SessionCreateParams.InputAudioTranscription;
 
@@ -470,15 +473,33 @@ export namespace SessionCreateParams {
    * Configuration for input audio transcription, defaults to off and can be set to
    * `null` to turn off once on. Input audio transcription is not native to the
    * model, since the model consumes audio directly. Transcription runs
-   * asynchronously through Whisper and should be treated as rough guidance rather
-   * than the representation understood by the model.
+   * asynchronously through
+   * [OpenAI Whisper transcription](https://platform.openai.com/docs/api-reference/audio/createTranscription)
+   * and should be treated as rough guidance rather than the representation
+   * understood by the model. The client can optionally set the language and prompt
+   * for transcription, these fields will be passed to the Whisper API.
    */
   export interface InputAudioTranscription {
+    /**
+     * The language of the input audio. Supplying the input language in
+     * [ISO-639-1](https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes) (e.g. `en`)
+     * format will improve accuracy and latency.
+     */
+    language?: string;
+
     /**
      * The model to use for transcription, `whisper-1` is the only currently supported
      * model.
      */
     model?: string;
+
+    /**
+     * An optional text to guide the model's style or continue a previous audio
+     * segment. The
+     * [prompt](https://platform.openai.com/docs/guides/speech-to-text#prompting)
+     * should match the audio language.
+     */
+    prompt?: string;
   }
 
   export interface Tool {

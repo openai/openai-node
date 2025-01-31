@@ -113,7 +113,7 @@ export interface Upload {
   status: 'pending' | 'completed' | 'cancelled' | 'expired';
 
   /**
-   * The ready File object after the Upload is completed.
+   * The `File` object represents a document that has been uploaded to OpenAI.
    */
   file?: FilesAPI.FileObject | null;
 }
