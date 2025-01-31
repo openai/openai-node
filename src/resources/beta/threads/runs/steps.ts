@@ -2,6 +2,7 @@
 
 import { APIResource } from '../../../../resource';
 import * as StepsAPI from './steps';
+import * as Shared from '../../../shared';
 import { APIPromise } from '../../../../api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../../pagination';
 import { buildHeaders } from '../../../../internal/headers';
@@ -477,11 +478,13 @@ export interface RunStep {
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
-   * for storing additional information about the object in a structured format. Keys
-   * can be a maximum of 64 characters long and values can be a maximum of 512
-   * characters long.
+   * for storing additional information about the object in a structured format, and
+   * querying for objects via API or the dashboard.
+   *
+   * Keys are strings with a maximum length of 64 characters. Values are strings with
+   * a maximum length of 512 characters.
    */
-  metadata: unknown | null;
+  metadata: Shared.Metadata | null;
 
   /**
    * The object type, which is always `thread.run.step`.

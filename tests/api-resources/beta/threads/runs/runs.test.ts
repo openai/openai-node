@@ -29,13 +29,13 @@ describe('resource runs', () => {
           content: 'string',
           role: 'user',
           attachments: [{ file_id: 'file_id', tools: [{ type: 'code_interpreter' }] }],
-          metadata: {},
+          metadata: { foo: 'string' },
         },
       ],
       instructions: 'instructions',
       max_completion_tokens: 256,
       max_prompt_tokens: 256,
-      metadata: {},
+      metadata: { foo: 'string' },
       model: 'gpt-4o',
       parallel_tool_calls: true,
       response_format: 'auto',
@@ -77,7 +77,7 @@ describe('resource runs', () => {
   test('update: required and optional params', async () => {
     const response = await client.beta.threads.runs.update('run_id', {
       thread_id: 'thread_id',
-      metadata: {},
+      metadata: { foo: 'string' },
     });
   });
 
