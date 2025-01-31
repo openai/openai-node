@@ -45,8 +45,8 @@ test(`basic request works`, async function () {
 
 test(`proxied request works`, async function () {
   const client = new OpenAI({
-    fetch(url, init) {
-      return fetch(url, { ...init, proxy: process.env['ECOSYSTEM_TESTS_PROXY'] });
+    fetchOptions: {
+      proxy: process.env['ECOSYSTEM_TESTS_PROXY'],
     },
   });
   
