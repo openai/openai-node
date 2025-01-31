@@ -4,13 +4,13 @@ import type { OpenAI } from '../index';
 class AzureTranslation extends Translations {
   constructor(
     client: OpenAI,
-    private deployments: string[],
+    private _deployments: string[],
   ) {
     super(client);
   }
   // @ts-ignore we don't want to redeclare all the method signatures
   override create(...args: Parameters<Translations['create']>): ReturnType<Translations['create']> {
-    this.deployments.push(args[0].model);
+    this._deployments.push(args[0].model);
     return super.create(args[0], args[1]);
   }
 }
@@ -18,13 +18,13 @@ class AzureTranslation extends Translations {
 class AzureTranscription extends Transcriptions {
   constructor(
     client: OpenAI,
-    private deployments: string[],
+    private _deployments: string[],
   ) {
     super(client);
   }
   // @ts-ignore we don't want to redeclare all the method signatures
   override create(...args: Parameters<Transcriptions['create']>): ReturnType<Transcriptions['create']> {
-    this.deployments.push(args[0].model);
+    this._deployments.push(args[0].model);
     return super.create(args[0], args[1]);
   }
 }

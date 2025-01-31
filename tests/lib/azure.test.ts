@@ -501,7 +501,7 @@ describe('azure request building', () => {
           file: { url: 'https://example.com', blob: () => 0 as any },
         })) as any;
         expect(url).toStrictEqual(
-          `https://example.com/openai/deployments/deployment/audio/translations?api-version=${apiVersion}`,
+          `https://example.com/openai/deployments/${deployment}/audio/translations?api-version=${apiVersion}`,
         );
       });
 
@@ -511,7 +511,7 @@ describe('azure request building', () => {
           file: { url: 'https://example.com', blob: () => 0 as any },
         })) as any;
         expect(url).toStrictEqual(
-          `https://example.com/openai/deployments/deployment/audio/transcriptions?api-version=${apiVersion}`,
+          `https://example.com/openai/deployments/${deployment}/audio/transcriptions?api-version=${apiVersion}`,
         );
       });
 
