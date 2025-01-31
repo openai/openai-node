@@ -28,7 +28,7 @@ describe('resource messages', () => {
       content: 'string',
       role: 'user',
       attachments: [{ file_id: 'file_id', tools: [{ type: 'code_interpreter' }] }],
-      metadata: {},
+      metadata: { foo: 'string' },
     });
   });
 
