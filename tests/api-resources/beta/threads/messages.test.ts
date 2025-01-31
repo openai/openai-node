@@ -27,7 +27,7 @@ describe('resource messages', () => {
       content: 'string',
       role: 'user',
       attachments: [{ file_id: 'file_id', tools: [{ type: 'code_interpreter' }] }],
-      metadata: {},
+      metadata: { foo: 'string' },
     });
   });
 
@@ -60,7 +60,7 @@ describe('resource messages', () => {
   test('update: required and optional params', async () => {
     const response = await client.beta.threads.messages.update('message_id', {
       thread_id: 'thread_id',
-      metadata: {},
+      metadata: { foo: 'string' },
     });
   });
 
