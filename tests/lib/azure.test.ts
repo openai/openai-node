@@ -495,21 +495,23 @@ describe('azure request building', () => {
         );
       });
 
-      test('Audio translations is not handled', async () => {
+      test('handles audio translations', async () => {
         const { url } = (await client.audio.translations.create({
           model: deployment,
           file: { url: 'https://example.com', blob: () => 0 as any },
         })) as any;
-        expect(url).toStrictEqual(`https://example.com/openai/audio/translations?api-version=${apiVersion}`);
+        expect(url).toStrictEqual(
+          `https://example.com/openai/deployments/deployment/audio/translations?api-version=${apiVersion}`,
+        );
       });
 
-      test('Audio transcriptions is not handled', async () => {
+      test('handles audio transcriptions', async () => {
         const { url } = (await client.audio.transcriptions.create({
           model: deployment,
           file: { url: 'https://example.com', blob: () => 0 as any },
         })) as any;
         expect(url).toStrictEqual(
-          `https://example.com/openai/audio/transcriptions?api-version=${apiVersion}`,
+          `https://example.com/openai/deployments/deployment/audio/transcriptions?api-version=${apiVersion}`,
         );
       });
 

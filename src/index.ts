@@ -106,6 +106,7 @@ import {
   UploadCreateParams,
   Uploads as UploadsAPIUploads,
 } from './resources/uploads/uploads';
+import { AzureAudio } from './azure/audio';
 
 export interface ClientOptions {
   /**
@@ -492,6 +493,7 @@ export interface AzureClientOptions extends ClientOptions {
 /** API Client for interfacing with the Azure OpenAI API. */
 export class AzureOpenAI extends OpenAI {
   private _azureADTokenProvider: (() => Promise<string>) | undefined;
+  private _audioDeployments: string[] = [];
   deploymentName: string | undefined;
   apiVersion: string = '';
   /**
@@ -578,6 +580,8 @@ export class AzureOpenAI extends OpenAI {
     this.deploymentName = deployment;
   }
 
+  override audio: API.Audio = new AzureAudio(this, this._audioDeployments);
+
   override buildRequest(
     options: Core.FinalRequestOptions<unknown>,
     props: { retryCount?: number } = {},
@@ -590,7 +594,7 @@ export class AzureOpenAI extends OpenAI {
       if (!Core.isObj(options.body)) {
         throw new Error('Expected request body to be an object');
       }
-      const model = this.deploymentName || options.body['model'];
+      const model = this.deploymentName || options.body['model'] || this._audioDeployments.shift();
       if (model !== undefined && !this.baseURL.includes('/deployments')) {
         options.path = `/deployments/${model}${options.path}`;
       }
