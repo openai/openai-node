@@ -1,5 +1,19 @@
 # Changelog
 
+## 4.82.0 (2025-01-31)
+
+Full Changelog: [v4.81.0...v4.82.0](https://github.com/openai/openai-node/compare/v4.81.0...v4.82.0)
+
+### Features
+
+* **api:** add o3-mini ([#1295](https://github.com/openai/openai-node/issues/1295)) ([378e2f7](https://github.com/openai/openai-node/commit/378e2f7af62c570adb4c7644a4d49576b698de41))
+
+
+### Bug Fixes
+
+* **examples/realtime:** remove duplicate `session.update` call ([#1293](https://github.com/openai/openai-node/issues/1293)) ([ad800b4](https://github.com/openai/openai-node/commit/ad800b4f9410c6838994c24a3386ea708717f72b))
+* **types:** correct metadata type + other fixes ([378e2f7](https://github.com/openai/openai-node/commit/378e2f7af62c570adb4c7644a4d49576b698de41))
+
 ## 4.81.0 (2025-01-29)
 
 Full Changelog: [v4.80.1...v4.81.0](https://github.com/openai/openai-node/compare/v4.80.1...v4.81.0)
