@@ -814,6 +814,7 @@ export type RequestOptions<
   signal?: AbortSignal | undefined | null;
   idempotencyKey?: string;
 
+  __metadata?: Record<string, unknown>;
   __binaryRequest?: boolean | undefined;
   __binaryResponse?: boolean | undefined;
   __streamClass?: typeof Stream;
@@ -836,6 +837,7 @@ const requestOptionsKeys: KeysEnum<RequestOptions> = {
   signal: true,
   idempotencyKey: true,
 
+  __metadata: true,
   __binaryRequest: true,
   __binaryResponse: true,
   __streamClass: true,

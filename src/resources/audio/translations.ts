@@ -26,7 +26,10 @@ export class Translations extends APIResource {
     body: TranslationCreateParams,
     options?: Core.RequestOptions,
   ): Core.APIPromise<TranslationCreateResponse | string> {
-    return this._client.post('/audio/translations', Core.multipartFormRequestOptions({ body, ...options }));
+    return this._client.post(
+      '/audio/translations',
+      Core.multipartFormRequestOptions({ body, ...options, __metadata: { model: body.model } }),
+    );
   }
 }
 
