@@ -3,9 +3,8 @@
 import { NullableHeaders } from './headers';
 
 import type { BodyInit } from './builtin-types';
-import { isEmptyObj, hasOwn } from './utils/values';
 import { Stream } from '../streaming';
-import type { HTTPMethod, KeysEnum, MergedRequestInit } from './types';
+import type { HTTPMethod, MergedRequestInit } from './types';
 import { type HeadersLike } from './headers';
 
 export type FinalRequestOptions = RequestOptions & { method: HTTPMethod; path: string };
@@ -25,36 +24,6 @@ export type RequestOptions = {
 
   __binaryResponse?: boolean | undefined;
   __streamClass?: typeof Stream;
-};
-
-// This is required so that we can determine if a given object matches the RequestOptions
-// type at runtime. While this requires duplication, it is enforced by the TypeScript
-// compiler such that any missing / extraneous keys will cause an error.
-const requestOptionsKeys: KeysEnum<RequestOptions> = {
-  method: true,
-  path: true,
-  query: true,
-  body: true,
-  headers: true,
-
-  maxRetries: true,
-  stream: true,
-  timeout: true,
-  fetchOptions: true,
-  signal: true,
-  idempotencyKey: true,
-
-  __binaryResponse: true,
-  __streamClass: true,
-};
-
-export const isRequestOptions = (obj: unknown): obj is RequestOptions => {
-  return (
-    typeof obj === 'object' &&
-    obj !== null &&
-    !isEmptyObj(obj) &&
-    Object.keys(obj).every((k) => hasOwn(requestOptionsKeys, k))
-  );
 };
 
 export type EncodedContent = { bodyHeaders: HeadersLike; body: BodyInit };
