@@ -294,6 +294,7 @@ export abstract class APIClient {
     options: FinalRequestOptions<Req>,
     { retryCount = 0 }: { retryCount?: number } = {},
   ): { req: RequestInit; url: string; timeout: number } {
+    options = { ...options };
     const { method, path, query, headers: headers = {} } = options;
 
     const body =
@@ -306,9 +307,9 @@ export abstract class APIClient {
 
     const url = this.buildURL(path!, query);
     if ('timeout' in options) validatePositiveInteger('timeout', options.timeout);
-    const timeout = options.timeout ?? this.timeout;
+    options.timeout = options.timeout ?? this.timeout;
     const httpAgent = options.httpAgent ?? this.httpAgent ?? getDefaultAgent(url);
-    const minAgentTimeout = timeout + 1000;
+    const minAgentTimeout = options.timeout + 1000;
     if (
       typeof (httpAgent as any)?.options?.timeout === 'number' &&
       minAgentTimeout > ((httpAgent as any).options.timeout ?? 0)
@@ -337,7 +338,7 @@ export abstract class APIClient {
       signal: options.signal ?? null,
     };
 
-    return { req, url, timeout };
+    return { req, url, timeout: options.timeout };
   }
 
   private buildHeaders({
@@ -365,14 +366,21 @@ export abstract class APIClient {
       delete reqHeaders['content-type'];
     }
 
-    // Don't set the retry count header if it was already set or removed through default headers or by the
-    // caller. We check `defaultHeaders` and `headers`, which can contain nulls, instead of `reqHeaders` to
-    // account for the removal case.
+    // Don't set theses headers if they were already set or removed through default headers or by the caller.
+    // We check `defaultHeaders` and `headers`, which can contain nulls, instead of `reqHeaders` to account
+    // for the removal case.
     if (
       getHeader(defaultHeaders, 'x-stainless-retry-count') === undefined &&
       getHeader(headers, 'x-stainless-retry-count') === undefined
     ) {
       reqHeaders['x-stainless-retry-count'] = String(retryCount);
+    }
+    if (
+      getHeader(defaultHeaders, 'x-stainless-timeout') === undefined &&
+      getHeader(headers, 'x-stainless-timeout') === undefined &&
+      options.timeout
+    ) {
+      reqHeaders['x-stainless-timeout'] = String(options.timeout);
     }
 
     this.validateHeaders(reqHeaders, headers);
