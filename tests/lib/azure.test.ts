@@ -376,7 +376,7 @@ describe('azure request building', () => {
         expect(
           await client.audio.translations.create({
             model,
-            file: { url: 'https://example.com', blob: () => 0 as any },
+            file: { url: 'https://example.com', blob: async () => new Blob([]) },
           }),
         ).toMatchObject({
           url: `https://example.com/openai/deployments/${deployment}/audio/translations?api-version=${apiVersion}`,
@@ -387,7 +387,7 @@ describe('azure request building', () => {
         expect(
           await client.audio.transcriptions.create({
             model,
-            file: { url: 'https://example.com', blob: () => 0 as any },
+            file: { url: 'https://example.com', blob: async () => new Blob([]) },
           }),
         ).toMatchObject({
           url: `https://example.com/openai/deployments/${deployment}/audio/transcriptions?api-version=${apiVersion}`,
@@ -432,7 +432,7 @@ describe('azure request building', () => {
       test('handles files', async () => {
         expect(
           await client.files.create({
-            file: { url: 'https://example.com', blob: () => 0 as any },
+            file: { url: 'https://example.com', blob: async () => new Blob([]) },
             purpose: 'assistants',
           }),
         ).toMatchObject({
@@ -509,7 +509,7 @@ describe('azure request building', () => {
         expect(
           await client.audio.translations.create({
             model: deployment,
-            file: { url: 'https://example.com', blob: () => 0 as any },
+            file: { url: 'https://example.com', blob: async () => new Blob([]) },
           }),
         ).toMatchObject({
           url: `https://example.com/openai/audio/translations?api-version=${apiVersion}`,
@@ -520,7 +520,7 @@ describe('azure request building', () => {
         expect(
           await client.audio.transcriptions.create({
             model: deployment,
-            file: { url: 'https://example.com', blob: () => 0 as any },
+            file: { url: 'https://example.com', blob: async () => new Blob([]) },
           }),
         ).toMatchObject({
           url: `https://example.com/openai/audio/transcriptions?api-version=${apiVersion}`,
@@ -565,7 +565,7 @@ describe('azure request building', () => {
       test('handles files', async () => {
         expect(
           await client.files.create({
-            file: { url: 'https://example.com', blob: () => 0 as any },
+            file: { url: 'https://example.com', blob: async () => new Blob([]) },
             purpose: 'assistants',
           }),
         ).toMatchObject({

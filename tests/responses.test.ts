@@ -2,6 +2,8 @@ import { APIPromise } from 'openai/api-promise';
 import OpenAI from 'openai/index';
 import { compareType } from './utils/typing';
 
+const client = new OpenAI();
+
 describe('request id', () => {
   test('types', () => {
     compareType<Awaited<APIPromise<string>>, string>(true);
@@ -54,6 +56,7 @@ describe('request id', () => {
 
   test('envelope response', async () => {
     const promise = new APIPromise<{ data: { foo: string } }>(
+      client,
       (async () => {
         return {
           response: new Response(JSON.stringify({ data: { foo: 'bar' } }), {
@@ -86,6 +89,7 @@ describe('request id', () => {
 
   test('array response', async () => {
     const promise = new APIPromise<Array<{ foo: string }>>(
+      client,
       (async () => {
         return {
           response: new Response(JSON.stringify([{ foo: 'bar' }]), {
@@ -105,6 +109,7 @@ describe('request id', () => {
 
   test('string response', async () => {
     const promise = new APIPromise<string>(
+      client,
       (async () => {
         return {
           response: new Response('hello world', {
