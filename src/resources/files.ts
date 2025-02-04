@@ -70,15 +70,6 @@ export class Files extends APIResource {
       __binaryResponse: true,
     });
   }
-
-  /**
-   * Returns the contents of the specified file.
-   *
-   * @deprecated The `.content()` method should be used instead
-   */
-  retrieveContent(fileID: string, options?: RequestOptions): APIPromise<string> {
-    return this._client.get(`/files/${fileID}/content`, options);
-  }
 }
 
 export type FileObjectsPage = CursorPage<FileObject>;
