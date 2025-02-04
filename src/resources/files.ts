@@ -74,15 +74,6 @@ export class Files extends APIResource {
   }
 
   /**
-   * Returns the contents of the specified file.
-   *
-   * @deprecated The `.content()` method should be used instead
-   */
-  retrieveContent(fileID: string, options?: RequestOptions): APIPromise<string> {
-    return this._client.get(`/files/${fileID}/content`, options);
-  }
-
-  /**
    * Waits for the given file to be processed, default timeout is 30 mins.
    */
   async waitForProcessing(

@@ -93,7 +93,6 @@ Methods:
 - <code title="get /files">client.files.<a href="./src/resources/files.ts">list</a>({ ...params }) -> FileObjectsPage</code>
 - <code title="delete /files/{file_id}">client.files.<a href="./src/resources/files.ts">delete</a>(fileID) -> FileDeleted</code>
 - <code title="get /files/{file_id}/content">client.files.<a href="./src/resources/files.ts">content</a>(fileID) -> Response</code>
-- <code title="get /files/{file_id}/content">client.files.<a href="./src/resources/files.ts">retrieveContent</a>(fileID) -> string</code>
 - <code>client.files.<a href="./src/resources/files.ts">waitForProcessing</a>(id, { pollInterval = 5000, maxWait = 30 _ 60 _ 1000 }) -> Promise&lt;FileObject&gt;</code>
 
 # Images
