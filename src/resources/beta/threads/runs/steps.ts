@@ -7,6 +7,7 @@ import { APIPromise } from '../../../../api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../../pagination';
 import { buildHeaders } from '../../../../internal/headers';
 import { RequestOptions } from '../../../../internal/request-options';
+import { path } from '../../../../internal/utils/path';
 
 export class Steps extends APIResource {
   /**
@@ -14,7 +15,7 @@ export class Steps extends APIResource {
    */
   retrieve(stepID: string, params: StepRetrieveParams, options?: RequestOptions): APIPromise<RunStep> {
     const { thread_id, run_id, ...query } = params;
-    return this._client.get(`/threads/${thread_id}/runs/${run_id}/steps/${stepID}`, {
+    return this._client.get(path`/threads/${thread_id}/runs/${run_id}/steps/${stepID}`, {
       query,
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
@@ -26,7 +27,7 @@ export class Steps extends APIResource {
    */
   list(runID: string, params: StepListParams, options?: RequestOptions): PagePromise<RunStepsPage, RunStep> {
     const { thread_id, ...query } = params;
-    return this._client.getAPIList(`/threads/${thread_id}/runs/${runID}/steps`, CursorPage<RunStep>, {
+    return this._client.getAPIList(path`/threads/${thread_id}/runs/${runID}/steps`, CursorPage<RunStep>, {
       query,
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),

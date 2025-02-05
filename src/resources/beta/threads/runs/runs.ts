@@ -40,6 +40,7 @@ import { RequestOptions } from '../../../../internal/request-options';
 import { AssistantStream, RunCreateParamsBaseStream } from '../../../../lib/AssistantStream';
 import { sleep } from '../../../../internal/utils/sleep';
 import { RunSubmitToolOutputsParamsStream } from '../../../../lib/AssistantStream';
+import { path } from '../../../../internal/utils/path';
 
 export class Runs extends APIResource {
   steps: StepsAPI.Steps = new StepsAPI.Steps(this._client);
@@ -64,7 +65,7 @@ export class Runs extends APIResource {
     options?: RequestOptions,
   ): APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>> {
     const { include, ...body } = params;
-    return this._client.post(`/threads/${threadID}/runs`, {
+    return this._client.post(path`/threads/${threadID}/runs`, {
       query: { include },
       body,
       ...options,
@@ -78,7 +79,7 @@ export class Runs extends APIResource {
    */
   retrieve(runID: string, params: RunRetrieveParams, options?: RequestOptions): APIPromise<Run> {
     const { thread_id } = params;
-    return this._client.get(`/threads/${thread_id}/runs/${runID}`, {
+    return this._client.get(path`/threads/${thread_id}/runs/${runID}`, {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
@@ -89,7 +90,7 @@ export class Runs extends APIResource {
    */
   update(runID: string, params: RunUpdateParams, options?: RequestOptions): APIPromise<Run> {
     const { thread_id, ...body } = params;
-    return this._client.post(`/threads/${thread_id}/runs/${runID}`, {
+    return this._client.post(path`/threads/${thread_id}/runs/${runID}`, {
       body,
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
@@ -104,7 +105,7 @@ export class Runs extends APIResource {
     query: RunListParams | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<RunsPage, Run> {
-    return this._client.getAPIList(`/threads/${threadID}/runs`, CursorPage<Run>, {
+    return this._client.getAPIList(path`/threads/${threadID}/runs`, CursorPage<Run>, {
       query,
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
@@ -116,7 +117,7 @@ export class Runs extends APIResource {
    */
   cancel(runID: string, params: RunCancelParams, options?: RequestOptions): APIPromise<Run> {
     const { thread_id } = params;
-    return this._client.post(`/threads/${thread_id}/runs/${runID}/cancel`, {
+    return this._client.post(path`/threads/${thread_id}/runs/${runID}/cancel`, {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
@@ -239,7 +240,7 @@ export class Runs extends APIResource {
     options?: RequestOptions,
   ): APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>> {
     const { thread_id, ...body } = params;
-    return this._client.post(`/threads/${thread_id}/runs/${runID}/submit_tool_outputs`, {
+    return this._client.post(path`/threads/${thread_id}/runs/${runID}/submit_tool_outputs`, {
       body,
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),

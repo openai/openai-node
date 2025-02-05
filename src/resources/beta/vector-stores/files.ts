@@ -8,6 +8,7 @@ import { buildHeaders } from '../../../internal/headers';
 import { RequestOptions } from '../../../internal/request-options';
 import { sleep } from '../../../internal/utils';
 import { Uploadable } from '../../../uploads';
+import { path } from '../../../internal/utils/path';
 
 export class Files extends APIResource {
   /**
@@ -20,7 +21,7 @@ export class Files extends APIResource {
     body: FileCreateParams,
     options?: RequestOptions,
   ): APIPromise<VectorStoreFile> {
-    return this._client.post(`/vector_stores/${vectorStoreID}/files`, {
+    return this._client.post(path`/vector_stores/${vectorStoreID}/files`, {
       body,
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
@@ -36,7 +37,7 @@ export class Files extends APIResource {
     options?: RequestOptions,
   ): APIPromise<VectorStoreFile> {
     const { vector_store_id } = params;
-    return this._client.get(`/vector_stores/${vector_store_id}/files/${fileID}`, {
+    return this._client.get(path`/vector_stores/${vector_store_id}/files/${fileID}`, {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
@@ -50,7 +51,7 @@ export class Files extends APIResource {
     query: FileListParams | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<VectorStoreFilesPage, VectorStoreFile> {
-    return this._client.getAPIList(`/vector_stores/${vectorStoreID}/files`, CursorPage<VectorStoreFile>, {
+    return this._client.getAPIList(path`/vector_stores/${vectorStoreID}/files`, CursorPage<VectorStoreFile>, {
       query,
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
@@ -69,7 +70,7 @@ export class Files extends APIResource {
     options?: RequestOptions,
   ): APIPromise<VectorStoreFileDeleted> {
     const { vector_store_id } = params;
-    return this._client.delete(`/vector_stores/${vector_store_id}/files/${fileID}`, {
+    return this._client.delete(path`/vector_stores/${vector_store_id}/files/${fileID}`, {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });

@@ -5,6 +5,7 @@ import { APIPromise } from '../../api-promise';
 import { type Uploadable } from '../../uploads';
 import { RequestOptions } from '../../internal/request-options';
 import { multipartFormRequestOptions } from '../../internal/uploads';
+import { path } from '../../internal/utils/path';
 
 export class Parts extends APIResource {
   /**
@@ -22,7 +23,7 @@ export class Parts extends APIResource {
    */
   create(uploadID: string, body: PartCreateParams, options?: RequestOptions): APIPromise<UploadPart> {
     return this._client.post(
-      `/uploads/${uploadID}/parts`,
+      path`/uploads/${uploadID}/parts`,
       multipartFormRequestOptions({ body, ...options }, this._client),
     );
   }

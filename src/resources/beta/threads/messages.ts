@@ -7,13 +7,14 @@ import { APIPromise } from '../../../api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../pagination';
 import { buildHeaders } from '../../../internal/headers';
 import { RequestOptions } from '../../../internal/request-options';
+import { path } from '../../../internal/utils/path';
 
 export class Messages extends APIResource {
   /**
    * Create a message.
    */
   create(threadID: string, body: MessageCreateParams, options?: RequestOptions): APIPromise<Message> {
-    return this._client.post(`/threads/${threadID}/messages`, {
+    return this._client.post(path`/threads/${threadID}/messages`, {
       body,
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
@@ -25,7 +26,7 @@ export class Messages extends APIResource {
    */
   retrieve(messageID: string, params: MessageRetrieveParams, options?: RequestOptions): APIPromise<Message> {
     const { thread_id } = params;
-    return this._client.get(`/threads/${thread_id}/messages/${messageID}`, {
+    return this._client.get(path`/threads/${thread_id}/messages/${messageID}`, {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
@@ -36,7 +37,7 @@ export class Messages extends APIResource {
    */
   update(messageID: string, params: MessageUpdateParams, options?: RequestOptions): APIPromise<Message> {
     const { thread_id, ...body } = params;
-    return this._client.post(`/threads/${thread_id}/messages/${messageID}`, {
+    return this._client.post(path`/threads/${thread_id}/messages/${messageID}`, {
       body,
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
@@ -51,7 +52,7 @@ export class Messages extends APIResource {
     query: MessageListParams | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<MessagesPage, Message> {
-    return this._client.getAPIList(`/threads/${threadID}/messages`, CursorPage<Message>, {
+    return this._client.getAPIList(path`/threads/${threadID}/messages`, CursorPage<Message>, {
       query,
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
@@ -67,7 +68,7 @@ export class Messages extends APIResource {
     options?: RequestOptions,
   ): APIPromise<MessageDeleted> {
     const { thread_id } = params;
-    return this._client.delete(`/threads/${thread_id}/messages/${messageID}`, {
+    return this._client.delete(path`/threads/${thread_id}/messages/${messageID}`, {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });

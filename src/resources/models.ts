@@ -4,6 +4,7 @@ import { APIResource } from '../resource';
 import { APIPromise } from '../api-promise';
 import { Page, PagePromise } from '../pagination';
 import { RequestOptions } from '../internal/request-options';
+import { path } from '../internal/utils/path';
 
 export class Models extends APIResource {
   /**
@@ -11,7 +12,7 @@ export class Models extends APIResource {
    * the owner and permissioning.
    */
   retrieve(model: string, options?: RequestOptions): APIPromise<Model> {
-    return this._client.get(`/models/${model}`, options);
+    return this._client.get(path`/models/${model}`, options);
   }
 
   /**
@@ -27,7 +28,7 @@ export class Models extends APIResource {
    * delete a model.
    */
   delete(model: string, options?: RequestOptions): APIPromise<ModelDeleted> {
-    return this._client.delete(`/models/${model}`, options);
+    return this._client.delete(path`/models/${model}`, options);
   }
 }
 
