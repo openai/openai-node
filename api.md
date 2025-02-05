@@ -226,6 +226,7 @@ Types:
 - <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItemInputAudioTranscriptionFailedEvent</a></code>
 - <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItemTruncateEvent</a></code>
 - <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItemTruncatedEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItemWithReference</a></code>
 - <code><a href="./src/resources/beta/realtime/realtime.ts">ErrorEvent</a></code>
 - <code><a href="./src/resources/beta/realtime/realtime.ts">InputAudioBufferAppendEvent</a></code>
 - <code><a href="./src/resources/beta/realtime/realtime.ts">InputAudioBufferClearEvent</a></code>

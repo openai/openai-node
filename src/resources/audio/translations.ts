@@ -28,7 +28,7 @@ export interface TranslationVerbose {
   /**
    * The duration of the input audio.
    */
-  duration: string;
+  duration: number;
 
   /**
    * The language of the output translation (always `english`).
