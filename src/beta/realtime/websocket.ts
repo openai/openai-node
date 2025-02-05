@@ -95,7 +95,7 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
   }
 
   static async azure(
-    client: AzureOpenAI,
+    client: Pick<AzureOpenAI, '_getAzureADToken' | 'apiVersion' | 'apiKey' | 'baseURL' | 'deploymentName'>,
     options: { deploymentName?: string; dangerouslyAllowBrowser?: boolean } = {},
   ): Promise<OpenAIRealtimeWebSocket> {
     const token = await client._getAzureADToken();
