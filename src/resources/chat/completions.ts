@@ -741,14 +741,14 @@ export interface ChatCompletionPredictionContent {
 }
 
 /**
- * **o1 models only**
+ * **o1 and o3-mini models only**
  *
  * Constrains effort on reasoning for
  * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
  * supported values are `low`, `medium`, and `high`. Reducing reasoning effort can
  * result in faster responses and fewer tokens used on reasoning in a response.
  */
-export type ChatCompletionReasoningEffort = 'low' | 'medium' | 'high';
+export type ChatCompletionReasoningEffort = 'low' | 'medium' | 'high' | null;
 
 /**
  * The role of the author of a message
@@ -1055,14 +1055,14 @@ export interface ChatCompletionCreateParamsBase {
   presence_penalty?: number | null;
 
   /**
-   * **o1 models only**
+   * **o1 and o3-mini models only**
    *
    * Constrains effort on reasoning for
    * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
    * supported values are `low`, `medium`, and `high`. Reducing reasoning effort can
    * result in faster responses and fewer tokens used on reasoning in a response.
    */
-  reasoning_effort?: ChatCompletionReasoningEffort;
+  reasoning_effort?: ChatCompletionReasoningEffort | null;
 
   /**
    * An object specifying the format that the model must output.
