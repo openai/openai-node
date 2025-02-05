@@ -1,5 +1,19 @@
 # Changelog
 
+## 4.83.0 (2025-02-05)
+
+Full Changelog: [v4.82.0...v4.83.0](https://github.com/openai/openai-node/compare/v4.82.0...v4.83.0)
+
+### Features
+
+* **client:** send `X-Stainless-Timeout` header ([#1299](https://github.com/openai/openai-node/issues/1299)) ([ddfc686](https://github.com/openai/openai-node/commit/ddfc686f43a3420c3adf8dec2e82b4d10a121eb8))
+
+
+### Bug Fixes
+
+* **api/types:** correct audio duration & role types ([#1300](https://github.com/openai/openai-node/issues/1300)) ([a955ac2](https://github.com/openai/openai-node/commit/a955ac2bf5bee663d530d0c82b0005bf3ce6fc47))
+* **azure/audio:** use model param for deployments ([#1297](https://github.com/openai/openai-node/issues/1297)) ([85de382](https://github.com/openai/openai-node/commit/85de382db17cbe5f112650e79d0fc1cc841efbb2))
+
 ## 4.82.0 (2025-01-31)
 
 Full Changelog: [v4.81.0...v4.82.0](https://github.com/openai/openai-node/compare/v4.81.0...v4.82.0)
