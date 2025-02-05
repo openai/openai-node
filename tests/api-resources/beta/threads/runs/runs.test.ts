@@ -38,6 +38,7 @@ describe('resource runs', () => {
       metadata: { foo: 'string' },
       model: 'gpt-4o',
       parallel_tool_calls: true,
+      reasoning_effort: 'low',
       response_format: 'auto',
       stream: false,
       temperature: 1,

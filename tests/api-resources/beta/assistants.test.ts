@@ -26,6 +26,7 @@ describe('resource assistants', () => {
       instructions: 'instructions',
       metadata: { foo: 'string' },
       name: 'name',
+      reasoning_effort: 'low',
       response_format: 'auto',
       temperature: 1,
       tool_resources: {
