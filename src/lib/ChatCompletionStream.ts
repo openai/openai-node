@@ -12,6 +12,7 @@ import {
   type ChatCompletionCreateParams,
   type ChatCompletionCreateParamsStreaming,
   type ChatCompletionCreateParamsBase,
+  type ChatCompletionRole,
 } from '../resources/chat/completions';
 import {
   AbstractChatCompletionRunner,
@@ -797,7 +798,7 @@ export namespace ChatCompletionSnapshot {
       /**
        * The role of the author of this message.
        */
-      role?: 'system' | 'user' | 'assistant' | 'function' | 'tool';
+      role?: ChatCompletionRole;
     }
 
     export namespace Message {
