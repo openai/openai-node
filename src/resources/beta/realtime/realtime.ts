@@ -440,6 +440,76 @@ export interface ConversationItemTruncatedEvent {
 }
 
 /**
+ * The item to add to the conversation.
+ */
+export interface ConversationItemWithReference {
+  /**
+   * For an item of type (`message` | `function_call` | `function_call_output`) this
+   * field allows the client to assign the unique ID of the item. It is not required
+   * because the server will generate one if not provided.
+   *
+   * For an item of type `item_reference`, this field is required and is a reference
+   * to any item that has previously existed in the conversation.
+   */
+  id?: string;
+
+  /**
+   * The arguments of the function call (for `function_call` items).
+   */
+  arguments?: string;
+
+  /**
+   * The ID of the function call (for `function_call` and `function_call_output`
+   * items). If passed on a `function_call_output` item, the server will check that a
+   * `function_call` item with the same ID exists in the conversation history.
+   */
+  call_id?: string;
+
+  /**
+   * The content of the message, applicable for `message` items.
+   *
+   * - Message items of role `system` support only `input_text` content
+   * - Message items of role `user` support `input_text` and `input_audio` content
+   * - Message items of role `assistant` support `text` content.
+   */
+  content?: Array<ConversationItemContent>;
+
+  /**
+   * The name of the function being called (for `function_call` items).
+   */
+  name?: string;
+
+  /**
+   * Identifier for the API object being returned - always `realtime.item`.
+   */
+  object?: 'realtime.item';
+
+  /**
+   * The output of the function call (for `function_call_output` items).
+   */
+  output?: string;
+
+  /**
+   * The role of the message sender (`user`, `assistant`, `system`), only applicable
+   * for `message` items.
+   */
+  role?: 'user' | 'assistant' | 'system';
+
+  /**
+   * The status of the item (`completed`, `incomplete`). These have no effect on the
+   * conversation, but are accepted for consistency with the
+   * `conversation.item.created` event.
+   */
+  status?: 'completed' | 'incomplete';
+
+  /**
+   * The type of the item (`message`, `function_call`, `function_call_output`,
+   * `item_reference`).
+   */
+  type?: 'message' | 'function_call' | 'function_call_output' | 'item_reference';
+}
+
+/**
  * Returned when an error occurs, which could be a client problem or a server
  * problem. Most errors are recoverable and the session will stay open, we
  * recommend to implementors to monitor and log error messages by default.
@@ -1336,11 +1406,12 @@ export namespace ResponseCreateEvent {
     conversation?: (string & {}) | 'auto' | 'none';
 
     /**
-     * Input items to include in the prompt for the model. Creates a new context for
-     * this response, without including the default conversation. Can include
-     * references to items from the default conversation.
+     * Input items to include in the prompt for the model. Using this field creates a
+     * new context for this Response instead of using the default conversation. An
+     * empty array `[]` will clear the context for this Response. Note that this can
+     * include references to items from the default conversation.
      */
-    input?: Array<RealtimeAPI.ConversationItem>;
+    input?: Array<RealtimeAPI.ConversationItemWithReference>;
 
     /**
      * The default system instructions (i.e. system message) prepended to model calls.

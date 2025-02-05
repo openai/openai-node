@@ -371,7 +371,7 @@ export namespace ChatCompletionChunk {
       /**
        * The role of the author of this message.
        */
-      role?: 'system' | 'user' | 'assistant' | 'tool';
+      role?: 'developer' | 'system' | 'user' | 'assistant' | 'tool';
 
       tool_calls?: Array<Delta.ToolCall>;
     }
@@ -756,7 +756,7 @@ export type ChatCompletionReasoningEffort = 'low' | 'medium' | 'high';
 /**
  * The role of the author of a message
  */
-export type ChatCompletionRole = 'system' | 'user' | 'assistant' | 'tool' | 'function';
+export type ChatCompletionRole = 'developer' | 'system' | 'user' | 'assistant' | 'tool' | 'function';
 
 /**
  * Options for streaming response. Only set this when you set `stream: true`.
