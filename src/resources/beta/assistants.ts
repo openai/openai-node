@@ -12,6 +12,7 @@ import { APIPromise } from '../../api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../pagination';
 import { buildHeaders } from '../../internal/headers';
 import { RequestOptions } from '../../internal/request-options';
+import { path } from '../../internal/utils/path';
 
 export class Assistants extends APIResource {
   /**
@@ -29,7 +30,7 @@ export class Assistants extends APIResource {
    * Retrieves an assistant.
    */
   retrieve(assistantID: string, options?: RequestOptions): APIPromise<Assistant> {
-    return this._client.get(`/assistants/${assistantID}`, {
+    return this._client.get(path`/assistants/${assistantID}`, {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
@@ -39,7 +40,7 @@ export class Assistants extends APIResource {
    * Modifies an assistant.
    */
   update(assistantID: string, body: AssistantUpdateParams, options?: RequestOptions): APIPromise<Assistant> {
-    return this._client.post(`/assistants/${assistantID}`, {
+    return this._client.post(path`/assistants/${assistantID}`, {
       body,
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
@@ -64,7 +65,7 @@ export class Assistants extends APIResource {
    * Delete an assistant.
    */
   delete(assistantID: string, options?: RequestOptions): APIPromise<AssistantDeleted> {
-    return this._client.delete(`/assistants/${assistantID}`, {
+    return this._client.delete(path`/assistants/${assistantID}`, {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });

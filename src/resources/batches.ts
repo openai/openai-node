@@ -6,6 +6,7 @@ import * as Shared from './shared';
 import { APIPromise } from '../api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../pagination';
 import { RequestOptions } from '../internal/request-options';
+import { path } from '../internal/utils/path';
 
 export class Batches extends APIResource {
   /**
@@ -19,7 +20,7 @@ export class Batches extends APIResource {
    * Retrieves a batch.
    */
   retrieve(batchID: string, options?: RequestOptions): APIPromise<Batch> {
-    return this._client.get(`/batches/${batchID}`, options);
+    return this._client.get(path`/batches/${batchID}`, options);
   }
 
   /**
@@ -38,7 +39,7 @@ export class Batches extends APIResource {
    * (if any) available in the output file.
    */
   cancel(batchID: string, options?: RequestOptions): APIPromise<Batch> {
-    return this._client.post(`/batches/${batchID}/cancel`, options);
+    return this._client.post(path`/batches/${batchID}/cancel`, options);
   }
 }
 

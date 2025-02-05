@@ -26,6 +26,7 @@ import { APIPromise } from '../../../api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../pagination';
 import { buildHeaders } from '../../../internal/headers';
 import { RequestOptions } from '../../../internal/request-options';
+import { path } from '../../../internal/utils/path';
 
 export class VectorStores extends APIResource {
   files: FilesAPI.Files = new FilesAPI.Files(this._client);
@@ -46,7 +47,7 @@ export class VectorStores extends APIResource {
    * Retrieves a vector store.
    */
   retrieve(vectorStoreID: string, options?: RequestOptions): APIPromise<VectorStore> {
-    return this._client.get(`/vector_stores/${vectorStoreID}`, {
+    return this._client.get(path`/vector_stores/${vectorStoreID}`, {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
@@ -60,7 +61,7 @@ export class VectorStores extends APIResource {
     body: VectorStoreUpdateParams,
     options?: RequestOptions,
   ): APIPromise<VectorStore> {
-    return this._client.post(`/vector_stores/${vectorStoreID}`, {
+    return this._client.post(path`/vector_stores/${vectorStoreID}`, {
       body,
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
@@ -85,7 +86,7 @@ export class VectorStores extends APIResource {
    * Delete a vector store.
    */
   delete(vectorStoreID: string, options?: RequestOptions): APIPromise<VectorStoreDeleted> {
-    return this._client.delete(`/vector_stores/${vectorStoreID}`, {
+    return this._client.delete(path`/vector_stores/${vectorStoreID}`, {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });

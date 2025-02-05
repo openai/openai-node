@@ -11,6 +11,7 @@ import {
 import { APIPromise } from '../../../api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../pagination';
 import { RequestOptions } from '../../../internal/request-options';
+import { path } from '../../../internal/utils/path';
 
 export class Jobs extends APIResource {
   checkpoints: CheckpointsAPI.Checkpoints = new CheckpointsAPI.Checkpoints(this._client);
@@ -34,7 +35,7 @@ export class Jobs extends APIResource {
    * [Learn more about fine-tuning](https://platform.openai.com/docs/guides/fine-tuning)
    */
   retrieve(fineTuningJobID: string, options?: RequestOptions): APIPromise<FineTuningJob> {
-    return this._client.get(`/fine_tuning/jobs/${fineTuningJobID}`, options);
+    return this._client.get(path`/fine_tuning/jobs/${fineTuningJobID}`, options);
   }
 
   /**
@@ -51,7 +52,7 @@ export class Jobs extends APIResource {
    * Immediately cancel a fine-tune job.
    */
   cancel(fineTuningJobID: string, options?: RequestOptions): APIPromise<FineTuningJob> {
-    return this._client.post(`/fine_tuning/jobs/${fineTuningJobID}/cancel`, options);
+    return this._client.post(path`/fine_tuning/jobs/${fineTuningJobID}/cancel`, options);
   }
 
   /**
@@ -63,7 +64,7 @@ export class Jobs extends APIResource {
     options?: RequestOptions,
   ): PagePromise<FineTuningJobEventsPage, FineTuningJobEvent> {
     return this._client.getAPIList(
-      `/fine_tuning/jobs/${fineTuningJobID}/events`,
+      path`/fine_tuning/jobs/${fineTuningJobID}/events`,
       CursorPage<FineTuningJobEvent>,
       { query, ...options },
     );

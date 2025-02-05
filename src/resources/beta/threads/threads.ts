@@ -66,6 +66,7 @@ import { APIPromise } from '../../../api-promise';
 import { Stream } from '../../../streaming';
 import { buildHeaders } from '../../../internal/headers';
 import { RequestOptions } from '../../../internal/request-options';
+import { path } from '../../../internal/utils/path';
 
 export class Threads extends APIResource {
   runs: RunsAPI.Runs = new RunsAPI.Runs(this._client);
@@ -86,7 +87,7 @@ export class Threads extends APIResource {
    * Retrieves a thread.
    */
   retrieve(threadID: string, options?: RequestOptions): APIPromise<Thread> {
-    return this._client.get(`/threads/${threadID}`, {
+    return this._client.get(path`/threads/${threadID}`, {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
@@ -96,7 +97,7 @@ export class Threads extends APIResource {
    * Modifies a thread.
    */
   update(threadID: string, body: ThreadUpdateParams, options?: RequestOptions): APIPromise<Thread> {
-    return this._client.post(`/threads/${threadID}`, {
+    return this._client.post(path`/threads/${threadID}`, {
       body,
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
@@ -107,7 +108,7 @@ export class Threads extends APIResource {
    * Delete a thread.
    */
   delete(threadID: string, options?: RequestOptions): APIPromise<ThreadDeleted> {
-    return this._client.delete(`/threads/${threadID}`, {
+    return this._client.delete(path`/threads/${threadID}`, {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });

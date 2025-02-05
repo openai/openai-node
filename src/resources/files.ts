@@ -7,6 +7,7 @@ import { type Uploadable } from '../uploads';
 import { buildHeaders } from '../internal/headers';
 import { RequestOptions } from '../internal/request-options';
 import { multipartFormRequestOptions } from '../internal/uploads';
+import { path } from '../internal/utils/path';
 
 export class Files extends APIResource {
   /**
@@ -40,7 +41,7 @@ export class Files extends APIResource {
    * Returns information about a specific file.
    */
   retrieve(fileID: string, options?: RequestOptions): APIPromise<FileObject> {
-    return this._client.get(`/files/${fileID}`, options);
+    return this._client.get(path`/files/${fileID}`, options);
   }
 
   /**
@@ -57,14 +58,14 @@ export class Files extends APIResource {
    * Delete a file.
    */
   delete(fileID: string, options?: RequestOptions): APIPromise<FileDeleted> {
-    return this._client.delete(`/files/${fileID}`, options);
+    return this._client.delete(path`/files/${fileID}`, options);
   }
 
   /**
    * Returns the contents of the specified file.
    */
   content(fileID: string, options?: RequestOptions): APIPromise<Response> {
-    return this._client.get(`/files/${fileID}/content`, {
+    return this._client.get(path`/files/${fileID}/content`, {
       ...options,
       headers: buildHeaders([{ Accept: 'application/binary' }, options?.headers]),
       __binaryResponse: true,
