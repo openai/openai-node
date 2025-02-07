@@ -5,7 +5,7 @@ const has = Object.prototype.hasOwnProperty;
 const is_array = Array.isArray;
 
 const hex_table = (() => {
-  const array = [];
+  const array: string[] = [];;
   for (let i = 0; i < 256; ++i) {
     array.push('%' + ((i < 16 ? '0' : '') + i.toString(16)).toUpperCase());
   }
@@ -162,7 +162,7 @@ export const encode: (
   let out = '';
   for (let j = 0; j < string.length; j += limit) {
     const segment = string.length >= limit ? string.slice(j, j + limit) : string;
-    const arr = [];
+    const arr: string[] = [];
 
     for (let i = 0; i < segment.length; ++i) {
       let c = segment.charCodeAt(i);
@@ -214,7 +214,7 @@ export const encode: (
 
 export function compact(value: any) {
   const queue = [{ obj: { o: value }, prop: 'o' }];
-  const refs = [];
+  const refs: any[] = [];
 
   for (let i = 0; i < queue.length; ++i) {
     const item = queue[i];
@@ -255,7 +255,7 @@ export function combine(a: any, b: any) {
 
 export function maybe_map<T>(val: T[], fn: (v: T) => T) {
   if (is_array(val)) {
-    const mapped = [];
+    const mapped: T[] = [];
     for (let i = 0; i < val.length; i += 1) {
       mapped.push(fn(val[i]!));
     }

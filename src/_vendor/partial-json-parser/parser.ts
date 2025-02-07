@@ -176,7 +176,7 @@ const _parseJSON = (jsonString: string, allow: number) => {
 
   const parseArr = () => {
     index++; // skip initial bracket
-    const arr = [];
+    const arr: any[] = [];
     try {
       while (jsonString[index] !== ']') {
         arr.push(parseAny());
