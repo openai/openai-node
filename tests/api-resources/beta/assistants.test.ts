@@ -118,3 +118,114 @@ describe('resource assistants', () => {
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 });
+
+describe('resource o1 assistants', () => {
+  test('create: only required params', async () => {
+    const responsePromise = client.beta.assistants.create({ model: 'o1', reasoning_effort: 'low' });
+    const rawResponse = await responsePromise.asResponse();
+    expect(rawResponse).toBeInstanceOf(Response);
+    const response = await responsePromise;
+    expect(response).not.toBeInstanceOf(Response);
+    const dataAndResponse = await responsePromise.withResponse();
+    expect(dataAndResponse.data).toBe(response);
+    expect(dataAndResponse.response).toBe(rawResponse);
+  });
+
+  test('create: required and optional params', async () => {
+    const response = await client.beta.assistants.create({
+      model: '01',
+      description: 'description',
+      instructions: 'instructions',
+      metadata: { foo: 'string' },
+      name: 'name',
+      response_format: 'auto',
+      reasoning_effort: 'low',
+      tool_resources: {
+        code_interpreter: { file_ids: ['string'] },
+        file_search: {
+          vector_store_ids: ['string'],
+          vector_stores: [
+            { chunking_strategy: { type: 'auto' }, file_ids: ['string'], metadata: { foo: 'string' } },
+          ],
+        },
+      },
+      tools: [{ type: 'code_interpreter' }],
+      top_p: 1,
+    });
+  });
+
+  test('retrieve', async () => {
+    const responsePromise = client.beta.assistants.retrieve('assistant_id');
+    const rawResponse = await responsePromise.asResponse();
+    expect(rawResponse).toBeInstanceOf(Response);
+    const response = await responsePromise;
+    expect(response).not.toBeInstanceOf(Response);
+    const dataAndResponse = await responsePromise.withResponse();
+    expect(dataAndResponse.data).toBe(response);
+    expect(dataAndResponse.response).toBe(rawResponse);
+  });
+
+  test('retrieve: request options instead of params are passed correctly', async () => {
+    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
+    await expect(
+      client.beta.assistants.retrieve('assistant_id', { path: '/_stainless_unknown_path' }),
+    ).rejects.toThrow(OpenAI.NotFoundError);
+  });
+
+  test('update', async () => {
+    const responsePromise = client.beta.assistants.update('assistant_id', { reasoning_effort: 'high' });
+    const rawResponse = await responsePromise.asResponse();
+    expect(rawResponse).toBeInstanceOf(Response);
+    const response = await responsePromise;
+    expect(response).not.toBeInstanceOf(Response);
+    const dataAndResponse = await responsePromise.withResponse();
+    expect(dataAndResponse.data).toBe(response);
+    expect(dataAndResponse.response).toBe(rawResponse);
+  });
+
+  test('list', async () => {
+    const responsePromise = client.beta.assistants.list();
+    const rawResponse = await responsePromise.asResponse();
+    expect(rawResponse).toBeInstanceOf(Response);
+    const response = await responsePromise;
+    expect(response).not.toBeInstanceOf(Response);
+    const dataAndResponse = await responsePromise.withResponse();
+    expect(dataAndResponse.data).toBe(response);
+    expect(dataAndResponse.response).toBe(rawResponse);
+  });
+
+  test('list: request options instead of params are passed correctly', async () => {
+    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
+    await expect(client.beta.assistants.list({ path: '/_stainless_unknown_path' })).rejects.toThrow(
+      OpenAI.NotFoundError,
+    );
+  });
+
+  test('list: request options and params are passed correctly', async () => {
+    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
+    await expect(
+      client.beta.assistants.list(
+        { after: 'after', before: 'before', limit: 0, order: 'asc' },
+        { path: '/_stainless_unknown_path' },
+      ),
+    ).rejects.toThrow(OpenAI.NotFoundError);
+  });
+
+  test('del', async () => {
+    const responsePromise = client.beta.assistants.del('assistant_id');
+    const rawResponse = await responsePromise.asResponse();
+    expect(rawResponse).toBeInstanceOf(Response);
+    const response = await responsePromise;
+    expect(response).not.toBeInstanceOf(Response);
+    const dataAndResponse = await responsePromise.withResponse();
+    expect(dataAndResponse.data).toBe(response);
+    expect(dataAndResponse.response).toBe(rawResponse);
+  });
+
+  test('del: request options instead of params are passed correctly', async () => {
+    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
+    await expect(
+      client.beta.assistants.del('assistant_id', { path: '/_stainless_unknown_path' }),
+    ).rejects.toThrow(OpenAI.NotFoundError);
+  });
+});

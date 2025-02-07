@@ -41,6 +41,8 @@ import {
   CreateChatCompletionRequestMessage,
 } from './completions';
 
+export type ReasoningEffort = ChatCompletionReasoningEffort;
+
 export class Chat extends APIResource {
   completions: CompletionsAPI.Completions = new CompletionsAPI.Completions(this._client);
 }

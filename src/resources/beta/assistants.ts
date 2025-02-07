@@ -1187,6 +1187,16 @@ export interface AssistantCreateParams {
    * We generally recommend altering this or temperature but not both.
    */
   top_p?: number | null;
+
+  /**
+   * **o1 models only**
+   *
+   * Constrains effort on reasoning for
+   * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
+   * supported values are `low`, `medium`, and `high`. Reducing reasoning effort can
+   * result in faster responses and fewer tokens used on reasoning in a response.
+   */
+  reasoning_effort?: ChatAPI.ReasoningEffort | null;
 }
 
 export namespace AssistantCreateParams {
@@ -1349,6 +1359,16 @@ export interface AssistantUpdateParams {
    * We generally recommend altering this or temperature but not both.
    */
   top_p?: number | null;
+
+  /**
+   * **o1 models only**
+   *
+   * Constrains effort on reasoning for
+   * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
+   * supported values are `low`, `medium`, and `high`. Reducing reasoning effort can
+   * result in faster responses and fewer tokens used on reasoning in a response.
+   */
+  reasoning_effort?: ChatAPI.ReasoningEffort | null;
 }
 
 export namespace AssistantUpdateParams {
