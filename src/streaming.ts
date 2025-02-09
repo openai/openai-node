@@ -79,8 +79,9 @@ export class Stream<Item> implements AsyncIterable<Item> {
         if (e instanceof Error && e.name === 'AbortError') return;
         throw e;
       } finally {
-        // If the user `break`s, abort the ongoing request.
-        if (!done) controller.abort();
+        if (!done && !controller.signal.aborted) {
+          controller.abort(); // Cleanup only if still active
+        }
       }
     }
 
@@ -126,8 +127,9 @@ export class Stream<Item> implements AsyncIterable<Item> {
         if (e instanceof Error && e.name === 'AbortError') return;
         throw e;
       } finally {
-        // If the user `break`s, abort the ongoing request.
-        if (!done) controller.abort();
+        if (!done && response.body) {
+          response.body.cancel();
+        }
       }
     }
 
@@ -208,20 +210,22 @@ export async function* _iterSSEMessages(
     throw new OpenAIError(`Attempted to iterate over a response with no body`);
   }
 
+  const reader = response.body.getReader(); // Explicit reader
   const sseDecoder = new SSEDecoder();
   const lineDecoder = new LineDecoder();
 
-  const iter = ReadableStreamToAsyncIterable<Bytes>(response.body);
-  for await (const sseChunk of iterSSEChunks(iter)) {
-    for (const line of lineDecoder.decode(sseChunk)) {
-      const sse = sseDecoder.decode(line);
-      if (sse) yield sse;
+  try {
+    const iter = ReadableStreamToAsyncIterable<Bytes>(response.body);
+    for await (const sseChunk of iterSSEChunks(iter)) {
+      for (const line of lineDecoder.decode(sseChunk)) {
+        const sse = sseDecoder.decode(line);
+        if (sse) yield sse;
+      }
     }
-  }
-
-  for (const line of lineDecoder.flush()) {
-    const sse = sseDecoder.decode(line);
-    if (sse) yield sse;
+  } finally {
+    // Ensure cleanup when stream is done
+    reader.cancel(); // Explicitly cancel reader
+    controller.abort(); // Abort request to close socket
   }
 }
 
