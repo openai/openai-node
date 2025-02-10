@@ -1,6 +1,7 @@
 import { PassThrough } from 'stream';
 import assert from 'assert';
 import { _iterSSEMessages, _decodeChunks as decodeChunks } from 'openai/streaming';
+import { LineDecoder } from 'openai/internal/decoders/line';
 
 describe('line decoder', () => {
   test('basic', () => {
@@ -9,8 +10,8 @@ describe('line decoder', () => {
   });
 
   test('basic with \\r', () => {
-    // baz is not included because the line hasn't ended yet
     expect(decodeChunks(['foo', ' bar\r\nbaz'])).toEqual(['foo bar']);
+    expect(decodeChunks(['foo', ' bar\r\nbaz'], { flush: true })).toEqual(['foo bar', 'baz']);
   });
 
   test('trailing new lines', () => {
@@ -27,6 +28,56 @@ describe('line decoder', () => {
 
   test('escaped new lines with \\r', () => {
     expect(decodeChunks(['foo', ' bar\\r\\nbaz\n'])).toEqual(['foo bar\\r\\nbaz']);
+  });
+
+  test('\\r & \\n split across multiple chunks', () => {
+    expect(decodeChunks(['foo\r', '\n', 'bar'], { flush: true })).toEqual(['foo', 'bar']);
+  });
+
+  test('single \\r', () => {
+    expect(decodeChunks(['foo\r', 'bar'], { flush: true })).toEqual(['foo', 'bar']);
+  });
+
+  test('double \\r', () => {
+    expect(decodeChunks(['foo\r', 'bar\r'], { flush: true })).toEqual(['foo', 'bar']);
+    expect(decodeChunks(['foo\r', '\r', 'bar'], { flush: true })).toEqual(['foo', '', 'bar']);
+    // implementation detail that we don't yield the single \r line until a new \r or \n is encountered
+    expect(decodeChunks(['foo\r', '\r', 'bar'], { flush: false })).toEqual(['foo']);
+  });
+
+  test('double \\r then \\r\\n', () => {
+    expect(decodeChunks(['foo\r', '\r', '\r', '\n', 'bar', '\n'])).toEqual(['foo', '', '', 'bar']);
+    expect(decodeChunks(['foo\n', '\n', '\n', 'bar', '\n'])).toEqual(['foo', '', '', 'bar']);
+  });
+
+  test('double newline', () => {
+    expect(decodeChunks(['foo\n\nbar'], { flush: true })).toEqual(['foo', '', 'bar']);
+    expect(decodeChunks(['foo', '\n', '\nbar'], { flush: true })).toEqual(['foo', '', 'bar']);
+    expect(decodeChunks(['foo\n', '\n', 'bar'], { flush: true })).toEqual(['foo', '', 'bar']);
+    expect(decodeChunks(['foo', '\n', '\n', 'bar'], { flush: true })).toEqual(['foo', '', 'bar']);
+  });
+
+  test('multi-byte characters across chunks', () => {
+    const decoder = new LineDecoder();
+
+    // bytes taken from the string 'известни' and arbitrarily split
+    // so that some multi-byte characters span multiple chunks
+    expect(decoder.decode(new Uint8Array([0xd0]))).toHaveLength(0);
+    expect(decoder.decode(new Uint8Array([0xb8, 0xd0, 0xb7, 0xd0]))).toHaveLength(0);
+    expect(
+      decoder.decode(new Uint8Array([0xb2, 0xd0, 0xb5, 0xd1, 0x81, 0xd1, 0x82, 0xd0, 0xbd, 0xd0, 0xb8])),
+    ).toHaveLength(0);
+
+    const decoded = decoder.decode(new Uint8Array([0xa]));
+    expect(decoded).toEqual(['известни']);
+  });
+
+  test('flushing trailing newlines', () => {
+    expect(decodeChunks(['foo\n', '\nbar'], { flush: true })).toEqual(['foo', '', 'bar']);
+  });
+
+  test('flushing empty buffer', () => {
+    expect(decodeChunks([], { flush: true })).toEqual([]);
   });
 });
 
