@@ -31,10 +31,11 @@ export class APIError<
     this.request_id = headers?.['x-request-id'];
     this.error = formattedMessage;
 
-    // You can still retain the raw error object for later use, but store the formatted message
-    this.code = error?.['code'];
-    this.param = error?.['param'];
-    this.type = error?.['type'];
+    const data = error as Record<string, any>;
+    this.code = data?.['code'];
+    this.param = data?.['param'];
+    this.type = data?.['type'];
+
   }
 
   private static makeMessage(status: number | undefined, error: any, message: string | undefined) {
