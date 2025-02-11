@@ -1,3 +1,4 @@
+import { Readable } from 'stream'; // Node.js stream module
 import { ReadableStream, type Response } from './_shims/index';
 import { OpenAIError } from './error';
 import { LineDecoder } from './internal/decoders/line';
@@ -66,7 +67,6 @@ export class Stream<Item> implements AsyncIterable<Item> {
               console.error(`From chunk:`, sse.raw);
               throw e;
             }
-            // TODO: Is this where the error should be thrown?
             if (sse.event == 'error') {
               throw new APIError(undefined, data.error, data.message, undefined);
             }
@@ -75,13 +75,20 @@ export class Stream<Item> implements AsyncIterable<Item> {
         }
         done = true;
       } catch (e) {
-        // If the user calls `stream.controller.abort()`, we should exit without throwing.
         if (e instanceof Error && e.name === 'AbortError') return;
         throw e;
       } finally {
-        if (!done && !controller.signal.aborted) {
-          controller.abort(); // Cleanup only if still active
+        // Ensure response body is properly closed
+        if (response.body instanceof Readable) {
+          // Node.js stream
+          response.body.destroy();
+        } else if (response.body instanceof ReadableStream) {
+          // Web ReadableStream
+          response.body.cancel();
+        } else {
+          throw new Error('Unsupported stream type');
         }
+        controller.abort();
       }
     }
 
@@ -99,14 +106,19 @@ export class Stream<Item> implements AsyncIterable<Item> {
       const lineDecoder = new LineDecoder();
 
       const iter = ReadableStreamToAsyncIterable<Bytes>(readableStream);
-      for await (const chunk of iter) {
-        for (const line of lineDecoder.decode(chunk)) {
+      try {
+        for await (const chunk of iter) {
+          for (const line of lineDecoder.decode(chunk)) {
+            yield line;
+          }
+        }
+
+        for (const line of lineDecoder.flush()) {
           yield line;
         }
-      }
-
-      for (const line of lineDecoder.flush()) {
-        yield line;
+      } finally {
+        // Ensure stream is properly canceled
+        readableStream.cancel();
       }
     }
 
@@ -123,13 +135,12 @@ export class Stream<Item> implements AsyncIterable<Item> {
         }
         done = true;
       } catch (e) {
-        // If the user calls `stream.controller.abort()`, we should exit without throwing.
         if (e instanceof Error && e.name === 'AbortError') return;
         throw e;
       } finally {
-        if (!done && response.body) {
-          response.body.cancel();
-        }
+        // Ensure cleanup when stream is done
+        readableStream.cancel();
+        controller.abort();
       }
     }
 
@@ -210,22 +221,34 @@ export async function* _iterSSEMessages(
     throw new OpenAIError(`Attempted to iterate over a response with no body`);
   }
 
-  const reader = response.body.getReader(); // Explicit reader
   const sseDecoder = new SSEDecoder();
   const lineDecoder = new LineDecoder();
 
+  const iter = ReadableStreamToAsyncIterable<Bytes>(response.body);
   try {
-    const iter = ReadableStreamToAsyncIterable<Bytes>(response.body);
     for await (const sseChunk of iterSSEChunks(iter)) {
       for (const line of lineDecoder.decode(sseChunk)) {
         const sse = sseDecoder.decode(line);
         if (sse) yield sse;
       }
     }
+
+    for (const line of lineDecoder.flush()) {
+      const sse = sseDecoder.decode(line);
+      if (sse) yield sse;
+    }
   } finally {
-    // Ensure cleanup when stream is done
-    reader.cancel(); // Explicitly cancel reader
-    controller.abort(); // Abort request to close socket
+    // Ensure response body is properly closed
+    if (response.body instanceof Readable) {
+      // Node.js stream
+      response.body.destroy();
+    } else if (response.body instanceof ReadableStream) {
+      // Web ReadableStream
+      response.body.cancel();
+    } else {
+      throw new Error('Unsupported stream type');
+    }
+    controller.abort();
   }
 }
 
