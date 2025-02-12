@@ -11,7 +11,7 @@ interface MessageEvent {
 type _WebSocket =
   typeof globalThis extends (
     {
-      WebSocket: infer ws;
+      WebSocket: infer ws extends abstract new (...args: any) => any;
     }
   ) ?
     // @ts-ignore
