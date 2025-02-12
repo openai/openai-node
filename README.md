@@ -213,7 +213,7 @@ const run = await openai.beta.threads.runs.createAndPoll(thread.id, {
 });
 ```
 
-More information on the lifecycle of a Run can be found in the [Run Lifecycle Documentation](https://platform.openai.com/docs/assistants/deep-dive/run-lifecycle)
+More information on the lifecycle of a Run can be found in the [Run Lifecycle Documentation](https://platform.openai.com/docs/assistants/deep-dive#run-lifecycle)
 
 ### Bulk Upload Helpers
 
