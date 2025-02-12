@@ -1,5 +1,30 @@
 # Changelog
 
+## 4.84.0 (2025-02-12)
+
+Full Changelog: [v4.83.0...v4.84.0](https://github.com/openai/openai-node/compare/v4.83.0...v4.84.0)
+
+### Features
+
+* **pagination:** avoid fetching when has_more: false ([#1305](https://github.com/openai/openai-node/issues/1305)) ([b6944c6](https://github.com/openai/openai-node/commit/b6944c634b53c9084f2ccf777c2491e89b2cc7af))
+
+
+### Bug Fixes
+
+* **api:** add missing reasoning effort + model enums ([#1302](https://github.com/openai/openai-node/issues/1302)) ([14c55c3](https://github.com/openai/openai-node/commit/14c55c312e31f1ed46d02f39a99049f785504a53))
+* **assistants:** handle `thread.run.incomplete` event ([7032cc4](https://github.com/openai/openai-node/commit/7032cc40b8aa0a58459cf114bceb8028a8517400))
+* correctly decode multi-byte characters over multiple chunks ([#1316](https://github.com/openai/openai-node/issues/1316)) ([dd776c4](https://github.com/openai/openai-node/commit/dd776c4867401f527f699bd4b9e567890256e849))
+
+
+### Chores
+
+* **internal:** remove segfault-handler dependency ([3521ca3](https://github.com/openai/openai-node/commit/3521ca34e7f5bd51542084e27c084a5d7cc5448b))
+
+
+### Documentation
+
+* **readme:** cleanup into multiple files ([da94424](https://github.com/openai/openai-node/commit/da944242e542e9e5e51cb11853c621fc6825ac02))
+
 ## 4.83.0 (2025-02-05)
 
 Full Changelog: [v4.82.0...v4.83.0](https://github.com/openai/openai-node/compare/v4.82.0...v4.83.0)
