@@ -107,17 +107,17 @@
       "default": "./dist/index.mjs"
     },
     "./*.mjs": {
-      "types": "./dist/*.d.ts",
-      "default": "./dist/*.mjs"
+      "types": ["./dist/*.d.ts", "./dist/*/index.d.ts"],
+      "default": ["./dist/*.mjs", "./dist/*/index.mjs"]
     },
     "./*.js": {
-      "types": "./dist/*.d.ts",
-      "default": "./dist/*.js"
+      "types": ["./dist/*.d.ts", "./dist/*/index.d.ts"],
+      "default": ["./dist/*.js", "./dist/*/index.js"]
     },
     "./*": {
-      "types": "./dist/*.d.ts",
-      "require": "./dist/*.js",
-      "default": "./dist/*.mjs"
+      "types": ["./dist/*.d.ts", "./dist/*/index.d.ts"],
+      "require": ["./dist/*.js", "./dist/*/index.js"],
+      "default": ["./dist/*.mjs", "./dist/*/index.mjs"]
     }
   }
 }
