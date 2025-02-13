@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.84.1 (2025-02-13)
+
+Full Changelog: [v4.84.0...v4.84.1](https://github.com/openai/openai-node/compare/v4.84.0...v4.84.1)
+
+### Bug Fixes
+
+* **realtime:** correct websocket type var constraint ([#1321](https://github.com/openai/openai-node/issues/1321)) ([afb17ea](https://github.com/openai/openai-node/commit/afb17ea6497b860ebbe5d8e68e4a97681dd307ff))
+
 ## 4.84.0 (2025-02-12)
 
 Full Changelog: [v4.83.0...v4.84.0](https://github.com/openai/openai-node/compare/v4.83.0...v4.84.0)
