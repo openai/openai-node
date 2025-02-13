@@ -83,6 +83,13 @@ import { isEmptyObj } from './internal/utils/values';
 import { Audio, AudioModel, AudioResponseFormat } from './resources/audio/audio';
 import { Beta } from './resources/beta/beta';
 import { Chat, ChatModel } from './resources/chat/chat';
+import { FineTuning } from './resources/fine-tuning/fine-tuning';
+import {
+  Upload,
+  UploadCompleteParams,
+  UploadCreateParams,
+  Uploads as UploadsAPIUploads,
+} from './resources/uploads/uploads';
 import {
   ChatCompletion,
   ChatCompletionAssistantMessageParam,
@@ -97,9 +104,11 @@ import {
   ChatCompletionCreateParams,
   ChatCompletionCreateParamsNonStreaming,
   ChatCompletionCreateParamsStreaming,
+  ChatCompletionDeleted,
   ChatCompletionDeveloperMessageParam,
   ChatCompletionFunctionCallOption,
   ChatCompletionFunctionMessageParam,
+  ChatCompletionListParams,
   ChatCompletionMessage,
   ChatCompletionMessageParam,
   ChatCompletionMessageToolCall,
@@ -108,21 +117,17 @@ import {
   ChatCompletionPredictionContent,
   ChatCompletionReasoningEffort,
   ChatCompletionRole,
+  ChatCompletionStoreMessage,
   ChatCompletionStreamOptions,
   ChatCompletionSystemMessageParam,
   ChatCompletionTokenLogprob,
   ChatCompletionTool,
   ChatCompletionToolChoiceOption,
   ChatCompletionToolMessageParam,
+  ChatCompletionUpdateParams,
   ChatCompletionUserMessageParam,
-} from './resources/chat/completions';
-import { FineTuning } from './resources/fine-tuning/fine-tuning';
-import {
-  Upload,
-  UploadCompleteParams,
-  UploadCreateParams,
-  Uploads as UploadsAPIUploads,
-} from './resources/uploads/uploads';
+  ChatCompletionsPage,
+} from './resources/chat/completions/completions';
 
 const safeJSON = (text: string) => {
   try {
@@ -376,24 +381,6 @@ export class OpenAI {
     }
 
     return url.toString();
-  }
-
-  private calculateContentLength(body: unknown): string | null {
-    if (typeof body === 'string') {
-      if (typeof (globalThis as any).Buffer !== 'undefined') {
-        return (globalThis as any).Buffer.byteLength(body, 'utf8').toString();
-      }
-
-      if (typeof (globalThis as any).TextEncoder !== 'undefined') {
-        const encoder = new (globalThis as any).TextEncoder();
-        const encoded = encoder.encode(body);
-        return encoded.length.toString();
-      }
-    } else if (ArrayBuffer.isView(body)) {
-      return body.byteLength.toString();
-    }
-
-    return null;
   }
 
   /**
@@ -830,6 +817,7 @@ export declare namespace OpenAI {
     type ChatCompletionContentPartInputAudio as ChatCompletionContentPartInputAudio,
     type ChatCompletionContentPartRefusal as ChatCompletionContentPartRefusal,
     type ChatCompletionContentPartText as ChatCompletionContentPartText,
+    type ChatCompletionDeleted as ChatCompletionDeleted,
     type ChatCompletionDeveloperMessageParam as ChatCompletionDeveloperMessageParam,
     type ChatCompletionFunctionCallOption as ChatCompletionFunctionCallOption,
     type ChatCompletionFunctionMessageParam as ChatCompletionFunctionMessageParam,
@@ -841,6 +829,7 @@ export declare namespace OpenAI {
     type ChatCompletionPredictionContent as ChatCompletionPredictionContent,
     type ChatCompletionReasoningEffort as ChatCompletionReasoningEffort,
     type ChatCompletionRole as ChatCompletionRole,
+    type ChatCompletionStoreMessage as ChatCompletionStoreMessage,
     type ChatCompletionStreamOptions as ChatCompletionStreamOptions,
     type ChatCompletionSystemMessageParam as ChatCompletionSystemMessageParam,
     type ChatCompletionTokenLogprob as ChatCompletionTokenLogprob,
@@ -848,9 +837,12 @@ export declare namespace OpenAI {
     type ChatCompletionToolChoiceOption as ChatCompletionToolChoiceOption,
     type ChatCompletionToolMessageParam as ChatCompletionToolMessageParam,
     type ChatCompletionUserMessageParam as ChatCompletionUserMessageParam,
+    type ChatCompletionsPage as ChatCompletionsPage,
     type ChatCompletionCreateParams as ChatCompletionCreateParams,
     type ChatCompletionCreateParamsNonStreaming as ChatCompletionCreateParamsNonStreaming,
     type ChatCompletionCreateParamsStreaming as ChatCompletionCreateParamsStreaming,
+    type ChatCompletionUpdateParams as ChatCompletionUpdateParams,
+    type ChatCompletionListParams as ChatCompletionListParams,
   };
 
   export {

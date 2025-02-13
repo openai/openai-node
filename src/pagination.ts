@@ -46,7 +46,6 @@ export abstract class AbstractPage<Item> implements AsyncIterable<Item> {
   }
 
   async *iterPages(): AsyncGenerator<this> {
-    // eslint-disable-next-line @typescript-eslint/no-this-alias
     let page: this = this;
     yield page;
     while (page.hasNextPage()) {
