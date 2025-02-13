@@ -52,7 +52,7 @@ interface FileLike extends BlobLike {
   /** [MDN Reference](https://developer.mozilla.org/docs/Web/API/File/lastModified) */
   readonly lastModified: number;
   /** [MDN Reference](https://developer.mozilla.org/docs/Web/API/File/name) */
-  readonly name: string;
+  readonly name?: string | undefined;
 }
 declare var FileClass: {
   prototype: FileLike;
@@ -126,7 +126,7 @@ export async function toFile(
     if (File && value instanceof File) {
       return value;
     }
-    return makeFile([await value.arrayBuffer()], value.name);
+    return makeFile([await value.arrayBuffer()], value.name ?? 'unknown_file');
   }
 
   if (isResponseLike(value)) {
