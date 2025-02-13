@@ -32,38 +32,50 @@ Types:
 
 Types:
 
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletion</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionAssistantMessageParam</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionAudio</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionAudioParam</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionChunk</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionContentPart</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionContentPartImage</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionContentPartInputAudio</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionContentPartRefusal</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionContentPartText</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionDeveloperMessageParam</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionFunctionCallOption</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionFunctionMessageParam</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionMessage</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionMessageParam</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionMessageToolCall</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionModality</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionNamedToolChoice</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionPredictionContent</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionReasoningEffort</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionRole</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionStreamOptions</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionSystemMessageParam</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionTokenLogprob</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionTool</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionToolChoiceOption</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionToolMessageParam</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionUserMessageParam</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletion</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionAssistantMessageParam</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionAudio</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionAudioParam</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionChunk</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionContentPart</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionContentPartImage</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionContentPartInputAudio</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionContentPartRefusal</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionContentPartText</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionDeleted</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionDeveloperMessageParam</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionFunctionCallOption</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionFunctionMessageParam</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionMessage</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionMessageParam</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionMessageToolCall</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionModality</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionNamedToolChoice</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionPredictionContent</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionReasoningEffort</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionRole</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionStoreMessage</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionStreamOptions</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionSystemMessageParam</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionTokenLogprob</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionTool</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionToolChoiceOption</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionToolMessageParam</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionUserMessageParam</a></code>
 
 Methods:
 
-- <code title="post /chat/completions">client.chat.completions.<a href="./src/resources/chat/completions.ts">create</a>({ ...params }) -> ChatCompletion</code>
+- <code title="post /chat/completions">client.chat.completions.<a href="./src/resources/chat/completions/completions.ts">create</a>({ ...params }) -> ChatCompletion</code>
+- <code title="get /chat/completions/{completion_id}">client.chat.completions.<a href="./src/resources/chat/completions/completions.ts">retrieve</a>(completionID) -> ChatCompletion</code>
+- <code title="post /chat/completions/{completion_id}">client.chat.completions.<a href="./src/resources/chat/completions/completions.ts">update</a>(completionID, { ...params }) -> ChatCompletion</code>
+- <code title="get /chat/completions">client.chat.completions.<a href="./src/resources/chat/completions/completions.ts">list</a>({ ...params }) -> ChatCompletionsPage</code>
+- <code title="delete /chat/completions/{completion_id}">client.chat.completions.<a href="./src/resources/chat/completions/completions.ts">delete</a>(completionID) -> ChatCompletionDeleted</code>
+
+### Messages
+
+Methods:
+
+- <code title="get /chat/completions/{completion_id}/messages">client.chat.completions.messages.<a href="./src/resources/chat/completions/messages.ts">list</a>(completionID, { ...params }) -> ChatCompletionStoreMessagesPage</code>
 
 # Embeddings
 

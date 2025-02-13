@@ -1,7 +1,7 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../resource';
-import * as CompletionsAPI from './completions';
+import * as CompletionsAPI from './completions/completions';
 import {
   ChatCompletion,
   ChatCompletionAssistantMessageParam,
@@ -16,9 +16,11 @@ import {
   ChatCompletionCreateParams,
   ChatCompletionCreateParamsNonStreaming,
   ChatCompletionCreateParamsStreaming,
+  ChatCompletionDeleted,
   ChatCompletionDeveloperMessageParam,
   ChatCompletionFunctionCallOption,
   ChatCompletionFunctionMessageParam,
+  ChatCompletionListParams,
   ChatCompletionMessage,
   ChatCompletionMessageParam,
   ChatCompletionMessageToolCall,
@@ -27,15 +29,18 @@ import {
   ChatCompletionPredictionContent,
   ChatCompletionReasoningEffort,
   ChatCompletionRole,
+  ChatCompletionStoreMessage,
   ChatCompletionStreamOptions,
   ChatCompletionSystemMessageParam,
   ChatCompletionTokenLogprob,
   ChatCompletionTool,
   ChatCompletionToolChoiceOption,
   ChatCompletionToolMessageParam,
+  ChatCompletionUpdateParams,
   ChatCompletionUserMessageParam,
+  ChatCompletionsPage,
   Completions,
-} from './completions';
+} from './completions/completions';
 
 export class Chat extends APIResource {
   completions: CompletionsAPI.Completions = new CompletionsAPI.Completions(this._client);
@@ -99,6 +104,7 @@ export declare namespace Chat {
     type ChatCompletionContentPartInputAudio as ChatCompletionContentPartInputAudio,
     type ChatCompletionContentPartRefusal as ChatCompletionContentPartRefusal,
     type ChatCompletionContentPartText as ChatCompletionContentPartText,
+    type ChatCompletionDeleted as ChatCompletionDeleted,
     type ChatCompletionDeveloperMessageParam as ChatCompletionDeveloperMessageParam,
     type ChatCompletionFunctionCallOption as ChatCompletionFunctionCallOption,
     type ChatCompletionFunctionMessageParam as ChatCompletionFunctionMessageParam,
@@ -110,6 +116,7 @@ export declare namespace Chat {
     type ChatCompletionPredictionContent as ChatCompletionPredictionContent,
     type ChatCompletionReasoningEffort as ChatCompletionReasoningEffort,
     type ChatCompletionRole as ChatCompletionRole,
+    type ChatCompletionStoreMessage as ChatCompletionStoreMessage,
     type ChatCompletionStreamOptions as ChatCompletionStreamOptions,
     type ChatCompletionSystemMessageParam as ChatCompletionSystemMessageParam,
     type ChatCompletionTokenLogprob as ChatCompletionTokenLogprob,
@@ -117,8 +124,11 @@ export declare namespace Chat {
     type ChatCompletionToolChoiceOption as ChatCompletionToolChoiceOption,
     type ChatCompletionToolMessageParam as ChatCompletionToolMessageParam,
     type ChatCompletionUserMessageParam as ChatCompletionUserMessageParam,
+    type ChatCompletionsPage as ChatCompletionsPage,
     type ChatCompletionCreateParams as ChatCompletionCreateParams,
     type ChatCompletionCreateParamsNonStreaming as ChatCompletionCreateParamsNonStreaming,
     type ChatCompletionCreateParamsStreaming as ChatCompletionCreateParamsStreaming,
+    type ChatCompletionUpdateParams as ChatCompletionUpdateParams,
+    type ChatCompletionListParams as ChatCompletionListParams,
   };
 }

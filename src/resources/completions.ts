@@ -2,7 +2,7 @@
 
 import { APIResource } from '../resource';
 import * as CompletionsAPI from './completions';
-import * as ChatCompletionsAPI from './chat/completions';
+import * as CompletionsCompletionsAPI from './chat/completions/completions';
 import { APIPromise } from '../api-promise';
 import { Stream } from '../streaming';
 import { RequestOptions } from '../internal/request-options';
@@ -308,7 +308,7 @@ export interface CompletionCreateParamsBase {
   /**
    * Options for streaming response. Only set this when you set `stream: true`.
    */
-  stream_options?: ChatCompletionsAPI.ChatCompletionStreamOptions | null;
+  stream_options?: CompletionsCompletionsAPI.ChatCompletionStreamOptions | null;
 
   /**
    * The suffix that comes after a completion of inserted text.
