@@ -1,5 +1,18 @@
 # Changelog
 
+## 4.85.0 (2025-02-13)
+
+Full Changelog: [v4.84.1...v4.85.0](https://github.com/openai/openai-node/compare/v4.84.1...v4.85.0)
+
+### Features
+
+* **api:** add support for storing chat completions ([#1327](https://github.com/openai/openai-node/issues/1327)) ([8d77f8e](https://github.com/openai/openai-node/commit/8d77f8e3c4801b7fa1e7c6f50b48c1de1f43f3e6))
+
+
+### Bug Fixes
+
+* **realtime:** call .toString() on WebSocket url ([#1324](https://github.com/openai/openai-node/issues/1324)) ([09bc50d](https://github.com/openai/openai-node/commit/09bc50d439679b6acfd2441e69ee5aa18c00e5d9))
+
 ## 4.84.1 (2025-02-13)
 
 Full Changelog: [v4.84.0...v4.84.1](https://github.com/openai/openai-node/compare/v4.84.0...v4.84.1)
