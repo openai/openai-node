@@ -70,6 +70,7 @@ const projectRunners = {
   'cloudflare-worker': async () => {
     await installPackage();
 
+    await fs.writeFile('.dev.vars', `OPENAI_API_KEY='${process.env['OPENAI_API_KEY']}'`);
     await run('npm', ['run', 'tsc']);
 
     if (state.live) {
