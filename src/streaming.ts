@@ -346,11 +346,15 @@ class SSEDecoder {
 }
 
 /** This is an internal helper function that's just used for testing */
-export function _decodeChunks(chunks: string[]): string[] {
+export function _decodeChunks(chunks: string[], { flush }: { flush: boolean } = { flush: false }): string[] {
   const decoder = new LineDecoder();
   const lines: string[] = [];
   for (const chunk of chunks) {
     lines.push(...decoder.decode(chunk));
+  }
+
+  if (flush) {
+    lines.push(...decoder.flush());
   }
 
   return lines;

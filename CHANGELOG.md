@@ -1,5 +1,51 @@
 # Changelog
 
+## 4.85.0 (2025-02-13)
+
+Full Changelog: [v4.84.1...v4.85.0](https://github.com/openai/openai-node/compare/v4.84.1...v4.85.0)
+
+### Features
+
+* **api:** add support for storing chat completions ([#1327](https://github.com/openai/openai-node/issues/1327)) ([8d77f8e](https://github.com/openai/openai-node/commit/8d77f8e3c4801b7fa1e7c6f50b48c1de1f43f3e6))
+
+
+### Bug Fixes
+
+* **realtime:** call .toString() on WebSocket url ([#1324](https://github.com/openai/openai-node/issues/1324)) ([09bc50d](https://github.com/openai/openai-node/commit/09bc50d439679b6acfd2441e69ee5aa18c00e5d9))
+
+## 4.84.1 (2025-02-13)
+
+Full Changelog: [v4.84.0...v4.84.1](https://github.com/openai/openai-node/compare/v4.84.0...v4.84.1)
+
+### Bug Fixes
+
+* **realtime:** correct websocket type var constraint ([#1321](https://github.com/openai/openai-node/issues/1321)) ([afb17ea](https://github.com/openai/openai-node/commit/afb17ea6497b860ebbe5d8e68e4a97681dd307ff))
+
+## 4.84.0 (2025-02-12)
+
+Full Changelog: [v4.83.0...v4.84.0](https://github.com/openai/openai-node/compare/v4.83.0...v4.84.0)
+
+### Features
+
+* **pagination:** avoid fetching when has_more: false ([#1305](https://github.com/openai/openai-node/issues/1305)) ([b6944c6](https://github.com/openai/openai-node/commit/b6944c634b53c9084f2ccf777c2491e89b2cc7af))
+
+
+### Bug Fixes
+
+* **api:** add missing reasoning effort + model enums ([#1302](https://github.com/openai/openai-node/issues/1302)) ([14c55c3](https://github.com/openai/openai-node/commit/14c55c312e31f1ed46d02f39a99049f785504a53))
+* **assistants:** handle `thread.run.incomplete` event ([7032cc4](https://github.com/openai/openai-node/commit/7032cc40b8aa0a58459cf114bceb8028a8517400))
+* correctly decode multi-byte characters over multiple chunks ([#1316](https://github.com/openai/openai-node/issues/1316)) ([dd776c4](https://github.com/openai/openai-node/commit/dd776c4867401f527f699bd4b9e567890256e849))
+
+
+### Chores
+
+* **internal:** remove segfault-handler dependency ([3521ca3](https://github.com/openai/openai-node/commit/3521ca34e7f5bd51542084e27c084a5d7cc5448b))
+
+
+### Documentation
+
+* **readme:** cleanup into multiple files ([da94424](https://github.com/openai/openai-node/commit/da944242e542e9e5e51cb11853c621fc6825ac02))
+
 ## 4.83.0 (2025-02-05)
 
 Full Changelog: [v4.82.0...v4.83.0](https://github.com/openai/openai-node/compare/v4.82.0...v4.83.0)
