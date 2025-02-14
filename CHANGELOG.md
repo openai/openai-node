@@ -1,5 +1,19 @@
 # Changelog
 
+## 4.85.1 (2025-02-14)
+
+Full Changelog: [v4.85.0...v4.85.1](https://github.com/openai/openai-node/compare/v4.85.0...v4.85.1)
+
+### Bug Fixes
+
+* **client:** fix export map for index exports ([#1328](https://github.com/openai/openai-node/issues/1328)) ([647ba7a](https://github.com/openai/openai-node/commit/647ba7a52311928f604c72b2cc95698c0837887f))
+* **package:** add chat/completions.ts back in ([#1333](https://github.com/openai/openai-node/issues/1333)) ([e4b5546](https://github.com/openai/openai-node/commit/e4b554632ab1646da831f29413fefb3378c49cc1))
+
+
+### Chores
+
+* **internal:** add missing return type annotation ([#1334](https://github.com/openai/openai-node/issues/1334)) ([53e0856](https://github.com/openai/openai-node/commit/53e0856ec4d36deee4d71b5aaf436df0a59b9402))
+
 ## 4.85.0 (2025-02-13)
 
 Full Changelog: [v4.84.1...v4.85.0](https://github.com/openai/openai-node/compare/v4.84.1...v4.85.0)

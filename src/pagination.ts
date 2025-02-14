@@ -77,7 +77,7 @@ export class CursorPage<Item extends { id: string }>
     return this.data ?? [];
   }
 
-  override hasNextPage() {
+  override hasNextPage(): boolean {
     if (this.has_more === false) {
       return false;
     }
