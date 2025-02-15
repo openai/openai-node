@@ -1,4 +1,4 @@
-> [!IMPORTANT]  
+> ##[!IMPORTANT]  
 > We're actively working on a new alpha version that migrates from `node-fetch` to builtin fetch.
 > 
 > Please try it out and let us know if you run into any issues!
