@@ -85,41 +85,12 @@ export function isRunnableFunctionWithParse<Args extends object>(
 
 export type BaseFunctionsArgs = readonly (object | string)[];
 
-export type RunnableFunctions<FunctionsArgs extends BaseFunctionsArgs> =
-  [any[]] extends [FunctionsArgs] ? readonly RunnableFunction<any>[]
-  : {
-      [Index in keyof FunctionsArgs]: Index extends number ? RunnableFunction<FunctionsArgs[Index]>
-      : FunctionsArgs[Index];
-    };
-
 export type RunnableTools<FunctionsArgs extends BaseFunctionsArgs> =
   [any[]] extends [FunctionsArgs] ? readonly RunnableToolFunction<any>[]
   : {
       [Index in keyof FunctionsArgs]: Index extends number ? RunnableToolFunction<FunctionsArgs[Index]>
       : FunctionsArgs[Index];
     };
-
-/**
- * This is helper class for passing a `function` and `parse` where the `function`
- * argument type matches the `parse` return type.
- *
- * @deprecated - please use ParsingToolFunction instead.
- */
-export class ParsingFunction<Args extends object> {
-  function: RunnableFunctionWithParse<Args>['function'];
-  parse: RunnableFunctionWithParse<Args>['parse'];
-  parameters: RunnableFunctionWithParse<Args>['parameters'];
-  description: RunnableFunctionWithParse<Args>['description'];
-  name?: RunnableFunctionWithParse<Args>['name'];
-
-  constructor(input: RunnableFunctionWithParse<Args>) {
-    this.function = input.function;
-    this.parse = input.parse;
-    this.parameters = input.parameters;
-    this.description = input.description;
-    this.name = input.name;
-  }
-}
 
 /**
  * This is helper class for passing a `function` and `parse` where the `function`

@@ -353,8 +353,6 @@ chat completion request, not for the entire call run.
 See an example of automated function calls in action in
 [`examples/function-call-helpers.ts`](examples/function-call-helpers.ts).
 
-Note, `runFunctions` was also previously available, but has been deprecated in favor of `runTools`.
-
 ### Chat Events
 
 #### `.on('connect', () => …)`

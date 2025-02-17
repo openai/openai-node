@@ -287,8 +287,6 @@ main();
 
 Like with `.stream()`, we provide a variety of [helpers and events](helpers.md#chat-events).
 
-Note that `runFunctions` was previously available as well, but has been deprecated in favor of `runTools`.
-
 Read more about various examples such as with integrating with [zod](helpers.md#integrate-with-zod),
 [next.js](helpers.md#integrate-with-nextjs), and [proxying a stream to the browser](helpers.md#proxy-streaming-to-a-browser).
 

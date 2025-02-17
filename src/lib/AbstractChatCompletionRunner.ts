@@ -13,11 +13,8 @@ import {
   type BaseFunctionsArgs,
   RunnableToolFunction,
 } from './RunnableFunction';
-import { ChatCompletionFunctionRunnerParams, ChatCompletionToolRunnerParams } from './ChatCompletionRunner';
-import {
-  ChatCompletionStreamingFunctionRunnerParams,
-  ChatCompletionStreamingToolRunnerParams,
-} from './ChatCompletionStreamingRunner';
+import { ChatCompletionToolRunnerParams } from './ChatCompletionRunner';
+import { ChatCompletionStreamingToolRunnerParams } from './ChatCompletionStreamingRunner';
 import { isAssistantMessage, isFunctionMessage, isToolMessage } from './chatCompletionUtils';
 import { BaseEvents, EventStream } from './EventStream';
 import { ParsedChatCompletion } from '../resources/beta/chat/completions';
@@ -264,91 +261,6 @@ export class AbstractChatCompletionRunner<
       this._addMessage(message, false);
     }
     return await this._createChatCompletion(client, params, options);
-  }
-
-  protected async _runFunctions<FunctionsArgs extends BaseFunctionsArgs>(
-    client: OpenAI,
-    params:
-      | ChatCompletionFunctionRunnerParams<FunctionsArgs>
-      | ChatCompletionStreamingFunctionRunnerParams<FunctionsArgs>,
-    options?: RunnerOptions,
-  ) {
-    const role = 'function' as const;
-    const { function_call = 'auto', stream, ...restParams } = params;
-    const singleFunctionToCall = typeof function_call !== 'string' && function_call?.name;
-    const { maxChatCompletions = DEFAULT_MAX_CHAT_COMPLETIONS } = options || {};
-
-    const functionsByName: Record<string, RunnableFunction<any>> = {};
-    for (const f of params.functions) {
-      functionsByName[f.name || f.function.name] = f;
-    }
-
-    const functions: ChatCompletionCreateParams.Function[] = params.functions.map(
-      (f): ChatCompletionCreateParams.Function => ({
-        name: f.name || f.function.name,
-        parameters: f.parameters as Record<string, unknown>,
-        description: f.description,
-      }),
-    );
-
-    for (const message of params.messages) {
-      this._addMessage(message, false);
-    }
-
-    for (let i = 0; i < maxChatCompletions; ++i) {
-      const chatCompletion: ChatCompletion = await this._createChatCompletion(
-        client,
-        {
-          ...restParams,
-          function_call,
-          functions,
-          messages: [...this.messages],
-        },
-        options,
-      );
-      const message = chatCompletion.choices[0]?.message;
-      if (!message) {
-        throw new OpenAIError(`missing message in ChatCompletion response`);
-      }
-      if (!message.function_call) return;
-      const { name, arguments: args } = message.function_call;
-      const fn = functionsByName[name];
-      if (!fn) {
-        const content = `Invalid function_call: ${JSON.stringify(name)}. Available options are: ${functions
-          .map((f) => JSON.stringify(f.name))
-          .join(', ')}. Please try again`;
-
-        this._addMessage({ role, name, content });
-        continue;
-      } else if (singleFunctionToCall && singleFunctionToCall !== name) {
-        const content = `Invalid function_call: ${JSON.stringify(name)}. ${JSON.stringify(
-          singleFunctionToCall,
-        )} requested. Please try again`;
-
-        this._addMessage({ role, name, content });
-        continue;
-      }
-
-      let parsed;
-      try {
-        parsed = isRunnableFunctionWithParse(fn) ? await fn.parse(args) : args;
-      } catch (error) {
-        this._addMessage({
-          role,
-          name,
-          content: error instanceof Error ? error.message : String(error),
-        });
-        continue;
-      }
-
-      // @ts-expect-error it can't rule out `never` type.
-      const rawContent = await fn.function(parsed, this);
-      const content = this.#stringifyFunctionCallResult(rawContent);
-
-      this._addMessage({ role, name, content });
-
-      if (singleFunctionToCall) return;
-    }
   }
 
   protected async _runTools<FunctionsArgs extends BaseFunctionsArgs>(
