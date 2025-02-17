@@ -131,6 +131,14 @@ test('handles fs.ReadStream', async function () {
   expectSimilar(result.text, correctAnswer, 12);
 });
 
+test('handles Bun.File', async function () {
+  const result = await client.audio.transcriptions.create({
+    file: Bun.file('sample1.mp3'),
+    model,
+  });
+  expectSimilar(result.text, correctAnswer, 12);
+});
+
 const fineTune = `{"prompt": "<prompt text>", "completion": "<ideal generated text>"}`;
 
 // @ts-ignore avoid DOM lib for testing purposes
