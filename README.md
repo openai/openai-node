@@ -40,7 +40,7 @@ import OpenAI from 'jsr:@openai/openai';
 The full API of this library can be found in [api.md file](api.md) along with many [code examples](https://github.com/openai/openai-node/tree/master/examples). The code below shows how to get started using the chat completions API.
 
 <!-- prettier-ignore -->
-```js
+```ts
 import OpenAI from 'openai';
 
 const client = new OpenAI({
@@ -80,189 +80,11 @@ async function main() {
 main();
 ```
 
-If you need to cancel a stream, you can `break` from the loop
-or call `stream.controller.abort()`.
+If you need to cancel a stream, you can `break` from the loop or call `stream.controller.abort()`.
 
-## Realtime API beta
+### Chat Completion streaming helpers
 
-The Realtime API enables you to build low-latency, multi-modal conversational experiences. It currently supports text and audio as both input and output, as well as [function calling](https://platform.openai.com/docs/guides/function-calling) through a `WebSocket` connection.
-
-The Realtime API works through a combination of client-sent events and server-sent events. Clients can send events to do things like update session configuration or send text and audio inputs. Server events confirm when audio responses have completed, or when a text response from the model has been received. A full event reference can be found [here](https://platform.openai.com/docs/api-reference/realtime-client-events) and a guide can be found [here](https://platform.openai.com/docs/guides/realtime).
-
-This SDK supports accessing the Realtime API through the [WebSocket API](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket) or with [ws](https://github.com/websockets/ws).
-
-Basic text based example with `ws`:
-
-```ts
-// requires `yarn add ws @types/ws`
-import { OpenAIRealtimeWS } from 'openai/beta/realtime/ws';
-
-const rt = new OpenAIRealtimeWS({ model: 'gpt-4o-realtime-preview-2024-12-17' });
-
-// access the underlying `ws.WebSocket` instance
-rt.socket.on('open', () => {
-  console.log('Connection opened!');
-  rt.send({
-    type: 'session.update',
-    session: {
-      modalities: ['text'],
-      model: 'gpt-4o-realtime-preview',
-    },
-  });
-
-  rt.send({
-    type: 'conversation.item.create',
-    item: {
-      type: 'message',
-      role: 'user',
-      content: [{ type: 'input_text', text: 'Say a couple paragraphs!' }],
-    },
-  });
-
-  rt.send({ type: 'response.create' });
-});
-
-rt.on('error', (err) => {
-  // in a real world scenario this should be logged somewhere as you
-  // likely want to continue procesing events regardless of any errors
-  throw err;
-});
-
-rt.on('session.created', (event) => {
-  console.log('session created!', event.session);
-  console.log();
-});
-
-rt.on('response.text.delta', (event) => process.stdout.write(event.delta));
-rt.on('response.text.done', () => console.log());
-
-rt.on('response.done', () => rt.close());
-
-rt.socket.on('close', () => console.log('\nConnection closed!'));
-```
-
-To use the web API `WebSocket` implementation, replace `OpenAIRealtimeWS` with `OpenAIRealtimeWebSocket` and adjust any `rt.socket` access:
-
-```ts
-import { OpenAIRealtimeWebSocket } from 'openai/beta/realtime/websocket';
-
-const rt = new OpenAIRealtimeWebSocket({ model: 'gpt-4o-realtime-preview-2024-12-17' });
-// ...
-rt.socket.addEventListener('open', () => {
- // ...
-});
-```
-
-A full example can be found [here](https://github.com/openai/openai-node/blob/master/examples/realtime/websocket.ts).
-
-### Realtime error handling
-
-When an error is encountered, either on the client side or returned from the server through the [`error` event](https://platform.openai.com/docs/guides/realtime-model-capabilities#error-handling), the `error` event listener will be fired. However, if you haven't registered an `error` event listener then an `unhandled Promise rejection` error will be thrown.
-
-It is **highly recommended** that you register an `error` event listener and handle errors approriately as typically the underlying connection is still usable.
-
-```ts
-const rt = new OpenAIRealtimeWS({ model: 'gpt-4o-realtime-preview-2024-12-17' });
-rt.on('error', (err) => {
-  // in a real world scenario this should be logged somewhere as you
-  // likely want to continue procesing events regardless of any errors
-  throw err;
-});
-```
-
-### Request & Response types
-
-This library includes TypeScript definitions for all request params and response fields. You may import and use them like so:
-
-<!-- prettier-ignore -->
-```ts
-import OpenAI from 'openai';
-
-const client = new OpenAI({
-  apiKey: process.env['OPENAI_API_KEY'], // This is the default and can be omitted
-});
-
-async function main() {
-  const params: OpenAI.Chat.ChatCompletionCreateParams = {
-    messages: [{ role: 'user', content: 'Say this is a test' }],
-    model: 'gpt-4o',
-  };
-  const chatCompletion: OpenAI.Chat.ChatCompletion = await client.chat.completions.create(params);
-}
-
-main();
-```
-
-Documentation for each method, request param, and response field are available in docstrings and will appear on hover in most modern editors.
-
-> [!IMPORTANT]
-> Previous versions of this SDK used a `Configuration` class. See the [v3 to v4 migration guide](https://github.com/openai/openai-node/discussions/217).
-
-### Polling Helpers
-
-When interacting with the API some actions such as starting a Run and adding files to vector stores are asynchronous and take time to complete. The SDK includes
-helper functions which will poll the status until it reaches a terminal state and then return the resulting object.
-If an API method results in an action which could benefit from polling there will be a corresponding version of the
-method ending in 'AndPoll'.
-
-For instance to create a Run and poll until it reaches a terminal state you can run:
-
-```ts
-const run = await openai.beta.threads.runs.createAndPoll(thread.id, {
-  assistant_id: assistantId,
-});
-```
-
-More information on the lifecycle of a Run can be found in the [Run Lifecycle Documentation](https://platform.openai.com/docs/assistants/deep-dive/run-lifecycle)
-
-### Bulk Upload Helpers
-
-When creating and interacting with vector stores, you can use the polling helpers to monitor the status of operations.
-For convenience, we also provide a bulk upload helper to allow you to simultaneously upload several files at once.
-
-```ts
-const fileList = [
-  createReadStream('/home/data/example.pdf'),
-  ...
-];
-
-const batch = await openai.vectorStores.fileBatches.uploadAndPoll(vectorStore.id, {files: fileList});
-```
-
-### Streaming Helpers
-
-The SDK also includes helpers to process streams and handle the incoming events.
-
-```ts
-const run = openai.beta.threads.runs
-  .stream(thread.id, {
-    assistant_id: assistant.id,
-  })
-  .on('textCreated', (text) => process.stdout.write('\nassistant > '))
-  .on('textDelta', (textDelta, snapshot) => process.stdout.write(textDelta.value))
-  .on('toolCallCreated', (toolCall) => process.stdout.write(`\nassistant > ${toolCall.type}\n\n`))
-  .on('toolCallDelta', (toolCallDelta, snapshot) => {
-    if (toolCallDelta.type === 'code_interpreter') {
-      if (toolCallDelta.code_interpreter.input) {
-        process.stdout.write(toolCallDelta.code_interpreter.input);
-      }
-      if (toolCallDelta.code_interpreter.outputs) {
-        process.stdout.write('\noutput >\n');
-        toolCallDelta.code_interpreter.outputs.forEach((output) => {
-          if (output.type === 'logs') {
-            process.stdout.write(`\n${output.logs}\n`);
-          }
-        });
-      }
-    }
-  });
-```
-
-More information on streaming helpers can be found in the dedicated documentation: [helpers.md](helpers.md)
-
-### Streaming responses
-
-This library provides several conveniences for streaming chat completions, for example:
+This library also provides several conveniences for streaming chat completions, for example:
 
 ```ts
 import OpenAI from 'openai';
@@ -292,98 +114,32 @@ async function main() {
 main();
 ```
 
-Streaming with `openai.beta.chat.completions.stream({…})` exposes
-[various helpers for your convenience](helpers.md#chat-events) including event handlers and promises.
+See [helpers.md](helpers.md#chat-events) for more details.
 
-Alternatively, you can use `openai.chat.completions.create({ stream: true, … })`
-which only returns an async iterable of the chunks in the stream and thus uses less memory
-(it does not build up a final chat completion object for you).
+### Request & Response types
 
-If you need to cancel a stream, you can `break` from a `for await` loop or call `stream.abort()`.
+This library includes TypeScript definitions for all request params and response fields. You may import and use them like so:
 
-### Automated function calls
-
-We provide the `openai.beta.chat.completions.runTools({…})`
-convenience helper for using function tool calls with the `/chat/completions` endpoint
-which automatically call the JavaScript functions you provide
-and sends their results back to the `/chat/completions` endpoint,
-looping as long as the model requests tool calls.
-
-If you pass a `parse` function, it will automatically parse the `arguments` for you
-and returns any parsing errors to the model to attempt auto-recovery.
-Otherwise, the args will be passed to the function you provide as a string.
-
-If you pass `tool_choice: {function: {name: …}}` instead of `auto`,
-it returns immediately after calling that function (and only loops to auto-recover parsing errors).
-
+<!-- prettier-ignore -->
 ```ts
 import OpenAI from 'openai';
 
-const client = new OpenAI();
+const client = new OpenAI({
+  apiKey: process.env['OPENAI_API_KEY'], // This is the default and can be omitted
+});
 
 async function main() {
-  const runner = client.beta.chat.completions
-    .runTools({
-      model: 'gpt-4o',
-      messages: [{ role: 'user', content: 'How is the weather this week?' }],
-      tools: [
-        {
-          type: 'function',
-          function: {
-            function: getCurrentLocation,
-            parameters: { type: 'object', properties: {} },
-          },
-        },
-        {
-          type: 'function',
-          function: {
-            function: getWeather,
-            parse: JSON.parse, // or use a validation library like zod for typesafe parsing.
-            parameters: {
-              type: 'object',
-              properties: {
-                location: { type: 'string' },
-              },
-            },
-          },
-        },
-      ],
-    })
-    .on('message', (message) => console.log(message));
-
-  const finalContent = await runner.finalContent();
-  console.log();
-  console.log('Final content:', finalContent);
-}
-
-async function getCurrentLocation() {
-  return 'Boston'; // Simulate lookup
-}
-
-async function getWeather(args: { location: string }) {
-  const { location } = args;
-  // … do lookup …
-  return { temperature, precipitation };
+  const params: OpenAI.Chat.ChatCompletionCreateParams = {
+    messages: [{ role: 'user', content: 'Say this is a test' }],
+    model: 'gpt-4o',
+  };
+  const chatCompletion: OpenAI.Chat.ChatCompletion = await client.chat.completions.create(params);
 }
 
 main();
-
-// {role: "user",      content: "How's the weather this week?"}
-// {role: "assistant", tool_calls: [{type: "function", function: {name: "getCurrentLocation", arguments: "{}"}, id: "123"}
-// {role: "tool",      name: "getCurrentLocation", content: "Boston", tool_call_id: "123"}
-// {role: "assistant", tool_calls: [{type: "function", function: {name: "getWeather", arguments: '{"location": "Boston"}'}, id: "1234"}]}
-// {role: "tool",      name: "getWeather", content: '{"temperature": "50degF", "preciptation": "high"}', tool_call_id: "1234"}
-// {role: "assistant", content: "It's looking cold and rainy - you might want to wear a jacket!"}
-//
-// Final content: "It's looking cold and rainy - you might want to wear a jacket!"
 ```
 
-Like with `.stream()`, we provide a variety of [helpers and events](helpers.md#chat-events).
-
-Note that `runFunctions` was previously available as well, but has been deprecated in favor of `runTools`.
-
-Read more about various examples such as with integrating with [zod](helpers.md#integrate-with-zod),
-[next.js](helpers.md#integrate-with-nextjs), and [proxying a stream to the browser](helpers.md#proxy-streaming-to-a-browser).
+Documentation for each method, request param, and response field are available in docstrings and will appear on hover in most modern editors.
 
 ## File uploads
 
@@ -434,6 +190,7 @@ async function main() {
     .create({ model: 'gpt-4o', training_file: 'file-abc123' })
     .catch(async (err) => {
       if (err instanceof OpenAI.APIError) {
+        console.log(err.request_id);
         console.log(err.status); // 400
         console.log(err.name); // BadRequestError
         console.log(err.headers); // {server: 'nginx', ...}
@@ -458,76 +215,6 @@ Error codes are as followed:
 | 429         | `RateLimitError`           |
 | >=500       | `InternalServerError`      |
 | N/A         | `APIConnectionError`       |
-
-## Request IDs
-
-> For more information on debugging requests, see [these docs](https://platform.openai.com/docs/api-reference/debugging-requests)
-
-All object responses in the SDK provide a `_request_id` property which is added from the `x-request-id` response header so that you can quickly log failing requests and report them back to OpenAI.
-
-```ts
-const completion = await client.chat.completions.create({ messages: [{ role: 'user', content: 'Say this is a test' }], model: 'gpt-4o' });
-console.log(completion._request_id) // req_123
-```
-
-You can also access the Request ID using the `.withResponse()` method:
-
-```ts
-const { data: stream, request_id } = await openai.chat.completions
-  .create({
-    model: 'gpt-4',
-    messages: [{ role: 'user', content: 'Say this is a test' }],
-    stream: true,
-  })
-  .withResponse();
-```
-
-## Microsoft Azure OpenAI
-
-To use this library with [Azure OpenAI](https://learn.microsoft.com/azure/ai-services/openai/overview), use the `AzureOpenAI`
-class instead of the `OpenAI` class.
-
-> [!IMPORTANT]
-> The Azure API shape slightly differs from the core API shape which means that the static types for responses / params
-> won't always be correct.
-
-```ts
-import { AzureOpenAI } from 'openai';
-import { getBearerTokenProvider, DefaultAzureCredential } from '@azure/identity';
-
-const credential = new DefaultAzureCredential();
-const scope = 'https://cognitiveservices.azure.com/.default';
-const azureADTokenProvider = getBearerTokenProvider(credential, scope);
-
-const openai = new AzureOpenAI({ azureADTokenProvider, apiVersion: "<The API version, e.g. 2024-10-01-preview>" });
-
-const result = await openai.chat.completions.create({
-  model: 'gpt-4o',
-  messages: [{ role: 'user', content: 'Say hello!' }],
-});
-
-console.log(result.choices[0]!.message?.content);
-```
-
-### Realtime API
-This SDK provides real-time streaming capabilities for Azure OpenAI through the `OpenAIRealtimeWS` and `OpenAIRealtimeWebSocket` clients described previously.
-
-To utilize the real-time features, begin by creating a fully configured `AzureOpenAI` client and passing it into either `OpenAIRealtimeWS.azure` or `OpenAIRealtimeWebSocket.azure`. For example:
-
-```ts
-const cred = new DefaultAzureCredential();
-const scope = 'https://cognitiveservices.azure.com/.default';
-const deploymentName = 'gpt-4o-realtime-preview-1001';
-const azureADTokenProvider = getBearerTokenProvider(cred, scope);
-const client = new AzureOpenAI({
-  azureADTokenProvider,
-  apiVersion: '2024-10-01-preview',
-  deployment: deploymentName,
-});
-const rt = await OpenAIRealtimeWS.azure(client);
-```
-
-Once the instance has been created, you can then begin sending requests and receiving streaming responses in real time.
 
 ### Retries
 
@@ -571,6 +258,29 @@ On timeout, an `APIConnectionTimeoutError` is thrown.
 
 Note that requests which time out will be [retried twice by default](#retries).
 
+## Request IDs
+
+> For more information on debugging requests, see [these docs](https://platform.openai.com/docs/api-reference/debugging-requests)
+
+All object responses in the SDK provide a `_request_id` property which is added from the `x-request-id` response header so that you can quickly log failing requests and report them back to OpenAI.
+
+```ts
+const completion = await client.chat.completions.create({ messages: [{ role: 'user', content: 'Say this is a test' }], model: 'gpt-4o' });
+console.log(completion._request_id) // req_123
+```
+
+You can also access the Request ID using the `.withResponse()` method:
+
+```ts
+const { data: stream, request_id } = await openai.chat.completions
+  .create({
+    model: 'gpt-4',
+    messages: [{ role: 'user', content: 'Say this is a test' }],
+    stream: true,
+  })
+  .withResponse();
+```
+
 ## Auto-pagination
 
 List methods in the OpenAI API are paginated.
@@ -601,6 +311,55 @@ while (page.hasNextPage()) {
   // ...
 }
 ```
+
+## Realtime API Beta
+
+The Realtime API enables you to build low-latency, multi-modal conversational experiences. It currently supports text and audio as both input and output, as well as [function calling](https://platform.openai.com/docs/guides/function-calling) through a `WebSocket` connection.
+
+```ts
+import { OpenAIRealtimeWebSocket } from 'openai/beta/realtime/websocket';
+
+const rt = new OpenAIRealtimeWebSocket({ model: 'gpt-4o-realtime-preview-2024-12-17' });
+
+rt.on('response.text.delta', (event) => process.stdout.write(event.delta));
+```
+
+For more information see [realtime.md](realtime.md).
+
+## Microsoft Azure OpenAI
+
+To use this library with [Azure OpenAI](https://learn.microsoft.com/azure/ai-services/openai/overview), use the `AzureOpenAI`
+class instead of the `OpenAI` class.
+
+> [!IMPORTANT]
+> The Azure API shape slightly differs from the core API shape which means that the static types for responses / params
+> won't always be correct.
+
+```ts
+import { AzureOpenAI } from 'openai';
+import { getBearerTokenProvider, DefaultAzureCredential } from '@azure/identity';
+
+const credential = new DefaultAzureCredential();
+const scope = 'https://cognitiveservices.azure.com/.default';
+const azureADTokenProvider = getBearerTokenProvider(credential, scope);
+
+const openai = new AzureOpenAI({ azureADTokenProvider, apiVersion: "<The API version, e.g. 2024-10-01-preview>" });
+
+const result = await openai.chat.completions.create({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: 'Say hello!' }],
+});
+
+console.log(result.choices[0]!.message?.content);
+```
+
+For more information on support for the Azure API, see [azure.md](azure.md).
+
+## Automated function calls
+
+We provide the `openai.beta.chat.completions.runTools({…})` convenience helper for using function tool calls with the `/chat/completions` endpoint which automatically call the JavaScript functions you provide and sends their results back to the `/chat/completions` endpoint, looping as long as the model requests tool calls.
+
+For more information see [helpers.md](helpers.md#automated-function-calls).
 
 ## Advanced Usage
 

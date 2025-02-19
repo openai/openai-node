@@ -11,7 +11,7 @@ interface MessageEvent {
 type _WebSocket =
   typeof globalThis extends (
     {
-      WebSocket: infer ws;
+      WebSocket: infer ws extends abstract new (...args: any) => any;
     }
   ) ?
     // @ts-ignore
@@ -53,7 +53,7 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
     props.onURL?.(this.url);
 
     // @ts-ignore
-    this.socket = new WebSocket(this.url, [
+    this.socket = new WebSocket(this.url.toString(), [
       'realtime',
       ...(isAzure(client) ? [] : [`openai-insecure-api-key.${client.apiKey}`]),
       'openai-beta.realtime-v1',
@@ -95,7 +95,7 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
   }
 
   static async azure(
-    client: AzureOpenAI,
+    client: Pick<AzureOpenAI, '_getAzureADToken' | 'apiVersion' | 'apiKey' | 'baseURL' | 'deploymentName'>,
     options: { deploymentName?: string; dangerouslyAllowBrowser?: boolean } = {},
   ): Promise<OpenAIRealtimeWebSocket> {
     const token = await client._getAzureADToken();

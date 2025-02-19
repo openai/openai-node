@@ -75,14 +75,14 @@ export namespace Moderation {
      * execution of wrongdoing, or that gives advice or instruction on how to commit
      * illicit acts. For example, "how to shoplift" would fit this category.
      */
-    illicit: boolean;
+    illicit: boolean | null;
 
     /**
      * Content that includes instructions or advice that facilitate the planning or
      * execution of wrongdoing that also includes violence, or that gives advice or
      * instruction on the procurement of any weapon.
      */
-    'illicit/violent': boolean;
+    'illicit/violent': boolean | null;
 
     /**
      * Content that promotes, encourages, or depicts acts of self-harm, such as

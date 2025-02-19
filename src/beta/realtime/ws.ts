@@ -52,7 +52,7 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
   }
 
   static async azure(
-    client: AzureOpenAI,
+    client: Pick<AzureOpenAI, '_getAzureADToken' | 'apiVersion' | 'apiKey' | 'baseURL' | 'deploymentName'>,
     options: { deploymentName?: string; options?: WS.ClientOptions | undefined } = {},
   ): Promise<OpenAIRealtimeWS> {
     const deploymentName = options.deploymentName ?? client.deploymentName;
@@ -82,7 +82,7 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
   }
 }
 
-async function getAzureHeaders(client: AzureOpenAI) {
+async function getAzureHeaders(client: Pick<AzureOpenAI, '_getAzureADToken' | 'apiKey'>) {
   if (client.apiKey !== '<Missing Key>') {
     return { 'api-key': client.apiKey };
   } else {

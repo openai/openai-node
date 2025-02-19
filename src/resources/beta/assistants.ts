@@ -1134,6 +1134,16 @@ export interface AssistantCreateParams {
   name?: string | null;
 
   /**
+   * **o1 and o3-mini models only**
+   *
+   * Constrains effort on reasoning for
+   * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
+   * supported values are `low`, `medium`, and `high`. Reducing reasoning effort can
+   * result in faster responses and fewer tokens used on reasoning in a response.
+   */
+  reasoning_effort?: 'low' | 'medium' | 'high' | null;
+
+  /**
    * Specifies the format that the model must output. Compatible with
    * [GPT-4o](https://platform.openai.com/docs/models#gpt-4o),
    * [GPT-4 Turbo](https://platform.openai.com/docs/models#gpt-4-turbo-and-gpt-4),
@@ -1288,12 +1298,51 @@ export interface AssistantUpdateParams {
    * [Model overview](https://platform.openai.com/docs/models) for descriptions of
    * them.
    */
-  model?: string;
+  model?:
+    | (string & {})
+    | 'o3-mini'
+    | 'o3-mini-2025-01-31'
+    | 'o1'
+    | 'o1-2024-12-17'
+    | 'gpt-4o'
+    | 'gpt-4o-2024-11-20'
+    | 'gpt-4o-2024-08-06'
+    | 'gpt-4o-2024-05-13'
+    | 'gpt-4o-mini'
+    | 'gpt-4o-mini-2024-07-18'
+    | 'gpt-4-turbo'
+    | 'gpt-4-turbo-2024-04-09'
+    | 'gpt-4-0125-preview'
+    | 'gpt-4-turbo-preview'
+    | 'gpt-4-1106-preview'
+    | 'gpt-4-vision-preview'
+    | 'gpt-4'
+    | 'gpt-4-0314'
+    | 'gpt-4-0613'
+    | 'gpt-4-32k'
+    | 'gpt-4-32k-0314'
+    | 'gpt-4-32k-0613'
+    | 'gpt-3.5-turbo'
+    | 'gpt-3.5-turbo-16k'
+    | 'gpt-3.5-turbo-0613'
+    | 'gpt-3.5-turbo-1106'
+    | 'gpt-3.5-turbo-0125'
+    | 'gpt-3.5-turbo-16k-0613';
 
   /**
    * The name of the assistant. The maximum length is 256 characters.
    */
   name?: string | null;
+
+  /**
+   * **o1 and o3-mini models only**
+   *
+   * Constrains effort on reasoning for
+   * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
+   * supported values are `low`, `medium`, and `high`. Reducing reasoning effort can
+   * result in faster responses and fewer tokens used on reasoning in a response.
+   */
+  reasoning_effort?: 'low' | 'medium' | 'high' | null;
 
   /**
    * Specifies the format that the model must output. Compatible with

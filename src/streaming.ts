@@ -1,6 +1,6 @@
 import { ReadableStream, type Response } from './_shims/index';
 import { OpenAIError } from './error';
-import { LineDecoder } from './internal/decoders/line';
+import { findDoubleNewlineIndex, LineDecoder } from './internal/decoders/line';
 import { ReadableStreamToAsyncIterable } from './internal/stream-utils';
 
 import { APIError } from './error';
@@ -259,37 +259,6 @@ async function* iterSSEChunks(iterator: AsyncIterableIterator<Bytes>): AsyncGene
   }
 }
 
-function findDoubleNewlineIndex(buffer: Uint8Array): number {
-  // This function searches the buffer for the end patterns (\r\r, \n\n, \r\n\r\n)
-  // and returns the index right after the first occurrence of any pattern,
-  // or -1 if none of the patterns are found.
-  const newline = 0x0a; // \n
-  const carriage = 0x0d; // \r
-
-  for (let i = 0; i < buffer.length - 2; i++) {
-    if (buffer[i] === newline && buffer[i + 1] === newline) {
-      // \n\n
-      return i + 2;
-    }
-    if (buffer[i] === carriage && buffer[i + 1] === carriage) {
-      // \r\r
-      return i + 2;
-    }
-    if (
-      buffer[i] === carriage &&
-      buffer[i + 1] === newline &&
-      i + 3 < buffer.length &&
-      buffer[i + 2] === carriage &&
-      buffer[i + 3] === newline
-    ) {
-      // \r\n\r\n
-      return i + 4;
-    }
-  }
-
-  return -1;
-}
-
 class SSEDecoder {
   private data: string[];
   private event: string | null;
@@ -343,17 +312,6 @@ class SSEDecoder {
 
     return null;
   }
-}
-
-/** This is an internal helper function that's just used for testing */
-export function _decodeChunks(chunks: string[]): string[] {
-  const decoder = new LineDecoder();
-  const lines: string[] = [];
-  for (const chunk of chunks) {
-    lines.push(...decoder.decode(chunk));
-  }
-
-  return lines;
 }
 
 function partition(str: string, delimiter: string): [string, string, string] {

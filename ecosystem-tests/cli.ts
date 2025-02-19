@@ -4,10 +4,6 @@ import yargs from 'yargs';
 import assert from 'assert';
 import path from 'path';
 
-// @ts-ignore
-var SegfaultHandler = require('segfault-handler');
-SegfaultHandler.registerHandler('crash.log');
-
 const TAR_NAME = 'openai.tgz';
 const PACK_FOLDER = '.pack';
 const PACK_FILE = `${PACK_FOLDER}/${TAR_NAME}`;
@@ -74,6 +70,7 @@ const projectRunners = {
   'cloudflare-worker': async () => {
     await installPackage();
 
+    await fs.writeFile('.dev.vars', `OPENAI_API_KEY='${process.env['OPENAI_API_KEY']}'`);
     await run('npm', ['run', 'tsc']);
 
     if (state.live) {

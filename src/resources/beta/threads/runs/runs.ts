@@ -732,6 +732,16 @@ export interface RunCreateParamsBase {
   parallel_tool_calls?: boolean;
 
   /**
+   * Body param: **o1 and o3-mini models only**
+   *
+   * Constrains effort on reasoning for
+   * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
+   * supported values are `low`, `medium`, and `high`. Reducing reasoning effort can
+   * result in faster responses and fewer tokens used on reasoning in a response.
+   */
+  reasoning_effort?: 'low' | 'medium' | 'high' | null;
+
+  /**
    * Body param: Specifies the format that the model must output. Compatible with
    * [GPT-4o](https://platform.openai.com/docs/models#gpt-4o),
    * [GPT-4 Turbo](https://platform.openai.com/docs/models#gpt-4-turbo-and-gpt-4),

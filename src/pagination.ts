@@ -43,6 +43,8 @@ export class Page<Item> extends AbstractPage<Item> implements PageResponse<Item>
 
 export interface CursorPageResponse<Item> {
   data: Array<Item>;
+
+  has_more: boolean;
 }
 
 export interface CursorPageParams {
@@ -57,6 +59,8 @@ export class CursorPage<Item extends { id: string }>
 {
   data: Array<Item>;
 
+  has_more: boolean;
+
   constructor(
     client: APIClient,
     response: Response,
@@ -66,10 +70,19 @@ export class CursorPage<Item extends { id: string }>
     super(client, response, body, options);
 
     this.data = body.data || [];
+    this.has_more = body.has_more || false;
   }
 
   getPaginatedItems(): Item[] {
     return this.data ?? [];
+  }
+
+  override hasNextPage(): boolean {
+    if (this.has_more === false) {
+      return false;
+    }
+
+    return super.hasNextPage();
   }
 
   // @deprecated Please use `nextPageInfo()` instead

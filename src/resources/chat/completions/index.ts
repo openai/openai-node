@@ -1,6 +1,5 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-export { Chat, type ChatModel } from './chat';
 export {
   ChatCompletionStoreMessagesPage,
   ChatCompletionsPage,
@@ -46,4 +45,5 @@ export {
   type CompletionUpdateParams,
   type ChatCompletionListParams,
   type CompletionListParams,
-} from './completions/index';
+} from './completions';
+export { Messages, type MessageListParams } from './messages';
