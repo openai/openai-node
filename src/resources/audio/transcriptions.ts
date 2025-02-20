@@ -30,7 +30,7 @@ export class Transcriptions extends APIResource {
   ): APIPromise<TranscriptionCreateResponse | string> {
     return this._client.post(
       '/audio/transcriptions',
-      multipartFormRequestOptions({ body, ...options }, this._client),
+      multipartFormRequestOptions({ body, ...options, __metadata: { model: body.model } }, this._client),
     );
   }
 }

@@ -505,25 +505,25 @@ describe('azure request building', () => {
         });
       });
 
-      test('Audio translations is not handled', async () => {
+      test('handles audio translations', async () => {
         expect(
           await client.audio.translations.create({
             model: deployment,
             file: { url: 'https://example.com', blob: async () => new Blob([]) },
           }),
         ).toMatchObject({
-          url: `https://example.com/openai/audio/translations?api-version=${apiVersion}`,
+          url: `https://example.com/openai/deployments/${deployment}/audio/translations?api-version=${apiVersion}`,
         });
       });
 
-      test('Audio transcriptions is not handled', async () => {
+      test('handles audio transcriptions', async () => {
         expect(
           await client.audio.transcriptions.create({
             model: deployment,
             file: { url: 'https://example.com', blob: async () => new Blob([]) },
           }),
         ).toMatchObject({
-          url: `https://example.com/openai/audio/transcriptions?api-version=${apiVersion}`,
+          url: `https://example.com/openai/deployments/${deployment}/audio/transcriptions?api-version=${apiVersion}`,
         });
       });
 

@@ -22,6 +22,7 @@ export type RequestOptions = {
   signal?: AbortSignal | undefined | null;
   idempotencyKey?: string;
 
+  __metadata?: Record<string, unknown>;
   __binaryResponse?: boolean | undefined;
   __streamClass?: typeof Stream;
 };
