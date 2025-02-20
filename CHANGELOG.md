@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.85.3 (2025-02-20)
+
+Full Changelog: [v4.85.2...v4.85.3](https://github.com/openai/openai-node/compare/v4.85.2...v4.85.3)
+
+### Bug Fixes
+
+* **parsing:** remove tool_calls default empty array ([#1341](https://github.com/openai/openai-node/issues/1341)) ([2672160](https://github.com/openai/openai-node/commit/26721608e61949daa9592483e89b79230bb9198a))
+
 ## 4.85.2 (2025-02-18)
 
 Full Changelog: [v4.85.1...v4.85.2](https://github.com/openai/openai-node/compare/v4.85.1...v4.85.2)
