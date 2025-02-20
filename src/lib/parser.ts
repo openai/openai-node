@@ -119,7 +119,15 @@ export function maybeParseChatCompletion<
       ...completion,
       choices: completion.choices.map((choice) => ({
         ...choice,
-        message: { ...choice.message, parsed: null, tool_calls: choice.message.tool_calls ?? [] },
+        message: {
+          ...choice.message,
+          parsed: null,
+          ...(choice.message.tool_calls ?
+            {
+              tool_calls: choice.message.tool_calls,
+            }
+          : undefined),
+        },
       })),
     };
   }
@@ -144,7 +152,12 @@ export function parseChatCompletion<
       ...choice,
       message: {
         ...choice.message,
-        tool_calls: choice.message.tool_calls?.map((toolCall) => parseToolCall(params, toolCall)) ?? [],
+        ...(choice.message.tool_calls ?
+          {
+            tool_calls:
+              choice.message.tool_calls?.map((toolCall) => parseToolCall(params, toolCall)) ?? undefined,
+          }
+        : undefined),
         parsed:
           choice.message.content && !choice.message.refusal ?
             parseResponseFormat(params, choice.message.content)
