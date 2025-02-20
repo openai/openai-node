@@ -628,7 +628,7 @@ describe('resource completions', () => {
           content: "it's raining",
           parsed: null,
           refusal: null,
-          tool_calls: [],
+          tool_calls: undefined,
         },
       ]);
       expect(listener.functionCallResults).toEqual([`it's raining`]);
@@ -876,7 +876,7 @@ describe('resource completions', () => {
           content: 'there are 3 properties in {"a": 1, "b": 2, "c": 3}',
           parsed: null,
           refusal: null,
-          tool_calls: [],
+          tool_calls: undefined,
         },
       ]);
       expect(listener.functionCallResults).toEqual(['3']);
@@ -1125,7 +1125,7 @@ describe('resource completions', () => {
           content: 'there are 3 properties in {"a": 1, "b": 2, "c": 3}',
           parsed: null,
           refusal: null,
-          tool_calls: [],
+          tool_calls: undefined,
         },
       ]);
       expect(listener.functionCallResults).toEqual([`must be an object`, '3']);
@@ -1443,7 +1443,7 @@ describe('resource completions', () => {
           content: "it's raining",
           parsed: null,
           refusal: null,
-          tool_calls: [],
+          tool_calls: undefined,
         },
       ]);
       expect(listener.functionCallResults).toEqual([
@@ -1572,7 +1572,7 @@ describe('resource completions', () => {
           content: "it's raining",
           parsed: null,
           refusal: null,
-          tool_calls: [],
+          tool_calls: undefined,
         },
       ]);
       expect(listener.eventFunctionCallResults).toEqual([`it's raining`]);
@@ -1795,7 +1795,7 @@ describe('resource completions', () => {
           content: 'there are 3 properties in {"a": 1, "b": 2, "c": 3}',
           parsed: null,
           refusal: null,
-          tool_calls: [],
+          tool_calls: undefined,
         },
       ]);
       expect(listener.eventFunctionCallResults).toEqual(['3']);
@@ -1997,7 +1997,7 @@ describe('resource completions', () => {
           content: 'there are 3 properties in {"a": 1, "b": 2, "c": 3}',
           parsed: null,
           refusal: null,
-          tool_calls: [],
+          tool_calls: undefined,
         },
       ]);
       expect(listener.eventFunctionCallResults).toEqual([`must be an object`, '3']);
@@ -2301,7 +2301,7 @@ describe('resource completions', () => {
           content: "it's raining",
           parsed: null,
           refusal: null,
-          tool_calls: [],
+          tool_calls: undefined,
         },
       ]);
       expect(listener.eventFunctionCallResults).toEqual([
@@ -2347,7 +2347,7 @@ describe('resource completions', () => {
         content: 'The weather is great today!',
         parsed: null,
         refusal: null,
-        tool_calls: [],
+        tool_calls: undefined,
       });
       await listener.sanityCheck();
     });
@@ -2386,7 +2386,7 @@ describe('resource completions', () => {
         content: 'The weather is great today!',
         parsed: null,
         refusal: null,
-        tool_calls: [],
+        tool_calls: undefined,
       });
       await listener.sanityCheck();
     });
