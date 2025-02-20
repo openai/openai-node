@@ -39,7 +39,6 @@ describe('.stream()', () => {
           },
           "refusal": null,
           "role": "assistant",
-          "tool_calls": [],
         },
       }
     `);
@@ -198,7 +197,6 @@ describe('.stream()', () => {
           },
           "refusal": null,
           "role": "assistant",
-          "tool_calls": [],
         },
       }
     `);
@@ -386,7 +384,6 @@ describe('.stream()', () => {
           "parsed": null,
           "refusal": "I'm very sorry, but I can't assist with that request.",
           "role": "assistant",
-          "tool_calls": [],
         },
       }
     `);

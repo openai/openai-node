@@ -39,7 +39,6 @@ describe('.parse()', () => {
             },
             "refusal": null,
             "role": "assistant",
-            "tool_calls": [],
           },
         }
       `);
@@ -154,7 +153,6 @@ describe('.parse()', () => {
           },
           "refusal": null,
           "role": "assistant",
-          "tool_calls": [],
         }
       `);
 
@@ -488,7 +486,6 @@ describe('.parse()', () => {
           },
           "refusal": null,
           "role": "assistant",
-          "tool_calls": [],
         }
       `);
     });
@@ -787,7 +784,6 @@ describe('.parse()', () => {
           },
           "refusal": null,
           "role": "assistant",
-          "tool_calls": [],
         }
       `);
     });
@@ -947,7 +943,6 @@ describe('.parse()', () => {
           },
           "refusal": null,
           "role": "assistant",
-          "tool_calls": [],
         }
       `);
     });
@@ -1061,7 +1056,6 @@ describe('.parse()', () => {
           },
           "refusal": null,
           "role": "assistant",
-          "tool_calls": [],
         }
       `);
     });

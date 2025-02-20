@@ -47,7 +47,7 @@ export interface ParsedFunctionToolCall extends ChatCompletionMessageToolCall {
 
 export interface ParsedChatCompletionMessage<ParsedT> extends ChatCompletionMessage {
   parsed: ParsedT | null;
-  tool_calls: Array<ParsedFunctionToolCall>;
+  tool_calls?: Array<ParsedFunctionToolCall>;
 }
 
 export interface ParsedChoice<ParsedT> extends ChatCompletion.Choice {
