@@ -388,6 +388,20 @@ const { data: stream, request_id } = await openai.chat.completions
   .withResponse();
 ```
 
+## Realtime API Beta
+
+The Realtime API enables you to build low-latency, multi-modal conversational experiences. It currently supports text and audio as both input and output, as well as [function calling](https://platform.openai.com/docs/guides/function-calling) through a `WebSocket` connection.
+
+```ts
+import { OpenAIRealtimeWebSocket } from 'openai/beta/realtime/websocket';
+
+const rt = new OpenAIRealtimeWebSocket({ model: 'gpt-4o-realtime-preview-2024-12-17' });
+
+rt.on('response.text.delta', (event) => process.stdout.write(event.delta));
+```
+
+For more information see [realtime.md](realtime.md).
+
 ## Microsoft Azure OpenAI
 
 To use this library with [Azure OpenAI](https://learn.microsoft.com/azure/ai-services/openai/overview), use the `AzureOpenAI`
