@@ -64,6 +64,9 @@ describe('request id', () => {
           }),
           controller: {} as any,
           options: {} as any,
+          requestLogID: 'log_...',
+          retryOfRequestLogID: undefined,
+          startTime: Date.now(),
         };
       })(),
     )._thenUnwrap((d) => d.data);
@@ -97,6 +100,9 @@ describe('request id', () => {
           }),
           controller: {} as any,
           options: {} as any,
+          requestLogID: 'log_...',
+          retryOfRequestLogID: undefined,
+          startTime: Date.now(),
         };
       })(),
     );
@@ -117,6 +123,9 @@ describe('request id', () => {
           }),
           controller: {} as any,
           options: {} as any,
+          requestLogID: 'log_...',
+          retryOfRequestLogID: undefined,
+          startTime: Date.now(),
         };
       })(),
     );
