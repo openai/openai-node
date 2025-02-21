@@ -35,17 +35,25 @@ export class APIError<
     this.code = data?.['code'];
     this.param = data?.['param'];
     this.type = data?.['type'];
+  }
 
+  // New helper function to format the error message
+  private static formatErrorMessage(error: any): string {
+    if (!error) return '';
+
+    if (typeof error.message === 'string') {
+      return error.message
+        .replace(/'/g, '"') // Convert single quotes to double quotes
+        .replace(/\(\s*([^()]+?)\s*\)/g, (_, content) => `[${content.split(/\s*,\s*/).join(', ')}]`);
+      // Convert tuples of any length to arrays
+    }
+
+    return JSON.stringify(error.message ?? error);
   }
 
   private static makeMessage(status: number | undefined, error: any, message: string | undefined) {
     const msg =
-      error?.message ?
-        typeof error.message === 'string' ?
-          error.message
-            .replace(/'/g, '"') // Convert single quotes to double quotes
-            .replace(/\(\s*([^,]+),\s*([^,]+)\s*\)/g, '[$1, $2]') // Convert tuples to arrays (e.g., ('body', 'input') -> ["body", "input"])
-        : JSON.stringify(error.message)
+      error?.message ? APIError.formatErrorMessage(error)
       : error ? JSON.stringify(error)
       : message;
 
