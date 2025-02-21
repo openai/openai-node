@@ -15,6 +15,17 @@ export const castToError = (err: any): Error => {
   if (err instanceof Error) return err;
   if (typeof err === 'object' && err !== null) {
     try {
+      if (Object.prototype.toString.call(err) === '[object Error]') {
+        // @ts-ignore - not all envs have native support for cause yet
+        const error = new Error(err.message, err.cause ? { cause: err.cause } : {});
+        if (err.stack) error.stack = err.stack;
+        // @ts-ignore - not all envs have native support for cause yet
+        if (err.cause && !error.cause) error.cause = err.cause;
+        if (err.name) error.name = err.name;
+        throw error;
+      }
+    } catch {}
+    try {
       return new Error(JSON.stringify(err));
     } catch {}
   }
