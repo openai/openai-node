@@ -22,7 +22,7 @@ export const castToError = (err: any): Error => {
         // @ts-ignore - not all envs have native support for cause yet
         if (err.cause && !error.cause) error.cause = err.cause;
         if (err.name) error.name = err.name;
-        throw error;
+        return error;
       }
     } catch {}
     try {
