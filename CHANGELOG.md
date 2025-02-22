@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.85.4 (2025-02-22)
+
+Full Changelog: [v4.85.3...v4.85.4](https://github.com/openai/openai-node/compare/v4.85.3...v4.85.4)
+
+### Chores
+
+* **internal:** fix devcontainers setup ([#1343](https://github.com/openai/openai-node/issues/1343)) ([cb1ec90](https://github.com/openai/openai-node/commit/cb1ec907832e325bc29abe94ae325e0477cb87d1))
+
 ## 4.85.3 (2025-02-20)
 
 Full Changelog: [v4.85.2...v4.85.3](https://github.com/openai/openai-node/compare/v4.85.2...v4.85.3)
