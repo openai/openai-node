@@ -13,28 +13,29 @@ export class Embeddings extends APIResource {
   ): Core.APIPromise<CreateEmbeddingResponse> {
     Core.debug('request', 'Sending request with arguments:', { body, ...options });
 
-    const hasUserProvidedEncodingFormat = body.encoding_format !== undefined;
-    let encoding_format: 'float' | 'base64' = 'float'; // current API defaults to float
+    const hasUserProvidedEncodingFormat = !!body.encoding_format;
+    let encoding_format: EmbeddingCreateParams['encoding_format'] =
+      hasUserProvidedEncodingFormat ? body.encoding_format : 'base64';
 
-    if (hasUserProvidedEncodingFormat === false) {
+    if (hasUserProvidedEncodingFormat) {
+      Core.debug('Request', 'User defined encoding_format:', body.encoding_format);
+    } else {
       // No encoding_format specified, defaulting to base64 for performance reasons
       // See https://github.com/openai/openai-node/pull/1312
       encoding_format = 'base64';
-    } else {
-      Core.debug('Request', 'User defined encoding_format:', body.encoding_format);
     }
 
-    const response = this._client.post<EmbeddingCreateParams, CreateEmbeddingResponse>('/embeddings', {
+    const response = this._client.post('/embeddings', {
       body: {
         ...body,
-        encoding_format,
+        encoding_format: encoding_format as EmbeddingCreateParams['encoding_format'],
       },
       ...options,
     });
 
     // if the user specified an encoding_format, return the response as-is
     if (hasUserProvidedEncodingFormat) {
-      return response;
+      return response as Core.APIPromise<CreateEmbeddingResponse>;
     }
 
     // in this stage, we are sure the user did not specify an encoding_format
@@ -44,7 +45,7 @@ export class Embeddings extends APIResource {
     Core.debug('response', `User requested encoding_format=${encoding_format || 'default'}`);
     Core.debug('response', 'Decoding base64 embeddings to float32 array');
 
-    return response._thenUnwrap((response) => {
+    return (response as Core.APIPromise<CreateEmbeddingResponse>)._thenUnwrap((response) => {
       if (response && response.data) {
         response.data.forEach((embeddingBase64Obj) => {
           const embeddingBase64Str = embeddingBase64Obj.embedding as unknown as string;
