@@ -37,11 +37,8 @@ export class Embeddings extends APIResource {
       return base64Response._thenUnwrap((response) => {
         if (response && response.data) {
           response.data.forEach((embeddingBase64Obj) => {
-            console.log(embeddingBase64Obj);
             const embeddingBase64Str = embeddingBase64Obj.embedding as unknown as string;
-            embeddingBase64Obj.embedding = Array.from(
-              new Float32Array(Buffer.from(embeddingBase64Str, 'base64').buffer),
-            );
+            embeddingBase64Obj.embedding = Core.toFloat32Array(embeddingBase64Str);
           });
           Core.debug('response', 'Decoded embeddings:', response.data);
         }
