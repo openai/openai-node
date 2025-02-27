@@ -13,7 +13,7 @@ npm install git+ssh://git@github.com:stainless-sdks/openai-typescript.git
 ```
 
 > [!NOTE]
-> Once this package is [published to npm](https://app.stainlessapi.com/docs/guides/publish), this will become: `npm install openai`
+> Once this package is [published to npm](https://app.stainless.com/docs/guides/publish), this will become: `npm install openai`
 
 ## Usage
 
