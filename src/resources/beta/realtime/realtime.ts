@@ -1796,11 +1796,14 @@ export interface SessionCreatedEvent {
 
 /**
  * Send this event to update the session’s default configuration. The client may
- * send this event at any time to update the session configuration, and any field
- * may be updated at any time, except for "voice". The server will respond with a
- * `session.updated` event that shows the full effective configuration. Only fields
- * that are present are updated, thus the correct way to clear a field like
- * "instructions" is to pass an empty string.
+ * send this event at any time to update any field, except for `voice`. However,
+ * note that once a session has been initialized with a particular `model`, it
+ * can’t be changed to another model using `session.update`.
+ *
+ * When the server receives a `session.update`, it will respond with a
+ * `session.updated` event showing the full, effective configuration. Only the
+ * fields that are present are updated. To clear a field like `instructions`, pass
+ * an empty string.
  */
 export interface SessionUpdateEvent {
   /**
@@ -1982,10 +1985,17 @@ export namespace SessionUpdateEvent {
      */
     export interface TurnDetection {
       /**
-       * Whether or not to automatically generate a response when VAD is enabled. `true`
-       * by default.
+       * Whether or not to automatically generate a response when a VAD stop event
+       * occurs. `true` by default.
        */
       create_response?: boolean;
+
+      /**
+       * Whether or not to automatically interrupt any ongoing response with output to
+       * the default conversation (i.e. `conversation` of `auto`) when a VAD start event
+       * occurs. `true` by default.
+       */
+      interrupt_response?: boolean;
 
       /**
        * Amount of audio to include before the VAD detected speech (in milliseconds).
