@@ -86,7 +86,7 @@ export interface Upload {
   created_at: number;
 
   /**
-   * The Unix timestamp (in seconds) for when the Upload was created.
+   * The Unix timestamp (in seconds) for when the Upload will expire.
    */
   expires_at: number;
 
