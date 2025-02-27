@@ -174,6 +174,11 @@ export interface FileObject {
   status: 'uploaded' | 'processed' | 'error';
 
   /**
+   * The Unix timestamp (in seconds) for when the file will expire.
+   */
+  expires_at?: number;
+
+  /**
    * @deprecated Deprecated. For details on why a fine-tuning training file failed
    * validation, see the `error` field on `fine_tuning.job`.
    */
