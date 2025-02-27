@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.86.1 (2025-02-27)
+
+Full Changelog: [v4.86.0...v4.86.1](https://github.com/openai/openai-node/compare/v4.86.0...v4.86.1)
+
+### Documentation
+
+* update URLs from stainlessapi.com to stainless.com ([#1352](https://github.com/openai/openai-node/issues/1352)) ([8294e9e](https://github.com/openai/openai-node/commit/8294e9ef57ed98722105b56d205ebea9d028f671))
+
 ## 4.86.0 (2025-02-27)
 
 Full Changelog: [v4.85.4...v4.86.0](https://github.com/openai/openai-node/compare/v4.85.4...v4.86.0)
