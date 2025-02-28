@@ -51,7 +51,6 @@ it(`raw response`, async function () {
     })
     .asResponse();
 
-  // test that we can use node-fetch Response API
   const chunks: string[] = [];
   if (!response.body) throw new Error(`expected response.body to be defined`);
 

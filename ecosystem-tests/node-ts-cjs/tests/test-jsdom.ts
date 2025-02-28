@@ -1,11 +1,8 @@
 /**
- * @jest-environment jsdom
+ * @jest-environment jest-fixed-jsdom
  */
 import OpenAI, { toFile } from 'openai';
-import fetch from 'node-fetch';
 import { distance } from 'fastest-levenshtein';
-// @ts-ignore
-import { TextEncoder } from 'text-encoding-polyfill';
 
 const url = 'https://audio-samples.github.io/samples/mp3/blizzard_biased/sample-1.mp3';
 const filename = 'sample-1.mp3';
@@ -17,8 +14,6 @@ const model = 'whisper-1';
 const client = new OpenAI({
   apiKey: process.env['OPENAI_API_KEY'],
   dangerouslyAllowBrowser: true,
-  // @ts-expect-error node-fetch types are not compatible
-  fetch,
 });
 
 async function typeTests() {

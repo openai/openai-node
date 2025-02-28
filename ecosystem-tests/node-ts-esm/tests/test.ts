@@ -1,6 +1,5 @@
 import OpenAI, { toFile } from 'openai';
 import { TranscriptionCreateParams } from 'openai/resources/audio/transcriptions';
-import fetch from 'node-fetch';
 import { File as FormDataFile, Blob as FormDataBlob } from 'formdata-node';
 import * as fs from 'fs';
 import { distance } from 'fastest-levenshtein';
@@ -66,17 +65,6 @@ it(`streaming works`, async function () {
     chunks.push(part);
   }
   expect(chunks.map((c) => c.choices[0]?.delta.content || '').join('')).toBeSimilarTo('This is a test', 10);
-});
-
-it('handles formdata-node File', async function () {
-  const file = await fetch(url)
-    .then((x) => x.arrayBuffer())
-    .then((x) => new FormDataFile([x], filename));
-
-  const params: TranscriptionCreateParams = { file, model };
-
-  const result = await client.audio.transcriptions.create(params);
-  expect(result.text).toBeSimilarTo(correctAnswer, 12);
 });
 
 if (typeof File !== 'undefined') {
@@ -153,5 +141,18 @@ describe('toFile', () => {
       purpose: 'fine-tune',
     });
     expect(result.filename).toEqual('finetune.jsonl');
+  });
+
+  it('handles formdata-node File', async function () {
+    const file = await fetch(url)
+      .then((x) => x.arrayBuffer())
+      .then((x) => toFile(new FormDataFile([x], filename)));
+
+    expect(file.name).toEqual(filename);
+  
+    const params: TranscriptionCreateParams = { file, model };
+  
+    const result = await client.audio.transcriptions.create(params);
+    expect(result.text).toBeSimilarTo(correctAnswer, 12);
   });
 });
