@@ -23,11 +23,13 @@ export class APIError<
   readonly request_id: string | null | undefined;
 
   constructor(status: TStatus, error: TError, message: string | undefined, headers: THeaders) {
-    super(`${APIError.makeMessage(status, error, message)}`);
+    // Always format message when constructing
+    const formattedMessage = APIError.makeMessage(status, error, message);
+    super(formattedMessage); // Use formatted message directly
     this.status = status;
     this.headers = headers;
     this.request_id = headers?.['x-request-id'];
-    this.error = error;
+    this.error = formattedMessage;
 
     const data = error as Record<string, any>;
     this.code = data?.['code'];
@@ -35,12 +37,23 @@ export class APIError<
     this.type = data?.['type'];
   }
 
+  // New helper function to format the error message
+  private static formatErrorMessage(error: any): string {
+    if (!error) return '';
+
+    if (typeof error.message === 'string') {
+      return error.message
+        .replace(/'/g, '"') // Convert single quotes to double quotes
+        .replace(/\(\s*([^()]+?)\s*\)/g, (_, content) => `[${content.split(/\s*,\s*/).join(', ')}]`);
+      // Convert tuples of any length to arrays
+    }
+
+    return JSON.stringify(error.message ?? error);
+  }
+
   private static makeMessage(status: number | undefined, error: any, message: string | undefined) {
     const msg =
-      error?.message ?
-        typeof error.message === 'string' ?
-          error.message
-        : JSON.stringify(error.message)
+      error?.message ? APIError.formatErrorMessage(error)
       : error ? JSON.stringify(error)
       : message;
 
@@ -100,6 +113,7 @@ export class APIError<
       return new InternalServerError(status, error, message, headers);
     }
 
+    // Default to a generic APIError if no specific handling
     return new APIError(status, error, message, headers);
   }
 }
