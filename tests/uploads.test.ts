@@ -14,12 +14,6 @@ function mockResponse({ url, content }: { url: string; content?: Blob }): Respon
   };
 }
 
-beforeEach(() => {
-  // The file shim captures the global File object when it's first imported.
-  // Reset modules before each test so we can test the error thrown when it's undefined.
-  jest.resetModules();
-});
-
 describe('toFile', () => {
   it('throws a helpful error for mismatched types', async () => {
     await expect(
@@ -80,10 +74,22 @@ describe('toFile', () => {
 });
 
 describe('missing File error message', () => {
+  let prevFile: unknown;
   beforeEach(() => {
+    // The file shim captures the global File object when it's first imported.
+    // Reset modules before each test so we can test the error thrown when it's undefined.
+    jest.resetModules();
+    // @ts-ignore
+    prevFile = globalThis.File;
     // @ts-ignore
     globalThis.File = undefined;
     require('node:buffer').File = undefined;
+  });
+  afterEach(() => {
+    // Clean up
+    // @ts-ignore
+    globalThis.File = prevFile;
+    jest.resetModules();
   });
 
   test('is thrown', async () => {
