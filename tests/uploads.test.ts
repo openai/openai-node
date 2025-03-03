@@ -74,21 +74,25 @@ describe('toFile', () => {
 });
 
 describe('missing File error message', () => {
-  let prevFile: unknown;
+  let prevGlobalFile: unknown;
+  let prevNodeFile: unknown;
   beforeEach(() => {
     // The file shim captures the global File object when it's first imported.
     // Reset modules before each test so we can test the error thrown when it's undefined.
     jest.resetModules();
+    const buffer = require('node:buffer');
     // @ts-ignore
-    prevFile = globalThis.File;
+    prevGlobalFile = globalThis.File;
+    prevNodeFile = buffer.File;
     // @ts-ignore
     globalThis.File = undefined;
-    require('node:buffer').File = undefined;
+    buffer.File = undefined;
   });
   afterEach(() => {
     // Clean up
     // @ts-ignore
-    globalThis.File = prevFile;
+    globalThis.File = prevGlobalFile;
+    require('node:buffer').File = prevNodeFile;
     jest.resetModules();
   });
 
