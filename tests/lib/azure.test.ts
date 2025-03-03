@@ -1,6 +1,7 @@
 import { AzureOpenAI } from 'openai';
 import { APIUserAbortError } from 'openai';
 import { type Response, RequestInit, RequestInfo } from 'openai/internal/builtin-types';
+import { File } from 'node:buffer';
 
 const defaultFetch = fetch;
 
