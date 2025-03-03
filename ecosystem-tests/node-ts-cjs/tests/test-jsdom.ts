@@ -80,7 +80,7 @@ it(`streaming works`, async function () {
 
 it.skip('handles builtinFile', async function () {
   const file = await fetch(url)
-    .then((x) => x.arrayBuffer())
+    .then((x) => x.blob())
     .then((x) => new File([x], filename));
 
   const result = await client.audio.transcriptions.create({ file, model });

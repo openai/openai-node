@@ -4,6 +4,7 @@ import { File as FormDataFile, Blob as FormDataBlob } from 'formdata-node';
 import * as fs from 'fs';
 import { distance } from 'fastest-levenshtein';
 import { ChatCompletion } from 'openai/resources/chat/completions';
+import { File } from 'node:buffer';
 
 const url = 'https://audio-samples.github.io/samples/mp3/blizzard_biased/sample-1.mp3';
 const filename = 'sample-1.mp3';
@@ -166,9 +167,9 @@ describe('toFile', () => {
       .then((x) => toFile(new FormDataFile([x], filename)));
 
     expect(file.name).toEqual(filename);
-  
+
     const params: TranscriptionCreateParams = { file, model };
-  
+
     const result = await client.audio.transcriptions.create(params);
     expect(result.text).toBeSimilarTo(correctAnswer, 12);
   });
