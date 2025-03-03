@@ -51,6 +51,9 @@
     "ws": "^8.18.0",
     "zod": "^3.23.8"
   },
+  "resolutions": {
+    "synckit": "0.8.8"
+  },
   "imports": {
     "openai": ".",
     "openai/*": "./src/*"
