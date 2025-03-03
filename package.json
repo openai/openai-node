@@ -46,6 +46,9 @@
     "tsconfig-paths": "^4.0.0",
     "typescript": "^4.8.2"
   },
+  "resolutions": {
+    "synckit": "0.8.8"
+  },
   "imports": {
     "openai": ".",
     "openai/*": "./src/*"

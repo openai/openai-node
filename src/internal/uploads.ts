@@ -128,7 +128,8 @@ export const createForm = async <T = Record<string, unknown>>(
 
 // We check for Blob not File because Bun.File doesn't inherit from File,
 // but they both inherit from Blob and have a `name` property at runtime.
-const isNamedBlob = (value: object) => value instanceof File || (value instanceof Blob && 'name' in value);
+const isNamedBlob = (value: object) =>
+  (File && value instanceof File) || (value instanceof Blob && 'name' in value);
 
 const isUploadable = (value: unknown) =>
   typeof value === 'object' &&
