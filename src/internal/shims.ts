@@ -20,62 +20,6 @@ export function getDefaultFetch(): Fetch {
   );
 }
 
-/**
- * A minimal copy of the NodeJS `stream.Readable` class so that we can
- * accept the NodeJS types in certain places, e.g. file uploads
- *
- * https://nodejs.org/api/stream.html#class-streamreadable
- */
-export interface ReadableLike {
-  readable: boolean;
-  readonly readableEnded: boolean;
-  readonly readableFlowing: boolean | null;
-  readonly readableHighWaterMark: number;
-  readonly readableLength: number;
-  readonly readableObjectMode: boolean;
-  destroyed: boolean;
-  read(size?: number): any;
-  pause(): this;
-  resume(): this;
-  isPaused(): boolean;
-  destroy(error?: Error): this;
-  [Symbol.asyncIterator](): AsyncIterableIterator<any>;
-}
-
-/**
- * Determines if the given value looks like a NodeJS `stream.Readable`
- * object and that it is readable, i.e. has not been consumed.
- *
- * https://nodejs.org/api/stream.html#class-streamreadable
- */
-export function isReadableLike(value: any) {
-  // We declare our own class of Readable here, so it's not feasible to
-  // do an 'instanceof' check. Instead, check for Readable-like properties.
-  return !!value && value.readable === true && typeof value.read === 'function';
-}
-
-/**
- * A minimal copy of the NodeJS `fs.ReadStream` class for usage within file uploads.
- *
- * https://nodejs.org/api/fs.html#class-fsreadstream
- */
-export interface FsReadStreamLike extends ReadableLike {
-  path: {}; // real type is string | Buffer but we can't reference `Buffer` here
-}
-
-/**
- * Determines if the given value looks like a NodeJS `fs.ReadStream`
- * object.
- *
- * This just checks if the object matches our `Readable` interface
- * and defines a `path` property, there may be false positives.
- *
- * https://nodejs.org/api/fs.html#class-fsreadstream
- */
-export function isFsReadStreamLike(value: any): value is FsReadStreamLike {
-  return isReadableLike(value) && 'path' in value;
-}
-
 type ReadableStreamArgs = ConstructorParameters<typeof ReadableStream>;
 
 export function makeReadableStream(...args: ReadableStreamArgs): ReadableStream {

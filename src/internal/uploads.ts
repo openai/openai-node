@@ -1,11 +1,16 @@
 import { type RequestOptions } from './request-options';
 import type { FilePropertyBag, Fetch } from './builtin-types';
-import { isFsReadStreamLike, type FsReadStreamLike } from './shims';
 import type { OpenAI } from '../client';
-import './polyfill/file.node.js';
+import { File } from './shims/file.node.js';
+import { ReadableStreamFrom } from './shims';
 
-type BlobLikePart = string | ArrayBuffer | ArrayBufferView | BlobLike | DataView;
-type BlobPart = string | ArrayBuffer | ArrayBufferView | Blob | DataView;
+export type BlobPart = string | ArrayBuffer | ArrayBufferView | Blob | DataView;
+type FsReadStream = AsyncIterable<Uint8Array> & { path: string | { toString(): string } };
+
+// https://github.com/oven-sh/bun/issues/5980
+interface BunFile extends Blob {
+  readonly name?: string | undefined;
+}
 
 /**
  * Typically, this is a native "File" class.
@@ -16,188 +21,41 @@ type BlobPart = string | ArrayBuffer | ArrayBufferView | Blob | DataView;
  * For convenience, you can also pass a fetch Response, or in Node,
  * the result of fs.createReadStream().
  */
-export type Uploadable = FileLike | ResponseLike | FsReadStreamLike;
-
-/**
- * Intended to match DOM Blob, node-fetch Blob, node:buffer Blob, etc.
- * Don't add arrayBuffer here, node-fetch doesn't have it
- */
-interface BlobLike {
-  /** [MDN Reference](https://developer.mozilla.org/docs/Web/API/Blob/size) */
-  readonly size: number;
-  /** [MDN Reference](https://developer.mozilla.org/docs/Web/API/Blob/type) */
-  readonly type: string;
-  /** [MDN Reference](https://developer.mozilla.org/docs/Web/API/Blob/text) */
-  text(): Promise<string>;
-  /** [MDN Reference](https://developer.mozilla.org/docs/Web/API/Blob/slice) */
-  slice(start?: number, end?: number): BlobLike;
-}
-
-/**
- * This check adds the arrayBuffer() method type because it is available and used at runtime
- */
-const isBlobLike = (value: any): value is BlobLike & { arrayBuffer(): Promise<ArrayBuffer> } =>
-  value != null &&
-  typeof value === 'object' &&
-  typeof value.size === 'number' &&
-  typeof value.type === 'string' &&
-  typeof value.text === 'function' &&
-  typeof value.slice === 'function' &&
-  typeof value.arrayBuffer === 'function';
-
-/**
- * Intended to match DOM File, node:buffer File, undici File, etc.
- */
-interface FileLike extends BlobLike {
-  /** [MDN Reference](https://developer.mozilla.org/docs/Web/API/File/lastModified) */
-  readonly lastModified: number;
-  /** [MDN Reference](https://developer.mozilla.org/docs/Web/API/File/name) */
-  readonly name?: string | undefined;
-}
-declare var FileClass: {
-  prototype: FileLike;
-  new (fileBits: BlobPart[], fileName: string, options?: FilePropertyBag): FileLike;
-};
-
-/**
- * This check adds the arrayBuffer() method type because it is available and used at runtime
- */
-const isFileLike = (value: any): value is FileLike & { arrayBuffer(): Promise<ArrayBuffer> } =>
-  value != null &&
-  typeof value === 'object' &&
-  typeof value.name === 'string' &&
-  typeof value.lastModified === 'number' &&
-  isBlobLike(value);
-
-/**
- * Intended to match DOM Response, node-fetch Response, undici Response, etc.
- */
-export interface ResponseLike {
-  url: string;
-  blob(): Promise<BlobLike>;
-}
-
-const isResponseLike = (value: any): value is ResponseLike =>
-  value != null &&
-  typeof value === 'object' &&
-  typeof value.url === 'string' &&
-  typeof value.blob === 'function';
-
-const isUploadable = (value: any): value is Uploadable => {
-  return isFileLike(value) || isResponseLike(value) || isFsReadStreamLike(value);
-};
-
-type ToFileInput = Uploadable | Exclude<BlobLikePart, string> | AsyncIterable<BlobLikePart>;
+export type Uploadable = File | Response | FsReadStream | BunFile;
 
 /**
  * Construct a `File` instance. This is used to ensure a helpful error is thrown
- * for environments that don't define a global `File` yet and so that we don't
- * accidentally rely on a global `File` type in our annotations.
+ * for environments that don't define a global `File` yet.
  */
-function makeFile(fileBits: BlobPart[], fileName: string, options?: FilePropertyBag): FileLike {
-  const File = (globalThis as any).File as typeof FileClass | undefined;
+export function makeFile(
+  fileBits: BlobPart[],
+  fileName: string | undefined,
+  options?: FilePropertyBag,
+): File {
   if (typeof File === 'undefined') {
     throw new Error('`File` is not defined as a global which is required for file uploads');
   }
 
-  return new File(fileBits, fileName, options);
+  return new File(fileBits as any, fileName ?? 'unknown_file', options);
 }
 
-/**
- * Helper for creating a {@link File} to pass to an SDK upload method from a variety of different data formats
- * @param value the raw content of the file.  Can be an {@link Uploadable}, {@link BlobLikePart}, or {@link AsyncIterable} of {@link BlobLikePart}s
- * @param {string=} name the name of the file. If omitted, toFile will try to determine a file name from bits if possible
- * @param {Object=} options additional properties
- * @param {string=} options.type the MIME type of the content
- * @param {number=} options.lastModified the last modified timestamp
- * @returns a {@link File} with the given properties
- */
-export async function toFile(
-  value: ToFileInput | PromiseLike<ToFileInput>,
-  name?: string | null | undefined,
-  options?: FilePropertyBag | undefined,
-): Promise<FileLike> {
-  // If it's a promise, resolve it.
-  value = await value;
-
-  // If we've been given a `File` we don't need to do anything
-  if (isFileLike(value)) {
-    const File = (globalThis as any).File as typeof FileClass | undefined;
-    if (File && value instanceof File) {
-      return value;
-    }
-    return makeFile([await value.arrayBuffer()], value.name ?? 'unknown_file');
-  }
-
-  if (isResponseLike(value)) {
-    const blob = await value.blob();
-    name ||= new URL(value.url).pathname.split(/[\\/]/).pop() ?? 'unknown_file';
-
-    return makeFile(await getBytes(blob), name, options);
-  }
-
-  const parts = await getBytes(value);
-
-  name ||= getName(value) ?? 'unknown_file';
-
-  if (!options?.type) {
-    const type = parts.find((part) => typeof part === 'object' && 'type' in part && part.type);
-    if (typeof type === 'string') {
-      options = { ...options, type };
-    }
-  }
-
-  return makeFile(parts, name, options);
-}
-
-export async function getBytes(
-  value: Uploadable | BlobLikePart | AsyncIterable<BlobLikePart>,
-): Promise<Array<BlobPart>> {
-  let parts: Array<BlobPart> = [];
-  if (
-    typeof value === 'string' ||
-    ArrayBuffer.isView(value) || // includes Uint8Array, Buffer, etc.
-    value instanceof ArrayBuffer
-  ) {
-    parts.push(value);
-  } else if (isBlobLike(value)) {
-    parts.push(value instanceof Blob ? value : await value.arrayBuffer());
-  } else if (
-    isAsyncIterableIterator(value) // includes Readable, ReadableStream, etc.
-  ) {
-    for await (const chunk of value) {
-      parts.push(...(await getBytes(chunk as BlobLikePart))); // TODO, consider validating?
-    }
-  } else {
-    const constructor = value?.constructor?.name;
-    throw new Error(
-      `Unexpected data type: ${typeof value}${
-        constructor ? `; constructor: ${constructor}` : ''
-      }${propsForError(value)}`,
-    );
-  }
-
-  return parts;
-}
-
-function propsForError(value: unknown): string {
-  if (typeof value !== 'object' || value === null) return '';
-  const props = Object.getOwnPropertyNames(value);
-  return `; props: [${props.map((p) => `"${p}"`).join(', ')}]`;
-}
-
-function getName(value: unknown): string | undefined {
+export function getName(value: any): string | undefined {
   return (
-    (typeof value === 'object' &&
-      value !== null &&
-      (('name' in value && String(value.name)) ||
-        ('filename' in value && String(value.filename)) ||
-        ('path' in value && String(value.path).split(/[\\/]/).pop()))) ||
-    undefined
+    (
+      (typeof value === 'object' &&
+        value !== null &&
+        (('name' in value && value.name && String(value.name)) ||
+          ('url' in value && value.url && String(value.url)) ||
+          ('filename' in value && value.filename && String(value.filename)) ||
+          ('path' in value && value.path && String(value.path)))) ||
+      ''
+    )
+      .split(/[\\/]/)
+      .pop() || undefined
   );
 }
 
-const isAsyncIterableIterator = (value: any): value is AsyncIterableIterator<unknown> =>
+export const isAsyncIterable = (value: any): value is AsyncIterable<any> =>
   value != null && typeof value === 'object' && typeof value[Symbol.asyncIterator] === 'function';
 
 /**
@@ -268,6 +126,15 @@ export const createForm = async <T = Record<string, unknown>>(
   return form;
 };
 
+// We check for Blob not File because Bun.File doesn't inherit from File,
+// but they both inherit from Blob and have a `name` property at runtime.
+const isNamedBlob = (value: object) => value instanceof File || (value instanceof Blob && 'name' in value);
+
+const isUploadable = (value: unknown) =>
+  typeof value === 'object' &&
+  value !== null &&
+  (value instanceof Response || isAsyncIterable(value) || isNamedBlob(value));
+
 const hasUploadableValue = (value: unknown): boolean => {
   if (isUploadable(value)) return true;
   if (Array.isArray(value)) return value.some(hasUploadableValue);
@@ -290,9 +157,12 @@ const addFormValue = async (form: FormData, key: string, value: unknown): Promis
   // TODO: make nested formats configurable
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
     form.append(key, String(value));
-  } else if (isUploadable(value)) {
-    const file = await toFile(value);
-    form.append(key, file as any);
+  } else if (value instanceof Response) {
+    form.append(key, makeFile([await value.blob()], getName(value)));
+  } else if (isAsyncIterable(value)) {
+    form.append(key, makeFile([await new Response(ReadableStreamFrom(value)).blob()], getName(value)));
+  } else if (isNamedBlob(value)) {
+    form.append(key, value, getName(value));
   } else if (Array.isArray(value)) {
     await Promise.all(value.map((entry) => addFormValue(form, key + '[]', entry)));
   } else if (typeof value === 'object') {

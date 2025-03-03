@@ -1,6 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { crypto } from '../polyfill/crypto.node';
+import { crypto } from '../shims/crypto.node.js';
 
 /**
  * https://stackoverflow.com/a/2117523
