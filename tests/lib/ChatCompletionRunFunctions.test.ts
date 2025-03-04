@@ -4,9 +4,9 @@ import { PassThrough } from 'stream';
 import {
   ParsingToolFunction,
   type ChatCompletionRunner,
-  type ChatCompletionFunctionRunnerParams,
+  type ChatCompletionToolRunnerParams,
   ChatCompletionStreamingRunner,
-  type ChatCompletionStreamingFunctionRunnerParams,
+  type ChatCompletionStreamingToolRunnerParams,
 } from 'openai/resources/beta/chat/completions';
 import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
 import { isAssistantMessage } from '../../src/lib/chatCompletionUtils';
@@ -18,12 +18,12 @@ function mockChatCompletionFetch() {
   const { fetch, handleRequest: handleRawRequest } = mockFetch();
 
   function handleRequest(
-    handler: (body: ChatCompletionFunctionRunnerParams<any[]>) => Promise<OpenAI.Chat.ChatCompletion>,
+    handler: (body: ChatCompletionToolRunnerParams<any[]>) => Promise<OpenAI.Chat.ChatCompletion>,
   ): Promise<void> {
     return handleRawRequest(async (req, init) => {
       const rawBody = init?.body;
       if (typeof rawBody !== 'string') throw new Error(`expected init.body to be a string`);
-      const body: ChatCompletionFunctionRunnerParams<any[]> = JSON.parse(rawBody);
+      const body: ChatCompletionToolRunnerParams<any[]> = JSON.parse(rawBody);
       return new Response(JSON.stringify(await handler(body)), {
         headers: { 'Content-Type': 'application/json' },
       });
@@ -39,13 +39,13 @@ function mockStreamingChatCompletionFetch() {
 
   function handleRequest(
     handler: (
-      body: ChatCompletionStreamingFunctionRunnerParams<any[]>,
+      body: ChatCompletionStreamingToolRunnerParams<any[]>,
     ) => AsyncIterable<OpenAI.Chat.ChatCompletionChunk>,
   ): Promise<void> {
     return handleRawRequest(async (req, init) => {
       const rawBody = init?.body;
       if (typeof rawBody !== 'string') throw new Error(`expected init.body to be a string`);
-      const body: ChatCompletionStreamingFunctionRunnerParams<any[]> = JSON.parse(rawBody);
+      const body: ChatCompletionStreamingToolRunnerParams<any[]> = JSON.parse(rawBody);
       const stream = new PassThrough();
       (async () => {
         for await (const chunk of handler(body)) {
@@ -627,7 +627,7 @@ describe('resource completions', () => {
           content: "it's raining",
           parsed: null,
           refusal: null,
-          tool_calls: [],
+          tool_calls: undefined,
         },
       ]);
       expect(listener.functionCallResults).toEqual([`it's raining`]);
@@ -875,7 +875,7 @@ describe('resource completions', () => {
           content: 'there are 3 properties in {"a": 1, "b": 2, "c": 3}',
           parsed: null,
           refusal: null,
-          tool_calls: [],
+          tool_calls: undefined,
         },
       ]);
       expect(listener.functionCallResults).toEqual(['3']);
@@ -1124,7 +1124,7 @@ describe('resource completions', () => {
           content: 'there are 3 properties in {"a": 1, "b": 2, "c": 3}',
           parsed: null,
           refusal: null,
-          tool_calls: [],
+          tool_calls: undefined,
         },
       ]);
       expect(listener.functionCallResults).toEqual([`must be an object`, '3']);
@@ -1442,7 +1442,7 @@ describe('resource completions', () => {
           content: "it's raining",
           parsed: null,
           refusal: null,
-          tool_calls: [],
+          tool_calls: undefined,
         },
       ]);
       expect(listener.functionCallResults).toEqual([
@@ -1571,7 +1571,7 @@ describe('resource completions', () => {
           content: "it's raining",
           parsed: null,
           refusal: null,
-          tool_calls: [],
+          tool_calls: undefined,
         },
       ]);
       expect(listener.eventFunctionCallResults).toEqual([`it's raining`]);
@@ -1794,7 +1794,7 @@ describe('resource completions', () => {
           content: 'there are 3 properties in {"a": 1, "b": 2, "c": 3}',
           parsed: null,
           refusal: null,
-          tool_calls: [],
+          tool_calls: undefined,
         },
       ]);
       expect(listener.eventFunctionCallResults).toEqual(['3']);
@@ -1996,7 +1996,7 @@ describe('resource completions', () => {
           content: 'there are 3 properties in {"a": 1, "b": 2, "c": 3}',
           parsed: null,
           refusal: null,
-          tool_calls: [],
+          tool_calls: undefined,
         },
       ]);
       expect(listener.eventFunctionCallResults).toEqual([`must be an object`, '3']);
@@ -2300,7 +2300,7 @@ describe('resource completions', () => {
           content: "it's raining",
           parsed: null,
           refusal: null,
-          tool_calls: [],
+          tool_calls: undefined,
         },
       ]);
       expect(listener.eventFunctionCallResults).toEqual([
@@ -2346,7 +2346,7 @@ describe('resource completions', () => {
         content: 'The weather is great today!',
         parsed: null,
         refusal: null,
-        tool_calls: [],
+        tool_calls: undefined,
       });
       await listener.sanityCheck();
     });
@@ -2385,7 +2385,7 @@ describe('resource completions', () => {
         content: 'The weather is great today!',
         parsed: null,
         refusal: null,
-        tool_calls: [],
+        tool_calls: undefined,
       });
       await listener.sanityCheck();
     });

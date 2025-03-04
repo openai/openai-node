@@ -4,8 +4,9 @@ import { APIResource } from '../../resource';
 import * as AudioAPI from './audio';
 import * as TranscriptionsAPI from './transcriptions';
 import { APIPromise } from '../../api-promise';
-import { type Uploadable, multipartFormRequestOptions } from '../../uploads';
+import { type Uploadable } from '../../uploads';
 import { RequestOptions } from '../../internal/request-options';
+import { multipartFormRequestOptions } from '../../internal/uploads';
 
 export class Translations extends APIResource {
   /**
@@ -25,7 +26,10 @@ export class Translations extends APIResource {
     body: TranslationCreateParams,
     options?: RequestOptions,
   ): APIPromise<TranslationCreateResponse | string> {
-    return this._client.post('/audio/translations', multipartFormRequestOptions({ body, ...options }));
+    return this._client.post(
+      '/audio/translations',
+      multipartFormRequestOptions({ body, ...options, __metadata: { model: body.model } }, this._client),
+    );
   }
 }
 
@@ -37,7 +41,7 @@ export interface TranslationVerbose {
   /**
    * The duration of the input audio.
    */
-  duration: string;
+  duration: number;
 
   /**
    * The language of the output translation (always `english`).

@@ -10,8 +10,7 @@
   },
   "dependencies": {
     "formdata-node": "^5.0.1",
-    "import-in-the-middle": "^1.11.2",
-    "node-fetch": "^3.0.0"
+    "import-in-the-middle": "^1.11.2"
   },
   "devDependencies": {
     "@types/node": "^20.3.1",

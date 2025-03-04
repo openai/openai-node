@@ -50,14 +50,14 @@ async function postprocess() {
     if (entry.isDirectory() && entry.name !== 'src' && entry.name !== 'internal' && entry.name !== 'bin') {
       const subpath = './' + entry.name;
       newExports[subpath + '/*.mjs'] = {
-        default: subpath + '/*.mjs',
+        default: [subpath + '/*.mjs', subpath + '/*/index.mjs'],
       };
       newExports[subpath + '/*.js'] = {
-        default: subpath + '/*.js',
+        default: [subpath + '/*.js', subpath + '/*/index.js'],
       };
       newExports[subpath + '/*'] = {
-        import: subpath + '/*.mjs',
-        require: subpath + '/*.js',
+        import: [subpath + '/*.mjs', subpath + '/*/index.mjs'],
+        require: [subpath + '/*.js', subpath + '/*/index.js'],
       };
     } else if (entry.isFile() && /\.[cm]?js$/.test(entry.name)) {
       const { name, ext } = path.parse(entry.name);

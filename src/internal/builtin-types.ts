@@ -1,6 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-export type Fetch = typeof fetch;
+export type Fetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 /**
  * An alias to the builtin `RequestInit` type so we can

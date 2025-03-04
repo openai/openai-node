@@ -1,11 +1,13 @@
 import { OpenAIError } from './error';
 import { type ReadableStream } from './internal/shim-types';
 import { makeReadableStream } from './internal/shims';
-import { LineDecoder } from './internal/decoders/line';
+import { findDoubleNewlineIndex, LineDecoder } from './internal/decoders/line';
+import { ReadableStreamToAsyncIterable } from './internal/shims';
+import { isAbortError } from './internal/errors';
 
 import { APIError } from './error';
 
-type Bytes = string | ArrayBuffer | Uint8Array | Buffer | null | undefined;
+type Bytes = string | ArrayBuffer | Uint8Array | null | undefined;
 
 export type ServerSentEvent = {
   event: string | null;
@@ -76,7 +78,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
         done = true;
       } catch (e) {
         // If the user calls `stream.controller.abort()`, we should exit without throwing.
-        if (e instanceof Error && e.name === 'AbortError') return;
+        if (isAbortError(e)) return;
         throw e;
       } finally {
         // If the user `break`s, abort the ongoing request.
@@ -97,7 +99,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
     async function* iterLines(): AsyncGenerator<string, void, unknown> {
       const lineDecoder = new LineDecoder();
 
-      const iter = readableStreamAsyncIterable<Bytes>(readableStream);
+      const iter = ReadableStreamToAsyncIterable<Bytes>(readableStream);
       for await (const chunk of iter) {
         for (const line of lineDecoder.decode(chunk)) {
           yield line;
@@ -123,7 +125,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
         done = true;
       } catch (e) {
         // If the user calls `stream.controller.abort()`, we should exit without throwing.
-        if (e instanceof Error && e.name === 'AbortError') return;
+        if (isAbortError(e)) return;
         throw e;
       } finally {
         // If the user `break`s, abort the ongoing request.
@@ -174,7 +176,9 @@ export class Stream<Item> implements AsyncIterable<Item> {
   toReadableStream(): ReadableStream {
     const self = this;
     let iter: AsyncIterator<Item>;
-    const encoder = new TextEncoder();
+    const encoder: {
+      encode(str: string): Uint8Array;
+    } = new (globalThis as any).TextEncoder();
 
     return makeReadableStream({
       async start() {
@@ -205,13 +209,21 @@ export async function* _iterSSEMessages(
 ): AsyncGenerator<ServerSentEvent, void, unknown> {
   if (!response.body) {
     controller.abort();
+    if (
+      typeof (globalThis as any).navigator !== 'undefined' &&
+      (globalThis as any).navigator.product === 'ReactNative'
+    ) {
+      throw new OpenAIError(
+        `The default react-native fetch implementation does not support streaming. Please use expo/fetch: https://docs.expo.dev/versions/latest/sdk/expo/#expofetch-api`,
+      );
+    }
     throw new OpenAIError(`Attempted to iterate over a response with no body`);
   }
 
   const sseDecoder = new SSEDecoder();
   const lineDecoder = new LineDecoder();
 
-  const iter = readableStreamAsyncIterable<Bytes>(response.body);
+  const iter = ReadableStreamToAsyncIterable<Bytes>(response.body);
   for await (const sseChunk of iterSSEChunks(iter)) {
     for (const line of lineDecoder.decode(sseChunk)) {
       const sse = sseDecoder.decode(line);
@@ -239,7 +251,7 @@ async function* iterSSEChunks(iterator: AsyncIterableIterator<Bytes>): AsyncGene
 
     const binaryChunk =
       chunk instanceof ArrayBuffer ? new Uint8Array(chunk)
-      : typeof chunk === 'string' ? new TextEncoder().encode(chunk)
+      : typeof chunk === 'string' ? new (globalThis as any).TextEncoder().encode(chunk)
       : chunk;
 
     let newData = new Uint8Array(data.length + binaryChunk.length);
@@ -257,37 +269,6 @@ async function* iterSSEChunks(iterator: AsyncIterableIterator<Bytes>): AsyncGene
   if (data.length > 0) {
     yield data;
   }
-}
-
-function findDoubleNewlineIndex(buffer: Uint8Array): number {
-  // This function searches the buffer for the end patterns (\r\r, \n\n, \r\n\r\n)
-  // and returns the index right after the first occurrence of any pattern,
-  // or -1 if none of the patterns are found.
-  const newline = 0x0a; // \n
-  const carriage = 0x0d; // \r
-
-  for (let i = 0; i < buffer.length - 2; i++) {
-    if (buffer[i] === newline && buffer[i + 1] === newline) {
-      // \n\n
-      return i + 2;
-    }
-    if (buffer[i] === carriage && buffer[i + 1] === carriage) {
-      // \r\r
-      return i + 2;
-    }
-    if (
-      buffer[i] === carriage &&
-      buffer[i + 1] === newline &&
-      i + 3 < buffer.length &&
-      buffer[i + 2] === carriage &&
-      buffer[i + 3] === newline
-    ) {
-      // \r\n\r\n
-      return i + 4;
-    }
-  }
-
-  return -1;
 }
 
 class SSEDecoder {
@@ -345,17 +326,6 @@ class SSEDecoder {
   }
 }
 
-/** This is an internal helper function that's just used for testing */
-export function _decodeChunks(chunks: string[]): string[] {
-  const decoder = new LineDecoder();
-  const lines: string[] = [];
-  for (const chunk of chunks) {
-    lines.push(...decoder.decode(chunk));
-  }
-
-  return lines;
-}
-
 function partition(str: string, delimiter: string): [string, string, string] {
   const index = str.indexOf(delimiter);
   if (index !== -1) {
@@ -363,37 +333,4 @@ function partition(str: string, delimiter: string): [string, string, string] {
   }
 
   return [str, '', ''];
-}
-
-/**
- * Most browsers don't yet have async iterable support for ReadableStream,
- * and Node has a very different way of reading bytes from its "ReadableStream".
- *
- * This polyfill was pulled from https://github.com/MattiasBuelens/web-streams-polyfill/pull/122#issuecomment-1627354490
- */
-export function readableStreamAsyncIterable<T>(stream: any): AsyncIterableIterator<T> {
-  if (stream[Symbol.asyncIterator]) return stream;
-
-  const reader = stream.getReader();
-  return {
-    async next() {
-      try {
-        const result = await reader.read();
-        if (result?.done) reader.releaseLock(); // release lock when stream becomes closed
-        return result;
-      } catch (e) {
-        reader.releaseLock(); // release lock when stream becomes errored
-        throw e;
-      }
-    },
-    async return() {
-      const cancelPromise = reader.cancel();
-      reader.releaseLock();
-      await cancelPromise;
-      return { done: true, value: undefined };
-    },
-    [Symbol.asyncIterator]() {
-      return this;
-    },
-  };
 }

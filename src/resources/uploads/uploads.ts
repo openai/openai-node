@@ -6,6 +6,7 @@ import * as PartsAPI from './parts';
 import { PartCreateParams, Parts, UploadPart } from './parts';
 import { APIPromise } from '../../api-promise';
 import { RequestOptions } from '../../internal/request-options';
+import { path } from '../../internal/utils/path';
 
 export class Uploads extends APIResource {
   parts: PartsAPI.Parts = new PartsAPI.Parts(this._client);
@@ -40,7 +41,7 @@ export class Uploads extends APIResource {
    * Cancels the Upload. No Parts may be added after an Upload is cancelled.
    */
   cancel(uploadID: string, options?: RequestOptions): APIPromise<Upload> {
-    return this._client.post(`/uploads/${uploadID}/cancel`, options);
+    return this._client.post(path`/uploads/${uploadID}/cancel`, options);
   }
 
   /**
@@ -59,7 +60,7 @@ export class Uploads extends APIResource {
    * an Upload is completed.
    */
   complete(uploadID: string, body: UploadCompleteParams, options?: RequestOptions): APIPromise<Upload> {
-    return this._client.post(`/uploads/${uploadID}/complete`, { body, ...options });
+    return this._client.post(path`/uploads/${uploadID}/complete`, { body, ...options });
   }
 }
 
@@ -83,7 +84,7 @@ export interface Upload {
   created_at: number;
 
   /**
-   * The Unix timestamp (in seconds) for when the Upload was created.
+   * The Unix timestamp (in seconds) for when the Upload will expire.
    */
   expires_at: number;
 
@@ -110,7 +111,7 @@ export interface Upload {
   status: 'pending' | 'completed' | 'cancelled' | 'expired';
 
   /**
-   * The ready File object after the Upload is completed.
+   * The `File` object represents a document that has been uploaded to OpenAI.
    */
   file?: FilesAPI.FileObject | null;
 }

@@ -2,9 +2,11 @@
 
 import { APIResource } from '../resource';
 import * as BatchesAPI from './batches';
+import * as Shared from './shared';
 import { APIPromise } from '../api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../pagination';
 import { RequestOptions } from '../internal/request-options';
+import { path } from '../internal/utils/path';
 
 export class Batches extends APIResource {
   /**
@@ -18,7 +20,7 @@ export class Batches extends APIResource {
    * Retrieves a batch.
    */
   retrieve(batchID: string, options?: RequestOptions): APIPromise<Batch> {
-    return this._client.get(`/batches/${batchID}`, options);
+    return this._client.get(path`/batches/${batchID}`, options);
   }
 
   /**
@@ -37,7 +39,7 @@ export class Batches extends APIResource {
    * (if any) available in the output file.
    */
   cancel(batchID: string, options?: RequestOptions): APIPromise<Batch> {
-    return this._client.post(`/batches/${batchID}/cancel`, options);
+    return this._client.post(path`/batches/${batchID}/cancel`, options);
   }
 }
 
@@ -133,11 +135,13 @@ export interface Batch {
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
-   * for storing additional information about the object in a structured format. Keys
-   * can be a maximum of 64 characters long and values can be a maxium of 512
-   * characters long.
+   * for storing additional information about the object in a structured format, and
+   * querying for objects via API or the dashboard.
+   *
+   * Keys are strings with a maximum length of 64 characters. Values are strings with
+   * a maximum length of 512 characters.
    */
-  metadata?: unknown | null;
+  metadata?: Shared.Metadata | null;
 
   /**
    * The ID of the file containing the outputs of successfully executed requests.
@@ -232,9 +236,14 @@ export interface BatchCreateParams {
   input_file_id: string;
 
   /**
-   * Optional custom metadata for the batch.
+   * Set of 16 key-value pairs that can be attached to an object. This can be useful
+   * for storing additional information about the object in a structured format, and
+   * querying for objects via API or the dashboard.
+   *
+   * Keys are strings with a maximum length of 64 characters. Values are strings with
+   * a maximum length of 512 characters.
    */
-  metadata?: Record<string, string> | null;
+  metadata?: Shared.Metadata | null;
 }
 
 export interface BatchListParams extends CursorPageParams {}

@@ -1,6 +1,7 @@
 import { AzureOpenAI } from 'openai';
 import { APIUserAbortError } from 'openai';
 import { type Response, RequestInit, RequestInfo } from 'openai/internal/builtin-types';
+import { File } from 'node:buffer';
 
 const defaultFetch = fetch;
 
@@ -376,7 +377,7 @@ describe('azure request building', () => {
         expect(
           await client.audio.translations.create({
             model,
-            file: { url: 'https://example.com', blob: () => 0 as any },
+            file: new File([], ''),
           }),
         ).toMatchObject({
           url: `https://example.com/openai/deployments/${deployment}/audio/translations?api-version=${apiVersion}`,
@@ -387,7 +388,7 @@ describe('azure request building', () => {
         expect(
           await client.audio.transcriptions.create({
             model,
-            file: { url: 'https://example.com', blob: () => 0 as any },
+            file: new File([], ''),
           }),
         ).toMatchObject({
           url: `https://example.com/openai/deployments/${deployment}/audio/transcriptions?api-version=${apiVersion}`,
@@ -432,7 +433,7 @@ describe('azure request building', () => {
       test('handles files', async () => {
         expect(
           await client.files.create({
-            file: { url: 'https://example.com', blob: () => 0 as any },
+            file: new File([], ''),
             purpose: 'assistants',
           }),
         ).toMatchObject({
@@ -505,25 +506,25 @@ describe('azure request building', () => {
         });
       });
 
-      test('Audio translations is not handled', async () => {
+      test('handles audio translations', async () => {
         expect(
           await client.audio.translations.create({
             model: deployment,
-            file: { url: 'https://example.com', blob: () => 0 as any },
+            file: new File([], ''),
           }),
         ).toMatchObject({
-          url: `https://example.com/openai/audio/translations?api-version=${apiVersion}`,
+          url: `https://example.com/openai/deployments/${deployment}/audio/translations?api-version=${apiVersion}`,
         });
       });
 
-      test('Audio transcriptions is not handled', async () => {
+      test('handles audio transcriptions', async () => {
         expect(
           await client.audio.transcriptions.create({
             model: deployment,
-            file: { url: 'https://example.com', blob: () => 0 as any },
+            file: new File([], ''),
           }),
         ).toMatchObject({
-          url: `https://example.com/openai/audio/transcriptions?api-version=${apiVersion}`,
+          url: `https://example.com/openai/deployments/${deployment}/audio/transcriptions?api-version=${apiVersion}`,
         });
       });
 
@@ -565,7 +566,7 @@ describe('azure request building', () => {
       test('handles files', async () => {
         expect(
           await client.files.create({
-            file: { url: 'https://example.com', blob: () => 0 as any },
+            file: new File([], ''),
             purpose: 'assistants',
           }),
         ).toMatchObject({

@@ -3,6 +3,7 @@
 import { APIResource } from '../../../resource';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../pagination';
 import { RequestOptions } from '../../../internal/request-options';
+import { path } from '../../../internal/utils/path';
 
 export class Checkpoints extends APIResource {
   /**
@@ -14,7 +15,7 @@ export class Checkpoints extends APIResource {
     options?: RequestOptions,
   ): PagePromise<FineTuningJobCheckpointsPage, FineTuningJobCheckpoint> {
     return this._client.getAPIList(
-      `/fine_tuning/jobs/${fineTuningJobID}/checkpoints`,
+      path`/fine_tuning/jobs/${fineTuningJobID}/checkpoints`,
       CursorPage<FineTuningJobCheckpoint>,
       { query, ...options },
     );

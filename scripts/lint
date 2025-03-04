@@ -5,10 +5,13 @@ set -e
 cd "$(dirname "$0")/.."
 
 echo "==> Running eslint"
-ESLINT_USE_FLAT_CONFIG="false" ./node_modules/.bin/eslint --ext ts,js .
+./node_modules/.bin/eslint .
 
 echo "==> Building"
-./scripts/build # also checks types
+./scripts/build
+
+echo "==> Checking types"
+./node_modules/typescript/bin/tsc
 
 echo "==> Running Are The Types Wrong?"
 ./node_modules/.bin/attw --pack dist -f json >.attw.json || true

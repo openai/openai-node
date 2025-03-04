@@ -1,34 +1,6 @@
-import { PassThrough } from 'stream';
 import assert from 'assert';
-import { _iterSSEMessages, _decodeChunks as decodeChunks } from 'openai/streaming';
-
-describe('line decoder', () => {
-  test('basic', () => {
-    // baz is not included because the line hasn't ended yet
-    expect(decodeChunks(['foo', ' bar\nbaz'])).toEqual(['foo bar']);
-  });
-
-  test('basic with \\r', () => {
-    // baz is not included because the line hasn't ended yet
-    expect(decodeChunks(['foo', ' bar\r\nbaz'])).toEqual(['foo bar']);
-  });
-
-  test('trailing new lines', () => {
-    expect(decodeChunks(['foo', ' bar', 'baz\n', 'thing\n'])).toEqual(['foo barbaz', 'thing']);
-  });
-
-  test('trailing new lines with \\r', () => {
-    expect(decodeChunks(['foo', ' bar', 'baz\r\n', 'thing\r\n'])).toEqual(['foo barbaz', 'thing']);
-  });
-
-  test('escaped new lines', () => {
-    expect(decodeChunks(['foo', ' bar\\nbaz\n'])).toEqual(['foo bar\\nbaz']);
-  });
-
-  test('escaped new lines with \\r', () => {
-    expect(decodeChunks(['foo', ' bar\\r\\nbaz\n'])).toEqual(['foo bar\\r\\nbaz']);
-  });
-});
+import { _iterSSEMessages } from 'openai/streaming';
+import { ReadableStreamFrom } from 'openai/internal/shims';
 
 describe('streaming decoding', () => {
   test('basic', async () => {
@@ -38,7 +10,7 @@ describe('streaming decoding', () => {
       yield Buffer.from('\n');
     }
 
-    const stream = _iterSSEMessages(new Response(await iteratorToStream(body())), new AbortController())[
+    const stream = _iterSSEMessages(new Response(ReadableStreamFrom(body())), new AbortController())[
       Symbol.asyncIterator
     ]();
 
@@ -56,7 +28,7 @@ describe('streaming decoding', () => {
       yield Buffer.from('\n');
     }
 
-    const stream = _iterSSEMessages(new Response(await iteratorToStream(body())), new AbortController())[
+    const stream = _iterSSEMessages(new Response(ReadableStreamFrom(body())), new AbortController())[
       Symbol.asyncIterator
     ]();
 
@@ -75,7 +47,7 @@ describe('streaming decoding', () => {
       yield Buffer.from('\n');
     }
 
-    const stream = _iterSSEMessages(new Response(await iteratorToStream(body())), new AbortController())[
+    const stream = _iterSSEMessages(new Response(ReadableStreamFrom(body())), new AbortController())[
       Symbol.asyncIterator
     ]();
 
@@ -96,7 +68,7 @@ describe('streaming decoding', () => {
       yield Buffer.from('\n');
     }
 
-    const stream = _iterSSEMessages(new Response(await iteratorToStream(body())), new AbortController())[
+    const stream = _iterSSEMessages(new Response(ReadableStreamFrom(body())), new AbortController())[
       Symbol.asyncIterator
     ]();
 
@@ -124,7 +96,7 @@ describe('streaming decoding', () => {
       yield Buffer.from('\n');
     }
 
-    const stream = _iterSSEMessages(new Response(await iteratorToStream(body())), new AbortController())[
+    const stream = _iterSSEMessages(new Response(ReadableStreamFrom(body())), new AbortController())[
       Symbol.asyncIterator
     ]();
 
@@ -153,7 +125,7 @@ describe('streaming decoding', () => {
       yield Buffer.from('\n\n');
     }
 
-    const stream = _iterSSEMessages(new Response(await iteratorToStream(body())), new AbortController())[
+    const stream = _iterSSEMessages(new Response(ReadableStreamFrom(body())), new AbortController())[
       Symbol.asyncIterator
     ]();
 
@@ -174,7 +146,7 @@ describe('streaming decoding', () => {
       yield Buffer.from('\n\n');
     }
 
-    const stream = _iterSSEMessages(new Response(await iteratorToStream(body())), new AbortController())[
+    const stream = _iterSSEMessages(new Response(ReadableStreamFrom(body())), new AbortController())[
       Symbol.asyncIterator
     ]();
 
@@ -199,7 +171,7 @@ describe('streaming decoding', () => {
       yield Buffer.from('\n');
     }
 
-    const stream = _iterSSEMessages(new Response(await iteratorToStream(body())), new AbortController())[
+    const stream = _iterSSEMessages(new Response(ReadableStreamFrom(body())), new AbortController())[
       Symbol.asyncIterator
     ]();
 
@@ -232,7 +204,7 @@ describe('streaming decoding', () => {
       yield Buffer.from('\n');
     }
 
-    const stream = _iterSSEMessages(new Response(await iteratorToStream(body())), new AbortController())[
+    const stream = _iterSSEMessages(new Response(ReadableStreamFrom(body())), new AbortController())[
       Symbol.asyncIterator
     ]();
 
@@ -245,27 +217,3 @@ describe('streaming decoding', () => {
     expect(event.done).toBeTruthy();
   });
 });
-
-async function iteratorToStream(iterator: AsyncGenerator<any>): Promise<PassThrough> {
-  const parts: unknown[] = [];
-
-  for await (const chunk of iterator) {
-    parts.push(chunk);
-  }
-
-  let index = 0;
-
-  const stream = new PassThrough({
-    read() {
-      const value = parts[index];
-      if (value === undefined) {
-        stream.end();
-      } else {
-        index += 1;
-        stream.write(value);
-      }
-    },
-  });
-
-  return stream;
-}

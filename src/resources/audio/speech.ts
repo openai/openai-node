@@ -2,6 +2,7 @@
 
 import { APIResource } from '../../resource';
 import { APIPromise } from '../../api-promise';
+import { buildHeaders } from '../../internal/headers';
 import { RequestOptions } from '../../internal/request-options';
 
 export class Speech extends APIResource {
@@ -9,7 +10,12 @@ export class Speech extends APIResource {
    * Generates audio from the input text.
    */
   create(body: SpeechCreateParams, options?: RequestOptions): APIPromise<Response> {
-    return this._client.post('/audio/speech', { body, ...options, __binaryResponse: true });
+    return this._client.post('/audio/speech', {
+      body,
+      ...options,
+      headers: buildHeaders([{ Accept: 'application/octet-stream' }, options?.headers]),
+      __binaryResponse: true,
+    });
   }
 }
 
@@ -28,12 +34,12 @@ export interface SpeechCreateParams {
   model: (string & {}) | SpeechModel;
 
   /**
-   * The voice to use when generating the audio. Supported voices are `alloy`,
-   * `echo`, `fable`, `onyx`, `nova`, and `shimmer`. Previews of the voices are
-   * available in the
+   * The voice to use when generating the audio. Supported voices are `alloy`, `ash`,
+   * `coral`, `echo`, `fable`, `onyx`, `nova`, `sage` and `shimmer`. Previews of the
+   * voices are available in the
    * [Text to speech guide](https://platform.openai.com/docs/guides/text-to-speech#voice-options).
    */
-  voice: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
+  voice: 'alloy' | 'ash' | 'coral' | 'echo' | 'fable' | 'onyx' | 'nova' | 'sage' | 'shimmer';
 
   /**
    * The format to audio in. Supported formats are `mp3`, `opus`, `aac`, `flac`,

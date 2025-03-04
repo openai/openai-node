@@ -25,7 +25,11 @@ function getDetectedPlatform(): DetectedPlatform {
   if (typeof EdgeRuntime !== 'undefined') {
     return 'edge';
   }
-  if (Object.prototype.toString.call(typeof process !== 'undefined' ? process : 0) === '[object process]') {
+  if (
+    Object.prototype.toString.call(
+      typeof (globalThis as any).process !== 'undefined' ? (globalThis as any).process : 0,
+    ) === '[object process]'
+  ) {
     return 'node';
   }
   return 'unknown';
@@ -73,7 +77,7 @@ const getPlatformProperties = (): PlatformProperties => {
       'X-Stainless-OS': 'Unknown',
       'X-Stainless-Arch': `other:${EdgeRuntime}`,
       'X-Stainless-Runtime': 'edge',
-      'X-Stainless-Runtime-Version': process.version,
+      'X-Stainless-Runtime-Version': (globalThis as any).process.version,
     };
   }
   // Check if Node.js
@@ -81,10 +85,10 @@ const getPlatformProperties = (): PlatformProperties => {
     return {
       'X-Stainless-Lang': 'js',
       'X-Stainless-Package-Version': VERSION,
-      'X-Stainless-OS': normalizePlatform(process.platform),
-      'X-Stainless-Arch': normalizeArch(process.arch),
+      'X-Stainless-OS': normalizePlatform((globalThis as any).process.platform),
+      'X-Stainless-Arch': normalizeArch((globalThis as any).process.arch),
       'X-Stainless-Runtime': 'node',
-      'X-Stainless-Runtime-Version': process.version,
+      'X-Stainless-Runtime-Version': (globalThis as any).process.version,
     };
   }
 

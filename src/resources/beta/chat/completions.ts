@@ -3,7 +3,6 @@
 import { APIResource } from '../../../resource';
 import { ChatCompletionRunner } from '../../../lib/ChatCompletionRunner';
 import { ChatCompletionStreamingRunner } from '../../../lib/ChatCompletionStreamingRunner';
-import { RunnerOptions } from '../../../lib/AbstractChatCompletionRunner';
 import { ChatCompletionToolRunnerParams } from '../../../lib/ChatCompletionRunner';
 import { ChatCompletionStreamingToolRunnerParams } from '../../../lib/ChatCompletionStreamingRunner';
 import { ChatCompletionStream, type ChatCompletionStreamParams } from '../../../lib/ChatCompletionStream';
@@ -14,28 +13,21 @@ import {
   ChatCompletionMessageToolCall,
 } from '../../chat/completions';
 import { ExtractParsedContentFromParams, parseChatCompletion, validateInputTools } from '../../../lib/parser';
+import { RequestOptions } from '../../../internal/request-options';
+import { type APIPromise } from '../../../api-promise';
+import { RunnerOptions } from '../../../lib/AbstractChatCompletionRunner';
 
-export {
-  ChatCompletionStreamingRunner,
-  type ChatCompletionStreamingFunctionRunnerParams,
-} from '../../../lib/ChatCompletionStreamingRunner';
+export { ChatCompletionStream, type ChatCompletionStreamParams } from '../../../lib/ChatCompletionStream';
+export { ChatCompletionRunner } from '../../../lib/ChatCompletionRunner';
+export { ChatCompletionStreamingRunner } from '../../../lib/ChatCompletionStreamingRunner';
 export {
   type RunnableFunction,
-  type RunnableFunctions,
   type RunnableFunctionWithParse,
   type RunnableFunctionWithoutParse,
-  ParsingFunction,
   ParsingToolFunction,
 } from '../../../lib/RunnableFunction';
 export { type ChatCompletionToolRunnerParams } from '../../../lib/ChatCompletionRunner';
 export { type ChatCompletionStreamingToolRunnerParams } from '../../../lib/ChatCompletionStreamingRunner';
-export { ChatCompletionStream, type ChatCompletionStreamParams } from '../../../lib/ChatCompletionStream';
-export {
-  ChatCompletionRunner,
-  type ChatCompletionFunctionRunnerParams,
-} from '../../../lib/ChatCompletionRunner';
-import { RequestOptions } from '../../../internal/request-options';
-import { type APIPromise } from '../../../index';
 
 export interface ParsedFunction extends ChatCompletionMessageToolCall.Function {
   parsed_arguments?: unknown;
@@ -47,7 +39,7 @@ export interface ParsedFunctionToolCall extends ChatCompletionMessageToolCall {
 
 export interface ParsedChatCompletionMessage<ParsedT> extends ChatCompletionMessage {
   parsed: ParsedT | null;
-  tool_calls: Array<ParsedFunctionToolCall>;
+  tool_calls?: Array<ParsedFunctionToolCall>;
 }
 
 export interface ParsedChoice<ParsedT> extends ChatCompletion.Choice {

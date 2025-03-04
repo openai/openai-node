@@ -18,8 +18,5 @@
 		"ts-jest": "^29.1.0",
 		"typescript": "5.0.4",
 		"wrangler": "^3.74.0"
-	},
-	"dependencies": {
-		"node-fetch": "^3.3.1"
 	}
 }

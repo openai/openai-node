@@ -10,7 +10,9 @@ import * as RunsAPI from './threads/runs/runs';
 import * as StepsAPI from './threads/runs/steps';
 import { APIPromise } from '../../api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../pagination';
+import { buildHeaders } from '../../internal/headers';
 import { RequestOptions } from '../../internal/request-options';
+import { path } from '../../internal/utils/path';
 
 export class Assistants extends APIResource {
   /**
@@ -20,7 +22,7 @@ export class Assistants extends APIResource {
     return this._client.post('/assistants', {
       body,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 
@@ -28,9 +30,9 @@ export class Assistants extends APIResource {
    * Retrieves an assistant.
    */
   retrieve(assistantID: string, options?: RequestOptions): APIPromise<Assistant> {
-    return this._client.get(`/assistants/${assistantID}`, {
+    return this._client.get(path`/assistants/${assistantID}`, {
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 
@@ -38,10 +40,10 @@ export class Assistants extends APIResource {
    * Modifies an assistant.
    */
   update(assistantID: string, body: AssistantUpdateParams, options?: RequestOptions): APIPromise<Assistant> {
-    return this._client.post(`/assistants/${assistantID}`, {
+    return this._client.post(path`/assistants/${assistantID}`, {
       body,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 
@@ -55,7 +57,7 @@ export class Assistants extends APIResource {
     return this._client.getAPIList('/assistants', CursorPage<Assistant>, {
       query,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 
@@ -63,9 +65,9 @@ export class Assistants extends APIResource {
    * Delete an assistant.
    */
   delete(assistantID: string, options?: RequestOptions): APIPromise<AssistantDeleted> {
-    return this._client.delete(`/assistants/${assistantID}`, {
+    return this._client.delete(path`/assistants/${assistantID}`, {
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 }
@@ -99,11 +101,13 @@ export interface Assistant {
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
-   * for storing additional information about the object in a structured format. Keys
-   * can be a maximum of 64 characters long and values can be a maxium of 512
-   * characters long.
+   * for storing additional information about the object in a structured format, and
+   * querying for objects via API or the dashboard.
+   *
+   * Keys are strings with a maximum length of 64 characters. Values are strings with
+   * a maximum length of 512 characters.
    */
-  metadata: unknown | null;
+  metadata: Shared.Metadata | null;
 
   /**
    * ID of the model to use. You can use the
@@ -1106,16 +1110,28 @@ export interface AssistantCreateParams {
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
-   * for storing additional information about the object in a structured format. Keys
-   * can be a maximum of 64 characters long and values can be a maxium of 512
-   * characters long.
+   * for storing additional information about the object in a structured format, and
+   * querying for objects via API or the dashboard.
+   *
+   * Keys are strings with a maximum length of 64 characters. Values are strings with
+   * a maximum length of 512 characters.
    */
-  metadata?: unknown | null;
+  metadata?: Shared.Metadata | null;
 
   /**
    * The name of the assistant. The maximum length is 256 characters.
    */
   name?: string | null;
+
+  /**
+   * **o1 and o3-mini models only**
+   *
+   * Constrains effort on reasoning for
+   * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
+   * supported values are `low`, `medium`, and `high`. Reducing reasoning effort can
+   * result in faster responses and fewer tokens used on reasoning in a response.
+   */
+  reasoning_effort?: 'low' | 'medium' | 'high' | null;
 
   /**
    * Specifies the format that the model must output. Compatible with
@@ -1230,12 +1246,14 @@ export namespace AssistantCreateParams {
         file_ids?: Array<string>;
 
         /**
-         * Set of 16 key-value pairs that can be attached to a vector store. This can be
-         * useful for storing additional information about the vector store in a structured
-         * format. Keys can be a maximum of 64 characters long and values can be a maxium
-         * of 512 characters long.
+         * Set of 16 key-value pairs that can be attached to an object. This can be useful
+         * for storing additional information about the object in a structured format, and
+         * querying for objects via API or the dashboard.
+         *
+         * Keys are strings with a maximum length of 64 characters. Values are strings with
+         * a maximum length of 512 characters.
          */
-        metadata?: unknown;
+        metadata?: Shared.Metadata | null;
       }
     }
   }
@@ -1255,11 +1273,13 @@ export interface AssistantUpdateParams {
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
-   * for storing additional information about the object in a structured format. Keys
-   * can be a maximum of 64 characters long and values can be a maxium of 512
-   * characters long.
+   * for storing additional information about the object in a structured format, and
+   * querying for objects via API or the dashboard.
+   *
+   * Keys are strings with a maximum length of 64 characters. Values are strings with
+   * a maximum length of 512 characters.
    */
-  metadata?: unknown | null;
+  metadata?: Shared.Metadata | null;
 
   /**
    * ID of the model to use. You can use the
@@ -1268,12 +1288,53 @@ export interface AssistantUpdateParams {
    * [Model overview](https://platform.openai.com/docs/models) for descriptions of
    * them.
    */
-  model?: string;
+  model?:
+    | (string & {})
+    | 'o3-mini'
+    | 'o3-mini-2025-01-31'
+    | 'o1'
+    | 'o1-2024-12-17'
+    | 'gpt-4o'
+    | 'gpt-4o-2024-11-20'
+    | 'gpt-4o-2024-08-06'
+    | 'gpt-4o-2024-05-13'
+    | 'gpt-4o-mini'
+    | 'gpt-4o-mini-2024-07-18'
+    | 'gpt-4.5-preview'
+    | 'gpt-4.5-preview-2025-02-27'
+    | 'gpt-4-turbo'
+    | 'gpt-4-turbo-2024-04-09'
+    | 'gpt-4-0125-preview'
+    | 'gpt-4-turbo-preview'
+    | 'gpt-4-1106-preview'
+    | 'gpt-4-vision-preview'
+    | 'gpt-4'
+    | 'gpt-4-0314'
+    | 'gpt-4-0613'
+    | 'gpt-4-32k'
+    | 'gpt-4-32k-0314'
+    | 'gpt-4-32k-0613'
+    | 'gpt-3.5-turbo'
+    | 'gpt-3.5-turbo-16k'
+    | 'gpt-3.5-turbo-0613'
+    | 'gpt-3.5-turbo-1106'
+    | 'gpt-3.5-turbo-0125'
+    | 'gpt-3.5-turbo-16k-0613';
 
   /**
    * The name of the assistant. The maximum length is 256 characters.
    */
   name?: string | null;
+
+  /**
+   * **o1 and o3-mini models only**
+   *
+   * Constrains effort on reasoning for
+   * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
+   * supported values are `low`, `medium`, and `high`. Reducing reasoning effort can
+   * result in faster responses and fewer tokens used on reasoning in a response.
+   */
+  reasoning_effort?: 'low' | 'medium' | 'high' | null;
 
   /**
    * Specifies the format that the model must output. Compatible with

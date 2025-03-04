@@ -287,8 +287,6 @@ main();
 
 Like with `.stream()`, we provide a variety of [helpers and events](helpers.md#chat-events).
 
-Note that `runFunctions` was previously available as well, but has been deprecated in favor of `runTools`.
-
 Read more about various examples such as with integrating with [zod](helpers.md#integrate-with-zod),
 [next.js](helpers.md#integrate-with-nextjs), and [proxying a stream to the browser](helpers.md#proxy-streaming-to-a-browser).
 
@@ -387,6 +385,20 @@ const { data: stream, request_id } = await openai.chat.completions
   })
   .withResponse();
 ```
+
+## Realtime API Beta
+
+The Realtime API enables you to build low-latency, multi-modal conversational experiences. It currently supports text and audio as both input and output, as well as [function calling](https://platform.openai.com/docs/guides/function-calling) through a `WebSocket` connection.
+
+```ts
+import { OpenAIRealtimeWebSocket } from 'openai/beta/realtime/websocket';
+
+const rt = new OpenAIRealtimeWebSocket({ model: 'gpt-4o-realtime-preview-2024-12-17' });
+
+rt.on('response.text.delta', (event) => process.stdout.write(event.delta));
+```
+
+For more information see [realtime.md](realtime.md).
 
 ## Microsoft Azure OpenAI
 
@@ -513,6 +525,59 @@ console.log(raw.headers.get('X-My-Header'));
 console.log(chatCompletion);
 ```
 
+### Logging
+
+> [!IMPORTANT]
+> All log messages are intended for debugging only. The format and content of log messages
+> may change between releases.
+
+#### Log levels
+
+The log level can be configured in two ways:
+
+1. Via the `OPENAI_LOG` environment variable
+2. Using the `logLevel` client option (overrides the environment variable if set)
+
+```ts
+import OpenAI from 'openai';
+
+const client = new OpenAI({
+  logLevel: 'debug', // Show all log messages
+});
+```
+
+Available log levels, from most to least verbose:
+
+- `'debug'` - Show debug messages, info, warnings, and errors
+- `'info'` - Show info messages, warnings, and errors
+- `'warn'` - Show warnings and errors (default)
+- `'error'` - Show only errors
+- `'off'` - Disable all logging
+
+At the `'debug'` level, all HTTP requests and responses are logged, including headers and bodies.
+Some authentication-related headers are redacted, but sensitive data in request and response bodies
+may still be visible.
+
+#### Custom logger
+
+By default, this library logs to `globalThis.console`. You can also provide a custom logger.
+Most logging libraries are supported, including [pino](https://www.npmjs.com/package/pino), [winston](https://www.npmjs.com/package/winston), [bunyan](https://www.npmjs.com/package/bunyan), [consola](https://www.npmjs.com/package/consola), [signale](https://www.npmjs.com/package/signale), and [@std/log](https://jsr.io/@std/log). If your logger doesn't work, please open an issue.
+
+When providing a custom logger, the `logLevel` option still controls which messages are emitted, messages
+below the configured level will not be sent to your logger.
+
+```ts
+import OpenAI from 'openai';
+import pino from 'pino';
+
+const logger = pino();
+
+const client = new OpenAI({
+  logger: logger.child({ name: 'OpenAI' }),
+  logLevel: 'debug', // Send all messages to pino, allowing it to filter
+});
+```
+
 ### Making custom/undocumented requests
 
 This library is typed for convenient access to the documented API. If you need to access undocumented
@@ -572,52 +637,67 @@ globalThis.fetch = fetch;
 Or pass it to the client:
 
 ```ts
+import OpenAI from 'openai';
 import fetch from 'my-fetch';
 
 const client = new OpenAI({ fetch });
 ```
 
-### Logging and middleware
+### Fetch options
 
-You may also provide a custom `fetch` function when instantiating the client,
-which can be used to inspect or alter the `Request` or `Response` before/after each request:
+If you want to set custom `fetch` options without overriding the `fetch` function, you can provide a `fetchOptions` object when instantiating the client or making a request. (Request-specific options override client options.)
 
 ```ts
-import { fetch } from 'undici'; // as one example
 import OpenAI from 'openai';
 
 const client = new OpenAI({
-  fetch: async (url: RequestInfo, init?: RequestInit): Promise<Response> => {
-    console.log('About to make a request', url, init);
-    const response = await fetch(url, init);
-    console.log('Got response', response);
-    return response;
+  fetchOptions: {
+    // `RequestInit` options
   },
 });
 ```
 
-Note that if given a `DEBUG=true` environment variable, this library will log all requests and responses automatically.
-This is intended for debugging purposes only and may change in the future without notice.
+#### Configuring proxies
 
-### Configuring an HTTP(S) Agent (e.g., for proxies)
+To modify proxy behavior, you can provide custom `fetchOptions` that add runtime-specific proxy
+options to requests:
 
-By default, this library uses a stable agent for all http/https requests to reuse TCP connections, eliminating many TCP & TLS handshakes and shaving around 100ms off most requests.
+<img src="https://raw.githubusercontent.com/stainless-api/sdk-assets/refs/heads/main/node.svg" align="top" width="18" height="21"> **Node** <sup>[[docs](https://github.com/nodejs/undici/blob/main/docs/docs/api/ProxyAgent.md#example---proxyagent-with-fetch)]</sup>
 
-If you would like to disable or customize this behavior, for example to use the API behind a proxy, you can pass an `httpAgent` which is used for all requests (be they http or https), for example:
-
-<!-- prettier-ignore -->
 ```ts
-import http from 'http';
-import { HttpsProxyAgent } from 'https-proxy-agent';
+import OpenAI from 'openai';
+import * as undici from 'undici';
 
-// Configure the default for all requests:
+const proxyAgent = new undici.ProxyAgent('http://localhost:8888');
 const client = new OpenAI({
-  httpAgent: new HttpsProxyAgent(process.env.PROXY_URL),
+  fetchOptions: {
+    dispatcher: proxyAgent,
+  },
 });
+```
 
-// Override per-request:
-await client.models.list({
-  httpAgent: new http.Agent({ keepAlive: false }),
+<img src="https://raw.githubusercontent.com/stainless-api/sdk-assets/refs/heads/main/bun.svg" align="top" width="18" height="21"> **Bun** <sup>[[docs](https://bun.sh/guides/http/proxy)]</sup>
+
+```ts
+import OpenAI from 'openai';
+
+const client = new OpenAI({
+  fetchOptions: {
+    proxy: 'http://localhost:8888',
+  },
+});
+```
+
+<img src="https://raw.githubusercontent.com/stainless-api/sdk-assets/refs/heads/main/deno.svg" align="top" width="18" height="21"> **Deno** <sup>[[docs](https://docs.deno.com/api/deno/~/Deno.createHttpClient)]</sup>
+
+```ts
+import OpenAI from 'npm:openai';
+
+const httpClient = Deno.createHttpClient({ proxy: { url: 'http://localhost:8888' } });
+const client = new OpenAI({
+  fetchOptions: {
+    client: httpClient,
+  },
 });
 ```
 
@@ -628,7 +708,7 @@ await client.models.list({
 This package generally follows [SemVer](https://semver.org/spec/v2.0.0.html) conventions, though certain backwards-incompatible changes may be released as minor versions:
 
 1. Changes that only affect static types, without breaking runtime behavior.
-2. Changes to library internals which are technically public but not intended or documented for external use. _(Please open a GitHub issue to let us know if you are relying on such internals)_.
+2. Changes to library internals which are technically public but not intended or documented for external use. _(Please open a GitHub issue to let us know if you are relying on such internals.)_
 3. Changes that we do not expect to impact the vast majority of users in practice.
 
 We take backwards-compatibility seriously and work hard to ensure you can rely on a smooth upgrade experience.

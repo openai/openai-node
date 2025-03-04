@@ -1,11 +1,11 @@
 import OpenAI, { toFile } from 'openai';
 import { TranscriptionCreateParams } from 'openai/resources/audio/transcriptions';
-import fetch from 'node-fetch';
+import * as undici from 'undici';
 import { File as FormDataFile, Blob as FormDataBlob } from 'formdata-node';
 import * as fs from 'fs';
 import { distance } from 'fastest-levenshtein';
 import { ChatCompletion } from 'openai/resources/chat/completions';
-import type { ReadableStream as WebReadableStream } from 'node:stream/web';
+import { File } from 'node:buffer';
 
 const url = 'https://audio-samples.github.io/samples/mp3/blizzard_biased/sample-1.mp3';
 const filename = 'sample-1.mp3';
@@ -65,12 +65,9 @@ it(`raw response`, async function () {
     })
     .asResponse();
 
-  // As far as I can tell, we need to cast because the jest-jsdom types
-  const body = response.body as WebReadableStream<Uint8Array>;
-
   const decoder = new TextDecoder();
   const chunks: string[] = [];
-  for await (const chunk of body) {
+  for await (const chunk of response.body!) {
     chunks.push(decoder.decode(chunk));
   }
 
@@ -91,15 +88,18 @@ it(`streaming works`, async function () {
   expect(chunks.map((c) => c.choices[0]?.delta.content || '').join('')).toBeSimilarTo('This is a test', 10);
 });
 
-it('handles formdata-node File', async function () {
-  const file = await fetch(url)
-    .then((x) => x.arrayBuffer())
-    .then((x) => new FormDataFile([x], filename));
-
-  const params: TranscriptionCreateParams = { file, model };
-
-  const result = await client.audio.transcriptions.create(params);
-  expect(result.text).toBeSimilarTo(correctAnswer, 12);
+test(`proxied request`, async function () {
+  const dispatcher = new undici.ProxyAgent(process.env['ECOSYSTEM_TESTS_PROXY']!);
+  const client = new OpenAI({
+    fetchOptions: {
+      dispatcher,
+    },
+  });
+  const completion = await client.chat.completions.create({
+    model: 'gpt-4',
+    messages: [{ role: 'user', content: 'Say this is a test' }],
+  });
+  expect(completion.choices[0]?.message?.content).toBeSimilarTo('This is a test', 10);
 });
 
 it('handles builtinFile', async function () {
@@ -174,5 +174,18 @@ describe('toFile', () => {
       purpose: 'fine-tune',
     });
     expect(result.filename).toEqual('finetune.jsonl');
+  });
+
+  it('handles formdata-node File', async function () {
+    const file = await fetch(url)
+      .then((x) => x.arrayBuffer())
+      .then((x) => toFile(new FormDataFile([x], filename)));
+
+    expect(file.name).toEqual(filename);
+
+    const params: TranscriptionCreateParams = { file, model };
+
+    const result = await client.audio.transcriptions.create(params);
+    expect(result.text).toBeSimilarTo(correctAnswer, 12);
   });
 });

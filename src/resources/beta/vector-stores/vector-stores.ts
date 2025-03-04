@@ -1,6 +1,7 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../../resource';
+import * as Shared from '../../shared';
 import * as FileBatchesAPI from './file-batches';
 import {
   FileBatchCancelParams,
@@ -23,7 +24,9 @@ import {
 } from './files';
 import { APIPromise } from '../../../api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../pagination';
+import { buildHeaders } from '../../../internal/headers';
 import { RequestOptions } from '../../../internal/request-options';
+import { path } from '../../../internal/utils/path';
 
 export class VectorStores extends APIResource {
   files: FilesAPI.Files = new FilesAPI.Files(this._client);
@@ -36,7 +39,7 @@ export class VectorStores extends APIResource {
     return this._client.post('/vector_stores', {
       body,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 
@@ -44,9 +47,9 @@ export class VectorStores extends APIResource {
    * Retrieves a vector store.
    */
   retrieve(vectorStoreID: string, options?: RequestOptions): APIPromise<VectorStore> {
-    return this._client.get(`/vector_stores/${vectorStoreID}`, {
+    return this._client.get(path`/vector_stores/${vectorStoreID}`, {
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 
@@ -58,10 +61,10 @@ export class VectorStores extends APIResource {
     body: VectorStoreUpdateParams,
     options?: RequestOptions,
   ): APIPromise<VectorStore> {
-    return this._client.post(`/vector_stores/${vectorStoreID}`, {
+    return this._client.post(path`/vector_stores/${vectorStoreID}`, {
       body,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 
@@ -75,7 +78,7 @@ export class VectorStores extends APIResource {
     return this._client.getAPIList('/vector_stores', CursorPage<VectorStore>, {
       query,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 
@@ -83,9 +86,9 @@ export class VectorStores extends APIResource {
    * Delete a vector store.
    */
   delete(vectorStoreID: string, options?: RequestOptions): APIPromise<VectorStoreDeleted> {
-    return this._client.delete(`/vector_stores/${vectorStoreID}`, {
+    return this._client.delete(path`/vector_stores/${vectorStoreID}`, {
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 }
@@ -112,7 +115,7 @@ export type FileChunkingStrategy = StaticFileChunkingStrategyObject | OtherFileC
  * The chunking strategy used to chunk the file(s). If not set, will use the `auto`
  * strategy. Only applicable if `file_ids` is non-empty.
  */
-export type FileChunkingStrategyParam = AutoFileChunkingStrategyParam | StaticFileChunkingStrategyParam;
+export type FileChunkingStrategyParam = AutoFileChunkingStrategyParam | StaticFileChunkingStrategyObjectParam;
 
 /**
  * This is returned when the chunking strategy is unknown. Typically, this is
@@ -150,7 +153,7 @@ export interface StaticFileChunkingStrategyObject {
   type: 'static';
 }
 
-export interface StaticFileChunkingStrategyParam {
+export interface StaticFileChunkingStrategyObjectParam {
   static: StaticFileChunkingStrategy;
 
   /**
@@ -183,11 +186,13 @@ export interface VectorStore {
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
-   * for storing additional information about the object in a structured format. Keys
-   * can be a maximum of 64 characters long and values can be a maxium of 512
-   * characters long.
+   * for storing additional information about the object in a structured format, and
+   * querying for objects via API or the dashboard.
+   *
+   * Keys are strings with a maximum length of 64 characters. Values are strings with
+   * a maximum length of 512 characters.
    */
-  metadata: unknown | null;
+  metadata: Shared.Metadata | null;
 
   /**
    * The name of the vector store.
@@ -296,11 +301,13 @@ export interface VectorStoreCreateParams {
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
-   * for storing additional information about the object in a structured format. Keys
-   * can be a maximum of 64 characters long and values can be a maxium of 512
-   * characters long.
+   * for storing additional information about the object in a structured format, and
+   * querying for objects via API or the dashboard.
+   *
+   * Keys are strings with a maximum length of 64 characters. Values are strings with
+   * a maximum length of 512 characters.
    */
-  metadata?: unknown | null;
+  metadata?: Shared.Metadata | null;
 
   /**
    * The name of the vector store.
@@ -334,11 +341,13 @@ export interface VectorStoreUpdateParams {
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
-   * for storing additional information about the object in a structured format. Keys
-   * can be a maximum of 64 characters long and values can be a maxium of 512
-   * characters long.
+   * for storing additional information about the object in a structured format, and
+   * querying for objects via API or the dashboard.
+   *
+   * Keys are strings with a maximum length of 64 characters. Values are strings with
+   * a maximum length of 512 characters.
    */
-  metadata?: unknown | null;
+  metadata?: Shared.Metadata | null;
 
   /**
    * The name of the vector store.
@@ -391,7 +400,7 @@ export declare namespace VectorStores {
     type OtherFileChunkingStrategyObject as OtherFileChunkingStrategyObject,
     type StaticFileChunkingStrategy as StaticFileChunkingStrategy,
     type StaticFileChunkingStrategyObject as StaticFileChunkingStrategyObject,
-    type StaticFileChunkingStrategyParam as StaticFileChunkingStrategyParam,
+    type StaticFileChunkingStrategyObjectParam as StaticFileChunkingStrategyObjectParam,
     type VectorStore as VectorStore,
     type VectorStoreDeleted as VectorStoreDeleted,
     type VectorStoresPage as VectorStoresPage,

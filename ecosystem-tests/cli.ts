@@ -3,12 +3,8 @@ import execa from 'execa';
 import yargs from 'yargs';
 import assert from 'assert';
 import path from 'path';
-
-try {
-  // @ts-ignore
-  var SegfaultHandler = require('segfault-handler');
-  SegfaultHandler.registerHandler('crash.log');
-} catch (_) {}
+import { createServer } from 'http';
+import { connect } from 'net';
 
 const TAR_NAME = 'openai.tgz';
 const PACK_FOLDER = '.pack';
@@ -114,6 +110,35 @@ const projectRunners = {
 
 let projectNames = Object.keys(projectRunners) as Array<keyof typeof projectRunners>;
 const projectNamesSet = new Set(projectNames);
+
+async function startProxy() {
+  const proxy = createServer((_req, res) => {
+    res.end();
+  });
+
+  proxy.on('connect', (req, clientSocket, head) => {
+    console.log('got proxied connection');
+    const serverSocket = connect(443, 'api.openai.com', () => {
+      clientSocket.write(
+        'HTTP/1.1 200 Connection Established\r\n' + 'Proxy-agent: Node.js-Proxy\r\n' + '\r\n',
+      );
+      serverSocket.write(head);
+      serverSocket.pipe(clientSocket);
+      clientSocket.pipe(serverSocket);
+    });
+  });
+
+  await new Promise<void>((resolve) => proxy.listen(0, '127.0.0.1', resolve));
+
+  const address = proxy.address();
+  assert(address && typeof address !== 'string');
+  process.env['ECOSYSTEM_TESTS_PROXY'] = 'http://127.0.0.1:' + address.port;
+
+  return () => {
+    delete process.env['ECOSYSTEM_TESTS_PROXY'];
+    proxy.close();
+  };
+}
 
 function parseArgs() {
   return yargs(process.argv.slice(2))
@@ -293,112 +318,118 @@ async function main() {
     await fileCache.cacheFiles(tmpFolderPath);
   }
 
-  if (jobs > 1) {
-    const queue = [...projectsToRun];
-    const runningProjects = new Set();
+  const stopProxy = await startProxy();
+  try {
+    if (jobs > 1) {
+      const queue = [...projectsToRun];
+      const runningProjects = new Set();
 
-    const cursorLeft = '\x1B[G';
-    const eraseLine = '\x1B[2K';
+      const cursorLeft = '\x1B[G';
+      const eraseLine = '\x1B[2K';
 
-    let progressDisplayed = false;
-    function clearProgress() {
-      if (progressDisplayed) {
-        process.stderr.write(cursorLeft + eraseLine);
-        progressDisplayed = false;
+      let progressDisplayed = false;
+      function clearProgress() {
+        if (progressDisplayed) {
+          process.stderr.write(cursorLeft + eraseLine);
+          progressDisplayed = false;
+        }
+      }
+      const spinner = ['|', '/', '-', '\\'];
+
+      function showProgress() {
+        clearProgress();
+        progressDisplayed = true;
+        const spin = spinner[Math.floor(Date.now() / 500) % spinner.length];
+        process.stderr.write(
+          `${spin} Running ${[...runningProjects].join(', ')}`.substring(0, process.stdout.columns - 3) +
+            '...',
+        );
+      }
+
+      const progressInterval = setInterval(showProgress, process.stdout.isTTY ? 500 : 5000);
+      showProgress();
+
+      await Promise.all(
+        [...Array(jobs).keys()].map(async () => {
+          while (queue.length) {
+            const project = queue.shift();
+            if (!project) {
+              break;
+            }
+
+            // preserve interleaved ordering of writes to stdout/stderr
+            const chunks: { dest: 'stdout' | 'stderr'; data: string | Buffer }[] = [];
+            try {
+              runningProjects.add(project);
+              const child = execa(
+                'yarn',
+                [
+                  'tsn',
+                  __filename,
+                  project,
+                  '--skip-pack',
+                  '--noCleanup',
+                  `--retry=${args.retry}`,
+                  ...(args.live ? ['--live'] : []),
+                  ...(args.verbose ? ['--verbose'] : []),
+                  ...(args.deploy ? ['--deploy'] : []),
+                  ...(args.fromNpm ? ['--from-npm'] : []),
+                ],
+                { stdio: 'pipe', encoding: 'utf8', maxBuffer: 100 * 1024 * 1024 },
+              );
+              child.stdout?.on('data', (data) => chunks.push({ dest: 'stdout', data }));
+              child.stderr?.on('data', (data) => chunks.push({ dest: 'stderr', data }));
+
+              await child;
+            } catch (error) {
+              failed.push(project);
+            } finally {
+              runningProjects.delete(project);
+            }
+
+            if (IS_CI) {
+              console.log(`::group::${failed.includes(project) ? '❌' : '✅'} ${project}`);
+            }
+
+            for (const { data } of chunks) {
+              process.stdout.write(data);
+            }
+            if (IS_CI) console.log('::endgroup::');
+          }
+        }),
+      );
+
+      clearInterval(progressInterval);
+      clearProgress();
+    } else {
+      for (const project of projectsToRun) {
+        const fn = projectRunners[project];
+
+        await withChdir(path.join(rootDir, 'ecosystem-tests', project), async () => {
+          console.error('\n');
+          console.error(banner(`▶️ ${project}`));
+          console.error('\n');
+
+          try {
+            await withRetry(fn, project, state.retry, state.retryDelay);
+            console.error('\n');
+            console.error(`✅ ${project}`);
+          } catch (err) {
+            if (err && (err as any).shortMessage) {
+              console.error((err as any).shortMessage);
+            } else {
+              console.error(err);
+            }
+            console.error('\n');
+            console.error(`❌ ${project}`);
+            failed.push(project);
+          }
+          console.error('\n');
+        });
       }
     }
-    const spinner = ['|', '/', '-', '\\'];
-
-    function showProgress() {
-      clearProgress();
-      progressDisplayed = true;
-      const spin = spinner[Math.floor(Date.now() / 500) % spinner.length];
-      process.stderr.write(
-        `${spin} Running ${[...runningProjects].join(', ')}`.substring(0, process.stdout.columns - 3) + '...',
-      );
-    }
-
-    const progressInterval = setInterval(showProgress, process.stdout.isTTY ? 500 : 5000);
-    showProgress();
-
-    await Promise.all(
-      [...Array(jobs).keys()].map(async () => {
-        while (queue.length) {
-          const project = queue.shift();
-          if (!project) {
-            break;
-          }
-
-          // preserve interleaved ordering of writes to stdout/stderr
-          const chunks: { dest: 'stdout' | 'stderr'; data: string | Buffer }[] = [];
-          try {
-            runningProjects.add(project);
-            const child = execa(
-              'yarn',
-              [
-                'tsn',
-                __filename,
-                project,
-                '--skip-pack',
-                '--noCleanup',
-                `--retry=${args.retry}`,
-                ...(args.live ? ['--live'] : []),
-                ...(args.verbose ? ['--verbose'] : []),
-                ...(args.deploy ? ['--deploy'] : []),
-                ...(args.fromNpm ? ['--from-npm'] : []),
-              ],
-              { stdio: 'pipe', encoding: 'utf8', maxBuffer: 100 * 1024 * 1024 },
-            );
-            child.stdout?.on('data', (data) => chunks.push({ dest: 'stdout', data }));
-            child.stderr?.on('data', (data) => chunks.push({ dest: 'stderr', data }));
-
-            await child;
-          } catch (error) {
-            failed.push(project);
-          } finally {
-            runningProjects.delete(project);
-          }
-
-          if (IS_CI) {
-            console.log(`::group::${failed.includes(project) ? '❌' : '✅'} ${project}`);
-          }
-
-          for (const { data } of chunks) {
-            process.stdout.write(data);
-          }
-          if (IS_CI) console.log('::endgroup::');
-        }
-      }),
-    );
-
-    clearInterval(progressInterval);
-    clearProgress();
-  } else {
-    for (const project of projectsToRun) {
-      const fn = projectRunners[project];
-
-      await withChdir(path.join(rootDir, 'ecosystem-tests', project), async () => {
-        console.error('\n');
-        console.error(banner(`▶️ ${project}`));
-        console.error('\n');
-
-        try {
-          await withRetry(fn, project, state.retry, state.retryDelay);
-          console.error('\n');
-          console.error(`✅ ${project}`);
-        } catch (err) {
-          if (err && (err as any).shortMessage) {
-            console.error((err as any).shortMessage);
-          } else {
-            console.error(err);
-          }
-          console.error('\n');
-          console.error(`❌ ${project}`);
-          failed.push(project);
-        }
-        console.error('\n');
-      });
-    }
+  } finally {
+    stopProxy();
   }
 
   if (!args.noCleanup) {

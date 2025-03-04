@@ -3,8 +3,9 @@
 import { APIResource } from '../../resource';
 import * as AudioAPI from './audio';
 import { APIPromise } from '../../api-promise';
-import { type Uploadable, multipartFormRequestOptions } from '../../uploads';
+import { type Uploadable } from '../../uploads';
 import { RequestOptions } from '../../internal/request-options';
+import { multipartFormRequestOptions } from '../../internal/uploads';
 
 export class Transcriptions extends APIResource {
   /**
@@ -27,7 +28,10 @@ export class Transcriptions extends APIResource {
     body: TranscriptionCreateParams,
     options?: RequestOptions,
   ): APIPromise<TranscriptionCreateResponse | string> {
-    return this._client.post('/audio/transcriptions', multipartFormRequestOptions({ body, ...options }));
+    return this._client.post(
+      '/audio/transcriptions',
+      multipartFormRequestOptions({ body, ...options, __metadata: { model: body.model } }, this._client),
+    );
   }
 }
 
@@ -105,7 +109,7 @@ export interface TranscriptionVerbose {
   /**
    * The duration of the input audio.
    */
-  duration: string;
+  duration: number;
 
   /**
    * The language of the input audio.
@@ -168,8 +172,8 @@ export interface TranscriptionCreateParams<
 
   /**
    * The language of the input audio. Supplying the input language in
-   * [ISO-639-1](https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes) format will
-   * improve accuracy and latency.
+   * [ISO-639-1](https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes) (e.g. `en`)
+   * format will improve accuracy and latency.
    */
   language?: string;
 

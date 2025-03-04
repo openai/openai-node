@@ -49,7 +49,7 @@ if (message?.parsed) {
 
 The `.parse()` method will also automatically parse `function` tool calls if:
 
-- You use the `zodFunctionTool()` helper method
+- You use the `zodFunction()` helper method
 - You mark your tool schema with `"strict": True`
 
 For example:
@@ -226,7 +226,7 @@ on in the documentation page [Message](https://platform.openai.com/docs/api-refe
 
 ```ts
 .on('textCreated', (content: Text) => ...)
-.on('textDelta', (delta: RunStepDelta, snapshot: Text) => ...)
+.on('textDelta', (delta: TextDelta, snapshot: Text) => ...)
 .on('textDone', (content: Text, snapshot: Message) => ...)
 ```
 
@@ -352,8 +352,6 @@ chat completion request, not for the entire call run.
 
 See an example of automated function calls in action in
 [`examples/function-call-helpers.ts`](examples/function-call-helpers.ts).
-
-Note, `runFunctions` was also previously available, but has been deprecated in favor of `runTools`.
 
 ### Chat Events
 

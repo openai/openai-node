@@ -5,6 +5,7 @@ Types:
 - <code><a href="./src/resources/shared.ts">ErrorObject</a></code>
 - <code><a href="./src/resources/shared.ts">FunctionDefinition</a></code>
 - <code><a href="./src/resources/shared.ts">FunctionParameters</a></code>
+- <code><a href="./src/resources/shared.ts">Metadata</a></code>
 - <code><a href="./src/resources/shared.ts">ResponseFormatJSONObject</a></code>
 - <code><a href="./src/resources/shared.ts">ResponseFormatJSONSchema</a></code>
 - <code><a href="./src/resources/shared.ts">ResponseFormatText</a></code>
@@ -31,38 +32,50 @@ Types:
 
 Types:
 
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletion</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionAssistantMessageParam</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionAudio</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionAudioParam</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionChunk</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionContentPart</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionContentPartImage</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionContentPartInputAudio</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionContentPartRefusal</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionContentPartText</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionDeveloperMessageParam</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionFunctionCallOption</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionFunctionMessageParam</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionMessage</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionMessageParam</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionMessageToolCall</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionModality</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionNamedToolChoice</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionPredictionContent</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionReasoningEffort</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionRole</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionStreamOptions</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionSystemMessageParam</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionTokenLogprob</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionTool</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionToolChoiceOption</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionToolMessageParam</a></code>
-- <code><a href="./src/resources/chat/completions.ts">ChatCompletionUserMessageParam</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletion</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionAssistantMessageParam</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionAudio</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionAudioParam</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionChunk</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionContentPart</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionContentPartImage</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionContentPartInputAudio</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionContentPartRefusal</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionContentPartText</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionDeleted</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionDeveloperMessageParam</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionFunctionCallOption</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionFunctionMessageParam</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionMessage</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionMessageParam</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionMessageToolCall</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionModality</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionNamedToolChoice</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionPredictionContent</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionReasoningEffort</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionRole</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionStoreMessage</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionStreamOptions</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionSystemMessageParam</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionTokenLogprob</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionTool</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionToolChoiceOption</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionToolMessageParam</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionUserMessageParam</a></code>
 
 Methods:
 
-- <code title="post /chat/completions">client.chat.completions.<a href="./src/resources/chat/completions.ts">create</a>({ ...params }) -> ChatCompletion</code>
+- <code title="post /chat/completions">client.chat.completions.<a href="./src/resources/chat/completions/completions.ts">create</a>({ ...params }) -> ChatCompletion</code>
+- <code title="get /chat/completions/{completion_id}">client.chat.completions.<a href="./src/resources/chat/completions/completions.ts">retrieve</a>(completionID) -> ChatCompletion</code>
+- <code title="post /chat/completions/{completion_id}">client.chat.completions.<a href="./src/resources/chat/completions/completions.ts">update</a>(completionID, { ...params }) -> ChatCompletion</code>
+- <code title="get /chat/completions">client.chat.completions.<a href="./src/resources/chat/completions/completions.ts">list</a>({ ...params }) -> ChatCompletionsPage</code>
+- <code title="delete /chat/completions/{completion_id}">client.chat.completions.<a href="./src/resources/chat/completions/completions.ts">delete</a>(completionID) -> ChatCompletionDeleted</code>
+
+### Messages
+
+Methods:
+
+- <code title="get /chat/completions/{completion_id}/messages">client.chat.completions.messages.<a href="./src/resources/chat/completions/messages.ts">list</a>(completionID, { ...params }) -> ChatCompletionStoreMessagesPage</code>
 
 # Embeddings
 
@@ -92,7 +105,6 @@ Methods:
 - <code title="get /files">client.files.<a href="./src/resources/files.ts">list</a>({ ...params }) -> FileObjectsPage</code>
 - <code title="delete /files/{file_id}">client.files.<a href="./src/resources/files.ts">delete</a>(fileID) -> FileDeleted</code>
 - <code title="get /files/{file_id}/content">client.files.<a href="./src/resources/files.ts">content</a>(fileID) -> Response</code>
-- <code title="get /files/{file_id}/content">client.files.<a href="./src/resources/files.ts">retrieveContent</a>(fileID) -> string</code>
 - <code>client.files.<a href="./src/resources/files.ts">waitForProcessing</a>(id, { pollInterval = 5000, maxWait = 30 _ 60 _ 1000 }) -> Promise&lt;FileObject&gt;</code>
 
 # Images
@@ -212,6 +224,67 @@ Methods:
 
 # Beta
 
+## Realtime
+
+Types:
+
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationCreatedEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItem</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItemContent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItemCreateEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItemCreatedEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItemDeleteEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItemDeletedEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItemInputAudioTranscriptionCompletedEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItemInputAudioTranscriptionFailedEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItemTruncateEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItemTruncatedEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItemWithReference</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ErrorEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">InputAudioBufferAppendEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">InputAudioBufferClearEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">InputAudioBufferClearedEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">InputAudioBufferCommitEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">InputAudioBufferCommittedEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">InputAudioBufferSpeechStartedEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">InputAudioBufferSpeechStoppedEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">RateLimitsUpdatedEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">RealtimeClientEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">RealtimeResponse</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">RealtimeResponseStatus</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">RealtimeResponseUsage</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">RealtimeServerEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ResponseAudioDeltaEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ResponseAudioDoneEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ResponseAudioTranscriptDeltaEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ResponseAudioTranscriptDoneEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ResponseCancelEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ResponseContentPartAddedEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ResponseContentPartDoneEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ResponseCreateEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ResponseCreatedEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ResponseDoneEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ResponseFunctionCallArgumentsDeltaEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ResponseFunctionCallArgumentsDoneEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ResponseOutputItemAddedEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ResponseOutputItemDoneEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ResponseTextDeltaEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ResponseTextDoneEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">SessionCreatedEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">SessionUpdateEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">SessionUpdatedEvent</a></code>
+
+### Sessions
+
+Types:
+
+- <code><a href="./src/resources/beta/realtime/sessions.ts">Session</a></code>
+- <code><a href="./src/resources/beta/realtime/sessions.ts">SessionCreateResponse</a></code>
+
+Methods:
+
+- <code title="post /realtime/sessions">client.beta.realtime.sessions.<a href="./src/resources/beta/realtime/sessions.ts">create</a>({ ...params }) -> SessionCreateResponse</code>
+
 ## VectorStores
 
 Types:
@@ -222,7 +295,7 @@ Types:
 - <code><a href="./src/resources/beta/vector-stores/vector-stores.ts">OtherFileChunkingStrategyObject</a></code>
 - <code><a href="./src/resources/beta/vector-stores/vector-stores.ts">StaticFileChunkingStrategy</a></code>
 - <code><a href="./src/resources/beta/vector-stores/vector-stores.ts">StaticFileChunkingStrategyObject</a></code>
-- <code><a href="./src/resources/beta/vector-stores/vector-stores.ts">StaticFileChunkingStrategyParam</a></code>
+- <code><a href="./src/resources/beta/vector-stores/vector-stores.ts">StaticFileChunkingStrategyObjectParam</a></code>
 - <code><a href="./src/resources/beta/vector-stores/vector-stores.ts">VectorStore</a></code>
 - <code><a href="./src/resources/beta/vector-stores/vector-stores.ts">VectorStoreDeleted</a></code>
 
@@ -274,7 +347,6 @@ Methods:
 
 Methods:
 
-- <code>client.beta.chat.completions.<a href="./src/resources/beta/chat/completions.ts">runFunctions</a>(body, options?) -> ChatCompletionRunner | ChatCompletionStreamingRunner</code>
 - <code>client.beta.chat.completions.<a href="./src/resources/beta/chat/completions.ts">runTools</a>(body, options?) -> ChatCompletionRunner | ChatCompletionStreamingRunner</code>
 - <code>client.beta.chat.completions.<a href="./src/resources/beta/chat/completions.ts">stream</a>(body, options?) -> ChatCompletionStream</code>
 

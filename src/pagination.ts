@@ -1,10 +1,10 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import type { OpenAI } from './client';
 import { OpenAIError } from './error';
 import { FinalRequestOptions } from './internal/request-options';
 import { defaultParseResponse, WithRequestID } from './internal/parse';
 import { APIPromise } from './api-promise';
+import { type OpenAI } from './client';
 import { type APIResponseProps } from './internal/parse';
 import { maybeObj } from './internal/utils/values';
 
@@ -46,7 +46,6 @@ export abstract class AbstractPage<Item> implements AsyncIterable<Item> {
   }
 
   async *iterPages(): AsyncGenerator<this> {
-    // eslint-disable-next-line @typescript-eslint/no-this-alias
     let page: this = this;
     yield page;
     while (page.hasNextPage()) {
@@ -86,12 +85,13 @@ export class PagePromise<
     Page: new (...args: ConstructorParameters<typeof AbstractPage>) => PageClass,
   ) {
     super(
+      client,
       request,
-      async (props) =>
+      async (client, props) =>
         new Page(
           client,
           props.response,
-          await defaultParseResponse(props),
+          await defaultParseResponse(client, props),
           props.options,
         ) as WithRequestID<PageClass>,
     );
@@ -144,6 +144,8 @@ export class Page<Item> extends AbstractPage<Item> implements PageResponse<Item>
 
 export interface CursorPageResponse<Item> {
   data: Array<Item>;
+
+  has_more: boolean;
 }
 
 export interface CursorPageParams {
@@ -158,6 +160,8 @@ export class CursorPage<Item extends { id: string }>
 {
   data: Array<Item>;
 
+  has_more: boolean;
+
   constructor(
     client: OpenAI,
     response: Response,
@@ -167,10 +171,19 @@ export class CursorPage<Item extends { id: string }>
     super(client, response, body, options);
 
     this.data = body.data || [];
+    this.has_more = body.has_more || false;
   }
 
   getPaginatedItems(): Item[] {
     return this.data ?? [];
+  }
+
+  override hasNextPage(): boolean {
+    if (this.has_more === false) {
+      return false;
+    }
+
+    return super.hasNextPage();
   }
 
   nextPageRequestOptions(): PageRequestOptions | null {

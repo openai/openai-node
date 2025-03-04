@@ -368,6 +368,7 @@ export class AssistantStream
       case 'thread.run.in_progress':
       case 'thread.run.requires_action':
       case 'thread.run.completed':
+      case 'thread.run.incomplete':
       case 'thread.run.failed':
       case 'thread.run.cancelling':
       case 'thread.run.cancelled':
@@ -398,6 +399,8 @@ export class AssistantStream
         throw new Error(
           'Encountered an error event in event processing - errors should be processed earlier',
         );
+      default:
+        assertNever(event);
     }
   }
 
@@ -769,3 +772,5 @@ export class AssistantStream
     return await this._createToolAssistantStream(runs, runId, params, options);
   }
 }
+
+function assertNever(_x: never) {}

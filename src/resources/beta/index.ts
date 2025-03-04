@@ -19,6 +19,7 @@ export {
   type AssistantsPage,
 } from './assistants';
 export { Beta } from './beta';
+export { Realtime } from './realtime/index';
 export { Chat } from './chat/index';
 export {
   Threads,
@@ -44,7 +45,7 @@ export {
   type OtherFileChunkingStrategyObject,
   type StaticFileChunkingStrategy,
   type StaticFileChunkingStrategyObject,
-  type StaticFileChunkingStrategyParam,
+  type StaticFileChunkingStrategyObjectParam,
   type VectorStore,
   type VectorStoreDeleted,
   type VectorStoreCreateParams,

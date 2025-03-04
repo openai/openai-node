@@ -1,12 +1,9 @@
 /**
- * @jest-environment jsdom
+ * @jest-environment jest-fixed-jsdom
  */
-import 'whatwg-fetch';
 import OpenAI, { toFile } from 'openai';
 import { distance } from 'fastest-levenshtein';
 import { ChatCompletion } from 'openai/resources/chat/completions';
-// @ts-ignore
-import { TextEncoder } from 'text-encoding-polyfill';
 
 const url = 'https://audio-samples.github.io/samples/mp3/blizzard_biased/sample-1.mp3';
 const filename = 'sample-1.mp3';

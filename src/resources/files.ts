@@ -3,10 +3,13 @@
 import { APIResource } from '../resource';
 import { APIPromise } from '../api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../pagination';
-import { type Uploadable, multipartFormRequestOptions } from '../uploads';
+import { type Uploadable } from '../uploads';
+import { buildHeaders } from '../internal/headers';
 import { RequestOptions } from '../internal/request-options';
 import { sleep } from '../internal/utils/sleep';
 import { APIConnectionTimeoutError } from '../error';
+import { multipartFormRequestOptions } from '../internal/uploads';
+import { path } from '../internal/utils/path';
 
 export class Files extends APIResource {
   /**
@@ -33,14 +36,14 @@ export class Files extends APIResource {
    * storage limits.
    */
   create(body: FileCreateParams, options?: RequestOptions): APIPromise<FileObject> {
-    return this._client.post('/files', multipartFormRequestOptions({ body, ...options }));
+    return this._client.post('/files', multipartFormRequestOptions({ body, ...options }, this._client));
   }
 
   /**
    * Returns information about a specific file.
    */
   retrieve(fileID: string, options?: RequestOptions): APIPromise<FileObject> {
-    return this._client.get(`/files/${fileID}`, options);
+    return this._client.get(path`/files/${fileID}`, options);
   }
 
   /**
@@ -57,25 +60,17 @@ export class Files extends APIResource {
    * Delete a file.
    */
   delete(fileID: string, options?: RequestOptions): APIPromise<FileDeleted> {
-    return this._client.delete(`/files/${fileID}`, options);
+    return this._client.delete(path`/files/${fileID}`, options);
   }
 
   /**
    * Returns the contents of the specified file.
    */
   content(fileID: string, options?: RequestOptions): APIPromise<Response> {
-    return this._client.get(`/files/${fileID}/content`, { ...options, __binaryResponse: true });
-  }
-
-  /**
-   * Returns the contents of the specified file.
-   *
-   * @deprecated The `.content()` method should be used instead
-   */
-  retrieveContent(fileID: string, options?: RequestOptions): APIPromise<string> {
-    return this._client.get(`/files/${fileID}/content`, {
+    return this._client.get(path`/files/${fileID}/content`, {
       ...options,
-      headers: { Accept: 'application/json', ...options?.headers },
+      headers: buildHeaders([{ Accept: 'application/binary' }, options?.headers]),
+      __binaryResponse: true,
     });
   }
 
@@ -162,13 +157,18 @@ export interface FileObject {
     | 'vision';
 
   /**
-   * @deprecated: Deprecated. The current status of the file, which can be either
+   * @deprecated Deprecated. The current status of the file, which can be either
    * `uploaded`, `processed`, or `error`.
    */
   status: 'uploaded' | 'processed' | 'error';
 
   /**
-   * @deprecated: Deprecated. For details on why a fine-tuning training file failed
+   * The Unix timestamp (in seconds) for when the file will expire.
+   */
+  expires_at?: number;
+
+  /**
+   * @deprecated Deprecated. For details on why a fine-tuning training file failed
    * validation, see the `error` field on `fine_tuning.job`.
    */
   status_details?: string;
