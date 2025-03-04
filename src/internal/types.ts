@@ -6,14 +6,6 @@ export type HTTPMethod = 'get' | 'post' | 'put' | 'patch' | 'delete';
 export type KeysEnum<T> = { [P in keyof Required<T>]: true };
 
 type NotAny<T> = [unknown] extends [T] ? never : T;
-type Literal<T> = PropertyKey extends T ? never : T;
-type MappedLiteralKeys<T> = T extends any ? Literal<keyof T> : never;
-type MappedIndex<T, K> =
-  T extends any ?
-    K extends keyof T ?
-      T[K]
-    : never
-  : never;
 
 /**
  * Some environments overload the global fetch function, and Parameters<T> only gets the last signature.
@@ -93,6 +85,6 @@ type RequestInits =
  * This type contains `RequestInit` options that may be available on the current runtime,
  * including per-platform extensions like `dispatcher`, `agent`, `client`, etc.
  */
-export type MergedRequestInit = {
-  [K in MappedLiteralKeys<RequestInits>]?: MappedIndex<RequestInits, K> | undefined;
-};
+export type MergedRequestInit = RequestInits &
+  /** We don't include these in the types as they'll be overridden for every request. */
+  Partial<Record<'body' | 'headers' | 'method' | 'signal', never>>;
