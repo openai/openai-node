@@ -76,3 +76,56 @@ jobs:
 
       - name: Run tests
         run: ./scripts/test
+
+  examples:
+    name: examples
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Install dependencies
+        run: |
+          yarn install
+
+      - env: 
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+            yarn tsn examples/demo.ts
+
+  ecosystem_tests:
+    name: ecosystem tests (v${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    if: github.repository == 'openai/openai-node'
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ['20']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '${{ matrix.node-version }}'
+
+      - uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.39.0
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Bootstrap
+        run: ./scripts/bootstrap
+
+      - name: Run ecosystem tests
+        run: |
+          yarn tsn ecosystem-tests/cli.ts --live --verbose --parallel --jobs=4 --retry=3
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
