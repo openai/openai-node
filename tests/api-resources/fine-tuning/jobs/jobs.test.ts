@@ -34,6 +34,7 @@ describe('resource jobs', () => {
           wandb: { project: 'my-wandb-project', entity: 'entity', name: 'name', tags: ['custom-tag'] },
         },
       ],
+      metadata: { foo: 'string' },
       method: {
         dpo: {
           hyperparameters: {
@@ -93,7 +94,10 @@ describe('resource jobs', () => {
   test('list: request options and params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      client.fineTuning.jobs.list({ after: 'after', limit: 0 }, { path: '/_stainless_unknown_path' }),
+      client.fineTuning.jobs.list(
+        { after: 'after', limit: 0, metadata: { foo: 'string' } },
+        { path: '/_stainless_unknown_path' },
+      ),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
