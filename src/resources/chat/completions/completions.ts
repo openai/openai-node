@@ -7,7 +7,6 @@ import * as Core from '../../../core';
 import * as CompletionsCompletionsAPI from './completions';
 import * as CompletionsAPI from '../../completions';
 import * as Shared from '../../shared';
-import * as ChatAPI from '../chat';
 import * as MessagesAPI from './messages';
 import { MessageListParams, Messages } from './messages';
 import { CursorPage, type CursorPageParams } from '../../../pagination';
@@ -1018,7 +1017,7 @@ export interface ChatCompletionCreateParamsBase {
    * [model endpoint compatibility](https://platform.openai.com/docs/models#model-endpoint-compatibility)
    * table for details on which models work with the Chat API.
    */
-  model: (string & {}) | ChatAPI.ChatModel;
+  model: (string & {}) | Shared.ChatModel;
 
   /**
    * Parameters for audio output. Required when audio output is requested with

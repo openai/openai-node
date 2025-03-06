@@ -4,7 +4,6 @@ import { APIResource } from '../../resource';
 import { isRequestOptions } from '../../core';
 import * as Core from '../../core';
 import * as Shared from '../shared';
-import * as ChatAPI from '../chat/chat';
 import * as MessagesAPI from './threads/messages';
 import * as ThreadsAPI from './threads/threads';
 import * as VectorStoresAPI from './vector-stores/vector-stores';
@@ -1105,7 +1104,7 @@ export interface AssistantCreateParams {
    * [Model overview](https://platform.openai.com/docs/models) for descriptions of
    * them.
    */
-  model: (string & {}) | ChatAPI.ChatModel;
+  model: (string & {}) | Shared.ChatModel;
 
   /**
    * The description of the assistant. The maximum length is 512 characters.
