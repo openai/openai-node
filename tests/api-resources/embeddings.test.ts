@@ -32,4 +32,38 @@ describe('resource embeddings', () => {
       user: 'user-1234',
     });
   });
+
+  test.only('create: encoding_format=float should create float32 embeddings', async () => {
+    const responsePromise = client.embeddings.create({
+      input: 'The quick brown fox jumped over the lazy dog',
+      model: 'text-embedding-3-small',
+    });
+    const response = await responsePromise;
+
+    expect(response.data?.at(0)?.embedding).toBeInstanceOf(Array);
+    expect(Number.isFinite(response.data?.at(0)?.embedding.at(0))).toBe(true);
+  });
+
+  test('create: encoding_format=base64 should create float32 embeddings', async () => {
+    const responsePromise = client.embeddings.create({
+      input: 'The quick brown fox jumped over the lazy dog',
+      model: 'text-embedding-3-small',
+      encoding_format: 'base64',
+    });
+    const response = await responsePromise;
+
+    expect(response.data?.at(0)?.embedding).toBeInstanceOf(Array);
+    expect(Number.isFinite(response.data?.at(0)?.embedding.at(0))).toBe(true);
+  });
+
+  test('create: encoding_format=default should create float32 embeddings', async () => {
+    const responsePromise = client.embeddings.create({
+      input: 'The quick brown fox jumped over the lazy dog',
+      model: 'text-embedding-3-small',
+    });
+    const response = await responsePromise;
+
+    expect(response.data?.at(0)?.embedding).toBeInstanceOf(Array);
+    expect(Number.isFinite(response.data?.at(0)?.embedding.at(0))).toBe(true);
+  });
 });
