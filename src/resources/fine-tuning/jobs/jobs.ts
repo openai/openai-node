@@ -380,8 +380,6 @@ export interface FineTuningJobEvent {
   type?: 'message' | 'metrics';
 }
 
-export type FineTuningJobIntegration = FineTuningJobWandbIntegrationObject;
-
 /**
  * The settings for your integration with Weights and Biases. This payload
  * specifies the project that metrics will be sent to. Optionally, you can set an
@@ -429,6 +427,8 @@ export interface FineTuningJobWandbIntegrationObject {
    */
   wandb: FineTuningJobWandbIntegration;
 }
+
+export type FineTuningJobIntegration = FineTuningJobWandbIntegrationObject;
 
 export interface JobCreateParams {
   /**
@@ -709,9 +709,9 @@ export declare namespace Jobs {
   export {
     type FineTuningJob as FineTuningJob,
     type FineTuningJobEvent as FineTuningJobEvent,
-    type FineTuningJobIntegration as FineTuningJobIntegration,
     type FineTuningJobWandbIntegration as FineTuningJobWandbIntegration,
     type FineTuningJobWandbIntegrationObject as FineTuningJobWandbIntegrationObject,
+    type FineTuningJobIntegration as FineTuningJobIntegration,
     type FineTuningJobsPage as FineTuningJobsPage,
     type FineTuningJobEventsPage as FineTuningJobEventsPage,
     type JobCreateParams as JobCreateParams,
