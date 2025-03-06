@@ -4,7 +4,6 @@ import { APIResource } from '../../../resource';
 import * as ThreadsAPI from './threads';
 import * as Shared from '../../shared';
 import * as AssistantsAPI from '../assistants';
-import * as ChatAPI from '../../chat/chat';
 import * as MessagesAPI from './messages';
 import {
   Annotation,
@@ -564,7 +563,7 @@ export interface ThreadCreateAndRunParamsBase {
    * model associated with the assistant. If not, the model associated with the
    * assistant will be used.
    */
-  model?: (string & {}) | ChatAPI.ChatModel | null;
+  model?: (string & {}) | Shared.ChatModel | null;
 
   /**
    * Whether to enable

@@ -82,7 +82,7 @@ import { formatRequestDetails, loggerFor } from './internal/utils/log';
 import { isEmptyObj } from './internal/utils/values';
 import { Audio, AudioModel, AudioResponseFormat } from './resources/audio/audio';
 import { Beta } from './resources/beta/beta';
-import { Chat, ChatModel } from './resources/chat/chat';
+import { Chat } from './resources/chat/chat';
 import { FineTuning } from './resources/fine-tuning/fine-tuning';
 import {
   Upload,
@@ -910,7 +910,6 @@ export declare namespace OpenAI {
 
   export {
     Chat as Chat,
-    type ChatModel as ChatModel,
     type ChatCompletion as ChatCompletion,
     type ChatCompletionAssistantMessageParam as ChatCompletionAssistantMessageParam,
     type ChatCompletionAudio as ChatCompletionAudio,
@@ -1019,6 +1018,7 @@ export declare namespace OpenAI {
     type UploadCompleteParams as UploadCompleteParams,
   };
 
+  export type ChatModel = API.ChatModel;
   export type ErrorObject = API.ErrorObject;
   export type FunctionDefinition = API.FunctionDefinition;
   export type FunctionParameters = API.FunctionParameters;
