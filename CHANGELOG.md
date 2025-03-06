@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.86.2 (2025-03-05)
+
+Full Changelog: [v4.86.1...v4.86.2](https://github.com/openai/openai-node/compare/v4.86.1...v4.86.2)
+
+### Chores
+
+* **internal:** run example files in CI ([#1357](https://github.com/openai/openai-node/issues/1357)) ([88d0050](https://github.com/openai/openai-node/commit/88d0050336749deb3810b4cb43473de1f84e42bd))
+
 ## 4.86.1 (2025-02-27)
 
 Full Changelog: [v4.86.0...v4.86.1](https://github.com/openai/openai-node/compare/v4.86.0...v4.86.1)
