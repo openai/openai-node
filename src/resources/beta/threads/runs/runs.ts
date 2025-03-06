@@ -7,7 +7,6 @@ import * as Core from '../../../../core';
 import * as RunsAPI from './runs';
 import * as Shared from '../../../shared';
 import * as AssistantsAPI from '../../assistants';
-import * as ChatAPI from '../../../chat/chat';
 import * as MessagesAPI from '../messages';
 import * as ThreadsAPI from '../threads';
 import * as StepsAPI from './steps';
@@ -596,7 +595,7 @@ export interface RunCreateParamsBase {
    * associated with the assistant. If not, the model associated with the assistant
    * will be used.
    */
-  model?: (string & {}) | ChatAPI.ChatModel | null;
+  model?: (string & {}) | Shared.ChatModel | null;
 
   /**
    * Body param: Whether to enable
