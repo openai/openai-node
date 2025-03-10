@@ -45,7 +45,7 @@ describe('.stream()', () => {
   });
 
   it('emits content logprobs events', async () => {
-    var capturedLogProbs: ChatCompletionTokenLogprob[] | undefined;
+    let capturedLogProbs: ChatCompletionTokenLogprob[] | undefined;
 
     const stream = (
       await makeStreamSnapshotRequest((openai) =>
@@ -200,11 +200,11 @@ describe('.stream()', () => {
         },
       }
     `);
-    expect(capturedLogProbs?.length).toEqual(choice?.logprobs?.content?.length);
+    expect(capturedLogProbs?.length).toBe(choice?.logprobs?.content?.length);
   });
 
   it('emits refusal logprobs events', async () => {
-    var capturedLogProbs: ChatCompletionTokenLogprob[] | undefined;
+    let capturedLogProbs: ChatCompletionTokenLogprob[] | undefined;
 
     const stream = (
       await makeStreamSnapshotRequest((openai) =>
@@ -387,6 +387,6 @@ describe('.stream()', () => {
         },
       }
     `);
-    expect(capturedLogProbs?.length).toEqual(choice?.logprobs?.refusal?.length);
+    expect(capturedLogProbs?.length).toBe(choice?.logprobs?.refusal?.length);
   });
 });

@@ -20,7 +20,7 @@ describe('streaming decoding', () => {
     expect(JSON.parse(event.value.data)).toEqual({ foo: true });
 
     event = await stream.next();
-    expect(event.done).toBeTruthy();
+    expect(event.done).toBe(true);
   });
 
   test('data without event', async () => {
@@ -39,7 +39,7 @@ describe('streaming decoding', () => {
     expect(JSON.parse(event.value.data)).toEqual({ foo: true });
 
     event = await stream.next();
-    expect(event.done).toBeTruthy();
+    expect(event.done).toBe(true);
   });
 
   test('event without data', async () => {
@@ -54,11 +54,11 @@ describe('streaming decoding', () => {
 
     let event = await stream.next();
     assert(event.value);
-    expect(event.value.event).toEqual('foo');
-    expect(event.value.data).toEqual('');
+    expect(event.value.event).toBe('foo');
+    expect(event.value.data).toBe('');
 
     event = await stream.next();
-    expect(event.done).toBeTruthy();
+    expect(event.done).toBe(true);
   });
 
   test('multiple events', async () => {
@@ -75,16 +75,16 @@ describe('streaming decoding', () => {
 
     let event = await stream.next();
     assert(event.value);
-    expect(event.value.event).toEqual('foo');
-    expect(event.value.data).toEqual('');
+    expect(event.value.event).toBe('foo');
+    expect(event.value.data).toBe('');
 
     event = await stream.next();
     assert(event.value);
-    expect(event.value.event).toEqual('ping');
-    expect(event.value.data).toEqual('');
+    expect(event.value.event).toBe('ping');
+    expect(event.value.data).toBe('');
 
     event = await stream.next();
-    expect(event.done).toBeTruthy();
+    expect(event.done).toBe(true);
   });
 
   test('multiple events with data', async () => {
@@ -103,16 +103,16 @@ describe('streaming decoding', () => {
 
     let event = await stream.next();
     assert(event.value);
-    expect(event.value.event).toEqual('foo');
+    expect(event.value.event).toBe('foo');
     expect(JSON.parse(event.value.data)).toEqual({ foo: true });
 
     event = await stream.next();
     assert(event.value);
-    expect(event.value.event).toEqual('ping');
+    expect(event.value.event).toBe('ping');
     expect(JSON.parse(event.value.data)).toEqual({ bar: false });
 
     event = await stream.next();
-    expect(event.done).toBeTruthy();
+    expect(event.done).toBe(true);
   });
 
   test('multiple data lines with empty line', async () => {
@@ -132,12 +132,12 @@ describe('streaming decoding', () => {
 
     let event = await stream.next();
     assert(event.value);
-    expect(event.value.event).toEqual('ping');
+    expect(event.value.event).toBe('ping');
     expect(JSON.parse(event.value.data)).toEqual({ foo: true });
-    expect(event.value.data).toEqual('{\n"foo":\n\n\ntrue}');
+    expect(event.value.data).toBe('{\n"foo":\n\n\ntrue}');
 
     event = await stream.next();
-    expect(event.done).toBeTruthy();
+    expect(event.done).toBe(true);
   });
 
   test('data json escaped double new line', async () => {
@@ -153,11 +153,11 @@ describe('streaming decoding', () => {
 
     let event = await stream.next();
     assert(event.value);
-    expect(event.value.event).toEqual('ping');
+    expect(event.value.event).toBe('ping');
     expect(JSON.parse(event.value.data)).toEqual({ foo: 'my long\n\ncontent' });
 
     event = await stream.next();
-    expect(event.done).toBeTruthy();
+    expect(event.done).toBe(true);
   });
 
   test('special new line characters', async () => {
@@ -189,7 +189,7 @@ describe('streaming decoding', () => {
     expect(JSON.parse(event.value.data)).toEqual({ content: 'foo' });
 
     event = await stream.next();
-    expect(event.done).toBeTruthy();
+    expect(event.done).toBe(true);
   });
 
   test('multi-byte characters across chunks', async () => {
@@ -215,7 +215,7 @@ describe('streaming decoding', () => {
     expect(JSON.parse(event.value.data)).toEqual({ content: 'известни' });
 
     event = await stream.next();
-    expect(event.done).toBeTruthy();
+    expect(event.done).toBe(true);
   });
 });
 
