@@ -40,8 +40,8 @@ export async function defaultParseResponse<T>(client: OpenAI, props: APIResponse
     }
 
     const contentType = response.headers.get('content-type');
-    const isJSON =
-      contentType?.includes('application/json') || contentType?.includes('application/vnd.api+json');
+    const mediaType = contentType?.split(';')[0]?.trim();
+    const isJSON = mediaType?.includes('application/json') || mediaType?.endsWith('+json');
     if (isJSON) {
       const json = await response.json();
       return json as T;
