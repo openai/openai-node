@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.87.1 (2025-03-11)
+
+Full Changelog: [v4.87.0...v4.87.1](https://github.com/openai/openai-node/compare/v4.87.0...v4.87.1)
+
+### Bug Fixes
+
+* correct imports ([5cdf17c](https://github.com/openai/openai-node/commit/5cdf17cec33da7cf540b8bdbcfa30c0c52842dd1))
+
 ## 4.87.0 (2025-03-11)
 
 Full Changelog: [v4.86.2...v4.87.0](https://github.com/openai/openai-node/compare/v4.86.2...v4.87.0)
