@@ -1,6 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-export { Chat, type ChatModel } from './chat';
+export { Chat } from './chat';
 export {
   ChatCompletionStoreMessagesPage,
   ChatCompletionsPage,
@@ -25,7 +25,6 @@ export {
   type ChatCompletionModality,
   type ChatCompletionNamedToolChoice,
   type ChatCompletionPredictionContent,
-  type ChatCompletionReasoningEffort,
   type ChatCompletionRole,
   type ChatCompletionStoreMessage,
   type ChatCompletionStreamOptions,

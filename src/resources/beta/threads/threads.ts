@@ -8,7 +8,6 @@ import * as Core from '../../../core';
 import * as ThreadsAPI from './threads';
 import * as Shared from '../../shared';
 import * as AssistantsAPI from '../assistants';
-import * as ChatAPI from '../../chat/chat';
 import * as MessagesAPI from './messages';
 import {
   Annotation,
@@ -45,7 +44,6 @@ import {
   TextDelta,
   TextDeltaBlock,
 } from './messages';
-import * as VectorStoresAPI from '../vector-stores/vector-stores';
 import * as RunsAPI from './runs/runs';
 import {
   RequiredActionFunctionToolCall,
@@ -441,9 +439,9 @@ export namespace ThreadCreateParams {
       export interface VectorStore {
         /**
          * The chunking strategy used to chunk the file(s). If not set, will use the `auto`
-         * strategy. Only applicable if `file_ids` is non-empty.
+         * strategy.
          */
-        chunking_strategy?: VectorStoresAPI.FileChunkingStrategyParam;
+        chunking_strategy?: VectorStore.Auto | VectorStore.Static;
 
         /**
          * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs to
@@ -461,6 +459,45 @@ export namespace ThreadCreateParams {
          * a maximum length of 512 characters.
          */
         metadata?: Shared.Metadata | null;
+      }
+
+      export namespace VectorStore {
+        /**
+         * The default strategy. This strategy currently uses a `max_chunk_size_tokens` of
+         * `800` and `chunk_overlap_tokens` of `400`.
+         */
+        export interface Auto {
+          /**
+           * Always `auto`.
+           */
+          type: 'auto';
+        }
+
+        export interface Static {
+          static: Static.Static;
+
+          /**
+           * Always `static`.
+           */
+          type: 'static';
+        }
+
+        export namespace Static {
+          export interface Static {
+            /**
+             * The number of tokens that overlap between chunks. The default value is `400`.
+             *
+             * Note that the overlap must not exceed half of `max_chunk_size_tokens`.
+             */
+            chunk_overlap_tokens: number;
+
+            /**
+             * The maximum number of tokens in each chunk. The default value is `800`. The
+             * minimum value is `100` and the maximum value is `4096`.
+             */
+            max_chunk_size_tokens: number;
+          }
+        }
       }
     }
   }
@@ -573,7 +610,7 @@ export interface ThreadCreateAndRunParamsBase {
    * model associated with the assistant. If not, the model associated with the
    * assistant will be used.
    */
-  model?: (string & {}) | ChatAPI.ChatModel | null;
+  model?: (string & {}) | Shared.ChatModel | null;
 
   /**
    * Whether to enable
@@ -800,9 +837,9 @@ export namespace ThreadCreateAndRunParams {
         export interface VectorStore {
           /**
            * The chunking strategy used to chunk the file(s). If not set, will use the `auto`
-           * strategy. Only applicable if `file_ids` is non-empty.
+           * strategy.
            */
-          chunking_strategy?: VectorStoresAPI.FileChunkingStrategyParam;
+          chunking_strategy?: VectorStore.Auto | VectorStore.Static;
 
           /**
            * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs to
@@ -820,6 +857,45 @@ export namespace ThreadCreateAndRunParams {
            * a maximum length of 512 characters.
            */
           metadata?: Shared.Metadata | null;
+        }
+
+        export namespace VectorStore {
+          /**
+           * The default strategy. This strategy currently uses a `max_chunk_size_tokens` of
+           * `800` and `chunk_overlap_tokens` of `400`.
+           */
+          export interface Auto {
+            /**
+             * Always `auto`.
+             */
+            type: 'auto';
+          }
+
+          export interface Static {
+            static: Static.Static;
+
+            /**
+             * Always `static`.
+             */
+            type: 'static';
+          }
+
+          export namespace Static {
+            export interface Static {
+              /**
+               * The number of tokens that overlap between chunks. The default value is `400`.
+               *
+               * Note that the overlap must not exceed half of `max_chunk_size_tokens`.
+               */
+              chunk_overlap_tokens: number;
+
+              /**
+               * The maximum number of tokens in each chunk. The default value is `800`. The
+               * minimum value is `100` and the maximum value is `4096`.
+               */
+              max_chunk_size_tokens: number;
+            }
+          }
         }
       }
     }

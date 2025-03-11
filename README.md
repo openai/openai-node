@@ -1,9 +1,3 @@
-> [!IMPORTANT]  
-> We're actively working on a new alpha version that migrates from `node-fetch` to builtin fetch.
-> 
-> Please try it out and let us know if you run into any issues!
-> https://community.openai.com/t/your-feedback-requested-node-js-sdk-5-0-0-alpha/1063774
-
 # OpenAI TypeScript and JavaScript API Library
 
 [![NPM version](https://img.shields.io/npm/v/openai.svg)](https://npmjs.org/package/openai) ![npm bundle size](https://img.shields.io/bundlephobia/minzip/openai) [![JSR Version](https://jsr.io/badges/@openai/openai)](https://jsr.io/@openai/openai)
@@ -27,9 +21,7 @@ deno add jsr:@openai/openai
 npx jsr add @openai/openai
 ```
 
-These commands will make the module importable from the `@openai/openai` scope:
-
-You can also [import directly from JSR](https://jsr.io/docs/using-packages#importing-with-jsr-specifiers) without an install step if you're using the Deno JavaScript runtime:
+These commands will make the module importable from the `@openai/openai` scope. You can also [import directly from JSR](https://jsr.io/docs/using-packages#importing-with-jsr-specifiers) without an install step if you're using the Deno JavaScript runtime:
 
 ```ts
 import OpenAI from 'jsr:@openai/openai';
@@ -37,9 +29,10 @@ import OpenAI from 'jsr:@openai/openai';
 
 ## Usage
 
-The full API of this library can be found in [api.md file](api.md) along with many [code examples](https://github.com/openai/openai-node/tree/master/examples). The code below shows how to get started using the chat completions API.
+The full API of this library can be found in [api.md file](api.md) along with many [code examples](https://github.com/openai/openai-node/tree/master/examples).
 
-<!-- prettier-ignore -->
+The primary API for interacting with OpenAI models is the [Responses API](https://platform.openai.com/docs/api-reference/responses). You can generate text from the model with the code below.
+
 ```ts
 import OpenAI from 'openai';
 
@@ -47,14 +40,33 @@ const client = new OpenAI({
   apiKey: process.env['OPENAI_API_KEY'], // This is the default and can be omitted
 });
 
-async function main() {
-  const chatCompletion = await client.chat.completions.create({
-    messages: [{ role: 'user', content: 'Say this is a test' }],
-    model: 'gpt-4o',
-  });
-}
+const response = await client.responses.create({
+  model: 'gpt-4o',
+  instructions: 'You are a coding assistant that talks like a pirate',
+  input: 'Are semicolons optional in JavaScript?',
+});
 
-main();
+console.log(response.output_text);
+```
+
+The previous standard (supported indefinitely) for generating text is the [Chat Completions API](https://platform.openai.com/docs/api-reference/chat). You can use that API to generate text from the model with the code below.
+
+```ts
+import OpenAI from 'openai';
+
+const client = new OpenAI({
+  apiKey: process.env['OPENAI_API_KEY'], // This is the default and can be omitted
+});
+
+const completion = await client.chat.completions.create({
+  model: 'gpt-4o',
+  messages: [
+    { role: 'developer', content: 'Talk like a pirate.' },
+    { role: 'user', content: 'Are semicolons optional in JavaScript?' },
+  ],
+});
+
+console.log(completion.choices[0].message.content);
 ```
 
 ## Streaming responses
@@ -66,80 +78,16 @@ import OpenAI from 'openai';
 
 const client = new OpenAI();
 
-async function main() {
-  const stream = await client.chat.completions.create({
-    model: 'gpt-4o',
-    messages: [{ role: 'user', content: 'Say this is a test' }],
-    stream: true,
-  });
-  for await (const chunk of stream) {
-    process.stdout.write(chunk.choices[0]?.delta?.content || '');
-  }
-}
-
-main();
-```
-
-If you need to cancel a stream, you can `break` from the loop or call `stream.controller.abort()`.
-
-### Chat Completion streaming helpers
-
-This library also provides several conveniences for streaming chat completions, for example:
-
-```ts
-import OpenAI from 'openai';
-
-const openai = new OpenAI();
-
-async function main() {
-  const stream = await openai.beta.chat.completions.stream({
-    model: 'gpt-4o',
-    messages: [{ role: 'user', content: 'Say this is a test' }],
-    stream: true,
-  });
-
-  stream.on('content', (delta, snapshot) => {
-    process.stdout.write(delta);
-  });
-
-  // or, equivalently:
-  for await (const chunk of stream) {
-    process.stdout.write(chunk.choices[0]?.delta?.content || '');
-  }
-
-  const chatCompletion = await stream.finalChatCompletion();
-  console.log(chatCompletion); // {id: "…", choices: […], …}
-}
-
-main();
-```
-
-See [helpers.md](helpers.md#chat-events) for more details.
-
-### Request & Response types
-
-This library includes TypeScript definitions for all request params and response fields. You may import and use them like so:
-
-<!-- prettier-ignore -->
-```ts
-import OpenAI from 'openai';
-
-const client = new OpenAI({
-  apiKey: process.env['OPENAI_API_KEY'], // This is the default and can be omitted
+const stream = await client.responses.create({
+  model: 'gpt-4o',
+  input: 'Say "Sheep sleep deep" ten times fast!',
+  stream: true,
 });
 
-async function main() {
-  const params: OpenAI.Chat.ChatCompletionCreateParams = {
-    messages: [{ role: 'user', content: 'Say this is a test' }],
-    model: 'gpt-4o',
-  };
-  const chatCompletion: OpenAI.Chat.ChatCompletion = await client.chat.completions.create(params);
+for await (const event of stream) {
+  console.log(event);
 }
-
-main();
 ```
-
-Documentation for each method, request param, and response field are available in docstrings and will appear on hover in most modern editors.
 
 ## File uploads
 
@@ -265,17 +213,17 @@ Note that requests which time out will be [retried twice by default](#retries).
 All object responses in the SDK provide a `_request_id` property which is added from the `x-request-id` response header so that you can quickly log failing requests and report them back to OpenAI.
 
 ```ts
-const completion = await client.chat.completions.create({ messages: [{ role: 'user', content: 'Say this is a test' }], model: 'gpt-4o' });
-console.log(completion._request_id) // req_123
+const response = await client.responses.create({ model: 'gpt-4o', input: 'testing 123' });
+console.log(response._request_id) // req_123
 ```
 
 You can also access the Request ID using the `.withResponse()` method:
 
 ```ts
-const { data: stream, request_id } = await openai.chat.completions
+const { data: stream, request_id } = await openai.responses
   .create({
-    model: 'gpt-4',
-    messages: [{ role: 'user', content: 'Say this is a test' }],
+    model: 'gpt-4o',
+    input: 'Say this is a test',
     stream: true,
   })
   .withResponse();
@@ -355,12 +303,6 @@ console.log(result.choices[0]!.message?.content);
 
 For more information on support for the Azure API, see [azure.md](azure.md).
 
-## Automated function calls
-
-We provide the `openai.beta.chat.completions.runTools({…})` convenience helper for using function tool calls with the `/chat/completions` endpoint which automatically call the JavaScript functions you provide and sends their results back to the `/chat/completions` endpoint, looping as long as the model requests tool calls.
-
-For more information see [helpers.md](helpers.md#automated-function-calls).
-
 ## Advanced Usage
 
 ### Accessing raw Response data (e.g., headers)
@@ -373,17 +315,19 @@ You can also use the `.withResponse()` method to get the raw `Response` along wi
 ```ts
 const client = new OpenAI();
 
-const response = await client.chat.completions
-  .create({ messages: [{ role: 'user', content: 'Say this is a test' }], model: 'gpt-4o' })
+const httpResponse = await client.responses
+  .create({ model: 'gpt-4o', input: 'say this is a test.' })
   .asResponse();
-console.log(response.headers.get('X-My-Header'));
-console.log(response.statusText); // access the underlying Response object
 
-const { data: chatCompletion, response: raw } = await client.chat.completions
-  .create({ messages: [{ role: 'user', content: 'Say this is a test' }], model: 'gpt-4o' })
+// access the underlying web standard Response object
+console.log(httpResponse.headers.get('X-My-Header'));
+console.log(httpResponse.statusText);
+
+const { data: modelResponse, response: raw } = await client.responses
+  .create({ model: 'gpt-4o', input: 'say this is a test.' })
   .withResponse();
 console.log(raw.headers.get('X-My-Header'));
-console.log(chatCompletion);
+console.log(modelResponse);
 ```
 
 ### Making custom/undocumented requests
@@ -431,6 +375,11 @@ the response object, or cast the response object to the requisite type. Like the
 validate or strip extra properties from the response from the API.
 
 ### Customizing the fetch client
+
+> We're actively working on a new alpha version that migrates from `node-fetch` to builtin fetch.
+> 
+> Please try it out and let us know if you run into any issues!
+> https://community.openai.com/t/your-feedback-requested-node-js-sdk-5-0-0-alpha/1063774
 
 By default, this library uses `node-fetch` in Node, and expects a global `fetch` function in other environments.
 

@@ -8,14 +8,18 @@ export {
 } from './file-batches';
 export {
   VectorStoreFilesPage,
+  FileContentResponsesPage,
   Files,
   type VectorStoreFile,
   type VectorStoreFileDeleted,
+  type FileContentResponse,
   type FileCreateParams,
+  type FileUpdateParams,
   type FileListParams,
 } from './files';
 export {
   VectorStoresPage,
+  VectorStoreSearchResponsesPage,
   VectorStores,
   type AutoFileChunkingStrategyParam,
   type FileChunkingStrategy,
@@ -26,7 +30,9 @@ export {
   type StaticFileChunkingStrategyObjectParam,
   type VectorStore,
   type VectorStoreDeleted,
+  type VectorStoreSearchResponse,
   type VectorStoreCreateParams,
   type VectorStoreUpdateParams,
   type VectorStoreListParams,
+  type VectorStoreSearchParams,
 } from './vector-stores';
