@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.87.2 (2025-03-11)
+
+Full Changelog: [v4.87.1...v4.87.2](https://github.com/openai/openai-node/compare/v4.87.1...v4.87.2)
+
+### Bug Fixes
+
+* **responses:** correctly add output_text ([4ceb5cc](https://github.com/openai/openai-node/commit/4ceb5cc516b8c75d46f0042534d7658796a8cd71))
+
 ## 4.87.1 (2025-03-11)
 
 Full Changelog: [v4.87.0...v4.87.1](https://github.com/openai/openai-node/compare/v4.87.0...v4.87.1)
