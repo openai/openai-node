@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.87.3 (2025-03-11)
+
+Full Changelog: [v4.87.2...v4.87.3](https://github.com/openai/openai-node/compare/v4.87.2...v4.87.3)
+
+### Bug Fixes
+
+* **responses:** correct reasoning output type ([2abef57](https://github.com/openai/openai-node/commit/2abef57d7645a96a4b9a6b91483861cd568d2d4d))
+
 ## 4.87.2 (2025-03-11)
 
 Full Changelog: [v4.87.1...v4.87.2](https://github.com/openai/openai-node/compare/v4.87.1...v4.87.2)
