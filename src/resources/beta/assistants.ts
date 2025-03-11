@@ -4,7 +4,6 @@ import { APIResource } from '../../resource';
 import * as Shared from '../shared';
 import * as MessagesAPI from './threads/messages';
 import * as ThreadsAPI from './threads/threads';
-import * as VectorStoresAPI from './vector-stores/vector-stores';
 import * as RunsAPI from './threads/runs/runs';
 import * as StepsAPI from './threads/runs/steps';
 import { APIPromise } from '../../api-promise';
@@ -1123,14 +1122,14 @@ export interface AssistantCreateParams {
   name?: string | null;
 
   /**
-   * **o1 and o3-mini models only**
+   * **o-series models only**
    *
    * Constrains effort on reasoning for
    * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
    * supported values are `low`, `medium`, and `high`. Reducing reasoning effort can
    * result in faster responses and fewer tokens used on reasoning in a response.
    */
-  reasoning_effort?: 'low' | 'medium' | 'high' | null;
+  reasoning_effort?: Shared.ReasoningEffort | null;
 
   /**
    * Specifies the format that the model must output. Compatible with
@@ -1233,9 +1232,9 @@ export namespace AssistantCreateParams {
       export interface VectorStore {
         /**
          * The chunking strategy used to chunk the file(s). If not set, will use the `auto`
-         * strategy. Only applicable if `file_ids` is non-empty.
+         * strategy.
          */
-        chunking_strategy?: VectorStoresAPI.FileChunkingStrategyParam;
+        chunking_strategy?: VectorStore.Auto | VectorStore.Static;
 
         /**
          * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs to
@@ -1253,6 +1252,45 @@ export namespace AssistantCreateParams {
          * a maximum length of 512 characters.
          */
         metadata?: Shared.Metadata | null;
+      }
+
+      export namespace VectorStore {
+        /**
+         * The default strategy. This strategy currently uses a `max_chunk_size_tokens` of
+         * `800` and `chunk_overlap_tokens` of `400`.
+         */
+        export interface Auto {
+          /**
+           * Always `auto`.
+           */
+          type: 'auto';
+        }
+
+        export interface Static {
+          static: Static.Static;
+
+          /**
+           * Always `static`.
+           */
+          type: 'static';
+        }
+
+        export namespace Static {
+          export interface Static {
+            /**
+             * The number of tokens that overlap between chunks. The default value is `400`.
+             *
+             * Note that the overlap must not exceed half of `max_chunk_size_tokens`.
+             */
+            chunk_overlap_tokens: number;
+
+            /**
+             * The maximum number of tokens in each chunk. The default value is `800`. The
+             * minimum value is `100` and the maximum value is `4096`.
+             */
+            max_chunk_size_tokens: number;
+          }
+        }
       }
     }
   }
@@ -1326,14 +1364,14 @@ export interface AssistantUpdateParams {
   name?: string | null;
 
   /**
-   * **o1 and o3-mini models only**
+   * **o-series models only**
    *
    * Constrains effort on reasoning for
    * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
    * supported values are `low`, `medium`, and `high`. Reducing reasoning effort can
    * result in faster responses and fewer tokens used on reasoning in a response.
    */
-  reasoning_effort?: 'low' | 'medium' | 'high' | null;
+  reasoning_effort?: Shared.ReasoningEffort | null;
 
   /**
    * Specifies the format that the model must output. Compatible with
