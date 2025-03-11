@@ -7,12 +7,9 @@ const client = new OpenAI({
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
-describe('resource completions', () => {
+describe('resource files', () => {
   test('create: only required params', async () => {
-    const responsePromise = client.chat.completions.create({
-      messages: [{ content: 'string', role: 'developer' }],
-      model: 'gpt-4o',
-    });
+    const responsePromise = client.vectorStores.files.create('vs_abc123', { file_id: 'file_id' });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -23,54 +20,17 @@ describe('resource completions', () => {
   });
 
   test('create: required and optional params', async () => {
-    const response = await client.chat.completions.create({
-      messages: [{ content: 'string', role: 'developer', name: 'name' }],
-      model: 'gpt-4o',
-      audio: { format: 'wav', voice: 'alloy' },
-      frequency_penalty: -2,
-      function_call: 'none',
-      functions: [{ name: 'name', description: 'description', parameters: { foo: 'bar' } }],
-      logit_bias: { foo: 0 },
-      logprobs: true,
-      max_completion_tokens: 0,
-      max_tokens: 0,
-      metadata: { foo: 'string' },
-      modalities: ['text'],
-      n: 1,
-      parallel_tool_calls: true,
-      prediction: { content: 'string', type: 'content' },
-      presence_penalty: -2,
-      reasoning_effort: 'low',
-      response_format: { type: 'text' },
-      seed: -9007199254740991,
-      service_tier: 'auto',
-      stop: '\n',
-      store: true,
-      stream: false,
-      stream_options: { include_usage: true },
-      temperature: 1,
-      tool_choice: 'none',
-      tools: [
-        {
-          function: { name: 'name', description: 'description', parameters: { foo: 'bar' }, strict: true },
-          type: 'function',
-        },
-      ],
-      top_logprobs: 0,
-      top_p: 1,
-      user: 'user-1234',
-      web_search_options: {
-        search_context_size: 'low',
-        user_location: {
-          approximate: { city: 'city', country: 'country', region: 'region', timezone: 'timezone' },
-          type: 'approximate',
-        },
-      },
+    const response = await client.vectorStores.files.create('vs_abc123', {
+      file_id: 'file_id',
+      attributes: { foo: 'string' },
+      chunking_strategy: { type: 'auto' },
     });
   });
 
-  test('retrieve', async () => {
-    const responsePromise = client.chat.completions.retrieve('completion_id');
+  test('retrieve: only required params', async () => {
+    const responsePromise = client.vectorStores.files.retrieve('file-abc123', {
+      vector_store_id: 'vs_abc123',
+    });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -80,8 +40,17 @@ describe('resource completions', () => {
     expect(dataAndResponse.response).toBe(rawResponse);
   });
 
+  test('retrieve: required and optional params', async () => {
+    const response = await client.vectorStores.files.retrieve('file-abc123', {
+      vector_store_id: 'vs_abc123',
+    });
+  });
+
   test('update: only required params', async () => {
-    const responsePromise = client.chat.completions.update('completion_id', { metadata: { foo: 'string' } });
+    const responsePromise = client.vectorStores.files.update('file-abc123', {
+      vector_store_id: 'vs_abc123',
+      attributes: { foo: 'string' },
+    });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -92,11 +61,14 @@ describe('resource completions', () => {
   });
 
   test('update: required and optional params', async () => {
-    const response = await client.chat.completions.update('completion_id', { metadata: { foo: 'string' } });
+    const response = await client.vectorStores.files.update('file-abc123', {
+      vector_store_id: 'vs_abc123',
+      attributes: { foo: 'string' },
+    });
   });
 
   test('list', async () => {
-    const responsePromise = client.chat.completions.list();
+    const responsePromise = client.vectorStores.files.list('vector_store_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -109,15 +81,18 @@ describe('resource completions', () => {
   test('list: request options and params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      client.chat.completions.list(
-        { after: 'after', limit: 0, metadata: { foo: 'string' }, model: 'model', order: 'asc' },
+      client.vectorStores.files.list(
+        'vector_store_id',
+        { after: 'after', before: 'before', filter: 'in_progress', limit: 0, order: 'asc' },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
-  test('delete', async () => {
-    const responsePromise = client.chat.completions.delete('completion_id');
+  test('delete: only required params', async () => {
+    const responsePromise = client.vectorStores.files.delete('file_id', {
+      vector_store_id: 'vector_store_id',
+    });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -125,5 +100,28 @@ describe('resource completions', () => {
     const dataAndResponse = await responsePromise.withResponse();
     expect(dataAndResponse.data).toBe(response);
     expect(dataAndResponse.response).toBe(rawResponse);
+  });
+
+  test('delete: required and optional params', async () => {
+    const response = await client.vectorStores.files.delete('file_id', {
+      vector_store_id: 'vector_store_id',
+    });
+  });
+
+  test('content: only required params', async () => {
+    const responsePromise = client.vectorStores.files.content('file-abc123', {
+      vector_store_id: 'vs_abc123',
+    });
+    const rawResponse = await responsePromise.asResponse();
+    expect(rawResponse).toBeInstanceOf(Response);
+    const response = await responsePromise;
+    expect(response).not.toBeInstanceOf(Response);
+    const dataAndResponse = await responsePromise.withResponse();
+    expect(dataAndResponse.data).toBe(response);
+    expect(dataAndResponse.response).toBe(rawResponse);
+  });
+
+  test('content: required and optional params', async () => {
+    const response = await client.vectorStores.files.content('file-abc123', { vector_store_id: 'vs_abc123' });
   });
 });

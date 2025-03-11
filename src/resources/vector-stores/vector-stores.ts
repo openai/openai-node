@@ -1,7 +1,7 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../../resource';
-import * as Shared from '../../shared';
+import { APIResource } from '../../resource';
+import * as Shared from '../shared';
 import * as FileBatchesAPI from './file-batches';
 import {
   FileBatchCancelParams,
@@ -13,20 +13,24 @@ import {
 } from './file-batches';
 import * as FilesAPI from './files';
 import {
+  FileContentParams,
+  FileContentResponse,
+  FileContentResponsesPage,
   FileCreateParams,
   FileDeleteParams,
   FileListParams,
   FileRetrieveParams,
+  FileUpdateParams,
   Files,
   VectorStoreFile,
   VectorStoreFileDeleted,
   VectorStoreFilesPage,
 } from './files';
-import { APIPromise } from '../../../api-promise';
-import { CursorPage, type CursorPageParams, PagePromise } from '../../../pagination';
-import { buildHeaders } from '../../../internal/headers';
-import { RequestOptions } from '../../../internal/request-options';
-import { path } from '../../../internal/utils/path';
+import { APIPromise } from '../../api-promise';
+import { CursorPage, type CursorPageParams, Page, PagePromise } from '../../pagination';
+import { buildHeaders } from '../../internal/headers';
+import { RequestOptions } from '../../internal/request-options';
+import { path } from '../../internal/utils/path';
 
 export class VectorStores extends APIResource {
   files: FilesAPI.Files = new FilesAPI.Files(this._client);
@@ -91,9 +95,33 @@ export class VectorStores extends APIResource {
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
+
+  /**
+   * Search a vector store for relevant chunks based on a query and file attributes
+   * filter.
+   */
+  search(
+    vectorStoreID: string,
+    body: VectorStoreSearchParams,
+    options?: RequestOptions,
+  ): PagePromise<VectorStoreSearchResponsesPage, VectorStoreSearchResponse> {
+    return this._client.getAPIList(
+      path`/vector_stores/${vectorStoreID}/search`,
+      Page<VectorStoreSearchResponse>,
+      {
+        body,
+        method: 'post',
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      },
+    );
+  }
 }
 
 export type VectorStoresPage = CursorPage<VectorStore>;
+
+// Note: no pagination actually occurs yet, this is for forwards-compatibility.
+export type VectorStoreSearchResponsesPage = Page<VectorStoreSearchResponse>;
 
 /**
  * The default strategy. This strategy currently uses a `max_chunk_size_tokens` of
@@ -153,6 +181,9 @@ export interface StaticFileChunkingStrategyObject {
   type: 'static';
 }
 
+/**
+ * Customize your own chunking strategy by setting chunk size and chunk overlap.
+ */
 export interface StaticFileChunkingStrategyObjectParam {
   static: StaticFileChunkingStrategy;
 
@@ -280,6 +311,51 @@ export interface VectorStoreDeleted {
   object: 'vector_store.deleted';
 }
 
+export interface VectorStoreSearchResponse {
+  /**
+   * Set of 16 key-value pairs that can be attached to an object. This can be useful
+   * for storing additional information about the object in a structured format, and
+   * querying for objects via API or the dashboard. Keys are strings with a maximum
+   * length of 64 characters. Values are strings with a maximum length of 512
+   * characters, booleans, or numbers.
+   */
+  attributes: Record<string, string | number | boolean> | null;
+
+  /**
+   * Content chunks from the file.
+   */
+  content: Array<VectorStoreSearchResponse.Content>;
+
+  /**
+   * The ID of the vector store file.
+   */
+  file_id: string;
+
+  /**
+   * The name of the vector store file.
+   */
+  filename: string;
+
+  /**
+   * The similarity score for the result.
+   */
+  score: number;
+}
+
+export namespace VectorStoreSearchResponse {
+  export interface Content {
+    /**
+     * The text content returned from search.
+     */
+    text: string;
+
+    /**
+     * The type of content.
+     */
+    type: 'text';
+  }
+}
+
 export interface VectorStoreCreateParams {
   /**
    * The chunking strategy used to chunk the file(s). If not set, will use the `auto`
@@ -389,6 +465,45 @@ export interface VectorStoreListParams extends CursorPageParams {
   order?: 'asc' | 'desc';
 }
 
+export interface VectorStoreSearchParams {
+  /**
+   * A query string for a search
+   */
+  query: string | Array<string>;
+
+  /**
+   * A filter to apply based on file attributes.
+   */
+  filters?: Shared.ComparisonFilter | Shared.CompoundFilter;
+
+  /**
+   * The maximum number of results to return. This number should be between 1 and 50
+   * inclusive.
+   */
+  max_num_results?: number;
+
+  /**
+   * Ranking options for search.
+   */
+  ranking_options?: VectorStoreSearchParams.RankingOptions;
+
+  /**
+   * Whether to rewrite the natural language query for vector search.
+   */
+  rewrite_query?: boolean;
+}
+
+export namespace VectorStoreSearchParams {
+  /**
+   * Ranking options for search.
+   */
+  export interface RankingOptions {
+    ranker?: 'auto' | 'default-2024-11-15';
+
+    score_threshold?: number;
+  }
+}
+
 VectorStores.Files = Files;
 VectorStores.FileBatches = FileBatches;
 
@@ -403,21 +518,28 @@ export declare namespace VectorStores {
     type StaticFileChunkingStrategyObjectParam as StaticFileChunkingStrategyObjectParam,
     type VectorStore as VectorStore,
     type VectorStoreDeleted as VectorStoreDeleted,
+    type VectorStoreSearchResponse as VectorStoreSearchResponse,
     type VectorStoresPage as VectorStoresPage,
+    type VectorStoreSearchResponsesPage as VectorStoreSearchResponsesPage,
     type VectorStoreCreateParams as VectorStoreCreateParams,
     type VectorStoreUpdateParams as VectorStoreUpdateParams,
     type VectorStoreListParams as VectorStoreListParams,
+    type VectorStoreSearchParams as VectorStoreSearchParams,
   };
 
   export {
     Files as Files,
     type VectorStoreFile as VectorStoreFile,
     type VectorStoreFileDeleted as VectorStoreFileDeleted,
+    type FileContentResponse as FileContentResponse,
     type VectorStoreFilesPage as VectorStoreFilesPage,
+    type FileContentResponsesPage as FileContentResponsesPage,
     type FileCreateParams as FileCreateParams,
     type FileRetrieveParams as FileRetrieveParams,
+    type FileUpdateParams as FileUpdateParams,
     type FileListParams as FileListParams,
     type FileDeleteParams as FileDeleteParams,
+    type FileContentParams as FileContentParams,
   };
 
   export {

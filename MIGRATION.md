@@ -110,11 +110,13 @@ client.example.create('c_456', { parent_id: 'p_123' });
 
 This affects the following methods:
 
-- `client.beta.vectorStores.files.retrieve()`
-- `client.beta.vectorStores.files.delete()`
-- `client.beta.vectorStores.fileBatches.retrieve()`
-- `client.beta.vectorStores.fileBatches.cancel()`
-- `client.beta.vectorStores.fileBatches.listFiles()`
+- `client.vectorStores.files.retrieve()`
+- `client.vectorStores.files.update()`
+- `client.vectorStores.files.delete()`
+- `client.vectorStores.files.content()`
+- `client.vectorStores.fileBatches.retrieve()`
+- `client.vectorStores.fileBatches.cancel()`
+- `client.vectorStores.fileBatches.listFiles()`
 - `client.beta.threads.runs.retrieve()`
 - `client.beta.threads.runs.update()`
 - `client.beta.threads.runs.cancel()`
@@ -182,21 +184,23 @@ Some methods could not be named intuitively due to an internal naming conflict. 
 client.chat.completions.del();
 client.files.del();
 client.models.del();
-client.beta.vectorStores.del();
-client.beta.vectorStores.files.del();
+client.vectorStores.del();
+client.vectorStores.files.del();
 client.beta.assistants.del();
 client.beta.threads.del();
 client.beta.threads.messages.del();
+client.responses.del();
 
 // After
 client.chat.completions.delete();
 client.files.delete();
 client.models.delete();
-client.beta.vectorStores.delete();
-client.beta.vectorStores.files.delete();
+client.vectorStores.delete();
+client.vectorStores.files.delete();
 client.beta.assistants.delete();
 client.beta.threads.delete();
 client.beta.threads.messages.delete();
+client.responses.delete();
 ```
 
 ### Removed request options overloads
@@ -220,13 +224,15 @@ This affects the following methods:
 - `client.fineTuning.jobs.list()`
 - `client.fineTuning.jobs.listEvents()`
 - `client.fineTuning.jobs.checkpoints.list()`
-- `client.beta.vectorStores.list()`
-- `client.beta.vectorStores.files.list()`
+- `client.vectorStores.list()`
+- `client.vectorStores.files.list()`
 - `client.beta.assistants.list()`
 - `client.beta.threads.create()`
 - `client.beta.threads.runs.list()`
 - `client.beta.threads.messages.list()`
 - `client.batches.list()`
+- `client.responses.retrieve()`
+- `client.responses.inputItems.list()`
 
 ### Pagination changes
 

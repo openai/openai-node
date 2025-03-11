@@ -40,59 +40,23 @@ import {
   ThreadUpdateParams,
   Threads,
 } from './threads/threads';
-import * as VectorStoresAPI from './vector-stores/vector-stores';
-import {
-  AutoFileChunkingStrategyParam,
-  FileChunkingStrategy,
-  FileChunkingStrategyParam,
-  OtherFileChunkingStrategyObject,
-  StaticFileChunkingStrategy,
-  StaticFileChunkingStrategyObject,
-  StaticFileChunkingStrategyObjectParam,
-  VectorStore,
-  VectorStoreCreateParams,
-  VectorStoreDeleted,
-  VectorStoreListParams,
-  VectorStoreUpdateParams,
-  VectorStores,
-  VectorStoresPage,
-} from './vector-stores/vector-stores';
 import { Chat } from './chat/chat';
 
 export class Beta extends APIResource {
   realtime: RealtimeAPI.Realtime = new RealtimeAPI.Realtime(this._client);
-  vectorStores: VectorStoresAPI.VectorStores = new VectorStoresAPI.VectorStores(this._client);
   chat: ChatAPI.Chat = new ChatAPI.Chat(this._client);
   assistants: AssistantsAPI.Assistants = new AssistantsAPI.Assistants(this._client);
   threads: ThreadsAPI.Threads = new ThreadsAPI.Threads(this._client);
 }
 
 Beta.Realtime = Realtime;
-Beta.VectorStores = VectorStores;
 Beta.Assistants = Assistants;
 Beta.Threads = Threads;
 
 export declare namespace Beta {
   export { Realtime as Realtime };
 
-  export {
-    VectorStores as VectorStores,
-    type AutoFileChunkingStrategyParam as AutoFileChunkingStrategyParam,
-    type FileChunkingStrategy as FileChunkingStrategy,
-    type FileChunkingStrategyParam as FileChunkingStrategyParam,
-    type OtherFileChunkingStrategyObject as OtherFileChunkingStrategyObject,
-    type StaticFileChunkingStrategy as StaticFileChunkingStrategy,
-    type StaticFileChunkingStrategyObject as StaticFileChunkingStrategyObject,
-    type StaticFileChunkingStrategyObjectParam as StaticFileChunkingStrategyObjectParam,
-    type VectorStore as VectorStore,
-    type VectorStoreDeleted as VectorStoreDeleted,
-    type VectorStoresPage as VectorStoresPage,
-    type VectorStoreCreateParams as VectorStoreCreateParams,
-    type VectorStoreUpdateParams as VectorStoreUpdateParams,
-    type VectorStoreListParams as VectorStoreListParams,
-  };
-
-  export { Chat };
+  export { Chat as Chat };
 
   export {
     Assistants as Assistants,
