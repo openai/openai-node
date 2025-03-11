@@ -90,7 +90,7 @@ export interface ComputerTool {
   /**
    * The type of the computer use tool. Always `computer_use_preview`.
    */
-  type: 'computer-preview';
+  type: 'computer_use_preview';
 }
 
 /**
