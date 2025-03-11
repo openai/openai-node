@@ -1,14 +1,14 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../../resource';
+import { APIResource } from '../../resource';
 import * as FilesAPI from './files';
 import { VectorStoreFilesPage } from './files';
 import * as VectorStoresAPI from './vector-stores';
-import { APIPromise } from '../../../api-promise';
-import { CursorPage, type CursorPageParams, PagePromise } from '../../../pagination';
-import { buildHeaders } from '../../../internal/headers';
-import { RequestOptions } from '../../../internal/request-options';
-import { path } from '../../../internal/utils/path';
+import { APIPromise } from '../../api-promise';
+import { CursorPage, type CursorPageParams, PagePromise } from '../../pagination';
+import { buildHeaders } from '../../internal/headers';
+import { RequestOptions } from '../../internal/request-options';
+import { path } from '../../internal/utils/path';
 
 export class FileBatches extends APIResource {
   /**
@@ -147,6 +147,15 @@ export interface FileBatchCreateParams {
    * files.
    */
   file_ids: Array<string>;
+
+  /**
+   * Set of 16 key-value pairs that can be attached to an object. This can be useful
+   * for storing additional information about the object in a structured format, and
+   * querying for objects via API or the dashboard. Keys are strings with a maximum
+   * length of 64 characters. Values are strings with a maximum length of 512
+   * characters, booleans, or numbers.
+   */
+  attributes?: Record<string, string | number | boolean> | null;
 
   /**
    * The chunking strategy used to chunk the file(s). If not set, will use the `auto`

@@ -1,12 +1,12 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../../resource';
+import { APIResource } from '../../resource';
 import * as VectorStoresAPI from './vector-stores';
-import { APIPromise } from '../../../api-promise';
-import { CursorPage, type CursorPageParams, PagePromise } from '../../../pagination';
-import { buildHeaders } from '../../../internal/headers';
-import { RequestOptions } from '../../../internal/request-options';
-import { path } from '../../../internal/utils/path';
+import { APIPromise } from '../../api-promise';
+import { CursorPage, type CursorPageParams, Page, PagePromise } from '../../pagination';
+import { buildHeaders } from '../../internal/headers';
+import { RequestOptions } from '../../internal/request-options';
+import { path } from '../../internal/utils/path';
 
 export class Files extends APIResource {
   /**
@@ -36,6 +36,18 @@ export class Files extends APIResource {
   ): APIPromise<VectorStoreFile> {
     const { vector_store_id } = params;
     return this._client.get(path`/vector_stores/${vector_store_id}/files/${fileID}`, {
+      ...options,
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+    });
+  }
+
+  /**
+   * Update attributes on a vector store file.
+   */
+  update(fileID: string, params: FileUpdateParams, options?: RequestOptions): APIPromise<VectorStoreFile> {
+    const { vector_store_id, ...body } = params;
+    return this._client.post(path`/vector_stores/${vector_store_id}/files/${fileID}`, {
+      body,
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
@@ -73,9 +85,28 @@ export class Files extends APIResource {
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
+
+  /**
+   * Retrieve the parsed contents of a vector store file.
+   */
+  content(
+    fileID: string,
+    params: FileContentParams,
+    options?: RequestOptions,
+  ): PagePromise<FileContentResponsesPage, FileContentResponse> {
+    const { vector_store_id } = params;
+    return this._client.getAPIList(
+      path`/vector_stores/${vector_store_id}/files/${fileID}/content`,
+      Page<FileContentResponse>,
+      { ...options, headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]) },
+    );
+  }
 }
 
 export type VectorStoreFilesPage = CursorPage<VectorStoreFile>;
+
+// Note: no pagination actually occurs yet, this is for forwards-compatibility.
+export type FileContentResponsesPage = Page<FileContentResponse>;
 
 /**
  * A list of files attached to a vector store.
@@ -124,6 +155,15 @@ export interface VectorStoreFile {
   vector_store_id: string;
 
   /**
+   * Set of 16 key-value pairs that can be attached to an object. This can be useful
+   * for storing additional information about the object in a structured format, and
+   * querying for objects via API or the dashboard. Keys are strings with a maximum
+   * length of 64 characters. Values are strings with a maximum length of 512
+   * characters, booleans, or numbers.
+   */
+  attributes?: Record<string, string | number | boolean> | null;
+
+  /**
    * The strategy used to chunk the file.
    */
   chunking_strategy?: VectorStoresAPI.FileChunkingStrategy;
@@ -155,6 +195,18 @@ export interface VectorStoreFileDeleted {
   object: 'vector_store.file.deleted';
 }
 
+export interface FileContentResponse {
+  /**
+   * The text content
+   */
+  text?: string;
+
+  /**
+   * The content type (currently only `"text"`)
+   */
+  type?: string;
+}
+
 export interface FileCreateParams {
   /**
    * A [File](https://platform.openai.com/docs/api-reference/files) ID that the
@@ -162,6 +214,15 @@ export interface FileCreateParams {
    * files.
    */
   file_id: string;
+
+  /**
+   * Set of 16 key-value pairs that can be attached to an object. This can be useful
+   * for storing additional information about the object in a structured format, and
+   * querying for objects via API or the dashboard. Keys are strings with a maximum
+   * length of 64 characters. Values are strings with a maximum length of 512
+   * characters, booleans, or numbers.
+   */
+  attributes?: Record<string, string | number | boolean> | null;
 
   /**
    * The chunking strategy used to chunk the file(s). If not set, will use the `auto`
@@ -175,6 +236,22 @@ export interface FileRetrieveParams {
    * The ID of the vector store that the file belongs to.
    */
   vector_store_id: string;
+}
+
+export interface FileUpdateParams {
+  /**
+   * Path param: The ID of the vector store the file belongs to.
+   */
+  vector_store_id: string;
+
+  /**
+   * Body param: Set of 16 key-value pairs that can be attached to an object. This
+   * can be useful for storing additional information about the object in a
+   * structured format, and querying for objects via API or the dashboard. Keys are
+   * strings with a maximum length of 64 characters. Values are strings with a
+   * maximum length of 512 characters, booleans, or numbers.
+   */
+  attributes: Record<string, string | number | boolean> | null;
 }
 
 export interface FileListParams extends CursorPageParams {
@@ -205,14 +282,25 @@ export interface FileDeleteParams {
   vector_store_id: string;
 }
 
+export interface FileContentParams {
+  /**
+   * The ID of the vector store.
+   */
+  vector_store_id: string;
+}
+
 export declare namespace Files {
   export {
     type VectorStoreFile as VectorStoreFile,
     type VectorStoreFileDeleted as VectorStoreFileDeleted,
+    type FileContentResponse as FileContentResponse,
     type VectorStoreFilesPage as VectorStoreFilesPage,
+    type FileContentResponsesPage as FileContentResponsesPage,
     type FileCreateParams as FileCreateParams,
     type FileRetrieveParams as FileRetrieveParams,
+    type FileUpdateParams as FileUpdateParams,
     type FileListParams as FileListParams,
     type FileDeleteParams as FileDeleteParams,
+    type FileContentParams as FileContentParams,
   };
 }
