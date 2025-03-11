@@ -583,6 +583,7 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponseOutputMessage</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseOutputRefusal</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseOutputText</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseReasoningItem</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseRefusalDeltaEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseRefusalDoneEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseStatus</a></code>
