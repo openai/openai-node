@@ -24,7 +24,6 @@ export {
   type ChatCompletionModality,
   type ChatCompletionNamedToolChoice,
   type ChatCompletionPredictionContent,
-  type ChatCompletionReasoningEffort,
   type ChatCompletionRole,
   type ChatCompletionStoreMessage,
   type ChatCompletionStreamOptions,

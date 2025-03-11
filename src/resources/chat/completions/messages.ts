@@ -9,7 +9,7 @@ import { type CursorPageParams } from '../../../pagination';
 
 export class Messages extends APIResource {
   /**
-   * Get the messages in a stored chat completion. Only chat completions that have
+   * Get the messages in a stored chat completion. Only Chat Completions that have
    * been created with the `store` parameter set to `true` will be returned.
    */
   list(
