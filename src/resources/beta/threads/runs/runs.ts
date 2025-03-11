@@ -10,7 +10,6 @@ import { RunSubmitToolOutputsParamsStream } from '../../../../lib/AssistantStrea
 import * as RunsAPI from './runs';
 import * as Shared from '../../../shared';
 import * as AssistantsAPI from '../../assistants';
-import * as ChatAPI from '../../../chat/chat';
 import * as MessagesAPI from '../messages';
 import * as ThreadsAPI from '../threads';
 import * as StepsAPI from './steps';
@@ -722,7 +721,7 @@ export interface RunCreateParamsBase {
    * associated with the assistant. If not, the model associated with the assistant
    * will be used.
    */
-  model?: (string & {}) | ChatAPI.ChatModel | null;
+  model?: (string & {}) | Shared.ChatModel | null;
 
   /**
    * Body param: Whether to enable
@@ -732,14 +731,14 @@ export interface RunCreateParamsBase {
   parallel_tool_calls?: boolean;
 
   /**
-   * Body param: **o1 and o3-mini models only**
+   * Body param: **o-series models only**
    *
    * Constrains effort on reasoning for
    * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
    * supported values are `low`, `medium`, and `high`. Reducing reasoning effort can
    * result in faster responses and fewer tokens used on reasoning in a response.
    */
-  reasoning_effort?: 'low' | 'medium' | 'high' | null;
+  reasoning_effort?: Shared.ReasoningEffort | null;
 
   /**
    * Body param: Specifies the format that the model must output. Compatible with

@@ -65,14 +65,34 @@ import {
 } from './resources/moderations';
 import { Audio, AudioModel, AudioResponseFormat } from './resources/audio/audio';
 import { Beta } from './resources/beta/beta';
-import { Chat, ChatModel } from './resources/chat/chat';
+import { Chat } from './resources/chat/chat';
 import { FineTuning } from './resources/fine-tuning/fine-tuning';
+import { Responses } from './resources/responses/responses';
 import {
   Upload,
   UploadCompleteParams,
   UploadCreateParams,
   Uploads as UploadsAPIUploads,
 } from './resources/uploads/uploads';
+import {
+  AutoFileChunkingStrategyParam,
+  FileChunkingStrategy,
+  FileChunkingStrategyParam,
+  OtherFileChunkingStrategyObject,
+  StaticFileChunkingStrategy,
+  StaticFileChunkingStrategyObject,
+  StaticFileChunkingStrategyObjectParam,
+  VectorStore,
+  VectorStoreCreateParams,
+  VectorStoreDeleted,
+  VectorStoreListParams,
+  VectorStoreSearchParams,
+  VectorStoreSearchResponse,
+  VectorStoreSearchResponsesPage,
+  VectorStoreUpdateParams,
+  VectorStores,
+  VectorStoresPage,
+} from './resources/vector-stores/vector-stores';
 import {
   ChatCompletion,
   ChatCompletionAssistantMessageParam,
@@ -98,7 +118,6 @@ import {
   ChatCompletionModality,
   ChatCompletionNamedToolChoice,
   ChatCompletionPredictionContent,
-  ChatCompletionReasoningEffort,
   ChatCompletionRole,
   ChatCompletionStoreMessage,
   ChatCompletionStreamOptions,
@@ -267,9 +286,11 @@ export class OpenAI extends Core.APIClient {
   moderations: API.Moderations = new API.Moderations(this);
   models: API.Models = new API.Models(this);
   fineTuning: API.FineTuning = new API.FineTuning(this);
+  vectorStores: API.VectorStores = new API.VectorStores(this);
   beta: API.Beta = new API.Beta(this);
   batches: API.Batches = new API.Batches(this);
   uploads: API.Uploads = new API.Uploads(this);
+  responses: API.Responses = new API.Responses(this);
 
   protected override defaultQuery(): Core.DefaultQuery | undefined {
     return this._options.defaultQuery;
@@ -325,10 +346,14 @@ OpenAI.Moderations = Moderations;
 OpenAI.Models = Models;
 OpenAI.ModelsPage = ModelsPage;
 OpenAI.FineTuning = FineTuning;
+OpenAI.VectorStores = VectorStores;
+OpenAI.VectorStoresPage = VectorStoresPage;
+OpenAI.VectorStoreSearchResponsesPage = VectorStoreSearchResponsesPage;
 OpenAI.Beta = Beta;
 OpenAI.Batches = Batches;
 OpenAI.BatchesPage = BatchesPage;
 OpenAI.Uploads = UploadsAPIUploads;
+OpenAI.Responses = Responses;
 export declare namespace OpenAI {
   export type RequestOptions = Core.RequestOptions;
 
@@ -350,7 +375,6 @@ export declare namespace OpenAI {
 
   export {
     Chat as Chat,
-    type ChatModel as ChatModel,
     type ChatCompletion as ChatCompletion,
     type ChatCompletionAssistantMessageParam as ChatCompletionAssistantMessageParam,
     type ChatCompletionAudio as ChatCompletionAudio,
@@ -371,7 +395,6 @@ export declare namespace OpenAI {
     type ChatCompletionModality as ChatCompletionModality,
     type ChatCompletionNamedToolChoice as ChatCompletionNamedToolChoice,
     type ChatCompletionPredictionContent as ChatCompletionPredictionContent,
-    type ChatCompletionReasoningEffort as ChatCompletionReasoningEffort,
     type ChatCompletionRole as ChatCompletionRole,
     type ChatCompletionStoreMessage as ChatCompletionStoreMessage,
     type ChatCompletionStreamOptions as ChatCompletionStreamOptions,
@@ -440,6 +463,26 @@ export declare namespace OpenAI {
 
   export { FineTuning as FineTuning };
 
+  export {
+    VectorStores as VectorStores,
+    type AutoFileChunkingStrategyParam as AutoFileChunkingStrategyParam,
+    type FileChunkingStrategy as FileChunkingStrategy,
+    type FileChunkingStrategyParam as FileChunkingStrategyParam,
+    type OtherFileChunkingStrategyObject as OtherFileChunkingStrategyObject,
+    type StaticFileChunkingStrategy as StaticFileChunkingStrategy,
+    type StaticFileChunkingStrategyObject as StaticFileChunkingStrategyObject,
+    type StaticFileChunkingStrategyObjectParam as StaticFileChunkingStrategyObjectParam,
+    type VectorStore as VectorStore,
+    type VectorStoreDeleted as VectorStoreDeleted,
+    type VectorStoreSearchResponse as VectorStoreSearchResponse,
+    VectorStoresPage as VectorStoresPage,
+    VectorStoreSearchResponsesPage as VectorStoreSearchResponsesPage,
+    type VectorStoreCreateParams as VectorStoreCreateParams,
+    type VectorStoreUpdateParams as VectorStoreUpdateParams,
+    type VectorStoreListParams as VectorStoreListParams,
+    type VectorStoreSearchParams as VectorStoreSearchParams,
+  };
+
   export { Beta as Beta };
 
   export {
@@ -459,10 +502,17 @@ export declare namespace OpenAI {
     type UploadCompleteParams as UploadCompleteParams,
   };
 
+  export { Responses as Responses };
+
+  export type ChatModel = API.ChatModel;
+  export type ComparisonFilter = API.ComparisonFilter;
+  export type CompoundFilter = API.CompoundFilter;
   export type ErrorObject = API.ErrorObject;
   export type FunctionDefinition = API.FunctionDefinition;
   export type FunctionParameters = API.FunctionParameters;
   export type Metadata = API.Metadata;
+  export type Reasoning = API.Reasoning;
+  export type ReasoningEffort = API.ReasoningEffort;
   export type ResponseFormatJSONObject = API.ResponseFormatJSONObject;
   export type ResponseFormatJSONSchema = API.ResponseFormatJSONSchema;
   export type ResponseFormatText = API.ResponseFormatText;
