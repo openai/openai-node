@@ -79,7 +79,7 @@ export class Responses extends APIResource {
         | APIPromise<Response>
         | APIPromise<Stream<ResponseStreamEvent>>
     )._thenUnwrap((rsp) => {
-      if ('type' in rsp && rsp.type === 'response') {
+      if ('object' in rsp && rsp.object === 'response') {
         addOutputText(rsp as Response);
       }
 
