@@ -1,5 +1,5 @@
 import { OpenAIError } from '../error';
-import { type ChatCompletionTool } from '../resources';
+import type { ChatCompletionTool } from '../resources/chat/completions';
 import {
   type FunctionTool,
   type ParsedContent,
