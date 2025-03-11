@@ -37,19 +37,3 @@ export {
   type ThreadCreateAndRunPollParams,
   type ThreadCreateAndRunStreamParams,
 } from './threads/index';
-export {
-  VectorStores,
-  type AutoFileChunkingStrategyParam,
-  type FileChunkingStrategy,
-  type FileChunkingStrategyParam,
-  type OtherFileChunkingStrategyObject,
-  type StaticFileChunkingStrategy,
-  type StaticFileChunkingStrategyObject,
-  type StaticFileChunkingStrategyObjectParam,
-  type VectorStore,
-  type VectorStoreDeleted,
-  type VectorStoreCreateParams,
-  type VectorStoreUpdateParams,
-  type VectorStoreListParams,
-  type VectorStoresPage,
-} from './vector-stores/index';
