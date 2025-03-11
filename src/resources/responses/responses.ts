@@ -1498,7 +1498,7 @@ export type ResponseInputItem =
   | ResponseFunctionWebSearch
   | ResponseFunctionToolCall
   | ResponseInputItem.FunctionCallOutput
-  | ResponseInputItem.Reasoning
+  | ResponseReasoningItem
   | ResponseInputItem.ItemReference;
 
 export namespace ResponseInputItem {
@@ -1644,47 +1644,6 @@ export namespace ResponseInputItem {
   }
 
   /**
-   * A description of the chain of thought used by a reasoning model while generating
-   * a response.
-   */
-  export interface Reasoning {
-    /**
-     * The unique identifier of the reasoning content.
-     */
-    id: string;
-
-    /**
-     * Reasoning text contents.
-     */
-    content: Array<Reasoning.Content>;
-
-    /**
-     * The type of the object. Always `reasoning`.
-     */
-    type: 'reasoning';
-
-    /**
-     * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
-     * Populated when items are returned via API.
-     */
-    status?: 'in_progress' | 'completed' | 'incomplete';
-  }
-
-  export namespace Reasoning {
-    export interface Content {
-      /**
-       * A short summary of the reasoning used by the model when generating the response.
-       */
-      text: string;
-
-      /**
-       * The type of the object. Always `text`.
-       */
-      type: 'reasoning_summary';
-    }
-  }
-
-  /**
    * An internal identifier for an item to reference.
    */
   export interface ItemReference {
@@ -1750,50 +1709,7 @@ export type ResponseOutputItem =
   | ResponseFunctionToolCall
   | ResponseFunctionWebSearch
   | ResponseComputerToolCall
-  | ResponseOutputItem.Reasoning;
-
-export namespace ResponseOutputItem {
-  /**
-   * A description of the chain of thought used by a reasoning model while generating
-   * a response.
-   */
-  export interface Reasoning {
-    /**
-     * The unique identifier of the reasoning content.
-     */
-    id: string;
-
-    /**
-     * Reasoning text contents.
-     */
-    content: Array<Reasoning.Content>;
-
-    /**
-     * The type of the object. Always `reasoning`.
-     */
-    type: 'reasoning';
-
-    /**
-     * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
-     * Populated when items are returned via API.
-     */
-    status?: 'in_progress' | 'completed' | 'incomplete';
-  }
-
-  export namespace Reasoning {
-    export interface Content {
-      /**
-       * A short summary of the reasoning used by the model when generating the response.
-       */
-      text: string;
-
-      /**
-       * The type of the object. Always `text`.
-       */
-      type: 'reasoning_summary';
-    }
-  }
-}
+  | ResponseReasoningItem;
 
 /**
  * Emitted when a new output item is added.
@@ -1972,6 +1888,47 @@ export namespace ResponseOutputText {
      * The type of the file path. Always `file_path`.
      */
     type: 'file_path';
+  }
+}
+
+/**
+ * A description of the chain of thought used by a reasoning model while generating
+ * a response.
+ */
+export interface ResponseReasoningItem {
+  /**
+   * The unique identifier of the reasoning content.
+   */
+  id: string;
+
+  /**
+   * Reasoning text contents.
+   */
+  summary: Array<ResponseReasoningItem.Summary>;
+
+  /**
+   * The type of the object. Always `reasoning`.
+   */
+  type: 'reasoning';
+
+  /**
+   * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
+   * Populated when items are returned via API.
+   */
+  status?: 'in_progress' | 'completed' | 'incomplete';
+}
+
+export namespace ResponseReasoningItem {
+  export interface Summary {
+    /**
+     * A short summary of the reasoning used by the model when generating the response.
+     */
+    text: string;
+
+    /**
+     * The type of the object. Always `summary_text`.
+     */
+    type: 'summary_text';
   }
 }
 
