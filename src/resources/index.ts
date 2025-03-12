@@ -60,4 +60,24 @@ export {
   type ModerationCreateResponse,
   type ModerationCreateParams,
 } from './moderations';
+export { Responses } from './responses/responses';
 export { Uploads, type Upload, type UploadCreateParams, type UploadCompleteParams } from './uploads/uploads';
+export {
+  VectorStoresPage,
+  VectorStoreSearchResponsesPage,
+  VectorStores,
+  type AutoFileChunkingStrategyParam,
+  type FileChunkingStrategy,
+  type FileChunkingStrategyParam,
+  type OtherFileChunkingStrategyObject,
+  type StaticFileChunkingStrategy,
+  type StaticFileChunkingStrategyObject,
+  type StaticFileChunkingStrategyObjectParam,
+  type VectorStore,
+  type VectorStoreDeleted,
+  type VectorStoreSearchResponse,
+  type VectorStoreCreateParams,
+  type VectorStoreUpdateParams,
+  type VectorStoreListParams,
+  type VectorStoreSearchParams,
+} from './vector-stores/vector-stores';

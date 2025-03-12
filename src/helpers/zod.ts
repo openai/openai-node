@@ -2,11 +2,15 @@ import { ResponseFormatJSONSchema } from '../resources/index';
 import type { infer as zodInfer, ZodType } from 'zod';
 import {
   AutoParseableResponseFormat,
+  AutoParseableTextFormat,
   AutoParseableTool,
   makeParseableResponseFormat,
+  makeParseableTextFormat,
   makeParseableTool,
 } from '../lib/parser';
 import { zodToJsonSchema as _zodToJsonSchema } from '../_vendor/zod-to-json-schema';
+import { AutoParseableResponseTool, makeParseableResponseTool } from '../lib/ResponsesParser';
+import { type ResponseFormatTextJSONSchemaConfig } from '../resources/responses/responses';
 
 function zodToJsonSchema(schema: ZodType, options: { name: string }): Record<string, unknown> {
   return _zodToJsonSchema(schema, {
@@ -74,6 +78,23 @@ export function zodResponseFormat<ZodInput extends ZodType>(
   );
 }
 
+export function zodTextFormat<ZodInput extends ZodType>(
+  zodObject: ZodInput,
+  name: string,
+  props?: Omit<ResponseFormatTextJSONSchemaConfig, 'schema' | 'type' | 'strict' | 'name'>,
+): AutoParseableTextFormat<zodInfer<ZodInput>> {
+  return makeParseableTextFormat(
+    {
+      type: 'json_schema',
+      ...props,
+      name,
+      strict: true,
+      schema: zodToJsonSchema(zodObject, { name }),
+    },
+    (content) => zodObject.parse(JSON.parse(content)),
+  );
+}
+
 /**
  * Creates a chat completion `function` tool that can be invoked
  * automatically by the chat completion `.runTools()` method or automatically
@@ -99,6 +120,31 @@ export function zodFunction<Parameters extends ZodType>(options: {
         strict: true,
         ...(options.description ? { description: options.description } : undefined),
       },
+    },
+    {
+      callback: options.function,
+      parser: (args) => options.parameters.parse(JSON.parse(args)),
+    },
+  );
+}
+
+export function zodResponsesFunction<Parameters extends ZodType>(options: {
+  name: string;
+  parameters: Parameters;
+  function?: ((args: zodInfer<Parameters>) => unknown | Promise<unknown>) | undefined;
+  description?: string | undefined;
+}): AutoParseableResponseTool<{
+  arguments: Parameters;
+  name: string;
+  function: (args: zodInfer<Parameters>) => unknown;
+}> {
+  return makeParseableResponseTool<any>(
+    {
+      type: 'function',
+      name: options.name,
+      parameters: zodToJsonSchema(options.parameters, { name: options.name }),
+      strict: true,
+      ...(options.description ? { description: options.description } : undefined),
     },
     {
       callback: options.function,

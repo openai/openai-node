@@ -1,5 +1,37 @@
 # Changelog
 
+## 4.87.3 (2025-03-11)
+
+Full Changelog: [v4.87.2...v4.87.3](https://github.com/openai/openai-node/compare/v4.87.2...v4.87.3)
+
+### Bug Fixes
+
+* **responses:** correct reasoning output type ([2abef57](https://github.com/openai/openai-node/commit/2abef57d7645a96a4b9a6b91483861cd568d2d4d))
+
+## 4.87.2 (2025-03-11)
+
+Full Changelog: [v4.87.1...v4.87.2](https://github.com/openai/openai-node/compare/v4.87.1...v4.87.2)
+
+### Bug Fixes
+
+* **responses:** correctly add output_text ([4ceb5cc](https://github.com/openai/openai-node/commit/4ceb5cc516b8c75d46f0042534d7658796a8cd71))
+
+## 4.87.1 (2025-03-11)
+
+Full Changelog: [v4.87.0...v4.87.1](https://github.com/openai/openai-node/compare/v4.87.0...v4.87.1)
+
+### Bug Fixes
+
+* correct imports ([5cdf17c](https://github.com/openai/openai-node/commit/5cdf17cec33da7cf540b8bdbcfa30c0c52842dd1))
+
+## 4.87.0 (2025-03-11)
+
+Full Changelog: [v4.86.2...v4.87.0](https://github.com/openai/openai-node/compare/v4.86.2...v4.87.0)
+
+### Features
+
+* **api:** add /v1/responses and built-in tools ([119b584](https://github.com/openai/openai-node/commit/119b5843a18b8014167c8d2031d75c08dbf400a3))
+
 ## 4.86.2 (2025-03-05)
 
 Full Changelog: [v4.86.1...v4.86.2](https://github.com/openai/openai-node/compare/v4.86.1...v4.86.2)
