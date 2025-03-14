@@ -13,8 +13,7 @@ jobs:
   lint:
     name: lint
     runs-on: ubuntu-latest
-    if: github.repository == 'openai/openai-node'
-
+    
     steps:
       - uses: actions/checkout@v4
 
@@ -32,8 +31,7 @@ jobs:
   build:
     name: build
     runs-on: ubuntu-latest
-    if: github.repository == 'openai/openai-node'
-
+    
     steps:
       - uses: actions/checkout@v4
 
@@ -50,7 +48,6 @@ jobs:
   test:
     name: test
     runs-on: ubuntu-latest
-    if: github.repository == 'openai/openai-node'
 
     steps:
       - uses: actions/checkout@v4
