@@ -169,19 +169,6 @@ export namespace Session {
    */
   export interface TurnDetection {
     /**
-     * Whether or not to automatically generate a response when a VAD stop event
-     * occurs. `true` by default.
-     */
-    create_response?: boolean;
-
-    /**
-     * Whether or not to automatically interrupt any ongoing response with output to
-     * the default conversation (i.e. `conversation` of `auto`) when a VAD start event
-     * occurs. `true` by default.
-     */
-    interrupt_response?: boolean;
-
-    /**
      * Amount of audio to include before the VAD detected speech (in milliseconds).
      * Defaults to 300ms.
      */
@@ -545,17 +532,10 @@ export namespace SessionCreateParams {
    */
   export interface TurnDetection {
     /**
-     * Whether or not to automatically generate a response when a VAD stop event
-     * occurs. `true` by default.
+     * Whether or not to automatically generate a response when VAD is enabled. `true`
+     * by default.
      */
     create_response?: boolean;
-
-    /**
-     * Whether or not to automatically interrupt any ongoing response with output to
-     * the default conversation (i.e. `conversation` of `auto`) when a VAD start event
-     * occurs. `true` by default.
-     */
-    interrupt_response?: boolean;
 
     /**
      * Amount of audio to include before the VAD detected speech (in milliseconds).

@@ -4,8 +4,10 @@ import { APIResource } from '../../resource';
 import { isRequestOptions } from '../../core';
 import * as Core from '../../core';
 import * as Shared from '../shared';
+import * as ChatAPI from '../chat/chat';
 import * as MessagesAPI from './threads/messages';
 import * as ThreadsAPI from './threads/threads';
+import * as VectorStoresAPI from './vector-stores/vector-stores';
 import * as RunsAPI from './threads/runs/runs';
 import * as StepsAPI from './threads/runs/steps';
 import { CursorPage, type CursorPageParams } from '../../pagination';
@@ -1103,7 +1105,7 @@ export interface AssistantCreateParams {
    * [Model overview](https://platform.openai.com/docs/models) for descriptions of
    * them.
    */
-  model: (string & {}) | Shared.ChatModel;
+  model: (string & {}) | ChatAPI.ChatModel;
 
   /**
    * The description of the assistant. The maximum length is 512 characters.
@@ -1132,14 +1134,14 @@ export interface AssistantCreateParams {
   name?: string | null;
 
   /**
-   * **o-series models only**
+   * **o1 and o3-mini models only**
    *
    * Constrains effort on reasoning for
    * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
    * supported values are `low`, `medium`, and `high`. Reducing reasoning effort can
    * result in faster responses and fewer tokens used on reasoning in a response.
    */
-  reasoning_effort?: Shared.ReasoningEffort | null;
+  reasoning_effort?: 'low' | 'medium' | 'high' | null;
 
   /**
    * Specifies the format that the model must output. Compatible with
@@ -1242,9 +1244,9 @@ export namespace AssistantCreateParams {
       export interface VectorStore {
         /**
          * The chunking strategy used to chunk the file(s). If not set, will use the `auto`
-         * strategy.
+         * strategy. Only applicable if `file_ids` is non-empty.
          */
-        chunking_strategy?: VectorStore.Auto | VectorStore.Static;
+        chunking_strategy?: VectorStoresAPI.FileChunkingStrategyParam;
 
         /**
          * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs to
@@ -1262,45 +1264,6 @@ export namespace AssistantCreateParams {
          * a maximum length of 512 characters.
          */
         metadata?: Shared.Metadata | null;
-      }
-
-      export namespace VectorStore {
-        /**
-         * The default strategy. This strategy currently uses a `max_chunk_size_tokens` of
-         * `800` and `chunk_overlap_tokens` of `400`.
-         */
-        export interface Auto {
-          /**
-           * Always `auto`.
-           */
-          type: 'auto';
-        }
-
-        export interface Static {
-          static: Static.Static;
-
-          /**
-           * Always `static`.
-           */
-          type: 'static';
-        }
-
-        export namespace Static {
-          export interface Static {
-            /**
-             * The number of tokens that overlap between chunks. The default value is `400`.
-             *
-             * Note that the overlap must not exceed half of `max_chunk_size_tokens`.
-             */
-            chunk_overlap_tokens: number;
-
-            /**
-             * The maximum number of tokens in each chunk. The default value is `800`. The
-             * minimum value is `100` and the maximum value is `4096`.
-             */
-            max_chunk_size_tokens: number;
-          }
-        }
       }
     }
   }
@@ -1347,8 +1310,6 @@ export interface AssistantUpdateParams {
     | 'gpt-4o-2024-05-13'
     | 'gpt-4o-mini'
     | 'gpt-4o-mini-2024-07-18'
-    | 'gpt-4.5-preview'
-    | 'gpt-4.5-preview-2025-02-27'
     | 'gpt-4-turbo'
     | 'gpt-4-turbo-2024-04-09'
     | 'gpt-4-0125-preview'
@@ -1374,14 +1335,14 @@ export interface AssistantUpdateParams {
   name?: string | null;
 
   /**
-   * **o-series models only**
+   * **o1 and o3-mini models only**
    *
    * Constrains effort on reasoning for
    * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
    * supported values are `low`, `medium`, and `high`. Reducing reasoning effort can
    * result in faster responses and fewer tokens used on reasoning in a response.
    */
-  reasoning_effort?: Shared.ReasoningEffort | null;
+  reasoning_effort?: 'low' | 'medium' | 'high' | null;
 
   /**
    * Specifies the format that the model must output. Compatible with

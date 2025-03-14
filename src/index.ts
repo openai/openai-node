@@ -65,34 +65,7 @@ import {
 } from './resources/moderations';
 import { Audio, AudioModel, AudioResponseFormat } from './resources/audio/audio';
 import { Beta } from './resources/beta/beta';
-import { Chat } from './resources/chat/chat';
-import { FineTuning } from './resources/fine-tuning/fine-tuning';
-import { Responses } from './resources/responses/responses';
-import {
-  Upload,
-  UploadCompleteParams,
-  UploadCreateParams,
-  Uploads as UploadsAPIUploads,
-} from './resources/uploads/uploads';
-import {
-  AutoFileChunkingStrategyParam,
-  FileChunkingStrategy,
-  FileChunkingStrategyParam,
-  OtherFileChunkingStrategyObject,
-  StaticFileChunkingStrategy,
-  StaticFileChunkingStrategyObject,
-  StaticFileChunkingStrategyObjectParam,
-  VectorStore,
-  VectorStoreCreateParams,
-  VectorStoreDeleted,
-  VectorStoreListParams,
-  VectorStoreSearchParams,
-  VectorStoreSearchResponse,
-  VectorStoreSearchResponsesPage,
-  VectorStoreUpdateParams,
-  VectorStores,
-  VectorStoresPage,
-} from './resources/vector-stores/vector-stores';
+import { Chat, ChatModel } from './resources/chat/chat';
 import {
   ChatCompletion,
   ChatCompletionAssistantMessageParam,
@@ -107,29 +80,32 @@ import {
   ChatCompletionCreateParams,
   ChatCompletionCreateParamsNonStreaming,
   ChatCompletionCreateParamsStreaming,
-  ChatCompletionDeleted,
   ChatCompletionDeveloperMessageParam,
   ChatCompletionFunctionCallOption,
   ChatCompletionFunctionMessageParam,
-  ChatCompletionListParams,
   ChatCompletionMessage,
   ChatCompletionMessageParam,
   ChatCompletionMessageToolCall,
   ChatCompletionModality,
   ChatCompletionNamedToolChoice,
   ChatCompletionPredictionContent,
+  ChatCompletionReasoningEffort,
   ChatCompletionRole,
-  ChatCompletionStoreMessage,
   ChatCompletionStreamOptions,
   ChatCompletionSystemMessageParam,
   ChatCompletionTokenLogprob,
   ChatCompletionTool,
   ChatCompletionToolChoiceOption,
   ChatCompletionToolMessageParam,
-  ChatCompletionUpdateParams,
   ChatCompletionUserMessageParam,
-  ChatCompletionsPage,
-} from './resources/chat/completions/completions';
+} from './resources/chat/completions';
+import { FineTuning } from './resources/fine-tuning/fine-tuning';
+import {
+  Upload,
+  UploadCompleteParams,
+  UploadCreateParams,
+  Uploads as UploadsAPIUploads,
+} from './resources/uploads/uploads';
 
 export interface ClientOptions {
   /**
@@ -286,11 +262,9 @@ export class OpenAI extends Core.APIClient {
   moderations: API.Moderations = new API.Moderations(this);
   models: API.Models = new API.Models(this);
   fineTuning: API.FineTuning = new API.FineTuning(this);
-  vectorStores: API.VectorStores = new API.VectorStores(this);
   beta: API.Beta = new API.Beta(this);
   batches: API.Batches = new API.Batches(this);
   uploads: API.Uploads = new API.Uploads(this);
-  responses: API.Responses = new API.Responses(this);
 
   protected override defaultQuery(): Core.DefaultQuery | undefined {
     return this._options.defaultQuery;
@@ -336,7 +310,6 @@ export class OpenAI extends Core.APIClient {
 
 OpenAI.Completions = Completions;
 OpenAI.Chat = Chat;
-OpenAI.ChatCompletionsPage = ChatCompletionsPage;
 OpenAI.Embeddings = Embeddings;
 OpenAI.Files = Files;
 OpenAI.FileObjectsPage = FileObjectsPage;
@@ -346,14 +319,10 @@ OpenAI.Moderations = Moderations;
 OpenAI.Models = Models;
 OpenAI.ModelsPage = ModelsPage;
 OpenAI.FineTuning = FineTuning;
-OpenAI.VectorStores = VectorStores;
-OpenAI.VectorStoresPage = VectorStoresPage;
-OpenAI.VectorStoreSearchResponsesPage = VectorStoreSearchResponsesPage;
 OpenAI.Beta = Beta;
 OpenAI.Batches = Batches;
 OpenAI.BatchesPage = BatchesPage;
 OpenAI.Uploads = UploadsAPIUploads;
-OpenAI.Responses = Responses;
 export declare namespace OpenAI {
   export type RequestOptions = Core.RequestOptions;
 
@@ -375,6 +344,7 @@ export declare namespace OpenAI {
 
   export {
     Chat as Chat,
+    type ChatModel as ChatModel,
     type ChatCompletion as ChatCompletion,
     type ChatCompletionAssistantMessageParam as ChatCompletionAssistantMessageParam,
     type ChatCompletionAudio as ChatCompletionAudio,
@@ -385,7 +355,6 @@ export declare namespace OpenAI {
     type ChatCompletionContentPartInputAudio as ChatCompletionContentPartInputAudio,
     type ChatCompletionContentPartRefusal as ChatCompletionContentPartRefusal,
     type ChatCompletionContentPartText as ChatCompletionContentPartText,
-    type ChatCompletionDeleted as ChatCompletionDeleted,
     type ChatCompletionDeveloperMessageParam as ChatCompletionDeveloperMessageParam,
     type ChatCompletionFunctionCallOption as ChatCompletionFunctionCallOption,
     type ChatCompletionFunctionMessageParam as ChatCompletionFunctionMessageParam,
@@ -395,8 +364,8 @@ export declare namespace OpenAI {
     type ChatCompletionModality as ChatCompletionModality,
     type ChatCompletionNamedToolChoice as ChatCompletionNamedToolChoice,
     type ChatCompletionPredictionContent as ChatCompletionPredictionContent,
+    type ChatCompletionReasoningEffort as ChatCompletionReasoningEffort,
     type ChatCompletionRole as ChatCompletionRole,
-    type ChatCompletionStoreMessage as ChatCompletionStoreMessage,
     type ChatCompletionStreamOptions as ChatCompletionStreamOptions,
     type ChatCompletionSystemMessageParam as ChatCompletionSystemMessageParam,
     type ChatCompletionTokenLogprob as ChatCompletionTokenLogprob,
@@ -404,12 +373,9 @@ export declare namespace OpenAI {
     type ChatCompletionToolChoiceOption as ChatCompletionToolChoiceOption,
     type ChatCompletionToolMessageParam as ChatCompletionToolMessageParam,
     type ChatCompletionUserMessageParam as ChatCompletionUserMessageParam,
-    ChatCompletionsPage as ChatCompletionsPage,
     type ChatCompletionCreateParams as ChatCompletionCreateParams,
     type ChatCompletionCreateParamsNonStreaming as ChatCompletionCreateParamsNonStreaming,
     type ChatCompletionCreateParamsStreaming as ChatCompletionCreateParamsStreaming,
-    type ChatCompletionUpdateParams as ChatCompletionUpdateParams,
-    type ChatCompletionListParams as ChatCompletionListParams,
   };
 
   export {
@@ -463,26 +429,6 @@ export declare namespace OpenAI {
 
   export { FineTuning as FineTuning };
 
-  export {
-    VectorStores as VectorStores,
-    type AutoFileChunkingStrategyParam as AutoFileChunkingStrategyParam,
-    type FileChunkingStrategy as FileChunkingStrategy,
-    type FileChunkingStrategyParam as FileChunkingStrategyParam,
-    type OtherFileChunkingStrategyObject as OtherFileChunkingStrategyObject,
-    type StaticFileChunkingStrategy as StaticFileChunkingStrategy,
-    type StaticFileChunkingStrategyObject as StaticFileChunkingStrategyObject,
-    type StaticFileChunkingStrategyObjectParam as StaticFileChunkingStrategyObjectParam,
-    type VectorStore as VectorStore,
-    type VectorStoreDeleted as VectorStoreDeleted,
-    type VectorStoreSearchResponse as VectorStoreSearchResponse,
-    VectorStoresPage as VectorStoresPage,
-    VectorStoreSearchResponsesPage as VectorStoreSearchResponsesPage,
-    type VectorStoreCreateParams as VectorStoreCreateParams,
-    type VectorStoreUpdateParams as VectorStoreUpdateParams,
-    type VectorStoreListParams as VectorStoreListParams,
-    type VectorStoreSearchParams as VectorStoreSearchParams,
-  };
-
   export { Beta as Beta };
 
   export {
@@ -502,17 +448,10 @@ export declare namespace OpenAI {
     type UploadCompleteParams as UploadCompleteParams,
   };
 
-  export { Responses as Responses };
-
-  export type ChatModel = API.ChatModel;
-  export type ComparisonFilter = API.ComparisonFilter;
-  export type CompoundFilter = API.CompoundFilter;
   export type ErrorObject = API.ErrorObject;
   export type FunctionDefinition = API.FunctionDefinition;
   export type FunctionParameters = API.FunctionParameters;
   export type Metadata = API.Metadata;
-  export type Reasoning = API.Reasoning;
-  export type ReasoningEffort = API.ReasoningEffort;
   export type ResponseFormatJSONObject = API.ResponseFormatJSONObject;
   export type ResponseFormatJSONSchema = API.ResponseFormatJSONSchema;
   export type ResponseFormatText = API.ResponseFormatText;

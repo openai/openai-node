@@ -279,10 +279,9 @@ export namespace FileSearchToolCall {
      */
     export interface RankingOptions {
       /**
-       * The ranker to use for the file search. If not specified will use the `auto`
-       * ranker.
+       * The ranker used for the file search.
        */
-      ranker: 'auto' | 'default_2024_08_21';
+      ranker: 'default_2024_08_21';
 
       /**
        * The score threshold for the file search. All values must be a floating point

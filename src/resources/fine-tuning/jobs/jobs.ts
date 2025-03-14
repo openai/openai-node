@@ -3,7 +3,6 @@
 import { APIResource } from '../../../resource';
 import { isRequestOptions } from '../../../core';
 import * as Core from '../../../core';
-import * as Shared from '../../shared';
 import * as CheckpointsAPI from './checkpoints';
 import {
   CheckpointListParams,
@@ -195,16 +194,6 @@ export interface FineTuningJob {
    * A list of integrations to enable for this fine-tuning job.
    */
   integrations?: Array<FineTuningJobWandbIntegrationObject> | null;
-
-  /**
-   * Set of 16 key-value pairs that can be attached to an object. This can be useful
-   * for storing additional information about the object in a structured format, and
-   * querying for objects via API or the dashboard.
-   *
-   * Keys are strings with a maximum length of 64 characters. Values are strings with
-   * a maximum length of 512 characters.
-   */
-  metadata?: Shared.Metadata | null;
 
   /**
    * The method used for fine-tuning.
@@ -488,16 +477,6 @@ export interface JobCreateParams {
   integrations?: Array<JobCreateParams.Integration> | null;
 
   /**
-   * Set of 16 key-value pairs that can be attached to an object. This can be useful
-   * for storing additional information about the object in a structured format, and
-   * querying for objects via API or the dashboard.
-   *
-   * Keys are strings with a maximum length of 64 characters. Values are strings with
-   * a maximum length of 512 characters.
-   */
-  metadata?: Shared.Metadata | null;
-
-  /**
    * The method used for fine-tuning.
    */
   method?: JobCreateParams.Method;
@@ -711,13 +690,7 @@ export namespace JobCreateParams {
   }
 }
 
-export interface JobListParams extends CursorPageParams {
-  /**
-   * Optional metadata filter. To filter, use the syntax `metadata[k]=v`.
-   * Alternatively, set `metadata=null` to indicate no metadata.
-   */
-  metadata?: Record<string, string> | null;
-}
+export interface JobListParams extends CursorPageParams {}
 
 export interface JobListEventsParams extends CursorPageParams {}
 
