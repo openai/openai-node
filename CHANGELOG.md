@@ -1,5 +1,14 @@
 # Changelog
 
+## 4.87.4 (2025-03-15)
+
+Full Changelog: [v4.87.3...v4.87.4](https://github.com/openai/openai-node/compare/v4.87.3...v4.87.4)
+
+### Chores
+
+* **internal:** remove CI condition ([#1381](https://github.com/openai/openai-node/issues/1381)) ([ef17981](https://github.com/openai/openai-node/commit/ef17981a0bd6b3e971986ece829c5d260d7392d4))
+* **internal:** update release workflows ([90b77d0](https://github.com/openai/openai-node/commit/90b77d09c04d21487aa38fe775c79ae632136813))
+
 ## 4.87.3 (2025-03-11)
 
 Full Changelog: [v4.87.2...v4.87.3](https://github.com/openai/openai-node/compare/v4.87.2...v4.87.3)
