@@ -42,7 +42,6 @@ export class Embeddings extends APIResource {
     // and we defaulted to base64 for performance reasons
     // we are sure then that the response is base64 encoded, let's decode it
     // the returned result will be a float32 array since this is OpenAI API's default encoding
-    Core.debug('response', `User requested encoding_format=${encoding_format || 'default'}`);
     Core.debug('response', 'Decoding base64 embeddings to float32 array');
 
     return (response as Core.APIPromise<CreateEmbeddingResponse>)._thenUnwrap((response) => {
