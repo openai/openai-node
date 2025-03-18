@@ -33,7 +33,7 @@ describe('resource embeddings', () => {
     });
   });
 
-  test.only('create: encoding_format=float should create float32 embeddings', async () => {
+  test('create: encoding_format=float should create float32 embeddings', async () => {
     const responsePromise = client.embeddings.create({
       input: 'The quick brown fox jumped over the lazy dog',
       model: 'text-embedding-3-small',
