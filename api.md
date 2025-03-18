@@ -532,6 +532,8 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponseCodeInterpreterToolCall</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseCompletedEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseComputerToolCall</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseComputerToolCallOutputItem</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseComputerToolCallOutputScreenshot</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseContent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseContentPartAddedEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseContentPartDoneEvent</a></code>
@@ -548,6 +550,8 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponseFunctionCallArgumentsDeltaEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseFunctionCallArgumentsDoneEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseFunctionToolCall</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseFunctionToolCallItem</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseFunctionToolCallOutputItem</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseFunctionWebSearch</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseInProgressEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseIncludable</a></code>
@@ -559,7 +563,9 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponseInputImage</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseInputItem</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseInputMessageContentList</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseInputMessageItem</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseInputText</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseItem</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseOutputAudio</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseOutputItem</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseOutputItemAddedEvent</a></code>
@@ -600,4 +606,4 @@ Types:
 
 Methods:
 
-- <code title="get /responses/{response_id}/input_items">client.responses.inputItems.<a href="./src/resources/responses/input-items.ts">list</a>(responseId, { ...params }) -> ResponseItemListDataPage</code>
+- <code title="get /responses/{response_id}/input_items">client.responses.inputItems.<a href="./src/resources/responses/input-items.ts">list</a>(responseId, { ...params }) -> ResponseItemsPage</code>
