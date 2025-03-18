@@ -92,3 +92,11 @@ export const maybeCoerceBoolean = (value: unknown): boolean | undefined => {
   }
   return coerceBoolean(value);
 };
+
+export const safeJSON = (text: string) => {
+  try {
+    return JSON.parse(text);
+  } catch (err) {
+    return undefined;
+  }
+};

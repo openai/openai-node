@@ -1,10 +1,12 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import type { RequestInit, RequestInfo, BodyInit } from './internal/builtin-types';
-import type { HTTPMethod, PromiseOrValue, MergedRequestInit } from './internal/types';
+import type { HTTPMethod, PromiseOrValue, MergedRequestInit, FinalizedRequestInit } from './internal/types';
 import { uuid4 } from './internal/utils/uuid';
-import { validatePositiveInteger, isAbsoluteURL, hasOwn } from './internal/utils/values';
+import { validatePositiveInteger, isAbsoluteURL, safeJSON } from './internal/utils/values';
 import { sleep } from './internal/utils/sleep';
+import { type Logger, type LogLevel, parseLogLevel } from './internal/utils/log';
+export type { Logger, LogLevel } from './internal/utils/log';
 import { castToError, isAbortError } from './internal/errors';
 import type { APIResponseProps } from './internal/parse';
 import { getPlatformHeaders } from './internal/detect-platform';
@@ -148,48 +150,6 @@ import {
   ChatCompletionsPage,
 } from './resources/chat/completions/completions';
 
-const safeJSON = (text: string) => {
-  try {
-    return JSON.parse(text);
-  } catch (err) {
-    return undefined;
-  }
-};
-
-type LogFn = (message: string, ...rest: unknown[]) => void;
-export type Logger = {
-  error: LogFn;
-  warn: LogFn;
-  info: LogFn;
-  debug: LogFn;
-};
-export type LogLevel = 'off' | 'error' | 'warn' | 'info' | 'debug';
-const parseLogLevel = (
-  maybeLevel: string | undefined,
-  sourceName: string,
-  client: OpenAI,
-): LogLevel | undefined => {
-  if (!maybeLevel) {
-    return undefined;
-  }
-  const levels: Record<LogLevel, true> = {
-    off: true,
-    error: true,
-    warn: true,
-    info: true,
-    debug: true,
-  };
-  if (hasOwn(levels, maybeLevel)) {
-    return maybeLevel;
-  }
-  loggerFor(client).warn(
-    `${sourceName} was set to ${JSON.stringify(maybeLevel)}, expected one of ${JSON.stringify(
-      Object.keys(levels),
-    )}`,
-  );
-  return undefined;
-};
-
 export interface ClientOptions {
   /**
    * Defaults to process.env['OPENAI_API_KEY'].
@@ -278,8 +238,6 @@ export interface ClientOptions {
    */
   logger?: Logger | undefined;
 }
-
-type FinalizedRequestInit = RequestInit & { headers: Headers };
 
 /**
  * API Client for interfacing with the OpenAI API.
