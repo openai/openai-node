@@ -55,11 +55,10 @@ describe('resource embeddings', () => {
   });
 
   test('create: encoding_format=default should create float32 embeddings', async () => {
-    const responsePromise = client.embeddings.create({
+    const response = await client.embeddings.create({
       input: 'The quick brown fox jumped over the lazy dog',
       model: 'text-embedding-3-small',
     });
-    const response = await responsePromise;
 
     expect(response.data?.at(0)?.embedding).toBeInstanceOf(Array);
     expect(Number.isFinite(response.data?.at(0)?.embedding.at(0))).toBe(true);
