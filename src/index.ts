@@ -118,6 +118,7 @@ import {
   ChatCompletionModality,
   ChatCompletionNamedToolChoice,
   ChatCompletionPredictionContent,
+  ChatCompletionReasoningEffort,
   ChatCompletionRole,
   ChatCompletionStoreMessage,
   ChatCompletionStreamOptions,
@@ -129,6 +130,7 @@ import {
   ChatCompletionUpdateParams,
   ChatCompletionUserMessageParam,
   ChatCompletionsPage,
+  CreateChatCompletionRequestMessage,
 } from './resources/chat/completions/completions';
 
 export interface ClientOptions {
@@ -404,6 +406,8 @@ export declare namespace OpenAI {
     type ChatCompletionToolChoiceOption as ChatCompletionToolChoiceOption,
     type ChatCompletionToolMessageParam as ChatCompletionToolMessageParam,
     type ChatCompletionUserMessageParam as ChatCompletionUserMessageParam,
+    type CreateChatCompletionRequestMessage as CreateChatCompletionRequestMessage,
+    type ChatCompletionReasoningEffort as ChatCompletionReasoningEffort,
     ChatCompletionsPage as ChatCompletionsPage,
     type ChatCompletionCreateParams as ChatCompletionCreateParams,
     type ChatCompletionCreateParamsNonStreaming as ChatCompletionCreateParamsNonStreaming,
