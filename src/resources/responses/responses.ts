@@ -1363,11 +1363,6 @@ export interface ResponseFunctionCallArgumentsDoneEvent {
  */
 export interface ResponseFunctionToolCall {
   /**
-   * The unique ID of the function tool call.
-   */
-  id: string;
-
-  /**
    * A JSON string of the arguments to pass to the function.
    */
   arguments: string;
@@ -1386,6 +1381,11 @@ export interface ResponseFunctionToolCall {
    * The type of the function tool call. Always `function_call`.
    */
   type: 'function_call';
+
+  /**
+   * The unique ID of the function tool call.
+   */
+  id?: string;
 
   /**
    * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
@@ -2306,6 +2306,11 @@ export interface ResponseUsage {
   input_tokens: number;
 
   /**
+   * A detailed breakdown of the input tokens.
+   */
+  input_tokens_details: ResponseUsage.InputTokensDetails;
+
+  /**
    * The number of output tokens.
    */
   output_tokens: number;
@@ -2322,6 +2327,17 @@ export interface ResponseUsage {
 }
 
 export namespace ResponseUsage {
+  /**
+   * A detailed breakdown of the input tokens.
+   */
+  export interface InputTokensDetails {
+    /**
+     * The number of tokens that were retrieved from the cache.
+     * [More on prompt caching](https://platform.openai.com/docs/guides/prompt-caching).
+     */
+    cached_tokens: number;
+  }
+
   /**
    * A detailed breakdown of the output tokens.
    */
