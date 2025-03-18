@@ -14,18 +14,16 @@ export class Embeddings extends APIResource {
     Core.debug('request', 'Sending request with arguments:', { body, ...options });
 
     const hasUserProvidedEncodingFormat = !!body.encoding_format;
+    // No encoding_format specified, defaulting to base64 for performance reasons
+    // See https://github.com/openai/openai-node/pull/1312
     let encoding_format: EmbeddingCreateParams['encoding_format'] =
       hasUserProvidedEncodingFormat ? body.encoding_format : 'base64';
 
     if (hasUserProvidedEncodingFormat) {
       Core.debug('Request', 'User defined encoding_format:', body.encoding_format);
-    } else {
-      // No encoding_format specified, defaulting to base64 for performance reasons
-      // See https://github.com/openai/openai-node/pull/1312
-      encoding_format = 'base64';
     }
 
-    const response = this._client.post('/embeddings', {
+    const response: Core.APIPromise<CreateEmbeddingResponse> = this._client.post('/embeddings', {
       body: {
         ...body,
         encoding_format: encoding_format as EmbeddingCreateParams['encoding_format'],
@@ -35,7 +33,7 @@ export class Embeddings extends APIResource {
 
     // if the user specified an encoding_format, return the response as-is
     if (hasUserProvidedEncodingFormat) {
-      return response as Core.APIPromise<CreateEmbeddingResponse>;
+      return response;
     }
 
     // in this stage, we are sure the user did not specify an encoding_format
