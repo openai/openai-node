@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - master
+      - update-specs
   pull_request:
     branches:
       - master
@@ -87,7 +88,6 @@ jobs:
   ecosystem_tests:
     name: ecosystem tests (v${{ matrix.node-version }})
     runs-on: ubuntu-latest
-    if: github.repository == 'openai/openai-node'
     timeout-minutes: 20
     strategy:
       fail-fast: false
