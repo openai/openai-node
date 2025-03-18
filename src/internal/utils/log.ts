@@ -1,8 +1,17 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import type { LogLevel, Logger } from '../../client';
+import { hasOwn } from './values';
 import { type OpenAI } from '../../client';
 import { RequestOptions } from '../request-options';
+
+type LogFn = (message: string, ...rest: unknown[]) => void;
+export type Logger = {
+  error: LogFn;
+  warn: LogFn;
+  info: LogFn;
+  debug: LogFn;
+};
+export type LogLevel = 'off' | 'error' | 'warn' | 'info' | 'debug';
 
 const levelNumbers = {
   off: 0,
@@ -10,6 +19,25 @@ const levelNumbers = {
   warn: 300,
   info: 400,
   debug: 500,
+};
+
+export const parseLogLevel = (
+  maybeLevel: string | undefined,
+  sourceName: string,
+  client: OpenAI,
+): LogLevel | undefined => {
+  if (!maybeLevel) {
+    return undefined;
+  }
+  if (hasOwn(levelNumbers, maybeLevel)) {
+    return maybeLevel;
+  }
+  loggerFor(client).warn(
+    `${sourceName} was set to ${JSON.stringify(maybeLevel)}, expected one of ${JSON.stringify(
+      Object.keys(levelNumbers),
+    )}`,
+  );
+  return undefined;
 };
 
 function noop() {}

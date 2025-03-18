@@ -5,6 +5,8 @@ export type HTTPMethod = 'get' | 'post' | 'put' | 'patch' | 'delete';
 
 export type KeysEnum<T> = { [P in keyof Required<T>]: true };
 
+export type FinalizedRequestInit = RequestInit & { headers: Headers };
+
 type NotAny<T> = [unknown] extends [T] ? never : T;
 
 /**
