@@ -171,10 +171,10 @@ export interface Reasoning {
    * supported values are `low`, `medium`, and `high`. Reducing reasoning effort can
    * result in faster responses and fewer tokens used on reasoning in a response.
    */
-  effort: ReasoningEffort | null;
+  effort?: ReasoningEffort | null;
 
   /**
-   * **o-series models only**
+   * **computer_use_preview only**
    *
    * A summary of the reasoning performed by the model. This can be useful for
    * debugging and understanding the model's reasoning process. One of `concise` or

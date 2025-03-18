@@ -377,10 +377,13 @@ export interface ChatCompletionChunk {
   /**
    * An optional field that will only be present when you set
    * `stream_options: {"include_usage": true}` in your request. When present, it
-   * contains a null value except for the last chunk which contains the token usage
-   * statistics for the entire request.
+   * contains a null value **except for the last chunk** which contains the token
+   * usage statistics for the entire request.
+   *
+   * **NOTE:** If the stream is interrupted or cancelled, you may not receive the
+   * final usage chunk which contains the total token usage for the request.
    */
-  usage?: CompletionsAPI.CompletionUsage | null;
+  usage?: CompletionsAPI.CompletionUsage;
 }
 
 export namespace ChatCompletionChunk {
@@ -551,7 +554,7 @@ export namespace ChatCompletionContentPart {
       /**
        * The name of the file, used when passing the file to the model as a string.
        */
-      file_name?: string;
+      filename?: string;
     }
   }
 }
@@ -930,8 +933,11 @@ export interface ChatCompletionStreamOptions {
   /**
    * If set, an additional chunk will be streamed before the `data: [DONE]` message.
    * The `usage` field on this chunk shows the token usage statistics for the entire
-   * request, and the `choices` field will always be an empty array. All other chunks
-   * will also include a `usage` field, but with a null value.
+   * request, and the `choices` field will always be an empty array.
+   *
+   * All other chunks will also include a `usage` field, but with a null value.
+   * **NOTE:** If the stream is interrupted, you may not receive the final usage
+   * chunk which contains the total token usage for the request.
    */
   include_usage?: boolean;
 }
