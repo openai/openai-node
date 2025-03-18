@@ -65,6 +65,7 @@ export class InputItems extends APIResource {
 }
 
 export class ResponseItemListDataPage extends CursorPage<
+  // @ts-ignore some items don't necessarily have the `id` property
   | ResponseItemList.Message
   | ResponsesAPI.ResponseOutputMessage
   | ResponsesAPI.ResponseFileSearchToolCall
