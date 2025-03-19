@@ -1,0 +1,25 @@
+{
+  "name": "@openai/openai",
+<<<<<<< HEAD
+  "version": "4.87.4",
+  "exports": {
+    ".": "./index.ts",
+    "./helpers/zod": "./helpers/zod.ts",
+    "./beta/realtime/websocket": "./beta/realtime/websocket.ts"
+  },
+  "imports": {
+    "zod": "npm:zod@3"
+  },
+||||||| parent of 0603bcac (chore(internal): version bump (#1393))
+  "version": "4.87.3",
+  "exports": "./index.ts",
+=======
+  "version": "4.87.4",
+  "exports": "./index.ts",
+>>>>>>> 0603bcac (chore(internal): version bump (#1393))
+  "publish": {
+    "exclude": [
+      "!."
+    ]
+  }
+}
