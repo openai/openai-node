@@ -132,6 +132,47 @@ import {
   ChatCompletionsPage,
   CreateChatCompletionRequestMessage,
 } from './resources/chat/completions/completions';
+import {
+  Response,
+  ParsedResponse,
+  ResponseStreamEvent,
+  ResponseItem,
+  ResponseOutputItem,
+  ResponseStatus,
+  ResponseError,
+  ResponseUsage,
+  ResponseInputItem,
+  ResponseInputMessageItem,
+  ResponseOutputMessage,
+  ResponseOutputText,
+  ResponseOutputRefusal,
+  ResponseInputText,
+  ResponseInputImage,
+  ResponseInputFile,
+  ResponseTextConfig,
+  ResponseFunctionToolCall,
+  ResponseFileSearchToolCall,
+  ResponseComputerToolCall,
+  ResponseReasoningItem,
+  Tool,
+  FunctionTool,
+  FileSearchTool,
+  ComputerTool,
+  WebSearchTool,
+  ToolChoiceOptions,
+  ToolChoiceTypes,
+  ToolChoiceFunction,
+  ResponseCreateParams,
+  ResponseCreateParamsNonStreaming,
+  ResponseCreateParamsStreaming,
+  ResponseRetrieveParams,
+  ResponseParseParams,
+  ResponseIncludable,
+  ResponseFormatTextConfig,
+  EasyInputMessage,
+  ResponseItemsPage,
+} from './resources/responses/responses';
+import { ResponseStream } from './lib/responses/ResponseStream';
 
 export interface ClientOptions {
   /**
@@ -507,6 +548,49 @@ export declare namespace OpenAI {
   };
 
   export { Responses as Responses };
+
+  export {
+    Response as Response,
+    ParsedResponse as ParsedResponse,
+    ResponseStreamEvent as ResponseStreamEvent,
+    ResponseItem as ResponseItem,
+    ResponseOutputItem as ResponseOutputItem,
+    ResponseStatus as ResponseStatus,
+    ResponseError as ResponseError,
+    ResponseUsage as ResponseUsage,
+    ResponseInputItem as ResponseInputItem,
+    ResponseInputMessageItem as ResponseInputMessageItem,
+    ResponseOutputMessage as ResponseOutputMessage,
+    ResponseOutputText as ResponseOutputText,
+    ResponseOutputRefusal as ResponseOutputRefusal,
+    ResponseInputText as ResponseInputText,
+    ResponseInputImage as ResponseInputImage,
+    ResponseInputFile as ResponseInputFile,
+    ResponseTextConfig as ResponseTextConfig,
+    ResponseFunctionToolCall as ResponseFunctionToolCall,
+    ResponseFileSearchToolCall as ResponseFileSearchToolCall,
+    ResponseComputerToolCall as ResponseComputerToolCall,
+    ResponseReasoningItem as ResponseReasoningItem,
+    Tool as Tool,
+    FunctionTool as FunctionTool,
+    FileSearchTool as FileSearchTool,
+    ComputerTool as ComputerTool,
+    WebSearchTool as WebSearchTool,
+    ToolChoiceOptions as ToolChoiceOptions,
+    ToolChoiceTypes as ToolChoiceTypes,
+    ToolChoiceFunction as ToolChoiceFunction,
+    ResponseCreateParams as ResponseCreateParams,
+    ResponseCreateParamsNonStreaming as ResponseCreateParamsNonStreaming,
+    ResponseCreateParamsStreaming as ResponseCreateParamsStreaming,
+    ResponseRetrieveParams as ResponseRetrieveParams,
+    ResponseParseParams as ResponseParseParams,
+    ResponseIncludable as ResponseIncludable,
+    ResponseFormatTextConfig as ResponseFormatTextConfig,
+    EasyInputMessage as EasyInputMessage,
+    ResponseItemsPage as ResponseItemsPage,
+  };
+
+  export { ResponseStream as ResponseStream };
 
   export type ChatModel = API.ChatModel;
   export type ComparisonFilter = API.ComparisonFilter;
