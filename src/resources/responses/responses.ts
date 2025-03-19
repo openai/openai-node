@@ -255,7 +255,7 @@ export interface Response {
    * [model guide](https://platform.openai.com/docs/models) to browse and compare
    * available models.
    */
-  model: (string & {}) | Shared.ChatModel;
+  model: Shared.ResponsesModel;
 
   /**
    * The object type of this resource - always set to `response`.
@@ -1409,7 +1409,7 @@ export interface ResponseFunctionToolCall {
  */
 export interface ResponseFunctionToolCallItem extends ResponseFunctionToolCall {
   /**
-   * The unique ID of the function call tool output.
+   * The unique ID of the function tool call.
    */
   id: string;
 }
@@ -2607,7 +2607,7 @@ export interface ResponseCreateParamsBase {
    * [model guide](https://platform.openai.com/docs/models) to browse and compare
    * available models.
    */
-  model: (string & {}) | Shared.ChatModel;
+  model: Shared.ResponsesModel;
 
   /**
    * Specify additional output data to include in the model response. Currently
