@@ -2,6 +2,7 @@
 
 Types:
 
+- <code><a href="./src/resources/shared.ts">AllModels</a></code>
 - <code><a href="./src/resources/shared.ts">ChatModel</a></code>
 - <code><a href="./src/resources/shared.ts">ComparisonFilter</a></code>
 - <code><a href="./src/resources/shared.ts">CompoundFilter</a></code>
@@ -14,6 +15,7 @@ Types:
 - <code><a href="./src/resources/shared.ts">ResponseFormatJSONObject</a></code>
 - <code><a href="./src/resources/shared.ts">ResponseFormatJSONSchema</a></code>
 - <code><a href="./src/resources/shared.ts">ResponseFormatText</a></code>
+- <code><a href="./src/resources/shared.ts">ResponsesModel</a></code>
 
 # Completions
 
