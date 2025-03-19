@@ -1,5 +1,20 @@
 # Changelog
 
+## 4.88.0 (2025-03-19)
+
+Full Changelog: [v4.87.4...v4.88.0](https://github.com/openai/openai-node/compare/v4.87.4...v4.88.0)
+
+### Features
+
+* **api:** o1-pro now available through the API ([#1398](https://github.com/openai/openai-node/issues/1398)) ([616a7e9](https://github.com/openai/openai-node/commit/616a7e90e764882cd749a65af8cc6ae8734fc80d))
+
+
+### Chores
+
+* **exports:** cleaner resource index imports ([#1396](https://github.com/openai/openai-node/issues/1396)) ([26b0856](https://github.com/openai/openai-node/commit/26b0856cd63846c34b75895a1ea42ceec7908c1a))
+* **exports:** stop using path fallbacks ([#1397](https://github.com/openai/openai-node/issues/1397)) ([d1479c2](https://github.com/openai/openai-node/commit/d1479c23aff68dd46c73fd31896dd2298a6bf140))
+* **internal:** version bump ([#1393](https://github.com/openai/openai-node/issues/1393)) ([7f16c3a](https://github.com/openai/openai-node/commit/7f16c3aa7b1ab36541219c5a0f93fc518733d0e3))
+
 ## 4.87.4 (2025-03-18)
 
 Full Changelog: [v4.87.3...v4.87.4](https://github.com/openai/openai-node/compare/v4.87.3...v4.87.4)
