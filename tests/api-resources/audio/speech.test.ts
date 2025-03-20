@@ -14,6 +14,7 @@ describe('resource speech', () => {
       input: 'input',
       model: 'string',
       voice: 'alloy',
+      instructions: 'instructions',
       response_format: 'mp3',
       speed: 0.25,
     });
