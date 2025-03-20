@@ -35,6 +35,33 @@ export class InputItems extends APIResource {
   }
 }
 
+<<<<<<< HEAD
+export class ResponseItemListDataPage extends CursorPage<
+  // @ts-ignore some items don't necessarily have the `id` property
+  | ResponseItemList.Message
+  | ResponsesAPI.ResponseOutputMessage
+  | ResponsesAPI.ResponseFileSearchToolCall
+  | ResponsesAPI.ResponseComputerToolCall
+  | ResponseItemList.ComputerCallOutput
+  | ResponsesAPI.ResponseFunctionWebSearch
+  | ResponsesAPI.ResponseFunctionToolCall
+  | ResponseItemList.FunctionCallOutput
+> {}
+
+||||||| parent of e5ea4a71 (fix(types): improve responses type names (#1392))
+export class ResponseItemListDataPage extends CursorPage<
+  | ResponseItemList.Message
+  | ResponsesAPI.ResponseOutputMessage
+  | ResponsesAPI.ResponseFileSearchToolCall
+  | ResponsesAPI.ResponseComputerToolCall
+  | ResponseItemList.ComputerCallOutput
+  | ResponsesAPI.ResponseFunctionWebSearch
+  | ResponsesAPI.ResponseFunctionToolCall
+  | ResponseItemList.FunctionCallOutput
+> {}
+
+=======
+>>>>>>> e5ea4a71 (fix(types): improve responses type names (#1392))
 /**
  * A list of Response items.
  */

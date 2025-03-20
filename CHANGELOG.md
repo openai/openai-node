@@ -1,5 +1,39 @@
 # Changelog
 
+## 4.88.0 (2025-03-19)
+
+Full Changelog: [v4.87.4...v4.88.0](https://github.com/openai/openai-node/compare/v4.87.4...v4.88.0)
+
+### Features
+
+* **api:** o1-pro now available through the API ([#1398](https://github.com/openai/openai-node/issues/1398)) ([616a7e9](https://github.com/openai/openai-node/commit/616a7e90e764882cd749a65af8cc6ae8734fc80d))
+
+
+### Chores
+
+* **exports:** cleaner resource index imports ([#1396](https://github.com/openai/openai-node/issues/1396)) ([26b0856](https://github.com/openai/openai-node/commit/26b0856cd63846c34b75895a1ea42ceec7908c1a))
+* **exports:** stop using path fallbacks ([#1397](https://github.com/openai/openai-node/issues/1397)) ([d1479c2](https://github.com/openai/openai-node/commit/d1479c23aff68dd46c73fd31896dd2298a6bf140))
+* **internal:** version bump ([#1393](https://github.com/openai/openai-node/issues/1393)) ([7f16c3a](https://github.com/openai/openai-node/commit/7f16c3aa7b1ab36541219c5a0f93fc518733d0e3))
+
+## 4.87.4 (2025-03-18)
+
+Full Changelog: [v4.87.3...v4.87.4](https://github.com/openai/openai-node/compare/v4.87.3...v4.87.4)
+
+### Bug Fixes
+
+* **api:** correct some Responses types ([#1391](https://github.com/openai/openai-node/issues/1391)) ([af45876](https://github.com/openai/openai-node/commit/af458766ac721fb6cf18e7d78c458506c8bfc4e1))
+* **types:** ignore missing `id` in responses pagination ([1b9d20e](https://github.com/openai/openai-node/commit/1b9d20e71f5afbd4999f1999fe4810175476c5d2))
+* **types:** improve responses type names ([#1392](https://github.com/openai/openai-node/issues/1392)) ([164f476](https://github.com/openai/openai-node/commit/164f47606b41fd3e2850f8209eb1c6e2996a81ff))
+
+
+### Chores
+
+* add missing type alias exports ([#1390](https://github.com/openai/openai-node/issues/1390)) ([16c5e22](https://github.com/openai/openai-node/commit/16c5e2261c8c1a0ba96c2d5f475e8b1bc67387d7))
+* **internal:** add back release workflow ([dddf29b](https://github.com/openai/openai-node/commit/dddf29bd914a02d4586b239ec06217389a4409f9))
+* **internal:** remove CI condition ([#1381](https://github.com/openai/openai-node/issues/1381)) ([ef17981](https://github.com/openai/openai-node/commit/ef17981a0bd6b3e971986ece829c5d260d7392d4))
+* **internal:** run CI on update-specs branch ([9fc2130](https://github.com/openai/openai-node/commit/9fc2130b74a5919a3bbd41926903bdb310de4446))
+* **internal:** update release workflows ([90b77d0](https://github.com/openai/openai-node/commit/90b77d09c04d21487aa38fe775c79ae632136813))
+
 ## 4.87.3 (2025-03-11)
 
 Full Changelog: [v4.87.2...v4.87.3](https://github.com/openai/openai-node/compare/v4.87.2...v4.87.3)

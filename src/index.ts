@@ -118,6 +118,7 @@ import {
   ChatCompletionModality,
   ChatCompletionNamedToolChoice,
   ChatCompletionPredictionContent,
+  ChatCompletionReasoningEffort,
   ChatCompletionRole,
   ChatCompletionStoreMessage,
   ChatCompletionStreamOptions,
@@ -129,6 +130,7 @@ import {
   ChatCompletionUpdateParams,
   ChatCompletionUserMessageParam,
   ChatCompletionsPage,
+  CreateChatCompletionRequestMessage,
 } from './resources/chat/completions/completions';
 
 export interface ClientOptions {
@@ -404,6 +406,8 @@ export declare namespace OpenAI {
     type ChatCompletionToolChoiceOption as ChatCompletionToolChoiceOption,
     type ChatCompletionToolMessageParam as ChatCompletionToolMessageParam,
     type ChatCompletionUserMessageParam as ChatCompletionUserMessageParam,
+    type CreateChatCompletionRequestMessage as CreateChatCompletionRequestMessage,
+    type ChatCompletionReasoningEffort as ChatCompletionReasoningEffort,
     ChatCompletionsPage as ChatCompletionsPage,
     type ChatCompletionCreateParams as ChatCompletionCreateParams,
     type ChatCompletionCreateParamsNonStreaming as ChatCompletionCreateParamsNonStreaming,
@@ -504,6 +508,7 @@ export declare namespace OpenAI {
 
   export { Responses as Responses };
 
+  export type AllModels = API.AllModels;
   export type ChatModel = API.ChatModel;
   export type ComparisonFilter = API.ComparisonFilter;
   export type CompoundFilter = API.CompoundFilter;
@@ -516,6 +521,7 @@ export declare namespace OpenAI {
   export type ResponseFormatJSONObject = API.ResponseFormatJSONObject;
   export type ResponseFormatJSONSchema = API.ResponseFormatJSONSchema;
   export type ResponseFormatText = API.ResponseFormatText;
+  export type ResponsesModel = API.ResponsesModel;
 }
 
 // ---------------------- Azure ----------------------
