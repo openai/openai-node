@@ -1,8 +1,10 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../resource';
+import * as TranscriptionsAPI from './transcriptions';
 import * as AudioAPI from './audio';
 import { APIPromise } from '../../api-promise';
+import { Stream } from '../../streaming';
 import { type Uploadable } from '../../uploads';
 import { RequestOptions } from '../../internal/request-options';
 import { multipartFormRequestOptions } from '../../internal/uploads';
@@ -11,11 +13,26 @@ export class Transcriptions extends APIResource {
   /**
    * Transcribes audio into the input language.
    */
-  create(body: TranscriptionCreateParams, options?: RequestOptions): APIPromise<TranscriptionCreateResponse> {
+  create(
+    body: TranscriptionCreateParamsNonStreaming,
+    options?: RequestOptions,
+  ): APIPromise<TranscriptionCreateResponse>;
+  create(
+    body: TranscriptionCreateParamsStreaming,
+    options?: RequestOptions,
+  ): APIPromise<Stream<TranscriptionStreamEvent>>;
+  create(
+    body: TranscriptionCreateParamsBase,
+    options?: RequestOptions,
+  ): APIPromise<Stream<TranscriptionStreamEvent> | TranscriptionCreateResponse>;
+  create(
+    body: TranscriptionCreateParams,
+    options?: RequestOptions,
+  ): APIPromise<TranscriptionCreateResponse> | APIPromise<Stream<TranscriptionStreamEvent>> {
     return this._client.post(
       '/audio/transcriptions',
-      multipartFormRequestOptions({ body, ...options }, this._client),
-    );
+      multipartFormRequestOptions({ body, ...options, stream: body.stream ?? false }, this._client),
+    ) as APIPromise<TranscriptionCreateResponse> | APIPromise<Stream<TranscriptionStreamEvent>>;
   }
 }
 
@@ -28,7 +45,35 @@ export interface Transcription {
    * The transcribed text.
    */
   text: string;
+
+  /**
+   * The log probabilities of the tokens in the transcription. Only returned with the
+   * models `gpt-4o-transcribe` and `gpt-4o-mini-transcribe` if `logprobs` is added
+   * to the `include` array.
+   */
+  logprobs?: Array<Transcription.Logprob>;
 }
+
+export namespace Transcription {
+  export interface Logprob {
+    /**
+     * The token in the transcription.
+     */
+    token?: string;
+
+    /**
+     * The bytes of the token.
+     */
+    bytes?: Array<number>;
+
+    /**
+     * The log probability of the token.
+     */
+    logprob?: number;
+  }
+}
+
+export type TranscriptionInclude = 'logprobs';
 
 export interface TranscriptionSegment {
   /**
@@ -86,6 +131,103 @@ export interface TranscriptionSegment {
 }
 
 /**
+ * Emitted when there is an additional text delta. This is also the first event
+ * emitted when the transcription starts. Only emitted when you
+ * [create a transcription](https://platform.openai.com/docs/api-reference/audio/create-transcription)
+ * with the `Stream` parameter set to `true`.
+ */
+export type TranscriptionStreamEvent = TranscriptionTextDeltaEvent | TranscriptionTextDoneEvent;
+
+/**
+ * Emitted when there is an additional text delta. This is also the first event
+ * emitted when the transcription starts. Only emitted when you
+ * [create a transcription](https://platform.openai.com/docs/api-reference/audio/create-transcription)
+ * with the `Stream` parameter set to `true`.
+ */
+export interface TranscriptionTextDeltaEvent {
+  /**
+   * The text delta that was additionally transcribed.
+   */
+  delta: string;
+
+  /**
+   * The type of the event. Always `transcript.text.delta`.
+   */
+  type: 'transcript.text.delta';
+
+  /**
+   * The log probabilities of the delta. Only included if you
+   * [create a transcription](https://platform.openai.com/docs/api-reference/audio/create-transcription)
+   * with the `include[]` parameter set to `logprobs`.
+   */
+  logprobs?: Array<TranscriptionTextDeltaEvent.Logprob>;
+}
+
+export namespace TranscriptionTextDeltaEvent {
+  export interface Logprob {
+    /**
+     * The token that was used to generate the log probability.
+     */
+    token?: string;
+
+    /**
+     * The bytes that were used to generate the log probability.
+     */
+    bytes?: Array<unknown>;
+
+    /**
+     * The log probability of the token.
+     */
+    logprob?: number;
+  }
+}
+
+/**
+ * Emitted when the transcription is complete. Contains the complete transcription
+ * text. Only emitted when you
+ * [create a transcription](https://platform.openai.com/docs/api-reference/audio/create-transcription)
+ * with the `Stream` parameter set to `true`.
+ */
+export interface TranscriptionTextDoneEvent {
+  /**
+   * The text that was transcribed.
+   */
+  text: string;
+
+  /**
+   * The type of the event. Always `transcript.text.done`.
+   */
+  type: 'transcript.text.done';
+
+  /**
+   * The log probabilities of the individual tokens in the transcription. Only
+   * included if you
+   * [create a transcription](https://platform.openai.com/docs/api-reference/audio/create-transcription)
+   * with the `include[]` parameter set to `logprobs`.
+   */
+  logprobs?: Array<TranscriptionTextDoneEvent.Logprob>;
+}
+
+export namespace TranscriptionTextDoneEvent {
+  export interface Logprob {
+    /**
+     * The token that was used to generate the log probability.
+     */
+    token?: string;
+
+    /**
+     * The bytes that were used to generate the log probability.
+     */
+    bytes?: Array<unknown>;
+
+    /**
+     * The log probability of the token.
+     */
+    logprob?: number;
+  }
+}
+
+/**
  * Represents a verbose json transcription response returned by model, based on the
  * provided input.
  */
@@ -139,7 +281,11 @@ export interface TranscriptionWord {
  */
 export type TranscriptionCreateResponse = Transcription | TranscriptionVerbose;
 
-export interface TranscriptionCreateParams {
+export type TranscriptionCreateParams =
+  | TranscriptionCreateParamsNonStreaming
+  | TranscriptionCreateParamsStreaming;
+
+export interface TranscriptionCreateParamsBase {
   /**
    * The audio file object (not file name) to transcribe, in one of these formats:
    * flac, mp3, mp4, mpeg, mpga, m4a, ogg, wav, or webm.
@@ -147,10 +293,20 @@ export interface TranscriptionCreateParams {
   file: Uploadable;
 
   /**
-   * ID of the model to use. Only `whisper-1` (which is powered by our open source
-   * Whisper V2 model) is currently available.
+   * ID of the model to use. The options are `gpt-4o-transcribe`,
+   * `gpt-4o-mini-transcribe`, and `whisper-1` (which is powered by our open source
+   * Whisper V2 model).
    */
   model: (string & {}) | AudioAPI.AudioModel;
+
+  /**
+   * Additional information to include in the transcription response. `logprobs` will
+   * return the log probabilities of the tokens in the response to understand the
+   * model's confidence in the transcription. `logprobs` only works with
+   * response_format set to `json` and only with the models `gpt-4o-transcribe` and
+   * `gpt-4o-mini-transcribe`.
+   */
+  include?: Array<TranscriptionInclude>;
 
   /**
    * The language of the input audio. Supplying the input language in
@@ -169,9 +325,22 @@ export interface TranscriptionCreateParams {
 
   /**
    * The format of the output, in one of these options: `json`, `text`, `srt`,
-   * `verbose_json`, or `vtt`.
+   * `verbose_json`, or `vtt`. For `gpt-4o-transcribe` and `gpt-4o-mini-transcribe`,
+   * the only supported format is `json`.
    */
   response_format?: AudioAPI.AudioResponseFormat;
+
+  /**
+   * If set to true, the model response data will be streamed to the client as it is
+   * generated using
+   * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
+   * See the
+   * [Streaming section of the Speech-to-Text guide](https://platform.openai.com/docs/guides/speech-to-text?lang=curl#streaming-transcriptions)
+   * for more information.
+   *
+   * Note: Streaming is not supported for the `whisper-1` model and will be ignored.
+   */
+  stream?: boolean | null;
 
   /**
    * The sampling temperature, between 0 and 1. Higher values like 0.8 will make the
@@ -192,13 +361,52 @@ export interface TranscriptionCreateParams {
   timestamp_granularities?: Array<'word' | 'segment'>;
 }
 
+export namespace TranscriptionCreateParams {
+  export type TranscriptionCreateParamsNonStreaming = TranscriptionsAPI.TranscriptionCreateParamsNonStreaming;
+  export type TranscriptionCreateParamsStreaming = TranscriptionsAPI.TranscriptionCreateParamsStreaming;
+}
+
+export interface TranscriptionCreateParamsNonStreaming extends TranscriptionCreateParamsBase {
+  /**
+   * If set to true, the model response data will be streamed to the client as it is
+   * generated using
+   * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
+   * See the
+   * [Streaming section of the Speech-to-Text guide](https://platform.openai.com/docs/guides/speech-to-text?lang=curl#streaming-transcriptions)
+   * for more information.
+   *
+   * Note: Streaming is not supported for the `whisper-1` model and will be ignored.
+   */
+  stream?: false | null;
+}
+
+export interface TranscriptionCreateParamsStreaming extends TranscriptionCreateParamsBase {
+  /**
+   * If set to true, the model response data will be streamed to the client as it is
+   * generated using
+   * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
+   * See the
+   * [Streaming section of the Speech-to-Text guide](https://platform.openai.com/docs/guides/speech-to-text?lang=curl#streaming-transcriptions)
+   * for more information.
+   *
+   * Note: Streaming is not supported for the `whisper-1` model and will be ignored.
+   */
+  stream: true;
+}
+
 export declare namespace Transcriptions {
   export {
     type Transcription as Transcription,
+    type TranscriptionInclude as TranscriptionInclude,
     type TranscriptionSegment as TranscriptionSegment,
+    type TranscriptionStreamEvent as TranscriptionStreamEvent,
+    type TranscriptionTextDeltaEvent as TranscriptionTextDeltaEvent,
+    type TranscriptionTextDoneEvent as TranscriptionTextDoneEvent,
     type TranscriptionVerbose as TranscriptionVerbose,
     type TranscriptionWord as TranscriptionWord,
     type TranscriptionCreateResponse as TranscriptionCreateResponse,
     type TranscriptionCreateParams as TranscriptionCreateParams,
+    type TranscriptionCreateParamsNonStreaming as TranscriptionCreateParamsNonStreaming,
+    type TranscriptionCreateParamsStreaming as TranscriptionCreateParamsStreaming,
   };
 }
