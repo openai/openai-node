@@ -591,7 +591,9 @@ export declare namespace OpenAI {
   };
 
   export { ResponseStream as ResponseStream };
-
+  
+  export type AllModels = API.AllModels;
+  
   export type ChatModel = API.ChatModel;
   export type ComparisonFilter = API.ComparisonFilter;
   export type CompoundFilter = API.CompoundFilter;
@@ -604,6 +606,7 @@ export declare namespace OpenAI {
   export type ResponseFormatJSONObject = API.ResponseFormatJSONObject;
   export type ResponseFormatJSONSchema = API.ResponseFormatJSONSchema;
   export type ResponseFormatText = API.ResponseFormatText;
+  export type ResponsesModel = API.ResponsesModel;
 }
 
 // ---------------------- Azure ----------------------
