@@ -140,7 +140,11 @@ Types:
 Types:
 
 - <code><a href="./src/resources/audio/transcriptions.ts">Transcription</a></code>
+- <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionInclude</a></code>
 - <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionSegment</a></code>
+- <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionStreamEvent</a></code>
+- <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionTextDeltaEvent</a></code>
+- <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionTextDoneEvent</a></code>
 - <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionVerbose</a></code>
 - <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionWord</a></code>
 - <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionCreateResponse</a></code>
@@ -305,7 +309,9 @@ Types:
 - <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItemDeleteEvent</a></code>
 - <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItemDeletedEvent</a></code>
 - <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItemInputAudioTranscriptionCompletedEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItemInputAudioTranscriptionDeltaEvent</a></code>
 - <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItemInputAudioTranscriptionFailedEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItemRetrieveEvent</a></code>
 - <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItemTruncateEvent</a></code>
 - <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItemTruncatedEvent</a></code>
 - <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItemWithReference</a></code>
@@ -342,6 +348,8 @@ Types:
 - <code><a href="./src/resources/beta/realtime/realtime.ts">SessionCreatedEvent</a></code>
 - <code><a href="./src/resources/beta/realtime/realtime.ts">SessionUpdateEvent</a></code>
 - <code><a href="./src/resources/beta/realtime/realtime.ts">SessionUpdatedEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">TranscriptionSessionUpdate</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">TranscriptionSessionUpdatedEvent</a></code>
 
 ### Sessions
 
@@ -353,6 +361,16 @@ Types:
 Methods:
 
 - <code title="post /realtime/sessions">client.beta.realtime.sessions.<a href="./src/resources/beta/realtime/sessions.ts">create</a>({ ...params }) -> SessionCreateResponse</code>
+
+### TranscriptionSessions
+
+Types:
+
+- <code><a href="./src/resources/beta/realtime/transcription-sessions.ts">TranscriptionSession</a></code>
+
+Methods:
+
+- <code title="post /realtime/transcription_sessions">client.beta.realtime.transcriptionSessions.<a href="./src/resources/beta/realtime/transcription-sessions.ts">create</a>({ ...params }) -> TranscriptionSession</code>
 
 ## Assistants
 

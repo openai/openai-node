@@ -7,8 +7,14 @@ import * as TranscriptionsAPI from './transcriptions';
 import {
   Transcription,
   TranscriptionCreateParams,
+  TranscriptionCreateParamsNonStreaming,
+  TranscriptionCreateParamsStreaming,
   TranscriptionCreateResponse,
+  TranscriptionInclude,
   TranscriptionSegment,
+  TranscriptionStreamEvent,
+  TranscriptionTextDeltaEvent,
+  TranscriptionTextDoneEvent,
   TranscriptionVerbose,
   TranscriptionWord,
   Transcriptions,
@@ -28,11 +34,12 @@ export class Audio extends APIResource {
   speech: SpeechAPI.Speech = new SpeechAPI.Speech(this._client);
 }
 
-export type AudioModel = 'whisper-1';
+export type AudioModel = 'whisper-1' | 'gpt-4o-transcribe' | 'gpt-4o-mini-transcribe';
 
 /**
  * The format of the output, in one of these options: `json`, `text`, `srt`,
- * `verbose_json`, or `vtt`.
+ * `verbose_json`, or `vtt`. For `gpt-4o-transcribe` and `gpt-4o-mini-transcribe`,
+ * the only supported format is `json`.
  */
 export type AudioResponseFormat = 'json' | 'text' | 'srt' | 'verbose_json' | 'vtt';
 
@@ -46,11 +53,17 @@ export declare namespace Audio {
   export {
     Transcriptions as Transcriptions,
     type Transcription as Transcription,
+    type TranscriptionInclude as TranscriptionInclude,
     type TranscriptionSegment as TranscriptionSegment,
+    type TranscriptionStreamEvent as TranscriptionStreamEvent,
+    type TranscriptionTextDeltaEvent as TranscriptionTextDeltaEvent,
+    type TranscriptionTextDoneEvent as TranscriptionTextDoneEvent,
     type TranscriptionVerbose as TranscriptionVerbose,
     type TranscriptionWord as TranscriptionWord,
     type TranscriptionCreateResponse as TranscriptionCreateResponse,
     type TranscriptionCreateParams as TranscriptionCreateParams,
+    type TranscriptionCreateParamsNonStreaming as TranscriptionCreateParamsNonStreaming,
+    type TranscriptionCreateParamsStreaming as TranscriptionCreateParamsStreaming,
   };
 
   export {
