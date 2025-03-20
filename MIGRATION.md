@@ -286,7 +286,7 @@ import fs from 'fs';
 fs.createReadStream('path/to/file');
 ```
 
-Note that this function previously only worked on Node.j. If you're using Bun, you can use [`Bun.file`](https://bun.sh/docs/api/file-io) instead.
+Note that this function previously only worked on Node.js. If you're using Bun, you can use [`Bun.file`](https://bun.sh/docs/api/file-io) instead.
 
 ### Shims removal
 
