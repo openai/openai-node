@@ -499,7 +499,7 @@ export abstract class APIClient {
 
       const errText = await response.text().catch((e) => castToError(e).message);
       const errJSON = safeJSON(errText);
-      const errMessage = errJSON ? undefined : errText;
+      const errMessage = errJSON ? errJSON.message : errText;
       const retryMessage = retriesRemaining ? `(error; no more retries left)` : `(error; not retryable)`;
 
       debug(`response (error; ${retryMessage})`, response.status, url, responseHeaders, errMessage);
