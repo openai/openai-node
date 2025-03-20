@@ -412,7 +412,7 @@ export namespace ThreadCreateParams {
          * The chunking strategy used to chunk the file(s). If not set, will use the `auto`
          * strategy.
          */
-        chunking_strategy?: Auto | Static;
+        chunking_strategy?: VectorStore.Auto | VectorStore.Static;
 
         /**
          * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs to
@@ -810,7 +810,7 @@ export namespace ThreadCreateAndRunParams {
            * The chunking strategy used to chunk the file(s). If not set, will use the `auto`
            * strategy.
            */
-          chunking_strategy?: Auto | Static;
+          chunking_strategy?: VectorStore.Auto | VectorStore.Static;
 
           /**
            * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs to
