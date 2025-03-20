@@ -3,9 +3,10 @@
 import { APIResource } from '../../resource';
 import { isRequestOptions } from '../../core';
 import * as Core from '../../core';
+import * as ThreadsAPI from './threads/threads';
+import { type Auto, Static, unnamed_schema_0 } from './threads/threads';
 import * as Shared from '../shared';
 import * as MessagesAPI from './threads/messages';
-import * as ThreadsAPI from './threads/threads';
 import * as RunsAPI from './threads/runs/runs';
 import * as StepsAPI from './threads/runs/steps';
 import { CursorPage, type CursorPageParams } from '../../pagination';
@@ -1178,7 +1179,7 @@ export interface AssistantCreateParams {
    * a list of file IDs, while the `file_search` tool requires a list of vector store
    * IDs.
    */
-  tool_resources?: AssistantCreateParams.ToolResources | null;
+  tool_resources?: unnamed_schema_0 | null;
 
   /**
    * A list of tool enabled on the assistant. There can be a maximum of 128 tools per
@@ -1204,13 +1205,13 @@ export namespace AssistantCreateParams {
    * a list of file IDs, while the `file_search` tool requires a list of vector store
    * IDs.
    */
-  export interface ToolResources {
-    code_interpreter?: ToolResources.CodeInterpreter;
+  export interface unnamed_schema_0 {
+    code_interpreter?: ThreadsAPI.unnamed_schema_0.CodeInterpreter;
 
-    file_search?: ToolResources.FileSearch;
+    file_search?: ThreadsAPI.unnamed_schema_0.FileSearch;
   }
 
-  export namespace ToolResources {
+  export namespace unnamed_schema_0 {
     export interface CodeInterpreter {
       /**
        * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs made
@@ -1235,7 +1236,7 @@ export namespace AssistantCreateParams {
        * with file_ids and attach it to this assistant. There can be a maximum of 1
        * vector store attached to the assistant.
        */
-      vector_stores?: Array<FileSearch.VectorStore>;
+      vector_stores?: Array<ThreadsAPI.FileSearch.VectorStore>;
     }
 
     export namespace FileSearch {
@@ -1244,7 +1245,7 @@ export namespace AssistantCreateParams {
          * The chunking strategy used to chunk the file(s). If not set, will use the `auto`
          * strategy.
          */
-        chunking_strategy?: VectorStore.Auto | VectorStore.Static;
+        chunking_strategy?: Auto | Static;
 
         /**
          * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs to
@@ -1277,7 +1278,7 @@ export namespace AssistantCreateParams {
         }
 
         export interface Static {
-          static: Static.Static;
+          static: ThreadsAPI.Static.Static;
 
           /**
            * Always `static`.
