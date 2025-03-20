@@ -1,5 +1,19 @@
 # Changelog
 
+## 4.89.0 (2025-03-20)
+
+Full Changelog: [v4.88.0...v4.89.0](https://github.com/openai/openai-node/compare/v4.88.0...v4.89.0)
+
+### Features
+
+* add audio helpers ([ea1b6b4](https://github.com/openai/openai-node/commit/ea1b6b4ef38813af568b3662037519da9404b80e))
+* **api:** new models for TTS, STT, + new audio features for Realtime ([#1407](https://github.com/openai/openai-node/issues/1407)) ([142933a](https://github.com/openai/openai-node/commit/142933ae70d06045dbf4661cd72c7fa35ae7903d))
+
+
+### Chores
+
+* **internal:** version bump ([#1400](https://github.com/openai/openai-node/issues/1400)) ([6838ab4](https://github.com/openai/openai-node/commit/6838ab4268c7c0e083e7be21ef1a51bdea0f0b57))
+
 ## 4.88.0 (2025-03-19)
 
 Full Changelog: [v4.87.4...v4.88.0](https://github.com/openai/openai-node/compare/v4.87.4...v4.88.0)
