@@ -20,6 +20,10 @@ export class Speech extends APIResource {
 
 export type SpeechModel = 'tts-1' | 'tts-1-hd';
 
+export type SpeechVoice = 'alloy' | 'ash' | 'coral' | 'echo' | 'fable' | 'onyx' | 'nova' | 'sage' | 'shimmer';
+
+export type SpeechResponseFormat = 'mp3' | 'opus' | 'aac' | 'flac' | 'wav' | 'pcm';
+
 export interface SpeechCreateParams {
   /**
    * The text to generate audio for. The maximum length is 4096 characters.
@@ -38,13 +42,13 @@ export interface SpeechCreateParams {
    * voices are available in the
    * [Text to speech guide](https://platform.openai.com/docs/guides/text-to-speech#voice-options).
    */
-  voice: 'alloy' | 'ash' | 'coral' | 'echo' | 'fable' | 'onyx' | 'nova' | 'sage' | 'shimmer';
+  voice: (string & {}) | SpeechVoice;
 
   /**
    * The format to audio in. Supported formats are `mp3`, `opus`, `aac`, `flac`,
    * `wav`, and `pcm`.
    */
-  response_format?: 'mp3' | 'opus' | 'aac' | 'flac' | 'wav' | 'pcm';
+  response_format?: (string & {}) | SpeechResponseFormat;
 
   /**
    * The speed of the generated audio. Select a value from `0.25` to `4.0`. `1.0` is
@@ -54,5 +58,10 @@ export interface SpeechCreateParams {
 }
 
 export declare namespace Speech {
-  export { type SpeechModel as SpeechModel, type SpeechCreateParams as SpeechCreateParams };
+  export {
+    type SpeechModel as SpeechModel,
+    type SpeechCreateParams as SpeechCreateParams,
+    type SpeechVoice as SpeechVoice,
+    type SpeechResponseFormat as SpeechResponseFormat,
+  };
 }
