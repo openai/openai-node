@@ -88,7 +88,7 @@ export interface TranslationCreateParams<
    * The format of the output, in one of these options: `json`, `text`, `srt`,
    * `verbose_json`, or `vtt`.
    */
-  response_format?: ResponseFormat;
+  response_format?: 'json' | 'text' | 'srt' | 'verbose_json' | 'vtt';
 
   /**
    * The sampling temperature, between 0 and 1. Higher values like 0.8 will make the
