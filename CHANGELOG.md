@@ -1,5 +1,19 @@
 # Changelog
 
+## 4.89.1 (2025-03-22)
+
+Full Changelog: [v4.89.0...v4.89.1](https://github.com/openai/openai-node/compare/v4.89.0...v4.89.1)
+
+### Bug Fixes
+
+* avoid type error in certain environments ([#1413](https://github.com/openai/openai-node/issues/1413)) ([d3f6f8f](https://github.com/openai/openai-node/commit/d3f6f8f9c7511a98cc5795756fee49a30e44d485))
+* **client:** remove duplicate types ([#1410](https://github.com/openai/openai-node/issues/1410)) ([338878b](https://github.com/openai/openai-node/commit/338878bf484dac5a4fadf50592b1f8d1045cd4b6))
+
+
+### Chores
+
+* **internal:** version bump ([#1408](https://github.com/openai/openai-node/issues/1408)) ([9c0949a](https://github.com/openai/openai-node/commit/9c0949a93c3e181d327f820dbc2a4b0ad77258e9))
+
 ## 4.89.0 (2025-03-20)
 
 Full Changelog: [v4.88.0...v4.89.0](https://github.com/openai/openai-node/compare/v4.88.0...v4.89.0)

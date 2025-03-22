@@ -430,7 +430,7 @@ export abstract class APIClient {
       !headers ? {}
       : Symbol.iterator in headers ?
         Object.fromEntries(Array.from(headers as Iterable<string[]>).map((header) => [...header]))
-      : { ...headers }
+      : { ...(headers as any as Record<string, string>) }
     );
   }
 

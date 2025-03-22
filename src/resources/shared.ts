@@ -1,9 +1,7 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 export type AllModels =
-  | string
-  | ChatModel
-  | string
+  | (string & {})
   | ChatModel
   | 'o1-pro'
   | 'o1-pro-2025-03-19'
