@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.89.2 (2025-03-26)
+
+Full Changelog: [v4.89.1...v4.89.2](https://github.com/openai/openai-node/compare/v4.89.1...v4.89.2)
+
+### Chores
+
+* **internal:** version bump ([#1419](https://github.com/openai/openai-node/issues/1419)) ([7891333](https://github.com/openai/openai-node/commit/7891333501998d7ac7d87c2aacecf8e668d71694))
+
 ## 4.89.1 (2025-03-26)
 
 Full Changelog: [v4.89.0...v4.89.1](https://github.com/openai/openai-node/compare/v4.89.0...v4.89.1)
