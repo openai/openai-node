@@ -321,49 +321,48 @@ The `headers` property on `APIError` objects is now an instance of the Web [Head
 
 ### Removed exports
 
-#### `Response`
-
-```typescript
-// Before
-import { Response } from 'openai';
-
-// After
-// `Response` must now come from the builtin types
-```
-
 #### Resource classes
 
-If you were importing resource classes from the root package then you must now import them from the file they are defined in:
+If you were importing resource classes from the root package then you must now import them from the file they are defined in.
+This was never valid at the type level and only worked in CommonJS files.
 
 ```typescript
 // Before
-import { Completions } from 'openai';
+const { Completions } = require('openai');
 
 // After
-import { Completions } from 'openai/resources/completions';
+const { OpenAI } = require('openai');
+OpenAI.Completions; // or import directly from openai/resources/completions
 ```
 
-#### `openai/core`
+#### Refactor of `openai/core`, `error`, `pagination`, `resource`, `streaming` and `uploads`
 
-The `openai/core` file was intended to be internal-only but it was publicly accessible, as such it has been refactored and split up into internal files.
+Much of the `openai/core` file was intended to be internal-only but it was publicly accessible, as such it has been refactored and split up into internal and public files, with public-facing code moved to a new `core` folder and internal code moving to the private `internal` folder.
+
+At the same time, we moved some public-facing files which were previously at the top level into `core` to make the file structure cleaner and more clear:
+
+```typescript
+// Before
+import 'openai/error';
+import 'openai/pagination';
+import 'openai/resource';
+import 'openai/streaming';
+import 'openai/uploads';
+
+// After
+import 'openai/core/error';
+import 'openai/core/pagination';
+import 'openai/core/resource';
+import 'openai/core/streaming';
+import 'openai/core/uploads';
+```
 
 If you were relying on anything that was only exported from `openai/core` and is also not accessible anywhere else, please open an issue and we'll consider adding it to the public API.
 
-#### `APIClient`
+#### Cleaned up `uploads` exports
 
-The `APIClient` base client class has been removed as it is no longer needed. If you were importing this class then you must now import the main client class:
-
-```typescript
-// Before
-import { APIClient } from 'openai/core';
-
-// After
-import { OpenAI } from 'openai';
-```
-
-#### Cleaned up `openai/uploads` exports
-
-The following exports have been removed from `openai/uploads` as they were not intended to be a part of the public API:
+As part of the `core` refactor, `openai/uploads` was moved to `openai/core/uploads`
+and the following exports were removed, as they were not intended to be a part of the public API:
 
 - `fileFromPath`
 - `BlobPart`
@@ -382,5 +381,17 @@ The following exports have been removed from `openai/uploads` as they were not i
 Note that `Uploadable` & `toFile` **are** still exported:
 
 ```typescript
-import { type Uploadable, toFile } from 'openai/uploads';
+import { type Uploadable, toFile } from 'openai/core/uploads';
+```
+
+#### `APIClient`
+
+The `APIClient` base client class has been removed as it is no longer needed. If you were importing this class then you must now import the main client class:
+
+```typescript
+// Before
+import { APIClient } from 'openai/core';
+
+// After
+import { OpenAI } from 'openai';
 ```

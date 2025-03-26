@@ -1,2 +1,2 @@
-export { type Uploadable } from './internal/uploads';
-export { toFile, type ToFileInput } from './internal/to-file';
+/** @deprecated Import from ./core/uploads instead */
+export * from './core/uploads';
