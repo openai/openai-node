@@ -141,7 +141,19 @@ export interface Session {
    * once the model has responded with audio at least once. Current voice options are
    * `alloy`, `ash`, `ballad`, `coral`, `echo` `sage`, `shimmer` and `verse`.
    */
-  voice?: 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse';
+  voice?:
+    | (string & {})
+    | 'alloy'
+    | 'ash'
+    | 'ballad'
+    | 'coral'
+    | 'echo'
+    | 'fable'
+    | 'onyx'
+    | 'nova'
+    | 'sage'
+    | 'shimmer'
+    | 'verse';
 }
 
 export namespace Session {
@@ -363,7 +375,19 @@ export interface SessionCreateResponse {
    * once the model has responded with audio at least once. Current voice options are
    * `alloy`, `ash`, `ballad`, `coral`, `echo` `sage`, `shimmer` and `verse`.
    */
-  voice?: 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse';
+  voice?:
+    | (string & {})
+    | 'alloy'
+    | 'ash'
+    | 'ballad'
+    | 'coral'
+    | 'echo'
+    | 'fable'
+    | 'onyx'
+    | 'nova'
+    | 'sage'
+    | 'shimmer'
+    | 'verse';
 }
 
 export namespace SessionCreateResponse {
@@ -563,9 +587,22 @@ export interface SessionCreateParams {
   /**
    * The voice the model uses to respond. Voice cannot be changed during the session
    * once the model has responded with audio at least once. Current voice options are
-   * `alloy`, `ash`, `ballad`, `coral`, `echo` `sage`, `shimmer` and `verse`.
+   * `alloy`, `ash`, `ballad`, `coral`, `echo`, `fable`, `onyx`, `nova`, `sage`,
+   * `shimmer`, and `verse`.
    */
-  voice?: 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse';
+  voice?:
+    | (string & {})
+    | 'alloy'
+    | 'ash'
+    | 'ballad'
+    | 'coral'
+    | 'echo'
+    | 'fable'
+    | 'onyx'
+    | 'nova'
+    | 'sage'
+    | 'shimmer'
+    | 'verse';
 }
 
 export namespace SessionCreateParams {

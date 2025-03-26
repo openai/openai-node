@@ -1005,9 +1005,22 @@ export interface RealtimeResponse {
 
   /**
    * The voice the model used to respond. Current voice options are `alloy`, `ash`,
-   * `ballad`, `coral`, `echo` `sage`, `shimmer` and `verse`.
+   * `ballad`, `coral`, `echo`, `fable`, `onyx`, `nova`, `sage`, `shimmer`, and
+   * `verse`.
    */
-  voice?: 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse';
+  voice?:
+    | (string & {})
+    | 'alloy'
+    | 'ash'
+    | 'ballad'
+    | 'coral'
+    | 'echo'
+    | 'fable'
+    | 'onyx'
+    | 'nova'
+    | 'sage'
+    | 'shimmer'
+    | 'verse';
 }
 
 /**
@@ -1620,9 +1633,22 @@ export namespace ResponseCreateEvent {
     /**
      * The voice the model uses to respond. Voice cannot be changed during the session
      * once the model has responded with audio at least once. Current voice options are
-     * `alloy`, `ash`, `ballad`, `coral`, `echo` `sage`, `shimmer` and `verse`.
+     * `alloy`, `ash`, `ballad`, `coral`, `echo`, `fable`, `onyx`, `nova`, `sage`,
+     * `shimmer`, and `verse`.
      */
-    voice?: 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse';
+    voice?:
+      | (string & {})
+      | 'alloy'
+      | 'ash'
+      | 'ballad'
+      | 'coral'
+      | 'echo'
+      | 'fable'
+      | 'onyx'
+      | 'nova'
+      | 'sage'
+      | 'shimmer'
+      | 'verse';
   }
 
   export namespace Response {
@@ -2078,9 +2104,22 @@ export namespace SessionUpdateEvent {
     /**
      * The voice the model uses to respond. Voice cannot be changed during the session
      * once the model has responded with audio at least once. Current voice options are
-     * `alloy`, `ash`, `ballad`, `coral`, `echo` `sage`, `shimmer` and `verse`.
+     * `alloy`, `ash`, `ballad`, `coral`, `echo`, `fable`, `onyx`, `nova`, `sage`,
+     * `shimmer`, and `verse`.
      */
-    voice?: 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse';
+    voice?:
+      | (string & {})
+      | 'alloy'
+      | 'ash'
+      | 'ballad'
+      | 'coral'
+      | 'echo'
+      | 'fable'
+      | 'onyx'
+      | 'nova'
+      | 'sage'
+      | 'shimmer'
+      | 'verse';
   }
 
   export namespace Session {
@@ -2376,7 +2415,7 @@ export namespace TranscriptionSessionUpdate {
     export interface TurnDetection {
       /**
        * Whether or not to automatically generate a response when a VAD stop event
-       * occurs.
+       * occurs. Not available for transcription sessions.
        */
       create_response?: boolean;
 
@@ -2390,7 +2429,7 @@ export namespace TranscriptionSessionUpdate {
       /**
        * Whether or not to automatically interrupt any ongoing response with output to
        * the default conversation (i.e. `conversation` of `auto`) when a VAD start event
-       * occurs.
+       * occurs. Not available for transcription sessions.
        */
       interrupt_response?: boolean;
 
