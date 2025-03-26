@@ -3,6 +3,7 @@ import { OpenAIError } from './error';
 import { findDoubleNewlineIndex, LineDecoder } from './internal/decoders/line';
 import { ReadableStreamToAsyncIterable } from './internal/stream-utils';
 
+import { createResponseHeaders } from './core';
 import { APIError } from './error';
 
 type Bytes = string | ArrayBuffer | Uint8Array | Buffer | null | undefined;
@@ -51,7 +52,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
             }
 
             if (data && data.error) {
-              throw new APIError(undefined, data.error, undefined, undefined);
+              throw new APIError(undefined, data.error, undefined, createResponseHeaders(response.headers));
             }
 
             yield data;
