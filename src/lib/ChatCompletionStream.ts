@@ -12,7 +12,7 @@ import {
   type ChatCompletionCreateParamsStreaming,
   type ChatCompletionCreateParamsBase,
   type ChatCompletionRole,
-} from '../resources/chat/completions';
+} from '../resources/chat/completions/completions';
 import {
   AbstractChatCompletionRunner,
   type AbstractChatCompletionRunnerEvents,

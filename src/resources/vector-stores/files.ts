@@ -1,9 +1,9 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../resource';
+import { APIResource } from '../../core/resource';
 import * as VectorStoresAPI from './vector-stores';
-import { APIPromise } from '../../api-promise';
-import { CursorPage, type CursorPageParams, PagePromise, Page } from '../../pagination';
+import { APIPromise } from '../../core/api-promise';
+import { CursorPage, type CursorPageParams, PagePromise, Page } from '../../core/pagination';
 import { buildHeaders } from '../../internal/headers';
 import { RequestOptions } from '../../internal/request-options';
 import { sleep } from '../../internal/utils';

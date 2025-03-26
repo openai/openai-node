@@ -1,6 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../../resource';
+import { APIResource } from '../../../core/resource';
 import * as ThreadsAPI from './threads';
 import * as Shared from '../../shared';
 import * as AssistantsAPI from '../assistants';
@@ -65,8 +65,8 @@ import {
   Runs,
   RunsPage,
 } from './runs/runs';
-import { APIPromise } from '../../../api-promise';
-import { Stream } from '../../../streaming';
+import { APIPromise } from '../../../core/api-promise';
+import { Stream } from '../../../core/streaming';
 import { buildHeaders } from '../../../internal/headers';
 import { RequestOptions } from '../../../internal/request-options';
 import { AssistantStream, ThreadCreateAndRunParamsBaseStream } from '../../../lib/AssistantStream';
