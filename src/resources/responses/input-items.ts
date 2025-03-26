@@ -72,6 +72,12 @@ export interface InputItemListParams extends CursorPageParams {
   before?: string;
 
   /**
+   * Additional fields to include in the response. See the `include` parameter for
+   * Response creation above for more information.
+   */
+  include?: Array<ResponsesAPI.ResponseIncludable>;
+
+  /**
    * The order to return the input items in. Default is `asc`.
    *
    * - `asc`: Return the input items in ascending order.
