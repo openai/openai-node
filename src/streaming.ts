@@ -30,7 +30,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
 
     async function* iterator(): AsyncIterator<Item, any, undefined> {
       if (consumed) {
-        throw new Error('Cannot iterate over a consumed stream, use `.tee()` to split the stream.');
+        throw new OpenAIError('Cannot iterate over a consumed stream, use `.tee()` to split the stream.');
       }
       consumed = true;
       let done = false;
@@ -53,7 +53,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
             }
 
             if (data && data.error) {
-              throw new APIError(undefined, data.error, undefined, undefined);
+              throw new APIError(undefined, data.error, undefined, response.headers);
             }
 
             yield data;
@@ -97,7 +97,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
 
     async function* iterator(): AsyncIterator<Item, any, undefined> {
       if (consumed) {
-        throw new Error('Cannot iterate over a consumed stream, use `.tee()` to split the stream.');
+        throw new OpenAIError('Cannot iterate over a consumed stream, use `.tee()` to split the stream.');
       }
       consumed = true;
       let done = false;
