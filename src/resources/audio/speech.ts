@@ -34,11 +34,23 @@ export interface SpeechCreateParams {
 
   /**
    * The voice to use when generating the audio. Supported voices are `alloy`, `ash`,
-   * `coral`, `echo`, `fable`, `onyx`, `nova`, `sage` and `shimmer`. Previews of the
-   * voices are available in the
+   * `ballad`, `coral`, `echo`, `fable`, `onyx`, `nova`, `sage`, `shimmer`, and
+   * `verse`. Previews of the voices are available in the
    * [Text to speech guide](https://platform.openai.com/docs/guides/text-to-speech#voice-options).
    */
-  voice: 'alloy' | 'ash' | 'coral' | 'echo' | 'fable' | 'onyx' | 'nova' | 'sage' | 'shimmer';
+  voice:
+    | (string & {})
+    | 'alloy'
+    | 'ash'
+    | 'ballad'
+    | 'coral'
+    | 'echo'
+    | 'fable'
+    | 'onyx'
+    | 'nova'
+    | 'sage'
+    | 'shimmer'
+    | 'verse';
 
   /**
    * Control the voice of your generated audio with additional instructions. Does not

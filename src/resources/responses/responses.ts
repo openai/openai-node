@@ -241,8 +241,8 @@ export interface Response {
    * context.
    *
    * When using along with `previous_response_id`, the instructions from a previous
-   * response will be not be carried over to the next response. This makes it simple
-   * to swap out system (or developer) messages in new responses.
+   * response will not be carried over to the next response. This makes it simple to
+   * swap out system (or developer) messages in new responses.
    */
   instructions: string | null;
 
@@ -1293,6 +1293,12 @@ export type ResponseFormatTextConfig =
  */
 export interface ResponseFormatTextJSONSchemaConfig {
   /**
+   * The name of the response format. Must be a-z, A-Z, 0-9, or contain underscores
+   * and dashes, with a maximum length of 64.
+   */
+  name: string;
+
+  /**
    * The schema for the response format, described as a JSON Schema object. Learn how
    * to build JSON schemas [here](https://json-schema.org/).
    */
@@ -1308,12 +1314,6 @@ export interface ResponseFormatTextJSONSchemaConfig {
    * how to respond in the format.
    */
   description?: string;
-
-  /**
-   * The name of the response format. Must be a-z, A-Z, 0-9, or contain underscores
-   * and dashes, with a maximum length of 64.
-   */
-  name?: string;
 
   /**
    * Whether to enable strict schema adherence when generating the output. If set to
@@ -2634,8 +2634,8 @@ export interface ResponseCreateParamsBase {
    * context.
    *
    * When using along with `previous_response_id`, the instructions from a previous
-   * response will be not be carried over to the next response. This makes it simple
-   * to swap out system (or developer) messages in new responses.
+   * response will not be carried over to the next response. This makes it simple to
+   * swap out system (or developer) messages in new responses.
    */
   instructions?: string | null;
 
