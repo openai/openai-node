@@ -60,7 +60,6 @@ export {
   type ModerationCreateResponse,
   type ModerationCreateParams,
 } from './moderations';
-export { Responses } from './responses/responses';
 export { Uploads, type Upload, type UploadCreateParams, type UploadCompleteParams } from './uploads/uploads';
 export {
   VectorStoresPage,
@@ -81,3 +80,35 @@ export {
   type VectorStoreListParams,
   type VectorStoreSearchParams,
 } from './vector-stores/vector-stores';
+export {
+  Responses,
+  type Response,
+  type ResponseCreateParams,
+  type ResponseCreateParamsNonStreaming,
+  type ResponseCreateParamsStreaming,
+  type ResponseStatus,
+  type ResponseCompletedEvent,
+  type ResponseUsage,
+  type ResponseTextConfig,
+  type Tool,
+  type ComputerTool,
+  type FileSearchTool,
+  type FunctionTool,
+  type WebSearchTool,
+  type ToolChoiceOptions,
+  type ToolChoiceFunction,
+  type ToolChoiceTypes,
+  type ResponseInput,
+  type ResponseInputMessageContentList,
+  type ResponseOutputMessage,
+  type ResponseOutputText,
+  type ResponseOutputRefusal,
+  type ResponseOutputItem,
+  type ResponseReasoningItem,
+  type ResponseFunctionToolCall,
+  type ResponseFileSearchToolCall,
+  type ResponseFunctionWebSearch,
+  type ResponseComputerToolCall,
+  type EasyInputMessage,
+  type ResponseStreamEvent,
+} from './responses/responses';

@@ -1,4 +1,35 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 export { InputItems, type ResponseItemList, type InputItemListParams } from './input-items';
-export { Responses } from './responses';
+export {
+  Responses,
+  type Response,
+  type ResponseCreateParams,
+  type ResponseCreateParamsNonStreaming,
+  type ResponseCreateParamsStreaming,
+  type ResponseStatus,
+  type ResponseCompletedEvent,
+  type ResponseUsage,
+  type ResponseTextConfig,
+  type Tool,
+  type ComputerTool,
+  type FileSearchTool,
+  type FunctionTool,
+  type WebSearchTool,
+  type ToolChoiceOptions,
+  type ToolChoiceFunction,
+  type ToolChoiceTypes,
+  type ResponseInput,
+  type ResponseInputMessageContentList,
+  type ResponseOutputMessage,
+  type ResponseOutputText,
+  type ResponseOutputRefusal,
+  type ResponseOutputItem,
+  type ResponseReasoningItem,
+  type ResponseFunctionToolCall,
+  type ResponseFileSearchToolCall,
+  type ResponseFunctionWebSearch,
+  type ResponseComputerToolCall,
+  type EasyInputMessage,
+  type ResponseStreamEvent,
+} from "./responses";
