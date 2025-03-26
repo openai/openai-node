@@ -1377,7 +1377,7 @@ export interface ResponseFormatTextJSONSchemaConfig {
    * The name of the response format. Must be a-z, A-Z, 0-9, or contain underscores
    * and dashes, with a maximum length of 64.
    */
-  name?: string;
+  name: string;
 
   /**
    * Whether to enable strict schema adherence when generating the output. If set to
