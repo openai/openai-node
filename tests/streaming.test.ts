@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { _iterSSEMessages } from 'openai/streaming';
+import { _iterSSEMessages } from 'openai/core/streaming';
 import { ReadableStreamFrom } from 'openai/internal/shims';
 
 describe('streaming decoding', () => {

@@ -1,14 +1,14 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../../resource';
+import { APIResource } from '../../../core/resource';
 import * as CompletionsCompletionsAPI from './completions';
 import * as CompletionsAPI from '../../completions';
 import * as Shared from '../../shared';
 import * as MessagesAPI from './messages';
 import { MessageListParams, Messages } from './messages';
-import { APIPromise } from '../../../api-promise';
-import { CursorPage, type CursorPageParams, PagePromise } from '../../../pagination';
-import { Stream } from '../../../streaming';
+import { APIPromise } from '../../../core/api-promise';
+import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pagination';
+import { Stream } from '../../../core/streaming';
 import { RequestOptions } from '../../../internal/request-options';
 import { path } from '../../../internal/utils/path';
 

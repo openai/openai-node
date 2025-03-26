@@ -1,5 +1,5 @@
 import { multipartFormRequestOptions, createForm } from 'openai/internal/uploads';
-import { toFile } from 'openai/uploads';
+import { toFile } from 'openai/core/uploads';
 
 describe('form data validation', () => {
   test('valid values do not error', async () => {
