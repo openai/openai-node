@@ -32,7 +32,7 @@ describe('resource inputItems', () => {
     await expect(
       client.responses.inputItems.list(
         'response_id',
-        { after: 'after', before: 'before', limit: 0, order: 'asc' },
+        { after: 'after', before: 'before', include: ['file_search_call.results'], limit: 0, order: 'asc' },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);

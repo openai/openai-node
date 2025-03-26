@@ -325,7 +325,19 @@ export interface ChatCompletionAudioParam {
    * The voice the model uses to respond. Supported voices are `alloy`, `ash`,
    * `ballad`, `coral`, `echo`, `sage`, and `shimmer`.
    */
-  voice: 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse';
+  voice:
+    | (string & {})
+    | 'alloy'
+    | 'ash'
+    | 'ballad'
+    | 'coral'
+    | 'echo'
+    | 'fable'
+    | 'onyx'
+    | 'nova'
+    | 'sage'
+    | 'shimmer'
+    | 'verse';
 }
 
 /**
