@@ -255,7 +255,7 @@ export namespace TranscriptionSessionCreateParams {
   export interface TurnDetection {
     /**
      * Whether or not to automatically generate a response when a VAD stop event
-     * occurs.
+     * occurs. Not available for transcription sessions.
      */
     create_response?: boolean;
 
@@ -269,7 +269,7 @@ export namespace TranscriptionSessionCreateParams {
     /**
      * Whether or not to automatically interrupt any ongoing response with output to
      * the default conversation (i.e. `conversation` of `auto`) when a VAD start event
-     * occurs.
+     * occurs. Not available for transcription sessions.
      */
     interrupt_response?: boolean;
 
