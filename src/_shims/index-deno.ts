@@ -108,3 +108,5 @@ export declare class FsReadStream extends Readable {
 const _ReadableStream = ReadableStream;
 type _ReadableStream = ReadableStream;
 export { _ReadableStream as ReadableStream };
+
+export const init = () => {};
