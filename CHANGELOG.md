@@ -1,5 +1,26 @@
 # Changelog
 
+## 4.90.0 (2025-03-27)
+
+Full Changelog: [v4.89.1...v4.90.0](https://github.com/openai/openai-node/compare/v4.89.1...v4.90.0)
+
+### Features
+
+* **api:** add `get /chat/completions` endpoint ([2d6710a](https://github.com/openai/openai-node/commit/2d6710a1f9dd4f768d9c73e9c9f5f93c737cdc66))
+
+
+### Bug Fixes
+
+* **audio:** correctly handle transcription streaming ([2a9b603](https://github.com/openai/openai-node/commit/2a9b60336cd40a4d4fb9b898ece49170ad648fd0))
+* **internal:** work around https://github.com/vercel/next.js/issues/76881 ([#1427](https://github.com/openai/openai-node/issues/1427)) ([b467e94](https://github.com/openai/openai-node/commit/b467e949476621e8e92587a83c9de6fab35b2b9d))
+
+
+### Chores
+
+* add hash of OpenAPI spec/config inputs to .stats.yml ([45db35e](https://github.com/openai/openai-node/commit/45db35e34be560c75bf36224cc153c6d0e6e2a88))
+* **api:** updates to supported Voice IDs ([#1424](https://github.com/openai/openai-node/issues/1424)) ([404f4db](https://github.com/openai/openai-node/commit/404f4db41a2ee651f5bfdaa7b8881e1bf015f058))
+* **client:** expose headers on some streaming errors ([#1423](https://github.com/openai/openai-node/issues/1423)) ([b0783cc](https://github.com/openai/openai-node/commit/b0783cc6221b68f1738e759b393756a7d0e540a3))
+
 ## 4.89.1 (2025-03-26)
 
 Full Changelog: [v4.89.0...v4.89.1](https://github.com/openai/openai-node/compare/v4.89.0...v4.89.1)
