@@ -40,7 +40,7 @@ async function main() {
 
   rt.on('error', (err) => {
     // in a real world scenario this should be logged somewhere as you
-    // likely want to continue procesing events regardless of any errors
+    // likely want to continue processing events regardless of any errors
     throw err;
   });
 
