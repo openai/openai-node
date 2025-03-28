@@ -1287,6 +1287,27 @@ export const toBase64 = (str: string | null | undefined): string => {
   throw new OpenAIError('Cannot generate b64 string; Expected `Buffer` or `btoa` to be defined');
 };
 
+/**
+ * Converts a Base64 encoded string to a Float32Array.
+ * @param base64Str - The Base64 encoded string.
+ * @returns An Array of numbers interpreted as Float32 values.
+ */
+export const toFloat32Array = (base64Str: string): Array<number> => {
+  if (typeof Buffer !== 'undefined') {
+    // for Node.js environment
+    return Array.from(new Float32Array(Buffer.from(base64Str, 'base64').buffer));
+  } else {
+    // for legacy web platform APIs
+    const binaryStr = atob(base64Str);
+    const len = binaryStr.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binaryStr.charCodeAt(i);
+    }
+    return Array.from(new Float32Array(bytes.buffer));
+  }
+};
+
 export function isObj(obj: unknown): obj is Record<string, unknown> {
   return obj != null && typeof obj === 'object' && !Array.isArray(obj);
 }
