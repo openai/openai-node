@@ -11,8 +11,6 @@ export class Embeddings extends APIResource {
     body: EmbeddingCreateParams,
     options?: Core.RequestOptions<EmbeddingCreateParams>,
   ): Core.APIPromise<CreateEmbeddingResponse> {
-    Core.debug('request', 'Sending request with arguments:', { body, ...options });
-
     const hasUserProvidedEncodingFormat = !!body.encoding_format;
     // No encoding_format specified, defaulting to base64 for performance reasons
     // See https://github.com/openai/openai-node/pull/1312
@@ -48,7 +46,6 @@ export class Embeddings extends APIResource {
           const embeddingBase64Str = embeddingBase64Obj.embedding as unknown as string;
           embeddingBase64Obj.embedding = Core.toFloat32Array(embeddingBase64Str);
         });
-        Core.debug('response', 'Decoded embeddings:', response.data);
       }
 
       return response;
