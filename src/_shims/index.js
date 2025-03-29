@@ -3,7 +3,9 @@
  */
 const shims = require('./registry');
 const auto = require('openai/_shims/auto/runtime');
-if (!shims.kind) shims.setShims(auto.getRuntime(), { auto: true });
+exports.init = () => {
+  if (!shims.kind) shims.setShims(auto.getRuntime(), { auto: true });
+};
 for (const property of Object.keys(shims)) {
   Object.defineProperty(exports, property, {
     get() {
@@ -11,3 +13,5 @@ for (const property of Object.keys(shims)) {
     },
   });
 }
+
+exports.init();

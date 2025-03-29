@@ -13,7 +13,7 @@ describe('resource speech', () => {
     const response = await client.audio.speech.create({
       input: 'input',
       model: 'string',
-      voice: 'alloy',
+      voice: 'ash',
       instructions: 'instructions',
       response_format: 'mp3',
       speed: 0.25,

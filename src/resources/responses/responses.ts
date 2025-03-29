@@ -305,8 +305,8 @@ export interface Response {
    * context.
    *
    * When using along with `previous_response_id`, the instructions from a previous
-   * response will be not be carried over to the next response. This makes it simple
-   * to swap out system (or developer) messages in new responses.
+   * response will not be carried over to the next response. This makes it simple to
+   * swap out system (or developer) messages in new responses.
    */
   instructions: string | null;
 
@@ -1357,6 +1357,12 @@ export type ResponseFormatTextConfig =
  */
 export interface ResponseFormatTextJSONSchemaConfig {
   /**
+   * The name of the response format. Must be a-z, A-Z, 0-9, or contain underscores
+   * and dashes, with a maximum length of 64.
+   */
+  name: string;
+
+  /**
    * The schema for the response format, described as a JSON Schema object. Learn how
    * to build JSON schemas [here](https://json-schema.org/).
    */
@@ -1372,12 +1378,6 @@ export interface ResponseFormatTextJSONSchemaConfig {
    * how to respond in the format.
    */
   description?: string;
-
-  /**
-   * The name of the response format. Must be a-z, A-Z, 0-9, or contain underscores
-   * and dashes, with a maximum length of 64.
-   */
-  name?: string;
 
   /**
    * Whether to enable strict schema adherence when generating the output. If set to
@@ -2698,8 +2698,8 @@ export interface ResponseCreateParamsBase {
    * context.
    *
    * When using along with `previous_response_id`, the instructions from a previous
-   * response will be not be carried over to the next response. This makes it simple
-   * to swap out system (or developer) messages in new responses.
+   * response will not be carried over to the next response. This makes it simple to
+   * swap out system (or developer) messages in new responses.
    */
   instructions?: string | null;
 
@@ -2865,6 +2865,89 @@ export interface ResponseRetrieveParams {
 Responses.InputItems = InputItems;
 
 export declare namespace Responses {
+  export {
+    type ComputerTool as ComputerTool,
+    type EasyInputMessage as EasyInputMessage,
+    type FileSearchTool as FileSearchTool,
+    type FunctionTool as FunctionTool,
+    type Response as Response,
+    type ResponseAudioDeltaEvent as ResponseAudioDeltaEvent,
+    type ResponseAudioDoneEvent as ResponseAudioDoneEvent,
+    type ResponseAudioTranscriptDeltaEvent as ResponseAudioTranscriptDeltaEvent,
+    type ResponseAudioTranscriptDoneEvent as ResponseAudioTranscriptDoneEvent,
+    type ResponseCodeInterpreterCallCodeDeltaEvent as ResponseCodeInterpreterCallCodeDeltaEvent,
+    type ResponseCodeInterpreterCallCodeDoneEvent as ResponseCodeInterpreterCallCodeDoneEvent,
+    type ResponseCodeInterpreterCallCompletedEvent as ResponseCodeInterpreterCallCompletedEvent,
+    type ResponseCodeInterpreterCallInProgressEvent as ResponseCodeInterpreterCallInProgressEvent,
+    type ResponseCodeInterpreterCallInterpretingEvent as ResponseCodeInterpreterCallInterpretingEvent,
+    type ResponseCodeInterpreterToolCall as ResponseCodeInterpreterToolCall,
+    type ResponseCompletedEvent as ResponseCompletedEvent,
+    type ResponseComputerToolCall as ResponseComputerToolCall,
+    type ResponseComputerToolCallOutputItem as ResponseComputerToolCallOutputItem,
+    type ResponseComputerToolCallOutputScreenshot as ResponseComputerToolCallOutputScreenshot,
+    type ResponseContent as ResponseContent,
+    type ResponseContentPartAddedEvent as ResponseContentPartAddedEvent,
+    type ResponseContentPartDoneEvent as ResponseContentPartDoneEvent,
+    type ResponseCreatedEvent as ResponseCreatedEvent,
+    type ResponseError as ResponseError,
+    type ResponseErrorEvent as ResponseErrorEvent,
+    type ResponseFailedEvent as ResponseFailedEvent,
+    type ResponseFileSearchCallCompletedEvent as ResponseFileSearchCallCompletedEvent,
+    type ResponseFileSearchCallInProgressEvent as ResponseFileSearchCallInProgressEvent,
+    type ResponseFileSearchCallSearchingEvent as ResponseFileSearchCallSearchingEvent,
+    type ResponseFileSearchToolCall as ResponseFileSearchToolCall,
+    type ResponseFormatTextConfig as ResponseFormatTextConfig,
+    type ResponseFormatTextJSONSchemaConfig as ResponseFormatTextJSONSchemaConfig,
+    type ResponseFunctionCallArgumentsDeltaEvent as ResponseFunctionCallArgumentsDeltaEvent,
+    type ResponseFunctionCallArgumentsDoneEvent as ResponseFunctionCallArgumentsDoneEvent,
+    type ResponseFunctionToolCall as ResponseFunctionToolCall,
+    type ResponseFunctionToolCallItem as ResponseFunctionToolCallItem,
+    type ResponseFunctionToolCallOutputItem as ResponseFunctionToolCallOutputItem,
+    type ResponseFunctionWebSearch as ResponseFunctionWebSearch,
+    type ResponseInProgressEvent as ResponseInProgressEvent,
+    type ResponseIncludable as ResponseIncludable,
+    type ResponseIncompleteEvent as ResponseIncompleteEvent,
+    type ResponseInput as ResponseInput,
+    type ResponseInputAudio as ResponseInputAudio,
+    type ResponseInputContent as ResponseInputContent,
+    type ResponseInputFile as ResponseInputFile,
+    type ResponseInputImage as ResponseInputImage,
+    type ResponseInputItem as ResponseInputItem,
+    type ResponseInputMessageContentList as ResponseInputMessageContentList,
+    type ResponseInputMessageItem as ResponseInputMessageItem,
+    type ResponseInputText as ResponseInputText,
+    type ResponseItem as ResponseItem,
+    type ResponseOutputAudio as ResponseOutputAudio,
+    type ResponseOutputItem as ResponseOutputItem,
+    type ResponseOutputItemAddedEvent as ResponseOutputItemAddedEvent,
+    type ResponseOutputItemDoneEvent as ResponseOutputItemDoneEvent,
+    type ResponseOutputMessage as ResponseOutputMessage,
+    type ResponseOutputRefusal as ResponseOutputRefusal,
+    type ResponseOutputText as ResponseOutputText,
+    type ResponseReasoningItem as ResponseReasoningItem,
+    type ResponseRefusalDeltaEvent as ResponseRefusalDeltaEvent,
+    type ResponseRefusalDoneEvent as ResponseRefusalDoneEvent,
+    type ResponseStatus as ResponseStatus,
+    type ResponseStreamEvent as ResponseStreamEvent,
+    type ResponseTextAnnotationDeltaEvent as ResponseTextAnnotationDeltaEvent,
+    type ResponseTextConfig as ResponseTextConfig,
+    type ResponseTextDeltaEvent as ResponseTextDeltaEvent,
+    type ResponseTextDoneEvent as ResponseTextDoneEvent,
+    type ResponseUsage as ResponseUsage,
+    type ResponseWebSearchCallCompletedEvent as ResponseWebSearchCallCompletedEvent,
+    type ResponseWebSearchCallInProgressEvent as ResponseWebSearchCallInProgressEvent,
+    type ResponseWebSearchCallSearchingEvent as ResponseWebSearchCallSearchingEvent,
+    type Tool as Tool,
+    type ToolChoiceFunction as ToolChoiceFunction,
+    type ToolChoiceOptions as ToolChoiceOptions,
+    type ToolChoiceTypes as ToolChoiceTypes,
+    type WebSearchTool as WebSearchTool,
+    type ResponseCreateParams as ResponseCreateParams,
+    type ResponseCreateParamsNonStreaming as ResponseCreateParamsNonStreaming,
+    type ResponseCreateParamsStreaming as ResponseCreateParamsStreaming,
+    type ResponseRetrieveParams as ResponseRetrieveParams,
+  };
+
   export {
     InputItems as InputItems,
     type ResponseItemList as ResponseItemList,

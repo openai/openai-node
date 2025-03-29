@@ -17,7 +17,12 @@ import {
   type RequestInit,
   type Response,
   type HeadersInit,
+  init,
 } from './_shims/index';
+
+// try running side effects outside of _shims/index to workaround https://github.com/vercel/next.js/issues/76881
+init();
+
 export { type Response };
 import { BlobLike, isBlobLike, isMultipartBody } from './uploads';
 export {
@@ -430,7 +435,7 @@ export abstract class APIClient {
       !headers ? {}
       : Symbol.iterator in headers ?
         Object.fromEntries(Array.from(headers as Iterable<string[]>).map((header) => [...header]))
-      : { ...headers }
+      : { ...(headers as any as Record<string, string>) }
     );
   }
 

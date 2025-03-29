@@ -1005,9 +1005,22 @@ export interface RealtimeResponse {
 
   /**
    * The voice the model used to respond. Current voice options are `alloy`, `ash`,
-   * `ballad`, `coral`, `echo` `sage`, `shimmer` and `verse`.
+   * `ballad`, `coral`, `echo`, `fable`, `onyx`, `nova`, `sage`, `shimmer`, and
+   * `verse`.
    */
-  voice?: 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse';
+  voice?:
+    | (string & {})
+    | 'alloy'
+    | 'ash'
+    | 'ballad'
+    | 'coral'
+    | 'echo'
+    | 'fable'
+    | 'onyx'
+    | 'nova'
+    | 'sage'
+    | 'shimmer'
+    | 'verse';
 }
 
 /**
@@ -1620,9 +1633,22 @@ export namespace ResponseCreateEvent {
     /**
      * The voice the model uses to respond. Voice cannot be changed during the session
      * once the model has responded with audio at least once. Current voice options are
-     * `alloy`, `ash`, `ballad`, `coral`, `echo` `sage`, `shimmer` and `verse`.
+     * `alloy`, `ash`, `ballad`, `coral`, `echo`, `fable`, `onyx`, `nova`, `sage`,
+     * `shimmer`, and `verse`.
      */
-    voice?: 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse';
+    voice?:
+      | (string & {})
+      | 'alloy'
+      | 'ash'
+      | 'ballad'
+      | 'coral'
+      | 'echo'
+      | 'fable'
+      | 'onyx'
+      | 'nova'
+      | 'sage'
+      | 'shimmer'
+      | 'verse';
   }
 
   export namespace Response {
@@ -2078,9 +2104,22 @@ export namespace SessionUpdateEvent {
     /**
      * The voice the model uses to respond. Voice cannot be changed during the session
      * once the model has responded with audio at least once. Current voice options are
-     * `alloy`, `ash`, `ballad`, `coral`, `echo` `sage`, `shimmer` and `verse`.
+     * `alloy`, `ash`, `ballad`, `coral`, `echo`, `fable`, `onyx`, `nova`, `sage`,
+     * `shimmer`, and `verse`.
      */
-    voice?: 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse';
+    voice?:
+      | (string & {})
+      | 'alloy'
+      | 'ash'
+      | 'ballad'
+      | 'coral'
+      | 'echo'
+      | 'fable'
+      | 'onyx'
+      | 'nova'
+      | 'sage'
+      | 'shimmer'
+      | 'verse';
   }
 
   export namespace Session {
@@ -2376,7 +2415,7 @@ export namespace TranscriptionSessionUpdate {
     export interface TurnDetection {
       /**
        * Whether or not to automatically generate a response when a VAD stop event
-       * occurs.
+       * occurs. Not available for transcription sessions.
        */
       create_response?: boolean;
 
@@ -2390,7 +2429,7 @@ export namespace TranscriptionSessionUpdate {
       /**
        * Whether or not to automatically interrupt any ongoing response with output to
        * the default conversation (i.e. `conversation` of `auto`) when a VAD start event
-       * occurs.
+       * occurs. Not available for transcription sessions.
        */
       interrupt_response?: boolean;
 
@@ -2451,6 +2490,58 @@ Realtime.Sessions = Sessions;
 Realtime.TranscriptionSessions = TranscriptionSessions;
 
 export declare namespace Realtime {
+  export {
+    type ConversationCreatedEvent as ConversationCreatedEvent,
+    type ConversationItem as ConversationItem,
+    type ConversationItemContent as ConversationItemContent,
+    type ConversationItemCreateEvent as ConversationItemCreateEvent,
+    type ConversationItemCreatedEvent as ConversationItemCreatedEvent,
+    type ConversationItemDeleteEvent as ConversationItemDeleteEvent,
+    type ConversationItemDeletedEvent as ConversationItemDeletedEvent,
+    type ConversationItemInputAudioTranscriptionCompletedEvent as ConversationItemInputAudioTranscriptionCompletedEvent,
+    type ConversationItemInputAudioTranscriptionDeltaEvent as ConversationItemInputAudioTranscriptionDeltaEvent,
+    type ConversationItemInputAudioTranscriptionFailedEvent as ConversationItemInputAudioTranscriptionFailedEvent,
+    type ConversationItemRetrieveEvent as ConversationItemRetrieveEvent,
+    type ConversationItemTruncateEvent as ConversationItemTruncateEvent,
+    type ConversationItemTruncatedEvent as ConversationItemTruncatedEvent,
+    type ConversationItemWithReference as ConversationItemWithReference,
+    type ErrorEvent as ErrorEvent,
+    type InputAudioBufferAppendEvent as InputAudioBufferAppendEvent,
+    type InputAudioBufferClearEvent as InputAudioBufferClearEvent,
+    type InputAudioBufferClearedEvent as InputAudioBufferClearedEvent,
+    type InputAudioBufferCommitEvent as InputAudioBufferCommitEvent,
+    type InputAudioBufferCommittedEvent as InputAudioBufferCommittedEvent,
+    type InputAudioBufferSpeechStartedEvent as InputAudioBufferSpeechStartedEvent,
+    type InputAudioBufferSpeechStoppedEvent as InputAudioBufferSpeechStoppedEvent,
+    type RateLimitsUpdatedEvent as RateLimitsUpdatedEvent,
+    type RealtimeClientEvent as RealtimeClientEvent,
+    type RealtimeResponse as RealtimeResponse,
+    type RealtimeResponseStatus as RealtimeResponseStatus,
+    type RealtimeResponseUsage as RealtimeResponseUsage,
+    type RealtimeServerEvent as RealtimeServerEvent,
+    type ResponseAudioDeltaEvent as ResponseAudioDeltaEvent,
+    type ResponseAudioDoneEvent as ResponseAudioDoneEvent,
+    type ResponseAudioTranscriptDeltaEvent as ResponseAudioTranscriptDeltaEvent,
+    type ResponseAudioTranscriptDoneEvent as ResponseAudioTranscriptDoneEvent,
+    type ResponseCancelEvent as ResponseCancelEvent,
+    type ResponseContentPartAddedEvent as ResponseContentPartAddedEvent,
+    type ResponseContentPartDoneEvent as ResponseContentPartDoneEvent,
+    type ResponseCreateEvent as ResponseCreateEvent,
+    type ResponseCreatedEvent as ResponseCreatedEvent,
+    type ResponseDoneEvent as ResponseDoneEvent,
+    type ResponseFunctionCallArgumentsDeltaEvent as ResponseFunctionCallArgumentsDeltaEvent,
+    type ResponseFunctionCallArgumentsDoneEvent as ResponseFunctionCallArgumentsDoneEvent,
+    type ResponseOutputItemAddedEvent as ResponseOutputItemAddedEvent,
+    type ResponseOutputItemDoneEvent as ResponseOutputItemDoneEvent,
+    type ResponseTextDeltaEvent as ResponseTextDeltaEvent,
+    type ResponseTextDoneEvent as ResponseTextDoneEvent,
+    type SessionCreatedEvent as SessionCreatedEvent,
+    type SessionUpdateEvent as SessionUpdateEvent,
+    type SessionUpdatedEvent as SessionUpdatedEvent,
+    type TranscriptionSessionUpdate as TranscriptionSessionUpdate,
+    type TranscriptionSessionUpdatedEvent as TranscriptionSessionUpdatedEvent,
+  };
+
   export {
     Sessions as Sessions,
     type SessionsAPISession as Session,

@@ -40,7 +40,12 @@ export class Transcriptions extends APIResource {
   ): Core.APIPromise<TranscriptionCreateResponse | string | Stream<TranscriptionStreamEvent>> {
     return this._client.post(
       '/audio/transcriptions',
-      Core.multipartFormRequestOptions({ body, ...options, __metadata: { model: body.model } }),
+      Core.multipartFormRequestOptions({
+        body,
+        ...options,
+        stream: body.stream ?? false,
+        __metadata: { model: body.model },
+      }),
     );
   }
 }
