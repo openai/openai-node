@@ -1,5 +1,18 @@
 # Changelog
 
+## 4.91.0 (2025-03-29)
+
+Full Changelog: [v4.90.0...v4.91.0](https://github.com/openai/openai-node/compare/v4.90.0...v4.91.0)
+
+### Features
+
+* **api:** add `get /responses/{response_id}/input_items` endpoint ([07140fd](https://github.com/openai/openai-node/commit/07140fd5f8ed20e2c789938c4ccf0340a0ac3c24))
+
+
+### Performance Improvements
+
+* **embedding:** default embedding creation to base64 ([#1312](https://github.com/openai/openai-node/issues/1312)) ([ce2157b](https://github.com/openai/openai-node/commit/ce2157bacbadf01df3584de07c74a08c63e57392)), closes [#1310](https://github.com/openai/openai-node/issues/1310)
+
 ## 4.90.0 (2025-03-27)
 
 Full Changelog: [v4.89.1...v4.90.0](https://github.com/openai/openai-node/compare/v4.89.1...v4.90.0)
