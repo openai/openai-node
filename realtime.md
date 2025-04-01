@@ -39,7 +39,7 @@ rt.socket.on('open', () => {
 
 rt.on('error', (err) => {
   // in a real world scenario this should be logged somewhere as you
-  // likely want to continue procesing events regardless of any errors
+  // likely want to continue processing events regardless of any errors
   throw err;
 });
 
@@ -80,8 +80,7 @@ It is **highly recommended** that you register an `error` event listener and han
 const rt = new OpenAIRealtimeWS({ model: 'gpt-4o-realtime-preview-2024-12-17' });
 rt.on('error', (err) => {
   // in a real world scenario this should be logged somewhere as you
-  // likely want to continue procesing events regardless of any errors
+  // likely want to continue processing events regardless of any errors
   throw err;
 });
 ```
-
