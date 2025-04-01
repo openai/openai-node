@@ -163,7 +163,7 @@ export interface ComputerTool {
   /**
    * The type of the computer use tool. Always `computer_use_preview`.
    */
-  type: 'computer-preview';
+  type: 'computer_use_preview';
 }
 
 /**
@@ -288,7 +288,11 @@ export interface Response {
    */
   created_at: number;
 
-  output_text: string;
+  /**
+   * SDK-only convenience property that contains the aggregated text output from all
+   * output_text items in the output array, if any are present
+   */
+  output_text: string | null;
 
   /**
    * An error object returned when the model fails to generate a Response.
