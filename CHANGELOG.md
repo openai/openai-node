@@ -1,5 +1,18 @@
 # Changelog
 
+## 4.91.1 (2025-04-01)
+
+Full Changelog: [v4.91.0...v4.91.1](https://github.com/openai/openai-node/compare/v4.91.0...v4.91.1)
+
+### Bug Fixes
+
+* **docs:** correct docstring on responses.stream ([1c8cd6a](https://github.com/openai/openai-node/commit/1c8cd6a638128b0ff5fac89d6c7db256f0b63a85))
+
+
+### Chores
+
+* Remove deprecated/unused remote spec feature ([ce3dfa8](https://github.com/openai/openai-node/commit/ce3dfa88bd4d395debccc0e6e1aac6d218b07cb8))
+
 ## 4.91.0 (2025-03-31)
 
 Full Changelog: [v4.90.0...v4.91.0](https://github.com/openai/openai-node/compare/v4.90.0...v4.91.0)
