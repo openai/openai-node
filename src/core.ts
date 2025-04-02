@@ -406,7 +406,7 @@ export abstract class APIClient {
       getHeader(headers, 'x-stainless-timeout') === undefined &&
       options.timeout
     ) {
-      reqHeaders['x-stainless-timeout'] = String(options.timeout);
+      reqHeaders['x-stainless-timeout'] = String(Math.trunc(options.timeout / 1000));
     }
 
     this.validateHeaders(reqHeaders, headers);
