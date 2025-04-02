@@ -34,6 +34,20 @@ export {
 
 export type Fetch = (url: RequestInfo, init?: RequestInit) => Promise<Response>;
 
+/**
+ * An alias to the builtin `Array` type so we can
+ * easily alias it in import statements if there are name clashes.
+ */
+type _Array<T> = Array<T>;
+
+/**
+ * An alias to the builtin `Record` type so we can
+ * easily alias it in import statements if there are name clashes.
+ */
+type _Record<K extends keyof any, T> = Record<K, T>;
+
+export type { _Array as Array, _Record as Record };
+
 type PromiseOrValue<T> = T | Promise<T>;
 
 type APIResponseProps = {
