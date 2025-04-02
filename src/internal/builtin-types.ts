@@ -39,9 +39,23 @@ type _HeadersInit = RequestInit['headers'];
  */
 type _BodyInit = RequestInit['body'];
 
+/**
+ * An alias to the builtin `Array<T>` type so we can
+ * easily alias it in import statements if there are name clashes.
+ */
+type _Array<T> = Array<T>;
+
+/**
+ * An alias to the builtin `Record<K, T>` type so we can
+ * easily alias it in import statements if there are name clashes.
+ */
+type _Record<K extends keyof any, T> = Record<K, T>;
+
 export type {
+  _Array as Array,
   _BodyInit as BodyInit,
   _HeadersInit as HeadersInit,
+  _Record as Record,
   _RequestInfo as RequestInfo,
   _RequestInit as RequestInit,
   _Response as Response,
