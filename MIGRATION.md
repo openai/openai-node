@@ -102,10 +102,10 @@ For example, for a method that would call an endpoint at `/v1/parents/{parent_id
 
 ```ts
 // Before
-client.parents.children.create('p_123', 'c_456');
+client.parents.children.retrieve('p_123', 'c_456');
 
 // After
-client.example.create('c_456', { parent_id: 'p_123' });
+client.parents.children.retrieve('c_456', { parent_id: 'p_123' });
 ```
 
 This affects the following methods:
@@ -136,10 +136,69 @@ For example:
 
 ```diff
 - client.example.retrieve(encodeURIComponent('string/with/slash'))
-+ client.example.retrieve('string/with/slash') // renders example/string%2Fwith%2Fslash
++ client.example.retrieve('string/with/slash') // retrieves /example/string%2Fwith%2Fslash
 ```
 
 Previously without the `encodeURIComponent()` call we would have used the path `/example/string/with/slash`; now we'll use `/example/string%2Fwith%2Fslash`.
+
+### Removed request options overloads
+
+When making requests with no required body, query or header parameters, you must now explicitly pass `null`, `undefined` or an empty object `{}` to the params argument in order to customise request options.
+
+```diff
+client.example.list();
+client.example.list({}, { headers: { ... } });
+client.example.list(null, { headers: { ... } });
+client.example.list(undefined, { headers: { ... } });
+- client.example.list({ headers: { ... } });
++ client.example.list({}, { headers: { ... } });
+```
+
+This affects the following methods:
+
+- `client.chat.completions.list()`
+- `client.chat.completions.messages.list()`
+- `client.files.list()`
+- `client.fineTuning.jobs.list()`
+- `client.fineTuning.jobs.listEvents()`
+- `client.fineTuning.jobs.checkpoints.list()`
+- `client.vectorStores.list()`
+- `client.vectorStores.files.list()`
+- `client.beta.assistants.list()`
+- `client.beta.threads.create()`
+- `client.beta.threads.runs.list()`
+- `client.beta.threads.messages.list()`
+- `client.batches.list()`
+- `client.responses.retrieve()`
+- `client.responses.inputItems.list()`
+
+### HTTP method naming
+
+Previously some methods could not be named intuitively due to an internal naming conflict. This has been fixed and the affected methods are now correctly named.
+
+```ts
+// Before
+client.chat.completions.del();
+client.files.del();
+client.models.del();
+client.vectorStores.del();
+client.vectorStores.files.del();
+client.beta.assistants.del();
+client.beta.threads.del();
+client.beta.threads.messages.del();
+client.responses.del();
+
+// After
+client.chat.completions.delete();
+client.files.delete();
+client.models.delete();
+client.vectorStores.delete();
+client.vectorStores.files.delete();
+client.beta.assistants.delete();
+client.beta.threads.delete();
+client.beta.threads.messages.delete();
+client.responses.delete();
+```
 
 ### Removed `httpAgent` in favor of `fetchOptions`
 
@@ -175,165 +234,7 @@ const client = new OpenAI({
 });
 ```
 
-### HTTP method naming
-
-Some methods could not be named intuitively due to an internal naming conflict. This has been resolved and the methods are now correctly named.
-
-```ts
-// Before
-client.chat.completions.del();
-client.files.del();
-client.models.del();
-client.vectorStores.del();
-client.vectorStores.files.del();
-client.beta.assistants.del();
-client.beta.threads.del();
-client.beta.threads.messages.del();
-client.responses.del();
-
-// After
-client.chat.completions.delete();
-client.files.delete();
-client.models.delete();
-client.vectorStores.delete();
-client.vectorStores.files.delete();
-client.beta.assistants.delete();
-client.beta.threads.delete();
-client.beta.threads.messages.delete();
-client.responses.delete();
-```
-
-### Removed request options overloads
-
-When making requests with no required body, query or header parameters, you must now explicitly pass `null`, `undefined` or an empty object `{}` to the params argument in order to customise request options.
-
-```diff
-client.example.list();
-client.example.list({}, { headers: { ... } });
-client.example.list(null, { headers: { ... } });
-client.example.list(undefined, { headers: { ... } });
-- client.example.list({ headers: { ... } });
-+ client.example.list({}, { headers: { ... } });
-```
-
-This affects the following methods:
-
-- `client.chat.completions.list()`
-- `client.chat.completions.messages.list()`
-- `client.files.list()`
-- `client.fineTuning.jobs.list()`
-- `client.fineTuning.jobs.listEvents()`
-- `client.fineTuning.jobs.checkpoints.list()`
-- `client.vectorStores.list()`
-- `client.vectorStores.files.list()`
-- `client.beta.assistants.list()`
-- `client.beta.threads.create()`
-- `client.beta.threads.runs.list()`
-- `client.beta.threads.messages.list()`
-- `client.batches.list()`
-- `client.responses.retrieve()`
-- `client.responses.inputItems.list()`
-
-### Pagination changes
-
-Note that the `for await` syntax is _not_ affected. This still works as-is:
-
-```ts
-// Automatically fetches more pages as needed.
-for await (const fineTuningJob of client.fineTuning.jobs.list()) {
-  console.log(fineTuningJob);
-}
-```
-
-#### Simplified interface
-
-The pagination interface has been simplified:
-
-```ts
-// Before
-page.nextPageParams();
-page.nextPageInfo();
-// Required manually handling { url } | { params } type
-
-// After
-page.nextPageRequestOptions();
-```
-
-#### Removed unnecessary classes
-
-Page classes for individual methods are now type aliases:
-
-```ts
-// Before
-export class FineTuningJobsPage extends CursorPage<FineTuningJob> {}
-
-// After
-export type FineTuningJobsPage = CursorPage<FineTuningJob>;
-```
-
-If you were importing these classes at runtime, you'll need to switch to importing the base class or only import them at the type-level.
-
-### File handling
-
-The deprecated `fileFromPath` helper has been removed in favor of native Node.js streams:
-
-```ts
-// Before
-OpenAI.fileFromPath('path/to/file');
-
-// After
-import fs from 'fs';
-fs.createReadStream('path/to/file');
-```
-
-Note that this function previously only worked on Node.js. If you're using Bun, you can use [`Bun.file`](https://bun.sh/docs/api/file-io) instead.
-
-### Shims removal
-
-Previously you could configure the types that the SDK used like this:
-
-```ts
-// Tell TypeScript and the package to use the global Web fetch instead of node-fetch.
-import 'openai/shims/web';
-import OpenAI from 'openai';
-```
-
-The `openai/shims` imports have been removed. Your global types must now be [correctly configured](#minimum-types-requirements).
-
-### `openai/src` directory removed
-
-Previously IDEs may have auto-completed imports from the `openai/src` directory, however this
-directory was only included for an improved go-to-definition experience and should not have been used at runtime.
-
-If you have any `openai/src` imports, you must replace it with `openai`.
-
-```ts
-// Before
-import OpenAI from 'openai/src';
-
-// After
-import OpenAI from 'openai';
-```
-
-### Headers
-
-The `headers` property on `APIError` objects is now an instance of the Web [Headers](https://developer.mozilla.org/en-US/docs/Web/API/Headers) class. It was previously just `Record<string, string | null | undefined>`.
-
-### Removed exports
-
-#### Resource classes
-
-If you were importing resource classes from the root package then you must now import them from the file they are defined in.
-This was never valid at the type level and only worked in CommonJS files.
-
-```typescript
-// Before
-const { Completions } = require('openai');
-
-// After
-const { OpenAI } = require('openai');
-OpenAI.Completions; // or import directly from openai/resources/completions
-```
+### Changed exports
 
 #### Refactor of `openai/core`, `error`, `pagination`, `resource`, `streaming` and `uploads`
 
@@ -358,6 +259,20 @@ import 'openai/core/uploads';
 ```
 
 If you were relying on anything that was only exported from `openai/core` and is also not accessible anywhere else, please open an issue and we'll consider adding it to the public API.
+
+#### Resource classes
+
+Previously under certain circumstances it was possible to import resource classes like `Completions` directly from the root of the package. This was never valid at the type level and only worked in CommonJS files.
+Now you must always either reference them as static class properties or import them directly from the files in which they are defined.
+
+```typescript
+// Before
+const { Completions } = require('openai');
+
+// After
+const { OpenAI } = require('openai');
+OpenAI.Completions; // or import directly from openai/resources/completions
+```
 
 #### Cleaned up `uploads` exports
 
@@ -395,3 +310,86 @@ import { APIClient } from 'openai/core';
 // After
 import { OpenAI } from 'openai';
 ```
+
+### File handling
+
+The deprecated `fileFromPath` helper has been removed in favor of native Node.js streams:
+
+```ts
+// Before
+OpenAI.fileFromPath('path/to/file');
+
+// After
+import fs from 'fs';
+fs.createReadStream('path/to/file');
+```
+
+Note that this function previously only worked on Node.js. If you're using Bun, you can use [`Bun.file`](https://bun.sh/docs/api/file-io) instead.
+
+### Shims removal
+
+Previously you could configure the types that the SDK used like this:
+
+```ts
+// Tell TypeScript and the package to use the global Web fetch instead of node-fetch.
+import 'openai/shims/web';
+import OpenAI from 'openai';
+```
+
+The `openai/shims` imports have been removed. Your global types must now be [correctly configured](#minimum-types-requirements).
+
+### Pagination changes
+
+The `for await` syntax **is not affected**. This still works as-is:
+
+```ts
+// Automatically fetches more pages as needed.
+for await (const fineTuningJob of client.fineTuning.jobs.list()) {
+  console.log(fineTuningJob);
+}
+```
+
+The interface for manually paginating through list results has been simplified:
+
+```ts
+// Before
+page.nextPageParams();
+page.nextPageInfo();
+// Required manually handling { url } | { params } type
+
+// After
+page.nextPageRequestOptions();
+```
+
+#### Removed unnecessary classes
+
+Page classes for individual methods are now type aliases:
+
+```ts
+// Before
+export class FineTuningJobsPage extends CursorPage<FineTuningJob> {}
+
+// After
+export type FineTuningJobsPage = CursorPage<FineTuningJob>;
+```
+
+If you were importing these classes at runtime, you'll need to switch to importing the base class or only import them at the type-level.
+
+### `openai/src` directory removed
+
+Previously IDEs may have auto-completed imports from the `openai/src` directory, however this
+directory was only included for an improved go-to-definition experience and should not have been used at runtime.
+
+If you have any `openai/src/*` imports, you will need to replace them with `openai/*`.
+
+```ts
+// Before
+import OpenAI from 'openai/src';
+
+// After
+import OpenAI from 'openai';
+```
+
+### Headers
+
+The `headers` property on `APIError` objects is now an instance of the Web [Headers](https://developer.mozilla.org/en-US/docs/Web/API/Headers) class. It was previously just `Record<string, string | null | undefined>`.
