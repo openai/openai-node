@@ -1,5 +1,29 @@
 # Changelog
 
+## 4.92.0 (2025-04-07)
+
+Full Changelog: [v4.91.1...v4.92.0](https://github.com/openai/openai-node/compare/v4.91.1...v4.92.0)
+
+### Features
+
+* **api:** manual updates ([891754d](https://github.com/openai/openai-node/commit/891754d7fa42d71ce4f93288dd043ef0b97fee23))
+* **api:** manual updates ([01e5546](https://github.com/openai/openai-node/commit/01e5546f3f48a1f4d645e09e7581f16b30f25bdd))
+* **api:** manual updates ([f38dbf3](https://github.com/openai/openai-node/commit/f38dbf3b39b0800b3bbef5c603a4fa2b616f25d8))
+* **api:** manual updates ([1f12253](https://github.com/openai/openai-node/commit/1f12253054a5a7e35dc03b17901b4c1f33bf5b3d))
+
+
+### Bug Fixes
+
+* **api:** improve type resolution when importing as a package ([#1444](https://github.com/openai/openai-node/issues/1444)) ([4aa46d6](https://github.com/openai/openai-node/commit/4aa46d6c0da681bcdde31fcbb09e8ba6fdaf764b))
+* **client:** send `X-Stainless-Timeout` in seconds ([#1442](https://github.com/openai/openai-node/issues/1442)) ([aa4206c](https://github.com/openai/openai-node/commit/aa4206c7d93b4e3114a697f5467ffbbf5a64d1a8))
+* **embeddings:** correctly decode base64 data ([#1448](https://github.com/openai/openai-node/issues/1448)) ([58128f7](https://github.com/openai/openai-node/commit/58128f7efde73726da740c42adde7b02cdf60a6a))
+* **mcp:** remove unused tools.ts ([#1445](https://github.com/openai/openai-node/issues/1445)) ([520a8fa](https://github.com/openai/openai-node/commit/520a8fa77a69ce5855dde3481f9bd39339cb7b83))
+
+
+### Chores
+
+* **internal:** add aliases for Record and Array ([#1443](https://github.com/openai/openai-node/issues/1443)) ([b65391b](https://github.com/openai/openai-node/commit/b65391ba10d5063035c3e5c0bcc5a48ffc80f41d))
+
 ## 4.91.1 (2025-04-01)
 
 Full Changelog: [v4.91.0...v4.91.1](https://github.com/openai/openai-node/compare/v4.91.0...v4.91.1)
