@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.92.1 (2025-04-07)
+
+Full Changelog: [v4.92.0...v4.92.1](https://github.com/openai/openai-node/compare/v4.92.0...v4.92.1)
+
+### Chores
+
+* **internal:** only run examples workflow in main repo ([#1450](https://github.com/openai/openai-node/issues/1450)) ([5e49a7a](https://github.com/openai/openai-node/commit/5e49a7a447bb788fa05898c15ae57c6ea9c8fd49))
+
 ## 4.92.0 (2025-04-07)
 
 Full Changelog: [v4.91.1...v4.92.0](https://github.com/openai/openai-node/compare/v4.91.1...v4.92.0)
