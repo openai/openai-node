@@ -2,6 +2,9 @@
 
 import OpenAI from 'openai';
 import { Response } from 'node-fetch';
+import { mockFetch } from '../utils/mock-fetch';
+import fs from 'fs/promises';
+import Path from 'path';
 
 const client = new OpenAI({
   apiKey: 'My API Key',
@@ -33,34 +36,72 @@ describe('resource embeddings', () => {
     });
   });
 
-  test('create: encoding_format=float should create float32 embeddings', async () => {
+  test('create: encoding_format=default should create float32 embeddings', async () => {
+    const client = makeClient();
     const response = await client.embeddings.create({
       input: 'The quick brown fox jumped over the lazy dog',
       model: 'text-embedding-3-small',
     });
 
     expect(response.data?.at(0)?.embedding).toBeInstanceOf(Array);
-    expect(Number.isFinite(response.data?.at(0)?.embedding.at(0))).toBe(true);
+    expect(response.data?.at(0)?.embedding.at(0)).toBe(-0.09928705543279648);
   });
 
-  test('create: encoding_format=base64 should create float32 embeddings', async () => {
+  test('create: encoding_format=float should create float32 embeddings', async () => {
+    const client = makeClient();
+    const response = await client.embeddings.create({
+      input: 'The quick brown fox jumped over the lazy dog',
+      model: 'text-embedding-3-small',
+      encoding_format: 'float',
+    });
+
+    expect(response.data?.at(0)?.embedding).toBeInstanceOf(Array);
+    expect(response.data?.at(0)?.embedding.at(0)).toBe(-0.099287055);
+  });
+
+  test('create: encoding_format=base64 should return base64 embeddings', async () => {
+    const client = makeClient();
     const response = await client.embeddings.create({
       input: 'The quick brown fox jumped over the lazy dog',
       model: 'text-embedding-3-small',
       encoding_format: 'base64',
     });
 
-    expect(response.data?.at(0)?.embedding).toBeInstanceOf(Array);
-    expect(Number.isFinite(response.data?.at(0)?.embedding.at(0))).toBe(true);
-  });
-
-  test('create: encoding_format=default should create float32 embeddings', async () => {
-    const response = await client.embeddings.create({
-      input: 'The quick brown fox jumped over the lazy dog',
-      model: 'text-embedding-3-small',
-    });
-
-    expect(response.data?.at(0)?.embedding).toBeInstanceOf(Array);
-    expect(Number.isFinite(response.data?.at(0)?.embedding.at(0))).toBe(true);
+    expect(typeof response.data?.at(0)?.embedding).toBe('string');
   });
 });
+
+function makeClient(): OpenAI {
+  const { fetch, handleRequest } = mockFetch();
+
+  handleRequest(async (_, init) => {
+    const format = (JSON.parse(init!.body as string) as OpenAI.EmbeddingCreateParams).encoding_format;
+    return new Response(
+      await fs.readFile(
+        Path.join(
+          __dirname,
+
+          // these responses were taken from the live API with:
+          //
+          // model: 'text-embedding-3-large',
+          // input: 'h',
+          // dimensions: 256,
+
+          format === 'base64' ? 'embeddings-base64-response.json' : 'embeddings-float-response.json',
+        ),
+      ),
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      },
+    );
+  });
+
+  return new OpenAI({
+    fetch,
+    apiKey: 'My API Key',
+    baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
+  });
+}
