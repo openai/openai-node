@@ -1309,7 +1309,10 @@ export const toBase64 = (str: string | null | undefined): string => {
 export const toFloat32Array = (base64Str: string): Array<number> => {
   if (typeof Buffer !== 'undefined') {
     // for Node.js environment
-    return Array.from(new Float32Array(Buffer.from(base64Str, 'base64').buffer));
+    const buf = Buffer.from(base64Str, 'base64');
+    return Array.from(
+      new Float32Array(buf.buffer, buf.byteOffset, buf.length / Float32Array.BYTES_PER_ELEMENT),
+    );
   } else {
     // for legacy web platform APIs
     const binaryStr = atob(base64Str);
