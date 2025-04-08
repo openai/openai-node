@@ -34,6 +34,20 @@ export {
 
 export type Fetch = (url: RequestInfo, init?: RequestInit) => Promise<Response>;
 
+/**
+ * An alias to the builtin `Array` type so we can
+ * easily alias it in import statements if there are name clashes.
+ */
+type _Array<T> = Array<T>;
+
+/**
+ * An alias to the builtin `Record` type so we can
+ * easily alias it in import statements if there are name clashes.
+ */
+type _Record<K extends keyof any, T> = Record<K, T>;
+
+export type { _Array as Array, _Record as Record };
+
 type PromiseOrValue<T> = T | Promise<T>;
 
 type APIResponseProps = {
@@ -406,7 +420,7 @@ export abstract class APIClient {
       getHeader(headers, 'x-stainless-timeout') === undefined &&
       options.timeout
     ) {
-      reqHeaders['x-stainless-timeout'] = String(options.timeout);
+      reqHeaders['x-stainless-timeout'] = String(Math.trunc(options.timeout / 1000));
     }
 
     this.validateHeaders(reqHeaders, headers);
@@ -1285,6 +1299,30 @@ export const toBase64 = (str: string | null | undefined): string => {
   }
 
   throw new OpenAIError('Cannot generate b64 string; Expected `Buffer` or `btoa` to be defined');
+};
+
+/**
+ * Converts a Base64 encoded string to a Float32Array.
+ * @param base64Str - The Base64 encoded string.
+ * @returns An Array of numbers interpreted as Float32 values.
+ */
+export const toFloat32Array = (base64Str: string): Array<number> => {
+  if (typeof Buffer !== 'undefined') {
+    // for Node.js environment
+    const buf = Buffer.from(base64Str, 'base64');
+    return Array.from(
+      new Float32Array(buf.buffer, buf.byteOffset, buf.length / Float32Array.BYTES_PER_ELEMENT),
+    );
+  } else {
+    // for legacy web platform APIs
+    const binaryStr = atob(base64Str);
+    const len = binaryStr.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binaryStr.charCodeAt(i);
+    }
+    return Array.from(new Float32Array(bytes.buffer));
+  }
 };
 
 export function isObj(obj: unknown): obj is Record<string, unknown> {
