@@ -85,6 +85,23 @@ import { isEmptyObj } from './internal/utils/values';
 import { Audio, AudioModel, AudioResponseFormat } from './resources/audio/audio';
 import { Beta } from './resources/beta/beta';
 import { Chat } from './resources/chat/chat';
+import {
+  EvalCreateParams,
+  EvalCreateResponse,
+  EvalCustomDataSourceConfig,
+  EvalDeleteResponse,
+  EvalLabelModelGrader,
+  EvalListParams,
+  EvalListResponse,
+  EvalListResponsesPage,
+  EvalRetrieveResponse,
+  EvalStoredCompletionsDataSourceConfig,
+  EvalStringCheckGrader,
+  EvalTextSimilarityGrader,
+  EvalUpdateParams,
+  EvalUpdateResponse,
+  Evals,
+} from './resources/evals/evals';
 import { FineTuning } from './resources/fine-tuning/fine-tuning';
 import { Responses } from './resources/responses/responses';
 import {
@@ -856,6 +873,7 @@ export class OpenAI {
   batches: API.Batches = new API.Batches(this);
   uploads: API.Uploads = new API.Uploads(this);
   responses: API.Responses = new API.Responses(this);
+  evals: API.Evals = new API.Evals(this);
 }
 OpenAI.Completions = Completions;
 OpenAI.Chat = Chat;
@@ -871,6 +889,7 @@ OpenAI.Beta = Beta;
 OpenAI.Batches = Batches;
 OpenAI.Uploads = UploadsAPIUploads;
 OpenAI.Responses = Responses;
+OpenAI.Evals = Evals;
 export declare namespace OpenAI {
   export type RequestOptions = Opts.RequestOptions;
 
@@ -1021,6 +1040,24 @@ export declare namespace OpenAI {
   };
 
   export { Responses as Responses };
+
+  export {
+    Evals as Evals,
+    type EvalCustomDataSourceConfig as EvalCustomDataSourceConfig,
+    type EvalLabelModelGrader as EvalLabelModelGrader,
+    type EvalStoredCompletionsDataSourceConfig as EvalStoredCompletionsDataSourceConfig,
+    type EvalStringCheckGrader as EvalStringCheckGrader,
+    type EvalTextSimilarityGrader as EvalTextSimilarityGrader,
+    type EvalCreateResponse as EvalCreateResponse,
+    type EvalRetrieveResponse as EvalRetrieveResponse,
+    type EvalUpdateResponse as EvalUpdateResponse,
+    type EvalListResponse as EvalListResponse,
+    type EvalDeleteResponse as EvalDeleteResponse,
+    type EvalListResponsesPage as EvalListResponsesPage,
+    type EvalCreateParams as EvalCreateParams,
+    type EvalUpdateParams as EvalUpdateParams,
+    type EvalListParams as EvalListParams,
+  };
 
   export type AllModels = API.AllModels;
   export type ChatModel = API.ChatModel;
