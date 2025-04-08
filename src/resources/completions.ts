@@ -254,7 +254,7 @@ export interface CompletionCreateParamsBase {
   logprobs?: number | null;
 
   /**
-   * The maximum number of [tokens](/tokenizer) that can be generated in the
+   * The maximum number of [tokens](https://platform.openai.com/tokenizer) that can be generated in the
    * completion.
    *
    * The token count of your prompt plus `max_tokens` cannot exceed the model's
