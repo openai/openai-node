@@ -66,6 +66,23 @@ import {
 import { Audio, AudioModel, AudioResponseFormat } from './resources/audio/audio';
 import { Beta } from './resources/beta/beta';
 import { Chat } from './resources/chat/chat';
+import {
+  EvalCreateParams,
+  EvalCreateResponse,
+  EvalCustomDataSourceConfig,
+  EvalDeleteResponse,
+  EvalLabelModelGrader,
+  EvalListParams,
+  EvalListResponse,
+  EvalListResponsesPage,
+  EvalRetrieveResponse,
+  EvalStoredCompletionsDataSourceConfig,
+  EvalStringCheckGrader,
+  EvalTextSimilarityGrader,
+  EvalUpdateParams,
+  EvalUpdateResponse,
+  Evals,
+} from './resources/evals/evals';
 import { FineTuning } from './resources/fine-tuning/fine-tuning';
 import { Responses } from './resources/responses/responses';
 import {
@@ -293,6 +310,7 @@ export class OpenAI extends Core.APIClient {
   batches: API.Batches = new API.Batches(this);
   uploads: API.Uploads = new API.Uploads(this);
   responses: API.Responses = new API.Responses(this);
+  evals: API.Evals = new API.Evals(this);
 
   protected override defaultQuery(): Core.DefaultQuery | undefined {
     return this._options.defaultQuery;
@@ -356,6 +374,8 @@ OpenAI.Batches = Batches;
 OpenAI.BatchesPage = BatchesPage;
 OpenAI.Uploads = UploadsAPIUploads;
 OpenAI.Responses = Responses;
+OpenAI.Evals = Evals;
+OpenAI.EvalListResponsesPage = EvalListResponsesPage;
 export declare namespace OpenAI {
   export type RequestOptions = Core.RequestOptions;
 
@@ -507,6 +527,24 @@ export declare namespace OpenAI {
   };
 
   export { Responses as Responses };
+
+  export {
+    Evals as Evals,
+    type EvalCustomDataSourceConfig as EvalCustomDataSourceConfig,
+    type EvalLabelModelGrader as EvalLabelModelGrader,
+    type EvalStoredCompletionsDataSourceConfig as EvalStoredCompletionsDataSourceConfig,
+    type EvalStringCheckGrader as EvalStringCheckGrader,
+    type EvalTextSimilarityGrader as EvalTextSimilarityGrader,
+    type EvalCreateResponse as EvalCreateResponse,
+    type EvalRetrieveResponse as EvalRetrieveResponse,
+    type EvalUpdateResponse as EvalUpdateResponse,
+    type EvalListResponse as EvalListResponse,
+    type EvalDeleteResponse as EvalDeleteResponse,
+    EvalListResponsesPage as EvalListResponsesPage,
+    type EvalCreateParams as EvalCreateParams,
+    type EvalUpdateParams as EvalUpdateParams,
+    type EvalListParams as EvalListParams,
+  };
 
   export type AllModels = API.AllModels;
   export type ChatModel = API.ChatModel;
