@@ -27,7 +27,7 @@ describe('resource images', () => {
       model: 'dall-e-2',
       n: 1,
       response_format: 'url',
-      size: '256x256',
+      size: '1024x1024',
       user: 'user-1234',
     });
   });
@@ -54,7 +54,7 @@ describe('resource images', () => {
       model: 'dall-e-2',
       n: 1,
       response_format: 'url',
-      size: '256x256',
+      size: '1024x1024',
       user: 'user-1234',
     });
   });
@@ -77,7 +77,7 @@ describe('resource images', () => {
       n: 1,
       quality: 'standard',
       response_format: 'url',
-      size: '256x256',
+      size: '1024x1024',
       style: 'vivid',
       user: 'user-1234',
     });
