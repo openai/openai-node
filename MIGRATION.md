@@ -108,7 +108,9 @@ client.parents.children.retrieve('p_123', 'c_456');
 client.parents.children.retrieve('c_456', { parent_id: 'p_123' });
 ```
 
-This affects the following methods:
+<details>
+
+<summary>This affects the following methods</summary>
 
 - `client.vectorStores.files.retrieve()`
 - `client.vectorStores.files.update()`
@@ -126,6 +128,13 @@ This affects the following methods:
 - `client.beta.threads.messages.retrieve()`
 - `client.beta.threads.messages.update()`
 - `client.beta.threads.messages.delete()`
+- `client.evals.runs.retrieve()`
+- `client.evals.runs.delete()`
+- `client.evals.runs.cancel()`
+- `client.evals.runs.outputItems.retrieve()`
+- `client.evals.runs.outputItems.list()`
+
+</details>
 
 ### URI encoded path parameters
 
@@ -162,6 +171,7 @@ This affects the following methods:
 - `client.fineTuning.jobs.list()`
 - `client.fineTuning.jobs.listEvents()`
 - `client.fineTuning.jobs.checkpoints.list()`
+- `client.fineTuning.checkpoints.permissions.retrieve()`
 - `client.vectorStores.list()`
 - `client.vectorStores.files.list()`
 - `client.beta.assistants.list()`
@@ -171,6 +181,8 @@ This affects the following methods:
 - `client.batches.list()`
 - `client.responses.retrieve()`
 - `client.responses.inputItems.list()`
+- `client.evals.list()`
+- `client.evals.runs.list()`
 
 ### HTTP method naming
 
@@ -181,23 +193,29 @@ Previously some methods could not be named intuitively due to an internal naming
 client.chat.completions.del();
 client.files.del();
 client.models.del();
+client.fineTuning.checkpoints.permissions.del();
 client.vectorStores.del();
 client.vectorStores.files.del();
 client.beta.assistants.del();
 client.beta.threads.del();
 client.beta.threads.messages.del();
 client.responses.del();
+client.evals.del();
+client.evals.runs.del();
 
 // After
 client.chat.completions.delete();
 client.files.delete();
 client.models.delete();
+client.fineTuning.checkpoints.permissions.delete();
 client.vectorStores.delete();
 client.vectorStores.files.delete();
 client.beta.assistants.delete();
 client.beta.threads.delete();
 client.beta.threads.messages.delete();
 client.responses.delete();
+client.evals.delete();
+client.evals.runs.delete();
 ```
 
 ### Removed `httpAgent` in favor of `fetchOptions`
