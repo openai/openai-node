@@ -51,7 +51,8 @@ describe('resource permissions', () => {
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
-  test('delete', async () => {
+  // OpenAPI spec is slightly incorrect
+  test.skip('delete', async () => {
     const responsePromise = client.fineTuning.checkpoints.permissions.delete(
       'ft:gpt-4o-mini-2024-07-18:org:weather:B7R9VjQd',
     );
