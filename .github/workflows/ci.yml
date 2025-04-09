@@ -1,19 +1,18 @@
 name: CI
 on:
   push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
-      - next
+    branches-ignore:
+      - 'generated'
+      - 'codegen/**'
+      - 'integrated/**'
+      - 'preview-head/**'
+      - 'preview-base/**'
+      - 'preview/**'
 
 jobs:
   lint:
     name: lint
     runs-on: ubuntu-latest
-    
-
     steps:
       - uses: actions/checkout@v4
 
@@ -31,8 +30,9 @@ jobs:
   build:
     name: build
     runs-on: ubuntu-latest
-    
-
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
 
@@ -46,10 +46,24 @@ jobs:
 
       - name: Check build
         run: ./scripts/build
+
+      - name: Get GitHub OIDC Token
+        if: github.repository == 'stainless-sdks/openai-typescript'
+        id: github-oidc
+        uses: actions/github-script@v6
+        with:
+          script: core.setOutput('github_token', await core.getIDToken());
+
+      - name: Upload tarball
+        if: github.repository == 'stainless-sdks/openai-typescript'
+        env:
+          URL: https://pkg.stainless.com/s
+          AUTH: ${{ steps.github-oidc.outputs.github_token }}
+          SHA: ${{ github.sha }}
+        run: ./scripts/utils/upload-artifact.sh
   test:
     name: test
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
 
