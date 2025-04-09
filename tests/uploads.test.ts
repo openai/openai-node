@@ -101,7 +101,7 @@ describe('missing File error message', () => {
     await expect(
       uploads.toFile(mockResponse({ url: 'https://example.com/my/audio.mp3' })),
     ).rejects.toMatchInlineSnapshot(
-      `[Error: \`File\` is not defined as a global which is required for file uploads]`,
+      `[Error: \`File\` is not defined as a global, which is required for file uploads.]`,
     );
   });
 });
