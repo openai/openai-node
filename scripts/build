@@ -35,8 +35,6 @@ node scripts/utils/fix-index-exports.cjs
 cp tsconfig.dist-src.json dist/src/tsconfig.json
 cp src/internal/shim-types.d.ts dist/internal/shim-types.d.ts
 cp src/internal/shim-types.d.ts dist/internal/shim-types.d.mts
-mkdir -p dist/internal/shims
-cp src/internal/shims/*.{mjs,js,d.ts,d.mts} dist/internal/shims
 
 node scripts/utils/postprocess-files.cjs
 
