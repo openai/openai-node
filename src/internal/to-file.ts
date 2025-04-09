@@ -1,4 +1,4 @@
-import { File } from './shims/file.node.js';
+import { type File, getFile } from './shims/file';
 import { BlobPart, getName, makeFile, isAsyncIterable } from './uploads';
 import type { FilePropertyBag } from './builtin-types';
 
@@ -90,7 +90,7 @@ export async function toFile(
 
   // If we've been given a `File` we don't need to do anything
   if (isFileLike(value)) {
-    if (File && value instanceof File) {
+    if (value instanceof getFile()) {
       return value;
     }
     return makeFile([await value.arrayBuffer()], value.name);
