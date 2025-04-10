@@ -29,11 +29,13 @@ export let getBuiltinModule: null | ((id: string) => object | undefined) = funct
       }
       const magicKey = Math.random() + '';
       let module: { BuiltinModule: any } | undefined;
+      let ObjectPrototype: {} = Blob;
+      for (let next; (next = Reflect.getPrototypeOf(ObjectPrototype)); ObjectPrototype = next);
       try {
         const kClone = Object.getOwnPropertySymbols(Blob.prototype).find(
           (e) => e.description?.includes('clone'),
         )!;
-        Object.defineProperty(Object.prototype, magicKey, {
+        Object.defineProperty(ObjectPrototype, magicKey, {
           get() {
             module = this;
             throw null;
@@ -50,7 +52,7 @@ export let getBuiltinModule: null | ((id: string) => object | undefined) = funct
           })([]),
         );
       } catch {}
-      delete (Object.prototype as any)[magicKey];
+      delete (ObjectPrototype as any)[magicKey];
       if (module) {
         getBuiltinModule = createFallbackGetBuiltinModule(module.BuiltinModule);
       } else {
