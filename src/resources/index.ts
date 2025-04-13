@@ -30,6 +30,23 @@ export {
   type EmbeddingCreateParams,
 } from './embeddings';
 export {
+  EvalListResponsesPage,
+  Evals,
+  type EvalCustomDataSourceConfig,
+  type EvalLabelModelGrader,
+  type EvalStoredCompletionsDataSourceConfig,
+  type EvalStringCheckGrader,
+  type EvalTextSimilarityGrader,
+  type EvalCreateResponse,
+  type EvalRetrieveResponse,
+  type EvalUpdateResponse,
+  type EvalListResponse,
+  type EvalDeleteResponse,
+  type EvalCreateParams,
+  type EvalUpdateParams,
+  type EvalListParams,
+} from './evals/evals';
+export {
   FileObjectsPage,
   Files,
   type FileContent,

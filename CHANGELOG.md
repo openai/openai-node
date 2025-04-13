@@ -1,5 +1,20 @@
 # Changelog
 
+## 4.93.0 (2025-04-08)
+
+Full Changelog: [v4.92.1...v4.93.0](https://github.com/openai/openai-node/compare/v4.92.1...v4.93.0)
+
+### Features
+
+* **api:** Add evalapi to sdk ([#1456](https://github.com/openai/openai-node/issues/1456)) ([ee917e3](https://github.com/openai/openai-node/commit/ee917e3335fcf44e87a28e54ce8ddfdcdfab1652))
+
+
+### Chores
+
+* **internal:** fix examples ([#1457](https://github.com/openai/openai-node/issues/1457)) ([a3dd0dd](https://github.com/openai/openai-node/commit/a3dd0dde3e8ad9cc7a02cf203d4550f91d31a2ae))
+* **internal:** skip broken test ([#1458](https://github.com/openai/openai-node/issues/1458)) ([4d2f815](https://github.com/openai/openai-node/commit/4d2f815ba5f6c426f9c21f4c3db443166389bbf8))
+* **tests:** improve enum examples ([#1454](https://github.com/openai/openai-node/issues/1454)) ([ecabce2](https://github.com/openai/openai-node/commit/ecabce282a9fb60122310942f3b647dfefae5403))
+
 ## 4.92.1 (2025-04-07)
 
 Full Changelog: [v4.92.0...v4.92.1](https://github.com/openai/openai-node/compare/v4.92.0...v4.92.1)
