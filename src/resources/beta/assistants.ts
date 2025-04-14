@@ -1337,6 +1337,12 @@ export interface AssistantUpdateParams {
    */
   model?:
     | (string & {})
+    | 'gpt-4.1'
+    | 'gpt-4.1-mini'
+    | 'gpt-4.1-nano'
+    | 'gpt-4.1-2025-04-14'
+    | 'gpt-4.1-mini-2025-04-14'
+    | 'gpt-4.1-nano-2025-04-14'
     | 'o3-mini'
     | 'o3-mini-2025-01-31'
     | 'o1'
