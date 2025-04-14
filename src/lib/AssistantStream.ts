@@ -721,6 +721,7 @@ export class AssistantStream
 
   #handleRun(this: AssistantStream, event: RunStreamEvent) {
     this.#currentRunSnapshot = event.data;
+
     switch (event.event) {
       case 'thread.run.created':
         break;
@@ -733,6 +734,7 @@ export class AssistantStream
       case 'thread.run.failed':
       case 'thread.run.completed':
       case 'thread.run.expired':
+      case 'thread.run.incomplete':
         this.#finalRun = event.data;
         if (this.#currentToolCall) {
           this._emit('toolCallDone', this.#currentToolCall);
