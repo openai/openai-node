@@ -1,6 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { type Agent, type RequestInit } from './_shims/index';
+import {  type Agent, type RequestInit } from './_shims/index';
 import * as qs from './internal/qs';
 import * as Core from './core';
 import * as Errors from './error';
@@ -84,7 +84,38 @@ import {
   Evals,
 } from './resources/evals/evals';
 import { FineTuning } from './resources/fine-tuning/fine-tuning';
-import { Responses } from './resources/responses/responses';
+import {
+  Response,
+  ComputerTool,
+  EasyInputMessage,
+  FileSearchTool,
+  FunctionTool,
+  ResponseCompletedEvent,
+  ResponseComputerToolCall,
+  ResponseCreateParams,
+  ResponseCreateParamsNonStreaming,
+  ResponseFunctionWebSearch,
+  ResponseFileSearchToolCall,
+  ResponseFunctionToolCall,
+  ResponseReasoningItem,
+  ResponseOutputItem,
+  ResponseOutputRefusal,
+  ResponseOutputText,
+  ResponseOutputMessage,
+  ResponseInput,
+  ResponseInputMessageContentList,
+  Responses,
+  ResponseStatus,
+  ResponseTextConfig,
+  ResponseUsage,
+  Tool,
+  ToolChoiceFunction,
+  ToolChoiceOptions,
+  ToolChoiceTypes,
+  WebSearchTool,
+  ResponseCreateParamsStreaming,
+  ResponseStreamEvent,
+} from './resources/responses/responses';
 import {
   Upload,
   UploadCompleteParams,
@@ -526,7 +557,39 @@ export declare namespace OpenAI {
     type UploadCompleteParams as UploadCompleteParams,
   };
 
-  export { Responses as Responses };
+  export {
+    Responses as Responses,
+    type Response as Response
+    type ResponseCreateParams as ResponseCreateParams,
+    type ResponseCreateParamsNonStreaming as ResponseCreateParamsNonStreaming,
+    type ResponseCreateParamsStreaming as ResponseCreateParamsStreaming,
+    type ResponseStatus as ResponseStatus,
+    type ResponseCompletedEvent as ResponseCompletedEvent,
+    type ResponseUsage as ResponseUsage,
+    type ResponseTextConfig as ResponseTextConfig,
+    type Tool as Tool,
+    type ComputerTool as ComputerTool,
+    type FileSearchTool as FileSearchTool,
+    type FunctionTool as FunctionTool,
+    type WebSearchTool as WebSearchTool,
+    type ToolChoiceOptions as ToolChoiceOptions,
+    type ToolChoiceFunction as ToolChoiceFunction,
+    type ToolChoiceTypes as ToolChoiceTypes,
+    type ResponseInput as ResponseInput,
+    type ResponseInputMessageContentList as ResponseInputMessageContentList,
+    type ResponseOutputMessage as ResponseOutputMessage,
+    type ResponseOutputText as ResponseOutputText,
+    type ResponseOutputRefusal as ResponseOutputRefusal,
+    type ResponseOutputItem as ResponseOutputItem,
+    type ResponseReasoningItem as ResponseReasoningItem,
+    type ResponseFunctionToolCall as ResponseFunctionToolCall,
+    type ResponseFileSearchToolCall as ResponseFileSearchToolCall,
+    type ResponseFunctionWebSearch as ResponseFunctionWebSearch,
+    type ResponseComputerToolCall as ResponseComputerToolCall,
+    type EasyInputMessage as EasyInputMessage,
+    type ResponseStreamEvent as ResponseStreamEvent,
+
+  };
 
   export {
     Evals as Evals,
