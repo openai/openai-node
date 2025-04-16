@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.95.0 (2025-04-16)
+
+Full Changelog: [v4.94.0...v4.95.0](https://github.com/openai/openai-node/compare/v4.94.0...v4.95.0)
+
+### Features
+
+* **api:** add o3 and o4-mini model IDs ([4845cd9](https://github.com/openai/openai-node/commit/4845cd9ac17450022f1632ae01397e41a97f1662))
+
 ## 4.94.0 (2025-04-14)
 
 Full Changelog: [v4.93.0...v4.94.0](https://github.com/openai/openai-node/compare/v4.93.0...v4.94.0)
