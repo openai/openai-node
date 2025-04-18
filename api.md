@@ -2,6 +2,7 @@
 
 Types:
 
+- <code><a href="./src/resources/shared.ts">AllModels</a></code>
 - <code><a href="./src/resources/shared.ts">ChatModel</a></code>
 - <code><a href="./src/resources/shared.ts">ComparisonFilter</a></code>
 - <code><a href="./src/resources/shared.ts">CompoundFilter</a></code>
@@ -14,6 +15,7 @@ Types:
 - <code><a href="./src/resources/shared.ts">ResponseFormatJSONObject</a></code>
 - <code><a href="./src/resources/shared.ts">ResponseFormatJSONSchema</a></code>
 - <code><a href="./src/resources/shared.ts">ResponseFormatText</a></code>
+- <code><a href="./src/resources/shared.ts">ResponsesModel</a></code>
 
 # Completions
 
@@ -140,7 +142,11 @@ Types:
 Types:
 
 - <code><a href="./src/resources/audio/transcriptions.ts">Transcription</a></code>
+- <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionInclude</a></code>
 - <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionSegment</a></code>
+- <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionStreamEvent</a></code>
+- <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionTextDeltaEvent</a></code>
+- <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionTextDoneEvent</a></code>
 - <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionVerbose</a></code>
 - <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionWord</a></code>
 - <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionCreateResponse</a></code>
@@ -229,6 +235,22 @@ Methods:
 
 - <code title="get /fine_tuning/jobs/{fine_tuning_job_id}/checkpoints">client.fineTuning.jobs.checkpoints.<a href="./src/resources/fine-tuning/jobs/checkpoints.ts">list</a>(fineTuningJobId, { ...params }) -> FineTuningJobCheckpointsPage</code>
 
+## Checkpoints
+
+### Permissions
+
+Types:
+
+- <code><a href="./src/resources/fine-tuning/checkpoints/permissions.ts">PermissionCreateResponse</a></code>
+- <code><a href="./src/resources/fine-tuning/checkpoints/permissions.ts">PermissionRetrieveResponse</a></code>
+- <code><a href="./src/resources/fine-tuning/checkpoints/permissions.ts">PermissionDeleteResponse</a></code>
+
+Methods:
+
+- <code title="post /fine_tuning/checkpoints/{fine_tuned_model_checkpoint}/permissions">client.fineTuning.checkpoints.permissions.<a href="./src/resources/fine-tuning/checkpoints/permissions.ts">create</a>(fineTunedModelCheckpoint, { ...params }) -> PermissionCreateResponsesPage</code>
+- <code title="get /fine_tuning/checkpoints/{fine_tuned_model_checkpoint}/permissions">client.fineTuning.checkpoints.permissions.<a href="./src/resources/fine-tuning/checkpoints/permissions.ts">retrieve</a>(fineTunedModelCheckpoint, { ...params }) -> PermissionRetrieveResponse</code>
+- <code title="delete /fine_tuning/checkpoints/{fine_tuned_model_checkpoint}/permissions">client.fineTuning.checkpoints.permissions.<a href="./src/resources/fine-tuning/checkpoints/permissions.ts">del</a>(fineTunedModelCheckpoint) -> PermissionDeleteResponse</code>
+
 # VectorStores
 
 Types:
@@ -304,7 +326,9 @@ Types:
 - <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItemDeleteEvent</a></code>
 - <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItemDeletedEvent</a></code>
 - <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItemInputAudioTranscriptionCompletedEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItemInputAudioTranscriptionDeltaEvent</a></code>
 - <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItemInputAudioTranscriptionFailedEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItemRetrieveEvent</a></code>
 - <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItemTruncateEvent</a></code>
 - <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItemTruncatedEvent</a></code>
 - <code><a href="./src/resources/beta/realtime/realtime.ts">ConversationItemWithReference</a></code>
@@ -341,6 +365,8 @@ Types:
 - <code><a href="./src/resources/beta/realtime/realtime.ts">SessionCreatedEvent</a></code>
 - <code><a href="./src/resources/beta/realtime/realtime.ts">SessionUpdateEvent</a></code>
 - <code><a href="./src/resources/beta/realtime/realtime.ts">SessionUpdatedEvent</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">TranscriptionSessionUpdate</a></code>
+- <code><a href="./src/resources/beta/realtime/realtime.ts">TranscriptionSessionUpdatedEvent</a></code>
 
 ### Sessions
 
@@ -352,6 +378,16 @@ Types:
 Methods:
 
 - <code title="post /realtime/sessions">client.beta.realtime.sessions.<a href="./src/resources/beta/realtime/sessions.ts">create</a>({ ...params }) -> SessionCreateResponse</code>
+
+### TranscriptionSessions
+
+Types:
+
+- <code><a href="./src/resources/beta/realtime/transcription-sessions.ts">TranscriptionSession</a></code>
+
+Methods:
+
+- <code title="post /realtime/transcription_sessions">client.beta.realtime.transcriptionSessions.<a href="./src/resources/beta/realtime/transcription-sessions.ts">create</a>({ ...params }) -> TranscriptionSession</code>
 
 ## Assistants
 
@@ -548,6 +584,8 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponseCodeInterpreterToolCall</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseCompletedEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseComputerToolCall</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseComputerToolCallOutputItem</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseComputerToolCallOutputScreenshot</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseContent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseContentPartAddedEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseContentPartDoneEvent</a></code>
@@ -564,6 +602,8 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponseFunctionCallArgumentsDeltaEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseFunctionCallArgumentsDoneEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseFunctionToolCall</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseFunctionToolCallItem</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseFunctionToolCallOutputItem</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseFunctionWebSearch</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseInProgressEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseIncludable</a></code>
@@ -575,7 +615,9 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponseInputImage</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseInputItem</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseInputMessageContentList</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseInputMessageItem</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseInputText</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseItem</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseOutputAudio</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseOutputItem</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseOutputItemAddedEvent</a></code>
@@ -583,6 +625,7 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponseOutputMessage</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseOutputRefusal</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseOutputText</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseReasoningItem</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseRefusalDeltaEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseRefusalDoneEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseStatus</a></code>
@@ -615,4 +658,60 @@ Types:
 
 Methods:
 
-- <code title="get /responses/{response_id}/input_items">client.responses.inputItems.<a href="./src/resources/responses/input-items.ts">list</a>(responseId, { ...params }) -> ResponseItemListDataPage</code>
+- <code title="get /responses/{response_id}/input_items">client.responses.inputItems.<a href="./src/resources/responses/input-items.ts">list</a>(responseId, { ...params }) -> ResponseItemsPage</code>
+
+# Evals
+
+Types:
+
+- <code><a href="./src/resources/evals/evals.ts">EvalCustomDataSourceConfig</a></code>
+- <code><a href="./src/resources/evals/evals.ts">EvalLabelModelGrader</a></code>
+- <code><a href="./src/resources/evals/evals.ts">EvalStoredCompletionsDataSourceConfig</a></code>
+- <code><a href="./src/resources/evals/evals.ts">EvalStringCheckGrader</a></code>
+- <code><a href="./src/resources/evals/evals.ts">EvalTextSimilarityGrader</a></code>
+- <code><a href="./src/resources/evals/evals.ts">EvalCreateResponse</a></code>
+- <code><a href="./src/resources/evals/evals.ts">EvalRetrieveResponse</a></code>
+- <code><a href="./src/resources/evals/evals.ts">EvalUpdateResponse</a></code>
+- <code><a href="./src/resources/evals/evals.ts">EvalListResponse</a></code>
+- <code><a href="./src/resources/evals/evals.ts">EvalDeleteResponse</a></code>
+
+Methods:
+
+- <code title="post /evals">client.evals.<a href="./src/resources/evals/evals.ts">create</a>({ ...params }) -> EvalCreateResponse</code>
+- <code title="get /evals/{eval_id}">client.evals.<a href="./src/resources/evals/evals.ts">retrieve</a>(evalId) -> EvalRetrieveResponse</code>
+- <code title="post /evals/{eval_id}">client.evals.<a href="./src/resources/evals/evals.ts">update</a>(evalId, { ...params }) -> EvalUpdateResponse</code>
+- <code title="get /evals">client.evals.<a href="./src/resources/evals/evals.ts">list</a>({ ...params }) -> EvalListResponsesPage</code>
+- <code title="delete /evals/{eval_id}">client.evals.<a href="./src/resources/evals/evals.ts">del</a>(evalId) -> EvalDeleteResponse</code>
+
+## Runs
+
+Types:
+
+- <code><a href="./src/resources/evals/runs/runs.ts">CreateEvalCompletionsRunDataSource</a></code>
+- <code><a href="./src/resources/evals/runs/runs.ts">CreateEvalJSONLRunDataSource</a></code>
+- <code><a href="./src/resources/evals/runs/runs.ts">EvalAPIError</a></code>
+- <code><a href="./src/resources/evals/runs/runs.ts">RunCreateResponse</a></code>
+- <code><a href="./src/resources/evals/runs/runs.ts">RunRetrieveResponse</a></code>
+- <code><a href="./src/resources/evals/runs/runs.ts">RunListResponse</a></code>
+- <code><a href="./src/resources/evals/runs/runs.ts">RunDeleteResponse</a></code>
+- <code><a href="./src/resources/evals/runs/runs.ts">RunCancelResponse</a></code>
+
+Methods:
+
+- <code title="post /evals/{eval_id}/runs">client.evals.runs.<a href="./src/resources/evals/runs/runs.ts">create</a>(evalId, { ...params }) -> RunCreateResponse</code>
+- <code title="get /evals/{eval_id}/runs/{run_id}">client.evals.runs.<a href="./src/resources/evals/runs/runs.ts">retrieve</a>(evalId, runId) -> RunRetrieveResponse</code>
+- <code title="get /evals/{eval_id}/runs">client.evals.runs.<a href="./src/resources/evals/runs/runs.ts">list</a>(evalId, { ...params }) -> RunListResponsesPage</code>
+- <code title="delete /evals/{eval_id}/runs/{run_id}">client.evals.runs.<a href="./src/resources/evals/runs/runs.ts">del</a>(evalId, runId) -> RunDeleteResponse</code>
+- <code title="post /evals/{eval_id}/runs/{run_id}">client.evals.runs.<a href="./src/resources/evals/runs/runs.ts">cancel</a>(evalId, runId) -> RunCancelResponse</code>
+
+### OutputItems
+
+Types:
+
+- <code><a href="./src/resources/evals/runs/output-items.ts">OutputItemRetrieveResponse</a></code>
+- <code><a href="./src/resources/evals/runs/output-items.ts">OutputItemListResponse</a></code>
+
+Methods:
+
+- <code title="get /evals/{eval_id}/runs/{run_id}/output_items/{output_item_id}">client.evals.runs.outputItems.<a href="./src/resources/evals/runs/output-items.ts">retrieve</a>(evalId, runId, outputItemId) -> OutputItemRetrieveResponse</code>
+- <code title="get /evals/{eval_id}/runs/{run_id}/output_items">client.evals.runs.outputItems.<a href="./src/resources/evals/runs/output-items.ts">list</a>(evalId, runId, { ...params }) -> OutputItemListResponsesPage</code>

@@ -4,7 +4,7 @@ import {
   type ResponseCreateParamsBase,
   type ResponseCreateParamsStreaming,
   type ResponseStreamEvent,
-} from 'openai/resources/responses/responses';
+} from '../../resources/responses/responses';
 import * as Core from '../../core';
 import { APIUserAbortError, OpenAIError } from '../../error';
 import OpenAI from '../../index';

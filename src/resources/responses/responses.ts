@@ -9,12 +9,13 @@ import {
 import * as Core from '../../core';
 import { APIPromise, isRequestOptions } from '../../core';
 import { APIResource } from '../../resource';
-import { Stream } from '../../streaming';
 import * as Shared from '../shared';
 import * as InputItemsAPI from './input-items';
-import { InputItemListParams, InputItems, ResponseItemList, ResponseItemListDataPage } from './input-items';
+import { InputItemListParams, InputItems, ResponseItemList } from './input-items';
 import * as ResponsesAPI from './responses';
 import { ResponseStream, ResponseStreamParams } from '../../lib/responses/ResponseStream';
+import { CursorPage } from '../../pagination';
+import { Stream } from '../../streaming';
 
 export interface ParsedResponseOutputText<ParsedT> extends ResponseOutputText {
   parsed: ParsedT | null;
@@ -36,7 +37,7 @@ export type ParsedResponseOutputItem<ParsedT> =
   | ResponseFileSearchToolCall
   | ResponseFunctionWebSearch
   | ResponseComputerToolCall
-  | ResponseOutputItem.Reasoning;
+  | ResponseReasoningItem;
 
 export interface ParsedResponse<ParsedT> extends Response {
   output: Array<ParsedResponseOutputItem<ParsedT>>;
@@ -79,7 +80,7 @@ export class Responses extends APIResource {
         | APIPromise<Response>
         | APIPromise<Stream<ResponseStreamEvent>>
     )._thenUnwrap((rsp) => {
-      if ('type' in rsp && rsp.type === 'response') {
+      if ('object' in rsp && rsp.object === 'response') {
         addOutputText(rsp as Response);
       }
 
@@ -127,7 +128,7 @@ export class Responses extends APIResource {
   }
 
   /**
-   * Creates a chat completion stream
+   * Creates a model response stream
    */
   stream<Params extends ResponseStreamParams, ParsedT = ExtractParsedContentFromParams<Params>>(
     body: Params,
@@ -136,6 +137,8 @@ export class Responses extends APIResource {
     return ResponseStream.createResponse<ParsedT>(this._client, body, options);
   }
 }
+
+export class ResponseItemsPage extends CursorPage<ResponseItem> {}
 
 /**
  * A tool that controls a virtual computer. Learn more about the
@@ -302,8 +305,8 @@ export interface Response {
    * context.
    *
    * When using along with `previous_response_id`, the instructions from a previous
-   * response will be not be carried over to the next response. This makes it simple
-   * to swap out system (or developer) messages in new responses.
+   * response will not be carried over to the next response. This makes it simple to
+   * swap out system (or developer) messages in new responses.
    */
   instructions: string | null;
 
@@ -318,13 +321,13 @@ export interface Response {
   metadata: Shared.Metadata | null;
 
   /**
-   * Model ID used to generate the response, like `gpt-4o` or `o1`. OpenAI offers a
+   * Model ID used to generate the response, like `gpt-4o` or `o3`. OpenAI offers a
    * wide range of models with different capabilities, performance characteristics,
    * and price points. Refer to the
    * [model guide](https://platform.openai.com/docs/models) to browse and compare
    * available models.
    */
-  model: (string & {}) | Shared.ChatModel;
+  model: Shared.ResponsesModel;
 
   /**
    * The object type of this resource - always set to `response`.
@@ -410,6 +413,27 @@ export interface Response {
    * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
    */
   reasoning?: Shared.Reasoning | null;
+
+  /**
+   * Specifies the latency tier to use for processing the request. This parameter is
+   * relevant for customers subscribed to the scale tier service:
+   *
+   * - If set to 'auto', and the Project is Scale tier enabled, the system will
+   *   utilize scale tier credits until they are exhausted.
+   * - If set to 'auto', and the Project is not Scale tier enabled, the request will
+   *   be processed using the default service tier with a lower uptime SLA and no
+   *   latency guarentee.
+   * - If set to 'default', the request will be processed using the default service
+   *   tier with a lower uptime SLA and no latency guarentee.
+   * - If set to 'flex', the request will be processed with the Flex Processing
+   *   service tier.
+   *   [Learn more](https://platform.openai.com/docs/guides/flex-processing).
+   * - When not set, the default behavior is 'auto'.
+   *
+   * When this parameter is set, the response body will include the `service_tier`
+   * utilized.
+   */
+  service_tier?: 'auto' | 'default' | 'flex' | null;
 
   /**
    * The status of the response generation. One of `completed`, `failed`,
@@ -966,6 +990,83 @@ export namespace ResponseComputerToolCall {
   }
 }
 
+export interface ResponseComputerToolCallOutputItem {
+  /**
+   * The unique ID of the computer call tool output.
+   */
+  id: string;
+
+  /**
+   * The ID of the computer tool call that produced the output.
+   */
+  call_id: string;
+
+  /**
+   * A computer screenshot image used with the computer use tool.
+   */
+  output: ResponseComputerToolCallOutputScreenshot;
+
+  /**
+   * The type of the computer tool call output. Always `computer_call_output`.
+   */
+  type: 'computer_call_output';
+
+  /**
+   * The safety checks reported by the API that have been acknowledged by the
+   * developer.
+   */
+  acknowledged_safety_checks?: Array<ResponseComputerToolCallOutputItem.AcknowledgedSafetyCheck>;
+
+  /**
+   * The status of the message input. One of `in_progress`, `completed`, or
+   * `incomplete`. Populated when input items are returned via API.
+   */
+  status?: 'in_progress' | 'completed' | 'incomplete';
+}
+
+export namespace ResponseComputerToolCallOutputItem {
+  /**
+   * A pending safety check for the computer call.
+   */
+  export interface AcknowledgedSafetyCheck {
+    /**
+     * The ID of the pending safety check.
+     */
+    id: string;
+
+    /**
+     * The type of the pending safety check.
+     */
+    code: string;
+
+    /**
+     * Details about the pending safety check.
+     */
+    message: string;
+  }
+}
+
+/**
+ * A computer screenshot image used with the computer use tool.
+ */
+export interface ResponseComputerToolCallOutputScreenshot {
+  /**
+   * Specifies the event type. For a computer screenshot, this property is always set
+   * to `computer_screenshot`.
+   */
+  type: 'computer_screenshot';
+
+  /**
+   * The identifier of an uploaded file that contains the screenshot.
+   */
+  file_id?: string;
+
+  /**
+   * The URL of the screenshot image.
+   */
+  image_url?: string;
+}
+
 /**
  * Multi-modal input and output contents.
  */
@@ -1277,6 +1378,12 @@ export type ResponseFormatTextConfig =
  */
 export interface ResponseFormatTextJSONSchemaConfig {
   /**
+   * The name of the response format. Must be a-z, A-Z, 0-9, or contain underscores
+   * and dashes, with a maximum length of 64.
+   */
+  name: string;
+
+  /**
    * The schema for the response format, described as a JSON Schema object. Learn how
    * to build JSON schemas [here](https://json-schema.org/).
    */
@@ -1292,12 +1399,6 @@ export interface ResponseFormatTextJSONSchemaConfig {
    * how to respond in the format.
    */
   description?: string;
-
-  /**
-   * The name of the response format. Must be a-z, A-Z, 0-9, or contain underscores
-   * and dashes, with a maximum length of 64.
-   */
-  name?: string;
 
   /**
    * Whether to enable strict schema adherence when generating the output. If set to
@@ -1363,11 +1464,6 @@ export interface ResponseFunctionCallArgumentsDoneEvent {
  */
 export interface ResponseFunctionToolCall {
   /**
-   * The unique ID of the function tool call.
-   */
-  id: string;
-
-  /**
    * A JSON string of the arguments to pass to the function.
    */
   arguments: string;
@@ -1386,6 +1482,51 @@ export interface ResponseFunctionToolCall {
    * The type of the function tool call. Always `function_call`.
    */
   type: 'function_call';
+
+  /**
+   * The unique ID of the function tool call.
+   */
+  id?: string;
+
+  /**
+   * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
+   * Populated when items are returned via API.
+   */
+  status?: 'in_progress' | 'completed' | 'incomplete';
+}
+
+/**
+ * A tool call to run a function. See the
+ * [function calling guide](https://platform.openai.com/docs/guides/function-calling)
+ * for more information.
+ */
+export interface ResponseFunctionToolCallItem extends ResponseFunctionToolCall {
+  /**
+   * The unique ID of the function tool call.
+   */
+  id: string;
+}
+
+export interface ResponseFunctionToolCallOutputItem {
+  /**
+   * The unique ID of the function call tool output.
+   */
+  id: string;
+
+  /**
+   * The unique ID of the function tool call generated by the model.
+   */
+  call_id: string;
+
+  /**
+   * A JSON string of the output of the function tool call.
+   */
+  output: string;
+
+  /**
+   * The type of the function tool call output. Always `function_call_output`.
+   */
+  type: 'function_call_output';
 
   /**
    * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
@@ -1562,7 +1703,7 @@ export type ResponseInputItem =
   | ResponseFunctionWebSearch
   | ResponseFunctionToolCall
   | ResponseInputItem.FunctionCallOutput
-  | ResponseInputItem.Reasoning
+  | ResponseReasoningItem
   | ResponseInputItem.ItemReference;
 
 export namespace ResponseInputItem {
@@ -1607,7 +1748,7 @@ export namespace ResponseInputItem {
     /**
      * A computer screenshot image used with the computer use tool.
      */
-    output: ComputerCallOutput.Output;
+    output: ResponsesAPI.ResponseComputerToolCallOutputScreenshot;
 
     /**
      * The type of the computer tool call output. Always `computer_call_output`.
@@ -1633,27 +1774,6 @@ export namespace ResponseInputItem {
   }
 
   export namespace ComputerCallOutput {
-    /**
-     * A computer screenshot image used with the computer use tool.
-     */
-    export interface Output {
-      /**
-       * Specifies the event type. For a computer screenshot, this property is always set
-       * to `computer_screenshot`.
-       */
-      type: 'computer_screenshot';
-
-      /**
-       * The identifier of an uploaded file that contains the screenshot.
-       */
-      file_id?: string;
-
-      /**
-       * The URL of the screenshot image.
-       */
-      image_url?: string;
-    }
-
     /**
      * A pending safety check for the computer call.
      */
@@ -1708,47 +1828,6 @@ export namespace ResponseInputItem {
   }
 
   /**
-   * A description of the chain of thought used by a reasoning model while generating
-   * a response.
-   */
-  export interface Reasoning {
-    /**
-     * The unique identifier of the reasoning content.
-     */
-    id: string;
-
-    /**
-     * Reasoning text contents.
-     */
-    content: Array<Reasoning.Content>;
-
-    /**
-     * The type of the object. Always `reasoning`.
-     */
-    type: 'reasoning';
-
-    /**
-     * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
-     * Populated when items are returned via API.
-     */
-    status?: 'in_progress' | 'completed' | 'incomplete';
-  }
-
-  export namespace Reasoning {
-    export interface Content {
-      /**
-       * A short summary of the reasoning used by the model when generating the response.
-       */
-      text: string;
-
-      /**
-       * The type of the object. Always `text`.
-       */
-      type: 'reasoning_summary';
-    }
-  }
-
-  /**
    * An internal identifier for an item to reference.
    */
   export interface ItemReference {
@@ -1770,6 +1849,35 @@ export namespace ResponseInputItem {
  */
 export type ResponseInputMessageContentList = Array<ResponseInputContent>;
 
+export interface ResponseInputMessageItem {
+  /**
+   * The unique ID of the message input.
+   */
+  id: string;
+
+  /**
+   * A list of one or many input items to the model, containing different content
+   * types.
+   */
+  content: ResponseInputMessageContentList;
+
+  /**
+   * The role of the message input. One of `user`, `system`, or `developer`.
+   */
+  role: 'user' | 'system' | 'developer';
+
+  /**
+   * The status of item. One of `in_progress`, `completed`, or `incomplete`.
+   * Populated when items are returned via API.
+   */
+  status?: 'in_progress' | 'completed' | 'incomplete';
+
+  /**
+   * The type of the message input. Always set to `message`.
+   */
+  type?: 'message';
+}
+
 /**
  * A text input to the model.
  */
@@ -1784,6 +1892,19 @@ export interface ResponseInputText {
    */
   type: 'input_text';
 }
+
+/**
+ * Content item used to generate a response.
+ */
+export type ResponseItem =
+  | ResponseInputMessageItem
+  | ResponseOutputMessage
+  | ResponseFileSearchToolCall
+  | ResponseComputerToolCall
+  | ResponseComputerToolCallOutputItem
+  | ResponseFunctionWebSearch
+  | ResponseFunctionToolCallItem
+  | ResponseFunctionToolCallOutputItem;
 
 /**
  * An audio output from the model.
@@ -1814,50 +1935,7 @@ export type ResponseOutputItem =
   | ResponseFunctionToolCall
   | ResponseFunctionWebSearch
   | ResponseComputerToolCall
-  | ResponseOutputItem.Reasoning;
-
-export namespace ResponseOutputItem {
-  /**
-   * A description of the chain of thought used by a reasoning model while generating
-   * a response.
-   */
-  export interface Reasoning {
-    /**
-     * The unique identifier of the reasoning content.
-     */
-    id: string;
-
-    /**
-     * Reasoning text contents.
-     */
-    content: Array<Reasoning.Content>;
-
-    /**
-     * The type of the object. Always `reasoning`.
-     */
-    type: 'reasoning';
-
-    /**
-     * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
-     * Populated when items are returned via API.
-     */
-    status?: 'in_progress' | 'completed' | 'incomplete';
-  }
-
-  export namespace Reasoning {
-    export interface Content {
-      /**
-       * A short summary of the reasoning used by the model when generating the response.
-       */
-      text: string;
-
-      /**
-       * The type of the object. Always `text`.
-       */
-      type: 'reasoning_summary';
-    }
-  }
-}
+  | ResponseReasoningItem;
 
 /**
  * Emitted when a new output item is added.
@@ -2036,6 +2114,47 @@ export namespace ResponseOutputText {
      * The type of the file path. Always `file_path`.
      */
     type: 'file_path';
+  }
+}
+
+/**
+ * A description of the chain of thought used by a reasoning model while generating
+ * a response.
+ */
+export interface ResponseReasoningItem {
+  /**
+   * The unique identifier of the reasoning content.
+   */
+  id: string;
+
+  /**
+   * Reasoning text contents.
+   */
+  summary: Array<ResponseReasoningItem.Summary>;
+
+  /**
+   * The type of the object. Always `reasoning`.
+   */
+  type: 'reasoning';
+
+  /**
+   * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
+   * Populated when items are returned via API.
+   */
+  status?: 'in_progress' | 'completed' | 'incomplete';
+}
+
+export namespace ResponseReasoningItem {
+  export interface Summary {
+    /**
+     * A short summary of the reasoning used by the model when generating the response.
+     */
+    text: string;
+
+    /**
+     * The type of the object. Always `summary_text`.
+     */
+    type: 'summary_text';
   }
 }
 
@@ -2349,6 +2468,11 @@ export interface ResponseUsage {
   input_tokens: number;
 
   /**
+   * A detailed breakdown of the input tokens.
+   */
+  input_tokens_details: ResponseUsage.InputTokensDetails;
+
+  /**
    * The number of output tokens.
    */
   output_tokens: number;
@@ -2365,6 +2489,17 @@ export interface ResponseUsage {
 }
 
 export namespace ResponseUsage {
+  /**
+   * A detailed breakdown of the input tokens.
+   */
+  export interface InputTokensDetails {
+    /**
+     * The number of tokens that were retrieved from the cache.
+     * [More on prompt caching](https://platform.openai.com/docs/guides/prompt-caching).
+     */
+    cached_tokens: number;
+  }
+
   /**
    * A detailed breakdown of the output tokens.
    */
@@ -2559,13 +2694,13 @@ export interface ResponseCreateParamsBase {
   input: string | ResponseInput;
 
   /**
-   * Model ID used to generate the response, like `gpt-4o` or `o1`. OpenAI offers a
+   * Model ID used to generate the response, like `gpt-4o` or `o3`. OpenAI offers a
    * wide range of models with different capabilities, performance characteristics,
    * and price points. Refer to the
    * [model guide](https://platform.openai.com/docs/models) to browse and compare
    * available models.
    */
-  model: (string & {}) | Shared.ChatModel;
+  model: Shared.ResponsesModel;
 
   /**
    * Specify additional output data to include in the model response. Currently
@@ -2584,8 +2719,8 @@ export interface ResponseCreateParamsBase {
    * context.
    *
    * When using along with `previous_response_id`, the instructions from a previous
-   * response will be not be carried over to the next response. This makes it simple
-   * to swap out system (or developer) messages in new responses.
+   * response will not be carried over to the next response. This makes it simple to
+   * swap out system (or developer) messages in new responses.
    */
   instructions?: string | null;
 
@@ -2625,6 +2760,27 @@ export interface ResponseCreateParamsBase {
    * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
    */
   reasoning?: Shared.Reasoning | null;
+
+  /**
+   * Specifies the latency tier to use for processing the request. This parameter is
+   * relevant for customers subscribed to the scale tier service:
+   *
+   * - If set to 'auto', and the Project is Scale tier enabled, the system will
+   *   utilize scale tier credits until they are exhausted.
+   * - If set to 'auto', and the Project is not Scale tier enabled, the request will
+   *   be processed using the default service tier with a lower uptime SLA and no
+   *   latency guarentee.
+   * - If set to 'default', the request will be processed using the default service
+   *   tier with a lower uptime SLA and no latency guarentee.
+   * - If set to 'flex', the request will be processed with the Flex Processing
+   *   service tier.
+   *   [Learn more](https://platform.openai.com/docs/guides/flex-processing).
+   * - When not set, the default behavior is 'auto'.
+   *
+   * When this parameter is set, the response body will include the `service_tier`
+   * utilized.
+   */
+  service_tier?: 'auto' | 'default' | 'flex' | null;
 
   /**
    * Whether to store the generated model response for later retrieval via API.
@@ -2749,13 +2905,94 @@ export interface ResponseRetrieveParams {
 }
 
 Responses.InputItems = InputItems;
-Responses.ResponseItemListDataPage = ResponseItemListDataPage;
 
 export declare namespace Responses {
   export {
+    type ComputerTool as ComputerTool,
+    type EasyInputMessage as EasyInputMessage,
+    type FileSearchTool as FileSearchTool,
+    type FunctionTool as FunctionTool,
+    type Response as Response,
+    type ResponseAudioDeltaEvent as ResponseAudioDeltaEvent,
+    type ResponseAudioDoneEvent as ResponseAudioDoneEvent,
+    type ResponseAudioTranscriptDeltaEvent as ResponseAudioTranscriptDeltaEvent,
+    type ResponseAudioTranscriptDoneEvent as ResponseAudioTranscriptDoneEvent,
+    type ResponseCodeInterpreterCallCodeDeltaEvent as ResponseCodeInterpreterCallCodeDeltaEvent,
+    type ResponseCodeInterpreterCallCodeDoneEvent as ResponseCodeInterpreterCallCodeDoneEvent,
+    type ResponseCodeInterpreterCallCompletedEvent as ResponseCodeInterpreterCallCompletedEvent,
+    type ResponseCodeInterpreterCallInProgressEvent as ResponseCodeInterpreterCallInProgressEvent,
+    type ResponseCodeInterpreterCallInterpretingEvent as ResponseCodeInterpreterCallInterpretingEvent,
+    type ResponseCodeInterpreterToolCall as ResponseCodeInterpreterToolCall,
+    type ResponseCompletedEvent as ResponseCompletedEvent,
+    type ResponseComputerToolCall as ResponseComputerToolCall,
+    type ResponseComputerToolCallOutputItem as ResponseComputerToolCallOutputItem,
+    type ResponseComputerToolCallOutputScreenshot as ResponseComputerToolCallOutputScreenshot,
+    type ResponseContent as ResponseContent,
+    type ResponseContentPartAddedEvent as ResponseContentPartAddedEvent,
+    type ResponseContentPartDoneEvent as ResponseContentPartDoneEvent,
+    type ResponseCreatedEvent as ResponseCreatedEvent,
+    type ResponseError as ResponseError,
+    type ResponseErrorEvent as ResponseErrorEvent,
+    type ResponseFailedEvent as ResponseFailedEvent,
+    type ResponseFileSearchCallCompletedEvent as ResponseFileSearchCallCompletedEvent,
+    type ResponseFileSearchCallInProgressEvent as ResponseFileSearchCallInProgressEvent,
+    type ResponseFileSearchCallSearchingEvent as ResponseFileSearchCallSearchingEvent,
+    type ResponseFileSearchToolCall as ResponseFileSearchToolCall,
+    type ResponseFormatTextConfig as ResponseFormatTextConfig,
+    type ResponseFormatTextJSONSchemaConfig as ResponseFormatTextJSONSchemaConfig,
+    type ResponseFunctionCallArgumentsDeltaEvent as ResponseFunctionCallArgumentsDeltaEvent,
+    type ResponseFunctionCallArgumentsDoneEvent as ResponseFunctionCallArgumentsDoneEvent,
+    type ResponseFunctionToolCall as ResponseFunctionToolCall,
+    type ResponseFunctionToolCallItem as ResponseFunctionToolCallItem,
+    type ResponseFunctionToolCallOutputItem as ResponseFunctionToolCallOutputItem,
+    type ResponseFunctionWebSearch as ResponseFunctionWebSearch,
+    type ResponseInProgressEvent as ResponseInProgressEvent,
+    type ResponseIncludable as ResponseIncludable,
+    type ResponseIncompleteEvent as ResponseIncompleteEvent,
+    type ResponseInput as ResponseInput,
+    type ResponseInputAudio as ResponseInputAudio,
+    type ResponseInputContent as ResponseInputContent,
+    type ResponseInputFile as ResponseInputFile,
+    type ResponseInputImage as ResponseInputImage,
+    type ResponseInputItem as ResponseInputItem,
+    type ResponseInputMessageContentList as ResponseInputMessageContentList,
+    type ResponseInputMessageItem as ResponseInputMessageItem,
+    type ResponseInputText as ResponseInputText,
+    type ResponseItem as ResponseItem,
+    type ResponseOutputAudio as ResponseOutputAudio,
+    type ResponseOutputItem as ResponseOutputItem,
+    type ResponseOutputItemAddedEvent as ResponseOutputItemAddedEvent,
+    type ResponseOutputItemDoneEvent as ResponseOutputItemDoneEvent,
+    type ResponseOutputMessage as ResponseOutputMessage,
+    type ResponseOutputRefusal as ResponseOutputRefusal,
+    type ResponseOutputText as ResponseOutputText,
+    type ResponseReasoningItem as ResponseReasoningItem,
+    type ResponseRefusalDeltaEvent as ResponseRefusalDeltaEvent,
+    type ResponseRefusalDoneEvent as ResponseRefusalDoneEvent,
+    type ResponseStatus as ResponseStatus,
+    type ResponseStreamEvent as ResponseStreamEvent,
+    type ResponseTextAnnotationDeltaEvent as ResponseTextAnnotationDeltaEvent,
+    type ResponseTextConfig as ResponseTextConfig,
+    type ResponseTextDeltaEvent as ResponseTextDeltaEvent,
+    type ResponseTextDoneEvent as ResponseTextDoneEvent,
+    type ResponseUsage as ResponseUsage,
+    type ResponseWebSearchCallCompletedEvent as ResponseWebSearchCallCompletedEvent,
+    type ResponseWebSearchCallInProgressEvent as ResponseWebSearchCallInProgressEvent,
+    type ResponseWebSearchCallSearchingEvent as ResponseWebSearchCallSearchingEvent,
+    type Tool as Tool,
+    type ToolChoiceFunction as ToolChoiceFunction,
+    type ToolChoiceOptions as ToolChoiceOptions,
+    type ToolChoiceTypes as ToolChoiceTypes,
+    type WebSearchTool as WebSearchTool,
+    type ResponseCreateParams as ResponseCreateParams,
+    type ResponseCreateParamsNonStreaming as ResponseCreateParamsNonStreaming,
+    type ResponseCreateParamsStreaming as ResponseCreateParamsStreaming,
+    type ResponseRetrieveParams as ResponseRetrieveParams,
+  };
+
+  export {
     InputItems as InputItems,
     type ResponseItemList as ResponseItemList,
-    ResponseItemListDataPage as ResponseItemListDataPage,
     type InputItemListParams as InputItemListParams,
   };
 }

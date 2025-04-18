@@ -79,3 +79,5 @@ export function fileFromPath(path: string, options?: FileFromPathOptions): Promi
 export function fileFromPath(path: string, filename?: string, options?: FileFromPathOptions): Promise<File>;
 
 export function isFsReadStream(value: any): value is FsReadStream;
+
+export const init: () => void;

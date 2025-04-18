@@ -9,6 +9,7 @@ import * as ThreadsAPI from './threads/threads';
 import * as RunsAPI from './threads/runs/runs';
 import * as StepsAPI from './threads/runs/steps';
 import { CursorPage, type CursorPageParams } from '../../pagination';
+import { AssistantStream } from '../../lib/AssistantStream';
 
 export class Assistants extends APIResource {
   /**
@@ -1337,6 +1338,12 @@ export interface AssistantUpdateParams {
    */
   model?:
     | (string & {})
+    | 'gpt-4.1'
+    | 'gpt-4.1-mini'
+    | 'gpt-4.1-nano'
+    | 'gpt-4.1-2025-04-14'
+    | 'gpt-4.1-mini-2025-04-14'
+    | 'gpt-4.1-nano-2025-04-14'
     | 'o3-mini'
     | 'o3-mini-2025-01-31'
     | 'o1'
@@ -1511,4 +1518,6 @@ export declare namespace Assistants {
     type AssistantUpdateParams as AssistantUpdateParams,
     type AssistantListParams as AssistantListParams,
   };
+
+  export { AssistantStream };
 }

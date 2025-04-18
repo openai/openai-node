@@ -140,9 +140,25 @@ export interface ChatCompletion {
   object: 'chat.completion';
 
   /**
-   * The service tier used for processing the request.
+   * Specifies the latency tier to use for processing the request. This parameter is
+   * relevant for customers subscribed to the scale tier service:
+   *
+   * - If set to 'auto', and the Project is Scale tier enabled, the system will
+   *   utilize scale tier credits until they are exhausted.
+   * - If set to 'auto', and the Project is not Scale tier enabled, the request will
+   *   be processed using the default service tier with a lower uptime SLA and no
+   *   latency guarentee.
+   * - If set to 'default', the request will be processed using the default service
+   *   tier with a lower uptime SLA and no latency guarentee.
+   * - If set to 'flex', the request will be processed with the Flex Processing
+   *   service tier.
+   *   [Learn more](https://platform.openai.com/docs/guides/flex-processing).
+   * - When not set, the default behavior is 'auto'.
+   *
+   * When this parameter is set, the response body will include the `service_tier`
+   * utilized.
    */
-  service_tier?: 'scale' | 'default' | null;
+  service_tier?: 'auto' | 'default' | 'flex' | null;
 
   /**
    * This fingerprint represents the backend configuration that the model runs with.
@@ -319,13 +335,25 @@ export interface ChatCompletionAudioParam {
    * Specifies the output audio format. Must be one of `wav`, `mp3`, `flac`, `opus`,
    * or `pcm16`.
    */
-  format: 'wav' | 'mp3' | 'flac' | 'opus' | 'pcm16';
+  format: 'wav' | 'aac' | 'mp3' | 'flac' | 'opus' | 'pcm16';
 
   /**
    * The voice the model uses to respond. Supported voices are `alloy`, `ash`,
-   * `ballad`, `coral`, `echo`, `sage`, and `shimmer`.
+   * `ballad`, `coral`, `echo`, `fable`, `nova`, `onyx`, `sage`, and `shimmer`.
    */
-  voice: 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse';
+  voice:
+    | (string & {})
+    | 'alloy'
+    | 'ash'
+    | 'ballad'
+    | 'coral'
+    | 'echo'
+    | 'fable'
+    | 'onyx'
+    | 'nova'
+    | 'sage'
+    | 'shimmer'
+    | 'verse';
 }
 
 /**
@@ -363,9 +391,25 @@ export interface ChatCompletionChunk {
   object: 'chat.completion.chunk';
 
   /**
-   * The service tier used for processing the request.
+   * Specifies the latency tier to use for processing the request. This parameter is
+   * relevant for customers subscribed to the scale tier service:
+   *
+   * - If set to 'auto', and the Project is Scale tier enabled, the system will
+   *   utilize scale tier credits until they are exhausted.
+   * - If set to 'auto', and the Project is not Scale tier enabled, the request will
+   *   be processed using the default service tier with a lower uptime SLA and no
+   *   latency guarentee.
+   * - If set to 'default', the request will be processed using the default service
+   *   tier with a lower uptime SLA and no latency guarentee.
+   * - If set to 'flex', the request will be processed with the Flex Processing
+   *   service tier.
+   *   [Learn more](https://platform.openai.com/docs/guides/flex-processing).
+   * - When not set, the default behavior is 'auto'.
+   *
+   * When this parameter is set, the response body will include the `service_tier`
+   * utilized.
    */
-  service_tier?: 'scale' | 'default' | null;
+  service_tier?: 'auto' | 'default' | 'flex' | null;
 
   /**
    * This fingerprint represents the backend configuration that the model runs with.
@@ -377,8 +421,11 @@ export interface ChatCompletionChunk {
   /**
    * An optional field that will only be present when you set
    * `stream_options: {"include_usage": true}` in your request. When present, it
-   * contains a null value except for the last chunk which contains the token usage
-   * statistics for the entire request.
+   * contains a null value **except for the last chunk** which contains the token
+   * usage statistics for the entire request.
+   *
+   * **NOTE:** If the stream is interrupted or cancelled, you may not receive the
+   * final usage chunk which contains the total token usage for the request.
    */
   usage?: CompletionsAPI.CompletionUsage | null;
 }
@@ -551,7 +598,7 @@ export namespace ChatCompletionContentPart {
       /**
        * The name of the file, used when passing the file to the model as a string.
        */
-      file_name?: string;
+      filename?: string;
     }
   }
 }
@@ -930,8 +977,11 @@ export interface ChatCompletionStreamOptions {
   /**
    * If set, an additional chunk will be streamed before the `data: [DONE]` message.
    * The `usage` field on this chunk shows the token usage statistics for the entire
-   * request, and the `choices` field will always be an empty array. All other chunks
-   * will also include a `usage` field, but with a null value.
+   * request, and the `choices` field will always be an empty array.
+   *
+   * All other chunks will also include a `usage` field, but with a null value.
+   * **NOTE:** If the stream is interrupted, you may not receive the final usage
+   * chunk which contains the total token usage for the request.
    */
   include_usage?: boolean;
 }
@@ -1096,7 +1146,7 @@ export interface ChatCompletionCreateParamsBase {
   messages: Array<ChatCompletionMessageParam>;
 
   /**
-   * Model ID used to generate the response, like `gpt-4o` or `o1`. OpenAI offers a
+   * Model ID used to generate the response, like `gpt-4o` or `o3`. OpenAI offers a
    * wide range of models with different capabilities, performance characteristics,
    * and price points. Refer to the
    * [model guide](https://platform.openai.com/docs/models) to browse and compare
@@ -1176,7 +1226,7 @@ export interface ChatCompletionCreateParamsBase {
    *
    * This value is now deprecated in favor of `max_completion_tokens`, and is not
    * compatible with
-   * [o1 series models](https://platform.openai.com/docs/guides/reasoning).
+   * [o-series models](https://platform.openai.com/docs/guides/reasoning).
    */
   max_tokens?: number | null;
 
@@ -1278,14 +1328,19 @@ export interface ChatCompletionCreateParamsBase {
    *   latency guarentee.
    * - If set to 'default', the request will be processed using the default service
    *   tier with a lower uptime SLA and no latency guarentee.
+   * - If set to 'flex', the request will be processed with the Flex Processing
+   *   service tier.
+   *   [Learn more](https://platform.openai.com/docs/guides/flex-processing).
    * - When not set, the default behavior is 'auto'.
    *
    * When this parameter is set, the response body will include the `service_tier`
    * utilized.
    */
-  service_tier?: 'auto' | 'default' | null;
+  service_tier?: 'auto' | 'default' | 'flex' | null;
 
   /**
+   * Not supported with latest reasoning models `o3` and `o4-mini`.
+   *
    * Up to 4 sequences where the API will stop generating further tokens. The
    * returned text will not contain the stop sequence.
    */
