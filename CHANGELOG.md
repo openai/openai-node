@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.95.1 (2025-04-18)
+
+Full Changelog: [v4.95.0...v4.95.1](https://github.com/openai/openai-node/compare/v4.95.0...v4.95.1)
+
+### Bug Fixes
+
+* **zod:** warn on optional field usage ([#1469](https://github.com/openai/openai-node/issues/1469)) ([aea2d12](https://github.com/openai/openai-node/commit/aea2d123d200e6a7eae11e66583127270a8db8bf))
+
 ## 4.95.0 (2025-04-16)
 
 Full Changelog: [v4.94.0...v4.95.0](https://github.com/openai/openai-node/compare/v4.94.0...v4.95.0)
