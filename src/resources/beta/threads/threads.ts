@@ -1718,4 +1718,6 @@ export declare namespace Threads {
     type MessageUpdateParams as MessageUpdateParams,
     type MessageListParams as MessageListParams,
   };
+
+  export { AssistantStream };
 }

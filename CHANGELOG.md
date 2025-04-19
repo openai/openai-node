@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.95.2 (2025-04-19)
+
+Full Changelog: [v4.95.1...v4.95.2](https://github.com/openai/openai-node/compare/v4.95.1...v4.95.2)
+
+### Bug Fixes
+
+* **types:** export AssistantStream ([#1472](https://github.com/openai/openai-node/issues/1472)) ([626c844](https://github.com/openai/openai-node/commit/626c844a758a68ffbff48873d4773be2e3868952))
+
 ## 4.95.1 (2025-04-18)
 
 Full Changelog: [v4.95.0...v4.95.1](https://github.com/openai/openai-node/compare/v4.95.0...v4.95.1)
