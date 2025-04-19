@@ -2219,6 +2219,126 @@ export interface ResponseRefusalDoneEvent {
 }
 
 /**
+ * Emitted when a reasoning summary part is added.
+ */
+export interface ResponseReasoningSummaryPartAddedEvent {
+  /**
+   * The ID of the output item that the reasoning summary part was added to.
+   */
+  item_id: string;
+
+  /**
+   * The index of the output item that the reasoning summary part was added to.
+   */
+  output_index: number;
+
+  /**
+   * The index of the summary part that was added.
+   */
+  summary_index: number;
+
+  /**
+   * The part that was added.
+   */
+  part: ResponseReasoningItem.Summary;
+
+  /**
+   * The type of the event. Always `response.reasoning_summary_part.added`.
+   */
+  type: 'response.reasoning_summary_part.added';
+}
+
+/**
+ * Emitted when a reasoning summary part is done.
+ */
+export interface ResponseReasoningSummaryPartDoneEvent {
+  /**
+   * The ID of the output item that the reasoning summary part belongs to.
+   */
+  item_id: string;
+
+  /**
+   * The index of the output item that the reasoning summary part belongs to.
+   */
+  output_index: number;
+
+  /**
+   * The index of the summary part that is done.
+   */
+  summary_index: number;
+
+  /**
+   * The part that is done.
+   */
+  part: ResponseReasoningItem.Summary;
+
+  /**
+   * The type of the event. Always `response.reasoning_summary_part.done`.
+   */
+  type: 'response.reasoning_summary_part.done';
+}
+
+/**
+ * Emitted when there is a partial reasoning summary text delta.
+ */
+export interface ResponseReasoningSummaryTextDeltaEvent {
+  /**
+   * The ID of the output item that the reasoning summary text delta was added to.
+   */
+  item_id: string;
+
+  /**
+   * The index of the output item that the reasoning summary text delta was added to.
+   */
+  output_index: number;
+
+  /**
+   * The index of the summary that the delta was added to.
+   */
+  summary_index: number;
+
+  /**
+   * The delta text that was added.
+   */
+  delta: string;
+
+  /**
+   * The type of the event. Always `response.reasoning_summary_text.delta`.
+   */
+  type: 'response.reasoning_summary_text.delta';
+}
+
+/**
+ * Emitted when a reasoning summary text is finalized.
+ */
+export interface ResponseReasoningSummaryTextDoneEvent {
+  /**
+   * The ID of the output item that the reasoning summary text belongs to.
+   */
+  item_id: string;
+
+  /**
+   * The index of the output item that the reasoning summary text belongs to.
+   */
+  output_index: number;
+
+  /**
+   * The index of the summary that is finalized.
+   */
+  summary_index: number;
+
+  /**
+   * The finalized text.
+   */
+  text: string;
+
+  /**
+   * The type of the event. Always `response.reasoning_summary_text.done`.
+   */
+  type: 'response.reasoning_summary_text.done';
+}
+
+/**
  * The status of the response generation. One of `completed`, `failed`,
  * `in_progress`, or `incomplete`.
  */
@@ -2252,6 +2372,10 @@ export type ResponseStreamEvent =
   | ResponseIncompleteEvent
   | ResponseOutputItemAddedEvent
   | ResponseOutputItemDoneEvent
+  | ResponseReasoningSummaryPartAddedEvent
+  | ResponseReasoningSummaryPartDoneEvent
+  | ResponseReasoningSummaryTextDeltaEvent
+  | ResponseReasoningSummaryTextDoneEvent
   | ResponseRefusalDeltaEvent
   | ResponseRefusalDoneEvent
   | ResponseTextAnnotationDeltaEvent
@@ -2967,6 +3091,10 @@ export declare namespace Responses {
     type ResponseOutputRefusal as ResponseOutputRefusal,
     type ResponseOutputText as ResponseOutputText,
     type ResponseReasoningItem as ResponseReasoningItem,
+    type ResponseReasoningSummaryPartAddedEvent as ResponseReasoningSummaryPartAddedEvent,
+    type ResponseReasoningSummaryPartDoneEvent as ResponseReasoningSummaryPartDoneEvent,
+    type ResponseReasoningSummaryTextDeltaEvent as ResponseReasoningSummaryTextDeltaEvent,
+    type ResponseReasoningSummaryTextDoneEvent as ResponseReasoningSummaryTextDoneEvent,
     type ResponseRefusalDeltaEvent as ResponseRefusalDeltaEvent,
     type ResponseRefusalDoneEvent as ResponseRefusalDoneEvent,
     type ResponseStatus as ResponseStatus,
