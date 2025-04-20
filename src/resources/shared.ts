@@ -9,6 +9,16 @@ export type AllModels =
   | 'computer-use-preview-2025-03-11';
 
 export type ChatModel =
+  | 'gpt-4.1'
+  | 'gpt-4.1-mini'
+  | 'gpt-4.1-nano'
+  | 'gpt-4.1-2025-04-14'
+  | 'gpt-4.1-mini-2025-04-14'
+  | 'gpt-4.1-nano-2025-04-14'
+  | 'o4-mini'
+  | 'o4-mini-2025-04-16'
+  | 'o3'
+  | 'o3-2025-04-16'
   | 'o3-mini'
   | 'o3-mini-2025-01-31'
   | 'o1'
@@ -181,13 +191,20 @@ export interface Reasoning {
   effort?: ReasoningEffort | null;
 
   /**
-   * **computer_use_preview only**
+   * @deprecated **Deprecated:** use `summary` instead.
    *
    * A summary of the reasoning performed by the model. This can be useful for
-   * debugging and understanding the model's reasoning process. One of `concise` or
-   * `detailed`.
+   * debugging and understanding the model's reasoning process. One of `auto`,
+   * `concise`, or `detailed`.
    */
-  generate_summary?: 'concise' | 'detailed' | null;
+  generate_summary?: 'auto' | 'concise' | 'detailed' | null;
+
+  /**
+   * A summary of the reasoning performed by the model. This can be useful for
+   * debugging and understanding the model's reasoning process. One of `auto`,
+   * `concise`, or `detailed`.
+   */
+  summary?: 'auto' | 'concise' | 'detailed' | null;
 }
 
 /**

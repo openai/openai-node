@@ -321,7 +321,7 @@ export interface Response {
   metadata: Shared.Metadata | null;
 
   /**
-   * Model ID used to generate the response, like `gpt-4o` or `o1`. OpenAI offers a
+   * Model ID used to generate the response, like `gpt-4o` or `o3`. OpenAI offers a
    * wide range of models with different capabilities, performance characteristics,
    * and price points. Refer to the
    * [model guide](https://platform.openai.com/docs/models) to browse and compare
@@ -413,6 +413,27 @@ export interface Response {
    * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
    */
   reasoning?: Shared.Reasoning | null;
+
+  /**
+   * Specifies the latency tier to use for processing the request. This parameter is
+   * relevant for customers subscribed to the scale tier service:
+   *
+   * - If set to 'auto', and the Project is Scale tier enabled, the system will
+   *   utilize scale tier credits until they are exhausted.
+   * - If set to 'auto', and the Project is not Scale tier enabled, the request will
+   *   be processed using the default service tier with a lower uptime SLA and no
+   *   latency guarentee.
+   * - If set to 'default', the request will be processed using the default service
+   *   tier with a lower uptime SLA and no latency guarentee.
+   * - If set to 'flex', the request will be processed with the Flex Processing
+   *   service tier.
+   *   [Learn more](https://platform.openai.com/docs/guides/flex-processing).
+   * - When not set, the default behavior is 'auto'.
+   *
+   * When this parameter is set, the response body will include the `service_tier`
+   * utilized.
+   */
+  service_tier?: 'auto' | 'default' | 'flex' | null;
 
   /**
    * The status of the response generation. One of `completed`, `failed`,
@@ -2673,7 +2694,7 @@ export interface ResponseCreateParamsBase {
   input: string | ResponseInput;
 
   /**
-   * Model ID used to generate the response, like `gpt-4o` or `o1`. OpenAI offers a
+   * Model ID used to generate the response, like `gpt-4o` or `o3`. OpenAI offers a
    * wide range of models with different capabilities, performance characteristics,
    * and price points. Refer to the
    * [model guide](https://platform.openai.com/docs/models) to browse and compare
@@ -2739,6 +2760,27 @@ export interface ResponseCreateParamsBase {
    * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
    */
   reasoning?: Shared.Reasoning | null;
+
+  /**
+   * Specifies the latency tier to use for processing the request. This parameter is
+   * relevant for customers subscribed to the scale tier service:
+   *
+   * - If set to 'auto', and the Project is Scale tier enabled, the system will
+   *   utilize scale tier credits until they are exhausted.
+   * - If set to 'auto', and the Project is not Scale tier enabled, the request will
+   *   be processed using the default service tier with a lower uptime SLA and no
+   *   latency guarentee.
+   * - If set to 'default', the request will be processed using the default service
+   *   tier with a lower uptime SLA and no latency guarentee.
+   * - If set to 'flex', the request will be processed with the Flex Processing
+   *   service tier.
+   *   [Learn more](https://platform.openai.com/docs/guides/flex-processing).
+   * - When not set, the default behavior is 'auto'.
+   *
+   * When this parameter is set, the response body will include the `service_tier`
+   * utilized.
+   */
+  service_tier?: 'auto' | 'default' | 'flex' | null;
 
   /**
    * Whether to store the generated model response for later retrieval via API.
