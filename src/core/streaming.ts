@@ -43,7 +43,11 @@ export class Stream<Item> implements AsyncIterable<Item> {
             continue;
           }
 
-          if (sse.event === null || sse.event.startsWith('response.')) {
+          if (
+            sse.event === null ||
+            sse.event.startsWith('response.') ||
+            sse.event.startsWith('transcript.')
+          ) {
             let data;
 
             try {
