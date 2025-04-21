@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - main
+      - update-specs
   pull_request:
     branches:
       - main
