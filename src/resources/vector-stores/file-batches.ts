@@ -9,6 +9,9 @@ import { CursorPage, type CursorPageParams, PagePromise } from '../../core/pagin
 import { buildHeaders } from '../../internal/headers';
 import { RequestOptions } from '../../internal/request-options';
 import { path } from '../../internal/utils/path';
+import { allSettledWithThrow } from '../../lib/util';
+import { sleep } from '../../internal/utils/sleep';
+import { Uploadable } from '../../internal/uploads';
 
 export class FileBatches extends APIResource {
   /**

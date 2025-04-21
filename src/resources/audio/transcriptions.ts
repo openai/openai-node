@@ -285,7 +285,9 @@ export type TranscriptionCreateParams =
   | TranscriptionCreateParamsNonStreaming
   | TranscriptionCreateParamsStreaming;
 
-export interface TranscriptionCreateParamsBase {
+export interface TranscriptionCreateParamsBase<
+  ResponseFormat extends AudioAPI.AudioResponseFormat | undefined = AudioAPI.AudioResponseFormat | undefined,
+> {
   /**
    * The audio file object (not file name) to transcribe, in one of these formats:
    * flac, mp3, mp4, mpeg, mpga, m4a, ogg, wav, or webm.

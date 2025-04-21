@@ -11,7 +11,43 @@ import { Stream } from '../../core/streaming';
 import { buildHeaders } from '../../internal/headers';
 import { RequestOptions } from '../../internal/request-options';
 import { path } from '../../internal/utils/path';
+import {
+  type ExtractParsedContentFromParams,
+  parseResponse,
+  type ResponseCreateParamsWithTools,
+  addOutputText,
+} from '../../lib/ResponsesParser';
+import { ResponseStream, ResponseStreamParams } from '../../lib/responses/ResponseStream';
 
+export interface ParsedResponseOutputText<ParsedT> extends ResponseOutputText {
+  parsed: ParsedT | null;
+}
+
+export type ParsedContent<ParsedT> = ParsedResponseOutputText<ParsedT> | ResponseOutputRefusal;
+
+export interface ParsedResponseOutputMessage<ParsedT> extends ResponseOutputMessage {
+  content: ParsedContent<ParsedT>[];
+}
+
+export interface ParsedResponseFunctionToolCall extends ResponseFunctionToolCall {
+  parsed_arguments: any;
+}
+
+export type ParsedResponseOutputItem<ParsedT> =
+  | ParsedResponseOutputMessage<ParsedT>
+  | ParsedResponseFunctionToolCall
+  | ResponseFileSearchToolCall
+  | ResponseFunctionWebSearch
+  | ResponseComputerToolCall
+  | ResponseReasoningItem;
+
+export interface ParsedResponse<ParsedT> extends Response {
+  output: Array<ParsedResponseOutputItem<ParsedT>>;
+
+  output_parsed: ParsedT | null;
+}
+
+export type ResponseParseParams = ResponseCreateParamsNonStreaming;
 export class Responses extends APIResource {
   inputItems: InputItemsAPI.InputItems = new InputItemsAPI.InputItems(this._client);
 
@@ -41,9 +77,17 @@ export class Responses extends APIResource {
     body: ResponseCreateParams,
     options?: RequestOptions,
   ): APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>> {
-    return this._client.post('/responses', { body, ...options, stream: body.stream ?? false }) as
-      | APIPromise<Response>
-      | APIPromise<Stream<ResponseStreamEvent>>;
+    return (
+      this._client.post('/responses', { body, ...options, stream: body.stream ?? false }) as
+        | APIPromise<Response>
+        | APIPromise<Stream<ResponseStreamEvent>>
+    )._thenUnwrap((rsp) => {
+      if ('object' in rsp && rsp.object === 'response') {
+        addOutputText(rsp as Response);
+      }
+
+      return rsp;
+    }) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>;
   }
 
   /**
@@ -65,6 +109,25 @@ export class Responses extends APIResource {
       ...options,
       headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
     });
+  }
+
+  parse<Params extends ResponseCreateParamsWithTools, ParsedT = ExtractParsedContentFromParams<Params>>(
+    body: Params,
+    options?: RequestOptions,
+  ): APIPromise<ParsedResponse<ParsedT>> {
+    return this._client.responses
+      .create(body, options)
+      ._thenUnwrap((response) => parseResponse(response as Response, body));
+  }
+
+  /**
+   * Creates a chat completion stream
+   */
+  stream<Params extends ResponseStreamParams, ParsedT = ExtractParsedContentFromParams<Params>>(
+    body: Params,
+    options?: RequestOptions,
+  ): ResponseStream<ParsedT> {
+    return ResponseStream.createResponse<ParsedT>(this._client, body, options);
   }
 }
 
@@ -217,6 +280,8 @@ export interface Response {
    * Unix timestamp (in seconds) of when this Response was created.
    */
   created_at: number;
+
+  output_text: string;
 
   /**
    * An error object returned when the model fails to generate a Response.

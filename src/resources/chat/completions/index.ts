@@ -32,6 +32,7 @@ export {
   type ChatCompletionToolMessageParam,
   type ChatCompletionUserMessageParam,
   type ChatCompletionCreateParams,
+  type ChatCompletionCreateParamsBase,
   type ChatCompletionCreateParamsNonStreaming,
   type ChatCompletionCreateParamsStreaming,
   type ChatCompletionUpdateParams,

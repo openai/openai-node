@@ -14,6 +14,7 @@ import {
 } from '../resources/beta/chat/completions';
 import { ResponseFormatJSONSchema } from '../resources/shared';
 import { ContentFilterFinishReasonError, LengthFinishReasonError, OpenAIError } from '../error';
+import { type ResponseFormatTextJSONSchemaConfig } from '../resources/responses/responses';
 
 type AnyChatCompletionCreateParams =
   | ChatCompletionCreateParams
@@ -23,6 +24,33 @@ type AnyChatCompletionCreateParams =
 
 export type ExtractParsedContentFromParams<Params extends AnyChatCompletionCreateParams> =
   Params['response_format'] extends AutoParseableResponseFormat<infer P> ? P : null;
+
+export type AutoParseableTextFormat<ParsedT> = ResponseFormatTextJSONSchemaConfig & {
+  __output: ParsedT; // type-level only
+
+  $brand: 'auto-parseable-response-format';
+  $parseRaw(content: string): ParsedT;
+};
+
+export function makeParseableTextFormat<ParsedT>(
+  response_format: ResponseFormatTextJSONSchemaConfig,
+  parser: (content: string) => ParsedT,
+): AutoParseableTextFormat<ParsedT> {
+  const obj = { ...response_format };
+
+  Object.defineProperties(obj, {
+    $brand: {
+      value: 'auto-parseable-response-format',
+      enumerable: false,
+    },
+    $parseRaw: {
+      value: parser,
+      enumerable: false,
+    },
+  });
+
+  return obj as AutoParseableTextFormat<ParsedT>;
+}
 
 export type AutoParseableResponseFormat<ParsedT> = ResponseFormatJSONSchema & {
   __output: ParsedT; // type-level only
