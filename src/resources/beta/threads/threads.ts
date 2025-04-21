@@ -1381,4 +1381,5 @@ export declare namespace Threads {
     type MessageListParams as MessageListParams,
     type MessageDeleteParams as MessageDeleteParams,
   };
+  export type { AssistantStream };
 }

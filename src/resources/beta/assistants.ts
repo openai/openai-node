@@ -11,6 +11,7 @@ import { CursorPage, type CursorPageParams, PagePromise } from '../../core/pagin
 import { buildHeaders } from '../../internal/headers';
 import { RequestOptions } from '../../internal/request-options';
 import { path } from '../../internal/utils/path';
+import { AssistantStream } from '../../lib/AssistantStream';
 
 export class Assistants extends APIResource {
   /**
@@ -1505,4 +1506,6 @@ export declare namespace Assistants {
     type AssistantUpdateParams as AssistantUpdateParams,
     type AssistantListParams as AssistantListParams,
   };
+
+  export type { AssistantStream };
 }
