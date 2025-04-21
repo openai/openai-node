@@ -121,7 +121,7 @@ export class Responses extends APIResource {
   }
 
   /**
-   * Creates a chat completion stream
+   * Creates a model response stream
    */
   stream<Params extends ResponseStreamParams, ParsedT = ExtractParsedContentFromParams<Params>>(
     body: Params,
