@@ -31,4 +31,34 @@ describe('resource embeddings', () => {
       user: 'user-1234',
     });
   });
+
+  test('create: encoding_format: "float" should create float32 embeddings', async () => {
+    const response = await client.embeddings.create({
+      input: 'The quick brown fox jumped over the lazy dog',
+      model: 'text-embedding-3-small',
+    });
+
+    expect(response.data?.[0]?.embedding).toBeInstanceOf(Array);
+    expect(Number.isFinite(response.data?.[0]?.embedding[0])).toBe(true);
+  });
+
+  test('create: encoding_format: "base64" should create string embeddings', async () => {
+    const response = await client.embeddings.create({
+      input: 'The quick brown fox jumped over the lazy dog',
+      model: 'text-embedding-3-small',
+      encoding_format: 'base64',
+    });
+
+    expect(typeof response.data?.[0]?.embedding).toBe('string');
+  });
+
+  test('create: default encoding_format should create float32 embeddings', async () => {
+    const response = await client.embeddings.create({
+      input: 'The quick brown fox jumped over the lazy dog',
+      model: 'text-embedding-3-small',
+    });
+
+    expect(response.data?.[0]?.embedding).toBeInstanceOf(Array);
+    expect(Number.isFinite(response.data?.[0]?.embedding[0])).toBe(true);
+  });
 });

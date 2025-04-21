@@ -3,13 +3,43 @@
 import { APIResource } from '../core/resource';
 import { APIPromise } from '../core/api-promise';
 import { RequestOptions } from '../internal/request-options';
+import { fromBase64 } from '../internal/utils';
 
 export class Embeddings extends APIResource {
   /**
    * Creates an embedding vector representing the input text.
    */
   create(body: EmbeddingCreateParams, options?: RequestOptions): APIPromise<CreateEmbeddingResponse> {
-    return this._client.post('/embeddings', { body, ...options });
+    const response: APIPromise<CreateEmbeddingResponse> = this._client.post('/embeddings', {
+      body: {
+        ...body,
+        encoding_format: body.encoding_format ?? 'base64',
+      },
+      ...options,
+    });
+
+    // if the user specified an encoding_format, return the response as-is
+    if (body.encoding_format) {
+      return response;
+    }
+
+    // otherwise, decode the base64 embeddings
+    return (response as APIPromise<CreateEmbeddingResponse>)._thenUnwrap((response) => {
+      if (response && response.data) {
+        response.data.forEach((embeddingBase64Obj) => {
+          const embeddingBytes = fromBase64(embeddingBase64Obj.embedding as unknown as string);
+          embeddingBase64Obj.embedding = Array.from(
+            new Uint32Array(
+              embeddingBytes.buffer,
+              embeddingBytes.byteOffset,
+              embeddingBytes.byteLength / Uint32Array.BYTES_PER_ELEMENT,
+            ),
+          );
+        });
+      }
+
+      return response;
+    });
   }
 }
 
