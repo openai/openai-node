@@ -21,9 +21,7 @@ deno add jsr:@openai/openai
 npx jsr add @openai/openai
 ```
 
-These commands will make the module importable from the `@openai/openai` scope:
-
-You can also [import directly from JSR](https://jsr.io/docs/using-packages#importing-with-jsr-specifiers) without an install step if you're using the Deno JavaScript runtime:
+These commands will make the module importable from the `@openai/openai` scope. You can also [import directly from JSR](https://jsr.io/docs/using-packages#importing-with-jsr-specifiers) without an install step if you're using the Deno JavaScript runtime:
 
 ```ts
 import OpenAI from 'jsr:@openai/openai';
@@ -31,7 +29,9 @@ import OpenAI from 'jsr:@openai/openai';
 
 ## Usage
 
-The full API of this library can be found in [api.md file](api.md) along with many [code examples](https://github.com/openai/openai-node/tree/master/examples). The code below shows how to get started using the chat completions API.
+The full API of this library can be found in [api.md file](api.md) along with many [code examples](https://github.com/openai/openai-node/tree/master/examples).
+
+The primary API for interacting with OpenAI models is the [Responses API](https://platform.openai.com/docs/api-reference/responses). You can generate text from the model with the code below.
 
 <!-- prettier-ignore -->
 ```js
@@ -41,14 +41,33 @@ const client = new OpenAI({
   apiKey: process.env['OPENAI_API_KEY'], // This is the default and can be omitted
 });
 
-async function main() {
-  const chatCompletion = await client.chat.completions.create({
-    messages: [{ role: 'user', content: 'Say this is a test' }],
-    model: 'gpt-4o',
-  });
-}
+const response = await client.responses.create({
+  model: 'gpt-4o',
+  instructions: 'You are a coding assistant that talks like a pirate',
+  input: 'Are semicolons optional in JavaScript?',
+});
 
-main();
+console.log(response.output_text);
+```
+
+The previous standard (supported indefinitely) for generating text is the [Chat Completions API](https://platform.openai.com/docs/api-reference/chat). You can use that API to generate text from the model with the code below.
+
+```ts
+import OpenAI from 'openai';
+
+const client = new OpenAI({
+  apiKey: process.env['OPENAI_API_KEY'], // This is the default and can be omitted
+});
+
+const completion = await client.chat.completions.create({
+  model: 'gpt-4o',
+  messages: [
+    { role: 'developer', content: 'Talk like a pirate.' },
+    { role: 'user', content: 'Are semicolons optional in JavaScript?' },
+  ],
+});
+
+console.log(completion.choices[0].message.content);
 ```
 
 ## Streaming responses
@@ -58,237 +77,20 @@ We provide support for streaming responses using Server Sent Events (SSE).
 ```ts
 import OpenAI from 'openai';
 
-const client = new OpenAI();
-
-async function main() {
-  const stream = await client.chat.completions.create({
-    model: 'gpt-4o',
-    messages: [{ role: 'user', content: 'Say this is a test' }],
-    stream: true,
-  });
-  for await (const chunk of stream) {
-    process.stdout.write(chunk.choices[0]?.delta?.content || '');
-  }
-}
-
-main();
-```
-
-If you need to cancel a stream, you can `break` from the loop
-or call `stream.controller.abort()`.
-
-### Request & Response types
-
-This library includes TypeScript definitions for all request params and response fields. You may import and use them like so:
-
-<!-- prettier-ignore -->
-```ts
-import OpenAI from 'openai';
-
 const client = new OpenAI({
   apiKey: process.env['OPENAI_API_KEY'], // This is the default and can be omitted
 });
 
-async function main() {
-  const params: OpenAI.Chat.ChatCompletionCreateParams = {
-    messages: [{ role: 'user', content: 'Say this is a test' }],
-    model: 'gpt-4o',
-  };
-  const chatCompletion: OpenAI.Chat.ChatCompletion = await client.chat.completions.create(params);
-}
-
-main();
-```
-
-Documentation for each method, request param, and response field are available in docstrings and will appear on hover in most modern editors.
-
-> [!IMPORTANT]
-> Previous versions of this SDK used a `Configuration` class. See the [v3 to v4 migration guide](https://github.com/openai/openai-node/discussions/217).
-
-### Polling Helpers
-
-When interacting with the API some actions such as starting a Run and adding files to vector stores are asynchronous and take time to complete. The SDK includes
-helper functions which will poll the status until it reaches a terminal state and then return the resulting object.
-If an API method results in an action which could benefit from polling there will be a corresponding version of the
-method ending in 'AndPoll'.
-
-For instance to create a Run and poll until it reaches a terminal state you can run:
-
-```ts
-const run = await openai.beta.threads.runs.createAndPoll(thread.id, {
-  assistant_id: assistantId,
+const stream = await client.responses.create({
+  model: 'gpt-4o',
+  input: 'Say "Sheep sleep deep" ten times fast!',
+  stream: true,
 });
-```
 
-More information on the lifecycle of a Run can be found in the [Run Lifecycle Documentation](https://platform.openai.com/docs/assistants/deep-dive/run-lifecycle)
-
-### Bulk Upload Helpers
-
-When creating and interacting with vector stores, you can use the polling helpers to monitor the status of operations.
-For convenience, we also provide a bulk upload helper to allow you to simultaneously upload several files at once.
-
-```ts
-const fileList = [
-  createReadStream('/home/data/example.pdf'),
-  ...
-];
-
-const batch = await openai.vectorStores.fileBatches.uploadAndPoll(vectorStore.id, {files: fileList});
-```
-
-### Streaming Helpers
-
-The SDK also includes helpers to process streams and handle the incoming events.
-
-```ts
-const run = openai.beta.threads.runs
-  .stream(thread.id, {
-    assistant_id: assistant.id,
-  })
-  .on('textCreated', (text) => process.stdout.write('\nassistant > '))
-  .on('textDelta', (textDelta, snapshot) => process.stdout.write(textDelta.value))
-  .on('toolCallCreated', (toolCall) => process.stdout.write(`\nassistant > ${toolCall.type}\n\n`))
-  .on('toolCallDelta', (toolCallDelta, snapshot) => {
-    if (toolCallDelta.type === 'code_interpreter') {
-      if (toolCallDelta.code_interpreter.input) {
-        process.stdout.write(toolCallDelta.code_interpreter.input);
-      }
-      if (toolCallDelta.code_interpreter.outputs) {
-        process.stdout.write('\noutput >\n');
-        toolCallDelta.code_interpreter.outputs.forEach((output) => {
-          if (output.type === 'logs') {
-            process.stdout.write(`\n${output.logs}\n`);
-          }
-        });
-      }
-    }
-  });
-```
-
-More information on streaming helpers can be found in the dedicated documentation: [helpers.md](helpers.md)
-
-### Streaming responses
-
-This library provides several conveniences for streaming chat completions, for example:
-
-```ts
-import OpenAI from 'openai';
-
-const openai = new OpenAI();
-
-async function main() {
-  const stream = await openai.beta.chat.completions.stream({
-    model: 'gpt-4o',
-    messages: [{ role: 'user', content: 'Say this is a test' }],
-    stream: true,
-  });
-
-  stream.on('content', (delta, snapshot) => {
-    process.stdout.write(delta);
-  });
-
-  // or, equivalently:
-  for await (const chunk of stream) {
-    process.stdout.write(chunk.choices[0]?.delta?.content || '');
-  }
-
-  const chatCompletion = await stream.finalChatCompletion();
-  console.log(chatCompletion); // {id: "…", choices: […], …}
+for await (const event of stream) {
+  console.log(event);
 }
-
-main();
 ```
-
-Streaming with `openai.beta.chat.completions.stream({…})` exposes
-[various helpers for your convenience](helpers.md#chat-events) including event handlers and promises.
-
-Alternatively, you can use `openai.chat.completions.create({ stream: true, … })`
-which only returns an async iterable of the chunks in the stream and thus uses less memory
-(it does not build up a final chat completion object for you).
-
-If you need to cancel a stream, you can `break` from a `for await` loop or call `stream.abort()`.
-
-### Automated function calls
-
-We provide the `openai.beta.chat.completions.runTools({…})`
-convenience helper for using function tool calls with the `/chat/completions` endpoint
-which automatically call the JavaScript functions you provide
-and sends their results back to the `/chat/completions` endpoint,
-looping as long as the model requests tool calls.
-
-If you pass a `parse` function, it will automatically parse the `arguments` for you
-and returns any parsing errors to the model to attempt auto-recovery.
-Otherwise, the args will be passed to the function you provide as a string.
-
-If you pass `tool_choice: {function: {name: …}}` instead of `auto`,
-it returns immediately after calling that function (and only loops to auto-recover parsing errors).
-
-```ts
-import OpenAI from 'openai';
-
-const client = new OpenAI();
-
-async function main() {
-  const runner = client.beta.chat.completions
-    .runTools({
-      model: 'gpt-4o',
-      messages: [{ role: 'user', content: 'How is the weather this week?' }],
-      tools: [
-        {
-          type: 'function',
-          function: {
-            function: getCurrentLocation,
-            parameters: { type: 'object', properties: {} },
-          },
-        },
-        {
-          type: 'function',
-          function: {
-            function: getWeather,
-            parse: JSON.parse, // or use a validation library like zod for typesafe parsing.
-            parameters: {
-              type: 'object',
-              properties: {
-                location: { type: 'string' },
-              },
-            },
-          },
-        },
-      ],
-    })
-    .on('message', (message) => console.log(message));
-
-  const finalContent = await runner.finalContent();
-  console.log();
-  console.log('Final content:', finalContent);
-}
-
-async function getCurrentLocation() {
-  return 'Boston'; // Simulate lookup
-}
-
-async function getWeather(args: { location: string }) {
-  const { location } = args;
-  // … do lookup …
-  return { temperature, precipitation };
-}
-
-main();
-
-// {role: "user",      content: "How's the weather this week?"}
-// {role: "assistant", tool_calls: [{type: "function", function: {name: "getCurrentLocation", arguments: "{}"}, id: "123"}
-// {role: "tool",      name: "getCurrentLocation", content: "Boston", tool_call_id: "123"}
-// {role: "assistant", tool_calls: [{type: "function", function: {name: "getWeather", arguments: '{"location": "Boston"}'}, id: "1234"}]}
-// {role: "tool",      name: "getWeather", content: '{"temperature": "50degF", "preciptation": "high"}', tool_call_id: "1234"}
-// {role: "assistant", content: "It's looking cold and rainy - you might want to wear a jacket!"}
-//
-// Final content: "It's looking cold and rainy - you might want to wear a jacket!"
-```
-
-Like with `.stream()`, we provide a variety of [helpers and events](helpers.md#chat-events).
-
-Read more about various examples such as with integrating with [zod](helpers.md#integrate-with-zod),
-[next.js](helpers.md#integrate-with-nextjs), and [proxying a stream to the browser](helpers.md#proxy-streaming-to-a-browser).
 
 ## File uploads
 
@@ -370,17 +172,20 @@ Error codes are as followed:
 All object responses in the SDK provide a `_request_id` property which is added from the `x-request-id` response header so that you can quickly log failing requests and report them back to OpenAI.
 
 ```ts
-const completion = await client.chat.completions.create({ messages: [{ role: 'user', content: 'Say this is a test' }], model: 'gpt-4o' });
-console.log(completion._request_id) // req_123
+const completion = await client.responses.create({
+  model: 'gpt-4o',
+  input: 'Say this is a test',
+});
+console.log(completion._request_id); // req_123
 ```
 
 You can also access the Request ID using the `.withResponse()` method:
 
 ```ts
-const { data: stream, request_id } = await openai.chat.completions
+const { data: stream, request_id } = await openai.responses
   .create({
-    model: 'gpt-4',
-    messages: [{ role: 'user', content: 'Say this is a test' }],
+    model: 'gpt-4o',
+    input: 'Say this is a test',
     stream: true,
   })
   .withResponse();
@@ -427,7 +232,7 @@ const result = await openai.chat.completions.create({
 console.log(result.choices[0]!.message?.content);
 ```
 
-### Retries
+## Retries
 
 Certain errors will be automatically retried 2 times by default, with a short exponential backoff.
 Connection errors (for example, due to a network connectivity problem), 408 Request Timeout, 409 Conflict,
@@ -443,12 +248,12 @@ const client = new OpenAI({
 });
 
 // Or, configure per-request:
-await client.chat.completions.create({ messages: [{ role: 'user', content: 'How can I get the name of the current day in JavaScript?' }], model: 'gpt-4o' }, {
+await client.responses.create({ model: 'gpt-4o', input: 'How can I get the name of the current day in JavaScript?' }, {
   maxRetries: 5,
 });
 ```
 
-### Timeouts
+## Timeouts
 
 Requests time out after 10 minutes by default. You can configure this with a `timeout` option:
 
@@ -460,7 +265,7 @@ const client = new OpenAI({
 });
 
 // Override per-request:
-await client.chat.completions.create({ messages: [{ role: 'user', content: 'How can I list all files in a directory using Python?' }], model: 'gpt-4o' }, {
+await client.responses.create({ model: 'gpt-4o', input: 'How can I list all files in a directory using Python?' }, {
   timeout: 5 * 1000,
 });
 ```
@@ -514,17 +319,17 @@ Unlike `.asResponse()` this method consumes the body, returning once it is parse
 ```ts
 const client = new OpenAI();
 
-const response = await client.chat.completions
-  .create({ messages: [{ role: 'user', content: 'Say this is a test' }], model: 'gpt-4o' })
+const response = await client.responses
+  .create({ model: 'gpt-4o', input: 'say this is a test.' })
   .asResponse();
 console.log(response.headers.get('X-My-Header'));
 console.log(response.statusText); // access the underlying Response object
 
-const { data: chatCompletion, response: raw } = await client.chat.completions
-  .create({ messages: [{ role: 'user', content: 'Say this is a test' }], model: 'gpt-4o' })
+const { data, response: raw } = await client.responses
+  .create({ model: 'gpt-4o', input: 'say this is a test.' })
   .withResponse();
 console.log(raw.headers.get('X-My-Header'));
-console.log(chatCompletion);
+console.log(data);
 ```
 
 ### Logging
