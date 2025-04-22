@@ -22,15 +22,17 @@ export const toBase64 = (data: string | Uint8Array | null | undefined): string =
 
 export const fromBase64 = (str: string): Uint8Array => {
   if (typeof (globalThis as any).Buffer !== 'undefined') {
-    return new Uint8Array((globalThis as any).Buffer.from(str, 'base64'));
+    const buf = (globalThis as any).Buffer.from(str, 'base64');
+    return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
   }
 
   if (typeof atob !== 'undefined') {
-    return new Uint8Array(
-      atob(str)
-        .split('')
-        .map((c) => c.charCodeAt(0)),
-    );
+    const bstr = atob(str);
+    const buf = new Uint8Array(bstr.length);
+    for (let i = 0; i < bstr.length; i++) {
+      buf[i] = bstr.charCodeAt(i);
+    }
+    return buf;
   }
 
   throw new OpenAIError('Cannot decode base64 string; Expected `Buffer` or `atob` to be defined');
