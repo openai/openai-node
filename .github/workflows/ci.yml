@@ -10,6 +10,7 @@ on:
 
 jobs:
   lint:
+    timeout-minutes: 10
     name: lint
     runs-on: ubuntu-latest
     steps:
@@ -27,6 +28,7 @@ jobs:
         run: ./scripts/lint
 
   build:
+    timeout-minutes: 5
     name: build
     runs-on: ubuntu-latest
     permissions:
@@ -61,6 +63,7 @@ jobs:
           SHA: ${{ github.sha }}
         run: ./scripts/utils/upload-artifact.sh
   test:
+    timeout-minutes: 10
     name: test
     runs-on: ubuntu-latest
     steps:
