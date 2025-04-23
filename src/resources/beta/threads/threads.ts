@@ -677,9 +677,7 @@ export interface ThreadCreateAndRunParamsBase {
    * Override the tools the assistant can use for this run. This is useful for
    * modifying the behavior on a per-run basis.
    */
-  tools?: Array<
-    AssistantsAPI.CodeInterpreterTool | AssistantsAPI.FileSearchTool | AssistantsAPI.FunctionTool
-  > | null;
+  tools?: Array<AssistantsAPI.AssistantTool> | null;
 
   /**
    * An alternative to sampling with temperature, called nucleus sampling, where the

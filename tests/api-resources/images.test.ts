@@ -53,6 +53,7 @@ describe('resource images', () => {
       mask: await toFile(Buffer.from('# my file contents'), 'README.md'),
       model: 'string',
       n: 1,
+      quality: 'high',
       response_format: 'url',
       size: '1024x1024',
       user: 'user-1234',
@@ -73,9 +74,13 @@ describe('resource images', () => {
   test('generate: required and optional params', async () => {
     const response = await client.images.generate({
       prompt: 'A cute baby sea otter',
+      background: 'transparent',
       model: 'string',
+      moderation: 'low',
       n: 1,
-      quality: 'standard',
+      output_compression: 100,
+      output_format: 'png',
+      quality: 'medium',
       response_format: 'url',
       size: '1024x1024',
       style: 'vivid',

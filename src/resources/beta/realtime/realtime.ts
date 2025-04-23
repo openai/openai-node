@@ -915,11 +915,33 @@ export type RealtimeClientEvent =
   | ConversationItemTruncateEvent
   | InputAudioBufferAppendEvent
   | InputAudioBufferClearEvent
+  | RealtimeClientEvent.OutputAudioBufferClear
   | InputAudioBufferCommitEvent
   | ResponseCancelEvent
   | ResponseCreateEvent
   | SessionUpdateEvent
   | TranscriptionSessionUpdate;
+
+export namespace RealtimeClientEvent {
+  /**
+   * **WebRTC Only:** Emit to cut off the current audio response. This will trigger
+   * the server to stop generating audio and emit a `output_audio_buffer.cleared`
+   * event. This event should be preceded by a `response.cancel` client event to stop
+   * the generation of the current response.
+   * [Learn more](https://platform.openai.com/docs/guides/realtime-model-capabilities#client-and-server-events-for-audio-in-webrtc).
+   */
+  export interface OutputAudioBufferClear {
+    /**
+     * The event type, must be `output_audio_buffer.clear`.
+     */
+    type: 'output_audio_buffer.clear';
+
+    /**
+     * The unique ID of the client event used for error handling.
+     */
+    event_id?: string;
+  }
+}
 
 /**
  * The response resource.
@@ -1174,7 +1196,10 @@ export type RealtimeServerEvent =
   | ResponseTextDoneEvent
   | SessionCreatedEvent
   | SessionUpdatedEvent
-  | TranscriptionSessionUpdatedEvent;
+  | TranscriptionSessionUpdatedEvent
+  | RealtimeServerEvent.OutputAudioBufferStarted
+  | RealtimeServerEvent.OutputAudioBufferStopped
+  | RealtimeServerEvent.OutputAudioBufferCleared;
 
 export namespace RealtimeServerEvent {
   /**
@@ -1196,6 +1221,77 @@ export namespace RealtimeServerEvent {
      * The event type, must be `conversation.item.retrieved`.
      */
     type: 'conversation.item.retrieved';
+  }
+
+  /**
+   * **WebRTC Only:** Emitted when the server begins streaming audio to the client.
+   * This event is emitted after an audio content part has been added
+   * (`response.content_part.added`) to the response.
+   * [Learn more](https://platform.openai.com/docs/guides/realtime-model-capabilities#client-and-server-events-for-audio-in-webrtc).
+   */
+  export interface OutputAudioBufferStarted {
+    /**
+     * The unique ID of the server event.
+     */
+    event_id: string;
+
+    /**
+     * The unique ID of the response that produced the audio.
+     */
+    response_id: string;
+
+    /**
+     * The event type, must be `output_audio_buffer.started`.
+     */
+    type: 'output_audio_buffer.started';
+  }
+
+  /**
+   * **WebRTC Only:** Emitted when the output audio buffer has been completely
+   * drained on the server, and no more audio is forthcoming. This event is emitted
+   * after the full response data has been sent to the client (`response.done`).
+   * [Learn more](https://platform.openai.com/docs/guides/realtime-model-capabilities#client-and-server-events-for-audio-in-webrtc).
+   */
+  export interface OutputAudioBufferStopped {
+    /**
+     * The unique ID of the server event.
+     */
+    event_id: string;
+
+    /**
+     * The unique ID of the response that produced the audio.
+     */
+    response_id: string;
+
+    /**
+     * The event type, must be `output_audio_buffer.stopped`.
+     */
+    type: 'output_audio_buffer.stopped';
+  }
+
+  /**
+   * **WebRTC Only:** Emitted when the output audio buffer is cleared. This happens
+   * either in VAD mode when the user has interrupted
+   * (`input_audio_buffer.speech_started`), or when the client has emitted the
+   * `output_audio_buffer.clear` event to manually cut off the current audio
+   * response.
+   * [Learn more](https://platform.openai.com/docs/guides/realtime-model-capabilities#client-and-server-events-for-audio-in-webrtc).
+   */
+  export interface OutputAudioBufferCleared {
+    /**
+     * The unique ID of the server event.
+     */
+    event_id: string;
+
+    /**
+     * The unique ID of the response that produced the audio.
+     */
+    response_id: string;
+
+    /**
+     * The event type, must be `output_audio_buffer.cleared`.
+     */
+    type: 'output_audio_buffer.cleared';
   }
 }
 
