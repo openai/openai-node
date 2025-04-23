@@ -51,11 +51,10 @@ describe('resource permissions', () => {
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
-  // OpenAPI spec is slightly incorrect
-  test.skip('delete', async () => {
-    const responsePromise = client.fineTuning.checkpoints.permissions.delete(
-      'ft:gpt-4o-mini-2024-07-18:org:weather:B7R9VjQd',
-    );
+  test('delete: only required params', async () => {
+    const responsePromise = client.fineTuning.checkpoints.permissions.delete('cp_zc4Q7MP6XxulcVzj4MZdwsAB', {
+      fine_tuned_model_checkpoint: 'ft:gpt-4o-mini-2024-07-18:org:weather:B7R9VjQd',
+    });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -63,5 +62,11 @@ describe('resource permissions', () => {
     const dataAndResponse = await responsePromise.withResponse();
     expect(dataAndResponse.data).toBe(response);
     expect(dataAndResponse.response).toBe(rawResponse);
+  });
+
+  test('delete: required and optional params', async () => {
+    const response = await client.fineTuning.checkpoints.permissions.delete('cp_zc4Q7MP6XxulcVzj4MZdwsAB', {
+      fine_tuned_model_checkpoint: 'ft:gpt-4o-mini-2024-07-18:org:weather:B7R9VjQd',
+    });
   });
 });

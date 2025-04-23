@@ -48,9 +48,14 @@ export class Permissions extends APIResource {
    * Organization owners can use this endpoint to delete a permission for a
    * fine-tuned model checkpoint.
    */
-  delete(fineTunedModelCheckpoint: string, options?: RequestOptions): APIPromise<PermissionDeleteResponse> {
+  delete(
+    permissionID: string,
+    params: PermissionDeleteParams,
+    options?: RequestOptions,
+  ): APIPromise<PermissionDeleteResponse> {
+    const { fine_tuned_model_checkpoint } = params;
     return this._client.delete(
-      path`/fine_tuning/checkpoints/${fineTunedModelCheckpoint}/permissions`,
+      path`/fine_tuning/checkpoints/${fine_tuned_model_checkpoint}/permissions/${permissionID}`,
       options,
     );
   }
@@ -171,6 +176,13 @@ export interface PermissionRetrieveParams {
   project_id?: string;
 }
 
+export interface PermissionDeleteParams {
+  /**
+   * The ID of the fine-tuned model checkpoint to delete a permission for.
+   */
+  fine_tuned_model_checkpoint: string;
+}
+
 export declare namespace Permissions {
   export {
     type PermissionCreateResponse as PermissionCreateResponse,
@@ -179,5 +191,6 @@ export declare namespace Permissions {
     type PermissionCreateResponsesPage as PermissionCreateResponsesPage,
     type PermissionCreateParams as PermissionCreateParams,
     type PermissionRetrieveParams as PermissionRetrieveParams,
+    type PermissionDeleteParams as PermissionDeleteParams,
   };
 }

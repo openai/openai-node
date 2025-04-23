@@ -6,6 +6,7 @@ import {
   PermissionCreateParams,
   PermissionCreateResponse,
   PermissionCreateResponsesPage,
+  PermissionDeleteParams,
   PermissionDeleteResponse,
   PermissionRetrieveParams,
   PermissionRetrieveResponse,
@@ -27,5 +28,6 @@ export declare namespace Checkpoints {
     type PermissionCreateResponsesPage as PermissionCreateResponsesPage,
     type PermissionCreateParams as PermissionCreateParams,
     type PermissionRetrieveParams as PermissionRetrieveParams,
+    type PermissionDeleteParams as PermissionDeleteParams,
   };
 }
