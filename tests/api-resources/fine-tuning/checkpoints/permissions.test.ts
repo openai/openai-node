@@ -61,10 +61,10 @@ describe('resource permissions', () => {
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
-  // OpenAPI spec is slightly incorrect
-  test.skip('del', async () => {
+  test('del', async () => {
     const responsePromise = client.fineTuning.checkpoints.permissions.del(
       'ft:gpt-4o-mini-2024-07-18:org:weather:B7R9VjQd',
+      'cp_zc4Q7MP6XxulcVzj4MZdwsAB',
     );
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
@@ -75,13 +75,14 @@ describe('resource permissions', () => {
     expect(dataAndResponse.response).toBe(rawResponse);
   });
 
-  // OpenAPI spec is slightly incorrect
-  test.skip('del: request options instead of params are passed correctly', async () => {
+  test('del: request options instead of params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      client.fineTuning.checkpoints.permissions.del('ft:gpt-4o-mini-2024-07-18:org:weather:B7R9VjQd', {
-        path: '/_stainless_unknown_path',
-      }),
+      client.fineTuning.checkpoints.permissions.del(
+        'ft:gpt-4o-mini-2024-07-18:org:weather:B7R9VjQd',
+        'cp_zc4Q7MP6XxulcVzj4MZdwsAB',
+        { path: '/_stainless_unknown_path' },
+      ),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 });
