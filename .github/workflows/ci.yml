@@ -12,7 +12,7 @@ jobs:
   lint:
     timeout-minutes: 10
     name: lint
-    runs-on: depot-ubuntu-24.04
+    runs-on: ${{ github.repository == 'stainless-sdks/openai-typescript' && 'depot-ubuntu-24.04' || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -30,7 +30,7 @@ jobs:
   build:
     timeout-minutes: 5
     name: build
-    runs-on: depot-ubuntu-24.04
+    runs-on: ${{ github.repository == 'stainless-sdks/openai-typescript' && 'depot-ubuntu-24.04' || 'ubuntu-latest' }}
     permissions:
       contents: read
       id-token: write
@@ -65,7 +65,7 @@ jobs:
   test:
     timeout-minutes: 10
     name: test
-    runs-on: depot-ubuntu-24.04
+    runs-on: ${{ github.repository == 'stainless-sdks/openai-typescript' && 'depot-ubuntu-24.04' || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -82,7 +82,7 @@ jobs:
 
   examples:
     name: examples
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.repository == 'stainless-sdks/openai-typescript' && 'depot-ubuntu-24.04' || 'ubuntu-latest' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -102,7 +102,7 @@ jobs:
 
   ecosystem_tests:
     name: ecosystem tests (v${{ matrix.node-version }})
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.repository == 'stainless-sdks/openai-typescript' && 'depot-ubuntu-24.04' || 'ubuntu-latest' }}
     if: github.repository == 'openai/openai-node'
     timeout-minutes: 20
     strategy:
