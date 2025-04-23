@@ -112,6 +112,7 @@ client.parents.children.retrieve('c_456', { parent_id: 'p_123' });
 
 <summary>This affects the following methods</summary>
 
+- `client.fineTuning.checkpoints.permissions.delete()`
 - `client.vectorStores.files.retrieve()`
 - `client.vectorStores.files.update()`
 - `client.vectorStores.files.delete()`

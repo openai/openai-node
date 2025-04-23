@@ -46,7 +46,6 @@ describe('resource evals', () => {
       ],
       metadata: { foo: 'string' },
       name: 'name',
-      share_with_openai: true,
     });
   });
 
