@@ -1,5 +1,23 @@
 # Changelog
 
+## 4.96.0 (2025-04-23)
+
+Full Changelog: [v4.95.1...v4.96.0](https://github.com/openai/openai-node/compare/v4.95.1...v4.96.0)
+
+### Features
+
+* **api:** adding new image model support ([a00d331](https://github.com/openai/openai-node/commit/a00d33190edd08df7d9c088c00ab7b77673f88ba))
+
+
+### Bug Fixes
+
+* **types:** export AssistantStream ([#1472](https://github.com/openai/openai-node/issues/1472)) ([626c844](https://github.com/openai/openai-node/commit/626c844a758a68ffbff48873d4773be2e3868952))
+
+
+### Chores
+
+* **ci:** add timeout thresholds for CI jobs ([e465063](https://github.com/openai/openai-node/commit/e46506351097f1de39c866c28b6ec20fa724fc36))
+
 ## 4.95.1 (2025-04-18)
 
 Full Changelog: [v4.95.0...v4.95.1](https://github.com/openai/openai-node/compare/v4.95.0...v4.95.1)

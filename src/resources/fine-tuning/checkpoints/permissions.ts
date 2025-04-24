@@ -61,9 +61,13 @@ export class Permissions extends APIResource {
    */
   del(
     fineTunedModelCheckpoint: string,
+    permissionId: string,
     options?: Core.RequestOptions,
   ): Core.APIPromise<PermissionDeleteResponse> {
-    return this._client.delete(`/fine_tuning/checkpoints/${fineTunedModelCheckpoint}/permissions`, options);
+    return this._client.delete(
+      `/fine_tuning/checkpoints/${fineTunedModelCheckpoint}/permissions/${permissionId}`,
+      options,
+    );
   }
 }
 

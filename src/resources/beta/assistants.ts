@@ -9,6 +9,7 @@ import * as ThreadsAPI from './threads/threads';
 import * as RunsAPI from './threads/runs/runs';
 import * as StepsAPI from './threads/runs/steps';
 import { CursorPage, type CursorPageParams } from '../../pagination';
+import { AssistantStream } from '../../lib/AssistantStream';
 
 export class Assistants extends APIResource {
   /**
@@ -1517,4 +1518,6 @@ export declare namespace Assistants {
     type AssistantUpdateParams as AssistantUpdateParams,
     type AssistantListParams as AssistantListParams,
   };
+
+  export { AssistantStream };
 }
