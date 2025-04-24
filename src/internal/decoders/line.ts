@@ -1,4 +1,4 @@
-import { OpenAIError } from '../../error';
+import { OpenAIError } from '../../core/error';
 
 export type Bytes = string | ArrayBuffer | Uint8Array | null | undefined;
 

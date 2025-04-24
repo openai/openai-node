@@ -1,10 +1,10 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../resource';
+import { APIResource } from '../../core/resource';
 import * as AudioAPI from './audio';
 import * as TranscriptionsAPI from './transcriptions';
-import { APIPromise } from '../../api-promise';
-import { type Uploadable } from '../../uploads';
+import { APIPromise } from '../../core/api-promise';
+import { type Uploadable } from '../../core/uploads';
 import { RequestOptions } from '../../internal/request-options';
 import { multipartFormRequestOptions } from '../../internal/uploads';
 
@@ -88,7 +88,7 @@ export interface TranslationCreateParams<
    * The format of the output, in one of these options: `json`, `text`, `srt`,
    * `verbose_json`, or `vtt`.
    */
-  response_format?: ResponseFormat;
+  response_format?: 'json' | 'text' | 'srt' | 'verbose_json' | 'vtt';
 
   /**
    * The sampling temperature, between 0 and 1. Higher values like 0.8 will make the

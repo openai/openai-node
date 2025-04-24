@@ -1,10 +1,10 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../resource';
+import { APIResource } from '../../core/resource';
 import * as FilesAPI from '../files';
 import * as PartsAPI from './parts';
 import { PartCreateParams, Parts, UploadPart } from './parts';
-import { APIPromise } from '../../api-promise';
+import { APIPromise } from '../../core/api-promise';
 import { RequestOptions } from '../../internal/request-options';
 import { path } from '../../internal/utils/path';
 
@@ -24,10 +24,9 @@ export class Uploads extends APIResource {
    * contains all the parts you uploaded. This File is usable in the rest of our
    * platform as a regular File object.
    *
-   * For certain `purpose`s, the correct `mime_type` must be specified. Please refer
-   * to documentation for the supported MIME types for your use case:
-   *
-   * - [Assistants](https://platform.openai.com/docs/assistants/tools/file-search#supported-files)
+   * For certain `purpose` values, the correct `mime_type` must be specified. Please
+   * refer to documentation for the
+   * [supported MIME types for your use case](https://platform.openai.com/docs/assistants/tools/file-search#supported-files).
    *
    * For guidance on the proper filename extensions for each purpose, please follow
    * the documentation on

@@ -1,15 +1,15 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../../resource';
+import { APIResource } from '../../../core/resource';
 import * as CompletionsAPI from './completions';
 import { ChatCompletionStoreMessagesPage } from './completions';
-import { CursorPage, type CursorPageParams, PagePromise } from '../../../pagination';
+import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pagination';
 import { RequestOptions } from '../../../internal/request-options';
 import { path } from '../../../internal/utils/path';
 
 export class Messages extends APIResource {
   /**
-   * Get the messages in a stored chat completion. Only chat completions that have
+   * Get the messages in a stored chat completion. Only Chat Completions that have
    * been created with the `store` parameter set to `true` will be returned.
    */
   list(

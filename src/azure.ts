@@ -3,7 +3,7 @@ import * as Errors from './error';
 import { FinalRequestOptions } from './internal/request-options';
 import { isObj, readEnv } from './internal/utils';
 import { ClientOptions, OpenAI } from './client';
-import { buildHeaders } from './internal/headers';
+import { buildHeaders, NullableHeaders } from './internal/headers';
 
 /** API Client for interfacing with the Azure OpenAI API. */
 export interface AzureClientOptions extends ClientOptions {
@@ -133,7 +133,10 @@ export class AzureOpenAI extends OpenAI {
       if (!isObj(options.body)) {
         throw new Error('Expected request body to be an object');
       }
-      const model = this.deploymentName || options.body['model'] || options.__metadata?.['model'];
+      const model =
+        this.deploymentName ||
+        (options.body instanceof FormData ? options.body.get('model') : options.body['model']) ||
+        options.__metadata?.['model'];
       if (model !== undefined && !this.baseURL.includes('/deployments')) {
         options.path = `/deployments/${model}${options.path}`;
       }
@@ -154,8 +157,8 @@ export class AzureOpenAI extends OpenAI {
     return undefined;
   }
 
-  protected override authHeaders(opts: FinalRequestOptions): Headers {
-    return new Headers();
+  protected override authHeaders(opts: FinalRequestOptions): NullableHeaders {
+    return buildHeaders([]);
   }
 
   protected override async prepareOptions(opts: FinalRequestOptions): Promise<void> {

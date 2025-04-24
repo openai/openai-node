@@ -1,15 +1,14 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../../resource';
+import { APIResource } from '../../../core/resource';
 import * as CompletionsCompletionsAPI from './completions';
 import * as CompletionsAPI from '../../completions';
 import * as Shared from '../../shared';
-import * as ChatAPI from '../chat';
 import * as MessagesAPI from './messages';
 import { MessageListParams, Messages } from './messages';
-import { APIPromise } from '../../../api-promise';
-import { CursorPage, type CursorPageParams, PagePromise } from '../../../pagination';
-import { Stream } from '../../../streaming';
+import { APIPromise } from '../../../core/api-promise';
+import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pagination';
+import { Stream } from '../../../core/streaming';
 import { RequestOptions } from '../../../internal/request-options';
 import { path } from '../../../internal/utils/path';
 
@@ -17,6 +16,13 @@ export class Completions extends APIResource {
   messages: MessagesAPI.Messages = new MessagesAPI.Messages(this._client);
 
   /**
+   * **Starting a new project?** We recommend trying
+   * [Responses](https://platform.openai.com/docs/api-reference/responses) to take
+   * advantage of the latest OpenAI platform features. Compare
+   * [Chat Completions with Responses](https://platform.openai.com/docs/guides/responses-vs-chat-completions?api-mode=responses).
+   *
+   * ---
+   *
    * Creates a model response for the given chat conversation. Learn more in the
    * [text generation](https://platform.openai.com/docs/guides/text-generation),
    * [vision](https://platform.openai.com/docs/guides/vision), and
@@ -47,7 +53,7 @@ export class Completions extends APIResource {
   }
 
   /**
-   * Get a stored chat completion. Only chat completions that have been created with
+   * Get a stored chat completion. Only Chat Completions that have been created with
    * the `store` parameter set to `true` will be returned.
    */
   retrieve(completionID: string, options?: RequestOptions): APIPromise<ChatCompletion> {
@@ -55,7 +61,7 @@ export class Completions extends APIResource {
   }
 
   /**
-   * Modify a stored chat completion. Only chat completions that have been created
+   * Modify a stored chat completion. Only Chat Completions that have been created
    * with the `store` parameter set to `true` can be modified. Currently, the only
    * supported modification is to update the `metadata` field.
    */
@@ -68,7 +74,7 @@ export class Completions extends APIResource {
   }
 
   /**
-   * List stored chat completions. Only chat completions that have been stored with
+   * List stored Chat Completions. Only Chat Completions that have been stored with
    * the `store` parameter set to `true` will be returned.
    */
   list(
@@ -79,7 +85,7 @@ export class Completions extends APIResource {
   }
 
   /**
-   * Delete a stored chat completion. Only chat completions that have been created
+   * Delete a stored chat completion. Only Chat Completions that have been created
    * with the `store` parameter set to `true` can be deleted.
    */
   delete(completionID: string, options?: RequestOptions): APIPromise<ChatCompletionDeleted> {
@@ -123,9 +129,25 @@ export interface ChatCompletion {
   object: 'chat.completion';
 
   /**
-   * The service tier used for processing the request.
+   * Specifies the latency tier to use for processing the request. This parameter is
+   * relevant for customers subscribed to the scale tier service:
+   *
+   * - If set to 'auto', and the Project is Scale tier enabled, the system will
+   *   utilize scale tier credits until they are exhausted.
+   * - If set to 'auto', and the Project is not Scale tier enabled, the request will
+   *   be processed using the default service tier with a lower uptime SLA and no
+   *   latency guarentee.
+   * - If set to 'default', the request will be processed using the default service
+   *   tier with a lower uptime SLA and no latency guarentee.
+   * - If set to 'flex', the request will be processed with the Flex Processing
+   *   service tier.
+   *   [Learn more](https://platform.openai.com/docs/guides/flex-processing).
+   * - When not set, the default behavior is 'auto'.
+   *
+   * When this parameter is set, the response body will include the `service_tier`
+   * utilized.
    */
-  service_tier?: 'scale' | 'default' | null;
+  service_tier?: 'auto' | 'default' | 'flex' | null;
 
   /**
    * This fingerprint represents the backend configuration that the model runs with.
@@ -302,19 +324,31 @@ export interface ChatCompletionAudioParam {
    * Specifies the output audio format. Must be one of `wav`, `mp3`, `flac`, `opus`,
    * or `pcm16`.
    */
-  format: 'wav' | 'mp3' | 'flac' | 'opus' | 'pcm16';
+  format: 'wav' | 'aac' | 'mp3' | 'flac' | 'opus' | 'pcm16';
 
   /**
-   * The voice the model uses to respond. Supported voices are `ash`, `ballad`,
-   * `coral`, `sage`, and `verse` (also supported but not recommended are `alloy`,
-   * `echo`, and `shimmer`; these voices are less expressive).
+   * The voice the model uses to respond. Supported voices are `alloy`, `ash`,
+   * `ballad`, `coral`, `echo`, `fable`, `nova`, `onyx`, `sage`, and `shimmer`.
    */
-  voice: 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse';
+  voice:
+    | (string & {})
+    | 'alloy'
+    | 'ash'
+    | 'ballad'
+    | 'coral'
+    | 'echo'
+    | 'fable'
+    | 'onyx'
+    | 'nova'
+    | 'sage'
+    | 'shimmer'
+    | 'verse';
 }
 
 /**
- * Represents a streamed chunk of a chat completion response returned by model,
+ * Represents a streamed chunk of a chat completion response returned by the model,
  * based on the provided input.
+ * [Learn more](https://platform.openai.com/docs/guides/streaming-responses).
  */
 export interface ChatCompletionChunk {
   /**
@@ -346,9 +380,25 @@ export interface ChatCompletionChunk {
   object: 'chat.completion.chunk';
 
   /**
-   * The service tier used for processing the request.
+   * Specifies the latency tier to use for processing the request. This parameter is
+   * relevant for customers subscribed to the scale tier service:
+   *
+   * - If set to 'auto', and the Project is Scale tier enabled, the system will
+   *   utilize scale tier credits until they are exhausted.
+   * - If set to 'auto', and the Project is not Scale tier enabled, the request will
+   *   be processed using the default service tier with a lower uptime SLA and no
+   *   latency guarentee.
+   * - If set to 'default', the request will be processed using the default service
+   *   tier with a lower uptime SLA and no latency guarentee.
+   * - If set to 'flex', the request will be processed with the Flex Processing
+   *   service tier.
+   *   [Learn more](https://platform.openai.com/docs/guides/flex-processing).
+   * - When not set, the default behavior is 'auto'.
+   *
+   * When this parameter is set, the response body will include the `service_tier`
+   * utilized.
    */
-  service_tier?: 'scale' | 'default' | null;
+  service_tier?: 'auto' | 'default' | 'flex' | null;
 
   /**
    * This fingerprint represents the backend configuration that the model runs with.
@@ -360,8 +410,11 @@ export interface ChatCompletionChunk {
   /**
    * An optional field that will only be present when you set
    * `stream_options: {"include_usage": true}` in your request. When present, it
-   * contains a null value except for the last chunk which contains the token usage
-   * statistics for the entire request.
+   * contains a null value **except for the last chunk** which contains the token
+   * usage statistics for the entire request.
+   *
+   * **NOTE:** If the stream is interrupted or cancelled, you may not receive the
+   * final usage chunk which contains the total token usage for the request.
    */
   usage?: CompletionsAPI.CompletionUsage | null;
 }
@@ -501,7 +554,43 @@ export namespace ChatCompletionChunk {
 export type ChatCompletionContentPart =
   | ChatCompletionContentPartText
   | ChatCompletionContentPartImage
-  | ChatCompletionContentPartInputAudio;
+  | ChatCompletionContentPartInputAudio
+  | ChatCompletionContentPart.File;
+
+export namespace ChatCompletionContentPart {
+  /**
+   * Learn about [file inputs](https://platform.openai.com/docs/guides/text) for text
+   * generation.
+   */
+  export interface File {
+    file: File.File;
+
+    /**
+     * The type of the content part. Always `file`.
+     */
+    type: 'file';
+  }
+
+  export namespace File {
+    export interface File {
+      /**
+       * The base64 encoded file data, used when passing the file to the model as a
+       * string.
+       */
+      file_data?: string;
+
+      /**
+       * The ID of an uploaded file to use as input.
+       */
+      file_id?: string;
+
+      /**
+       * The name of the file, used when passing the file to the model as a string.
+       */
+      filename?: string;
+    }
+  }
+}
 
 /**
  * Learn about [image inputs](https://platform.openai.com/docs/guides/vision).
@@ -675,6 +764,12 @@ export interface ChatCompletionMessage {
   role: 'assistant';
 
   /**
+   * Annotations for the message, when applicable, as when using the
+   * [web search tool](https://platform.openai.com/docs/guides/tools-web-search?api-mode=chat).
+   */
+  annotations?: Array<ChatCompletionMessage.Annotation>;
+
+  /**
    * If the audio output modality is requested, this object contains data about the
    * audio response from the model.
    * [Learn more](https://platform.openai.com/docs/guides/audio).
@@ -694,6 +789,48 @@ export interface ChatCompletionMessage {
 }
 
 export namespace ChatCompletionMessage {
+  /**
+   * A URL citation when using web search.
+   */
+  export interface Annotation {
+    /**
+     * The type of the URL citation. Always `url_citation`.
+     */
+    type: 'url_citation';
+
+    /**
+     * A URL citation when using web search.
+     */
+    url_citation: Annotation.URLCitation;
+  }
+
+  export namespace Annotation {
+    /**
+     * A URL citation when using web search.
+     */
+    export interface URLCitation {
+      /**
+       * The index of the last character of the URL citation in the message.
+       */
+      end_index: number;
+
+      /**
+       * The index of the first character of the URL citation in the message.
+       */
+      start_index: number;
+
+      /**
+       * The title of the web resource.
+       */
+      title: string;
+
+      /**
+       * The URL of the web resource.
+       */
+      url: string;
+    }
+  }
+
   /**
    * @deprecated Deprecated and replaced by `tool_calls`. The name and arguments of a
    * function that should be called, as generated by the model.
@@ -808,16 +945,6 @@ export interface ChatCompletionPredictionContent {
 }
 
 /**
- * **o1 and o3-mini models only**
- *
- * Constrains effort on reasoning for
- * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
- * supported values are `low`, `medium`, and `high`. Reducing reasoning effort can
- * result in faster responses and fewer tokens used on reasoning in a response.
- */
-export type ChatCompletionReasoningEffort = 'low' | 'medium' | 'high' | null;
-
-/**
  * The role of the author of a message
  */
 export type ChatCompletionRole = 'developer' | 'system' | 'user' | 'assistant' | 'tool' | 'function';
@@ -839,8 +966,11 @@ export interface ChatCompletionStreamOptions {
   /**
    * If set, an additional chunk will be streamed before the `data: [DONE]` message.
    * The `usage` field on this chunk shows the token usage statistics for the entire
-   * request, and the `choices` field will always be an empty array. All other chunks
-   * will also include a `usage` field, but with a null value.
+   * request, and the `choices` field will always be an empty array.
+   *
+   * All other chunks will also include a `usage` field, but with a null value.
+   * **NOTE:** If the stream is interrupted, you may not receive the final usage
+   * chunk which contains the total token usage for the request.
    */
   include_usage?: boolean;
 }
@@ -982,6 +1112,8 @@ export interface ChatCompletionUserMessageParam {
   name?: string;
 }
 
+export type ChatCompletionReasoningEffort = Shared.ReasoningEffort | null;
+
 export type ChatCompletionCreateParams =
   | ChatCompletionCreateParamsNonStreaming
   | ChatCompletionCreateParamsStreaming;
@@ -998,11 +1130,13 @@ export interface ChatCompletionCreateParamsBase {
   messages: Array<ChatCompletionMessageParam>;
 
   /**
-   * ID of the model to use. See the
-   * [model endpoint compatibility](https://platform.openai.com/docs/models#model-endpoint-compatibility)
-   * table for details on which models work with the Chat API.
+   * Model ID used to generate the response, like `gpt-4o` or `o3`. OpenAI offers a
+   * wide range of models with different capabilities, performance characteristics,
+   * and price points. Refer to the
+   * [model guide](https://platform.openai.com/docs/models) to browse and compare
+   * available models.
    */
-  model: (string & {}) | ChatAPI.ChatModel;
+  model: (string & {}) | Shared.ChatModel;
 
   /**
    * Parameters for audio output. Required when audio output is requested with
@@ -1076,7 +1210,7 @@ export interface ChatCompletionCreateParamsBase {
    *
    * This value is now deprecated in favor of `max_completion_tokens`, and is not
    * compatible with
-   * [o1 series models](https://platform.openai.com/docs/guides/reasoning).
+   * [o-series models](https://platform.openai.com/docs/guides/reasoning).
    */
   max_tokens?: number | null;
 
@@ -1091,8 +1225,8 @@ export interface ChatCompletionCreateParamsBase {
   metadata?: Shared.Metadata | null;
 
   /**
-   * Output types that you would like the model to generate for this request. Most
-   * models are capable of generating text, which is the default:
+   * Output types that you would like the model to generate. Most models are capable
+   * of generating text, which is the default:
    *
    * `["text"]`
    *
@@ -1102,7 +1236,7 @@ export interface ChatCompletionCreateParamsBase {
    *
    * `["text", "audio"]`
    */
-  modalities?: Array<ChatCompletionModality> | null;
+  modalities?: Array<'text' | 'audio'> | null;
 
   /**
    * How many chat completion choices to generate for each input message. Note that
@@ -1132,14 +1266,14 @@ export interface ChatCompletionCreateParamsBase {
   presence_penalty?: number | null;
 
   /**
-   * **o1 and o3-mini models only**
+   * **o-series models only**
    *
    * Constrains effort on reasoning for
    * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
    * supported values are `low`, `medium`, and `high`. Reducing reasoning effort can
    * result in faster responses and fewer tokens used on reasoning in a response.
    */
-  reasoning_effort?: ChatCompletionReasoningEffort | null;
+  reasoning_effort?: Shared.ReasoningEffort | null;
 
   /**
    * An object specifying the format that the model must output.
@@ -1149,21 +1283,14 @@ export interface ChatCompletionCreateParamsBase {
    * in the
    * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
    *
-   * Setting to `{ "type": "json_object" }` enables JSON mode, which ensures the
-   * message the model generates is valid JSON.
-   *
-   * **Important:** when using JSON mode, you **must** also instruct the model to
-   * produce JSON yourself via a system or user message. Without this, the model may
-   * generate an unending stream of whitespace until the generation reaches the token
-   * limit, resulting in a long-running and seemingly "stuck" request. Also note that
-   * the message content may be partially cut off if `finish_reason="length"`, which
-   * indicates the generation exceeded `max_tokens` or the conversation exceeded the
-   * max context length.
+   * Setting to `{ "type": "json_object" }` enables the older JSON mode, which
+   * ensures the message the model generates is valid JSON. Using `json_schema` is
+   * preferred for models that support it.
    */
   response_format?:
     | Shared.ResponseFormatText
-    | Shared.ResponseFormatJSONObject
-    | Shared.ResponseFormatJSONSchema;
+    | Shared.ResponseFormatJSONSchema
+    | Shared.ResponseFormatJSONObject;
 
   /**
    * This feature is in Beta. If specified, our system will make a best effort to
@@ -1182,15 +1309,24 @@ export interface ChatCompletionCreateParamsBase {
    *   utilize scale tier credits until they are exhausted.
    * - If set to 'auto', and the Project is not Scale tier enabled, the request will
    *   be processed using the default service tier with a lower uptime SLA and no
-   *   latency guarantee.
+   *   latency guarentee.
    * - If set to 'default', the request will be processed using the default service
-   *   tier with a lower uptime SLA and no latency guarantee.
+   *   tier with a lower uptime SLA and no latency guarentee.
+   * - If set to 'flex', the request will be processed with the Flex Processing
+   *   service tier.
+   *   [Learn more](https://platform.openai.com/docs/guides/flex-processing).
    * - When not set, the default behavior is 'auto'.
+   *
+   * When this parameter is set, the response body will include the `service_tier`
+   * utilized.
    */
-  service_tier?: 'auto' | 'default' | null;
+  service_tier?: 'auto' | 'default' | 'flex' | null;
 
   /**
-   * Up to 4 sequences where the API will stop generating further tokens.
+   * Not supported with latest reasoning models `o3` and `o4-mini`.
+   *
+   * Up to 4 sequences where the API will stop generating further tokens. The
+   * returned text will not contain the stop sequence.
    */
   stop?: string | null | Array<string>;
 
@@ -1202,12 +1338,14 @@ export interface ChatCompletionCreateParamsBase {
   store?: boolean | null;
 
   /**
-   * If set, partial message deltas will be sent, like in ChatGPT. Tokens will be
-   * sent as data-only
-   * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format)
-   * as they become available, with the stream terminated by a `data: [DONE]`
-   * message.
-   * [Example Python code](https://cookbook.openai.com/examples/how_to_stream_completions).
+   * If set to true, the model response data will be streamed to the client as it is
+   * generated using
+   * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
+   * See the
+   * [Streaming section below](https://platform.openai.com/docs/api-reference/chat/streaming)
+   * for more information, along with the
+   * [streaming responses](https://platform.openai.com/docs/guides/streaming-responses)
+   * guide for more information on how to handle the streaming events.
    */
   stream?: boolean | null;
 
@@ -1266,6 +1404,13 @@ export interface ChatCompletionCreateParamsBase {
    * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#end-user-ids).
    */
   user?: string;
+
+  /**
+   * This tool searches the web for relevant results to use in a response. Learn more
+   * about the
+   * [web search tool](https://platform.openai.com/docs/guides/tools-web-search?api-mode=chat).
+   */
+  web_search_options?: ChatCompletionCreateParams.WebSearchOptions;
 }
 
 export namespace ChatCompletionCreateParams {
@@ -1297,6 +1442,70 @@ export namespace ChatCompletionCreateParams {
     parameters?: Shared.FunctionParameters;
   }
 
+  /**
+   * This tool searches the web for relevant results to use in a response. Learn more
+   * about the
+   * [web search tool](https://platform.openai.com/docs/guides/tools-web-search?api-mode=chat).
+   */
+  export interface WebSearchOptions {
+    /**
+     * High level guidance for the amount of context window space to use for the
+     * search. One of `low`, `medium`, or `high`. `medium` is the default.
+     */
+    search_context_size?: 'low' | 'medium' | 'high';
+
+    /**
+     * Approximate location parameters for the search.
+     */
+    user_location?: WebSearchOptions.UserLocation | null;
+  }
+
+  export namespace WebSearchOptions {
+    /**
+     * Approximate location parameters for the search.
+     */
+    export interface UserLocation {
+      /**
+       * Approximate location parameters for the search.
+       */
+      approximate: UserLocation.Approximate;
+
+      /**
+       * The type of location approximation. Always `approximate`.
+       */
+      type: 'approximate';
+    }
+
+    export namespace UserLocation {
+      /**
+       * Approximate location parameters for the search.
+       */
+      export interface Approximate {
+        /**
+         * Free text input for the city of the user, e.g. `San Francisco`.
+         */
+        city?: string;
+
+        /**
+         * The two-letter [ISO country code](https://en.wikipedia.org/wiki/ISO_3166-1) of
+         * the user, e.g. `US`.
+         */
+        country?: string;
+
+        /**
+         * Free text input for the region of the user, e.g. `California`.
+         */
+        region?: string;
+
+        /**
+         * The [IANA timezone](https://timeapi.io/documentation/iana-timezones) of the
+         * user, e.g. `America/Los_Angeles`.
+         */
+        timezone?: string;
+      }
+    }
+  }
+
   export type ChatCompletionCreateParamsNonStreaming =
     CompletionsCompletionsAPI.ChatCompletionCreateParamsNonStreaming;
   export type ChatCompletionCreateParamsStreaming =
@@ -1305,24 +1514,28 @@ export namespace ChatCompletionCreateParams {
 
 export interface ChatCompletionCreateParamsNonStreaming extends ChatCompletionCreateParamsBase {
   /**
-   * If set, partial message deltas will be sent, like in ChatGPT. Tokens will be
-   * sent as data-only
-   * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format)
-   * as they become available, with the stream terminated by a `data: [DONE]`
-   * message.
-   * [Example Python code](https://cookbook.openai.com/examples/how_to_stream_completions).
+   * If set to true, the model response data will be streamed to the client as it is
+   * generated using
+   * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
+   * See the
+   * [Streaming section below](https://platform.openai.com/docs/api-reference/chat/streaming)
+   * for more information, along with the
+   * [streaming responses](https://platform.openai.com/docs/guides/streaming-responses)
+   * guide for more information on how to handle the streaming events.
    */
   stream?: false | null;
 }
 
 export interface ChatCompletionCreateParamsStreaming extends ChatCompletionCreateParamsBase {
   /**
-   * If set, partial message deltas will be sent, like in ChatGPT. Tokens will be
-   * sent as data-only
-   * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format)
-   * as they become available, with the stream terminated by a `data: [DONE]`
-   * message.
-   * [Example Python code](https://cookbook.openai.com/examples/how_to_stream_completions).
+   * If set to true, the model response data will be streamed to the client as it is
+   * generated using
+   * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
+   * See the
+   * [Streaming section below](https://platform.openai.com/docs/api-reference/chat/streaming)
+   * for more information, along with the
+   * [streaming responses](https://platform.openai.com/docs/guides/streaming-responses)
+   * guide for more information on how to handle the streaming events.
    */
   stream: true;
 }
@@ -1341,19 +1554,19 @@ export interface ChatCompletionUpdateParams {
 
 export interface ChatCompletionListParams extends CursorPageParams {
   /**
-   * A list of metadata keys to filter the chat completions by. Example:
+   * A list of metadata keys to filter the Chat Completions by. Example:
    *
    * `metadata[key1]=value1&metadata[key2]=value2`
    */
   metadata?: Shared.Metadata | null;
 
   /**
-   * The model used to generate the chat completions.
+   * The model used to generate the Chat Completions.
    */
   model?: string;
 
   /**
-   * Sort order for chat completions by timestamp. Use `asc` for ascending order or
+   * Sort order for Chat Completions by timestamp. Use `asc` for ascending order or
    * `desc` for descending order. Defaults to `asc`.
    */
   order?: 'asc' | 'desc';
@@ -1383,7 +1596,6 @@ export declare namespace Completions {
     type ChatCompletionModality as ChatCompletionModality,
     type ChatCompletionNamedToolChoice as ChatCompletionNamedToolChoice,
     type ChatCompletionPredictionContent as ChatCompletionPredictionContent,
-    type ChatCompletionReasoningEffort as ChatCompletionReasoningEffort,
     type ChatCompletionRole as ChatCompletionRole,
     type ChatCompletionStoreMessage as ChatCompletionStoreMessage,
     type ChatCompletionStreamOptions as ChatCompletionStreamOptions,
@@ -1393,6 +1605,7 @@ export declare namespace Completions {
     type ChatCompletionToolChoiceOption as ChatCompletionToolChoiceOption,
     type ChatCompletionToolMessageParam as ChatCompletionToolMessageParam,
     type ChatCompletionUserMessageParam as ChatCompletionUserMessageParam,
+    type ChatCompletionReasoningEffort as ChatCompletionReasoningEffort,
     type ChatCompletionsPage as ChatCompletionsPage,
     type ChatCompletionCreateParams as ChatCompletionCreateParams,
     type ChatCompletionCreateParamsNonStreaming as ChatCompletionCreateParamsNonStreaming,

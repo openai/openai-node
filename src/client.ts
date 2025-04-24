@@ -1,10 +1,12 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import type { RequestInit, RequestInfo, BodyInit } from './internal/builtin-types';
-import type { HTTPMethod, PromiseOrValue, MergedRequestInit } from './internal/types';
+import type { HTTPMethod, PromiseOrValue, MergedRequestInit, FinalizedRequestInit } from './internal/types';
 import { uuid4 } from './internal/utils/uuid';
-import { validatePositiveInteger, isAbsoluteURL, hasOwn } from './internal/utils/values';
+import { validatePositiveInteger, isAbsoluteURL, safeJSON } from './internal/utils/values';
 import { sleep } from './internal/utils/sleep';
+import { type Logger, type LogLevel, parseLogLevel } from './internal/utils/log';
+export type { Logger, LogLevel } from './internal/utils/log';
 import { castToError, isAbortError } from './internal/errors';
 import type { APIResponseProps } from './internal/parse';
 import { getPlatformHeaders } from './internal/detect-platform';
@@ -12,12 +14,12 @@ import * as Shims from './internal/shims';
 import * as Opts from './internal/request-options';
 import * as qs from './internal/qs';
 import { VERSION } from './version';
-import * as Errors from './error';
-import * as Pagination from './pagination';
-import { AbstractPage, type CursorPageParams, CursorPageResponse, PageResponse } from './pagination';
-import * as Uploads from './uploads';
+import * as Errors from './core/error';
+import * as Pagination from './core/pagination';
+import { AbstractPage, type CursorPageParams, CursorPageResponse, PageResponse } from './core/pagination';
+import * as Uploads from './core/uploads';
 import * as API from './resources/index';
-import { APIPromise } from './api-promise';
+import { APIPromise } from './core/api-promise';
 import { type Fetch } from './internal/builtin-types';
 import { isRunningInBrowser } from './internal/detect-platform';
 import { HeadersLike, NullableHeaders, buildHeaders } from './internal/headers';
@@ -82,14 +84,51 @@ import { formatRequestDetails, loggerFor } from './internal/utils/log';
 import { isEmptyObj } from './internal/utils/values';
 import { Audio, AudioModel, AudioResponseFormat } from './resources/audio/audio';
 import { Beta } from './resources/beta/beta';
-import { Chat, ChatModel } from './resources/chat/chat';
+import { Chat } from './resources/chat/chat';
+import {
+  EvalCreateParams,
+  EvalCreateResponse,
+  EvalCustomDataSourceConfig,
+  EvalDeleteResponse,
+  EvalLabelModelGrader,
+  EvalListParams,
+  EvalListResponse,
+  EvalListResponsesPage,
+  EvalRetrieveResponse,
+  EvalStoredCompletionsDataSourceConfig,
+  EvalStringCheckGrader,
+  EvalTextSimilarityGrader,
+  EvalUpdateParams,
+  EvalUpdateResponse,
+  Evals,
+} from './resources/evals/evals';
 import { FineTuning } from './resources/fine-tuning/fine-tuning';
+import { Responses } from './resources/responses/responses';
 import {
   Upload,
   UploadCompleteParams,
   UploadCreateParams,
   Uploads as UploadsAPIUploads,
 } from './resources/uploads/uploads';
+import {
+  AutoFileChunkingStrategyParam,
+  FileChunkingStrategy,
+  FileChunkingStrategyParam,
+  OtherFileChunkingStrategyObject,
+  StaticFileChunkingStrategy,
+  StaticFileChunkingStrategyObject,
+  StaticFileChunkingStrategyObjectParam,
+  VectorStore,
+  VectorStoreCreateParams,
+  VectorStoreDeleted,
+  VectorStoreListParams,
+  VectorStoreSearchParams,
+  VectorStoreSearchResponse,
+  VectorStoreSearchResponsesPage,
+  VectorStoreUpdateParams,
+  VectorStores,
+  VectorStoresPage,
+} from './resources/vector-stores/vector-stores';
 import {
   ChatCompletion,
   ChatCompletionAssistantMessageParam,
@@ -128,48 +167,6 @@ import {
   ChatCompletionUserMessageParam,
   ChatCompletionsPage,
 } from './resources/chat/completions/completions';
-
-const safeJSON = (text: string) => {
-  try {
-    return JSON.parse(text);
-  } catch (err) {
-    return undefined;
-  }
-};
-
-type LogFn = (message: string, ...rest: unknown[]) => void;
-export type Logger = {
-  error: LogFn;
-  warn: LogFn;
-  info: LogFn;
-  debug: LogFn;
-};
-export type LogLevel = 'off' | 'error' | 'warn' | 'info' | 'debug';
-const parseLogLevel = (
-  maybeLevel: string | undefined,
-  sourceName: string,
-  client: OpenAI,
-): LogLevel | undefined => {
-  if (!maybeLevel) {
-    return undefined;
-  }
-  const levels: Record<LogLevel, true> = {
-    off: true,
-    error: true,
-    warn: true,
-    info: true,
-    debug: true,
-  };
-  if (hasOwn(levels, maybeLevel)) {
-    return maybeLevel;
-  }
-  loggerFor(client).warn(
-    `${sourceName} was set to ${JSON.stringify(maybeLevel)}, expected one of ${JSON.stringify(
-      Object.keys(levels),
-    )}`,
-  );
-  return undefined;
-};
 
 export interface ClientOptions {
   /**
@@ -259,8 +256,6 @@ export interface ClientOptions {
    */
   logger?: Logger | undefined;
 }
-
-type FinalizedRequestInit = RequestInit & { headers: Headers };
 
 /**
  * API Client for interfacing with the OpenAI API.
@@ -354,8 +349,8 @@ export class OpenAI {
     return;
   }
 
-  protected authHeaders(opts: FinalRequestOptions): Headers | undefined {
-    return new Headers({ Authorization: `Bearer ${this.apiKey}` });
+  protected authHeaders(opts: FinalRequestOptions): NullableHeaders | undefined {
+    return buildHeaders([{ Authorization: `Bearer ${this.apiKey}` }]);
   }
 
   protected stringifyQuery(query: Record<string, unknown>): string {
@@ -743,17 +738,17 @@ export class OpenAI {
   }
 
   buildRequest(
-    options: FinalRequestOptions,
+    inputOptions: FinalRequestOptions,
     { retryCount = 0 }: { retryCount?: number } = {},
   ): { req: FinalizedRequestInit; url: string; timeout: number } {
-    options = { ...options };
+    const options = { ...inputOptions };
     const { method, path, query } = options;
 
     const url = this.buildURL(path!, query as Record<string, unknown>);
     if ('timeout' in options) validatePositiveInteger('timeout', options.timeout);
     options.timeout = options.timeout ?? this.timeout;
     const { bodyHeaders, body } = this.buildBody({ options });
-    const reqHeaders = this.buildHeaders({ options, method, bodyHeaders, retryCount });
+    const reqHeaders = this.buildHeaders({ options: inputOptions, method, bodyHeaders, retryCount });
 
     const req: FinalizedRequestInit = {
       method,
@@ -792,7 +787,7 @@ export class OpenAI {
         Accept: 'application/json',
         'User-Agent': this.getUserAgent(),
         'X-Stainless-Retry-Count': String(retryCount),
-        ...(options.timeout ? { 'X-Stainless-Timeout': String(options.timeout) } : {}),
+        ...(options.timeout ? { 'X-Stainless-Timeout': String(Math.trunc(options.timeout / 1000)) } : {}),
         ...getPlatformHeaders(),
         'OpenAI-Organization': this.organization,
         'OpenAI-Project': this.project,
@@ -873,9 +868,12 @@ export class OpenAI {
   moderations: API.Moderations = new API.Moderations(this);
   models: API.Models = new API.Models(this);
   fineTuning: API.FineTuning = new API.FineTuning(this);
+  vectorStores: API.VectorStores = new API.VectorStores(this);
   beta: API.Beta = new API.Beta(this);
   batches: API.Batches = new API.Batches(this);
   uploads: API.Uploads = new API.Uploads(this);
+  responses: API.Responses = new API.Responses(this);
+  evals: API.Evals = new API.Evals(this);
 }
 OpenAI.Completions = Completions;
 OpenAI.Chat = Chat;
@@ -886,9 +884,12 @@ OpenAI.Audio = Audio;
 OpenAI.Moderations = Moderations;
 OpenAI.Models = Models;
 OpenAI.FineTuning = FineTuning;
+OpenAI.VectorStores = VectorStores;
 OpenAI.Beta = Beta;
 OpenAI.Batches = Batches;
 OpenAI.Uploads = UploadsAPIUploads;
+OpenAI.Responses = Responses;
+OpenAI.Evals = Evals;
 export declare namespace OpenAI {
   export type RequestOptions = Opts.RequestOptions;
 
@@ -910,7 +911,6 @@ export declare namespace OpenAI {
 
   export {
     Chat as Chat,
-    type ChatModel as ChatModel,
     type ChatCompletion as ChatCompletion,
     type ChatCompletionAssistantMessageParam as ChatCompletionAssistantMessageParam,
     type ChatCompletionAudio as ChatCompletionAudio,
@@ -931,7 +931,6 @@ export declare namespace OpenAI {
     type ChatCompletionModality as ChatCompletionModality,
     type ChatCompletionNamedToolChoice as ChatCompletionNamedToolChoice,
     type ChatCompletionPredictionContent as ChatCompletionPredictionContent,
-    type ChatCompletionReasoningEffort as ChatCompletionReasoningEffort,
     type ChatCompletionRole as ChatCompletionRole,
     type ChatCompletionStoreMessage as ChatCompletionStoreMessage,
     type ChatCompletionStreamOptions as ChatCompletionStreamOptions,
@@ -941,6 +940,7 @@ export declare namespace OpenAI {
     type ChatCompletionToolChoiceOption as ChatCompletionToolChoiceOption,
     type ChatCompletionToolMessageParam as ChatCompletionToolMessageParam,
     type ChatCompletionUserMessageParam as ChatCompletionUserMessageParam,
+    type ChatCompletionReasoningEffort as ChatCompletionReasoningEffort,
     type ChatCompletionsPage as ChatCompletionsPage,
     type ChatCompletionCreateParams as ChatCompletionCreateParams,
     type ChatCompletionCreateParamsNonStreaming as ChatCompletionCreateParamsNonStreaming,
@@ -1000,6 +1000,26 @@ export declare namespace OpenAI {
 
   export { FineTuning as FineTuning };
 
+  export {
+    VectorStores as VectorStores,
+    type AutoFileChunkingStrategyParam as AutoFileChunkingStrategyParam,
+    type FileChunkingStrategy as FileChunkingStrategy,
+    type FileChunkingStrategyParam as FileChunkingStrategyParam,
+    type OtherFileChunkingStrategyObject as OtherFileChunkingStrategyObject,
+    type StaticFileChunkingStrategy as StaticFileChunkingStrategy,
+    type StaticFileChunkingStrategyObject as StaticFileChunkingStrategyObject,
+    type StaticFileChunkingStrategyObjectParam as StaticFileChunkingStrategyObjectParam,
+    type VectorStore as VectorStore,
+    type VectorStoreDeleted as VectorStoreDeleted,
+    type VectorStoreSearchResponse as VectorStoreSearchResponse,
+    type VectorStoresPage as VectorStoresPage,
+    type VectorStoreSearchResponsesPage as VectorStoreSearchResponsesPage,
+    type VectorStoreCreateParams as VectorStoreCreateParams,
+    type VectorStoreUpdateParams as VectorStoreUpdateParams,
+    type VectorStoreListParams as VectorStoreListParams,
+    type VectorStoreSearchParams as VectorStoreSearchParams,
+  };
+
   export { Beta as Beta };
 
   export {
@@ -1019,11 +1039,38 @@ export declare namespace OpenAI {
     type UploadCompleteParams as UploadCompleteParams,
   };
 
+  export { Responses as Responses };
+
+  export {
+    Evals as Evals,
+    type EvalCustomDataSourceConfig as EvalCustomDataSourceConfig,
+    type EvalLabelModelGrader as EvalLabelModelGrader,
+    type EvalStoredCompletionsDataSourceConfig as EvalStoredCompletionsDataSourceConfig,
+    type EvalStringCheckGrader as EvalStringCheckGrader,
+    type EvalTextSimilarityGrader as EvalTextSimilarityGrader,
+    type EvalCreateResponse as EvalCreateResponse,
+    type EvalRetrieveResponse as EvalRetrieveResponse,
+    type EvalUpdateResponse as EvalUpdateResponse,
+    type EvalListResponse as EvalListResponse,
+    type EvalDeleteResponse as EvalDeleteResponse,
+    type EvalListResponsesPage as EvalListResponsesPage,
+    type EvalCreateParams as EvalCreateParams,
+    type EvalUpdateParams as EvalUpdateParams,
+    type EvalListParams as EvalListParams,
+  };
+
+  export type AllModels = API.AllModels;
+  export type ChatModel = API.ChatModel;
+  export type ComparisonFilter = API.ComparisonFilter;
+  export type CompoundFilter = API.CompoundFilter;
   export type ErrorObject = API.ErrorObject;
   export type FunctionDefinition = API.FunctionDefinition;
   export type FunctionParameters = API.FunctionParameters;
   export type Metadata = API.Metadata;
+  export type Reasoning = API.Reasoning;
+  export type ReasoningEffort = API.ReasoningEffort;
   export type ResponseFormatJSONObject = API.ResponseFormatJSONObject;
   export type ResponseFormatJSONSchema = API.ResponseFormatJSONSchema;
   export type ResponseFormatText = API.ResponseFormatText;
+  export type ResponsesModel = API.ResponsesModel;
 }

@@ -1,10 +1,9 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../../resource';
+import { APIResource } from '../../../core/resource';
 import * as ThreadsAPI from './threads';
 import * as Shared from '../../shared';
 import * as AssistantsAPI from '../assistants';
-import * as ChatAPI from '../../chat/chat';
 import * as MessagesAPI from './messages';
 import {
   Annotation,
@@ -43,7 +42,6 @@ import {
   TextDelta,
   TextDeltaBlock,
 } from './messages';
-import * as VectorStoresAPI from '../vector-stores/vector-stores';
 import * as RunsAPI from './runs/runs';
 import {
   RequiredActionFunctionToolCall,
@@ -67,8 +65,8 @@ import {
   Runs,
   RunsPage,
 } from './runs/runs';
-import { APIPromise } from '../../../api-promise';
-import { Stream } from '../../../streaming';
+import { APIPromise } from '../../../core/api-promise';
+import { Stream } from '../../../core/streaming';
 import { buildHeaders } from '../../../internal/headers';
 import { RequestOptions } from '../../../internal/request-options';
 import { AssistantStream, ThreadCreateAndRunParamsBaseStream } from '../../../lib/AssistantStream';
@@ -432,9 +430,9 @@ export namespace ThreadCreateParams {
       export interface VectorStore {
         /**
          * The chunking strategy used to chunk the file(s). If not set, will use the `auto`
-         * strategy. Only applicable if `file_ids` is non-empty.
+         * strategy.
          */
-        chunking_strategy?: VectorStoresAPI.FileChunkingStrategyParam;
+        chunking_strategy?: VectorStore.Auto | VectorStore.Static;
 
         /**
          * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs to
@@ -452,6 +450,45 @@ export namespace ThreadCreateParams {
          * a maximum length of 512 characters.
          */
         metadata?: Shared.Metadata | null;
+      }
+
+      export namespace VectorStore {
+        /**
+         * The default strategy. This strategy currently uses a `max_chunk_size_tokens` of
+         * `800` and `chunk_overlap_tokens` of `400`.
+         */
+        export interface Auto {
+          /**
+           * Always `auto`.
+           */
+          type: 'auto';
+        }
+
+        export interface Static {
+          static: Static.Static;
+
+          /**
+           * Always `static`.
+           */
+          type: 'static';
+        }
+
+        export namespace Static {
+          export interface Static {
+            /**
+             * The number of tokens that overlap between chunks. The default value is `400`.
+             *
+             * Note that the overlap must not exceed half of `max_chunk_size_tokens`.
+             */
+            chunk_overlap_tokens: number;
+
+            /**
+             * The maximum number of tokens in each chunk. The default value is `800`. The
+             * minimum value is `100` and the maximum value is `4096`.
+             */
+            max_chunk_size_tokens: number;
+          }
+        }
       }
     }
   }
@@ -564,7 +601,7 @@ export interface ThreadCreateAndRunParamsBase {
    * model associated with the assistant. If not, the model associated with the
    * assistant will be used.
    */
-  model?: (string & {}) | ChatAPI.ChatModel | null;
+  model?: (string & {}) | Shared.ChatModel | null;
 
   /**
    * Whether to enable
@@ -640,9 +677,7 @@ export interface ThreadCreateAndRunParamsBase {
    * Override the tools the assistant can use for this run. This is useful for
    * modifying the behavior on a per-run basis.
    */
-  tools?: Array<
-    AssistantsAPI.CodeInterpreterTool | AssistantsAPI.FileSearchTool | AssistantsAPI.FunctionTool
-  > | null;
+  tools?: Array<AssistantsAPI.AssistantTool> | null;
 
   /**
    * An alternative to sampling with temperature, called nucleus sampling, where the
@@ -791,9 +826,9 @@ export namespace ThreadCreateAndRunParams {
         export interface VectorStore {
           /**
            * The chunking strategy used to chunk the file(s). If not set, will use the `auto`
-           * strategy. Only applicable if `file_ids` is non-empty.
+           * strategy.
            */
-          chunking_strategy?: VectorStoresAPI.FileChunkingStrategyParam;
+          chunking_strategy?: VectorStore.Auto | VectorStore.Static;
 
           /**
            * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs to
@@ -811,6 +846,45 @@ export namespace ThreadCreateAndRunParams {
            * a maximum length of 512 characters.
            */
           metadata?: Shared.Metadata | null;
+        }
+
+        export namespace VectorStore {
+          /**
+           * The default strategy. This strategy currently uses a `max_chunk_size_tokens` of
+           * `800` and `chunk_overlap_tokens` of `400`.
+           */
+          export interface Auto {
+            /**
+             * Always `auto`.
+             */
+            type: 'auto';
+          }
+
+          export interface Static {
+            static: Static.Static;
+
+            /**
+             * Always `static`.
+             */
+            type: 'static';
+          }
+
+          export namespace Static {
+            export interface Static {
+              /**
+               * The number of tokens that overlap between chunks. The default value is `400`.
+               *
+               * Note that the overlap must not exceed half of `max_chunk_size_tokens`.
+               */
+              chunk_overlap_tokens: number;
+
+              /**
+               * The maximum number of tokens in each chunk. The default value is `800`. The
+               * minimum value is `100` and the maximum value is `4096`.
+               */
+              max_chunk_size_tokens: number;
+            }
+          }
         }
       }
     }
@@ -1305,4 +1379,5 @@ export declare namespace Threads {
     type MessageListParams as MessageListParams,
     type MessageDeleteParams as MessageDeleteParams,
   };
+  export type { AssistantStream };
 }

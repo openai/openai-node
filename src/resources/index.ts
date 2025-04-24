@@ -30,6 +30,23 @@ export {
   type EmbeddingCreateParams,
 } from './embeddings';
 export {
+  Evals,
+  type EvalCustomDataSourceConfig,
+  type EvalLabelModelGrader,
+  type EvalStoredCompletionsDataSourceConfig,
+  type EvalStringCheckGrader,
+  type EvalTextSimilarityGrader,
+  type EvalCreateResponse,
+  type EvalRetrieveResponse,
+  type EvalUpdateResponse,
+  type EvalListResponse,
+  type EvalDeleteResponse,
+  type EvalCreateParams,
+  type EvalUpdateParams,
+  type EvalListParams,
+  type EvalListResponsesPage,
+} from './evals/evals';
+export {
   Files,
   type FileContent,
   type FileDeleted,
@@ -60,4 +77,24 @@ export {
   type ModerationCreateResponse,
   type ModerationCreateParams,
 } from './moderations';
+export { Responses } from './responses/responses';
 export { Uploads, type Upload, type UploadCreateParams, type UploadCompleteParams } from './uploads/uploads';
+export {
+  VectorStores,
+  type AutoFileChunkingStrategyParam,
+  type FileChunkingStrategy,
+  type FileChunkingStrategyParam,
+  type OtherFileChunkingStrategyObject,
+  type StaticFileChunkingStrategy,
+  type StaticFileChunkingStrategyObject,
+  type StaticFileChunkingStrategyObjectParam,
+  type VectorStore,
+  type VectorStoreDeleted,
+  type VectorStoreSearchResponse,
+  type VectorStoreCreateParams,
+  type VectorStoreUpdateParams,
+  type VectorStoreListParams,
+  type VectorStoreSearchParams,
+  type VectorStoresPage,
+  type VectorStoreSearchResponsesPage,
+} from './vector-stores/vector-stores';

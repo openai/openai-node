@@ -1,4 +1,4 @@
-import { OpenAIError } from '../../error';
+import { OpenAIError } from '../../core/error';
 
 /**
  * Percent-encode everything that isn't safe to have in a path without encoding safe chars.

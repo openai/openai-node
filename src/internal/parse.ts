@@ -1,7 +1,7 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import type { FinalRequestOptions } from './request-options';
-import { Stream } from '../streaming';
+import { Stream } from '../core/streaming';
 import { type OpenAI } from '../client';
 import { formatRequestDetails, loggerFor } from './utils/log';
 import type { AbstractPage } from '../pagination';
@@ -44,8 +44,8 @@ export async function defaultParseResponse<T>(
     }
 
     const contentType = response.headers.get('content-type');
-    const isJSON =
-      contentType?.includes('application/json') || contentType?.includes('application/vnd.api+json');
+    const mediaType = contentType?.split(';')[0]?.trim();
+    const isJSON = mediaType?.includes('application/json') || mediaType?.endsWith('+json');
     if (isJSON) {
       const json = await response.json();
       return addRequestID(json as T, response);

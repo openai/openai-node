@@ -3,7 +3,7 @@
 import { NullableHeaders } from './headers';
 
 import type { BodyInit } from './builtin-types';
-import { Stream } from '../streaming';
+import { Stream } from '../core/streaming';
 import type { HTTPMethod, MergedRequestInit } from './types';
 import { type HeadersLike } from './headers';
 

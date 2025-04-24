@@ -26,7 +26,7 @@ describe('resource completions', () => {
     const response = await client.chat.completions.create({
       messages: [{ content: 'string', role: 'developer', name: 'name' }],
       model: 'gpt-4o',
-      audio: { format: 'wav', voice: 'alloy' },
+      audio: { format: 'wav', voice: 'ash' },
       frequency_penalty: -2,
       function_call: 'none',
       functions: [{ name: 'name', description: 'description', parameters: { foo: 'bar' } }],
@@ -42,9 +42,9 @@ describe('resource completions', () => {
       presence_penalty: -2,
       reasoning_effort: 'low',
       response_format: { type: 'text' },
-      seed: 0,
+      seed: -9007199254740991,
       service_tier: 'auto',
-      stop: 'string',
+      stop: '\n',
       store: true,
       stream: false,
       stream_options: { include_usage: true },
@@ -59,6 +59,13 @@ describe('resource completions', () => {
       top_logprobs: 0,
       top_p: 1,
       user: 'user-1234',
+      web_search_options: {
+        search_context_size: 'low',
+        user_location: {
+          approximate: { city: 'city', country: 'country', region: 'region', timezone: 'timezone' },
+          type: 'approximate',
+        },
+      },
     });
   });
 

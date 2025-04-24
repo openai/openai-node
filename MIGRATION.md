@@ -102,19 +102,24 @@ For example, for a method that would call an endpoint at `/v1/parents/{parent_id
 
 ```ts
 // Before
-client.parents.children.create('p_123', 'c_456');
+client.parents.children.retrieve('p_123', 'c_456');
 
 // After
-client.example.create('c_456', { parent_id: 'p_123' });
+client.parents.children.retrieve('c_456', { parent_id: 'p_123' });
 ```
 
-This affects the following methods:
+<details>
 
-- `client.beta.vectorStores.files.retrieve()`
-- `client.beta.vectorStores.files.delete()`
-- `client.beta.vectorStores.fileBatches.retrieve()`
-- `client.beta.vectorStores.fileBatches.cancel()`
-- `client.beta.vectorStores.fileBatches.listFiles()`
+<summary>This affects the following methods</summary>
+
+- `client.fineTuning.checkpoints.permissions.delete()`
+- `client.vectorStores.files.retrieve()`
+- `client.vectorStores.files.update()`
+- `client.vectorStores.files.delete()`
+- `client.vectorStores.files.content()`
+- `client.vectorStores.fileBatches.retrieve()`
+- `client.vectorStores.fileBatches.cancel()`
+- `client.vectorStores.fileBatches.listFiles()`
 - `client.beta.threads.runs.retrieve()`
 - `client.beta.threads.runs.update()`
 - `client.beta.threads.runs.cancel()`
@@ -124,6 +129,13 @@ This affects the following methods:
 - `client.beta.threads.messages.retrieve()`
 - `client.beta.threads.messages.update()`
 - `client.beta.threads.messages.delete()`
+- `client.evals.runs.retrieve()`
+- `client.evals.runs.delete()`
+- `client.evals.runs.cancel()`
+- `client.evals.runs.outputItems.retrieve()`
+- `client.evals.runs.outputItems.list()`
+
+</details>
 
 ### URI encoded path parameters
 
@@ -134,10 +146,78 @@ For example:
 
 ```diff
 - client.example.retrieve(encodeURIComponent('string/with/slash'))
-+ client.example.retrieve('string/with/slash') // renders example/string%2Fwith%2Fslash
++ client.example.retrieve('string/with/slash') // retrieves /example/string%2Fwith%2Fslash
 ```
 
 Previously without the `encodeURIComponent()` call we would have used the path `/example/string/with/slash`; now we'll use `/example/string%2Fwith%2Fslash`.
+
+### Removed request options overloads
+
+When making requests with no required body, query or header parameters, you must now explicitly pass `null`, `undefined` or an empty object `{}` to the params argument in order to customise request options.
+
+```diff
+client.example.list();
+client.example.list({}, { headers: { ... } });
+client.example.list(null, { headers: { ... } });
+client.example.list(undefined, { headers: { ... } });
+- client.example.list({ headers: { ... } });
++ client.example.list({}, { headers: { ... } });
+```
+
+This affects the following methods:
+
+- `client.chat.completions.list()`
+- `client.chat.completions.messages.list()`
+- `client.files.list()`
+- `client.fineTuning.jobs.list()`
+- `client.fineTuning.jobs.listEvents()`
+- `client.fineTuning.jobs.checkpoints.list()`
+- `client.fineTuning.checkpoints.permissions.retrieve()`
+- `client.vectorStores.list()`
+- `client.vectorStores.files.list()`
+- `client.beta.assistants.list()`
+- `client.beta.threads.create()`
+- `client.beta.threads.runs.list()`
+- `client.beta.threads.messages.list()`
+- `client.batches.list()`
+- `client.responses.retrieve()`
+- `client.responses.inputItems.list()`
+- `client.evals.list()`
+- `client.evals.runs.list()`
+
+### HTTP method naming
+
+Previously some methods could not be named intuitively due to an internal naming conflict. This has been fixed and the affected methods are now correctly named.
+
+```ts
+// Before
+client.chat.completions.del();
+client.files.del();
+client.models.del();
+client.fineTuning.checkpoints.permissions.del();
+client.vectorStores.del();
+client.vectorStores.files.del();
+client.beta.assistants.del();
+client.beta.threads.del();
+client.beta.threads.messages.del();
+client.responses.del();
+client.evals.del();
+client.evals.runs.del();
+
+// After
+client.chat.completions.delete();
+client.files.delete();
+client.models.delete();
+client.fineTuning.checkpoints.permissions.delete();
+client.vectorStores.delete();
+client.vectorStores.files.delete();
+client.beta.assistants.delete();
+client.beta.threads.delete();
+client.beta.threads.messages.delete();
+client.responses.delete();
+client.evals.delete();
+client.evals.runs.delete();
+```
 
 ### Removed `httpAgent` in favor of `fetchOptions`
 
@@ -173,64 +253,113 @@ const client = new OpenAI({
 });
 ```
 
-### HTTP method naming
+### Changed exports
 
-Some methods could not be named intuitively due to an internal naming conflict. This has been resolved and the methods are now correctly named.
+#### Refactor of `openai/core`, `error`, `pagination`, `resource`, `streaming` and `uploads`
+
+Much of the `openai/core` file was intended to be internal-only but it was publicly accessible, as such it has been refactored and split up into internal and public files, with public-facing code moved to a new `core` folder and internal code moving to the private `internal` folder.
+
+At the same time, we moved some public-facing files which were previously at the top level into `core` to make the file structure cleaner and more clear:
+
+```typescript
+// Before
+import 'openai/error';
+import 'openai/pagination';
+import 'openai/resource';
+import 'openai/streaming';
+import 'openai/uploads';
+
+// After
+import 'openai/core/error';
+import 'openai/core/pagination';
+import 'openai/core/resource';
+import 'openai/core/streaming';
+import 'openai/core/uploads';
+```
+
+If you were relying on anything that was only exported from `openai/core` and is also not accessible anywhere else, please open an issue and we'll consider adding it to the public API.
+
+#### Resource classes
+
+Previously under certain circumstances it was possible to import resource classes like `Completions` directly from the root of the package. This was never valid at the type level and only worked in CommonJS files.
+Now you must always either reference them as static class properties or import them directly from the files in which they are defined.
+
+```typescript
+// Before
+const { Completions } = require('openai');
+
+// After
+const { OpenAI } = require('openai');
+OpenAI.Completions; // or import directly from openai/resources/completions
+```
+
+#### Cleaned up `uploads` exports
+
+As part of the `core` refactor, `openai/uploads` was moved to `openai/core/uploads`
+and the following exports were removed, as they were not intended to be a part of the public API:
+
+- `fileFromPath`
+- `BlobPart`
+- `BlobLike`
+- `FileLike`
+- `ResponseLike`
+- `isResponseLike`
+- `isBlobLike`
+- `isFileLike`
+- `isUploadable`
+- `isMultipartBody`
+- `maybeMultipartFormRequestOptions`
+- `multipartFormRequestOptions`
+- `createForm`
+
+Note that `Uploadable` & `toFile` **are** still exported:
+
+```typescript
+import { type Uploadable, toFile } from 'openai/core/uploads';
+```
+
+#### `APIClient`
+
+The `APIClient` base client class has been removed as it is no longer needed. If you were importing this class then you must now import the main client class:
+
+```typescript
+// Before
+import { APIClient } from 'openai/core';
+
+// After
+import { OpenAI } from 'openai';
+```
+
+### File handling
+
+The deprecated `fileFromPath` helper has been removed in favor of native Node.js streams:
 
 ```ts
 // Before
-client.chat.completions.del();
-client.files.del();
-client.models.del();
-client.beta.vectorStores.del();
-client.beta.vectorStores.files.del();
-client.beta.assistants.del();
-client.beta.threads.del();
-client.beta.threads.messages.del();
+OpenAI.fileFromPath('path/to/file');
 
 // After
-client.chat.completions.delete();
-client.files.delete();
-client.models.delete();
-client.beta.vectorStores.delete();
-client.beta.vectorStores.files.delete();
-client.beta.assistants.delete();
-client.beta.threads.delete();
-client.beta.threads.messages.delete();
+import fs from 'fs';
+fs.createReadStream('path/to/file');
 ```
 
-### Removed request options overloads
+Note that this function previously only worked on Node.js. If you're using Bun, you can use [`Bun.file`](https://bun.sh/docs/api/file-io) instead.
 
-When making requests with no required body, query or header parameters, you must now explicitly pass `null`, `undefined` or an empty object `{}` to the params argument in order to customise request options.
+### Shims removal
 
-```diff
-client.example.list();
-client.example.list({}, { headers: { ... } });
-client.example.list(null, { headers: { ... } });
-client.example.list(undefined, { headers: { ... } });
-- client.example.list({ headers: { ... } });
-+ client.example.list({}, { headers: { ... } });
+Previously you could configure the types that the SDK used like this:
+
+```ts
+// Tell TypeScript and the package to use the global Web fetch instead of node-fetch.
+import 'openai/shims/web';
+import OpenAI from 'openai';
 ```
 
-This affects the following methods:
-
-- `client.chat.completions.list()`
-- `client.chat.completions.messages.list()`
-- `client.files.list()`
-- `client.fineTuning.jobs.list()`
-- `client.fineTuning.jobs.listEvents()`
-- `client.fineTuning.jobs.checkpoints.list()`
-- `client.beta.vectorStores.list()`
-- `client.beta.vectorStores.files.list()`
-- `client.beta.assistants.list()`
-- `client.beta.threads.create()`
-- `client.beta.threads.runs.list()`
-- `client.beta.threads.messages.list()`
-- `client.batches.list()`
+The `openai/shims` imports have been removed. Your global types must now be [correctly configured](#minimum-types-requirements).
 
 ### Pagination changes
 
-Note that the `for await` syntax is _not_ affected. This still works as-is:
+The `for await` syntax **is not affected**. This still works as-is:
 
 ```ts
 // Automatically fetches more pages as needed.
@@ -239,9 +368,7 @@ for await (const fineTuningJob of client.fineTuning.jobs.list()) {
 }
 ```
 
-#### Simplified interface
-
-The pagination interface has been simplified:
+The interface for manually paginating through list results has been simplified:
 
 ```ts
 // Before
@@ -267,39 +394,12 @@ export type FineTuningJobsPage = CursorPage<FineTuningJob>;
 
 If you were importing these classes at runtime, you'll need to switch to importing the base class or only import them at the type-level.
 
-### File handling
-
-The deprecated `fileFromPath` helper has been removed in favor of native Node.js streams:
-
-```ts
-// Before
-OpenAI.fileFromPath('path/to/file');
-
-// After
-import fs from 'fs';
-fs.createReadStream('path/to/file');
-```
-
-Note that this function previously only worked on Node.j. If you're using Bun, you can use [`Bun.file`](https://bun.sh/docs/api/file-io) instead.
-
-### Shims removal
-
-Previously you could configure the types that the SDK used like this:
-
-```ts
-// Tell TypeScript and the package to use the global Web fetch instead of node-fetch.
-import 'openai/shims/web';
-import OpenAI from 'openai';
-```
-
-The `openai/shims` imports have been removed. Your global types must now be [correctly configured](#minimum-types-requirements).
-
 ### `openai/src` directory removed
 
 Previously IDEs may have auto-completed imports from the `openai/src` directory, however this
 directory was only included for an improved go-to-definition experience and should not have been used at runtime.
 
-If you have any `openai/src` imports, you must replace it with `openai`.
+If you have any `openai/src/*` imports, you will need to replace them with `openai/*`.
 
 ```ts
 // Before
@@ -312,69 +412,3 @@ import OpenAI from 'openai';
 ### Headers
 
 The `headers` property on `APIError` objects is now an instance of the Web [Headers](https://developer.mozilla.org/en-US/docs/Web/API/Headers) class. It was previously just `Record<string, string | null | undefined>`.
-
-### Removed exports
-
-#### `Response`
-
-```typescript
-// Before
-import { Response } from 'openai';
-
-// After
-// `Response` must now come from the builtin types
-```
-
-#### Resource classes
-
-If you were importing resource classes from the root package then you must now import them from the file they are defined in:
-
-```typescript
-// Before
-import { Completions } from 'openai';
-
-// After
-import { Completions } from 'openai/resources/completions';
-```
-
-#### `openai/core`
-
-The `openai/core` file was intended to be internal-only but it was publicly accessible, as such it has been refactored and split up into internal files.
-
-If you were relying on anything that was only exported from `openai/core` and is also not accessible anywhere else, please open an issue and we'll consider adding it to the public API.
-
-#### `APIClient`
-
-The `APIClient` base client class has been removed as it is no longer needed. If you were importing this class then you must now import the main client class:
-
-```typescript
-// Before
-import { APIClient } from 'openai/core';
-
-// After
-import { OpenAI } from 'openai';
-```
-
-#### Cleaned up `openai/uploads` exports
-
-The following exports have been removed from `openai/uploads` as they were not intended to be a part of the public API:
-
-- `fileFromPath`
-- `BlobPart`
-- `BlobLike`
-- `FileLike`
-- `ResponseLike`
-- `isResponseLike`
-- `isBlobLike`
-- `isFileLike`
-- `isUploadable`
-- `isMultipartBody`
-- `maybeMultipartFormRequestOptions`
-- `multipartFormRequestOptions`
-- `createForm`
-
-Note that `Uploadable` & `toFile` **are** still exported:
-
-```typescript
-import { type Uploadable, toFile } from 'openai/uploads';
-```

@@ -36,7 +36,7 @@ describe('resource runs', () => {
       max_completion_tokens: 256,
       max_prompt_tokens: 256,
       metadata: { foo: 'string' },
-      model: 'gpt-4o',
+      model: 'string',
       parallel_tool_calls: true,
       reasoning_effort: 'low',
       response_format: 'auto',

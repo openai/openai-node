@@ -1,6 +1,7 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../../resource';
+import { APIResource } from '../../../core/resource';
+import * as Shared from '../../shared';
 import * as CheckpointsAPI from './checkpoints';
 import {
   CheckpointListParams,
@@ -8,8 +9,8 @@ import {
   FineTuningJobCheckpoint,
   FineTuningJobCheckpointsPage,
 } from './checkpoints';
-import { APIPromise } from '../../../api-promise';
-import { CursorPage, type CursorPageParams, PagePromise } from '../../../pagination';
+import { APIPromise } from '../../../core/api-promise';
+import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pagination';
 import { RequestOptions } from '../../../internal/request-options';
 import { path } from '../../../internal/utils/path';
 
@@ -176,6 +177,16 @@ export interface FineTuningJob {
    * A list of integrations to enable for this fine-tuning job.
    */
   integrations?: Array<FineTuningJobWandbIntegrationObject> | null;
+
+  /**
+   * Set of 16 key-value pairs that can be attached to an object. This can be useful
+   * for storing additional information about the object in a structured format, and
+   * querying for objects via API or the dashboard.
+   *
+   * Keys are strings with a maximum length of 64 characters. Values are strings with
+   * a maximum length of 512 characters.
+   */
+  metadata?: Shared.Metadata | null;
 
   /**
    * The method used for fine-tuning.
@@ -369,8 +380,6 @@ export interface FineTuningJobEvent {
   type?: 'message' | 'metrics';
 }
 
-export type FineTuningJobIntegration = FineTuningJobWandbIntegrationObject;
-
 /**
  * The settings for your integration with Weights and Biases. This payload
  * specifies the project that metrics will be sent to. Optionally, you can set an
@@ -419,6 +428,8 @@ export interface FineTuningJobWandbIntegrationObject {
   wandb: FineTuningJobWandbIntegration;
 }
 
+export type FineTuningJobIntegration = FineTuningJobWandbIntegrationObject;
+
 export interface JobCreateParams {
   /**
    * The name of the model to fine-tune. You can select one of the
@@ -457,6 +468,16 @@ export interface JobCreateParams {
    * A list of integrations to enable for your fine-tuning job.
    */
   integrations?: Array<JobCreateParams.Integration> | null;
+
+  /**
+   * Set of 16 key-value pairs that can be attached to an object. This can be useful
+   * for storing additional information about the object in a structured format, and
+   * querying for objects via API or the dashboard.
+   *
+   * Keys are strings with a maximum length of 64 characters. Values are strings with
+   * a maximum length of 512 characters.
+   */
+  metadata?: Shared.Metadata | null;
 
   /**
    * The method used for fine-tuning.
@@ -672,7 +693,13 @@ export namespace JobCreateParams {
   }
 }
 
-export interface JobListParams extends CursorPageParams {}
+export interface JobListParams extends CursorPageParams {
+  /**
+   * Optional metadata filter. To filter, use the syntax `metadata[k]=v`.
+   * Alternatively, set `metadata=null` to indicate no metadata.
+   */
+  metadata?: Record<string, string> | null;
+}
 
 export interface JobListEventsParams extends CursorPageParams {}
 
@@ -682,9 +709,9 @@ export declare namespace Jobs {
   export {
     type FineTuningJob as FineTuningJob,
     type FineTuningJobEvent as FineTuningJobEvent,
-    type FineTuningJobIntegration as FineTuningJobIntegration,
     type FineTuningJobWandbIntegration as FineTuningJobWandbIntegration,
     type FineTuningJobWandbIntegrationObject as FineTuningJobWandbIntegrationObject,
+    type FineTuningJobIntegration as FineTuningJobIntegration,
     type FineTuningJobsPage as FineTuningJobsPage,
     type FineTuningJobEventsPage as FineTuningJobEventsPage,
     type JobCreateParams as JobCreateParams,

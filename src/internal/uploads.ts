@@ -1,7 +1,7 @@
 import { type RequestOptions } from './request-options';
 import type { FilePropertyBag, Fetch } from './builtin-types';
 import type { OpenAI } from '../client';
-import { File } from './shims/file.node.js';
+import { type File, getFile } from './shims/file';
 import { ReadableStreamFrom } from './shims';
 
 export type BlobPart = string | ArrayBuffer | ArrayBufferView | Blob | DataView;
@@ -32,10 +32,7 @@ export function makeFile(
   fileName: string | undefined,
   options?: FilePropertyBag,
 ): File {
-  if (typeof File === 'undefined') {
-    throw new Error('`File` is not defined as a global which is required for file uploads');
-  }
-
+  const File = getFile();
   return new File(fileBits as any, fileName ?? 'unknown_file', options);
 }
 
@@ -129,7 +126,7 @@ export const createForm = async <T = Record<string, unknown>>(
 // We check for Blob not File because Bun.File doesn't inherit from File,
 // but they both inherit from Blob and have a `name` property at runtime.
 const isNamedBlob = (value: object) =>
-  (File && value instanceof File) || (value instanceof Blob && 'name' in value);
+  value instanceof getFile() || (value instanceof Blob && 'name' in value);
 
 const isUploadable = (value: unknown) =>
   typeof value === 'object' &&
