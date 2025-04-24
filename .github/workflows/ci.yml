@@ -8,6 +8,7 @@ on:
     branches:
       - main
       - next
+      - alpha
 
 jobs:
   lint:
@@ -93,10 +94,10 @@ jobs:
         run: |
           yarn install
 
-      - env: 
+      - env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-            yarn tsn examples/demo.ts
+          yarn tsn examples/demo.ts
 
   ecosystem_tests:
     name: ecosystem tests (v${{ matrix.node-version }})
