@@ -29,10 +29,10 @@ export class Embeddings extends APIResource {
         response.data.forEach((embeddingBase64Obj) => {
           const embeddingBytes = fromBase64(embeddingBase64Obj.embedding as unknown as string);
           embeddingBase64Obj.embedding = Array.from(
-            new Uint32Array(
+            new Float32Array(
               embeddingBytes.buffer,
               embeddingBytes.byteOffset,
-              embeddingBytes.byteLength / Uint32Array.BYTES_PER_ELEMENT,
+              embeddingBytes.byteLength / Float32Array.BYTES_PER_ELEMENT,
             ),
           );
         });
