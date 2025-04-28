@@ -14,7 +14,7 @@ import {
 } from '../resources/responses/responses';
 import { type AutoParseableTextFormat, isAutoParsableResponseFormat } from '../lib/parser';
 
-type ParseableToolsParams = Array<Tool> | ChatCompletionTool | null;
+export type ParseableToolsParams = Array<Tool> | ChatCompletionTool | null;
 
 export type ResponseCreateParamsWithTools = ResponseCreateParamsBase & {
   tools?: ParseableToolsParams;
