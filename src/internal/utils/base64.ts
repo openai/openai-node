@@ -1,16 +1,17 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { OpenAIError } from '../../core/error';
+import { encodeUTF8 } from './bytes';
 
 export const toBase64 = (data: string | Uint8Array | null | undefined): string => {
   if (!data) return '';
 
-  if (typeof data === 'string') {
-    data = new (globalThis as any).TextEncoder().encode(data);
-  }
-
   if (typeof (globalThis as any).Buffer !== 'undefined') {
     return (globalThis as any).Buffer.from(data).toString('base64');
+  }
+
+  if (typeof data === 'string') {
+    data = encodeUTF8(data);
   }
 
   if (typeof btoa !== 'undefined') {

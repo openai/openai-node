@@ -4,6 +4,7 @@ import { makeReadableStream } from '../internal/shims';
 import { findDoubleNewlineIndex, LineDecoder } from '../internal/decoders/line';
 import { ReadableStreamToAsyncIterable } from '../internal/shims';
 import { isAbortError } from '../internal/errors';
+import { encodeUTF8 } from '../internal/utils/bytes';
 
 import { APIError } from './error';
 
@@ -160,9 +161,6 @@ export class Stream<Item> implements AsyncIterable<Item> {
   toReadableStream(): ReadableStream {
     const self = this;
     let iter: AsyncIterator<Item>;
-    const encoder: {
-      encode(str: string): Uint8Array;
-    } = new (globalThis as any).TextEncoder();
 
     return makeReadableStream({
       async start() {
@@ -173,7 +171,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
           const { value, done } = await iter.next();
           if (done) return ctrl.close();
 
-          const bytes = encoder.encode(JSON.stringify(value) + '\n');
+          const bytes = encodeUTF8(JSON.stringify(value) + '\n');
 
           ctrl.enqueue(bytes);
         } catch (err) {
@@ -235,7 +233,7 @@ async function* iterSSEChunks(iterator: AsyncIterableIterator<Bytes>): AsyncGene
 
     const binaryChunk =
       chunk instanceof ArrayBuffer ? new Uint8Array(chunk)
-      : typeof chunk === 'string' ? new (globalThis as any).TextEncoder().encode(chunk)
+      : typeof chunk === 'string' ? encodeUTF8(chunk)
       : chunk;
 
     let newData = new Uint8Array(data.length + binaryChunk.length);
