@@ -1,4 +1,4 @@
-import { OpenAIError } from '../../core/error';
+import { concatBytes, decodeUTF8, encodeUTF8 } from '../utils/bytes';
 
 export type Bytes = string | ArrayBuffer | Uint8Array | null | undefined;
 
@@ -13,16 +13,11 @@ export class LineDecoder {
   static NEWLINE_CHARS = new Set(['\n', '\r']);
   static NEWLINE_REGEXP = /\r\n|[\n\r]/g;
 
-  buffer: Uint8Array;
+  #buffer: Uint8Array;
   #carriageReturnIndex: number | null;
-  textDecoder:
-    | undefined
-    | {
-        decode(buffer: Uint8Array | ArrayBuffer): string;
-      };
 
   constructor() {
-    this.buffer = new Uint8Array();
+    this.#buffer = new Uint8Array();
     this.#carriageReturnIndex = null;
   }
 
@@ -33,17 +28,14 @@ export class LineDecoder {
 
     const binaryChunk =
       chunk instanceof ArrayBuffer ? new Uint8Array(chunk)
-      : typeof chunk === 'string' ? new TextEncoder().encode(chunk)
+      : typeof chunk === 'string' ? encodeUTF8(chunk)
       : chunk;
 
-    let newData = new Uint8Array(this.buffer.length + binaryChunk.length);
-    newData.set(this.buffer);
-    newData.set(binaryChunk, this.buffer.length);
-    this.buffer = newData;
+    this.#buffer = concatBytes([this.#buffer, binaryChunk]);
 
     const lines: string[] = [];
     let patternIndex;
-    while ((patternIndex = findNewlineIndex(this.buffer, this.#carriageReturnIndex)) != null) {
+    while ((patternIndex = findNewlineIndex(this.#buffer, this.#carriageReturnIndex)) != null) {
       if (patternIndex.carriage && this.#carriageReturnIndex == null) {
         // skip until we either get a corresponding `\n`, a new `\r` or nothing
         this.#carriageReturnIndex = patternIndex.index;
@@ -55,8 +47,8 @@ export class LineDecoder {
         this.#carriageReturnIndex != null &&
         (patternIndex.index !== this.#carriageReturnIndex + 1 || patternIndex.carriage)
       ) {
-        lines.push(this.decodeText(this.buffer.slice(0, this.#carriageReturnIndex - 1)));
-        this.buffer = this.buffer.slice(this.#carriageReturnIndex);
+        lines.push(decodeUTF8(this.#buffer.subarray(0, this.#carriageReturnIndex - 1)));
+        this.#buffer = this.#buffer.subarray(this.#carriageReturnIndex);
         this.#carriageReturnIndex = null;
         continue;
       }
@@ -64,55 +56,18 @@ export class LineDecoder {
       const endIndex =
         this.#carriageReturnIndex !== null ? patternIndex.preceding - 1 : patternIndex.preceding;
 
-      const line = this.decodeText(this.buffer.slice(0, endIndex));
+      const line = decodeUTF8(this.#buffer.subarray(0, endIndex));
       lines.push(line);
 
-      this.buffer = this.buffer.slice(patternIndex.index);
+      this.#buffer = this.#buffer.subarray(patternIndex.index);
       this.#carriageReturnIndex = null;
     }
 
     return lines;
   }
 
-  decodeText(bytes: Bytes): string {
-    if (bytes == null) return '';
-    if (typeof bytes === 'string') return bytes;
-
-    // Node:
-    if (typeof (globalThis as any).Buffer !== 'undefined') {
-      if (bytes instanceof (globalThis as any).Buffer) {
-        return bytes.toString();
-      }
-      if (bytes instanceof Uint8Array) {
-        return (globalThis as any).Buffer.from(bytes).toString();
-      }
-
-      throw new OpenAIError(
-        `Unexpected: received non-Uint8Array (${bytes.constructor.name}) stream chunk in an environment with a global "Buffer" defined, which this library assumes to be Node. Please report this error.`,
-      );
-    }
-
-    // Browser
-    if (typeof (globalThis as any).TextDecoder !== 'undefined') {
-      if (bytes instanceof Uint8Array || bytes instanceof ArrayBuffer) {
-        this.textDecoder ??= new (globalThis as any).TextDecoder('utf8');
-        return this.textDecoder!.decode(bytes);
-      }
-
-      throw new OpenAIError(
-        `Unexpected: received non-Uint8Array/ArrayBuffer (${
-          (bytes as any).constructor.name
-        }) in a web platform. Please report this error.`,
-      );
-    }
-
-    throw new OpenAIError(
-      `Unexpected: neither Buffer nor TextDecoder are available as globals. Please report this error.`,
-    );
-  }
-
   flush(): string[] {
-    if (!this.buffer.length) {
+    if (!this.#buffer.length) {
       return [];
     }
     return this.decode('\n');

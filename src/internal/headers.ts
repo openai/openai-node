@@ -3,7 +3,7 @@
 type HeaderValue = string | undefined | null;
 export type HeadersLike =
   | Headers
-  | readonly [string, HeaderValue][]
+  | readonly HeaderValue[][]
   | Record<string, HeaderValue | readonly HeaderValue[]>
   | undefined
   | null
@@ -40,7 +40,7 @@ function* iterateHeaders(headers: HeadersLike): IterableIterator<readonly [strin
   }
 
   let shouldClear = false;
-  let iter: Iterable<readonly [string, HeaderValue | readonly HeaderValue[]]>;
+  let iter: Iterable<readonly (HeaderValue | readonly HeaderValue[])[]>;
   if (headers instanceof Headers) {
     iter = headers.entries();
   } else if (isArray(headers)) {
@@ -51,6 +51,7 @@ function* iterateHeaders(headers: HeadersLike): IterableIterator<readonly [strin
   }
   for (let row of iter) {
     const name = row[0];
+    if (typeof name !== 'string') throw new TypeError('expected header name to be a string');
     const values = isArray(row[1]) ? row[1] : [row[1]];
     let didClear = false;
     for (const value of values) {
