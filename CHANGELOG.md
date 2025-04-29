@@ -1,5 +1,19 @@
 # Changelog
 
+## 4.96.2 (2025-04-29)
+
+Full Changelog: [v4.96.1...v4.96.2](https://github.com/openai/openai-node/compare/v4.96.1...v4.96.2)
+
+### Bug Fixes
+
+* **types:** export ParseableToolsParams ([#1486](https://github.com/openai/openai-node/issues/1486)) ([3e7c92c](https://github.com/openai/openai-node/commit/3e7c92c8a76c1f747610d63d9d69a88b796ee9fc))
+
+
+### Chores
+
+* **ci:** only use depot for staging repos ([214da39](https://github.com/openai/openai-node/commit/214da398c76f46d40994665f3ca7e10e203e9579))
+* **ci:** run on more branches and use depot runners ([ead76fc](https://github.com/openai/openai-node/commit/ead76fc6429ac52a1c8b008ac5c0afcefaa0bae5))
+
 ## 4.96.1 (2025-04-29)
 
 Full Changelog: [v4.96.0...v4.96.1](https://github.com/openai/openai-node/compare/v4.96.0...v4.96.1)
