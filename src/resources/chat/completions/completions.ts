@@ -1153,7 +1153,7 @@ export interface ChatCompletionCreateParamsBase {
   frequency_penalty?: number | null;
 
   /**
-   * Deprecated in favor of `tool_choice`.
+   * @deprecated Deprecated in favor of `tool_choice`.
    *
    * Controls which (if any) function is called by the model.
    *
@@ -1171,7 +1171,7 @@ export interface ChatCompletionCreateParamsBase {
   function_call?: 'none' | 'auto' | ChatCompletionFunctionCallOption;
 
   /**
-   * Deprecated in favor of `tools`.
+   * @deprecated Deprecated in favor of `tools`.
    *
    * A list of functions the model may generate JSON inputs for.
    */
@@ -1204,8 +1204,8 @@ export interface ChatCompletionCreateParamsBase {
   max_completion_tokens?: number | null;
 
   /**
-   * The maximum number of [tokens](/tokenizer) that can be generated in the chat
-   * completion. This value can be used to control
+   * @deprecated The maximum number of [tokens](/tokenizer) that can be generated in
+   * the chat completion. This value can be used to control
    * [costs](https://openai.com/api/pricing/) for text generated via API.
    *
    * This value is now deprecated in favor of `max_completion_tokens`, and is not
