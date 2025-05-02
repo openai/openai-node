@@ -158,7 +158,7 @@ export interface ComputerTool {
   /**
    * The type of computer environment to control.
    */
-  environment: 'mac' | 'windows' | 'ubuntu' | 'browser';
+  environment: 'windows' | 'mac' | 'linux' | 'ubuntu' | 'browser';
 
   /**
    * The type of the computer use tool. Always `computer_use_preview`.
@@ -209,9 +209,9 @@ export interface FileSearchTool {
   vector_store_ids: Array<string>;
 
   /**
-   * A filter to apply based on file attributes.
+   * A filter to apply.
    */
-  filters?: Shared.ComparisonFilter | Shared.CompoundFilter;
+  filters?: Shared.ComparisonFilter | Shared.CompoundFilter | null;
 
   /**
    * The maximum number of results to return. This number should be between 1 and 50
@@ -258,12 +258,12 @@ export interface FunctionTool {
   /**
    * A JSON schema object describing the parameters of the function.
    */
-  parameters: Record<string, unknown>;
+  parameters: Record<string, unknown> | null;
 
   /**
    * Whether to enforce strict parameter validation. Default `true`.
    */
-  strict: boolean;
+  strict: boolean | null;
 
   /**
    * The type of the function tool. Always `function`.
@@ -1581,11 +1581,17 @@ export interface ResponseInProgressEvent {
  * - `message.input_image.image_url`: Include image urls from the input message.
  * - `computer_call_output.output.image_url`: Include image urls from the computer
  *   call output.
+ * - `reasoning.encrypted_content`: Includes an encrypted version of reasoning
+ *   tokens in reasoning item outputs. This enables reasoning items to be used in
+ *   multi-turn conversations when using the Responses API statelessly (like when
+ *   the `store` parameter is set to `false`, or when an organization is enrolled
+ *   in the zero data retention program).
  */
 export type ResponseIncludable =
   | 'file_search_call.results'
   | 'message.input_image.image_url'
-  | 'computer_call_output.output.image_url';
+  | 'computer_call_output.output.image_url'
+  | 'reasoning.encrypted_content';
 
 /**
  * An event that is emitted when a response finishes as incomplete.
@@ -1650,7 +1656,7 @@ export interface ResponseInputFile {
   /**
    * The ID of the file to be sent to the model.
    */
-  file_id?: string;
+  file_id?: string | null;
 
   /**
    * The name of the file to be sent to the model.
@@ -1667,7 +1673,7 @@ export interface ResponseInputImage {
    * The detail level of the image to be sent to the model. One of `high`, `low`, or
    * `auto`. Defaults to `auto`.
    */
-  detail: 'high' | 'low' | 'auto';
+  detail: 'low' | 'high' | 'auto';
 
   /**
    * The type of the input item. Always `input_image`.
@@ -1758,19 +1764,19 @@ export namespace ResponseInputItem {
     /**
      * The ID of the computer tool call output.
      */
-    id?: string;
+    id?: string | null;
 
     /**
      * The safety checks reported by the API that have been acknowledged by the
      * developer.
      */
-    acknowledged_safety_checks?: Array<ComputerCallOutput.AcknowledgedSafetyCheck>;
+    acknowledged_safety_checks?: Array<ComputerCallOutput.AcknowledgedSafetyCheck> | null;
 
     /**
      * The status of the message input. One of `in_progress`, `completed`, or
      * `incomplete`. Populated when input items are returned via API.
      */
-    status?: 'in_progress' | 'completed' | 'incomplete';
+    status?: 'in_progress' | 'completed' | 'incomplete' | null;
   }
 
   export namespace ComputerCallOutput {
@@ -1786,12 +1792,12 @@ export namespace ResponseInputItem {
       /**
        * The type of the pending safety check.
        */
-      code: string;
+      code?: string | null;
 
       /**
        * Details about the pending safety check.
        */
-      message: string;
+      message?: string | null;
     }
   }
 
@@ -1818,13 +1824,13 @@ export namespace ResponseInputItem {
      * The unique ID of the function tool call output. Populated when this item is
      * returned via API.
      */
-    id?: string;
+    id?: string | null;
 
     /**
      * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
      * Populated when items are returned via API.
      */
-    status?: 'in_progress' | 'completed' | 'incomplete';
+    status?: 'in_progress' | 'completed' | 'incomplete' | null;
   }
 
   /**
@@ -1839,7 +1845,7 @@ export namespace ResponseInputItem {
     /**
      * The type of item to reference. Always `item_reference`.
      */
-    type: 'item_reference';
+    type?: 'item_reference' | null;
   }
 }
 
@@ -2119,7 +2125,9 @@ export namespace ResponseOutputText {
 
 /**
  * A description of the chain of thought used by a reasoning model while generating
- * a response.
+ * a response. Be sure to include these items in your `input` to the Responses API
+ * for subsequent turns of a conversation if you are manually
+ * [managing context](https://platform.openai.com/docs/guides/conversation-state).
  */
 export interface ResponseReasoningItem {
   /**
@@ -2136,6 +2144,12 @@ export interface ResponseReasoningItem {
    * The type of the object. Always `reasoning`.
    */
   type: 'reasoning';
+
+  /**
+   * The encrypted content of the reasoning item - populated when a response is
+   * generated with `reasoning.encrypted_content` in the `include` parameter.
+   */
+  encrypted_content?: string | null;
 
   /**
    * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
@@ -2730,11 +2744,9 @@ export interface ResponseWebSearchCallSearchingEvent {
 }
 
 /**
- * A tool that searches for relevant content from uploaded files. Learn more about
- * the
- * [file search tool](https://platform.openai.com/docs/guides/tools-file-search).
+ * A tool that can be used to generate a response.
  */
-export type Tool = FileSearchTool | FunctionTool | ComputerTool | WebSearchTool;
+export type Tool = FileSearchTool | FunctionTool | WebSearchTool | ComputerTool;
 
 /**
  * Use this option to force the model to call a specific function.
@@ -2788,10 +2800,8 @@ export interface ToolChoiceTypes {
  */
 export interface WebSearchTool {
   /**
-   * The type of the web search tool. One of:
-   *
-   * - `web_search_preview`
-   * - `web_search_preview_2025_03_11`
+   * The type of the web search tool. One of `web_search_preview` or
+   * `web_search_preview_2025_03_11`.
    */
   type: 'web_search_preview' | 'web_search_preview_2025_03_11';
 
@@ -2801,10 +2811,16 @@ export interface WebSearchTool {
    */
   search_context_size?: 'low' | 'medium' | 'high';
 
+  /**
+   * The user's location.
+   */
   user_location?: WebSearchTool.UserLocation | null;
 }
 
 export namespace WebSearchTool {
+  /**
+   * The user's location.
+   */
   export interface UserLocation {
     /**
      * The type of location approximation. Always `approximate`.
@@ -2814,24 +2830,24 @@ export namespace WebSearchTool {
     /**
      * Free text input for the city of the user, e.g. `San Francisco`.
      */
-    city?: string;
+    city?: string | null;
 
     /**
      * The two-letter [ISO country code](https://en.wikipedia.org/wiki/ISO_3166-1) of
      * the user, e.g. `US`.
      */
-    country?: string;
+    country?: string | null;
 
     /**
      * Free text input for the region of the user, e.g. `California`.
      */
-    region?: string;
+    region?: string | null;
 
     /**
      * The [IANA timezone](https://timeapi.io/documentation/iana-timezones) of the
      * user, e.g. `America/Los_Angeles`.
      */
-    timezone?: string;
+    timezone?: string | null;
   }
 }
 
@@ -2869,6 +2885,11 @@ export interface ResponseCreateParamsBase {
    * - `message.input_image.image_url`: Include image urls from the input message.
    * - `computer_call_output.output.image_url`: Include image urls from the computer
    *   call output.
+   * - `reasoning.encrypted_content`: Includes an encrypted version of reasoning
+   *   tokens in reasoning item outputs. This enables reasoning items to be used in
+   *   multi-turn conversations when using the Responses API statelessly (like when
+   *   the `store` parameter is set to `false`, or when an organization is enrolled
+   *   in the zero data retention program).
    */
   include?: Array<ResponseIncludable> | null;
 
