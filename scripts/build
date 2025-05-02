@@ -19,8 +19,12 @@ for file in LICENSE CHANGELOG.md; do
   if [ -e "${file}" ]; then cp "${file}" dist; fi
 done
 if [ -e "bin/cli" ]; then
-  mkdir dist/bin
+  mkdir -p dist/bin
   cp -p "bin/cli" dist/bin/;
+fi
+if [ -e "bin/migration-config.json" ]; then
+  mkdir -p dist/bin
+  cp -p "bin/migration-config.json" dist/bin/;
 fi
 # this converts the export map paths for the dist directory
 # and does a few other minor things

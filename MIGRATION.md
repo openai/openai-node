@@ -4,95 +4,40 @@ This guide outlines the changes and steps needed to migrate your codebase to the
 
 The main changes are that the SDK now relies on the [builtin Web fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API) instead of `node-fetch` and has zero dependencies.
 
+## Migration CLI
+
+Most programs will only need minimal changes, but to assist there is a migration tool that will automatically update your code for the new version.
+To use it, upgrade the `openai` package, then run `./node_modules/.bin/openai migrate ./your/src/folders` to update your code.
+To preview the changes without writing them to disk, run the tool with `--dry`.
+
 ## Environment requirements
 
 The minimum supported runtime and tooling versions are now:
 
-- Node.js 18.x last LTS (Required for built-in fetch support)
+- Node.js 18.x last LTS (Required for builtin fetch support)
   - This was previously documented as the minimum supported Node.js version but Node.js 16.x mostly worked at runtime; now it will not.
 - TypeScript 4.9
 - Jest 28
 
-## Minimum types requirements
-
-### DOM
-
-`tsconfig.json`
-
-```jsonc
-{
-  "target": "ES2015", // note: we recommend ES2020 or higher
-  "lib": ["DOM", "DOM.Iterable", "ES2018"]
-}
-```
-
-### Node.js
-
-`tsconfig.json`
-
-```jsonc
-{
-  "target": "ES2015" // note: we recommend ES2020 or higher
-}
-```
-
-`package.json`
-
-```json
-{
-  "devDependencies": {
-    "@types/node": ">= 18.18.7"
-  }
-}
-```
-
-### Cloudflare Workers
-
-`tsconfig.json`
-
-```jsonc
-{
-  "target": "ES2015", // note: we recommend ES2020 or higher
-  "lib": ["ES2020"], // <- needed by @cloudflare/workers-types
-  "types": ["@cloudflare/workers-types"]
-}
-```
-
-`package.json`
-
-```json
-{
-  "devDependencies": {
-    "@cloudflare/workers-types": ">= 0.20221111.0"
-  }
-}
-```
-
-### Bun
-
-`tsconfig.json`
-
-```jsonc
-{
-  "target": "ES2015" // note: we recommend ES2020 or higher
-}
-```
-
-`package.json`
-
-```json
-{
-  "devDependencies": {
-    "@types/bun": ">= 1.2.0"
-  }
-}
-```
-
-### Deno
-
-No config needed!
-
 ## Breaking changes
+
+### Web types for `withResponse`, `asResponse`, and `APIError.headers`
+
+Because we now use the builtin Web fetch API on all platforms, if you wrote code that used `withResponse` or `asResponse` and then accessed `node-fetch`-specific properties on the result, you will need to switch to standardized alternatives.
+For example, `body` is now a [Web `ReadableStream`](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream) rather than a [node `Readable`](https://nodejs.org/api/stream.html#readable-streams).
+
+```ts
+// Before:
+const res = await client.example.retrieve('string/with/slash').asResponse();
+res.body.pipe(process.stdout);
+
+// After:
+import { Readable } from 'node:stream';
+const res = await client.example.retrieve('string/with/slash').asResponse();
+Readable.fromWeb(res.body).pipe(process.stdout);
+```
+
+Additionally, the `headers` property on `APIError` objects is now an instance of the Web [Headers](https://developer.mozilla.org/en-US/docs/Web/API/Headers) class. It was previously defined as `Record<string, string | null | undefined>`.
 
 ### Named path parameters
 
@@ -409,6 +354,80 @@ import OpenAI from 'openai/src';
 import OpenAI from 'openai';
 ```
 
-### Headers
+## TypeScript troubleshooting
 
-The `headers` property on `APIError` objects is now an instance of the Web [Headers](https://developer.mozilla.org/en-US/docs/Web/API/Headers) class. It was previously just `Record<string, string | null | undefined>`.
+When referencing the library after updating, you may encounter new type errors related to JS features like private properties or fetch classes like Request, Response, and Headers.
+To resolve these issues, configure your tsconfig.json and install the appropriate `@types` packages for your runtime environment using the guidelines below:
+
+### Browsers
+
+`tsconfig.json`
+
+```jsonc
+{
+  "target": "ES2018", // note: we recommend ES2020 or higher
+  "lib": ["DOM", "DOM.Iterable", "ES2018"]
+}
+```
+
+### Node.js
+
+`tsconfig.json`
+
+```jsonc
+{
+  "target": "ES2018" // note: we recommend ES2020 or higher
+}
+```
+
+`package.json`
+
+```json
+{
+  "devDependencies": {
+    "@types/node": ">= 18.18.7"
+  }
+}
+```
+
+### Cloudflare Workers
+
+`tsconfig.json`
+
+```jsonc
+{
+  "target": "ES2018", // note: we recommend ES2020 or higher
+  "lib": ["ES2020"], // <- needed by @cloudflare/workers-types
+  "types": ["@cloudflare/workers-types"]
+}
+```
+
+`package.json`
+
+```json
+{
+  "devDependencies": {
+    "@cloudflare/workers-types": ">= 0.20221111.0"
+  }
+}
+```
+
+### Bun
+
+`tsconfig.json`
+
+```jsonc
+{
+  "target": "ES2018" // note: we recommend ES2020 or higher
+}
+```
+
+`package.json`
+
+```json
+{
+  "devDependencies": {
+    "@types/bun": ">= 1.2.0"
+  }
+}
+```
