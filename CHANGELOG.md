@@ -1,5 +1,24 @@
 # Changelog
 
+## 4.97.0 (2025-05-02)
+
+Full Changelog: [v4.96.2...v4.97.0](https://github.com/openai/openai-node/compare/v4.96.2...v4.97.0)
+
+### Features
+
+* **api:** add image sizes, reasoning encryption ([9c2113a](https://github.com/openai/openai-node/commit/9c2113af7c7ea9a797a0e39d07d9ad8627c96acb))
+
+
+### Chores
+
+* **docs:** add missing deprecation warnings ([253392c](https://github.com/openai/openai-node/commit/253392c93adca88e0ee83f784183b2128ff64a16))
+
+
+### Documentation
+
+* fix "procesing" -&gt; "processing" in realtime examples ([#1406](https://github.com/openai/openai-node/issues/1406)) ([8717b9f](https://github.com/openai/openai-node/commit/8717b9fce87d03e51d40ee58f5d6259408405e1f))
+* **readme:** fix typo ([cab3478](https://github.com/openai/openai-node/commit/cab3478f195f9de5c21033a1b3684f52ad347ffc))
+
 ## 4.96.2 (2025-04-29)
 
 Full Changelog: [v4.96.1...v4.96.2](https://github.com/openai/openai-node/compare/v4.96.1...v4.96.2)
