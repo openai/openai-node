@@ -51,6 +51,7 @@ describe('resource images', () => {
     const response = await client.images.edit({
       image: await toFile(Buffer.from('# my file contents'), 'README.md'),
       prompt: 'A cute baby sea otter wearing a beret',
+      background: 'transparent',
       mask: await toFile(Buffer.from('# my file contents'), 'README.md'),
       model: 'string',
       n: 1,
