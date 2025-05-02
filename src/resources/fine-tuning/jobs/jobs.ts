@@ -466,8 +466,9 @@ export interface JobCreateParams {
   training_file: string;
 
   /**
-   * The hyperparameters used for the fine-tuning job. This value is now deprecated
-   * in favor of `method`, and should be passed in under the `method` parameter.
+   * @deprecated The hyperparameters used for the fine-tuning job. This value is now
+   * deprecated in favor of `method`, and should be passed in under the `method`
+   * parameter.
    */
   hyperparameters?: JobCreateParams.Hyperparameters;
 
