@@ -1,5 +1,52 @@
 # Changelog
 
+## 4.97.0 (2025-05-02)
+
+Full Changelog: [v4.96.2...v4.97.0](https://github.com/openai/openai-node/compare/v4.96.2...v4.97.0)
+
+### Features
+
+* **api:** add image sizes, reasoning encryption ([9c2113a](https://github.com/openai/openai-node/commit/9c2113af7c7ea9a797a0e39d07d9ad8627c96acb))
+
+
+### Chores
+
+* **docs:** add missing deprecation warnings ([253392c](https://github.com/openai/openai-node/commit/253392c93adca88e0ee83f784183b2128ff64a16))
+
+
+### Documentation
+
+* fix "procesing" -&gt; "processing" in realtime examples ([#1406](https://github.com/openai/openai-node/issues/1406)) ([8717b9f](https://github.com/openai/openai-node/commit/8717b9fce87d03e51d40ee58f5d6259408405e1f))
+* **readme:** fix typo ([cab3478](https://github.com/openai/openai-node/commit/cab3478f195f9de5c21033a1b3684f52ad347ffc))
+
+## 4.96.2 (2025-04-29)
+
+Full Changelog: [v4.96.1...v4.96.2](https://github.com/openai/openai-node/compare/v4.96.1...v4.96.2)
+
+### Bug Fixes
+
+* **types:** export ParseableToolsParams ([#1486](https://github.com/openai/openai-node/issues/1486)) ([3e7c92c](https://github.com/openai/openai-node/commit/3e7c92c8a76c1f747610d63d9d69a88b796ee9fc))
+
+
+### Chores
+
+* **ci:** only use depot for staging repos ([214da39](https://github.com/openai/openai-node/commit/214da398c76f46d40994665f3ca7e10e203e9579))
+* **ci:** run on more branches and use depot runners ([ead76fc](https://github.com/openai/openai-node/commit/ead76fc6429ac52a1c8b008ac5c0afcefaa0bae5))
+
+## 4.96.1 (2025-04-29)
+
+Full Changelog: [v4.96.0...v4.96.1](https://github.com/openai/openai-node/compare/v4.96.0...v4.96.1)
+
+### Bug Fixes
+
+* **types:** export ParseableToolsParams ([#1486](https://github.com/openai/openai-node/issues/1486)) ([eb055b2](https://github.com/openai/openai-node/commit/eb055b26ce90e5fe1b101a95a4390956d519e168))
+
+
+### Chores
+
+* **ci:** only use depot for staging repos ([e80af47](https://github.com/openai/openai-node/commit/e80af47590056baa8f456e8d60c37f0d00ff08c4))
+* **ci:** run on more branches and use depot runners ([b04a801](https://github.com/openai/openai-node/commit/b04a801d0356105eacddbb4d10f4359719585dd6))
+
 ## 4.96.0 (2025-04-23)
 
 Full Changelog: [v4.95.1...v4.96.0](https://github.com/openai/openai-node/compare/v4.95.1...v4.96.0)

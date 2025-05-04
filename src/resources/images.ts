@@ -162,10 +162,13 @@ export interface ImageCreateVariationParams {
 
 export interface ImageEditParams {
   /**
-   * The image(s) to edit. Must be a supported image file or an array of images. For
-   * `gpt-image-1`, each image should be a `png`, `webp`, or `jpg` file less than
-   * 25MB. For `dall-e-2`, you can only provide one image, and it should be a square
-   * `png` file less than 4MB.
+   * The image(s) to edit. Must be a supported image file or an array of images.
+   *
+   * For `gpt-image-1`, each image should be a `png`, `webp`, or `jpg` file less than
+   * 25MB. You can provide up to 16 images.
+   *
+   * For `dall-e-2`, you can only provide one image, and it should be a square `png`
+   * file less than 4MB.
    */
   image: Core.Uploadable | Array<Core.Uploadable>;
 
@@ -174,6 +177,17 @@ export interface ImageEditParams {
    * characters for `dall-e-2`, and 32000 characters for `gpt-image-1`.
    */
   prompt: string;
+
+  /**
+   * Allows to set transparency for the background of the generated image(s). This
+   * parameter is only supported for `gpt-image-1`. Must be one of `transparent`,
+   * `opaque` or `auto` (default value). When `auto` is used, the model will
+   * automatically determine the best background for the image.
+   *
+   * If `transparent`, the output format needs to support transparency, so it should
+   * be set to either `png` (default value) or `webp`.
+   */
+  background?: 'transparent' | 'opaque' | 'auto' | null;
 
   /**
    * An additional image whose fully transparent areas (e.g. where alpha is zero)
@@ -215,7 +229,7 @@ export interface ImageEditParams {
    * (landscape), `1024x1536` (portrait), or `auto` (default value) for
    * `gpt-image-1`, and one of `256x256`, `512x512`, or `1024x1024` for `dall-e-2`.
    */
-  size?: '256x256' | '512x512' | '1024x1024' | null;
+  size?: '256x256' | '512x512' | '1024x1024' | '1536x1024' | '1024x1536' | 'auto' | null;
 
   /**
    * A unique identifier representing your end-user, which can help OpenAI to monitor
