@@ -54,10 +54,6 @@
   "resolutions": {
     "synckit": "0.8.8"
   },
-  "browser": {
-    "./internal/shims/getBuiltinModule.mjs": "./internal/shims/nullGetBuiltinModule.mjs",
-    "./internal/shims/getBuiltinModule.js": "./internal/shims/nullGetBuiltinModule.js"
-  },
   "imports": {
     "openai": ".",
     "openai/*": "./src/*"
@@ -81,7 +77,9 @@
       "require": "./dist/*.js"
     }
   },
-  "bin": "./bin/cli",
+  "engines": {
+    "node": ">= 20"
+  },
   "peerDependencies": {
     "ws": "^8.18.0",
     "zod": "^3.23.8"

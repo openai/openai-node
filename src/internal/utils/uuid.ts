@@ -1,12 +1,10 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { getCrypto } from '../shims/crypto';
-
 /**
  * https://stackoverflow.com/a/2117523
  */
 export let uuid4 = function () {
-  const crypto = getCrypto();
+  const { crypto } = globalThis as any;
   if (crypto?.randomUUID) {
     uuid4 = crypto.randomUUID.bind(crypto);
     return crypto.randomUUID();
