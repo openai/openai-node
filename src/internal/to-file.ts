@@ -1,6 +1,6 @@
-import { type File, getFile } from './shims/file';
 import { BlobPart, getName, makeFile, isAsyncIterable } from './uploads';
 import type { FilePropertyBag } from './builtin-types';
+import { checkFileSupport } from './uploads';
 
 type BlobLikePart = string | ArrayBuffer | ArrayBufferView | BlobLike | DataView;
 
@@ -85,12 +85,14 @@ export async function toFile(
   name?: string | null | undefined,
   options?: FilePropertyBag | undefined,
 ): Promise<File> {
+  checkFileSupport();
+
   // If it's a promise, resolve it.
   value = await value;
 
   // If we've been given a `File` we don't need to do anything
   if (isFileLike(value)) {
-    if (value instanceof getFile()) {
+    if (value instanceof File) {
       return value;
     }
     return makeFile([await value.arrayBuffer()], value.name);

@@ -1,7 +1,6 @@
 import { type RequestOptions } from './request-options';
 import type { FilePropertyBag, Fetch } from './builtin-types';
 import type { OpenAI } from '../client';
-import { type File, getFile } from './shims/file';
 import { ReadableStreamFrom } from './shims';
 
 export type BlobPart = string | ArrayBuffer | ArrayBufferView | Blob | DataView;
@@ -11,6 +10,20 @@ type FsReadStream = AsyncIterable<Uint8Array> & { path: string | { toString(): s
 interface BunFile extends Blob {
   readonly name?: string | undefined;
 }
+
+export const checkFileSupport = () => {
+  if (typeof File === 'undefined') {
+    const { process } = globalThis as any;
+    const isOldNode =
+      typeof process?.versions?.node === 'string' && parseInt(process.versions.node.split('.')) < 20;
+    throw new Error(
+      '`File` is not defined as a global, which is required for file uploads.' +
+        (isOldNode ?
+          " Update to Node 20 LTS or newer, or set `globalThis.File` to `import('node:buffer').File`."
+        : ''),
+    );
+  }
+};
 
 /**
  * Typically, this is a native "File" class.
@@ -32,7 +45,7 @@ export function makeFile(
   fileName: string | undefined,
   options?: FilePropertyBag,
 ): File {
-  const File = getFile();
+  checkFileSupport();
   return new File(fileBits as any, fileName ?? 'unknown_file', options);
 }
 
@@ -125,8 +138,7 @@ export const createForm = async <T = Record<string, unknown>>(
 
 // We check for Blob not File because Bun.File doesn't inherit from File,
 // but they both inherit from Blob and have a `name` property at runtime.
-const isNamedBlob = (value: object) =>
-  value instanceof getFile() || (value instanceof Blob && 'name' in value);
+const isNamedBlob = (value: object) => value instanceof Blob && 'name' in value;
 
 const isUploadable = (value: unknown) =>
   typeof value === 'object' &&

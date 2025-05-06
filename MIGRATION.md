@@ -14,8 +14,7 @@ To preview the changes without writing them to disk, run the tool with `--dry`.
 
 The minimum supported runtime and tooling versions are now:
 
-- Node.js 18.x last LTS (Required for builtin fetch support)
-  - This was previously documented as the minimum supported Node.js version but Node.js 16.x mostly worked at runtime; now it will not.
+- Node.js 20 LTS (Most recent non-EOL Node version)
 - TypeScript 4.9
 - Jest 28
 
@@ -385,7 +384,7 @@ To resolve these issues, configure your tsconfig.json and install the appropriat
 ```json
 {
   "devDependencies": {
-    "@types/node": ">= 18.18.7"
+    "@types/node": ">= 20"
   }
 }
 ```
