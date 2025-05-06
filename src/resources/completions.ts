@@ -10,6 +10,14 @@ import { Stream } from '../streaming';
 export class Completions extends APIResource {
   /**
    * Creates a completion for the provided prompt and parameters.
+   *
+   * @example
+   * ```ts
+   * const completion = await client.completions.create({
+   *   model: 'string',
+   *   prompt: 'This is a test.',
+   * });
+   * ```
    */
   create(body: CompletionCreateParamsNonStreaming, options?: Core.RequestOptions): APIPromise<Completion>;
   create(

@@ -33,6 +33,16 @@ export class Completions extends APIResource {
    * supported for reasoning models are noted below. For the current state of
    * unsupported parameters in reasoning models,
    * [refer to the reasoning guide](https://platform.openai.com/docs/guides/reasoning).
+   *
+   * @example
+   * ```ts
+   * const chatCompletion = await client.chat.completions.create(
+   *   {
+   *     messages: [{ content: 'string', role: 'developer' }],
+   *     model: 'gpt-4o',
+   *   },
+   * );
+   * ```
    */
   create(
     body: ChatCompletionCreateParamsNonStreaming,
@@ -58,6 +68,12 @@ export class Completions extends APIResource {
   /**
    * Get a stored chat completion. Only Chat Completions that have been created with
    * the `store` parameter set to `true` will be returned.
+   *
+   * @example
+   * ```ts
+   * const chatCompletion =
+   *   await client.chat.completions.retrieve('completion_id');
+   * ```
    */
   retrieve(completionId: string, options?: Core.RequestOptions): Core.APIPromise<ChatCompletion> {
     return this._client.get(`/chat/completions/${completionId}`, options);
@@ -67,6 +83,14 @@ export class Completions extends APIResource {
    * Modify a stored chat completion. Only Chat Completions that have been created
    * with the `store` parameter set to `true` can be modified. Currently, the only
    * supported modification is to update the `metadata` field.
+   *
+   * @example
+   * ```ts
+   * const chatCompletion = await client.chat.completions.update(
+   *   'completion_id',
+   *   { metadata: { foo: 'string' } },
+   * );
+   * ```
    */
   update(
     completionId: string,
@@ -79,6 +103,14 @@ export class Completions extends APIResource {
   /**
    * List stored Chat Completions. Only Chat Completions that have been stored with
    * the `store` parameter set to `true` will be returned.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const chatCompletion of client.chat.completions.list()) {
+   *   // ...
+   * }
+   * ```
    */
   list(
     query?: ChatCompletionListParams,
@@ -98,6 +130,12 @@ export class Completions extends APIResource {
   /**
    * Delete a stored chat completion. Only Chat Completions that have been created
    * with the `store` parameter set to `true` can be deleted.
+   *
+   * @example
+   * ```ts
+   * const chatCompletionDeleted =
+   *   await client.chat.completions.del('completion_id');
+   * ```
    */
   del(completionId: string, options?: Core.RequestOptions): Core.APIPromise<ChatCompletionDeleted> {
     return this._client.delete(`/chat/completions/${completionId}`, options);

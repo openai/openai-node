@@ -61,6 +61,14 @@ export class Responses extends APIResource {
    * [web search](https://platform.openai.com/docs/guides/tools-web-search) or
    * [file search](https://platform.openai.com/docs/guides/tools-file-search) to use
    * your own data as input for the model's response.
+   *
+   * @example
+   * ```ts
+   * const response = await client.responses.create({
+   *   input: 'string',
+   *   model: 'gpt-4o',
+   * });
+   * ```
    */
   create(body: ResponseCreateParamsNonStreaming, options?: Core.RequestOptions): APIPromise<Response>;
   create(
@@ -90,6 +98,13 @@ export class Responses extends APIResource {
 
   /**
    * Retrieves a model response with the given ID.
+   *
+   * @example
+   * ```ts
+   * const response = await client.responses.retrieve(
+   *   'resp_677efb5139a88190b512bc3fef8e535d',
+   * );
+   * ```
    */
   retrieve(
     responseId: string,
@@ -110,6 +125,13 @@ export class Responses extends APIResource {
 
   /**
    * Deletes a model response with the given ID.
+   *
+   * @example
+   * ```ts
+   * await client.responses.del(
+   *   'resp_677efb5139a88190b512bc3fef8e535d',
+   * );
+   * ```
    */
   del(responseId: string, options?: Core.RequestOptions): Core.APIPromise<void> {
     return this._client.delete(`/responses/${responseId}`, {

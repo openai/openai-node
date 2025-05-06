@@ -12,6 +12,12 @@ export class TranscriptionSessions extends APIResource {
    * It responds with a session object, plus a `client_secret` key which contains a
    * usable ephemeral API token that can be used to authenticate browser clients for
    * the Realtime API.
+   *
+   * @example
+   * ```ts
+   * const transcriptionSession =
+   *   await client.beta.realtime.transcriptionSessions.create();
+   * ```
    */
   create(
     body: TranscriptionSessionCreateParams,
