@@ -9,6 +9,15 @@ import { Stream } from '../../streaming';
 export class Transcriptions extends APIResource {
   /**
    * Transcribes audio into the input language.
+   *
+   * @example
+   * ```ts
+   * const transcription =
+   *   await client.audio.transcriptions.create({
+   *     file: fs.createReadStream('speech.mp3'),
+   *     model: 'gpt-4o-transcribe',
+   *   });
+   * ```
    */
   create(
     body: TranscriptionCreateParamsNonStreaming<'json' | undefined>,

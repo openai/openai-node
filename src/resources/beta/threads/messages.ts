@@ -10,6 +10,14 @@ import { CursorPage, type CursorPageParams } from '../../../pagination';
 export class Messages extends APIResource {
   /**
    * Create a message.
+   *
+   * @example
+   * ```ts
+   * const message = await client.beta.threads.messages.create(
+   *   'thread_id',
+   *   { content: 'string', role: 'user' },
+   * );
+   * ```
    */
   create(
     threadId: string,
@@ -25,6 +33,14 @@ export class Messages extends APIResource {
 
   /**
    * Retrieve a message.
+   *
+   * @example
+   * ```ts
+   * const message = await client.beta.threads.messages.retrieve(
+   *   'thread_id',
+   *   'message_id',
+   * );
+   * ```
    */
   retrieve(threadId: string, messageId: string, options?: Core.RequestOptions): Core.APIPromise<Message> {
     return this._client.get(`/threads/${threadId}/messages/${messageId}`, {
@@ -35,6 +51,14 @@ export class Messages extends APIResource {
 
   /**
    * Modifies a message.
+   *
+   * @example
+   * ```ts
+   * const message = await client.beta.threads.messages.update(
+   *   'thread_id',
+   *   'message_id',
+   * );
+   * ```
    */
   update(
     threadId: string,
@@ -51,6 +75,16 @@ export class Messages extends APIResource {
 
   /**
    * Returns a list of messages for a given thread.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const message of client.beta.threads.messages.list(
+   *   'thread_id',
+   * )) {
+   *   // ...
+   * }
+   * ```
    */
   list(
     threadId: string,
@@ -75,6 +109,15 @@ export class Messages extends APIResource {
 
   /**
    * Deletes a message.
+   *
+   * @example
+   * ```ts
+   * const messageDeleted =
+   *   await client.beta.threads.messages.del(
+   *     'thread_id',
+   *     'message_id',
+   *   );
+   * ```
    */
   del(threadId: string, messageId: string, options?: Core.RequestOptions): Core.APIPromise<MessageDeleted> {
     return this._client.delete(`/threads/${threadId}/messages/${messageId}`, {
