@@ -10,6 +10,16 @@ import { CursorPage, type CursorPageParams } from '../../../../pagination';
 export class Steps extends APIResource {
   /**
    * Retrieves a run step.
+   *
+   * @example
+   * ```ts
+   * const runStep =
+   *   await client.beta.threads.runs.steps.retrieve(
+   *     'thread_id',
+   *     'run_id',
+   *     'step_id',
+   *   );
+   * ```
    */
   retrieve(
     threadId: string,
@@ -43,6 +53,17 @@ export class Steps extends APIResource {
 
   /**
    * Returns a list of run steps belonging to a run.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const runStep of client.beta.threads.runs.steps.list(
+   *   'thread_id',
+   *   'run_id',
+   * )) {
+   *   // ...
+   * }
+   * ```
    */
   list(
     threadId: string,

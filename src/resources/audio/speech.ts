@@ -7,6 +7,18 @@ import { type Response } from '../../_shims/index';
 export class Speech extends APIResource {
   /**
    * Generates audio from the input text.
+   *
+   * @example
+   * ```ts
+   * const speech = await client.audio.speech.create({
+   *   input: 'input',
+   *   model: 'string',
+   *   voice: 'ash',
+   * });
+   *
+   * const content = await speech.blob();
+   * console.log(content);
+   * ```
    */
   create(body: SpeechCreateParams, options?: Core.RequestOptions): Core.APIPromise<Response> {
     return this._client.post('/audio/speech', {

@@ -67,6 +67,11 @@ export class Threads extends APIResource {
 
   /**
    * Create a thread.
+   *
+   * @example
+   * ```ts
+   * const thread = await client.beta.threads.create();
+   * ```
    */
   create(body?: ThreadCreateParams, options?: Core.RequestOptions): Core.APIPromise<Thread>;
   create(options?: Core.RequestOptions): Core.APIPromise<Thread>;
@@ -86,6 +91,13 @@ export class Threads extends APIResource {
 
   /**
    * Retrieves a thread.
+   *
+   * @example
+   * ```ts
+   * const thread = await client.beta.threads.retrieve(
+   *   'thread_id',
+   * );
+   * ```
    */
   retrieve(threadId: string, options?: Core.RequestOptions): Core.APIPromise<Thread> {
     return this._client.get(`/threads/${threadId}`, {
@@ -96,6 +108,13 @@ export class Threads extends APIResource {
 
   /**
    * Modifies a thread.
+   *
+   * @example
+   * ```ts
+   * const thread = await client.beta.threads.update(
+   *   'thread_id',
+   * );
+   * ```
    */
   update(threadId: string, body: ThreadUpdateParams, options?: Core.RequestOptions): Core.APIPromise<Thread> {
     return this._client.post(`/threads/${threadId}`, {
@@ -107,6 +126,13 @@ export class Threads extends APIResource {
 
   /**
    * Delete a thread.
+   *
+   * @example
+   * ```ts
+   * const threadDeleted = await client.beta.threads.del(
+   *   'thread_id',
+   * );
+   * ```
    */
   del(threadId: string, options?: Core.RequestOptions): Core.APIPromise<ThreadDeleted> {
     return this._client.delete(`/threads/${threadId}`, {
@@ -117,6 +143,13 @@ export class Threads extends APIResource {
 
   /**
    * Create a thread and run it in one request.
+   *
+   * @example
+   * ```ts
+   * const run = await client.beta.threads.createAndRun({
+   *   assistant_id: 'assistant_id',
+   * });
+   * ```
    */
   createAndRun(
     body: ThreadCreateAndRunParamsNonStreaming,

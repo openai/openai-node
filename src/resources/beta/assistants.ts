@@ -13,6 +13,13 @@ import { CursorPage, type CursorPageParams } from '../../pagination';
 export class Assistants extends APIResource {
   /**
    * Create an assistant with a model and instructions.
+   *
+   * @example
+   * ```ts
+   * const assistant = await client.beta.assistants.create({
+   *   model: 'gpt-4o',
+   * });
+   * ```
    */
   create(body: AssistantCreateParams, options?: Core.RequestOptions): Core.APIPromise<Assistant> {
     return this._client.post('/assistants', {
@@ -24,6 +31,13 @@ export class Assistants extends APIResource {
 
   /**
    * Retrieves an assistant.
+   *
+   * @example
+   * ```ts
+   * const assistant = await client.beta.assistants.retrieve(
+   *   'assistant_id',
+   * );
+   * ```
    */
   retrieve(assistantId: string, options?: Core.RequestOptions): Core.APIPromise<Assistant> {
     return this._client.get(`/assistants/${assistantId}`, {
@@ -34,6 +48,13 @@ export class Assistants extends APIResource {
 
   /**
    * Modifies an assistant.
+   *
+   * @example
+   * ```ts
+   * const assistant = await client.beta.assistants.update(
+   *   'assistant_id',
+   * );
+   * ```
    */
   update(
     assistantId: string,
@@ -49,6 +70,14 @@ export class Assistants extends APIResource {
 
   /**
    * Returns a list of assistants.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const assistant of client.beta.assistants.list()) {
+   *   // ...
+   * }
+   * ```
    */
   list(
     query?: AssistantListParams,
@@ -71,6 +100,13 @@ export class Assistants extends APIResource {
 
   /**
    * Delete an assistant.
+   *
+   * @example
+   * ```ts
+   * const assistantDeleted = await client.beta.assistants.del(
+   *   'assistant_id',
+   * );
+   * ```
    */
   del(assistantId: string, options?: Core.RequestOptions): Core.APIPromise<AssistantDeleted> {
     return this._client.delete(`/assistants/${assistantId}`, {

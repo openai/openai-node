@@ -10,6 +10,16 @@ import { type CursorPageParams } from '../../pagination';
 export class InputItems extends APIResource {
   /**
    * Returns a list of input items for a given response.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const responseItem of client.responses.inputItems.list(
+   *   'response_id',
+   * )) {
+   *   // ...
+   * }
+   * ```
    */
   list(
     responseId: string,

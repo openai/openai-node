@@ -6,6 +6,13 @@ import * as Core from '../core';
 export class Images extends APIResource {
   /**
    * Creates a variation of a given image. This endpoint only supports `dall-e-2`.
+   *
+   * @example
+   * ```ts
+   * const imagesResponse = await client.images.createVariation({
+   *   image: fs.createReadStream('otter.png'),
+   * });
+   * ```
    */
   createVariation(
     body: ImageCreateVariationParams,
@@ -17,6 +24,14 @@ export class Images extends APIResource {
   /**
    * Creates an edited or extended image given one or more source images and a
    * prompt. This endpoint only supports `gpt-image-1` and `dall-e-2`.
+   *
+   * @example
+   * ```ts
+   * const imagesResponse = await client.images.edit({
+   *   image: fs.createReadStream('path/to/file'),
+   *   prompt: 'A cute baby sea otter wearing a beret',
+   * });
+   * ```
    */
   edit(body: ImageEditParams, options?: Core.RequestOptions): Core.APIPromise<ImagesResponse> {
     return this._client.post('/images/edits', Core.multipartFormRequestOptions({ body, ...options }));
@@ -25,6 +40,13 @@ export class Images extends APIResource {
   /**
    * Creates an image given a prompt.
    * [Learn more](https://platform.openai.com/docs/guides/images).
+   *
+   * @example
+   * ```ts
+   * const imagesResponse = await client.images.generate({
+   *   prompt: 'A cute baby sea otter',
+   * });
+   * ```
    */
   generate(body: ImageGenerateParams, options?: Core.RequestOptions): Core.APIPromise<ImagesResponse> {
     return this._client.post('/images/generations', { body, ...options });
