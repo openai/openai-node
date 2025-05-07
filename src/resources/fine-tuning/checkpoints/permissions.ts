@@ -12,6 +12,17 @@ export class Permissions extends APIResource {
    *
    * This enables organization owners to share fine-tuned models with other projects
    * in their organization.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const permissionCreateResponse of client.fineTuning.checkpoints.permissions.create(
+   *   'ft:gpt-4o-mini-2024-07-18:org:weather:B7R9VjQd',
+   *   { project_ids: ['string'] },
+   * )) {
+   *   // ...
+   * }
+   * ```
    */
   create(
     fineTunedModelCheckpoint: string,
@@ -30,6 +41,14 @@ export class Permissions extends APIResource {
    *
    * Organization owners can use this endpoint to view all permissions for a
    * fine-tuned model checkpoint.
+   *
+   * @example
+   * ```ts
+   * const permission =
+   *   await client.fineTuning.checkpoints.permissions.retrieve(
+   *     'ft-AF1WoRqd3aJAHsqc9NY7iL8F',
+   *   );
+   * ```
    */
   retrieve(
     fineTunedModelCheckpoint: string,
@@ -47,6 +66,18 @@ export class Permissions extends APIResource {
    *
    * Organization owners can use this endpoint to delete a permission for a
    * fine-tuned model checkpoint.
+   *
+   * @example
+   * ```ts
+   * const permission =
+   *   await client.fineTuning.checkpoints.permissions.delete(
+   *     'cp_zc4Q7MP6XxulcVzj4MZdwsAB',
+   *     {
+   *       fine_tuned_model_checkpoint:
+   *         'ft:gpt-4o-mini-2024-07-18:org:weather:B7R9VjQd',
+   *     },
+   *   );
+   * ```
    */
   delete(
     permissionID: string,

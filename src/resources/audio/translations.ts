@@ -11,6 +11,14 @@ import { multipartFormRequestOptions } from '../../internal/uploads';
 export class Translations extends APIResource {
   /**
    * Translates audio into English.
+   *
+   * @example
+   * ```ts
+   * const translation = await client.audio.translations.create({
+   *   file: fs.createReadStream('speech.mp3'),
+   *   model: 'whisper-1',
+   * });
+   * ```
    */
   create(body: TranslationCreateParams, options?: RequestOptions): APIPromise<TranslationCreateResponse> {
     return this._client.post(

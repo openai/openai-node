@@ -12,6 +12,15 @@ import { path } from '../../../../internal/utils/path';
 export class Steps extends APIResource {
   /**
    * Retrieves a run step.
+   *
+   * @example
+   * ```ts
+   * const runStep =
+   *   await client.beta.threads.runs.steps.retrieve('step_id', {
+   *     thread_id: 'thread_id',
+   *     run_id: 'run_id',
+   *   });
+   * ```
    */
   retrieve(stepID: string, params: StepRetrieveParams, options?: RequestOptions): APIPromise<RunStep> {
     const { thread_id, run_id, ...query } = params;
@@ -24,6 +33,17 @@ export class Steps extends APIResource {
 
   /**
    * Returns a list of run steps belonging to a run.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const runStep of client.beta.threads.runs.steps.list(
+   *   'run_id',
+   *   { thread_id: 'thread_id' },
+   * )) {
+   *   // ...
+   * }
+   * ```
    */
   list(runID: string, params: StepListParams, options?: RequestOptions): PagePromise<RunStepsPage, RunStep> {
     const { thread_id, ...query } = params;

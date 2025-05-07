@@ -8,6 +8,18 @@ import { RequestOptions } from '../../internal/request-options';
 export class Speech extends APIResource {
   /**
    * Generates audio from the input text.
+   *
+   * @example
+   * ```ts
+   * const speech = await client.audio.speech.create({
+   *   input: 'input',
+   *   model: 'string',
+   *   voice: 'ash',
+   * });
+   *
+   * const content = await speech.blob();
+   * console.log(content);
+   * ```
    */
   create(body: SpeechCreateParams, options?: RequestOptions): APIPromise<Response> {
     return this._client.post('/audio/speech', {

@@ -14,6 +14,12 @@ export class Sessions extends APIResource {
    * It responds with a session object, plus a `client_secret` key which contains a
    * usable ephemeral API token that can be used to authenticate browser clients for
    * the Realtime API.
+   *
+   * @example
+   * ```ts
+   * const session =
+   *   await client.beta.realtime.sessions.create();
+   * ```
    */
   create(body: SessionCreateParams, options?: RequestOptions): APIPromise<SessionCreateResponse> {
     return this._client.post('/realtime/sessions', {

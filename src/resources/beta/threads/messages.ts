@@ -12,6 +12,14 @@ import { path } from '../../../internal/utils/path';
 export class Messages extends APIResource {
   /**
    * Create a message.
+   *
+   * @example
+   * ```ts
+   * const message = await client.beta.threads.messages.create(
+   *   'thread_id',
+   *   { content: 'string', role: 'user' },
+   * );
+   * ```
    */
   create(threadID: string, body: MessageCreateParams, options?: RequestOptions): APIPromise<Message> {
     return this._client.post(path`/threads/${threadID}/messages`, {
@@ -23,6 +31,14 @@ export class Messages extends APIResource {
 
   /**
    * Retrieve a message.
+   *
+   * @example
+   * ```ts
+   * const message = await client.beta.threads.messages.retrieve(
+   *   'message_id',
+   *   { thread_id: 'thread_id' },
+   * );
+   * ```
    */
   retrieve(messageID: string, params: MessageRetrieveParams, options?: RequestOptions): APIPromise<Message> {
     const { thread_id } = params;
@@ -34,6 +50,14 @@ export class Messages extends APIResource {
 
   /**
    * Modifies a message.
+   *
+   * @example
+   * ```ts
+   * const message = await client.beta.threads.messages.update(
+   *   'message_id',
+   *   { thread_id: 'thread_id' },
+   * );
+   * ```
    */
   update(messageID: string, params: MessageUpdateParams, options?: RequestOptions): APIPromise<Message> {
     const { thread_id, ...body } = params;
@@ -46,6 +70,16 @@ export class Messages extends APIResource {
 
   /**
    * Returns a list of messages for a given thread.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const message of client.beta.threads.messages.list(
+   *   'thread_id',
+   * )) {
+   *   // ...
+   * }
+   * ```
    */
   list(
     threadID: string,
@@ -61,6 +95,14 @@ export class Messages extends APIResource {
 
   /**
    * Deletes a message.
+   *
+   * @example
+   * ```ts
+   * const messageDeleted =
+   *   await client.beta.threads.messages.delete('message_id', {
+   *     thread_id: 'thread_id',
+   *   });
+   * ```
    */
   delete(
     messageID: string,
