@@ -8,6 +8,16 @@ import { path } from '../../../internal/utils/path';
 export class Checkpoints extends APIResource {
   /**
    * List checkpoints for a fine-tuning job.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const fineTuningJobCheckpoint of client.fineTuning.jobs.checkpoints.list(
+   *   'ft-AF1WoRqd3aJAHsqc9NY7iL8F',
+   * )) {
+   *   // ...
+   * }
+   * ```
    */
   list(
     fineTuningJobID: string,

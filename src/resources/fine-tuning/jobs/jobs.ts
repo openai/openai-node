@@ -25,6 +25,14 @@ export class Jobs extends APIResource {
    * of the fine-tuned models once complete.
    *
    * [Learn more about fine-tuning](https://platform.openai.com/docs/guides/fine-tuning)
+   *
+   * @example
+   * ```ts
+   * const fineTuningJob = await client.fineTuning.jobs.create({
+   *   model: 'gpt-4o-mini',
+   *   training_file: 'file-abc123',
+   * });
+   * ```
    */
   create(body: JobCreateParams, options?: RequestOptions): APIPromise<FineTuningJob> {
     return this._client.post('/fine_tuning/jobs', { body, ...options });
@@ -34,6 +42,13 @@ export class Jobs extends APIResource {
    * Get info about a fine-tuning job.
    *
    * [Learn more about fine-tuning](https://platform.openai.com/docs/guides/fine-tuning)
+   *
+   * @example
+   * ```ts
+   * const fineTuningJob = await client.fineTuning.jobs.retrieve(
+   *   'ft-AF1WoRqd3aJAHsqc9NY7iL8F',
+   * );
+   * ```
    */
   retrieve(fineTuningJobID: string, options?: RequestOptions): APIPromise<FineTuningJob> {
     return this._client.get(path`/fine_tuning/jobs/${fineTuningJobID}`, options);
@@ -41,6 +56,14 @@ export class Jobs extends APIResource {
 
   /**
    * List your organization's fine-tuning jobs
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const fineTuningJob of client.fineTuning.jobs.list()) {
+   *   // ...
+   * }
+   * ```
    */
   list(
     query: JobListParams | null | undefined = {},
@@ -51,6 +74,13 @@ export class Jobs extends APIResource {
 
   /**
    * Immediately cancel a fine-tune job.
+   *
+   * @example
+   * ```ts
+   * const fineTuningJob = await client.fineTuning.jobs.cancel(
+   *   'ft-AF1WoRqd3aJAHsqc9NY7iL8F',
+   * );
+   * ```
    */
   cancel(fineTuningJobID: string, options?: RequestOptions): APIPromise<FineTuningJob> {
     return this._client.post(path`/fine_tuning/jobs/${fineTuningJobID}/cancel`, options);
@@ -58,6 +88,16 @@ export class Jobs extends APIResource {
 
   /**
    * Get status updates for a fine-tuning job.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const fineTuningJobEvent of client.fineTuning.jobs.listEvents(
+   *   'ft-AF1WoRqd3aJAHsqc9NY7iL8F',
+   * )) {
+   *   // ...
+   * }
+   * ```
    */
   listEvents(
     fineTuningJobID: string,
