@@ -71,19 +71,17 @@ import {
   EvalCreateResponse,
   EvalCustomDataSourceConfig,
   EvalDeleteResponse,
-  EvalLabelModelGrader,
   EvalListParams,
   EvalListResponse,
   EvalListResponsesPage,
   EvalRetrieveResponse,
   EvalStoredCompletionsDataSourceConfig,
-  EvalStringCheckGrader,
-  EvalTextSimilarityGrader,
   EvalUpdateParams,
   EvalUpdateResponse,
   Evals,
 } from './resources/evals/evals';
 import { FineTuning } from './resources/fine-tuning/fine-tuning';
+import { Graders } from './resources/graders/graders';
 import { Responses } from './resources/responses/responses';
 import {
   Upload,
@@ -305,6 +303,7 @@ export class OpenAI extends Core.APIClient {
   moderations: API.Moderations = new API.Moderations(this);
   models: API.Models = new API.Models(this);
   fineTuning: API.FineTuning = new API.FineTuning(this);
+  graders: API.Graders = new API.Graders(this);
   vectorStores: API.VectorStores = new API.VectorStores(this);
   beta: API.Beta = new API.Beta(this);
   batches: API.Batches = new API.Batches(this);
@@ -366,6 +365,7 @@ OpenAI.Moderations = Moderations;
 OpenAI.Models = Models;
 OpenAI.ModelsPage = ModelsPage;
 OpenAI.FineTuning = FineTuning;
+OpenAI.Graders = Graders;
 OpenAI.VectorStores = VectorStores;
 OpenAI.VectorStoresPage = VectorStoresPage;
 OpenAI.VectorStoreSearchResponsesPage = VectorStoreSearchResponsesPage;
@@ -487,6 +487,8 @@ export declare namespace OpenAI {
 
   export { FineTuning as FineTuning };
 
+  export { Graders as Graders };
+
   export {
     VectorStores as VectorStores,
     type AutoFileChunkingStrategyParam as AutoFileChunkingStrategyParam,
@@ -531,10 +533,7 @@ export declare namespace OpenAI {
   export {
     Evals as Evals,
     type EvalCustomDataSourceConfig as EvalCustomDataSourceConfig,
-    type EvalLabelModelGrader as EvalLabelModelGrader,
     type EvalStoredCompletionsDataSourceConfig as EvalStoredCompletionsDataSourceConfig,
-    type EvalStringCheckGrader as EvalStringCheckGrader,
-    type EvalTextSimilarityGrader as EvalTextSimilarityGrader,
     type EvalCreateResponse as EvalCreateResponse,
     type EvalRetrieveResponse as EvalRetrieveResponse,
     type EvalUpdateResponse as EvalUpdateResponse,
