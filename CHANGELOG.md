@@ -1,5 +1,24 @@
 # Changelog
 
+## 4.98.0 (2025-05-08)
+
+Full Changelog: [v4.97.0...v4.98.0](https://github.com/openai/openai-node/compare/v4.97.0...v4.98.0)
+
+### Features
+
+* **api:** Add reinforcement fine-tuning api support ([4aa7a79](https://github.com/openai/openai-node/commit/4aa7a7954c63caa26cc1640ace56093fe1cafa04))
+
+
+### Chores
+
+* **ci:** bump node version for release workflows ([2961f63](https://github.com/openai/openai-node/commit/2961f63c4d5b8ae8efdf8ea6581aa83c6b0f722e))
+* **internal:** fix formatting ([91a44fe](https://github.com/openai/openai-node/commit/91a44fe11c0847dc50d48a03a8d409ac4bece37a))
+
+
+### Documentation
+
+* add examples to tsdocs ([7d841b7](https://github.com/openai/openai-node/commit/7d841b7f98eb542a398fb9de12056125e8d6cb22))
+
 ## 4.97.0 (2025-05-02)
 
 Full Changelog: [v4.96.2...v4.97.0](https://github.com/openai/openai-node/compare/v4.96.2...v4.97.0)
