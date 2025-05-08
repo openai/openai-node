@@ -1,6 +1,18 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../resource';
+import * as MethodsAPI from './methods';
+import {
+  DpoHyperparameters,
+  DpoMethod,
+  Methods,
+  ReinforcementHyperparameters,
+  ReinforcementMethod,
+  SupervisedHyperparameters,
+  SupervisedMethod,
+} from './methods';
+import * as AlphaAPI from './alpha/alpha';
+import { Alpha } from './alpha/alpha';
 import * as CheckpointsAPI from './checkpoints/checkpoints';
 import { Checkpoints } from './checkpoints/checkpoints';
 import * as JobsAPI from './jobs/jobs';
@@ -19,16 +31,30 @@ import {
 } from './jobs/jobs';
 
 export class FineTuning extends APIResource {
+  methods: MethodsAPI.Methods = new MethodsAPI.Methods(this._client);
   jobs: JobsAPI.Jobs = new JobsAPI.Jobs(this._client);
   checkpoints: CheckpointsAPI.Checkpoints = new CheckpointsAPI.Checkpoints(this._client);
+  alpha: AlphaAPI.Alpha = new AlphaAPI.Alpha(this._client);
 }
 
+FineTuning.Methods = Methods;
 FineTuning.Jobs = Jobs;
 FineTuning.FineTuningJobsPage = FineTuningJobsPage;
 FineTuning.FineTuningJobEventsPage = FineTuningJobEventsPage;
 FineTuning.Checkpoints = Checkpoints;
+FineTuning.Alpha = Alpha;
 
 export declare namespace FineTuning {
+  export {
+    Methods as Methods,
+    type DpoHyperparameters as DpoHyperparameters,
+    type DpoMethod as DpoMethod,
+    type ReinforcementHyperparameters as ReinforcementHyperparameters,
+    type ReinforcementMethod as ReinforcementMethod,
+    type SupervisedHyperparameters as SupervisedHyperparameters,
+    type SupervisedMethod as SupervisedMethod,
+  };
+
   export {
     Jobs as Jobs,
     type FineTuningJob as FineTuningJob,
@@ -44,4 +70,6 @@ export declare namespace FineTuning {
   };
 
   export { Checkpoints as Checkpoints };
+
+  export { Alpha as Alpha };
 }
