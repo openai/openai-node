@@ -32,10 +32,7 @@ export {
 export {
   Evals,
   type EvalCustomDataSourceConfig,
-  type EvalLabelModelGrader,
   type EvalStoredCompletionsDataSourceConfig,
-  type EvalStringCheckGrader,
-  type EvalTextSimilarityGrader,
   type EvalCreateResponse,
   type EvalRetrieveResponse,
   type EvalUpdateResponse,
@@ -57,6 +54,7 @@ export {
   type FileObjectsPage,
 } from './files';
 export { FineTuning } from './fine-tuning/fine-tuning';
+export { Graders } from './graders/graders';
 export {
   Images,
   type Image,

@@ -205,6 +205,17 @@ Methods:
 
 # FineTuning
 
+## Methods
+
+Types:
+
+- <code><a href="./src/resources/fine-tuning/methods.ts">DpoHyperparameters</a></code>
+- <code><a href="./src/resources/fine-tuning/methods.ts">DpoMethod</a></code>
+- <code><a href="./src/resources/fine-tuning/methods.ts">ReinforcementHyperparameters</a></code>
+- <code><a href="./src/resources/fine-tuning/methods.ts">ReinforcementMethod</a></code>
+- <code><a href="./src/resources/fine-tuning/methods.ts">SupervisedHyperparameters</a></code>
+- <code><a href="./src/resources/fine-tuning/methods.ts">SupervisedMethod</a></code>
+
 ## Jobs
 
 Types:
@@ -222,6 +233,8 @@ Methods:
 - <code title="get /fine_tuning/jobs">client.fineTuning.jobs.<a href="./src/resources/fine-tuning/jobs/jobs.ts">list</a>({ ...params }) -> FineTuningJobsPage</code>
 - <code title="post /fine_tuning/jobs/{fine_tuning_job_id}/cancel">client.fineTuning.jobs.<a href="./src/resources/fine-tuning/jobs/jobs.ts">cancel</a>(fineTuningJobID) -> FineTuningJob</code>
 - <code title="get /fine_tuning/jobs/{fine_tuning_job_id}/events">client.fineTuning.jobs.<a href="./src/resources/fine-tuning/jobs/jobs.ts">listEvents</a>(fineTuningJobID, { ...params }) -> FineTuningJobEventsPage</code>
+- <code title="post /fine_tuning/jobs/{fine_tuning_job_id}/pause">client.fineTuning.jobs.<a href="./src/resources/fine-tuning/jobs/jobs.ts">pause</a>(fineTuningJobID) -> FineTuningJob</code>
+- <code title="post /fine_tuning/jobs/{fine_tuning_job_id}/resume">client.fineTuning.jobs.<a href="./src/resources/fine-tuning/jobs/jobs.ts">resume</a>(fineTuningJobID) -> FineTuningJob</code>
 
 ### Checkpoints
 
@@ -248,6 +261,33 @@ Methods:
 - <code title="post /fine_tuning/checkpoints/{fine_tuned_model_checkpoint}/permissions">client.fineTuning.checkpoints.permissions.<a href="./src/resources/fine-tuning/checkpoints/permissions.ts">create</a>(fineTunedModelCheckpoint, { ...params }) -> PermissionCreateResponsesPage</code>
 - <code title="get /fine_tuning/checkpoints/{fine_tuned_model_checkpoint}/permissions">client.fineTuning.checkpoints.permissions.<a href="./src/resources/fine-tuning/checkpoints/permissions.ts">retrieve</a>(fineTunedModelCheckpoint, { ...params }) -> PermissionRetrieveResponse</code>
 - <code title="delete /fine_tuning/checkpoints/{fine_tuned_model_checkpoint}/permissions/{permission_id}">client.fineTuning.checkpoints.permissions.<a href="./src/resources/fine-tuning/checkpoints/permissions.ts">delete</a>(permissionID, { ...params }) -> PermissionDeleteResponse</code>
+
+## Alpha
+
+### Graders
+
+Types:
+
+- <code><a href="./src/resources/fine-tuning/alpha/graders.ts">GraderRunResponse</a></code>
+- <code><a href="./src/resources/fine-tuning/alpha/graders.ts">GraderValidateResponse</a></code>
+
+Methods:
+
+- <code title="post /fine_tuning/alpha/graders/run">client.fineTuning.alpha.graders.<a href="./src/resources/fine-tuning/alpha/graders.ts">run</a>({ ...params }) -> GraderRunResponse</code>
+- <code title="post /fine_tuning/alpha/graders/validate">client.fineTuning.alpha.graders.<a href="./src/resources/fine-tuning/alpha/graders.ts">validate</a>({ ...params }) -> GraderValidateResponse</code>
+
+# Graders
+
+## GraderModels
+
+Types:
+
+- <code><a href="./src/resources/graders/grader-models.ts">LabelModelGrader</a></code>
+- <code><a href="./src/resources/graders/grader-models.ts">MultiGrader</a></code>
+- <code><a href="./src/resources/graders/grader-models.ts">PythonGrader</a></code>
+- <code><a href="./src/resources/graders/grader-models.ts">ScoreModelGrader</a></code>
+- <code><a href="./src/resources/graders/grader-models.ts">StringCheckGrader</a></code>
+- <code><a href="./src/resources/graders/grader-models.ts">TextSimilarityGrader</a></code>
 
 # VectorStores
 
@@ -668,10 +708,7 @@ Methods:
 Types:
 
 - <code><a href="./src/resources/evals/evals.ts">EvalCustomDataSourceConfig</a></code>
-- <code><a href="./src/resources/evals/evals.ts">EvalLabelModelGrader</a></code>
 - <code><a href="./src/resources/evals/evals.ts">EvalStoredCompletionsDataSourceConfig</a></code>
-- <code><a href="./src/resources/evals/evals.ts">EvalStringCheckGrader</a></code>
-- <code><a href="./src/resources/evals/evals.ts">EvalTextSimilarityGrader</a></code>
 - <code><a href="./src/resources/evals/evals.ts">EvalCreateResponse</a></code>
 - <code><a href="./src/resources/evals/evals.ts">EvalRetrieveResponse</a></code>
 - <code><a href="./src/resources/evals/evals.ts">EvalUpdateResponse</a></code>
