@@ -45,6 +45,14 @@ export class Runs extends APIResource {
 
   /**
    * Create a run.
+   *
+   * @example
+   * ```ts
+   * const run = await client.beta.threads.runs.create(
+   *   'thread_id',
+   *   { assistant_id: 'assistant_id' },
+   * );
+   * ```
    */
   create(
     threadId: string,
@@ -78,6 +86,14 @@ export class Runs extends APIResource {
 
   /**
    * Retrieves a run.
+   *
+   * @example
+   * ```ts
+   * const run = await client.beta.threads.runs.retrieve(
+   *   'thread_id',
+   *   'run_id',
+   * );
+   * ```
    */
   retrieve(threadId: string, runId: string, options?: Core.RequestOptions): Core.APIPromise<Run> {
     return this._client.get(`/threads/${threadId}/runs/${runId}`, {
@@ -88,6 +104,14 @@ export class Runs extends APIResource {
 
   /**
    * Modifies a run.
+   *
+   * @example
+   * ```ts
+   * const run = await client.beta.threads.runs.update(
+   *   'thread_id',
+   *   'run_id',
+   * );
+   * ```
    */
   update(
     threadId: string,
@@ -104,6 +128,16 @@ export class Runs extends APIResource {
 
   /**
    * Returns a list of runs belonging to a thread.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const run of client.beta.threads.runs.list(
+   *   'thread_id',
+   * )) {
+   *   // ...
+   * }
+   * ```
    */
   list(
     threadId: string,
@@ -128,6 +162,14 @@ export class Runs extends APIResource {
 
   /**
    * Cancels a run that is `in_progress`.
+   *
+   * @example
+   * ```ts
+   * const run = await client.beta.threads.runs.cancel(
+   *   'thread_id',
+   *   'run_id',
+   * );
+   * ```
    */
   cancel(threadId: string, runId: string, options?: Core.RequestOptions): Core.APIPromise<Run> {
     return this._client.post(`/threads/${threadId}/runs/${runId}/cancel`, {
@@ -229,6 +271,16 @@ export class Runs extends APIResource {
    * `submit_tool_outputs`, this endpoint can be used to submit the outputs from the
    * tool calls once they're all completed. All outputs must be submitted in a single
    * request.
+   *
+   * @example
+   * ```ts
+   * const run =
+   *   await client.beta.threads.runs.submitToolOutputs(
+   *     'thread_id',
+   *     'run_id',
+   *     { tool_outputs: [{}] },
+   *   );
+   * ```
    */
   submitToolOutputs(
     threadId: string,

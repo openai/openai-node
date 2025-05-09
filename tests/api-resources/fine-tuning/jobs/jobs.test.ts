@@ -35,6 +35,7 @@ describe('resource jobs', () => {
         },
       ],
       method: {
+        type: 'supervised',
         dpo: {
           hyperparameters: {
             batch_size: 'auto',
@@ -43,10 +44,27 @@ describe('resource jobs', () => {
             n_epochs: 'auto',
           },
         },
+        reinforcement: {
+          grader: {
+            input: 'input',
+            name: 'name',
+            operation: 'eq',
+            reference: 'reference',
+            type: 'string_check',
+          },
+          hyperparameters: {
+            batch_size: 'auto',
+            compute_multiplier: 'auto',
+            eval_interval: 'auto',
+            eval_samples: 'auto',
+            learning_rate_multiplier: 'auto',
+            n_epochs: 'auto',
+            reasoning_effort: 'default',
+          },
+        },
         supervised: {
           hyperparameters: { batch_size: 'auto', learning_rate_multiplier: 'auto', n_epochs: 'auto' },
         },
-        type: 'supervised',
       },
       seed: 42,
       suffix: 'x',
@@ -141,6 +159,42 @@ describe('resource jobs', () => {
         { after: 'after', limit: 0 },
         { path: '/_stainless_unknown_path' },
       ),
+    ).rejects.toThrow(OpenAI.NotFoundError);
+  });
+
+  test('pause', async () => {
+    const responsePromise = client.fineTuning.jobs.pause('ft-AF1WoRqd3aJAHsqc9NY7iL8F');
+    const rawResponse = await responsePromise.asResponse();
+    expect(rawResponse).toBeInstanceOf(Response);
+    const response = await responsePromise;
+    expect(response).not.toBeInstanceOf(Response);
+    const dataAndResponse = await responsePromise.withResponse();
+    expect(dataAndResponse.data).toBe(response);
+    expect(dataAndResponse.response).toBe(rawResponse);
+  });
+
+  test('pause: request options instead of params are passed correctly', async () => {
+    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
+    await expect(
+      client.fineTuning.jobs.pause('ft-AF1WoRqd3aJAHsqc9NY7iL8F', { path: '/_stainless_unknown_path' }),
+    ).rejects.toThrow(OpenAI.NotFoundError);
+  });
+
+  test('resume', async () => {
+    const responsePromise = client.fineTuning.jobs.resume('ft-AF1WoRqd3aJAHsqc9NY7iL8F');
+    const rawResponse = await responsePromise.asResponse();
+    expect(rawResponse).toBeInstanceOf(Response);
+    const response = await responsePromise;
+    expect(response).not.toBeInstanceOf(Response);
+    const dataAndResponse = await responsePromise.withResponse();
+    expect(dataAndResponse.data).toBe(response);
+    expect(dataAndResponse.response).toBe(rawResponse);
+  });
+
+  test('resume: request options instead of params are passed correctly', async () => {
+    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
+    await expect(
+      client.fineTuning.jobs.resume('ft-AF1WoRqd3aJAHsqc9NY7iL8F', { path: '/_stainless_unknown_path' }),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 });

@@ -8,6 +8,14 @@ import * as TranscriptionsAPI from './transcriptions';
 export class Translations extends APIResource {
   /**
    * Translates audio into English.
+   *
+   * @example
+   * ```ts
+   * const translation = await client.audio.translations.create({
+   *   file: fs.createReadStream('speech.mp3'),
+   *   model: 'whisper-1',
+   * });
+   * ```
    */
   create(
     body: TranslationCreateParams<'json' | undefined>,
