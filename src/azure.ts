@@ -3,7 +3,7 @@ import * as Errors from './error';
 import { FinalRequestOptions } from './internal/request-options';
 import { isObj, readEnv } from './internal/utils';
 import { ClientOptions, OpenAI } from './client';
-import { buildHeaders } from './internal/headers';
+import { buildHeaders, NullableHeaders } from './internal/headers';
 
 /** API Client for interfacing with the Azure OpenAI API. */
 export interface AzureClientOptions extends ClientOptions {
@@ -154,8 +154,8 @@ export class AzureOpenAI extends OpenAI {
     return undefined;
   }
 
-  protected override authHeaders(opts: FinalRequestOptions): Headers {
-    return new Headers();
+  protected override authHeaders(opts: FinalRequestOptions): NullableHeaders | undefined {
+    return;
   }
 
   protected override async prepareOptions(opts: FinalRequestOptions): Promise<void> {
