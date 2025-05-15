@@ -87,6 +87,7 @@ import {
   ThreadDeleted,
   ThreadUpdateParams,
   Threads,
+  TruncationObject,
 } from './threads/threads';
 
 export class Beta extends APIResource {
@@ -181,6 +182,7 @@ export declare namespace Beta {
     type AssistantToolChoiceOption as AssistantToolChoiceOption,
     type Thread as Thread,
     type ThreadDeleted as ThreadDeleted,
+    type TruncationObject as TruncationObject,
     type ThreadCreateParams as ThreadCreateParams,
     type ThreadUpdateParams as ThreadUpdateParams,
     type ThreadCreateAndRunParams as ThreadCreateAndRunParams,
