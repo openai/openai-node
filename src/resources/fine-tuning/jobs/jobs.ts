@@ -302,7 +302,7 @@ export namespace FineTuningJob {
      * Number of examples in each batch. A larger batch size means that model
      * parameters are updated less frequently, but with lower variance.
      */
-    batch_size?: 'auto' | number;
+    batch_size?: unknown | 'auto' | number | null;
 
     /**
      * Scaling factor for the learning rate. A smaller learning rate may be useful to

@@ -12,6 +12,7 @@ export {
   Runs,
   type CreateEvalCompletionsRunDataSource,
   type CreateEvalJSONLRunDataSource,
+  type CreateEvalResponsesRunDataSource,
   type EvalAPIError,
   type RunCreateResponse,
   type RunRetrieveResponse,

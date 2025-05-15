@@ -74,6 +74,7 @@ import {
   EvalListParams,
   EvalListResponse,
   EvalListResponsesPage,
+  EvalLogsDataSourceConfig,
   EvalRetrieveResponse,
   EvalStoredCompletionsDataSourceConfig,
   EvalUpdateParams,
@@ -533,6 +534,7 @@ export declare namespace OpenAI {
   export {
     Evals as Evals,
     type EvalCustomDataSourceConfig as EvalCustomDataSourceConfig,
+    type EvalLogsDataSourceConfig as EvalLogsDataSourceConfig,
     type EvalStoredCompletionsDataSourceConfig as EvalStoredCompletionsDataSourceConfig,
     type EvalCreateResponse as EvalCreateResponse,
     type EvalRetrieveResponse as EvalRetrieveResponse,

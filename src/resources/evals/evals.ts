@@ -10,6 +10,7 @@ import * as RunsAPI from './runs/runs';
 import {
   CreateEvalCompletionsRunDataSource,
   CreateEvalJSONLRunDataSource,
+  CreateEvalResponsesRunDataSource,
   EvalAPIError,
   RunCancelResponse,
   RunCreateParams,
@@ -105,11 +106,37 @@ export interface EvalCustomDataSourceConfig {
 }
 
 /**
- * A StoredCompletionsDataSourceConfig which specifies the metadata property of
- * your stored completions query. This is usually metadata like `usecase=chatbot`
- * or `prompt-version=v2`, etc. The schema returned by this data source config is
- * used to defined what variables are available in your evals. `item` and `sample`
- * are both defined when using this data source config.
+ * A LogsDataSourceConfig which specifies the metadata property of your logs query.
+ * This is usually metadata like `usecase=chatbot` or `prompt-version=v2`, etc. The
+ * schema returned by this data source config is used to defined what variables are
+ * available in your evals. `item` and `sample` are both defined when using this
+ * data source config.
+ */
+export interface EvalLogsDataSourceConfig {
+  /**
+   * The json schema for the run data source items. Learn how to build JSON schemas
+   * [here](https://json-schema.org/).
+   */
+  schema: Record<string, unknown>;
+
+  /**
+   * The type of data source. Always `logs`.
+   */
+  type: 'logs';
+
+  /**
+   * Set of 16 key-value pairs that can be attached to an object. This can be useful
+   * for storing additional information about the object in a structured format, and
+   * querying for objects via API or the dashboard.
+   *
+   * Keys are strings with a maximum length of 64 characters. Values are strings with
+   * a maximum length of 512 characters.
+   */
+  metadata?: Shared.Metadata | null;
+}
+
+/**
+ * @deprecated Deprecated in favor of LogsDataSourceConfig.
  */
 export interface EvalStoredCompletionsDataSourceConfig {
   /**
@@ -119,9 +146,9 @@ export interface EvalStoredCompletionsDataSourceConfig {
   schema: Record<string, unknown>;
 
   /**
-   * The type of data source. Always `stored_completions`.
+   * The type of data source. Always `stored-completions`.
    */
-  type: 'stored_completions';
+  type: 'stored-completions';
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
@@ -156,7 +183,10 @@ export interface EvalCreateResponse {
   /**
    * Configuration of data sources used in runs of the evaluation.
    */
-  data_source_config: EvalCustomDataSourceConfig | EvalStoredCompletionsDataSourceConfig;
+  data_source_config:
+    | EvalCustomDataSourceConfig
+    | EvalLogsDataSourceConfig
+    | EvalStoredCompletionsDataSourceConfig;
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
@@ -244,7 +274,10 @@ export interface EvalRetrieveResponse {
   /**
    * Configuration of data sources used in runs of the evaluation.
    */
-  data_source_config: EvalCustomDataSourceConfig | EvalStoredCompletionsDataSourceConfig;
+  data_source_config:
+    | EvalCustomDataSourceConfig
+    | EvalLogsDataSourceConfig
+    | EvalStoredCompletionsDataSourceConfig;
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
@@ -332,7 +365,10 @@ export interface EvalUpdateResponse {
   /**
    * Configuration of data sources used in runs of the evaluation.
    */
-  data_source_config: EvalCustomDataSourceConfig | EvalStoredCompletionsDataSourceConfig;
+  data_source_config:
+    | EvalCustomDataSourceConfig
+    | EvalLogsDataSourceConfig
+    | EvalStoredCompletionsDataSourceConfig;
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
@@ -420,7 +456,10 @@ export interface EvalListResponse {
   /**
    * Configuration of data sources used in runs of the evaluation.
    */
-  data_source_config: EvalCustomDataSourceConfig | EvalStoredCompletionsDataSourceConfig;
+  data_source_config:
+    | EvalCustomDataSourceConfig
+    | EvalLogsDataSourceConfig
+    | EvalStoredCompletionsDataSourceConfig;
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
@@ -498,7 +537,7 @@ export interface EvalCreateParams {
   /**
    * The configuration for the data source used for the evaluation runs.
    */
-  data_source_config: EvalCreateParams.Custom | EvalCreateParams.StoredCompletions;
+  data_source_config: EvalCreateParams.Custom | EvalCreateParams.Logs | EvalCreateParams.StoredCompletions;
 
   /**
    * A list of graders for all eval runs in this group.
@@ -555,15 +594,29 @@ export namespace EvalCreateParams {
   }
 
   /**
-   * A data source config which specifies the metadata property of your stored
-   * completions query. This is usually metadata like `usecase=chatbot` or
-   * `prompt-version=v2`, etc.
+   * A data source config which specifies the metadata property of your logs query.
+   * This is usually metadata like `usecase=chatbot` or `prompt-version=v2`, etc.
+   */
+  export interface Logs {
+    /**
+     * The type of data source. Always `logs`.
+     */
+    type: 'logs';
+
+    /**
+     * Metadata filters for the logs data source.
+     */
+    metadata?: Record<string, unknown>;
+  }
+
+  /**
+   * Deprecated in favor of LogsDataSourceConfig.
    */
   export interface StoredCompletions {
     /**
-     * The type of data source. Always `stored_completions`.
+     * The type of data source. Always `stored-completions`.
      */
-    type: 'stored_completions';
+    type: 'stored-completions';
 
     /**
      * Metadata filters for the stored completions data source.
@@ -733,6 +786,7 @@ Evals.RunListResponsesPage = RunListResponsesPage;
 export declare namespace Evals {
   export {
     type EvalCustomDataSourceConfig as EvalCustomDataSourceConfig,
+    type EvalLogsDataSourceConfig as EvalLogsDataSourceConfig,
     type EvalStoredCompletionsDataSourceConfig as EvalStoredCompletionsDataSourceConfig,
     type EvalCreateResponse as EvalCreateResponse,
     type EvalRetrieveResponse as EvalRetrieveResponse,
@@ -749,6 +803,7 @@ export declare namespace Evals {
     Runs as Runs,
     type CreateEvalCompletionsRunDataSource as CreateEvalCompletionsRunDataSource,
     type CreateEvalJSONLRunDataSource as CreateEvalJSONLRunDataSource,
+    type CreateEvalResponsesRunDataSource as CreateEvalResponsesRunDataSource,
     type EvalAPIError as EvalAPIError,
     type RunCreateResponse as RunCreateResponse,
     type RunRetrieveResponse as RunRetrieveResponse,
