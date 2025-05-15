@@ -91,6 +91,7 @@ export {
   type StaticFileChunkingStrategyObjectParam,
   type VectorStore,
   type VectorStoreDeleted,
+  type VectorStoreExpirationAfter,
   type VectorStoreSearchResponse,
   type VectorStoreCreateParams,
   type VectorStoreUpdateParams,
