@@ -14,6 +14,8 @@ export {
   type CreateEvalJSONLRunDataSource,
   type CreateEvalResponsesRunDataSource,
   type EvalAPIError,
+  type EvalJSONLFileContentSource,
+  type EvalJSONLFileIDSource,
   type RunCreateResponse,
   type RunRetrieveResponse,
   type RunListResponse,

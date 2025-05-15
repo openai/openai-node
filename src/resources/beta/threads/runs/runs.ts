@@ -540,7 +540,7 @@ export interface Run {
    * Controls for how a thread will be truncated prior to the run. Use this to
    * control the intial context window of the run.
    */
-  truncation_strategy: Run.TruncationStrategy | null;
+  truncation_strategy: ThreadsAPI.TruncationObject | null;
 
   /**
    * Usage statistics related to the run. This value will be `null` if the run is not
@@ -613,26 +613,6 @@ export namespace Run {
        */
       tool_calls: Array<RunsAPI.RequiredActionFunctionToolCall>;
     }
-  }
-
-  /**
-   * Controls for how a thread will be truncated prior to the run. Use this to
-   * control the intial context window of the run.
-   */
-  export interface TruncationStrategy {
-    /**
-     * The truncation strategy to use for the thread. The default is `auto`. If set to
-     * `last_messages`, the thread will be truncated to the n most recent messages in
-     * the thread. When set to `auto`, messages in the middle of the thread will be
-     * dropped to fit the context length of the model, `max_prompt_tokens`.
-     */
-    type: 'auto' | 'last_messages';
-
-    /**
-     * The number of most recent messages from the thread when constructing the context
-     * for the run.
-     */
-    last_messages?: number | null;
   }
 
   /**
@@ -838,7 +818,7 @@ export interface RunCreateParamsBase {
    * Body param: Controls for how a thread will be truncated prior to the run. Use
    * this to control the intial context window of the run.
    */
-  truncation_strategy?: RunCreateParams.TruncationStrategy | null;
+  truncation_strategy?: ThreadsAPI.TruncationObject | null;
 }
 
 export namespace RunCreateParams {
@@ -895,26 +875,6 @@ export namespace RunCreateParams {
         type: 'file_search';
       }
     }
-  }
-
-  /**
-   * Controls for how a thread will be truncated prior to the run. Use this to
-   * control the intial context window of the run.
-   */
-  export interface TruncationStrategy {
-    /**
-     * The truncation strategy to use for the thread. The default is `auto`. If set to
-     * `last_messages`, the thread will be truncated to the n most recent messages in
-     * the thread. When set to `auto`, messages in the middle of the thread will be
-     * dropped to fit the context length of the model, `max_prompt_tokens`.
-     */
-    type: 'auto' | 'last_messages';
-
-    /**
-     * The number of most recent messages from the thread when constructing the context
-     * for the run.
-     */
-    last_messages?: number | null;
   }
 
   export type RunCreateParamsNonStreaming = RunsAPI.RunCreateParamsNonStreaming;

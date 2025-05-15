@@ -120,6 +120,7 @@ import {
   VectorStore,
   VectorStoreCreateParams,
   VectorStoreDeleted,
+  VectorStoreExpirationAfter,
   VectorStoreListParams,
   VectorStoreSearchParams,
   VectorStoreSearchResponse,
@@ -1033,6 +1034,7 @@ export declare namespace OpenAI {
     type StaticFileChunkingStrategyObjectParam as StaticFileChunkingStrategyObjectParam,
     type VectorStore as VectorStore,
     type VectorStoreDeleted as VectorStoreDeleted,
+    type VectorStoreExpirationAfter as VectorStoreExpirationAfter,
     type VectorStoreSearchResponse as VectorStoreSearchResponse,
     type VectorStoresPage as VectorStoresPage,
     type VectorStoreSearchResponsesPage as VectorStoreSearchResponsesPage,
@@ -1084,6 +1086,7 @@ export declare namespace OpenAI {
   export type ComparisonFilter = API.ComparisonFilter;
   export type CompoundFilter = API.CompoundFilter;
   export type ErrorObject = API.ErrorObject;
+  export type EvalItem = API.EvalItem;
   export type FunctionDefinition = API.FunctionDefinition;
   export type FunctionParameters = API.FunctionParameters;
   export type Metadata = API.Metadata;

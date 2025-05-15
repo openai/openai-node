@@ -67,6 +67,7 @@ export {
   type AssistantToolChoiceOption,
   type Thread,
   type ThreadDeleted,
+  type TruncationObject,
   type ThreadCreateParams,
   type ThreadUpdateParams,
   type ThreadCreateAndRunParams,
