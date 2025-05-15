@@ -32,6 +32,7 @@ export {
 export {
   Evals,
   type EvalCustomDataSourceConfig,
+  type EvalLogsDataSourceConfig,
   type EvalStoredCompletionsDataSourceConfig,
   type EvalCreateResponse,
   type EvalRetrieveResponse,

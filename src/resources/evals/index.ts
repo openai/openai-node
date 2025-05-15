@@ -3,6 +3,7 @@
 export {
   Evals,
   type EvalCustomDataSourceConfig,
+  type EvalLogsDataSourceConfig,
   type EvalStoredCompletionsDataSourceConfig,
   type EvalCreateResponse,
   type EvalRetrieveResponse,
@@ -18,6 +19,7 @@ export {
   Runs,
   type CreateEvalCompletionsRunDataSource,
   type CreateEvalJSONLRunDataSource,
+  type CreateEvalResponsesRunDataSource,
   type EvalAPIError,
   type RunCreateResponse,
   type RunRetrieveResponse,
