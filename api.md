@@ -709,6 +709,7 @@ Methods:
 Types:
 
 - <code><a href="./src/resources/evals/evals.ts">EvalCustomDataSourceConfig</a></code>
+- <code><a href="./src/resources/evals/evals.ts">EvalLogsDataSourceConfig</a></code>
 - <code><a href="./src/resources/evals/evals.ts">EvalStoredCompletionsDataSourceConfig</a></code>
 - <code><a href="./src/resources/evals/evals.ts">EvalCreateResponse</a></code>
 - <code><a href="./src/resources/evals/evals.ts">EvalRetrieveResponse</a></code>
@@ -730,6 +731,7 @@ Types:
 
 - <code><a href="./src/resources/evals/runs/runs.ts">CreateEvalCompletionsRunDataSource</a></code>
 - <code><a href="./src/resources/evals/runs/runs.ts">CreateEvalJSONLRunDataSource</a></code>
+- <code><a href="./src/resources/evals/runs/runs.ts">CreateEvalResponsesRunDataSource</a></code>
 - <code><a href="./src/resources/evals/runs/runs.ts">EvalAPIError</a></code>
 - <code><a href="./src/resources/evals/runs/runs.ts">RunCreateResponse</a></code>
 - <code><a href="./src/resources/evals/runs/runs.ts">RunRetrieveResponse</a></code>

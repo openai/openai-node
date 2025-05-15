@@ -27,6 +27,7 @@ describe('resource transcriptions', () => {
     const response = await client.audio.transcriptions.create({
       file: await toFile(Buffer.from('# my file contents'), 'README.md'),
       model: 'gpt-4o-transcribe',
+      chunking_strategy: 'auto',
       include: ['logprobs'],
       language: 'language',
       prompt: 'prompt',
