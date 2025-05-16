@@ -90,7 +90,6 @@ import {
   ThreadDeleted,
   ThreadUpdateParams,
   Threads,
-  TruncationObject,
 } from './threads/threads';
 import { Chat } from './chat/chat';
 
@@ -189,7 +188,6 @@ export declare namespace Beta {
     type AssistantToolChoiceOption as AssistantToolChoiceOption,
     type Thread as Thread,
     type ThreadDeleted as ThreadDeleted,
-    type TruncationObject as TruncationObject,
     type ThreadCreateParams as ThreadCreateParams,
     type ThreadUpdateParams as ThreadUpdateParams,
     type ThreadCreateAndRunParams as ThreadCreateAndRunParams,
