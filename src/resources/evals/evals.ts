@@ -3,14 +3,12 @@
 import { APIResource } from '../../core/resource';
 import * as Shared from '../shared';
 import * as GraderModelsAPI from '../graders/grader-models';
+import * as ResponsesAPI from '../responses/responses';
 import * as RunsAPI from './runs/runs';
 import {
   CreateEvalCompletionsRunDataSource,
   CreateEvalJSONLRunDataSource,
-  CreateEvalResponsesRunDataSource,
   EvalAPIError,
-  EvalJSONLFileContentSource,
-  EvalJSONLFileIDSource,
   RunCancelParams,
   RunCancelResponse,
   RunCreateParams,
@@ -99,36 +97,6 @@ export interface EvalCustomDataSourceConfig {
 }
 
 /**
- * A LogsDataSourceConfig which specifies the metadata property of your logs query.
- * This is usually metadata like `usecase=chatbot` or `prompt-version=v2`, etc. The
- * schema returned by this data source config is used to defined what variables are
- * available in your evals. `item` and `sample` are both defined when using this
- * data source config.
- */
-export interface EvalLogsDataSourceConfig {
-  /**
-   * The json schema for the run data source items. Learn how to build JSON schemas
-   * [here](https://json-schema.org/).
-   */
-  schema: Record<string, unknown>;
-
-  /**
-   * The type of data source. Always `logs`.
-   */
-  type: 'logs';
-
-  /**
-   * Set of 16 key-value pairs that can be attached to an object. This can be useful
-   * for storing additional information about the object in a structured format, and
-   * querying for objects via API or the dashboard.
-   *
-   * Keys are strings with a maximum length of 64 characters. Values are strings with
-   * a maximum length of 512 characters.
-   */
-  metadata?: Shared.Metadata | null;
-}
-
-/**
  * @deprecated Deprecated in favor of LogsDataSourceConfig.
  */
 export interface EvalStoredCompletionsDataSourceConfig {
@@ -178,7 +146,7 @@ export interface EvalCreateResponse {
    */
   data_source_config:
     | EvalCustomDataSourceConfig
-    | EvalLogsDataSourceConfig
+    | EvalCreateResponse.Logs
     | EvalStoredCompletionsDataSourceConfig;
 
   /**
@@ -214,6 +182,36 @@ export interface EvalCreateResponse {
 }
 
 export namespace EvalCreateResponse {
+  /**
+   * A LogsDataSourceConfig which specifies the metadata property of your logs query.
+   * This is usually metadata like `usecase=chatbot` or `prompt-version=v2`, etc. The
+   * schema returned by this data source config is used to defined what variables are
+   * available in your evals. `item` and `sample` are both defined when using this
+   * data source config.
+   */
+  export interface Logs {
+    /**
+     * The json schema for the run data source items. Learn how to build JSON schemas
+     * [here](https://json-schema.org/).
+     */
+    schema: Record<string, unknown>;
+
+    /**
+     * The type of data source. Always `logs`.
+     */
+    type: 'logs';
+
+    /**
+     * Set of 16 key-value pairs that can be attached to an object. This can be useful
+     * for storing additional information about the object in a structured format, and
+     * querying for objects via API or the dashboard.
+     *
+     * Keys are strings with a maximum length of 64 characters. Values are strings with
+     * a maximum length of 512 characters.
+     */
+    metadata?: Shared.Metadata | null;
+  }
+
   /**
    * A TextSimilarityGrader object which grades text based on similarity metrics.
    */
@@ -269,7 +267,7 @@ export interface EvalRetrieveResponse {
    */
   data_source_config:
     | EvalCustomDataSourceConfig
-    | EvalLogsDataSourceConfig
+    | EvalRetrieveResponse.Logs
     | EvalStoredCompletionsDataSourceConfig;
 
   /**
@@ -305,6 +303,36 @@ export interface EvalRetrieveResponse {
 }
 
 export namespace EvalRetrieveResponse {
+  /**
+   * A LogsDataSourceConfig which specifies the metadata property of your logs query.
+   * This is usually metadata like `usecase=chatbot` or `prompt-version=v2`, etc. The
+   * schema returned by this data source config is used to defined what variables are
+   * available in your evals. `item` and `sample` are both defined when using this
+   * data source config.
+   */
+  export interface Logs {
+    /**
+     * The json schema for the run data source items. Learn how to build JSON schemas
+     * [here](https://json-schema.org/).
+     */
+    schema: Record<string, unknown>;
+
+    /**
+     * The type of data source. Always `logs`.
+     */
+    type: 'logs';
+
+    /**
+     * Set of 16 key-value pairs that can be attached to an object. This can be useful
+     * for storing additional information about the object in a structured format, and
+     * querying for objects via API or the dashboard.
+     *
+     * Keys are strings with a maximum length of 64 characters. Values are strings with
+     * a maximum length of 512 characters.
+     */
+    metadata?: Shared.Metadata | null;
+  }
+
   /**
    * A TextSimilarityGrader object which grades text based on similarity metrics.
    */
@@ -360,7 +388,7 @@ export interface EvalUpdateResponse {
    */
   data_source_config:
     | EvalCustomDataSourceConfig
-    | EvalLogsDataSourceConfig
+    | EvalUpdateResponse.Logs
     | EvalStoredCompletionsDataSourceConfig;
 
   /**
@@ -396,6 +424,36 @@ export interface EvalUpdateResponse {
 }
 
 export namespace EvalUpdateResponse {
+  /**
+   * A LogsDataSourceConfig which specifies the metadata property of your logs query.
+   * This is usually metadata like `usecase=chatbot` or `prompt-version=v2`, etc. The
+   * schema returned by this data source config is used to defined what variables are
+   * available in your evals. `item` and `sample` are both defined when using this
+   * data source config.
+   */
+  export interface Logs {
+    /**
+     * The json schema for the run data source items. Learn how to build JSON schemas
+     * [here](https://json-schema.org/).
+     */
+    schema: Record<string, unknown>;
+
+    /**
+     * The type of data source. Always `logs`.
+     */
+    type: 'logs';
+
+    /**
+     * Set of 16 key-value pairs that can be attached to an object. This can be useful
+     * for storing additional information about the object in a structured format, and
+     * querying for objects via API or the dashboard.
+     *
+     * Keys are strings with a maximum length of 64 characters. Values are strings with
+     * a maximum length of 512 characters.
+     */
+    metadata?: Shared.Metadata | null;
+  }
+
   /**
    * A TextSimilarityGrader object which grades text based on similarity metrics.
    */
@@ -451,7 +509,7 @@ export interface EvalListResponse {
    */
   data_source_config:
     | EvalCustomDataSourceConfig
-    | EvalLogsDataSourceConfig
+    | EvalListResponse.Logs
     | EvalStoredCompletionsDataSourceConfig;
 
   /**
@@ -487,6 +545,36 @@ export interface EvalListResponse {
 }
 
 export namespace EvalListResponse {
+  /**
+   * A LogsDataSourceConfig which specifies the metadata property of your logs query.
+   * This is usually metadata like `usecase=chatbot` or `prompt-version=v2`, etc. The
+   * schema returned by this data source config is used to defined what variables are
+   * available in your evals. `item` and `sample` are both defined when using this
+   * data source config.
+   */
+  export interface Logs {
+    /**
+     * The json schema for the run data source items. Learn how to build JSON schemas
+     * [here](https://json-schema.org/).
+     */
+    schema: Record<string, unknown>;
+
+    /**
+     * The type of data source. Always `logs`.
+     */
+    type: 'logs';
+
+    /**
+     * Set of 16 key-value pairs that can be attached to an object. This can be useful
+     * for storing additional information about the object in a structured format, and
+     * querying for objects via API or the dashboard.
+     *
+     * Keys are strings with a maximum length of 64 characters. Values are strings with
+     * a maximum length of 512 characters.
+     */
+    metadata?: Shared.Metadata | null;
+  }
+
   /**
    * A TextSimilarityGrader object which grades text based on similarity metrics.
    */
@@ -626,7 +714,7 @@ export namespace EvalCreateParams {
      * A list of chat messages forming the prompt or context. May include variable
      * references to the "item" namespace, ie {{item.name}}.
      */
-    input: Array<LabelModel.SimpleInputMessage | Shared.EvalItem>;
+    input: Array<LabelModel.SimpleInputMessage | LabelModel.EvalItem>;
 
     /**
      * The labels to classify to each item in the evaluation.
@@ -665,6 +753,48 @@ export namespace EvalCreateParams {
        * The role of the message (e.g. "system", "assistant", "user").
        */
       role: string;
+    }
+
+    /**
+     * A message input to the model with a role indicating instruction following
+     * hierarchy. Instructions given with the `developer` or `system` role take
+     * precedence over instructions given with the `user` role. Messages with the
+     * `assistant` role are presumed to have been generated by the model in previous
+     * interactions.
+     */
+    export interface EvalItem {
+      /**
+       * Text inputs to the model - can contain template strings.
+       */
+      content: string | ResponsesAPI.ResponseInputText | EvalItem.OutputText;
+
+      /**
+       * The role of the message input. One of `user`, `assistant`, `system`, or
+       * `developer`.
+       */
+      role: 'user' | 'assistant' | 'system' | 'developer';
+
+      /**
+       * The type of the message input. Always `message`.
+       */
+      type?: 'message';
+    }
+
+    export namespace EvalItem {
+      /**
+       * A text output from the model.
+       */
+      export interface OutputText {
+        /**
+         * The text output from the model.
+         */
+        text: string;
+
+        /**
+         * The type of the output text. Always `output_text`.
+         */
+        type: 'output_text';
+      }
     }
   }
 
@@ -735,7 +865,6 @@ Evals.Runs = Runs;
 export declare namespace Evals {
   export {
     type EvalCustomDataSourceConfig as EvalCustomDataSourceConfig,
-    type EvalLogsDataSourceConfig as EvalLogsDataSourceConfig,
     type EvalStoredCompletionsDataSourceConfig as EvalStoredCompletionsDataSourceConfig,
     type EvalCreateResponse as EvalCreateResponse,
     type EvalRetrieveResponse as EvalRetrieveResponse,
@@ -752,10 +881,7 @@ export declare namespace Evals {
     Runs as Runs,
     type CreateEvalCompletionsRunDataSource as CreateEvalCompletionsRunDataSource,
     type CreateEvalJSONLRunDataSource as CreateEvalJSONLRunDataSource,
-    type CreateEvalResponsesRunDataSource as CreateEvalResponsesRunDataSource,
     type EvalAPIError as EvalAPIError,
-    type EvalJSONLFileContentSource as EvalJSONLFileContentSource,
-    type EvalJSONLFileIDSource as EvalJSONLFileIDSource,
     type RunCreateResponse as RunCreateResponse,
     type RunRetrieveResponse as RunRetrieveResponse,
     type RunListResponse as RunListResponse,

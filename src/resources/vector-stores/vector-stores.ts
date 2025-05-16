@@ -250,7 +250,7 @@ export interface VectorStore {
   /**
    * The expiration policy for a vector store.
    */
-  expires_after?: VectorStoreExpirationAfter;
+  expires_after?: VectorStore.ExpiresAfter;
 
   /**
    * The Unix timestamp (in seconds) for when the vector store will expire.
@@ -285,6 +285,22 @@ export namespace VectorStore {
      */
     total: number;
   }
+
+  /**
+   * The expiration policy for a vector store.
+   */
+  export interface ExpiresAfter {
+    /**
+     * Anchor timestamp after which the expiration policy applies. Supported anchors:
+     * `last_active_at`.
+     */
+    anchor: 'last_active_at';
+
+    /**
+     * The number of days after the anchor time that the vector store will expire.
+     */
+    days: number;
+  }
 }
 
 export interface VectorStoreDeleted {
@@ -293,22 +309,6 @@ export interface VectorStoreDeleted {
   deleted: boolean;
 
   object: 'vector_store.deleted';
-}
-
-/**
- * The expiration policy for a vector store.
- */
-export interface VectorStoreExpirationAfter {
-  /**
-   * Anchor timestamp after which the expiration policy applies. Supported anchors:
-   * `last_active_at`.
-   */
-  anchor: 'last_active_at';
-
-  /**
-   * The number of days after the anchor time that the vector store will expire.
-   */
-  days: number;
 }
 
 export interface VectorStoreSearchResponse {
@@ -366,7 +366,7 @@ export interface VectorStoreCreateParams {
   /**
    * The expiration policy for a vector store.
    */
-  expires_after?: VectorStoreExpirationAfter;
+  expires_after?: VectorStoreCreateParams.ExpiresAfter;
 
   /**
    * A list of [File](https://platform.openai.com/docs/api-reference/files) IDs that
@@ -391,11 +391,29 @@ export interface VectorStoreCreateParams {
   name?: string;
 }
 
+export namespace VectorStoreCreateParams {
+  /**
+   * The expiration policy for a vector store.
+   */
+  export interface ExpiresAfter {
+    /**
+     * Anchor timestamp after which the expiration policy applies. Supported anchors:
+     * `last_active_at`.
+     */
+    anchor: 'last_active_at';
+
+    /**
+     * The number of days after the anchor time that the vector store will expire.
+     */
+    days: number;
+  }
+}
+
 export interface VectorStoreUpdateParams {
   /**
    * The expiration policy for a vector store.
    */
-  expires_after?: VectorStoreExpirationAfter | null;
+  expires_after?: VectorStoreUpdateParams.ExpiresAfter | null;
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
@@ -411,6 +429,24 @@ export interface VectorStoreUpdateParams {
    * The name of the vector store.
    */
   name?: string | null;
+}
+
+export namespace VectorStoreUpdateParams {
+  /**
+   * The expiration policy for a vector store.
+   */
+  export interface ExpiresAfter {
+    /**
+     * Anchor timestamp after which the expiration policy applies. Supported anchors:
+     * `last_active_at`.
+     */
+    anchor: 'last_active_at';
+
+    /**
+     * The number of days after the anchor time that the vector store will expire.
+     */
+    days: number;
+  }
 }
 
 export interface VectorStoreListParams extends CursorPageParams {
@@ -482,7 +518,6 @@ export declare namespace VectorStores {
     type StaticFileChunkingStrategyObjectParam as StaticFileChunkingStrategyObjectParam,
     type VectorStore as VectorStore,
     type VectorStoreDeleted as VectorStoreDeleted,
-    type VectorStoreExpirationAfter as VectorStoreExpirationAfter,
     type VectorStoreSearchResponse as VectorStoreSearchResponse,
     type VectorStoresPage as VectorStoresPage,
     type VectorStoreSearchResponsesPage as VectorStoreSearchResponsesPage,

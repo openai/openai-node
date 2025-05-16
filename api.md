@@ -7,7 +7,6 @@ Types:
 - <code><a href="./src/resources/shared.ts">ComparisonFilter</a></code>
 - <code><a href="./src/resources/shared.ts">CompoundFilter</a></code>
 - <code><a href="./src/resources/shared.ts">ErrorObject</a></code>
-- <code><a href="./src/resources/shared.ts">EvalItem</a></code>
 - <code><a href="./src/resources/shared.ts">FunctionDefinition</a></code>
 - <code><a href="./src/resources/shared.ts">FunctionParameters</a></code>
 - <code><a href="./src/resources/shared.ts">Metadata</a></code>
@@ -303,7 +302,6 @@ Types:
 - <code><a href="./src/resources/vector-stores/vector-stores.ts">StaticFileChunkingStrategyObjectParam</a></code>
 - <code><a href="./src/resources/vector-stores/vector-stores.ts">VectorStore</a></code>
 - <code><a href="./src/resources/vector-stores/vector-stores.ts">VectorStoreDeleted</a></code>
-- <code><a href="./src/resources/vector-stores/vector-stores.ts">VectorStoreExpirationAfter</a></code>
 - <code><a href="./src/resources/vector-stores/vector-stores.ts">VectorStoreSearchResponse</a></code>
 
 Methods:
@@ -464,7 +462,6 @@ Types:
 - <code><a href="./src/resources/beta/threads/threads.ts">AssistantToolChoiceOption</a></code>
 - <code><a href="./src/resources/beta/threads/threads.ts">Thread</a></code>
 - <code><a href="./src/resources/beta/threads/threads.ts">ThreadDeleted</a></code>
-- <code><a href="./src/resources/beta/threads/threads.ts">TruncationObject</a></code>
 
 Methods:
 
@@ -711,7 +708,6 @@ Methods:
 Types:
 
 - <code><a href="./src/resources/evals/evals.ts">EvalCustomDataSourceConfig</a></code>
-- <code><a href="./src/resources/evals/evals.ts">EvalLogsDataSourceConfig</a></code>
 - <code><a href="./src/resources/evals/evals.ts">EvalStoredCompletionsDataSourceConfig</a></code>
 - <code><a href="./src/resources/evals/evals.ts">EvalCreateResponse</a></code>
 - <code><a href="./src/resources/evals/evals.ts">EvalRetrieveResponse</a></code>
@@ -733,10 +729,7 @@ Types:
 
 - <code><a href="./src/resources/evals/runs/runs.ts">CreateEvalCompletionsRunDataSource</a></code>
 - <code><a href="./src/resources/evals/runs/runs.ts">CreateEvalJSONLRunDataSource</a></code>
-- <code><a href="./src/resources/evals/runs/runs.ts">CreateEvalResponsesRunDataSource</a></code>
 - <code><a href="./src/resources/evals/runs/runs.ts">EvalAPIError</a></code>
-- <code><a href="./src/resources/evals/runs/runs.ts">EvalJSONLFileContentSource</a></code>
-- <code><a href="./src/resources/evals/runs/runs.ts">EvalJSONLFileIDSource</a></code>
 - <code><a href="./src/resources/evals/runs/runs.ts">RunCreateResponse</a></code>
 - <code><a href="./src/resources/evals/runs/runs.ts">RunRetrieveResponse</a></code>
 - <code><a href="./src/resources/evals/runs/runs.ts">RunListResponse</a></code>

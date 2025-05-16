@@ -32,7 +32,6 @@ export {
 export {
   Evals,
   type EvalCustomDataSourceConfig,
-  type EvalLogsDataSourceConfig,
   type EvalStoredCompletionsDataSourceConfig,
   type EvalCreateResponse,
   type EvalRetrieveResponse,
@@ -89,7 +88,6 @@ export {
   type StaticFileChunkingStrategyObjectParam,
   type VectorStore,
   type VectorStoreDeleted,
-  type VectorStoreExpirationAfter,
   type VectorStoreSearchResponse,
   type VectorStoreCreateParams,
   type VectorStoreUpdateParams,

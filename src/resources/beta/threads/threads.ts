@@ -337,26 +337,6 @@ export interface ThreadDeleted {
   object: 'thread.deleted';
 }
 
-/**
- * Controls for how a thread will be truncated prior to the run. Use this to
- * control the intial context window of the run.
- */
-export interface TruncationObject {
-  /**
-   * The truncation strategy to use for the thread. The default is `auto`. If set to
-   * `last_messages`, the thread will be truncated to the n most recent messages in
-   * the thread. When set to `auto`, messages in the middle of the thread will be
-   * dropped to fit the context length of the model, `max_prompt_tokens`.
-   */
-  type: 'auto' | 'last_messages';
-
-  /**
-   * The number of most recent messages from the thread when constructing the context
-   * for the run.
-   */
-  last_messages?: number | null;
-}
-
 export interface ThreadCreateParams {
   /**
    * A list of [messages](https://platform.openai.com/docs/api-reference/messages) to
@@ -745,7 +725,7 @@ export interface ThreadCreateAndRunParamsBase {
    * Controls for how a thread will be truncated prior to the run. Use this to
    * control the intial context window of the run.
    */
-  truncation_strategy?: TruncationObject | null;
+  truncation_strategy?: ThreadCreateAndRunParams.TruncationStrategy | null;
 }
 
 export namespace ThreadCreateAndRunParams {
@@ -974,6 +954,26 @@ export namespace ThreadCreateAndRunParams {
        */
       vector_store_ids?: Array<string>;
     }
+  }
+
+  /**
+   * Controls for how a thread will be truncated prior to the run. Use this to
+   * control the intial context window of the run.
+   */
+  export interface TruncationStrategy {
+    /**
+     * The truncation strategy to use for the thread. The default is `auto`. If set to
+     * `last_messages`, the thread will be truncated to the n most recent messages in
+     * the thread. When set to `auto`, messages in the middle of the thread will be
+     * dropped to fit the context length of the model, `max_prompt_tokens`.
+     */
+    type: 'auto' | 'last_messages';
+
+    /**
+     * The number of most recent messages from the thread when constructing the context
+     * for the run.
+     */
+    last_messages?: number | null;
   }
 
   export type ThreadCreateAndRunParamsNonStreaming = ThreadsAPI.ThreadCreateAndRunParamsNonStreaming;
@@ -1343,7 +1343,6 @@ export declare namespace Threads {
     type AssistantToolChoiceOption as AssistantToolChoiceOption,
     type Thread as Thread,
     type ThreadDeleted as ThreadDeleted,
-    type TruncationObject as TruncationObject,
     type ThreadCreateParams as ThreadCreateParams,
     type ThreadUpdateParams as ThreadUpdateParams,
     type ThreadCreateAndRunParams as ThreadCreateAndRunParams,
