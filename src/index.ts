@@ -74,7 +74,6 @@ import {
   EvalListParams,
   EvalListResponse,
   EvalListResponsesPage,
-  EvalLogsDataSourceConfig,
   EvalRetrieveResponse,
   EvalStoredCompletionsDataSourceConfig,
   EvalUpdateParams,
@@ -101,7 +100,6 @@ import {
   VectorStore,
   VectorStoreCreateParams,
   VectorStoreDeleted,
-  VectorStoreExpirationAfter,
   VectorStoreListParams,
   VectorStoreSearchParams,
   VectorStoreSearchResponse,
@@ -502,7 +500,6 @@ export declare namespace OpenAI {
     type StaticFileChunkingStrategyObjectParam as StaticFileChunkingStrategyObjectParam,
     type VectorStore as VectorStore,
     type VectorStoreDeleted as VectorStoreDeleted,
-    type VectorStoreExpirationAfter as VectorStoreExpirationAfter,
     type VectorStoreSearchResponse as VectorStoreSearchResponse,
     VectorStoresPage as VectorStoresPage,
     VectorStoreSearchResponsesPage as VectorStoreSearchResponsesPage,
@@ -536,7 +533,6 @@ export declare namespace OpenAI {
   export {
     Evals as Evals,
     type EvalCustomDataSourceConfig as EvalCustomDataSourceConfig,
-    type EvalLogsDataSourceConfig as EvalLogsDataSourceConfig,
     type EvalStoredCompletionsDataSourceConfig as EvalStoredCompletionsDataSourceConfig,
     type EvalCreateResponse as EvalCreateResponse,
     type EvalRetrieveResponse as EvalRetrieveResponse,
@@ -554,7 +550,6 @@ export declare namespace OpenAI {
   export type ComparisonFilter = API.ComparisonFilter;
   export type CompoundFilter = API.CompoundFilter;
   export type ErrorObject = API.ErrorObject;
-  export type EvalItem = API.EvalItem;
   export type FunctionDefinition = API.FunctionDefinition;
   export type FunctionParameters = API.FunctionParameters;
   export type Metadata = API.Metadata;
