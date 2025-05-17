@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.100.1 (2025-05-17)
+
+Full Changelog: [v4.100.0...v4.100.1](https://github.com/openai/openai-node/compare/v4.100.0...v4.100.1)
+
+### Chores
+
+* **internal:** version bump ([b40e830](https://github.com/openai/openai-node/commit/b40e8302ec11683b6a360a050236ad1284afc760))
+
 ## 4.100.0 (2025-05-16)
 
 Full Changelog: [v4.99.0...v4.100.0](https://github.com/openai/openai-node/compare/v4.99.0...v4.100.0)
