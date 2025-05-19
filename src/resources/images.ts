@@ -242,8 +242,8 @@ export interface ImageEditParams {
    * The format in which the generated images are returned. This parameter is only
    * supported for `gpt-image-1`. Must be one of `png`, `jpeg`, or `webp`.
    */
-    output_format?: 'png' | 'webp' | null;
-
+    output_format?: 'png' | 'jpeg' | 'webp' | null;
+    
   /**
    * The format in which the generated images are returned. Must be one of `url` or
    * `b64_json`. URLs are only valid for 60 minutes after the image has been
