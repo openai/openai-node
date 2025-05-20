@@ -1,5 +1,28 @@
 # Changelog
 
+## 4.100.0 (2025-05-16)
+
+Full Changelog: [v4.99.0...v4.100.0](https://github.com/openai/openai-node/compare/v4.99.0...v4.100.0)
+
+### Features
+
+* **api:** further updates for evals API ([3f6f248](https://github.com/openai/openai-node/commit/3f6f248191b45015924be76fd5154d149c4ed8a0))
+
+
+### Chores
+
+* **internal:** version bump ([5123fe0](https://github.com/openai/openai-node/commit/5123fe08a56f3d0040b1cc67129382f3eacc3cca))
+
+## 4.99.0 (2025-05-16)
+
+Full Changelog: [v4.98.0...v4.99.0](https://github.com/openai/openai-node/compare/v4.98.0...v4.99.0)
+
+### Features
+
+* **api:** manual updates ([75eb804](https://github.com/openai/openai-node/commit/75eb804edd6ad653eaa22d47f8c6d09ee845ebf4))
+* **api:** responses x eval api ([5029f1a](https://github.com/openai/openai-node/commit/5029f1a05eb1e8601ada06e0a5ba49f4c2b83c02))
+* **api:** Updating Assistants and Evals API schemas ([27fd517](https://github.com/openai/openai-node/commit/27fd5173b20f75debe96024ae8f1ce58a8254d26))
+
 ## 4.98.0 (2025-05-08)
 
 Full Changelog: [v4.97.0...v4.98.0](https://github.com/openai/openai-node/compare/v4.97.0...v4.98.0)

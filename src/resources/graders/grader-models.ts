@@ -103,7 +103,7 @@ export interface MultiGrader {
   name: string;
 
   /**
-   * The type of grader.
+   * The object type, which is always `multi`.
    */
   type: 'multi';
 }
