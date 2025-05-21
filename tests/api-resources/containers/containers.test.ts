@@ -8,9 +8,9 @@ const client = new OpenAI({
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
-describe('resource responses', () => {
+describe('resource containers', () => {
   test('create: only required params', async () => {
-    const responsePromise = client.responses.create({ input: 'string', model: 'gpt-4o' });
+    const responsePromise = client.containers.create({ name: 'name' });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -21,40 +21,15 @@ describe('resource responses', () => {
   });
 
   test('create: required and optional params', async () => {
-    const response = await client.responses.create({
-      input: 'string',
-      model: 'gpt-4o',
-      background: true,
-      include: ['file_search_call.results'],
-      instructions: 'instructions',
-      max_output_tokens: 0,
-      metadata: { foo: 'string' },
-      parallel_tool_calls: true,
-      previous_response_id: 'previous_response_id',
-      reasoning: { effort: 'low', generate_summary: 'auto', summary: 'auto' },
-      service_tier: 'auto',
-      store: true,
-      stream: false,
-      temperature: 1,
-      text: { format: { type: 'text' } },
-      tool_choice: 'none',
-      tools: [
-        {
-          name: 'name',
-          parameters: { foo: 'bar' },
-          strict: true,
-          type: 'function',
-          description: 'description',
-        },
-      ],
-      top_p: 1,
-      truncation: 'auto',
-      user: 'user-1234',
+    const response = await client.containers.create({
+      name: 'name',
+      expires_after: { anchor: 'last_active_at', minutes: 0 },
+      file_ids: ['string'],
     });
   });
 
   test('retrieve', async () => {
-    const responsePromise = client.responses.retrieve('resp_677efb5139a88190b512bc3fef8e535d');
+    const responsePromise = client.containers.retrieve('container_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -67,25 +42,40 @@ describe('resource responses', () => {
   test('retrieve: request options instead of params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      client.responses.retrieve('resp_677efb5139a88190b512bc3fef8e535d', {
-        path: '/_stainless_unknown_path',
-      }),
+      client.containers.retrieve('container_id', { path: '/_stainless_unknown_path' }),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
-  test('retrieve: request options and params are passed correctly', async () => {
+  test('list', async () => {
+    const responsePromise = client.containers.list();
+    const rawResponse = await responsePromise.asResponse();
+    expect(rawResponse).toBeInstanceOf(Response);
+    const response = await responsePromise;
+    expect(response).not.toBeInstanceOf(Response);
+    const dataAndResponse = await responsePromise.withResponse();
+    expect(dataAndResponse.data).toBe(response);
+    expect(dataAndResponse.response).toBe(rawResponse);
+  });
+
+  test('list: request options instead of params are passed correctly', async () => {
+    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
+    await expect(client.containers.list({ path: '/_stainless_unknown_path' })).rejects.toThrow(
+      OpenAI.NotFoundError,
+    );
+  });
+
+  test('list: request options and params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      client.responses.retrieve(
-        'resp_677efb5139a88190b512bc3fef8e535d',
-        { include: ['file_search_call.results'] },
+      client.containers.list(
+        { after: 'after', limit: 0, order: 'asc' },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
   test('del', async () => {
-    const responsePromise = client.responses.del('resp_677efb5139a88190b512bc3fef8e535d');
+    const responsePromise = client.containers.del('container_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -97,26 +87,8 @@ describe('resource responses', () => {
 
   test('del: request options instead of params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(
-      client.responses.del('resp_677efb5139a88190b512bc3fef8e535d', { path: '/_stainless_unknown_path' }),
-    ).rejects.toThrow(OpenAI.NotFoundError);
-  });
-
-  test('cancel', async () => {
-    const responsePromise = client.responses.cancel('resp_677efb5139a88190b512bc3fef8e535d');
-    const rawResponse = await responsePromise.asResponse();
-    expect(rawResponse).toBeInstanceOf(Response);
-    const response = await responsePromise;
-    expect(response).not.toBeInstanceOf(Response);
-    const dataAndResponse = await responsePromise.withResponse();
-    expect(dataAndResponse.data).toBe(response);
-    expect(dataAndResponse.response).toBe(rawResponse);
-  });
-
-  test('cancel: request options instead of params are passed correctly', async () => {
-    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(
-      client.responses.cancel('resp_677efb5139a88190b512bc3fef8e535d', { path: '/_stainless_unknown_path' }),
-    ).rejects.toThrow(OpenAI.NotFoundError);
+    await expect(client.containers.del('container_id', { path: '/_stainless_unknown_path' })).rejects.toThrow(
+      OpenAI.NotFoundError,
+    );
   });
 });
