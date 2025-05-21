@@ -96,6 +96,25 @@ export class Responses extends APIResource {
       headers: { Accept: '*/*', ...options?.headers },
     });
   }
+
+  /**
+   * Cancels a model response with the given ID. Only responses created with the
+   * `background` parameter set to `true` can be cancelled.
+   * [Learn more](https://platform.openai.com/docs/guides/background).
+   *
+   * @example
+   * ```ts
+   * await client.responses.cancel(
+   *   'resp_677efb5139a88190b512bc3fef8e535d',
+   * );
+   * ```
+   */
+  cancel(responseId: string, options?: Core.RequestOptions): Core.APIPromise<void> {
+    return this._client.post(`/responses/${responseId}/cancel`, {
+      ...options,
+      headers: { Accept: '*/*', ...options?.headers },
+    });
+  }
 }
 
 export class ResponseItemsPage extends CursorPage<ResponseItem> {}
@@ -461,6 +480,11 @@ export interface ResponseAudioDeltaEvent {
   delta: string;
 
   /**
+   * A sequence number for this chunk of the stream response.
+   */
+  sequence_number: number;
+
+  /**
    * The type of the event. Always `response.audio.delta`.
    */
   type: 'response.audio.delta';
@@ -470,6 +494,11 @@ export interface ResponseAudioDeltaEvent {
  * Emitted when the audio response is complete.
  */
 export interface ResponseAudioDoneEvent {
+  /**
+   * The sequence number of the delta.
+   */
+  sequence_number: number;
+
   /**
    * The type of the event. Always `response.audio.done`.
    */
@@ -486,6 +515,11 @@ export interface ResponseAudioTranscriptDeltaEvent {
   delta: string;
 
   /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
    * The type of the event. Always `response.audio.transcript.delta`.
    */
   type: 'response.audio.transcript.delta';
@@ -495,6 +529,11 @@ export interface ResponseAudioTranscriptDeltaEvent {
  * Emitted when the full audio transcript is completed.
  */
 export interface ResponseAudioTranscriptDoneEvent {
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
   /**
    * The type of the event. Always `response.audio.transcript.done`.
    */
@@ -514,6 +553,11 @@ export interface ResponseCodeInterpreterCallCodeDeltaEvent {
    * The index of the output item that the code interpreter call is in progress.
    */
   output_index: number;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
 
   /**
    * The type of the event. Always `response.code_interpreter_call.code.delta`.
@@ -536,6 +580,11 @@ export interface ResponseCodeInterpreterCallCodeDoneEvent {
   output_index: number;
 
   /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
    * The type of the event. Always `response.code_interpreter_call.code.done`.
    */
   type: 'response.code_interpreter_call.code.done';
@@ -554,6 +603,11 @@ export interface ResponseCodeInterpreterCallCompletedEvent {
    * The index of the output item that the code interpreter call is in progress.
    */
   output_index: number;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
 
   /**
    * The type of the event. Always `response.code_interpreter_call.completed`.
@@ -576,6 +630,11 @@ export interface ResponseCodeInterpreterCallInProgressEvent {
   output_index: number;
 
   /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
    * The type of the event. Always `response.code_interpreter_call.in_progress`.
    */
   type: 'response.code_interpreter_call.in_progress';
@@ -594,6 +653,11 @@ export interface ResponseCodeInterpreterCallInterpretingEvent {
    * The index of the output item that the code interpreter call is in progress.
    */
   output_index: number;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
 
   /**
    * The type of the event. Always `response.code_interpreter_call.interpreting`.
@@ -687,6 +751,11 @@ export interface ResponseCompletedEvent {
    * Properties of the completed response.
    */
   response: Response;
+
+  /**
+   * The sequence number for this event.
+   */
+  sequence_number: number;
 
   /**
    * The type of the event. Always `response.completed`.
@@ -1071,6 +1140,11 @@ export interface ResponseContentPartAddedEvent {
   part: ResponseOutputText | ResponseOutputRefusal;
 
   /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
    * The type of the event. Always `response.content_part.added`.
    */
   type: 'response.content_part.added';
@@ -1101,6 +1175,11 @@ export interface ResponseContentPartDoneEvent {
   part: ResponseOutputText | ResponseOutputRefusal;
 
   /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
    * The type of the event. Always `response.content_part.done`.
    */
   type: 'response.content_part.done';
@@ -1114,6 +1193,11 @@ export interface ResponseCreatedEvent {
    * The response that was created.
    */
   response: Response;
+
+  /**
+   * The sequence number for this event.
+   */
+  sequence_number: number;
 
   /**
    * The type of the event. Always `response.created`.
@@ -1174,6 +1258,11 @@ export interface ResponseErrorEvent {
   param: string | null;
 
   /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
    * The type of the event. Always `error`.
    */
   type: 'error';
@@ -1187,6 +1276,11 @@ export interface ResponseFailedEvent {
    * The response that failed.
    */
   response: Response;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
 
   /**
    * The type of the event. Always `response.failed`.
@@ -1209,6 +1303,11 @@ export interface ResponseFileSearchCallCompletedEvent {
   output_index: number;
 
   /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
    * The type of the event. Always `response.file_search_call.completed`.
    */
   type: 'response.file_search_call.completed';
@@ -1229,6 +1328,11 @@ export interface ResponseFileSearchCallInProgressEvent {
   output_index: number;
 
   /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
    * The type of the event. Always `response.file_search_call.in_progress`.
    */
   type: 'response.file_search_call.in_progress';
@@ -1247,6 +1351,11 @@ export interface ResponseFileSearchCallSearchingEvent {
    * The index of the output item that the file search call is searching.
    */
   output_index: number;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
 
   /**
    * The type of the event. Always `response.file_search_call.searching`.
@@ -1399,6 +1508,11 @@ export interface ResponseFunctionCallArgumentsDeltaEvent {
   output_index: number;
 
   /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
    * The type of the event. Always `response.function_call_arguments.delta`.
    */
   type: 'response.function_call_arguments.delta';
@@ -1422,6 +1536,11 @@ export interface ResponseFunctionCallArgumentsDoneEvent {
    * The index of the output item.
    */
   output_index: number;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
 
   type: 'response.function_call_arguments.done';
 }
@@ -1542,6 +1661,11 @@ export interface ResponseImageGenCallCompletedEvent {
   output_index: number;
 
   /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
    * The type of the event. Always 'response.image_generation_call.completed'.
    */
   type: 'response.image_generation_call.completed';
@@ -1563,14 +1687,14 @@ export interface ResponseImageGenCallGeneratingEvent {
   output_index: number;
 
   /**
+   * The sequence number of the image generation item being processed.
+   */
+  sequence_number: number;
+
+  /**
    * The type of the event. Always 'response.image_generation_call.generating'.
    */
   type: 'response.image_generation_call.generating';
-
-  /**
-   * The sequence number of the image generation item being processed.
-   */
-  sequence_number?: number;
 }
 
 /**
@@ -1644,6 +1768,11 @@ export interface ResponseInProgressEvent {
   response: Response;
 
   /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
    * The type of the event. Always `response.in_progress`.
    */
   type: 'response.in_progress';
@@ -1678,6 +1807,11 @@ export interface ResponseIncompleteEvent {
    * The response that was incomplete.
    */
   response: Response;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
 
   /**
    * The type of the event. Always `response.incomplete`.
@@ -2576,6 +2710,11 @@ export interface ResponseMcpCallArgumentsDeltaEvent {
   output_index: number;
 
   /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
    * The type of the event. Always 'response.mcp_call.arguments_delta'.
    */
   type: 'response.mcp_call.arguments_delta';
@@ -2601,6 +2740,11 @@ export interface ResponseMcpCallArgumentsDoneEvent {
   output_index: number;
 
   /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
    * The type of the event. Always 'response.mcp_call.arguments_done'.
    */
   type: 'response.mcp_call.arguments_done';
@@ -2611,6 +2755,11 @@ export interface ResponseMcpCallArgumentsDoneEvent {
  */
 export interface ResponseMcpCallCompletedEvent {
   /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
    * The type of the event. Always 'response.mcp_call.completed'.
    */
   type: 'response.mcp_call.completed';
@@ -2620,6 +2769,11 @@ export interface ResponseMcpCallCompletedEvent {
  * Emitted when an MCP tool call has failed.
  */
 export interface ResponseMcpCallFailedEvent {
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
   /**
    * The type of the event. Always 'response.mcp_call.failed'.
    */
@@ -2641,6 +2795,11 @@ export interface ResponseMcpCallInProgressEvent {
   output_index: number;
 
   /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
    * The type of the event. Always 'response.mcp_call.in_progress'.
    */
   type: 'response.mcp_call.in_progress';
@@ -2650,6 +2809,11 @@ export interface ResponseMcpCallInProgressEvent {
  * Emitted when the list of available MCP tools has been successfully retrieved.
  */
 export interface ResponseMcpListToolsCompletedEvent {
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
   /**
    * The type of the event. Always 'response.mcp_list_tools.completed'.
    */
@@ -2661,6 +2825,11 @@ export interface ResponseMcpListToolsCompletedEvent {
  */
 export interface ResponseMcpListToolsFailedEvent {
   /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
    * The type of the event. Always 'response.mcp_list_tools.failed'.
    */
   type: 'response.mcp_list_tools.failed';
@@ -2671,6 +2840,11 @@ export interface ResponseMcpListToolsFailedEvent {
  * MCP tools.
  */
 export interface ResponseMcpListToolsInProgressEvent {
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
   /**
    * The type of the event. Always 'response.mcp_list_tools.in_progress'.
    */
@@ -2950,6 +3124,11 @@ export interface ResponseOutputItemAddedEvent {
   output_index: number;
 
   /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
    * The type of the event. Always `response.output_item.added`.
    */
   type: 'response.output_item.added';
@@ -2968,6 +3147,11 @@ export interface ResponseOutputItemDoneEvent {
    * The index of the output item that was marked done.
    */
   output_index: number;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
 
   /**
    * The type of the event. Always `response.output_item.done`.
@@ -3145,6 +3329,11 @@ export interface ResponseOutputTextAnnotationAddedEvent {
   output_index: number;
 
   /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
    * The type of the event. Always 'response.output_text_annotation.added'.
    */
   type: 'response.output_text_annotation.added';
@@ -3158,6 +3347,11 @@ export interface ResponseQueuedEvent {
    * The full response object that is queued.
    */
   response: Response;
+
+  /**
+   * The sequence number for this event.
+   */
+  sequence_number: number;
 
   /**
    * The type of the event. Always 'response.queued'.
@@ -3190,6 +3384,11 @@ export interface ResponseReasoningDeltaEvent {
   output_index: number;
 
   /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
    * The type of the event. Always 'response.reasoning.delta'.
    */
   type: 'response.reasoning.delta';
@@ -3213,6 +3412,11 @@ export interface ResponseReasoningDoneEvent {
    * The index of the output item in the response's output array.
    */
   output_index: number;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
 
   /**
    * The finalized reasoning text.
@@ -3295,6 +3499,11 @@ export interface ResponseReasoningSummaryDeltaEvent {
   output_index: number;
 
   /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
    * The index of the summary part within the output item.
    */
   summary_index: number;
@@ -3318,6 +3527,11 @@ export interface ResponseReasoningSummaryDoneEvent {
    * The index of the output item in the response's output array.
    */
   output_index: number;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
 
   /**
    * The index of the summary part within the output item.
@@ -3353,6 +3567,11 @@ export interface ResponseReasoningSummaryPartAddedEvent {
    * The summary part that was added.
    */
   part: ResponseReasoningSummaryPartAddedEvent.Part;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
 
   /**
    * The index of the summary part within the reasoning summary.
@@ -3402,6 +3621,11 @@ export interface ResponseReasoningSummaryPartDoneEvent {
   part: ResponseReasoningSummaryPartDoneEvent.Part;
 
   /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
    * The index of the summary part within the reasoning summary.
    */
   summary_index: number;
@@ -3449,6 +3673,11 @@ export interface ResponseReasoningSummaryTextDeltaEvent {
   output_index: number;
 
   /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
    * The index of the summary part within the reasoning summary.
    */
   summary_index: number;
@@ -3472,6 +3701,11 @@ export interface ResponseReasoningSummaryTextDoneEvent {
    * The index of the output item this summary text is associated with.
    */
   output_index: number;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
 
   /**
    * The index of the summary part within the reasoning summary.
@@ -3514,6 +3748,11 @@ export interface ResponseRefusalDeltaEvent {
   output_index: number;
 
   /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
    * The type of the event. Always `response.refusal.delta`.
    */
   type: 'response.refusal.delta';
@@ -3542,6 +3781,11 @@ export interface ResponseRefusalDoneEvent {
    * The refusal text that is finalized.
    */
   refusal: string;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
 
   /**
    * The type of the event. Always `response.refusal.done`.
@@ -3645,6 +3889,11 @@ export interface ResponseTextAnnotationDeltaEvent {
    * The index of the output item that the text annotation was added to.
    */
   output_index: number;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
 
   /**
    * The type of the event. Always `response.output_text.annotation.added`.
@@ -3775,6 +4024,11 @@ export interface ResponseTextDeltaEvent {
   output_index: number;
 
   /**
+   * The sequence number for this event.
+   */
+  sequence_number: number;
+
+  /**
    * The type of the event. Always `response.output_text.delta`.
    */
   type: 'response.output_text.delta';
@@ -3798,6 +4052,11 @@ export interface ResponseTextDoneEvent {
    * The index of the output item that the text content is finalized.
    */
   output_index: number;
+
+  /**
+   * The sequence number for this event.
+   */
+  sequence_number: number;
 
   /**
    * The text content that is finalized.

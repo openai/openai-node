@@ -67,6 +67,15 @@ import { Audio, AudioModel, AudioResponseFormat } from './resources/audio/audio'
 import { Beta } from './resources/beta/beta';
 import { Chat } from './resources/chat/chat';
 import {
+  ContainerCreateParams,
+  ContainerCreateResponse,
+  ContainerListParams,
+  ContainerListResponse,
+  ContainerListResponsesPage,
+  ContainerRetrieveResponse,
+  Containers,
+} from './resources/containers/containers';
+import {
   EvalCreateParams,
   EvalCreateResponse,
   EvalCustomDataSourceConfig,
@@ -310,6 +319,7 @@ export class OpenAI extends Core.APIClient {
   uploads: API.Uploads = new API.Uploads(this);
   responses: API.Responses = new API.Responses(this);
   evals: API.Evals = new API.Evals(this);
+  containers: API.Containers = new API.Containers(this);
 
   protected override defaultQuery(): Core.DefaultQuery | undefined {
     return this._options.defaultQuery;
@@ -376,6 +386,8 @@ OpenAI.Uploads = UploadsAPIUploads;
 OpenAI.Responses = Responses;
 OpenAI.Evals = Evals;
 OpenAI.EvalListResponsesPage = EvalListResponsesPage;
+OpenAI.Containers = Containers;
+OpenAI.ContainerListResponsesPage = ContainerListResponsesPage;
 export declare namespace OpenAI {
   export type RequestOptions = Core.RequestOptions;
 
@@ -543,6 +555,16 @@ export declare namespace OpenAI {
     type EvalCreateParams as EvalCreateParams,
     type EvalUpdateParams as EvalUpdateParams,
     type EvalListParams as EvalListParams,
+  };
+
+  export {
+    Containers as Containers,
+    type ContainerCreateResponse as ContainerCreateResponse,
+    type ContainerRetrieveResponse as ContainerRetrieveResponse,
+    type ContainerListResponse as ContainerListResponse,
+    ContainerListResponsesPage as ContainerListResponsesPage,
+    type ContainerCreateParams as ContainerCreateParams,
+    type ContainerListParams as ContainerListParams,
   };
 
   export type AllModels = API.AllModels;
