@@ -24,6 +24,7 @@ describe('resource responses', () => {
     const response = await client.responses.create({
       input: 'string',
       model: 'gpt-4o',
+      background: true,
       include: ['file_search_call.results'],
       instructions: 'instructions',
       max_output_tokens: 0,
@@ -39,11 +40,11 @@ describe('resource responses', () => {
       tool_choice: 'none',
       tools: [
         {
-          type: 'file_search',
-          vector_store_ids: ['string'],
-          filters: { key: 'key', type: 'eq', value: 'string' },
-          max_num_results: 0,
-          ranking_options: { ranker: 'auto', score_threshold: 0 },
+          name: 'name',
+          parameters: { foo: 'bar' },
+          strict: true,
+          type: 'function',
+          description: 'description',
         },
       ],
       top_p: 1,
