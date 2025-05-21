@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.102.0 (2025-05-21)
+
+Full Changelog: [v4.101.0...v4.102.0](https://github.com/openai/openai-node/compare/v4.101.0...v4.102.0)
+
+### Features
+
+* **api:** add container endpoint ([e973476](https://github.com/openai/openai-node/commit/e9734764625275c50ef612ff934804be8cb2adff))
+
 ## 4.101.0 (2025-05-21)
 
 Full Changelog: [v4.100.0...v4.101.0](https://github.com/openai/openai-node/compare/v4.100.0...v4.101.0)
