@@ -711,6 +711,7 @@ Methods:
 - <code title="post /responses">client.responses.<a href="./src/resources/responses/responses.ts">create</a>({ ...params }) -> Response</code>
 - <code title="get /responses/{response_id}">client.responses.<a href="./src/resources/responses/responses.ts">retrieve</a>(responseId, { ...params }) -> Response</code>
 - <code title="delete /responses/{response_id}">client.responses.<a href="./src/resources/responses/responses.ts">del</a>(responseId) -> void</code>
+- <code title="post /responses/{response_id}/cancel">client.responses.<a href="./src/resources/responses/responses.ts">cancel</a>(responseId) -> void</code>
 
 ## InputItems
 
@@ -774,3 +775,39 @@ Methods:
 
 - <code title="get /evals/{eval_id}/runs/{run_id}/output_items/{output_item_id}">client.evals.runs.outputItems.<a href="./src/resources/evals/runs/output-items.ts">retrieve</a>(evalId, runId, outputItemId) -> OutputItemRetrieveResponse</code>
 - <code title="get /evals/{eval_id}/runs/{run_id}/output_items">client.evals.runs.outputItems.<a href="./src/resources/evals/runs/output-items.ts">list</a>(evalId, runId, { ...params }) -> OutputItemListResponsesPage</code>
+
+# Containers
+
+Types:
+
+- <code><a href="./src/resources/containers/containers.ts">ContainerCreateResponse</a></code>
+- <code><a href="./src/resources/containers/containers.ts">ContainerRetrieveResponse</a></code>
+- <code><a href="./src/resources/containers/containers.ts">ContainerListResponse</a></code>
+
+Methods:
+
+- <code title="post /containers">client.containers.<a href="./src/resources/containers/containers.ts">create</a>({ ...params }) -> ContainerCreateResponse</code>
+- <code title="get /containers/{container_id}">client.containers.<a href="./src/resources/containers/containers.ts">retrieve</a>(containerId) -> ContainerRetrieveResponse</code>
+- <code title="get /containers">client.containers.<a href="./src/resources/containers/containers.ts">list</a>({ ...params }) -> ContainerListResponsesPage</code>
+- <code title="delete /containers/{container_id}">client.containers.<a href="./src/resources/containers/containers.ts">del</a>(containerId) -> void</code>
+
+## Files
+
+Types:
+
+- <code><a href="./src/resources/containers/files/files.ts">FileCreateResponse</a></code>
+- <code><a href="./src/resources/containers/files/files.ts">FileRetrieveResponse</a></code>
+- <code><a href="./src/resources/containers/files/files.ts">FileListResponse</a></code>
+
+Methods:
+
+- <code title="post /containers/{container_id}/files">client.containers.files.<a href="./src/resources/containers/files/files.ts">create</a>(containerId, { ...params }) -> FileCreateResponse</code>
+- <code title="get /containers/{container_id}/files/{file_id}">client.containers.files.<a href="./src/resources/containers/files/files.ts">retrieve</a>(containerId, fileId) -> FileRetrieveResponse</code>
+- <code title="get /containers/{container_id}/files">client.containers.files.<a href="./src/resources/containers/files/files.ts">list</a>(containerId, { ...params }) -> FileListResponsesPage</code>
+- <code title="delete /containers/{container_id}/files/{file_id}">client.containers.files.<a href="./src/resources/containers/files/files.ts">del</a>(containerId, fileId) -> void</code>
+
+### Content
+
+Methods:
+
+- <code title="get /containers/{container_id}/files/{file_id}/content">client.containers.files.content.<a href="./src/resources/containers/files/content.ts">retrieve</a>(containerId, fileId) -> void</code>
