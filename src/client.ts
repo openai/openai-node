@@ -86,6 +86,15 @@ import { Audio, AudioModel, AudioResponseFormat } from './resources/audio/audio'
 import { Beta } from './resources/beta/beta';
 import { Chat } from './resources/chat/chat';
 import {
+  ContainerCreateParams,
+  ContainerCreateResponse,
+  ContainerListParams,
+  ContainerListResponse,
+  ContainerListResponsesPage,
+  ContainerRetrieveResponse,
+  Containers,
+} from './resources/containers/containers';
+import {
   EvalCreateParams,
   EvalCreateResponse,
   EvalCustomDataSourceConfig,
@@ -892,6 +901,7 @@ export class OpenAI {
   uploads: API.Uploads = new API.Uploads(this);
   responses: API.Responses = new API.Responses(this);
   evals: API.Evals = new API.Evals(this);
+  containers: API.Containers = new API.Containers(this);
 }
 OpenAI.Completions = Completions;
 OpenAI.Chat = Chat;
@@ -909,6 +919,7 @@ OpenAI.Batches = Batches;
 OpenAI.Uploads = UploadsAPIUploads;
 OpenAI.Responses = Responses;
 OpenAI.Evals = Evals;
+OpenAI.Containers = Containers;
 export declare namespace OpenAI {
   export type RequestOptions = Opts.RequestOptions;
 
@@ -1075,6 +1086,16 @@ export declare namespace OpenAI {
     type EvalCreateParams as EvalCreateParams,
     type EvalUpdateParams as EvalUpdateParams,
     type EvalListParams as EvalListParams,
+  };
+
+  export {
+    Containers as Containers,
+    type ContainerCreateResponse as ContainerCreateResponse,
+    type ContainerRetrieveResponse as ContainerRetrieveResponse,
+    type ContainerListResponse as ContainerListResponse,
+    type ContainerListResponsesPage as ContainerListResponsesPage,
+    type ContainerCreateParams as ContainerCreateParams,
+    type ContainerListParams as ContainerListParams,
   };
 
   export type AllModels = API.AllModels;

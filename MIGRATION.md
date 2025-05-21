@@ -78,6 +78,9 @@ client.parents.children.retrieve('c_456', { parent_id: 'p_123' });
 - `client.evals.runs.cancel()`
 - `client.evals.runs.outputItems.retrieve()`
 - `client.evals.runs.outputItems.list()`
+- `client.containers.files.retrieve()`
+- `client.containers.files.delete()`
+- `client.containers.files.content.retrieve()`
 
 </details>
 
@@ -128,6 +131,8 @@ This affects the following methods:
 - `client.responses.inputItems.list()`
 - `client.evals.list()`
 - `client.evals.runs.list()`
+- `client.containers.list()`
+- `client.containers.files.list()`
 
 ### HTTP method naming
 
@@ -147,6 +152,8 @@ client.beta.threads.messages.del();
 client.responses.del();
 client.evals.del();
 client.evals.runs.del();
+client.containers.del();
+client.containers.files.del();
 
 // After
 client.chat.completions.delete();
@@ -161,6 +168,8 @@ client.beta.threads.messages.delete();
 client.responses.delete();
 client.evals.delete();
 client.evals.runs.delete();
+client.containers.delete();
+client.containers.files.delete();
 ```
 
 ### Removed `httpAgent` in favor of `fetchOptions`

@@ -814,6 +814,111 @@
           "type": "options"
         }
       ]
+    },
+    {
+      "base": "containers",
+      "name": "delete",
+      "oldName": "del"
+    },
+    {
+      "base": "containers.files",
+      "name": "retrieve",
+      "params": [
+        {
+          "type": "param",
+          "key": "file_id",
+          "location": "path"
+        },
+        {
+          "type": "params",
+          "maybeOverload": false
+        },
+        {
+          "type": "options"
+        }
+      ],
+      "oldParams": [
+        {
+          "type": "param",
+          "key": "container_id",
+          "location": "path"
+        },
+        {
+          "type": "param",
+          "key": "file_id",
+          "location": "path"
+        },
+        {
+          "type": "options"
+        }
+      ]
+    },
+    {
+      "base": "containers.files",
+      "name": "delete",
+      "params": [
+        {
+          "type": "param",
+          "key": "file_id",
+          "location": "path"
+        },
+        {
+          "type": "params",
+          "maybeOverload": false
+        },
+        {
+          "type": "options"
+        }
+      ],
+      "oldName": "del",
+      "oldParams": [
+        {
+          "type": "param",
+          "key": "container_id",
+          "location": "path"
+        },
+        {
+          "type": "param",
+          "key": "file_id",
+          "location": "path"
+        },
+        {
+          "type": "options"
+        }
+      ]
+    },
+    {
+      "base": "containers.files.content",
+      "name": "retrieve",
+      "params": [
+        {
+          "type": "param",
+          "key": "file_id",
+          "location": "path"
+        },
+        {
+          "type": "params",
+          "maybeOverload": false
+        },
+        {
+          "type": "options"
+        }
+      ],
+      "oldParams": [
+        {
+          "type": "param",
+          "key": "container_id",
+          "location": "path"
+        },
+        {
+          "type": "param",
+          "key": "file_id",
+          "location": "path"
+        },
+        {
+          "type": "options"
+        }
+      ]
     }
   ]
 }
