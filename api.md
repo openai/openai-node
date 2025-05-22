@@ -691,7 +691,6 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponseRefusalDoneEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseStatus</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseStreamEvent</a></code>
-- <code><a href="./src/resources/responses/responses.ts">ResponseTextAnnotationDeltaEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseTextConfig</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseTextDeltaEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseTextDoneEvent</a></code>

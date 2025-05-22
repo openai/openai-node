@@ -443,8 +443,8 @@ export interface Response {
   usage?: ResponseUsage;
 
   /**
-   * A unique identifier representing your end-user, which can help OpenAI to monitor
-   * and detect abuse.
+   * A stable identifier for your end-users. Used to boost cache hit rates by better
+   * bucketing similar requests and to help OpenAI detect and prevent abuse.
    * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#end-user-ids).
    */
   user?: string;
@@ -3825,7 +3825,6 @@ export type ResponseStreamEvent =
   | ResponseReasoningSummaryTextDoneEvent
   | ResponseRefusalDeltaEvent
   | ResponseRefusalDoneEvent
-  | ResponseTextAnnotationDeltaEvent
   | ResponseTextDeltaEvent
   | ResponseTextDoneEvent
   | ResponseWebSearchCallCompletedEvent
@@ -3849,121 +3848,6 @@ export type ResponseStreamEvent =
   | ResponseReasoningDoneEvent
   | ResponseReasoningSummaryDeltaEvent
   | ResponseReasoningSummaryDoneEvent;
-
-/**
- * Emitted when a text annotation is added.
- */
-export interface ResponseTextAnnotationDeltaEvent {
-  /**
-   * A citation to a file.
-   */
-  annotation:
-    | ResponseTextAnnotationDeltaEvent.FileCitation
-    | ResponseTextAnnotationDeltaEvent.URLCitation
-    | ResponseTextAnnotationDeltaEvent.FilePath;
-
-  /**
-   * The index of the annotation that was added.
-   */
-  annotation_index: number;
-
-  /**
-   * The index of the content part that the text annotation was added to.
-   */
-  content_index: number;
-
-  /**
-   * The ID of the output item that the text annotation was added to.
-   */
-  item_id: string;
-
-  /**
-   * The index of the output item that the text annotation was added to.
-   */
-  output_index: number;
-
-  /**
-   * The sequence number of this event.
-   */
-  sequence_number: number;
-
-  /**
-   * The type of the event. Always `response.output_text.annotation.added`.
-   */
-  type: 'response.output_text.annotation.added';
-}
-
-export namespace ResponseTextAnnotationDeltaEvent {
-  /**
-   * A citation to a file.
-   */
-  export interface FileCitation {
-    /**
-     * The ID of the file.
-     */
-    file_id: string;
-
-    /**
-     * The index of the file in the list of files.
-     */
-    index: number;
-
-    /**
-     * The type of the file citation. Always `file_citation`.
-     */
-    type: 'file_citation';
-  }
-
-  /**
-   * A citation for a web resource used to generate a model response.
-   */
-  export interface URLCitation {
-    /**
-     * The index of the last character of the URL citation in the message.
-     */
-    end_index: number;
-
-    /**
-     * The index of the first character of the URL citation in the message.
-     */
-    start_index: number;
-
-    /**
-     * The title of the web resource.
-     */
-    title: string;
-
-    /**
-     * The type of the URL citation. Always `url_citation`.
-     */
-    type: 'url_citation';
-
-    /**
-     * The URL of the web resource.
-     */
-    url: string;
-  }
-
-  /**
-   * A path to a file.
-   */
-  export interface FilePath {
-    /**
-     * The ID of the file.
-     */
-    file_id: string;
-
-    /**
-     * The index of the file in the list of files.
-     */
-    index: number;
-
-    /**
-     * The type of the file path. Always `file_path`.
-     */
-    type: 'file_path';
-  }
-}
 
 /**
  * Configuration options for a text response from the model. Can be plain text or
@@ -4130,6 +4014,11 @@ export interface ResponseWebSearchCallCompletedEvent {
   output_index: number;
 
   /**
+   * The sequence number of the web search call being processed.
+   */
+  sequence_number: number;
+
+  /**
    * The type of the event. Always `response.web_search_call.completed`.
    */
   type: 'response.web_search_call.completed';
@@ -4150,6 +4039,11 @@ export interface ResponseWebSearchCallInProgressEvent {
   output_index: number;
 
   /**
+   * The sequence number of the web search call being processed.
+   */
+  sequence_number: number;
+
+  /**
    * The type of the event. Always `response.web_search_call.in_progress`.
    */
   type: 'response.web_search_call.in_progress';
@@ -4168,6 +4062,11 @@ export interface ResponseWebSearchCallSearchingEvent {
    * The index of the output item that the web search call is associated with.
    */
   output_index: number;
+
+  /**
+   * The sequence number of the web search call being processed.
+   */
+  sequence_number: number;
 
   /**
    * The type of the event. Always `response.web_search_call.searching`.
@@ -4248,11 +4147,6 @@ export namespace Tool {
        * A list of tools that never require approval.
        */
       never?: McpToolApprovalFilter.Never;
-
-      /**
-       * List of allowed tool names.
-       */
-      tool_names?: Array<string>;
     }
 
     export namespace McpToolApprovalFilter {
@@ -4709,8 +4603,8 @@ export interface ResponseCreateParamsBase {
   truncation?: 'auto' | 'disabled' | null;
 
   /**
-   * A unique identifier representing your end-user, which can help OpenAI to monitor
-   * and detect abuse.
+   * A stable identifier for your end-users. Used to boost cache hit rates by better
+   * bucketing similar requests and to help OpenAI detect and prevent abuse.
    * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#end-user-ids).
    */
   user?: string;
@@ -4842,7 +4736,6 @@ export declare namespace Responses {
     type ResponseRefusalDoneEvent as ResponseRefusalDoneEvent,
     type ResponseStatus as ResponseStatus,
     type ResponseStreamEvent as ResponseStreamEvent,
-    type ResponseTextAnnotationDeltaEvent as ResponseTextAnnotationDeltaEvent,
     type ResponseTextConfig as ResponseTextConfig,
     type ResponseTextDeltaEvent as ResponseTextDeltaEvent,
     type ResponseTextDoneEvent as ResponseTextDoneEvent,
