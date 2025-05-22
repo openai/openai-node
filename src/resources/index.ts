@@ -23,6 +23,15 @@ export {
   type CompletionCreateParamsStreaming,
 } from './completions';
 export {
+  ContainerListResponsesPage,
+  Containers,
+  type ContainerCreateResponse,
+  type ContainerRetrieveResponse,
+  type ContainerListResponse,
+  type ContainerCreateParams,
+  type ContainerListParams,
+} from './containers/containers';
+export {
   Embeddings,
   type CreateEmbeddingResponse,
   type Embedding,
