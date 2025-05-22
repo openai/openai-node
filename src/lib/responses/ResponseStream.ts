@@ -174,8 +174,8 @@ export class ResponseStream<ParsedT = null>
     }
     this.#beginRequest();
 
-    var stream: Stream<ResponseStreamEvent> | undefined;
-    var starting_after: number | null = null;
+    let stream: Stream<ResponseStreamEvent> | undefined;
+    let starting_after: number | null = null;
     if ('response_id' in params) {
       stream = await client.responses.retrieve(
         params.response_id,

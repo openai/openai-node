@@ -11,7 +11,7 @@ async function main() {
     background: true,
   });
 
-  var id: string | null = null;
+  let id: string | null = null;
 
   for await (const event of runner) {
     if (event.type == 'response.created') {
