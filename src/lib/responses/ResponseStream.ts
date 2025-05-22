@@ -21,7 +21,13 @@ export type ResponseCreateAndStreamParams = Omit<ResponseCreateParamsBase, 'stre
 };
 
 export type ResponseStreamByIdParams = {
+  /**
+   * The ID of the response to stream.
+   */
   response_id: string;
+  /**
+   * If provided, the stream will start after the event with the given sequence number.
+   */
   starting_after?: number;
   /**
    * Configuration options for a text response from the model. Can be plain text or
@@ -31,6 +37,11 @@ export type ResponseStreamByIdParams = {
    * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
    */
   text?: ResponseTextConfig;
+
+  /**
+   * An array of tools the model may call while generating a response. When continuing a stream, provide
+   * the same tools as the original request.
+   */
   tools?: ParseableToolsParams;
 };
 
