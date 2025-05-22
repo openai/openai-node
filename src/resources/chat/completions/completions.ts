@@ -1,16 +1,15 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../../resource';
-import { isRequestOptions } from '../../../core';
-import { APIPromise } from '../../../core';
 import * as Core from '../../../core';
-import * as CompletionsCompletionsAPI from './completions';
+import { APIPromise, isRequestOptions } from '../../../core';
+import { CursorPage, type CursorPageParams } from '../../../pagination';
+import { APIResource } from '../../../resource';
+import { Stream } from '../../../streaming';
 import * as CompletionsAPI from '../../completions';
 import * as Shared from '../../shared';
+import * as CompletionsCompletionsAPI from './completions';
 import * as MessagesAPI from './messages';
 import { MessageListParams, Messages } from './messages';
-import { CursorPage, type CursorPageParams } from '../../../pagination';
-import { Stream } from '../../../streaming';
 
 export class Completions extends APIResource {
   messages: MessagesAPI.Messages = new MessagesAPI.Messages(this._client);
