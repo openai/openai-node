@@ -24,7 +24,6 @@ import {
   ResponseOutputItemDoneEvent,
   ResponseRefusalDeltaEvent,
   ResponseRefusalDoneEvent,
-  ResponseTextAnnotationDeltaEvent,
   ResponseTextDeltaEvent as RawResponseTextDeltaEvent,
   ResponseTextDoneEvent,
   ResponseIncompleteEvent,
@@ -68,7 +67,6 @@ export type ParsedResponseStreamEvent =
   | ResponseOutputItemDoneEvent
   | ResponseRefusalDeltaEvent
   | ResponseRefusalDoneEvent
-  | ResponseTextAnnotationDeltaEvent
   | ResponseTextDeltaEvent
   | ResponseTextDoneEvent
   | ResponseWebSearchCallCompletedEvent
