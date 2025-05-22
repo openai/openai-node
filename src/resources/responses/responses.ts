@@ -112,21 +112,44 @@ export class Responses extends APIResource {
    * );
    * ```
    */
+
   retrieve(
     responseId: string,
-    query?: ResponseRetrieveParams,
+    query?: ResponseRetrieveParamsNonStreaming,
     options?: Core.RequestOptions,
   ): Core.APIPromise<Response>;
+  retrieve(
+    responseId: string,
+    query?: ResponseRetrieveParamsStreaming,
+    options?: Core.RequestOptions,
+  ): Core.APIPromise<Stream<ResponseStreamEvent>>;
   retrieve(responseId: string, options?: Core.RequestOptions): Core.APIPromise<Response>;
+  retrieve(
+    responseId: string,
+    query: ResponseRetrieveParams | Core.RequestOptions,
+    options?: Core.RequestOptions,
+  ): Core.APIPromise<Response> | Core.APIPromise<Stream<ResponseStreamEvent>>;
   retrieve(
     responseId: string,
     query: ResponseRetrieveParams | Core.RequestOptions = {},
     options?: Core.RequestOptions,
-  ): Core.APIPromise<Response> {
-    if (isRequestOptions(query)) {
+  ): Core.APIPromise<Response> | Core.APIPromise<Stream<ResponseStreamEvent>> {
+    if (isRequestOptions(query) && options === undefined) {
       return this.retrieve(responseId, {}, query);
     }
-    return this._client.get(`/responses/${responseId}`, { query, ...options });
+    return (
+      this._client.get(`/responses/${responseId}`, {
+        query,
+        ...options,
+        stream: query.stream ?? false,
+      }) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>
+    )._thenUnwrap((rsp) => {
+      if ('object' in rsp && rsp.object === 'response') {
+        addOutputText(rsp as Response);
+      }
+
+      return rsp;
+    }) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>;
   }
 
   /**
@@ -4205,6 +4228,11 @@ export interface ResponseWebSearchCallCompletedEvent {
   item_id: string;
 
   /**
+   * A sequence number for this chunk of the stream response.
+   */
+  sequence_number: number;
+
+  /**
    * The index of the output item that the web search call is associated with.
    */
   output_index: number;
@@ -4225,6 +4253,11 @@ export interface ResponseWebSearchCallInProgressEvent {
   item_id: string;
 
   /**
+   * A sequence number for this chunk of the stream response.
+   */
+  sequence_number: number;
+
+  /**
    * The index of the output item that the web search call is associated with.
    */
   output_index: number;
@@ -4243,6 +4276,11 @@ export interface ResponseWebSearchCallSearchingEvent {
    * Unique ID for the output item associated with the web search call.
    */
   item_id: string;
+
+  /**
+   * A sequence number for this chunk of the stream response.
+   */
+  sequence_number: number;
 
   /**
    * The index of the output item that the web search call is associated with.
@@ -4825,14 +4863,29 @@ export interface ResponseCreateParamsStreaming extends ResponseCreateParamsBase 
   stream: true;
 }
 
-export interface ResponseRetrieveParams {
+export type ResponseRetrieveParams = ResponseRetrieveParamsStreaming | ResponseRetrieveParamsNonStreaming;
+export interface ResponseRetrieveParamsBase {
   /**
    * Additional fields to include in the response. See the `include` parameter for
    * Response creation above for more information.
    */
   include?: Array<ResponseIncludable>;
+
+  starting_after?: number | null;
+  stream?: boolean | null;
 }
 
+export interface ResponseRetrieveParamsStreaming extends ResponseRetrieveParamsBase {
+  stream: true;
+}
+export interface ResponseRetrieveParamsNonStreaming extends ResponseRetrieveParamsBase {
+  stream?: false | null;
+}
+
+export namespace ResponseRetrieveParams {
+  export type ResponseRetrieveParamsStreaming = ResponsesAPI.ResponseRetrieveParamsStreaming;
+  export type ResponseRetrieveParamsNonStreaming = ResponsesAPI.ResponseRetrieveParamsNonStreaming;
+}
 Responses.InputItems = InputItems;
 
 export declare namespace Responses {
