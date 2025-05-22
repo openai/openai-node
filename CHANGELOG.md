@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.103.0 (2025-05-22)
+
+Full Changelog: [v4.102.0...v4.103.0](https://github.com/openai/openai-node/compare/v4.102.0...v4.103.0)
+
+### Features
+
+* **api:** new streaming helpers for background responses ([1ddd6ff](https://github.com/openai/openai-node/commit/1ddd6ff182b09d696954fda4bde50fb82f1d6585))
+
 ## 4.102.0 (2025-05-21)
 
 Full Changelog: [v4.101.0...v4.102.0](https://github.com/openai/openai-node/compare/v4.101.0...v4.102.0)
