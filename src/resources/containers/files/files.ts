@@ -21,7 +21,10 @@ export class Files extends APIResource {
     body: FileCreateParams,
     options?: Core.RequestOptions,
   ): Core.APIPromise<FileCreateResponse> {
-    return this._client.post(`/containers/${containerId}/files`, { body, ...options });
+    return this._client.post(
+      `/containers/${containerId}/files`,
+      Core.multipartFormRequestOptions({ body, ...options }),
+    );
   }
 
   /**

@@ -928,7 +928,7 @@ export namespace RealtimeClientEvent {
    * the server to stop generating audio and emit a `output_audio_buffer.cleared`
    * event. This event should be preceded by a `response.cancel` client event to stop
    * the generation of the current response.
-   * [Learn more](https://platform.openai.com/docs/guides/realtime-model-capabilities#client-and-server-events-for-audio-in-webrtc).
+   * [Learn more](https://platform.openai.com/docs/guides/realtime-conversations#client-and-server-events-for-audio-in-webrtc).
    */
   export interface OutputAudioBufferClear {
     /**
@@ -1227,7 +1227,7 @@ export namespace RealtimeServerEvent {
    * **WebRTC Only:** Emitted when the server begins streaming audio to the client.
    * This event is emitted after an audio content part has been added
    * (`response.content_part.added`) to the response.
-   * [Learn more](https://platform.openai.com/docs/guides/realtime-model-capabilities#client-and-server-events-for-audio-in-webrtc).
+   * [Learn more](https://platform.openai.com/docs/guides/realtime-conversations#client-and-server-events-for-audio-in-webrtc).
    */
   export interface OutputAudioBufferStarted {
     /**
@@ -1250,7 +1250,7 @@ export namespace RealtimeServerEvent {
    * **WebRTC Only:** Emitted when the output audio buffer has been completely
    * drained on the server, and no more audio is forthcoming. This event is emitted
    * after the full response data has been sent to the client (`response.done`).
-   * [Learn more](https://platform.openai.com/docs/guides/realtime-model-capabilities#client-and-server-events-for-audio-in-webrtc).
+   * [Learn more](https://platform.openai.com/docs/guides/realtime-conversations#client-and-server-events-for-audio-in-webrtc).
    */
   export interface OutputAudioBufferStopped {
     /**
@@ -1275,7 +1275,7 @@ export namespace RealtimeServerEvent {
    * (`input_audio_buffer.speech_started`), or when the client has emitted the
    * `output_audio_buffer.clear` event to manually cut off the current audio
    * response.
-   * [Learn more](https://platform.openai.com/docs/guides/realtime-model-capabilities#client-and-server-events-for-audio-in-webrtc).
+   * [Learn more](https://platform.openai.com/docs/guides/realtime-conversations#client-and-server-events-for-audio-in-webrtc).
    */
   export interface OutputAudioBufferCleared {
     /**
