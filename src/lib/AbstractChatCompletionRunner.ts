@@ -29,6 +29,12 @@ const DEFAULT_MAX_CHAT_COMPLETIONS = 10;
 export interface RunnerOptions extends Core.RequestOptions {
   /** How many requests to make before canceling. Default 10. */
   maxChatCompletions?: number;
+  /** A callback to be run after each chat completion (and after any tools have been run for the completion).
+   * Can be used, for example, to make an LLM call to analyze the conversation thus far and provide guidance
+   * or supplemental information by injecting a message via runner._addMessage().
+   * Receives the chat completion that was just processed as an argument and runs after all tool calls have been handled.
+   */
+  afterCompletion?: (completion: ChatCompletion) => Promise<void>;
 }
 
 export class AbstractChatCompletionRunner<
@@ -276,7 +282,7 @@ export class AbstractChatCompletionRunner<
     const role = 'function' as const;
     const { function_call = 'auto', stream, ...restParams } = params;
     const singleFunctionToCall = typeof function_call !== 'string' && function_call?.name;
-    const { maxChatCompletions = DEFAULT_MAX_CHAT_COMPLETIONS } = options || {};
+    const { maxChatCompletions = DEFAULT_MAX_CHAT_COMPLETIONS, afterCompletion } = options || {};
 
     const functionsByName: Record<string, RunnableFunction<any>> = {};
     for (const f of params.functions) {
@@ -347,6 +353,10 @@ export class AbstractChatCompletionRunner<
 
       this._addMessage({ role, name, content });
 
+      if (afterCompletion) {
+        await afterCompletion(chatCompletion);
+      }
+
       if (singleFunctionToCall) return;
     }
   }
@@ -361,7 +371,7 @@ export class AbstractChatCompletionRunner<
     const role = 'tool' as const;
     const { tool_choice = 'auto', stream, ...restParams } = params;
     const singleFunctionToCall = typeof tool_choice !== 'string' && tool_choice?.function?.name;
-    const { maxChatCompletions = DEFAULT_MAX_CHAT_COMPLETIONS } = options || {};
+    const { maxChatCompletions = DEFAULT_MAX_CHAT_COMPLETIONS, afterCompletion } = options || {};
 
     // TODO(someday): clean this logic up
     const inputTools = params.tools.map((tool): RunnableToolFunction<any> => {
@@ -472,8 +482,15 @@ export class AbstractChatCompletionRunner<
         this._addMessage({ role, tool_call_id, content });
 
         if (singleFunctionToCall) {
+          if (afterCompletion) {
+            await afterCompletion(chatCompletion);
+          }
           return;
         }
+      }
+
+      if (afterCompletion) {
+        await afterCompletion(chatCompletion);
       }
     }
 
