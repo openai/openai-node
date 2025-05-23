@@ -1,11 +1,15 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../../resource';
-import { isRequestOptions } from '../../../core';
-import * as Core from '../../../core';
+import { APIResource } from '../../../core/resource';
 import * as ContentAPI from './content';
-import { Content } from './content';
-import { CursorPage, type CursorPageParams } from '../../../pagination';
+import { Content, ContentRetrieveParams } from './content';
+import { APIPromise } from '../../../core/api-promise';
+import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pagination';
+import { type Uploadable } from '../../../core/uploads';
+import { buildHeaders } from '../../../internal/headers';
+import { RequestOptions } from '../../../internal/request-options';
+import { multipartFormRequestOptions } from '../../../internal/uploads';
+import { path } from '../../../internal/utils/path';
 
 export class Files extends APIResource {
   content: ContentAPI.Content = new ContentAPI.Content(this._client);
@@ -17,13 +21,13 @@ export class Files extends APIResource {
    * a JSON request with a file ID.
    */
   create(
-    containerId: string,
+    containerID: string,
     body: FileCreateParams,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<FileCreateResponse> {
+    options?: RequestOptions,
+  ): APIPromise<FileCreateResponse> {
     return this._client.post(
-      `/containers/${containerId}/files`,
-      Core.multipartFormRequestOptions({ body, ...options }),
+      path`/containers/${containerID}/files`,
+      multipartFormRequestOptions({ body, ...options }, this._client),
     );
   }
 
@@ -31,34 +35,23 @@ export class Files extends APIResource {
    * Retrieve Container File
    */
   retrieve(
-    containerId: string,
-    fileId: string,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<FileRetrieveResponse> {
-    return this._client.get(`/containers/${containerId}/files/${fileId}`, options);
+    fileID: string,
+    params: FileRetrieveParams,
+    options?: RequestOptions,
+  ): APIPromise<FileRetrieveResponse> {
+    const { container_id } = params;
+    return this._client.get(path`/containers/${container_id}/files/${fileID}`, options);
   }
 
   /**
    * List Container files
    */
   list(
-    containerId: string,
-    query?: FileListParams,
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<FileListResponsesPage, FileListResponse>;
-  list(
-    containerId: string,
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<FileListResponsesPage, FileListResponse>;
-  list(
-    containerId: string,
-    query: FileListParams | Core.RequestOptions = {},
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<FileListResponsesPage, FileListResponse> {
-    if (isRequestOptions(query)) {
-      return this.list(containerId, {}, query);
-    }
-    return this._client.getAPIList(`/containers/${containerId}/files`, FileListResponsesPage, {
+    containerID: string,
+    query: FileListParams | null | undefined = {},
+    options?: RequestOptions,
+  ): PagePromise<FileListResponsesPage, FileListResponse> {
+    return this._client.getAPIList(path`/containers/${containerID}/files`, CursorPage<FileListResponse>, {
       query,
       ...options,
     });
@@ -67,15 +60,16 @@ export class Files extends APIResource {
   /**
    * Delete Container File
    */
-  del(containerId: string, fileId: string, options?: Core.RequestOptions): Core.APIPromise<void> {
-    return this._client.delete(`/containers/${containerId}/files/${fileId}`, {
+  delete(fileID: string, params: FileDeleteParams, options?: RequestOptions): APIPromise<void> {
+    const { container_id } = params;
+    return this._client.delete(path`/containers/${container_id}/files/${fileID}`, {
       ...options,
-      headers: { Accept: '*/*', ...options?.headers },
+      headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
     });
   }
 }
 
-export class FileListResponsesPage extends CursorPage<FileListResponse> {}
+export type FileListResponsesPage = CursorPage<FileListResponse>;
 
 export interface FileCreateResponse {
   /**
@@ -192,12 +186,16 @@ export interface FileCreateParams {
   /**
    * The File object (not file name) to be uploaded.
    */
-  file?: Core.Uploadable;
+  file?: Uploadable;
 
   /**
    * Name of the file to create.
    */
   file_id?: string;
+}
+
+export interface FileRetrieveParams {
+  container_id: string;
 }
 
 export interface FileListParams extends CursorPageParams {
@@ -208,7 +206,10 @@ export interface FileListParams extends CursorPageParams {
   order?: 'asc' | 'desc';
 }
 
-Files.FileListResponsesPage = FileListResponsesPage;
+export interface FileDeleteParams {
+  container_id: string;
+}
+
 Files.Content = Content;
 
 export declare namespace Files {
@@ -216,10 +217,12 @@ export declare namespace Files {
     type FileCreateResponse as FileCreateResponse,
     type FileRetrieveResponse as FileRetrieveResponse,
     type FileListResponse as FileListResponse,
-    FileListResponsesPage as FileListResponsesPage,
+    type FileListResponsesPage as FileListResponsesPage,
     type FileCreateParams as FileCreateParams,
+    type FileRetrieveParams as FileRetrieveParams,
     type FileListParams as FileListParams,
+    type FileDeleteParams as FileDeleteParams,
   };
 
-  export { Content as Content };
+  export { Content as Content, type ContentRetrieveParams as ContentRetrieveParams };
 }

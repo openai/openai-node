@@ -7,7 +7,7 @@ const openai = new OpenAI();
 
 async function main() {
   // Explicit non streaming params type:
-  const params: OpenAI.Chat.CompletionCreateParams = {
+  const params: OpenAI.Chat.ChatCompletionCreateParams = {
     model: 'gpt-4',
     messages: [{ role: 'user', content: 'Say this is a test!' }],
   };
@@ -15,7 +15,7 @@ async function main() {
   console.log(completion.choices[0]?.message?.content);
 
   // Explicit streaming params type:
-  const streaming_params: OpenAI.Chat.CompletionCreateParams = {
+  const streaming_params: OpenAI.Chat.ChatCompletionCreateParams = {
     model: 'gpt-4',
     messages: [{ role: 'user', content: 'Say this is a test!' }],
     stream: true,

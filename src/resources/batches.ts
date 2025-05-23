@@ -1,40 +1,36 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../resource';
-import { isRequestOptions } from '../core';
-import * as Core from '../core';
+import { APIResource } from '../core/resource';
 import * as BatchesAPI from './batches';
 import * as Shared from './shared';
-import { CursorPage, type CursorPageParams } from '../pagination';
+import { APIPromise } from '../core/api-promise';
+import { CursorPage, type CursorPageParams, PagePromise } from '../core/pagination';
+import { RequestOptions } from '../internal/request-options';
+import { path } from '../internal/utils/path';
 
 export class Batches extends APIResource {
   /**
    * Creates and executes a batch from an uploaded file of requests
    */
-  create(body: BatchCreateParams, options?: Core.RequestOptions): Core.APIPromise<Batch> {
+  create(body: BatchCreateParams, options?: RequestOptions): APIPromise<Batch> {
     return this._client.post('/batches', { body, ...options });
   }
 
   /**
    * Retrieves a batch.
    */
-  retrieve(batchId: string, options?: Core.RequestOptions): Core.APIPromise<Batch> {
-    return this._client.get(`/batches/${batchId}`, options);
+  retrieve(batchID: string, options?: RequestOptions): APIPromise<Batch> {
+    return this._client.get(path`/batches/${batchID}`, options);
   }
 
   /**
    * List your organization's batches.
    */
-  list(query?: BatchListParams, options?: Core.RequestOptions): Core.PagePromise<BatchesPage, Batch>;
-  list(options?: Core.RequestOptions): Core.PagePromise<BatchesPage, Batch>;
   list(
-    query: BatchListParams | Core.RequestOptions = {},
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<BatchesPage, Batch> {
-    if (isRequestOptions(query)) {
-      return this.list({}, query);
-    }
-    return this._client.getAPIList('/batches', BatchesPage, { query, ...options });
+    query: BatchListParams | null | undefined = {},
+    options?: RequestOptions,
+  ): PagePromise<BatchesPage, Batch> {
+    return this._client.getAPIList('/batches', CursorPage<Batch>, { query, ...options });
   }
 
   /**
@@ -42,12 +38,12 @@ export class Batches extends APIResource {
    * 10 minutes, before changing to `cancelled`, where it will have partial results
    * (if any) available in the output file.
    */
-  cancel(batchId: string, options?: Core.RequestOptions): Core.APIPromise<Batch> {
-    return this._client.post(`/batches/${batchId}/cancel`, options);
+  cancel(batchID: string, options?: RequestOptions): APIPromise<Batch> {
+    return this._client.post(path`/batches/${batchID}/cancel`, options);
   }
 }
 
-export class BatchesPage extends CursorPage<Batch> {}
+export type BatchesPage = CursorPage<Batch>;
 
 export interface Batch {
   id: string;
@@ -252,14 +248,12 @@ export interface BatchCreateParams {
 
 export interface BatchListParams extends CursorPageParams {}
 
-Batches.BatchesPage = BatchesPage;
-
 export declare namespace Batches {
   export {
     type Batch as Batch,
     type BatchError as BatchError,
     type BatchRequestCounts as BatchRequestCounts,
-    BatchesPage as BatchesPage,
+    type BatchesPage as BatchesPage,
     type BatchCreateParams as BatchCreateParams,
     type BatchListParams as BatchListParams,
   };

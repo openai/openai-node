@@ -1,8 +1,9 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../resource';
-import * as Core from '../../core';
-import { type Response } from '../../_shims/index';
+import { APIResource } from '../../core/resource';
+import { APIPromise } from '../../core/api-promise';
+import { buildHeaders } from '../../internal/headers';
+import { RequestOptions } from '../../internal/request-options';
 
 export class Speech extends APIResource {
   /**
@@ -20,11 +21,11 @@ export class Speech extends APIResource {
    * console.log(content);
    * ```
    */
-  create(body: SpeechCreateParams, options?: Core.RequestOptions): Core.APIPromise<Response> {
+  create(body: SpeechCreateParams, options?: RequestOptions): APIPromise<Response> {
     return this._client.post('/audio/speech', {
       body,
       ...options,
-      headers: { Accept: 'application/octet-stream', ...options?.headers },
+      headers: buildHeaders([{ Accept: 'application/octet-stream' }, options?.headers]),
       __binaryResponse: true,
     });
   }

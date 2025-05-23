@@ -4,12 +4,11 @@ import { PassThrough } from 'stream';
 import {
   ParsingToolFunction,
   type ChatCompletionRunner,
-  type ChatCompletionFunctionRunnerParams,
+  type ChatCompletionToolRunnerParams,
   ChatCompletionStreamingRunner,
-  type ChatCompletionStreamingFunctionRunnerParams,
+  type ChatCompletionStreamingToolRunnerParams,
 } from 'openai/resources/beta/chat/completions';
 import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
-import { Response } from 'node-fetch';
 import { isAssistantMessage } from '../../src/lib/chatCompletionUtils';
 import { mockFetch } from '../utils/mock-fetch';
 
@@ -19,12 +18,12 @@ function mockChatCompletionFetch() {
   const { fetch, handleRequest: handleRawRequest } = mockFetch();
 
   function handleRequest(
-    handler: (body: ChatCompletionFunctionRunnerParams<any[]>) => Promise<OpenAI.Chat.ChatCompletion>,
+    handler: (body: ChatCompletionToolRunnerParams<any[]>) => Promise<OpenAI.Chat.ChatCompletion>,
   ): Promise<void> {
     return handleRawRequest(async (req, init) => {
       const rawBody = init?.body;
       if (typeof rawBody !== 'string') throw new Error(`expected init.body to be a string`);
-      const body: ChatCompletionFunctionRunnerParams<any[]> = JSON.parse(rawBody);
+      const body: ChatCompletionToolRunnerParams<any[]> = JSON.parse(rawBody);
       return new Response(JSON.stringify(await handler(body)), {
         headers: { 'Content-Type': 'application/json' },
       });
@@ -40,13 +39,13 @@ function mockStreamingChatCompletionFetch() {
 
   function handleRequest(
     handler: (
-      body: ChatCompletionStreamingFunctionRunnerParams<any[]>,
+      body: ChatCompletionStreamingToolRunnerParams<any[]>,
     ) => AsyncIterable<OpenAI.Chat.ChatCompletionChunk>,
   ): Promise<void> {
     return handleRawRequest(async (req, init) => {
       const rawBody = init?.body;
       if (typeof rawBody !== 'string') throw new Error(`expected init.body to be a string`);
-      const body: ChatCompletionStreamingFunctionRunnerParams<any[]> = JSON.parse(rawBody);
+      const body: ChatCompletionStreamingToolRunnerParams<any[]> = JSON.parse(rawBody);
       const stream = new PassThrough();
       (async () => {
         for await (const chunk of handler(body)) {

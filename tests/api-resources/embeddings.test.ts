@@ -1,7 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import OpenAI from 'openai';
-import { Response } from 'node-fetch';
 import { mockFetch } from '../utils/mock-fetch';
 import fs from 'fs/promises';
 import Path from 'path';

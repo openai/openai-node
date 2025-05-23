@@ -1,16 +1,16 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../../resource';
-import { isRequestOptions } from '../../../core';
-import { APIPromise } from '../../../core';
-import * as Core from '../../../core';
+import { APIResource } from '../../../core/resource';
 import * as CompletionsCompletionsAPI from './completions';
 import * as CompletionsAPI from '../../completions';
 import * as Shared from '../../shared';
 import * as MessagesAPI from './messages';
 import { MessageListParams, Messages } from './messages';
-import { CursorPage, type CursorPageParams } from '../../../pagination';
-import { Stream } from '../../../streaming';
+import { APIPromise } from '../../../core/api-promise';
+import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pagination';
+import { Stream } from '../../../core/streaming';
+import { RequestOptions } from '../../../internal/request-options';
+import { path } from '../../../internal/utils/path';
 
 export class Completions extends APIResource {
   messages: MessagesAPI.Messages = new MessagesAPI.Messages(this._client);
@@ -44,21 +44,18 @@ export class Completions extends APIResource {
    * );
    * ```
    */
-  create(
-    body: ChatCompletionCreateParamsNonStreaming,
-    options?: Core.RequestOptions,
-  ): APIPromise<ChatCompletion>;
+  create(body: ChatCompletionCreateParamsNonStreaming, options?: RequestOptions): APIPromise<ChatCompletion>;
   create(
     body: ChatCompletionCreateParamsStreaming,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): APIPromise<Stream<ChatCompletionChunk>>;
   create(
     body: ChatCompletionCreateParamsBase,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): APIPromise<Stream<ChatCompletionChunk> | ChatCompletion>;
   create(
     body: ChatCompletionCreateParams,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): APIPromise<ChatCompletion> | APIPromise<Stream<ChatCompletionChunk>> {
     return this._client.post('/chat/completions', { body, ...options, stream: body.stream ?? false }) as
       | APIPromise<ChatCompletion>
@@ -75,8 +72,8 @@ export class Completions extends APIResource {
    *   await client.chat.completions.retrieve('completion_id');
    * ```
    */
-  retrieve(completionId: string, options?: Core.RequestOptions): Core.APIPromise<ChatCompletion> {
-    return this._client.get(`/chat/completions/${completionId}`, options);
+  retrieve(completionID: string, options?: RequestOptions): APIPromise<ChatCompletion> {
+    return this._client.get(path`/chat/completions/${completionID}`, options);
   }
 
   /**
@@ -93,11 +90,11 @@ export class Completions extends APIResource {
    * ```
    */
   update(
-    completionId: string,
+    completionID: string,
     body: ChatCompletionUpdateParams,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<ChatCompletion> {
-    return this._client.post(`/chat/completions/${completionId}`, { body, ...options });
+    options?: RequestOptions,
+  ): APIPromise<ChatCompletion> {
+    return this._client.post(path`/chat/completions/${completionID}`, { body, ...options });
   }
 
   /**
@@ -113,18 +110,10 @@ export class Completions extends APIResource {
    * ```
    */
   list(
-    query?: ChatCompletionListParams,
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<ChatCompletionsPage, ChatCompletion>;
-  list(options?: Core.RequestOptions): Core.PagePromise<ChatCompletionsPage, ChatCompletion>;
-  list(
-    query: ChatCompletionListParams | Core.RequestOptions = {},
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<ChatCompletionsPage, ChatCompletion> {
-    if (isRequestOptions(query)) {
-      return this.list({}, query);
-    }
-    return this._client.getAPIList('/chat/completions', ChatCompletionsPage, { query, ...options });
+    query: ChatCompletionListParams | null | undefined = {},
+    options?: RequestOptions,
+  ): PagePromise<ChatCompletionsPage, ChatCompletion> {
+    return this._client.getAPIList('/chat/completions', CursorPage<ChatCompletion>, { query, ...options });
   }
 
   /**
@@ -134,17 +123,17 @@ export class Completions extends APIResource {
    * @example
    * ```ts
    * const chatCompletionDeleted =
-   *   await client.chat.completions.del('completion_id');
+   *   await client.chat.completions.delete('completion_id');
    * ```
    */
-  del(completionId: string, options?: Core.RequestOptions): Core.APIPromise<ChatCompletionDeleted> {
-    return this._client.delete(`/chat/completions/${completionId}`, options);
+  delete(completionID: string, options?: RequestOptions): APIPromise<ChatCompletionDeleted> {
+    return this._client.delete(path`/chat/completions/${completionID}`, options);
   }
 }
 
-export class ChatCompletionsPage extends CursorPage<ChatCompletion> {}
+export type ChatCompletionsPage = CursorPage<ChatCompletion>;
 
-export class ChatCompletionStoreMessagesPage extends CursorPage<ChatCompletionStoreMessage> {}
+export type ChatCompletionStoreMessagesPage = CursorPage<ChatCompletionStoreMessage>;
 
 /**
  * Represents a chat completion response returned by model, based on the provided
@@ -1161,11 +1150,6 @@ export interface ChatCompletionUserMessageParam {
   name?: string;
 }
 
-/**
- * @deprecated ChatCompletionMessageParam should be used instead
- */
-export type CreateChatCompletionRequestMessage = ChatCompletionMessageParam;
-
 export type ChatCompletionReasoningEffort = Shared.ReasoningEffort | null;
 
 export type ChatCompletionCreateParams =
@@ -1566,11 +1550,6 @@ export namespace ChatCompletionCreateParams {
     CompletionsCompletionsAPI.ChatCompletionCreateParamsStreaming;
 }
 
-/**
- * @deprecated Use ChatCompletionCreateParams instead
- */
-export type CompletionCreateParams = ChatCompletionCreateParams;
-
 export interface ChatCompletionCreateParamsNonStreaming extends ChatCompletionCreateParamsBase {
   /**
    * If set to true, the model response data will be streamed to the client as it is
@@ -1584,11 +1563,6 @@ export interface ChatCompletionCreateParamsNonStreaming extends ChatCompletionCr
    */
   stream?: false | null;
 }
-
-/**
- * @deprecated Use ChatCompletionCreateParamsNonStreaming instead
- */
-export type CompletionCreateParamsNonStreaming = ChatCompletionCreateParamsNonStreaming;
 
 export interface ChatCompletionCreateParamsStreaming extends ChatCompletionCreateParamsBase {
   /**
@@ -1604,11 +1578,6 @@ export interface ChatCompletionCreateParamsStreaming extends ChatCompletionCreat
   stream: true;
 }
 
-/**
- * @deprecated Use ChatCompletionCreateParamsStreaming instead
- */
-export type CompletionCreateParamsStreaming = ChatCompletionCreateParamsStreaming;
-
 export interface ChatCompletionUpdateParams {
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
@@ -1620,11 +1589,6 @@ export interface ChatCompletionUpdateParams {
    */
   metadata: Shared.Metadata | null;
 }
-
-/**
- * @deprecated Use ChatCompletionUpdateParams instead
- */
-export type CompletionUpdateParams = ChatCompletionUpdateParams;
 
 export interface ChatCompletionListParams extends CursorPageParams {
   /**
@@ -1646,12 +1610,6 @@ export interface ChatCompletionListParams extends CursorPageParams {
   order?: 'asc' | 'desc';
 }
 
-/**
- * @deprecated Use ChatCompletionListParams instead
- */
-export type CompletionListParams = ChatCompletionListParams;
-
-Completions.ChatCompletionsPage = ChatCompletionsPage;
 Completions.Messages = Messages;
 
 export declare namespace Completions {
@@ -1685,19 +1643,13 @@ export declare namespace Completions {
     type ChatCompletionToolChoiceOption as ChatCompletionToolChoiceOption,
     type ChatCompletionToolMessageParam as ChatCompletionToolMessageParam,
     type ChatCompletionUserMessageParam as ChatCompletionUserMessageParam,
-    type CreateChatCompletionRequestMessage as CreateChatCompletionRequestMessage,
     type ChatCompletionReasoningEffort as ChatCompletionReasoningEffort,
-    ChatCompletionsPage as ChatCompletionsPage,
+    type ChatCompletionsPage as ChatCompletionsPage,
     type ChatCompletionCreateParams as ChatCompletionCreateParams,
-    type CompletionCreateParams as CompletionCreateParams,
     type ChatCompletionCreateParamsNonStreaming as ChatCompletionCreateParamsNonStreaming,
-    type CompletionCreateParamsNonStreaming as CompletionCreateParamsNonStreaming,
     type ChatCompletionCreateParamsStreaming as ChatCompletionCreateParamsStreaming,
-    type CompletionCreateParamsStreaming as CompletionCreateParamsStreaming,
     type ChatCompletionUpdateParams as ChatCompletionUpdateParams,
-    type CompletionUpdateParams as CompletionUpdateParams,
     type ChatCompletionListParams as ChatCompletionListParams,
-    type CompletionListParams as CompletionListParams,
   };
 
   export { Messages as Messages, type MessageListParams as MessageListParams };

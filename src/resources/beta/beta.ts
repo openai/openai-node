@@ -1,6 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../resource';
+import { APIResource } from '../../core/resource';
 import * as AssistantsAPI from './assistants';
 import * as ChatAPI from './chat/chat';
 import {
@@ -102,7 +102,6 @@ export class Beta extends APIResource {
 
 Beta.Realtime = Realtime;
 Beta.Assistants = Assistants;
-Beta.AssistantsPage = AssistantsPage;
 Beta.Threads = Threads;
 
 export declare namespace Beta {
@@ -159,7 +158,7 @@ export declare namespace Beta {
     type TranscriptionSessionUpdatedEvent as TranscriptionSessionUpdatedEvent,
   };
 
-  export { Chat };
+  export { Chat as Chat };
 
   export {
     Assistants as Assistants,
@@ -174,7 +173,7 @@ export declare namespace Beta {
     type RunStepStreamEvent as RunStepStreamEvent,
     type RunStreamEvent as RunStreamEvent,
     type ThreadStreamEvent as ThreadStreamEvent,
-    AssistantsPage as AssistantsPage,
+    type AssistantsPage as AssistantsPage,
     type AssistantCreateParams as AssistantCreateParams,
     type AssistantUpdateParams as AssistantUpdateParams,
     type AssistantListParams as AssistantListParams,

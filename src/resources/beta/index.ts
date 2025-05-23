@@ -1,7 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 export {
-  AssistantsPage,
   Assistants,
   type Assistant,
   type AssistantDeleted,
@@ -17,6 +16,7 @@ export {
   type AssistantCreateParams,
   type AssistantUpdateParams,
   type AssistantListParams,
+  type AssistantsPage,
 } from './assistants';
 export { Beta } from './beta';
 export { Realtime } from './realtime/index';

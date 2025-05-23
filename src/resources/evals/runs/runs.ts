@@ -1,8 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../../resource';
-import { isRequestOptions } from '../../../core';
-import * as Core from '../../../core';
+import { APIResource } from '../../../core/resource';
 import * as Shared from '../../shared';
 import * as ResponsesAPI from '../../responses/responses';
 import * as OutputItemsAPI from './output-items';
@@ -10,10 +8,14 @@ import {
   OutputItemListParams,
   OutputItemListResponse,
   OutputItemListResponsesPage,
+  OutputItemRetrieveParams,
   OutputItemRetrieveResponse,
   OutputItems,
 } from './output-items';
-import { CursorPage, type CursorPageParams } from '../../../pagination';
+import { APIPromise } from '../../../core/api-promise';
+import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pagination';
+import { RequestOptions } from '../../../internal/request-options';
+import { path } from '../../../internal/utils/path';
 
 export class Runs extends APIResource {
   outputItems: OutputItemsAPI.OutputItems = new OutputItemsAPI.OutputItems(this._client);
@@ -23,64 +25,54 @@ export class Runs extends APIResource {
    * model configuration to use to test. The datasource will be validated against the
    * schema specified in the config of the evaluation.
    */
-  create(
-    evalId: string,
-    body: RunCreateParams,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<RunCreateResponse> {
-    return this._client.post(`/evals/${evalId}/runs`, { body, ...options });
+  create(evalID: string, body: RunCreateParams, options?: RequestOptions): APIPromise<RunCreateResponse> {
+    return this._client.post(path`/evals/${evalID}/runs`, { body, ...options });
   }
 
   /**
    * Get an evaluation run by ID.
    */
   retrieve(
-    evalId: string,
-    runId: string,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<RunRetrieveResponse> {
-    return this._client.get(`/evals/${evalId}/runs/${runId}`, options);
+    runID: string,
+    params: RunRetrieveParams,
+    options?: RequestOptions,
+  ): APIPromise<RunRetrieveResponse> {
+    const { eval_id } = params;
+    return this._client.get(path`/evals/${eval_id}/runs/${runID}`, options);
   }
 
   /**
    * Get a list of runs for an evaluation.
    */
   list(
-    evalId: string,
-    query?: RunListParams,
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<RunListResponsesPage, RunListResponse>;
-  list(
-    evalId: string,
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<RunListResponsesPage, RunListResponse>;
-  list(
-    evalId: string,
-    query: RunListParams | Core.RequestOptions = {},
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<RunListResponsesPage, RunListResponse> {
-    if (isRequestOptions(query)) {
-      return this.list(evalId, {}, query);
-    }
-    return this._client.getAPIList(`/evals/${evalId}/runs`, RunListResponsesPage, { query, ...options });
+    evalID: string,
+    query: RunListParams | null | undefined = {},
+    options?: RequestOptions,
+  ): PagePromise<RunListResponsesPage, RunListResponse> {
+    return this._client.getAPIList(path`/evals/${evalID}/runs`, CursorPage<RunListResponse>, {
+      query,
+      ...options,
+    });
   }
 
   /**
    * Delete an eval run.
    */
-  del(evalId: string, runId: string, options?: Core.RequestOptions): Core.APIPromise<RunDeleteResponse> {
-    return this._client.delete(`/evals/${evalId}/runs/${runId}`, options);
+  delete(runID: string, params: RunDeleteParams, options?: RequestOptions): APIPromise<RunDeleteResponse> {
+    const { eval_id } = params;
+    return this._client.delete(path`/evals/${eval_id}/runs/${runID}`, options);
   }
 
   /**
    * Cancel an ongoing evaluation run.
    */
-  cancel(evalId: string, runId: string, options?: Core.RequestOptions): Core.APIPromise<RunCancelResponse> {
-    return this._client.post(`/evals/${evalId}/runs/${runId}`, options);
+  cancel(runID: string, params: RunCancelParams, options?: RequestOptions): APIPromise<RunCancelResponse> {
+    const { eval_id } = params;
+    return this._client.post(path`/evals/${eval_id}/runs/${runID}`, options);
   }
 }
 
-export class RunListResponsesPage extends CursorPage<RunListResponse> {}
+export type RunListResponsesPage = CursorPage<RunListResponse>;
 
 /**
  * A CompletionsRunDataSource object describing a model sampling configuration.
@@ -2185,6 +2177,13 @@ export namespace RunCreateParams {
   }
 }
 
+export interface RunRetrieveParams {
+  /**
+   * The ID of the evaluation to retrieve runs for.
+   */
+  eval_id: string;
+}
+
 export interface RunListParams extends CursorPageParams {
   /**
    * Sort order for runs by timestamp. Use `asc` for ascending order or `desc` for
@@ -2199,9 +2198,21 @@ export interface RunListParams extends CursorPageParams {
   status?: 'queued' | 'in_progress' | 'completed' | 'canceled' | 'failed';
 }
 
-Runs.RunListResponsesPage = RunListResponsesPage;
+export interface RunDeleteParams {
+  /**
+   * The ID of the evaluation to delete the run from.
+   */
+  eval_id: string;
+}
+
+export interface RunCancelParams {
+  /**
+   * The ID of the evaluation whose run you want to cancel.
+   */
+  eval_id: string;
+}
+
 Runs.OutputItems = OutputItems;
-Runs.OutputItemListResponsesPage = OutputItemListResponsesPage;
 
 export declare namespace Runs {
   export {
@@ -2213,16 +2224,20 @@ export declare namespace Runs {
     type RunListResponse as RunListResponse,
     type RunDeleteResponse as RunDeleteResponse,
     type RunCancelResponse as RunCancelResponse,
-    RunListResponsesPage as RunListResponsesPage,
+    type RunListResponsesPage as RunListResponsesPage,
     type RunCreateParams as RunCreateParams,
+    type RunRetrieveParams as RunRetrieveParams,
     type RunListParams as RunListParams,
+    type RunDeleteParams as RunDeleteParams,
+    type RunCancelParams as RunCancelParams,
   };
 
   export {
     OutputItems as OutputItems,
     type OutputItemRetrieveResponse as OutputItemRetrieveResponse,
     type OutputItemListResponse as OutputItemListResponse,
-    OutputItemListResponsesPage as OutputItemListResponsesPage,
+    type OutputItemListResponsesPage as OutputItemListResponsesPage,
+    type OutputItemRetrieveParams as OutputItemRetrieveParams,
     type OutputItemListParams as OutputItemListParams,
   };
 }

@@ -1,13 +1,8 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import * as Core from '../../../core';
 import { APIResource } from '../../../resource';
-import { ChatCompletionRunner, ChatCompletionFunctionRunnerParams } from '../../../lib/ChatCompletionRunner';
-import {
-  ChatCompletionStreamingRunner,
-  ChatCompletionStreamingFunctionRunnerParams,
-} from '../../../lib/ChatCompletionStreamingRunner';
-import { BaseFunctionsArgs } from '../../../lib/RunnableFunction';
+import { ChatCompletionRunner } from '../../../lib/ChatCompletionRunner';
+import { ChatCompletionStreamingRunner } from '../../../lib/ChatCompletionStreamingRunner';
 import { RunnerOptions } from '../../../lib/AbstractChatCompletionRunner';
 import { ChatCompletionToolRunnerParams } from '../../../lib/ChatCompletionRunner';
 import { ChatCompletionStreamingToolRunnerParams } from '../../../lib/ChatCompletionStreamingRunner';
@@ -39,6 +34,8 @@ export {
   ChatCompletionRunner,
   type ChatCompletionFunctionRunnerParams,
 } from '../../../lib/ChatCompletionRunner';
+import { RequestOptions } from '../../../internal/request-options';
+import { type APIPromise } from '../../../index';
 
 export interface ParsedFunction extends ChatCompletionMessageToolCall.Function {
   parsed_arguments?: unknown;
@@ -66,8 +63,8 @@ export type ChatCompletionParseParams = ChatCompletionCreateParamsNonStreaming;
 export class Completions extends APIResource {
   parse<Params extends ChatCompletionParseParams, ParsedT = ExtractParsedContentFromParams<Params>>(
     body: Params,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<ParsedChatCompletion<ParsedT>> {
+    options?: RequestOptions,
+  ): APIPromise<ParsedChatCompletion<ParsedT>> {
     validateInputTools(body.tools);
 
     return this._client.chat.completions
@@ -79,37 +76,6 @@ export class Completions extends APIResource {
         },
       })
       ._thenUnwrap((completion) => parseChatCompletion(completion, body));
-  }
-
-  /**
-   * @deprecated - use `runTools` instead.
-   */
-  runFunctions<FunctionsArgs extends BaseFunctionsArgs>(
-    body: ChatCompletionFunctionRunnerParams<FunctionsArgs>,
-    options?: Core.RequestOptions,
-  ): ChatCompletionRunner<null>;
-  runFunctions<FunctionsArgs extends BaseFunctionsArgs>(
-    body: ChatCompletionStreamingFunctionRunnerParams<FunctionsArgs>,
-    options?: Core.RequestOptions,
-  ): ChatCompletionStreamingRunner<null>;
-  runFunctions<FunctionsArgs extends BaseFunctionsArgs>(
-    body:
-      | ChatCompletionFunctionRunnerParams<FunctionsArgs>
-      | ChatCompletionStreamingFunctionRunnerParams<FunctionsArgs>,
-    options?: Core.RequestOptions,
-  ): ChatCompletionRunner<null> | ChatCompletionStreamingRunner<null> {
-    if (body.stream) {
-      return ChatCompletionStreamingRunner.runFunctions(
-        this._client,
-        body as ChatCompletionStreamingFunctionRunnerParams<FunctionsArgs>,
-        options,
-      );
-    }
-    return ChatCompletionRunner.runFunctions(
-      this._client,
-      body as ChatCompletionFunctionRunnerParams<FunctionsArgs>,
-      options,
-    );
   }
 
   /**
@@ -154,7 +120,7 @@ export class Completions extends APIResource {
    */
   stream<Params extends ChatCompletionStreamParams, ParsedT = ExtractParsedContentFromParams<Params>>(
     body: Params,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): ChatCompletionStream<ParsedT> {
     return ChatCompletionStream.createChatCompletion(this._client, body, options);
   }

@@ -1,29 +1,31 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../resource';
-import { isRequestOptions } from '../../core';
-import { sleep } from '../../core';
-import { Uploadable } from '../../core';
-import { allSettledWithThrow } from '../../lib/Util';
-import * as Core from '../../core';
+import { APIResource } from '../../core/resource';
 import * as FilesAPI from './files';
 import { VectorStoreFilesPage } from './files';
 import * as VectorStoresAPI from './vector-stores';
-import { type CursorPageParams } from '../../pagination';
+import { APIPromise } from '../../core/api-promise';
+import { CursorPage, type CursorPageParams, PagePromise } from '../../core/pagination';
+import { buildHeaders } from '../../internal/headers';
+import { RequestOptions } from '../../internal/request-options';
+import { sleep } from '../../internal/utils/sleep';
+import { type Uploadable } from '../../uploads';
+import { allSettledWithThrow } from '../../lib/Util';
+import { path } from '../../internal/utils/path';
 
 export class FileBatches extends APIResource {
   /**
    * Create a vector store file batch.
    */
   create(
-    vectorStoreId: string,
+    vectorStoreID: string,
     body: FileBatchCreateParams,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<VectorStoreFileBatch> {
-    return this._client.post(`/vector_stores/${vectorStoreId}/file_batches`, {
+    options?: RequestOptions,
+  ): APIPromise<VectorStoreFileBatch> {
+    return this._client.post(path`/vector_stores/${vectorStoreID}/file_batches`, {
       body,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 
@@ -31,13 +33,14 @@ export class FileBatches extends APIResource {
    * Retrieves a vector store file batch.
    */
   retrieve(
-    vectorStoreId: string,
-    batchId: string,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<VectorStoreFileBatch> {
-    return this._client.get(`/vector_stores/${vectorStoreId}/file_batches/${batchId}`, {
+    batchID: string,
+    params: FileBatchRetrieveParams,
+    options?: RequestOptions,
+  ): APIPromise<VectorStoreFileBatch> {
+    const { vector_store_id } = params;
+    return this._client.get(path`/vector_stores/${vector_store_id}/file_batches/${batchID}`, {
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 
@@ -46,13 +49,14 @@ export class FileBatches extends APIResource {
    * files in this batch as soon as possible.
    */
   cancel(
-    vectorStoreId: string,
-    batchId: string,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<VectorStoreFileBatch> {
-    return this._client.post(`/vector_stores/${vectorStoreId}/file_batches/${batchId}/cancel`, {
+    batchID: string,
+    params: FileBatchCancelParams,
+    options?: RequestOptions,
+  ): APIPromise<VectorStoreFileBatch> {
+    const { vector_store_id } = params;
+    return this._client.post(path`/vector_stores/${vector_store_id}/file_batches/${batchID}/cancel`, {
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 
@@ -62,7 +66,7 @@ export class FileBatches extends APIResource {
   async createAndPoll(
     vectorStoreId: string,
     body: FileBatchCreateParams,
-    options?: Core.RequestOptions & { pollIntervalMs?: number },
+    options?: RequestOptions & { pollIntervalMs?: number },
   ): Promise<VectorStoreFileBatch> {
     const batch = await this.create(vectorStoreId, body);
     return await this.poll(vectorStoreId, batch.id, options);
@@ -72,29 +76,15 @@ export class FileBatches extends APIResource {
    * Returns a list of vector store files in a batch.
    */
   listFiles(
-    vectorStoreId: string,
-    batchId: string,
-    query?: FileBatchListFilesParams,
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<VectorStoreFilesPage, FilesAPI.VectorStoreFile>;
-  listFiles(
-    vectorStoreId: string,
-    batchId: string,
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<VectorStoreFilesPage, FilesAPI.VectorStoreFile>;
-  listFiles(
-    vectorStoreId: string,
-    batchId: string,
-    query: FileBatchListFilesParams | Core.RequestOptions = {},
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<VectorStoreFilesPage, FilesAPI.VectorStoreFile> {
-    if (isRequestOptions(query)) {
-      return this.listFiles(vectorStoreId, batchId, {}, query);
-    }
+    batchID: string,
+    params: FileBatchListFilesParams,
+    options?: RequestOptions,
+  ): PagePromise<VectorStoreFilesPage, FilesAPI.VectorStoreFile> {
+    const { vector_store_id, ...query } = params;
     return this._client.getAPIList(
-      `/vector_stores/${vectorStoreId}/file_batches/${batchId}/files`,
-      VectorStoreFilesPage,
-      { query, ...options, headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers } },
+      path`/vector_stores/${vector_store_id}/file_batches/${batchID}/files`,
+      CursorPage<FilesAPI.VectorStoreFile>,
+      { query, ...options, headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]) },
     );
   }
 
@@ -105,20 +95,27 @@ export class FileBatches extends APIResource {
    * check batch.file_counts.failed_count to handle this case.
    */
   async poll(
-    vectorStoreId: string,
-    batchId: string,
-    options?: Core.RequestOptions & { pollIntervalMs?: number },
+    vectorStoreID: string,
+    batchID: string,
+    options?: RequestOptions & { pollIntervalMs?: number },
   ): Promise<VectorStoreFileBatch> {
-    const headers: { [key: string]: string } = { ...options?.headers, 'X-Stainless-Poll-Helper': 'true' };
-    if (options?.pollIntervalMs) {
-      headers['X-Stainless-Custom-Poll-Interval'] = options.pollIntervalMs.toString();
-    }
+    const headers = buildHeaders([
+      options?.headers,
+      {
+        'X-Stainless-Poll-Helper': 'true',
+        'X-Stainless-Custom-Poll-Interval': options?.pollIntervalMs?.toString() ?? undefined,
+      },
+    ]);
 
     while (true) {
-      const { data: batch, response } = await this.retrieve(vectorStoreId, batchId, {
-        ...options,
-        headers,
-      }).withResponse();
+      const { data: batch, response } = await this.retrieve(
+        batchID,
+        { vector_store_id: vectorStoreID },
+        {
+          ...options,
+          headers,
+        },
+      ).withResponse();
 
       switch (batch.status) {
         case 'in_progress':
@@ -153,7 +150,7 @@ export class FileBatches extends APIResource {
   async uploadAndPoll(
     vectorStoreId: string,
     { files, fileIds = [] }: { files: Uploadable[]; fileIds?: string[] },
-    options?: Core.RequestOptions & { pollIntervalMs?: number; maxConcurrency?: number },
+    options?: RequestOptions & { pollIntervalMs?: number; maxConcurrency?: number },
   ): Promise<VectorStoreFileBatch> {
     if (files == null || files.length == 0) {
       throw new Error(
@@ -281,23 +278,43 @@ export interface FileBatchCreateParams {
   chunking_strategy?: VectorStoresAPI.FileChunkingStrategyParam;
 }
 
+export interface FileBatchRetrieveParams {
+  /**
+   * The ID of the vector store that the file batch belongs to.
+   */
+  vector_store_id: string;
+}
+
+export interface FileBatchCancelParams {
+  /**
+   * The ID of the vector store that the file batch belongs to.
+   */
+  vector_store_id: string;
+}
+
 export interface FileBatchListFilesParams extends CursorPageParams {
   /**
-   * A cursor for use in pagination. `before` is an object ID that defines your place
-   * in the list. For instance, if you make a list request and receive 100 objects,
-   * starting with obj_foo, your subsequent call can include before=obj_foo in order
-   * to fetch the previous page of the list.
+   * Path param: The ID of the vector store that the files belong to.
+   */
+  vector_store_id: string;
+
+  /**
+   * Query param: A cursor for use in pagination. `before` is an object ID that
+   * defines your place in the list. For instance, if you make a list request and
+   * receive 100 objects, starting with obj_foo, your subsequent call can include
+   * before=obj_foo in order to fetch the previous page of the list.
    */
   before?: string;
 
   /**
-   * Filter by file status. One of `in_progress`, `completed`, `failed`, `cancelled`.
+   * Query param: Filter by file status. One of `in_progress`, `completed`, `failed`,
+   * `cancelled`.
    */
   filter?: 'in_progress' | 'completed' | 'failed' | 'cancelled';
 
   /**
-   * Sort order by the `created_at` timestamp of the objects. `asc` for ascending
-   * order and `desc` for descending order.
+   * Query param: Sort order by the `created_at` timestamp of the objects. `asc` for
+   * ascending order and `desc` for descending order.
    */
   order?: 'asc' | 'desc';
 }
@@ -306,8 +323,10 @@ export declare namespace FileBatches {
   export {
     type VectorStoreFileBatch as VectorStoreFileBatch,
     type FileBatchCreateParams as FileBatchCreateParams,
+    type FileBatchRetrieveParams as FileBatchRetrieveParams,
+    type FileBatchCancelParams as FileBatchCancelParams,
     type FileBatchListFilesParams as FileBatchListFilesParams,
   };
 }
 
-export { VectorStoreFilesPage };
+export { type VectorStoreFilesPage };

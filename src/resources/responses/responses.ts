@@ -6,16 +6,18 @@ import {
   type ResponseCreateParamsWithTools,
   addOutputText,
 } from '../../lib/ResponsesParser';
-import * as Core from '../../core';
-import { APIPromise, isRequestOptions } from '../../core';
-import { APIResource } from '../../resource';
+import { ResponseStream, ResponseStreamParams } from '../../lib/responses/ResponseStream';
+import { APIResource } from '../../core/resource';
+import * as ResponsesAPI from './responses';
 import * as Shared from '../shared';
 import * as InputItemsAPI from './input-items';
 import { InputItemListParams, InputItems, ResponseItemList } from './input-items';
-import * as ResponsesAPI from './responses';
-import { ResponseStream, ResponseStreamParams } from '../../lib/responses/ResponseStream';
-import { CursorPage } from '../../pagination';
-import { Stream } from '../../streaming';
+import { APIPromise } from '../../core/api-promise';
+import { CursorPage } from '../../core/pagination';
+import { Stream } from '../../core/streaming';
+import { buildHeaders } from '../../internal/headers';
+import { RequestOptions } from '../../internal/request-options';
+import { path } from '../../internal/utils/path';
 
 export interface ParsedResponseOutputText<ParsedT> extends ResponseOutputText {
   parsed: ParsedT | null;
@@ -52,6 +54,7 @@ export interface ParsedResponse<ParsedT> extends Response {
 }
 
 export type ResponseParseParams = ResponseCreateParamsNonStreaming;
+
 export class Responses extends APIResource {
   inputItems: InputItemsAPI.InputItems = new InputItemsAPI.InputItems(this._client);
 
@@ -76,18 +79,18 @@ export class Responses extends APIResource {
    * });
    * ```
    */
-  create(body: ResponseCreateParamsNonStreaming, options?: Core.RequestOptions): APIPromise<Response>;
+  create(body: ResponseCreateParamsNonStreaming, options?: RequestOptions): APIPromise<Response>;
   create(
     body: ResponseCreateParamsStreaming,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): APIPromise<Stream<ResponseStreamEvent>>;
   create(
     body: ResponseCreateParamsBase,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): APIPromise<Stream<ResponseStreamEvent> | Response>;
   create(
     body: ResponseCreateParams,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>> {
     return (
       this._client.post('/responses', { body, ...options, stream: body.stream ?? false }) as
@@ -112,33 +115,13 @@ export class Responses extends APIResource {
    * );
    * ```
    */
-
   retrieve(
-    responseId: string,
-    query?: ResponseRetrieveParamsNonStreaming,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<Response>;
-  retrieve(
-    responseId: string,
-    query?: ResponseRetrieveParamsStreaming,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<Stream<ResponseStreamEvent>>;
-  retrieve(responseId: string, options?: Core.RequestOptions): Core.APIPromise<Response>;
-  retrieve(
-    responseId: string,
-    query: ResponseRetrieveParams | Core.RequestOptions,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<Response> | Core.APIPromise<Stream<ResponseStreamEvent>>;
-  retrieve(
-    responseId: string,
-    query: ResponseRetrieveParams | Core.RequestOptions = {},
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<Response> | Core.APIPromise<Stream<ResponseStreamEvent>> {
-    if (isRequestOptions(query) && options === undefined) {
-      return this.retrieve(responseId, {}, query);
-    }
-    return (
-      this._client.get(`/responses/${responseId}`, {
+    responseID: string,
+    query: ResponseRetrieveParams | null | undefined = {},
+    options?: RequestOptions,
+  ): APIPromise<Response> {
+  return (
+      this._client.get(path`/responses/${responseID}`, {
         query,
         ...options,
         stream: query.stream ?? false,
@@ -157,22 +140,22 @@ export class Responses extends APIResource {
    *
    * @example
    * ```ts
-   * await client.responses.del(
+   * await client.responses.delete(
    *   'resp_677efb5139a88190b512bc3fef8e535d',
    * );
    * ```
    */
-  del(responseId: string, options?: Core.RequestOptions): Core.APIPromise<void> {
-    return this._client.delete(`/responses/${responseId}`, {
+  delete(responseID: string, options?: RequestOptions): APIPromise<void> {
+    return this._client.delete(path`/responses/${responseID}`, {
       ...options,
-      headers: { Accept: '*/*', ...options?.headers },
+      headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
     });
   }
 
   parse<Params extends ResponseCreateParamsWithTools, ParsedT = ExtractParsedContentFromParams<Params>>(
     body: Params,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<ParsedResponse<ParsedT>> {
+    options?: RequestOptions,
+  ): APIPromise<ParsedResponse<ParsedT>> {
     return this._client.responses
       .create(body, options)
       ._thenUnwrap((response) => parseResponse(response as Response, body));
@@ -181,10 +164,9 @@ export class Responses extends APIResource {
   /**
    * Creates a model response stream
    */
-
   stream<Params extends ResponseStreamParams, ParsedT = ExtractParsedContentFromParams<Params>>(
     body: Params,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): ResponseStream<ParsedT> {
     return ResponseStream.createResponse<ParsedT>(this._client, body, options);
   }
@@ -201,16 +183,15 @@ export class Responses extends APIResource {
    * );
    * ```
    */
-
-  cancel(responseId: string, options?: Core.RequestOptions): Core.APIPromise<void> {
-    return this._client.post(`/responses/${responseId}/cancel`, {
+  cancel(responseID: string, options?: RequestOptions): APIPromise<void> {
+    return this._client.post(path`/responses/${responseID}/cancel`, {
       ...options,
-      headers: { Accept: '*/*', ...options?.headers },
+      headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
     });
   }
 }
 
-export class ResponseItemsPage extends CursorPage<ResponseItem> {}
+export type ResponseItemsPage = CursorPage<ResponseItem>;
 
 /**
  * A tool that controls a virtual computer. Learn more about the
@@ -235,7 +216,7 @@ export interface ComputerTool {
   /**
    * The type of the computer use tool. Always `computer_use_preview`.
    */
-  type: 'computer-preview';
+  type: 'computer_use_preview';
 }
 
 /**

@@ -1,7 +1,10 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../resource';
-import * as Core from '../core';
+import { APIResource } from '../core/resource';
+import { APIPromise } from '../core/api-promise';
+import { type Uploadable } from '../core/uploads';
+import { RequestOptions } from '../internal/request-options';
+import { multipartFormRequestOptions } from '../internal/uploads';
 
 export class Images extends APIResource {
   /**
@@ -14,11 +17,11 @@ export class Images extends APIResource {
    * });
    * ```
    */
-  createVariation(
-    body: ImageCreateVariationParams,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<ImagesResponse> {
-    return this._client.post('/images/variations', Core.multipartFormRequestOptions({ body, ...options }));
+  createVariation(body: ImageCreateVariationParams, options?: RequestOptions): APIPromise<ImagesResponse> {
+    return this._client.post(
+      '/images/variations',
+      multipartFormRequestOptions({ body, ...options }, this._client),
+    );
   }
 
   /**
@@ -33,8 +36,11 @@ export class Images extends APIResource {
    * });
    * ```
    */
-  edit(body: ImageEditParams, options?: Core.RequestOptions): Core.APIPromise<ImagesResponse> {
-    return this._client.post('/images/edits', Core.multipartFormRequestOptions({ body, ...options }));
+  edit(body: ImageEditParams, options?: RequestOptions): APIPromise<ImagesResponse> {
+    return this._client.post(
+      '/images/edits',
+      multipartFormRequestOptions({ body, ...options }, this._client),
+    );
   }
 
   /**
@@ -48,7 +54,7 @@ export class Images extends APIResource {
    * });
    * ```
    */
-  generate(body: ImageGenerateParams, options?: Core.RequestOptions): Core.APIPromise<ImagesResponse> {
+  generate(body: ImageGenerateParams, options?: RequestOptions): APIPromise<ImagesResponse> {
     return this._client.post('/images/generations', { body, ...options });
   }
 }
@@ -148,7 +154,7 @@ export interface ImageCreateVariationParams {
    * The image to use as the basis for the variation(s). Must be a valid PNG file,
    * less than 4MB, and square.
    */
-  image: Core.Uploadable;
+  image: Uploadable;
 
   /**
    * The model to use for image generation. Only `dall-e-2` is supported at this
@@ -192,7 +198,7 @@ export interface ImageEditParams {
    * For `dall-e-2`, you can only provide one image, and it should be a square `png`
    * file less than 4MB.
    */
-  image: Core.Uploadable | Array<Core.Uploadable>;
+  image: Uploadable | Array<Uploadable>;
 
   /**
    * A text description of the desired image(s). The maximum length is 1000
@@ -217,7 +223,7 @@ export interface ImageEditParams {
    * the mask will be applied on the first image. Must be a valid PNG file, less than
    * 4MB, and have the same dimensions as `image`.
    */
-  mask?: Core.Uploadable;
+  mask?: Uploadable;
 
   /**
    * The model to use for image generation. Only `dall-e-2` and `gpt-image-1` are
