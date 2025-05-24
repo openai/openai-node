@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.103.1 (2025-05-24)
+
+Full Changelog: [v4.103.0...v4.103.1](https://github.com/openai/openai-node/compare/v4.103.0...v4.103.1)
+
+### Chores
+
+* **internal:** fix release workflows ([353349d](https://github.com/openai/openai-node/commit/353349de9ee10d32d3243cb5c60a8ae982c49d37))
+
 ## 4.103.0 (2025-05-22)
 
 Full Changelog: [v4.102.0...v4.103.0](https://github.com/openai/openai-node/compare/v4.102.0...v4.103.0)
