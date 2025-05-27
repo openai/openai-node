@@ -518,21 +518,19 @@ describe('azure request building', () => {
       });
 
       test('handles audio translations', async () => {
-        expect(await client.audio.translations.create({
-          model: deployment,
-          file: { url: 'https://example.com', blob: new File([], '') },
-        })).toMatchObject(
-          { url: `https://example.com/openai/deployments/${deployment}/audio/translations?api-version=${apiVersion}`},
-        );
+        expect(
+          await client.audio.translations.create({ model: deployment, file: new File([], '') }),
+        ).toMatchObject({
+          url: `https://example.com/openai/deployments/${deployment}/audio/translations?api-version=${apiVersion}`,
+        });
       });
 
       test('handles audio transcriptions', async () => {
-        expect(await client.audio.transcriptions.create({
-          model: deployment,
-          file: { url: 'https://example.com', blob: new File([], '') },
-        })).toMatchObject(
-          { url: `https://example.com/openai/deployments/${deployment}/audio/transcriptions?api-version=${apiVersion}`},
-        );
+        expect(
+          await client.audio.transcriptions.create({ model: deployment, file: new File([], '') }),
+        ).toMatchObject({
+          url: `https://example.com/openai/deployments/${deployment}/audio/transcriptions?api-version=${apiVersion}`,
+        });
       });
 
       test('handles text to speech', async () => {
