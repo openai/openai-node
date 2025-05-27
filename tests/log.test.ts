@@ -1,6 +1,7 @@
 import OpenAI, { ClientOptions } from 'openai/index';
 
 const opts: ClientOptions = {
+  apiKey: 'example-api-key',
   baseURL: 'http://localhost:5000/',
   logLevel: 'debug',
   fetch: (url) => {

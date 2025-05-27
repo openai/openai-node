@@ -2,7 +2,7 @@ import { APIPromise } from 'openai/api-promise';
 import OpenAI from 'openai/index';
 import { compareType } from './utils/typing';
 
-const client = new OpenAI();
+const client = new OpenAI({ apiKey: 'example-api-key' });
 
 describe('request id', () => {
   test('types', () => {
