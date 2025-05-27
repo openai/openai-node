@@ -42,7 +42,7 @@ describe('resource embeddings', () => {
       model: 'text-embedding-3-small',
     });
 
-    expect(response.data?.at(0)?.embedding).toBeInstanceOf(Array);
+    expect(Array.isArray(response.data?.at(0)?.embedding)).toBe(true);
     expect(response.data?.at(0)?.embedding.at(0)).toBe(-0.09928705543279648);
   });
 
@@ -54,7 +54,7 @@ describe('resource embeddings', () => {
       encoding_format: 'float',
     });
 
-    expect(response.data?.at(0)?.embedding).toBeInstanceOf(Array);
+    expect(Array.isArray(response.data?.at(0)?.embedding)).toBe(true);
     expect(response.data?.at(0)?.embedding.at(0)).toBe(-0.099287055);
   });
 
