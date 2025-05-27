@@ -46,11 +46,16 @@ export function parseObjectDef(def: ZodObjectDef, refs: Refs) {
           propertyPath,
         });
         if (parsedDef === undefined) return acc;
-        if (refs.openaiStrictMode && propDef.isOptional() && !propDef.isNullable()) {
-          console.warn(
+        if (
+          refs.openaiStrictMode &&
+          propDef.isOptional() &&
+          !propDef.isNullable() &&
+          typeof propDef._def?.defaultValue === 'undefined'
+        ) {
+          throw new Error(
             `Zod field at \`${propertyPath.join(
               '/',
-            )}\` uses \`.optional()\` without \`.nullable()\` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required\nThis will become an error in a future version of the SDK.`,
+            )}\` uses \`.optional()\` without \`.nullable()\` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required`,
           );
         }
         return {
