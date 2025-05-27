@@ -117,14 +117,29 @@ export class Responses extends APIResource {
    */
   retrieve(
     responseID: string,
+    query?: ResponseRetrieveParamsNonStreaming,
+    options?: RequestOptions,
+  ): APIPromise<Response>;
+  retrieve(
+    responseID: string,
+    query: ResponseRetrieveParamsStreaming,
+    options?: RequestOptions,
+  ): APIPromise<Stream<ResponseStreamEvent>>;
+  retrieve(
+    responseID: string,
+    query: ResponseRetrieveParams,
+    options?: RequestOptions,
+  ): APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>;
+  retrieve(
+    responseID: string,
     query: ResponseRetrieveParams | null | undefined = {},
     options?: RequestOptions,
-  ): APIPromise<Response> {
-  return (
+  ): APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>> {
+    return (
       this._client.get(path`/responses/${responseID}`, {
         query,
         ...options,
-        stream: query.stream ?? false,
+        stream: query?.stream ?? false,
       }) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>
     )._thenUnwrap((rsp) => {
       if ('object' in rsp && rsp.object === 'response') {
