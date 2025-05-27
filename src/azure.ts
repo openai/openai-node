@@ -192,6 +192,7 @@ const _deployments_endpoints = new Set([
   '/audio/speech',
   '/images/generations',
   '/batches',
+  '/images/edits',
 ]);
 
 const API_KEY_SENTINEL = '<Missing Key>';
