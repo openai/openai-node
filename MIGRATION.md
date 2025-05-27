@@ -310,6 +310,36 @@ import OpenAI from 'openai';
 
 The `openai/shims` imports have been removed. Your global types must now be [correctly configured](#minimum-types-requirements).
 
+### Zod helpers optionality error
+
+Previously, the following code would just output a warning to the console, now it will throw an error.
+
+```ts
+const completion = await client.beta.chat.completions.parse({
+  // ...
+  response_format: zodResponseFormat(
+    z.object({
+      optional_property: z.string().optional(),
+    }),
+    'schema',
+  ),
+});
+```
+
+You must mark optional properties with `.nullable()` as purely optional fields are not supported by the [API](https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required).
+
+```ts
+const completion = await client.beta.chat.completions.parse({
+  // ...
+  response_format: zodResponseFormat(
+    z.object({
+      optional_property: z.string().optional().nullable(),
+    }),
+    'schema',
+  ),
+});
+```
+
 ### Pagination changes
 
 The `for await` syntax **is not affected**. This still works as-is:
