@@ -41,19 +41,16 @@ import { sleep } from '../../../../internal/utils/sleep';
 import { RunSubmitToolOutputsParamsStream } from '../../../../lib/AssistantStream';
 import { path } from '../../../../internal/utils/path';
 
+/**
+ * @deprecated The Assistants API is deprecated in favor of the Responses API
+ */
 export class Runs extends APIResource {
   steps: StepsAPI.Steps = new StepsAPI.Steps(this._client);
 
   /**
    * Create a run.
    *
-   * @example
-   * ```ts
-   * const run = await client.beta.threads.runs.create(
-   *   'thread_id',
-   *   { assistant_id: 'assistant_id' },
-   * );
-   * ```
+   * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
   create(threadID: string, params: RunCreateParamsNonStreaming, options?: RequestOptions): APIPromise<Run>;
   create(
@@ -84,13 +81,7 @@ export class Runs extends APIResource {
   /**
    * Retrieves a run.
    *
-   * @example
-   * ```ts
-   * const run = await client.beta.threads.runs.retrieve(
-   *   'run_id',
-   *   { thread_id: 'thread_id' },
-   * );
-   * ```
+   * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
   retrieve(runID: string, params: RunRetrieveParams, options?: RequestOptions): APIPromise<Run> {
     const { thread_id } = params;
@@ -103,13 +94,7 @@ export class Runs extends APIResource {
   /**
    * Modifies a run.
    *
-   * @example
-   * ```ts
-   * const run = await client.beta.threads.runs.update(
-   *   'run_id',
-   *   { thread_id: 'thread_id' },
-   * );
-   * ```
+   * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
   update(runID: string, params: RunUpdateParams, options?: RequestOptions): APIPromise<Run> {
     const { thread_id, ...body } = params;
@@ -123,15 +108,7 @@ export class Runs extends APIResource {
   /**
    * Returns a list of runs belonging to a thread.
    *
-   * @example
-   * ```ts
-   * // Automatically fetches more pages as needed.
-   * for await (const run of client.beta.threads.runs.list(
-   *   'thread_id',
-   * )) {
-   *   // ...
-   * }
-   * ```
+   * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
   list(
     threadID: string,
@@ -148,13 +125,7 @@ export class Runs extends APIResource {
   /**
    * Cancels a run that is `in_progress`.
    *
-   * @example
-   * ```ts
-   * const run = await client.beta.threads.runs.cancel(
-   *   'run_id',
-   *   { thread_id: 'thread_id' },
-   * );
-   * ```
+   * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
   cancel(runID: string, params: RunCancelParams, options?: RequestOptions): APIPromise<Run> {
     const { thread_id } = params;
@@ -260,14 +231,7 @@ export class Runs extends APIResource {
    * tool calls once they're all completed. All outputs must be submitted in a single
    * request.
    *
-   * @example
-   * ```ts
-   * const run =
-   *   await client.beta.threads.runs.submitToolOutputs(
-   *     'run_id',
-   *     { thread_id: 'thread_id', tool_outputs: [{}] },
-   *   );
-   * ```
+   * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
   submitToolOutputs(
     runID: string,
