@@ -12,7 +12,7 @@ import {
   type RunnableFunction,
   isRunnableFunctionWithParse,
   type BaseFunctionsArgs,
-  RunnableToolFunction,
+  type RunnableToolFunction,
 } from './RunnableFunction';
 import type { ChatCompletionToolRunnerParams } from './ChatCompletionRunner';
 import type { ChatCompletionStreamingToolRunnerParams } from './ChatCompletionStreamingRunner';
@@ -60,11 +60,11 @@ export class AbstractChatCompletionRunner<
       this._emit('message', message);
       if (isToolMessage(message) && message.content) {
         // Note, this assumes that {role: 'tool', content: …} is always the result of a call of tool of type=function.
-        this._emit('functionCallResult', message.content as string);
+        this._emit('functionToolCallResult', message.content as string);
       } else if (isAssistantMessage(message) && message.tool_calls) {
         for (const tool_call of message.tool_calls) {
           if (tool_call.type === 'function') {
-            this._emit('functionCall', tool_call.function);
+            this._emit('functionToolCall', tool_call.function);
           }
         }
       }
@@ -121,7 +121,7 @@ export class AbstractChatCompletionRunner<
     return this.#getFinalMessage();
   }
 
-  #getFinalFunctionCall(): ChatCompletionMessageToolCall.Function | undefined {
+  #getFinalFunctionToolCall(): ChatCompletionMessageToolCall.Function | undefined {
     for (let i = this.messages.length - 1; i >= 0; i--) {
       const message = this.messages[i];
       if (isAssistantMessage(message) && message?.tool_calls?.length) {
@@ -136,12 +136,12 @@ export class AbstractChatCompletionRunner<
    * @returns a promise that resolves with the content of the final FunctionCall, or rejects
    * if an error occurred or the stream ended prematurely without producing a ChatCompletionMessage.
    */
-  async finalFunctionCall(): Promise<ChatCompletionMessageToolCall.Function | undefined> {
+  async finalFunctionToolCall(): Promise<ChatCompletionMessageToolCall.Function | undefined> {
     await this.done();
-    return this.#getFinalFunctionCall();
+    return this.#getFinalFunctionToolCall();
   }
 
-  #getFinalFunctionCallResult(): string | undefined {
+  #getFinalFunctionToolCallResult(): string | undefined {
     for (let i = this.messages.length - 1; i >= 0; i--) {
       const message = this.messages[i];
       if (
@@ -161,9 +161,9 @@ export class AbstractChatCompletionRunner<
     return;
   }
 
-  async finalFunctionCallResult(): Promise<string | undefined> {
+  async finalFunctionToolCallResult(): Promise<string | undefined> {
     await this.done();
-    return this.#getFinalFunctionCallResult();
+    return this.#getFinalFunctionToolCallResult();
   }
 
   #calculateTotalUsage(): CompletionUsage {
@@ -201,11 +201,11 @@ export class AbstractChatCompletionRunner<
     const finalContent = this.#getFinalContent();
     if (finalContent) this._emit('finalContent', finalContent);
 
-    const finalFunctionCall = this.#getFinalFunctionCall();
-    if (finalFunctionCall) this._emit('finalFunctionCall', finalFunctionCall);
+    const finalFunctionCall = this.#getFinalFunctionToolCall();
+    if (finalFunctionCall) this._emit('finalFunctionToolCall', finalFunctionCall);
 
-    const finalFunctionCallResult = this.#getFinalFunctionCallResult();
-    if (finalFunctionCallResult != null) this._emit('finalFunctionCallResult', finalFunctionCallResult);
+    const finalFunctionCallResult = this.#getFinalFunctionToolCallResult();
+    if (finalFunctionCallResult != null) this._emit('finalFunctionToolCallResult', finalFunctionCallResult);
 
     if (this._chatCompletions.some((c) => c.usage)) {
       this._emit('totalUsage', this.#calculateTotalUsage());
@@ -390,14 +390,14 @@ export class AbstractChatCompletionRunner<
 }
 
 export interface AbstractChatCompletionRunnerEvents extends BaseEvents {
-  functionCall: (functionCall: ChatCompletionMessageToolCall.Function) => void;
+  functionToolCall: (functionCall: ChatCompletionMessageToolCall.Function) => void;
   message: (message: ChatCompletionMessageParam) => void;
   chatCompletion: (completion: ChatCompletion) => void;
   finalContent: (contentSnapshot: string) => void;
   finalMessage: (message: ChatCompletionMessageParam) => void;
   finalChatCompletion: (completion: ChatCompletion) => void;
-  finalFunctionCall: (functionCall: ChatCompletionMessageToolCall.Function) => void;
-  functionCallResult: (content: string) => void;
-  finalFunctionCallResult: (content: string) => void;
+  finalFunctionToolCall: (functionCall: ChatCompletionMessageToolCall.Function) => void;
+  functionToolCallResult: (content: string) => void;
+  finalFunctionToolCallResult: (content: string) => void;
   totalUsage: (usage: CompletionUsage) => void;
 }

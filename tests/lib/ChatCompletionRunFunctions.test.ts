@@ -151,13 +151,13 @@ class RunnerListener {
       .on('content', (content) => this.contents.push(content))
       .on('message', (message) => this.messages.push(message))
       .on('chatCompletion', (completion) => this.chatCompletions.push(completion))
-      .on('functionCall', (functionCall) => this.functionCalls.push(functionCall))
-      .on('functionCallResult', (result) => this.functionCallResults.push(result))
+      .on('functionToolCall', (functionCall) => this.functionCalls.push(functionCall))
+      .on('functionToolCallResult', (result) => this.functionCallResults.push(result))
       .on('finalContent', (content) => (this.finalContent = content))
       .on('finalMessage', (message) => (this.finalMessage = message))
       .on('finalChatCompletion', (completion) => (this.finalChatCompletion = completion))
-      .on('finalFunctionCall', (functionCall) => (this.finalFunctionCall = functionCall))
-      .on('finalFunctionCallResult', (result) => (this.finalFunctionCallResult = result))
+      .on('finalFunctionToolCall', (functionCall) => (this.finalFunctionCall = functionCall))
+      .on('finalFunctionToolCallResult', (result) => (this.finalFunctionCallResult = result))
       .on('totalUsage', (usage) => (this.totalUsage = usage))
       .on('error', (error) => (this.error = error))
       .on('abort', (error) => ((this.error = error), (this.gotAbort = true)))
@@ -175,8 +175,8 @@ class RunnerListener {
       await expect(this.runner.finalChatCompletion()).rejects.toThrow(error);
       await expect(this.runner.finalMessage()).rejects.toThrow(error);
       await expect(this.runner.finalContent()).rejects.toThrow(error);
-      await expect(this.runner.finalFunctionCall()).rejects.toThrow(error);
-      await expect(this.runner.finalFunctionCallResult()).rejects.toThrow(error);
+      await expect(this.runner.finalFunctionToolCall()).rejects.toThrow(error);
+      await expect(this.runner.finalFunctionToolCallResult()).rejects.toThrow(error);
       await expect(this.runner.totalUsage()).rejects.toThrow(error);
       await expect(this.runner.done()).rejects.toThrow(error);
     } else {
@@ -214,11 +214,11 @@ class RunnerListener {
     expect(this.finalChatCompletion).toEqual(this.chatCompletions[this.chatCompletions.length - 1]);
     expect(await this.runner.finalChatCompletion()).toEqual(this.finalChatCompletion);
     expect(this.finalFunctionCall).toEqual(this.functionCalls[this.functionCalls.length - 1]);
-    expect(await this.runner.finalFunctionCall()).toEqual(this.finalFunctionCall);
+    expect(await this.runner.finalFunctionToolCall()).toEqual(this.finalFunctionCall);
     expect(this.finalFunctionCallResult).toEqual(
       this.functionCallResults[this.functionCallResults.length - 1],
     );
-    expect(await this.runner.finalFunctionCallResult()).toEqual(this.finalFunctionCallResult);
+    expect(await this.runner.finalFunctionToolCallResult()).toEqual(this.finalFunctionCallResult);
     expect(this.chatCompletions).toEqual(this.runner.allChatCompletions());
     expect(this.messages).toEqual(this.runner.messages.slice(-this.messages.length));
     if (this.chatCompletions.some((c) => c.usage)) {
@@ -266,13 +266,13 @@ class StreamingRunnerListener {
       .on('content', (delta, snapshot) => this.eventContents.push([delta, snapshot]))
       .on('message', (message) => this.eventMessages.push(message))
       .on('chatCompletion', (completion) => this.eventChatCompletions.push(completion))
-      .on('functionCall', (functionCall) => this.eventFunctionCalls.push(functionCall))
-      .on('functionCallResult', (result) => this.eventFunctionCallResults.push(result))
+      .on('functionToolCall', (functionCall) => this.eventFunctionCalls.push(functionCall))
+      .on('functionToolCallResult', (result) => this.eventFunctionCallResults.push(result))
       .on('finalContent', (content) => (this.finalContent = content))
       .on('finalMessage', (message) => (this.finalMessage = message))
       .on('finalChatCompletion', (completion) => (this.finalChatCompletion = completion))
-      .on('finalFunctionCall', (functionCall) => (this.finalFunctionCall = functionCall))
-      .on('finalFunctionCallResult', (result) => (this.finalFunctionCallResult = result))
+      .on('finalFunctionToolCall', (functionCall) => (this.finalFunctionCall = functionCall))
+      .on('finalFunctionToolCallResult', (result) => (this.finalFunctionCallResult = result))
       .on('error', (error) => (this.error = error))
       .on('abort', (abort) => (this.error = abort))
       .on('end', () => (this.gotEnd = true));
@@ -285,8 +285,8 @@ class StreamingRunnerListener {
       await expect(this.runner.finalChatCompletion()).rejects.toThrow(error);
       await expect(this.runner.finalMessage()).rejects.toThrow(error);
       await expect(this.runner.finalContent()).rejects.toThrow(error);
-      await expect(this.runner.finalFunctionCall()).rejects.toThrow(error);
-      await expect(this.runner.finalFunctionCallResult()).rejects.toThrow(error);
+      await expect(this.runner.finalFunctionToolCall()).rejects.toThrow(error);
+      await expect(this.runner.finalFunctionToolCallResult()).rejects.toThrow(error);
       await expect(this.runner.done()).rejects.toThrow(error);
     } else {
       expect(this.error).toBeUndefined();
@@ -318,11 +318,11 @@ class StreamingRunnerListener {
     expect(this.finalChatCompletion).toEqual(this.eventChatCompletions[this.eventChatCompletions.length - 1]);
     expect(await this.runner.finalChatCompletion()).toEqual(this.finalChatCompletion);
     expect(this.finalFunctionCall).toEqual(this.eventFunctionCalls[this.eventFunctionCalls.length - 1]);
-    expect(await this.runner.finalFunctionCall()).toEqual(this.finalFunctionCall);
+    expect(await this.runner.finalFunctionToolCall()).toEqual(this.finalFunctionCall);
     expect(this.finalFunctionCallResult).toEqual(
       this.eventFunctionCallResults[this.eventFunctionCallResults.length - 1],
     );
-    expect(await this.runner.finalFunctionCallResult()).toEqual(this.finalFunctionCallResult);
+    expect(await this.runner.finalFunctionToolCallResult()).toEqual(this.finalFunctionCallResult);
     expect(this.eventChatCompletions).toEqual(this.runner.allChatCompletions());
     expect(this.eventMessages).toEqual(this.runner.messages.slice(-this.eventMessages.length));
     if (error) {
@@ -1603,7 +1603,7 @@ describe('resource completions', () => {
         },
         { signal: controller.signal },
       );
-      runner.on('functionCallResult', () => controller.abort());
+      runner.on('functionToolCallResult', () => controller.abort());
       const listener = new StreamingRunnerListener(runner);
 
       await handleRequest(async function* (request): AsyncIterable<OpenAI.Chat.ChatCompletionChunk> {
