@@ -382,6 +382,42 @@ If you were importing these classes at runtime, you'll need to switch to importi
 The deprecated `client.beta.chat.completions.runFunctions()` method and all of it's surrounding types have been removed, instead you should use
 `client.beta.chat.completions.runTools()`.
 
+### `.runTools()` event / method names
+
+To better align with the tool-based API, several event names in the ChatCompletionRunner have been renamed:
+
+```ts
+// Before
+openai.beta.chat.completions
+  .runTools({
+    // ..
+  })
+  .on('functionCall', (functionCall) => console.log('functionCall', functionCall))
+  .on('functionCallResult', (functionCallResult) => console.log('functionCallResult', functionCallResult))
+  .on('finalFunctionCall', (functionCall) => console.log('finalFunctionCall', functionCall))
+  .on('finalFunctionCallResult', (result) => console.log('finalFunctionCallResult', result));
+
+// After
+openai.beta.chat.completions
+  .runTools({
+    // ..
+  })
+  .on('functionToolCall', (functionCall) => console.log('functionCall', functionCall))
+  .on('functionToolCallResult', (functionCallResult) => console.log('functionCallResult', functionCallResult))
+  .on('finalFunctionToolCall', (functionCall) => console.log('finalFunctionCall', functionCall))
+  .on('finalFunctionToolCallResult', (result) => console.log('finalFunctionCallResult', result));
+```
+
+The following event names have been changed:
+- `functionCall` → `functionToolCall`
+- `functionCallResult` → `functionToolCallResult`
+- `finalFunctionCall` → `finalFunctionToolCall`
+- `finalFunctionCallResult` → `finalFunctionToolCallResult`
+
+Additionally, the following methods have been renamed:
+- `runner.finalFunctionCall()` → `runner.finalFunctionToolCall()`
+- `runner.finalFunctionCallResult()` → `runner.finalFunctionToolCallResult()`
+
 ### `openai/src` directory removed
 
 Previously IDEs may have auto-completed imports from the `openai/src` directory, however this
