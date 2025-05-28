@@ -24,7 +24,6 @@ export {
   type RunnableFunctions,
   type RunnableFunctionWithParse,
   type RunnableFunctionWithoutParse,
-  ParsingFunction,
   ParsingToolFunction,
 } from '../../../lib/RunnableFunction';
 export { type ChatCompletionToolRunnerParams } from '../../../lib/ChatCompletionRunner';

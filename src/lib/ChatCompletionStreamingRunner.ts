@@ -38,21 +38,6 @@ export class ChatCompletionStreamingRunner<ParsedT = null>
     return runner;
   }
 
-  /** @deprecated - please use `runTools` instead. */
-  static runFunctions<T extends (string | object)[]>(
-    client: OpenAI,
-    params: ChatCompletionStreamingFunctionRunnerParams<T>,
-    options?: RunnerOptions,
-  ): ChatCompletionStreamingRunner<null> {
-    const runner = new ChatCompletionStreamingRunner(null);
-    const opts = {
-      ...options,
-      headers: { ...options?.headers, 'X-Stainless-Helper-Method': 'runFunctions' },
-    };
-    runner._run(() => runner._runFunctions(client, params, opts));
-    return runner;
-  }
-
   static runTools<T extends (string | object)[], ParsedT = null>(
     client: OpenAI,
     params: ChatCompletionStreamingToolRunnerParams<T>,

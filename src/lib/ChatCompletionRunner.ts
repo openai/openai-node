@@ -34,21 +34,6 @@ export class ChatCompletionRunner<ParsedT = null> extends AbstractChatCompletion
   ChatCompletionRunnerEvents,
   ParsedT
 > {
-  /** @deprecated - please use `runTools` instead. */
-  static runFunctions(
-    client: OpenAI,
-    params: ChatCompletionFunctionRunnerParams<any[]>,
-    options?: RunnerOptions,
-  ): ChatCompletionRunner<null> {
-    const runner = new ChatCompletionRunner();
-    const opts = {
-      ...options,
-      headers: { ...options?.headers, 'X-Stainless-Helper-Method': 'runFunctions' },
-    };
-    runner._run(() => runner._runFunctions(client, params, opts));
-    return runner;
-  }
-
   static runTools<ParsedT>(
     client: OpenAI,
     params: ChatCompletionToolRunnerParams<any[]>,

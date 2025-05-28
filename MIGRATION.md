@@ -347,6 +347,11 @@ export type FineTuningJobsPage = CursorPage<FineTuningJob>;
 
 If you were importing these classes at runtime, you'll need to switch to importing the base class or only import them at the type-level.
 
+### Removed deprecated `.runFunctions` methods
+
+The deprecated `client.beta.chat.completions.runFunctions()` method and all of it's surrounding types have been removed, instead you should use
+`client.beta.chat.completions.runTools()`.
+
 ### `openai/src` directory removed
 
 Previously IDEs may have auto-completed imports from the `openai/src` directory, however this
