@@ -7,19 +7,14 @@ import * as StepsAPI from './steps';
 import * as Shared from '../../../shared';
 import { CursorPage, type CursorPageParams } from '../../../../pagination';
 
+/**
+ * @deprecated The Assistants API is deprecated in favor of the Responses API
+ */
 export class Steps extends APIResource {
   /**
    * Retrieves a run step.
    *
-   * @example
-   * ```ts
-   * const runStep =
-   *   await client.beta.threads.runs.steps.retrieve(
-   *     'thread_id',
-   *     'run_id',
-   *     'step_id',
-   *   );
-   * ```
+   * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
   retrieve(
     threadId: string,
@@ -54,16 +49,7 @@ export class Steps extends APIResource {
   /**
    * Returns a list of run steps belonging to a run.
    *
-   * @example
-   * ```ts
-   * // Automatically fetches more pages as needed.
-   * for await (const runStep of client.beta.threads.runs.steps.list(
-   *   'thread_id',
-   *   'run_id',
-   * )) {
-   *   // ...
-   * }
-   * ```
+   * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
   list(
     threadId: string,
