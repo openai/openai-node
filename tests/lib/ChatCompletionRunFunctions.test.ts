@@ -7,7 +7,7 @@ import {
   type ChatCompletionToolRunnerParams,
   ChatCompletionStreamingRunner,
   type ChatCompletionStreamingToolRunnerParams,
-} from 'openai/resources/beta/chat/completions';
+} from 'openai/resources/chat/completions';
 import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
 import { isAssistantMessage } from '../../src/lib/chatCompletionUtils';
 import { mockFetch } from '../utils/mock-fetch';
@@ -339,7 +339,7 @@ class StreamingRunnerListener {
 function _typeTests() {
   const openai = new OpenAI();
 
-  openai.beta.chat.completions.runTools({
+  openai.chat.completions.runTools({
     messages: [
       { role: 'user', content: 'can you tell me how many properties are in {"a": 1, "b": 2, "c": 3}' },
     ],
@@ -380,7 +380,7 @@ function _typeTests() {
       },
     ],
   });
-  openai.beta.chat.completions.runTools({
+  openai.chat.completions.runTools({
     messages: [
       { role: 'user', content: 'can you tell me how many properties are in {"a": 1, "b": 2, "c": 3}' },
     ],
@@ -396,7 +396,7 @@ function _typeTests() {
       }),
     ],
   });
-  openai.beta.chat.completions.runTools({
+  openai.chat.completions.runTools({
     messages: [
       { role: 'user', content: 'can you tell me how many properties are in {"a": 1, "b": 2, "c": 3}' },
     ],
@@ -438,7 +438,7 @@ function _typeTests() {
       }),
     ],
   });
-  openai.beta.chat.completions.runTools({
+  openai.chat.completions.runTools({
     messages: [
       { role: 'user', content: 'can you tell me how many properties are in {"a": 1, "b": 2, "c": 3}' },
     ],
@@ -500,7 +500,7 @@ describe('resource completions', () => {
 
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
-      const runner = openai.beta.chat.completions.runTools({
+      const runner = openai.chat.completions.runTools({
         messages: [{ role: 'user', content: 'tell me what the weather is like' }],
         model: 'gpt-3.5-turbo',
         tools: [
@@ -639,7 +639,7 @@ describe('resource completions', () => {
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
       const controller = new AbortController();
-      const runner = openai.beta.chat.completions.runTools(
+      const runner = openai.chat.completions.runTools(
         {
           messages: [{ role: 'user', content: 'tell me what the weather is like' }],
           model: 'gpt-3.5-turbo',
@@ -726,7 +726,7 @@ describe('resource completions', () => {
 
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
-      const runner = openai.beta.chat.completions.runTools({
+      const runner = openai.chat.completions.runTools({
         messages: [
           {
             role: 'user',
@@ -886,7 +886,7 @@ describe('resource completions', () => {
 
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
-      const runner = openai.beta.chat.completions.runTools({
+      const runner = openai.chat.completions.runTools({
         messages: [
           {
             role: 'user',
@@ -1135,7 +1135,7 @@ describe('resource completions', () => {
 
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
-      const runner = openai.beta.chat.completions.runTools({
+      const runner = openai.chat.completions.runTools({
         messages: [{ role: 'user', content: 'tell me what the weather is like' }],
         model: 'gpt-3.5-turbo',
         tool_choice: {
@@ -1223,7 +1223,7 @@ describe('resource completions', () => {
 
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
-      const runner = openai.beta.chat.completions.runTools({
+      const runner = openai.chat.completions.runTools({
         messages: [{ role: 'user', content: 'tell me what the weather is like' }],
         model: 'gpt-3.5-turbo',
         tools: [
@@ -1459,7 +1459,7 @@ describe('resource completions', () => {
 
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
-      const runner = openai.beta.chat.completions.runTools({
+      const runner = openai.chat.completions.runTools({
         stream: true,
         messages: [{ role: 'user', content: 'tell me what the weather is like' }],
         model: 'gpt-3.5-turbo',
@@ -1583,7 +1583,7 @@ describe('resource completions', () => {
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
       const controller = new AbortController();
-      const runner = openai.beta.chat.completions.runTools(
+      const runner = openai.chat.completions.runTools(
         {
           stream: true,
           messages: [{ role: 'user', content: 'tell me what the weather is like' }],
@@ -1667,7 +1667,7 @@ describe('resource completions', () => {
 
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
-      const runner = openai.beta.chat.completions.runTools({
+      const runner = openai.chat.completions.runTools({
         stream: true,
         messages: [
           {
@@ -1805,7 +1805,7 @@ describe('resource completions', () => {
 
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
-      const runner = openai.beta.chat.completions.runTools({
+      const runner = openai.chat.completions.runTools({
         stream: true,
         messages: [
           {
@@ -2007,7 +2007,7 @@ describe('resource completions', () => {
 
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
-      const runner = openai.beta.chat.completions.runTools({
+      const runner = openai.chat.completions.runTools({
         stream: true,
         messages: [{ role: 'user', content: 'tell me what the weather is like' }],
         model: 'gpt-3.5-turbo',
@@ -2093,7 +2093,7 @@ describe('resource completions', () => {
 
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
-      const runner = openai.beta.chat.completions.runTools({
+      const runner = openai.chat.completions.runTools({
         stream: true,
         messages: [{ role: 'user', content: 'tell me what the weather is like' }],
         model: 'gpt-3.5-turbo',
@@ -2317,7 +2317,7 @@ describe('resource completions', () => {
 
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
-      const runner = openai.beta.chat.completions.stream({
+      const runner = openai.chat.completions.stream({
         stream: true,
         messages: [{ role: 'user', content: 'tell me what the weather is like' }],
         model: 'gpt-3.5-turbo',
@@ -2355,7 +2355,7 @@ describe('resource completions', () => {
 
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
-      const runner = openai.beta.chat.completions.stream({
+      const runner = openai.chat.completions.stream({
         stream: true,
         messages: [{ role: 'user', content: 'tell me what the weather is like' }],
         model: 'gpt-3.5-turbo',
@@ -2394,7 +2394,7 @@ describe('resource completions', () => {
 
       const openai = new OpenAI({ apiKey: '...', fetch });
 
-      const stream = openai.beta.chat.completions.stream(
+      const stream = openai.chat.completions.stream(
         {
           max_tokens: 1024,
           model: 'gpt-3.5-turbo',
@@ -2418,7 +2418,7 @@ describe('resource completions', () => {
 
       const openai = new OpenAI({ apiKey: '...', fetch });
 
-      const stream = openai.beta.chat.completions.stream(
+      const stream = openai.chat.completions.stream(
         {
           max_tokens: 1024,
           model: 'gpt-3.5-turbo',

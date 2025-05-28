@@ -20,7 +20,7 @@ import {
 import { type ReadableStream } from '../internal/shim-types';
 import { Stream } from '../streaming';
 import OpenAI from '../index';
-import { ParsedChatCompletion } from '../resources/beta/chat/completions';
+import { ParsedChatCompletion } from '../resources/chat/completions';
 import {
   AutoParseableResponseFormat,
   hasAutoParseableInput,
