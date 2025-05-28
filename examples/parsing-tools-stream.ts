@@ -12,7 +12,7 @@ async function main() {
   const client = new OpenAI();
   const refusal = process.argv.includes('refusal');
 
-  const stream = client.beta.chat.completions
+  const stream = client.chat.completions
     .stream({
       model: 'gpt-4o-2024-08-06',
       messages: [

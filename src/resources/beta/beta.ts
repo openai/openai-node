@@ -2,7 +2,6 @@
 
 import { APIResource } from '../../core/resource';
 import * as AssistantsAPI from './assistants';
-import * as ChatAPI from './chat/chat';
 import {
   Assistant,
   AssistantCreateParams,
@@ -91,11 +90,9 @@ import {
   ThreadUpdateParams,
   Threads,
 } from './threads/threads';
-import { Chat } from './chat/chat';
 
 export class Beta extends APIResource {
   realtime: RealtimeAPI.Realtime = new RealtimeAPI.Realtime(this._client);
-  chat: ChatAPI.Chat = new ChatAPI.Chat(this._client);
   assistants: AssistantsAPI.Assistants = new AssistantsAPI.Assistants(this._client);
   threads: ThreadsAPI.Threads = new ThreadsAPI.Threads(this._client);
 }
@@ -157,8 +154,6 @@ export declare namespace Beta {
     type TranscriptionSessionUpdate as TranscriptionSessionUpdate,
     type TranscriptionSessionUpdatedEvent as TranscriptionSessionUpdatedEvent,
   };
-
-  export { Chat as Chat };
 
   export {
     Assistants as Assistants,

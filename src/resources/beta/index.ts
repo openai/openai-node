@@ -20,7 +20,6 @@ export {
 } from './assistants';
 export { Beta } from './beta';
 export { Realtime } from './realtime/index';
-export { Chat } from './chat/index';
 export {
   Threads,
   type AssistantResponseFormatOption,

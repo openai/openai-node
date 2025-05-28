@@ -63,7 +63,7 @@ const tools: RunnableToolFunction<any>[] = [
 ];
 
 async function main() {
-  const runner = await openai.beta.chat.completions
+  const runner = await openai.chat.completions
     .runTools({
       model: 'gpt-4-1106-preview',
       stream: true,
