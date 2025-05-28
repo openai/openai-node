@@ -15,13 +15,8 @@ import {
 } from '../../chat/completions';
 import { ExtractParsedContentFromParams, parseChatCompletion, validateInputTools } from '../../../lib/parser';
 
+export { ChatCompletionStreamingRunner } from '../../../lib/ChatCompletionStreamingRunner';
 export {
-  ChatCompletionStreamingRunner,
-  type ChatCompletionStreamingFunctionRunnerParams,
-} from '../../../lib/ChatCompletionStreamingRunner';
-export {
-  type RunnableFunction,
-  type RunnableFunctions,
   type RunnableFunctionWithParse,
   type RunnableFunctionWithoutParse,
   ParsingToolFunction,
@@ -29,10 +24,7 @@ export {
 export { type ChatCompletionToolRunnerParams } from '../../../lib/ChatCompletionRunner';
 export { type ChatCompletionStreamingToolRunnerParams } from '../../../lib/ChatCompletionStreamingRunner';
 export { ChatCompletionStream, type ChatCompletionStreamParams } from '../../../lib/ChatCompletionStream';
-export {
-  ChatCompletionRunner,
-  type ChatCompletionFunctionRunnerParams,
-} from '../../../lib/ChatCompletionRunner';
+export { ChatCompletionRunner } from '../../../lib/ChatCompletionRunner';
 import { RequestOptions } from '../../../internal/request-options';
 import { type APIPromise } from '../../../index';
 

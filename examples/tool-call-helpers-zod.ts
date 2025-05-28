@@ -73,8 +73,10 @@ async function main() {
       ],
     })
     .on('message', (msg) => console.log('msg', msg))
-    .on('functionCall', (functionCall) => console.log('functionCall', functionCall))
-    .on('functionCallResult', (functionCallResult) => console.log('functionCallResult', functionCallResult))
+    .on('finalFunctionToolCall', (functionCall) => console.log('functionCall', functionCall))
+    .on('finalFunctionToolCallResult', (functionCallResult) =>
+      console.log('functionCallResult', functionCallResult),
+    )
     .on('content', (diff) => process.stdout.write(diff));
 
   const result = await runner.finalChatCompletion();

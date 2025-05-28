@@ -2,7 +2,7 @@ import {
   type ChatCompletionMessageParam,
   type ChatCompletionCreateParamsNonStreaming,
 } from '../resources/chat/completions';
-import { type RunnableFunctions, type BaseFunctionsArgs, RunnableTools } from './RunnableFunction';
+import { type BaseFunctionsArgs, RunnableTools } from './RunnableFunction';
 import {
   AbstractChatCompletionRunner,
   AbstractChatCompletionRunnerEvents,
@@ -15,13 +15,6 @@ import { AutoParseableTool } from '../lib/parser';
 export interface ChatCompletionRunnerEvents extends AbstractChatCompletionRunnerEvents {
   content: (content: string) => void;
 }
-
-export type ChatCompletionFunctionRunnerParams<FunctionsArgs extends BaseFunctionsArgs> = Omit<
-  ChatCompletionCreateParamsNonStreaming,
-  'functions'
-> & {
-  functions: RunnableFunctions<FunctionsArgs>;
-};
 
 export type ChatCompletionToolRunnerParams<FunctionsArgs extends BaseFunctionsArgs> = Omit<
   ChatCompletionCreateParamsNonStreaming,

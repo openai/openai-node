@@ -4,7 +4,7 @@ import {
 } from '../resources/chat/completions';
 import { RunnerOptions, type AbstractChatCompletionRunnerEvents } from './AbstractChatCompletionRunner';
 import { type ReadableStream } from '../internal/shim-types';
-import { RunnableTools, type BaseFunctionsArgs, type RunnableFunctions } from './RunnableFunction';
+import { RunnableTools, type BaseFunctionsArgs } from './RunnableFunction';
 import { ChatCompletionSnapshot, ChatCompletionStream } from './ChatCompletionStream';
 import OpenAI from '../index';
 import { AutoParseableTool } from '../lib/parser';
@@ -13,13 +13,6 @@ export interface ChatCompletionStreamEvents extends AbstractChatCompletionRunner
   content: (contentDelta: string, contentSnapshot: string) => void;
   chunk: (chunk: ChatCompletionChunk, snapshot: ChatCompletionSnapshot) => void;
 }
-
-export type ChatCompletionStreamingFunctionRunnerParams<FunctionsArgs extends BaseFunctionsArgs> = Omit<
-  ChatCompletionCreateParamsStreaming,
-  'functions'
-> & {
-  functions: RunnableFunctions<FunctionsArgs>;
-};
 
 export type ChatCompletionStreamingToolRunnerParams<FunctionsArgs extends BaseFunctionsArgs> = Omit<
   ChatCompletionCreateParamsStreaming,
