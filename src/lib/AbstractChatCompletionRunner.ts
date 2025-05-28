@@ -18,7 +18,7 @@ import type { ChatCompletionToolRunnerParams } from './ChatCompletionRunner';
 import type { ChatCompletionStreamingToolRunnerParams } from './ChatCompletionStreamingRunner';
 import { isAssistantMessage, isToolMessage } from './chatCompletionUtils';
 import { BaseEvents, EventStream } from './EventStream';
-import type { ParsedChatCompletion } from '../resources/beta/chat/completions';
+import type { ParsedChatCompletion } from '../resources/chat/completions';
 import type OpenAI from '../index';
 import { isAutoParsableTool, parseChatCompletion } from '../lib/parser';
 import type { RequestOptions } from '../internal/request-options';

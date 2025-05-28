@@ -76,7 +76,7 @@ it(`ChatCompletionStream works`, async function () {
   let finalMessage: OpenAI.Chat.ChatCompletionMessageParam | undefined;
   let finalChatCompletion: OpenAI.Chat.ChatCompletion | undefined;
 
-  const stream = client.beta.chat.completions
+  const stream = client.chat.completions
     .stream({
       model: 'gpt-4',
       messages: [{ role: 'user', content: 'Say this is a test' }],
@@ -120,7 +120,7 @@ it(`aborting ChatCompletionStream works`, async function () {
   let emittedError: any;
   let caughtError: any;
   const controller = new AbortController();
-  const stream = client.beta.chat.completions
+  const stream = client.chat.completions
     .stream(
       {
         model: 'gpt-4',

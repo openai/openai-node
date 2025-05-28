@@ -39,4 +39,5 @@ export {
   type ChatCompletionStoreMessagesPage,
   type ChatCompletionsPage,
 } from './completions';
+export * from './completions';
 export { Messages, type MessageListParams } from './messages';

@@ -38,7 +38,7 @@ const Query = z.object({
 async function main() {
   const client = new OpenAI();
 
-  const completion = await client.beta.chat.completions.parse({
+  const completion = await client.chat.completions.parse({
     model: 'gpt-4o-2024-08-06',
     messages: [
       {

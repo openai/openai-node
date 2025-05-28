@@ -34,7 +34,7 @@ async function getBook({ id }: GetParams) {
 }
 
 async function main() {
-  const runner = openai.beta.chat.completions
+  const runner = openai.chat.completions
     .runTools({
       model: 'gpt-4-1106-preview',
       stream: true,

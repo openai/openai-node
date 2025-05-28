@@ -315,7 +315,7 @@ The `openai/shims` imports have been removed. Your global types must now be [cor
 Previously, the following code would just output a warning to the console, now it will throw an error.
 
 ```ts
-const completion = await client.beta.chat.completions.parse({
+const completion = await client.chat.completions.parse({
   // ...
   response_format: zodResponseFormat(
     z.object({
@@ -329,7 +329,7 @@ const completion = await client.beta.chat.completions.parse({
 You must mark optional properties with `.nullable()` as purely optional fields are not supported by the [API](https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required).
 
 ```ts
-const completion = await client.beta.chat.completions.parse({
+const completion = await client.chat.completions.parse({
   // ...
   response_format: zodResponseFormat(
     z.object({
@@ -377,10 +377,36 @@ export type FineTuningJobsPage = CursorPage<FineTuningJob>;
 
 If you were importing these classes at runtime, you'll need to switch to importing the base class or only import them at the type-level.
 
+### Beta chat namespace removed
+
+The `beta.chat` namespace has been removed. All chat completion methods that were previously in beta have been moved to the main `chat.completions` namespace:
+
+```ts
+// Before
+client.beta.chat.completions.parse()
+client.beta.chat.completions.stream()
+client.beta.chat.completions.runTools()
+
+// After
+client.chat.completions.parse()
+client.chat.completions.stream()
+client.chat.completions.runTools()
+```
+
+Additionally, related types have been moved:
+
+```ts
+// Before
+import { ParsedChatCompletion, ParsedChoice, ParsedFunction } from 'openai/resources/beta/chat/completions';
+
+// After
+import { ParsedChatCompletion, ParsedChoice, ParsedFunction } from 'openai/resources/chat/completions';
+```
+
 ### Removed deprecated `.runFunctions` methods
 
-The deprecated `client.beta.chat.completions.runFunctions()` method and all of it's surrounding types have been removed, instead you should use
-`client.beta.chat.completions.runTools()`.
+The deprecated `client.chat.completions.runFunctions()` method and all of it's surrounding types have been removed, instead you should use
+`client.chat.completions.runTools()`.
 
 ### `.runTools()` event / method names
 
@@ -388,7 +414,7 @@ To better align with the tool-based API, several event names in the ChatCompleti
 
 ```ts
 // Before
-openai.beta.chat.completions
+openai.chat.completions
   .runTools({
     // ..
   })
@@ -398,7 +424,7 @@ openai.beta.chat.completions
   .on('finalFunctionCallResult', (result) => console.log('finalFunctionCallResult', result));
 
 // After
-openai.beta.chat.completions
+openai.chat.completions
   .runTools({
     // ..
   })
