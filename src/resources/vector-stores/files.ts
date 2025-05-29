@@ -1,10 +1,14 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../resource';
-import { sleep, Uploadable, isRequestOptions } from '../../core';
-import * as Core from '../../core';
+import { APIResource } from '../../core/resource';
 import * as VectorStoresAPI from './vector-stores';
-import { CursorPage, type CursorPageParams, Page } from '../../pagination';
+import { APIPromise } from '../../core/api-promise';
+import { CursorPage, type CursorPageParams, PagePromise, Page } from '../../core/pagination';
+import { buildHeaders } from '../../internal/headers';
+import { RequestOptions } from '../../internal/request-options';
+import { sleep } from '../../internal/utils';
+import { Uploadable } from '../../uploads';
+import { path } from '../../internal/utils/path';
 
 export class Files extends APIResource {
   /**
@@ -13,14 +17,14 @@ export class Files extends APIResource {
    * [vector store](https://platform.openai.com/docs/api-reference/vector-stores/object).
    */
   create(
-    vectorStoreId: string,
+    vectorStoreID: string,
     body: FileCreateParams,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<VectorStoreFile> {
-    return this._client.post(`/vector_stores/${vectorStoreId}/files`, {
+    options?: RequestOptions,
+  ): APIPromise<VectorStoreFile> {
+    return this._client.post(path`/vector_stores/${vectorStoreID}/files`, {
       body,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 
@@ -28,29 +32,26 @@ export class Files extends APIResource {
    * Retrieves a vector store file.
    */
   retrieve(
-    vectorStoreId: string,
-    fileId: string,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<VectorStoreFile> {
-    return this._client.get(`/vector_stores/${vectorStoreId}/files/${fileId}`, {
+    fileID: string,
+    params: FileRetrieveParams,
+    options?: RequestOptions,
+  ): APIPromise<VectorStoreFile> {
+    const { vector_store_id } = params;
+    return this._client.get(path`/vector_stores/${vector_store_id}/files/${fileID}`, {
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 
   /**
    * Update attributes on a vector store file.
    */
-  update(
-    vectorStoreId: string,
-    fileId: string,
-    body: FileUpdateParams,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<VectorStoreFile> {
-    return this._client.post(`/vector_stores/${vectorStoreId}/files/${fileId}`, {
+  update(fileID: string, params: FileUpdateParams, options?: RequestOptions): APIPromise<VectorStoreFile> {
+    const { vector_store_id, ...body } = params;
+    return this._client.post(path`/vector_stores/${vector_store_id}/files/${fileID}`, {
       body,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 
@@ -58,26 +59,14 @@ export class Files extends APIResource {
    * Returns a list of vector store files.
    */
   list(
-    vectorStoreId: string,
-    query?: FileListParams,
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<VectorStoreFilesPage, VectorStoreFile>;
-  list(
-    vectorStoreId: string,
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<VectorStoreFilesPage, VectorStoreFile>;
-  list(
-    vectorStoreId: string,
-    query: FileListParams | Core.RequestOptions = {},
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<VectorStoreFilesPage, VectorStoreFile> {
-    if (isRequestOptions(query)) {
-      return this.list(vectorStoreId, {}, query);
-    }
-    return this._client.getAPIList(`/vector_stores/${vectorStoreId}/files`, VectorStoreFilesPage, {
+    vectorStoreID: string,
+    query: FileListParams | null | undefined = {},
+    options?: RequestOptions,
+  ): PagePromise<VectorStoreFilesPage, VectorStoreFile> {
+    return this._client.getAPIList(path`/vector_stores/${vectorStoreID}/files`, CursorPage<VectorStoreFile>, {
       query,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 
@@ -87,14 +76,15 @@ export class Files extends APIResource {
    * [delete file](https://platform.openai.com/docs/api-reference/files/delete)
    * endpoint.
    */
-  del(
-    vectorStoreId: string,
-    fileId: string,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<VectorStoreFileDeleted> {
-    return this._client.delete(`/vector_stores/${vectorStoreId}/files/${fileId}`, {
+  delete(
+    fileID: string,
+    params: FileDeleteParams,
+    options?: RequestOptions,
+  ): APIPromise<VectorStoreFileDeleted> {
+    const { vector_store_id } = params;
+    return this._client.delete(path`/vector_stores/${vector_store_id}/files/${fileID}`, {
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 
@@ -104,12 +94,11 @@ export class Files extends APIResource {
   async createAndPoll(
     vectorStoreId: string,
     body: FileCreateParams,
-    options?: Core.RequestOptions & { pollIntervalMs?: number },
+    options?: RequestOptions & { pollIntervalMs?: number },
   ): Promise<VectorStoreFile> {
     const file = await this.create(vectorStoreId, body, options);
     return await this.poll(vectorStoreId, file.id, options);
   }
-
   /**
    * Wait for the vector store file to finish processing.
    *
@@ -117,19 +106,26 @@ export class Files extends APIResource {
    * file.last_error and file.status to handle these cases
    */
   async poll(
-    vectorStoreId: string,
-    fileId: string,
-    options?: Core.RequestOptions & { pollIntervalMs?: number },
+    vectorStoreID: string,
+    fileID: string,
+    options?: RequestOptions & { pollIntervalMs?: number },
   ): Promise<VectorStoreFile> {
-    const headers: { [key: string]: string } = { ...options?.headers, 'X-Stainless-Poll-Helper': 'true' };
-    if (options?.pollIntervalMs) {
-      headers['X-Stainless-Custom-Poll-Interval'] = options.pollIntervalMs.toString();
-    }
+    const headers = buildHeaders([
+      options?.headers,
+      {
+        'X-Stainless-Poll-Helper': 'true',
+        'X-Stainless-Custom-Poll-Interval': options?.pollIntervalMs?.toString() ?? undefined,
+      },
+    ]);
+
     while (true) {
-      const fileResponse = await this.retrieve(vectorStoreId, fileId, {
-        ...options,
-        headers,
-      }).withResponse();
+      const fileResponse = await this.retrieve(
+        fileID,
+        {
+          vector_store_id: vectorStoreID,
+        },
+        { ...options, headers },
+      ).withResponse();
 
       const file = fileResponse.data;
 
@@ -156,29 +152,23 @@ export class Files extends APIResource {
       }
     }
   }
-
   /**
    * Upload a file to the `files` API and then attach it to the given vector store.
    *
    * Note the file will be asynchronously processed (you can use the alternative
    * polling helper method to wait for processing to complete).
    */
-  async upload(
-    vectorStoreId: string,
-    file: Uploadable,
-    options?: Core.RequestOptions,
-  ): Promise<VectorStoreFile> {
+  async upload(vectorStoreId: string, file: Uploadable, options?: RequestOptions): Promise<VectorStoreFile> {
     const fileInfo = await this._client.files.create({ file: file, purpose: 'assistants' }, options);
     return this.create(vectorStoreId, { file_id: fileInfo.id }, options);
   }
-
   /**
    * Add a file to a vector store and poll until processing is complete.
    */
   async uploadAndPoll(
     vectorStoreId: string,
     file: Uploadable,
-    options?: Core.RequestOptions & { pollIntervalMs?: number },
+    options?: RequestOptions & { pollIntervalMs?: number },
   ): Promise<VectorStoreFile> {
     const fileInfo = await this.upload(vectorStoreId, file, options);
     return await this.poll(vectorStoreId, fileInfo.id, options);
@@ -188,24 +178,23 @@ export class Files extends APIResource {
    * Retrieve the parsed contents of a vector store file.
    */
   content(
-    vectorStoreId: string,
-    fileId: string,
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<FileContentResponsesPage, FileContentResponse> {
+    fileID: string,
+    params: FileContentParams,
+    options?: RequestOptions,
+  ): PagePromise<FileContentResponsesPage, FileContentResponse> {
+    const { vector_store_id } = params;
     return this._client.getAPIList(
-      `/vector_stores/${vectorStoreId}/files/${fileId}/content`,
-      FileContentResponsesPage,
-      { ...options, headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers } },
+      path`/vector_stores/${vector_store_id}/files/${fileID}/content`,
+      Page<FileContentResponse>,
+      { ...options, headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]) },
     );
   }
 }
 
-export class VectorStoreFilesPage extends CursorPage<VectorStoreFile> {}
+export type VectorStoreFilesPage = CursorPage<VectorStoreFile>;
 
-/**
- * Note: no pagination actually occurs yet, this is for forwards-compatibility.
- */
-export class FileContentResponsesPage extends Page<FileContentResponse> {}
+// Note: no pagination actually occurs yet, this is for forwards-compatibility.
+export type FileContentResponsesPage = Page<FileContentResponse>;
 
 /**
  * A list of files attached to a vector store.
@@ -330,13 +319,25 @@ export interface FileCreateParams {
   chunking_strategy?: VectorStoresAPI.FileChunkingStrategyParam;
 }
 
+export interface FileRetrieveParams {
+  /**
+   * The ID of the vector store that the file belongs to.
+   */
+  vector_store_id: string;
+}
+
 export interface FileUpdateParams {
   /**
-   * Set of 16 key-value pairs that can be attached to an object. This can be useful
-   * for storing additional information about the object in a structured format, and
-   * querying for objects via API or the dashboard. Keys are strings with a maximum
-   * length of 64 characters. Values are strings with a maximum length of 512
-   * characters, booleans, or numbers.
+   * Path param: The ID of the vector store the file belongs to.
+   */
+  vector_store_id: string;
+
+  /**
+   * Body param: Set of 16 key-value pairs that can be attached to an object. This
+   * can be useful for storing additional information about the object in a
+   * structured format, and querying for objects via API or the dashboard. Keys are
+   * strings with a maximum length of 64 characters. Values are strings with a
+   * maximum length of 512 characters, booleans, or numbers.
    */
   attributes: Record<string, string | number | boolean> | null;
 }
@@ -362,18 +363,32 @@ export interface FileListParams extends CursorPageParams {
   order?: 'asc' | 'desc';
 }
 
-Files.VectorStoreFilesPage = VectorStoreFilesPage;
-Files.FileContentResponsesPage = FileContentResponsesPage;
+export interface FileDeleteParams {
+  /**
+   * The ID of the vector store that the file belongs to.
+   */
+  vector_store_id: string;
+}
+
+export interface FileContentParams {
+  /**
+   * The ID of the vector store.
+   */
+  vector_store_id: string;
+}
 
 export declare namespace Files {
   export {
     type VectorStoreFile as VectorStoreFile,
     type VectorStoreFileDeleted as VectorStoreFileDeleted,
     type FileContentResponse as FileContentResponse,
-    VectorStoreFilesPage as VectorStoreFilesPage,
-    FileContentResponsesPage as FileContentResponsesPage,
+    type VectorStoreFilesPage as VectorStoreFilesPage,
+    type FileContentResponsesPage as FileContentResponsesPage,
     type FileCreateParams as FileCreateParams,
+    type FileRetrieveParams as FileRetrieveParams,
     type FileUpdateParams as FileUpdateParams,
     type FileListParams as FileListParams,
+    type FileDeleteParams as FileDeleteParams,
+    type FileContentParams as FileContentParams,
   };
 }

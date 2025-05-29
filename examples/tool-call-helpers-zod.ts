@@ -1,10 +1,8 @@
 #!/usr/bin/env -S npm run tsn -T
 
 import OpenAI from 'openai';
-import { RunnableToolFunctionWithParse } from 'openai/lib/RunnableFunction';
-import { JSONSchema } from 'openai/lib/jsonschema';
-import { ZodSchema, z } from 'zod';
-import { zodToJsonSchema } from 'zod-to-json-schema';
+import { zodFunction } from 'openai/helpers/zod';
+import { z } from 'zod';
 
 // gets API Key from environment variable OPENAI_API_KEY
 const openai = new OpenAI();
@@ -36,24 +34,27 @@ async function getBook({ id }: GetParams) {
 }
 
 async function main() {
-  const runner = openai.beta.chat.completions
+  const runner = openai.chat.completions
     .runTools({
       model: 'gpt-4-1106-preview',
       stream: true,
       tools: [
         zodFunction({
+          name: 'listBooks',
           function: listBooks,
-          schema: ListParams,
+          parameters: ListParams,
           description: 'List queries books by genre, and returns a list of names of books',
         }),
         zodFunction({
+          name: 'searchBooks',
           function: searchBooks,
-          schema: SearchParams,
+          parameters: SearchParams,
           description: 'Search queries books by their name and returns a list of book names and their ids',
         }),
         zodFunction({
+          name: 'getBook',
           function: getBook,
-          schema: GetParams,
+          parameters: GetParams,
           description:
             "Get returns a book's detailed information based on the id of the book. Note that this does not accept names, and only IDs, which you can get by using search.",
         }),
@@ -72,8 +73,10 @@ async function main() {
       ],
     })
     .on('message', (msg) => console.log('msg', msg))
-    .on('functionCall', (functionCall) => console.log('functionCall', functionCall))
-    .on('functionCallResult', (functionCallResult) => console.log('functionCallResult', functionCallResult))
+    .on('finalFunctionToolCall', (functionCall) => console.log('functionCall', functionCall))
+    .on('finalFunctionToolCallResult', (functionCallResult) =>
+      console.log('functionCallResult', functionCallResult),
+    )
     .on('content', (diff) => process.stdout.write(diff));
 
   const result = await runner.finalChatCompletion();
@@ -107,38 +110,5 @@ const db = [
 But Kya is not what they say. A born naturalist with just one day of school, she takes life's lessons from the land, learning the real ways of the world from the dishonest signals of fireflies. But while she has the skills to live in solitude forever, the time comes when she yearns to be touched and loved. Drawn to two young men from town, who are each intrigued by her wild beauty, Kya opens herself to a new and startling world—until the unthinkable happens.`,
   },
 ];
-
-/**
- * A generic utility function that returns a RunnableFunction
- * you can pass to `.runTools()`,
- * with a fully validated, typesafe parameters schema.
- *
- * You are encouraged to copy/paste this into your codebase!
- */
-function zodFunction<T extends object>({
-  function: fn,
-  schema,
-  description = '',
-  name,
-}: {
-  function: (args: T) => Promise<object>;
-  schema: ZodSchema<T>;
-  description?: string;
-  name?: string;
-}): RunnableToolFunctionWithParse<T> {
-  return {
-    type: 'function',
-    function: {
-      function: fn,
-      name: name ?? fn.name,
-      description: description,
-      parameters: zodToJsonSchema(schema) as JSONSchema,
-      parse(input: string): T {
-        const obj = JSON.parse(input);
-        return schema.parse(obj);
-      },
-    },
-  };
-}
 
 main();

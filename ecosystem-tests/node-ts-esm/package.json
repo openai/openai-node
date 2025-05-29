@@ -6,11 +6,11 @@
   "private": true,
   "scripts": {
     "tsc": "tsc && tsc -p tsconfig.noderesolution.json",
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
+    "test": "node --import=./iitm.js --experimental-vm-modules node_modules/jest/bin/jest.js"
   },
   "dependencies": {
     "formdata-node": "^5.0.1",
-    "node-fetch": "^3.0.0"
+    "import-in-the-middle": "^1.11.2"
   },
   "devDependencies": {
     "@types/node": "^20.3.1",

@@ -15,7 +15,7 @@ const MathResponse = z.object({
 async function main() {
   const client = new OpenAI();
 
-  const stream = client.beta.chat.completions
+  const stream = client.chat.completions
     .stream({
       model: 'gpt-4o-2024-08-06',
       messages: [

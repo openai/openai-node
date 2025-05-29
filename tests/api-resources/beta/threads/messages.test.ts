@@ -1,7 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import OpenAI from 'openai';
-import { Response } from 'node-fetch';
 
 const client = new OpenAI({
   apiKey: 'My API Key',
@@ -32,8 +31,8 @@ describe('resource messages', () => {
     });
   });
 
-  test('retrieve', async () => {
-    const responsePromise = client.beta.threads.messages.retrieve('thread_id', 'message_id');
+  test('retrieve: only required params', async () => {
+    const responsePromise = client.beta.threads.messages.retrieve('message_id', { thread_id: 'thread_id' });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -43,15 +42,12 @@ describe('resource messages', () => {
     expect(dataAndResponse.response).toBe(rawResponse);
   });
 
-  test('retrieve: request options instead of params are passed correctly', async () => {
-    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(
-      client.beta.threads.messages.retrieve('thread_id', 'message_id', { path: '/_stainless_unknown_path' }),
-    ).rejects.toThrow(OpenAI.NotFoundError);
+  test('retrieve: required and optional params', async () => {
+    const response = await client.beta.threads.messages.retrieve('message_id', { thread_id: 'thread_id' });
   });
 
-  test('update', async () => {
-    const responsePromise = client.beta.threads.messages.update('thread_id', 'message_id', {});
+  test('update: only required params', async () => {
+    const responsePromise = client.beta.threads.messages.update('message_id', { thread_id: 'thread_id' });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -59,6 +55,13 @@ describe('resource messages', () => {
     const dataAndResponse = await responsePromise.withResponse();
     expect(dataAndResponse.data).toBe(response);
     expect(dataAndResponse.response).toBe(rawResponse);
+  });
+
+  test('update: required and optional params', async () => {
+    const response = await client.beta.threads.messages.update('message_id', {
+      thread_id: 'thread_id',
+      metadata: { foo: 'string' },
+    });
   });
 
   test('list', async () => {
@@ -72,13 +75,6 @@ describe('resource messages', () => {
     expect(dataAndResponse.response).toBe(rawResponse);
   });
 
-  test('list: request options instead of params are passed correctly', async () => {
-    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(
-      client.beta.threads.messages.list('thread_id', { path: '/_stainless_unknown_path' }),
-    ).rejects.toThrow(OpenAI.NotFoundError);
-  });
-
   test('list: request options and params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
@@ -90,8 +86,8 @@ describe('resource messages', () => {
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
-  test('del', async () => {
-    const responsePromise = client.beta.threads.messages.del('thread_id', 'message_id');
+  test('delete: only required params', async () => {
+    const responsePromise = client.beta.threads.messages.delete('message_id', { thread_id: 'thread_id' });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -101,10 +97,7 @@ describe('resource messages', () => {
     expect(dataAndResponse.response).toBe(rawResponse);
   });
 
-  test('del: request options instead of params are passed correctly', async () => {
-    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(
-      client.beta.threads.messages.del('thread_id', 'message_id', { path: '/_stainless_unknown_path' }),
-    ).rejects.toThrow(OpenAI.NotFoundError);
+  test('delete: required and optional params', async () => {
+    const response = await client.beta.threads.messages.delete('message_id', { thread_id: 'thread_id' });
   });
 });

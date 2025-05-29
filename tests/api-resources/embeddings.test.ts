@@ -1,7 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import OpenAI from 'openai';
-import { Response } from 'node-fetch';
 import { mockFetch } from '../utils/mock-fetch';
 import fs from 'fs/promises';
 import Path from 'path';
@@ -43,7 +42,7 @@ describe('resource embeddings', () => {
       model: 'text-embedding-3-small',
     });
 
-    expect(response.data?.at(0)?.embedding).toBeInstanceOf(Array);
+    expect(Array.isArray(response.data?.at(0)?.embedding)).toBe(true);
     expect(response.data?.at(0)?.embedding.at(0)).toBe(-0.09928705543279648);
   });
 
@@ -55,7 +54,7 @@ describe('resource embeddings', () => {
       encoding_format: 'float',
     });
 
-    expect(response.data?.at(0)?.embedding).toBeInstanceOf(Array);
+    expect(Array.isArray(response.data?.at(0)?.embedding)).toBe(true);
     expect(response.data?.at(0)?.embedding.at(0)).toBe(-0.099287055);
   });
 

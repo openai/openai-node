@@ -1,4 +1,3 @@
-import * as Core from '../core';
 import {
   OpenAIError,
   APIUserAbortError,
@@ -18,10 +17,10 @@ import {
   AbstractChatCompletionRunner,
   type AbstractChatCompletionRunnerEvents,
 } from './AbstractChatCompletionRunner';
-import { type ReadableStream } from '../_shims/index';
+import { type ReadableStream } from '../internal/shim-types';
 import { Stream } from '../streaming';
 import OpenAI from '../index';
-import { ParsedChatCompletion } from '../resources/beta/chat/completions';
+import { ParsedChatCompletion } from '../resources/chat/completions';
 import {
   AutoParseableResponseFormat,
   hasAutoParseableInput,
@@ -31,6 +30,7 @@ import {
   shouldParseToolCall,
 } from '../lib/parser';
 import { partialParse } from '../_vendor/partial-json-parser/parser';
+import { RequestOptions } from '../internal/request-options';
 
 export interface ContentDeltaEvent {
   delta: string;
@@ -159,7 +159,7 @@ export class ChatCompletionStream<ParsedT = null>
   static createChatCompletion<ParsedT>(
     client: OpenAI,
     params: ChatCompletionStreamParams,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): ChatCompletionStream<ParsedT> {
     const runner = new ChatCompletionStream<ParsedT>(params as ChatCompletionCreateParamsStreaming);
     runner._run(() =>
@@ -369,7 +369,7 @@ export class ChatCompletionStream<ParsedT = null>
   protected override async _createChatCompletion(
     client: OpenAI,
     params: ChatCompletionCreateParams,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): Promise<ParsedChatCompletion<ParsedT>> {
     super._createChatCompletion;
     const signal = options?.signal;
@@ -395,7 +395,7 @@ export class ChatCompletionStream<ParsedT = null>
 
   protected async _fromReadableStream(
     readableStream: ReadableStream,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): Promise<ChatCompletion> {
     const signal = options?.signal;
     if (signal) {

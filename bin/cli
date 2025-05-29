@@ -4,25 +4,28 @@ const { spawnSync } = require('child_process');
 
 const commands = {
   migrate: {
-    description: 'Run migrations to update from openai v3 to v4',
+    description: 'Run migrations to update to the latest major SDK version',
     fn: () => {
-      console.log('This automatic code migration is provided by grit.io');
-      console.log('Visit https://app.grit.io/studio?preset=openai_v4 for more details.')
-
       const result = spawnSync(
         'npx',
-        ['-y', '@getgrit/launcher', 'apply', 'openai_v4', ...process.argv.slice(3)],
+        [
+          '-y',
+          'https://github.com/stainless-api/migrate-ts/releases/download/0.0.3/stainless-api-migrate-0.0.3.tgz',
+          '--migrationConfig',
+          require.resolve('./migration-config.json'),
+          ...process.argv.slice(3),
+        ],
         { stdio: 'inherit' },
       );
       if (result.status !== 0) {
         process.exit(result.status);
       }
-    }
-  }
-}
+    },
+  },
+};
 
 function exitWithHelp() {
-  console.log("Usage: $0 <subcommand>");
+  console.log(`Usage: openai <subcommand>`);
   console.log();
   console.log('Subcommands:');
 

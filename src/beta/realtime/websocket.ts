@@ -1,8 +1,8 @@
 import { AzureOpenAI, OpenAI } from '../../index';
 import { OpenAIError } from '../../error';
-import * as Core from '../../core';
 import type { RealtimeClientEvent, RealtimeServerEvent } from '../../resources/beta/realtime/realtime';
 import { OpenAIRealtimeEmitter, buildRealtimeURL, isAzure } from './internal-base';
+import { isRunningInBrowser } from '../../internal/detect-platform';
 
 interface MessageEvent {
   data: string;
@@ -41,7 +41,7 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
       (client as any)?._options?.dangerouslyAllowBrowser ??
       (client?.apiKey.startsWith('ek_') ? true : null);
 
-    if (!dangerouslyAllowBrowser && Core.isRunningInBrowser()) {
+    if (!dangerouslyAllowBrowser && isRunningInBrowser()) {
       throw new OpenAIError(
         "It looks like you're running in a browser-like environment.\n\nThis is disabled by default, as it risks exposing your secret API credentials to attackers.\n\nYou can avoid this error by creating an ephemeral session token:\nhttps://platform.openai.com/docs/api-reference/realtime-sessions\n",
       );

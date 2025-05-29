@@ -8,7 +8,10 @@ const indexJs =
 
 let before = fs.readFileSync(indexJs, 'utf8');
 let after = before.replace(
-  /^\s*exports\.default\s*=\s*(\w+)/m,
-  'exports = module.exports = $1;\nmodule.exports.AzureOpenAI = AzureOpenAI;\nexports.default = $1',
+  /^(\s*Object\.defineProperty\s*\(exports,\s*["']__esModule["'].+)$/m,
+  `exports = module.exports = function (...args) {
+    return new exports.default(...args)
+  }
+  $1`.replace(/^  /gm, ''),
 );
 fs.writeFileSync(indexJs, after, 'utf8');

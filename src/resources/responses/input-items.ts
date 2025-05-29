@@ -1,11 +1,11 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../resource';
-import { isRequestOptions } from '../../core';
-import * as Core from '../../core';
+import { APIResource } from '../../core/resource';
 import * as ResponsesAPI from './responses';
 import { ResponseItemsPage } from './responses';
-import { type CursorPageParams } from '../../pagination';
+import { CursorPage, type CursorPageParams, PagePromise } from '../../core/pagination';
+import { RequestOptions } from '../../internal/request-options';
+import { path } from '../../internal/utils/path';
 
 export class InputItems extends APIResource {
   /**
@@ -22,26 +22,15 @@ export class InputItems extends APIResource {
    * ```
    */
   list(
-    responseId: string,
-    query?: InputItemListParams,
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<ResponseItemsPage, ResponsesAPI.ResponseItem>;
-  list(
-    responseId: string,
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<ResponseItemsPage, ResponsesAPI.ResponseItem>;
-  list(
-    responseId: string,
-    query: InputItemListParams | Core.RequestOptions = {},
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<ResponseItemsPage, ResponsesAPI.ResponseItem> {
-    if (isRequestOptions(query)) {
-      return this.list(responseId, {}, query);
-    }
-    return this._client.getAPIList(`/responses/${responseId}/input_items`, ResponseItemsPage, {
-      query,
-      ...options,
-    });
+    responseID: string,
+    query: InputItemListParams | null | undefined = {},
+    options?: RequestOptions,
+  ): PagePromise<ResponseItemsPage, ResponsesAPI.ResponseItem> {
+    return this._client.getAPIList(
+      path`/responses/${responseID}/input_items`,
+      CursorPage<ResponsesAPI.ResponseItem>,
+      { query, ...options },
+    );
   }
 }
 
@@ -100,4 +89,4 @@ export declare namespace InputItems {
   export { type ResponseItemList as ResponseItemList, type InputItemListParams as InputItemListParams };
 }
 
-export { ResponseItemsPage };
+export { type ResponseItemsPage };

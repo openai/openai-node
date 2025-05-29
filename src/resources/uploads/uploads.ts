@@ -1,10 +1,12 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../resource';
-import * as Core from '../../core';
+import { APIResource } from '../../core/resource';
 import * as FilesAPI from '../files';
 import * as PartsAPI from './parts';
 import { PartCreateParams, Parts, UploadPart } from './parts';
+import { APIPromise } from '../../core/api-promise';
+import { RequestOptions } from '../../internal/request-options';
+import { path } from '../../internal/utils/path';
 
 export class Uploads extends APIResource {
   parts: PartsAPI.Parts = new PartsAPI.Parts(this._client);
@@ -30,15 +32,15 @@ export class Uploads extends APIResource {
    * the documentation on
    * [creating a File](https://platform.openai.com/docs/api-reference/files/create).
    */
-  create(body: UploadCreateParams, options?: Core.RequestOptions): Core.APIPromise<Upload> {
+  create(body: UploadCreateParams, options?: RequestOptions): APIPromise<Upload> {
     return this._client.post('/uploads', { body, ...options });
   }
 
   /**
    * Cancels the Upload. No Parts may be added after an Upload is cancelled.
    */
-  cancel(uploadId: string, options?: Core.RequestOptions): Core.APIPromise<Upload> {
-    return this._client.post(`/uploads/${uploadId}/cancel`, options);
+  cancel(uploadID: string, options?: RequestOptions): APIPromise<Upload> {
+    return this._client.post(path`/uploads/${uploadID}/cancel`, options);
   }
 
   /**
@@ -56,12 +58,8 @@ export class Uploads extends APIResource {
    * initially specified when creating the Upload object. No Parts may be added after
    * an Upload is completed.
    */
-  complete(
-    uploadId: string,
-    body: UploadCompleteParams,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<Upload> {
-    return this._client.post(`/uploads/${uploadId}/complete`, { body, ...options });
+  complete(uploadID: string, body: UploadCompleteParams, options?: RequestOptions): APIPromise<Upload> {
+    return this._client.post(path`/uploads/${uploadID}/complete`, { body, ...options });
   }
 }
 

@@ -9,8 +9,7 @@
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
   },
   "dependencies": {
-    "formdata-node": "^5.0.1",
-    "node-fetch": "^3.0.0"
+    "formdata-node": "^5.0.1"
   },
   "devDependencies": {
     "@types/node": "^20.3.1",

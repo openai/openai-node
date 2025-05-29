@@ -1,7 +1,4 @@
-import { type RequestInfo, type RequestInit } from 'openai/_shims/index';
-import { Response } from 'node-fetch';
-
-type Fetch = (req: string | RequestInfo, init?: RequestInit) => Promise<Response>;
+import { type Fetch, type RequestInfo, type RequestInit, type Response } from 'openai/internal/builtin-types';
 
 /**
  * Creates a mock `fetch` function and a `handleRequest` function for intercepting `fetch` calls.

@@ -1,8 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 export {
-  ChatCompletionStoreMessagesPage,
-  ChatCompletionsPage,
   Completions,
   type ChatCompletion,
   type ChatCompletionAssistantMessageParam,
@@ -33,16 +31,13 @@ export {
   type ChatCompletionToolChoiceOption,
   type ChatCompletionToolMessageParam,
   type ChatCompletionUserMessageParam,
-  type CreateChatCompletionRequestMessage,
   type ChatCompletionCreateParams,
-  type CompletionCreateParams,
   type ChatCompletionCreateParamsNonStreaming,
-  type CompletionCreateParamsNonStreaming,
   type ChatCompletionCreateParamsStreaming,
-  type CompletionCreateParamsStreaming,
   type ChatCompletionUpdateParams,
-  type CompletionUpdateParams,
   type ChatCompletionListParams,
-  type CompletionListParams,
+  type ChatCompletionStoreMessagesPage,
+  type ChatCompletionsPage,
 } from './completions';
+export * from './completions';
 export { Messages, type MessageListParams } from './messages';

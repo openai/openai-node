@@ -1,8 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../resource';
-import { isRequestOptions } from '../../core';
-import * as Core from '../../core';
+import { APIResource } from '../../core/resource';
 import * as Shared from '../shared';
 import * as GraderModelsAPI from '../graders/grader-models';
 import * as ResponsesAPI from '../responses/responses';
@@ -11,17 +9,23 @@ import {
   CreateEvalCompletionsRunDataSource,
   CreateEvalJSONLRunDataSource,
   EvalAPIError,
+  RunCancelParams,
   RunCancelResponse,
   RunCreateParams,
   RunCreateResponse,
+  RunDeleteParams,
   RunDeleteResponse,
   RunListParams,
   RunListResponse,
   RunListResponsesPage,
+  RunRetrieveParams,
   RunRetrieveResponse,
   Runs,
 } from './runs/runs';
-import { CursorPage, type CursorPageParams } from '../../pagination';
+import { APIPromise } from '../../core/api-promise';
+import { CursorPage, type CursorPageParams, PagePromise } from '../../core/pagination';
+import { RequestOptions } from '../../internal/request-options';
+import { path } from '../../internal/utils/path';
 
 export class Evals extends APIResource {
   runs: RunsAPI.Runs = new RunsAPI.Runs(this._client);
@@ -34,55 +38,43 @@ export class Evals extends APIResource {
    * We support several types of graders and datasources. For more information, see
    * the [Evals guide](https://platform.openai.com/docs/guides/evals).
    */
-  create(body: EvalCreateParams, options?: Core.RequestOptions): Core.APIPromise<EvalCreateResponse> {
+  create(body: EvalCreateParams, options?: RequestOptions): APIPromise<EvalCreateResponse> {
     return this._client.post('/evals', { body, ...options });
   }
 
   /**
    * Get an evaluation by ID.
    */
-  retrieve(evalId: string, options?: Core.RequestOptions): Core.APIPromise<EvalRetrieveResponse> {
-    return this._client.get(`/evals/${evalId}`, options);
+  retrieve(evalID: string, options?: RequestOptions): APIPromise<EvalRetrieveResponse> {
+    return this._client.get(path`/evals/${evalID}`, options);
   }
 
   /**
    * Update certain properties of an evaluation.
    */
-  update(
-    evalId: string,
-    body: EvalUpdateParams,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<EvalUpdateResponse> {
-    return this._client.post(`/evals/${evalId}`, { body, ...options });
+  update(evalID: string, body: EvalUpdateParams, options?: RequestOptions): APIPromise<EvalUpdateResponse> {
+    return this._client.post(path`/evals/${evalID}`, { body, ...options });
   }
 
   /**
    * List evaluations for a project.
    */
   list(
-    query?: EvalListParams,
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<EvalListResponsesPage, EvalListResponse>;
-  list(options?: Core.RequestOptions): Core.PagePromise<EvalListResponsesPage, EvalListResponse>;
-  list(
-    query: EvalListParams | Core.RequestOptions = {},
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<EvalListResponsesPage, EvalListResponse> {
-    if (isRequestOptions(query)) {
-      return this.list({}, query);
-    }
-    return this._client.getAPIList('/evals', EvalListResponsesPage, { query, ...options });
+    query: EvalListParams | null | undefined = {},
+    options?: RequestOptions,
+  ): PagePromise<EvalListResponsesPage, EvalListResponse> {
+    return this._client.getAPIList('/evals', CursorPage<EvalListResponse>, { query, ...options });
   }
 
   /**
    * Delete an evaluation.
    */
-  del(evalId: string, options?: Core.RequestOptions): Core.APIPromise<EvalDeleteResponse> {
-    return this._client.delete(`/evals/${evalId}`, options);
+  delete(evalID: string, options?: RequestOptions): APIPromise<EvalDeleteResponse> {
+    return this._client.delete(path`/evals/${evalID}`, options);
   }
 }
 
-export class EvalListResponsesPage extends CursorPage<EvalListResponse> {}
+export type EvalListResponsesPage = CursorPage<EvalListResponse>;
 
 /**
  * A CustomDataSourceConfig which specifies the schema of your `item` and
@@ -873,9 +865,7 @@ export interface EvalListParams extends CursorPageParams {
   order_by?: 'created_at' | 'updated_at';
 }
 
-Evals.EvalListResponsesPage = EvalListResponsesPage;
 Evals.Runs = Runs;
-Evals.RunListResponsesPage = RunListResponsesPage;
 
 export declare namespace Evals {
   export {
@@ -886,7 +876,7 @@ export declare namespace Evals {
     type EvalUpdateResponse as EvalUpdateResponse,
     type EvalListResponse as EvalListResponse,
     type EvalDeleteResponse as EvalDeleteResponse,
-    EvalListResponsesPage as EvalListResponsesPage,
+    type EvalListResponsesPage as EvalListResponsesPage,
     type EvalCreateParams as EvalCreateParams,
     type EvalUpdateParams as EvalUpdateParams,
     type EvalListParams as EvalListParams,
@@ -902,8 +892,11 @@ export declare namespace Evals {
     type RunListResponse as RunListResponse,
     type RunDeleteResponse as RunDeleteResponse,
     type RunCancelResponse as RunCancelResponse,
-    RunListResponsesPage as RunListResponsesPage,
+    type RunListResponsesPage as RunListResponsesPage,
     type RunCreateParams as RunCreateParams,
+    type RunRetrieveParams as RunRetrieveParams,
     type RunListParams as RunListParams,
+    type RunDeleteParams as RunDeleteParams,
+    type RunCancelParams as RunCancelParams,
   };
 }

@@ -4,8 +4,8 @@
   // via declaration maps
   "include": ["index.ts"],
   "compilerOptions": {
-    "target": "es2015",
-    "lib": ["DOM"],
+    "target": "ES2015",
+    "lib": ["DOM", "DOM.Iterable", "ES2018"],
     "moduleResolution": "node"
   }
 }

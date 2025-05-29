@@ -15,7 +15,10 @@ const credential = new DefaultAzureCredential();
 const scope = 'https://cognitiveservices.azure.com/.default';
 const azureADTokenProvider = getBearerTokenProvider(credential, scope);
 
-const openai = new AzureOpenAI({ azureADTokenProvider, apiVersion: "<The API version, e.g. 2024-10-01-preview>" });
+const openai = new AzureOpenAI({
+  azureADTokenProvider,
+  apiVersion: '<The API version, e.g. 2024-10-01-preview>',
+});
 
 const result = await openai.chat.completions.create({
   model: 'gpt-4o',

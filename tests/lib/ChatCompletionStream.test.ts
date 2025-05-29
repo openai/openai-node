@@ -8,7 +8,7 @@ jest.setTimeout(1000 * 30);
 describe('.stream()', () => {
   it('works', async () => {
     const stream = await makeStreamSnapshotRequest((openai) =>
-      openai.beta.chat.completions.stream({
+      openai.chat.completions.stream({
         model: 'gpt-4o-2024-08-06',
         messages: [
           {
@@ -49,7 +49,7 @@ describe('.stream()', () => {
 
     const stream = (
       await makeStreamSnapshotRequest((openai) =>
-        openai.beta.chat.completions.stream({
+        openai.chat.completions.stream({
           model: 'gpt-4o-2024-08-06',
           messages: [
             {
@@ -208,7 +208,7 @@ describe('.stream()', () => {
 
     const stream = (
       await makeStreamSnapshotRequest((openai) =>
-        openai.beta.chat.completions.stream({
+        openai.chat.completions.stream({
           model: 'gpt-4o-2024-08-06',
           messages: [
             {

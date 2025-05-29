@@ -1,7 +1,6 @@
-import { Response } from 'node-fetch';
-import { PassThrough } from 'stream';
 import assert from 'assert';
-import { _iterSSEMessages } from 'openai/streaming';
+import { _iterSSEMessages } from 'openai/core/streaming';
+import { ReadableStreamFrom } from 'openai/internal/shims';
 
 describe('streaming decoding', () => {
   test('basic', async () => {
@@ -11,7 +10,7 @@ describe('streaming decoding', () => {
       yield Buffer.from('\n');
     }
 
-    const stream = _iterSSEMessages(new Response(await iteratorToStream(body())), new AbortController())[
+    const stream = _iterSSEMessages(new Response(ReadableStreamFrom(body())), new AbortController())[
       Symbol.asyncIterator
     ]();
 
@@ -29,7 +28,7 @@ describe('streaming decoding', () => {
       yield Buffer.from('\n');
     }
 
-    const stream = _iterSSEMessages(new Response(await iteratorToStream(body())), new AbortController())[
+    const stream = _iterSSEMessages(new Response(ReadableStreamFrom(body())), new AbortController())[
       Symbol.asyncIterator
     ]();
 
@@ -48,7 +47,7 @@ describe('streaming decoding', () => {
       yield Buffer.from('\n');
     }
 
-    const stream = _iterSSEMessages(new Response(await iteratorToStream(body())), new AbortController())[
+    const stream = _iterSSEMessages(new Response(ReadableStreamFrom(body())), new AbortController())[
       Symbol.asyncIterator
     ]();
 
@@ -69,7 +68,7 @@ describe('streaming decoding', () => {
       yield Buffer.from('\n');
     }
 
-    const stream = _iterSSEMessages(new Response(await iteratorToStream(body())), new AbortController())[
+    const stream = _iterSSEMessages(new Response(ReadableStreamFrom(body())), new AbortController())[
       Symbol.asyncIterator
     ]();
 
@@ -97,7 +96,7 @@ describe('streaming decoding', () => {
       yield Buffer.from('\n');
     }
 
-    const stream = _iterSSEMessages(new Response(await iteratorToStream(body())), new AbortController())[
+    const stream = _iterSSEMessages(new Response(ReadableStreamFrom(body())), new AbortController())[
       Symbol.asyncIterator
     ]();
 
@@ -126,7 +125,7 @@ describe('streaming decoding', () => {
       yield Buffer.from('\n\n');
     }
 
-    const stream = _iterSSEMessages(new Response(await iteratorToStream(body())), new AbortController())[
+    const stream = _iterSSEMessages(new Response(ReadableStreamFrom(body())), new AbortController())[
       Symbol.asyncIterator
     ]();
 
@@ -147,7 +146,7 @@ describe('streaming decoding', () => {
       yield Buffer.from('\n\n');
     }
 
-    const stream = _iterSSEMessages(new Response(await iteratorToStream(body())), new AbortController())[
+    const stream = _iterSSEMessages(new Response(ReadableStreamFrom(body())), new AbortController())[
       Symbol.asyncIterator
     ]();
 
@@ -172,7 +171,7 @@ describe('streaming decoding', () => {
       yield Buffer.from('\n');
     }
 
-    const stream = _iterSSEMessages(new Response(await iteratorToStream(body())), new AbortController())[
+    const stream = _iterSSEMessages(new Response(ReadableStreamFrom(body())), new AbortController())[
       Symbol.asyncIterator
     ]();
 
@@ -205,7 +204,7 @@ describe('streaming decoding', () => {
       yield Buffer.from('\n');
     }
 
-    const stream = _iterSSEMessages(new Response(await iteratorToStream(body())), new AbortController())[
+    const stream = _iterSSEMessages(new Response(ReadableStreamFrom(body())), new AbortController())[
       Symbol.asyncIterator
     ]();
 
@@ -218,27 +217,3 @@ describe('streaming decoding', () => {
     expect(event.done).toBeTruthy();
   });
 });
-
-async function iteratorToStream(iterator: AsyncGenerator<any>): Promise<PassThrough> {
-  const parts: unknown[] = [];
-
-  for await (const chunk of iterator) {
-    parts.push(chunk);
-  }
-
-  let index = 0;
-
-  const stream = new PassThrough({
-    read() {
-      const value = parts[index];
-      if (value === undefined) {
-        stream.end();
-      } else {
-        index += 1;
-        stream.write(value);
-      }
-    },
-  });
-
-  return stream;
-}
