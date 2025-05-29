@@ -7,7 +7,7 @@ import {
   addOutputText,
 } from '../../lib/ResponsesParser';
 import * as Core from '../../core';
-import { APIPromise, isRequestOptions } from '../../core';
+import { APIPromise } from '../../core';
 import { APIResource } from '../../resource';
 import * as Shared from '../shared';
 import * as InputItemsAPI from './input-items';
@@ -117,38 +117,26 @@ export class Responses extends APIResource {
     responseId: string,
     query?: ResponseRetrieveParamsNonStreaming,
     options?: Core.RequestOptions,
-  ): Core.APIPromise<Response>;
+  ): APIPromise<Response>;
   retrieve(
     responseId: string,
-    query?: ResponseRetrieveParamsStreaming,
+    query: ResponseRetrieveParamsStreaming,
     options?: Core.RequestOptions,
-  ): Core.APIPromise<Stream<ResponseStreamEvent>>;
-  retrieve(responseId: string, options?: Core.RequestOptions): Core.APIPromise<Response>;
+  ): APIPromise<Stream<ResponseStreamEvent>>;
   retrieve(
     responseId: string,
-    query: ResponseRetrieveParams | Core.RequestOptions,
+    query?: ResponseRetrieveParamsBase | undefined,
     options?: Core.RequestOptions,
-  ): Core.APIPromise<Response> | Core.APIPromise<Stream<ResponseStreamEvent>>;
+  ): APIPromise<Stream<ResponseStreamEvent> | Response>;
   retrieve(
     responseId: string,
-    query: ResponseRetrieveParams | Core.RequestOptions = {},
+    query: ResponseRetrieveParams | undefined = {},
     options?: Core.RequestOptions,
-  ): Core.APIPromise<Response> | Core.APIPromise<Stream<ResponseStreamEvent>> {
-    if (isRequestOptions(query) && options === undefined) {
-      return this.retrieve(responseId, {}, query);
-    }
-    return (
-      this._client.get(`/responses/${responseId}`, {
-        query,
-        ...options,
-        stream: query.stream ?? false,
-      }) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>
-    )._thenUnwrap((rsp) => {
-      if ('object' in rsp && rsp.object === 'response') {
-        addOutputText(rsp as Response);
-      }
-
-      return rsp;
+  ): APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>> {
+    return this._client.get(`/responses/${responseId}`, {
+      query,
+      ...options,
+      stream: query?.stream ?? false,
     }) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>;
   }
 
@@ -3320,6 +3308,8 @@ export interface ResponseOutputText {
    * The type of the output text. Always `output_text`.
    */
   type: 'output_text';
+
+  logprobs?: Array<ResponseOutputText.Logprob>;
 }
 
 export namespace ResponseOutputText {
@@ -3391,6 +3381,32 @@ export namespace ResponseOutputText {
      * The type of the file path. Always `file_path`.
      */
     type: 'file_path';
+  }
+
+  /**
+   * The log probability of a token.
+   */
+  export interface Logprob {
+    token: string;
+
+    bytes: Array<number>;
+
+    logprob: number;
+
+    top_logprobs: Array<Logprob.TopLogprob>;
+  }
+
+  export namespace Logprob {
+    /**
+     * The top log probability of a token.
+     */
+    export interface TopLogprob {
+      token: string;
+
+      bytes: Array<number>;
+
+      logprob: number;
+    }
   }
 }
 
@@ -4742,7 +4758,8 @@ export interface ResponseCreateParamsStreaming extends ResponseCreateParamsBase 
   stream: true;
 }
 
-export type ResponseRetrieveParams = ResponseRetrieveParamsStreaming | ResponseRetrieveParamsNonStreaming;
+export type ResponseRetrieveParams = ResponseRetrieveParamsNonStreaming | ResponseRetrieveParamsStreaming;
+
 export interface ResponseRetrieveParamsBase {
   /**
    * Additional fields to include in the response. See the `include` parameter for
@@ -4750,21 +4767,51 @@ export interface ResponseRetrieveParamsBase {
    */
   include?: Array<ResponseIncludable>;
 
-  starting_after?: number | null;
-  stream?: boolean | null;
-}
+  /**
+   * The sequence number of the event after which to start streaming.
+   */
+  starting_after?: number;
 
-export interface ResponseRetrieveParamsStreaming extends ResponseRetrieveParamsBase {
-  stream: true;
-}
-export interface ResponseRetrieveParamsNonStreaming extends ResponseRetrieveParamsBase {
-  stream?: false | null;
+  /**
+   * If set to true, the model response data will be streamed to the client as it is
+   * generated using
+   * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
+   * See the
+   * [Streaming section below](https://platform.openai.com/docs/api-reference/responses-streaming)
+   * for more information.
+   */
+  stream?: boolean;
 }
 
 export namespace ResponseRetrieveParams {
-  export type ResponseRetrieveParamsStreaming = ResponsesAPI.ResponseRetrieveParamsStreaming;
   export type ResponseRetrieveParamsNonStreaming = ResponsesAPI.ResponseRetrieveParamsNonStreaming;
+  export type ResponseRetrieveParamsStreaming = ResponsesAPI.ResponseRetrieveParamsStreaming;
 }
+
+export interface ResponseRetrieveParamsNonStreaming extends ResponseRetrieveParamsBase {
+  /**
+   * If set to true, the model response data will be streamed to the client as it is
+   * generated using
+   * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
+   * See the
+   * [Streaming section below](https://platform.openai.com/docs/api-reference/responses-streaming)
+   * for more information.
+   */
+  stream?: false;
+}
+
+export interface ResponseRetrieveParamsStreaming extends ResponseRetrieveParamsBase {
+  /**
+   * If set to true, the model response data will be streamed to the client as it is
+   * generated using
+   * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
+   * See the
+   * [Streaming section below](https://platform.openai.com/docs/api-reference/responses-streaming)
+   * for more information.
+   */
+  stream: true;
+}
+
 Responses.InputItems = InputItems;
 
 export declare namespace Responses {
@@ -4870,6 +4917,8 @@ export declare namespace Responses {
     type ResponseCreateParamsNonStreaming as ResponseCreateParamsNonStreaming,
     type ResponseCreateParamsStreaming as ResponseCreateParamsStreaming,
     type ResponseRetrieveParams as ResponseRetrieveParams,
+    type ResponseRetrieveParamsNonStreaming as ResponseRetrieveParamsNonStreaming,
+    type ResponseRetrieveParamsStreaming as ResponseRetrieveParamsStreaming,
   };
 
   export {

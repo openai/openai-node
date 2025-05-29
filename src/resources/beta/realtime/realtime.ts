@@ -2095,6 +2095,11 @@ export namespace SessionUpdateEvent {
    */
   export interface Session {
     /**
+     * Configuration options for the generated client secret.
+     */
+    client_secret?: Session.ClientSecret;
+
+    /**
      * The format of input audio. Options are `pcm16`, `g711_ulaw`, or `g711_alaw`. For
      * `pcm16`, input audio must be 16-bit PCM at a 24kHz sample rate, single channel
      * (mono), and little-endian byte order.
@@ -2219,6 +2224,35 @@ export namespace SessionUpdateEvent {
   }
 
   export namespace Session {
+    /**
+     * Configuration options for the generated client secret.
+     */
+    export interface ClientSecret {
+      /**
+       * Configuration for the ephemeral token expiration.
+       */
+      expires_at?: ClientSecret.ExpiresAt;
+    }
+
+    export namespace ClientSecret {
+      /**
+       * Configuration for the ephemeral token expiration.
+       */
+      export interface ExpiresAt {
+        /**
+         * The anchor point for the ephemeral token expiration. Only `created_at` is
+         * currently supported.
+         */
+        anchor?: 'created_at';
+
+        /**
+         * The number of seconds from the anchor point to the expiration. Select a value
+         * between `10` and `7200`.
+         */
+        seconds?: number;
+      }
+    }
+
     /**
      * Configuration for input audio noise reduction. This can be set to `null` to turn
      * off. Noise reduction filters audio added to the input audio buffer before it is
@@ -2400,6 +2434,11 @@ export namespace TranscriptionSessionUpdate {
    */
   export interface Session {
     /**
+     * Configuration options for the generated client secret.
+     */
+    client_secret?: Session.ClientSecret;
+
+    /**
      * The set of items to include in the transcription. Current available items are:
      *
      * - `item.input_audio_transcription.logprobs`
@@ -2451,6 +2490,35 @@ export namespace TranscriptionSessionUpdate {
   }
 
   export namespace Session {
+    /**
+     * Configuration options for the generated client secret.
+     */
+    export interface ClientSecret {
+      /**
+       * Configuration for the ephemeral token expiration.
+       */
+      expires_at?: ClientSecret.ExpiresAt;
+    }
+
+    export namespace ClientSecret {
+      /**
+       * Configuration for the ephemeral token expiration.
+       */
+      export interface ExpiresAt {
+        /**
+         * The anchor point for the ephemeral token expiration. Only `created_at` is
+         * currently supported.
+         */
+        anchor?: 'created_at';
+
+        /**
+         * The number of seconds from the anchor point to the expiration. Select a value
+         * between `10` and `7200`.
+         */
+        seconds?: number;
+      }
+    }
+
     /**
      * Configuration for input audio noise reduction. This can be set to `null` to turn
      * off. Noise reduction filters audio added to the input audio buffer before it is
