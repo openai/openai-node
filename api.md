@@ -204,6 +204,17 @@ Methods:
 
 # FineTuning
 
+## Methods
+
+Types:
+
+- <code><a href="./src/resources/fine-tuning/methods.ts">DpoHyperparameters</a></code>
+- <code><a href="./src/resources/fine-tuning/methods.ts">DpoMethod</a></code>
+- <code><a href="./src/resources/fine-tuning/methods.ts">ReinforcementHyperparameters</a></code>
+- <code><a href="./src/resources/fine-tuning/methods.ts">ReinforcementMethod</a></code>
+- <code><a href="./src/resources/fine-tuning/methods.ts">SupervisedHyperparameters</a></code>
+- <code><a href="./src/resources/fine-tuning/methods.ts">SupervisedMethod</a></code>
+
 ## Jobs
 
 Types:
@@ -221,6 +232,8 @@ Methods:
 - <code title="get /fine_tuning/jobs">client.fineTuning.jobs.<a href="./src/resources/fine-tuning/jobs/jobs.ts">list</a>({ ...params }) -> FineTuningJobsPage</code>
 - <code title="post /fine_tuning/jobs/{fine_tuning_job_id}/cancel">client.fineTuning.jobs.<a href="./src/resources/fine-tuning/jobs/jobs.ts">cancel</a>(fineTuningJobID) -> FineTuningJob</code>
 - <code title="get /fine_tuning/jobs/{fine_tuning_job_id}/events">client.fineTuning.jobs.<a href="./src/resources/fine-tuning/jobs/jobs.ts">listEvents</a>(fineTuningJobID, { ...params }) -> FineTuningJobEventsPage</code>
+- <code title="post /fine_tuning/jobs/{fine_tuning_job_id}/pause">client.fineTuning.jobs.<a href="./src/resources/fine-tuning/jobs/jobs.ts">pause</a>(fineTuningJobID) -> FineTuningJob</code>
+- <code title="post /fine_tuning/jobs/{fine_tuning_job_id}/resume">client.fineTuning.jobs.<a href="./src/resources/fine-tuning/jobs/jobs.ts">resume</a>(fineTuningJobID) -> FineTuningJob</code>
 
 ### Checkpoints
 
@@ -247,6 +260,33 @@ Methods:
 - <code title="post /fine_tuning/checkpoints/{fine_tuned_model_checkpoint}/permissions">client.fineTuning.checkpoints.permissions.<a href="./src/resources/fine-tuning/checkpoints/permissions.ts">create</a>(fineTunedModelCheckpoint, { ...params }) -> PermissionCreateResponsesPage</code>
 - <code title="get /fine_tuning/checkpoints/{fine_tuned_model_checkpoint}/permissions">client.fineTuning.checkpoints.permissions.<a href="./src/resources/fine-tuning/checkpoints/permissions.ts">retrieve</a>(fineTunedModelCheckpoint, { ...params }) -> PermissionRetrieveResponse</code>
 - <code title="delete /fine_tuning/checkpoints/{fine_tuned_model_checkpoint}/permissions/{permission_id}">client.fineTuning.checkpoints.permissions.<a href="./src/resources/fine-tuning/checkpoints/permissions.ts">delete</a>(permissionID, { ...params }) -> PermissionDeleteResponse</code>
+
+## Alpha
+
+### Graders
+
+Types:
+
+- <code><a href="./src/resources/fine-tuning/alpha/graders.ts">GraderRunResponse</a></code>
+- <code><a href="./src/resources/fine-tuning/alpha/graders.ts">GraderValidateResponse</a></code>
+
+Methods:
+
+- <code title="post /fine_tuning/alpha/graders/run">client.fineTuning.alpha.graders.<a href="./src/resources/fine-tuning/alpha/graders.ts">run</a>({ ...params }) -> GraderRunResponse</code>
+- <code title="post /fine_tuning/alpha/graders/validate">client.fineTuning.alpha.graders.<a href="./src/resources/fine-tuning/alpha/graders.ts">validate</a>({ ...params }) -> GraderValidateResponse</code>
+
+# Graders
+
+## GraderModels
+
+Types:
+
+- <code><a href="./src/resources/graders/grader-models.ts">LabelModelGrader</a></code>
+- <code><a href="./src/resources/graders/grader-models.ts">MultiGrader</a></code>
+- <code><a href="./src/resources/graders/grader-models.ts">PythonGrader</a></code>
+- <code><a href="./src/resources/graders/grader-models.ts">ScoreModelGrader</a></code>
+- <code><a href="./src/resources/graders/grader-models.ts">StringCheckGrader</a></code>
+- <code><a href="./src/resources/graders/grader-models.ts">TextSimilarityGrader</a></code>
 
 # VectorStores
 
@@ -587,6 +627,10 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponseFunctionToolCallItem</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseFunctionToolCallOutputItem</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseFunctionWebSearch</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseImageGenCallCompletedEvent</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseImageGenCallGeneratingEvent</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseImageGenCallInProgressEvent</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseImageGenCallPartialImageEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseInProgressEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseIncludable</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseIncompleteEvent</a></code>
@@ -600,6 +644,14 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponseInputMessageItem</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseInputText</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseItem</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseMcpCallArgumentsDeltaEvent</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseMcpCallArgumentsDoneEvent</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseMcpCallCompletedEvent</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseMcpCallFailedEvent</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseMcpCallInProgressEvent</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseMcpListToolsCompletedEvent</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseMcpListToolsFailedEvent</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseMcpListToolsInProgressEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseOutputAudio</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseOutputItem</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseOutputItemAddedEvent</a></code>
@@ -607,7 +659,13 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponseOutputMessage</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseOutputRefusal</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseOutputText</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseOutputTextAnnotationAddedEvent</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseQueuedEvent</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseReasoningDeltaEvent</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseReasoningDoneEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseReasoningItem</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseReasoningSummaryDeltaEvent</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseReasoningSummaryDoneEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseReasoningSummaryPartAddedEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseReasoningSummaryPartDoneEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseReasoningSummaryTextDeltaEvent</a></code>
@@ -616,7 +674,6 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponseRefusalDoneEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseStatus</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseStreamEvent</a></code>
-- <code><a href="./src/resources/responses/responses.ts">ResponseTextAnnotationDeltaEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseTextConfig</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseTextDeltaEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseTextDoneEvent</a></code>
@@ -635,6 +692,7 @@ Methods:
 - <code title="post /responses">client.responses.<a href="./src/resources/responses/responses.ts">create</a>({ ...params }) -> Response</code>
 - <code title="get /responses/{response_id}">client.responses.<a href="./src/resources/responses/responses.ts">retrieve</a>(responseID, { ...params }) -> Response</code>
 - <code title="delete /responses/{response_id}">client.responses.<a href="./src/resources/responses/responses.ts">delete</a>(responseID) -> void</code>
+- <code title="post /responses/{response_id}/cancel">client.responses.<a href="./src/resources/responses/responses.ts">cancel</a>(responseID) -> void</code>
 
 ## InputItems
 
@@ -651,10 +709,7 @@ Methods:
 Types:
 
 - <code><a href="./src/resources/evals/evals.ts">EvalCustomDataSourceConfig</a></code>
-- <code><a href="./src/resources/evals/evals.ts">EvalLabelModelGrader</a></code>
 - <code><a href="./src/resources/evals/evals.ts">EvalStoredCompletionsDataSourceConfig</a></code>
-- <code><a href="./src/resources/evals/evals.ts">EvalStringCheckGrader</a></code>
-- <code><a href="./src/resources/evals/evals.ts">EvalTextSimilarityGrader</a></code>
 - <code><a href="./src/resources/evals/evals.ts">EvalCreateResponse</a></code>
 - <code><a href="./src/resources/evals/evals.ts">EvalRetrieveResponse</a></code>
 - <code><a href="./src/resources/evals/evals.ts">EvalUpdateResponse</a></code>
@@ -701,3 +756,39 @@ Methods:
 
 - <code title="get /evals/{eval_id}/runs/{run_id}/output_items/{output_item_id}">client.evals.runs.outputItems.<a href="./src/resources/evals/runs/output-items.ts">retrieve</a>(outputItemID, { ...params }) -> OutputItemRetrieveResponse</code>
 - <code title="get /evals/{eval_id}/runs/{run_id}/output_items">client.evals.runs.outputItems.<a href="./src/resources/evals/runs/output-items.ts">list</a>(runID, { ...params }) -> OutputItemListResponsesPage</code>
+
+# Containers
+
+Types:
+
+- <code><a href="./src/resources/containers/containers.ts">ContainerCreateResponse</a></code>
+- <code><a href="./src/resources/containers/containers.ts">ContainerRetrieveResponse</a></code>
+- <code><a href="./src/resources/containers/containers.ts">ContainerListResponse</a></code>
+
+Methods:
+
+- <code title="post /containers">client.containers.<a href="./src/resources/containers/containers.ts">create</a>({ ...params }) -> ContainerCreateResponse</code>
+- <code title="get /containers/{container_id}">client.containers.<a href="./src/resources/containers/containers.ts">retrieve</a>(containerID) -> ContainerRetrieveResponse</code>
+- <code title="get /containers">client.containers.<a href="./src/resources/containers/containers.ts">list</a>({ ...params }) -> ContainerListResponsesPage</code>
+- <code title="delete /containers/{container_id}">client.containers.<a href="./src/resources/containers/containers.ts">delete</a>(containerID) -> void</code>
+
+## Files
+
+Types:
+
+- <code><a href="./src/resources/containers/files/files.ts">FileCreateResponse</a></code>
+- <code><a href="./src/resources/containers/files/files.ts">FileRetrieveResponse</a></code>
+- <code><a href="./src/resources/containers/files/files.ts">FileListResponse</a></code>
+
+Methods:
+
+- <code title="post /containers/{container_id}/files">client.containers.files.<a href="./src/resources/containers/files/files.ts">create</a>(containerID, { ...params }) -> FileCreateResponse</code>
+- <code title="get /containers/{container_id}/files/{file_id}">client.containers.files.<a href="./src/resources/containers/files/files.ts">retrieve</a>(fileID, { ...params }) -> FileRetrieveResponse</code>
+- <code title="get /containers/{container_id}/files">client.containers.files.<a href="./src/resources/containers/files/files.ts">list</a>(containerID, { ...params }) -> FileListResponsesPage</code>
+- <code title="delete /containers/{container_id}/files/{file_id}">client.containers.files.<a href="./src/resources/containers/files/files.ts">delete</a>(fileID, { ...params }) -> void</code>
+
+### Content
+
+Methods:
+
+- <code title="get /containers/{container_id}/files/{file_id}/content">client.containers.files.content.<a href="./src/resources/containers/files/content.ts">retrieve</a>(fileID, { ...params }) -> Response</code>

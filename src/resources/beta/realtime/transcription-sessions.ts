@@ -34,7 +34,7 @@ export class TranscriptionSessions extends APIResource {
  * A new Realtime transcription session configuration.
  *
  * When a session is created on the server via REST API, the session object also
- * contains an ephemeral key. Default TTL for keys is one minute. This property is
+ * contains an ephemeral key. Default TTL for keys is 10 minutes. This property is
  * not present when a session is updated via the WebSocket API.
  */
 export interface TranscriptionSession {
@@ -149,6 +149,11 @@ export namespace TranscriptionSession {
 
 export interface TranscriptionSessionCreateParams {
   /**
+   * Configuration options for the generated client secret.
+   */
+  client_secret?: TranscriptionSessionCreateParams.ClientSecret;
+
+  /**
    * The set of items to include in the transcription. Current available items are:
    *
    * - `item.input_audio_transcription.logprobs`
@@ -200,6 +205,35 @@ export interface TranscriptionSessionCreateParams {
 }
 
 export namespace TranscriptionSessionCreateParams {
+  /**
+   * Configuration options for the generated client secret.
+   */
+  export interface ClientSecret {
+    /**
+     * Configuration for the ephemeral token expiration.
+     */
+    expires_at?: ClientSecret.ExpiresAt;
+  }
+
+  export namespace ClientSecret {
+    /**
+     * Configuration for the ephemeral token expiration.
+     */
+    export interface ExpiresAt {
+      /**
+       * The anchor point for the ephemeral token expiration. Only `created_at` is
+       * currently supported.
+       */
+      anchor?: 'created_at';
+
+      /**
+       * The number of seconds from the anchor point to the expiration. Select a value
+       * between `10` and `7200`.
+       */
+      seconds?: number;
+    }
+  }
+
   /**
    * Configuration for input audio noise reduction. This can be set to `null` to turn
    * off. Noise reduction filters audio added to the input audio buffer before it is

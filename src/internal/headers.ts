@@ -71,8 +71,8 @@ function* iterateHeaders(headers: HeadersLike): IterableIterator<readonly [strin
 export const buildHeaders = (newHeaders: HeadersLike[]): NullableHeaders => {
   const targetHeaders = new Headers();
   const nullHeaders = new Set<string>();
-  const seenHeaders = new Set<string>();
   for (const headers of newHeaders) {
+    const seenHeaders = new Set<string>();
     for (const [name, value] of iterateHeaders(headers)) {
       const lowerName = name.toLowerCase();
       if (!seenHeaders.has(lowerName)) {

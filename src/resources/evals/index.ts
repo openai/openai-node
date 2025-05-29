@@ -3,10 +3,7 @@
 export {
   Evals,
   type EvalCustomDataSourceConfig,
-  type EvalLabelModelGrader,
   type EvalStoredCompletionsDataSourceConfig,
-  type EvalStringCheckGrader,
-  type EvalTextSimilarityGrader,
   type EvalCreateResponse,
   type EvalRetrieveResponse,
   type EvalUpdateResponse,

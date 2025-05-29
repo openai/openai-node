@@ -86,23 +86,30 @@ import { Audio, AudioModel, AudioResponseFormat } from './resources/audio/audio'
 import { Beta } from './resources/beta/beta';
 import { Chat } from './resources/chat/chat';
 import {
+  ContainerCreateParams,
+  ContainerCreateResponse,
+  ContainerListParams,
+  ContainerListResponse,
+  ContainerListResponsesPage,
+  ContainerRetrieveResponse,
+  Containers,
+} from './resources/containers/containers';
+import {
   EvalCreateParams,
   EvalCreateResponse,
   EvalCustomDataSourceConfig,
   EvalDeleteResponse,
-  EvalLabelModelGrader,
   EvalListParams,
   EvalListResponse,
   EvalListResponsesPage,
   EvalRetrieveResponse,
   EvalStoredCompletionsDataSourceConfig,
-  EvalStringCheckGrader,
-  EvalTextSimilarityGrader,
   EvalUpdateParams,
   EvalUpdateResponse,
   Evals,
 } from './resources/evals/evals';
 import { FineTuning } from './resources/fine-tuning/fine-tuning';
+import { Graders } from './resources/graders/graders';
 import { Responses } from './resources/responses/responses';
 import {
   Upload,
@@ -887,12 +894,14 @@ export class OpenAI {
   moderations: API.Moderations = new API.Moderations(this);
   models: API.Models = new API.Models(this);
   fineTuning: API.FineTuning = new API.FineTuning(this);
+  graders: API.Graders = new API.Graders(this);
   vectorStores: API.VectorStores = new API.VectorStores(this);
   beta: API.Beta = new API.Beta(this);
   batches: API.Batches = new API.Batches(this);
   uploads: API.Uploads = new API.Uploads(this);
   responses: API.Responses = new API.Responses(this);
   evals: API.Evals = new API.Evals(this);
+  containers: API.Containers = new API.Containers(this);
 }
 OpenAI.Completions = Completions;
 OpenAI.Chat = Chat;
@@ -903,12 +912,14 @@ OpenAI.Audio = Audio;
 OpenAI.Moderations = Moderations;
 OpenAI.Models = Models;
 OpenAI.FineTuning = FineTuning;
+OpenAI.Graders = Graders;
 OpenAI.VectorStores = VectorStores;
 OpenAI.Beta = Beta;
 OpenAI.Batches = Batches;
 OpenAI.Uploads = UploadsAPIUploads;
 OpenAI.Responses = Responses;
 OpenAI.Evals = Evals;
+OpenAI.Containers = Containers;
 export declare namespace OpenAI {
   export type RequestOptions = Opts.RequestOptions;
 
@@ -1019,6 +1030,8 @@ export declare namespace OpenAI {
 
   export { FineTuning as FineTuning };
 
+  export { Graders as Graders };
+
   export {
     VectorStores as VectorStores,
     type AutoFileChunkingStrategyParam as AutoFileChunkingStrategyParam,
@@ -1063,10 +1076,7 @@ export declare namespace OpenAI {
   export {
     Evals as Evals,
     type EvalCustomDataSourceConfig as EvalCustomDataSourceConfig,
-    type EvalLabelModelGrader as EvalLabelModelGrader,
     type EvalStoredCompletionsDataSourceConfig as EvalStoredCompletionsDataSourceConfig,
-    type EvalStringCheckGrader as EvalStringCheckGrader,
-    type EvalTextSimilarityGrader as EvalTextSimilarityGrader,
     type EvalCreateResponse as EvalCreateResponse,
     type EvalRetrieveResponse as EvalRetrieveResponse,
     type EvalUpdateResponse as EvalUpdateResponse,
@@ -1076,6 +1086,16 @@ export declare namespace OpenAI {
     type EvalCreateParams as EvalCreateParams,
     type EvalUpdateParams as EvalUpdateParams,
     type EvalListParams as EvalListParams,
+  };
+
+  export {
+    Containers as Containers,
+    type ContainerCreateResponse as ContainerCreateResponse,
+    type ContainerRetrieveResponse as ContainerRetrieveResponse,
+    type ContainerListResponse as ContainerListResponse,
+    type ContainerListResponsesPage as ContainerListResponsesPage,
+    type ContainerCreateParams as ContainerCreateParams,
+    type ContainerListParams as ContainerListParams,
   };
 
   export type AllModels = API.AllModels;

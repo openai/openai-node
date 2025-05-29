@@ -85,10 +85,10 @@ const getPlatformProperties = (): PlatformProperties => {
     return {
       'X-Stainless-Lang': 'js',
       'X-Stainless-Package-Version': VERSION,
-      'X-Stainless-OS': normalizePlatform((globalThis as any).process.platform),
-      'X-Stainless-Arch': normalizeArch((globalThis as any).process.arch),
+      'X-Stainless-OS': normalizePlatform((globalThis as any).process.platform ?? 'unknown'),
+      'X-Stainless-Arch': normalizeArch((globalThis as any).process.arch ?? 'unknown'),
       'X-Stainless-Runtime': 'node',
-      'X-Stainless-Runtime-Version': (globalThis as any).process.version,
+      'X-Stainless-Runtime-Version': (globalThis as any).process.version ?? 'unknown',
     };
   }
 

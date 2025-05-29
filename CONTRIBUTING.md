@@ -42,15 +42,15 @@ If you’d like to use the repository from source, you can either install from g
 To install via git:
 
 ```sh
-$ npm install git+ssh://git@github.com:stainless-sdks/openai-typescript.git
+$ npm install git+ssh://git@github.com:openai/openai-node.git
 ```
 
 Alternatively, to link a local copy of the repo:
 
 ```sh
 # Clone
-$ git clone https://www.github.com/stainless-sdks/openai-typescript
-$ cd openai-typescript
+$ git clone https://www.github.com/openai/openai-node
+$ cd openai-node
 
 # With yarn
 $ yarn link
@@ -91,3 +91,17 @@ To format and fix all lint issues automatically:
 ```sh
 $ yarn fix
 ```
+
+## Publishing and releases
+
+Changes made to this repository via the automated release PR pipeline should publish to npm automatically. If
+the changes aren't made through the automated pipeline, you may want to make releases manually.
+
+### Publish with a GitHub workflow
+
+You can release to package managers by using [the `Publish NPM` GitHub action](https://www.github.com/openai/openai-node/actions/workflows/publish-npm.yml). This requires a setup organization or repository secret to be set up.
+
+### Publish manually
+
+If you need to manually release a package, you can run the `bin/publish-npm` script with an `NPM_TOKEN` set on
+the environment.

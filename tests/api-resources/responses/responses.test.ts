@@ -23,6 +23,7 @@ describe('resource responses', () => {
     const response = await client.responses.create({
       input: 'string',
       model: 'gpt-4o',
+      background: true,
       include: ['file_search_call.results'],
       instructions: 'instructions',
       max_output_tokens: 0,
@@ -38,11 +39,11 @@ describe('resource responses', () => {
       tool_choice: 'none',
       tools: [
         {
-          type: 'file_search',
-          vector_store_ids: ['string'],
-          filters: { key: 'key', type: 'eq', value: 'string' },
-          max_num_results: 0,
-          ranking_options: { ranker: 'auto', score_threshold: 0 },
+          name: 'name',
+          parameters: { foo: 'bar' },
+          strict: true,
+          type: 'function',
+          description: 'description',
         },
       ],
       top_p: 1,
@@ -67,7 +68,7 @@ describe('resource responses', () => {
     await expect(
       client.responses.retrieve(
         'resp_677efb5139a88190b512bc3fef8e535d',
-        { include: ['file_search_call.results'] },
+        { include: ['file_search_call.results'], starting_after: 0, stream: false },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);
@@ -75,6 +76,17 @@ describe('resource responses', () => {
 
   test('delete', async () => {
     const responsePromise = client.responses.delete('resp_677efb5139a88190b512bc3fef8e535d');
+    const rawResponse = await responsePromise.asResponse();
+    expect(rawResponse).toBeInstanceOf(Response);
+    const response = await responsePromise;
+    expect(response).not.toBeInstanceOf(Response);
+    const dataAndResponse = await responsePromise.withResponse();
+    expect(dataAndResponse.data).toBe(response);
+    expect(dataAndResponse.response).toBe(rawResponse);
+  });
+
+  test('cancel', async () => {
+    const responsePromise = client.responses.cancel('resp_677efb5139a88190b512bc3fef8e535d');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;

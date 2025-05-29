@@ -4,19 +4,35 @@ set -eux
 
 npm config set '//registry.npmjs.org/:_authToken' "$NPM_TOKEN"
 
-# Build the project
 yarn build
-
-# Navigate to the dist directory
 cd dist
 
-# Get the version from package.json
+# Get latest version from npm
+#
+# If the package doesn't exist, yarn will return
+# {"type":"error","data":"Received invalid response from npm."}
+# where .data.version doesn't exist so LAST_VERSION will be an empty string.
+LAST_VERSION="$(yarn info --json 2> /dev/null | jq -r '.data.version')"
+
+# Get current version from package.json
 VERSION="$(node -p "require('./package.json').version")"
 
-# Extract the pre-release tag if it exists
+# Check if current version is pre-release (e.g. alpha / beta / rc)
+CURRENT_IS_PRERELEASE=false
 if [[ "$VERSION" =~ -([a-zA-Z]+) ]]; then
-  # Extract the part before any dot in the pre-release identifier
-  TAG="${BASH_REMATCH[1]}"
+  CURRENT_IS_PRERELEASE=true
+  CURRENT_TAG="${BASH_REMATCH[1]}"
+fi
+
+# Check if last version is a stable release
+LAST_IS_STABLE_RELEASE=true
+if [[ -z "$LAST_VERSION" || "$LAST_VERSION" =~ -([a-zA-Z]+) ]]; then
+  LAST_IS_STABLE_RELEASE=false
+fi
+
+# Use a corresponding alpha/beta tag if there already is a stable release and we're publishing a prerelease.
+if $CURRENT_IS_PRERELEASE && $LAST_IS_STABLE_RELEASE; then
+  TAG="$CURRENT_TAG"
 else
   TAG="latest"
 fi

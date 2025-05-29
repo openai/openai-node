@@ -21,7 +21,9 @@ export class Runs extends APIResource {
   outputItems: OutputItemsAPI.OutputItems = new OutputItemsAPI.OutputItems(this._client);
 
   /**
-   * Create a new evaluation run. This is the endpoint that will kick off grading.
+   * Kicks off a new run for a given evaluation, specifying the data source, and what
+   * model configuration to use to test. The datasource will be validated against the
+   * schema specified in the config of the evaluation.
    */
   create(evalID: string, body: RunCreateParams, options?: RequestOptions): APIPromise<RunCreateResponse> {
     return this._client.post(path`/evals/${evalID}/runs`, { body, ...options });
@@ -77,7 +79,7 @@ export type RunListResponsesPage = CursorPage<RunListResponse>;
  */
 export interface CreateEvalCompletionsRunDataSource {
   /**
-   * A StoredCompletionsRunDataSource configuration describing a set of filters
+   * Determines what populates the `item` namespace in this run's data source.
    */
   source:
     | CreateEvalCompletionsRunDataSource.FileContent
@@ -89,6 +91,12 @@ export interface CreateEvalCompletionsRunDataSource {
    */
   type: 'completions';
 
+  /**
+   * Used when sampling from a model. Dictates the structure of the messages passed
+   * into the model. Can either be a reference to a prebuilt trajectory (ie,
+   * `item.input_trajectory`), or a template with variable references to the `item`
+   * namespace.
+   */
   input_messages?:
     | CreateEvalCompletionsRunDataSource.Template
     | CreateEvalCompletionsRunDataSource.ItemReference;
@@ -177,7 +185,7 @@ export namespace CreateEvalCompletionsRunDataSource {
   export interface Template {
     /**
      * A list of chat messages forming the prompt or context. May include variable
-     * references to the "item" namespace, ie {{item.name}}.
+     * references to the `item` namespace, ie {{item.name}}.
      */
     template: Array<ResponsesAPI.EasyInputMessage | Template.Message>;
 
@@ -233,7 +241,7 @@ export namespace CreateEvalCompletionsRunDataSource {
 
   export interface ItemReference {
     /**
-     * A reference to a variable in the "item" namespace. Ie, "item.name"
+     * A reference to a variable in the `item` namespace. Ie, "item.input_trajectory"
      */
     item_reference: string;
 
@@ -271,6 +279,9 @@ export namespace CreateEvalCompletionsRunDataSource {
  * eval
  */
 export interface CreateEvalJSONLRunDataSource {
+  /**
+   * Determines what populates the `item` namespace in the data source.
+   */
   source: CreateEvalJSONLRunDataSource.FileContent | CreateEvalJSONLRunDataSource.FileID;
 
   /**
@@ -348,7 +359,7 @@ export interface RunCreateResponse {
   data_source:
     | CreateEvalJSONLRunDataSource
     | CreateEvalCompletionsRunDataSource
-    | RunCreateResponse.Completions;
+    | RunCreateResponse.Responses;
 
   /**
    * An object representing an error response from the Eval API.
@@ -415,28 +426,34 @@ export namespace RunCreateResponse {
   /**
    * A ResponsesRunDataSource object describing a model sampling configuration.
    */
-  export interface Completions {
+  export interface Responses {
     /**
-     * A EvalResponsesSource object describing a run data source configuration.
+     * Determines what populates the `item` namespace in this run's data source.
      */
-    source: Completions.FileContent | Completions.FileID | Completions.Responses;
+    source: Responses.FileContent | Responses.FileID | Responses.Responses;
 
     /**
-     * The type of run data source. Always `completions`.
+     * The type of run data source. Always `responses`.
      */
-    type: 'completions';
+    type: 'responses';
 
-    input_messages?: Completions.Template | Completions.ItemReference;
+    /**
+     * Used when sampling from a model. Dictates the structure of the messages passed
+     * into the model. Can either be a reference to a prebuilt trajectory (ie,
+     * `item.input_trajectory`), or a template with variable references to the `item`
+     * namespace.
+     */
+    input_messages?: Responses.Template | Responses.ItemReference;
 
     /**
      * The name of the model to use for generating completions (e.g. "o3-mini").
      */
     model?: string;
 
-    sampling_params?: Completions.SamplingParams;
+    sampling_params?: Responses.SamplingParams;
   }
 
-  export namespace Completions {
+  export namespace Responses {
     export interface FileContent {
       /**
        * The content of the jsonl file.
@@ -479,12 +496,6 @@ export namespace RunCreateResponse {
       type: 'responses';
 
       /**
-       * Whether to allow parallel tool calls. This is a query parameter used to select
-       * responses.
-       */
-      allow_parallel_tool_calls?: boolean | null;
-
-      /**
        * Only include items created after this timestamp (inclusive). This is a query
        * parameter used to select responses.
        */
@@ -497,14 +508,8 @@ export namespace RunCreateResponse {
       created_before?: number | null;
 
       /**
-       * Whether the response has tool calls. This is a query parameter used to select
-       * responses.
-       */
-      has_tool_calls?: boolean | null;
-
-      /**
-       * Optional search string for instructions. This is a query parameter used to
-       * select responses.
+       * Optional string to search the 'instructions' field. This is a query parameter
+       * used to select responses.
        */
       instructions_search?: string | null;
 
@@ -532,6 +537,11 @@ export namespace RunCreateResponse {
       temperature?: number | null;
 
       /**
+       * List of tool names. This is a query parameter used to select responses.
+       */
+      tools?: Array<string> | null;
+
+      /**
        * Nucleus sampling parameter. This is a query parameter used to select responses.
        */
       top_p?: number | null;
@@ -545,7 +555,7 @@ export namespace RunCreateResponse {
     export interface Template {
       /**
        * A list of chat messages forming the prompt or context. May include variable
-       * references to the "item" namespace, ie {{item.name}}.
+       * references to the `item` namespace, ie {{item.name}}.
        */
       template: Array<Template.ChatMessage | Template.EvalItem>;
 
@@ -613,7 +623,7 @@ export namespace RunCreateResponse {
 
     export interface ItemReference {
       /**
-       * A reference to a variable in the "item" namespace. Ie, "item.name"
+       * A reference to a variable in the `item` namespace. Ie, "item.name"
        */
       item_reference: string;
 
@@ -741,7 +751,7 @@ export interface RunRetrieveResponse {
   data_source:
     | CreateEvalJSONLRunDataSource
     | CreateEvalCompletionsRunDataSource
-    | RunRetrieveResponse.Completions;
+    | RunRetrieveResponse.Responses;
 
   /**
    * An object representing an error response from the Eval API.
@@ -808,28 +818,34 @@ export namespace RunRetrieveResponse {
   /**
    * A ResponsesRunDataSource object describing a model sampling configuration.
    */
-  export interface Completions {
+  export interface Responses {
     /**
-     * A EvalResponsesSource object describing a run data source configuration.
+     * Determines what populates the `item` namespace in this run's data source.
      */
-    source: Completions.FileContent | Completions.FileID | Completions.Responses;
+    source: Responses.FileContent | Responses.FileID | Responses.Responses;
 
     /**
-     * The type of run data source. Always `completions`.
+     * The type of run data source. Always `responses`.
      */
-    type: 'completions';
+    type: 'responses';
 
-    input_messages?: Completions.Template | Completions.ItemReference;
+    /**
+     * Used when sampling from a model. Dictates the structure of the messages passed
+     * into the model. Can either be a reference to a prebuilt trajectory (ie,
+     * `item.input_trajectory`), or a template with variable references to the `item`
+     * namespace.
+     */
+    input_messages?: Responses.Template | Responses.ItemReference;
 
     /**
      * The name of the model to use for generating completions (e.g. "o3-mini").
      */
     model?: string;
 
-    sampling_params?: Completions.SamplingParams;
+    sampling_params?: Responses.SamplingParams;
   }
 
-  export namespace Completions {
+  export namespace Responses {
     export interface FileContent {
       /**
        * The content of the jsonl file.
@@ -872,12 +888,6 @@ export namespace RunRetrieveResponse {
       type: 'responses';
 
       /**
-       * Whether to allow parallel tool calls. This is a query parameter used to select
-       * responses.
-       */
-      allow_parallel_tool_calls?: boolean | null;
-
-      /**
        * Only include items created after this timestamp (inclusive). This is a query
        * parameter used to select responses.
        */
@@ -890,14 +900,8 @@ export namespace RunRetrieveResponse {
       created_before?: number | null;
 
       /**
-       * Whether the response has tool calls. This is a query parameter used to select
-       * responses.
-       */
-      has_tool_calls?: boolean | null;
-
-      /**
-       * Optional search string for instructions. This is a query parameter used to
-       * select responses.
+       * Optional string to search the 'instructions' field. This is a query parameter
+       * used to select responses.
        */
       instructions_search?: string | null;
 
@@ -925,6 +929,11 @@ export namespace RunRetrieveResponse {
       temperature?: number | null;
 
       /**
+       * List of tool names. This is a query parameter used to select responses.
+       */
+      tools?: Array<string> | null;
+
+      /**
        * Nucleus sampling parameter. This is a query parameter used to select responses.
        */
       top_p?: number | null;
@@ -938,7 +947,7 @@ export namespace RunRetrieveResponse {
     export interface Template {
       /**
        * A list of chat messages forming the prompt or context. May include variable
-       * references to the "item" namespace, ie {{item.name}}.
+       * references to the `item` namespace, ie {{item.name}}.
        */
       template: Array<Template.ChatMessage | Template.EvalItem>;
 
@@ -1006,7 +1015,7 @@ export namespace RunRetrieveResponse {
 
     export interface ItemReference {
       /**
-       * A reference to a variable in the "item" namespace. Ie, "item.name"
+       * A reference to a variable in the `item` namespace. Ie, "item.name"
        */
       item_reference: string;
 
@@ -1131,10 +1140,7 @@ export interface RunListResponse {
   /**
    * Information about the run's data source.
    */
-  data_source:
-    | CreateEvalJSONLRunDataSource
-    | CreateEvalCompletionsRunDataSource
-    | RunListResponse.Completions;
+  data_source: CreateEvalJSONLRunDataSource | CreateEvalCompletionsRunDataSource | RunListResponse.Responses;
 
   /**
    * An object representing an error response from the Eval API.
@@ -1201,28 +1207,34 @@ export namespace RunListResponse {
   /**
    * A ResponsesRunDataSource object describing a model sampling configuration.
    */
-  export interface Completions {
+  export interface Responses {
     /**
-     * A EvalResponsesSource object describing a run data source configuration.
+     * Determines what populates the `item` namespace in this run's data source.
      */
-    source: Completions.FileContent | Completions.FileID | Completions.Responses;
+    source: Responses.FileContent | Responses.FileID | Responses.Responses;
 
     /**
-     * The type of run data source. Always `completions`.
+     * The type of run data source. Always `responses`.
      */
-    type: 'completions';
+    type: 'responses';
 
-    input_messages?: Completions.Template | Completions.ItemReference;
+    /**
+     * Used when sampling from a model. Dictates the structure of the messages passed
+     * into the model. Can either be a reference to a prebuilt trajectory (ie,
+     * `item.input_trajectory`), or a template with variable references to the `item`
+     * namespace.
+     */
+    input_messages?: Responses.Template | Responses.ItemReference;
 
     /**
      * The name of the model to use for generating completions (e.g. "o3-mini").
      */
     model?: string;
 
-    sampling_params?: Completions.SamplingParams;
+    sampling_params?: Responses.SamplingParams;
   }
 
-  export namespace Completions {
+  export namespace Responses {
     export interface FileContent {
       /**
        * The content of the jsonl file.
@@ -1265,12 +1277,6 @@ export namespace RunListResponse {
       type: 'responses';
 
       /**
-       * Whether to allow parallel tool calls. This is a query parameter used to select
-       * responses.
-       */
-      allow_parallel_tool_calls?: boolean | null;
-
-      /**
        * Only include items created after this timestamp (inclusive). This is a query
        * parameter used to select responses.
        */
@@ -1283,14 +1289,8 @@ export namespace RunListResponse {
       created_before?: number | null;
 
       /**
-       * Whether the response has tool calls. This is a query parameter used to select
-       * responses.
-       */
-      has_tool_calls?: boolean | null;
-
-      /**
-       * Optional search string for instructions. This is a query parameter used to
-       * select responses.
+       * Optional string to search the 'instructions' field. This is a query parameter
+       * used to select responses.
        */
       instructions_search?: string | null;
 
@@ -1318,6 +1318,11 @@ export namespace RunListResponse {
       temperature?: number | null;
 
       /**
+       * List of tool names. This is a query parameter used to select responses.
+       */
+      tools?: Array<string> | null;
+
+      /**
        * Nucleus sampling parameter. This is a query parameter used to select responses.
        */
       top_p?: number | null;
@@ -1331,7 +1336,7 @@ export namespace RunListResponse {
     export interface Template {
       /**
        * A list of chat messages forming the prompt or context. May include variable
-       * references to the "item" namespace, ie {{item.name}}.
+       * references to the `item` namespace, ie {{item.name}}.
        */
       template: Array<Template.ChatMessage | Template.EvalItem>;
 
@@ -1399,7 +1404,7 @@ export namespace RunListResponse {
 
     export interface ItemReference {
       /**
-       * A reference to a variable in the "item" namespace. Ie, "item.name"
+       * A reference to a variable in the `item` namespace. Ie, "item.name"
        */
       item_reference: string;
 
@@ -1535,7 +1540,7 @@ export interface RunCancelResponse {
   data_source:
     | CreateEvalJSONLRunDataSource
     | CreateEvalCompletionsRunDataSource
-    | RunCancelResponse.Completions;
+    | RunCancelResponse.Responses;
 
   /**
    * An object representing an error response from the Eval API.
@@ -1602,28 +1607,34 @@ export namespace RunCancelResponse {
   /**
    * A ResponsesRunDataSource object describing a model sampling configuration.
    */
-  export interface Completions {
+  export interface Responses {
     /**
-     * A EvalResponsesSource object describing a run data source configuration.
+     * Determines what populates the `item` namespace in this run's data source.
      */
-    source: Completions.FileContent | Completions.FileID | Completions.Responses;
+    source: Responses.FileContent | Responses.FileID | Responses.Responses;
 
     /**
-     * The type of run data source. Always `completions`.
+     * The type of run data source. Always `responses`.
      */
-    type: 'completions';
+    type: 'responses';
 
-    input_messages?: Completions.Template | Completions.ItemReference;
+    /**
+     * Used when sampling from a model. Dictates the structure of the messages passed
+     * into the model. Can either be a reference to a prebuilt trajectory (ie,
+     * `item.input_trajectory`), or a template with variable references to the `item`
+     * namespace.
+     */
+    input_messages?: Responses.Template | Responses.ItemReference;
 
     /**
      * The name of the model to use for generating completions (e.g. "o3-mini").
      */
     model?: string;
 
-    sampling_params?: Completions.SamplingParams;
+    sampling_params?: Responses.SamplingParams;
   }
 
-  export namespace Completions {
+  export namespace Responses {
     export interface FileContent {
       /**
        * The content of the jsonl file.
@@ -1666,12 +1677,6 @@ export namespace RunCancelResponse {
       type: 'responses';
 
       /**
-       * Whether to allow parallel tool calls. This is a query parameter used to select
-       * responses.
-       */
-      allow_parallel_tool_calls?: boolean | null;
-
-      /**
        * Only include items created after this timestamp (inclusive). This is a query
        * parameter used to select responses.
        */
@@ -1684,14 +1689,8 @@ export namespace RunCancelResponse {
       created_before?: number | null;
 
       /**
-       * Whether the response has tool calls. This is a query parameter used to select
-       * responses.
-       */
-      has_tool_calls?: boolean | null;
-
-      /**
-       * Optional search string for instructions. This is a query parameter used to
-       * select responses.
+       * Optional string to search the 'instructions' field. This is a query parameter
+       * used to select responses.
        */
       instructions_search?: string | null;
 
@@ -1719,6 +1718,11 @@ export namespace RunCancelResponse {
       temperature?: number | null;
 
       /**
+       * List of tool names. This is a query parameter used to select responses.
+       */
+      tools?: Array<string> | null;
+
+      /**
        * Nucleus sampling parameter. This is a query parameter used to select responses.
        */
       top_p?: number | null;
@@ -1732,7 +1736,7 @@ export namespace RunCancelResponse {
     export interface Template {
       /**
        * A list of chat messages forming the prompt or context. May include variable
-       * references to the "item" namespace, ie {{item.name}}.
+       * references to the `item` namespace, ie {{item.name}}.
        */
       template: Array<Template.ChatMessage | Template.EvalItem>;
 
@@ -1800,7 +1804,7 @@ export namespace RunCancelResponse {
 
     export interface ItemReference {
       /**
-       * A reference to a variable in the "item" namespace. Ie, "item.name"
+       * A reference to a variable in the `item` namespace. Ie, "item.name"
        */
       item_reference: string;
 
@@ -1939,7 +1943,7 @@ export namespace RunCreateParams {
    */
   export interface CreateEvalResponsesRunDataSource {
     /**
-     * A EvalResponsesSource object describing a run data source configuration.
+     * Determines what populates the `item` namespace in this run's data source.
      */
     source:
       | CreateEvalResponsesRunDataSource.FileContent
@@ -1947,10 +1951,16 @@ export namespace RunCreateParams {
       | CreateEvalResponsesRunDataSource.Responses;
 
     /**
-     * The type of run data source. Always `completions`.
+     * The type of run data source. Always `responses`.
      */
-    type: 'completions';
+    type: 'responses';
 
+    /**
+     * Used when sampling from a model. Dictates the structure of the messages passed
+     * into the model. Can either be a reference to a prebuilt trajectory (ie,
+     * `item.input_trajectory`), or a template with variable references to the `item`
+     * namespace.
+     */
     input_messages?:
       | CreateEvalResponsesRunDataSource.Template
       | CreateEvalResponsesRunDataSource.ItemReference;
@@ -2006,12 +2016,6 @@ export namespace RunCreateParams {
       type: 'responses';
 
       /**
-       * Whether to allow parallel tool calls. This is a query parameter used to select
-       * responses.
-       */
-      allow_parallel_tool_calls?: boolean | null;
-
-      /**
        * Only include items created after this timestamp (inclusive). This is a query
        * parameter used to select responses.
        */
@@ -2024,14 +2028,8 @@ export namespace RunCreateParams {
       created_before?: number | null;
 
       /**
-       * Whether the response has tool calls. This is a query parameter used to select
-       * responses.
-       */
-      has_tool_calls?: boolean | null;
-
-      /**
-       * Optional search string for instructions. This is a query parameter used to
-       * select responses.
+       * Optional string to search the 'instructions' field. This is a query parameter
+       * used to select responses.
        */
       instructions_search?: string | null;
 
@@ -2059,6 +2057,11 @@ export namespace RunCreateParams {
       temperature?: number | null;
 
       /**
+       * List of tool names. This is a query parameter used to select responses.
+       */
+      tools?: Array<string> | null;
+
+      /**
        * Nucleus sampling parameter. This is a query parameter used to select responses.
        */
       top_p?: number | null;
@@ -2072,7 +2075,7 @@ export namespace RunCreateParams {
     export interface Template {
       /**
        * A list of chat messages forming the prompt or context. May include variable
-       * references to the "item" namespace, ie {{item.name}}.
+       * references to the `item` namespace, ie {{item.name}}.
        */
       template: Array<Template.ChatMessage | Template.EvalItem>;
 
@@ -2140,7 +2143,7 @@ export namespace RunCreateParams {
 
     export interface ItemReference {
       /**
-       * A reference to a variable in the "item" namespace. Ie, "item.name"
+       * A reference to a variable in the `item` namespace. Ie, "item.name"
        */
       item_reference: string;
 

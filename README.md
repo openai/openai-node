@@ -1,6 +1,6 @@
 # OpenAI TypeScript and JavaScript API Library
 
-[![NPM version](https://img.shields.io/npm/v/openai.svg)](https://npmjs.org/package/openai) ![npm bundle size](https://img.shields.io/bundlephobia/minzip/openai)
+[![NPM version](https://img.shields.io/npm/v/openai.svg)](https://npmjs.org/package/openai) ![npm bundle size](https://img.shields.io/bundlephobia/minzip/openai) [![JSR Version](https://jsr.io/badges/@openai/openai)](https://jsr.io/@openai/openai)
 
 This library provides convenient access to the OpenAI REST API from server-side TypeScript or JavaScript.
 
@@ -9,11 +9,23 @@ The REST API documentation can be found on [platform.openai.com](https://platfor
 ## Installation
 
 ```sh
-npm install git+ssh://git@github.com:stainless-sdks/openai-typescript.git
+npm install openai
 ```
 
-> [!NOTE]
-> Once this package is [published to npm](https://app.stainless.com/docs/guides/publish), this will become: `npm install openai`
+### Installation from JSR
+
+```sh
+deno add jsr:@openai/openai
+npx jsr add @openai/openai
+```
+
+These commands will make the module importable from the `@openai/openai` scope:
+
+You can also [import directly from JSR](https://jsr.io/docs/using-packages#importing-with-jsr-specifiers) without an install step if you're using the Deno JavaScript runtime:
+
+```ts
+import OpenAI from 'jsr:@openai/openai';
+```
 
 ## Usage
 
@@ -423,7 +435,7 @@ const client = new OpenAI({
 <img src="https://raw.githubusercontent.com/stainless-api/sdk-assets/refs/heads/main/deno.svg" align="top" width="18" height="21"> **Deno** <sup>[[docs](https://docs.deno.com/api/deno/~/Deno.createHttpClient)]</sup>
 
 ```ts
-import OpenAI from 'npm:openai';
+import OpenAI from 'jsr:@openai/openai';
 
 const httpClient = Deno.createHttpClient({ proxy: { url: 'http://localhost:8888' } });
 const client = new OpenAI({
@@ -445,7 +457,7 @@ This package generally follows [SemVer](https://semver.org/spec/v2.0.0.html) con
 
 We take backwards-compatibility seriously and work hard to ensure you can rely on a smooth upgrade experience.
 
-We are keen for your feedback; please open an [issue](https://www.github.com/stainless-sdks/openai-typescript/issues) with questions, bugs, or suggestions.
+We are keen for your feedback; please open an [issue](https://www.github.com/openai/openai-node/issues) with questions, bugs, or suggestions.
 
 ## Requirements
 

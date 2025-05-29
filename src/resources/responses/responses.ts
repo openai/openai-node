@@ -66,10 +66,29 @@ export class Responses extends APIResource {
    */
   retrieve(
     responseID: string,
-    query: ResponseRetrieveParams | null | undefined = {},
+    query?: ResponseRetrieveParamsNonStreaming,
     options?: RequestOptions,
-  ): APIPromise<Response> {
-    return this._client.get(path`/responses/${responseID}`, { query, ...options });
+  ): APIPromise<Response>;
+  retrieve(
+    responseID: string,
+    query: ResponseRetrieveParamsStreaming,
+    options?: RequestOptions,
+  ): APIPromise<Stream<ResponseStreamEvent>>;
+  retrieve(
+    responseID: string,
+    query?: ResponseRetrieveParamsBase | undefined,
+    options?: RequestOptions,
+  ): APIPromise<Stream<ResponseStreamEvent> | Response>;
+  retrieve(
+    responseID: string,
+    query: ResponseRetrieveParams | undefined = {},
+    options?: RequestOptions,
+  ): APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>> {
+    return this._client.get(path`/responses/${responseID}`, {
+      query,
+      ...options,
+      stream: query?.stream ?? false,
+    }) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>;
   }
 
   /**
@@ -84,6 +103,25 @@ export class Responses extends APIResource {
    */
   delete(responseID: string, options?: RequestOptions): APIPromise<void> {
     return this._client.delete(path`/responses/${responseID}`, {
+      ...options,
+      headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
+    });
+  }
+
+  /**
+   * Cancels a model response with the given ID. Only responses created with the
+   * `background` parameter set to `true` can be cancelled.
+   * [Learn more](https://platform.openai.com/docs/guides/background).
+   *
+   * @example
+   * ```ts
+   * await client.responses.cancel(
+   *   'resp_677efb5139a88190b512bc3fef8e535d',
+   * );
+   * ```
+   */
+  cancel(responseID: string, options?: RequestOptions): APIPromise<void> {
+    return this._client.post(path`/responses/${responseID}/cancel`, {
       ...options,
       headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
     });
@@ -343,6 +381,12 @@ export interface Response {
   top_p: number | null;
 
   /**
+   * Whether to run the model response in the background.
+   * [Learn more](https://platform.openai.com/docs/guides/background).
+   */
+  background?: boolean | null;
+
+  /**
    * An upper bound for the number of tokens that can be generated for a response,
    * including visible output tokens and
    * [reasoning tokens](https://platform.openai.com/docs/guides/reasoning).
@@ -387,7 +431,7 @@ export interface Response {
 
   /**
    * The status of the response generation. One of `completed`, `failed`,
-   * `in_progress`, or `incomplete`.
+   * `in_progress`, `cancelled`, `queued`, or `incomplete`.
    */
   status?: ResponseStatus;
 
@@ -418,8 +462,8 @@ export interface Response {
   usage?: ResponseUsage;
 
   /**
-   * A unique identifier representing your end-user, which can help OpenAI to monitor
-   * and detect abuse.
+   * A stable identifier for your end-users. Used to boost cache hit rates by better
+   * bucketing similar requests and to help OpenAI detect and prevent abuse.
    * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#end-user-ids).
    */
   user?: string;
@@ -447,6 +491,11 @@ export interface ResponseAudioDeltaEvent {
   delta: string;
 
   /**
+   * A sequence number for this chunk of the stream response.
+   */
+  sequence_number: number;
+
+  /**
    * The type of the event. Always `response.audio.delta`.
    */
   type: 'response.audio.delta';
@@ -456,6 +505,11 @@ export interface ResponseAudioDeltaEvent {
  * Emitted when the audio response is complete.
  */
 export interface ResponseAudioDoneEvent {
+  /**
+   * The sequence number of the delta.
+   */
+  sequence_number: number;
+
   /**
    * The type of the event. Always `response.audio.done`.
    */
@@ -472,6 +526,11 @@ export interface ResponseAudioTranscriptDeltaEvent {
   delta: string;
 
   /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
    * The type of the event. Always `response.audio.transcript.delta`.
    */
   type: 'response.audio.transcript.delta';
@@ -481,6 +540,11 @@ export interface ResponseAudioTranscriptDeltaEvent {
  * Emitted when the full audio transcript is completed.
  */
 export interface ResponseAudioTranscriptDoneEvent {
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
   /**
    * The type of the event. Always `response.audio.transcript.done`.
    */
@@ -500,6 +564,11 @@ export interface ResponseCodeInterpreterCallCodeDeltaEvent {
    * The index of the output item that the code interpreter call is in progress.
    */
   output_index: number;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
 
   /**
    * The type of the event. Always `response.code_interpreter_call.code.delta`.
@@ -522,6 +591,11 @@ export interface ResponseCodeInterpreterCallCodeDoneEvent {
   output_index: number;
 
   /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
    * The type of the event. Always `response.code_interpreter_call.code.done`.
    */
   type: 'response.code_interpreter_call.code.done';
@@ -540,6 +614,11 @@ export interface ResponseCodeInterpreterCallCompletedEvent {
    * The index of the output item that the code interpreter call is in progress.
    */
   output_index: number;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
 
   /**
    * The type of the event. Always `response.code_interpreter_call.completed`.
@@ -562,6 +641,11 @@ export interface ResponseCodeInterpreterCallInProgressEvent {
   output_index: number;
 
   /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
    * The type of the event. Always `response.code_interpreter_call.in_progress`.
    */
   type: 'response.code_interpreter_call.in_progress';
@@ -580,6 +664,11 @@ export interface ResponseCodeInterpreterCallInterpretingEvent {
    * The index of the output item that the code interpreter call is in progress.
    */
   output_index: number;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
 
   /**
    * The type of the event. Always `response.code_interpreter_call.interpreting`.
@@ -615,6 +704,11 @@ export interface ResponseCodeInterpreterToolCall {
    * The type of the code interpreter tool call. Always `code_interpreter_call`.
    */
   type: 'code_interpreter_call';
+
+  /**
+   * The ID of the container used to run the code.
+   */
+  container_id?: string;
 }
 
 export namespace ResponseCodeInterpreterToolCall {
@@ -668,6 +762,11 @@ export interface ResponseCompletedEvent {
    * Properties of the completed response.
    */
   response: Response;
+
+  /**
+   * The sequence number for this event.
+   */
+  sequence_number: number;
 
   /**
    * The type of the event. Always `response.completed`.
@@ -1052,6 +1151,11 @@ export interface ResponseContentPartAddedEvent {
   part: ResponseOutputText | ResponseOutputRefusal;
 
   /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
    * The type of the event. Always `response.content_part.added`.
    */
   type: 'response.content_part.added';
@@ -1082,6 +1186,11 @@ export interface ResponseContentPartDoneEvent {
   part: ResponseOutputText | ResponseOutputRefusal;
 
   /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
    * The type of the event. Always `response.content_part.done`.
    */
   type: 'response.content_part.done';
@@ -1095,6 +1204,11 @@ export interface ResponseCreatedEvent {
    * The response that was created.
    */
   response: Response;
+
+  /**
+   * The sequence number for this event.
+   */
+  sequence_number: number;
 
   /**
    * The type of the event. Always `response.created`.
@@ -1155,6 +1269,11 @@ export interface ResponseErrorEvent {
   param: string | null;
 
   /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
    * The type of the event. Always `error`.
    */
   type: 'error';
@@ -1168,6 +1287,11 @@ export interface ResponseFailedEvent {
    * The response that failed.
    */
   response: Response;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
 
   /**
    * The type of the event. Always `response.failed`.
@@ -1190,6 +1314,11 @@ export interface ResponseFileSearchCallCompletedEvent {
   output_index: number;
 
   /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
    * The type of the event. Always `response.file_search_call.completed`.
    */
   type: 'response.file_search_call.completed';
@@ -1210,6 +1339,11 @@ export interface ResponseFileSearchCallInProgressEvent {
   output_index: number;
 
   /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
    * The type of the event. Always `response.file_search_call.in_progress`.
    */
   type: 'response.file_search_call.in_progress';
@@ -1228,6 +1362,11 @@ export interface ResponseFileSearchCallSearchingEvent {
    * The index of the output item that the file search call is searching.
    */
   output_index: number;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
 
   /**
    * The type of the event. Always `response.file_search_call.searching`.
@@ -1380,6 +1519,11 @@ export interface ResponseFunctionCallArgumentsDeltaEvent {
   output_index: number;
 
   /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
    * The type of the event. Always `response.function_call_arguments.delta`.
    */
   type: 'response.function_call_arguments.delta';
@@ -1403,6 +1547,11 @@ export interface ResponseFunctionCallArgumentsDoneEvent {
    * The index of the output item.
    */
   output_index: number;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
 
   type: 'response.function_call_arguments.done';
 }
@@ -1508,6 +1657,119 @@ export interface ResponseFunctionWebSearch {
 }
 
 /**
+ * Emitted when an image generation tool call has completed and the final image is
+ * available.
+ */
+export interface ResponseImageGenCallCompletedEvent {
+  /**
+   * The unique identifier of the image generation item being processed.
+   */
+  item_id: string;
+
+  /**
+   * The index of the output item in the response's output array.
+   */
+  output_index: number;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
+   * The type of the event. Always 'response.image_generation_call.completed'.
+   */
+  type: 'response.image_generation_call.completed';
+}
+
+/**
+ * Emitted when an image generation tool call is actively generating an image
+ * (intermediate state).
+ */
+export interface ResponseImageGenCallGeneratingEvent {
+  /**
+   * The unique identifier of the image generation item being processed.
+   */
+  item_id: string;
+
+  /**
+   * The index of the output item in the response's output array.
+   */
+  output_index: number;
+
+  /**
+   * The sequence number of the image generation item being processed.
+   */
+  sequence_number: number;
+
+  /**
+   * The type of the event. Always 'response.image_generation_call.generating'.
+   */
+  type: 'response.image_generation_call.generating';
+}
+
+/**
+ * Emitted when an image generation tool call is in progress.
+ */
+export interface ResponseImageGenCallInProgressEvent {
+  /**
+   * The unique identifier of the image generation item being processed.
+   */
+  item_id: string;
+
+  /**
+   * The index of the output item in the response's output array.
+   */
+  output_index: number;
+
+  /**
+   * The sequence number of the image generation item being processed.
+   */
+  sequence_number: number;
+
+  /**
+   * The type of the event. Always 'response.image_generation_call.in_progress'.
+   */
+  type: 'response.image_generation_call.in_progress';
+}
+
+/**
+ * Emitted when a partial image is available during image generation streaming.
+ */
+export interface ResponseImageGenCallPartialImageEvent {
+  /**
+   * The unique identifier of the image generation item being processed.
+   */
+  item_id: string;
+
+  /**
+   * The index of the output item in the response's output array.
+   */
+  output_index: number;
+
+  /**
+   * Base64-encoded partial image data, suitable for rendering as an image.
+   */
+  partial_image_b64: string;
+
+  /**
+   * 0-based index for the partial image (backend is 1-based, but this is 0-based for
+   * the user).
+   */
+  partial_image_index: number;
+
+  /**
+   * The sequence number of the image generation item being processed.
+   */
+  sequence_number: number;
+
+  /**
+   * The type of the event. Always 'response.image_generation_call.partial_image'.
+   */
+  type: 'response.image_generation_call.partial_image';
+}
+
+/**
  * Emitted when the response is in progress.
  */
 export interface ResponseInProgressEvent {
@@ -1515,6 +1777,11 @@ export interface ResponseInProgressEvent {
    * The response that is in progress.
    */
   response: Response;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
 
   /**
    * The type of the event. Always `response.in_progress`.
@@ -1551,6 +1818,11 @@ export interface ResponseIncompleteEvent {
    * The response that was incomplete.
    */
   response: Response;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
 
   /**
    * The type of the event. Always `response.incomplete`.
@@ -1660,6 +1932,14 @@ export type ResponseInputItem =
   | ResponseFunctionToolCall
   | ResponseInputItem.FunctionCallOutput
   | ResponseReasoningItem
+  | ResponseInputItem.ImageGenerationCall
+  | ResponseCodeInterpreterToolCall
+  | ResponseInputItem.LocalShellCall
+  | ResponseInputItem.LocalShellCallOutput
+  | ResponseInputItem.McpListTools
+  | ResponseInputItem.McpApprovalRequest
+  | ResponseInputItem.McpApprovalResponse
+  | ResponseInputItem.McpCall
   | ResponseInputItem.ItemReference;
 
 export namespace ResponseInputItem {
@@ -1784,6 +2064,280 @@ export namespace ResponseInputItem {
   }
 
   /**
+   * An image generation request made by the model.
+   */
+  export interface ImageGenerationCall {
+    /**
+     * The unique ID of the image generation call.
+     */
+    id: string;
+
+    /**
+     * The generated image encoded in base64.
+     */
+    result: string | null;
+
+    /**
+     * The status of the image generation call.
+     */
+    status: 'in_progress' | 'completed' | 'generating' | 'failed';
+
+    /**
+     * The type of the image generation call. Always `image_generation_call`.
+     */
+    type: 'image_generation_call';
+  }
+
+  /**
+   * A tool call to run a command on the local shell.
+   */
+  export interface LocalShellCall {
+    /**
+     * The unique ID of the local shell call.
+     */
+    id: string;
+
+    /**
+     * Execute a shell command on the server.
+     */
+    action: LocalShellCall.Action;
+
+    /**
+     * The unique ID of the local shell tool call generated by the model.
+     */
+    call_id: string;
+
+    /**
+     * The status of the local shell call.
+     */
+    status: 'in_progress' | 'completed' | 'incomplete';
+
+    /**
+     * The type of the local shell call. Always `local_shell_call`.
+     */
+    type: 'local_shell_call';
+  }
+
+  export namespace LocalShellCall {
+    /**
+     * Execute a shell command on the server.
+     */
+    export interface Action {
+      /**
+       * The command to run.
+       */
+      command: Array<string>;
+
+      /**
+       * Environment variables to set for the command.
+       */
+      env: Record<string, string>;
+
+      /**
+       * The type of the local shell action. Always `exec`.
+       */
+      type: 'exec';
+
+      /**
+       * Optional timeout in milliseconds for the command.
+       */
+      timeout_ms?: number | null;
+
+      /**
+       * Optional user to run the command as.
+       */
+      user?: string | null;
+
+      /**
+       * Optional working directory to run the command in.
+       */
+      working_directory?: string | null;
+    }
+  }
+
+  /**
+   * The output of a local shell tool call.
+   */
+  export interface LocalShellCallOutput {
+    /**
+     * The unique ID of the local shell tool call generated by the model.
+     */
+    id: string;
+
+    /**
+     * A JSON string of the output of the local shell tool call.
+     */
+    output: string;
+
+    /**
+     * The type of the local shell tool call output. Always `local_shell_call_output`.
+     */
+    type: 'local_shell_call_output';
+
+    /**
+     * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
+     */
+    status?: 'in_progress' | 'completed' | 'incomplete' | null;
+  }
+
+  /**
+   * A list of tools available on an MCP server.
+   */
+  export interface McpListTools {
+    /**
+     * The unique ID of the list.
+     */
+    id: string;
+
+    /**
+     * The label of the MCP server.
+     */
+    server_label: string;
+
+    /**
+     * The tools available on the server.
+     */
+    tools: Array<McpListTools.Tool>;
+
+    /**
+     * The type of the item. Always `mcp_list_tools`.
+     */
+    type: 'mcp_list_tools';
+
+    /**
+     * Error message if the server could not list tools.
+     */
+    error?: string | null;
+  }
+
+  export namespace McpListTools {
+    /**
+     * A tool available on an MCP server.
+     */
+    export interface Tool {
+      /**
+       * The JSON schema describing the tool's input.
+       */
+      input_schema: unknown;
+
+      /**
+       * The name of the tool.
+       */
+      name: string;
+
+      /**
+       * Additional annotations about the tool.
+       */
+      annotations?: unknown | null;
+
+      /**
+       * The description of the tool.
+       */
+      description?: string | null;
+    }
+  }
+
+  /**
+   * A request for human approval of a tool invocation.
+   */
+  export interface McpApprovalRequest {
+    /**
+     * The unique ID of the approval request.
+     */
+    id: string;
+
+    /**
+     * A JSON string of arguments for the tool.
+     */
+    arguments: string;
+
+    /**
+     * The name of the tool to run.
+     */
+    name: string;
+
+    /**
+     * The label of the MCP server making the request.
+     */
+    server_label: string;
+
+    /**
+     * The type of the item. Always `mcp_approval_request`.
+     */
+    type: 'mcp_approval_request';
+  }
+
+  /**
+   * A response to an MCP approval request.
+   */
+  export interface McpApprovalResponse {
+    /**
+     * The ID of the approval request being answered.
+     */
+    approval_request_id: string;
+
+    /**
+     * Whether the request was approved.
+     */
+    approve: boolean;
+
+    /**
+     * The type of the item. Always `mcp_approval_response`.
+     */
+    type: 'mcp_approval_response';
+
+    /**
+     * The unique ID of the approval response
+     */
+    id?: string | null;
+
+    /**
+     * Optional reason for the decision.
+     */
+    reason?: string | null;
+  }
+
+  /**
+   * An invocation of a tool on an MCP server.
+   */
+  export interface McpCall {
+    /**
+     * The unique ID of the tool call.
+     */
+    id: string;
+
+    /**
+     * A JSON string of the arguments passed to the tool.
+     */
+    arguments: string;
+
+    /**
+     * The name of the tool that was run.
+     */
+    name: string;
+
+    /**
+     * The label of the MCP server running the tool.
+     */
+    server_label: string;
+
+    /**
+     * The type of the item. Always `mcp_call`.
+     */
+    type: 'mcp_call';
+
+    /**
+     * The error from the tool call, if any.
+     */
+    error?: string | null;
+
+    /**
+     * The output from the tool call.
+     */
+    output?: string | null;
+  }
+
+  /**
    * An internal identifier for an item to reference.
    */
   export interface ItemReference {
@@ -1860,7 +2414,453 @@ export type ResponseItem =
   | ResponseComputerToolCallOutputItem
   | ResponseFunctionWebSearch
   | ResponseFunctionToolCallItem
-  | ResponseFunctionToolCallOutputItem;
+  | ResponseFunctionToolCallOutputItem
+  | ResponseItem.ImageGenerationCall
+  | ResponseCodeInterpreterToolCall
+  | ResponseItem.LocalShellCall
+  | ResponseItem.LocalShellCallOutput
+  | ResponseItem.McpListTools
+  | ResponseItem.McpApprovalRequest
+  | ResponseItem.McpApprovalResponse
+  | ResponseItem.McpCall;
+
+export namespace ResponseItem {
+  /**
+   * An image generation request made by the model.
+   */
+  export interface ImageGenerationCall {
+    /**
+     * The unique ID of the image generation call.
+     */
+    id: string;
+
+    /**
+     * The generated image encoded in base64.
+     */
+    result: string | null;
+
+    /**
+     * The status of the image generation call.
+     */
+    status: 'in_progress' | 'completed' | 'generating' | 'failed';
+
+    /**
+     * The type of the image generation call. Always `image_generation_call`.
+     */
+    type: 'image_generation_call';
+  }
+
+  /**
+   * A tool call to run a command on the local shell.
+   */
+  export interface LocalShellCall {
+    /**
+     * The unique ID of the local shell call.
+     */
+    id: string;
+
+    /**
+     * Execute a shell command on the server.
+     */
+    action: LocalShellCall.Action;
+
+    /**
+     * The unique ID of the local shell tool call generated by the model.
+     */
+    call_id: string;
+
+    /**
+     * The status of the local shell call.
+     */
+    status: 'in_progress' | 'completed' | 'incomplete';
+
+    /**
+     * The type of the local shell call. Always `local_shell_call`.
+     */
+    type: 'local_shell_call';
+  }
+
+  export namespace LocalShellCall {
+    /**
+     * Execute a shell command on the server.
+     */
+    export interface Action {
+      /**
+       * The command to run.
+       */
+      command: Array<string>;
+
+      /**
+       * Environment variables to set for the command.
+       */
+      env: Record<string, string>;
+
+      /**
+       * The type of the local shell action. Always `exec`.
+       */
+      type: 'exec';
+
+      /**
+       * Optional timeout in milliseconds for the command.
+       */
+      timeout_ms?: number | null;
+
+      /**
+       * Optional user to run the command as.
+       */
+      user?: string | null;
+
+      /**
+       * Optional working directory to run the command in.
+       */
+      working_directory?: string | null;
+    }
+  }
+
+  /**
+   * The output of a local shell tool call.
+   */
+  export interface LocalShellCallOutput {
+    /**
+     * The unique ID of the local shell tool call generated by the model.
+     */
+    id: string;
+
+    /**
+     * A JSON string of the output of the local shell tool call.
+     */
+    output: string;
+
+    /**
+     * The type of the local shell tool call output. Always `local_shell_call_output`.
+     */
+    type: 'local_shell_call_output';
+
+    /**
+     * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
+     */
+    status?: 'in_progress' | 'completed' | 'incomplete' | null;
+  }
+
+  /**
+   * A list of tools available on an MCP server.
+   */
+  export interface McpListTools {
+    /**
+     * The unique ID of the list.
+     */
+    id: string;
+
+    /**
+     * The label of the MCP server.
+     */
+    server_label: string;
+
+    /**
+     * The tools available on the server.
+     */
+    tools: Array<McpListTools.Tool>;
+
+    /**
+     * The type of the item. Always `mcp_list_tools`.
+     */
+    type: 'mcp_list_tools';
+
+    /**
+     * Error message if the server could not list tools.
+     */
+    error?: string | null;
+  }
+
+  export namespace McpListTools {
+    /**
+     * A tool available on an MCP server.
+     */
+    export interface Tool {
+      /**
+       * The JSON schema describing the tool's input.
+       */
+      input_schema: unknown;
+
+      /**
+       * The name of the tool.
+       */
+      name: string;
+
+      /**
+       * Additional annotations about the tool.
+       */
+      annotations?: unknown | null;
+
+      /**
+       * The description of the tool.
+       */
+      description?: string | null;
+    }
+  }
+
+  /**
+   * A request for human approval of a tool invocation.
+   */
+  export interface McpApprovalRequest {
+    /**
+     * The unique ID of the approval request.
+     */
+    id: string;
+
+    /**
+     * A JSON string of arguments for the tool.
+     */
+    arguments: string;
+
+    /**
+     * The name of the tool to run.
+     */
+    name: string;
+
+    /**
+     * The label of the MCP server making the request.
+     */
+    server_label: string;
+
+    /**
+     * The type of the item. Always `mcp_approval_request`.
+     */
+    type: 'mcp_approval_request';
+  }
+
+  /**
+   * A response to an MCP approval request.
+   */
+  export interface McpApprovalResponse {
+    /**
+     * The unique ID of the approval response
+     */
+    id: string;
+
+    /**
+     * The ID of the approval request being answered.
+     */
+    approval_request_id: string;
+
+    /**
+     * Whether the request was approved.
+     */
+    approve: boolean;
+
+    /**
+     * The type of the item. Always `mcp_approval_response`.
+     */
+    type: 'mcp_approval_response';
+
+    /**
+     * Optional reason for the decision.
+     */
+    reason?: string | null;
+  }
+
+  /**
+   * An invocation of a tool on an MCP server.
+   */
+  export interface McpCall {
+    /**
+     * The unique ID of the tool call.
+     */
+    id: string;
+
+    /**
+     * A JSON string of the arguments passed to the tool.
+     */
+    arguments: string;
+
+    /**
+     * The name of the tool that was run.
+     */
+    name: string;
+
+    /**
+     * The label of the MCP server running the tool.
+     */
+    server_label: string;
+
+    /**
+     * The type of the item. Always `mcp_call`.
+     */
+    type: 'mcp_call';
+
+    /**
+     * The error from the tool call, if any.
+     */
+    error?: string | null;
+
+    /**
+     * The output from the tool call.
+     */
+    output?: string | null;
+  }
+}
+
+/**
+ * Emitted when there is a delta (partial update) to the arguments of an MCP tool
+ * call.
+ */
+export interface ResponseMcpCallArgumentsDeltaEvent {
+  /**
+   * The partial update to the arguments for the MCP tool call.
+   */
+  delta: unknown;
+
+  /**
+   * The unique identifier of the MCP tool call item being processed.
+   */
+  item_id: string;
+
+  /**
+   * The index of the output item in the response's output array.
+   */
+  output_index: number;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
+   * The type of the event. Always 'response.mcp_call.arguments_delta'.
+   */
+  type: 'response.mcp_call.arguments_delta';
+}
+
+/**
+ * Emitted when the arguments for an MCP tool call are finalized.
+ */
+export interface ResponseMcpCallArgumentsDoneEvent {
+  /**
+   * The finalized arguments for the MCP tool call.
+   */
+  arguments: unknown;
+
+  /**
+   * The unique identifier of the MCP tool call item being processed.
+   */
+  item_id: string;
+
+  /**
+   * The index of the output item in the response's output array.
+   */
+  output_index: number;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
+   * The type of the event. Always 'response.mcp_call.arguments_done'.
+   */
+  type: 'response.mcp_call.arguments_done';
+}
+
+/**
+ * Emitted when an MCP tool call has completed successfully.
+ */
+export interface ResponseMcpCallCompletedEvent {
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
+   * The type of the event. Always 'response.mcp_call.completed'.
+   */
+  type: 'response.mcp_call.completed';
+}
+
+/**
+ * Emitted when an MCP tool call has failed.
+ */
+export interface ResponseMcpCallFailedEvent {
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
+   * The type of the event. Always 'response.mcp_call.failed'.
+   */
+  type: 'response.mcp_call.failed';
+}
+
+/**
+ * Emitted when an MCP tool call is in progress.
+ */
+export interface ResponseMcpCallInProgressEvent {
+  /**
+   * The unique identifier of the MCP tool call item being processed.
+   */
+  item_id: string;
+
+  /**
+   * The index of the output item in the response's output array.
+   */
+  output_index: number;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
+   * The type of the event. Always 'response.mcp_call.in_progress'.
+   */
+  type: 'response.mcp_call.in_progress';
+}
+
+/**
+ * Emitted when the list of available MCP tools has been successfully retrieved.
+ */
+export interface ResponseMcpListToolsCompletedEvent {
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
+   * The type of the event. Always 'response.mcp_list_tools.completed'.
+   */
+  type: 'response.mcp_list_tools.completed';
+}
+
+/**
+ * Emitted when the attempt to list available MCP tools has failed.
+ */
+export interface ResponseMcpListToolsFailedEvent {
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
+   * The type of the event. Always 'response.mcp_list_tools.failed'.
+   */
+  type: 'response.mcp_list_tools.failed';
+}
+
+/**
+ * Emitted when the system is in the process of retrieving the list of available
+ * MCP tools.
+ */
+export interface ResponseMcpListToolsInProgressEvent {
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
+   * The type of the event. Always 'response.mcp_list_tools.in_progress'.
+   */
+  type: 'response.mcp_list_tools.in_progress';
+}
 
 /**
  * An audio output from the model.
@@ -1891,7 +2891,234 @@ export type ResponseOutputItem =
   | ResponseFunctionToolCall
   | ResponseFunctionWebSearch
   | ResponseComputerToolCall
-  | ResponseReasoningItem;
+  | ResponseReasoningItem
+  | ResponseOutputItem.ImageGenerationCall
+  | ResponseCodeInterpreterToolCall
+  | ResponseOutputItem.LocalShellCall
+  | ResponseOutputItem.McpCall
+  | ResponseOutputItem.McpListTools
+  | ResponseOutputItem.McpApprovalRequest;
+
+export namespace ResponseOutputItem {
+  /**
+   * An image generation request made by the model.
+   */
+  export interface ImageGenerationCall {
+    /**
+     * The unique ID of the image generation call.
+     */
+    id: string;
+
+    /**
+     * The generated image encoded in base64.
+     */
+    result: string | null;
+
+    /**
+     * The status of the image generation call.
+     */
+    status: 'in_progress' | 'completed' | 'generating' | 'failed';
+
+    /**
+     * The type of the image generation call. Always `image_generation_call`.
+     */
+    type: 'image_generation_call';
+  }
+
+  /**
+   * A tool call to run a command on the local shell.
+   */
+  export interface LocalShellCall {
+    /**
+     * The unique ID of the local shell call.
+     */
+    id: string;
+
+    /**
+     * Execute a shell command on the server.
+     */
+    action: LocalShellCall.Action;
+
+    /**
+     * The unique ID of the local shell tool call generated by the model.
+     */
+    call_id: string;
+
+    /**
+     * The status of the local shell call.
+     */
+    status: 'in_progress' | 'completed' | 'incomplete';
+
+    /**
+     * The type of the local shell call. Always `local_shell_call`.
+     */
+    type: 'local_shell_call';
+  }
+
+  export namespace LocalShellCall {
+    /**
+     * Execute a shell command on the server.
+     */
+    export interface Action {
+      /**
+       * The command to run.
+       */
+      command: Array<string>;
+
+      /**
+       * Environment variables to set for the command.
+       */
+      env: Record<string, string>;
+
+      /**
+       * The type of the local shell action. Always `exec`.
+       */
+      type: 'exec';
+
+      /**
+       * Optional timeout in milliseconds for the command.
+       */
+      timeout_ms?: number | null;
+
+      /**
+       * Optional user to run the command as.
+       */
+      user?: string | null;
+
+      /**
+       * Optional working directory to run the command in.
+       */
+      working_directory?: string | null;
+    }
+  }
+
+  /**
+   * An invocation of a tool on an MCP server.
+   */
+  export interface McpCall {
+    /**
+     * The unique ID of the tool call.
+     */
+    id: string;
+
+    /**
+     * A JSON string of the arguments passed to the tool.
+     */
+    arguments: string;
+
+    /**
+     * The name of the tool that was run.
+     */
+    name: string;
+
+    /**
+     * The label of the MCP server running the tool.
+     */
+    server_label: string;
+
+    /**
+     * The type of the item. Always `mcp_call`.
+     */
+    type: 'mcp_call';
+
+    /**
+     * The error from the tool call, if any.
+     */
+    error?: string | null;
+
+    /**
+     * The output from the tool call.
+     */
+    output?: string | null;
+  }
+
+  /**
+   * A list of tools available on an MCP server.
+   */
+  export interface McpListTools {
+    /**
+     * The unique ID of the list.
+     */
+    id: string;
+
+    /**
+     * The label of the MCP server.
+     */
+    server_label: string;
+
+    /**
+     * The tools available on the server.
+     */
+    tools: Array<McpListTools.Tool>;
+
+    /**
+     * The type of the item. Always `mcp_list_tools`.
+     */
+    type: 'mcp_list_tools';
+
+    /**
+     * Error message if the server could not list tools.
+     */
+    error?: string | null;
+  }
+
+  export namespace McpListTools {
+    /**
+     * A tool available on an MCP server.
+     */
+    export interface Tool {
+      /**
+       * The JSON schema describing the tool's input.
+       */
+      input_schema: unknown;
+
+      /**
+       * The name of the tool.
+       */
+      name: string;
+
+      /**
+       * Additional annotations about the tool.
+       */
+      annotations?: unknown | null;
+
+      /**
+       * The description of the tool.
+       */
+      description?: string | null;
+    }
+  }
+
+  /**
+   * A request for human approval of a tool invocation.
+   */
+  export interface McpApprovalRequest {
+    /**
+     * The unique ID of the approval request.
+     */
+    id: string;
+
+    /**
+     * A JSON string of arguments for the tool.
+     */
+    arguments: string;
+
+    /**
+     * The name of the tool to run.
+     */
+    name: string;
+
+    /**
+     * The label of the MCP server making the request.
+     */
+    server_label: string;
+
+    /**
+     * The type of the item. Always `mcp_approval_request`.
+     */
+    type: 'mcp_approval_request';
+  }
+}
 
 /**
  * Emitted when a new output item is added.
@@ -1906,6 +3133,11 @@ export interface ResponseOutputItemAddedEvent {
    * The index of the output item that was added.
    */
   output_index: number;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
 
   /**
    * The type of the event. Always `response.output_item.added`.
@@ -1926,6 +3158,11 @@ export interface ResponseOutputItemDoneEvent {
    * The index of the output item that was marked done.
    */
   output_index: number;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
 
   /**
    * The type of the event. Always `response.output_item.done`.
@@ -1999,6 +3236,8 @@ export interface ResponseOutputText {
    * The type of the output text. Always `output_text`.
    */
   type: 'output_text';
+
+  logprobs?: Array<ResponseOutputText.Logprob>;
 }
 
 export namespace ResponseOutputText {
@@ -2071,6 +3310,162 @@ export namespace ResponseOutputText {
      */
     type: 'file_path';
   }
+
+  /**
+   * The log probability of a token.
+   */
+  export interface Logprob {
+    token: string;
+
+    bytes: Array<number>;
+
+    logprob: number;
+
+    top_logprobs: Array<Logprob.TopLogprob>;
+  }
+
+  export namespace Logprob {
+    /**
+     * The top log probability of a token.
+     */
+    export interface TopLogprob {
+      token: string;
+
+      bytes: Array<number>;
+
+      logprob: number;
+    }
+  }
+}
+
+/**
+ * Emitted when an annotation is added to output text content.
+ */
+export interface ResponseOutputTextAnnotationAddedEvent {
+  /**
+   * The annotation object being added. (See annotation schema for details.)
+   */
+  annotation: unknown;
+
+  /**
+   * The index of the annotation within the content part.
+   */
+  annotation_index: number;
+
+  /**
+   * The index of the content part within the output item.
+   */
+  content_index: number;
+
+  /**
+   * The unique identifier of the item to which the annotation is being added.
+   */
+  item_id: string;
+
+  /**
+   * The index of the output item in the response's output array.
+   */
+  output_index: number;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
+   * The type of the event. Always 'response.output_text_annotation.added'.
+   */
+  type: 'response.output_text_annotation.added';
+}
+
+/**
+ * Emitted when a response is queued and waiting to be processed.
+ */
+export interface ResponseQueuedEvent {
+  /**
+   * The full response object that is queued.
+   */
+  response: Response;
+
+  /**
+   * The sequence number for this event.
+   */
+  sequence_number: number;
+
+  /**
+   * The type of the event. Always 'response.queued'.
+   */
+  type: 'response.queued';
+}
+
+/**
+ * Emitted when there is a delta (partial update) to the reasoning content.
+ */
+export interface ResponseReasoningDeltaEvent {
+  /**
+   * The index of the reasoning content part within the output item.
+   */
+  content_index: number;
+
+  /**
+   * The partial update to the reasoning content.
+   */
+  delta: unknown;
+
+  /**
+   * The unique identifier of the item for which reasoning is being updated.
+   */
+  item_id: string;
+
+  /**
+   * The index of the output item in the response's output array.
+   */
+  output_index: number;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
+   * The type of the event. Always 'response.reasoning.delta'.
+   */
+  type: 'response.reasoning.delta';
+}
+
+/**
+ * Emitted when the reasoning content is finalized for an item.
+ */
+export interface ResponseReasoningDoneEvent {
+  /**
+   * The index of the reasoning content part within the output item.
+   */
+  content_index: number;
+
+  /**
+   * The unique identifier of the item for which reasoning is finalized.
+   */
+  item_id: string;
+
+  /**
+   * The index of the output item in the response's output array.
+   */
+  output_index: number;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
+   * The finalized reasoning text.
+   */
+  text: string;
+
+  /**
+   * The type of the event. Always 'response.reasoning.done'.
+   */
+  type: 'response.reasoning.done';
 }
 
 /**
@@ -2123,6 +3518,77 @@ export namespace ResponseReasoningItem {
 }
 
 /**
+ * Emitted when there is a delta (partial update) to the reasoning summary content.
+ */
+export interface ResponseReasoningSummaryDeltaEvent {
+  /**
+   * The partial update to the reasoning summary content.
+   */
+  delta: unknown;
+
+  /**
+   * The unique identifier of the item for which the reasoning summary is being
+   * updated.
+   */
+  item_id: string;
+
+  /**
+   * The index of the output item in the response's output array.
+   */
+  output_index: number;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
+   * The index of the summary part within the output item.
+   */
+  summary_index: number;
+
+  /**
+   * The type of the event. Always 'response.reasoning_summary.delta'.
+   */
+  type: 'response.reasoning_summary.delta';
+}
+
+/**
+ * Emitted when the reasoning summary content is finalized for an item.
+ */
+export interface ResponseReasoningSummaryDoneEvent {
+  /**
+   * The unique identifier of the item for which the reasoning summary is finalized.
+   */
+  item_id: string;
+
+  /**
+   * The index of the output item in the response's output array.
+   */
+  output_index: number;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
+   * The index of the summary part within the output item.
+   */
+  summary_index: number;
+
+  /**
+   * The finalized reasoning summary text.
+   */
+  text: string;
+
+  /**
+   * The type of the event. Always 'response.reasoning_summary.done'.
+   */
+  type: 'response.reasoning_summary.done';
+}
+
+/**
  * Emitted when a new reasoning summary part is added.
  */
 export interface ResponseReasoningSummaryPartAddedEvent {
@@ -2140,6 +3606,11 @@ export interface ResponseReasoningSummaryPartAddedEvent {
    * The summary part that was added.
    */
   part: ResponseReasoningSummaryPartAddedEvent.Part;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
 
   /**
    * The index of the summary part within the reasoning summary.
@@ -2189,6 +3660,11 @@ export interface ResponseReasoningSummaryPartDoneEvent {
   part: ResponseReasoningSummaryPartDoneEvent.Part;
 
   /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
    * The index of the summary part within the reasoning summary.
    */
   summary_index: number;
@@ -2236,6 +3712,11 @@ export interface ResponseReasoningSummaryTextDeltaEvent {
   output_index: number;
 
   /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
    * The index of the summary part within the reasoning summary.
    */
   summary_index: number;
@@ -2259,6 +3740,11 @@ export interface ResponseReasoningSummaryTextDoneEvent {
    * The index of the output item this summary text is associated with.
    */
   output_index: number;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
 
   /**
    * The index of the summary part within the reasoning summary.
@@ -2301,6 +3787,11 @@ export interface ResponseRefusalDeltaEvent {
   output_index: number;
 
   /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
    * The type of the event. Always `response.refusal.delta`.
    */
   type: 'response.refusal.delta';
@@ -2331,6 +3822,11 @@ export interface ResponseRefusalDoneEvent {
   refusal: string;
 
   /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
    * The type of the event. Always `response.refusal.done`.
    */
   type: 'response.refusal.done';
@@ -2338,9 +3834,9 @@ export interface ResponseRefusalDoneEvent {
 
 /**
  * The status of the response generation. One of `completed`, `failed`,
- * `in_progress`, or `incomplete`.
+ * `in_progress`, `cancelled`, `queued`, or `incomplete`.
  */
-export type ResponseStatus = 'completed' | 'failed' | 'in_progress' | 'incomplete';
+export type ResponseStatus = 'completed' | 'failed' | 'in_progress' | 'cancelled' | 'queued' | 'incomplete';
 
 /**
  * Emitted when there is a partial audio response.
@@ -2376,122 +3872,29 @@ export type ResponseStreamEvent =
   | ResponseReasoningSummaryTextDoneEvent
   | ResponseRefusalDeltaEvent
   | ResponseRefusalDoneEvent
-  | ResponseTextAnnotationDeltaEvent
   | ResponseTextDeltaEvent
   | ResponseTextDoneEvent
   | ResponseWebSearchCallCompletedEvent
   | ResponseWebSearchCallInProgressEvent
-  | ResponseWebSearchCallSearchingEvent;
-
-/**
- * Emitted when a text annotation is added.
- */
-export interface ResponseTextAnnotationDeltaEvent {
-  /**
-   * A citation to a file.
-   */
-  annotation:
-    | ResponseTextAnnotationDeltaEvent.FileCitation
-    | ResponseTextAnnotationDeltaEvent.URLCitation
-    | ResponseTextAnnotationDeltaEvent.FilePath;
-
-  /**
-   * The index of the annotation that was added.
-   */
-  annotation_index: number;
-
-  /**
-   * The index of the content part that the text annotation was added to.
-   */
-  content_index: number;
-
-  /**
-   * The ID of the output item that the text annotation was added to.
-   */
-  item_id: string;
-
-  /**
-   * The index of the output item that the text annotation was added to.
-   */
-  output_index: number;
-
-  /**
-   * The type of the event. Always `response.output_text.annotation.added`.
-   */
-  type: 'response.output_text.annotation.added';
-}
-
-export namespace ResponseTextAnnotationDeltaEvent {
-  /**
-   * A citation to a file.
-   */
-  export interface FileCitation {
-    /**
-     * The ID of the file.
-     */
-    file_id: string;
-
-    /**
-     * The index of the file in the list of files.
-     */
-    index: number;
-
-    /**
-     * The type of the file citation. Always `file_citation`.
-     */
-    type: 'file_citation';
-  }
-
-  /**
-   * A citation for a web resource used to generate a model response.
-   */
-  export interface URLCitation {
-    /**
-     * The index of the last character of the URL citation in the message.
-     */
-    end_index: number;
-
-    /**
-     * The index of the first character of the URL citation in the message.
-     */
-    start_index: number;
-
-    /**
-     * The title of the web resource.
-     */
-    title: string;
-
-    /**
-     * The type of the URL citation. Always `url_citation`.
-     */
-    type: 'url_citation';
-
-    /**
-     * The URL of the web resource.
-     */
-    url: string;
-  }
-
-  /**
-   * A path to a file.
-   */
-  export interface FilePath {
-    /**
-     * The ID of the file.
-     */
-    file_id: string;
-
-    /**
-     * The index of the file in the list of files.
-     */
-    index: number;
-
-    /**
-     * The type of the file path. Always `file_path`.
-     */
-    type: 'file_path';
-  }
-}
+  | ResponseWebSearchCallSearchingEvent
+  | ResponseImageGenCallCompletedEvent
+  | ResponseImageGenCallGeneratingEvent
+  | ResponseImageGenCallInProgressEvent
+  | ResponseImageGenCallPartialImageEvent
+  | ResponseMcpCallArgumentsDeltaEvent
+  | ResponseMcpCallArgumentsDoneEvent
+  | ResponseMcpCallCompletedEvent
+  | ResponseMcpCallFailedEvent
+  | ResponseMcpCallInProgressEvent
+  | ResponseMcpListToolsCompletedEvent
+  | ResponseMcpListToolsFailedEvent
+  | ResponseMcpListToolsInProgressEvent
+  | ResponseOutputTextAnnotationAddedEvent
+  | ResponseQueuedEvent
+  | ResponseReasoningDeltaEvent
+  | ResponseReasoningDoneEvent
+  | ResponseReasoningSummaryDeltaEvent
+  | ResponseReasoningSummaryDoneEvent;
 
 /**
  * Configuration options for a text response from the model. Can be plain text or
@@ -2544,6 +3947,11 @@ export interface ResponseTextDeltaEvent {
   output_index: number;
 
   /**
+   * The sequence number for this event.
+   */
+  sequence_number: number;
+
+  /**
    * The type of the event. Always `response.output_text.delta`.
    */
   type: 'response.output_text.delta';
@@ -2567,6 +3975,11 @@ export interface ResponseTextDoneEvent {
    * The index of the output item that the text content is finalized.
    */
   output_index: number;
+
+  /**
+   * The sequence number for this event.
+   */
+  sequence_number: number;
 
   /**
    * The text content that is finalized.
@@ -2648,6 +4061,11 @@ export interface ResponseWebSearchCallCompletedEvent {
   output_index: number;
 
   /**
+   * The sequence number of the web search call being processed.
+   */
+  sequence_number: number;
+
+  /**
    * The type of the event. Always `response.web_search_call.completed`.
    */
   type: 'response.web_search_call.completed';
@@ -2666,6 +4084,11 @@ export interface ResponseWebSearchCallInProgressEvent {
    * The index of the output item that the web search call is associated with.
    */
   output_index: number;
+
+  /**
+   * The sequence number of the web search call being processed.
+   */
+  sequence_number: number;
 
   /**
    * The type of the event. Always `response.web_search_call.in_progress`.
@@ -2688,6 +4111,11 @@ export interface ResponseWebSearchCallSearchingEvent {
   output_index: number;
 
   /**
+   * The sequence number of the web search call being processed.
+   */
+  sequence_number: number;
+
+  /**
    * The type of the event. Always `response.web_search_call.searching`.
    */
   type: 'response.web_search_call.searching';
@@ -2696,7 +4124,224 @@ export interface ResponseWebSearchCallSearchingEvent {
 /**
  * A tool that can be used to generate a response.
  */
-export type Tool = FileSearchTool | FunctionTool | WebSearchTool | ComputerTool;
+export type Tool =
+  | FunctionTool
+  | FileSearchTool
+  | WebSearchTool
+  | ComputerTool
+  | Tool.Mcp
+  | Tool.CodeInterpreter
+  | Tool.ImageGeneration
+  | Tool.LocalShell;
+
+export namespace Tool {
+  /**
+   * Give the model access to additional tools via remote Model Context Protocol
+   * (MCP) servers.
+   * [Learn more about MCP](https://platform.openai.com/docs/guides/tools-remote-mcp).
+   */
+  export interface Mcp {
+    /**
+     * A label for this MCP server, used to identify it in tool calls.
+     */
+    server_label: string;
+
+    /**
+     * The URL for the MCP server.
+     */
+    server_url: string;
+
+    /**
+     * The type of the MCP tool. Always `mcp`.
+     */
+    type: 'mcp';
+
+    /**
+     * List of allowed tool names or a filter object.
+     */
+    allowed_tools?: Array<string> | Mcp.McpAllowedToolsFilter | null;
+
+    /**
+     * Optional HTTP headers to send to the MCP server. Use for authentication or other
+     * purposes.
+     */
+    headers?: Record<string, string> | null;
+
+    /**
+     * Specify which of the MCP server's tools require approval.
+     */
+    require_approval?: Mcp.McpToolApprovalFilter | 'always' | 'never' | null;
+  }
+
+  export namespace Mcp {
+    /**
+     * A filter object to specify which tools are allowed.
+     */
+    export interface McpAllowedToolsFilter {
+      /**
+       * List of allowed tool names.
+       */
+      tool_names?: Array<string>;
+    }
+
+    export interface McpToolApprovalFilter {
+      /**
+       * A list of tools that always require approval.
+       */
+      always?: McpToolApprovalFilter.Always;
+
+      /**
+       * A list of tools that never require approval.
+       */
+      never?: McpToolApprovalFilter.Never;
+    }
+
+    export namespace McpToolApprovalFilter {
+      /**
+       * A list of tools that always require approval.
+       */
+      export interface Always {
+        /**
+         * List of tools that require approval.
+         */
+        tool_names?: Array<string>;
+      }
+
+      /**
+       * A list of tools that never require approval.
+       */
+      export interface Never {
+        /**
+         * List of tools that do not require approval.
+         */
+        tool_names?: Array<string>;
+      }
+    }
+  }
+
+  /**
+   * A tool that runs Python code to help generate a response to a prompt.
+   */
+  export interface CodeInterpreter {
+    /**
+     * The code interpreter container. Can be a container ID or an object that
+     * specifies uploaded file IDs to make available to your code.
+     */
+    container: string | CodeInterpreter.CodeInterpreterToolAuto;
+
+    /**
+     * The type of the code interpreter tool. Always `code_interpreter`.
+     */
+    type: 'code_interpreter';
+  }
+
+  export namespace CodeInterpreter {
+    /**
+     * Configuration for a code interpreter container. Optionally specify the IDs of
+     * the files to run the code on.
+     */
+    export interface CodeInterpreterToolAuto {
+      /**
+       * Always `auto`.
+       */
+      type: 'auto';
+
+      /**
+       * An optional list of uploaded files to make available to your code.
+       */
+      file_ids?: Array<string>;
+    }
+  }
+
+  /**
+   * A tool that generates images using a model like `gpt-image-1`.
+   */
+  export interface ImageGeneration {
+    /**
+     * The type of the image generation tool. Always `image_generation`.
+     */
+    type: 'image_generation';
+
+    /**
+     * Background type for the generated image. One of `transparent`, `opaque`, or
+     * `auto`. Default: `auto`.
+     */
+    background?: 'transparent' | 'opaque' | 'auto';
+
+    /**
+     * Optional mask for inpainting. Contains `image_url` (string, optional) and
+     * `file_id` (string, optional).
+     */
+    input_image_mask?: ImageGeneration.InputImageMask;
+
+    /**
+     * The image generation model to use. Default: `gpt-image-1`.
+     */
+    model?: 'gpt-image-1';
+
+    /**
+     * Moderation level for the generated image. Default: `auto`.
+     */
+    moderation?: 'auto' | 'low';
+
+    /**
+     * Compression level for the output image. Default: 100.
+     */
+    output_compression?: number;
+
+    /**
+     * The output format of the generated image. One of `png`, `webp`, or `jpeg`.
+     * Default: `png`.
+     */
+    output_format?: 'png' | 'webp' | 'jpeg';
+
+    /**
+     * Number of partial images to generate in streaming mode, from 0 (default value)
+     * to 3.
+     */
+    partial_images?: number;
+
+    /**
+     * The quality of the generated image. One of `low`, `medium`, `high`, or `auto`.
+     * Default: `auto`.
+     */
+    quality?: 'low' | 'medium' | 'high' | 'auto';
+
+    /**
+     * The size of the generated image. One of `1024x1024`, `1024x1536`, `1536x1024`,
+     * or `auto`. Default: `auto`.
+     */
+    size?: '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
+  }
+
+  export namespace ImageGeneration {
+    /**
+     * Optional mask for inpainting. Contains `image_url` (string, optional) and
+     * `file_id` (string, optional).
+     */
+    export interface InputImageMask {
+      /**
+       * File ID for the mask image.
+       */
+      file_id?: string;
+
+      /**
+       * Base64-encoded mask image.
+       */
+      image_url?: string;
+    }
+  }
+
+  /**
+   * A tool that allows the model to execute shell commands in a local environment.
+   */
+  export interface LocalShell {
+    /**
+     * The type of the local shell tool. Always `local_shell`.
+     */
+    type: 'local_shell';
+  }
+}
 
 /**
  * Use this option to force the model to call a specific function.
@@ -2739,8 +4384,18 @@ export interface ToolChoiceTypes {
    * - `file_search`
    * - `web_search_preview`
    * - `computer_use_preview`
+   * - `code_interpreter`
+   * - `mcp`
+   * - `image_generation`
    */
-  type: 'file_search' | 'web_search_preview' | 'computer_use_preview' | 'web_search_preview_2025_03_11';
+  type:
+    | 'file_search'
+    | 'web_search_preview'
+    | 'computer_use_preview'
+    | 'web_search_preview_2025_03_11'
+    | 'image_generation'
+    | 'code_interpreter'
+    | 'mcp';
 }
 
 /**
@@ -2825,6 +4480,12 @@ export interface ResponseCreateParamsBase {
    * available models.
    */
   model: Shared.ResponsesModel;
+
+  /**
+   * Whether to run the model response in the background.
+   * [Learn more](https://platform.openai.com/docs/guides/background).
+   */
+  background?: boolean | null;
 
   /**
    * Specify additional output data to include in the model response. Currently
@@ -2989,8 +4650,8 @@ export interface ResponseCreateParamsBase {
   truncation?: 'auto' | 'disabled' | null;
 
   /**
-   * A unique identifier representing your end-user, which can help OpenAI to monitor
-   * and detect abuse.
+   * A stable identifier for your end-users. Used to boost cache hit rates by better
+   * bucketing similar requests and to help OpenAI detect and prevent abuse.
    * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#end-user-ids).
    */
   user?: string;
@@ -3025,12 +4686,58 @@ export interface ResponseCreateParamsStreaming extends ResponseCreateParamsBase 
   stream: true;
 }
 
-export interface ResponseRetrieveParams {
+export type ResponseRetrieveParams = ResponseRetrieveParamsNonStreaming | ResponseRetrieveParamsStreaming;
+
+export interface ResponseRetrieveParamsBase {
   /**
    * Additional fields to include in the response. See the `include` parameter for
    * Response creation above for more information.
    */
   include?: Array<ResponseIncludable>;
+
+  /**
+   * The sequence number of the event after which to start streaming.
+   */
+  starting_after?: number;
+
+  /**
+   * If set to true, the model response data will be streamed to the client as it is
+   * generated using
+   * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
+   * See the
+   * [Streaming section below](https://platform.openai.com/docs/api-reference/responses-streaming)
+   * for more information.
+   */
+  stream?: boolean;
+}
+
+export namespace ResponseRetrieveParams {
+  export type ResponseRetrieveParamsNonStreaming = ResponsesAPI.ResponseRetrieveParamsNonStreaming;
+  export type ResponseRetrieveParamsStreaming = ResponsesAPI.ResponseRetrieveParamsStreaming;
+}
+
+export interface ResponseRetrieveParamsNonStreaming extends ResponseRetrieveParamsBase {
+  /**
+   * If set to true, the model response data will be streamed to the client as it is
+   * generated using
+   * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
+   * See the
+   * [Streaming section below](https://platform.openai.com/docs/api-reference/responses-streaming)
+   * for more information.
+   */
+  stream?: false;
+}
+
+export interface ResponseRetrieveParamsStreaming extends ResponseRetrieveParamsBase {
+  /**
+   * If set to true, the model response data will be streamed to the client as it is
+   * generated using
+   * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
+   * See the
+   * [Streaming section below](https://platform.openai.com/docs/api-reference/responses-streaming)
+   * for more information.
+   */
+  stream: true;
 }
 
 Responses.InputItems = InputItems;
@@ -3075,6 +4782,10 @@ export declare namespace Responses {
     type ResponseFunctionToolCallItem as ResponseFunctionToolCallItem,
     type ResponseFunctionToolCallOutputItem as ResponseFunctionToolCallOutputItem,
     type ResponseFunctionWebSearch as ResponseFunctionWebSearch,
+    type ResponseImageGenCallCompletedEvent as ResponseImageGenCallCompletedEvent,
+    type ResponseImageGenCallGeneratingEvent as ResponseImageGenCallGeneratingEvent,
+    type ResponseImageGenCallInProgressEvent as ResponseImageGenCallInProgressEvent,
+    type ResponseImageGenCallPartialImageEvent as ResponseImageGenCallPartialImageEvent,
     type ResponseInProgressEvent as ResponseInProgressEvent,
     type ResponseIncludable as ResponseIncludable,
     type ResponseIncompleteEvent as ResponseIncompleteEvent,
@@ -3088,6 +4799,14 @@ export declare namespace Responses {
     type ResponseInputMessageItem as ResponseInputMessageItem,
     type ResponseInputText as ResponseInputText,
     type ResponseItem as ResponseItem,
+    type ResponseMcpCallArgumentsDeltaEvent as ResponseMcpCallArgumentsDeltaEvent,
+    type ResponseMcpCallArgumentsDoneEvent as ResponseMcpCallArgumentsDoneEvent,
+    type ResponseMcpCallCompletedEvent as ResponseMcpCallCompletedEvent,
+    type ResponseMcpCallFailedEvent as ResponseMcpCallFailedEvent,
+    type ResponseMcpCallInProgressEvent as ResponseMcpCallInProgressEvent,
+    type ResponseMcpListToolsCompletedEvent as ResponseMcpListToolsCompletedEvent,
+    type ResponseMcpListToolsFailedEvent as ResponseMcpListToolsFailedEvent,
+    type ResponseMcpListToolsInProgressEvent as ResponseMcpListToolsInProgressEvent,
     type ResponseOutputAudio as ResponseOutputAudio,
     type ResponseOutputItem as ResponseOutputItem,
     type ResponseOutputItemAddedEvent as ResponseOutputItemAddedEvent,
@@ -3095,7 +4814,13 @@ export declare namespace Responses {
     type ResponseOutputMessage as ResponseOutputMessage,
     type ResponseOutputRefusal as ResponseOutputRefusal,
     type ResponseOutputText as ResponseOutputText,
+    type ResponseOutputTextAnnotationAddedEvent as ResponseOutputTextAnnotationAddedEvent,
+    type ResponseQueuedEvent as ResponseQueuedEvent,
+    type ResponseReasoningDeltaEvent as ResponseReasoningDeltaEvent,
+    type ResponseReasoningDoneEvent as ResponseReasoningDoneEvent,
     type ResponseReasoningItem as ResponseReasoningItem,
+    type ResponseReasoningSummaryDeltaEvent as ResponseReasoningSummaryDeltaEvent,
+    type ResponseReasoningSummaryDoneEvent as ResponseReasoningSummaryDoneEvent,
     type ResponseReasoningSummaryPartAddedEvent as ResponseReasoningSummaryPartAddedEvent,
     type ResponseReasoningSummaryPartDoneEvent as ResponseReasoningSummaryPartDoneEvent,
     type ResponseReasoningSummaryTextDeltaEvent as ResponseReasoningSummaryTextDeltaEvent,
@@ -3104,7 +4829,6 @@ export declare namespace Responses {
     type ResponseRefusalDoneEvent as ResponseRefusalDoneEvent,
     type ResponseStatus as ResponseStatus,
     type ResponseStreamEvent as ResponseStreamEvent,
-    type ResponseTextAnnotationDeltaEvent as ResponseTextAnnotationDeltaEvent,
     type ResponseTextConfig as ResponseTextConfig,
     type ResponseTextDeltaEvent as ResponseTextDeltaEvent,
     type ResponseTextDoneEvent as ResponseTextDoneEvent,
@@ -3121,6 +4845,8 @@ export declare namespace Responses {
     type ResponseCreateParamsNonStreaming as ResponseCreateParamsNonStreaming,
     type ResponseCreateParamsStreaming as ResponseCreateParamsStreaming,
     type ResponseRetrieveParams as ResponseRetrieveParams,
+    type ResponseRetrieveParamsNonStreaming as ResponseRetrieveParamsNonStreaming,
+    type ResponseRetrieveParamsStreaming as ResponseRetrieveParamsStreaming,
   };
 
   export {

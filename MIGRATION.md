@@ -78,6 +78,9 @@ client.parents.children.retrieve('c_456', { parent_id: 'p_123' });
 - `client.evals.runs.cancel()`
 - `client.evals.runs.outputItems.retrieve()`
 - `client.evals.runs.outputItems.list()`
+- `client.containers.files.retrieve()`
+- `client.containers.files.delete()`
+- `client.containers.files.content.retrieve()`
 
 </details>
 
@@ -128,47 +131,15 @@ This affects the following methods:
 - `client.responses.inputItems.list()`
 - `client.evals.list()`
 - `client.evals.runs.list()`
-
-### HTTP method naming
-
-Previously some methods could not be named intuitively due to an internal naming conflict. This has been fixed and the affected methods are now correctly named.
-
-```ts
-// Before
-client.chat.completions.del();
-client.files.del();
-client.models.del();
-client.fineTuning.checkpoints.permissions.del();
-client.vectorStores.del();
-client.vectorStores.files.del();
-client.beta.assistants.del();
-client.beta.threads.del();
-client.beta.threads.messages.del();
-client.responses.del();
-client.evals.del();
-client.evals.runs.del();
-
-// After
-client.chat.completions.delete();
-client.files.delete();
-client.models.delete();
-client.fineTuning.checkpoints.permissions.delete();
-client.vectorStores.delete();
-client.vectorStores.files.delete();
-client.beta.assistants.delete();
-client.beta.threads.delete();
-client.beta.threads.messages.delete();
-client.responses.delete();
-client.evals.delete();
-client.evals.runs.delete();
-```
+- `client.containers.list()`
+- `client.containers.files.list()`
 
 ### Removed `httpAgent` in favor of `fetchOptions`
 
-The `httpAgent` client option has been removed in favor of a [platform-specific `fetchOptions` property](https://github.com/stainless-sdks/openai-typescript#fetch-options).
+The `httpAgent` client option has been removed in favor of a [platform-specific `fetchOptions` property](https://github.com/openai/openai-node#fetch-options).
 This change was made as `httpAgent` relied on `node:http` agents which are not supported by any runtime's builtin fetch implementation.
 
-If you were using `httpAgent` for proxy support, check out the [new proxy documentation](https://github.com/stainless-sdks/openai-typescript#configuring-proxies).
+If you were using `httpAgent` for proxy support, check out the [new proxy documentation](https://github.com/openai/openai-node#configuring-proxies).
 
 Before:
 
