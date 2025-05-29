@@ -1,5 +1,26 @@
 # Changelog
 
+## 4.104.0 (2025-05-29)
+
+Full Changelog: [v4.103.0...v4.104.0](https://github.com/openai/openai-node/compare/v4.103.0...v4.104.0)
+
+### Features
+
+* **api:** Config update for pakrym-stream-param ([469ad7b](https://github.com/openai/openai-node/commit/469ad7b9d76b674aa3fd829128a54758ab7adfbd))
+
+
+### Bug Fixes
+
+* **azure:** add /images/edits to deployments endpoints ([#1509](https://github.com/openai/openai-node/issues/1509)) ([84fc31a](https://github.com/openai/openai-node/commit/84fc31aa903eceeb80815f6b17562fc463a71cfc))
+* **client:** return binary content from `get /containers/{container_id}/files/{file_id}/content` ([83129d7](https://github.com/openai/openai-node/commit/83129d7eac3dd784bb1c29fa344c5b808a59db73))
+
+
+### Chores
+
+* deprecate Assistants API ([5b34fcd](https://github.com/openai/openai-node/commit/5b34fcdd1454b8cccbaaf05ace6516afb3b09273))
+* improve publish-npm script --latest tag logic ([6207a2a](https://github.com/openai/openai-node/commit/6207a2a03d3279423de594eed18c5efb4ce321af))
+* **internal:** fix release workflows ([353349d](https://github.com/openai/openai-node/commit/353349de9ee10d32d3243cb5c60a8ae982c49d37))
+
 ## 4.103.0 (2025-05-22)
 
 Full Changelog: [v4.102.0...v4.103.0](https://github.com/openai/openai-node/compare/v4.102.0...v4.103.0)
