@@ -809,4 +809,4 @@ Methods:
 
 Methods:
 
-- <code title="get /containers/{container_id}/files/{file_id}/content">client.containers.files.content.<a href="./src/resources/containers/files/content.ts">retrieve</a>(containerId, fileId) -> void</code>
+- <code title="get /containers/{container_id}/files/{file_id}/content">client.containers.files.content.<a href="./src/resources/containers/files/content.ts">retrieve</a>(containerId, fileId) -> Response</code>
