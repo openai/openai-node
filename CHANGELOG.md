@@ -1,5 +1,14 @@
 # Changelog
 
+## 5.0.1 (2025-05-29)
+
+Full Changelog: [v5.0.0...v5.0.1](https://github.com/openai/openai-node/compare/v5.0.0...v5.0.1)
+
+### Chores
+
+* sync changes ([90b100d](https://github.com/openai/openai-node/commit/90b100dcf504ecf0b98620702cb6bd0988695320))
+* **types:** add missing type annotation ([de37b55](https://github.com/openai/openai-node/commit/de37b55e6e95d7089ee845d4144883d93bb18ca0))
+
 ## 5.0.0 (2025-05-29)
 
 Full Changelog: [v5.0.0-alpha.0...v5.0.0](https://github.com/openai/openai-node/compare/v5.0.0-alpha.0...v5.0.0)

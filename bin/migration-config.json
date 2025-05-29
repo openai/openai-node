@@ -1,6 +1,6 @@
 {
   "pkg": "openai",
-  "githubRepo": "https://github.com/stainless-sdks/openai-typescript",
+  "githubRepo": "https://github.com/openai/openai-node",
   "clientClass": "OpenAI",
   "methods": [
     {
