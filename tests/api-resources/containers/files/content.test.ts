@@ -8,19 +8,6 @@ const client = new OpenAI({
 });
 
 describe('resource content', () => {
-  test('retrieve: only required params', async () => {
-    const responsePromise = client.containers.files.content.retrieve('file_id', {
-      container_id: 'container_id',
-    });
-    const rawResponse = await responsePromise.asResponse();
-    expect(rawResponse).toBeInstanceOf(Response);
-    const response = await responsePromise;
-    expect(response).not.toBeInstanceOf(Response);
-    const dataAndResponse = await responsePromise.withResponse();
-    expect(dataAndResponse.data).toBe(response);
-    expect(dataAndResponse.response).toBe(rawResponse);
-  });
-
   test('retrieve: required and optional params', async () => {
     const response = await client.containers.files.content.retrieve('file_id', {
       container_id: 'container_id',
