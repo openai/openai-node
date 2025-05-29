@@ -10,7 +10,7 @@ const commands = {
         'npx',
         [
           '-y',
-          'https://github.com/stainless-api/migrate-ts/releases/download/0.0.2/stainless-api-migrate-0.0.2-6.tgz',
+          'https://github.com/stainless-api/migrate-ts/releases/download/0.0.3/stainless-api-migrate-0.0.3.tgz',
           '--migrationConfig',
           require.resolve('./migration-config.json'),
           ...process.argv.slice(3),
