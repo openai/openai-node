@@ -1,19 +1,23 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../resource';
-import { isRequestOptions } from '../../core';
-import * as Core from '../../core';
+import { APIResource } from '../../core/resource';
 import * as FilesAPI from './files/files';
 import {
   FileCreateParams,
   FileCreateResponse,
+  FileDeleteParams,
   FileListParams,
   FileListResponse,
   FileListResponsesPage,
+  FileRetrieveParams,
   FileRetrieveResponse,
   Files,
 } from './files/files';
-import { CursorPage, type CursorPageParams } from '../../pagination';
+import { APIPromise } from '../../core/api-promise';
+import { CursorPage, type CursorPageParams, PagePromise } from '../../core/pagination';
+import { buildHeaders } from '../../internal/headers';
+import { RequestOptions } from '../../internal/request-options';
+import { path } from '../../internal/utils/path';
 
 export class Containers extends APIResource {
   files: FilesAPI.Files = new FilesAPI.Files(this._client);
@@ -21,50 +25,39 @@ export class Containers extends APIResource {
   /**
    * Create Container
    */
-  create(
-    body: ContainerCreateParams,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<ContainerCreateResponse> {
+  create(body: ContainerCreateParams, options?: RequestOptions): APIPromise<ContainerCreateResponse> {
     return this._client.post('/containers', { body, ...options });
   }
 
   /**
    * Retrieve Container
    */
-  retrieve(containerId: string, options?: Core.RequestOptions): Core.APIPromise<ContainerRetrieveResponse> {
-    return this._client.get(`/containers/${containerId}`, options);
+  retrieve(containerID: string, options?: RequestOptions): APIPromise<ContainerRetrieveResponse> {
+    return this._client.get(path`/containers/${containerID}`, options);
   }
 
   /**
    * List Containers
    */
   list(
-    query?: ContainerListParams,
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<ContainerListResponsesPage, ContainerListResponse>;
-  list(options?: Core.RequestOptions): Core.PagePromise<ContainerListResponsesPage, ContainerListResponse>;
-  list(
-    query: ContainerListParams | Core.RequestOptions = {},
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<ContainerListResponsesPage, ContainerListResponse> {
-    if (isRequestOptions(query)) {
-      return this.list({}, query);
-    }
-    return this._client.getAPIList('/containers', ContainerListResponsesPage, { query, ...options });
+    query: ContainerListParams | null | undefined = {},
+    options?: RequestOptions,
+  ): PagePromise<ContainerListResponsesPage, ContainerListResponse> {
+    return this._client.getAPIList('/containers', CursorPage<ContainerListResponse>, { query, ...options });
   }
 
   /**
    * Delete Container
    */
-  del(containerId: string, options?: Core.RequestOptions): Core.APIPromise<void> {
-    return this._client.delete(`/containers/${containerId}`, {
+  delete(containerID: string, options?: RequestOptions): APIPromise<void> {
+    return this._client.delete(path`/containers/${containerID}`, {
       ...options,
-      headers: { Accept: '*/*', ...options?.headers },
+      headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
     });
   }
 }
 
-export class ContainerListResponsesPage extends CursorPage<ContainerListResponse> {}
+export type ContainerListResponsesPage = CursorPage<ContainerListResponse>;
 
 export interface ContainerCreateResponse {
   /**
@@ -265,16 +258,14 @@ export interface ContainerListParams extends CursorPageParams {
   order?: 'asc' | 'desc';
 }
 
-Containers.ContainerListResponsesPage = ContainerListResponsesPage;
 Containers.Files = Files;
-Containers.FileListResponsesPage = FileListResponsesPage;
 
 export declare namespace Containers {
   export {
     type ContainerCreateResponse as ContainerCreateResponse,
     type ContainerRetrieveResponse as ContainerRetrieveResponse,
     type ContainerListResponse as ContainerListResponse,
-    ContainerListResponsesPage as ContainerListResponsesPage,
+    type ContainerListResponsesPage as ContainerListResponsesPage,
     type ContainerCreateParams as ContainerCreateParams,
     type ContainerListParams as ContainerListParams,
   };
@@ -284,8 +275,10 @@ export declare namespace Containers {
     type FileCreateResponse as FileCreateResponse,
     type FileRetrieveResponse as FileRetrieveResponse,
     type FileListResponse as FileListResponse,
-    FileListResponsesPage as FileListResponsesPage,
+    type FileListResponsesPage as FileListResponsesPage,
     type FileCreateParams as FileCreateParams,
+    type FileRetrieveParams as FileRetrieveParams,
     type FileListParams as FileListParams,
+    type FileDeleteParams as FileDeleteParams,
   };
 }

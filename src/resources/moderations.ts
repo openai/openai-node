@@ -1,17 +1,15 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../resource';
-import * as Core from '../core';
+import { APIResource } from '../core/resource';
+import { APIPromise } from '../core/api-promise';
+import { RequestOptions } from '../internal/request-options';
 
 export class Moderations extends APIResource {
   /**
    * Classifies if text and/or image inputs are potentially harmful. Learn more in
    * the [moderation guide](https://platform.openai.com/docs/guides/moderation).
    */
-  create(
-    body: ModerationCreateParams,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<ModerationCreateResponse> {
+  create(body: ModerationCreateParams, options?: RequestOptions): APIPromise<ModerationCreateResponse> {
     return this._client.post('/moderations', { body, ...options });
   }
 }

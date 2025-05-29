@@ -1,9 +1,12 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../resource';
-import * as Core from '../../core';
+import { APIResource } from '../../core/resource';
 import * as AudioAPI from './audio';
 import * as TranscriptionsAPI from './transcriptions';
+import { APIPromise } from '../../core/api-promise';
+import { type Uploadable } from '../../core/uploads';
+import { RequestOptions } from '../../internal/request-options';
+import { multipartFormRequestOptions } from '../../internal/uploads';
 
 export class Translations extends APIResource {
   /**
@@ -19,24 +22,21 @@ export class Translations extends APIResource {
    */
   create(
     body: TranslationCreateParams<'json' | undefined>,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<Translation>;
+    options?: RequestOptions,
+  ): APIPromise<Translation>;
   create(
     body: TranslationCreateParams<'verbose_json'>,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<TranslationVerbose>;
-  create(
-    body: TranslationCreateParams<'text' | 'srt' | 'vtt'>,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<string>;
-  create(body: TranslationCreateParams, options?: Core.RequestOptions): Core.APIPromise<Translation>;
+    options?: RequestOptions,
+  ): APIPromise<TranslationVerbose>;
+  create(body: TranslationCreateParams<'text' | 'srt' | 'vtt'>, options?: RequestOptions): APIPromise<string>;
+  create(body: TranslationCreateParams, options?: RequestOptions): APIPromise<Translation>;
   create(
     body: TranslationCreateParams,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<TranslationCreateResponse | string> {
+    options?: RequestOptions,
+  ): APIPromise<TranslationCreateResponse | string> {
     return this._client.post(
       '/audio/translations',
-      Core.multipartFormRequestOptions({ body, ...options, __metadata: { model: body.model } }),
+      multipartFormRequestOptions({ body, ...options, __metadata: { model: body.model } }, this._client),
     );
   }
 }
@@ -76,7 +76,7 @@ export interface TranslationCreateParams<
    * The audio file object (not file name) translate, in one of these formats: flac,
    * mp3, mp4, mpeg, mpga, m4a, ogg, wav, or webm.
    */
-  file: Core.Uploadable;
+  file: Uploadable;
 
   /**
    * ID of the model to use. Only `whisper-1` (which is powered by our open source

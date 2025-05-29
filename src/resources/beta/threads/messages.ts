@@ -1,11 +1,13 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../../resource';
-import { isRequestOptions } from '../../../core';
-import * as Core from '../../../core';
+import { APIResource } from '../../../core/resource';
 import * as Shared from '../../shared';
 import * as AssistantsAPI from '../assistants';
-import { CursorPage, type CursorPageParams } from '../../../pagination';
+import { APIPromise } from '../../../core/api-promise';
+import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pagination';
+import { buildHeaders } from '../../../internal/headers';
+import { RequestOptions } from '../../../internal/request-options';
+import { path } from '../../../internal/utils/path';
 
 /**
  * @deprecated The Assistants API is deprecated in favor of the Responses API
@@ -16,15 +18,11 @@ export class Messages extends APIResource {
    *
    * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
-  create(
-    threadId: string,
-    body: MessageCreateParams,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<Message> {
-    return this._client.post(`/threads/${threadId}/messages`, {
+  create(threadID: string, body: MessageCreateParams, options?: RequestOptions): APIPromise<Message> {
+    return this._client.post(path`/threads/${threadID}/messages`, {
       body,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 
@@ -33,10 +31,11 @@ export class Messages extends APIResource {
    *
    * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
-  retrieve(threadId: string, messageId: string, options?: Core.RequestOptions): Core.APIPromise<Message> {
-    return this._client.get(`/threads/${threadId}/messages/${messageId}`, {
+  retrieve(messageID: string, params: MessageRetrieveParams, options?: RequestOptions): APIPromise<Message> {
+    const { thread_id } = params;
+    return this._client.get(path`/threads/${thread_id}/messages/${messageID}`, {
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 
@@ -45,16 +44,12 @@ export class Messages extends APIResource {
    *
    * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
-  update(
-    threadId: string,
-    messageId: string,
-    body: MessageUpdateParams,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<Message> {
-    return this._client.post(`/threads/${threadId}/messages/${messageId}`, {
+  update(messageID: string, params: MessageUpdateParams, options?: RequestOptions): APIPromise<Message> {
+    const { thread_id, ...body } = params;
+    return this._client.post(path`/threads/${thread_id}/messages/${messageID}`, {
       body,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 
@@ -64,23 +59,14 @@ export class Messages extends APIResource {
    * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
   list(
-    threadId: string,
-    query?: MessageListParams,
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<MessagesPage, Message>;
-  list(threadId: string, options?: Core.RequestOptions): Core.PagePromise<MessagesPage, Message>;
-  list(
-    threadId: string,
-    query: MessageListParams | Core.RequestOptions = {},
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<MessagesPage, Message> {
-    if (isRequestOptions(query)) {
-      return this.list(threadId, {}, query);
-    }
-    return this._client.getAPIList(`/threads/${threadId}/messages`, MessagesPage, {
+    threadID: string,
+    query: MessageListParams | null | undefined = {},
+    options?: RequestOptions,
+  ): PagePromise<MessagesPage, Message> {
+    return this._client.getAPIList(path`/threads/${threadID}/messages`, CursorPage<Message>, {
       query,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 
@@ -89,15 +75,20 @@ export class Messages extends APIResource {
    *
    * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
-  del(threadId: string, messageId: string, options?: Core.RequestOptions): Core.APIPromise<MessageDeleted> {
-    return this._client.delete(`/threads/${threadId}/messages/${messageId}`, {
+  delete(
+    messageID: string,
+    params: MessageDeleteParams,
+    options?: RequestOptions,
+  ): APIPromise<MessageDeleted> {
+    const { thread_id } = params;
+    return this._client.delete(path`/threads/${thread_id}/messages/${messageID}`, {
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 }
 
-export class MessagesPage extends CursorPage<Message> {}
+export type MessagesPage = CursorPage<Message>;
 
 /**
  * A citation within the message that points to a specific quote from a specific
@@ -708,11 +699,24 @@ export namespace MessageCreateParams {
   }
 }
 
+export interface MessageRetrieveParams {
+  /**
+   * The ID of the [thread](https://platform.openai.com/docs/api-reference/threads)
+   * to which this message belongs.
+   */
+  thread_id: string;
+}
+
 export interface MessageUpdateParams {
   /**
-   * Set of 16 key-value pairs that can be attached to an object. This can be useful
-   * for storing additional information about the object in a structured format, and
-   * querying for objects via API or the dashboard.
+   * Path param: The ID of the thread to which this message belongs.
+   */
+  thread_id: string;
+
+  /**
+   * Body param: Set of 16 key-value pairs that can be attached to an object. This
+   * can be useful for storing additional information about the object in a
+   * structured format, and querying for objects via API or the dashboard.
    *
    * Keys are strings with a maximum length of 64 characters. Values are strings with
    * a maximum length of 512 characters.
@@ -741,7 +745,12 @@ export interface MessageListParams extends CursorPageParams {
   run_id?: string;
 }
 
-Messages.MessagesPage = MessagesPage;
+export interface MessageDeleteParams {
+  /**
+   * The ID of the thread to which this message belongs.
+   */
+  thread_id: string;
+}
 
 export declare namespace Messages {
   export {
@@ -773,9 +782,11 @@ export declare namespace Messages {
     type TextContentBlockParam as TextContentBlockParam,
     type TextDelta as TextDelta,
     type TextDeltaBlock as TextDeltaBlock,
-    MessagesPage as MessagesPage,
+    type MessagesPage as MessagesPage,
     type MessageCreateParams as MessageCreateParams,
+    type MessageRetrieveParams as MessageRetrieveParams,
     type MessageUpdateParams as MessageUpdateParams,
     type MessageListParams as MessageListParams,
+    type MessageDeleteParams as MessageDeleteParams,
   };
 }

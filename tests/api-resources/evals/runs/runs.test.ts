@@ -1,7 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import OpenAI from 'openai';
-import { Response } from 'node-fetch';
 
 const client = new OpenAI({
   apiKey: 'My API Key',
@@ -33,8 +32,8 @@ describe('resource runs', () => {
     });
   });
 
-  test('retrieve', async () => {
-    const responsePromise = client.evals.runs.retrieve('eval_id', 'run_id');
+  test('retrieve: only required params', async () => {
+    const responsePromise = client.evals.runs.retrieve('run_id', { eval_id: 'eval_id' });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -44,11 +43,8 @@ describe('resource runs', () => {
     expect(dataAndResponse.response).toBe(rawResponse);
   });
 
-  test('retrieve: request options instead of params are passed correctly', async () => {
-    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(
-      client.evals.runs.retrieve('eval_id', 'run_id', { path: '/_stainless_unknown_path' }),
-    ).rejects.toThrow(OpenAI.NotFoundError);
+  test('retrieve: required and optional params', async () => {
+    const response = await client.evals.runs.retrieve('run_id', { eval_id: 'eval_id' });
   });
 
   test('list', async () => {
@@ -62,13 +58,6 @@ describe('resource runs', () => {
     expect(dataAndResponse.response).toBe(rawResponse);
   });
 
-  test('list: request options instead of params are passed correctly', async () => {
-    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(client.evals.runs.list('eval_id', { path: '/_stainless_unknown_path' })).rejects.toThrow(
-      OpenAI.NotFoundError,
-    );
-  });
-
   test('list: request options and params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
@@ -80,8 +69,8 @@ describe('resource runs', () => {
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
-  test('del', async () => {
-    const responsePromise = client.evals.runs.del('eval_id', 'run_id');
+  test('delete: only required params', async () => {
+    const responsePromise = client.evals.runs.delete('run_id', { eval_id: 'eval_id' });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -91,15 +80,12 @@ describe('resource runs', () => {
     expect(dataAndResponse.response).toBe(rawResponse);
   });
 
-  test('del: request options instead of params are passed correctly', async () => {
-    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(
-      client.evals.runs.del('eval_id', 'run_id', { path: '/_stainless_unknown_path' }),
-    ).rejects.toThrow(OpenAI.NotFoundError);
+  test('delete: required and optional params', async () => {
+    const response = await client.evals.runs.delete('run_id', { eval_id: 'eval_id' });
   });
 
-  test('cancel', async () => {
-    const responsePromise = client.evals.runs.cancel('eval_id', 'run_id');
+  test('cancel: only required params', async () => {
+    const responsePromise = client.evals.runs.cancel('run_id', { eval_id: 'eval_id' });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -109,10 +95,7 @@ describe('resource runs', () => {
     expect(dataAndResponse.response).toBe(rawResponse);
   });
 
-  test('cancel: request options instead of params are passed correctly', async () => {
-    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(
-      client.evals.runs.cancel('eval_id', 'run_id', { path: '/_stainless_unknown_path' }),
-    ).rejects.toThrow(OpenAI.NotFoundError);
+  test('cancel: required and optional params', async () => {
+    const response = await client.evals.runs.cancel('run_id', { eval_id: 'eval_id' });
   });
 });

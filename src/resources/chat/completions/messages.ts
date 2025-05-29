@@ -1,11 +1,11 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../../resource';
-import { isRequestOptions } from '../../../core';
-import * as Core from '../../../core';
+import { APIResource } from '../../../core/resource';
 import * as CompletionsAPI from './completions';
 import { ChatCompletionStoreMessagesPage } from './completions';
-import { type CursorPageParams } from '../../../pagination';
+import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pagination';
+import { RequestOptions } from '../../../internal/request-options';
+import { path } from '../../../internal/utils/path';
 
 export class Messages extends APIResource {
   /**
@@ -23,25 +23,13 @@ export class Messages extends APIResource {
    * ```
    */
   list(
-    completionId: string,
-    query?: MessageListParams,
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<ChatCompletionStoreMessagesPage, CompletionsAPI.ChatCompletionStoreMessage>;
-  list(
-    completionId: string,
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<ChatCompletionStoreMessagesPage, CompletionsAPI.ChatCompletionStoreMessage>;
-  list(
-    completionId: string,
-    query: MessageListParams | Core.RequestOptions = {},
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<ChatCompletionStoreMessagesPage, CompletionsAPI.ChatCompletionStoreMessage> {
-    if (isRequestOptions(query)) {
-      return this.list(completionId, {}, query);
-    }
+    completionID: string,
+    query: MessageListParams | null | undefined = {},
+    options?: RequestOptions,
+  ): PagePromise<ChatCompletionStoreMessagesPage, CompletionsAPI.ChatCompletionStoreMessage> {
     return this._client.getAPIList(
-      `/chat/completions/${completionId}/messages`,
-      ChatCompletionStoreMessagesPage,
+      path`/chat/completions/${completionID}/messages`,
+      CursorPage<CompletionsAPI.ChatCompletionStoreMessage>,
       { query, ...options },
     );
   }
@@ -59,4 +47,4 @@ export declare namespace Messages {
   export { type MessageListParams as MessageListParams };
 }
 
-export { ChatCompletionStoreMessagesPage };
+export { type ChatCompletionStoreMessagesPage };

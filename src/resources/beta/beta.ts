@@ -1,8 +1,7 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../resource';
+import { APIResource } from '../../core/resource';
 import * as AssistantsAPI from './assistants';
-import * as ChatAPI from './chat/chat';
 import {
   Assistant,
   AssistantCreateParams,
@@ -91,18 +90,15 @@ import {
   ThreadUpdateParams,
   Threads,
 } from './threads/threads';
-import { Chat } from './chat/chat';
 
 export class Beta extends APIResource {
   realtime: RealtimeAPI.Realtime = new RealtimeAPI.Realtime(this._client);
-  chat: ChatAPI.Chat = new ChatAPI.Chat(this._client);
   assistants: AssistantsAPI.Assistants = new AssistantsAPI.Assistants(this._client);
   threads: ThreadsAPI.Threads = new ThreadsAPI.Threads(this._client);
 }
 
 Beta.Realtime = Realtime;
 Beta.Assistants = Assistants;
-Beta.AssistantsPage = AssistantsPage;
 Beta.Threads = Threads;
 
 export declare namespace Beta {
@@ -159,8 +155,6 @@ export declare namespace Beta {
     type TranscriptionSessionUpdatedEvent as TranscriptionSessionUpdatedEvent,
   };
 
-  export { Chat };
-
   export {
     Assistants as Assistants,
     type Assistant as Assistant,
@@ -174,7 +168,7 @@ export declare namespace Beta {
     type RunStepStreamEvent as RunStepStreamEvent,
     type RunStreamEvent as RunStreamEvent,
     type ThreadStreamEvent as ThreadStreamEvent,
-    AssistantsPage as AssistantsPage,
+    type AssistantsPage as AssistantsPage,
     type AssistantCreateParams as AssistantCreateParams,
     type AssistantUpdateParams as AssistantUpdateParams,
     type AssistantListParams as AssistantListParams,

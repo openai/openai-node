@@ -6,13 +6,13 @@ import {
   type ResponseCreateParamsStreaming,
   type ResponseStreamEvent,
 } from '../../resources/responses/responses';
-import * as Core from '../../core';
+import { RequestOptions } from '../../internal/request-options';
 import { APIUserAbortError, OpenAIError } from '../../error';
 import OpenAI from '../../index';
 import { type BaseEvents, EventStream } from '../EventStream';
 import { type ResponseFunctionCallArgumentsDeltaEvent, type ResponseTextDeltaEvent } from './EventTypes';
 import { maybeParseResponse, ParseableToolsParams } from '../ResponsesParser';
-import { Stream } from 'openai/streaming';
+import { Stream } from '../../streaming';
 
 export type ResponseStreamParams = ResponseCreateAndStreamParams | ResponseStreamByIdParams;
 
@@ -77,7 +77,7 @@ export class ResponseStream<ParsedT = null>
   static createResponse<ParsedT>(
     client: OpenAI,
     params: ResponseStreamParams,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): ResponseStream<ParsedT> {
     const runner = new ResponseStream<ParsedT>(params as ResponseCreateParamsStreaming);
     runner._run(() =>
@@ -165,7 +165,7 @@ export class ResponseStream<ParsedT = null>
   protected async _createOrRetrieveResponse(
     client: OpenAI,
     params: ResponseStreamParams,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): Promise<ParsedResponse<ParsedT>> {
     const signal = options?.signal;
     if (signal) {

@@ -63,7 +63,7 @@ const tools: RunnableToolFunction<any>[] = [
 ];
 
 async function main() {
-  const runner = await openai.beta.chat.completions
+  const runner = await openai.chat.completions
     .runTools({
       model: 'gpt-4-1106-preview',
       stream: true,
@@ -82,8 +82,10 @@ async function main() {
       ],
     })
     .on('message', (msg) => console.log('msg', msg))
-    .on('functionCall', (functionCall) => console.log('functionCall', functionCall))
-    .on('functionCallResult', (functionCallResult) => console.log('functionCallResult', functionCallResult))
+    .on('functionToolCall', (functionCall) => console.log('functionCall', functionCall))
+    .on('functionToolCallResult', (functionCallResult) =>
+      console.log('functionCallResult', functionCallResult),
+    )
     .on('content', (diff) => process.stdout.write(diff));
 
   const result = await runner.finalChatCompletion();

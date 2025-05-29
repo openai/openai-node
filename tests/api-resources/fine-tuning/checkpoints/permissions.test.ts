@@ -1,7 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import OpenAI from 'openai';
-import { Response } from 'node-fetch';
 
 const client = new OpenAI({
   apiKey: 'My API Key',
@@ -41,15 +40,6 @@ describe('resource permissions', () => {
     expect(dataAndResponse.response).toBe(rawResponse);
   });
 
-  test('retrieve: request options instead of params are passed correctly', async () => {
-    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(
-      client.fineTuning.checkpoints.permissions.retrieve('ft-AF1WoRqd3aJAHsqc9NY7iL8F', {
-        path: '/_stainless_unknown_path',
-      }),
-    ).rejects.toThrow(OpenAI.NotFoundError);
-  });
-
   test('retrieve: request options and params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
@@ -61,11 +51,10 @@ describe('resource permissions', () => {
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
-  test('del', async () => {
-    const responsePromise = client.fineTuning.checkpoints.permissions.del(
-      'ft:gpt-4o-mini-2024-07-18:org:weather:B7R9VjQd',
-      'cp_zc4Q7MP6XxulcVzj4MZdwsAB',
-    );
+  test('delete: only required params', async () => {
+    const responsePromise = client.fineTuning.checkpoints.permissions.delete('cp_zc4Q7MP6XxulcVzj4MZdwsAB', {
+      fine_tuned_model_checkpoint: 'ft:gpt-4o-mini-2024-07-18:org:weather:B7R9VjQd',
+    });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -75,14 +64,9 @@ describe('resource permissions', () => {
     expect(dataAndResponse.response).toBe(rawResponse);
   });
 
-  test('del: request options instead of params are passed correctly', async () => {
-    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(
-      client.fineTuning.checkpoints.permissions.del(
-        'ft:gpt-4o-mini-2024-07-18:org:weather:B7R9VjQd',
-        'cp_zc4Q7MP6XxulcVzj4MZdwsAB',
-        { path: '/_stainless_unknown_path' },
-      ),
-    ).rejects.toThrow(OpenAI.NotFoundError);
+  test('delete: required and optional params', async () => {
+    const response = await client.fineTuning.checkpoints.permissions.delete('cp_zc4Q7MP6XxulcVzj4MZdwsAB', {
+      fine_tuned_model_checkpoint: 'ft:gpt-4o-mini-2024-07-18:org:weather:B7R9VjQd',
+    });
   });
 });

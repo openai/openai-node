@@ -8,7 +8,7 @@ describe('.parse()', () => {
   describe('zod', () => {
     it('deserialises response_format', async () => {
       const completion = await makeSnapshotRequest((openai) =>
-        openai.beta.chat.completions.parse({
+        openai.chat.completions.parse({
           model: 'gpt-4o-2024-08-06',
           messages: [
             {
@@ -60,7 +60,7 @@ describe('.parse()', () => {
       );
 
       const completion = await makeSnapshotRequest((openai) =>
-        openai.beta.chat.completions.parse({
+        openai.chat.completions.parse({
           model: 'gpt-4o-2024-08-06',
           messages: [
             {
@@ -448,7 +448,7 @@ describe('.parse()', () => {
 
       const completion = await makeSnapshotRequest(
         (openai) =>
-          openai.beta.chat.completions.parse({
+          openai.chat.completions.parse({
             model: 'gpt-4o-2024-08-06',
             messages: [
               {
@@ -698,7 +698,7 @@ describe('.parse()', () => {
 
       const completion = await makeSnapshotRequest(
         (openai) =>
-          openai.beta.chat.completions.parse({
+          openai.chat.completions.parse({
             model: 'gpt-4o-2024-08-06',
             messages: [
               {
@@ -905,7 +905,7 @@ describe('.parse()', () => {
 
       const completion = await makeSnapshotRequest(
         (openai) =>
-          openai.beta.chat.completions.parse({
+          openai.chat.completions.parse({
             model: 'gpt-4o-2024-08-06',
             messages: [
               {
@@ -1030,7 +1030,7 @@ describe('.parse()', () => {
 
       const completion = await makeSnapshotRequest(
         (openai) =>
-          openai.beta.chat.completions.parse({
+          openai.chat.completions.parse({
             model: 'gpt-4o-2024-08-06',
             messages: [
               {

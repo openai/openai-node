@@ -1,6 +1,7 @@
 import fs from 'fs';
-import { toFile, type ResponseLike } from 'openai/uploads';
-import { File } from 'openai/_shims/index';
+import type { ResponseLike } from 'openai/internal/to-file';
+import { toFile } from 'openai/core/uploads';
+import { File } from 'node:buffer';
 
 class MyClass {
   name: string = 'foo';
@@ -9,7 +10,7 @@ class MyClass {
 function mockResponse({ url, content }: { url: string; content?: Blob }): ResponseLike {
   return {
     url,
-    blob: async () => content as any,
+    blob: async () => content || new Blob([]),
   };
 }
 
@@ -61,5 +62,46 @@ describe('toFile', () => {
     expect(file).toBe(input);
     expect(file.name).toEqual('input.jsonl');
     expect(file.type).toBe('jsonl');
+  });
+
+  it('is assignable to File and Blob', async () => {
+    const input = new File(['foo'], 'input.jsonl', { type: 'jsonl' });
+    const result = await toFile(input);
+    const file: File = result;
+    const blob: Blob = result;
+    void file, blob;
+  });
+});
+
+describe('missing File error message', () => {
+  let prevGlobalFile: unknown;
+  let prevNodeFile: unknown;
+  beforeEach(() => {
+    // The file shim captures the global File object when it's first imported.
+    // Reset modules before each test so we can test the error thrown when it's undefined.
+    jest.resetModules();
+    const buffer = require('node:buffer');
+    // @ts-ignore
+    prevGlobalFile = globalThis.File;
+    prevNodeFile = buffer.File;
+    // @ts-ignore
+    globalThis.File = undefined;
+    buffer.File = undefined;
+  });
+  afterEach(() => {
+    // Clean up
+    // @ts-ignore
+    globalThis.File = prevGlobalFile;
+    require('node:buffer').File = prevNodeFile;
+    jest.resetModules();
+  });
+
+  test('is thrown', async () => {
+    const uploads = await import('openai/core/uploads');
+    await expect(
+      uploads.toFile(mockResponse({ url: 'https://example.com/my/audio.mp3' })),
+    ).rejects.toMatchInlineSnapshot(
+      `[Error: \`File\` is not defined as a global, which is required for file uploads.]`,
+    );
   });
 });

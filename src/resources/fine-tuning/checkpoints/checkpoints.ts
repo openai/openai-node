@@ -1,11 +1,12 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../../resource';
+import { APIResource } from '../../../core/resource';
 import * as PermissionsAPI from './permissions';
 import {
   PermissionCreateParams,
   PermissionCreateResponse,
   PermissionCreateResponsesPage,
+  PermissionDeleteParams,
   PermissionDeleteResponse,
   PermissionRetrieveParams,
   PermissionRetrieveResponse,
@@ -17,7 +18,6 @@ export class Checkpoints extends APIResource {
 }
 
 Checkpoints.Permissions = Permissions;
-Checkpoints.PermissionCreateResponsesPage = PermissionCreateResponsesPage;
 
 export declare namespace Checkpoints {
   export {
@@ -25,8 +25,9 @@ export declare namespace Checkpoints {
     type PermissionCreateResponse as PermissionCreateResponse,
     type PermissionRetrieveResponse as PermissionRetrieveResponse,
     type PermissionDeleteResponse as PermissionDeleteResponse,
-    PermissionCreateResponsesPage as PermissionCreateResponsesPage,
+    type PermissionCreateResponsesPage as PermissionCreateResponsesPage,
     type PermissionCreateParams as PermissionCreateParams,
     type PermissionRetrieveParams as PermissionRetrieveParams,
+    type PermissionDeleteParams as PermissionDeleteParams,
   };
 }

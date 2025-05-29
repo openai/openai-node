@@ -1,9 +1,10 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../../resource';
-import { isRequestOptions } from '../../../core';
-import * as Core from '../../../core';
-import { Page } from '../../../pagination';
+import { APIResource } from '../../../core/resource';
+import { APIPromise } from '../../../core/api-promise';
+import { Page, PagePromise } from '../../../core/pagination';
+import { RequestOptions } from '../../../internal/request-options';
+import { path } from '../../../internal/utils/path';
 
 export class Permissions extends APIResource {
   /**
@@ -26,11 +27,11 @@ export class Permissions extends APIResource {
   create(
     fineTunedModelCheckpoint: string,
     body: PermissionCreateParams,
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<PermissionCreateResponsesPage, PermissionCreateResponse> {
+    options?: RequestOptions,
+  ): PagePromise<PermissionCreateResponsesPage, PermissionCreateResponse> {
     return this._client.getAPIList(
-      `/fine_tuning/checkpoints/${fineTunedModelCheckpoint}/permissions`,
-      PermissionCreateResponsesPage,
+      path`/fine_tuning/checkpoints/${fineTunedModelCheckpoint}/permissions`,
+      Page<PermissionCreateResponse>,
       { body, method: 'post', ...options },
     );
   }
@@ -51,22 +52,10 @@ export class Permissions extends APIResource {
    */
   retrieve(
     fineTunedModelCheckpoint: string,
-    query?: PermissionRetrieveParams,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<PermissionRetrieveResponse>;
-  retrieve(
-    fineTunedModelCheckpoint: string,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<PermissionRetrieveResponse>;
-  retrieve(
-    fineTunedModelCheckpoint: string,
-    query: PermissionRetrieveParams | Core.RequestOptions = {},
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<PermissionRetrieveResponse> {
-    if (isRequestOptions(query)) {
-      return this.retrieve(fineTunedModelCheckpoint, {}, query);
-    }
-    return this._client.get(`/fine_tuning/checkpoints/${fineTunedModelCheckpoint}/permissions`, {
+    query: PermissionRetrieveParams | null | undefined = {},
+    options?: RequestOptions,
+  ): APIPromise<PermissionRetrieveResponse> {
+    return this._client.get(path`/fine_tuning/checkpoints/${fineTunedModelCheckpoint}/permissions`, {
       query,
       ...options,
     });
@@ -81,28 +70,30 @@ export class Permissions extends APIResource {
    * @example
    * ```ts
    * const permission =
-   *   await client.fineTuning.checkpoints.permissions.del(
-   *     'ft:gpt-4o-mini-2024-07-18:org:weather:B7R9VjQd',
+   *   await client.fineTuning.checkpoints.permissions.delete(
    *     'cp_zc4Q7MP6XxulcVzj4MZdwsAB',
+   *     {
+   *       fine_tuned_model_checkpoint:
+   *         'ft:gpt-4o-mini-2024-07-18:org:weather:B7R9VjQd',
+   *     },
    *   );
    * ```
    */
-  del(
-    fineTunedModelCheckpoint: string,
-    permissionId: string,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<PermissionDeleteResponse> {
+  delete(
+    permissionID: string,
+    params: PermissionDeleteParams,
+    options?: RequestOptions,
+  ): APIPromise<PermissionDeleteResponse> {
+    const { fine_tuned_model_checkpoint } = params;
     return this._client.delete(
-      `/fine_tuning/checkpoints/${fineTunedModelCheckpoint}/permissions/${permissionId}`,
+      path`/fine_tuning/checkpoints/${fine_tuned_model_checkpoint}/permissions/${permissionID}`,
       options,
     );
   }
 }
 
-/**
- * Note: no pagination actually occurs yet, this is for forwards-compatibility.
- */
-export class PermissionCreateResponsesPage extends Page<PermissionCreateResponse> {}
+// Note: no pagination actually occurs yet, this is for forwards-compatibility.
+export type PermissionCreateResponsesPage = Page<PermissionCreateResponse>;
 
 /**
  * The `checkpoint.permission` object represents a permission for a fine-tuned
@@ -216,15 +207,21 @@ export interface PermissionRetrieveParams {
   project_id?: string;
 }
 
-Permissions.PermissionCreateResponsesPage = PermissionCreateResponsesPage;
+export interface PermissionDeleteParams {
+  /**
+   * The ID of the fine-tuned model checkpoint to delete a permission for.
+   */
+  fine_tuned_model_checkpoint: string;
+}
 
 export declare namespace Permissions {
   export {
     type PermissionCreateResponse as PermissionCreateResponse,
     type PermissionRetrieveResponse as PermissionRetrieveResponse,
     type PermissionDeleteResponse as PermissionDeleteResponse,
-    PermissionCreateResponsesPage as PermissionCreateResponsesPage,
+    type PermissionCreateResponsesPage as PermissionCreateResponsesPage,
     type PermissionCreateParams as PermissionCreateParams,
     type PermissionRetrieveParams as PermissionRetrieveParams,
+    type PermissionDeleteParams as PermissionDeleteParams,
   };
 }

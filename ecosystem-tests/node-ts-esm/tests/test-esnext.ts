@@ -1,13 +1,12 @@
-import 'openai/shims/node.mjs';
 import OpenAI from 'openai';
 import { distance } from 'fastest-levenshtein';
 import { ChatCompletion } from 'openai/resources/chat/completions';
-import * as shims from 'openai/_shims/index';
 
 // The tests in this file don't typecheck with "moduleResolution": "node"
 
-function typeTests(x: shims.Request) {
-  const url: string = x.url;
+async function typeTests(client: OpenAI) {
+  const response = await client.chat.completions.create({ model: 'gpt-4o', messages: [] }).asResponse();
+  const url: string = response.url;
 }
 
 const client = new OpenAI();
@@ -52,24 +51,15 @@ it(`raw response`, async function () {
     })
     .asResponse();
 
-  // test that we can use node-fetch Response API
   const chunks: string[] = [];
-  const { body } = response;
-  if (!body) throw new Error(`expected response.body to be defined`);
-  body.on('data', (chunk) => chunks.push(chunk));
-  await new Promise<void>((resolve, reject) => {
-    body.once('end', resolve);
-    body.once('error', reject);
-  });
+  if (!response.body) throw new Error(`expected response.body to be defined`);
+
+  const decoder = new TextDecoder();
+
+  for await (const chunk of response.body) {
+    chunks.push(decoder.decode(chunk));
+  }
+
   const json: ChatCompletion = JSON.parse(chunks.join(''));
   expect(json.choices[0]?.message.content || '').toBeSimilarTo('This is a test', 10);
-});
-
-test('query strings', () => {
-  expect(
-    decodeURIComponent((client as any).stringifyQuery({ foo: { nested: { a: true, b: 'foo' } } })),
-  ).toEqual('foo[nested][a]=true&foo[nested][b]=foo');
-  expect(
-    decodeURIComponent((client as any).stringifyQuery({ foo: { nested: { a: ['hello', 'world'] } } })),
-  ).toEqual('foo[nested][a][]=hello&foo[nested][a][]=world');
 });

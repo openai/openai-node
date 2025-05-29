@@ -1,6 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../resource';
+import { APIResource } from '../../core/resource';
 import * as MethodsAPI from './methods';
 import {
   DpoHyperparameters,
@@ -39,8 +39,6 @@ export class FineTuning extends APIResource {
 
 FineTuning.Methods = Methods;
 FineTuning.Jobs = Jobs;
-FineTuning.FineTuningJobsPage = FineTuningJobsPage;
-FineTuning.FineTuningJobEventsPage = FineTuningJobEventsPage;
 FineTuning.Checkpoints = Checkpoints;
 FineTuning.Alpha = Alpha;
 
@@ -59,11 +57,11 @@ export declare namespace FineTuning {
     Jobs as Jobs,
     type FineTuningJob as FineTuningJob,
     type FineTuningJobEvent as FineTuningJobEvent,
-    type FineTuningJobIntegration as FineTuningJobIntegration,
     type FineTuningJobWandbIntegration as FineTuningJobWandbIntegration,
     type FineTuningJobWandbIntegrationObject as FineTuningJobWandbIntegrationObject,
-    FineTuningJobsPage as FineTuningJobsPage,
-    FineTuningJobEventsPage as FineTuningJobEventsPage,
+    type FineTuningJobIntegration as FineTuningJobIntegration,
+    type FineTuningJobsPage as FineTuningJobsPage,
+    type FineTuningJobEventsPage as FineTuningJobEventsPage,
     type JobCreateParams as JobCreateParams,
     type JobListParams as JobListParams,
     type JobListEventsParams as JobListEventsParams,

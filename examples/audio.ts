@@ -1,5 +1,4 @@
 #!/usr/bin/env -S npm run tsn -T
-import 'openai/shims/node';
 
 import OpenAI, { toFile } from 'openai';
 import fs from 'fs';
@@ -23,9 +22,10 @@ async function streamingDemoNode() {
     input: 'the quick brown chicken jumped over the lazy dogs',
   });
 
-  const stream = response.body;
+  const stream = response.body!;
 
   console.log(`Streaming response to ${speechFile}`);
+  // @ts-ignore
   await streamToFile(stream, speechFile);
   console.log('Finished streaming');
 }

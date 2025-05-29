@@ -2,11 +2,12 @@
 
 export { Checkpoints } from './checkpoints';
 export {
-  PermissionCreateResponsesPage,
   Permissions,
   type PermissionCreateResponse,
   type PermissionRetrieveResponse,
   type PermissionDeleteResponse,
   type PermissionCreateParams,
   type PermissionRetrieveParams,
+  type PermissionDeleteParams,
+  type PermissionCreateResponsesPage,
 } from './permissions';

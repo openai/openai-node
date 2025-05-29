@@ -9,7 +9,7 @@
 
     /* Language and Environment */
     "target": "ES2015",
-    "lib": ["ES2015"],
+    "lib": ["ES2015", "DOM.AsyncIterable"],
     "jsx": "react",
 
     /* Modules */

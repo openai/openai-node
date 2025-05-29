@@ -1,7 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 export {
-  MessagesPage,
   Messages,
   type Annotation,
   type AnnotationDelta,
@@ -32,11 +31,13 @@ export {
   type TextDelta,
   type TextDeltaBlock,
   type MessageCreateParams,
+  type MessageRetrieveParams,
   type MessageUpdateParams,
   type MessageListParams,
+  type MessageDeleteParams,
+  type MessagesPage,
 } from './messages';
 export {
-  RunsPage,
   Runs,
   type RequiredActionFunctionToolCall,
   type Run,
@@ -44,11 +45,14 @@ export {
   type RunCreateParams,
   type RunCreateParamsNonStreaming,
   type RunCreateParamsStreaming,
+  type RunRetrieveParams,
   type RunUpdateParams,
   type RunListParams,
+  type RunCancelParams,
   type RunSubmitToolOutputsParams,
   type RunSubmitToolOutputsParamsNonStreaming,
   type RunSubmitToolOutputsParamsStreaming,
+  type RunsPage,
   type RunCreateAndPollParams,
   type RunCreateAndStreamParams,
   type RunStreamParams,

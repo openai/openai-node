@@ -1,6 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../resource';
+import { APIResource } from '../../core/resource';
 import * as Shared from '../shared';
 import * as CompletionsAPI from './completions/completions';
 import {
@@ -40,13 +40,7 @@ import {
   ChatCompletionUpdateParams,
   ChatCompletionUserMessageParam,
   ChatCompletionsPage,
-  CompletionCreateParams,
-  CompletionCreateParamsNonStreaming,
-  CompletionCreateParamsStreaming,
-  CompletionListParams,
-  CompletionUpdateParams,
   Completions,
-  CreateChatCompletionRequestMessage,
 } from './completions/completions';
 
 export class Chat extends APIResource {
@@ -56,7 +50,6 @@ export class Chat extends APIResource {
 export type ChatModel = Shared.ChatModel;
 
 Chat.Completions = Completions;
-Chat.ChatCompletionsPage = ChatCompletionsPage;
 
 export declare namespace Chat {
   export { type ChatModel as ChatModel };
@@ -92,18 +85,12 @@ export declare namespace Chat {
     type ChatCompletionToolChoiceOption as ChatCompletionToolChoiceOption,
     type ChatCompletionToolMessageParam as ChatCompletionToolMessageParam,
     type ChatCompletionUserMessageParam as ChatCompletionUserMessageParam,
-    type CreateChatCompletionRequestMessage as CreateChatCompletionRequestMessage,
     type ChatCompletionReasoningEffort as ChatCompletionReasoningEffort,
-    ChatCompletionsPage as ChatCompletionsPage,
+    type ChatCompletionsPage as ChatCompletionsPage,
     type ChatCompletionCreateParams as ChatCompletionCreateParams,
-    type CompletionCreateParams as CompletionCreateParams,
     type ChatCompletionCreateParamsNonStreaming as ChatCompletionCreateParamsNonStreaming,
-    type CompletionCreateParamsNonStreaming as CompletionCreateParamsNonStreaming,
     type ChatCompletionCreateParamsStreaming as ChatCompletionCreateParamsStreaming,
-    type CompletionCreateParamsStreaming as CompletionCreateParamsStreaming,
     type ChatCompletionUpdateParams as ChatCompletionUpdateParams,
-    type CompletionUpdateParams as CompletionUpdateParams,
     type ChatCompletionListParams as ChatCompletionListParams,
-    type CompletionListParams as CompletionListParams,
   };
 }
