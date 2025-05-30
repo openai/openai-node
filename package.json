@@ -34,7 +34,7 @@
     "@typescript-eslint/eslint-plugin": "8.31.1",
     "@typescript-eslint/parser": "8.31.1",
     "eslint": "^9.20.1",
-    "eslint-plugin-prettier": "^5.2.3",
+    "eslint-plugin-prettier": "^5.4.1",
     "eslint-plugin-unused-imports": "^4.1.4",
     "iconv-lite": "^0.6.3",
     "jest": "^29.4.0",
@@ -45,9 +45,6 @@
     "tsc-multi": "https://github.com/stainless-api/tsc-multi/releases/download/v1.1.4/tsc-multi-1.1.4.tgz",
     "tsconfig-paths": "^4.0.0",
     "typescript": "5.8.3"
-  },
-  "resolutions": {
-    "synckit": "0.8.8"
   },
   "imports": {
     "openai": ".",
