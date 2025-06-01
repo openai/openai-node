@@ -71,7 +71,8 @@ export interface Completion {
    * Can be used in conjunction with the `seed` request parameter to understand when
    * backend changes have been made that might impact determinism.
    */
-  system_fingerprint?: string;
+
+  system_fingerprint?: string | null;
 
   /**
    * Usage statistics for the completion request.
