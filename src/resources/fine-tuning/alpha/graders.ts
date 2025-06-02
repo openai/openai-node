@@ -20,7 +20,6 @@ export class Graders extends APIResource {
    *     type: 'string_check',
    *   },
    *   model_sample: 'model_sample',
-   *   reference_answer: 'string',
    * });
    * ```
    */
@@ -134,14 +133,20 @@ export interface GraderRunParams {
     | GraderModelsAPI.MultiGrader;
 
   /**
-   * The model sample to be evaluated.
+   * The model sample to be evaluated. This value will be used to populate the
+   * `sample` namespace. See
+   * [the guide](https://platform.openai.com/docs/guides/graders) for more details.
+   * The `output_json` variable will be populated if the model sample is a valid JSON
+   * string.
    */
   model_sample: string;
 
   /**
-   * The reference answer for the evaluation.
+   * The dataset item provided to the grader. This will be used to populate the
+   * `item` namespace. See
+   * [the guide](https://platform.openai.com/docs/guides/graders) for more details.
    */
-  reference_answer: string | unknown | Array<unknown> | number;
+  item?: unknown;
 }
 
 export interface GraderValidateParams {

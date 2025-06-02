@@ -692,7 +692,7 @@ Methods:
 - <code title="post /responses">client.responses.<a href="./src/resources/responses/responses.ts">create</a>({ ...params }) -> Response</code>
 - <code title="get /responses/{response_id}">client.responses.<a href="./src/resources/responses/responses.ts">retrieve</a>(responseID, { ...params }) -> Response</code>
 - <code title="delete /responses/{response_id}">client.responses.<a href="./src/resources/responses/responses.ts">delete</a>(responseID) -> void</code>
-- <code title="post /responses/{response_id}/cancel">client.responses.<a href="./src/resources/responses/responses.ts">cancel</a>(responseID) -> void</code>
+- <code title="post /responses/{response_id}/cancel">client.responses.<a href="./src/resources/responses/responses.ts">cancel</a>(responseID) -> Response</code>
 
 ## InputItems
 

@@ -12,7 +12,6 @@ describe('resource graders', () => {
     const responsePromise = client.fineTuning.alpha.graders.run({
       grader: { input: 'input', name: 'name', operation: 'eq', reference: 'reference', type: 'string_check' },
       model_sample: 'model_sample',
-      reference_answer: 'string',
     });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
@@ -27,7 +26,7 @@ describe('resource graders', () => {
     const response = await client.fineTuning.alpha.graders.run({
       grader: { input: 'input', name: 'name', operation: 'eq', reference: 'reference', type: 'string_check' },
       model_sample: 'model_sample',
-      reference_answer: 'string',
+      item: {},
     });
   });
 
