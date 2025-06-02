@@ -1,5 +1,19 @@
 # Changelog
 
+## 5.0.2 (2025-06-02)
+
+Full Changelog: [v5.0.1...v5.0.2](https://github.com/openai/openai-node/compare/v5.0.1...v5.0.2)
+
+### Bug Fixes
+
+* **api:** Fix evals and code interpreter interfaces ([992a9d8](https://github.com/openai/openai-node/commit/992a9d84fe412d96496b11b7a6be5c927f78db6c))
+
+
+### Chores
+
+* **deps:** bump eslint-plugin-prettier ([1428a8b](https://github.com/openai/openai-node/commit/1428a8b4f82e79695c2cbed5e12ca0da4958423b))
+* **internal:** codegen related update ([a65428f](https://github.com/openai/openai-node/commit/a65428fc81e05f681eab806e7efc6ad26062221b))
+
 ## 5.0.1 (2025-05-29)
 
 Full Changelog: [v5.0.0...v5.0.1](https://github.com/openai/openai-node/compare/v5.0.0...v5.0.1)
