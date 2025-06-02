@@ -199,7 +199,7 @@ export namespace TranscriptionTextDeltaEvent {
     /**
      * The bytes that were used to generate the log probability.
      */
-    bytes?: Array<unknown>;
+    bytes?: Array<number>;
 
     /**
      * The log probability of the token.
@@ -244,7 +244,7 @@ export namespace TranscriptionTextDoneEvent {
     /**
      * The bytes that were used to generate the log probability.
      */
-    bytes?: Array<unknown>;
+    bytes?: Array<number>;
 
     /**
      * The log probability of the token.

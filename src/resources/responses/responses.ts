@@ -185,16 +185,13 @@ export class Responses extends APIResource {
    *
    * @example
    * ```ts
-   * await client.responses.cancel(
+   * const response = await client.responses.cancel(
    *   'resp_677efb5139a88190b512bc3fef8e535d',
    * );
    * ```
    */
-  cancel(responseID: string, options?: RequestOptions): APIPromise<void> {
-    return this._client.post(path`/responses/${responseID}/cancel`, {
-      ...options,
-      headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
-    });
+  cancel(responseID: string, options?: RequestOptions): APIPromise<Response> {
+    return this._client.post(path`/responses/${responseID}/cancel`, options);
   }
 }
 
@@ -488,9 +485,9 @@ export interface Response {
    *   utilize scale tier credits until they are exhausted.
    * - If set to 'auto', and the Project is not Scale tier enabled, the request will
    *   be processed using the default service tier with a lower uptime SLA and no
-   *   latency guarentee.
+   *   latency guarantee.
    * - If set to 'default', the request will be processed using the default service
-   *   tier with a lower uptime SLA and no latency guarentee.
+   *   tier with a lower uptime SLA and no latency guarantee.
    * - If set to 'flex', the request will be processed with the Flex Processing
    *   service tier.
    *   [Learn more](https://platform.openai.com/docs/guides/flex-processing).
@@ -643,9 +640,9 @@ export interface ResponseCodeInterpreterCallCodeDeltaEvent {
   sequence_number: number;
 
   /**
-   * The type of the event. Always `response.code_interpreter_call.code.delta`.
+   * The type of the event. Always `response.code_interpreter_call_code.delta`.
    */
-  type: 'response.code_interpreter_call.code.delta';
+  type: 'response.code_interpreter_call_code.delta';
 }
 
 /**
@@ -668,9 +665,9 @@ export interface ResponseCodeInterpreterCallCodeDoneEvent {
   sequence_number: number;
 
   /**
-   * The type of the event. Always `response.code_interpreter_call.code.done`.
+   * The type of the event. Always `response.code_interpreter_call_code.done`.
    */
-  type: 'response.code_interpreter_call.code.done';
+  type: 'response.code_interpreter_call_code.done';
 }
 
 /**
@@ -1875,12 +1872,15 @@ export interface ResponseInProgressEvent {
  *   multi-turn conversations when using the Responses API statelessly (like when
  *   the `store` parameter is set to `false`, or when an organization is enrolled
  *   in the zero data retention program).
+ * - `code_interpreter_call.outputs`: Includes the outputs of python code execution
+ *   in code interpreter tool call items.
  */
 export type ResponseIncludable =
   | 'file_search_call.results'
   | 'message.input_image.image_url'
   | 'computer_call_output.output.image_url'
-  | 'reasoning.encrypted_content';
+  | 'reasoning.encrypted_content'
+  | 'code_interpreter_call.outputs';
 
 /**
  * An event that is emitted when a response finishes as incomplete.
@@ -3296,7 +3296,10 @@ export interface ResponseOutputText {
    * The annotations of the text output.
    */
   annotations: Array<
-    ResponseOutputText.FileCitation | ResponseOutputText.URLCitation | ResponseOutputText.FilePath
+    | ResponseOutputText.FileCitation
+    | ResponseOutputText.URLCitation
+    | ResponseOutputText.ContainerFileCitation
+    | ResponseOutputText.FilePath
   >;
 
   /**
@@ -3361,6 +3364,36 @@ export namespace ResponseOutputText {
      * The URL of the web resource.
      */
     url: string;
+  }
+
+  /**
+   * A citation for a container file used to generate a model response.
+   */
+  export interface ContainerFileCitation {
+    /**
+     * The ID of the container file.
+     */
+    container_id: string;
+
+    /**
+     * The index of the last character of the container file citation in the message.
+     */
+    end_index: number;
+
+    /**
+     * The ID of the file.
+     */
+    file_id: string;
+
+    /**
+     * The index of the first character of the container file citation in the message.
+     */
+    start_index: number;
+
+    /**
+     * The type of the container file citation. Always `container_file_citation`.
+     */
+    type: 'container_file_citation';
   }
 
   /**
@@ -4573,6 +4606,8 @@ export interface ResponseCreateParamsBase {
    *   multi-turn conversations when using the Responses API statelessly (like when
    *   the `store` parameter is set to `false`, or when an organization is enrolled
    *   in the zero data retention program).
+   * - `code_interpreter_call.outputs`: Includes the outputs of python code execution
+   *   in code interpreter tool call items.
    */
   include?: Array<ResponseIncludable> | null;
 
@@ -4631,9 +4666,9 @@ export interface ResponseCreateParamsBase {
    *   utilize scale tier credits until they are exhausted.
    * - If set to 'auto', and the Project is not Scale tier enabled, the request will
    *   be processed using the default service tier with a lower uptime SLA and no
-   *   latency guarentee.
+   *   latency guarantee.
    * - If set to 'default', the request will be processed using the default service
-   *   tier with a lower uptime SLA and no latency guarentee.
+   *   tier with a lower uptime SLA and no latency guarantee.
    * - If set to 'flex', the request will be processed with the Flex Processing
    *   service tier.
    *   [Learn more](https://platform.openai.com/docs/guides/flex-processing).

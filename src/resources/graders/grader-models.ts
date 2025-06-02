@@ -92,10 +92,11 @@ export interface MultiGrader {
    */
   calculate_output: string;
 
-  graders: Record<
-    string,
-    StringCheckGrader | TextSimilarityGrader | PythonGrader | ScoreModelGrader | LabelModelGrader
-  >;
+  /**
+   * A StringCheckGrader object that performs a string comparison between input and
+   * reference using a specified operation.
+   */
+  graders: StringCheckGrader | TextSimilarityGrader | PythonGrader | ScoreModelGrader | LabelModelGrader;
 
   /**
    * The name of the grader.
