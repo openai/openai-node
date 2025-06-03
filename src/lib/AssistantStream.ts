@@ -18,7 +18,6 @@ import {
   RunSubmitToolOutputsParamsBase,
   RunSubmitToolOutputsParamsStreaming,
 } from '../resources/beta/threads/runs/runs';
-import { type ReadableStream } from '../internal/shim-types';
 import { Stream } from '../streaming';
 import { APIUserAbortError, OpenAIError } from '../error';
 import {
