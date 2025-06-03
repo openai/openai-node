@@ -2203,7 +2203,7 @@ export namespace SessionUpdateEvent {
      * `auto` will create a trace for the session with default values for the workflow
      * name, group id, and metadata.
      */
-    tracing?: 'auto' | Session.UnionMember1;
+    tracing?: 'auto' | Session.TracingConfiguration;
 
     /**
      * Configuration for turn detection, ether Server VAD or Semantic VAD. This can be
@@ -2346,7 +2346,7 @@ export namespace SessionUpdateEvent {
     /**
      * Granular configuration for tracing.
      */
-    export interface UnionMember1 {
+    export interface TracingConfiguration {
       /**
        * The group id to attach to this trace to enable filtering and grouping in the
        * traces dashboard.

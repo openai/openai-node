@@ -143,7 +143,7 @@ export interface Session {
    * `auto` will create a trace for the session with default values for the workflow
    * name, group id, and metadata.
    */
-  tracing?: 'auto' | Session.UnionMember1;
+  tracing?: 'auto' | Session.TracingConfiguration;
 
   /**
    * Configuration for turn detection, ether Server VAD or Semantic VAD. This can be
@@ -257,7 +257,7 @@ export namespace Session {
   /**
    * Granular configuration for tracing.
    */
-  export interface UnionMember1 {
+  export interface TracingConfiguration {
     /**
      * The group id to attach to this trace to enable filtering and grouping in the
      * traces dashboard.
@@ -424,7 +424,7 @@ export interface SessionCreateResponse {
    * `auto` will create a trace for the session with default values for the workflow
    * name, group id, and metadata.
    */
-  tracing?: 'auto' | SessionCreateResponse.UnionMember1;
+  tracing?: 'auto' | SessionCreateResponse.TracingConfiguration;
 
   /**
    * Configuration for turn detection. Can be set to `null` to turn off. Server VAD
@@ -513,7 +513,7 @@ export namespace SessionCreateResponse {
   /**
    * Granular configuration for tracing.
    */
-  export interface UnionMember1 {
+  export interface TracingConfiguration {
     /**
      * The group id to attach to this trace to enable filtering and grouping in the
      * traces dashboard.
@@ -676,7 +676,7 @@ export interface SessionCreateParams {
    * `auto` will create a trace for the session with default values for the workflow
    * name, group id, and metadata.
    */
-  tracing?: 'auto' | SessionCreateParams.UnionMember1;
+  tracing?: 'auto' | SessionCreateParams.TracingConfiguration;
 
   /**
    * Configuration for turn detection, ether Server VAD or Semantic VAD. This can be
@@ -819,7 +819,7 @@ export namespace SessionCreateParams {
   /**
    * Granular configuration for tracing.
    */
-  export interface UnionMember1 {
+  export interface TracingConfiguration {
     /**
      * The group id to attach to this trace to enable filtering and grouping in the
      * traces dashboard.
