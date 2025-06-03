@@ -2162,6 +2162,7 @@ export namespace SessionUpdateEvent {
       | 'gpt-4o-realtime-preview'
       | 'gpt-4o-realtime-preview-2024-10-01'
       | 'gpt-4o-realtime-preview-2024-12-17'
+      | 'gpt-4o-realtime-preview-2025-06-03'
       | 'gpt-4o-mini-realtime-preview'
       | 'gpt-4o-mini-realtime-preview-2024-12-17';
 
@@ -2170,6 +2171,13 @@ export namespace SessionUpdateEvent {
      * For `pcm16`, output audio is sampled at a rate of 24kHz.
      */
     output_audio_format?: 'pcm16' | 'g711_ulaw' | 'g711_alaw';
+
+    /**
+     * The speed of the model's spoken response. 1.0 is the default speed. 0.25 is the
+     * minimum speed. 1.5 is the maximum speed. This value can only be changed in
+     * between model turns, not while a response is in progress.
+     */
+    speed?: number;
 
     /**
      * Sampling temperature for the model, limited to [0.6, 1.2]. For audio models a
@@ -2187,6 +2195,15 @@ export namespace SessionUpdateEvent {
      * Tools (functions) available to the model.
      */
     tools?: Array<Session.Tool>;
+
+    /**
+     * Configuration options for tracing. Set to null to disable tracing. Once tracing
+     * is enabled for a session, the configuration cannot be modified.
+     *
+     * `auto` will create a trace for the session with default values for the workflow
+     * name, group id, and metadata.
+     */
+    tracing?: 'auto' | Session.TracingConfiguration;
 
     /**
      * Configuration for turn detection, ether Server VAD or Semantic VAD. This can be
@@ -2324,6 +2341,29 @@ export namespace SessionUpdateEvent {
        * The type of the tool, i.e. `function`.
        */
       type?: 'function';
+    }
+
+    /**
+     * Granular configuration for tracing.
+     */
+    export interface TracingConfiguration {
+      /**
+       * The group id to attach to this trace to enable filtering and grouping in the
+       * traces dashboard.
+       */
+      group_id?: string;
+
+      /**
+       * The arbitrary metadata to attach to this trace to enable filtering in the traces
+       * dashboard.
+       */
+      metadata?: unknown;
+
+      /**
+       * The name of the workflow to attach to this trace. This is used to name the trace
+       * in the traces dashboard.
+       */
+      workflow_name?: string;
     }
 
     /**
