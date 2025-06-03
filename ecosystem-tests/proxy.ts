@@ -19,9 +19,9 @@ async function startProxy() {
 
   await new Promise<void>((resolve) => proxy.listen(0, '127.0.0.1', resolve));
 
-  console.log(proxy.address()!.toString())
+  console.log(proxy.address()!.toString());
 
   return () => {
-    proxy.close()
-  }
+    proxy.close();
+  };
 }
