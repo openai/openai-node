@@ -39,14 +39,10 @@ const client = new OpenAI({
   apiKey: process.env['OPENAI_API_KEY'], // This is the default and can be omitted
 });
 
-async function main() {
-  const chatCompletion = await client.chat.completions.create({
-    messages: [{ role: 'user', content: 'Say this is a test' }],
-    model: 'gpt-4o',
-  });
-}
-
-main();
+const chatCompletion = await client.chat.completions.create({
+  messages: [{ role: 'user', content: 'Say this is a test' }],
+  model: 'gpt-4o',
+});
 ```
 
 ## Streaming responses
@@ -83,15 +79,11 @@ const client = new OpenAI({
   apiKey: process.env['OPENAI_API_KEY'], // This is the default and can be omitted
 });
 
-async function main() {
-  const params: OpenAI.Chat.ChatCompletionCreateParams = {
-    messages: [{ role: 'user', content: 'Say this is a test' }],
-    model: 'gpt-4o',
-  };
-  const chatCompletion: OpenAI.Chat.ChatCompletion = await client.chat.completions.create(params);
-}
-
-main();
+const params: OpenAI.Chat.ChatCompletionCreateParams = {
+  messages: [{ role: 'user', content: 'Say this is a test' }],
+  model: 'gpt-4o',
+};
+const chatCompletion: OpenAI.Chat.ChatCompletion = await client.chat.completions.create(params);
 ```
 
 Documentation for each method, request param, and response field are available in docstrings and will appear on hover in most modern editors.
@@ -139,21 +131,17 @@ a subclass of `APIError` will be thrown:
 
 <!-- prettier-ignore -->
 ```ts
-async function main() {
-  const job = await client.fineTuning.jobs
-    .create({ model: 'gpt-4o', training_file: 'file-abc123' })
-    .catch(async (err) => {
-      if (err instanceof OpenAI.APIError) {
-        console.log(err.status); // 400
-        console.log(err.name); // BadRequestError
-        console.log(err.headers); // {server: 'nginx', ...}
-      } else {
-        throw err;
-      }
-    });
-}
-
-main();
+const job = await client.fineTuning.jobs
+  .create({ model: 'gpt-4o', training_file: 'file-abc123' })
+  .catch(async (err) => {
+    if (err instanceof OpenAI.APIError) {
+      console.log(err.status); // 400
+      console.log(err.name); // BadRequestError
+      console.log(err.headers); // {server: 'nginx', ...}
+    } else {
+      throw err;
+    }
+  });
 ```
 
 Error codes are as follows:
