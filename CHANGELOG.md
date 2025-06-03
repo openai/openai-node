@@ -1,5 +1,19 @@
 # Changelog
 
+## 5.1.0 (2025-06-03)
+
+Full Changelog: [v5.0.2...v5.1.0](https://github.com/openai/openai-node/compare/v5.0.2...v5.1.0)
+
+### Features
+
+* **api:** add new realtime and audio models, realtime session options ([1219f09](https://github.com/openai/openai-node/commit/1219f090b02b8d53f29abf5a0e7564af0f9f68fc))
+
+
+### Chores
+
+* adjust eslint.config.mjs ignore pattern ([9b5c898](https://github.com/openai/openai-node/commit/9b5c898fe5099859252d3c3fd62010d6aa552fef))
+* **api:** update type names ([7c296d6](https://github.com/openai/openai-node/commit/7c296d62bbde52ec84e3af78ed12f1cd196f9d52))
+
 ## 5.0.2 (2025-06-02)
 
 Full Changelog: [v5.0.1...v5.0.2](https://github.com/openai/openai-node/compare/v5.0.1...v5.0.2)
