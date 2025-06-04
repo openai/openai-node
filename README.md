@@ -132,22 +132,18 @@ a subclass of `APIError` will be thrown:
 
 <!-- prettier-ignore -->
 ```ts
-async function main() {
-  const job = await client.fineTuning.jobs
-    .create({ model: 'gpt-4o', training_file: 'file-abc123' })
-    .catch(async (err) => {
-      if (err instanceof OpenAI.APIError) {
-        console.log(err.request_id);
-        console.log(err.status); // 400
-        console.log(err.name); // BadRequestError
-        console.log(err.headers); // {server: 'nginx', ...}
-      } else {
-        throw err;
-      }
-    });
-}
-
-main();
+const job = await client.fineTuning.jobs
+  .create({ model: 'gpt-4o', training_file: 'file-abc123' })
+  .catch(async (err) => {
+    if (err instanceof OpenAI.APIError) {
+      console.log(err.request_id);
+      console.log(err.status); // 400
+      console.log(err.name); // BadRequestError
+      console.log(err.headers); // {server: 'nginx', ...}
+    } else {
+      throw err;
+    }
+  });
 ```
 
 Error codes are as follows:
