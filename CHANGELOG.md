@@ -1,5 +1,19 @@
 # Changelog
 
+## 5.1.1 (2025-06-05)
+
+Full Changelog: [v5.1.0...v5.1.1](https://github.com/openai/openai-node/compare/v5.1.0...v5.1.1)
+
+### Bug Fixes
+
+* **assistants:** handle thread.run.incomplete while streaming ([8f5e7f3](https://github.com/openai/openai-node/commit/8f5e7f3ffaad7bdd0424743eb68a63f918dbabb8))
+
+
+### Chores
+
+* **docs:** use top-level-await in example snippets ([065d3b0](https://github.com/openai/openai-node/commit/065d3b08b29e10d7af58bb66816245f71f386833))
+* **internal:** fix readablestream types in node 20 ([771ae81](https://github.com/openai/openai-node/commit/771ae818c32d855778c3847d9005efb80b0a8cd5))
+
 ## 5.1.0 (2025-06-03)
 
 Full Changelog: [v5.0.2...v5.1.0](https://github.com/openai/openai-node/compare/v5.0.2...v5.1.0)
