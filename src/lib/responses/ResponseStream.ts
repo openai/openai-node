@@ -1,19 +1,48 @@
 import {
+  ResponseTextConfig,
   type ParsedResponse,
   type Response,
   type ResponseCreateParamsBase,
   type ResponseCreateParamsStreaming,
   type ResponseStreamEvent,
 } from '../../resources/responses/responses';
-import * as Core from '../../core';
+import { RequestOptions } from '../../internal/request-options';
 import { APIUserAbortError, OpenAIError } from '../../error';
 import OpenAI from '../../index';
 import { type BaseEvents, EventStream } from '../EventStream';
 import { type ResponseFunctionCallArgumentsDeltaEvent, type ResponseTextDeltaEvent } from './EventTypes';
-import { maybeParseResponse } from '../ResponsesParser';
+import { maybeParseResponse, ParseableToolsParams } from '../ResponsesParser';
+import { Stream } from '../../streaming';
 
-export type ResponseStreamParams = Omit<ResponseCreateParamsBase, 'stream'> & {
+export type ResponseStreamParams = ResponseCreateAndStreamParams | ResponseStreamByIdParams;
+
+export type ResponseCreateAndStreamParams = Omit<ResponseCreateParamsBase, 'stream'> & {
   stream?: true;
+};
+
+export type ResponseStreamByIdParams = {
+  /**
+   * The ID of the response to stream.
+   */
+  response_id: string;
+  /**
+   * If provided, the stream will start after the event with the given sequence number.
+   */
+  starting_after?: number;
+  /**
+   * Configuration options for a text response from the model. Can be plain text or
+   * structured JSON data. Learn more:
+   *
+   * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
+   * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+   */
+  text?: ResponseTextConfig;
+
+  /**
+   * An array of tools the model may call while generating a response. When continuing a stream, provide
+   * the same tools as the original request.
+   */
+  tools?: ParseableToolsParams;
 };
 
 type ResponseEvents = BaseEvents &
@@ -48,11 +77,11 @@ export class ResponseStream<ParsedT = null>
   static createResponse<ParsedT>(
     client: OpenAI,
     params: ResponseStreamParams,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): ResponseStream<ParsedT> {
     const runner = new ResponseStream<ParsedT>(params as ResponseCreateParamsStreaming);
     runner._run(() =>
-      runner._createResponse(client, params, {
+      runner._createOrRetrieveResponse(client, params, {
         ...options,
         headers: { ...options?.headers, 'X-Stainless-Helper-Method': 'stream' },
       }),
@@ -65,11 +94,17 @@ export class ResponseStream<ParsedT = null>
     this.#currentResponseSnapshot = undefined;
   }
 
-  #addEvent(this: ResponseStream<ParsedT>, event: ResponseStreamEvent) {
+  #addEvent(this: ResponseStream<ParsedT>, event: ResponseStreamEvent, starting_after: number | null) {
     if (this.ended) return;
 
+    const maybeEmit = (name: string, event: ResponseStreamEvent & { snapshot?: string }) => {
+      if (starting_after == null || event.sequence_number > starting_after) {
+        this._emit(name as any, event);
+      }
+    };
+
     const response = this.#accumulateResponse(event);
-    this._emit('event', event);
+    maybeEmit('event', event);
 
     switch (event.type) {
       case 'response.output_text.delta': {
@@ -86,7 +121,7 @@ export class ResponseStream<ParsedT = null>
             throw new OpenAIError(`expected content to be 'output_text', got ${content.type}`);
           }
 
-          this._emit('response.output_text.delta', {
+          maybeEmit('response.output_text.delta', {
             ...event,
             snapshot: content.text,
           });
@@ -99,7 +134,7 @@ export class ResponseStream<ParsedT = null>
           throw new OpenAIError(`missing output at index ${event.output_index}`);
         }
         if (output.type === 'function_call') {
-          this._emit('response.function_call_arguments.delta', {
+          maybeEmit('response.function_call_arguments.delta', {
             ...event,
             snapshot: output.arguments,
           });
@@ -107,8 +142,7 @@ export class ResponseStream<ParsedT = null>
         break;
       }
       default:
-        // @ts-ignore
-        this._emit(event.type, event);
+        maybeEmit(event.type, event);
         break;
     }
   }
@@ -128,10 +162,10 @@ export class ResponseStream<ParsedT = null>
     return parsedResponse;
   }
 
-  protected async _createResponse(
+  protected async _createOrRetrieveResponse(
     client: OpenAI,
-    params: ResponseStreamingParams,
-    options?: Core.RequestOptions,
+    params: ResponseStreamParams,
+    options?: RequestOptions,
   ): Promise<ParsedResponse<ParsedT>> {
     const signal = options?.signal;
     if (signal) {
@@ -140,13 +174,25 @@ export class ResponseStream<ParsedT = null>
     }
     this.#beginRequest();
 
-    const stream = await client.responses.create(
-      { ...params, stream: true },
-      { ...options, signal: this.controller.signal },
-    );
+    let stream: Stream<ResponseStreamEvent> | undefined;
+    let starting_after: number | null = null;
+    if ('response_id' in params) {
+      stream = await client.responses.retrieve(
+        params.response_id,
+        { stream: true },
+        { ...options, signal: this.controller.signal, stream: true },
+      );
+      starting_after = params.starting_after ?? null;
+    } else {
+      stream = await client.responses.create(
+        { ...params, stream: true },
+        { ...options, signal: this.controller.signal },
+      );
+    }
+
     this._connected();
     for await (const event of stream) {
-      this.#addEvent(event);
+      this.#addEvent(event, starting_after);
     }
     if (stream.controller.signal?.aborted) {
       throw new APIUserAbortError();

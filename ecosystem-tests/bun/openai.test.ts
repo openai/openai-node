@@ -43,6 +43,20 @@ test(`basic request works`, async function () {
   expectSimilar(completion.choices[0]?.message?.content, 'This is a test', 10);
 });
 
+test(`proxied request works`, async function () {
+  const client = new OpenAI({
+    fetchOptions: {
+      proxy: process.env['ECOSYSTEM_TESTS_PROXY'],
+    },
+  });
+  
+  const completion = await client.chat.completions.create({
+    model: 'gpt-4',
+    messages: [{ role: 'user', content: 'Say this is a test' }],
+  });
+  expectSimilar(completion.choices[0]?.message?.content, 'This is a test', 10);
+});
+
 test(`raw response`, async function () {
   const response = await client.chat.completions
     .create({
@@ -112,6 +126,14 @@ test('handles Response', async function () {
 test('handles fs.ReadStream', async function () {
   const result = await client.audio.transcriptions.create({
     file: fs.createReadStream('sample1.mp3'),
+    model,
+  });
+  expectSimilar(result.text, correctAnswer, 12);
+});
+
+test('handles Bun.File', async function () {
+  const result = await client.audio.transcriptions.create({
+    file: Bun.file('sample1.mp3'),
     model,
   });
   expectSimilar(result.text, correctAnswer, 12);

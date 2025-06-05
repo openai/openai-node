@@ -6,7 +6,7 @@ import OpenAI from 'openai';
 const openai = new OpenAI();
 
 async function main() {
-  const stream = await openai.beta.chat.completions
+  const stream = await openai.chat.completions
     .stream({
       model: 'gpt-4',
       messages: [{ role: 'user', content: 'Say this is a test' }],

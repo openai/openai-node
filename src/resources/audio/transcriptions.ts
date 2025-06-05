@@ -1,51 +1,63 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../resource';
-import * as Core from '../../core';
+import { APIResource } from '../../core/resource';
 import * as TranscriptionsAPI from './transcriptions';
 import * as AudioAPI from './audio';
-import { Stream } from '../../streaming';
+import { APIPromise } from '../../core/api-promise';
+import { Stream } from '../../core/streaming';
+import { type Uploadable } from '../../core/uploads';
+import { RequestOptions } from '../../internal/request-options';
+import { multipartFormRequestOptions } from '../../internal/uploads';
 
 export class Transcriptions extends APIResource {
   /**
    * Transcribes audio into the input language.
+   *
+   * @example
+   * ```ts
+   * const transcription =
+   *   await client.audio.transcriptions.create({
+   *     file: fs.createReadStream('speech.mp3'),
+   *     model: 'gpt-4o-transcribe',
+   *   });
+   * ```
    */
   create(
     body: TranscriptionCreateParamsNonStreaming<'json' | undefined>,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<Transcription>;
+    options?: RequestOptions,
+  ): APIPromise<Transcription>;
   create(
     body: TranscriptionCreateParamsNonStreaming<'verbose_json'>,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<TranscriptionVerbose>;
+    options?: RequestOptions,
+  ): APIPromise<TranscriptionVerbose>;
   create(
     body: TranscriptionCreateParamsNonStreaming<'srt' | 'vtt' | 'text'>,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<string>;
-  create(
-    body: TranscriptionCreateParamsNonStreaming,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<Transcription>;
+    options?: RequestOptions,
+  ): APIPromise<string>;
+  create(body: TranscriptionCreateParamsNonStreaming, options?: RequestOptions): APIPromise<Transcription>;
   create(
     body: TranscriptionCreateParamsStreaming,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<Stream<TranscriptionStreamEvent>>;
+    options?: RequestOptions,
+  ): APIPromise<Stream<TranscriptionStreamEvent>>;
   create(
     body: TranscriptionCreateParamsStreaming,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<TranscriptionCreateResponse | string | Stream<TranscriptionStreamEvent>>;
+    options?: RequestOptions,
+  ): APIPromise<TranscriptionCreateResponse | string | Stream<TranscriptionStreamEvent>>;
   create(
     body: TranscriptionCreateParams,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<TranscriptionCreateResponse | string | Stream<TranscriptionStreamEvent>> {
+    options?: RequestOptions,
+  ): APIPromise<TranscriptionCreateResponse | string | Stream<TranscriptionStreamEvent>> {
     return this._client.post(
       '/audio/transcriptions',
-      Core.multipartFormRequestOptions({
-        body,
-        ...options,
-        stream: body.stream ?? false,
-        __metadata: { model: body.model },
-      }),
+      multipartFormRequestOptions(
+        {
+          body,
+          ...options,
+          stream: body.stream ?? false,
+          __metadata: { model: body.model },
+        },
+        this._client,
+      ),
     );
   }
 }
@@ -187,7 +199,7 @@ export namespace TranscriptionTextDeltaEvent {
     /**
      * The bytes that were used to generate the log probability.
      */
-    bytes?: Array<unknown>;
+    bytes?: Array<number>;
 
     /**
      * The log probability of the token.
@@ -232,7 +244,7 @@ export namespace TranscriptionTextDoneEvent {
     /**
      * The bytes that were used to generate the log probability.
      */
-    bytes?: Array<unknown>;
+    bytes?: Array<number>;
 
     /**
      * The log probability of the token.
@@ -306,7 +318,7 @@ export interface TranscriptionCreateParamsBase<
    * The audio file object (not file name) to transcribe, in one of these formats:
    * flac, mp3, mp4, mpeg, mpga, m4a, ogg, wav, or webm.
    */
-  file: Core.Uploadable;
+  file: Uploadable;
 
   /**
    * ID of the model to use. The options are `gpt-4o-transcribe`,
@@ -314,6 +326,14 @@ export interface TranscriptionCreateParamsBase<
    * Whisper V2 model).
    */
   model: (string & {}) | AudioAPI.AudioModel;
+
+  /**
+   * Controls how the audio is cut into chunks. When set to `"auto"`, the server
+   * first normalizes loudness and then uses voice activity detection (VAD) to choose
+   * boundaries. `server_vad` object can be provided to tweak VAD detection
+   * parameters manually. If unset, the audio is transcribed as a single block.
+   */
+  chunking_strategy?: 'auto' | TranscriptionCreateParams.VadConfig | null;
 
   /**
    * Additional information to include in the transcription response. `logprobs` will
@@ -378,6 +398,32 @@ export interface TranscriptionCreateParamsBase<
 }
 
 export namespace TranscriptionCreateParams {
+  export interface VadConfig {
+    /**
+     * Must be set to `server_vad` to enable manual chunking using server side VAD.
+     */
+    type: 'server_vad';
+
+    /**
+     * Amount of audio to include before the VAD detected speech (in milliseconds).
+     */
+    prefix_padding_ms?: number;
+
+    /**
+     * Duration of silence to detect speech stop (in milliseconds). With shorter values
+     * the model will respond more quickly, but may jump in on short pauses from the
+     * user.
+     */
+    silence_duration_ms?: number;
+
+    /**
+     * Sensitivity threshold (0.0 to 1.0) for voice activity detection. A higher
+     * threshold will require louder audio to activate the model, and thus might
+     * perform better in noisy environments.
+     */
+    threshold?: number;
+  }
+
   export type TranscriptionCreateParamsNonStreaming = TranscriptionsAPI.TranscriptionCreateParamsNonStreaming;
   export type TranscriptionCreateParamsStreaming = TranscriptionsAPI.TranscriptionCreateParamsStreaming;
 }

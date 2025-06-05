@@ -131,6 +131,7 @@ export function uploadWebApiTestCases({
 	});
 	it('toFile handles ArrayBuffer', async () => {
 		const result = await client.files.create({
+			// @ts-ignore
 			file: await toFile(new TextEncoder().encode(fineTune).buffer, 'finetune.jsonl'),
 			purpose: 'fine-tune',
 		});

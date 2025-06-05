@@ -1,7 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import OpenAI from 'openai';
-import { Response } from 'node-fetch';
 
 const client = new OpenAI({
   apiKey: 'My API Key',
@@ -47,7 +46,6 @@ describe('resource evals', () => {
       ],
       metadata: { foo: 'string' },
       name: 'name',
-      share_with_openai: true,
     });
   });
 
@@ -60,13 +58,6 @@ describe('resource evals', () => {
     const dataAndResponse = await responsePromise.withResponse();
     expect(dataAndResponse.data).toBe(response);
     expect(dataAndResponse.response).toBe(rawResponse);
-  });
-
-  test('retrieve: request options instead of params are passed correctly', async () => {
-    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(client.evals.retrieve('eval_id', { path: '/_stainless_unknown_path' })).rejects.toThrow(
-      OpenAI.NotFoundError,
-    );
   });
 
   test('update', async () => {
@@ -91,13 +82,6 @@ describe('resource evals', () => {
     expect(dataAndResponse.response).toBe(rawResponse);
   });
 
-  test('list: request options instead of params are passed correctly', async () => {
-    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(client.evals.list({ path: '/_stainless_unknown_path' })).rejects.toThrow(
-      OpenAI.NotFoundError,
-    );
-  });
-
   test('list: request options and params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
@@ -108,8 +92,8 @@ describe('resource evals', () => {
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
-  test('del', async () => {
-    const responsePromise = client.evals.del('eval_id');
+  test('delete', async () => {
+    const responsePromise = client.evals.delete('eval_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -117,12 +101,5 @@ describe('resource evals', () => {
     const dataAndResponse = await responsePromise.withResponse();
     expect(dataAndResponse.data).toBe(response);
     expect(dataAndResponse.response).toBe(rawResponse);
-  });
-
-  test('del: request options instead of params are passed correctly', async () => {
-    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(client.evals.del('eval_id', { path: '/_stainless_unknown_path' })).rejects.toThrow(
-      OpenAI.NotFoundError,
-    );
   });
 });

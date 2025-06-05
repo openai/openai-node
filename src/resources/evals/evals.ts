@@ -1,85 +1,80 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../resource';
-import { isRequestOptions } from '../../core';
-import * as Core from '../../core';
+import { APIResource } from '../../core/resource';
 import * as Shared from '../shared';
+import * as GraderModelsAPI from '../graders/grader-models';
+import * as ResponsesAPI from '../responses/responses';
 import * as RunsAPI from './runs/runs';
 import {
   CreateEvalCompletionsRunDataSource,
   CreateEvalJSONLRunDataSource,
   EvalAPIError,
+  RunCancelParams,
   RunCancelResponse,
   RunCreateParams,
   RunCreateResponse,
+  RunDeleteParams,
   RunDeleteResponse,
   RunListParams,
   RunListResponse,
   RunListResponsesPage,
+  RunRetrieveParams,
   RunRetrieveResponse,
   Runs,
 } from './runs/runs';
-import { CursorPage, type CursorPageParams } from '../../pagination';
+import { APIPromise } from '../../core/api-promise';
+import { CursorPage, type CursorPageParams, PagePromise } from '../../core/pagination';
+import { RequestOptions } from '../../internal/request-options';
+import { path } from '../../internal/utils/path';
 
 export class Evals extends APIResource {
   runs: RunsAPI.Runs = new RunsAPI.Runs(this._client);
 
   /**
    * Create the structure of an evaluation that can be used to test a model's
-   * performance. An evaluation is a set of testing criteria and a datasource. After
+   * performance. An evaluation is a set of testing criteria and the config for a
+   * data source, which dictates the schema of the data used in the evaluation. After
    * creating an evaluation, you can run it on different models and model parameters.
    * We support several types of graders and datasources. For more information, see
    * the [Evals guide](https://platform.openai.com/docs/guides/evals).
    */
-  create(body: EvalCreateParams, options?: Core.RequestOptions): Core.APIPromise<EvalCreateResponse> {
+  create(body: EvalCreateParams, options?: RequestOptions): APIPromise<EvalCreateResponse> {
     return this._client.post('/evals', { body, ...options });
   }
 
   /**
    * Get an evaluation by ID.
    */
-  retrieve(evalId: string, options?: Core.RequestOptions): Core.APIPromise<EvalRetrieveResponse> {
-    return this._client.get(`/evals/${evalId}`, options);
+  retrieve(evalID: string, options?: RequestOptions): APIPromise<EvalRetrieveResponse> {
+    return this._client.get(path`/evals/${evalID}`, options);
   }
 
   /**
    * Update certain properties of an evaluation.
    */
-  update(
-    evalId: string,
-    body: EvalUpdateParams,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<EvalUpdateResponse> {
-    return this._client.post(`/evals/${evalId}`, { body, ...options });
+  update(evalID: string, body: EvalUpdateParams, options?: RequestOptions): APIPromise<EvalUpdateResponse> {
+    return this._client.post(path`/evals/${evalID}`, { body, ...options });
   }
 
   /**
    * List evaluations for a project.
    */
   list(
-    query?: EvalListParams,
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<EvalListResponsesPage, EvalListResponse>;
-  list(options?: Core.RequestOptions): Core.PagePromise<EvalListResponsesPage, EvalListResponse>;
-  list(
-    query: EvalListParams | Core.RequestOptions = {},
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<EvalListResponsesPage, EvalListResponse> {
-    if (isRequestOptions(query)) {
-      return this.list({}, query);
-    }
-    return this._client.getAPIList('/evals', EvalListResponsesPage, { query, ...options });
+    query: EvalListParams | null | undefined = {},
+    options?: RequestOptions,
+  ): PagePromise<EvalListResponsesPage, EvalListResponse> {
+    return this._client.getAPIList('/evals', CursorPage<EvalListResponse>, { query, ...options });
   }
 
   /**
    * Delete an evaluation.
    */
-  del(evalId: string, options?: Core.RequestOptions): Core.APIPromise<EvalDeleteResponse> {
-    return this._client.delete(`/evals/${evalId}`, options);
+  delete(evalID: string, options?: RequestOptions): APIPromise<EvalDeleteResponse> {
+    return this._client.delete(path`/evals/${evalID}`, options);
   }
 }
 
-export class EvalListResponsesPage extends CursorPage<EvalListResponse> {}
+export type EvalListResponsesPage = CursorPage<EvalListResponse>;
 
 /**
  * A CustomDataSourceConfig which specifies the schema of your `item` and
@@ -103,102 +98,7 @@ export interface EvalCustomDataSourceConfig {
 }
 
 /**
- * A LabelModelGrader object which uses a model to assign labels to each item in
- * the evaluation.
- */
-export interface EvalLabelModelGrader {
-  input: Array<EvalLabelModelGrader.InputMessage | EvalLabelModelGrader.Assistant>;
-
-  /**
-   * The labels to assign to each item in the evaluation.
-   */
-  labels: Array<string>;
-
-  /**
-   * The model to use for the evaluation. Must support structured outputs.
-   */
-  model: string;
-
-  /**
-   * The name of the grader.
-   */
-  name: string;
-
-  /**
-   * The labels that indicate a passing result. Must be a subset of labels.
-   */
-  passing_labels: Array<string>;
-
-  /**
-   * The object type, which is always `label_model`.
-   */
-  type: 'label_model';
-}
-
-export namespace EvalLabelModelGrader {
-  export interface InputMessage {
-    content: InputMessage.Content;
-
-    /**
-     * The role of the message. One of `user`, `system`, or `developer`.
-     */
-    role: 'user' | 'system' | 'developer';
-
-    /**
-     * The type of item, which is always `message`.
-     */
-    type: 'message';
-  }
-
-  export namespace InputMessage {
-    export interface Content {
-      /**
-       * The text content.
-       */
-      text: string;
-
-      /**
-       * The type of content, which is always `input_text`.
-       */
-      type: 'input_text';
-    }
-  }
-
-  export interface Assistant {
-    content: Assistant.Content;
-
-    /**
-     * The role of the message. Must be `assistant` for output.
-     */
-    role: 'assistant';
-
-    /**
-     * The type of item, which is always `message`.
-     */
-    type: 'message';
-  }
-
-  export namespace Assistant {
-    export interface Content {
-      /**
-       * The text content.
-       */
-      text: string;
-
-      /**
-       * The type of content, which is always `output_text`.
-       */
-      type: 'output_text';
-    }
-  }
-}
-
-/**
- * A StoredCompletionsDataSourceConfig which specifies the metadata property of
- * your stored completions query. This is usually metadata like `usecase=chatbot`
- * or `prompt-version=v2`, etc. The schema returned by this data source config is
- * used to defined what variables are available in your evals. `item` and `sample`
- * are both defined when using this data source config.
+ * @deprecated Deprecated in favor of LogsDataSourceConfig.
  */
 export interface EvalStoredCompletionsDataSourceConfig {
   /**
@@ -224,90 +124,12 @@ export interface EvalStoredCompletionsDataSourceConfig {
 }
 
 /**
- * A StringCheckGrader object that performs a string comparison between input and
- * reference using a specified operation.
- */
-export interface EvalStringCheckGrader {
-  /**
-   * The input text. This may include template strings.
-   */
-  input: string;
-
-  /**
-   * The name of the grader.
-   */
-  name: string;
-
-  /**
-   * The string check operation to perform. One of `eq`, `ne`, `like`, or `ilike`.
-   */
-  operation: 'eq' | 'ne' | 'like' | 'ilike';
-
-  /**
-   * The reference text. This may include template strings.
-   */
-  reference: string;
-
-  /**
-   * The object type, which is always `string_check`.
-   */
-  type: 'string_check';
-}
-
-/**
- * A TextSimilarityGrader object which grades text based on similarity metrics.
- */
-export interface EvalTextSimilarityGrader {
-  /**
-   * The evaluation metric to use. One of `cosine`, `fuzzy_match`, `bleu`, `gleu`,
-   * `meteor`, `rouge_1`, `rouge_2`, `rouge_3`, `rouge_4`, `rouge_5`, or `rouge_l`.
-   */
-  evaluation_metric:
-    | 'fuzzy_match'
-    | 'bleu'
-    | 'gleu'
-    | 'meteor'
-    | 'rouge_1'
-    | 'rouge_2'
-    | 'rouge_3'
-    | 'rouge_4'
-    | 'rouge_5'
-    | 'rouge_l'
-    | 'cosine';
-
-  /**
-   * The text being graded.
-   */
-  input: string;
-
-  /**
-   * A float score where a value greater than or equal indicates a passing grade.
-   */
-  pass_threshold: number;
-
-  /**
-   * The text being graded against.
-   */
-  reference: string;
-
-  /**
-   * The type of grader.
-   */
-  type: 'text_similarity';
-
-  /**
-   * The name of the grader.
-   */
-  name?: string;
-}
-
-/**
  * An Eval object with a data source config and testing criteria. An Eval
  * represents a task to be done for your LLM integration. Like:
  *
  * - Improve the quality of my chatbot
  * - See how well my chatbot handles customer support
- * - Check if o3-mini is better at my usecase than gpt-4o
+ * - Check if o4-mini is better at my usecase than gpt-4o
  */
 export interface EvalCreateResponse {
   /**
@@ -323,7 +145,10 @@ export interface EvalCreateResponse {
   /**
    * Configuration of data sources used in runs of the evaluation.
    */
-  data_source_config: EvalCustomDataSourceConfig | EvalStoredCompletionsDataSourceConfig;
+  data_source_config:
+    | EvalCustomDataSourceConfig
+    | EvalCreateResponse.Logs
+    | EvalStoredCompletionsDataSourceConfig;
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
@@ -346,14 +171,77 @@ export interface EvalCreateResponse {
   object: 'eval';
 
   /**
-   * Indicates whether the evaluation is shared with OpenAI.
-   */
-  share_with_openai: boolean;
-
-  /**
    * A list of testing criteria.
    */
-  testing_criteria: Array<EvalLabelModelGrader | EvalStringCheckGrader | EvalTextSimilarityGrader>;
+  testing_criteria: Array<
+    | GraderModelsAPI.LabelModelGrader
+    | GraderModelsAPI.StringCheckGrader
+    | EvalCreateResponse.EvalGraderTextSimilarity
+    | EvalCreateResponse.EvalGraderPython
+    | EvalCreateResponse.EvalGraderScoreModel
+  >;
+}
+
+export namespace EvalCreateResponse {
+  /**
+   * A LogsDataSourceConfig which specifies the metadata property of your logs query.
+   * This is usually metadata like `usecase=chatbot` or `prompt-version=v2`, etc. The
+   * schema returned by this data source config is used to defined what variables are
+   * available in your evals. `item` and `sample` are both defined when using this
+   * data source config.
+   */
+  export interface Logs {
+    /**
+     * The json schema for the run data source items. Learn how to build JSON schemas
+     * [here](https://json-schema.org/).
+     */
+    schema: Record<string, unknown>;
+
+    /**
+     * The type of data source. Always `logs`.
+     */
+    type: 'logs';
+
+    /**
+     * Set of 16 key-value pairs that can be attached to an object. This can be useful
+     * for storing additional information about the object in a structured format, and
+     * querying for objects via API or the dashboard.
+     *
+     * Keys are strings with a maximum length of 64 characters. Values are strings with
+     * a maximum length of 512 characters.
+     */
+    metadata?: Shared.Metadata | null;
+  }
+
+  /**
+   * A TextSimilarityGrader object which grades text based on similarity metrics.
+   */
+  export interface EvalGraderTextSimilarity extends GraderModelsAPI.TextSimilarityGrader {
+    /**
+     * The threshold for the score.
+     */
+    pass_threshold: number;
+  }
+
+  /**
+   * A PythonGrader object that runs a python script on the input.
+   */
+  export interface EvalGraderPython extends GraderModelsAPI.PythonGrader {
+    /**
+     * The threshold for the score.
+     */
+    pass_threshold?: number;
+  }
+
+  /**
+   * A ScoreModelGrader object that uses a model to assign a score to the input.
+   */
+  export interface EvalGraderScoreModel extends GraderModelsAPI.ScoreModelGrader {
+    /**
+     * The threshold for the score.
+     */
+    pass_threshold?: number;
+  }
 }
 
 /**
@@ -362,7 +250,7 @@ export interface EvalCreateResponse {
  *
  * - Improve the quality of my chatbot
  * - See how well my chatbot handles customer support
- * - Check if o3-mini is better at my usecase than gpt-4o
+ * - Check if o4-mini is better at my usecase than gpt-4o
  */
 export interface EvalRetrieveResponse {
   /**
@@ -378,7 +266,10 @@ export interface EvalRetrieveResponse {
   /**
    * Configuration of data sources used in runs of the evaluation.
    */
-  data_source_config: EvalCustomDataSourceConfig | EvalStoredCompletionsDataSourceConfig;
+  data_source_config:
+    | EvalCustomDataSourceConfig
+    | EvalRetrieveResponse.Logs
+    | EvalStoredCompletionsDataSourceConfig;
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
@@ -401,14 +292,77 @@ export interface EvalRetrieveResponse {
   object: 'eval';
 
   /**
-   * Indicates whether the evaluation is shared with OpenAI.
-   */
-  share_with_openai: boolean;
-
-  /**
    * A list of testing criteria.
    */
-  testing_criteria: Array<EvalLabelModelGrader | EvalStringCheckGrader | EvalTextSimilarityGrader>;
+  testing_criteria: Array<
+    | GraderModelsAPI.LabelModelGrader
+    | GraderModelsAPI.StringCheckGrader
+    | EvalRetrieveResponse.EvalGraderTextSimilarity
+    | EvalRetrieveResponse.EvalGraderPython
+    | EvalRetrieveResponse.EvalGraderScoreModel
+  >;
+}
+
+export namespace EvalRetrieveResponse {
+  /**
+   * A LogsDataSourceConfig which specifies the metadata property of your logs query.
+   * This is usually metadata like `usecase=chatbot` or `prompt-version=v2`, etc. The
+   * schema returned by this data source config is used to defined what variables are
+   * available in your evals. `item` and `sample` are both defined when using this
+   * data source config.
+   */
+  export interface Logs {
+    /**
+     * The json schema for the run data source items. Learn how to build JSON schemas
+     * [here](https://json-schema.org/).
+     */
+    schema: Record<string, unknown>;
+
+    /**
+     * The type of data source. Always `logs`.
+     */
+    type: 'logs';
+
+    /**
+     * Set of 16 key-value pairs that can be attached to an object. This can be useful
+     * for storing additional information about the object in a structured format, and
+     * querying for objects via API or the dashboard.
+     *
+     * Keys are strings with a maximum length of 64 characters. Values are strings with
+     * a maximum length of 512 characters.
+     */
+    metadata?: Shared.Metadata | null;
+  }
+
+  /**
+   * A TextSimilarityGrader object which grades text based on similarity metrics.
+   */
+  export interface EvalGraderTextSimilarity extends GraderModelsAPI.TextSimilarityGrader {
+    /**
+     * The threshold for the score.
+     */
+    pass_threshold: number;
+  }
+
+  /**
+   * A PythonGrader object that runs a python script on the input.
+   */
+  export interface EvalGraderPython extends GraderModelsAPI.PythonGrader {
+    /**
+     * The threshold for the score.
+     */
+    pass_threshold?: number;
+  }
+
+  /**
+   * A ScoreModelGrader object that uses a model to assign a score to the input.
+   */
+  export interface EvalGraderScoreModel extends GraderModelsAPI.ScoreModelGrader {
+    /**
+     * The threshold for the score.
+     */
+    pass_threshold?: number;
+  }
 }
 
 /**
@@ -417,7 +371,7 @@ export interface EvalRetrieveResponse {
  *
  * - Improve the quality of my chatbot
  * - See how well my chatbot handles customer support
- * - Check if o3-mini is better at my usecase than gpt-4o
+ * - Check if o4-mini is better at my usecase than gpt-4o
  */
 export interface EvalUpdateResponse {
   /**
@@ -433,7 +387,10 @@ export interface EvalUpdateResponse {
   /**
    * Configuration of data sources used in runs of the evaluation.
    */
-  data_source_config: EvalCustomDataSourceConfig | EvalStoredCompletionsDataSourceConfig;
+  data_source_config:
+    | EvalCustomDataSourceConfig
+    | EvalUpdateResponse.Logs
+    | EvalStoredCompletionsDataSourceConfig;
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
@@ -456,14 +413,77 @@ export interface EvalUpdateResponse {
   object: 'eval';
 
   /**
-   * Indicates whether the evaluation is shared with OpenAI.
-   */
-  share_with_openai: boolean;
-
-  /**
    * A list of testing criteria.
    */
-  testing_criteria: Array<EvalLabelModelGrader | EvalStringCheckGrader | EvalTextSimilarityGrader>;
+  testing_criteria: Array<
+    | GraderModelsAPI.LabelModelGrader
+    | GraderModelsAPI.StringCheckGrader
+    | EvalUpdateResponse.EvalGraderTextSimilarity
+    | EvalUpdateResponse.EvalGraderPython
+    | EvalUpdateResponse.EvalGraderScoreModel
+  >;
+}
+
+export namespace EvalUpdateResponse {
+  /**
+   * A LogsDataSourceConfig which specifies the metadata property of your logs query.
+   * This is usually metadata like `usecase=chatbot` or `prompt-version=v2`, etc. The
+   * schema returned by this data source config is used to defined what variables are
+   * available in your evals. `item` and `sample` are both defined when using this
+   * data source config.
+   */
+  export interface Logs {
+    /**
+     * The json schema for the run data source items. Learn how to build JSON schemas
+     * [here](https://json-schema.org/).
+     */
+    schema: Record<string, unknown>;
+
+    /**
+     * The type of data source. Always `logs`.
+     */
+    type: 'logs';
+
+    /**
+     * Set of 16 key-value pairs that can be attached to an object. This can be useful
+     * for storing additional information about the object in a structured format, and
+     * querying for objects via API or the dashboard.
+     *
+     * Keys are strings with a maximum length of 64 characters. Values are strings with
+     * a maximum length of 512 characters.
+     */
+    metadata?: Shared.Metadata | null;
+  }
+
+  /**
+   * A TextSimilarityGrader object which grades text based on similarity metrics.
+   */
+  export interface EvalGraderTextSimilarity extends GraderModelsAPI.TextSimilarityGrader {
+    /**
+     * The threshold for the score.
+     */
+    pass_threshold: number;
+  }
+
+  /**
+   * A PythonGrader object that runs a python script on the input.
+   */
+  export interface EvalGraderPython extends GraderModelsAPI.PythonGrader {
+    /**
+     * The threshold for the score.
+     */
+    pass_threshold?: number;
+  }
+
+  /**
+   * A ScoreModelGrader object that uses a model to assign a score to the input.
+   */
+  export interface EvalGraderScoreModel extends GraderModelsAPI.ScoreModelGrader {
+    /**
+     * The threshold for the score.
+     */
+    pass_threshold?: number;
+  }
 }
 
 /**
@@ -472,7 +492,7 @@ export interface EvalUpdateResponse {
  *
  * - Improve the quality of my chatbot
  * - See how well my chatbot handles customer support
- * - Check if o3-mini is better at my usecase than gpt-4o
+ * - Check if o4-mini is better at my usecase than gpt-4o
  */
 export interface EvalListResponse {
   /**
@@ -488,7 +508,10 @@ export interface EvalListResponse {
   /**
    * Configuration of data sources used in runs of the evaluation.
    */
-  data_source_config: EvalCustomDataSourceConfig | EvalStoredCompletionsDataSourceConfig;
+  data_source_config:
+    | EvalCustomDataSourceConfig
+    | EvalListResponse.Logs
+    | EvalStoredCompletionsDataSourceConfig;
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
@@ -511,14 +534,77 @@ export interface EvalListResponse {
   object: 'eval';
 
   /**
-   * Indicates whether the evaluation is shared with OpenAI.
-   */
-  share_with_openai: boolean;
-
-  /**
    * A list of testing criteria.
    */
-  testing_criteria: Array<EvalLabelModelGrader | EvalStringCheckGrader | EvalTextSimilarityGrader>;
+  testing_criteria: Array<
+    | GraderModelsAPI.LabelModelGrader
+    | GraderModelsAPI.StringCheckGrader
+    | EvalListResponse.EvalGraderTextSimilarity
+    | EvalListResponse.EvalGraderPython
+    | EvalListResponse.EvalGraderScoreModel
+  >;
+}
+
+export namespace EvalListResponse {
+  /**
+   * A LogsDataSourceConfig which specifies the metadata property of your logs query.
+   * This is usually metadata like `usecase=chatbot` or `prompt-version=v2`, etc. The
+   * schema returned by this data source config is used to defined what variables are
+   * available in your evals. `item` and `sample` are both defined when using this
+   * data source config.
+   */
+  export interface Logs {
+    /**
+     * The json schema for the run data source items. Learn how to build JSON schemas
+     * [here](https://json-schema.org/).
+     */
+    schema: Record<string, unknown>;
+
+    /**
+     * The type of data source. Always `logs`.
+     */
+    type: 'logs';
+
+    /**
+     * Set of 16 key-value pairs that can be attached to an object. This can be useful
+     * for storing additional information about the object in a structured format, and
+     * querying for objects via API or the dashboard.
+     *
+     * Keys are strings with a maximum length of 64 characters. Values are strings with
+     * a maximum length of 512 characters.
+     */
+    metadata?: Shared.Metadata | null;
+  }
+
+  /**
+   * A TextSimilarityGrader object which grades text based on similarity metrics.
+   */
+  export interface EvalGraderTextSimilarity extends GraderModelsAPI.TextSimilarityGrader {
+    /**
+     * The threshold for the score.
+     */
+    pass_threshold: number;
+  }
+
+  /**
+   * A PythonGrader object that runs a python script on the input.
+   */
+  export interface EvalGraderPython extends GraderModelsAPI.PythonGrader {
+    /**
+     * The threshold for the score.
+     */
+    pass_threshold?: number;
+  }
+
+  /**
+   * A ScoreModelGrader object that uses a model to assign a score to the input.
+   */
+  export interface EvalGraderScoreModel extends GraderModelsAPI.ScoreModelGrader {
+    /**
+     * The threshold for the score.
+     */
+    pass_threshold?: number;
+  }
 }
 
 export interface EvalDeleteResponse {
@@ -531,14 +617,24 @@ export interface EvalDeleteResponse {
 
 export interface EvalCreateParams {
   /**
-   * The configuration for the data source used for the evaluation runs.
+   * The configuration for the data source used for the evaluation runs. Dictates the
+   * schema of the data used in the evaluation.
    */
-  data_source_config: EvalCreateParams.Custom | EvalCreateParams.StoredCompletions;
+  data_source_config: EvalCreateParams.Custom | EvalCreateParams.Logs | EvalCreateParams.StoredCompletions;
 
   /**
-   * A list of graders for all eval runs in this group.
+   * A list of graders for all eval runs in this group. Graders can reference
+   * variables in the data source using double curly braces notation, like
+   * `{{item.variable_name}}`. To reference the model's output, use the `sample`
+   * namespace (ie, `{{sample.output_text}}`).
    */
-  testing_criteria: Array<EvalCreateParams.LabelModel | EvalStringCheckGrader | EvalTextSimilarityGrader>;
+  testing_criteria: Array<
+    | EvalCreateParams.LabelModel
+    | GraderModelsAPI.StringCheckGrader
+    | EvalCreateParams.TextSimilarity
+    | EvalCreateParams.Python
+    | EvalCreateParams.ScoreModel
+  >;
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
@@ -554,11 +650,6 @@ export interface EvalCreateParams {
    * The name of the evaluation.
    */
   name?: string;
-
-  /**
-   * Indicates whether the evaluation is shared with OpenAI.
-   */
-  share_with_openai?: boolean;
 }
 
 export namespace EvalCreateParams {
@@ -572,7 +663,7 @@ export namespace EvalCreateParams {
    */
   export interface Custom {
     /**
-     * The json schema for the run data source items.
+     * The json schema for each row in the data source.
      */
     item_schema: Record<string, unknown>;
 
@@ -582,15 +673,30 @@ export namespace EvalCreateParams {
     type: 'custom';
 
     /**
-     * Whether to include the sample schema in the data source.
+     * Whether the eval should expect you to populate the sample namespace (ie, by
+     * generating responses off of your data source)
      */
     include_sample_schema?: boolean;
   }
 
   /**
-   * A data source config which specifies the metadata property of your stored
-   * completions query. This is usually metadata like `usecase=chatbot` or
-   * `prompt-version=v2`, etc.
+   * A data source config which specifies the metadata property of your logs query.
+   * This is usually metadata like `usecase=chatbot` or `prompt-version=v2`, etc.
+   */
+  export interface Logs {
+    /**
+     * The type of data source. Always `logs`.
+     */
+    type: 'logs';
+
+    /**
+     * Metadata filters for the logs data source.
+     */
+    metadata?: Record<string, unknown>;
+  }
+
+  /**
+   * @deprecated Deprecated in favor of LogsDataSourceConfig.
    */
   export interface StoredCompletions {
     /**
@@ -599,14 +705,9 @@ export namespace EvalCreateParams {
     type: 'stored_completions';
 
     /**
-     * Set of 16 key-value pairs that can be attached to an object. This can be useful
-     * for storing additional information about the object in a structured format, and
-     * querying for objects via API or the dashboard.
-     *
-     * Keys are strings with a maximum length of 64 characters. Values are strings with
-     * a maximum length of 512 characters.
+     * Metadata filters for the stored completions data source.
      */
-    metadata?: Shared.Metadata | null;
+    metadata?: Record<string, unknown>;
   }
 
   /**
@@ -614,7 +715,11 @@ export namespace EvalCreateParams {
    * the evaluation.
    */
   export interface LabelModel {
-    input: Array<LabelModel.SimpleInputMessage | LabelModel.InputMessage | LabelModel.OutputMessage>;
+    /**
+     * A list of chat messages forming the prompt or context. May include variable
+     * references to the `item` namespace, ie {{item.name}}.
+     */
+    input: Array<LabelModel.SimpleInputMessage | LabelModel.EvalItem>;
 
     /**
      * The labels to classify to each item in the evaluation.
@@ -655,61 +760,77 @@ export namespace EvalCreateParams {
       role: string;
     }
 
-    export interface InputMessage {
-      content: InputMessage.Content;
+    /**
+     * A message input to the model with a role indicating instruction following
+     * hierarchy. Instructions given with the `developer` or `system` role take
+     * precedence over instructions given with the `user` role. Messages with the
+     * `assistant` role are presumed to have been generated by the model in previous
+     * interactions.
+     */
+    export interface EvalItem {
+      /**
+       * Text inputs to the model - can contain template strings.
+       */
+      content: string | ResponsesAPI.ResponseInputText | EvalItem.OutputText;
 
       /**
-       * The role of the message. One of `user`, `system`, or `developer`.
+       * The role of the message input. One of `user`, `assistant`, `system`, or
+       * `developer`.
        */
-      role: 'user' | 'system' | 'developer';
+      role: 'user' | 'assistant' | 'system' | 'developer';
 
       /**
-       * The type of item, which is always `message`.
+       * The type of the message input. Always `message`.
        */
-      type: 'message';
+      type?: 'message';
     }
 
-    export namespace InputMessage {
-      export interface Content {
+    export namespace EvalItem {
+      /**
+       * A text output from the model.
+       */
+      export interface OutputText {
         /**
-         * The text content.
+         * The text output from the model.
          */
         text: string;
 
         /**
-         * The type of content, which is always `input_text`.
-         */
-        type: 'input_text';
-      }
-    }
-
-    export interface OutputMessage {
-      content: OutputMessage.Content;
-
-      /**
-       * The role of the message. Must be `assistant` for output.
-       */
-      role: 'assistant';
-
-      /**
-       * The type of item, which is always `message`.
-       */
-      type: 'message';
-    }
-
-    export namespace OutputMessage {
-      export interface Content {
-        /**
-         * The text content.
-         */
-        text: string;
-
-        /**
-         * The type of content, which is always `output_text`.
+         * The type of the output text. Always `output_text`.
          */
         type: 'output_text';
       }
     }
+  }
+
+  /**
+   * A TextSimilarityGrader object which grades text based on similarity metrics.
+   */
+  export interface TextSimilarity extends GraderModelsAPI.TextSimilarityGrader {
+    /**
+     * The threshold for the score.
+     */
+    pass_threshold: number;
+  }
+
+  /**
+   * A PythonGrader object that runs a python script on the input.
+   */
+  export interface Python extends GraderModelsAPI.PythonGrader {
+    /**
+     * The threshold for the score.
+     */
+    pass_threshold?: number;
+  }
+
+  /**
+   * A ScoreModelGrader object that uses a model to assign a score to the input.
+   */
+  export interface ScoreModel extends GraderModelsAPI.ScoreModelGrader {
+    /**
+     * The threshold for the score.
+     */
+    pass_threshold?: number;
   }
 }
 
@@ -744,23 +865,18 @@ export interface EvalListParams extends CursorPageParams {
   order_by?: 'created_at' | 'updated_at';
 }
 
-Evals.EvalListResponsesPage = EvalListResponsesPage;
 Evals.Runs = Runs;
-Evals.RunListResponsesPage = RunListResponsesPage;
 
 export declare namespace Evals {
   export {
     type EvalCustomDataSourceConfig as EvalCustomDataSourceConfig,
-    type EvalLabelModelGrader as EvalLabelModelGrader,
     type EvalStoredCompletionsDataSourceConfig as EvalStoredCompletionsDataSourceConfig,
-    type EvalStringCheckGrader as EvalStringCheckGrader,
-    type EvalTextSimilarityGrader as EvalTextSimilarityGrader,
     type EvalCreateResponse as EvalCreateResponse,
     type EvalRetrieveResponse as EvalRetrieveResponse,
     type EvalUpdateResponse as EvalUpdateResponse,
     type EvalListResponse as EvalListResponse,
     type EvalDeleteResponse as EvalDeleteResponse,
-    EvalListResponsesPage as EvalListResponsesPage,
+    type EvalListResponsesPage as EvalListResponsesPage,
     type EvalCreateParams as EvalCreateParams,
     type EvalUpdateParams as EvalUpdateParams,
     type EvalListParams as EvalListParams,
@@ -776,8 +892,11 @@ export declare namespace Evals {
     type RunListResponse as RunListResponse,
     type RunDeleteResponse as RunDeleteResponse,
     type RunCancelResponse as RunCancelResponse,
-    RunListResponsesPage as RunListResponsesPage,
+    type RunListResponsesPage as RunListResponsesPage,
     type RunCreateParams as RunCreateParams,
+    type RunRetrieveParams as RunRetrieveParams,
     type RunListParams as RunListParams,
+    type RunDeleteParams as RunDeleteParams,
+    type RunCancelParams as RunCancelParams,
   };
 }

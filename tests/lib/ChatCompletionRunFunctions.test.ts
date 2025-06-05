@@ -4,12 +4,11 @@ import { PassThrough } from 'stream';
 import {
   ParsingToolFunction,
   type ChatCompletionRunner,
-  type ChatCompletionFunctionRunnerParams,
+  type ChatCompletionToolRunnerParams,
   ChatCompletionStreamingRunner,
-  type ChatCompletionStreamingFunctionRunnerParams,
-} from 'openai/resources/beta/chat/completions';
+  type ChatCompletionStreamingToolRunnerParams,
+} from 'openai/resources/chat/completions';
 import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
-import { Response } from 'node-fetch';
 import { isAssistantMessage } from '../../src/lib/chatCompletionUtils';
 import { mockFetch } from '../utils/mock-fetch';
 
@@ -19,12 +18,12 @@ function mockChatCompletionFetch() {
   const { fetch, handleRequest: handleRawRequest } = mockFetch();
 
   function handleRequest(
-    handler: (body: ChatCompletionFunctionRunnerParams<any[]>) => Promise<OpenAI.Chat.ChatCompletion>,
+    handler: (body: ChatCompletionToolRunnerParams<any[]>) => Promise<OpenAI.Chat.ChatCompletion>,
   ): Promise<void> {
     return handleRawRequest(async (req, init) => {
       const rawBody = init?.body;
       if (typeof rawBody !== 'string') throw new Error(`expected init.body to be a string`);
-      const body: ChatCompletionFunctionRunnerParams<any[]> = JSON.parse(rawBody);
+      const body: ChatCompletionToolRunnerParams<any[]> = JSON.parse(rawBody);
       return new Response(JSON.stringify(await handler(body)), {
         headers: { 'Content-Type': 'application/json' },
       });
@@ -40,13 +39,13 @@ function mockStreamingChatCompletionFetch() {
 
   function handleRequest(
     handler: (
-      body: ChatCompletionStreamingFunctionRunnerParams<any[]>,
+      body: ChatCompletionStreamingToolRunnerParams<any[]>,
     ) => AsyncIterable<OpenAI.Chat.ChatCompletionChunk>,
   ): Promise<void> {
     return handleRawRequest(async (req, init) => {
       const rawBody = init?.body;
       if (typeof rawBody !== 'string') throw new Error(`expected init.body to be a string`);
-      const body: ChatCompletionStreamingFunctionRunnerParams<any[]> = JSON.parse(rawBody);
+      const body: ChatCompletionStreamingToolRunnerParams<any[]> = JSON.parse(rawBody);
       const stream = new PassThrough();
       (async () => {
         for await (const chunk of handler(body)) {
@@ -131,12 +130,12 @@ class RunnerListener {
   readonly contents: string[] = [];
   readonly messages: ChatCompletionMessageParam[] = [];
   readonly chatCompletions: OpenAI.Chat.ChatCompletion[] = [];
-  readonly functionCalls: OpenAI.Chat.ChatCompletionMessage.FunctionCall[] = [];
+  readonly functionCalls: OpenAI.Chat.ChatCompletionMessageToolCall.Function[] = [];
   readonly functionCallResults: string[] = [];
   finalContent: string | null = null;
   finalMessage: ChatCompletionMessageParam | undefined;
   finalChatCompletion: OpenAI.Chat.ChatCompletion | undefined;
-  finalFunctionCall: OpenAI.Chat.ChatCompletionMessage.FunctionCall | undefined;
+  finalFunctionCall: OpenAI.Chat.ChatCompletionMessageToolCall.Function | undefined;
   finalFunctionCallResult: string | undefined;
   totalUsage: OpenAI.CompletionUsage | undefined;
   error: OpenAIError | undefined;
@@ -152,13 +151,13 @@ class RunnerListener {
       .on('content', (content) => this.contents.push(content))
       .on('message', (message) => this.messages.push(message))
       .on('chatCompletion', (completion) => this.chatCompletions.push(completion))
-      .on('functionCall', (functionCall) => this.functionCalls.push(functionCall))
-      .on('functionCallResult', (result) => this.functionCallResults.push(result))
+      .on('functionToolCall', (functionCall) => this.functionCalls.push(functionCall))
+      .on('functionToolCallResult', (result) => this.functionCallResults.push(result))
       .on('finalContent', (content) => (this.finalContent = content))
       .on('finalMessage', (message) => (this.finalMessage = message))
       .on('finalChatCompletion', (completion) => (this.finalChatCompletion = completion))
-      .on('finalFunctionCall', (functionCall) => (this.finalFunctionCall = functionCall))
-      .on('finalFunctionCallResult', (result) => (this.finalFunctionCallResult = result))
+      .on('finalFunctionToolCall', (functionCall) => (this.finalFunctionCall = functionCall))
+      .on('finalFunctionToolCallResult', (result) => (this.finalFunctionCallResult = result))
       .on('totalUsage', (usage) => (this.totalUsage = usage))
       .on('error', (error) => (this.error = error))
       .on('abort', (error) => ((this.error = error), (this.gotAbort = true)))
@@ -176,8 +175,8 @@ class RunnerListener {
       await expect(this.runner.finalChatCompletion()).rejects.toThrow(error);
       await expect(this.runner.finalMessage()).rejects.toThrow(error);
       await expect(this.runner.finalContent()).rejects.toThrow(error);
-      await expect(this.runner.finalFunctionCall()).rejects.toThrow(error);
-      await expect(this.runner.finalFunctionCallResult()).rejects.toThrow(error);
+      await expect(this.runner.finalFunctionToolCall()).rejects.toThrow(error);
+      await expect(this.runner.finalFunctionToolCallResult()).rejects.toThrow(error);
       await expect(this.runner.totalUsage()).rejects.toThrow(error);
       await expect(this.runner.done()).rejects.toThrow(error);
     } else {
@@ -215,11 +214,11 @@ class RunnerListener {
     expect(this.finalChatCompletion).toEqual(this.chatCompletions[this.chatCompletions.length - 1]);
     expect(await this.runner.finalChatCompletion()).toEqual(this.finalChatCompletion);
     expect(this.finalFunctionCall).toEqual(this.functionCalls[this.functionCalls.length - 1]);
-    expect(await this.runner.finalFunctionCall()).toEqual(this.finalFunctionCall);
+    expect(await this.runner.finalFunctionToolCall()).toEqual(this.finalFunctionCall);
     expect(this.finalFunctionCallResult).toEqual(
       this.functionCallResults[this.functionCallResults.length - 1],
     );
-    expect(await this.runner.finalFunctionCallResult()).toEqual(this.finalFunctionCallResult);
+    expect(await this.runner.finalFunctionToolCallResult()).toEqual(this.finalFunctionCallResult);
     expect(this.chatCompletions).toEqual(this.runner.allChatCompletions());
     expect(this.messages).toEqual(this.runner.messages.slice(-this.messages.length));
     if (this.chatCompletions.some((c) => c.usage)) {
@@ -248,13 +247,13 @@ class StreamingRunnerListener {
   readonly eventContents: [string, string][] = [];
   readonly eventMessages: ChatCompletionMessageParam[] = [];
   readonly eventChatCompletions: OpenAI.Chat.ChatCompletion[] = [];
-  readonly eventFunctionCalls: OpenAI.Chat.ChatCompletionMessage.FunctionCall[] = [];
+  readonly eventFunctionCalls: OpenAI.Chat.ChatCompletionMessageToolCall.Function[] = [];
   readonly eventFunctionCallResults: string[] = [];
 
   finalContent: string | null = null;
   finalMessage: ChatCompletionMessageParam | undefined;
   finalChatCompletion: OpenAI.Chat.ChatCompletion | undefined;
-  finalFunctionCall: OpenAI.Chat.ChatCompletionMessage.FunctionCall | undefined;
+  finalFunctionCall: OpenAI.Chat.ChatCompletionMessageToolCall.Function | undefined;
   finalFunctionCallResult: string | undefined;
   error: OpenAIError | undefined;
   gotConnect = false;
@@ -267,13 +266,13 @@ class StreamingRunnerListener {
       .on('content', (delta, snapshot) => this.eventContents.push([delta, snapshot]))
       .on('message', (message) => this.eventMessages.push(message))
       .on('chatCompletion', (completion) => this.eventChatCompletions.push(completion))
-      .on('functionCall', (functionCall) => this.eventFunctionCalls.push(functionCall))
-      .on('functionCallResult', (result) => this.eventFunctionCallResults.push(result))
+      .on('functionToolCall', (functionCall) => this.eventFunctionCalls.push(functionCall))
+      .on('functionToolCallResult', (result) => this.eventFunctionCallResults.push(result))
       .on('finalContent', (content) => (this.finalContent = content))
       .on('finalMessage', (message) => (this.finalMessage = message))
       .on('finalChatCompletion', (completion) => (this.finalChatCompletion = completion))
-      .on('finalFunctionCall', (functionCall) => (this.finalFunctionCall = functionCall))
-      .on('finalFunctionCallResult', (result) => (this.finalFunctionCallResult = result))
+      .on('finalFunctionToolCall', (functionCall) => (this.finalFunctionCall = functionCall))
+      .on('finalFunctionToolCallResult', (result) => (this.finalFunctionCallResult = result))
       .on('error', (error) => (this.error = error))
       .on('abort', (abort) => (this.error = abort))
       .on('end', () => (this.gotEnd = true));
@@ -286,8 +285,8 @@ class StreamingRunnerListener {
       await expect(this.runner.finalChatCompletion()).rejects.toThrow(error);
       await expect(this.runner.finalMessage()).rejects.toThrow(error);
       await expect(this.runner.finalContent()).rejects.toThrow(error);
-      await expect(this.runner.finalFunctionCall()).rejects.toThrow(error);
-      await expect(this.runner.finalFunctionCallResult()).rejects.toThrow(error);
+      await expect(this.runner.finalFunctionToolCall()).rejects.toThrow(error);
+      await expect(this.runner.finalFunctionToolCallResult()).rejects.toThrow(error);
       await expect(this.runner.done()).rejects.toThrow(error);
     } else {
       expect(this.error).toBeUndefined();
@@ -319,11 +318,11 @@ class StreamingRunnerListener {
     expect(this.finalChatCompletion).toEqual(this.eventChatCompletions[this.eventChatCompletions.length - 1]);
     expect(await this.runner.finalChatCompletion()).toEqual(this.finalChatCompletion);
     expect(this.finalFunctionCall).toEqual(this.eventFunctionCalls[this.eventFunctionCalls.length - 1]);
-    expect(await this.runner.finalFunctionCall()).toEqual(this.finalFunctionCall);
+    expect(await this.runner.finalFunctionToolCall()).toEqual(this.finalFunctionCall);
     expect(this.finalFunctionCallResult).toEqual(
       this.eventFunctionCallResults[this.eventFunctionCallResults.length - 1],
     );
-    expect(await this.runner.finalFunctionCallResult()).toEqual(this.finalFunctionCallResult);
+    expect(await this.runner.finalFunctionToolCallResult()).toEqual(this.finalFunctionCallResult);
     expect(this.eventChatCompletions).toEqual(this.runner.allChatCompletions());
     expect(this.eventMessages).toEqual(this.runner.messages.slice(-this.eventMessages.length));
     if (error) {
@@ -340,7 +339,7 @@ class StreamingRunnerListener {
 function _typeTests() {
   const openai = new OpenAI();
 
-  openai.beta.chat.completions.runTools({
+  openai.chat.completions.runTools({
     messages: [
       { role: 'user', content: 'can you tell me how many properties are in {"a": 1, "b": 2, "c": 3}' },
     ],
@@ -381,7 +380,7 @@ function _typeTests() {
       },
     ],
   });
-  openai.beta.chat.completions.runTools({
+  openai.chat.completions.runTools({
     messages: [
       { role: 'user', content: 'can you tell me how many properties are in {"a": 1, "b": 2, "c": 3}' },
     ],
@@ -397,7 +396,7 @@ function _typeTests() {
       }),
     ],
   });
-  openai.beta.chat.completions.runTools({
+  openai.chat.completions.runTools({
     messages: [
       { role: 'user', content: 'can you tell me how many properties are in {"a": 1, "b": 2, "c": 3}' },
     ],
@@ -439,7 +438,7 @@ function _typeTests() {
       }),
     ],
   });
-  openai.beta.chat.completions.runTools({
+  openai.chat.completions.runTools({
     messages: [
       { role: 'user', content: 'can you tell me how many properties are in {"a": 1, "b": 2, "c": 3}' },
     ],
@@ -501,7 +500,7 @@ describe('resource completions', () => {
 
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
-      const runner = openai.beta.chat.completions.runTools({
+      const runner = openai.chat.completions.runTools({
         messages: [{ role: 'user', content: 'tell me what the weather is like' }],
         model: 'gpt-3.5-turbo',
         tools: [
@@ -640,7 +639,7 @@ describe('resource completions', () => {
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
       const controller = new AbortController();
-      const runner = openai.beta.chat.completions.runTools(
+      const runner = openai.chat.completions.runTools(
         {
           messages: [{ role: 'user', content: 'tell me what the weather is like' }],
           model: 'gpt-3.5-turbo',
@@ -727,7 +726,7 @@ describe('resource completions', () => {
 
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
-      const runner = openai.beta.chat.completions.runTools({
+      const runner = openai.chat.completions.runTools({
         messages: [
           {
             role: 'user',
@@ -887,7 +886,7 @@ describe('resource completions', () => {
 
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
-      const runner = openai.beta.chat.completions.runTools({
+      const runner = openai.chat.completions.runTools({
         messages: [
           {
             role: 'user',
@@ -1136,7 +1135,7 @@ describe('resource completions', () => {
 
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
-      const runner = openai.beta.chat.completions.runTools({
+      const runner = openai.chat.completions.runTools({
         messages: [{ role: 'user', content: 'tell me what the weather is like' }],
         model: 'gpt-3.5-turbo',
         tool_choice: {
@@ -1224,7 +1223,7 @@ describe('resource completions', () => {
 
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
-      const runner = openai.beta.chat.completions.runTools({
+      const runner = openai.chat.completions.runTools({
         messages: [{ role: 'user', content: 'tell me what the weather is like' }],
         model: 'gpt-3.5-turbo',
         tools: [
@@ -1460,7 +1459,7 @@ describe('resource completions', () => {
 
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
-      const runner = openai.beta.chat.completions.runTools({
+      const runner = openai.chat.completions.runTools({
         stream: true,
         messages: [{ role: 'user', content: 'tell me what the weather is like' }],
         model: 'gpt-3.5-turbo',
@@ -1584,7 +1583,7 @@ describe('resource completions', () => {
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
       const controller = new AbortController();
-      const runner = openai.beta.chat.completions.runTools(
+      const runner = openai.chat.completions.runTools(
         {
           stream: true,
           messages: [{ role: 'user', content: 'tell me what the weather is like' }],
@@ -1604,7 +1603,7 @@ describe('resource completions', () => {
         },
         { signal: controller.signal },
       );
-      runner.on('functionCallResult', () => controller.abort());
+      runner.on('functionToolCallResult', () => controller.abort());
       const listener = new StreamingRunnerListener(runner);
 
       await handleRequest(async function* (request): AsyncIterable<OpenAI.Chat.ChatCompletionChunk> {
@@ -1668,7 +1667,7 @@ describe('resource completions', () => {
 
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
-      const runner = openai.beta.chat.completions.runTools({
+      const runner = openai.chat.completions.runTools({
         stream: true,
         messages: [
           {
@@ -1806,7 +1805,7 @@ describe('resource completions', () => {
 
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
-      const runner = openai.beta.chat.completions.runTools({
+      const runner = openai.chat.completions.runTools({
         stream: true,
         messages: [
           {
@@ -2008,7 +2007,7 @@ describe('resource completions', () => {
 
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
-      const runner = openai.beta.chat.completions.runTools({
+      const runner = openai.chat.completions.runTools({
         stream: true,
         messages: [{ role: 'user', content: 'tell me what the weather is like' }],
         model: 'gpt-3.5-turbo',
@@ -2094,7 +2093,7 @@ describe('resource completions', () => {
 
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
-      const runner = openai.beta.chat.completions.runTools({
+      const runner = openai.chat.completions.runTools({
         stream: true,
         messages: [{ role: 'user', content: 'tell me what the weather is like' }],
         model: 'gpt-3.5-turbo',
@@ -2318,7 +2317,7 @@ describe('resource completions', () => {
 
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
-      const runner = openai.beta.chat.completions.stream({
+      const runner = openai.chat.completions.stream({
         stream: true,
         messages: [{ role: 'user', content: 'tell me what the weather is like' }],
         model: 'gpt-3.5-turbo',
@@ -2356,7 +2355,7 @@ describe('resource completions', () => {
 
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
-      const runner = openai.beta.chat.completions.stream({
+      const runner = openai.chat.completions.stream({
         stream: true,
         messages: [{ role: 'user', content: 'tell me what the weather is like' }],
         model: 'gpt-3.5-turbo',
@@ -2395,7 +2394,7 @@ describe('resource completions', () => {
 
       const openai = new OpenAI({ apiKey: '...', fetch });
 
-      const stream = openai.beta.chat.completions.stream(
+      const stream = openai.chat.completions.stream(
         {
           max_tokens: 1024,
           model: 'gpt-3.5-turbo',
@@ -2419,7 +2418,7 @@ describe('resource completions', () => {
 
       const openai = new OpenAI({ apiKey: '...', fetch });
 
-      const stream = openai.beta.chat.completions.stream(
+      const stream = openai.chat.completions.stream(
         {
           max_tokens: 1024,
           model: 'gpt-3.5-turbo',

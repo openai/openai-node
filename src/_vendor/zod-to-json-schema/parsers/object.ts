@@ -39,12 +39,25 @@ export function parseObjectDef(def: ZodObjectDef, refs: Refs) {
         [propName, propDef],
       ) => {
         if (propDef === undefined || propDef._def === undefined) return acc;
+        const propertyPath = [...refs.currentPath, 'properties', propName];
         const parsedDef = parseDef(propDef._def, {
           ...refs,
-          currentPath: [...refs.currentPath, 'properties', propName],
-          propertyPath: [...refs.currentPath, 'properties', propName],
+          currentPath: propertyPath,
+          propertyPath,
         });
         if (parsedDef === undefined) return acc;
+        if (
+          refs.openaiStrictMode &&
+          propDef.isOptional() &&
+          !propDef.isNullable() &&
+          typeof propDef._def?.defaultValue === 'undefined'
+        ) {
+          throw new Error(
+            `Zod field at \`${propertyPath.join(
+              '/',
+            )}\` uses \`.optional()\` without \`.nullable()\` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required`,
+          );
+        }
         return {
           properties: {
             ...acc.properties,

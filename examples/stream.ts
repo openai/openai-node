@@ -5,7 +5,7 @@ import OpenAI from 'openai';
 const openai = new OpenAI();
 
 async function main() {
-  const runner = openai.beta.chat.completions
+  const runner = openai.chat.completions
     .stream({
       model: 'gpt-3.5-turbo',
       messages: [{ role: 'user', content: 'Say this is a test' }],

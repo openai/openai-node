@@ -1,7 +1,9 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../../resource';
-import * as Core from '../../../core';
+import { APIResource } from '../../../core/resource';
+import { APIPromise } from '../../../core/api-promise';
+import { buildHeaders } from '../../../internal/headers';
+import { RequestOptions } from '../../../internal/request-options';
 
 export class Sessions extends APIResource {
   /**
@@ -12,12 +14,18 @@ export class Sessions extends APIResource {
    * It responds with a session object, plus a `client_secret` key which contains a
    * usable ephemeral API token that can be used to authenticate browser clients for
    * the Realtime API.
+   *
+   * @example
+   * ```ts
+   * const session =
+   *   await client.beta.realtime.sessions.create();
+   * ```
    */
-  create(body: SessionCreateParams, options?: Core.RequestOptions): Core.APIPromise<SessionCreateResponse> {
+  create(body: SessionCreateParams, options?: RequestOptions): APIPromise<SessionCreateResponse> {
     return this._client.post('/realtime/sessions', {
       body,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
     });
   }
 }
@@ -94,6 +102,7 @@ export interface Session {
     | 'gpt-4o-realtime-preview'
     | 'gpt-4o-realtime-preview-2024-10-01'
     | 'gpt-4o-realtime-preview-2024-12-17'
+    | 'gpt-4o-realtime-preview-2025-06-03'
     | 'gpt-4o-mini-realtime-preview'
     | 'gpt-4o-mini-realtime-preview-2024-12-17';
 
@@ -102,6 +111,13 @@ export interface Session {
    * For `pcm16`, output audio is sampled at a rate of 24kHz.
    */
   output_audio_format?: 'pcm16' | 'g711_ulaw' | 'g711_alaw';
+
+  /**
+   * The speed of the model's spoken response. 1.0 is the default speed. 0.25 is the
+   * minimum speed. 1.5 is the maximum speed. This value can only be changed in
+   * between model turns, not while a response is in progress.
+   */
+  speed?: number;
 
   /**
    * Sampling temperature for the model, limited to [0.6, 1.2]. For audio models a
@@ -121,6 +137,15 @@ export interface Session {
   tools?: Array<Session.Tool>;
 
   /**
+   * Configuration options for tracing. Set to null to disable tracing. Once tracing
+   * is enabled for a session, the configuration cannot be modified.
+   *
+   * `auto` will create a trace for the session with default values for the workflow
+   * name, group id, and metadata.
+   */
+  tracing?: 'auto' | Session.TracingConfiguration;
+
+  /**
    * Configuration for turn detection, ether Server VAD or Semantic VAD. This can be
    * set to `null` to turn off, in which case the client must manually trigger model
    * response. Server VAD means that the model will detect the start and end of
@@ -137,7 +162,8 @@ export interface Session {
   /**
    * The voice the model uses to respond. Voice cannot be changed during the session
    * once the model has responded with audio at least once. Current voice options are
-   * `alloy`, `ash`, `ballad`, `coral`, `echo` `sage`, `shimmer` and `verse`.
+   * `alloy`, `ash`, `ballad`, `coral`, `echo`, `fable`, `onyx`, `nova`, `sage`,
+   * `shimmer`, and `verse`.
    */
   voice?:
     | (string & {})
@@ -226,6 +252,29 @@ export namespace Session {
      * The type of the tool, i.e. `function`.
      */
     type?: 'function';
+  }
+
+  /**
+   * Granular configuration for tracing.
+   */
+  export interface TracingConfiguration {
+    /**
+     * The group id to attach to this trace to enable filtering and grouping in the
+     * traces dashboard.
+     */
+    group_id?: string;
+
+    /**
+     * The arbitrary metadata to attach to this trace to enable filtering in the traces
+     * dashboard.
+     */
+    metadata?: unknown;
+
+    /**
+     * The name of the workflow to attach to this trace. This is used to name the trace
+     * in the traces dashboard.
+     */
+    workflow_name?: string;
   }
 
   /**
@@ -346,6 +395,13 @@ export interface SessionCreateResponse {
   output_audio_format?: string;
 
   /**
+   * The speed of the model's spoken response. 1.0 is the default speed. 0.25 is the
+   * minimum speed. 1.5 is the maximum speed. This value can only be changed in
+   * between model turns, not while a response is in progress.
+   */
+  speed?: number;
+
+  /**
    * Sampling temperature for the model, limited to [0.6, 1.2]. Defaults to 0.8.
    */
   temperature?: number;
@@ -360,6 +416,15 @@ export interface SessionCreateResponse {
    * Tools (functions) available to the model.
    */
   tools?: Array<SessionCreateResponse.Tool>;
+
+  /**
+   * Configuration options for tracing. Set to null to disable tracing. Once tracing
+   * is enabled for a session, the configuration cannot be modified.
+   *
+   * `auto` will create a trace for the session with default values for the workflow
+   * name, group id, and metadata.
+   */
+  tracing?: 'auto' | SessionCreateResponse.TracingConfiguration;
 
   /**
    * Configuration for turn detection. Can be set to `null` to turn off. Server VAD
@@ -446,6 +511,29 @@ export namespace SessionCreateResponse {
   }
 
   /**
+   * Granular configuration for tracing.
+   */
+  export interface TracingConfiguration {
+    /**
+     * The group id to attach to this trace to enable filtering and grouping in the
+     * traces dashboard.
+     */
+    group_id?: string;
+
+    /**
+     * The arbitrary metadata to attach to this trace to enable filtering in the traces
+     * dashboard.
+     */
+    metadata?: unknown;
+
+    /**
+     * The name of the workflow to attach to this trace. This is used to name the trace
+     * in the traces dashboard.
+     */
+    workflow_name?: string;
+  }
+
+  /**
    * Configuration for turn detection. Can be set to `null` to turn off. Server VAD
    * means that the model will detect the start and end of speech based on audio
    * volume and respond at the end of user speech.
@@ -479,6 +567,11 @@ export namespace SessionCreateResponse {
 }
 
 export interface SessionCreateParams {
+  /**
+   * Configuration options for the generated client secret.
+   */
+  client_secret?: SessionCreateParams.ClientSecret;
+
   /**
    * The format of input audio. Options are `pcm16`, `g711_ulaw`, or `g711_alaw`. For
    * `pcm16`, input audio must be 16-bit PCM at a 24kHz sample rate, single channel
@@ -542,6 +635,7 @@ export interface SessionCreateParams {
     | 'gpt-4o-realtime-preview'
     | 'gpt-4o-realtime-preview-2024-10-01'
     | 'gpt-4o-realtime-preview-2024-12-17'
+    | 'gpt-4o-realtime-preview-2025-06-03'
     | 'gpt-4o-mini-realtime-preview'
     | 'gpt-4o-mini-realtime-preview-2024-12-17';
 
@@ -550,6 +644,13 @@ export interface SessionCreateParams {
    * For `pcm16`, output audio is sampled at a rate of 24kHz.
    */
   output_audio_format?: 'pcm16' | 'g711_ulaw' | 'g711_alaw';
+
+  /**
+   * The speed of the model's spoken response. 1.0 is the default speed. 0.25 is the
+   * minimum speed. 1.5 is the maximum speed. This value can only be changed in
+   * between model turns, not while a response is in progress.
+   */
+  speed?: number;
 
   /**
    * Sampling temperature for the model, limited to [0.6, 1.2]. For audio models a
@@ -567,6 +668,15 @@ export interface SessionCreateParams {
    * Tools (functions) available to the model.
    */
   tools?: Array<SessionCreateParams.Tool>;
+
+  /**
+   * Configuration options for tracing. Set to null to disable tracing. Once tracing
+   * is enabled for a session, the configuration cannot be modified.
+   *
+   * `auto` will create a trace for the session with default values for the workflow
+   * name, group id, and metadata.
+   */
+  tracing?: 'auto' | SessionCreateParams.TracingConfiguration;
 
   /**
    * Configuration for turn detection, ether Server VAD or Semantic VAD. This can be
@@ -604,6 +714,35 @@ export interface SessionCreateParams {
 }
 
 export namespace SessionCreateParams {
+  /**
+   * Configuration options for the generated client secret.
+   */
+  export interface ClientSecret {
+    /**
+     * Configuration for the ephemeral token expiration.
+     */
+    expires_at?: ClientSecret.ExpiresAt;
+  }
+
+  export namespace ClientSecret {
+    /**
+     * Configuration for the ephemeral token expiration.
+     */
+    export interface ExpiresAt {
+      /**
+       * The anchor point for the ephemeral token expiration. Only `created_at` is
+       * currently supported.
+       */
+      anchor?: 'created_at';
+
+      /**
+       * The number of seconds from the anchor point to the expiration. Select a value
+       * between `10` and `7200`.
+       */
+      seconds?: number;
+    }
+  }
+
   /**
    * Configuration for input audio noise reduction. This can be set to `null` to turn
    * off. Noise reduction filters audio added to the input audio buffer before it is
@@ -675,6 +814,29 @@ export namespace SessionCreateParams {
      * The type of the tool, i.e. `function`.
      */
     type?: 'function';
+  }
+
+  /**
+   * Granular configuration for tracing.
+   */
+  export interface TracingConfiguration {
+    /**
+     * The group id to attach to this trace to enable filtering and grouping in the
+     * traces dashboard.
+     */
+    group_id?: string;
+
+    /**
+     * The arbitrary metadata to attach to this trace to enable filtering in the traces
+     * dashboard.
+     */
+    metadata?: unknown;
+
+    /**
+     * The name of the workflow to attach to this trace. This is used to name the trace
+     * in the traces dashboard.
+     */
+    workflow_name?: string;
   }
 
   /**

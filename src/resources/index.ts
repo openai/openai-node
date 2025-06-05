@@ -4,13 +4,13 @@ export * from './chat/index';
 export * from './shared';
 export { Audio, type AudioModel, type AudioResponseFormat } from './audio/audio';
 export {
-  BatchesPage,
   Batches,
   type Batch,
   type BatchError,
   type BatchRequestCounts,
   type BatchCreateParams,
   type BatchListParams,
+  type BatchesPage,
 } from './batches';
 export { Beta } from './beta/beta';
 export {
@@ -23,6 +23,15 @@ export {
   type CompletionCreateParamsStreaming,
 } from './completions';
 export {
+  Containers,
+  type ContainerCreateResponse,
+  type ContainerRetrieveResponse,
+  type ContainerListResponse,
+  type ContainerCreateParams,
+  type ContainerListParams,
+  type ContainerListResponsesPage,
+} from './containers/containers';
+export {
   Embeddings,
   type CreateEmbeddingResponse,
   type Embedding,
@@ -30,13 +39,9 @@ export {
   type EmbeddingCreateParams,
 } from './embeddings';
 export {
-  EvalListResponsesPage,
   Evals,
   type EvalCustomDataSourceConfig,
-  type EvalLabelModelGrader,
   type EvalStoredCompletionsDataSourceConfig,
-  type EvalStringCheckGrader,
-  type EvalTextSimilarityGrader,
   type EvalCreateResponse,
   type EvalRetrieveResponse,
   type EvalUpdateResponse,
@@ -45,9 +50,9 @@ export {
   type EvalCreateParams,
   type EvalUpdateParams,
   type EvalListParams,
+  type EvalListResponsesPage,
 } from './evals/evals';
 export {
-  FileObjectsPage,
   Files,
   type FileContent,
   type FileDeleted,
@@ -55,8 +60,10 @@ export {
   type FilePurpose,
   type FileCreateParams,
   type FileListParams,
+  type FileObjectsPage,
 } from './files';
 export { FineTuning } from './fine-tuning/fine-tuning';
+export { Graders } from './graders/graders';
 export {
   Images,
   type Image,
@@ -66,7 +73,7 @@ export {
   type ImageEditParams,
   type ImageGenerateParams,
 } from './images';
-export { ModelsPage, Models, type Model, type ModelDeleted } from './models';
+export { Models, type Model, type ModelDeleted, type ModelsPage } from './models';
 export {
   Moderations,
   type Moderation,
@@ -80,8 +87,6 @@ export {
 export { Responses } from './responses/responses';
 export { Uploads, type Upload, type UploadCreateParams, type UploadCompleteParams } from './uploads/uploads';
 export {
-  VectorStoresPage,
-  VectorStoreSearchResponsesPage,
   VectorStores,
   type AutoFileChunkingStrategyParam,
   type FileChunkingStrategy,
@@ -97,4 +102,6 @@ export {
   type VectorStoreUpdateParams,
   type VectorStoreListParams,
   type VectorStoreSearchParams,
+  type VectorStoresPage,
+  type VectorStoreSearchResponsesPage,
 } from './vector-stores/vector-stores';

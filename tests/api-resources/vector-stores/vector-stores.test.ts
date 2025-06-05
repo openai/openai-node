@@ -1,7 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import OpenAI from 'openai';
-import { Response } from 'node-fetch';
 
 const client = new OpenAI({
   apiKey: 'My API Key',
@@ -31,13 +30,6 @@ describe('resource vectorStores', () => {
     expect(dataAndResponse.response).toBe(rawResponse);
   });
 
-  test('retrieve: request options instead of params are passed correctly', async () => {
-    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(
-      client.vectorStores.retrieve('vector_store_id', { path: '/_stainless_unknown_path' }),
-    ).rejects.toThrow(OpenAI.NotFoundError);
-  });
-
   test('update', async () => {
     const responsePromise = client.vectorStores.update('vector_store_id', {});
     const rawResponse = await responsePromise.asResponse();
@@ -60,13 +52,6 @@ describe('resource vectorStores', () => {
     expect(dataAndResponse.response).toBe(rawResponse);
   });
 
-  test('list: request options instead of params are passed correctly', async () => {
-    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(client.vectorStores.list({ path: '/_stainless_unknown_path' })).rejects.toThrow(
-      OpenAI.NotFoundError,
-    );
-  });
-
   test('list: request options and params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
@@ -77,8 +62,8 @@ describe('resource vectorStores', () => {
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
-  test('del', async () => {
-    const responsePromise = client.vectorStores.del('vector_store_id');
+  test('delete', async () => {
+    const responsePromise = client.vectorStores.delete('vector_store_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -86,13 +71,6 @@ describe('resource vectorStores', () => {
     const dataAndResponse = await responsePromise.withResponse();
     expect(dataAndResponse.data).toBe(response);
     expect(dataAndResponse.response).toBe(rawResponse);
-  });
-
-  test('del: request options instead of params are passed correctly', async () => {
-    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(
-      client.vectorStores.del('vector_store_id', { path: '/_stainless_unknown_path' }),
-    ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
   test('search: only required params', async () => {

@@ -4,22 +4,25 @@ export {
   FileBatches,
   type VectorStoreFileBatch,
   type FileBatchCreateParams,
+  type FileBatchRetrieveParams,
+  type FileBatchCancelParams,
   type FileBatchListFilesParams,
 } from './file-batches';
 export {
-  VectorStoreFilesPage,
-  FileContentResponsesPage,
   Files,
   type VectorStoreFile,
   type VectorStoreFileDeleted,
   type FileContentResponse,
   type FileCreateParams,
+  type FileRetrieveParams,
   type FileUpdateParams,
   type FileListParams,
+  type FileDeleteParams,
+  type FileContentParams,
+  type VectorStoreFilesPage,
+  type FileContentResponsesPage,
 } from './files';
 export {
-  VectorStoresPage,
-  VectorStoreSearchResponsesPage,
   VectorStores,
   type AutoFileChunkingStrategyParam,
   type FileChunkingStrategy,
@@ -35,4 +38,6 @@ export {
   type VectorStoreUpdateParams,
   type VectorStoreListParams,
   type VectorStoreSearchParams,
+  type VectorStoresPage,
+  type VectorStoreSearchResponsesPage,
 } from './vector-stores';
