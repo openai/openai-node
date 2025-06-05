@@ -562,11 +562,6 @@ async function withChdir<R>(newDir: string, fn: () => Promise<R>): Promise<R> {
   }
 }
 
-function checkNever(x: never, detail: any = x): never {
-  // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-  throw new Error(`checkNever: impossible to call: ${detail}`);
-}
-
 async function pathExists(path: string) {
   try {
     await fs.access(path);
