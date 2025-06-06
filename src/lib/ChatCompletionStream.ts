@@ -743,7 +743,7 @@ export interface ChatCompletionSnapshot {
    * Can be used in conjunction with the `seed` request parameter to understand when
    * backend changes have been made that might impact determinism.
    */
-  system_fingerprint?: string;
+  system_fingerprint?: string | null;
 }
 
 export namespace ChatCompletionSnapshot {
