@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.1.2 (2025-06-07)
+
+Full Changelog: [v5.1.1...v5.1.2](https://github.com/openai/openai-node/compare/v5.1.1...v5.1.2)
+
+### Chores
+
+* avoid type error in certain environments ([44ac3d9](https://github.com/openai/openai-node/commit/44ac3d96eb258cd777edb02004763ccef253ae7a))
+
 ## 5.1.1 (2025-06-05)
 
 Full Changelog: [v5.1.0...v5.1.1](https://github.com/openai/openai-node/compare/v5.1.0...v5.1.1)
