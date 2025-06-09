@@ -3,6 +3,7 @@
 import { APIResource } from '../../../core/resource';
 import * as Shared from '../../shared';
 import * as ResponsesAPI from '../../responses/responses';
+import * as CompletionsAPI from '../../chat/completions/completions';
 import * as OutputItemsAPI from './output-items';
 import {
   OutputItemListParams,
@@ -258,6 +259,23 @@ export namespace CreateEvalCompletionsRunDataSource {
     max_completion_tokens?: number;
 
     /**
+     * An object specifying the format that the model must output.
+     *
+     * Setting to `{ "type": "json_schema", "json_schema": {...} }` enables Structured
+     * Outputs which ensures the model will match your supplied JSON schema. Learn more
+     * in the
+     * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+     *
+     * Setting to `{ "type": "json_object" }` enables the older JSON mode, which
+     * ensures the message the model generates is valid JSON. Using `json_schema` is
+     * preferred for models that support it.
+     */
+    response_format?:
+      | Shared.ResponseFormatText
+      | Shared.ResponseFormatJSONSchema
+      | Shared.ResponseFormatJSONObject;
+
+    /**
      * A seed value to initialize the randomness, during sampling.
      */
     seed?: number;
@@ -266,6 +284,13 @@ export namespace CreateEvalCompletionsRunDataSource {
      * A higher temperature increases randomness in the outputs.
      */
     temperature?: number;
+
+    /**
+     * A list of tools the model may call. Currently, only functions are supported as a
+     * tool. Use this to provide a list of functions the model may generate JSON inputs
+     * for. A max of 128 functions are supported.
+     */
+    tools?: Array<CompletionsAPI.ChatCompletionTool>;
 
     /**
      * An alternative to temperature for nucleus sampling; 1.0 includes all tokens.
@@ -650,9 +675,64 @@ export namespace RunCreateResponse {
       temperature?: number;
 
       /**
+       * Configuration options for a text response from the model. Can be plain text or
+       * structured JSON data. Learn more:
+       *
+       * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
+       * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+       */
+      text?: SamplingParams.Text;
+
+      /**
+       * An array of tools the model may call while generating a response. You can
+       * specify which tool to use by setting the `tool_choice` parameter.
+       *
+       * The two categories of tools you can provide the model are:
+       *
+       * - **Built-in tools**: Tools that are provided by OpenAI that extend the model's
+       *   capabilities, like
+       *   [web search](https://platform.openai.com/docs/guides/tools-web-search) or
+       *   [file search](https://platform.openai.com/docs/guides/tools-file-search).
+       *   Learn more about
+       *   [built-in tools](https://platform.openai.com/docs/guides/tools).
+       * - **Function calls (custom tools)**: Functions that are defined by you, enabling
+       *   the model to call your own code. Learn more about
+       *   [function calling](https://platform.openai.com/docs/guides/function-calling).
+       */
+      tools?: Array<ResponsesAPI.Tool>;
+
+      /**
        * An alternative to temperature for nucleus sampling; 1.0 includes all tokens.
        */
       top_p?: number;
+    }
+
+    export namespace SamplingParams {
+      /**
+       * Configuration options for a text response from the model. Can be plain text or
+       * structured JSON data. Learn more:
+       *
+       * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
+       * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+       */
+      export interface Text {
+        /**
+         * An object specifying the format that the model must output.
+         *
+         * Configuring `{ "type": "json_schema" }` enables Structured Outputs, which
+         * ensures the model will match your supplied JSON schema. Learn more in the
+         * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+         *
+         * The default format is `{ "type": "text" }` with no additional options.
+         *
+         * **Not recommended for gpt-4o and newer models:**
+         *
+         * Setting to `{ "type": "json_object" }` enables the older JSON mode, which
+         * ensures the message the model generates is valid JSON. Using `json_schema` is
+         * preferred for models that support it.
+         */
+        format?: ResponsesAPI.ResponseFormatTextConfig;
+      }
     }
   }
 
@@ -1042,9 +1122,64 @@ export namespace RunRetrieveResponse {
       temperature?: number;
 
       /**
+       * Configuration options for a text response from the model. Can be plain text or
+       * structured JSON data. Learn more:
+       *
+       * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
+       * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+       */
+      text?: SamplingParams.Text;
+
+      /**
+       * An array of tools the model may call while generating a response. You can
+       * specify which tool to use by setting the `tool_choice` parameter.
+       *
+       * The two categories of tools you can provide the model are:
+       *
+       * - **Built-in tools**: Tools that are provided by OpenAI that extend the model's
+       *   capabilities, like
+       *   [web search](https://platform.openai.com/docs/guides/tools-web-search) or
+       *   [file search](https://platform.openai.com/docs/guides/tools-file-search).
+       *   Learn more about
+       *   [built-in tools](https://platform.openai.com/docs/guides/tools).
+       * - **Function calls (custom tools)**: Functions that are defined by you, enabling
+       *   the model to call your own code. Learn more about
+       *   [function calling](https://platform.openai.com/docs/guides/function-calling).
+       */
+      tools?: Array<ResponsesAPI.Tool>;
+
+      /**
        * An alternative to temperature for nucleus sampling; 1.0 includes all tokens.
        */
       top_p?: number;
+    }
+
+    export namespace SamplingParams {
+      /**
+       * Configuration options for a text response from the model. Can be plain text or
+       * structured JSON data. Learn more:
+       *
+       * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
+       * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+       */
+      export interface Text {
+        /**
+         * An object specifying the format that the model must output.
+         *
+         * Configuring `{ "type": "json_schema" }` enables Structured Outputs, which
+         * ensures the model will match your supplied JSON schema. Learn more in the
+         * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+         *
+         * The default format is `{ "type": "text" }` with no additional options.
+         *
+         * **Not recommended for gpt-4o and newer models:**
+         *
+         * Setting to `{ "type": "json_object" }` enables the older JSON mode, which
+         * ensures the message the model generates is valid JSON. Using `json_schema` is
+         * preferred for models that support it.
+         */
+        format?: ResponsesAPI.ResponseFormatTextConfig;
+      }
     }
   }
 
@@ -1431,9 +1566,64 @@ export namespace RunListResponse {
       temperature?: number;
 
       /**
+       * Configuration options for a text response from the model. Can be plain text or
+       * structured JSON data. Learn more:
+       *
+       * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
+       * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+       */
+      text?: SamplingParams.Text;
+
+      /**
+       * An array of tools the model may call while generating a response. You can
+       * specify which tool to use by setting the `tool_choice` parameter.
+       *
+       * The two categories of tools you can provide the model are:
+       *
+       * - **Built-in tools**: Tools that are provided by OpenAI that extend the model's
+       *   capabilities, like
+       *   [web search](https://platform.openai.com/docs/guides/tools-web-search) or
+       *   [file search](https://platform.openai.com/docs/guides/tools-file-search).
+       *   Learn more about
+       *   [built-in tools](https://platform.openai.com/docs/guides/tools).
+       * - **Function calls (custom tools)**: Functions that are defined by you, enabling
+       *   the model to call your own code. Learn more about
+       *   [function calling](https://platform.openai.com/docs/guides/function-calling).
+       */
+      tools?: Array<ResponsesAPI.Tool>;
+
+      /**
        * An alternative to temperature for nucleus sampling; 1.0 includes all tokens.
        */
       top_p?: number;
+    }
+
+    export namespace SamplingParams {
+      /**
+       * Configuration options for a text response from the model. Can be plain text or
+       * structured JSON data. Learn more:
+       *
+       * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
+       * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+       */
+      export interface Text {
+        /**
+         * An object specifying the format that the model must output.
+         *
+         * Configuring `{ "type": "json_schema" }` enables Structured Outputs, which
+         * ensures the model will match your supplied JSON schema. Learn more in the
+         * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+         *
+         * The default format is `{ "type": "text" }` with no additional options.
+         *
+         * **Not recommended for gpt-4o and newer models:**
+         *
+         * Setting to `{ "type": "json_object" }` enables the older JSON mode, which
+         * ensures the message the model generates is valid JSON. Using `json_schema` is
+         * preferred for models that support it.
+         */
+        format?: ResponsesAPI.ResponseFormatTextConfig;
+      }
     }
   }
 
@@ -1831,9 +2021,64 @@ export namespace RunCancelResponse {
       temperature?: number;
 
       /**
+       * Configuration options for a text response from the model. Can be plain text or
+       * structured JSON data. Learn more:
+       *
+       * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
+       * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+       */
+      text?: SamplingParams.Text;
+
+      /**
+       * An array of tools the model may call while generating a response. You can
+       * specify which tool to use by setting the `tool_choice` parameter.
+       *
+       * The two categories of tools you can provide the model are:
+       *
+       * - **Built-in tools**: Tools that are provided by OpenAI that extend the model's
+       *   capabilities, like
+       *   [web search](https://platform.openai.com/docs/guides/tools-web-search) or
+       *   [file search](https://platform.openai.com/docs/guides/tools-file-search).
+       *   Learn more about
+       *   [built-in tools](https://platform.openai.com/docs/guides/tools).
+       * - **Function calls (custom tools)**: Functions that are defined by you, enabling
+       *   the model to call your own code. Learn more about
+       *   [function calling](https://platform.openai.com/docs/guides/function-calling).
+       */
+      tools?: Array<ResponsesAPI.Tool>;
+
+      /**
        * An alternative to temperature for nucleus sampling; 1.0 includes all tokens.
        */
       top_p?: number;
+    }
+
+    export namespace SamplingParams {
+      /**
+       * Configuration options for a text response from the model. Can be plain text or
+       * structured JSON data. Learn more:
+       *
+       * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
+       * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+       */
+      export interface Text {
+        /**
+         * An object specifying the format that the model must output.
+         *
+         * Configuring `{ "type": "json_schema" }` enables Structured Outputs, which
+         * ensures the model will match your supplied JSON schema. Learn more in the
+         * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+         *
+         * The default format is `{ "type": "text" }` with no additional options.
+         *
+         * **Not recommended for gpt-4o and newer models:**
+         *
+         * Setting to `{ "type": "json_object" }` enables the older JSON mode, which
+         * ensures the message the model generates is valid JSON. Using `json_schema` is
+         * preferred for models that support it.
+         */
+        format?: ResponsesAPI.ResponseFormatTextConfig;
+      }
     }
   }
 
@@ -2170,9 +2415,64 @@ export namespace RunCreateParams {
       temperature?: number;
 
       /**
+       * Configuration options for a text response from the model. Can be plain text or
+       * structured JSON data. Learn more:
+       *
+       * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
+       * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+       */
+      text?: SamplingParams.Text;
+
+      /**
+       * An array of tools the model may call while generating a response. You can
+       * specify which tool to use by setting the `tool_choice` parameter.
+       *
+       * The two categories of tools you can provide the model are:
+       *
+       * - **Built-in tools**: Tools that are provided by OpenAI that extend the model's
+       *   capabilities, like
+       *   [web search](https://platform.openai.com/docs/guides/tools-web-search) or
+       *   [file search](https://platform.openai.com/docs/guides/tools-file-search).
+       *   Learn more about
+       *   [built-in tools](https://platform.openai.com/docs/guides/tools).
+       * - **Function calls (custom tools)**: Functions that are defined by you, enabling
+       *   the model to call your own code. Learn more about
+       *   [function calling](https://platform.openai.com/docs/guides/function-calling).
+       */
+      tools?: Array<ResponsesAPI.Tool>;
+
+      /**
        * An alternative to temperature for nucleus sampling; 1.0 includes all tokens.
        */
       top_p?: number;
+    }
+
+    export namespace SamplingParams {
+      /**
+       * Configuration options for a text response from the model. Can be plain text or
+       * structured JSON data. Learn more:
+       *
+       * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
+       * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+       */
+      export interface Text {
+        /**
+         * An object specifying the format that the model must output.
+         *
+         * Configuring `{ "type": "json_schema" }` enables Structured Outputs, which
+         * ensures the model will match your supplied JSON schema. Learn more in the
+         * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+         *
+         * The default format is `{ "type": "text" }` with no additional options.
+         *
+         * **Not recommended for gpt-4o and newer models:**
+         *
+         * Setting to `{ "type": "json_object" }` enables the older JSON mode, which
+         * ensures the message the model generates is valid JSON. Using `json_schema` is
+         * preferred for models that support it.
+         */
+        format?: ResponsesAPI.ResponseFormatTextConfig;
+      }
     }
   }
 }
