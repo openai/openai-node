@@ -1,5 +1,28 @@
 # Changelog
 
+## 5.2.0 (2025-06-09)
+
+Full Changelog: [v5.1.1...v5.2.0](https://github.com/openai/openai-node/compare/v5.1.1...v5.2.0)
+
+### Features
+
+* **api:** Add tools and structured outputs to evals ([64844f1](https://github.com/openai/openai-node/commit/64844f1be2da9658a603fac304d1387f28a110a4))
+
+
+### Bug Fixes
+
+* **changelog:** remove duplicated entries ([18484cc](https://github.com/openai/openai-node/commit/18484cceea615a01b62590b9b626b9e2140c7dd9))
+
+
+### Chores
+
+* avoid type error in certain environments ([44ac3d9](https://github.com/openai/openai-node/commit/44ac3d96eb258cd777edb02004763ccef253ae7a))
+
+
+### Documentation
+
+* **changelog:** reference MIGRATION.md ([b3d488f](https://github.com/openai/openai-node/commit/b3d488feff5acb020f5db6f27ea94884c56bc767)), closes [#1539](https://github.com/openai/openai-node/issues/1539)
+
 ## 5.1.1 (2025-06-05)
 
 Full Changelog: [v5.1.0...v5.1.1](https://github.com/openai/openai-node/compare/v5.1.0...v5.1.1)
