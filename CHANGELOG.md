@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.3.0 (2025-06-10)
+
+Full Changelog: [v5.2.0...v5.3.0](https://github.com/openai/openai-node/compare/v5.2.0...v5.3.0)
+
+### Features
+
+* **api:** Add o3-pro model IDs ([9988f8e](https://github.com/openai/openai-node/commit/9988f8ea50a370abfc03bc97882d1ddd83837217))
+
 ## 5.2.0 (2025-06-09)
 
 Full Changelog: [v5.1.1...v5.2.0](https://github.com/openai/openai-node/compare/v5.1.1...v5.2.0)
