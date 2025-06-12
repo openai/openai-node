@@ -5,6 +5,8 @@ export type AllModels =
   | ChatModel
   | 'o1-pro'
   | 'o1-pro-2025-03-19'
+  | 'o3-pro'
+  | 'o3-pro-2025-06-10'
   | 'computer-use-preview'
   | 'computer-use-preview-2025-03-11';
 
@@ -34,6 +36,7 @@ export type ChatModel =
   | 'gpt-4o-audio-preview'
   | 'gpt-4o-audio-preview-2024-10-01'
   | 'gpt-4o-audio-preview-2024-12-17'
+  | 'gpt-4o-audio-preview-2025-06-03'
   | 'gpt-4o-mini-audio-preview'
   | 'gpt-4o-mini-audio-preview-2024-12-17'
   | 'gpt-4o-search-preview'
@@ -41,6 +44,7 @@ export type ChatModel =
   | 'gpt-4o-search-preview-2025-03-11'
   | 'gpt-4o-mini-search-preview-2025-03-11'
   | 'chatgpt-4o-latest'
+  | 'codex-mini-latest'
   | 'gpt-4o-mini'
   | 'gpt-4o-mini-2024-07-18'
   | 'gpt-4-turbo'
@@ -295,5 +299,7 @@ export type ResponsesModel =
   | ChatModel
   | 'o1-pro'
   | 'o1-pro-2025-03-19'
+  | 'o3-pro'
+  | 'o3-pro-2025-06-10'
   | 'computer-use-preview'
   | 'computer-use-preview-2025-03-11';

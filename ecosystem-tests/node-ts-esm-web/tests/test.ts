@@ -1,5 +1,3 @@
-// shouldn't need extension, but Jest's ESM module resolution is broken
-import 'openai/shims/web.mjs';
 import OpenAI, { toFile } from 'openai';
 import { distance } from 'fastest-levenshtein';
 import { ChatCompletion } from 'openai/resources/chat/completions';
@@ -104,7 +102,16 @@ if (typeof File !== 'undefined') {
   it('handles builtinFile', async function () {
     const file = await fetch(url)
       .then((x) => x.arrayBuffer())
-      .then((x) => new File([x], filename));
+      .then(
+        (x) =>
+          new File(
+            [
+              // @ts-ignore array buffer can't be passed to File at the type-level
+              x,
+            ],
+            filename,
+          ),
+      );
 
     const result = await client.audio.transcriptions.create({ file, model });
     expect(result.text).toBeSimilarTo(correctAnswer, 12);
@@ -151,13 +158,4 @@ describe('toFile', () => {
     });
     expect(result.filename).toEqual('finetune.jsonl');
   });
-});
-
-test('query strings', () => {
-  expect(
-    decodeURIComponent((client as any).stringifyQuery({ foo: { nested: { a: true, b: 'foo' } } })),
-  ).toEqual('foo[nested][a]=true&foo[nested][b]=foo');
-  expect(
-    decodeURIComponent((client as any).stringifyQuery({ foo: { nested: { a: ['hello', 'world'] } } })),
-  ).toEqual('foo[nested][a][]=hello&foo[nested][a][]=world');
 });

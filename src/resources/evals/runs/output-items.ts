@@ -1,56 +1,43 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../../resource';
-import { isRequestOptions } from '../../../core';
-import * as Core from '../../../core';
+import { APIResource } from '../../../core/resource';
 import * as RunsAPI from './runs';
-import { CursorPage, type CursorPageParams } from '../../../pagination';
+import { APIPromise } from '../../../core/api-promise';
+import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pagination';
+import { RequestOptions } from '../../../internal/request-options';
+import { path } from '../../../internal/utils/path';
 
 export class OutputItems extends APIResource {
   /**
    * Get an evaluation run output item by ID.
    */
   retrieve(
-    evalId: string,
-    runId: string,
-    outputItemId: string,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<OutputItemRetrieveResponse> {
-    return this._client.get(`/evals/${evalId}/runs/${runId}/output_items/${outputItemId}`, options);
+    outputItemID: string,
+    params: OutputItemRetrieveParams,
+    options?: RequestOptions,
+  ): APIPromise<OutputItemRetrieveResponse> {
+    const { eval_id, run_id } = params;
+    return this._client.get(path`/evals/${eval_id}/runs/${run_id}/output_items/${outputItemID}`, options);
   }
 
   /**
    * Get a list of output items for an evaluation run.
    */
   list(
-    evalId: string,
-    runId: string,
-    query?: OutputItemListParams,
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<OutputItemListResponsesPage, OutputItemListResponse>;
-  list(
-    evalId: string,
-    runId: string,
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<OutputItemListResponsesPage, OutputItemListResponse>;
-  list(
-    evalId: string,
-    runId: string,
-    query: OutputItemListParams | Core.RequestOptions = {},
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<OutputItemListResponsesPage, OutputItemListResponse> {
-    if (isRequestOptions(query)) {
-      return this.list(evalId, runId, {}, query);
-    }
+    runID: string,
+    params: OutputItemListParams,
+    options?: RequestOptions,
+  ): PagePromise<OutputItemListResponsesPage, OutputItemListResponse> {
+    const { eval_id, ...query } = params;
     return this._client.getAPIList(
-      `/evals/${evalId}/runs/${runId}/output_items`,
-      OutputItemListResponsesPage,
+      path`/evals/${eval_id}/runs/${runID}/output_items`,
+      CursorPage<OutputItemListResponse>,
       { query, ...options },
     );
   }
 }
 
-export class OutputItemListResponsesPage extends CursorPage<OutputItemListResponse> {}
+export type OutputItemListResponsesPage = CursorPage<OutputItemListResponse>;
 
 /**
  * A schema representing an evaluation run output item.
@@ -384,27 +371,43 @@ export namespace OutputItemListResponse {
   }
 }
 
+export interface OutputItemRetrieveParams {
+  /**
+   * The ID of the evaluation to retrieve runs for.
+   */
+  eval_id: string;
+
+  /**
+   * The ID of the run to retrieve.
+   */
+  run_id: string;
+}
+
 export interface OutputItemListParams extends CursorPageParams {
   /**
-   * Sort order for output items by timestamp. Use `asc` for ascending order or
-   * `desc` for descending order. Defaults to `asc`.
+   * Path param: The ID of the evaluation to retrieve runs for.
+   */
+  eval_id: string;
+
+  /**
+   * Query param: Sort order for output items by timestamp. Use `asc` for ascending
+   * order or `desc` for descending order. Defaults to `asc`.
    */
   order?: 'asc' | 'desc';
 
   /**
-   * Filter output items by status. Use `failed` to filter by failed output items or
-   * `pass` to filter by passed output items.
+   * Query param: Filter output items by status. Use `failed` to filter by failed
+   * output items or `pass` to filter by passed output items.
    */
   status?: 'fail' | 'pass';
 }
-
-OutputItems.OutputItemListResponsesPage = OutputItemListResponsesPage;
 
 export declare namespace OutputItems {
   export {
     type OutputItemRetrieveResponse as OutputItemRetrieveResponse,
     type OutputItemListResponse as OutputItemListResponse,
-    OutputItemListResponsesPage as OutputItemListResponsesPage,
+    type OutputItemListResponsesPage as OutputItemListResponsesPage,
+    type OutputItemRetrieveParams as OutputItemRetrieveParams,
     type OutputItemListParams as OutputItemListParams,
   };
 }

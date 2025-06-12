@@ -1,25 +1,25 @@
 name: CI
 on:
   push:
-    branches:
-      - master
-  pull_request:
-    branches:
-      - master
-      - next
+    branches-ignore:
+      - 'generated'
+      - 'codegen/**'
+      - 'integrated/**'
+      - 'stl-preview-head/**'
+      - 'stl-preview-base/**'
 
 jobs:
   lint:
     timeout-minutes: 10
     name: lint
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.repository == 'stainless-sdks/openai-typescript' && 'depot-ubuntu-24.04' || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
       - name: Bootstrap
         run: ./scripts/bootstrap
@@ -30,7 +30,7 @@ jobs:
   build:
     timeout-minutes: 5
     name: build
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.repository == 'stainless-sdks/openai-typescript' && 'depot-ubuntu-24.04' || 'ubuntu-latest' }}
     permissions:
       contents: read
       id-token: write
@@ -40,7 +40,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
       - name: Bootstrap
         run: ./scripts/bootstrap
@@ -49,14 +49,14 @@ jobs:
         run: ./scripts/build
 
       - name: Get GitHub OIDC Token
-        if: github.repository == 'stainless-sdks/openai-node'
+        if: github.repository == 'stainless-sdks/openai-typescript'
         id: github-oidc
         uses: actions/github-script@v6
         with:
           script: core.setOutput('github_token', await core.getIDToken());
 
       - name: Upload tarball
-        if: github.repository == 'stainless-sdks/openai-node'
+        if: github.repository == 'stainless-sdks/openai-typescript'
         env:
           URL: https://pkg.stainless.com/s
           AUTH: ${{ steps.github-oidc.outputs.github_token }}
@@ -65,14 +65,14 @@ jobs:
   test:
     timeout-minutes: 10
     name: test
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.repository == 'stainless-sdks/openai-typescript' && 'depot-ubuntu-24.04' || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
       - name: Bootstrap
         run: ./scripts/bootstrap
@@ -83,7 +83,7 @@ jobs:
   examples:
     timeout-minutes: 10
     name: examples
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.repository == 'stainless-sdks/openai-typescript' && 'depot-ubuntu-24.04' || 'ubuntu-latest' }}
     if: github.repository == 'openai/openai-node'
 
     steps:
@@ -92,15 +92,15 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
       - name: Install dependencies
         run: |
           yarn install
 
-      - env: 
+      - env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-            yarn tsn examples/demo.ts
+          yarn tsn examples/demo.ts
 
   ecosystem_tests:
     name: ecosystem tests (v${{ matrix.node-version }})

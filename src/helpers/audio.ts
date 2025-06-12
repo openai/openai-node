@@ -1,8 +1,7 @@
-import { File } from 'formdata-node';
 import { spawn } from 'node:child_process';
 import { Readable } from 'node:stream';
 import { platform, versions } from 'node:process';
-import { Response } from 'openai/_shims';
+import { checkFileSupport } from '../internal/uploads';
 
 const DEFAULT_SAMPLE_RATE = 24000;
 const DEFAULT_CHANNELS = 1;
@@ -28,6 +27,7 @@ function isResponse(stream: NodeJS.ReadableStream | Response | File): stream is 
 }
 
 function isFile(stream: NodeJS.ReadableStream | Response | File): stream is File {
+  checkFileSupport();
   return stream instanceof File;
 }
 
@@ -37,7 +37,7 @@ async function nodejsPlayAudio(stream: NodeJS.ReadableStream | Response | File):
       const ffplay = spawn('ffplay', ['-autoexit', '-nodisp', '-i', 'pipe:0']);
 
       if (isResponse(stream)) {
-        stream.body.pipe(ffplay.stdin);
+        (stream.body! as any).pipe(ffplay.stdin);
       } else if (isFile(stream)) {
         Readable.from(stream.stream()).pipe(ffplay.stdin);
       } else {
@@ -73,6 +73,7 @@ type RecordAudioOptions = {
 };
 
 function nodejsRecordAudio({ signal, device, timeout }: RecordAudioOptions = {}): Promise<File> {
+  checkFileSupport();
   return new Promise((resolve, reject) => {
     const data: any[] = [];
     const provider = recordingProviders[platform];

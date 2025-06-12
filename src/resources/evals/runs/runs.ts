@@ -1,91 +1,86 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../../resource';
-import { isRequestOptions } from '../../../core';
-import * as Core from '../../../core';
+import { APIResource } from '../../../core/resource';
 import * as Shared from '../../shared';
 import * as ResponsesAPI from '../../responses/responses';
+import * as CompletionsAPI from '../../chat/completions/completions';
 import * as OutputItemsAPI from './output-items';
 import {
   OutputItemListParams,
   OutputItemListResponse,
   OutputItemListResponsesPage,
+  OutputItemRetrieveParams,
   OutputItemRetrieveResponse,
   OutputItems,
 } from './output-items';
-import { CursorPage, type CursorPageParams } from '../../../pagination';
+import { APIPromise } from '../../../core/api-promise';
+import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pagination';
+import { RequestOptions } from '../../../internal/request-options';
+import { path } from '../../../internal/utils/path';
 
 export class Runs extends APIResource {
   outputItems: OutputItemsAPI.OutputItems = new OutputItemsAPI.OutputItems(this._client);
 
   /**
-   * Create a new evaluation run. This is the endpoint that will kick off grading.
+   * Kicks off a new run for a given evaluation, specifying the data source, and what
+   * model configuration to use to test. The datasource will be validated against the
+   * schema specified in the config of the evaluation.
    */
-  create(
-    evalId: string,
-    body: RunCreateParams,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<RunCreateResponse> {
-    return this._client.post(`/evals/${evalId}/runs`, { body, ...options });
+  create(evalID: string, body: RunCreateParams, options?: RequestOptions): APIPromise<RunCreateResponse> {
+    return this._client.post(path`/evals/${evalID}/runs`, { body, ...options });
   }
 
   /**
    * Get an evaluation run by ID.
    */
   retrieve(
-    evalId: string,
-    runId: string,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<RunRetrieveResponse> {
-    return this._client.get(`/evals/${evalId}/runs/${runId}`, options);
+    runID: string,
+    params: RunRetrieveParams,
+    options?: RequestOptions,
+  ): APIPromise<RunRetrieveResponse> {
+    const { eval_id } = params;
+    return this._client.get(path`/evals/${eval_id}/runs/${runID}`, options);
   }
 
   /**
    * Get a list of runs for an evaluation.
    */
   list(
-    evalId: string,
-    query?: RunListParams,
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<RunListResponsesPage, RunListResponse>;
-  list(
-    evalId: string,
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<RunListResponsesPage, RunListResponse>;
-  list(
-    evalId: string,
-    query: RunListParams | Core.RequestOptions = {},
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<RunListResponsesPage, RunListResponse> {
-    if (isRequestOptions(query)) {
-      return this.list(evalId, {}, query);
-    }
-    return this._client.getAPIList(`/evals/${evalId}/runs`, RunListResponsesPage, { query, ...options });
+    evalID: string,
+    query: RunListParams | null | undefined = {},
+    options?: RequestOptions,
+  ): PagePromise<RunListResponsesPage, RunListResponse> {
+    return this._client.getAPIList(path`/evals/${evalID}/runs`, CursorPage<RunListResponse>, {
+      query,
+      ...options,
+    });
   }
 
   /**
    * Delete an eval run.
    */
-  del(evalId: string, runId: string, options?: Core.RequestOptions): Core.APIPromise<RunDeleteResponse> {
-    return this._client.delete(`/evals/${evalId}/runs/${runId}`, options);
+  delete(runID: string, params: RunDeleteParams, options?: RequestOptions): APIPromise<RunDeleteResponse> {
+    const { eval_id } = params;
+    return this._client.delete(path`/evals/${eval_id}/runs/${runID}`, options);
   }
 
   /**
    * Cancel an ongoing evaluation run.
    */
-  cancel(evalId: string, runId: string, options?: Core.RequestOptions): Core.APIPromise<RunCancelResponse> {
-    return this._client.post(`/evals/${evalId}/runs/${runId}`, options);
+  cancel(runID: string, params: RunCancelParams, options?: RequestOptions): APIPromise<RunCancelResponse> {
+    const { eval_id } = params;
+    return this._client.post(path`/evals/${eval_id}/runs/${runID}`, options);
   }
 }
 
-export class RunListResponsesPage extends CursorPage<RunListResponse> {}
+export type RunListResponsesPage = CursorPage<RunListResponse>;
 
 /**
  * A CompletionsRunDataSource object describing a model sampling configuration.
  */
 export interface CreateEvalCompletionsRunDataSource {
   /**
-   * A StoredCompletionsRunDataSource configuration describing a set of filters
+   * Determines what populates the `item` namespace in this run's data source.
    */
   source:
     | CreateEvalCompletionsRunDataSource.FileContent
@@ -97,6 +92,12 @@ export interface CreateEvalCompletionsRunDataSource {
    */
   type: 'completions';
 
+  /**
+   * Used when sampling from a model. Dictates the structure of the messages passed
+   * into the model. Can either be a reference to a prebuilt trajectory (ie,
+   * `item.input_trajectory`), or a template with variable references to the `item`
+   * namespace.
+   */
   input_messages?:
     | CreateEvalCompletionsRunDataSource.Template
     | CreateEvalCompletionsRunDataSource.ItemReference;
@@ -185,7 +186,7 @@ export namespace CreateEvalCompletionsRunDataSource {
   export interface Template {
     /**
      * A list of chat messages forming the prompt or context. May include variable
-     * references to the "item" namespace, ie {{item.name}}.
+     * references to the `item` namespace, ie {{item.name}}.
      */
     template: Array<ResponsesAPI.EasyInputMessage | Template.Message>;
 
@@ -241,7 +242,7 @@ export namespace CreateEvalCompletionsRunDataSource {
 
   export interface ItemReference {
     /**
-     * A reference to a variable in the "item" namespace. Ie, "item.name"
+     * A reference to a variable in the `item` namespace. Ie, "item.input_trajectory"
      */
     item_reference: string;
 
@@ -258,6 +259,23 @@ export namespace CreateEvalCompletionsRunDataSource {
     max_completion_tokens?: number;
 
     /**
+     * An object specifying the format that the model must output.
+     *
+     * Setting to `{ "type": "json_schema", "json_schema": {...} }` enables Structured
+     * Outputs which ensures the model will match your supplied JSON schema. Learn more
+     * in the
+     * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+     *
+     * Setting to `{ "type": "json_object" }` enables the older JSON mode, which
+     * ensures the message the model generates is valid JSON. Using `json_schema` is
+     * preferred for models that support it.
+     */
+    response_format?:
+      | Shared.ResponseFormatText
+      | Shared.ResponseFormatJSONSchema
+      | Shared.ResponseFormatJSONObject;
+
+    /**
      * A seed value to initialize the randomness, during sampling.
      */
     seed?: number;
@@ -266,6 +284,13 @@ export namespace CreateEvalCompletionsRunDataSource {
      * A higher temperature increases randomness in the outputs.
      */
     temperature?: number;
+
+    /**
+     * A list of tools the model may call. Currently, only functions are supported as a
+     * tool. Use this to provide a list of functions the model may generate JSON inputs
+     * for. A max of 128 functions are supported.
+     */
+    tools?: Array<CompletionsAPI.ChatCompletionTool>;
 
     /**
      * An alternative to temperature for nucleus sampling; 1.0 includes all tokens.
@@ -279,6 +304,9 @@ export namespace CreateEvalCompletionsRunDataSource {
  * eval
  */
 export interface CreateEvalJSONLRunDataSource {
+  /**
+   * Determines what populates the `item` namespace in the data source.
+   */
   source: CreateEvalJSONLRunDataSource.FileContent | CreateEvalJSONLRunDataSource.FileID;
 
   /**
@@ -356,7 +384,7 @@ export interface RunCreateResponse {
   data_source:
     | CreateEvalJSONLRunDataSource
     | CreateEvalCompletionsRunDataSource
-    | RunCreateResponse.Completions;
+    | RunCreateResponse.Responses;
 
   /**
    * An object representing an error response from the Eval API.
@@ -423,28 +451,34 @@ export namespace RunCreateResponse {
   /**
    * A ResponsesRunDataSource object describing a model sampling configuration.
    */
-  export interface Completions {
+  export interface Responses {
     /**
-     * A EvalResponsesSource object describing a run data source configuration.
+     * Determines what populates the `item` namespace in this run's data source.
      */
-    source: Completions.FileContent | Completions.FileID | Completions.Responses;
+    source: Responses.FileContent | Responses.FileID | Responses.Responses;
 
     /**
-     * The type of run data source. Always `completions`.
+     * The type of run data source. Always `responses`.
      */
-    type: 'completions';
+    type: 'responses';
 
-    input_messages?: Completions.Template | Completions.ItemReference;
+    /**
+     * Used when sampling from a model. Dictates the structure of the messages passed
+     * into the model. Can either be a reference to a prebuilt trajectory (ie,
+     * `item.input_trajectory`), or a template with variable references to the `item`
+     * namespace.
+     */
+    input_messages?: Responses.Template | Responses.ItemReference;
 
     /**
      * The name of the model to use for generating completions (e.g. "o3-mini").
      */
     model?: string;
 
-    sampling_params?: Completions.SamplingParams;
+    sampling_params?: Responses.SamplingParams;
   }
 
-  export namespace Completions {
+  export namespace Responses {
     export interface FileContent {
       /**
        * The content of the jsonl file.
@@ -487,12 +521,6 @@ export namespace RunCreateResponse {
       type: 'responses';
 
       /**
-       * Whether to allow parallel tool calls. This is a query parameter used to select
-       * responses.
-       */
-      allow_parallel_tool_calls?: boolean | null;
-
-      /**
        * Only include items created after this timestamp (inclusive). This is a query
        * parameter used to select responses.
        */
@@ -505,14 +533,8 @@ export namespace RunCreateResponse {
       created_before?: number | null;
 
       /**
-       * Whether the response has tool calls. This is a query parameter used to select
-       * responses.
-       */
-      has_tool_calls?: boolean | null;
-
-      /**
-       * Optional search string for instructions. This is a query parameter used to
-       * select responses.
+       * Optional string to search the 'instructions' field. This is a query parameter
+       * used to select responses.
        */
       instructions_search?: string | null;
 
@@ -540,6 +562,11 @@ export namespace RunCreateResponse {
       temperature?: number | null;
 
       /**
+       * List of tool names. This is a query parameter used to select responses.
+       */
+      tools?: Array<string> | null;
+
+      /**
        * Nucleus sampling parameter. This is a query parameter used to select responses.
        */
       top_p?: number | null;
@@ -553,7 +580,7 @@ export namespace RunCreateResponse {
     export interface Template {
       /**
        * A list of chat messages forming the prompt or context. May include variable
-       * references to the "item" namespace, ie {{item.name}}.
+       * references to the `item` namespace, ie {{item.name}}.
        */
       template: Array<Template.ChatMessage | Template.EvalItem>;
 
@@ -621,7 +648,7 @@ export namespace RunCreateResponse {
 
     export interface ItemReference {
       /**
-       * A reference to a variable in the "item" namespace. Ie, "item.name"
+       * A reference to a variable in the `item` namespace. Ie, "item.name"
        */
       item_reference: string;
 
@@ -648,9 +675,64 @@ export namespace RunCreateResponse {
       temperature?: number;
 
       /**
+       * Configuration options for a text response from the model. Can be plain text or
+       * structured JSON data. Learn more:
+       *
+       * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
+       * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+       */
+      text?: SamplingParams.Text;
+
+      /**
+       * An array of tools the model may call while generating a response. You can
+       * specify which tool to use by setting the `tool_choice` parameter.
+       *
+       * The two categories of tools you can provide the model are:
+       *
+       * - **Built-in tools**: Tools that are provided by OpenAI that extend the model's
+       *   capabilities, like
+       *   [web search](https://platform.openai.com/docs/guides/tools-web-search) or
+       *   [file search](https://platform.openai.com/docs/guides/tools-file-search).
+       *   Learn more about
+       *   [built-in tools](https://platform.openai.com/docs/guides/tools).
+       * - **Function calls (custom tools)**: Functions that are defined by you, enabling
+       *   the model to call your own code. Learn more about
+       *   [function calling](https://platform.openai.com/docs/guides/function-calling).
+       */
+      tools?: Array<ResponsesAPI.Tool>;
+
+      /**
        * An alternative to temperature for nucleus sampling; 1.0 includes all tokens.
        */
       top_p?: number;
+    }
+
+    export namespace SamplingParams {
+      /**
+       * Configuration options for a text response from the model. Can be plain text or
+       * structured JSON data. Learn more:
+       *
+       * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
+       * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+       */
+      export interface Text {
+        /**
+         * An object specifying the format that the model must output.
+         *
+         * Configuring `{ "type": "json_schema" }` enables Structured Outputs, which
+         * ensures the model will match your supplied JSON schema. Learn more in the
+         * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+         *
+         * The default format is `{ "type": "text" }` with no additional options.
+         *
+         * **Not recommended for gpt-4o and newer models:**
+         *
+         * Setting to `{ "type": "json_object" }` enables the older JSON mode, which
+         * ensures the message the model generates is valid JSON. Using `json_schema` is
+         * preferred for models that support it.
+         */
+        format?: ResponsesAPI.ResponseFormatTextConfig;
+      }
     }
   }
 
@@ -749,7 +831,7 @@ export interface RunRetrieveResponse {
   data_source:
     | CreateEvalJSONLRunDataSource
     | CreateEvalCompletionsRunDataSource
-    | RunRetrieveResponse.Completions;
+    | RunRetrieveResponse.Responses;
 
   /**
    * An object representing an error response from the Eval API.
@@ -816,28 +898,34 @@ export namespace RunRetrieveResponse {
   /**
    * A ResponsesRunDataSource object describing a model sampling configuration.
    */
-  export interface Completions {
+  export interface Responses {
     /**
-     * A EvalResponsesSource object describing a run data source configuration.
+     * Determines what populates the `item` namespace in this run's data source.
      */
-    source: Completions.FileContent | Completions.FileID | Completions.Responses;
+    source: Responses.FileContent | Responses.FileID | Responses.Responses;
 
     /**
-     * The type of run data source. Always `completions`.
+     * The type of run data source. Always `responses`.
      */
-    type: 'completions';
+    type: 'responses';
 
-    input_messages?: Completions.Template | Completions.ItemReference;
+    /**
+     * Used when sampling from a model. Dictates the structure of the messages passed
+     * into the model. Can either be a reference to a prebuilt trajectory (ie,
+     * `item.input_trajectory`), or a template with variable references to the `item`
+     * namespace.
+     */
+    input_messages?: Responses.Template | Responses.ItemReference;
 
     /**
      * The name of the model to use for generating completions (e.g. "o3-mini").
      */
     model?: string;
 
-    sampling_params?: Completions.SamplingParams;
+    sampling_params?: Responses.SamplingParams;
   }
 
-  export namespace Completions {
+  export namespace Responses {
     export interface FileContent {
       /**
        * The content of the jsonl file.
@@ -880,12 +968,6 @@ export namespace RunRetrieveResponse {
       type: 'responses';
 
       /**
-       * Whether to allow parallel tool calls. This is a query parameter used to select
-       * responses.
-       */
-      allow_parallel_tool_calls?: boolean | null;
-
-      /**
        * Only include items created after this timestamp (inclusive). This is a query
        * parameter used to select responses.
        */
@@ -898,14 +980,8 @@ export namespace RunRetrieveResponse {
       created_before?: number | null;
 
       /**
-       * Whether the response has tool calls. This is a query parameter used to select
-       * responses.
-       */
-      has_tool_calls?: boolean | null;
-
-      /**
-       * Optional search string for instructions. This is a query parameter used to
-       * select responses.
+       * Optional string to search the 'instructions' field. This is a query parameter
+       * used to select responses.
        */
       instructions_search?: string | null;
 
@@ -933,6 +1009,11 @@ export namespace RunRetrieveResponse {
       temperature?: number | null;
 
       /**
+       * List of tool names. This is a query parameter used to select responses.
+       */
+      tools?: Array<string> | null;
+
+      /**
        * Nucleus sampling parameter. This is a query parameter used to select responses.
        */
       top_p?: number | null;
@@ -946,7 +1027,7 @@ export namespace RunRetrieveResponse {
     export interface Template {
       /**
        * A list of chat messages forming the prompt or context. May include variable
-       * references to the "item" namespace, ie {{item.name}}.
+       * references to the `item` namespace, ie {{item.name}}.
        */
       template: Array<Template.ChatMessage | Template.EvalItem>;
 
@@ -1014,7 +1095,7 @@ export namespace RunRetrieveResponse {
 
     export interface ItemReference {
       /**
-       * A reference to a variable in the "item" namespace. Ie, "item.name"
+       * A reference to a variable in the `item` namespace. Ie, "item.name"
        */
       item_reference: string;
 
@@ -1041,9 +1122,64 @@ export namespace RunRetrieveResponse {
       temperature?: number;
 
       /**
+       * Configuration options for a text response from the model. Can be plain text or
+       * structured JSON data. Learn more:
+       *
+       * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
+       * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+       */
+      text?: SamplingParams.Text;
+
+      /**
+       * An array of tools the model may call while generating a response. You can
+       * specify which tool to use by setting the `tool_choice` parameter.
+       *
+       * The two categories of tools you can provide the model are:
+       *
+       * - **Built-in tools**: Tools that are provided by OpenAI that extend the model's
+       *   capabilities, like
+       *   [web search](https://platform.openai.com/docs/guides/tools-web-search) or
+       *   [file search](https://platform.openai.com/docs/guides/tools-file-search).
+       *   Learn more about
+       *   [built-in tools](https://platform.openai.com/docs/guides/tools).
+       * - **Function calls (custom tools)**: Functions that are defined by you, enabling
+       *   the model to call your own code. Learn more about
+       *   [function calling](https://platform.openai.com/docs/guides/function-calling).
+       */
+      tools?: Array<ResponsesAPI.Tool>;
+
+      /**
        * An alternative to temperature for nucleus sampling; 1.0 includes all tokens.
        */
       top_p?: number;
+    }
+
+    export namespace SamplingParams {
+      /**
+       * Configuration options for a text response from the model. Can be plain text or
+       * structured JSON data. Learn more:
+       *
+       * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
+       * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+       */
+      export interface Text {
+        /**
+         * An object specifying the format that the model must output.
+         *
+         * Configuring `{ "type": "json_schema" }` enables Structured Outputs, which
+         * ensures the model will match your supplied JSON schema. Learn more in the
+         * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+         *
+         * The default format is `{ "type": "text" }` with no additional options.
+         *
+         * **Not recommended for gpt-4o and newer models:**
+         *
+         * Setting to `{ "type": "json_object" }` enables the older JSON mode, which
+         * ensures the message the model generates is valid JSON. Using `json_schema` is
+         * preferred for models that support it.
+         */
+        format?: ResponsesAPI.ResponseFormatTextConfig;
+      }
     }
   }
 
@@ -1139,10 +1275,7 @@ export interface RunListResponse {
   /**
    * Information about the run's data source.
    */
-  data_source:
-    | CreateEvalJSONLRunDataSource
-    | CreateEvalCompletionsRunDataSource
-    | RunListResponse.Completions;
+  data_source: CreateEvalJSONLRunDataSource | CreateEvalCompletionsRunDataSource | RunListResponse.Responses;
 
   /**
    * An object representing an error response from the Eval API.
@@ -1209,28 +1342,34 @@ export namespace RunListResponse {
   /**
    * A ResponsesRunDataSource object describing a model sampling configuration.
    */
-  export interface Completions {
+  export interface Responses {
     /**
-     * A EvalResponsesSource object describing a run data source configuration.
+     * Determines what populates the `item` namespace in this run's data source.
      */
-    source: Completions.FileContent | Completions.FileID | Completions.Responses;
+    source: Responses.FileContent | Responses.FileID | Responses.Responses;
 
     /**
-     * The type of run data source. Always `completions`.
+     * The type of run data source. Always `responses`.
      */
-    type: 'completions';
+    type: 'responses';
 
-    input_messages?: Completions.Template | Completions.ItemReference;
+    /**
+     * Used when sampling from a model. Dictates the structure of the messages passed
+     * into the model. Can either be a reference to a prebuilt trajectory (ie,
+     * `item.input_trajectory`), or a template with variable references to the `item`
+     * namespace.
+     */
+    input_messages?: Responses.Template | Responses.ItemReference;
 
     /**
      * The name of the model to use for generating completions (e.g. "o3-mini").
      */
     model?: string;
 
-    sampling_params?: Completions.SamplingParams;
+    sampling_params?: Responses.SamplingParams;
   }
 
-  export namespace Completions {
+  export namespace Responses {
     export interface FileContent {
       /**
        * The content of the jsonl file.
@@ -1273,12 +1412,6 @@ export namespace RunListResponse {
       type: 'responses';
 
       /**
-       * Whether to allow parallel tool calls. This is a query parameter used to select
-       * responses.
-       */
-      allow_parallel_tool_calls?: boolean | null;
-
-      /**
        * Only include items created after this timestamp (inclusive). This is a query
        * parameter used to select responses.
        */
@@ -1291,14 +1424,8 @@ export namespace RunListResponse {
       created_before?: number | null;
 
       /**
-       * Whether the response has tool calls. This is a query parameter used to select
-       * responses.
-       */
-      has_tool_calls?: boolean | null;
-
-      /**
-       * Optional search string for instructions. This is a query parameter used to
-       * select responses.
+       * Optional string to search the 'instructions' field. This is a query parameter
+       * used to select responses.
        */
       instructions_search?: string | null;
 
@@ -1326,6 +1453,11 @@ export namespace RunListResponse {
       temperature?: number | null;
 
       /**
+       * List of tool names. This is a query parameter used to select responses.
+       */
+      tools?: Array<string> | null;
+
+      /**
        * Nucleus sampling parameter. This is a query parameter used to select responses.
        */
       top_p?: number | null;
@@ -1339,7 +1471,7 @@ export namespace RunListResponse {
     export interface Template {
       /**
        * A list of chat messages forming the prompt or context. May include variable
-       * references to the "item" namespace, ie {{item.name}}.
+       * references to the `item` namespace, ie {{item.name}}.
        */
       template: Array<Template.ChatMessage | Template.EvalItem>;
 
@@ -1407,7 +1539,7 @@ export namespace RunListResponse {
 
     export interface ItemReference {
       /**
-       * A reference to a variable in the "item" namespace. Ie, "item.name"
+       * A reference to a variable in the `item` namespace. Ie, "item.name"
        */
       item_reference: string;
 
@@ -1434,9 +1566,64 @@ export namespace RunListResponse {
       temperature?: number;
 
       /**
+       * Configuration options for a text response from the model. Can be plain text or
+       * structured JSON data. Learn more:
+       *
+       * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
+       * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+       */
+      text?: SamplingParams.Text;
+
+      /**
+       * An array of tools the model may call while generating a response. You can
+       * specify which tool to use by setting the `tool_choice` parameter.
+       *
+       * The two categories of tools you can provide the model are:
+       *
+       * - **Built-in tools**: Tools that are provided by OpenAI that extend the model's
+       *   capabilities, like
+       *   [web search](https://platform.openai.com/docs/guides/tools-web-search) or
+       *   [file search](https://platform.openai.com/docs/guides/tools-file-search).
+       *   Learn more about
+       *   [built-in tools](https://platform.openai.com/docs/guides/tools).
+       * - **Function calls (custom tools)**: Functions that are defined by you, enabling
+       *   the model to call your own code. Learn more about
+       *   [function calling](https://platform.openai.com/docs/guides/function-calling).
+       */
+      tools?: Array<ResponsesAPI.Tool>;
+
+      /**
        * An alternative to temperature for nucleus sampling; 1.0 includes all tokens.
        */
       top_p?: number;
+    }
+
+    export namespace SamplingParams {
+      /**
+       * Configuration options for a text response from the model. Can be plain text or
+       * structured JSON data. Learn more:
+       *
+       * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
+       * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+       */
+      export interface Text {
+        /**
+         * An object specifying the format that the model must output.
+         *
+         * Configuring `{ "type": "json_schema" }` enables Structured Outputs, which
+         * ensures the model will match your supplied JSON schema. Learn more in the
+         * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+         *
+         * The default format is `{ "type": "text" }` with no additional options.
+         *
+         * **Not recommended for gpt-4o and newer models:**
+         *
+         * Setting to `{ "type": "json_object" }` enables the older JSON mode, which
+         * ensures the message the model generates is valid JSON. Using `json_schema` is
+         * preferred for models that support it.
+         */
+        format?: ResponsesAPI.ResponseFormatTextConfig;
+      }
     }
   }
 
@@ -1543,7 +1730,7 @@ export interface RunCancelResponse {
   data_source:
     | CreateEvalJSONLRunDataSource
     | CreateEvalCompletionsRunDataSource
-    | RunCancelResponse.Completions;
+    | RunCancelResponse.Responses;
 
   /**
    * An object representing an error response from the Eval API.
@@ -1610,28 +1797,34 @@ export namespace RunCancelResponse {
   /**
    * A ResponsesRunDataSource object describing a model sampling configuration.
    */
-  export interface Completions {
+  export interface Responses {
     /**
-     * A EvalResponsesSource object describing a run data source configuration.
+     * Determines what populates the `item` namespace in this run's data source.
      */
-    source: Completions.FileContent | Completions.FileID | Completions.Responses;
+    source: Responses.FileContent | Responses.FileID | Responses.Responses;
 
     /**
-     * The type of run data source. Always `completions`.
+     * The type of run data source. Always `responses`.
      */
-    type: 'completions';
+    type: 'responses';
 
-    input_messages?: Completions.Template | Completions.ItemReference;
+    /**
+     * Used when sampling from a model. Dictates the structure of the messages passed
+     * into the model. Can either be a reference to a prebuilt trajectory (ie,
+     * `item.input_trajectory`), or a template with variable references to the `item`
+     * namespace.
+     */
+    input_messages?: Responses.Template | Responses.ItemReference;
 
     /**
      * The name of the model to use for generating completions (e.g. "o3-mini").
      */
     model?: string;
 
-    sampling_params?: Completions.SamplingParams;
+    sampling_params?: Responses.SamplingParams;
   }
 
-  export namespace Completions {
+  export namespace Responses {
     export interface FileContent {
       /**
        * The content of the jsonl file.
@@ -1674,12 +1867,6 @@ export namespace RunCancelResponse {
       type: 'responses';
 
       /**
-       * Whether to allow parallel tool calls. This is a query parameter used to select
-       * responses.
-       */
-      allow_parallel_tool_calls?: boolean | null;
-
-      /**
        * Only include items created after this timestamp (inclusive). This is a query
        * parameter used to select responses.
        */
@@ -1692,14 +1879,8 @@ export namespace RunCancelResponse {
       created_before?: number | null;
 
       /**
-       * Whether the response has tool calls. This is a query parameter used to select
-       * responses.
-       */
-      has_tool_calls?: boolean | null;
-
-      /**
-       * Optional search string for instructions. This is a query parameter used to
-       * select responses.
+       * Optional string to search the 'instructions' field. This is a query parameter
+       * used to select responses.
        */
       instructions_search?: string | null;
 
@@ -1727,6 +1908,11 @@ export namespace RunCancelResponse {
       temperature?: number | null;
 
       /**
+       * List of tool names. This is a query parameter used to select responses.
+       */
+      tools?: Array<string> | null;
+
+      /**
        * Nucleus sampling parameter. This is a query parameter used to select responses.
        */
       top_p?: number | null;
@@ -1740,7 +1926,7 @@ export namespace RunCancelResponse {
     export interface Template {
       /**
        * A list of chat messages forming the prompt or context. May include variable
-       * references to the "item" namespace, ie {{item.name}}.
+       * references to the `item` namespace, ie {{item.name}}.
        */
       template: Array<Template.ChatMessage | Template.EvalItem>;
 
@@ -1808,7 +1994,7 @@ export namespace RunCancelResponse {
 
     export interface ItemReference {
       /**
-       * A reference to a variable in the "item" namespace. Ie, "item.name"
+       * A reference to a variable in the `item` namespace. Ie, "item.name"
        */
       item_reference: string;
 
@@ -1835,9 +2021,64 @@ export namespace RunCancelResponse {
       temperature?: number;
 
       /**
+       * Configuration options for a text response from the model. Can be plain text or
+       * structured JSON data. Learn more:
+       *
+       * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
+       * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+       */
+      text?: SamplingParams.Text;
+
+      /**
+       * An array of tools the model may call while generating a response. You can
+       * specify which tool to use by setting the `tool_choice` parameter.
+       *
+       * The two categories of tools you can provide the model are:
+       *
+       * - **Built-in tools**: Tools that are provided by OpenAI that extend the model's
+       *   capabilities, like
+       *   [web search](https://platform.openai.com/docs/guides/tools-web-search) or
+       *   [file search](https://platform.openai.com/docs/guides/tools-file-search).
+       *   Learn more about
+       *   [built-in tools](https://platform.openai.com/docs/guides/tools).
+       * - **Function calls (custom tools)**: Functions that are defined by you, enabling
+       *   the model to call your own code. Learn more about
+       *   [function calling](https://platform.openai.com/docs/guides/function-calling).
+       */
+      tools?: Array<ResponsesAPI.Tool>;
+
+      /**
        * An alternative to temperature for nucleus sampling; 1.0 includes all tokens.
        */
       top_p?: number;
+    }
+
+    export namespace SamplingParams {
+      /**
+       * Configuration options for a text response from the model. Can be plain text or
+       * structured JSON data. Learn more:
+       *
+       * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
+       * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+       */
+      export interface Text {
+        /**
+         * An object specifying the format that the model must output.
+         *
+         * Configuring `{ "type": "json_schema" }` enables Structured Outputs, which
+         * ensures the model will match your supplied JSON schema. Learn more in the
+         * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+         *
+         * The default format is `{ "type": "text" }` with no additional options.
+         *
+         * **Not recommended for gpt-4o and newer models:**
+         *
+         * Setting to `{ "type": "json_object" }` enables the older JSON mode, which
+         * ensures the message the model generates is valid JSON. Using `json_schema` is
+         * preferred for models that support it.
+         */
+        format?: ResponsesAPI.ResponseFormatTextConfig;
+      }
     }
   }
 
@@ -1947,7 +2188,7 @@ export namespace RunCreateParams {
    */
   export interface CreateEvalResponsesRunDataSource {
     /**
-     * A EvalResponsesSource object describing a run data source configuration.
+     * Determines what populates the `item` namespace in this run's data source.
      */
     source:
       | CreateEvalResponsesRunDataSource.FileContent
@@ -1955,10 +2196,16 @@ export namespace RunCreateParams {
       | CreateEvalResponsesRunDataSource.Responses;
 
     /**
-     * The type of run data source. Always `completions`.
+     * The type of run data source. Always `responses`.
      */
-    type: 'completions';
+    type: 'responses';
 
+    /**
+     * Used when sampling from a model. Dictates the structure of the messages passed
+     * into the model. Can either be a reference to a prebuilt trajectory (ie,
+     * `item.input_trajectory`), or a template with variable references to the `item`
+     * namespace.
+     */
     input_messages?:
       | CreateEvalResponsesRunDataSource.Template
       | CreateEvalResponsesRunDataSource.ItemReference;
@@ -2014,12 +2261,6 @@ export namespace RunCreateParams {
       type: 'responses';
 
       /**
-       * Whether to allow parallel tool calls. This is a query parameter used to select
-       * responses.
-       */
-      allow_parallel_tool_calls?: boolean | null;
-
-      /**
        * Only include items created after this timestamp (inclusive). This is a query
        * parameter used to select responses.
        */
@@ -2032,14 +2273,8 @@ export namespace RunCreateParams {
       created_before?: number | null;
 
       /**
-       * Whether the response has tool calls. This is a query parameter used to select
-       * responses.
-       */
-      has_tool_calls?: boolean | null;
-
-      /**
-       * Optional search string for instructions. This is a query parameter used to
-       * select responses.
+       * Optional string to search the 'instructions' field. This is a query parameter
+       * used to select responses.
        */
       instructions_search?: string | null;
 
@@ -2067,6 +2302,11 @@ export namespace RunCreateParams {
       temperature?: number | null;
 
       /**
+       * List of tool names. This is a query parameter used to select responses.
+       */
+      tools?: Array<string> | null;
+
+      /**
        * Nucleus sampling parameter. This is a query parameter used to select responses.
        */
       top_p?: number | null;
@@ -2080,7 +2320,7 @@ export namespace RunCreateParams {
     export interface Template {
       /**
        * A list of chat messages forming the prompt or context. May include variable
-       * references to the "item" namespace, ie {{item.name}}.
+       * references to the `item` namespace, ie {{item.name}}.
        */
       template: Array<Template.ChatMessage | Template.EvalItem>;
 
@@ -2148,7 +2388,7 @@ export namespace RunCreateParams {
 
     export interface ItemReference {
       /**
-       * A reference to a variable in the "item" namespace. Ie, "item.name"
+       * A reference to a variable in the `item` namespace. Ie, "item.name"
        */
       item_reference: string;
 
@@ -2175,11 +2415,73 @@ export namespace RunCreateParams {
       temperature?: number;
 
       /**
+       * Configuration options for a text response from the model. Can be plain text or
+       * structured JSON data. Learn more:
+       *
+       * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
+       * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+       */
+      text?: SamplingParams.Text;
+
+      /**
+       * An array of tools the model may call while generating a response. You can
+       * specify which tool to use by setting the `tool_choice` parameter.
+       *
+       * The two categories of tools you can provide the model are:
+       *
+       * - **Built-in tools**: Tools that are provided by OpenAI that extend the model's
+       *   capabilities, like
+       *   [web search](https://platform.openai.com/docs/guides/tools-web-search) or
+       *   [file search](https://platform.openai.com/docs/guides/tools-file-search).
+       *   Learn more about
+       *   [built-in tools](https://platform.openai.com/docs/guides/tools).
+       * - **Function calls (custom tools)**: Functions that are defined by you, enabling
+       *   the model to call your own code. Learn more about
+       *   [function calling](https://platform.openai.com/docs/guides/function-calling).
+       */
+      tools?: Array<ResponsesAPI.Tool>;
+
+      /**
        * An alternative to temperature for nucleus sampling; 1.0 includes all tokens.
        */
       top_p?: number;
     }
+
+    export namespace SamplingParams {
+      /**
+       * Configuration options for a text response from the model. Can be plain text or
+       * structured JSON data. Learn more:
+       *
+       * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
+       * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+       */
+      export interface Text {
+        /**
+         * An object specifying the format that the model must output.
+         *
+         * Configuring `{ "type": "json_schema" }` enables Structured Outputs, which
+         * ensures the model will match your supplied JSON schema. Learn more in the
+         * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+         *
+         * The default format is `{ "type": "text" }` with no additional options.
+         *
+         * **Not recommended for gpt-4o and newer models:**
+         *
+         * Setting to `{ "type": "json_object" }` enables the older JSON mode, which
+         * ensures the message the model generates is valid JSON. Using `json_schema` is
+         * preferred for models that support it.
+         */
+        format?: ResponsesAPI.ResponseFormatTextConfig;
+      }
+    }
   }
+}
+
+export interface RunRetrieveParams {
+  /**
+   * The ID of the evaluation to retrieve runs for.
+   */
+  eval_id: string;
 }
 
 export interface RunListParams extends CursorPageParams {
@@ -2196,9 +2498,21 @@ export interface RunListParams extends CursorPageParams {
   status?: 'queued' | 'in_progress' | 'completed' | 'canceled' | 'failed';
 }
 
-Runs.RunListResponsesPage = RunListResponsesPage;
+export interface RunDeleteParams {
+  /**
+   * The ID of the evaluation to delete the run from.
+   */
+  eval_id: string;
+}
+
+export interface RunCancelParams {
+  /**
+   * The ID of the evaluation whose run you want to cancel.
+   */
+  eval_id: string;
+}
+
 Runs.OutputItems = OutputItems;
-Runs.OutputItemListResponsesPage = OutputItemListResponsesPage;
 
 export declare namespace Runs {
   export {
@@ -2210,16 +2524,20 @@ export declare namespace Runs {
     type RunListResponse as RunListResponse,
     type RunDeleteResponse as RunDeleteResponse,
     type RunCancelResponse as RunCancelResponse,
-    RunListResponsesPage as RunListResponsesPage,
+    type RunListResponsesPage as RunListResponsesPage,
     type RunCreateParams as RunCreateParams,
+    type RunRetrieveParams as RunRetrieveParams,
     type RunListParams as RunListParams,
+    type RunDeleteParams as RunDeleteParams,
+    type RunCancelParams as RunCancelParams,
   };
 
   export {
     OutputItems as OutputItems,
     type OutputItemRetrieveResponse as OutputItemRetrieveResponse,
     type OutputItemListResponse as OutputItemListResponse,
-    OutputItemListResponsesPage as OutputItemListResponsesPage,
+    type OutputItemListResponsesPage as OutputItemListResponsesPage,
+    type OutputItemRetrieveParams as OutputItemRetrieveParams,
     type OutputItemListParams as OutputItemListParams,
   };
 }

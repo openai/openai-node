@@ -1,6 +1,7 @@
 import { OpenAIError } from '../error';
 import type { ChatCompletionTool } from '../resources/chat/completions';
 import {
+  ResponseTextConfig,
   type FunctionTool,
   type ParsedContent,
   type ParsedResponse,
@@ -14,13 +15,15 @@ import {
 } from '../resources/responses/responses';
 import { type AutoParseableTextFormat, isAutoParsableResponseFormat } from '../lib/parser';
 
-type ParseableToolsParams = Array<Tool> | ChatCompletionTool | null;
+export type ParseableToolsParams = Array<Tool> | ChatCompletionTool | null;
 
 export type ResponseCreateParamsWithTools = ResponseCreateParamsBase & {
   tools?: ParseableToolsParams;
 };
 
-export type ExtractParsedContentFromParams<Params extends ResponseCreateParamsWithTools> =
+type TextConfigParams = { text?: ResponseTextConfig };
+
+export type ExtractParsedContentFromParams<Params extends TextConfigParams> =
   NonNullable<Params['text']>['format'] extends AutoParseableTextFormat<infer P> ? P : null;
 
 export function maybeParseResponse<

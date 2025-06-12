@@ -1,18 +1,31 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../resource';
-import * as Core from '../../core';
-import { type Response } from '../../_shims/index';
+import { APIResource } from '../../core/resource';
+import { APIPromise } from '../../core/api-promise';
+import { buildHeaders } from '../../internal/headers';
+import { RequestOptions } from '../../internal/request-options';
 
 export class Speech extends APIResource {
   /**
    * Generates audio from the input text.
+   *
+   * @example
+   * ```ts
+   * const speech = await client.audio.speech.create({
+   *   input: 'input',
+   *   model: 'string',
+   *   voice: 'ash',
+   * });
+   *
+   * const content = await speech.blob();
+   * console.log(content);
+   * ```
    */
-  create(body: SpeechCreateParams, options?: Core.RequestOptions): Core.APIPromise<Response> {
+  create(body: SpeechCreateParams, options?: RequestOptions): APIPromise<Response> {
     return this._client.post('/audio/speech', {
       body,
       ...options,
-      headers: { Accept: 'application/octet-stream', ...options?.headers },
+      headers: buildHeaders([{ Accept: 'application/octet-stream' }, options?.headers]),
       __binaryResponse: true,
     });
   }
@@ -66,7 +79,7 @@ export interface SpeechCreateParams {
 
   /**
    * The speed of the generated audio. Select a value from `0.25` to `4.0`. `1.0` is
-   * the default.
+   * the default. Does not work with `gpt-4o-mini-tts`.
    */
   speed?: number;
 }

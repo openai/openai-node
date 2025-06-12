@@ -11,7 +11,7 @@ import {
   ParsedChatCompletion,
   ParsedChoice,
   ParsedFunctionToolCall,
-} from '../resources/beta/chat/completions';
+} from '../resources/chat/completions';
 import { ResponseFormatJSONSchema } from '../resources/shared';
 import { ContentFilterFinishReasonError, LengthFinishReasonError, OpenAIError } from '../error';
 import { type ResponseFormatTextJSONSchemaConfig } from '../resources/responses/responses';

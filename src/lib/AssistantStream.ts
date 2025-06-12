@@ -9,8 +9,7 @@ import {
   MessageDelta,
   MessageContent,
 } from '../resources/beta/threads/messages';
-import * as Core from '../core';
-import { RequestOptions } from '../core';
+import { RequestOptions } from '../internal/request-options';
 import {
   Run,
   RunCreateParamsBase,
@@ -19,7 +18,7 @@ import {
   RunSubmitToolOutputsParamsBase,
   RunSubmitToolOutputsParamsStreaming,
 } from '../resources/beta/threads/runs/runs';
-import { type ReadableStream } from '../_shims/index';
+import { type ReadableStream } from '../internal/shim-types';
 import { Stream } from '../streaming';
 import { APIUserAbortError, OpenAIError } from '../error';
 import {
@@ -31,6 +30,7 @@ import {
 import { RunStep, RunStepDelta, ToolCall, ToolCallDelta } from '../resources/beta/threads/runs/steps';
 import { ThreadCreateAndRunParamsBase, Threads } from '../resources/beta/threads/threads';
 import { BaseEvents, EventStream } from './EventStream';
+import { isObj } from '../internal/utils';
 
 export interface AssistantStreamEvents extends BaseEvents {
   run: (run: Run) => void;
@@ -163,7 +163,7 @@ export class AssistantStream
 
   protected async _fromReadableStream(
     readableStream: ReadableStream,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): Promise<Run> {
     const signal = options?.signal;
     if (signal) {
@@ -187,7 +187,6 @@ export class AssistantStream
   }
 
   static createToolAssistantStream(
-    threadId: string,
     runId: string,
     runs: Runs,
     params: RunSubmitToolOutputsParamsStream,
@@ -195,7 +194,7 @@ export class AssistantStream
   ): AssistantStream {
     const runner = new AssistantStream();
     runner._run(() =>
-      runner._runToolAssistantStream(threadId, runId, runs, params, {
+      runner._runToolAssistantStream(runId, runs, params, {
         ...options,
         headers: { ...options?.headers, 'X-Stainless-Helper-Method': 'stream' },
       }),
@@ -205,10 +204,9 @@ export class AssistantStream
 
   protected async _createToolAssistantStream(
     run: Runs,
-    threadId: string,
     runId: string,
     params: RunSubmitToolOutputsParamsStream,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): Promise<Run> {
     const signal = options?.signal;
     if (signal) {
@@ -217,7 +215,7 @@ export class AssistantStream
     }
 
     const body: RunSubmitToolOutputsParamsStreaming = { ...params, stream: true };
-    const stream = await run.submitToolOutputs(threadId, runId, body, {
+    const stream = await run.submitToolOutputs(runId, body, {
       ...options,
       signal: this.controller.signal,
     });
@@ -303,7 +301,7 @@ export class AssistantStream
   protected async _createThreadAssistantStream(
     thread: Threads,
     params: ThreadCreateAndRunParamsBase,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): Promise<Run> {
     const signal = options?.signal;
     if (signal) {
@@ -330,7 +328,7 @@ export class AssistantStream
     run: Runs,
     threadId: string,
     params: RunCreateParamsBase,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): Promise<Run> {
     const signal = options?.signal;
     if (signal) {
@@ -679,7 +677,7 @@ export class AssistantStream
         accValue += deltaValue;
       } else if (typeof accValue === 'number' && typeof deltaValue === 'number') {
         accValue += deltaValue;
-      } else if (Core.isObj(accValue) && Core.isObj(deltaValue)) {
+      } else if (isObj(accValue) && isObj(deltaValue)) {
         accValue = this.accumulateDelta(accValue as Record<string, any>, deltaValue as Record<string, any>);
       } else if (Array.isArray(accValue) && Array.isArray(deltaValue)) {
         if (accValue.every((x) => typeof x === 'string' || typeof x === 'number')) {
@@ -688,7 +686,7 @@ export class AssistantStream
         }
 
         for (const deltaEntry of deltaValue) {
-          if (!Core.isObj(deltaEntry)) {
+          if (!isObj(deltaEntry)) {
             throw new Error(`Expected array delta entry to be an object but got: ${deltaEntry}`);
           }
 
@@ -721,6 +719,7 @@ export class AssistantStream
 
   #handleRun(this: AssistantStream, event: RunStreamEvent) {
     this.#currentRunSnapshot = event.data;
+
     switch (event.event) {
       case 'thread.run.created':
         break;
@@ -733,6 +732,7 @@ export class AssistantStream
       case 'thread.run.failed':
       case 'thread.run.completed':
       case 'thread.run.expired':
+      case 'thread.run.incomplete':
         this.#finalRun = event.data;
         if (this.#currentToolCall) {
           this._emit('toolCallDone', this.#currentToolCall);
@@ -751,7 +751,7 @@ export class AssistantStream
   protected async _threadAssistantStream(
     params: ThreadCreateAndRunParamsBase,
     thread: Threads,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): Promise<Run> {
     return await this._createThreadAssistantStream(thread, params, options);
   }
@@ -760,19 +760,18 @@ export class AssistantStream
     threadId: string,
     runs: Runs,
     params: RunCreateParamsBase,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): Promise<Run> {
     return await this._createAssistantStream(runs, threadId, params, options);
   }
 
   protected async _runToolAssistantStream(
-    threadId: string,
     runId: string,
     runs: Runs,
     params: RunSubmitToolOutputsParamsStream,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): Promise<Run> {
-    return await this._createToolAssistantStream(runs, threadId, runId, params, options);
+    return await this._createToolAssistantStream(runs, runId, params, options);
   }
 }
 
