@@ -2,7 +2,7 @@
 
 import type { OpenAI } from '../client';
 
-export class APIResource {
+export abstract class APIResource {
   protected _client: OpenAI;
 
   constructor(client: OpenAI) {

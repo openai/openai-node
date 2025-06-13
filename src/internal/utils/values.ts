@@ -9,6 +9,9 @@ export const isAbsoluteURL = (url: string): boolean => {
   return startsWithSchemeRegexp.test(url);
 };
 
+export let isArray = (val: unknown): val is unknown[] => ((isArray = Array.isArray), isArray(val));
+export let isReadonlyArray = isArray as (val: unknown) => val is readonly unknown[];
+
 /** Returns an object if the given value isn't an object, otherwise returns as-is */
 export function maybeObj(x: unknown): object {
   if (typeof x !== 'object') {
