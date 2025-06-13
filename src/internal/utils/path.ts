@@ -60,4 +60,4 @@ export const createPathTagFunction = (pathEncoder = encodeURIPath) =>
 /**
  * URI-encodes path params and ensures no unsafe /./ or /../ path segments are introduced.
  */
-export const path = createPathTagFunction(encodeURIPath);
+export const path = /* @__PURE__ */ createPathTagFunction(encodeURIPath);

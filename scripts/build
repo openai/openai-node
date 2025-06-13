@@ -31,7 +31,7 @@ fi
 node scripts/utils/make-dist-package-json.cjs > dist/package.json
 
 # build to .js/.mjs/.d.ts files
-npm exec tsc-multi
+./node_modules/.bin/tsc-multi
 # we need to patch index.js so that `new module.exports()` works for cjs backwards
 # compat. No way to get that from index.ts because it would cause compile errors
 # when building .mjs
