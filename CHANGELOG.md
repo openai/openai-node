@@ -1,5 +1,18 @@
 # Changelog
 
+## 5.3.1 (2025-06-14)
+
+Full Changelog: [v5.3.0...v5.3.1](https://github.com/openai/openai-node/compare/v5.3.0...v5.3.1)
+
+### Bug Fixes
+
+* publish script — handle NPM errors correctly ([a803cce](https://github.com/openai/openai-node/commit/a803cce6d44116eaba34f2bd7cb0f5d8f5c72be8))
+
+
+### Chores
+
+* **internal:** add pure annotations, make base APIResource abstract ([418eb02](https://github.com/openai/openai-node/commit/418eb02e3ebe3ef58d851405f9eb5cae275194b4))
+
 ## 5.3.0 (2025-06-10)
 
 Full Changelog: [v5.2.0...v5.3.0](https://github.com/openai/openai-node/compare/v5.2.0...v5.3.0)
