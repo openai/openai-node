@@ -30,6 +30,7 @@ describe('resource responses', () => {
       metadata: { foo: 'string' },
       parallel_tool_calls: true,
       previous_response_id: 'previous_response_id',
+      prompt: { id: 'id', variables: { foo: 'string' }, version: 'version' },
       reasoning: { effort: 'low', generate_summary: 'auto', summary: 'auto' },
       service_tier: 'auto',
       store: true,
