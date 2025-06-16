@@ -21,6 +21,7 @@ export type RequestOptions = {
   fetchOptions?: MergedRequestInit;
   signal?: AbortSignal | undefined | null;
   idempotencyKey?: string;
+  defaultBaseURL?: string | undefined;
 
   __metadata?: Record<string, unknown>;
   __binaryResponse?: boolean | undefined;
