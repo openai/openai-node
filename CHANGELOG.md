@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.5.0 (2025-06-16)
+
+Full Changelog: [v5.4.0...v5.5.0](https://github.com/openai/openai-node/compare/v5.4.0...v5.5.0)
+
+### Features
+
+* **api:** manual updates ([ab6b57c](https://github.com/openai/openai-node/commit/ab6b57c241dc7c57e411fae572842da801e9828b))
+
 ## 5.4.0 (2025-06-16)
 
 Full Changelog: [v5.3.0...v5.4.0](https://github.com/openai/openai-node/compare/v5.3.0...v5.4.0)
