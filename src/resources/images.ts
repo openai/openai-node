@@ -238,6 +238,20 @@ export interface ImageEditParams {
   n?: number | null;
 
   /**
+   * The compression level (0-100%) for the generated images. This parameter is only
+   * supported for `gpt-image-1` with the `webp` or `jpeg` output formats, and
+   * defaults to 100.
+   */
+  output_compression?: number | null;
+
+  /**
+   * The format in which the generated images are returned. This parameter is only
+   * supported for `gpt-image-1`. Must be one of `png`, `jpeg`, or `webp`. The
+   * default value is `png`.
+   */
+  output_format?: 'png' | 'jpeg' | 'webp' | null;
+
+  /**
    * The quality of the image that will be generated. `high`, `medium` and `low` are
    * only supported for `gpt-image-1`. `dall-e-2` only supports `standard` quality.
    * Defaults to `auto`.

@@ -25,7 +25,7 @@ export class Jobs extends APIResource {
    * Response includes details of the enqueued job including job status and the name
    * of the fine-tuned models once complete.
    *
-   * [Learn more about fine-tuning](https://platform.openai.com/docs/guides/fine-tuning)
+   * [Learn more about fine-tuning](https://platform.openai.com/docs/guides/model-optimization)
    *
    * @example
    * ```ts
@@ -42,7 +42,7 @@ export class Jobs extends APIResource {
   /**
    * Get info about a fine-tuning job.
    *
-   * [Learn more about fine-tuning](https://platform.openai.com/docs/guides/fine-tuning)
+   * [Learn more about fine-tuning](https://platform.openai.com/docs/guides/model-optimization)
    *
    * @example
    * ```ts
@@ -449,7 +449,8 @@ export interface JobCreateParams {
    * [preference](https://platform.openai.com/docs/api-reference/fine-tuning/preference-input)
    * format.
    *
-   * See the [fine-tuning guide](https://platform.openai.com/docs/guides/fine-tuning)
+   * See the
+   * [fine-tuning guide](https://platform.openai.com/docs/guides/model-optimization)
    * for more details.
    */
   training_file: string;
@@ -508,7 +509,8 @@ export interface JobCreateParams {
    * Your dataset must be formatted as a JSONL file. You must upload your file with
    * the purpose `fine-tune`.
    *
-   * See the [fine-tuning guide](https://platform.openai.com/docs/guides/fine-tuning)
+   * See the
+   * [fine-tuning guide](https://platform.openai.com/docs/guides/model-optimization)
    * for more details.
    */
   validation_file?: string | null;

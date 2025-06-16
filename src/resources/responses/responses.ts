@@ -358,14 +358,13 @@ export interface Response {
   incomplete_details: Response.IncompleteDetails | null;
 
   /**
-   * Inserts a system (or developer) message as the first item in the model's
-   * context.
+   * A system (or developer) message inserted into the model's context.
    *
    * When using along with `previous_response_id`, the instructions from a previous
    * response will not be carried over to the next response. This makes it simple to
    * swap out system (or developer) messages in new responses.
    */
-  instructions: string | null;
+  instructions: string | Array<ResponseInputItem> | null;
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
@@ -470,6 +469,12 @@ export interface Response {
   previous_response_id?: string | null;
 
   /**
+   * Reference to a prompt template and its variables.
+   * [Learn more](https://platform.openai.com/docs/guides/text?api-mode=responses#reusable-prompts).
+   */
+  prompt?: ResponsePrompt | null;
+
+  /**
    * **o-series models only**
    *
    * Configuration options for
@@ -496,7 +501,7 @@ export interface Response {
    * When this parameter is set, the response body will include the `service_tier`
    * utilized.
    */
-  service_tier?: 'auto' | 'default' | 'flex' | null;
+  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | null;
 
   /**
    * The status of the response generation. One of `completed`, `failed`,
@@ -3484,6 +3489,29 @@ export interface ResponseOutputTextAnnotationAddedEvent {
 }
 
 /**
+ * Reference to a prompt template and its variables.
+ * [Learn more](https://platform.openai.com/docs/guides/text?api-mode=responses#reusable-prompts).
+ */
+export interface ResponsePrompt {
+  /**
+   * The unique identifier of the prompt template to use.
+   */
+  id: string;
+
+  /**
+   * Optional map of values to substitute in for variables in your prompt. The
+   * substitution values can either be strings, or other Response input types like
+   * images or files.
+   */
+  variables?: Record<string, string | ResponseInputText | ResponseInputImage | ResponseInputFile> | null;
+
+  /**
+   * Optional version of the prompt template.
+   */
+  version?: string | null;
+}
+
+/**
  * Emitted when a response is queued and waiting to be processed.
  */
 export interface ResponseQueuedEvent {
@@ -4612,8 +4640,7 @@ export interface ResponseCreateParamsBase {
   include?: Array<ResponseIncludable> | null;
 
   /**
-   * Inserts a system (or developer) message as the first item in the model's
-   * context.
+   * A system (or developer) message inserted into the model's context.
    *
    * When using along with `previous_response_id`, the instructions from a previous
    * response will not be carried over to the next response. This makes it simple to
@@ -4651,6 +4678,12 @@ export interface ResponseCreateParamsBase {
   previous_response_id?: string | null;
 
   /**
+   * Reference to a prompt template and its variables.
+   * [Learn more](https://platform.openai.com/docs/guides/text?api-mode=responses#reusable-prompts).
+   */
+  prompt?: ResponsePrompt | null;
+
+  /**
    * **o-series models only**
    *
    * Configuration options for
@@ -4677,7 +4710,7 @@ export interface ResponseCreateParamsBase {
    * When this parameter is set, the response body will include the `service_tier`
    * utilized.
    */
-  service_tier?: 'auto' | 'default' | 'flex' | null;
+  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | null;
 
   /**
    * Whether to store the generated model response for later retrieval via API.
@@ -4922,6 +4955,7 @@ export declare namespace Responses {
     type ResponseOutputRefusal as ResponseOutputRefusal,
     type ResponseOutputText as ResponseOutputText,
     type ResponseOutputTextAnnotationAddedEvent as ResponseOutputTextAnnotationAddedEvent,
+    type ResponsePrompt as ResponsePrompt,
     type ResponseQueuedEvent as ResponseQueuedEvent,
     type ResponseReasoningDeltaEvent as ResponseReasoningDeltaEvent,
     type ResponseReasoningDoneEvent as ResponseReasoningDoneEvent,

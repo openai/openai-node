@@ -291,7 +291,7 @@ export interface ChatCompletion {
    * When this parameter is set, the response body will include the `service_tier`
    * utilized.
    */
-  service_tier?: 'auto' | 'default' | 'flex' | null;
+  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | null;
 
   /**
    * This fingerprint represents the backend configuration that the model runs with.
@@ -542,7 +542,7 @@ export interface ChatCompletionChunk {
    * When this parameter is set, the response body will include the `service_tier`
    * utilized.
    */
-  service_tier?: 'auto' | 'default' | 'flex' | null;
+  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | null;
 
   /**
    * This fingerprint represents the backend configuration that the model runs with.
@@ -1464,7 +1464,7 @@ export interface ChatCompletionCreateParamsBase {
    * When this parameter is set, the response body will include the `service_tier`
    * utilized.
    */
-  service_tier?: 'auto' | 'default' | 'flex' | null;
+  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | null;
 
   /**
    * Not supported with latest reasoning models `o3` and `o4-mini`.

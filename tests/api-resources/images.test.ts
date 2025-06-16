@@ -54,6 +54,8 @@ describe('resource images', () => {
       mask: await toFile(Buffer.from('# my file contents'), 'README.md'),
       model: 'string',
       n: 1,
+      output_compression: 100,
+      output_format: 'png',
       quality: 'high',
       response_format: 'url',
       size: '1024x1024',
