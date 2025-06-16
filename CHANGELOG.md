@@ -1,5 +1,25 @@
 # Changelog
 
+## 5.4.0 (2025-06-16)
+
+Full Changelog: [v5.3.0...v5.4.0](https://github.com/openai/openai-node/compare/v5.3.0...v5.4.0)
+
+### Features
+
+* **api:** add reusable prompt IDs ([c720bb3](https://github.com/openai/openai-node/commit/c720bb3fb909cdef1cc679df38357f046d3d2756))
+* **client:** add support for endpoint-specific base URLs ([05f558b](https://github.com/openai/openai-node/commit/05f558bcdd362ae56000fe515a24593363d59e83))
+
+
+### Bug Fixes
+
+* publish script — handle NPM errors correctly ([a803cce](https://github.com/openai/openai-node/commit/a803cce6d44116eaba34f2bd7cb0f5d8f5c72be8))
+
+
+### Chores
+
+* **client:** refactor imports ([9eb4470](https://github.com/openai/openai-node/commit/9eb44703432d7e22290564013f8e1798c82918a3))
+* **internal:** add pure annotations, make base APIResource abstract ([418eb02](https://github.com/openai/openai-node/commit/418eb02e3ebe3ef58d851405f9eb5cae275194b4))
+
 ## 5.3.0 (2025-06-10)
 
 Full Changelog: [v5.2.0...v5.3.0](https://github.com/openai/openai-node/compare/v5.2.0...v5.3.0)
