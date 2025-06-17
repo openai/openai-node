@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.5.1 (2025-06-17)
+
+Full Changelog: [v5.5.0...v5.5.1](https://github.com/openai/openai-node/compare/v5.5.0...v5.5.1)
+
+### Chores
+
+* **ci:** enable for pull requests ([e1cf00c](https://github.com/openai/openai-node/commit/e1cf00cf2a2ce832d759f3253f10826d3c16338e))
+
 ## 5.5.0 (2025-06-16)
 
 Full Changelog: [v5.4.0...v5.5.0](https://github.com/openai/openai-node/compare/v5.4.0...v5.5.0)
