@@ -1,5 +1,24 @@
 # Changelog
 
+## 5.6.0 (2025-06-20)
+
+Full Changelog: [v5.5.1...v5.6.0](https://github.com/openai/openai-node/compare/v5.5.1...v5.6.0)
+
+### Features
+
+* **api:** make model and inputs not required to create response ([52211c0](https://github.com/openai/openai-node/commit/52211c0e67c2926b27f4adee1f626066d90b6a2e))
+
+
+### Bug Fixes
+
+* **client:** explicitly copy fetch in withOptions ([0efacae](https://github.com/openai/openai-node/commit/0efacaeb8eb0bfbad6bd6bc29fc57f00916411c0))
+
+
+### Chores
+
+* **readme:** update badges ([6898954](https://github.com/openai/openai-node/commit/689895400adf38e85810ba8b63dc16ed56839ddd))
+* **readme:** use better example snippet for undocumented params ([668611f](https://github.com/openai/openai-node/commit/668611f4331ffa375257f3bc138c54d6ee965cd6))
+
 ## 5.5.1 (2025-06-17)
 
 Full Changelog: [v5.5.0...v5.5.1](https://github.com/openai/openai-node/compare/v5.5.0...v5.5.1)
