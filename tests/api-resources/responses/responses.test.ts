@@ -8,8 +8,8 @@ const client = new OpenAI({
 });
 
 describe('resource responses', () => {
-  test('create: only required params', async () => {
-    const responsePromise = client.responses.create({ input: 'string', model: 'gpt-4o' });
+  test('create', async () => {
+    const responsePromise = client.responses.create({});
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -17,40 +17,6 @@ describe('resource responses', () => {
     const dataAndResponse = await responsePromise.withResponse();
     expect(dataAndResponse.data).toBe(response);
     expect(dataAndResponse.response).toBe(rawResponse);
-  });
-
-  test('create: required and optional params', async () => {
-    const response = await client.responses.create({
-      input: 'string',
-      model: 'gpt-4o',
-      background: true,
-      include: ['file_search_call.results'],
-      instructions: 'instructions',
-      max_output_tokens: 0,
-      metadata: { foo: 'string' },
-      parallel_tool_calls: true,
-      previous_response_id: 'previous_response_id',
-      prompt: { id: 'id', variables: { foo: 'string' }, version: 'version' },
-      reasoning: { effort: 'low', generate_summary: 'auto', summary: 'auto' },
-      service_tier: 'auto',
-      store: true,
-      stream: false,
-      temperature: 1,
-      text: { format: { type: 'text' } },
-      tool_choice: 'none',
-      tools: [
-        {
-          name: 'name',
-          parameters: { foo: 'bar' },
-          strict: true,
-          type: 'function',
-          description: 'description',
-        },
-      ],
-      top_p: 1,
-      truncation: 'auto',
-      user: 'user-1234',
-    });
   });
 
   test('retrieve', async () => {
