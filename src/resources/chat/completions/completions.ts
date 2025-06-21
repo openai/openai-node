@@ -299,7 +299,7 @@ export interface ChatCompletion {
    * Can be used in conjunction with the `seed` request parameter to understand when
    * backend changes have been made that might impact determinism.
    */
-  system_fingerprint?: string;
+  system_fingerprint?: string | null;
 
   /**
    * Usage statistics for the completion request.
@@ -549,7 +549,7 @@ export interface ChatCompletionChunk {
    * Can be used in conjunction with the `seed` request parameter to understand when
    * backend changes have been made that might impact determinism.
    */
-  system_fingerprint?: string;
+  system_fingerprint?: string | null;
 
   /**
    * An optional field that will only be present when you set
