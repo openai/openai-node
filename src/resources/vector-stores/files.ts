@@ -249,7 +249,7 @@ export interface VectorStoreFile {
    * length of 64 characters. Values are strings with a maximum length of 512
    * characters, booleans, or numbers.
    */
-  attributes?: Record<string, string | number | boolean> | null;
+  attributes?: { [key: string]: string | number | boolean } | null;
 
   /**
    * The strategy used to chunk the file.
@@ -310,7 +310,7 @@ export interface FileCreateParams {
    * length of 64 characters. Values are strings with a maximum length of 512
    * characters, booleans, or numbers.
    */
-  attributes?: Record<string, string | number | boolean> | null;
+  attributes?: { [key: string]: string | number | boolean } | null;
 
   /**
    * The chunking strategy used to chunk the file(s). If not set, will use the `auto`
@@ -339,7 +339,7 @@ export interface FileUpdateParams {
    * strings with a maximum length of 64 characters. Values are strings with a
    * maximum length of 512 characters, booleans, or numbers.
    */
-  attributes: Record<string, string | number | boolean> | null;
+  attributes: { [key: string]: string | number | boolean } | null;
 }
 
 export interface FileListParams extends CursorPageParams {

@@ -1331,7 +1331,7 @@ export interface ChatCompletionCreateParamsBase {
    * increase likelihood of selection; values like -100 or 100 should result in a ban
    * or exclusive selection of the relevant token.
    */
-  logit_bias?: Record<string, number> | null;
+  logit_bias?: { [key: string]: number } | null;
 
   /**
    * Whether to return log probabilities of the output tokens or not. If true,

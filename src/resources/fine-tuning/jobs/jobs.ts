@@ -624,7 +624,7 @@ export interface JobListParams extends CursorPageParams {
    * Optional metadata filter. To filter, use the syntax `metadata[k]=v`.
    * Alternatively, set `metadata=null` to indicate no metadata.
    */
-  metadata?: Record<string, string> | null;
+  metadata?: { [key: string]: string } | null;
 }
 
 export interface JobListEventsParams extends CursorPageParams {}
