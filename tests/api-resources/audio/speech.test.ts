@@ -17,6 +17,7 @@ describe('resource speech', () => {
       instructions: 'instructions',
       response_format: 'mp3',
       speed: 0.25,
+      stream_format: 'sse',
     });
   });
 });
