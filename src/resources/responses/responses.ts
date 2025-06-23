@@ -242,7 +242,7 @@ export interface FunctionTool {
   /**
    * A JSON schema object describing the parameters of the function.
    */
-  parameters: Record<string, unknown> | null;
+  parameters: { [key: string]: unknown } | null;
 
   /**
    * Whether to enforce strict parameter validation. Default `true`.
@@ -1419,7 +1419,7 @@ export namespace ResponseFileSearchToolCall {
      * length of 64 characters. Values are strings with a maximum length of 512
      * characters, booleans, or numbers.
      */
-    attributes?: Record<string, string | number | boolean> | null;
+    attributes?: { [key: string]: string | number | boolean } | null;
 
     /**
      * The unique ID of the file.
@@ -1479,7 +1479,7 @@ export interface ResponseFormatTextJSONSchemaConfig {
    * The schema for the response format, described as a JSON Schema object. Learn how
    * to build JSON schemas [here](https://json-schema.org/).
    */
-  schema: Record<string, unknown>;
+  schema: { [key: string]: unknown };
 
   /**
    * The type of response format being defined. Always `json_schema`.
@@ -2137,7 +2137,7 @@ export namespace ResponseInputItem {
       /**
        * Environment variables to set for the command.
        */
-      env: Record<string, string>;
+      env: { [key: string]: string };
 
       /**
        * The type of the local shell action. Always `exec`.
@@ -2499,7 +2499,7 @@ export namespace ResponseItem {
       /**
        * Environment variables to set for the command.
        */
-      env: Record<string, string>;
+      env: { [key: string]: string };
 
       /**
        * The type of the local shell action. Always `exec`.
@@ -2974,7 +2974,7 @@ export namespace ResponseOutputItem {
       /**
        * Environment variables to set for the command.
        */
-      env: Record<string, string>;
+      env: { [key: string]: string };
 
       /**
        * The type of the local shell action. Always `exec`.
@@ -3442,7 +3442,7 @@ export interface ResponsePrompt {
    * substitution values can either be strings, or other Response input types like
    * images or files.
    */
-  variables?: Record<string, string | ResponseInputText | ResponseInputImage | ResponseInputFile> | null;
+  variables?: { [key: string]: string | ResponseInputText | ResponseInputImage | ResponseInputFile } | null;
 
   /**
    * Optional version of the prompt template.
@@ -4237,7 +4237,7 @@ export namespace Tool {
      * Optional HTTP headers to send to the MCP server. Use for authentication or other
      * purposes.
      */
-    headers?: Record<string, string> | null;
+    headers?: { [key: string]: string } | null;
 
     /**
      * Specify which of the MCP server's tools require approval.

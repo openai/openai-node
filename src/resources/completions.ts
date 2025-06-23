@@ -103,7 +103,7 @@ export namespace CompletionChoice {
 
     tokens?: Array<string>;
 
-    top_logprobs?: Array<Record<string, number>>;
+    top_logprobs?: Array<{ [key: string]: number }>;
   }
 }
 
@@ -246,7 +246,7 @@ export interface CompletionCreateParamsBase {
    * As an example, you can pass `{"50256": -100}` to prevent the <|endoftext|> token
    * from being generated.
    */
-  logit_bias?: Record<string, number> | null;
+  logit_bias?: { [key: string]: number } | null;
 
   /**
    * Include the log probabilities on the `logprobs` most likely output tokens, as

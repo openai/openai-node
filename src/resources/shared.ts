@@ -165,7 +165,7 @@ export interface FunctionDefinition {
  *
  * Omitting `parameters` defines a function with an empty parameter list.
  */
-export type FunctionParameters = Record<string, unknown>;
+export type FunctionParameters = { [key: string]: unknown };
 
 /**
  * Set of 16 key-value pairs that can be attached to an object. This can be useful
@@ -175,7 +175,7 @@ export type FunctionParameters = Record<string, unknown>;
  * Keys are strings with a maximum length of 64 characters. Values are strings with
  * a maximum length of 512 characters.
  */
-export type Metadata = Record<string, string>;
+export type Metadata = { [key: string]: string };
 
 /**
  * **o-series models only**
@@ -271,7 +271,7 @@ export namespace ResponseFormatJSONSchema {
      * The schema for the response format, described as a JSON Schema object. Learn how
      * to build JSON schemas [here](https://json-schema.org/).
      */
-    schema?: Record<string, unknown>;
+    schema?: { [key: string]: unknown };
 
     /**
      * Whether to enable strict schema adherence when generating the output. If set to
