@@ -279,9 +279,9 @@ export interface ConversationItemDeletedEvent {
  * the Response events.
  *
  * Realtime API models accept audio natively, and thus input transcription is a
- * separate process run on a separate ASR (Automatic Speech Recognition) model,
- * currently always `whisper-1`. Thus the transcript may diverge somewhat from the
- * model's interpretation, and should be treated as a rough guide.
+ * separate process run on a separate ASR (Automatic Speech Recognition) model. The
+ * transcript may diverge somewhat from the model's interpretation, and should be
+ * treated as a rough guide.
  */
 export interface ConversationItemInputAudioTranscriptionCompletedEvent {
   /**
@@ -2248,19 +2248,19 @@ export namespace SessionUpdateEvent {
       /**
        * Configuration for the ephemeral token expiration.
        */
-      expires_at?: ClientSecret.ExpiresAt;
+      expires_after?: ClientSecret.ExpiresAfter;
     }
 
     export namespace ClientSecret {
       /**
        * Configuration for the ephemeral token expiration.
        */
-      export interface ExpiresAt {
+      export interface ExpiresAfter {
         /**
          * The anchor point for the ephemeral token expiration. Only `created_at` is
          * currently supported.
          */
-        anchor?: 'created_at';
+        anchor: 'created_at';
 
         /**
          * The number of seconds from the anchor point to the expiration. Select a value
