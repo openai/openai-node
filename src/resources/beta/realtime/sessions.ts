@@ -356,8 +356,8 @@ export interface SessionCreateResponse {
    * Configuration for input audio transcription, defaults to off and can be set to
    * `null` to turn off once on. Input audio transcription is not native to the
    * model, since the model consumes audio directly. Transcription runs
-   * asynchronously through Whisper and should be treated as rough guidance rather
-   * than the representation understood by the model.
+   * asynchronously and should be treated as rough guidance rather than the
+   * representation understood by the model.
    */
   input_audio_transcription?: SessionCreateResponse.InputAudioTranscription;
 
@@ -476,13 +476,12 @@ export namespace SessionCreateResponse {
    * Configuration for input audio transcription, defaults to off and can be set to
    * `null` to turn off once on. Input audio transcription is not native to the
    * model, since the model consumes audio directly. Transcription runs
-   * asynchronously through Whisper and should be treated as rough guidance rather
-   * than the representation understood by the model.
+   * asynchronously and should be treated as rough guidance rather than the
+   * representation understood by the model.
    */
   export interface InputAudioTranscription {
     /**
-     * The model to use for transcription, `whisper-1` is the only currently supported
-     * model.
+     * The model to use for transcription.
      */
     model?: string;
   }
@@ -721,19 +720,19 @@ export namespace SessionCreateParams {
     /**
      * Configuration for the ephemeral token expiration.
      */
-    expires_at?: ClientSecret.ExpiresAt;
+    expires_after?: ClientSecret.ExpiresAfter;
   }
 
   export namespace ClientSecret {
     /**
      * Configuration for the ephemeral token expiration.
      */
-    export interface ExpiresAt {
+    export interface ExpiresAfter {
       /**
        * The anchor point for the ephemeral token expiration. Only `created_at` is
        * currently supported.
        */
-      anchor?: 'created_at';
+      anchor: 'created_at';
 
       /**
        * The number of seconds from the anchor point to the expiration. Select a value

@@ -10,5 +10,4 @@ export {
   type PermissionRetrieveParams,
   type PermissionDeleteParams,
   type PermissionCreateResponsesPage,
-  type PermissionRetrieveResponsesPage,
 } from './permissions';

@@ -78,6 +78,11 @@ export interface Transcription {
    * to the `include` array.
    */
   logprobs?: Array<Transcription.Logprob>;
+
+  /**
+   * Token usage statistics for the request.
+   */
+  usage?: Transcription.Tokens | Transcription.Duration;
 }
 
 export namespace Transcription {
@@ -96,6 +101,68 @@ export namespace Transcription {
      * The log probability of the token.
      */
     logprob?: number;
+  }
+
+  /**
+   * Usage statistics for models billed by token usage.
+   */
+  export interface Tokens {
+    /**
+     * Number of input tokens billed for this request.
+     */
+    input_tokens: number;
+
+    /**
+     * Number of output tokens generated.
+     */
+    output_tokens: number;
+
+    /**
+     * Total number of tokens used (input + output).
+     */
+    total_tokens: number;
+
+    /**
+     * The type of the usage object. Always `tokens` for this variant.
+     */
+    type: 'tokens';
+
+    /**
+     * Details about the input tokens billed for this request.
+     */
+    input_token_details?: Tokens.InputTokenDetails;
+  }
+
+  export namespace Tokens {
+    /**
+     * Details about the input tokens billed for this request.
+     */
+    export interface InputTokenDetails {
+      /**
+       * Number of audio tokens billed for this request.
+       */
+      audio_tokens?: number;
+
+      /**
+       * Number of text tokens billed for this request.
+       */
+      text_tokens?: number;
+    }
+  }
+
+  /**
+   * Usage statistics for models billed by audio input duration.
+   */
+  export interface Duration {
+    /**
+     * Duration of the input audio in seconds.
+     */
+    duration: number;
+
+    /**
+     * The type of the usage object. Always `duration` for this variant.
+     */
+    type: 'duration';
   }
 }
 
@@ -232,6 +299,11 @@ export interface TranscriptionTextDoneEvent {
    * with the `include[]` parameter set to `logprobs`.
    */
   logprobs?: Array<TranscriptionTextDoneEvent.Logprob>;
+
+  /**
+   * Usage statistics for models billed by token usage.
+   */
+  usage?: TranscriptionTextDoneEvent.Usage;
 }
 
 export namespace TranscriptionTextDoneEvent {
@@ -250,6 +322,53 @@ export namespace TranscriptionTextDoneEvent {
      * The log probability of the token.
      */
     logprob?: number;
+  }
+
+  /**
+   * Usage statistics for models billed by token usage.
+   */
+  export interface Usage {
+    /**
+     * Number of input tokens billed for this request.
+     */
+    input_tokens: number;
+
+    /**
+     * Number of output tokens generated.
+     */
+    output_tokens: number;
+
+    /**
+     * Total number of tokens used (input + output).
+     */
+    total_tokens: number;
+
+    /**
+     * The type of the usage object. Always `tokens` for this variant.
+     */
+    type: 'tokens';
+
+    /**
+     * Details about the input tokens billed for this request.
+     */
+    input_token_details?: Usage.InputTokenDetails;
+  }
+
+  export namespace Usage {
+    /**
+     * Details about the input tokens billed for this request.
+     */
+    export interface InputTokenDetails {
+      /**
+       * Number of audio tokens billed for this request.
+       */
+      audio_tokens?: number;
+
+      /**
+       * Number of text tokens billed for this request.
+       */
+      text_tokens?: number;
+    }
   }
 }
 
@@ -279,9 +398,31 @@ export interface TranscriptionVerbose {
   segments?: Array<TranscriptionSegment>;
 
   /**
+   * Usage statistics for models billed by audio input duration.
+   */
+  usage?: TranscriptionVerbose.Usage;
+
+  /**
    * Extracted words and their corresponding timestamps.
    */
   words?: Array<TranscriptionWord>;
+}
+
+export namespace TranscriptionVerbose {
+  /**
+   * Usage statistics for models billed by audio input duration.
+   */
+  export interface Usage {
+    /**
+     * Duration of the input audio in seconds.
+     */
+    duration: number;
+
+    /**
+     * The type of the usage object. Always `duration` for this variant.
+     */
+    type: 'duration';
+  }
 }
 
 export interface TranscriptionWord {

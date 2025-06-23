@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.7.0 (2025-06-23)
+
+Full Changelog: [v5.6.0...v5.7.0](https://github.com/openai/openai-node/compare/v5.6.0...v5.7.0)
+
+### Features
+
+* **api:** update api shapes for usage and code interpreter ([f2100e8](https://github.com/openai/openai-node/commit/f2100e89334753e7f580f7f20f48b43eb8ba2fe3))
+
 ## 5.6.0 (2025-06-20)
 
 Full Changelog: [v5.5.1...v5.6.0](https://github.com/openai/openai-node/compare/v5.5.1...v5.6.0)
