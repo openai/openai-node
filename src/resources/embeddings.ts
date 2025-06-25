@@ -109,7 +109,7 @@ export interface Embedding {
    * the model as listed in the
    * [embedding guide](https://platform.openai.com/docs/guides/embeddings).
    */
-  embedding: Array<number>;
+  embedding: Array<number> | string;
 
   /**
    * The index of the embedding in the list of embeddings.
