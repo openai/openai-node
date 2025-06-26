@@ -74,6 +74,7 @@ import {
   ModerationTextInput,
   Moderations,
 } from './resources/moderations';
+import { Webhooks } from './resources/webhooks';
 import { Audio, AudioModel, AudioResponseFormat } from './resources/audio/audio';
 import { Beta } from './resources/beta/beta';
 import { Chat } from './resources/chat/chat';
@@ -197,6 +198,11 @@ export interface ClientOptions {
   project?: string | null | undefined;
 
   /**
+   * Defaults to process.env['OPENAI_WEBHOOK_SECRET'].
+   */
+  webhookSecret?: string | null | undefined;
+
+  /**
    * Override the default base URL for the API, e.g., "https://api.example.com/v2/"
    *
    * Defaults to process.env['OPENAI_BASE_URL'].
@@ -276,6 +282,7 @@ export class OpenAI {
   apiKey: string;
   organization: string | null;
   project: string | null;
+  webhookSecret: string | null;
 
   baseURL: string;
   maxRetries: number;
@@ -295,6 +302,7 @@ export class OpenAI {
    * @param {string | undefined} [opts.apiKey=process.env['OPENAI_API_KEY'] ?? undefined]
    * @param {string | null | undefined} [opts.organization=process.env['OPENAI_ORG_ID'] ?? null]
    * @param {string | null | undefined} [opts.project=process.env['OPENAI_PROJECT_ID'] ?? null]
+   * @param {string | null | undefined} [opts.webhookSecret=process.env['OPENAI_WEBHOOK_SECRET'] ?? null]
    * @param {string} [opts.baseURL=process.env['OPENAI_BASE_URL'] ?? https://api.openai.com/v1] - Override the default base URL for the API.
    * @param {number} [opts.timeout=10 minutes] - The maximum amount of time (in milliseconds) the client will wait for a response before timing out.
    * @param {MergedRequestInit} [opts.fetchOptions] - Additional `RequestInit` options to be passed to `fetch` calls.
@@ -309,6 +317,7 @@ export class OpenAI {
     apiKey = readEnv('OPENAI_API_KEY'),
     organization = readEnv('OPENAI_ORG_ID') ?? null,
     project = readEnv('OPENAI_PROJECT_ID') ?? null,
+    webhookSecret = readEnv('OPENAI_WEBHOOK_SECRET') ?? null,
     ...opts
   }: ClientOptions = {}) {
     if (apiKey === undefined) {
@@ -321,6 +330,7 @@ export class OpenAI {
       apiKey,
       organization,
       project,
+      webhookSecret,
       ...opts,
       baseURL: baseURL || `https://api.openai.com/v1`,
     };
@@ -351,6 +361,7 @@ export class OpenAI {
     this.apiKey = apiKey;
     this.organization = organization;
     this.project = project;
+    this.webhookSecret = webhookSecret;
   }
 
   /**
@@ -369,6 +380,7 @@ export class OpenAI {
       apiKey: this.apiKey,
       organization: this.organization,
       project: this.project,
+      webhookSecret: this.webhookSecret,
       ...options,
     });
   }
@@ -900,6 +912,7 @@ export class OpenAI {
   static InternalServerError = Errors.InternalServerError;
   static PermissionDeniedError = Errors.PermissionDeniedError;
   static UnprocessableEntityError = Errors.UnprocessableEntityError;
+  static InvalidWebhookSignatureError = Errors.InvalidWebhookSignatureError;
 
   static toFile = Uploads.toFile;
 
@@ -914,6 +927,7 @@ export class OpenAI {
   fineTuning: API.FineTuning = new API.FineTuning(this);
   graders: API.Graders = new API.Graders(this);
   vectorStores: API.VectorStores = new API.VectorStores(this);
+  webhooks: API.Webhooks = new API.Webhooks(this);
   beta: API.Beta = new API.Beta(this);
   batches: API.Batches = new API.Batches(this);
   uploads: API.Uploads = new API.Uploads(this);
@@ -932,6 +946,7 @@ OpenAI.Models = Models;
 OpenAI.FineTuning = FineTuning;
 OpenAI.Graders = Graders;
 OpenAI.VectorStores = VectorStores;
+OpenAI.Webhooks = Webhooks;
 OpenAI.Beta = Beta;
 OpenAI.Batches = Batches;
 OpenAI.Uploads = UploadsAPIUploads;
@@ -1069,6 +1084,8 @@ export declare namespace OpenAI {
     type VectorStoreListParams as VectorStoreListParams,
     type VectorStoreSearchParams as VectorStoreSearchParams,
   };
+
+  export { Webhooks as Webhooks };
 
   export { Beta as Beta };
 

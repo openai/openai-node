@@ -89,7 +89,7 @@ export interface EvalCustomDataSourceConfig {
    * The json schema for the run data source items. Learn how to build JSON schemas
    * [here](https://json-schema.org/).
    */
-  schema: Record<string, unknown>;
+  schema: { [key: string]: unknown };
 
   /**
    * The type of data source. Always `custom`.
@@ -105,7 +105,7 @@ export interface EvalStoredCompletionsDataSourceConfig {
    * The json schema for the run data source items. Learn how to build JSON schemas
    * [here](https://json-schema.org/).
    */
-  schema: Record<string, unknown>;
+  schema: { [key: string]: unknown };
 
   /**
    * The type of data source. Always `stored_completions`.
@@ -195,7 +195,7 @@ export namespace EvalCreateResponse {
      * The json schema for the run data source items. Learn how to build JSON schemas
      * [here](https://json-schema.org/).
      */
-    schema: Record<string, unknown>;
+    schema: { [key: string]: unknown };
 
     /**
      * The type of data source. Always `logs`.
@@ -316,7 +316,7 @@ export namespace EvalRetrieveResponse {
      * The json schema for the run data source items. Learn how to build JSON schemas
      * [here](https://json-schema.org/).
      */
-    schema: Record<string, unknown>;
+    schema: { [key: string]: unknown };
 
     /**
      * The type of data source. Always `logs`.
@@ -437,7 +437,7 @@ export namespace EvalUpdateResponse {
      * The json schema for the run data source items. Learn how to build JSON schemas
      * [here](https://json-schema.org/).
      */
-    schema: Record<string, unknown>;
+    schema: { [key: string]: unknown };
 
     /**
      * The type of data source. Always `logs`.
@@ -558,7 +558,7 @@ export namespace EvalListResponse {
      * The json schema for the run data source items. Learn how to build JSON schemas
      * [here](https://json-schema.org/).
      */
-    schema: Record<string, unknown>;
+    schema: { [key: string]: unknown };
 
     /**
      * The type of data source. Always `logs`.
@@ -665,7 +665,7 @@ export namespace EvalCreateParams {
     /**
      * The json schema for each row in the data source.
      */
-    item_schema: Record<string, unknown>;
+    item_schema: { [key: string]: unknown };
 
     /**
      * The type of data source. Always `custom`.
@@ -692,7 +692,7 @@ export namespace EvalCreateParams {
     /**
      * Metadata filters for the logs data source.
      */
-    metadata?: Record<string, unknown>;
+    metadata?: { [key: string]: unknown };
   }
 
   /**
@@ -707,7 +707,7 @@ export namespace EvalCreateParams {
     /**
      * Metadata filters for the stored completions data source.
      */
-    metadata?: Record<string, unknown>;
+    metadata?: { [key: string]: unknown };
   }
 
   /**

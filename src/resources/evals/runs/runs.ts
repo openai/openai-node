@@ -125,9 +125,9 @@ export namespace CreateEvalCompletionsRunDataSource {
 
   export namespace FileContent {
     export interface Content {
-      item: Record<string, unknown>;
+      item: { [key: string]: unknown };
 
-      sample?: Record<string, unknown>;
+      sample?: { [key: string]: unknown };
     }
   }
 
@@ -330,9 +330,9 @@ export namespace CreateEvalJSONLRunDataSource {
 
   export namespace FileContent {
     export interface Content {
-      item: Record<string, unknown>;
+      item: { [key: string]: unknown };
 
-      sample?: Record<string, unknown>;
+      sample?: { [key: string]: unknown };
     }
   }
 
@@ -493,9 +493,9 @@ export namespace RunCreateResponse {
 
     export namespace FileContent {
       export interface Content {
-        item: Record<string, unknown>;
+        item: { [key: string]: unknown };
 
-        sample?: Record<string, unknown>;
+        sample?: { [key: string]: unknown };
       }
     }
 
@@ -940,9 +940,9 @@ export namespace RunRetrieveResponse {
 
     export namespace FileContent {
       export interface Content {
-        item: Record<string, unknown>;
+        item: { [key: string]: unknown };
 
-        sample?: Record<string, unknown>;
+        sample?: { [key: string]: unknown };
       }
     }
 
@@ -1384,9 +1384,9 @@ export namespace RunListResponse {
 
     export namespace FileContent {
       export interface Content {
-        item: Record<string, unknown>;
+        item: { [key: string]: unknown };
 
-        sample?: Record<string, unknown>;
+        sample?: { [key: string]: unknown };
       }
     }
 
@@ -1839,9 +1839,9 @@ export namespace RunCancelResponse {
 
     export namespace FileContent {
       export interface Content {
-        item: Record<string, unknown>;
+        item: { [key: string]: unknown };
 
-        sample?: Record<string, unknown>;
+        sample?: { [key: string]: unknown };
       }
     }
 
@@ -2233,9 +2233,9 @@ export namespace RunCreateParams {
 
     export namespace FileContent {
       export interface Content {
-        item: Record<string, unknown>;
+        item: { [key: string]: unknown };
 
-        sample?: Record<string, unknown>;
+        sample?: { [key: string]: unknown };
       }
     }
 

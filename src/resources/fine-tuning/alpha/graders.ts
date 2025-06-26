@@ -52,11 +52,11 @@ export class Graders extends APIResource {
 export interface GraderRunResponse {
   metadata: GraderRunResponse.Metadata;
 
-  model_grader_token_usage_per_model: Record<string, unknown>;
+  model_grader_token_usage_per_model: { [key: string]: unknown };
 
   reward: number;
 
-  sub_rewards: Record<string, unknown>;
+  sub_rewards: { [key: string]: unknown };
 }
 
 export namespace GraderRunResponse {
@@ -69,7 +69,7 @@ export namespace GraderRunResponse {
 
     sampled_model_name: string | null;
 
-    scores: Record<string, unknown>;
+    scores: { [key: string]: unknown };
 
     token_usage: number | null;
 

@@ -1,5 +1,23 @@
 # Changelog
 
+## 5.8.0 (2025-06-26)
+
+Full Changelog: [v5.7.0...v5.8.0](https://github.com/openai/openai-node/compare/v5.7.0...v5.8.0)
+
+### Features
+
+* **api:** webhook and deep research support ([f2b4f66](https://github.com/openai/openai-node/commit/f2b4f66226ad514d702f8acbb4820ae90b4fd40e))
+
+
+### Bug Fixes
+
+* **ci:** release-doctor — report correct token name ([aed2587](https://github.com/openai/openai-node/commit/aed2587294922415aeaece0b9a6911c3e1577c51))
+
+
+### Refactors
+
+* **types:** replace Record with mapped types ([7865910](https://github.com/openai/openai-node/commit/7865910c7d66a14dac70ea119e109975d9169414))
+
 ## 5.7.0 (2025-06-23)
 
 Full Changelog: [v5.6.0...v5.7.0](https://github.com/openai/openai-node/compare/v5.6.0...v5.7.0)
