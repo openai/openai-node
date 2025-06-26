@@ -1739,6 +1739,58 @@ export interface ResponseFunctionWebSearch {
   type: 'web_search_call';
 }
 
+export namespace ResponseFunctionWebSearch {
+  /**
+   * Action type "search" - Performs a web search query.
+   */
+  export interface Search {
+    /**
+     * The search query.
+     */
+    query: string;
+
+    /**
+     * The action type.
+     */
+    type: 'search';
+  }
+
+  /**
+   * Action type "open_page" - Opens a specific URL from search results.
+   */
+  export interface OpenPage {
+    /**
+     * The action type.
+     */
+    type: 'open_page';
+
+    /**
+     * The URL opened by the model.
+     */
+    url: string;
+  }
+
+  /**
+   * Action type "find": Searches for a pattern within a loaded page.
+   */
+  export interface Find {
+    /**
+     * The pattern or text to search for within the page.
+     */
+    pattern: string;
+
+    /**
+     * The action type.
+     */
+    type: 'find';
+
+    /**
+     * The URL of the page searched for the pattern.
+     */
+    url: string;
+  }
+}
+
 /**
  * Emitted when an image generation tool call has completed and the final image is
  * available.
