@@ -1696,11 +1696,6 @@ export namespace ResponseFunctionWebSearch {
      * The action type.
      */
     type: 'search';
-
-    /**
-     * Domains to restrict the search or domains where results were found.
-     */
-    domains?: Array<string>;
   }
 
   /**
