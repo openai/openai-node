@@ -1,5 +1,20 @@
 # Changelog
 
+## 5.8.1 (2025-06-26)
+
+Full Changelog: [v5.8.0...v5.8.1](https://github.com/openai/openai-node/compare/v5.8.0...v5.8.1)
+
+### Bug Fixes
+
+* **client:** ensure addOutputText is called on responses.retrieve ([d55bb64](https://github.com/openai/openai-node/commit/d55bb64f8022c1e861b4b4d1c23ad4cc0e80e536))
+
+
+### Chores
+
+* **api:** remove unsupported property ([1966954](https://github.com/openai/openai-node/commit/19669545157dc0339f4c88855bd1ae9acaaac53d))
+* **docs:** update README to include links to docs on Webhooks ([586d5da](https://github.com/openai/openai-node/commit/586d5daf5babc9f12793201f1e1e4c79829151f0))
+* **webhooks:** make private methods really private ([0ee396a](https://github.com/openai/openai-node/commit/0ee396a2a0e03c794c7cfa3c9f1beb848fd77f1d))
+
 ## 5.8.0 (2025-06-26)
 
 Full Changelog: [v5.7.0...v5.8.0](https://github.com/openai/openai-node/compare/v5.7.0...v5.8.0)
