@@ -1,5 +1,5 @@
-# workflow for re-running publishing to JSR in case it fails for some reason
-# you can run this workflow by navigating to https://www.github.com/openai/openai-node/actions/workflows/publish-jsr.yml
+# This workflow publishes the package to JSR.
+# You can run this workflow manually by navigating to https://www.github.com/openai/openai-node/actions/workflows/publish-jsr.yml
 name: Publish JSR
 on:
   workflow_dispatch:
