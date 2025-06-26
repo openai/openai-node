@@ -344,7 +344,7 @@ export interface Response {
    * response. See the `tools` parameter to see how to specify which tools the model
    * can call.
    */
-  tool_choice: ToolChoiceOptions | ToolChoiceTypes | ToolChoiceFunction;
+  tool_choice: ToolChoiceOptions | ToolChoiceTypes | ToolChoiceFunction | ToolChoiceMcp;
 
   /**
    * An array of tools the model may call while generating a response. You can
@@ -387,6 +387,14 @@ export interface Response {
   max_output_tokens?: number | null;
 
   /**
+   * The maximum number of total calls to built-in tools that can be processed in a
+   * response. This maximum number applies across all built-in tool calls, not per
+   * individual tool. Any further attempts to call a tool by the model will be
+   * ignored.
+   */
+  max_tool_calls?: number | null;
+
+  /**
    * The unique ID of the previous response to the model. Use this to create
    * multi-turn conversations. Learn more about
    * [conversation state](https://platform.openai.com/docs/guides/conversation-state).
@@ -408,25 +416,25 @@ export interface Response {
   reasoning?: Shared.Reasoning | null;
 
   /**
-   * Specifies the latency tier to use for processing the request. This parameter is
-   * relevant for customers subscribed to the scale tier service:
+   * Specifies the processing type used for serving the request.
    *
-   * - If set to 'auto', and the Project is Scale tier enabled, the system will
-   *   utilize scale tier credits until they are exhausted.
-   * - If set to 'auto', and the Project is not Scale tier enabled, the request will
-   *   be processed using the default service tier with a lower uptime SLA and no
-   *   latency guarantee.
-   * - If set to 'default', the request will be processed using the default service
-   *   tier with a lower uptime SLA and no latency guarantee.
-   * - If set to 'flex', the request will be processed with the Flex Processing
-   *   service tier.
-   *   [Learn more](https://platform.openai.com/docs/guides/flex-processing).
+   * - If set to 'auto', then the request will be processed with the service tier
+   *   configured in the Project settings. Unless otherwise configured, the Project
+   *   will use 'default'.
+   * - If set to 'default', then the requset will be processed with the standard
+   *   pricing and performance for the selected model.
+   * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)' or
+   *   'priority', then the request will be processed with the corresponding service
+   *   tier. [Contact sales](https://openai.com/contact-sales) to learn more about
+   *   Priority processing.
    * - When not set, the default behavior is 'auto'.
    *
-   * When this parameter is set, the response body will include the `service_tier`
-   * utilized.
+   * When the `service_tier` parameter is set, the response body will include the
+   * `service_tier` value based on the processing mode actually used to serve the
+   * request. This response value may be different from the value set in the
+   * parameter.
    */
-  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | null;
+  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | null;
 
   /**
    * The status of the response generation. One of `completed`, `failed`,
@@ -442,6 +450,12 @@ export interface Response {
    * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
    */
   text?: ResponseTextConfig;
+
+  /**
+   * An integer between 0 and 20 specifying the number of most likely tokens to
+   * return at each token position, each with an associated log probability.
+   */
+  top_logprobs?: number | null;
 
   /**
    * The truncation strategy to use for the model response.
@@ -1649,6 +1663,15 @@ export interface ResponseFunctionWebSearch {
   id: string;
 
   /**
+   * An object describing the specific action taken in this web search call. Includes
+   * details on how the model used the web (search, open_page, find).
+   */
+  action:
+    | ResponseFunctionWebSearch.Search
+    | ResponseFunctionWebSearch.OpenPage
+    | ResponseFunctionWebSearch.Find;
+
+  /**
    * The status of the web search tool call.
    */
   status: 'in_progress' | 'searching' | 'completed' | 'failed';
@@ -1657,6 +1680,63 @@ export interface ResponseFunctionWebSearch {
    * The type of the web search tool call. Always `web_search_call`.
    */
   type: 'web_search_call';
+}
+
+export namespace ResponseFunctionWebSearch {
+  /**
+   * Action type "search" - Performs a web search query.
+   */
+  export interface Search {
+    /**
+     * The search query.
+     */
+    query: string;
+
+    /**
+     * The action type.
+     */
+    type: 'search';
+
+    /**
+     * Domains to restrict the search or domains where results were found.
+     */
+    domains?: Array<string>;
+  }
+
+  /**
+   * Action type "open_page" - Opens a specific URL from search results.
+   */
+  export interface OpenPage {
+    /**
+     * The action type.
+     */
+    type: 'open_page';
+
+    /**
+     * The URL opened by the model.
+     */
+    url: string;
+  }
+
+  /**
+   * Action type "find": Searches for a pattern within a loaded page.
+   */
+  export interface Find {
+    /**
+     * The pattern or text to search for within the page.
+     */
+    pattern: string;
+
+    /**
+     * The action type.
+     */
+    type: 'find';
+
+    /**
+     * The URL of the page searched for the pattern.
+     */
+    url: string;
+  }
 }
 
 /**
@@ -1796,25 +1876,27 @@ export interface ResponseInProgressEvent {
  * Specify additional output data to include in the model response. Currently
  * supported values are:
  *
+ * - `code_interpreter_call.outputs`: Includes the outputs of python code execution
+ *   in code interpreter tool call items.
+ * - `computer_call_output.output.image_url`: Include image urls from the computer
+ *   call output.
  * - `file_search_call.results`: Include the search results of the file search tool
  *   call.
  * - `message.input_image.image_url`: Include image urls from the input message.
- * - `computer_call_output.output.image_url`: Include image urls from the computer
- *   call output.
+ * - `message.output_text.logprobs`: Include logprobs with assistant messages.
  * - `reasoning.encrypted_content`: Includes an encrypted version of reasoning
  *   tokens in reasoning item outputs. This enables reasoning items to be used in
  *   multi-turn conversations when using the Responses API statelessly (like when
  *   the `store` parameter is set to `false`, or when an organization is enrolled
  *   in the zero data retention program).
- * - `code_interpreter_call.outputs`: Includes the outputs of python code execution
- *   in code interpreter tool call items.
  */
 export type ResponseIncludable =
+  | 'code_interpreter_call.outputs'
+  | 'computer_call_output.output.image_url'
   | 'file_search_call.results'
   | 'message.input_image.image_url'
-  | 'computer_call_output.output.image_url'
-  | 'reasoning.encrypted_content'
-  | 'code_interpreter_call.outputs';
+  | 'message.output_text.logprobs'
+  | 'reasoning.encrypted_content';
 
 /**
  * An event that is emitted when a response finishes as incomplete.
@@ -4431,6 +4513,27 @@ export interface ToolChoiceFunction {
 }
 
 /**
+ * Use this option to force the model to call a specific tool on a remote MCP
+ * server.
+ */
+export interface ToolChoiceMcp {
+  /**
+   * The label of the MCP server to use.
+   */
+  server_label: string;
+
+  /**
+   * For MCP tools, the type is always `mcp`.
+   */
+  type: 'mcp';
+
+  /**
+   * The name of the tool to call on the server.
+   */
+  name?: string | null;
+}
+
+/**
  * Controls which (if any) tool is called by the model.
  *
  * `none` means the model will not call any tool and instead generates a message.
@@ -4457,7 +4560,6 @@ export interface ToolChoiceTypes {
    * - `web_search_preview`
    * - `computer_use_preview`
    * - `code_interpreter`
-   * - `mcp`
    * - `image_generation`
    */
   type:
@@ -4466,8 +4568,7 @@ export interface ToolChoiceTypes {
     | 'computer_use_preview'
     | 'web_search_preview_2025_03_11'
     | 'image_generation'
-    | 'code_interpreter'
-    | 'mcp';
+    | 'code_interpreter';
 }
 
 /**
@@ -4541,18 +4642,19 @@ export interface ResponseCreateParamsBase {
    * Specify additional output data to include in the model response. Currently
    * supported values are:
    *
+   * - `code_interpreter_call.outputs`: Includes the outputs of python code execution
+   *   in code interpreter tool call items.
+   * - `computer_call_output.output.image_url`: Include image urls from the computer
+   *   call output.
    * - `file_search_call.results`: Include the search results of the file search tool
    *   call.
    * - `message.input_image.image_url`: Include image urls from the input message.
-   * - `computer_call_output.output.image_url`: Include image urls from the computer
-   *   call output.
+   * - `message.output_text.logprobs`: Include logprobs with assistant messages.
    * - `reasoning.encrypted_content`: Includes an encrypted version of reasoning
    *   tokens in reasoning item outputs. This enables reasoning items to be used in
    *   multi-turn conversations when using the Responses API statelessly (like when
    *   the `store` parameter is set to `false`, or when an organization is enrolled
    *   in the zero data retention program).
-   * - `code_interpreter_call.outputs`: Includes the outputs of python code execution
-   *   in code interpreter tool call items.
    */
   include?: Array<ResponseIncludable> | null;
 
@@ -4584,6 +4686,14 @@ export interface ResponseCreateParamsBase {
    * [reasoning tokens](https://platform.openai.com/docs/guides/reasoning).
    */
   max_output_tokens?: number | null;
+
+  /**
+   * The maximum number of total calls to built-in tools that can be processed in a
+   * response. This maximum number applies across all built-in tool calls, not per
+   * individual tool. Any further attempts to call a tool by the model will be
+   * ignored.
+   */
+  max_tool_calls?: number | null;
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
@@ -4631,25 +4741,25 @@ export interface ResponseCreateParamsBase {
   reasoning?: Shared.Reasoning | null;
 
   /**
-   * Specifies the latency tier to use for processing the request. This parameter is
-   * relevant for customers subscribed to the scale tier service:
+   * Specifies the processing type used for serving the request.
    *
-   * - If set to 'auto', and the Project is Scale tier enabled, the system will
-   *   utilize scale tier credits until they are exhausted.
-   * - If set to 'auto', and the Project is not Scale tier enabled, the request will
-   *   be processed using the default service tier with a lower uptime SLA and no
-   *   latency guarantee.
-   * - If set to 'default', the request will be processed using the default service
-   *   tier with a lower uptime SLA and no latency guarantee.
-   * - If set to 'flex', the request will be processed with the Flex Processing
-   *   service tier.
-   *   [Learn more](https://platform.openai.com/docs/guides/flex-processing).
+   * - If set to 'auto', then the request will be processed with the service tier
+   *   configured in the Project settings. Unless otherwise configured, the Project
+   *   will use 'default'.
+   * - If set to 'default', then the requset will be processed with the standard
+   *   pricing and performance for the selected model.
+   * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)' or
+   *   'priority', then the request will be processed with the corresponding service
+   *   tier. [Contact sales](https://openai.com/contact-sales) to learn more about
+   *   Priority processing.
    * - When not set, the default behavior is 'auto'.
    *
-   * When this parameter is set, the response body will include the `service_tier`
-   * utilized.
+   * When the `service_tier` parameter is set, the response body will include the
+   * `service_tier` value based on the processing mode actually used to serve the
+   * request. This response value may be different from the value set in the
+   * parameter.
    */
-  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | null;
+  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | null;
 
   /**
    * Whether to store the generated model response for later retrieval via API.
@@ -4688,7 +4798,7 @@ export interface ResponseCreateParamsBase {
    * response. See the `tools` parameter to see how to specify which tools the model
    * can call.
    */
-  tool_choice?: ToolChoiceOptions | ToolChoiceTypes | ToolChoiceFunction;
+  tool_choice?: ToolChoiceOptions | ToolChoiceTypes | ToolChoiceFunction | ToolChoiceMcp;
 
   /**
    * An array of tools the model may call while generating a response. You can
@@ -4707,6 +4817,12 @@ export interface ResponseCreateParamsBase {
    *   [function calling](https://platform.openai.com/docs/guides/function-calling).
    */
   tools?: Array<Tool>;
+
+  /**
+   * An integer between 0 and 20 specifying the number of most likely tokens to
+   * return at each token position, each with an associated log probability.
+   */
+  top_logprobs?: number | null;
 
   /**
    * An alternative to sampling with temperature, called nucleus sampling, where the
@@ -4918,6 +5034,7 @@ export declare namespace Responses {
     type ResponseWebSearchCallSearchingEvent as ResponseWebSearchCallSearchingEvent,
     type Tool as Tool,
     type ToolChoiceFunction as ToolChoiceFunction,
+    type ToolChoiceMcp as ToolChoiceMcp,
     type ToolChoiceOptions as ToolChoiceOptions,
     type ToolChoiceTypes as ToolChoiceTypes,
     type WebSearchTool as WebSearchTool,
