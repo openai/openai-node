@@ -17,6 +17,9 @@ describe('resource responses', () => {
     const dataAndResponse = await responsePromise.withResponse();
     expect(dataAndResponse.data).toBe(response);
     expect(dataAndResponse.response).toBe(rawResponse);
+
+    expect(response).toHaveProperty('output_text');
+    expect(typeof response.output_text).toBe('string');
   });
 
   test('retrieve', async () => {
@@ -28,6 +31,9 @@ describe('resource responses', () => {
     const dataAndResponse = await responsePromise.withResponse();
     expect(dataAndResponse.data).toBe(response);
     expect(dataAndResponse.response).toBe(rawResponse);
+
+    expect(response).toHaveProperty('output_text');
+    expect(typeof response.output_text).toBe('string');
   });
 
   test('retrieve: request options and params are passed correctly', async () => {
