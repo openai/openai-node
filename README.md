@@ -128,6 +128,8 @@ await client.files.create({
 
 Verifying webhook signatures is _optional but encouraged_.
 
+For more information about webhooks, see [the API docs](https://platform.openai.com/docs/guides/webhooks).
+
 ### Parsing webhook payloads
 
 For most use cases, you will likely want to verify the webhook and parse the payload at the same time. To achieve this, we provide the method `client.webhooks.unwrap()`, which parses a webhook request and verifies that it was sent by OpenAI. This method will throw an error if the signature is invalid.

@@ -19,28 +19,6 @@ export class Webhooks extends APIResource {
     return JSON.parse(payload) as UnwrapWebhookEvent;
   }
 
-  private validateSecret(secret: string | null | undefined): asserts secret is string {
-    if (typeof secret !== 'string' || secret.length === 0) {
-      throw new Error(
-        `The webhook secret must either be set using the env var, OPENAI_WEBHOOK_SECRET, on the client class, OpenAI({ webhookSecret: '123' }), or passed to this function`,
-      );
-    }
-  }
-
-  private getRequiredHeader(headers: Headers, name: string): string {
-    if (!headers) {
-      throw new Error(`Headers are required`);
-    }
-
-    const value = headers.get(name);
-
-    if (value === null || value === undefined) {
-      throw new Error(`Missing required header: ${name}`);
-    }
-
-    return value;
-  }
-
   /**
    * Validates whether or not the webhook payload was sent by OpenAI.
    *
@@ -65,12 +43,12 @@ export class Webhooks extends APIResource {
       throw new Error('Webhook signature verification is only supported when the `crypto` global is defined');
     }
 
-    this.validateSecret(secret);
+    this.#validateSecret(secret);
 
     const headersObj = buildHeaders([headers]).values;
-    const signatureHeader = this.getRequiredHeader(headersObj, 'webhook-signature');
-    const timestamp = this.getRequiredHeader(headersObj, 'webhook-timestamp');
-    const webhookId = this.getRequiredHeader(headersObj, 'webhook-id');
+    const signatureHeader = this.#getRequiredHeader(headersObj, 'webhook-signature');
+    const timestamp = this.#getRequiredHeader(headersObj, 'webhook-timestamp');
+    const webhookId = this.#getRequiredHeader(headersObj, 'webhook-id');
 
     // Validate timestamp to prevent replay attacks
     const timestampSeconds = parseInt(timestamp, 10);
@@ -136,6 +114,28 @@ export class Webhooks extends APIResource {
     throw new InvalidWebhookSignatureError(
       'The given webhook signature does not match the expected signature',
     );
+  }
+
+  #validateSecret(secret: string | null | undefined): asserts secret is string {
+    if (typeof secret !== 'string' || secret.length === 0) {
+      throw new Error(
+        `The webhook secret must either be set using the env var, OPENAI_WEBHOOK_SECRET, on the client class, OpenAI({ webhookSecret: '123' }), or passed to this function`,
+      );
+    }
+  }
+
+  #getRequiredHeader(headers: Headers, name: string): string {
+    if (!headers) {
+      throw new Error(`Headers are required`);
+    }
+
+    const value = headers.get(name);
+
+    if (value === null || value === undefined) {
+      throw new Error(`Missing required header: ${name}`);
+    }
+
+    return value;
   }
 }
 

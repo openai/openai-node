@@ -132,10 +132,18 @@ export class Responses extends APIResource {
     query: ResponseRetrieveParams | undefined = {},
     options?: RequestOptions,
   ): APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>> {
-    return this._client.get(path`/responses/${responseID}`, {
-      query,
-      ...options,
-      stream: query?.stream ?? false,
+    return (
+      this._client.get(path`/responses/${responseID}`, {
+        query,
+        ...options,
+        stream: query?.stream ?? false,
+      }) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>
+    )._thenUnwrap((rsp) => {
+      if ('object' in rsp && rsp.object === 'response') {
+        addOutputText(rsp as Response);
+      }
+
+      return rsp;
     }) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>;
   }
 
@@ -1729,6 +1737,58 @@ export interface ResponseFunctionWebSearch {
    * The type of the web search tool call. Always `web_search_call`.
    */
   type: 'web_search_call';
+}
+
+export namespace ResponseFunctionWebSearch {
+  /**
+   * Action type "search" - Performs a web search query.
+   */
+  export interface Search {
+    /**
+     * The search query.
+     */
+    query: string;
+
+    /**
+     * The action type.
+     */
+    type: 'search';
+  }
+
+  /**
+   * Action type "open_page" - Opens a specific URL from search results.
+   */
+  export interface OpenPage {
+    /**
+     * The action type.
+     */
+    type: 'open_page';
+
+    /**
+     * The URL opened by the model.
+     */
+    url: string;
+  }
+
+  /**
+   * Action type "find": Searches for a pattern within a loaded page.
+   */
+  export interface Find {
+    /**
+     * The pattern or text to search for within the page.
+     */
+    pattern: string;
+
+    /**
+     * The action type.
+     */
+    type: 'find';
+
+    /**
+     * The URL of the page searched for the pattern.
+     */
+    url: string;
+  }
 }
 
 /**
