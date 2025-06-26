@@ -7,6 +7,10 @@ export type AllModels =
   | 'o1-pro-2025-03-19'
   | 'o3-pro'
   | 'o3-pro-2025-06-10'
+  | 'o3-deep-research'
+  | 'o3-deep-research-2025-06-26'
+  | 'o4-mini-deep-research'
+  | 'o4-mini-deep-research-2025-06-26'
   | 'computer-use-preview'
   | 'computer-use-preview-2025-03-11';
 
@@ -301,5 +305,9 @@ export type ResponsesModel =
   | 'o1-pro-2025-03-19'
   | 'o3-pro'
   | 'o3-pro-2025-06-10'
+  | 'o3-deep-research'
+  | 'o3-deep-research-2025-06-26'
+  | 'o4-mini-deep-research'
+  | 'o4-mini-deep-research-2025-06-26'
   | 'computer-use-preview'
   | 'computer-use-preview-2025-03-11';

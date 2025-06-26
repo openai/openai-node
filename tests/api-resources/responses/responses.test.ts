@@ -35,7 +35,7 @@ describe('resource responses', () => {
     await expect(
       client.responses.retrieve(
         'resp_677efb5139a88190b512bc3fef8e535d',
-        { include: ['file_search_call.results'], starting_after: 0, stream: false },
+        { include: ['code_interpreter_call.outputs'], starting_after: 0, stream: false },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);
