@@ -95,9 +95,31 @@ export interface ImagesResponse {
   created: number;
 
   /**
+   * The background parameter used for the image generation. Either `transparent` or
+   * `opaque`.
+   */
+  background?: 'transparent' | 'opaque';
+
+  /**
    * The list of generated images.
    */
   data?: Array<Image>;
+
+  /**
+   * The output format of the image generation. Either `png`, `webp`, or `jpeg`.
+   */
+  output_format?: 'png' | 'webp' | 'jpeg';
+
+  /**
+   * The quality of the image generated. Either `low`, `medium`, or `high`.
+   */
+  quality?: 'low' | 'medium' | 'high';
+
+  /**
+   * The size of the image generated. Either `1024x1024`, `1024x1536`, or
+   * `1536x1024`.
+   */
+  size?: '1024x1024' | '1024x1536' | '1536x1024';
 
   /**
    * For `gpt-image-1` only, the token usage information for the image generation.

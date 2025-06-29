@@ -132,10 +132,18 @@ export class Responses extends APIResource {
     query: ResponseRetrieveParams | undefined = {},
     options?: RequestOptions,
   ): APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>> {
-    return this._client.get(path`/responses/${responseID}`, {
-      query,
-      ...options,
-      stream: query?.stream ?? false,
+    return (
+      this._client.get(path`/responses/${responseID}`, {
+        query,
+        ...options,
+        stream: query?.stream ?? false,
+      }) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>
+    )._thenUnwrap((rsp) => {
+      if ('object' in rsp && rsp.object === 'response') {
+        addOutputText(rsp as Response);
+      }
+
+      return rsp;
     }) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>;
   }
 
@@ -312,7 +320,7 @@ export interface FunctionTool {
   /**
    * A JSON schema object describing the parameters of the function.
    */
-  parameters: Record<string, unknown> | null;
+  parameters: { [key: string]: unknown } | null;
 
   /**
    * Whether to enforce strict parameter validation. Default `true`.
@@ -498,7 +506,7 @@ export interface Response {
    * When this parameter is set, the response body will include the `service_tier`
    * utilized.
    */
-  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | null;
+  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | null;
 
   /**
    * The status of the response generation. One of `completed`, `failed`,
@@ -1491,7 +1499,7 @@ export namespace ResponseFileSearchToolCall {
      * length of 64 characters. Values are strings with a maximum length of 512
      * characters, booleans, or numbers.
      */
-    attributes?: Record<string, string | number | boolean> | null;
+    attributes?: { [key: string]: string | number | boolean } | null;
 
     /**
      * The unique ID of the file.
@@ -1551,7 +1559,7 @@ export interface ResponseFormatTextJSONSchemaConfig {
    * The schema for the response format, described as a JSON Schema object. Learn how
    * to build JSON schemas [here](https://json-schema.org/).
    */
-  schema: Record<string, unknown>;
+  schema: { [key: string]: unknown };
 
   /**
    * The type of response format being defined. Always `json_schema`.
@@ -1729,6 +1737,58 @@ export interface ResponseFunctionWebSearch {
    * The type of the web search tool call. Always `web_search_call`.
    */
   type: 'web_search_call';
+}
+
+export namespace ResponseFunctionWebSearch {
+  /**
+   * Action type "search" - Performs a web search query.
+   */
+  export interface Search {
+    /**
+     * The search query.
+     */
+    query: string;
+
+    /**
+     * The action type.
+     */
+    type: 'search';
+  }
+
+  /**
+   * Action type "open_page" - Opens a specific URL from search results.
+   */
+  export interface OpenPage {
+    /**
+     * The action type.
+     */
+    type: 'open_page';
+
+    /**
+     * The URL opened by the model.
+     */
+    url: string;
+  }
+
+  /**
+   * Action type "find": Searches for a pattern within a loaded page.
+   */
+  export interface Find {
+    /**
+     * The pattern or text to search for within the page.
+     */
+    pattern: string;
+
+    /**
+     * The action type.
+     */
+    type: 'find';
+
+    /**
+     * The URL of the page searched for the pattern.
+     */
+    url: string;
+  }
 }
 
 /**
@@ -2209,7 +2269,7 @@ export namespace ResponseInputItem {
       /**
        * Environment variables to set for the command.
        */
-      env: Record<string, string>;
+      env: { [key: string]: string };
 
       /**
        * The type of the local shell action. Always `exec`.
@@ -2571,7 +2631,7 @@ export namespace ResponseItem {
       /**
        * Environment variables to set for the command.
        */
-      env: Record<string, string>;
+      env: { [key: string]: string };
 
       /**
        * The type of the local shell action. Always `exec`.
@@ -3046,7 +3106,7 @@ export namespace ResponseOutputItem {
       /**
        * Environment variables to set for the command.
        */
-      env: Record<string, string>;
+      env: { [key: string]: string };
 
       /**
        * The type of the local shell action. Always `exec`.
@@ -3514,7 +3574,7 @@ export interface ResponsePrompt {
    * substitution values can either be strings, or other Response input types like
    * images or files.
    */
-  variables?: Record<string, string | ResponseInputText | ResponseInputImage | ResponseInputFile> | null;
+  variables?: { [key: string]: string | ResponseInputText | ResponseInputImage | ResponseInputFile } | null;
 
   /**
    * Optional version of the prompt template.
@@ -4309,7 +4369,7 @@ export namespace Tool {
      * Optional HTTP headers to send to the MCP server. Use for authentication or other
      * purposes.
      */
-    headers?: Record<string, string> | null;
+    headers?: { [key: string]: string } | null;
 
     /**
      * Specify which of the MCP server's tools require approval.
@@ -4721,7 +4781,7 @@ export interface ResponseCreateParamsBase {
    * When this parameter is set, the response body will include the `service_tier`
    * utilized.
    */
-  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | null;
+  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | null;
 
   /**
    * Whether to store the generated model response for later retrieval via API.

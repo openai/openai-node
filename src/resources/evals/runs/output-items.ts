@@ -56,7 +56,7 @@ export interface OutputItemRetrieveResponse {
   /**
    * Details of the input data source item.
    */
-  datasource_item: Record<string, unknown>;
+  datasource_item: { [key: string]: unknown };
 
   /**
    * The identifier for the data source item.
@@ -76,7 +76,7 @@ export interface OutputItemRetrieveResponse {
   /**
    * A list of results from the evaluation run.
    */
-  results: Array<Record<string, unknown>>;
+  results: Array<{ [key: string]: unknown }>;
 
   /**
    * The identifier of the evaluation run associated with this output item.
@@ -222,7 +222,7 @@ export interface OutputItemListResponse {
   /**
    * Details of the input data source item.
    */
-  datasource_item: Record<string, unknown>;
+  datasource_item: { [key: string]: unknown };
 
   /**
    * The identifier for the data source item.
@@ -242,7 +242,7 @@ export interface OutputItemListResponse {
   /**
    * A list of results from the evaluation run.
    */
-  results: Array<Record<string, unknown>>;
+  results: Array<{ [key: string]: unknown }>;
 
   /**
    * The identifier of the evaluation run associated with this output item.

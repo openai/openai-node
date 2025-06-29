@@ -105,3 +105,4 @@ export {
   type VectorStoresPage,
   type VectorStoreSearchResponsesPage,
 } from './vector-stores/vector-stores';
+export { Webhooks } from './webhooks';

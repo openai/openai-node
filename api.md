@@ -351,6 +351,31 @@ Methods:
 - <code>client.vectorStores.files.<a href="./src/resources/vector-stores/files.ts">upload</a>(vectorStoreId, file, options?) -> Promise&lt;VectorStoreFile&gt;</code>
 - <code>client.vectorStores.files.<a href="./src/resources/vector-stores/files.ts">uploadAndPoll</a>(vectorStoreId, file, options?) -> Promise&lt;VectorStoreFile&gt;</code>
 
+# Webhooks
+
+Types:
+
+- <code><a href="./src/resources/webhooks.ts">BatchCancelledWebhookEvent</a></code>
+- <code><a href="./src/resources/webhooks.ts">BatchCompletedWebhookEvent</a></code>
+- <code><a href="./src/resources/webhooks.ts">BatchExpiredWebhookEvent</a></code>
+- <code><a href="./src/resources/webhooks.ts">BatchFailedWebhookEvent</a></code>
+- <code><a href="./src/resources/webhooks.ts">EvalRunCanceledWebhookEvent</a></code>
+- <code><a href="./src/resources/webhooks.ts">EvalRunFailedWebhookEvent</a></code>
+- <code><a href="./src/resources/webhooks.ts">EvalRunSucceededWebhookEvent</a></code>
+- <code><a href="./src/resources/webhooks.ts">FineTuningJobCancelledWebhookEvent</a></code>
+- <code><a href="./src/resources/webhooks.ts">FineTuningJobFailedWebhookEvent</a></code>
+- <code><a href="./src/resources/webhooks.ts">FineTuningJobSucceededWebhookEvent</a></code>
+- <code><a href="./src/resources/webhooks.ts">ResponseCancelledWebhookEvent</a></code>
+- <code><a href="./src/resources/webhooks.ts">ResponseCompletedWebhookEvent</a></code>
+- <code><a href="./src/resources/webhooks.ts">ResponseFailedWebhookEvent</a></code>
+- <code><a href="./src/resources/webhooks.ts">ResponseIncompleteWebhookEvent</a></code>
+- <code><a href="./src/resources/webhooks.ts">UnwrapWebhookEvent</a></code>
+
+Methods:
+
+- <code>client.webhooks.<a href="./src/resources/webhooks.ts">unwrap</a>(payload, headers, secret?, tolerance?) -> UnwrapWebhookEvent</code>
+- <code>client.webhooks.<a href="./src/resources/webhooks.ts">verifySignature</a>(payload, headers, secret?, tolerance?) -> void</code>
+
 # Beta
 
 ## Realtime
@@ -701,6 +726,7 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponseWebSearchCallSearchingEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">Tool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ToolChoiceFunction</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ToolChoiceMcp</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ToolChoiceOptions</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ToolChoiceTypes</a></code>
 - <code><a href="./src/resources/responses/responses.ts">WebSearchTool</a></code>
