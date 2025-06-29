@@ -152,3 +152,9 @@ export class ContentFilterFinishReasonError extends OpenAIError {
     super(`Could not parse response content as the request was rejected by the content filter`);
   }
 }
+
+export class InvalidWebhookSignatureError extends Error {
+  constructor(message: string) {
+    super(message);
+  }
+}

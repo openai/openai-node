@@ -319,7 +319,7 @@ export interface VectorStoreSearchResponse {
    * length of 64 characters. Values are strings with a maximum length of 512
    * characters, booleans, or numbers.
    */
-  attributes: Record<string, string | number | boolean> | null;
+  attributes: { [key: string]: string | number | boolean } | null;
 
   /**
    * Content chunks from the file.

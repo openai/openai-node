@@ -20,6 +20,7 @@ export {
   InternalServerError,
   PermissionDeniedError,
   UnprocessableEntityError,
+  InvalidWebhookSignatureError,
 } from './core/error';
 
 export { AzureOpenAI } from './azure';

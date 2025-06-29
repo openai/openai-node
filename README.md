@@ -124,6 +124,85 @@ await client.files.create({
 });
 ```
 
+## Webhook Verification
+
+Verifying webhook signatures is _optional but encouraged_.
+
+For more information about webhooks, see [the API docs](https://platform.openai.com/docs/guides/webhooks).
+
+### Parsing webhook payloads
+
+For most use cases, you will likely want to verify the webhook and parse the payload at the same time. To achieve this, we provide the method `client.webhooks.unwrap()`, which parses a webhook request and verifies that it was sent by OpenAI. This method will throw an error if the signature is invalid.
+
+Note that the `body` parameter must be the raw JSON string sent from the server (do not parse it first). The `.unwrap()` method will parse this JSON for you into an event object after verifying the webhook was sent from OpenAI.
+
+```ts
+import { headers } from 'next/headers';
+import OpenAI from 'openai';
+
+const client = new OpenAI({
+  webhookSecret: process.env.OPENAI_WEBHOOK_SECRET, // env var used by default; explicit here.
+});
+
+export async function webhook(request: Request) {
+  const headersList = headers();
+  const body = await request.text();
+
+  try {
+    const event = client.webhooks.unwrap(body, headersList);
+
+    switch (event.type) {
+      case 'response.completed':
+        console.log('Response completed:', event.data);
+        break;
+      case 'response.failed':
+        console.log('Response failed:', event.data);
+        break;
+      default:
+        console.log('Unhandled event type:', event.type);
+    }
+
+    return Response.json({ message: 'ok' });
+  } catch (error) {
+    console.error('Invalid webhook signature:', error);
+    return new Response('Invalid signature', { status: 400 });
+  }
+}
+```
+
+### Verifying webhook payloads directly
+
+In some cases, you may want to verify the webhook separately from parsing the payload. If you prefer to handle these steps separately, we provide the method `client.webhooks.verifySignature()` to _only verify_ the signature of a webhook request. Like `.unwrap()`, this method will throw an error if the signature is invalid.
+
+Note that the `body` parameter must be the raw JSON string sent from the server (do not parse it first). You will then need to parse the body after verifying the signature.
+
+```ts
+import { headers } from 'next/headers';
+import OpenAI from 'openai';
+
+const client = new OpenAI({
+  webhookSecret: process.env.OPENAI_WEBHOOK_SECRET, // env var used by default; explicit here.
+});
+
+export async function webhook(request: Request) {
+  const headersList = headers();
+  const body = await request.text();
+
+  try {
+    client.webhooks.verifySignature(body, headersList);
+
+    // Parse the body after verification
+    const event = JSON.parse(body);
+    console.log('Verified event:', event);
+
+    return Response.json({ message: 'ok' });
+  } catch (error) {
+    console.error('Invalid webhook signature:', error);
+    return new Response('Invalid signature', { status: 400 });
+  }
+}
+```
+
 ## Handling errors
 
 When the library is unable to connect to the API,
