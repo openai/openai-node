@@ -90,7 +90,7 @@ export const multipartFormRequestOptions = async (
   return { ...opts, body: await createForm(opts.body, fetch) };
 };
 
-const supportsFormDataMap = /** @__PURE__ */ new WeakMap<Fetch, Promise<boolean>>();
+const supportsFormDataMap = /* @__PURE__ */ new WeakMap<Fetch, Promise<boolean>>();
 
 /**
  * node-fetch doesn't support the global FormData object in recent node versions. Instead of sending
