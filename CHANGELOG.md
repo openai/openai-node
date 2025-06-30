@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.8.3 (2025-06-30)
+
+Full Changelog: [v5.8.2...v5.8.3](https://github.com/openai/openai-node/compare/v5.8.2...v5.8.3)
+
+### Chores
+
+* **ci:** only run for pushes and fork pull requests ([e200bc4](https://github.com/openai/openai-node/commit/e200bc4db18a09d4148fff0056801140411bfa53))
+
 ## 5.8.2 (2025-06-27)
 
 Full Changelog: [v5.8.1...v5.8.2](https://github.com/openai/openai-node/compare/v5.8.1...v5.8.2)
