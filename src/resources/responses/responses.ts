@@ -3556,7 +3556,7 @@ export interface ResponseOutputTextAnnotationAddedEvent {
   /**
    * The type of the event. Always 'response.output_text_annotation.added'.
    */
-  type: 'response.output_text_annotation.added';
+  type: 'response.output_text.annotation.added';
 }
 
 /**
