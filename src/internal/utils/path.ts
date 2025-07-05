@@ -12,25 +12,43 @@ export function encodeURIPath(str: string) {
   return str.replace(/[^A-Za-z0-9\-._~!$&'()*+,;=:@]+/g, encodeURIComponent);
 }
 
+const EMPTY = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.create(null));
+
 export const createPathTagFunction = (pathEncoder = encodeURIPath) =>
   function path(statics: readonly string[], ...params: readonly unknown[]): string {
     // If there are no params, no processing is needed.
     if (statics.length === 1) return statics[0]!;
 
     let postPath = false;
+    const invalidSegments = [];
     const path = statics.reduce((previousValue, currentValue, index) => {
       if (/[?#]/.test(currentValue)) {
         postPath = true;
       }
-      return (
-        previousValue +
-        currentValue +
-        (index === params.length ? '' : (postPath ? encodeURIComponent : pathEncoder)(String(params[index])))
-      );
+      const value = params[index];
+      let encoded = (postPath ? encodeURIComponent : pathEncoder)('' + value);
+      if (
+        index !== params.length &&
+        (value == null ||
+          (typeof value === 'object' &&
+            // handle values from other realms
+            value.toString ===
+              Object.getPrototypeOf(Object.getPrototypeOf((value as any).hasOwnProperty ?? EMPTY) ?? EMPTY)
+                ?.toString))
+      ) {
+        encoded = value + '';
+        invalidSegments.push({
+          start: previousValue.length + currentValue.length,
+          length: encoded.length,
+          error: `Value of type ${Object.prototype.toString
+            .call(value)
+            .slice(8, -1)} is not a valid path parameter`,
+        });
+      }
+      return previousValue + currentValue + (index === params.length ? '' : encoded);
     }, '');
 
     const pathOnly = path.split(/[?#]/, 1)[0]!;
-    const invalidSegments = [];
     const invalidSegmentPattern = /(?<=^|\/)(?:\.|%2e){1,2}(?=\/|$)/gi;
     let match;
 
@@ -39,8 +57,11 @@ export const createPathTagFunction = (pathEncoder = encodeURIPath) =>
       invalidSegments.push({
         start: match.index,
         length: match[0].length,
+        error: `Value "${match[0]}" can\'t be safely passed as a path parameter`,
       });
     }
+
+    invalidSegments.sort((a, b) => a.start - b.start);
 
     if (invalidSegments.length > 0) {
       let lastEnd = 0;
@@ -51,7 +72,11 @@ export const createPathTagFunction = (pathEncoder = encodeURIPath) =>
         return acc + spaces + arrows;
       }, '');
 
-      throw new OpenAIError(`Path parameters result in path with invalid segments:\n${path}\n${underline}`);
+      throw new OpenAIError(
+        `Path parameters result in path with invalid segments:\n${invalidSegments
+          .map((e) => e.error)
+          .join('\n')}\n${path}\n${underline}`,
+      );
     }
 
     return path;
