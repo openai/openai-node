@@ -1,5 +1,21 @@
 # Changelog
 
+## 5.8.3 (2025-07-08)
+
+Full Changelog: [v5.8.2...v5.8.3](https://github.com/openai/openai-node/compare/v5.8.2...v5.8.3)
+
+### Bug Fixes
+
+* avoid console usage ([aec57c5](https://github.com/openai/openai-node/commit/aec57c5902b47d2d643f48d98a6014e0e77ba6cc))
+
+
+### Chores
+
+* add docs to RequestOptions type ([3735172](https://github.com/openai/openai-node/commit/37351723bc5a24c06a96c95e11104cda42a1bec3))
+* **ci:** only run for pushes and fork pull requests ([e200bc4](https://github.com/openai/openai-node/commit/e200bc4db18a09d4148fff0056801140411bfa53))
+* **client:** improve path param validation ([b5a043b](https://github.com/openai/openai-node/commit/b5a043bc96b6b6bfe8cca05e103a6e4d6fea962b))
+* **internal/tests:** pin bun types version ([fcffa88](https://github.com/openai/openai-node/commit/fcffa880c1b31aeca70a6fa093f4b1f9d3db1a74))
+
 ## 5.8.2 (2025-06-27)
 
 Full Changelog: [v5.8.1...v5.8.2](https://github.com/openai/openai-node/compare/v5.8.1...v5.8.2)
