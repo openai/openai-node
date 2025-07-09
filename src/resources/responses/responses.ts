@@ -1946,7 +1946,8 @@ export type ResponseIncludable =
   | 'message.input_image.image_url'
   | 'computer_call_output.output.image_url'
   | 'reasoning.encrypted_content'
-  | 'code_interpreter_call.outputs';
+  | 'code_interpreter_call.outputs'
+  | 'message.output_text.logprobs';
 
 /**
  * An event that is emitted when a response finishes as incomplete.
@@ -4687,6 +4688,11 @@ export interface ResponseCreateParamsBase {
    *   in code interpreter tool call items.
    */
   include?: Array<ResponseIncludable> | null;
+
+  /**
+   * The number of top logprobs to include in the response.
+   */
+  top_logprobs?: number | null;
 
   /**
    * Text, image, or file inputs to the model, used to generate a response.
