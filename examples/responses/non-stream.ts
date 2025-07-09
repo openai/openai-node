@@ -9,8 +9,6 @@ async function main() {
     .create({
       model: 'gpt-4o-2024-08-06',
       input: 'solve 8x + 31 = 2',
-      include: ['message.output_text.logprobs'],
-      top_logprobs: 20,
     });
 
     console.log(result.output_text);
