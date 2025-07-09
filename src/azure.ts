@@ -125,10 +125,10 @@ export class AzureOpenAI extends OpenAI {
     this.deploymentName = deployment;
   }
 
-  override buildRequest(
+  override async buildRequest(
     options: FinalRequestOptions,
     props: { retryCount?: number } = {},
-  ): { req: RequestInit & { headers: Headers }; url: string; timeout: number } {
+  ): Promise<{ req: RequestInit & { headers: Headers }; url: string; timeout: number }> {
     if (_deployments_endpoints.has(options.path) && options.method === 'post' && options.body !== undefined) {
       if (!isObj(options.body)) {
         throw new Error('Expected request body to be an object');
@@ -154,7 +154,7 @@ export class AzureOpenAI extends OpenAI {
     return undefined;
   }
 
-  protected override authHeaders(opts: FinalRequestOptions): NullableHeaders | undefined {
+  protected override async authHeaders(opts: FinalRequestOptions): Promise<NullableHeaders | undefined> {
     return;
   }
 
