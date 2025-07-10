@@ -1964,6 +1964,11 @@ export interface ResponseInputFile {
   file_id?: string | null;
 
   /**
+   * The URL of the file to be sent to the model.
+   */
+  file_url?: string;
+
+  /**
    * The name of the file to be sent to the model.
    */
   filename?: string;
@@ -2809,9 +2814,9 @@ export interface ResponseMcpCallArgumentsDeltaEvent {
   sequence_number: number;
 
   /**
-   * The type of the event. Always 'response.mcp_call.arguments_delta'.
+   * The type of the event. Always 'response.mcp_call_arguments.delta'.
    */
-  type: 'response.mcp_call.arguments_delta';
+  type: 'response.mcp_call_arguments.delta';
 }
 
 /**
@@ -2839,9 +2844,9 @@ export interface ResponseMcpCallArgumentsDoneEvent {
   sequence_number: number;
 
   /**
-   * The type of the event. Always 'response.mcp_call.arguments_done'.
+   * The type of the event. Always 'response.mcp_call_arguments.done'.
    */
-  type: 'response.mcp_call.arguments_done';
+  type: 'response.mcp_call_arguments.done';
 }
 
 /**
@@ -3499,9 +3504,9 @@ export interface ResponseOutputTextAnnotationAddedEvent {
   sequence_number: number;
 
   /**
-   * The type of the event. Always 'response.output_text_annotation.added'.
+   * The type of the event. Always 'response.output_text.annotation.added'.
    */
-  type: 'response.output_text_annotation.added';
+  type: 'response.output_text.annotation.added';
 }
 
 /**
@@ -4320,6 +4325,11 @@ export namespace Tool {
      * Specify which of the MCP server's tools require approval.
      */
     require_approval?: Mcp.McpToolApprovalFilter | 'always' | 'never' | null;
+
+    /**
+     * Optional description of the MCP server, used to provide more context.
+     */
+    server_description?: string;
   }
 
   export namespace Mcp {

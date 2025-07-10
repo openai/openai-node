@@ -310,12 +310,81 @@ export interface ConversationItemInputAudioTranscriptionCompletedEvent {
   type: 'conversation.item.input_audio_transcription.completed';
 
   /**
+   * Usage statistics for the transcription.
+   */
+  usage:
+    | ConversationItemInputAudioTranscriptionCompletedEvent.TranscriptTextUsageTokens
+    | ConversationItemInputAudioTranscriptionCompletedEvent.TranscriptTextUsageDuration;
+
+  /**
    * The log probabilities of the transcription.
    */
   logprobs?: Array<ConversationItemInputAudioTranscriptionCompletedEvent.Logprob> | null;
 }
 
 export namespace ConversationItemInputAudioTranscriptionCompletedEvent {
+  /**
+   * Usage statistics for models billed by token usage.
+   */
+  export interface TranscriptTextUsageTokens {
+    /**
+     * Number of input tokens billed for this request.
+     */
+    input_tokens: number;
+
+    /**
+     * Number of output tokens generated.
+     */
+    output_tokens: number;
+
+    /**
+     * Total number of tokens used (input + output).
+     */
+    total_tokens: number;
+
+    /**
+     * The type of the usage object. Always `tokens` for this variant.
+     */
+    type: 'tokens';
+
+    /**
+     * Details about the input tokens billed for this request.
+     */
+    input_token_details?: TranscriptTextUsageTokens.InputTokenDetails;
+  }
+
+  export namespace TranscriptTextUsageTokens {
+    /**
+     * Details about the input tokens billed for this request.
+     */
+    export interface InputTokenDetails {
+      /**
+       * Number of audio tokens billed for this request.
+       */
+      audio_tokens?: number;
+
+      /**
+       * Number of text tokens billed for this request.
+       */
+      text_tokens?: number;
+    }
+  }
+
+  /**
+   * Usage statistics for models billed by audio input duration.
+   */
+  export interface TranscriptTextUsageDuration {
+    /**
+     * Duration of the input audio in seconds.
+     */
+    seconds: number;
+
+    /**
+     * The type of the usage object. Always `duration` for this variant.
+     */
+    type: 'duration';
+  }
+
   /**
    * A log probability object.
    */

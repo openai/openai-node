@@ -140,7 +140,7 @@ export namespace Transcription {
     /**
      * Duration of the input audio in seconds.
      */
-    duration: number;
+    seconds: number;
 
     /**
      * The type of the usage object. Always `duration` for this variant.
@@ -399,7 +399,7 @@ export namespace TranscriptionVerbose {
     /**
      * Duration of the input audio in seconds.
      */
-    duration: number;
+    seconds: number;
 
     /**
      * The type of the usage object. Always `duration` for this variant.

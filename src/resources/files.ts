@@ -116,8 +116,8 @@ export interface FileObject {
 
   /**
    * The intended purpose of the file. Supported values are `assistants`,
-   * `assistants_output`, `batch`, `batch_output`, `fine-tune`, `fine-tune-results`
-   * and `vision`.
+   * `assistants_output`, `batch`, `batch_output`, `fine-tune`, `fine-tune-results`,
+   * `vision`, and `user_data`.
    */
   purpose:
     | 'assistants'
@@ -126,7 +126,8 @@ export interface FileObject {
     | 'batch_output'
     | 'fine-tune'
     | 'fine-tune-results'
-    | 'vision';
+    | 'vision'
+    | 'user_data';
 
   /**
    * @deprecated Deprecated. The current status of the file, which can be either
