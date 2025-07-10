@@ -11,7 +11,7 @@
     "formdata-node": "^4.4.1",
     "tsconfig-paths": "^4.0.0",
     "typescript": "^5.7.3",
-    "undici": "^7.2.0"
+    "undici": "^7.10.0"
   },
   "devDependencies": {
     "@types/node": "^20.14.8",
