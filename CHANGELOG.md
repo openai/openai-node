@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.9.0 (2025-07-10)
+
+Full Changelog: [v5.8.4...v5.9.0](https://github.com/openai/openai-node/compare/v5.8.4...v5.9.0)
+
+### Features
+
+* **api:** add file_url, fix event ID ([5f5d39e](https://github.com/openai/openai-node/commit/5f5d39e9e11224bf18a0301041b69548727ed4f3))
+
 ## 5.8.4 (2025-07-10)
 
 Full Changelog: [v5.8.3...v5.8.4](https://github.com/openai/openai-node/compare/v5.8.3...v5.8.4)
