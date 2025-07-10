@@ -1,5 +1,14 @@
 # Changelog
 
+## 5.8.4 (2025-07-10)
+
+Full Changelog: [v5.8.3...v5.8.4](https://github.com/openai/openai-node/compare/v5.8.3...v5.8.4)
+
+### Chores
+
+* **internal:** bump undici version in tests ([6f38b80](https://github.com/openai/openai-node/commit/6f38b809a69b6ab3fcbf1235e57bdb8912024ab3))
+* make some internal functions async ([841940d](https://github.com/openai/openai-node/commit/841940d2ae036191b456e8398fbcb1f24c6e4deb))
+
 ## 5.8.3 (2025-07-08)
 
 Full Changelog: [v5.8.2...v5.8.3](https://github.com/openai/openai-node/compare/v5.8.2...v5.8.3)
