@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.9.1 (2025-07-15)
+
+Full Changelog: [v5.9.0...v5.9.1](https://github.com/openai/openai-node/compare/v5.9.0...v5.9.1)
+
+### Chores
+
+* **api:** update realtime specs, build config ([bb4649f](https://github.com/openai/openai-node/commit/bb4649feb69a6d91e4eea857fd6f5e8c00f2a35d))
+
 ## 5.9.0 (2025-07-10)
 
 Full Changelog: [v5.8.4...v5.9.0](https://github.com/openai/openai-node/compare/v5.8.4...v5.9.0)
