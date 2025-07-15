@@ -48,9 +48,9 @@ export namespace LabelModelGrader {
    */
   export interface Input {
     /**
-     * Text inputs to the model - can contain template strings.
+     * Inputs to the model - can contain template strings.
      */
-    content: string | ResponsesAPI.ResponseInputText | Input.OutputText;
+    content: string | ResponsesAPI.ResponseInputText | Input.OutputText | Input.InputImage | Array<unknown>;
 
     /**
      * The role of the message input. One of `user`, `assistant`, `system`, or
@@ -78,6 +78,27 @@ export namespace LabelModelGrader {
        * The type of the output text. Always `output_text`.
        */
       type: 'output_text';
+    }
+
+    /**
+     * An image input to the model.
+     */
+    export interface InputImage {
+      /**
+       * The URL of the image input.
+       */
+      image_url: string;
+
+      /**
+       * The type of the image input. Always `input_image`.
+       */
+      type: 'input_image';
+
+      /**
+       * The detail level of the image to be sent to the model. One of `high`, `low`, or
+       * `auto`. Defaults to `auto`.
+       */
+      detail?: string;
     }
   }
 }
@@ -179,9 +200,9 @@ export namespace ScoreModelGrader {
    */
   export interface Input {
     /**
-     * Text inputs to the model - can contain template strings.
+     * Inputs to the model - can contain template strings.
      */
-    content: string | ResponsesAPI.ResponseInputText | Input.OutputText;
+    content: string | ResponsesAPI.ResponseInputText | Input.OutputText | Input.InputImage | Array<unknown>;
 
     /**
      * The role of the message input. One of `user`, `assistant`, `system`, or
@@ -209,6 +230,27 @@ export namespace ScoreModelGrader {
        * The type of the output text. Always `output_text`.
        */
       type: 'output_text';
+    }
+
+    /**
+     * An image input to the model.
+     */
+    export interface InputImage {
+      /**
+       * The URL of the image input.
+       */
+      image_url: string;
+
+      /**
+       * The type of the image input. Always `input_image`.
+       */
+      type: 'input_image';
+
+      /**
+       * The detail level of the image to be sent to the model. One of `high`, `low`, or
+       * `auto`. Defaults to `auto`.
+       */
+      detail?: string;
     }
   }
 }
