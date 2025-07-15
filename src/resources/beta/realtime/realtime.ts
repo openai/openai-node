@@ -145,14 +145,15 @@ export interface ConversationItemContent {
   text?: string;
 
   /**
-   * The transcript of the audio, used for `input_audio` content type.
+   * The transcript of the audio, used for `input_audio` and `audio` content types.
    */
   transcript?: string;
 
   /**
-   * The content type (`input_text`, `input_audio`, `item_reference`, `text`).
+   * The content type (`input_text`, `input_audio`, `item_reference`, `text`,
+   * `audio`).
    */
-  type?: 'input_text' | 'input_audio' | 'item_reference' | 'text';
+  type?: 'input_text' | 'input_audio' | 'item_reference' | 'text' | 'audio';
 }
 
 /**
@@ -659,7 +660,7 @@ export interface ConversationItemWithReference {
    * - Message items of role `user` support `input_text` and `input_audio` content
    * - Message items of role `assistant` support `text` content.
    */
-  content?: Array<ConversationItemContent>;
+  content?: Array<ConversationItemWithReference.Content>;
 
   /**
    * The name of the function being called (for `function_call` items).
@@ -694,6 +695,37 @@ export interface ConversationItemWithReference {
    * `item_reference`).
    */
   type?: 'message' | 'function_call' | 'function_call_output' | 'item_reference';
+}
+
+export namespace ConversationItemWithReference {
+  export interface Content {
+    /**
+     * ID of a previous conversation item to reference (for `item_reference` content
+     * types in `response.create` events). These can reference both client and server
+     * created items.
+     */
+    id?: string;
+
+    /**
+     * Base64-encoded audio bytes, used for `input_audio` content type.
+     */
+    audio?: string;
+
+    /**
+     * The text content, used for `input_text` and `text` content types.
+     */
+    text?: string;
+
+    /**
+     * The transcript of the audio, used for `input_audio` content type.
+     */
+    transcript?: string;
+
+    /**
+     * The content type (`input_text`, `input_audio`, `item_reference`, `text`).
+     */
+    type?: 'input_text' | 'input_audio' | 'item_reference' | 'text';
+  }
 }
 
 /**
