@@ -114,11 +114,11 @@ export interface ConversationItem {
   role?: 'user' | 'assistant' | 'system';
 
   /**
-   * The status of the item (`completed`, `incomplete`). These have no effect on the
-   * conversation, but are accepted for consistency with the
+   * The status of the item (`completed`, `incomplete`, `in_progress`). These have no
+   * effect on the conversation, but are accepted for consistency with the
    * `conversation.item.created` event.
    */
-  status?: 'completed' | 'incomplete';
+  status?: 'completed' | 'incomplete' | 'in_progress';
 
   /**
    * The type of the item (`message`, `function_call`, `function_call_output`).
@@ -215,15 +215,16 @@ export interface ConversationItemCreatedEvent {
   item: ConversationItem;
 
   /**
-   * The ID of the preceding item in the Conversation context, allows the client to
-   * understand the order of the conversation.
-   */
-  previous_item_id: string;
-
-  /**
    * The event type, must be `conversation.item.created`.
    */
   type: 'conversation.item.created';
+
+  /**
+   * The ID of the preceding item in the Conversation context, allows the client to
+   * understand the order of the conversation. Can be `null` if the item has no
+   * predecessor.
+   */
+  previous_item_id?: string | null;
 }
 
 /**
@@ -682,11 +683,11 @@ export interface ConversationItemWithReference {
   role?: 'user' | 'assistant' | 'system';
 
   /**
-   * The status of the item (`completed`, `incomplete`). These have no effect on the
-   * conversation, but are accepted for consistency with the
+   * The status of the item (`completed`, `incomplete`, `in_progress`). These have no
+   * effect on the conversation, but are accepted for consistency with the
    * `conversation.item.created` event.
    */
-  status?: 'completed' | 'incomplete';
+  status?: 'completed' | 'incomplete' | 'in_progress';
 
   /**
    * The type of the item (`message`, `function_call`, `function_call_output`,
@@ -851,14 +852,15 @@ export interface InputAudioBufferCommittedEvent {
   item_id: string;
 
   /**
-   * The ID of the preceding item after which the new item will be inserted.
-   */
-  previous_item_id: string;
-
-  /**
    * The event type, must be `input_audio_buffer.committed`.
    */
   type: 'input_audio_buffer.committed';
+
+  /**
+   * The ID of the preceding item after which the new item will be inserted. Can be
+   * `null` if the item has no predecessor.
+   */
+  previous_item_id?: string | null;
 }
 
 /**
@@ -1072,9 +1074,9 @@ export interface RealtimeResponse {
 
   /**
    * The final status of the response (`completed`, `cancelled`, `failed`, or
-   * `incomplete`).
+   * `incomplete`, `in_progress`).
    */
-  status?: 'completed' | 'cancelled' | 'failed' | 'incomplete';
+  status?: 'completed' | 'cancelled' | 'failed' | 'incomplete' | 'in_progress';
 
   /**
    * Additional details about the status.

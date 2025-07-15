@@ -769,9 +769,14 @@ export namespace EvalCreateParams {
      */
     export interface EvalItem {
       /**
-       * Text inputs to the model - can contain template strings.
+       * Inputs to the model - can contain template strings.
        */
-      content: string | ResponsesAPI.ResponseInputText | EvalItem.OutputText;
+      content:
+        | string
+        | ResponsesAPI.ResponseInputText
+        | EvalItem.OutputText
+        | EvalItem.InputImage
+        | Array<unknown>;
 
       /**
        * The role of the message input. One of `user`, `assistant`, `system`, or
@@ -799,6 +804,27 @@ export namespace EvalCreateParams {
          * The type of the output text. Always `output_text`.
          */
         type: 'output_text';
+      }
+
+      /**
+       * An image input to the model.
+       */
+      export interface InputImage {
+        /**
+         * The URL of the image input.
+         */
+        image_url: string;
+
+        /**
+         * The type of the image input. Always `input_image`.
+         */
+        type: 'input_image';
+
+        /**
+         * The detail level of the image to be sent to the model. One of `high`, `low`, or
+         * `auto`. Defaults to `auto`.
+         */
+        detail?: string;
       }
     }
   }
