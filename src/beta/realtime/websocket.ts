@@ -94,20 +94,24 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
     }
   }
 
+  static async create(
+    client: Pick<OpenAI, 'apiKey' | 'baseURL' | '_setToken'>,
+    props: { model: string; dangerouslyAllowBrowser?: boolean },
+  ): Promise<OpenAIRealtimeWebSocket> {
+    await client._setToken();
+    return new OpenAIRealtimeWebSocket(props, client);
+  }
+
   static async azure(
-    client: Pick<AzureOpenAI, '_getAzureADToken' | 'apiVersion' | 'apiKey' | 'baseURL' | 'deploymentName'>,
+    client: Pick<AzureOpenAI, '_setToken' | 'apiVersion' | 'apiKey' | 'baseURL' | 'deploymentName'>,
     options: { deploymentName?: string; dangerouslyAllowBrowser?: boolean } = {},
   ): Promise<OpenAIRealtimeWebSocket> {
-    const token = await client._getAzureADToken();
+    const isToken = await client._setToken();
     function onURL(url: URL) {
-      if (client.apiKey !== '<Missing Key>') {
-        url.searchParams.set('api-key', client.apiKey);
+      if (isToken) {
+        url.searchParams.set('Authorization', `Bearer ${client.apiKey}`);
       } else {
-        if (token) {
-          url.searchParams.set('Authorization', `Bearer ${token}`);
-        } else {
-          throw new Error('AzureOpenAI is not instantiated correctly. No API key or token provided.');
-        }
+        url.searchParams.set('api-key', client.apiKey);
       }
     }
     const deploymentName = options.deploymentName ?? client.deploymentName;
