@@ -1,5 +1,14 @@
 # Changelog
 
+## 5.10.1 (2025-07-16)
+
+Full Changelog: [v5.10.0...v5.10.1](https://github.com/openai/openai-node/compare/v5.10.0...v5.10.1)
+
+### Chores
+
+* **internal:** version bump ([896b418](https://github.com/openai/openai-node/commit/896b41828ce468fed36ceb50082633e21a0945ca))
+* **ts:** reorder package.json imports ([2f8d2f7](https://github.com/openai/openai-node/commit/2f8d2f7726dbc717c3c6e2a27dbd5b50ff9ef4b4))
+
 ## 5.10.0 (2025-07-16)
 
 Full Changelog: [v5.9.2...v5.10.0](https://github.com/openai/openai-node/compare/v5.9.2...v5.10.0)
