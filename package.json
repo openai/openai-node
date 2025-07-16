@@ -30,7 +30,6 @@
     "@swc/jest": "^0.2.29",
     "@types/jest": "^29.4.0",
     "@types/node": "^20.17.6",
-    "typescript-eslint": "8.31.1",
     "@typescript-eslint/eslint-plugin": "8.31.1",
     "@typescript-eslint/parser": "8.31.1",
     "eslint": "^9.20.1",
@@ -44,7 +43,8 @@
     "ts-node": "^10.5.0",
     "tsc-multi": "https://github.com/stainless-api/tsc-multi/releases/download/v1.1.8/tsc-multi.tgz",
     "tsconfig-paths": "^4.0.0",
-    "typescript": "5.8.3"
+    "typescript": "5.8.3",
+    "typescript-eslint": "8.31.1"
   },
   "imports": {
     "openai": ".",
