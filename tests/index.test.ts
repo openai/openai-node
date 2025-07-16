@@ -719,4 +719,96 @@ describe('retries', () => {
     ).toEqual(JSON.stringify({ a: 1 }));
     expect(count).toEqual(3);
   });
+
+  describe('auth', () => {
+    test('apiKey', async () => {
+      const client = new OpenAI({
+        baseURL: 'http://localhost:5000/',
+        apiKey: 'My API Key',
+      });
+      const { req } = await client.buildRequest({ path: '/foo', method: 'get' });
+      expect(req.headers.get('authorization')).toEqual('Bearer My API Key');
+    });
+
+    test('token', async () => {
+      const testFetch = async (url: any, { headers }: RequestInit = {}): Promise<Response> => {
+        return new Response(JSON.stringify({}), { headers: headers ?? [] });
+      };
+      const client = new OpenAI({
+        baseURL: 'http://localhost:5000/',
+        tokenProvider: async () => ({ token: 'my token' }),
+        fetch: testFetch,
+      });
+      expect(
+        (await client.request({ method: 'post', path: 'https://example.com' }).asResponse()).headers.get(
+          'authorization',
+        ),
+      ).toEqual('Bearer my token');
+    });
+
+    test('token is refreshed', async () => {
+      let fail = true;
+      const testFetch = async (url: any, { headers }: RequestInit = {}): Promise<Response> => {
+        if (fail) {
+          fail = false;
+          return new Response(undefined, {
+            status: 429,
+            headers: {
+              'Retry-After': '0.1',
+            },
+          });
+        }
+        return new Response(JSON.stringify({}), {
+          headers: headers ?? [],
+        });
+      };
+      let counter = 0;
+      async function tokenProvider() {
+        return { token: `token-${counter++}` };
+      }
+      const client = new OpenAI({
+        baseURL: 'http://localhost:5000/',
+        tokenProvider,
+        fetch: testFetch,
+      });
+      expect(
+        (
+          await client.chat.completions
+            .create({
+              model: '',
+              messages: [{ role: 'system', content: 'Hello' }],
+            })
+            .asResponse()
+        ).headers.get('authorization'),
+      ).toEqual('Bearer token-1');
+    });
+
+    test('mutual exclusive', () => {
+      try {
+        new OpenAI({
+          baseURL: 'http://localhost:5000/',
+          tokenProvider: async () => ({ token: 'my token' }),
+          apiKey: 'my api key',
+        });
+      } catch (error: any) {
+        expect(error).toBeInstanceOf(Error);
+        expect(error.message).toEqual(
+          'The `apiKey` and `tokenProvider` arguments are mutually exclusive; only one can be passed at a time.',
+        );
+      }
+    });
+
+    test('at least one', () => {
+      try {
+        new OpenAI({
+          baseURL: 'http://localhost:5000/',
+        });
+      } catch (error: any) {
+        expect(error).toBeInstanceOf(Error);
+        expect(error.message).toEqual(
+          'Missing credentials. Please pass one of `apiKey` and `tokenProvider`, or set the `OPENAI_API_KEY` environment variable.',
+        );
+      }
+    });
+  });
 });
