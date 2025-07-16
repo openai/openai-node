@@ -118,6 +118,12 @@ Methods:
 Types:
 
 - <code><a href="./src/resources/images.ts">Image</a></code>
+- <code><a href="./src/resources/images.ts">ImageEditCompletedEvent</a></code>
+- <code><a href="./src/resources/images.ts">ImageEditPartialImageEvent</a></code>
+- <code><a href="./src/resources/images.ts">ImageEditStreamEvent</a></code>
+- <code><a href="./src/resources/images.ts">ImageGenCompletedEvent</a></code>
+- <code><a href="./src/resources/images.ts">ImageGenPartialImageEvent</a></code>
+- <code><a href="./src/resources/images.ts">ImageGenStreamEvent</a></code>
 - <code><a href="./src/resources/images.ts">ImageModel</a></code>
 - <code><a href="./src/resources/images.ts">ImagesResponse</a></code>
 

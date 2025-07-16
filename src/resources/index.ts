@@ -67,11 +67,21 @@ export { Graders } from './graders/graders';
 export {
   Images,
   type Image,
+  type ImageEditCompletedEvent,
+  type ImageEditPartialImageEvent,
+  type ImageEditStreamEvent,
+  type ImageGenCompletedEvent,
+  type ImageGenPartialImageEvent,
+  type ImageGenStreamEvent,
   type ImageModel,
   type ImagesResponse,
   type ImageCreateVariationParams,
   type ImageEditParams,
+  type ImageEditParamsNonStreaming,
+  type ImageEditParamsStreaming,
   type ImageGenerateParams,
+  type ImageGenerateParamsNonStreaming,
+  type ImageGenerateParamsStreaming,
 } from './images';
 export { Models, type Model, type ModelDeleted, type ModelsPage } from './models';
 export {
