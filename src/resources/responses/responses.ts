@@ -2506,7 +2506,7 @@ export interface ResponseInputMessageItem {
   /**
    * The unique ID of the message input.
    */
-  id: string;
+  id?: string;
 
   /**
    * A list of one or many input items to the model, containing different content
