@@ -3349,7 +3349,7 @@ export interface ResponseOutputMessage {
  */
 export interface ResponseOutputRefusal {
   /**
-   * The refusal explanationfrom the model.
+   * The refusal explanation from the model.
    */
   refusal: string;
 
@@ -4481,6 +4481,13 @@ export namespace Tool {
      * `auto`. Default: `auto`.
      */
     background?: 'transparent' | 'opaque' | 'auto';
+
+    /**
+     * Control how much effort the model will exert to match the style and features,
+     * especially facial features, of input images. This parameter is only supported
+     * for `gpt-image-1`. Supports `high` and `low`. Defaults to `low`.
+     */
+    input_fidelity?: 'high' | 'low' | null;
 
     /**
      * Optional mask for inpainting. Contains `image_url` (string, optional) and

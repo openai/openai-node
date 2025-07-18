@@ -1,6 +1,6 @@
 {
   "name": "openai",
-  "version": "5.9.2",
+  "version": "5.10.1",
   "description": "The official TypeScript library for the OpenAI API",
   "author": "OpenAI <support@openai.com>",
   "types": "dist/index.d.ts",
@@ -31,7 +31,6 @@
     "@types/jest": "^29.4.0",
     "@types/ws": "^8.5.13",
     "@types/node": "^20.17.6",
-    "typescript-eslint": "8.31.1",
     "@typescript-eslint/eslint-plugin": "8.31.1",
     "@typescript-eslint/parser": "8.31.1",
     "eslint": "^9.20.1",
@@ -49,7 +48,8 @@
     "tsconfig-paths": "^4.0.0",
     "typescript": "5.8.3",
     "ws": "^8.18.0",
-    "zod": "^3.23.8"
+    "zod": "^3.23.8",
+    "typescript-eslint": "8.31.1"
   },
   "imports": {
     "openai": ".",
