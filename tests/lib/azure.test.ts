@@ -30,13 +30,13 @@ describe('instantiate azure client', () => {
       apiVersion,
     });
 
-    test('they are used in the request', () => {
-      const { req } = client.buildRequest({ path: '/foo', method: 'post' });
+    test('they are used in the request', async () => {
+      const { req } = await client.buildRequest({ path: '/foo', method: 'post' });
       expect(req.headers.get('x-my-default-header')).toEqual('2');
     });
 
-    test('can ignore `undefined` and leave the default', () => {
-      const { req } = client.buildRequest({
+    test('can ignore `undefined` and leave the default', async () => {
+      const { req } = await client.buildRequest({
         path: '/foo',
         method: 'post',
         headers: { 'X-My-Default-Header': undefined },
@@ -44,8 +44,8 @@ describe('instantiate azure client', () => {
       expect(req.headers.get('x-my-default-header')).toEqual('2');
     });
 
-    test('can be removed with `null`', () => {
-      const { req } = client.buildRequest({
+    test('can be removed with `null`', async () => {
+      const { req } = await client.buildRequest({
         path: '/foo',
         method: 'post',
         headers: { 'X-My-Default-Header': null },
@@ -53,8 +53,8 @@ describe('instantiate azure client', () => {
       expect(req.headers.has('x-my-default-header')).toBe(false);
     });
 
-    test('includes retry count', () => {
-      const { req } = client.buildRequest(
+    test('includes retry count', async () => {
+      const { req } = await client.buildRequest(
         {
           path: '/foo',
           method: 'post',
@@ -593,8 +593,8 @@ describe('azure request building', () => {
   });
 
   describe('custom headers', () => {
-    test('handles undefined', () => {
-      const { req } = client.buildRequest({
+    test('handles undefined', async () => {
+      const { req } = await client.buildRequest({
         path: '/foo',
         method: 'post',
         body: { value: 'hello' },
