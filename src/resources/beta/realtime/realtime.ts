@@ -1130,22 +1130,9 @@ export interface RealtimeResponse {
 
   /**
    * The voice the model used to respond. Current voice options are `alloy`, `ash`,
-   * `ballad`, `coral`, `echo`, `fable`, `onyx`, `nova`, `sage`, `shimmer`, and
-   * `verse`.
+   * `ballad`, `coral`, `echo`, `sage`, `shimmer`, and `verse`.
    */
-  voice?:
-    | (string & {})
-    | 'alloy'
-    | 'ash'
-    | 'ballad'
-    | 'coral'
-    | 'echo'
-    | 'fable'
-    | 'onyx'
-    | 'nova'
-    | 'sage'
-    | 'shimmer'
-    | 'verse';
+  voice?: (string & {}) | 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse';
 }
 
 /**
@@ -1832,22 +1819,9 @@ export namespace ResponseCreateEvent {
     /**
      * The voice the model uses to respond. Voice cannot be changed during the session
      * once the model has responded with audio at least once. Current voice options are
-     * `alloy`, `ash`, `ballad`, `coral`, `echo`, `fable`, `onyx`, `nova`, `sage`,
-     * `shimmer`, and `verse`.
+     * `alloy`, `ash`, `ballad`, `coral`, `echo`, `sage`, `shimmer`, and `verse`.
      */
-    voice?:
-      | (string & {})
-      | 'alloy'
-      | 'ash'
-      | 'ballad'
-      | 'coral'
-      | 'echo'
-      | 'fable'
-      | 'onyx'
-      | 'nova'
-      | 'sage'
-      | 'shimmer'
-      | 'verse';
+    voice?: (string & {}) | 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse';
   }
 
   export namespace Response {
@@ -2325,22 +2299,9 @@ export namespace SessionUpdateEvent {
     /**
      * The voice the model uses to respond. Voice cannot be changed during the session
      * once the model has responded with audio at least once. Current voice options are
-     * `alloy`, `ash`, `ballad`, `coral`, `echo`, `fable`, `onyx`, `nova`, `sage`,
-     * `shimmer`, and `verse`.
+     * `alloy`, `ash`, `ballad`, `coral`, `echo`, `sage`, `shimmer`, and `verse`.
      */
-    voice?:
-      | (string & {})
-      | 'alloy'
-      | 'ash'
-      | 'ballad'
-      | 'coral'
-      | 'echo'
-      | 'fable'
-      | 'onyx'
-      | 'nova'
-      | 'sage'
-      | 'shimmer'
-      | 'verse';
+    voice?: (string & {}) | 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse';
   }
 
   export namespace Session {
