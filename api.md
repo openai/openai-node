@@ -692,8 +692,6 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponseOutputTextAnnotationAddedEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponsePrompt</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseQueuedEvent</a></code>
-- <code><a href="./src/resources/responses/responses.ts">ResponseReasoningDeltaEvent</a></code>
-- <code><a href="./src/resources/responses/responses.ts">ResponseReasoningDoneEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseReasoningItem</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseReasoningSummaryDeltaEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseReasoningSummaryDoneEvent</a></code>

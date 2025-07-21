@@ -172,7 +172,7 @@ export interface ChatCompletion {
    * - If set to 'auto', then the request will be processed with the service tier
    *   configured in the Project settings. Unless otherwise configured, the Project
    *   will use 'default'.
-   * - If set to 'default', then the requset will be processed with the standard
+   * - If set to 'default', then the request will be processed with the standard
    *   pricing and performance for the selected model.
    * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)' or
    *   'priority', then the request will be processed with the corresponding service
@@ -368,19 +368,7 @@ export interface ChatCompletionAudioParam {
    * The voice the model uses to respond. Supported voices are `alloy`, `ash`,
    * `ballad`, `coral`, `echo`, `fable`, `nova`, `onyx`, `sage`, and `shimmer`.
    */
-  voice:
-    | (string & {})
-    | 'alloy'
-    | 'ash'
-    | 'ballad'
-    | 'coral'
-    | 'echo'
-    | 'fable'
-    | 'onyx'
-    | 'nova'
-    | 'sage'
-    | 'shimmer'
-    | 'verse';
+  voice: (string & {}) | 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse';
 }
 
 /**
@@ -423,7 +411,7 @@ export interface ChatCompletionChunk {
    * - If set to 'auto', then the request will be processed with the service tier
    *   configured in the Project settings. Unless otherwise configured, the Project
    *   will use 'default'.
-   * - If set to 'default', then the requset will be processed with the standard
+   * - If set to 'default', then the request will be processed with the standard
    *   pricing and performance for the selected model.
    * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)' or
    *   'priority', then the request will be processed with the corresponding service
@@ -1345,7 +1333,7 @@ export interface ChatCompletionCreateParamsBase {
    * - If set to 'auto', then the request will be processed with the service tier
    *   configured in the Project settings. Unless otherwise configured, the Project
    *   will use 'default'.
-   * - If set to 'default', then the requset will be processed with the standard
+   * - If set to 'default', then the request will be processed with the standard
    *   pricing and performance for the selected model.
    * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)' or
    *   'priority', then the request will be processed with the corresponding service
