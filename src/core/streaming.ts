@@ -54,13 +54,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
             continue;
           }
 
-          if (
-            sse.event === null ||
-            sse.event.startsWith('response.') ||
-            sse.event.startsWith('image_edit.') ||
-            sse.event.startsWith('image_generation.') ||
-            sse.event.startsWith('transcript.')
-          ) {
+          if (sse.event === null || !sse.event.startsWith('thread.')) {
             let data;
 
             try {
