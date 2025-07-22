@@ -7,7 +7,7 @@ provides richer integrations with TS specific types & returns a `ParsedChatCompl
 
 ## Auto-parsing response content with Zod schemas
 
-You can pass zod schemas wrapped with `zodResponseFormat()` to the `.parse()` method and the SDK will automatically conver the model
+You can pass zod schemas wrapped with `zodResponseFormat()` to the `.parse()` method and the SDK will automatically convert the model
 into a JSON schema, send it to the API and parse the response content back using the given zod schema.
 
 ```ts
