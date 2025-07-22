@@ -71,18 +71,11 @@ describe('zodResponseFormat', () => {
             "units": {
               "anyOf": [
                 {
-                  "anyOf": [
-                    {
-                      "not": {},
-                    },
-                    {
-                      "enum": [
-                        "c",
-                        "f",
-                      ],
-                      "type": "string",
-                    },
+                  "enum": [
+                    "c",
+                    "f",
                   ],
+                  "type": "string",
                 },
                 {
                   "type": "null",
