@@ -1,5 +1,19 @@
 # Changelog
 
+## 5.10.2 (2025-07-22)
+
+Full Changelog: [v5.10.1...v5.10.2](https://github.com/openai/openai-node/compare/v5.10.1...v5.10.2)
+
+### Chores
+
+* **api:** event shapes more accurate ([78f4e1d](https://github.com/openai/openai-node/commit/78f4e1d8e7400001a7bc6a05dc9a6e52a2047523))
+* **internal:** version bump ([ea885ca](https://github.com/openai/openai-node/commit/ea885cac5c4231597141e91bd454e540830deb95))
+
+
+### Documentation
+
+* fix typos in helpers and realtime ([#1592](https://github.com/openai/openai-node/issues/1592)) ([17733b7](https://github.com/openai/openai-node/commit/17733b7e4a19754c9ca2ec815cf7d246b1dc138d))
+
 ## 5.10.1 (2025-07-16)
 
 Full Changelog: [v5.10.0...v5.10.1](https://github.com/openai/openai-node/compare/v5.10.0...v5.10.1)
