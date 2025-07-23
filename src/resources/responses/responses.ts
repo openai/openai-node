@@ -491,16 +491,15 @@ export interface Response {
    * Specifies the latency tier to use for processing the request. This parameter is
    * relevant for customers subscribed to the scale tier service:
    *
-   * - If set to 'auto', and the Project is Scale tier enabled, the system will
-   *   utilize scale tier credits until they are exhausted.
-   * - If set to 'auto', and the Project is not Scale tier enabled, the request will
-   *   be processed using the default service tier with a lower uptime SLA and no
-   *   latency guarantee.
-   * - If set to 'default', the request will be processed using the default service
-   *   tier with a lower uptime SLA and no latency guarantee.
-   * - If set to 'flex', the request will be processed with the Flex Processing
-   *   service tier.
-   *   [Learn more](https://platform.openai.com/docs/guides/flex-processing).
+   * - If set to 'auto', then the request will be processed with the service tier
+   *   configured in the Project settings. Unless otherwise configured, the Project
+   *   will use 'default'.
+   * - If set to 'default', then the request will be processed with the standard
+   *   pricing and performance for the selected model.
+   * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)' or
+   *   'priority', then the request will be processed with the corresponding service
+   *   tier. [Contact sales](https://openai.com/contact-sales) to learn more about
+   *   Priority processing.
    * - When not set, the default behavior is 'auto'.
    *
    * When this parameter is set, the response body will include the `service_tier`
@@ -795,7 +794,8 @@ export interface ResponseCodeInterpreterToolCall {
   outputs: Array<ResponseCodeInterpreterToolCall.Logs | ResponseCodeInterpreterToolCall.Image> | null;
 
   /**
-   * The status of the code interpreter tool call.
+   * The status of the code interpreter tool call. Valid values are `in_progress`,
+   * `completed`, `incomplete`, `interpreting`, and `failed`.
    */
   status: 'in_progress' | 'completed' | 'incomplete' | 'interpreting' | 'failed';
 
@@ -2849,9 +2849,10 @@ export namespace ResponseItem {
  */
 export interface ResponseMcpCallArgumentsDeltaEvent {
   /**
-   * The partial update to the arguments for the MCP tool call.
+   * A JSON string containing the partial update to the arguments for the MCP tool
+   * call.
    */
-  delta: unknown;
+  delta: string;
 
   /**
    * The unique identifier of the MCP tool call item being processed.
@@ -2879,9 +2880,9 @@ export interface ResponseMcpCallArgumentsDeltaEvent {
  */
 export interface ResponseMcpCallArgumentsDoneEvent {
   /**
-   * The finalized arguments for the MCP tool call.
+   * A JSON string containing the finalized arguments for the MCP tool call.
    */
-  arguments: unknown;
+  arguments: string;
 
   /**
    * The unique identifier of the MCP tool call item being processed.
@@ -2909,6 +2910,16 @@ export interface ResponseMcpCallArgumentsDoneEvent {
  */
 export interface ResponseMcpCallCompletedEvent {
   /**
+   * The ID of the MCP tool call item that completed.
+   */
+  item_id: string;
+
+  /**
+   * The index of the output item that completed.
+   */
+  output_index: number;
+
+  /**
    * The sequence number of this event.
    */
   sequence_number: number;
@@ -2923,6 +2934,16 @@ export interface ResponseMcpCallCompletedEvent {
  * Emitted when an MCP tool call has failed.
  */
 export interface ResponseMcpCallFailedEvent {
+  /**
+   * The ID of the MCP tool call item that failed.
+   */
+  item_id: string;
+
+  /**
+   * The index of the output item that failed.
+   */
+  output_index: number;
+
   /**
    * The sequence number of this event.
    */
@@ -2964,6 +2985,16 @@ export interface ResponseMcpCallInProgressEvent {
  */
 export interface ResponseMcpListToolsCompletedEvent {
   /**
+   * The ID of the MCP tool call item that produced this output.
+   */
+  item_id: string;
+
+  /**
+   * The index of the output item that was processed.
+   */
+  output_index: number;
+
+  /**
    * The sequence number of this event.
    */
   sequence_number: number;
@@ -2978,6 +3009,16 @@ export interface ResponseMcpListToolsCompletedEvent {
  * Emitted when the attempt to list available MCP tools has failed.
  */
 export interface ResponseMcpListToolsFailedEvent {
+  /**
+   * The ID of the MCP tool call item that failed.
+   */
+  item_id: string;
+
+  /**
+   * The index of the output item that failed.
+   */
+  output_index: number;
+
   /**
    * The sequence number of this event.
    */
@@ -2994,6 +3035,16 @@ export interface ResponseMcpListToolsFailedEvent {
  * MCP tools.
  */
 export interface ResponseMcpListToolsInProgressEvent {
+  /**
+   * The ID of the MCP tool call item that is being processed.
+   */
+  item_id: string;
+
+  /**
+   * The index of the output item that is being processed.
+   */
+  output_index: number;
+
   /**
    * The sequence number of this event.
    */
@@ -3608,76 +3659,6 @@ export interface ResponseQueuedEvent {
 }
 
 /**
- * Emitted when there is a delta (partial update) to the reasoning content.
- */
-export interface ResponseReasoningDeltaEvent {
-  /**
-   * The index of the reasoning content part within the output item.
-   */
-  content_index: number;
-
-  /**
-   * The partial update to the reasoning content.
-   */
-  delta: unknown;
-
-  /**
-   * The unique identifier of the item for which reasoning is being updated.
-   */
-  item_id: string;
-
-  /**
-   * The index of the output item in the response's output array.
-   */
-  output_index: number;
-
-  /**
-   * The sequence number of this event.
-   */
-  sequence_number: number;
-
-  /**
-   * The type of the event. Always 'response.reasoning.delta'.
-   */
-  type: 'response.reasoning.delta';
-}
-
-/**
- * Emitted when the reasoning content is finalized for an item.
- */
-export interface ResponseReasoningDoneEvent {
-  /**
-   * The index of the reasoning content part within the output item.
-   */
-  content_index: number;
-
-  /**
-   * The unique identifier of the item for which reasoning is finalized.
-   */
-  item_id: string;
-
-  /**
-   * The index of the output item in the response's output array.
-   */
-  output_index: number;
-
-  /**
-   * The sequence number of this event.
-   */
-  sequence_number: number;
-
-  /**
-   * The finalized reasoning text.
-   */
-  text: string;
-
-  /**
-   * The type of the event. Always 'response.reasoning.done'.
-   */
-  type: 'response.reasoning.done';
-}
-
-/**
  * A description of the chain of thought used by a reasoning model while generating
  * a response. Be sure to include these items in your `input` to the Responses API
  * for subsequent turns of a conversation if you are manually
@@ -4100,8 +4081,6 @@ export type ResponseStreamEvent =
   | ResponseMcpListToolsInProgressEvent
   | ResponseOutputTextAnnotationAddedEvent
   | ResponseQueuedEvent
-  | ResponseReasoningDeltaEvent
-  | ResponseReasoningDoneEvent
   | ResponseReasoningSummaryDeltaEvent
   | ResponseReasoningSummaryDoneEvent;
 
@@ -4151,6 +4130,11 @@ export interface ResponseTextDeltaEvent {
   item_id: string;
 
   /**
+   * The log probabilities of the tokens in the delta.
+   */
+  logprobs: Array<ResponseTextDeltaEvent.Logprob>;
+
+  /**
    * The index of the output item that the text delta was added to.
    */
   output_index: number;
@@ -4166,6 +4150,44 @@ export interface ResponseTextDeltaEvent {
   type: 'response.output_text.delta';
 }
 
+export namespace ResponseTextDeltaEvent {
+  /**
+   * A logprob is the logarithmic probability that the model assigns to producing a
+   * particular token at a given position in the sequence. Less-negative (higher)
+   * logprob values indicate greater model confidence in that token choice.
+   */
+  export interface Logprob {
+    /**
+     * A possible text token.
+     */
+    token: string;
+
+    /**
+     * The log probability of this token.
+     */
+    logprob: number;
+
+    /**
+     * The log probability of the top 20 most likely tokens.
+     */
+    top_logprobs?: Array<Logprob.TopLogprob>;
+  }
+
+  export namespace Logprob {
+    export interface TopLogprob {
+      /**
+       * A possible text token.
+       */
+      token?: string;
+
+      /**
+       * The log probability of this token.
+       */
+      logprob?: number;
+    }
+  }
+}
+
 /**
  * Emitted when text content is finalized.
  */
@@ -4179,6 +4201,11 @@ export interface ResponseTextDoneEvent {
    * The ID of the output item that the text content is finalized.
    */
   item_id: string;
+
+  /**
+   * The log probabilities of the tokens in the delta.
+   */
+  logprobs: Array<ResponseTextDoneEvent.Logprob>;
 
   /**
    * The index of the output item that the text content is finalized.
@@ -4199,6 +4226,44 @@ export interface ResponseTextDoneEvent {
    * The type of the event. Always `response.output_text.done`.
    */
   type: 'response.output_text.done';
+}
+
+export namespace ResponseTextDoneEvent {
+  /**
+   * A logprob is the logarithmic probability that the model assigns to producing a
+   * particular token at a given position in the sequence. Less-negative (higher)
+   * logprob values indicate greater model confidence in that token choice.
+   */
+  export interface Logprob {
+    /**
+     * A possible text token.
+     */
+    token: string;
+
+    /**
+     * The log probability of this token.
+     */
+    logprob: number;
+
+    /**
+     * The log probability of the top 20 most likely tokens.
+     */
+    top_logprobs?: Array<Logprob.TopLogprob>;
+  }
+
+  export namespace Logprob {
+    export interface TopLogprob {
+      /**
+       * A possible text token.
+       */
+      token?: string;
+
+      /**
+       * The log probability of this token.
+       */
+      logprob?: number;
+    }
+  }
 }
 
 /**
@@ -4783,16 +4848,15 @@ export interface ResponseCreateParamsBase {
    * Specifies the latency tier to use for processing the request. This parameter is
    * relevant for customers subscribed to the scale tier service:
    *
-   * - If set to 'auto', and the Project is Scale tier enabled, the system will
-   *   utilize scale tier credits until they are exhausted.
-   * - If set to 'auto', and the Project is not Scale tier enabled, the request will
-   *   be processed using the default service tier with a lower uptime SLA and no
-   *   latency guarantee.
-   * - If set to 'default', the request will be processed using the default service
-   *   tier with a lower uptime SLA and no latency guarantee.
-   * - If set to 'flex', the request will be processed with the Flex Processing
-   *   service tier.
-   *   [Learn more](https://platform.openai.com/docs/guides/flex-processing).
+   * - If set to 'auto', then the request will be processed with the service tier
+   *   configured in the Project settings. Unless otherwise configured, the Project
+   *   will use 'default'.
+   * - If set to 'default', then the request will be processed with the standard
+   *   pricing and performance for the selected model.
+   * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)' or
+   *   'priority', then the request will be processed with the corresponding service
+   *   tier. [Contact sales](https://openai.com/contact-sales) to learn more about
+   *   Priority processing.
    * - When not set, the default behavior is 'auto'.
    *
    * When this parameter is set, the response body will include the `service_tier`
@@ -5045,8 +5109,6 @@ export declare namespace Responses {
     type ResponseOutputTextAnnotationAddedEvent as ResponseOutputTextAnnotationAddedEvent,
     type ResponsePrompt as ResponsePrompt,
     type ResponseQueuedEvent as ResponseQueuedEvent,
-    type ResponseReasoningDeltaEvent as ResponseReasoningDeltaEvent,
-    type ResponseReasoningDoneEvent as ResponseReasoningDoneEvent,
     type ResponseReasoningItem as ResponseReasoningItem,
     type ResponseReasoningSummaryDeltaEvent as ResponseReasoningSummaryDeltaEvent,
     type ResponseReasoningSummaryDoneEvent as ResponseReasoningSummaryDoneEvent,
