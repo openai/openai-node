@@ -114,11 +114,11 @@ export interface ConversationItem {
   role?: 'user' | 'assistant' | 'system';
 
   /**
-   * The status of the item (`completed`, `incomplete`). These have no effect on the
-   * conversation, but are accepted for consistency with the
+   * The status of the item (`completed`, `incomplete`, `in_progress`). These have no
+   * effect on the conversation, but are accepted for consistency with the
    * `conversation.item.created` event.
    */
-  status?: 'completed' | 'incomplete';
+  status?: 'completed' | 'incomplete' | 'in_progress';
 
   /**
    * The type of the item (`message`, `function_call`, `function_call_output`).
@@ -145,14 +145,15 @@ export interface ConversationItemContent {
   text?: string;
 
   /**
-   * The transcript of the audio, used for `input_audio` content type.
+   * The transcript of the audio, used for `input_audio` and `audio` content types.
    */
   transcript?: string;
 
   /**
-   * The content type (`input_text`, `input_audio`, `item_reference`, `text`).
+   * The content type (`input_text`, `input_audio`, `item_reference`, `text`,
+   * `audio`).
    */
-  type?: 'input_text' | 'input_audio' | 'item_reference' | 'text';
+  type?: 'input_text' | 'input_audio' | 'item_reference' | 'text' | 'audio';
 }
 
 /**
@@ -215,15 +216,16 @@ export interface ConversationItemCreatedEvent {
   item: ConversationItem;
 
   /**
-   * The ID of the preceding item in the Conversation context, allows the client to
-   * understand the order of the conversation.
-   */
-  previous_item_id: string;
-
-  /**
    * The event type, must be `conversation.item.created`.
    */
   type: 'conversation.item.created';
+
+  /**
+   * The ID of the preceding item in the Conversation context, allows the client to
+   * understand the order of the conversation. Can be `null` if the item has no
+   * predecessor.
+   */
+  previous_item_id?: string | null;
 }
 
 /**
@@ -310,12 +312,81 @@ export interface ConversationItemInputAudioTranscriptionCompletedEvent {
   type: 'conversation.item.input_audio_transcription.completed';
 
   /**
+   * Usage statistics for the transcription.
+   */
+  usage:
+    | ConversationItemInputAudioTranscriptionCompletedEvent.TranscriptTextUsageTokens
+    | ConversationItemInputAudioTranscriptionCompletedEvent.TranscriptTextUsageDuration;
+
+  /**
    * The log probabilities of the transcription.
    */
   logprobs?: Array<ConversationItemInputAudioTranscriptionCompletedEvent.Logprob> | null;
 }
 
 export namespace ConversationItemInputAudioTranscriptionCompletedEvent {
+  /**
+   * Usage statistics for models billed by token usage.
+   */
+  export interface TranscriptTextUsageTokens {
+    /**
+     * Number of input tokens billed for this request.
+     */
+    input_tokens: number;
+
+    /**
+     * Number of output tokens generated.
+     */
+    output_tokens: number;
+
+    /**
+     * Total number of tokens used (input + output).
+     */
+    total_tokens: number;
+
+    /**
+     * The type of the usage object. Always `tokens` for this variant.
+     */
+    type: 'tokens';
+
+    /**
+     * Details about the input tokens billed for this request.
+     */
+    input_token_details?: TranscriptTextUsageTokens.InputTokenDetails;
+  }
+
+  export namespace TranscriptTextUsageTokens {
+    /**
+     * Details about the input tokens billed for this request.
+     */
+    export interface InputTokenDetails {
+      /**
+       * Number of audio tokens billed for this request.
+       */
+      audio_tokens?: number;
+
+      /**
+       * Number of text tokens billed for this request.
+       */
+      text_tokens?: number;
+    }
+  }
+
+  /**
+   * Usage statistics for models billed by audio input duration.
+   */
+  export interface TranscriptTextUsageDuration {
+    /**
+     * Duration of the input audio in seconds.
+     */
+    seconds: number;
+
+    /**
+     * The type of the usage object. Always `duration` for this variant.
+     */
+    type: 'duration';
+  }
+
   /**
    * A log probability object.
    */
@@ -589,7 +660,7 @@ export interface ConversationItemWithReference {
    * - Message items of role `user` support `input_text` and `input_audio` content
    * - Message items of role `assistant` support `text` content.
    */
-  content?: Array<ConversationItemContent>;
+  content?: Array<ConversationItemWithReference.Content>;
 
   /**
    * The name of the function being called (for `function_call` items).
@@ -613,17 +684,48 @@ export interface ConversationItemWithReference {
   role?: 'user' | 'assistant' | 'system';
 
   /**
-   * The status of the item (`completed`, `incomplete`). These have no effect on the
-   * conversation, but are accepted for consistency with the
+   * The status of the item (`completed`, `incomplete`, `in_progress`). These have no
+   * effect on the conversation, but are accepted for consistency with the
    * `conversation.item.created` event.
    */
-  status?: 'completed' | 'incomplete';
+  status?: 'completed' | 'incomplete' | 'in_progress';
 
   /**
    * The type of the item (`message`, `function_call`, `function_call_output`,
    * `item_reference`).
    */
   type?: 'message' | 'function_call' | 'function_call_output' | 'item_reference';
+}
+
+export namespace ConversationItemWithReference {
+  export interface Content {
+    /**
+     * ID of a previous conversation item to reference (for `item_reference` content
+     * types in `response.create` events). These can reference both client and server
+     * created items.
+     */
+    id?: string;
+
+    /**
+     * Base64-encoded audio bytes, used for `input_audio` content type.
+     */
+    audio?: string;
+
+    /**
+     * The text content, used for `input_text` and `text` content types.
+     */
+    text?: string;
+
+    /**
+     * The transcript of the audio, used for `input_audio` content type.
+     */
+    transcript?: string;
+
+    /**
+     * The content type (`input_text`, `input_audio`, `item_reference`, `text`).
+     */
+    type?: 'input_text' | 'input_audio' | 'item_reference' | 'text';
+  }
 }
 
 /**
@@ -782,14 +884,15 @@ export interface InputAudioBufferCommittedEvent {
   item_id: string;
 
   /**
-   * The ID of the preceding item after which the new item will be inserted.
-   */
-  previous_item_id: string;
-
-  /**
    * The event type, must be `input_audio_buffer.committed`.
    */
   type: 'input_audio_buffer.committed';
+
+  /**
+   * The ID of the preceding item after which the new item will be inserted. Can be
+   * `null` if the item has no predecessor.
+   */
+  previous_item_id?: string | null;
 }
 
 /**
@@ -1003,9 +1106,9 @@ export interface RealtimeResponse {
 
   /**
    * The final status of the response (`completed`, `cancelled`, `failed`, or
-   * `incomplete`).
+   * `incomplete`, `in_progress`).
    */
-  status?: 'completed' | 'cancelled' | 'failed' | 'incomplete';
+  status?: 'completed' | 'cancelled' | 'failed' | 'incomplete' | 'in_progress';
 
   /**
    * Additional details about the status.
@@ -1027,22 +1130,9 @@ export interface RealtimeResponse {
 
   /**
    * The voice the model used to respond. Current voice options are `alloy`, `ash`,
-   * `ballad`, `coral`, `echo`, `fable`, `onyx`, `nova`, `sage`, `shimmer`, and
-   * `verse`.
+   * `ballad`, `coral`, `echo`, `sage`, `shimmer`, and `verse`.
    */
-  voice?:
-    | (string & {})
-    | 'alloy'
-    | 'ash'
-    | 'ballad'
-    | 'coral'
-    | 'echo'
-    | 'fable'
-    | 'onyx'
-    | 'nova'
-    | 'sage'
-    | 'shimmer'
-    | 'verse';
+  voice?: (string & {}) | 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse';
 }
 
 /**
@@ -1729,22 +1819,9 @@ export namespace ResponseCreateEvent {
     /**
      * The voice the model uses to respond. Voice cannot be changed during the session
      * once the model has responded with audio at least once. Current voice options are
-     * `alloy`, `ash`, `ballad`, `coral`, `echo`, `fable`, `onyx`, `nova`, `sage`,
-     * `shimmer`, and `verse`.
+     * `alloy`, `ash`, `ballad`, `coral`, `echo`, `sage`, `shimmer`, and `verse`.
      */
-    voice?:
-      | (string & {})
-      | 'alloy'
-      | 'ash'
-      | 'ballad'
-      | 'coral'
-      | 'echo'
-      | 'fable'
-      | 'onyx'
-      | 'nova'
-      | 'sage'
-      | 'shimmer'
-      | 'verse';
+    voice?: (string & {}) | 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse';
   }
 
   export namespace Response {
@@ -2222,22 +2299,9 @@ export namespace SessionUpdateEvent {
     /**
      * The voice the model uses to respond. Voice cannot be changed during the session
      * once the model has responded with audio at least once. Current voice options are
-     * `alloy`, `ash`, `ballad`, `coral`, `echo`, `fable`, `onyx`, `nova`, `sage`,
-     * `shimmer`, and `verse`.
+     * `alloy`, `ash`, `ballad`, `coral`, `echo`, `sage`, `shimmer`, and `verse`.
      */
-    voice?:
-      | (string & {})
-      | 'alloy'
-      | 'ash'
-      | 'ballad'
-      | 'coral'
-      | 'echo'
-      | 'fable'
-      | 'onyx'
-      | 'nova'
-      | 'sage'
-      | 'shimmer'
-      | 'verse';
+    voice?: (string & {}) | 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse';
   }
 
   export namespace Session {

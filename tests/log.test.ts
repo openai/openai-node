@@ -71,7 +71,7 @@ describe('debug()', () => {
       defaultHeaders: authorizationTest,
     });
 
-    const { req } = client.buildRequest({ path: '/foo', method: 'post' });
+    const { req } = await client.buildRequest({ path: '/foo', method: 'post' });
     await client.post('/foo', {});
 
     // Verify that the original headers weren't mutated
@@ -100,7 +100,7 @@ describe('debug()', () => {
       fetch: opts.fetch,
     });
 
-    const { req } = client.buildRequest({ path: '/foo', method: 'post' });
+    const { req } = await client.buildRequest({ path: '/foo', method: 'post' });
     await client.post('/foo', {});
 
     // Verify that the original headers weren't mutated

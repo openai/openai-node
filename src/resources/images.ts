@@ -1,7 +1,9 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../core/resource';
+import * as ImagesAPI from './images';
 import { APIPromise } from '../core/api-promise';
+import { Stream } from '../core/streaming';
 import { type Uploadable } from '../core/uploads';
 import { RequestOptions } from '../internal/request-options';
 import { multipartFormRequestOptions } from '../internal/uploads';
@@ -36,11 +38,20 @@ export class Images extends APIResource {
    * });
    * ```
    */
-  edit(body: ImageEditParams, options?: RequestOptions): APIPromise<ImagesResponse> {
+  edit(body: ImageEditParamsNonStreaming, options?: RequestOptions): APIPromise<ImagesResponse>;
+  edit(body: ImageEditParamsStreaming, options?: RequestOptions): APIPromise<Stream<ImageEditStreamEvent>>;
+  edit(
+    body: ImageEditParamsBase,
+    options?: RequestOptions,
+  ): APIPromise<Stream<ImageEditStreamEvent> | ImagesResponse>;
+  edit(
+    body: ImageEditParams,
+    options?: RequestOptions,
+  ): APIPromise<ImagesResponse> | APIPromise<Stream<ImageEditStreamEvent>> {
     return this._client.post(
       '/images/edits',
-      multipartFormRequestOptions({ body, ...options }, this._client),
-    );
+      multipartFormRequestOptions({ body, ...options, stream: body.stream ?? false }, this._client),
+    ) as APIPromise<ImagesResponse> | APIPromise<Stream<ImageEditStreamEvent>>;
   }
 
   /**
@@ -54,8 +65,22 @@ export class Images extends APIResource {
    * });
    * ```
    */
-  generate(body: ImageGenerateParams, options?: RequestOptions): APIPromise<ImagesResponse> {
-    return this._client.post('/images/generations', { body, ...options });
+  generate(body: ImageGenerateParamsNonStreaming, options?: RequestOptions): APIPromise<ImagesResponse>;
+  generate(
+    body: ImageGenerateParamsStreaming,
+    options?: RequestOptions,
+  ): APIPromise<Stream<ImageGenStreamEvent>>;
+  generate(
+    body: ImageGenerateParamsBase,
+    options?: RequestOptions,
+  ): APIPromise<Stream<ImageGenStreamEvent> | ImagesResponse>;
+  generate(
+    body: ImageGenerateParams,
+    options?: RequestOptions,
+  ): APIPromise<ImagesResponse> | APIPromise<Stream<ImageGenStreamEvent>> {
+    return this._client.post('/images/generations', { body, ...options, stream: body.stream ?? false }) as
+      | APIPromise<ImagesResponse>
+      | APIPromise<Stream<ImageGenStreamEvent>>;
   }
 }
 
@@ -82,6 +107,284 @@ export interface Image {
    */
   url?: string;
 }
+
+/**
+ * Emitted when image editing has completed and the final image is available.
+ */
+export interface ImageEditCompletedEvent {
+  /**
+   * Base64-encoded final edited image data, suitable for rendering as an image.
+   */
+  b64_json: string;
+
+  /**
+   * The background setting for the edited image.
+   */
+  background: 'transparent' | 'opaque' | 'auto';
+
+  /**
+   * The Unix timestamp when the event was created.
+   */
+  created_at: number;
+
+  /**
+   * The output format for the edited image.
+   */
+  output_format: 'png' | 'webp' | 'jpeg';
+
+  /**
+   * The quality setting for the edited image.
+   */
+  quality: 'low' | 'medium' | 'high' | 'auto';
+
+  /**
+   * The size of the edited image.
+   */
+  size: '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
+
+  /**
+   * The type of the event. Always `image_edit.completed`.
+   */
+  type: 'image_edit.completed';
+
+  /**
+   * For `gpt-image-1` only, the token usage information for the image generation.
+   */
+  usage: ImageEditCompletedEvent.Usage;
+}
+
+export namespace ImageEditCompletedEvent {
+  /**
+   * For `gpt-image-1` only, the token usage information for the image generation.
+   */
+  export interface Usage {
+    /**
+     * The number of tokens (images and text) in the input prompt.
+     */
+    input_tokens: number;
+
+    /**
+     * The input tokens detailed information for the image generation.
+     */
+    input_tokens_details: Usage.InputTokensDetails;
+
+    /**
+     * The number of image tokens in the output image.
+     */
+    output_tokens: number;
+
+    /**
+     * The total number of tokens (images and text) used for the image generation.
+     */
+    total_tokens: number;
+  }
+
+  export namespace Usage {
+    /**
+     * The input tokens detailed information for the image generation.
+     */
+    export interface InputTokensDetails {
+      /**
+       * The number of image tokens in the input prompt.
+       */
+      image_tokens: number;
+
+      /**
+       * The number of text tokens in the input prompt.
+       */
+      text_tokens: number;
+    }
+  }
+}
+
+/**
+ * Emitted when a partial image is available during image editing streaming.
+ */
+export interface ImageEditPartialImageEvent {
+  /**
+   * Base64-encoded partial image data, suitable for rendering as an image.
+   */
+  b64_json: string;
+
+  /**
+   * The background setting for the requested edited image.
+   */
+  background: 'transparent' | 'opaque' | 'auto';
+
+  /**
+   * The Unix timestamp when the event was created.
+   */
+  created_at: number;
+
+  /**
+   * The output format for the requested edited image.
+   */
+  output_format: 'png' | 'webp' | 'jpeg';
+
+  /**
+   * 0-based index for the partial image (streaming).
+   */
+  partial_image_index: number;
+
+  /**
+   * The quality setting for the requested edited image.
+   */
+  quality: 'low' | 'medium' | 'high' | 'auto';
+
+  /**
+   * The size of the requested edited image.
+   */
+  size: '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
+
+  /**
+   * The type of the event. Always `image_edit.partial_image`.
+   */
+  type: 'image_edit.partial_image';
+}
+
+/**
+ * Emitted when a partial image is available during image editing streaming.
+ */
+export type ImageEditStreamEvent = ImageEditPartialImageEvent | ImageEditCompletedEvent;
+
+/**
+ * Emitted when image generation has completed and the final image is available.
+ */
+export interface ImageGenCompletedEvent {
+  /**
+   * Base64-encoded image data, suitable for rendering as an image.
+   */
+  b64_json: string;
+
+  /**
+   * The background setting for the generated image.
+   */
+  background: 'transparent' | 'opaque' | 'auto';
+
+  /**
+   * The Unix timestamp when the event was created.
+   */
+  created_at: number;
+
+  /**
+   * The output format for the generated image.
+   */
+  output_format: 'png' | 'webp' | 'jpeg';
+
+  /**
+   * The quality setting for the generated image.
+   */
+  quality: 'low' | 'medium' | 'high' | 'auto';
+
+  /**
+   * The size of the generated image.
+   */
+  size: '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
+
+  /**
+   * The type of the event. Always `image_generation.completed`.
+   */
+  type: 'image_generation.completed';
+
+  /**
+   * For `gpt-image-1` only, the token usage information for the image generation.
+   */
+  usage: ImageGenCompletedEvent.Usage;
+}
+
+export namespace ImageGenCompletedEvent {
+  /**
+   * For `gpt-image-1` only, the token usage information for the image generation.
+   */
+  export interface Usage {
+    /**
+     * The number of tokens (images and text) in the input prompt.
+     */
+    input_tokens: number;
+
+    /**
+     * The input tokens detailed information for the image generation.
+     */
+    input_tokens_details: Usage.InputTokensDetails;
+
+    /**
+     * The number of image tokens in the output image.
+     */
+    output_tokens: number;
+
+    /**
+     * The total number of tokens (images and text) used for the image generation.
+     */
+    total_tokens: number;
+  }
+
+  export namespace Usage {
+    /**
+     * The input tokens detailed information for the image generation.
+     */
+    export interface InputTokensDetails {
+      /**
+       * The number of image tokens in the input prompt.
+       */
+      image_tokens: number;
+
+      /**
+       * The number of text tokens in the input prompt.
+       */
+      text_tokens: number;
+    }
+  }
+}
+
+/**
+ * Emitted when a partial image is available during image generation streaming.
+ */
+export interface ImageGenPartialImageEvent {
+  /**
+   * Base64-encoded partial image data, suitable for rendering as an image.
+   */
+  b64_json: string;
+
+  /**
+   * The background setting for the requested image.
+   */
+  background: 'transparent' | 'opaque' | 'auto';
+
+  /**
+   * The Unix timestamp when the event was created.
+   */
+  created_at: number;
+
+  /**
+   * The output format for the requested image.
+   */
+  output_format: 'png' | 'webp' | 'jpeg';
+
+  /**
+   * 0-based index for the partial image (streaming).
+   */
+  partial_image_index: number;
+
+  /**
+   * The quality setting for the requested image.
+   */
+  quality: 'low' | 'medium' | 'high' | 'auto';
+
+  /**
+   * The size of the requested image.
+   */
+  size: '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
+
+  /**
+   * The type of the event. Always `image_generation.partial_image`.
+   */
+  type: 'image_generation.partial_image';
+}
+
+/**
+ * Emitted when a partial image is available during image generation streaming.
+ */
+export type ImageGenStreamEvent = ImageGenPartialImageEvent | ImageGenCompletedEvent;
 
 export type ImageModel = 'dall-e-2' | 'dall-e-3' | 'gpt-image-1';
 
@@ -143,7 +446,7 @@ export namespace ImagesResponse {
     input_tokens_details: Usage.InputTokensDetails;
 
     /**
-     * The number of image tokens in the output image.
+     * The number of output tokens generated by the model.
      */
     output_tokens: number;
 
@@ -210,7 +513,9 @@ export interface ImageCreateVariationParams {
   user?: string;
 }
 
-export interface ImageEditParams {
+export type ImageEditParams = ImageEditParamsNonStreaming | ImageEditParamsStreaming;
+
+export interface ImageEditParamsBase {
   /**
    * The image(s) to edit. Must be a supported image file or an array of images.
    *
@@ -238,6 +543,13 @@ export interface ImageEditParams {
    * be set to either `png` (default value) or `webp`.
    */
   background?: 'transparent' | 'opaque' | 'auto' | null;
+
+  /**
+   * Control how much effort the model will exert to match the style and features,
+   * especially facial features, of input images. This parameter is only supported
+   * for `gpt-image-1`. Supports `high` and `low`. Defaults to `low`.
+   */
+  input_fidelity?: 'high' | 'low' | null;
 
   /**
    * An additional image whose fully transparent areas (e.g. where alpha is zero)
@@ -274,6 +586,16 @@ export interface ImageEditParams {
   output_format?: 'png' | 'jpeg' | 'webp' | null;
 
   /**
+   * The number of partial images to generate. This parameter is used for streaming
+   * responses that return partial images. Value must be between 0 and 3. When set to
+   * 0, the response will be a single image sent in one streaming event.
+   *
+   * Note that the final image may be sent before the full number of partial images
+   * are generated if the full image is generated more quickly.
+   */
+  partial_images?: number | null;
+
+  /**
    * The quality of the image that will be generated. `high`, `medium` and `low` are
    * only supported for `gpt-image-1`. `dall-e-2` only supports `standard` quality.
    * Defaults to `auto`.
@@ -296,6 +618,13 @@ export interface ImageEditParams {
   size?: '256x256' | '512x512' | '1024x1024' | '1536x1024' | '1024x1536' | 'auto' | null;
 
   /**
+   * Edit the image in streaming mode. Defaults to `false`. See the
+   * [Image generation guide](https://platform.openai.com/docs/guides/image-generation)
+   * for more information.
+   */
+  stream?: boolean | null;
+
+  /**
    * A unique identifier representing your end-user, which can help OpenAI to monitor
    * and detect abuse.
    * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#end-user-ids).
@@ -303,7 +632,32 @@ export interface ImageEditParams {
   user?: string;
 }
 
-export interface ImageGenerateParams {
+export namespace ImageEditParams {
+  export type ImageEditParamsNonStreaming = ImagesAPI.ImageEditParamsNonStreaming;
+  export type ImageEditParamsStreaming = ImagesAPI.ImageEditParamsStreaming;
+}
+
+export interface ImageEditParamsNonStreaming extends ImageEditParamsBase {
+  /**
+   * Edit the image in streaming mode. Defaults to `false`. See the
+   * [Image generation guide](https://platform.openai.com/docs/guides/image-generation)
+   * for more information.
+   */
+  stream?: false | null;
+}
+
+export interface ImageEditParamsStreaming extends ImageEditParamsBase {
+  /**
+   * Edit the image in streaming mode. Defaults to `false`. See the
+   * [Image generation guide](https://platform.openai.com/docs/guides/image-generation)
+   * for more information.
+   */
+  stream: true;
+}
+
+export type ImageGenerateParams = ImageGenerateParamsNonStreaming | ImageGenerateParamsStreaming;
+
+export interface ImageGenerateParamsBase {
   /**
    * A text description of the desired image(s). The maximum length is 32000
    * characters for `gpt-image-1`, 1000 characters for `dall-e-2` and 4000 characters
@@ -355,6 +709,16 @@ export interface ImageGenerateParams {
   output_format?: 'png' | 'jpeg' | 'webp' | null;
 
   /**
+   * The number of partial images to generate. This parameter is used for streaming
+   * responses that return partial images. Value must be between 0 and 3. When set to
+   * 0, the response will be a single image sent in one streaming event.
+   *
+   * Note that the final image may be sent before the full number of partial images
+   * are generated if the full image is generated more quickly.
+   */
+  partial_images?: number | null;
+
+  /**
    * The quality of the image that will be generated.
    *
    * - `auto` (default value) will automatically select the best quality for the
@@ -391,6 +755,13 @@ export interface ImageGenerateParams {
     | null;
 
   /**
+   * Generate the image in streaming mode. Defaults to `false`. See the
+   * [Image generation guide](https://platform.openai.com/docs/guides/image-generation)
+   * for more information. This parameter is only supported for `gpt-image-1`.
+   */
+  stream?: boolean | null;
+
+  /**
    * The style of the generated images. This parameter is only supported for
    * `dall-e-3`. Must be one of `vivid` or `natural`. Vivid causes the model to lean
    * towards generating hyper-real and dramatic images. Natural causes the model to
@@ -406,13 +777,46 @@ export interface ImageGenerateParams {
   user?: string;
 }
 
+export namespace ImageGenerateParams {
+  export type ImageGenerateParamsNonStreaming = ImagesAPI.ImageGenerateParamsNonStreaming;
+  export type ImageGenerateParamsStreaming = ImagesAPI.ImageGenerateParamsStreaming;
+}
+
+export interface ImageGenerateParamsNonStreaming extends ImageGenerateParamsBase {
+  /**
+   * Generate the image in streaming mode. Defaults to `false`. See the
+   * [Image generation guide](https://platform.openai.com/docs/guides/image-generation)
+   * for more information. This parameter is only supported for `gpt-image-1`.
+   */
+  stream?: false | null;
+}
+
+export interface ImageGenerateParamsStreaming extends ImageGenerateParamsBase {
+  /**
+   * Generate the image in streaming mode. Defaults to `false`. See the
+   * [Image generation guide](https://platform.openai.com/docs/guides/image-generation)
+   * for more information. This parameter is only supported for `gpt-image-1`.
+   */
+  stream: true;
+}
+
 export declare namespace Images {
   export {
     type Image as Image,
+    type ImageEditCompletedEvent as ImageEditCompletedEvent,
+    type ImageEditPartialImageEvent as ImageEditPartialImageEvent,
+    type ImageEditStreamEvent as ImageEditStreamEvent,
+    type ImageGenCompletedEvent as ImageGenCompletedEvent,
+    type ImageGenPartialImageEvent as ImageGenPartialImageEvent,
+    type ImageGenStreamEvent as ImageGenStreamEvent,
     type ImageModel as ImageModel,
     type ImagesResponse as ImagesResponse,
     type ImageCreateVariationParams as ImageCreateVariationParams,
     type ImageEditParams as ImageEditParams,
+    type ImageEditParamsNonStreaming as ImageEditParamsNonStreaming,
+    type ImageEditParamsStreaming as ImageEditParamsStreaming,
     type ImageGenerateParams as ImageGenerateParams,
+    type ImageGenerateParamsNonStreaming as ImageGenerateParamsNonStreaming,
+    type ImageGenerateParamsStreaming as ImageGenerateParamsStreaming,
   };
 }

@@ -119,6 +119,12 @@ Methods:
 Types:
 
 - <code><a href="./src/resources/images.ts">Image</a></code>
+- <code><a href="./src/resources/images.ts">ImageEditCompletedEvent</a></code>
+- <code><a href="./src/resources/images.ts">ImageEditPartialImageEvent</a></code>
+- <code><a href="./src/resources/images.ts">ImageEditStreamEvent</a></code>
+- <code><a href="./src/resources/images.ts">ImageGenCompletedEvent</a></code>
+- <code><a href="./src/resources/images.ts">ImageGenPartialImageEvent</a></code>
+- <code><a href="./src/resources/images.ts">ImageGenStreamEvent</a></code>
 - <code><a href="./src/resources/images.ts">ImageModel</a></code>
 - <code><a href="./src/resources/images.ts">ImagesResponse</a></code>
 
@@ -704,8 +710,6 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponseOutputTextAnnotationAddedEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponsePrompt</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseQueuedEvent</a></code>
-- <code><a href="./src/resources/responses/responses.ts">ResponseReasoningDeltaEvent</a></code>
-- <code><a href="./src/resources/responses/responses.ts">ResponseReasoningDoneEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseReasoningItem</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseReasoningSummaryDeltaEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseReasoningSummaryDoneEvent</a></code>
