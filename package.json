@@ -51,10 +51,6 @@
     "zod": "^3.23.8",
     "typescript-eslint": "8.31.1"
   },
-  "imports": {
-    "openai": ".",
-    "openai/*": "./src/*"
-  },
   "bin": {
     "openai": "bin/cli"
   },
