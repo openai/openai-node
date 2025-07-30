@@ -1,5 +1,20 @@
 # Changelog
 
+## 5.10.3 (2025-07-30)
+
+Full Changelog: [v5.10.2...v5.10.3](https://github.com/openai/openai-node/compare/v5.10.2...v5.10.3)
+
+### Bug Fixes
+
+* **zod:** avoid adding redundant not to optional schemas [#1593](https://github.com/openai/openai-node/issues/1593) ([162b697](https://github.com/openai/openai-node/commit/162b697d1b946dc4af213c8efcdb7a7b5317bb6e))
+
+
+### Chores
+
+* **client:** refactor streaming slightly to better future proof it ([292427f](https://github.com/openai/openai-node/commit/292427f7f39f6dd64e46ba4360b0b96c8e49adc9))
+* **internal:** remove redundant imports config ([28dd66d](https://github.com/openai/openai-node/commit/28dd66de15032d6ee620d3cf9f3e33ba61cad4e7))
+* **internal:** version bump ([56e0760](https://github.com/openai/openai-node/commit/56e076090a9ce5c6b7f4ac4d84d33ca3f6522973))
+
 ## 5.10.2 (2025-07-22)
 
 Full Changelog: [v5.10.1...v5.10.2](https://github.com/openai/openai-node/compare/v5.10.1...v5.10.2)
