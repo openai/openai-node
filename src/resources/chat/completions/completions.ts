@@ -1089,6 +1089,12 @@ export interface ChatCompletionStoreMessage extends ChatCompletionMessage {
    * The identifier of the chat message.
    */
   id: string;
+
+  /**
+   * If a content parts array was provided, this is an array of `text` and
+   * `image_url` parts. Otherwise, null.
+   */
+  content_parts?: Array<ChatCompletionContentPartText | ChatCompletionContentPartImage> | null;
 }
 
 /**
@@ -1398,6 +1404,13 @@ export interface ChatCompletionCreateParamsBase {
   presence_penalty?: number | null;
 
   /**
+   * Used by OpenAI to cache responses for similar requests to optimize your cache
+   * hit rates. Replaces the `user` field.
+   * [Learn more](https://platform.openai.com/docs/guides/prompt-caching).
+   */
+  prompt_cache_key?: string;
+
+  /**
    * **o-series models only**
    *
    * Constrains effort on reasoning for
@@ -1423,6 +1436,15 @@ export interface ChatCompletionCreateParamsBase {
     | Shared.ResponseFormatText
     | Shared.ResponseFormatJSONSchema
     | Shared.ResponseFormatJSONObject;
+
+  /**
+   * A stable identifier used to help detect users of your application that may be
+   * violating OpenAI's usage policies. The IDs should be a string that uniquely
+   * identifies each user. We recommend hashing their username or email address, in
+   * order to avoid sending us any identifying information.
+   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
+   */
+  safety_identifier?: string;
 
   /**
    * This feature is in Beta. If specified, our system will make a best effort to
@@ -1533,9 +1555,12 @@ export interface ChatCompletionCreateParamsBase {
   top_p?: number | null;
 
   /**
-   * A stable identifier for your end-users. Used to boost cache hit rates by better
-   * bucketing similar requests and to help OpenAI detect and prevent abuse.
-   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#end-user-ids).
+   * @deprecated This field is being replaced by `safety_identifier` and
+   * `prompt_cache_key`. Use `prompt_cache_key` instead to maintain caching
+   * optimizations. A stable identifier for your end-users. Used to boost cache hit
+   * rates by better bucketing similar requests and to help OpenAI detect and prevent
+   * abuse.
+   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
    */
   user?: string;
 
