@@ -408,12 +408,28 @@ export interface Response {
   prompt?: ResponsePrompt | null;
 
   /**
+   * Used by OpenAI to cache responses for similar requests to optimize your cache
+   * hit rates. Replaces the `user` field.
+   * [Learn more](https://platform.openai.com/docs/guides/prompt-caching).
+   */
+  prompt_cache_key?: string;
+
+  /**
    * **o-series models only**
    *
    * Configuration options for
    * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
    */
   reasoning?: Shared.Reasoning | null;
+
+  /**
+   * A stable identifier used to help detect users of your application that may be
+   * violating OpenAI's usage policies. The IDs should be a string that uniquely
+   * identifies each user. We recommend hashing their username or email address, in
+   * order to avoid sending us any identifying information.
+   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
+   */
+  safety_identifier?: string;
 
   /**
    * Specifies the processing type used for serving the request.
@@ -475,9 +491,12 @@ export interface Response {
   usage?: ResponseUsage;
 
   /**
-   * A stable identifier for your end-users. Used to boost cache hit rates by better
-   * bucketing similar requests and to help OpenAI detect and prevent abuse.
-   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#end-user-ids).
+   * @deprecated This field is being replaced by `safety_identifier` and
+   * `prompt_cache_key`. Use `prompt_cache_key` instead to maintain caching
+   * optimizations. A stable identifier for your end-users. Used to boost cache hit
+   * rates by better bucketing similar requests and to help OpenAI detect and prevent
+   * abuse.
+   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
    */
   user?: string;
 }
@@ -4811,12 +4830,28 @@ export interface ResponseCreateParamsBase {
   prompt?: ResponsePrompt | null;
 
   /**
+   * Used by OpenAI to cache responses for similar requests to optimize your cache
+   * hit rates. Replaces the `user` field.
+   * [Learn more](https://platform.openai.com/docs/guides/prompt-caching).
+   */
+  prompt_cache_key?: string;
+
+  /**
    * **o-series models only**
    *
    * Configuration options for
    * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
    */
   reasoning?: Shared.Reasoning | null;
+
+  /**
+   * A stable identifier used to help detect users of your application that may be
+   * violating OpenAI's usage policies. The IDs should be a string that uniquely
+   * identifies each user. We recommend hashing their username or email address, in
+   * order to avoid sending us any identifying information.
+   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
+   */
+  safety_identifier?: string;
 
   /**
    * Specifies the processing type used for serving the request.
@@ -4923,9 +4958,12 @@ export interface ResponseCreateParamsBase {
   truncation?: 'auto' | 'disabled' | null;
 
   /**
-   * A stable identifier for your end-users. Used to boost cache hit rates by better
-   * bucketing similar requests and to help OpenAI detect and prevent abuse.
-   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#end-user-ids).
+   * @deprecated This field is being replaced by `safety_identifier` and
+   * `prompt_cache_key`. Use `prompt_cache_key` instead to maintain caching
+   * optimizations. A stable identifier for your end-users. Used to boost cache hit
+   * rates by better bucketing similar requests and to help OpenAI detect and prevent
+   * abuse.
+   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
    */
   user?: string;
 }
