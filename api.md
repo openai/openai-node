@@ -711,12 +711,12 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponsePrompt</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseQueuedEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseReasoningItem</a></code>
-- <code><a href="./src/resources/responses/responses.ts">ResponseReasoningSummaryDeltaEvent</a></code>
-- <code><a href="./src/resources/responses/responses.ts">ResponseReasoningSummaryDoneEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseReasoningSummaryPartAddedEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseReasoningSummaryPartDoneEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseReasoningSummaryTextDeltaEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseReasoningSummaryTextDoneEvent</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseReasoningTextDeltaEvent</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseReasoningTextDoneEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseRefusalDeltaEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseRefusalDoneEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseStatus</a></code>
