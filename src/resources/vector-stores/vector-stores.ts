@@ -498,7 +498,10 @@ export namespace VectorStoreSearchParams {
    * Ranking options for search.
    */
   export interface RankingOptions {
-    ranker?: 'auto' | 'default-2024-11-15';
+    /**
+     * Enable re-ranking; set to `none` to disable, which can help reduce latency.
+     */
+    ranker?: 'none' | 'auto' | 'default-2024-11-15';
 
     score_threshold?: number;
   }

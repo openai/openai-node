@@ -3690,7 +3690,7 @@ export interface ResponseReasoningItem {
   id: string;
 
   /**
-   * Reasoning text contents.
+   * Reasoning summary content.
    */
   summary: Array<ResponseReasoningItem.Summary>;
 
@@ -3698,6 +3698,11 @@ export interface ResponseReasoningItem {
    * The type of the object. Always `reasoning`.
    */
   type: 'reasoning';
+
+  /**
+   * Reasoning text content.
+   */
+  content?: Array<ResponseReasoningItem.Content>;
 
   /**
    * The encrypted content of the reasoning item - populated when a response is
@@ -3715,7 +3720,7 @@ export interface ResponseReasoningItem {
 export namespace ResponseReasoningItem {
   export interface Summary {
     /**
-     * A short summary of the reasoning used by the model when generating the response.
+     * A summary of the reasoning output from the model so far.
      */
     text: string;
 
@@ -3724,77 +3729,18 @@ export namespace ResponseReasoningItem {
      */
     type: 'summary_text';
   }
-}
 
-/**
- * Emitted when there is a delta (partial update) to the reasoning summary content.
- */
-export interface ResponseReasoningSummaryDeltaEvent {
-  /**
-   * The partial update to the reasoning summary content.
-   */
-  delta: unknown;
+  export interface Content {
+    /**
+     * Reasoning text output from the model.
+     */
+    text: string;
 
-  /**
-   * The unique identifier of the item for which the reasoning summary is being
-   * updated.
-   */
-  item_id: string;
-
-  /**
-   * The index of the output item in the response's output array.
-   */
-  output_index: number;
-
-  /**
-   * The sequence number of this event.
-   */
-  sequence_number: number;
-
-  /**
-   * The index of the summary part within the output item.
-   */
-  summary_index: number;
-
-  /**
-   * The type of the event. Always 'response.reasoning_summary.delta'.
-   */
-  type: 'response.reasoning_summary.delta';
-}
-
-/**
- * Emitted when the reasoning summary content is finalized for an item.
- */
-export interface ResponseReasoningSummaryDoneEvent {
-  /**
-   * The unique identifier of the item for which the reasoning summary is finalized.
-   */
-  item_id: string;
-
-  /**
-   * The index of the output item in the response's output array.
-   */
-  output_index: number;
-
-  /**
-   * The sequence number of this event.
-   */
-  sequence_number: number;
-
-  /**
-   * The index of the summary part within the output item.
-   */
-  summary_index: number;
-
-  /**
-   * The finalized reasoning summary text.
-   */
-  text: string;
-
-  /**
-   * The type of the event. Always 'response.reasoning_summary.done'.
-   */
-  type: 'response.reasoning_summary.done';
+    /**
+     * The type of the object. Always `reasoning_text`.
+     */
+    type: 'reasoning_text';
+  }
 }
 
 /**
@@ -3972,6 +3918,76 @@ export interface ResponseReasoningSummaryTextDoneEvent {
 }
 
 /**
+ * Emitted when a delta is added to a reasoning text.
+ */
+export interface ResponseReasoningTextDeltaEvent {
+  /**
+   * The index of the reasoning content part this delta is associated with.
+   */
+  content_index: number;
+
+  /**
+   * The text delta that was added to the reasoning content.
+   */
+  delta: string;
+
+  /**
+   * The ID of the item this reasoning text delta is associated with.
+   */
+  item_id: string;
+
+  /**
+   * The index of the output item this reasoning text delta is associated with.
+   */
+  output_index: number;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
+   * The type of the event. Always `response.reasoning_text.delta`.
+   */
+  type: 'response.reasoning_text.delta';
+}
+
+/**
+ * Emitted when a reasoning text is completed.
+ */
+export interface ResponseReasoningTextDoneEvent {
+  /**
+   * The index of the reasoning content part.
+   */
+  content_index: number;
+
+  /**
+   * The ID of the item this reasoning text is associated with.
+   */
+  item_id: string;
+
+  /**
+   * The index of the output item this reasoning text is associated with.
+   */
+  output_index: number;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
+   * The full text of the completed reasoning content.
+   */
+  text: string;
+
+  /**
+   * The type of the event. Always `response.reasoning_text.done`.
+   */
+  type: 'response.reasoning_text.done';
+}
+
+/**
  * Emitted when there is a partial refusal text.
  */
 export interface ResponseRefusalDeltaEvent {
@@ -4079,6 +4095,8 @@ export type ResponseStreamEvent =
   | ResponseReasoningSummaryPartDoneEvent
   | ResponseReasoningSummaryTextDeltaEvent
   | ResponseReasoningSummaryTextDoneEvent
+  | ResponseReasoningTextDeltaEvent
+  | ResponseReasoningTextDoneEvent
   | ResponseRefusalDeltaEvent
   | ResponseRefusalDoneEvent
   | ResponseTextDeltaEvent
@@ -4099,9 +4117,7 @@ export type ResponseStreamEvent =
   | ResponseMcpListToolsFailedEvent
   | ResponseMcpListToolsInProgressEvent
   | ResponseOutputTextAnnotationAddedEvent
-  | ResponseQueuedEvent
-  | ResponseReasoningSummaryDeltaEvent
-  | ResponseReasoningSummaryDoneEvent;
+  | ResponseQueuedEvent;
 
 /**
  * Configuration options for a text response from the model. Can be plain text or
@@ -5148,12 +5164,12 @@ export declare namespace Responses {
     type ResponsePrompt as ResponsePrompt,
     type ResponseQueuedEvent as ResponseQueuedEvent,
     type ResponseReasoningItem as ResponseReasoningItem,
-    type ResponseReasoningSummaryDeltaEvent as ResponseReasoningSummaryDeltaEvent,
-    type ResponseReasoningSummaryDoneEvent as ResponseReasoningSummaryDoneEvent,
     type ResponseReasoningSummaryPartAddedEvent as ResponseReasoningSummaryPartAddedEvent,
     type ResponseReasoningSummaryPartDoneEvent as ResponseReasoningSummaryPartDoneEvent,
     type ResponseReasoningSummaryTextDeltaEvent as ResponseReasoningSummaryTextDeltaEvent,
     type ResponseReasoningSummaryTextDoneEvent as ResponseReasoningSummaryTextDoneEvent,
+    type ResponseReasoningTextDeltaEvent as ResponseReasoningTextDeltaEvent,
+    type ResponseReasoningTextDoneEvent as ResponseReasoningTextDoneEvent,
     type ResponseRefusalDeltaEvent as ResponseRefusalDeltaEvent,
     type ResponseRefusalDoneEvent as ResponseRefusalDoneEvent,
     type ResponseStatus as ResponseStatus,
