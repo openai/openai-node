@@ -316,7 +316,7 @@ export namespace CreateEvalCompletionsRunDataSource {
      * tool. Use this to provide a list of functions the model may generate JSON inputs
      * for. A max of 128 functions are supported.
      */
-    tools?: Array<CompletionsAPI.ChatCompletionTool>;
+    tools?: Array<CompletionsAPI.ChatCompletionFunctionTool>;
 
     /**
      * An alternative to temperature for nucleus sampling; 1.0 includes all tokens.
