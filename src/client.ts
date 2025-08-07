@@ -141,6 +141,8 @@ import {
 } from './resources/vector-stores/vector-stores';
 import {
   ChatCompletion,
+  ChatCompletionAllowedToolChoice,
+  ChatCompletionAllowedTools,
   ChatCompletionAssistantMessageParam,
   ChatCompletionAudio,
   ChatCompletionAudioParam,
@@ -153,16 +155,21 @@ import {
   ChatCompletionCreateParams,
   ChatCompletionCreateParamsNonStreaming,
   ChatCompletionCreateParamsStreaming,
+  ChatCompletionCustomTool,
   ChatCompletionDeleted,
   ChatCompletionDeveloperMessageParam,
   ChatCompletionFunctionCallOption,
   ChatCompletionFunctionMessageParam,
+  ChatCompletionFunctionTool,
   ChatCompletionListParams,
   ChatCompletionMessage,
+  ChatCompletionMessageCustomToolCall,
+  ChatCompletionMessageFunctionToolCall,
   ChatCompletionMessageParam,
   ChatCompletionMessageToolCall,
   ChatCompletionModality,
   ChatCompletionNamedToolChoice,
+  ChatCompletionNamedToolChoiceCustom,
   ChatCompletionPredictionContent,
   ChatCompletionReasoningEffort,
   ChatCompletionRole,
@@ -990,6 +997,7 @@ export declare namespace OpenAI {
   export {
     Chat as Chat,
     type ChatCompletion as ChatCompletion,
+    type ChatCompletionAllowedToolChoice as ChatCompletionAllowedToolChoice,
     type ChatCompletionAssistantMessageParam as ChatCompletionAssistantMessageParam,
     type ChatCompletionAudio as ChatCompletionAudio,
     type ChatCompletionAudioParam as ChatCompletionAudioParam,
@@ -999,15 +1007,20 @@ export declare namespace OpenAI {
     type ChatCompletionContentPartInputAudio as ChatCompletionContentPartInputAudio,
     type ChatCompletionContentPartRefusal as ChatCompletionContentPartRefusal,
     type ChatCompletionContentPartText as ChatCompletionContentPartText,
+    type ChatCompletionCustomTool as ChatCompletionCustomTool,
     type ChatCompletionDeleted as ChatCompletionDeleted,
     type ChatCompletionDeveloperMessageParam as ChatCompletionDeveloperMessageParam,
     type ChatCompletionFunctionCallOption as ChatCompletionFunctionCallOption,
     type ChatCompletionFunctionMessageParam as ChatCompletionFunctionMessageParam,
+    type ChatCompletionFunctionTool as ChatCompletionFunctionTool,
     type ChatCompletionMessage as ChatCompletionMessage,
+    type ChatCompletionMessageCustomToolCall as ChatCompletionMessageCustomToolCall,
+    type ChatCompletionMessageFunctionToolCall as ChatCompletionMessageFunctionToolCall,
     type ChatCompletionMessageParam as ChatCompletionMessageParam,
     type ChatCompletionMessageToolCall as ChatCompletionMessageToolCall,
     type ChatCompletionModality as ChatCompletionModality,
     type ChatCompletionNamedToolChoice as ChatCompletionNamedToolChoice,
+    type ChatCompletionNamedToolChoiceCustom as ChatCompletionNamedToolChoiceCustom,
     type ChatCompletionPredictionContent as ChatCompletionPredictionContent,
     type ChatCompletionRole as ChatCompletionRole,
     type ChatCompletionStoreMessage as ChatCompletionStoreMessage,
@@ -1018,6 +1031,7 @@ export declare namespace OpenAI {
     type ChatCompletionToolChoiceOption as ChatCompletionToolChoiceOption,
     type ChatCompletionToolMessageParam as ChatCompletionToolMessageParam,
     type ChatCompletionUserMessageParam as ChatCompletionUserMessageParam,
+    type ChatCompletionAllowedTools as ChatCompletionAllowedTools,
     type ChatCompletionReasoningEffort as ChatCompletionReasoningEffort,
     type ChatCompletionsPage as ChatCompletionsPage,
     type ChatCompletionCreateParams as ChatCompletionCreateParams,
@@ -1162,6 +1176,7 @@ export declare namespace OpenAI {
   export type ChatModel = API.ChatModel;
   export type ComparisonFilter = API.ComparisonFilter;
   export type CompoundFilter = API.CompoundFilter;
+  export type CustomToolInputFormat = API.CustomToolInputFormat;
   export type ErrorObject = API.ErrorObject;
   export type FunctionDefinition = API.FunctionDefinition;
   export type FunctionParameters = API.FunctionParameters;
@@ -1171,5 +1186,7 @@ export declare namespace OpenAI {
   export type ResponseFormatJSONObject = API.ResponseFormatJSONObject;
   export type ResponseFormatJSONSchema = API.ResponseFormatJSONSchema;
   export type ResponseFormatText = API.ResponseFormatText;
+  export type ResponseFormatTextGrammar = API.ResponseFormatTextGrammar;
+  export type ResponseFormatTextPython = API.ResponseFormatTextPython;
   export type ResponsesModel = API.ResponsesModel;
 }
