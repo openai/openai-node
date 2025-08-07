@@ -41,7 +41,7 @@ describe('resource completions', () => {
       prediction: { content: 'string', type: 'content' },
       presence_penalty: -2,
       prompt_cache_key: 'prompt-cache-key-1234',
-      reasoning_effort: 'low',
+      reasoning_effort: 'minimal',
       response_format: { type: 'text' },
       safety_identifier: 'safety-identifier-1234',
       seed: -9007199254740991,
@@ -49,7 +49,7 @@ describe('resource completions', () => {
       stop: '\n',
       store: true,
       stream: false,
-      stream_options: { include_usage: true },
+      stream_options: { include_obfuscation: true, include_usage: true },
       temperature: 1,
       tool_choice: 'none',
       tools: [
@@ -61,6 +61,7 @@ describe('resource completions', () => {
       top_logprobs: 0,
       top_p: 1,
       user: 'user-1234',
+      verbosity: 'low',
       web_search_options: {
         search_context_size: 'low',
         user_location: {

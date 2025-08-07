@@ -6,6 +6,7 @@ Types:
 - <code><a href="./src/resources/shared.ts">ChatModel</a></code>
 - <code><a href="./src/resources/shared.ts">ComparisonFilter</a></code>
 - <code><a href="./src/resources/shared.ts">CompoundFilter</a></code>
+- <code><a href="./src/resources/shared.ts">CustomToolInputFormat</a></code>
 - <code><a href="./src/resources/shared.ts">ErrorObject</a></code>
 - <code><a href="./src/resources/shared.ts">FunctionDefinition</a></code>
 - <code><a href="./src/resources/shared.ts">FunctionParameters</a></code>
@@ -15,6 +16,8 @@ Types:
 - <code><a href="./src/resources/shared.ts">ResponseFormatJSONObject</a></code>
 - <code><a href="./src/resources/shared.ts">ResponseFormatJSONSchema</a></code>
 - <code><a href="./src/resources/shared.ts">ResponseFormatText</a></code>
+- <code><a href="./src/resources/shared.ts">ResponseFormatTextGrammar</a></code>
+- <code><a href="./src/resources/shared.ts">ResponseFormatTextPython</a></code>
 - <code><a href="./src/resources/shared.ts">ResponsesModel</a></code>
 
 # Completions
@@ -40,6 +43,7 @@ Types:
 Types:
 
 - <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletion</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionAllowedToolChoice</a></code>
 - <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionAssistantMessageParam</a></code>
 - <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionAudio</a></code>
 - <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionAudioParam</a></code>
@@ -49,15 +53,20 @@ Types:
 - <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionContentPartInputAudio</a></code>
 - <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionContentPartRefusal</a></code>
 - <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionContentPartText</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionCustomTool</a></code>
 - <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionDeleted</a></code>
 - <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionDeveloperMessageParam</a></code>
 - <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionFunctionCallOption</a></code>
 - <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionFunctionMessageParam</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionFunctionTool</a></code>
 - <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionMessage</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionMessageCustomToolCall</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionMessageFunctionToolCall</a></code>
 - <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionMessageParam</a></code>
 - <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionMessageToolCall</a></code>
 - <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionModality</a></code>
 - <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionNamedToolChoice</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionNamedToolChoiceCustom</a></code>
 - <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionPredictionContent</a></code>
 - <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionRole</a></code>
 - <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionStoreMessage</a></code>
@@ -68,6 +77,7 @@ Types:
 - <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionToolChoiceOption</a></code>
 - <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionToolMessageParam</a></code>
 - <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionUserMessageParam</a></code>
+- <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionAllowedTools</a></code>
 - <code><a href="./src/resources/chat/completions/completions.ts">ChatCompletionReasoningEffort</a></code>
 
 Methods:
@@ -620,6 +630,7 @@ Methods:
 Types:
 
 - <code><a href="./src/resources/responses/responses.ts">ComputerTool</a></code>
+- <code><a href="./src/resources/responses/responses.ts">CustomTool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">EasyInputMessage</a></code>
 - <code><a href="./src/resources/responses/responses.ts">FileSearchTool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">FunctionTool</a></code>
@@ -642,6 +653,10 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponseContentPartAddedEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseContentPartDoneEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseCreatedEvent</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseCustomToolCall</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseCustomToolCallInputDeltaEvent</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseCustomToolCallInputDoneEvent</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseCustomToolCallOutput</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseError</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseErrorEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseFailedEvent</a></code>
@@ -711,6 +726,8 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponseWebSearchCallInProgressEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseWebSearchCallSearchingEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">Tool</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ToolChoiceAllowed</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ToolChoiceCustom</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ToolChoiceFunction</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ToolChoiceMcp</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ToolChoiceOptions</a></code>
