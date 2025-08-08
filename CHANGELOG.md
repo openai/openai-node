@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.12.2 (2025-08-08)
+
+Full Changelog: [v5.12.1...v5.12.2](https://github.com/openai/openai-node/compare/v5.12.1...v5.12.2)
+
+### Bug Fixes
+
+* **client:** fix verbosity parameter location in Responses ([eaa246f](https://github.com/openai/openai-node/commit/eaa246ffe00ffcdec45c695a96aeed3d87bb3f74))
+
 ## 5.12.1 (2025-08-07)
 
 Full Changelog: [v5.12.0...v5.12.1](https://github.com/openai/openai-node/compare/v5.12.0...v5.12.1)
