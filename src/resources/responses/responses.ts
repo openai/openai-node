@@ -533,13 +533,6 @@ export interface Response {
    * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
    */
   user?: string;
-
-  /**
-   * Constrains the verbosity of the model's response. Lower values will result in
-   * more concise responses, while higher values will result in more verbose
-   * responses. Currently supported values are `low`, `medium`, and `high`.
-   */
-  verbosity?: 'low' | 'medium' | 'high' | null;
 }
 
 export namespace Response {
@@ -4250,6 +4243,13 @@ export interface ResponseTextConfig {
    * preferred for models that support it.
    */
   format?: ResponseFormatTextConfig;
+
+  /**
+   * Constrains the verbosity of the model's response. Lower values will result in
+   * more concise responses, while higher values will result in more verbose
+   * responses. Currently supported values are `low`, `medium`, and `high`.
+   */
+  verbosity?: 'low' | 'medium' | 'high' | null;
 }
 
 /**
@@ -5207,13 +5207,6 @@ export interface ResponseCreateParamsBase {
    * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
    */
   user?: string;
-
-  /**
-   * Constrains the verbosity of the model's response. Lower values will result in
-   * more concise responses, while higher values will result in more verbose
-   * responses. Currently supported values are `low`, `medium`, and `high`.
-   */
-  verbosity?: 'low' | 'medium' | 'high' | null;
 }
 
 export namespace ResponseCreateParams {
