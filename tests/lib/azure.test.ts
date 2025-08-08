@@ -268,9 +268,9 @@ describe('instantiate azure client', () => {
       );
     });
 
-    test.skip('AAD token is refreshed', async () => {
+    test('AAD token is refreshed', async () => {
       let fail = true;
-      const testFetch = async (url: RequestInfo, req: RequestInit | undefined): Promise<Response> => {
+      const testFetch = async (url: any, { headers }: RequestInit = {}): Promise<Response> => {
         if (fail) {
           fail = false;
           return new Response(undefined, {
@@ -280,8 +280,8 @@ describe('instantiate azure client', () => {
             },
           });
         }
-        return new Response(JSON.stringify({ auth: (req?.headers as Headers).get('authorization') }), {
-          headers: { 'content-type': 'application/json' },
+        return new Response(JSON.stringify({}), {
+          headers: headers ?? [],
         });
       };
       let counter = 0;
@@ -295,13 +295,15 @@ describe('instantiate azure client', () => {
         fetch: testFetch,
       });
       expect(
-        await client.chat.completions.create({
-          model,
-          messages: [{ role: 'system', content: 'Hello' }],
-        }),
-      ).toStrictEqual({
-        auth: 'Bearer token-1',
-      });
+        (
+          await client.chat.completions
+            .create({
+              model,
+              messages: [{ role: 'system', content: 'Hello' }],
+            })
+            .asResponse()
+        ).headers.get('authorization'),
+      ).toEqual('Bearer token-1');
     });
   });
 
