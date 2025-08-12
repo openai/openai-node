@@ -51,7 +51,7 @@
     "tsconfig-paths": "^4.0.0",
     "typescript": "5.8.3",
     "ws": "^8.18.0",
-    "zod": "^3.23.8",
+    "zod": "^3.25 || ^4.0",
     "typescript-eslint": "8.31.1"
   },
   "bin": {
@@ -75,7 +75,7 @@
   },
   "peerDependencies": {
     "ws": "^8.18.0",
-    "zod": "^3.23.8"
+    "zod": "^3.25 || ^4.0"
   },
   "peerDependenciesMeta": {
     "ws": {

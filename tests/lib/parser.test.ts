@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import { makeSnapshotRequest } from '../utils/mock-snapshots';
 
