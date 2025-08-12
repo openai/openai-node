@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { ZodStringDef } from 'zod';
+import { ZodStringDef } from 'zod/v3';
 import { ErrorMessages, setResponseValueAndErrors } from '../errorMessages';
 import { Refs } from '../Refs';
 
