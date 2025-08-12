@@ -559,7 +559,7 @@ export class OpenAI {
     );
 
     if (options.signal?.aborted) {
-      throw new Errors.APIUserAbortError();
+      throw new Errors.APIUserAbortError({ message: options.signal.reason });
     }
 
     const controller = new AbortController();
@@ -569,7 +569,7 @@ export class OpenAI {
     if (response instanceof Error) {
       const retryMessage = `retrying, ${retriesRemaining} attempts remaining`;
       if (options.signal?.aborted) {
-        throw new Errors.APIUserAbortError();
+        throw new Errors.APIUserAbortError({ message: options.signal.reason });
       }
       // detect native connection timeout errors
       // deno throws "TypeError: error sending request for url (https://example/): client error (Connect): tcp connect error: Operation timed out (os error 60): Operation timed out (os error 60)"
