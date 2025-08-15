@@ -957,6 +957,7 @@ export class OpenAI {
   evals: API.Evals = new API.Evals(this);
   containers: API.Containers = new API.Containers(this);
 }
+
 OpenAI.Completions = Completions;
 OpenAI.Chat = Chat;
 OpenAI.Embeddings = Embeddings;
@@ -975,6 +976,7 @@ OpenAI.Uploads = UploadsAPIUploads;
 OpenAI.Responses = Responses;
 OpenAI.Evals = Evals;
 OpenAI.Containers = Containers;
+
 export declare namespace OpenAI {
   export type RequestOptions = Opts.RequestOptions;
 
