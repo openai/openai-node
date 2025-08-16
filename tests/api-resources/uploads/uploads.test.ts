@@ -30,6 +30,7 @@ describe('resource uploads', () => {
       filename: 'filename',
       mime_type: 'mime_type',
       purpose: 'assistants',
+      expires_after: { anchor: 'created_at', seconds: 3600 },
     });
   });
 

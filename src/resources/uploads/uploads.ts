@@ -141,6 +141,32 @@ export interface UploadCreateParams {
    * [documentation on File purposes](https://platform.openai.com/docs/api-reference/files/create#files-create-purpose).
    */
   purpose: FilesAPI.FilePurpose;
+
+  /**
+   * The expiration policy for a file. By default, files with `purpose=batch` expire
+   * after 30 days and all other files are persisted until they are manually deleted.
+   */
+  expires_after?: UploadCreateParams.ExpiresAfter;
+}
+
+export namespace UploadCreateParams {
+  /**
+   * The expiration policy for a file. By default, files with `purpose=batch` expire
+   * after 30 days and all other files are persisted until they are manually deleted.
+   */
+  export interface ExpiresAfter {
+    /**
+     * Anchor timestamp after which the expiration policy applies. Supported anchors:
+     * `created_at`.
+     */
+    anchor: 'created_at';
+
+    /**
+     * The number of seconds after the anchor time that the file will expire. Must be
+     * between 3600 (1 hour) and 2592000 (30 days).
+     */
+    seconds: number;
+  }
 }
 
 export interface UploadCompleteParams {

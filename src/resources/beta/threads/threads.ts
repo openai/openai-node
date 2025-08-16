@@ -703,7 +703,7 @@ export interface ThreadCreateAndRunParamsBase {
 
   /**
    * Controls for how a thread will be truncated prior to the run. Use this to
-   * control the intial context window of the run.
+   * control the initial context window of the run.
    */
   truncation_strategy?: ThreadCreateAndRunParams.TruncationStrategy | null;
 }
@@ -938,7 +938,7 @@ export namespace ThreadCreateAndRunParams {
 
   /**
    * Controls for how a thread will be truncated prior to the run. Use this to
-   * control the intial context window of the run.
+   * control the initial context window of the run.
    */
   export interface TruncationStrategy {
     /**

@@ -522,7 +522,7 @@ export interface Response {
   prompt_cache_key?: string;
 
   /**
-   * **o-series models only**
+   * **gpt-5 and o-series models only**
    *
    * Configuration options for
    * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
@@ -548,9 +548,8 @@ export interface Response {
    * - If set to 'default', then the request will be processed with the standard
    *   pricing and performance for the selected model.
    * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)' or
-   *   'priority', then the request will be processed with the corresponding service
-   *   tier. [Contact sales](https://openai.com/contact-sales) to learn more about
-   *   Priority processing.
+   *   '[priority](https://openai.com/api-priority-processing/)', then the request
+   *   will be processed with the corresponding service tier.
    * - When not set, the default behavior is 'auto'.
    *
    * When this parameter is set, the response body will include the `service_tier`
@@ -564,14 +563,7 @@ export interface Response {
    */
   status?: ResponseStatus;
 
-  /**
-   * Configuration options for a text response from the model. Can be plain text or
-   * structured JSON data. Learn more:
-   *
-   * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
-   * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
-   */
-  text?: ResponseTextConfig;
+  text?: Response.Text;
 
   /**
    * The truncation strategy to use for the model response.
@@ -610,6 +602,32 @@ export namespace Response {
      * The reason why the response is incomplete.
      */
     reason?: 'max_output_tokens' | 'content_filter';
+  }
+
+  export interface Text {
+    /**
+     * An object specifying the format that the model must output.
+     *
+     * Configuring `{ "type": "json_schema" }` enables Structured Outputs, which
+     * ensures the model will match your supplied JSON schema. Learn more in the
+     * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+     *
+     * The default format is `{ "type": "text" }` with no additional options.
+     *
+     * **Not recommended for gpt-4o and newer models:**
+     *
+     * Setting to `{ "type": "json_object" }` enables the older JSON mode, which
+     * ensures the message the model generates is valid JSON. Using `json_schema` is
+     * preferred for models that support it.
+     */
+    format?: ResponsesAPI.ResponseFormatTextConfig;
+
+    /**
+     * Constrains the verbosity of the model's response. Lower values will result in
+     * more concise responses, while higher values will result in more verbose
+     * responses. Currently supported values are `low`, `medium`, and `high`.
+     */
+    verbosity?: 'low' | 'medium' | 'high' | null;
   }
 }
 
@@ -5113,7 +5131,7 @@ export interface ResponseCreateParamsBase {
   prompt_cache_key?: string;
 
   /**
-   * **o-series models only**
+   * **gpt-5 and o-series models only**
    *
    * Configuration options for
    * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
@@ -5139,9 +5157,8 @@ export interface ResponseCreateParamsBase {
    * - If set to 'default', then the request will be processed with the standard
    *   pricing and performance for the selected model.
    * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)' or
-   *   'priority', then the request will be processed with the corresponding service
-   *   tier. [Contact sales](https://openai.com/contact-sales) to learn more about
-   *   Priority processing.
+   *   '[priority](https://openai.com/api-priority-processing/)', then the request
+   *   will be processed with the corresponding service tier.
    * - When not set, the default behavior is 'auto'.
    *
    * When this parameter is set, the response body will include the `service_tier`
@@ -5177,14 +5194,7 @@ export interface ResponseCreateParamsBase {
    */
   temperature?: number | null;
 
-  /**
-   * Configuration options for a text response from the model. Can be plain text or
-   * structured JSON data. Learn more:
-   *
-   * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
-   * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
-   */
-  text?: ResponseTextConfig;
+  text?: ResponseCreateParams.Text;
 
   /**
    * How the model should select which tool (or tools) to use when generating a
@@ -5264,6 +5274,32 @@ export namespace ResponseCreateParams {
      * you trust the network links between your application and the OpenAI API.
      */
     include_obfuscation?: boolean;
+  }
+
+  export interface Text {
+    /**
+     * An object specifying the format that the model must output.
+     *
+     * Configuring `{ "type": "json_schema" }` enables Structured Outputs, which
+     * ensures the model will match your supplied JSON schema. Learn more in the
+     * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+     *
+     * The default format is `{ "type": "text" }` with no additional options.
+     *
+     * **Not recommended for gpt-4o and newer models:**
+     *
+     * Setting to `{ "type": "json_object" }` enables the older JSON mode, which
+     * ensures the message the model generates is valid JSON. Using `json_schema` is
+     * preferred for models that support it.
+     */
+    format?: ResponsesAPI.ResponseFormatTextConfig;
+
+    /**
+     * Constrains the verbosity of the model's response. Lower values will result in
+     * more concise responses, while higher values will result in more verbose
+     * responses. Currently supported values are `low`, `medium`, and `high`.
+     */
+    verbosity?: 'low' | 'medium' | 'high' | null;
   }
 
   export type ResponseCreateParamsNonStreaming = ResponsesAPI.ResponseCreateParamsNonStreaming;

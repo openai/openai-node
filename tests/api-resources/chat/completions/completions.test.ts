@@ -51,6 +51,7 @@ describe('resource completions', () => {
       stream: false,
       stream_options: { include_obfuscation: true, include_usage: true },
       temperature: 1,
+      text: { verbosity: 'low' },
       tool_choice: 'none',
       tools: [
         {

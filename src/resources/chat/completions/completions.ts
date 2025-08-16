@@ -281,9 +281,8 @@ export interface ChatCompletion {
    * - If set to 'default', then the request will be processed with the standard
    *   pricing and performance for the selected model.
    * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)' or
-   *   'priority', then the request will be processed with the corresponding service
-   *   tier. [Contact sales](https://openai.com/contact-sales) to learn more about
-   *   Priority processing.
+   *   '[priority](https://openai.com/api-priority-processing/)', then the request
+   *   will be processed with the corresponding service tier.
    * - When not set, the default behavior is 'auto'.
    *
    * When the `service_tier` parameter is set, the response body will include the
@@ -294,7 +293,8 @@ export interface ChatCompletion {
   service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | null;
 
   /**
-   * This fingerprint represents the backend configuration that the model runs with.
+   * @deprecated This fingerprint represents the backend configuration that the model
+   * runs with.
    *
    * Can be used in conjunction with the `seed` request parameter to understand when
    * backend changes have been made that might impact determinism.
@@ -535,9 +535,8 @@ export interface ChatCompletionChunk {
    * - If set to 'default', then the request will be processed with the standard
    *   pricing and performance for the selected model.
    * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)' or
-   *   'priority', then the request will be processed with the corresponding service
-   *   tier. [Contact sales](https://openai.com/contact-sales) to learn more about
-   *   Priority processing.
+   *   '[priority](https://openai.com/api-priority-processing/)', then the request
+   *   will be processed with the corresponding service tier.
    * - When not set, the default behavior is 'auto'.
    *
    * When the `service_tier` parameter is set, the response body will include the
@@ -548,9 +547,9 @@ export interface ChatCompletionChunk {
   service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | null;
 
   /**
-   * This fingerprint represents the backend configuration that the model runs with.
-   * Can be used in conjunction with the `seed` request parameter to understand when
-   * backend changes have been made that might impact determinism.
+   * @deprecated This fingerprint represents the backend configuration that the model
+   * runs with. Can be used in conjunction with the `seed` request parameter to
+   * understand when backend changes have been made that might impact determinism.
    */
   system_fingerprint?: string;
 
@@ -1664,11 +1663,11 @@ export interface ChatCompletionCreateParamsBase {
   safety_identifier?: string;
 
   /**
-   * This feature is in Beta. If specified, our system will make a best effort to
-   * sample deterministically, such that repeated requests with the same `seed` and
-   * parameters should return the same result. Determinism is not guaranteed, and you
-   * should refer to the `system_fingerprint` response parameter to monitor changes
-   * in the backend.
+   * @deprecated This feature is in Beta. If specified, our system will make a best
+   * effort to sample deterministically, such that repeated requests with the same
+   * `seed` and parameters should return the same result. Determinism is not
+   * guaranteed, and you should refer to the `system_fingerprint` response parameter
+   * to monitor changes in the backend.
    */
   seed?: number | null;
 
@@ -1681,9 +1680,8 @@ export interface ChatCompletionCreateParamsBase {
    * - If set to 'default', then the request will be processed with the standard
    *   pricing and performance for the selected model.
    * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)' or
-   *   'priority', then the request will be processed with the corresponding service
-   *   tier. [Contact sales](https://openai.com/contact-sales) to learn more about
-   *   Priority processing.
+   *   '[priority](https://openai.com/api-priority-processing/)', then the request
+   *   will be processed with the corresponding service tier.
    * - When not set, the default behavior is 'auto'.
    *
    * When the `service_tier` parameter is set, the response body will include the
@@ -1734,6 +1732,8 @@ export interface ChatCompletionCreateParamsBase {
    * not both.
    */
   temperature?: number | null;
+
+  text?: ChatCompletionCreateParams.Text;
 
   /**
    * Controls which (if any) tool is called by the model. `none` means the model will
@@ -1823,6 +1823,15 @@ export namespace ChatCompletionCreateParams {
      * Omitting `parameters` defines a function with an empty parameter list.
      */
     parameters?: Shared.FunctionParameters;
+  }
+
+  export interface Text {
+    /**
+     * Constrains the verbosity of the model's response. Lower values will result in
+     * more concise responses, while higher values will result in more verbose
+     * responses. Currently supported values are `low`, `medium`, and `high`.
+     */
+    verbosity?: 'low' | 'medium' | 'high' | null;
   }
 
   /**

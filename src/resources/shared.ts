@@ -226,7 +226,7 @@ export type FunctionParameters = { [key: string]: unknown };
 export type Metadata = { [key: string]: string };
 
 /**
- * **o-series models only**
+ * **gpt-5 and o-series models only**
  *
  * Configuration options for
  * [reasoning models](https://platform.openai.com/docs/guides/reasoning).

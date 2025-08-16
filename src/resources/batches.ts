@@ -244,6 +244,33 @@ export interface BatchCreateParams {
    * a maximum length of 512 characters.
    */
   metadata?: Shared.Metadata | null;
+
+  /**
+   * The expiration policy for the output and/or error file that are generated for a
+   * batch.
+   */
+  output_expires_after?: BatchCreateParams.OutputExpiresAfter;
+}
+
+export namespace BatchCreateParams {
+  /**
+   * The expiration policy for the output and/or error file that are generated for a
+   * batch.
+   */
+  export interface OutputExpiresAfter {
+    /**
+     * Anchor timestamp after which the expiration policy applies. Supported anchors:
+     * `created_at`. Note that the anchor is the file creation time, not the time the
+     * batch is created.
+     */
+    anchor: 'created_at';
+
+    /**
+     * The number of seconds after the anchor time that the file will expire. Must be
+     * between 3600 (1 hour) and 2592000 (30 days).
+     */
+    seconds: number;
+  }
 }
 
 export interface BatchListParams extends CursorPageParams {}
