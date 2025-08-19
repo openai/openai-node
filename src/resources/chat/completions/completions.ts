@@ -1704,7 +1704,7 @@ export interface ChatCompletionCreateParamsBase {
    * our [model distillation](https://platform.openai.com/docs/guides/distillation)
    * or [evals](https://platform.openai.com/docs/guides/evals) products.
    *
-   * Supports text and image inputs. Note: image inputs over 10MB will be dropped.
+   * Supports text and image inputs. Note: image inputs over 8MB will be dropped.
    */
   store?: boolean | null;
 
@@ -1732,8 +1732,6 @@ export interface ChatCompletionCreateParamsBase {
    * not both.
    */
   temperature?: number | null;
-
-  text?: ChatCompletionCreateParams.Text;
 
   /**
    * Controls which (if any) tool is called by the model. `none` means the model will
@@ -1823,15 +1821,6 @@ export namespace ChatCompletionCreateParams {
      * Omitting `parameters` defines a function with an empty parameter list.
      */
     parameters?: Shared.FunctionParameters;
-  }
-
-  export interface Text {
-    /**
-     * Constrains the verbosity of the model's response. Lower values will result in
-     * more concise responses, while higher values will result in more verbose
-     * responses. Currently supported values are `low`, `medium`, and `high`.
-     */
-    verbosity?: 'low' | 'medium' | 'high' | null;
   }
 
   /**

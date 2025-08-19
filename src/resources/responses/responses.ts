@@ -563,7 +563,14 @@ export interface Response {
    */
   status?: ResponseStatus;
 
-  text?: Response.Text;
+  /**
+   * Configuration options for a text response from the model. Can be plain text or
+   * structured JSON data. Learn more:
+   *
+   * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
+   * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+   */
+  text?: ResponseTextConfig;
 
   /**
    * The truncation strategy to use for the model response.
@@ -602,32 +609,6 @@ export namespace Response {
      * The reason why the response is incomplete.
      */
     reason?: 'max_output_tokens' | 'content_filter';
-  }
-
-  export interface Text {
-    /**
-     * An object specifying the format that the model must output.
-     *
-     * Configuring `{ "type": "json_schema" }` enables Structured Outputs, which
-     * ensures the model will match your supplied JSON schema. Learn more in the
-     * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
-     *
-     * The default format is `{ "type": "text" }` with no additional options.
-     *
-     * **Not recommended for gpt-4o and newer models:**
-     *
-     * Setting to `{ "type": "json_object" }` enables the older JSON mode, which
-     * ensures the message the model generates is valid JSON. Using `json_schema` is
-     * preferred for models that support it.
-     */
-    format?: ResponsesAPI.ResponseFormatTextConfig;
-
-    /**
-     * Constrains the verbosity of the model's response. Lower values will result in
-     * more concise responses, while higher values will result in more verbose
-     * responses. Currently supported values are `low`, `medium`, and `high`.
-     */
-    verbosity?: 'low' | 'medium' | 'high' | null;
   }
 }
 
@@ -5194,7 +5175,14 @@ export interface ResponseCreateParamsBase {
    */
   temperature?: number | null;
 
-  text?: ResponseCreateParams.Text;
+  /**
+   * Configuration options for a text response from the model. Can be plain text or
+   * structured JSON data. Learn more:
+   *
+   * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
+   * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+   */
+  text?: ResponseTextConfig;
 
   /**
    * How the model should select which tool (or tools) to use when generating a
@@ -5274,32 +5262,6 @@ export namespace ResponseCreateParams {
      * you trust the network links between your application and the OpenAI API.
      */
     include_obfuscation?: boolean;
-  }
-
-  export interface Text {
-    /**
-     * An object specifying the format that the model must output.
-     *
-     * Configuring `{ "type": "json_schema" }` enables Structured Outputs, which
-     * ensures the model will match your supplied JSON schema. Learn more in the
-     * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
-     *
-     * The default format is `{ "type": "text" }` with no additional options.
-     *
-     * **Not recommended for gpt-4o and newer models:**
-     *
-     * Setting to `{ "type": "json_object" }` enables the older JSON mode, which
-     * ensures the message the model generates is valid JSON. Using `json_schema` is
-     * preferred for models that support it.
-     */
-    format?: ResponsesAPI.ResponseFormatTextConfig;
-
-    /**
-     * Constrains the verbosity of the model's response. Lower values will result in
-     * more concise responses, while higher values will result in more verbose
-     * responses. Currently supported values are `low`, `medium`, and `high`.
-     */
-    verbosity?: 'low' | 'medium' | 'high' | null;
   }
 
   export type ResponseCreateParamsNonStreaming = ResponsesAPI.ResponseCreateParamsNonStreaming;
