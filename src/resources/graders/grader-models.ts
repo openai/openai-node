@@ -291,10 +291,11 @@ export interface StringCheckGrader {
  */
 export interface TextSimilarityGrader {
   /**
-   * The evaluation metric to use. One of `fuzzy_match`, `bleu`, `gleu`, `meteor`,
-   * `rouge_1`, `rouge_2`, `rouge_3`, `rouge_4`, `rouge_5`, or `rouge_l`.
+   * The evaluation metric to use. One of `cosine`, `fuzzy_match`, `bleu`, `gleu`,
+   * `meteor`, `rouge_1`, `rouge_2`, `rouge_3`, `rouge_4`, `rouge_5`, or `rouge_l`.
    */
   evaluation_metric:
+    | 'cosine'
     | 'fuzzy_match'
     | 'bleu'
     | 'gleu'
