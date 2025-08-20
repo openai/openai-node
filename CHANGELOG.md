@@ -1,5 +1,18 @@
 # Changelog
 
+## 5.14.0 (2025-08-20)
+
+Full Changelog: [v5.13.1...v5.14.0](https://github.com/openai/openai-node/compare/v5.13.1...v5.14.0)
+
+### Features
+
+* **mcp:** add code execution tool ([3f8264c](https://github.com/openai/openai-node/commit/3f8264cfaafb8d03aedabe53a0d17a7e3dc326d8))
+
+
+### Chores
+
+* **internal/ci:** setup breaking change detection ([87e8004](https://github.com/openai/openai-node/commit/87e8004d05eb27d14a11d433239af525c9c493b9))
+
 ## 5.13.1 (2025-08-19)
 
 Full Changelog: [v5.13.0...v5.13.1](https://github.com/openai/openai-node/compare/v5.13.0...v5.13.1)
