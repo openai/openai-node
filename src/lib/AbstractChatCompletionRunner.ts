@@ -334,8 +334,8 @@ export class AbstractChatCompletionRunner<
         return;
       }
 
-      for (const tool_call of message.tool_calls) {
-        if (tool_call.type !== 'function') continue;
+      await Promise.all(message.tool_calls.map(async (tool_call) => {
+        if (tool_call.type !== 'function') return;
         const tool_call_id = tool_call.id;
         const { name, arguments: args } = tool_call.function;
         const fn = functionsByName[name];
@@ -348,14 +348,14 @@ export class AbstractChatCompletionRunner<
             .join(', ')}. Please try again`;
 
           this._addMessage({ role, tool_call_id, content });
-          continue;
+          return;
         } else if (singleFunctionToCall && singleFunctionToCall !== name) {
           const content = `Invalid tool_call: ${JSON.stringify(name)}. ${JSON.stringify(
             singleFunctionToCall,
           )} requested. Please try again`;
 
           this._addMessage({ role, tool_call_id, content });
-          continue;
+          return;
         }
 
         let parsed;
@@ -364,7 +364,7 @@ export class AbstractChatCompletionRunner<
         } catch (error) {
           const content = error instanceof Error ? error.message : String(error);
           this._addMessage({ role, tool_call_id, content });
-          continue;
+          return;
         }
 
         // @ts-expect-error it can't rule out `never` type.
@@ -375,7 +375,7 @@ export class AbstractChatCompletionRunner<
         if (singleFunctionToCall) {
           return;
         }
-      }
+      });
     }
 
     return;
