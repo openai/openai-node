@@ -2067,6 +2067,28 @@ export interface ResponseImageGenCallPartialImageEvent {
   sequence_number: number;
 
   /**
+   * The size of the generated image. One of `1024x1024`, `1024x1536`, `1536x1024`,
+   * or `auto`.
+   */
+  size?: '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
+
+  /**
+   * The quality of the generated image. One of `low`, `medium`, `high`, or `auto`.
+   */
+  quality?: 'low' | 'medium' | 'high' | 'auto';
+
+  /**
+   * Background type for the generated image. One of `transparent`, `opaque`, or
+   * `auto`.
+   */
+  background?: 'transparent' | 'opaque' | 'auto';
+
+  /**
+   * The output format of the generated image. One of `png`, `webp`, or `jpeg`.
+   */
+  output_format?: 'png' | 'webp' | 'jpeg';
+
+  /**
    * The type of the event. Always 'response.image_generation_call.partial_image'.
    */
   type: 'response.image_generation_call.partial_image';
