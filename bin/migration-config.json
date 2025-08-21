@@ -598,6 +598,76 @@
       ]
     },
     {
+      "base": "conversations.items",
+      "name": "retrieve",
+      "params": [
+        {
+          "type": "param",
+          "key": "item_id",
+          "location": "path"
+        },
+        {
+          "type": "params",
+          "maybeOverload": false
+        },
+        {
+          "type": "options"
+        }
+      ],
+      "oldParams": [
+        {
+          "type": "param",
+          "key": "conversation_id",
+          "location": "path"
+        },
+        {
+          "type": "param",
+          "key": "item_id",
+          "location": "path"
+        },
+        {
+          "type": "params",
+          "maybeOverload": true
+        },
+        {
+          "type": "options"
+        }
+      ]
+    },
+    {
+      "base": "conversations.items",
+      "name": "delete",
+      "params": [
+        {
+          "type": "param",
+          "key": "item_id",
+          "location": "path"
+        },
+        {
+          "type": "params",
+          "maybeOverload": false
+        },
+        {
+          "type": "options"
+        }
+      ],
+      "oldParams": [
+        {
+          "type": "param",
+          "key": "conversation_id",
+          "location": "path"
+        },
+        {
+          "type": "param",
+          "key": "item_id",
+          "location": "path"
+        },
+        {
+          "type": "options"
+        }
+      ]
+    },
+    {
       "base": "evals.runs",
       "name": "retrieve",
       "params": [
