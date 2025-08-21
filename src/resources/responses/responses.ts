@@ -495,6 +495,12 @@ export interface Response {
   background?: boolean | null;
 
   /**
+   * The conversation that this response belongs to. Input items and output items
+   * from this response are automatically added to this conversation.
+   */
+  conversation?: Response.Conversation | null;
+
+  /**
    * An upper bound for the number of tokens that can be generated for a response,
    * including visible output tokens and
    * [reasoning tokens](https://platform.openai.com/docs/guides/reasoning).
@@ -505,6 +511,7 @@ export interface Response {
    * The unique ID of the previous response to the model. Use this to create
    * multi-turn conversations. Learn more about
    * [conversation state](https://platform.openai.com/docs/guides/conversation-state).
+   * Cannot be used in conjunction with `conversation`.
    */
   previous_response_id?: string | null;
 
@@ -609,6 +616,17 @@ export namespace Response {
      * The reason why the response is incomplete.
      */
     reason?: 'max_output_tokens' | 'content_filter';
+  }
+
+  /**
+   * The conversation that this response belongs to. Input items and output items
+   * from this response are automatically added to this conversation.
+   */
+  export interface Conversation {
+    /**
+     * The unique ID of the conversation.
+     */
+    id: string;
   }
 }
 
@@ -1330,6 +1348,16 @@ export interface ResponseContentPartDoneEvent {
    * The type of the event. Always `response.content_part.done`.
    */
   type: 'response.content_part.done';
+}
+
+/**
+ * The conversation that this response belongs to.
+ */
+export interface ResponseConversationParam {
+  /**
+   * The unique ID of the conversation.
+   */
+  id: string;
 }
 
 /**
@@ -5020,6 +5048,14 @@ export interface ResponseCreateParamsBase {
   background?: boolean | null;
 
   /**
+   * The conversation that this response belongs to. Items from this conversation are
+   * prepended to `input_items` for this response request. Input items and output
+   * items from this response are automatically added to this conversation after this
+   * response completes.
+   */
+  conversation?: string | ResponseConversationParam | null;
+
+  /**
    * Specify additional output data to include in the model response. Currently
    * supported values are:
    *
@@ -5095,6 +5131,7 @@ export interface ResponseCreateParamsBase {
    * The unique ID of the previous response to the model. Use this to create
    * multi-turn conversations. Learn more about
    * [conversation state](https://platform.openai.com/docs/guides/conversation-state).
+   * Cannot be used in conjunction with `conversation`.
    */
   previous_response_id?: string | null;
 
@@ -5383,6 +5420,7 @@ export declare namespace Responses {
     type ResponseContent as ResponseContent,
     type ResponseContentPartAddedEvent as ResponseContentPartAddedEvent,
     type ResponseContentPartDoneEvent as ResponseContentPartDoneEvent,
+    type ResponseConversationParam as ResponseConversationParam,
     type ResponseCreatedEvent as ResponseCreatedEvent,
     type ResponseCustomToolCall as ResponseCustomToolCall,
     type ResponseCustomToolCallInputDeltaEvent as ResponseCustomToolCallInputDeltaEvent,

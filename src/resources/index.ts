@@ -31,6 +31,7 @@ export {
   type ContainerListParams,
   type ContainerListResponsesPage,
 } from './containers/containers';
+export { Conversations } from './conversations/conversations';
 export {
   Embeddings,
   type CreateEmbeddingResponse,

@@ -202,3 +202,68 @@ export class CursorPage<Item extends { id: string }>
     };
   }
 }
+
+export interface ConversationCursorPageResponse<Item> {
+  data: Array<Item>;
+
+  has_more: boolean;
+
+  last_id: string;
+}
+
+export interface ConversationCursorPageParams {
+  after?: string;
+
+  limit?: number;
+}
+
+export class ConversationCursorPage<Item>
+  extends AbstractPage<Item>
+  implements ConversationCursorPageResponse<Item>
+{
+  data: Array<Item>;
+
+  has_more: boolean;
+
+  last_id: string;
+
+  constructor(
+    client: OpenAI,
+    response: Response,
+    body: ConversationCursorPageResponse<Item>,
+    options: FinalRequestOptions,
+  ) {
+    super(client, response, body, options);
+
+    this.data = body.data || [];
+    this.has_more = body.has_more || false;
+    this.last_id = body.last_id || '';
+  }
+
+  getPaginatedItems(): Item[] {
+    return this.data ?? [];
+  }
+
+  override hasNextPage(): boolean {
+    if (this.has_more === false) {
+      return false;
+    }
+
+    return super.hasNextPage();
+  }
+
+  nextPageRequestOptions(): PageRequestOptions | null {
+    const cursor = this.last_id;
+    if (!cursor) {
+      return null;
+    }
+
+    return {
+      ...this.options,
+      query: {
+        ...maybeObj(this.options.query),
+        after: cursor,
+      },
+    };
+  }
+}

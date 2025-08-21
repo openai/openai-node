@@ -73,6 +73,8 @@ client.parents.children.retrieve('c_456', { parent_id: 'p_123' });
 - `client.beta.threads.messages.retrieve()`
 - `client.beta.threads.messages.update()`
 - `client.beta.threads.messages.delete()`
+- `client.conversations.items.retrieve()`
+- `client.conversations.items.delete()`
 - `client.evals.runs.retrieve()`
 - `client.evals.runs.delete()`
 - `client.evals.runs.cancel()`
@@ -111,7 +113,9 @@ client.example.list(undefined, { headers: { ... } });
 + client.example.list({}, { headers: { ... } });
 ```
 
-This affects the following methods:
+<details>
+
+<summary>This affects the following methods</summary>
 
 - `client.chat.completions.list()`
 - `client.chat.completions.messages.list()`
@@ -129,6 +133,7 @@ This affects the following methods:
 - `client.batches.list()`
 - `client.responses.retrieve()`
 - `client.responses.inputItems.list()`
+- `client.conversations.items.list()`
 - `client.evals.list()`
 - `client.evals.runs.list()`
 - `client.containers.list()`
