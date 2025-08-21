@@ -4646,11 +4646,6 @@ export namespace Tool {
     server_label: string;
 
     /**
-     * The URL for the MCP server.
-     */
-    server_url: string;
-
-    /**
      * The type of the MCP tool. Always `mcp`.
      */
     type: 'mcp';
@@ -4658,7 +4653,41 @@ export namespace Tool {
     /**
      * List of allowed tool names or a filter object.
      */
-    allowed_tools?: Array<string> | Mcp.McpAllowedToolsFilter | null;
+    allowed_tools?: Array<string> | Mcp.McpToolFilter | null;
+
+    /**
+     * An OAuth access token that can be used with a remote MCP server, either with a
+     * custom MCP server URL or a service connector. Your application must handle the
+     * OAuth authorization flow and provide the token here.
+     */
+    authorization?: string;
+
+    /**
+     * Identifier for service connectors, like those available in ChatGPT. One of
+     * `server_url` or `connector_id` must be provided. Learn more about service
+     * connectors
+     * [here](https://platform.openai.com/docs/guides/tools-remote-mcp#connectors).
+     *
+     * Currently supported `connector_id` values are:
+     *
+     * - Dropbox: `connector_dropbox`
+     * - Gmail: `connector_gmail`
+     * - Google Calendar: `connector_googlecalendar`
+     * - Google Drive: `connector_googledrive`
+     * - Microsoft Teams: `connector_microsoftteams`
+     * - Outlook Calendar: `connector_outlookcalendar`
+     * - Outlook Email: `connector_outlookemail`
+     * - SharePoint: `connector_sharepoint`
+     */
+    connector_id?:
+      | 'connector_dropbox'
+      | 'connector_gmail'
+      | 'connector_googlecalendar'
+      | 'connector_googledrive'
+      | 'connector_microsoftteams'
+      | 'connector_outlookcalendar'
+      | 'connector_outlookemail'
+      | 'connector_sharepoint';
 
     /**
      * Optional HTTP headers to send to the MCP server. Use for authentication or other
@@ -4675,48 +4704,82 @@ export namespace Tool {
      * Optional description of the MCP server, used to provide more context.
      */
     server_description?: string;
+
+    /**
+     * The URL for the MCP server. One of `server_url` or `connector_id` must be
+     * provided.
+     */
+    server_url?: string;
   }
 
   export namespace Mcp {
     /**
      * A filter object to specify which tools are allowed.
      */
-    export interface McpAllowedToolsFilter {
+    export interface McpToolFilter {
+      /**
+       * Indicates whether or not a tool modifies data or is read-only. If an MCP server
+       * is
+       * [annotated with `readOnlyHint`](https://modelcontextprotocol.io/specification/2025-06-18/schema#toolannotations-readonlyhint),
+       * it will match this filter.
+       */
+      read_only?: boolean;
+
       /**
        * List of allowed tool names.
        */
       tool_names?: Array<string>;
     }
 
+    /**
+     * Specify which of the MCP server's tools require approval. Can be `always`,
+     * `never`, or a filter object associated with tools that require approval.
+     */
     export interface McpToolApprovalFilter {
       /**
-       * A list of tools that always require approval.
+       * A filter object to specify which tools are allowed.
        */
       always?: McpToolApprovalFilter.Always;
 
       /**
-       * A list of tools that never require approval.
+       * A filter object to specify which tools are allowed.
        */
       never?: McpToolApprovalFilter.Never;
     }
 
     export namespace McpToolApprovalFilter {
       /**
-       * A list of tools that always require approval.
+       * A filter object to specify which tools are allowed.
        */
       export interface Always {
         /**
-         * List of tools that require approval.
+         * Indicates whether or not a tool modifies data or is read-only. If an MCP server
+         * is
+         * [annotated with `readOnlyHint`](https://modelcontextprotocol.io/specification/2025-06-18/schema#toolannotations-readonlyhint),
+         * it will match this filter.
+         */
+        read_only?: boolean;
+
+        /**
+         * List of allowed tool names.
          */
         tool_names?: Array<string>;
       }
 
       /**
-       * A list of tools that never require approval.
+       * A filter object to specify which tools are allowed.
        */
       export interface Never {
         /**
-         * List of tools that do not require approval.
+         * Indicates whether or not a tool modifies data or is read-only. If an MCP server
+         * is
+         * [annotated with `readOnlyHint`](https://modelcontextprotocol.io/specification/2025-06-18/schema#toolannotations-readonlyhint),
+         * it will match this filter.
+         */
+        read_only?: boolean;
+
+        /**
+         * List of allowed tool names.
          */
         tool_names?: Array<string>;
       }
