@@ -15,7 +15,14 @@ import * as qs from './internal/qs';
 import { VERSION } from './version';
 import * as Errors from './core/error';
 import * as Pagination from './core/pagination';
-import { AbstractPage, type CursorPageParams, CursorPageResponse, PageResponse } from './core/pagination';
+import {
+  AbstractPage,
+  type ConversationCursorPageParams,
+  ConversationCursorPageResponse,
+  type CursorPageParams,
+  CursorPageResponse,
+  PageResponse,
+} from './core/pagination';
 import * as Uploads from './core/uploads';
 import * as API from './resources/index';
 import { APIPromise } from './core/api-promise';
@@ -97,6 +104,7 @@ import {
   ContainerRetrieveResponse,
   Containers,
 } from './resources/containers/containers';
+import { Conversations } from './resources/conversations/conversations';
 import {
   EvalCreateParams,
   EvalCreateResponse,
@@ -954,6 +962,7 @@ export class OpenAI {
   batches: API.Batches = new API.Batches(this);
   uploads: API.Uploads = new API.Uploads(this);
   responses: API.Responses = new API.Responses(this);
+  conversations: API.Conversations = new API.Conversations(this);
   evals: API.Evals = new API.Evals(this);
   containers: API.Containers = new API.Containers(this);
 }
@@ -974,6 +983,7 @@ OpenAI.Beta = Beta;
 OpenAI.Batches = Batches;
 OpenAI.Uploads = UploadsAPIUploads;
 OpenAI.Responses = Responses;
+OpenAI.Conversations = Conversations;
 OpenAI.Evals = Evals;
 OpenAI.Containers = Containers;
 
@@ -985,6 +995,12 @@ export declare namespace OpenAI {
 
   export import CursorPage = Pagination.CursorPage;
   export { type CursorPageParams as CursorPageParams, type CursorPageResponse as CursorPageResponse };
+
+  export import ConversationCursorPage = Pagination.ConversationCursorPage;
+  export {
+    type ConversationCursorPageParams as ConversationCursorPageParams,
+    type ConversationCursorPageResponse as ConversationCursorPageResponse,
+  };
 
   export {
     Completions as Completions,
@@ -1148,6 +1164,8 @@ export declare namespace OpenAI {
   };
 
   export { Responses as Responses };
+
+  export { Conversations as Conversations };
 
   export {
     Evals as Evals,

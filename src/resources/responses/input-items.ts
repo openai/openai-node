@@ -66,11 +66,6 @@ export interface ResponseItemList {
 
 export interface InputItemListParams extends CursorPageParams {
   /**
-   * An item ID to list items before, used in pagination.
-   */
-  before?: string;
-
-  /**
    * Additional fields to include in the response. See the `include` parameter for
    * Response creation above for more information.
    */
