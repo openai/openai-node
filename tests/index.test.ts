@@ -736,7 +736,7 @@ describe('retries', () => {
       };
       const client = new OpenAI({
         baseURL: 'http://localhost:5000/',
-        tokenProvider: async () => ({ token: 'my token' }),
+        apiKey: async () => 'my token',
         fetch: testFetch,
       });
       expect(
@@ -763,12 +763,12 @@ describe('retries', () => {
         });
       };
       let counter = 0;
-      async function tokenProvider() {
-        return { token: `token-${counter++}` };
+      async function apiKey() {
+        return `token-${counter++}`;
       }
       const client = new OpenAI({
         baseURL: 'http://localhost:5000/',
-        tokenProvider,
+        apiKey,
         fetch: testFetch,
       });
       expect(
@@ -781,21 +781,6 @@ describe('retries', () => {
             .asResponse()
         ).headers.get('authorization'),
       ).toEqual('Bearer token-1');
-    });
-
-    test('mutual exclusive', () => {
-      try {
-        new OpenAI({
-          baseURL: 'http://localhost:5000/',
-          tokenProvider: async () => ({ token: 'my token' }),
-          apiKey: 'my api key',
-        });
-      } catch (error: any) {
-        expect(error).toBeInstanceOf(Error);
-        expect(error.message).toEqual(
-          'The `apiKey` and `tokenProvider` arguments are mutually exclusive; only one can be passed at a time.',
-        );
-      }
     });
 
     test('at least one', () => {

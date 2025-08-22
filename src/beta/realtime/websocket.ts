@@ -39,8 +39,9 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
     const dangerouslyAllowBrowser =
       props.dangerouslyAllowBrowser ??
       (client as any)?._options?.dangerouslyAllowBrowser ??
-      (client?.apiKey.startsWith('ek_') ? true : null);
-
+      (typeof (client as any)?._options?.apiKey === 'string' && client?.apiKey?.startsWith('ek_') ?
+        true
+      : null);
     if (!dangerouslyAllowBrowser && isRunningInBrowser()) {
       throw new OpenAIError(
         "It looks like you're running in a browser-like environment.\n\nThis is disabled by default, as it risks exposing your secret API credentials to attackers.\n\nYou can avoid this error by creating an ephemeral session token:\nhttps://platform.openai.com/docs/api-reference/realtime-sessions\n",
@@ -48,6 +49,10 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
     }
 
     client ??= new OpenAI({ dangerouslyAllowBrowser });
+
+    if (typeof (client as any)?._options?.apiKey !== 'string') {
+      throw new Error('Call the create method instead to construct the client');
+    }
 
     this.url = buildRealtimeURL(client, props.model);
     props.onURL?.(this.url);
@@ -95,18 +100,18 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
   }
 
   static async create(
-    client: Pick<OpenAI, 'apiKey' | 'baseURL' | '_setToken'>,
+    client: Pick<OpenAI, 'apiKey' | 'baseURL' | '_setApiKey'>,
     props: { model: string; dangerouslyAllowBrowser?: boolean },
   ): Promise<OpenAIRealtimeWebSocket> {
-    await client._setToken();
+    await client._setApiKey();
     return new OpenAIRealtimeWebSocket(props, client);
   }
 
   static async azure(
-    client: Pick<AzureOpenAI, '_setToken' | 'apiVersion' | 'apiKey' | 'baseURL' | 'deploymentName'>,
+    client: Pick<AzureOpenAI, '_setApiKey' | 'apiVersion' | 'apiKey' | 'baseURL' | 'deploymentName'>,
     options: { deploymentName?: string; dangerouslyAllowBrowser?: boolean } = {},
   ): Promise<OpenAIRealtimeWebSocket> {
-    const isToken = await client._setToken();
+    const isToken = await client._setApiKey();
     function onURL(url: URL) {
       if (isToken) {
         url.searchParams.set('Authorization', `Bearer ${client.apiKey}`);

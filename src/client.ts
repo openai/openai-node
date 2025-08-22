@@ -206,20 +206,13 @@ import {
 } from './internal/utils/log';
 import { isEmptyObj } from './internal/utils/values';
 
-export interface AccessToken {
-  token: string;
-}
-export type TokenProvider = () => Promise<AccessToken>;
+export type ApiKeySetter = () => Promise<string>;
 
 export interface ClientOptions {
   /**
    * Defaults to process.env['OPENAI_API_KEY'].
    */
-  apiKey?: string | undefined;
-  /**
-   * A function that returns a token to use for authentication.
-   */
-  tokenProvider?: TokenProvider | undefined;
+  apiKey?: string | ApiKeySetter | undefined;
   /**
    * Defaults to process.env['OPENAI_ORG_ID'].
    */
@@ -330,7 +323,6 @@ export class OpenAI {
   #encoder: Opts.RequestEncoder;
   protected idempotencyHeader?: string;
   private _options: ClientOptions;
-  private _tokenProvider: TokenProvider | undefined;
 
   /**
    * API Client for interfacing with the OpenAI API.
@@ -354,18 +346,11 @@ export class OpenAI {
     organization = readEnv('OPENAI_ORG_ID') ?? null,
     project = readEnv('OPENAI_PROJECT_ID') ?? null,
     webhookSecret = readEnv('OPENAI_WEBHOOK_SECRET') ?? null,
-    tokenProvider,
     ...opts
   }: ClientOptions = {}) {
-    if (apiKey === undefined && !tokenProvider) {
+    if (apiKey === undefined) {
       throw new Errors.OpenAIError(
-        'Missing credentials. Please pass one of `apiKey` and `tokenProvider`, or set the `OPENAI_API_KEY` environment variable.',
-      );
-    }
-
-    if (tokenProvider && apiKey) {
-      throw new Errors.OpenAIError(
-        'The `apiKey` and `tokenProvider` arguments are mutually exclusive; only one can be passed at a time.',
+        'Missing credentials. Please pass an `apiKey`, or set the `OPENAI_API_KEY` environment variable.',
       );
     }
 
@@ -374,7 +359,6 @@ export class OpenAI {
       organization,
       project,
       webhookSecret,
-      tokenProvider,
       ...opts,
       baseURL: baseURL || `https://api.openai.com/v1`,
     };
@@ -402,8 +386,7 @@ export class OpenAI {
 
     this._options = options;
 
-    this.apiKey = apiKey ?? 'Missing Key';
-    this._tokenProvider = tokenProvider;
+    this.apiKey = typeof apiKey === 'string' ? apiKey : 'Missing Key';
     this.organization = organization;
     this.project = project;
     this.webhookSecret = webhookSecret;
@@ -423,7 +406,6 @@ export class OpenAI {
       fetch: this.fetch,
       fetchOptions: this.fetchOptions,
       apiKey: this.apiKey,
-      tokenProvider: this._tokenProvider,
       organization: this.organization,
       project: this.project,
       webhookSecret: this.webhookSecret,
@@ -472,23 +454,24 @@ export class OpenAI {
     return Errors.APIError.generate(status, error, message, headers);
   }
 
-  async _setToken(): Promise<boolean> {
-    if (typeof this._tokenProvider === 'function') {
+  async _setApiKey(): Promise<boolean> {
+    const apiKey = this._options.apiKey;
+    if (typeof apiKey === 'function') {
       try {
-        const token = await this._tokenProvider();
-        if (!token || typeof token.token !== 'string') {
+        const token = await apiKey();
+        if (!token || typeof token !== 'string') {
           throw new Errors.OpenAIError(
-            `Expected 'tokenProvider' argument to return a string but it returned ${token}`,
+            `Expected 'apiKey' function argument to return a string but it returned ${token}`,
           );
         }
-        this.apiKey = token.token;
+        this.apiKey = token;
         return true;
       } catch (err: any) {
         if (err instanceof Errors.OpenAIError) {
           throw err;
         }
         throw new Errors.OpenAIError(
-          `Failed to get token from 'tokenProvider' function: ${err.message}`,
+          `Failed to get token from 'apiKey' function: ${err.message}`,
           // @ts-ignore
           { cause: err },
         );
@@ -524,7 +507,7 @@ export class OpenAI {
    * Used as a callback for mutating the given `FinalRequestOptions` object.
    */
   protected async prepareOptions(options: FinalRequestOptions): Promise<void> {
-    await this._setToken();
+    await this._setApiKey();
   }
 
   /**

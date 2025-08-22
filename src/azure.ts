@@ -109,10 +109,8 @@ export class AzureOpenAI extends OpenAI {
     }
 
     super({
-      apiKey,
+      apiKey: azureADTokenProvider ?? apiKey,
       baseURL,
-      tokenProvider:
-        !azureADTokenProvider ? undefined : async () => ({ token: await azureADTokenProvider() }),
       ...opts,
       ...(dangerouslyAllowBrowser !== undefined ? { dangerouslyAllowBrowser } : {}),
     });

@@ -13,7 +13,9 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
   ) {
     super();
     client ??= new OpenAI();
-
+    if (typeof (client as any)._options.apiKey !== 'string') {
+      throw new Error('Call the create method instead to construct the client');
+    }
     this.url = buildRealtimeURL(client, props.model);
     this.socket = new WS.WebSocket(this.url, {
       ...props.options,
@@ -52,15 +54,15 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
   }
 
   static async create(
-    client: Pick<OpenAI, 'apiKey' | 'baseURL' | '_setToken'>,
+    client: Pick<OpenAI, 'apiKey' | 'baseURL' | '_setApiKey'>,
     props: { model: string; options?: WS.ClientOptions | undefined },
   ): Promise<OpenAIRealtimeWS> {
-    await client._setToken();
+    await client._setApiKey();
     return new OpenAIRealtimeWS(props, client);
   }
 
   static async azure(
-    client: Pick<AzureOpenAI, '_setToken' | 'apiVersion' | 'apiKey' | 'baseURL' | 'deploymentName'>,
+    client: Pick<AzureOpenAI, '_setApiKey' | 'apiVersion' | 'apiKey' | 'baseURL' | 'deploymentName'>,
     options: { deploymentName?: string; options?: WS.ClientOptions | undefined } = {},
   ): Promise<OpenAIRealtimeWS> {
     const deploymentName = options.deploymentName ?? client.deploymentName;
@@ -90,8 +92,8 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
   }
 }
 
-async function getAzureHeaders(client: Pick<AzureOpenAI, '_setToken' | 'apiKey'>) {
-  const isToken = await client._setToken();
+async function getAzureHeaders(client: Pick<AzureOpenAI, '_setApiKey' | 'apiKey'>) {
+  const isToken = await client._setApiKey();
   if (isToken) {
     return { Authorization: `Bearer ${isToken}` };
   } else {
