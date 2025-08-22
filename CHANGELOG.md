@@ -1,5 +1,14 @@
 # Changelog
 
+## 5.15.1 (2025-08-22)
+
+Full Changelog: [v5.15.0...v5.15.1](https://github.com/openai/openai-node/compare/v5.15.0...v5.15.1)
+
+### Chores
+
+* **client:** qualify global Blob ([7998d3f](https://github.com/openai/openai-node/commit/7998d3fd3715ab2c06ea011155420ac126681649))
+* update CI script ([accb0c1](https://github.com/openai/openai-node/commit/accb0c1188dbaef20c1a40bd3047087960c99a07))
+
 ## 5.15.0 (2025-08-21)
 
 Full Changelog: [v5.14.0...v5.15.0](https://github.com/openai/openai-node/compare/v5.14.0...v5.15.0)
