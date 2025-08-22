@@ -12,7 +12,7 @@ if [[ "$SIGNED_URL" == "null" ]]; then
   exit 1
 fi
 
-UPLOAD_RESPONSE=$(tar -cz dist | curl -v -X PUT \
+UPLOAD_RESPONSE=$(tar -cz "${BUILD_PATH:-dist}" | curl -v -X PUT \
   -H "Content-Type: application/gzip" \
   --data-binary @- "$SIGNED_URL" 2>&1)
 
