@@ -206,12 +206,13 @@ import {
 } from './internal/utils/log';
 import { isEmptyObj } from './internal/utils/values';
 
+export type ApiKeySetter = () => Promise<string>;
+
 export interface ClientOptions {
   /**
    * Defaults to process.env['OPENAI_API_KEY'].
    */
-  apiKey?: string | undefined;
-
+  apiKey?: string | ApiKeySetter | undefined;
   /**
    * Defaults to process.env['OPENAI_ORG_ID'].
    */
@@ -349,7 +350,7 @@ export class OpenAI {
   }: ClientOptions = {}) {
     if (apiKey === undefined) {
       throw new Errors.OpenAIError(
-        "The OPENAI_API_KEY environment variable is missing or empty; either provide it, or instantiate the OpenAI client with an apiKey option, like new OpenAI({ apiKey: 'My API Key' }).",
+        'Missing credentials. Please pass an `apiKey`, or set the `OPENAI_API_KEY` environment variable.',
       );
     }
 
@@ -385,7 +386,7 @@ export class OpenAI {
 
     this._options = options;
 
-    this.apiKey = apiKey;
+    this.apiKey = typeof apiKey === 'string' ? apiKey : 'Missing Key';
     this.organization = organization;
     this.project = project;
     this.webhookSecret = webhookSecret;
@@ -453,6 +454,32 @@ export class OpenAI {
     return Errors.APIError.generate(status, error, message, headers);
   }
 
+  async _setApiKey(): Promise<boolean> {
+    const apiKey = this._options.apiKey;
+    if (typeof apiKey === 'function') {
+      try {
+        const token = await apiKey();
+        if (!token || typeof token !== 'string') {
+          throw new Errors.OpenAIError(
+            `Expected 'apiKey' function argument to return a string but it returned ${token}`,
+          );
+        }
+        this.apiKey = token;
+        return true;
+      } catch (err: any) {
+        if (err instanceof Errors.OpenAIError) {
+          throw err;
+        }
+        throw new Errors.OpenAIError(
+          `Failed to get token from 'apiKey' function: ${err.message}`,
+          // @ts-ignore
+          { cause: err },
+        );
+      }
+    }
+    return false;
+  }
+
   buildURL(
     path: string,
     query: Record<string, unknown> | null | undefined,
@@ -479,7 +506,9 @@ export class OpenAI {
   /**
    * Used as a callback for mutating the given `FinalRequestOptions` object.
    */
-  protected async prepareOptions(options: FinalRequestOptions): Promise<void> {}
+  protected async prepareOptions(options: FinalRequestOptions): Promise<void> {
+    await this._setApiKey();
+  }
 
   /**
    * Used as a callback for mutating the given `RequestInit` object.
