@@ -791,7 +791,7 @@ describe('retries', () => {
       } catch (error: any) {
         expect(error).toBeInstanceOf(Error);
         expect(error.message).toEqual(
-          'Missing credentials. Please pass one of `apiKey` and `tokenProvider`, or set the `OPENAI_API_KEY` environment variable.',
+          'Missing credentials. Please pass an `apiKey`, or set the `OPENAI_API_KEY` environment variable.',
         );
       }
     });
