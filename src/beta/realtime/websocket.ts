@@ -31,17 +31,17 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
        * @internal
        */
       onURL?: (url: URL) => void;
+      /** Indicates the token was resolved by the factory just before connecting. @internal */
+      __resolvedApiKey?: boolean;
     },
     client?: Pick<OpenAI, 'apiKey' | 'baseURL'>,
   ) {
     super();
-
+    const hasProvider = typeof (client as any)?._options?.apiKey === 'function';
     const dangerouslyAllowBrowser =
       props.dangerouslyAllowBrowser ??
       (client as any)?._options?.dangerouslyAllowBrowser ??
-      (typeof (client as any)?._options?.apiKey === 'string' && client?.apiKey?.startsWith('ek_') ?
-        true
-      : null);
+      (client?.apiKey?.startsWith('ek_') ? true : null);
     if (!dangerouslyAllowBrowser && isRunningInBrowser()) {
       throw new OpenAIError(
         "It looks like you're running in a browser-like environment.\n\nThis is disabled by default, as it risks exposing your secret API credentials to attackers.\n\nYou can avoid this error by creating an ephemeral session token:\nhttps://platform.openai.com/docs/api-reference/realtime-sessions\n",
@@ -50,7 +50,7 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
 
     client ??= new OpenAI({ dangerouslyAllowBrowser });
 
-    if (typeof (client as any)?._options?.apiKey !== 'string') {
+    if (hasProvider && !props?.__resolvedApiKey) {
       throw new Error(
         [
           'Cannot open Realtime WebSocket with a function-based apiKey.',
@@ -109,8 +109,7 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
     client: Pick<OpenAI, 'apiKey' | 'baseURL' | '_callApiKey'>,
     props: { model: string; dangerouslyAllowBrowser?: boolean },
   ): Promise<OpenAIRealtimeWebSocket> {
-    await client._callApiKey();
-    return new OpenAIRealtimeWebSocket(props, client);
+    return new OpenAIRealtimeWebSocket({ ...props, __resolvedApiKey: await client._callApiKey() }, client);
   }
 
   static async azure(
@@ -135,6 +134,7 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
         model: deploymentName,
         onURL,
         ...(dangerouslyAllowBrowser ? { dangerouslyAllowBrowser } : {}),
+        __resolvedApiKey: isToken,
       },
       client,
     );
