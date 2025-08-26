@@ -14,7 +14,13 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     super();
     client ??= new OpenAI();
     if (typeof (client as any)._options.apiKey !== 'string') {
-      throw new Error('Call the create method instead to construct the client');
+      throw new Error(
+        [
+          'Cannot open Realtime WebSocket with a function-based apiKey.',
+          'Use the factory so the key is resolved before connecting:',
+          '- OpenAIRealtimeWS.create(client, { model })',
+        ].join('\n'),
+      );
     }
     this.url = buildRealtimeURL(client, props.model);
     this.socket = new WS.WebSocket(this.url, {
