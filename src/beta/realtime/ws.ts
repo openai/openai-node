@@ -112,5 +112,3 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     }
   }
 }
-
-// getAzureHeaders inlined into azure()
