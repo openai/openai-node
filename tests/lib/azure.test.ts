@@ -270,7 +270,7 @@ describe('instantiate azure client', () => {
 
     test('AAD token is refreshed', async () => {
       let fail = true;
-      const testFetch = async (url: any, { headers }: RequestInit = {}): Promise<Response> => {
+      const testFetch = async (url: RequestInfo, { headers }: RequestInit = {}): Promise<Response> => {
         if (fail) {
           fail = false;
           return new Response(undefined, {

@@ -100,18 +100,18 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
   }
 
   static async create(
-    client: Pick<OpenAI, 'apiKey' | 'baseURL' | '_setApiKey'>,
+    client: Pick<OpenAI, 'apiKey' | 'baseURL' | '_callApiKey'>,
     props: { model: string; dangerouslyAllowBrowser?: boolean },
   ): Promise<OpenAIRealtimeWebSocket> {
-    await client._setApiKey();
+    await client._callApiKey();
     return new OpenAIRealtimeWebSocket(props, client);
   }
 
   static async azure(
-    client: Pick<AzureOpenAI, '_setApiKey' | 'apiVersion' | 'apiKey' | 'baseURL' | 'deploymentName'>,
+    client: Pick<AzureOpenAI, '_callApiKey' | 'apiVersion' | 'apiKey' | 'baseURL' | 'deploymentName'>,
     options: { deploymentName?: string; dangerouslyAllowBrowser?: boolean } = {},
   ): Promise<OpenAIRealtimeWebSocket> {
-    const isToken = await client._setApiKey();
+    const isToken = await client._callApiKey();
     function onURL(url: URL) {
       if (isToken) {
         url.searchParams.set('Authorization', `Bearer ${client.apiKey}`);
