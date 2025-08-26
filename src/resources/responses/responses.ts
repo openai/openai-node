@@ -1949,6 +1949,28 @@ export namespace ResponseFunctionWebSearch {
      * The action type.
      */
     type: 'search';
+
+    /**
+     * The sources used in the search.
+     */
+    sources?: Array<Search.Source>;
+  }
+
+  export namespace Search {
+    /**
+     * A source used in the search.
+     */
+    export interface Source {
+      /**
+       * The type of source. Always `url`.
+       */
+      type: 'url';
+
+      /**
+       * The URL of the source.
+       */
+      url: string;
+    }
   }
 
   /**
@@ -2124,6 +2146,12 @@ export interface ResponseInProgressEvent {
  * Specify additional output data to include in the model response. Currently
  * supported values are:
  *
+ * - `web_search_call.action.sources`: Include the sources of the web search tool
+ *   call.
+ * - `code_interpreter_call.outputs`: Includes the outputs of python code execution
+ *   in code interpreter tool call items.
+ * - `computer_call_output.output.image_url`: Include image urls from the computer
+ *   call output.
  * - `file_search_call.results`: Include the search results of the file search tool
  *   call.
  * - `message.input_image.image_url`: Include image urls from the input message.
@@ -4625,15 +4653,90 @@ export interface ResponseWebSearchCallSearchingEvent {
 export type Tool =
   | FunctionTool
   | FileSearchTool
-  | WebSearchTool
   | ComputerTool
+  | Tool.WebSearchTool
   | Tool.Mcp
   | Tool.CodeInterpreter
   | Tool.ImageGeneration
   | Tool.LocalShell
-  | CustomTool;
+  | CustomTool
+  | WebSearchTool;
 
 export namespace Tool {
+  /**
+   * Search the Internet for sources related to the prompt. Learn more about the
+   * [web search tool](https://platform.openai.com/docs/guides/tools-web-search).
+   */
+  export interface WebSearchTool {
+    /**
+     * The type of the web search tool. One of `web_search` or `web_search_2025_08_26`.
+     */
+    type: 'web_search' | 'web_search_2025_08_26';
+
+    /**
+     * Filters for the search.
+     */
+    filters?: WebSearchTool.Filters | null;
+
+    /**
+     * High level guidance for the amount of context window space to use for the
+     * search. One of `low`, `medium`, or `high`. `medium` is the default.
+     */
+    search_context_size?: 'low' | 'medium' | 'high';
+
+    /**
+     * The approximate location of the user.
+     */
+    user_location?: WebSearchTool.UserLocation | null;
+  }
+
+  export namespace WebSearchTool {
+    /**
+     * Filters for the search.
+     */
+    export interface Filters {
+      /**
+       * Allowed domains for the search. If not provided, all domains are allowed.
+       * Subdomains of the provided domains are allowed as well.
+       *
+       * Example: `["pubmed.ncbi.nlm.nih.gov"]`
+       */
+      allowed_domains?: Array<string> | null;
+    }
+
+    /**
+     * The approximate location of the user.
+     */
+    export interface UserLocation {
+      /**
+       * Free text input for the city of the user, e.g. `San Francisco`.
+       */
+      city?: string | null;
+
+      /**
+       * The two-letter [ISO country code](https://en.wikipedia.org/wiki/ISO_3166-1) of
+       * the user, e.g. `US`.
+       */
+      country?: string | null;
+
+      /**
+       * Free text input for the region of the user, e.g. `California`.
+       */
+      region?: string | null;
+
+      /**
+       * The [IANA timezone](https://timeapi.io/documentation/iana-timezones) of the
+       * user, e.g. `America/Los_Angeles`.
+       */
+      timezone?: string | null;
+
+      /**
+       * The type of location approximation. Always `approximate`.
+       */
+      type?: 'approximate';
+    }
+  }
+
   /**
    * Give the model access to additional tools via remote Model Context Protocol
    * (MCP) servers.
@@ -5122,6 +5225,12 @@ export interface ResponseCreateParamsBase {
    * Specify additional output data to include in the model response. Currently
    * supported values are:
    *
+   * - `web_search_call.action.sources`: Include the sources of the web search tool
+   *   call.
+   * - `code_interpreter_call.outputs`: Includes the outputs of python code execution
+   *   in code interpreter tool call items.
+   * - `computer_call_output.output.image_url`: Include image urls from the computer
+   *   call output.
    * - `file_search_call.results`: Include the search results of the file search tool
    *   call.
    * - `message.input_image.image_url`: Include image urls from the input message.
