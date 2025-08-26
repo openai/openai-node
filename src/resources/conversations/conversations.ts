@@ -22,7 +22,7 @@ export class Conversations extends APIResource {
   items: ItemsAPI.Items = new ItemsAPI.Items(this._client);
 
   /**
-   * Create a conversation with the given ID.
+   * Create a conversation.
    */
   create(body: ConversationCreateParams, options?: RequestOptions): APIPromise<Conversation> {
     return this._client.post('/conversations', { body, ...options });
