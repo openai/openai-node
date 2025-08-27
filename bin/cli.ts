@@ -1,11 +1,11 @@
-#!/usr/bin/env node
+#!/usr/bin/env -S npx tsx
 
-const { spawnSync } = require('child_process');
-const fs = require('fs');
-const path = require('path');
+import { spawnSync } from 'child_process';
+import fs from 'fs';
+import path from 'path';
 
 // Try to load the OpenAI client
-let OpenAI;
+let OpenAI: any;
 try {
   OpenAI = require('../dist/client').OpenAI;
 } catch (e) {
@@ -18,7 +18,12 @@ try {
   }
 }
 
-const commands = {
+interface Command {
+  description: string;
+  fn: () => void | Promise<void>;
+}
+
+const commands: Record<string, Command> = {
   migrate: {
     description: 'Run migrations to update to the latest major SDK version',
     fn: () => {
@@ -47,7 +52,7 @@ const commands = {
         console.log('✅ API key is valid!');
         console.log(`📊 You have access to ${models.data.length} models`);
         process.exit(0);
-      } catch (error) {
+      } catch (error: any) {
         console.error('❌ API key validation failed:');
         if (error.status === 401) {
           console.error('   Invalid API key. Please check your OPENAI_API_KEY environment variable.');
@@ -70,8 +75,8 @@ const commands = {
         console.log('🤖 Available Models:');
         console.log('');
         
-        const modelGroups = {};
-        models.data.forEach(model => {
+        const modelGroups: Record<string, any[]> = {};
+        models.data.forEach((model: any) => {
           const group = model.id.split('-')[0] || 'other';
           if (!modelGroups[group]) modelGroups[group] = [];
           modelGroups[group].push(model);
@@ -79,7 +84,7 @@ const commands = {
         
         Object.entries(modelGroups).forEach(([group, groupModels]) => {
           console.log(`📁 ${group.toUpperCase()}:`);
-          groupModels.forEach(model => {
+          groupModels.forEach((model: any) => {
             const status = model.deprecated ? '⚠️  (deprecated)' : '✅';
             console.log(`   ${status} ${model.id}`);
           });
@@ -87,7 +92,7 @@ const commands = {
         });
         
         console.log(`Total: ${models.data.length} models`);
-      } catch (error) {
+      } catch (error: any) {
         console.error('❌ Failed to fetch models:', error.message);
         process.exit(1);
       }
@@ -120,7 +125,7 @@ const commands = {
         
         const response = completion.choices[0]?.message?.content;
         console.log(`🤖 Assistant: ${response}`);
-      } catch (error) {
+      } catch (error: any) {
         console.error('❌ Chat failed:', error.message);
         process.exit(1);
       }
@@ -158,7 +163,7 @@ const commands = {
         console.log(`📊 Size: ${(file.bytes / 1024).toFixed(2)} KB`);
         console.log(`📋 Purpose: ${file.purpose}`);
         console.log(`⏰ Created: ${new Date(file.created_at * 1000).toLocaleString()}`);
-      } catch (error) {
+      } catch (error: any) {
         console.error('❌ Upload failed:', error.message);
         process.exit(1);
       }
@@ -189,7 +194,7 @@ const commands = {
         console.log('');
         console.log('💡 Tip: Set up usage alerts in your OpenAI dashboard to monitor costs.');
         
-      } catch (error) {
+      } catch (error: any) {
         console.error('❌ Failed to fetch usage:', error.message);
         process.exit(1);
       }
@@ -233,7 +238,7 @@ if (!command) {
 
 // Handle async commands
 if (command.fn.constructor.name === 'AsyncFunction') {
-  command.fn().catch(error => {
+  (command.fn as () => Promise<void>)().catch((error: any) => {
     console.error('❌ Unexpected error:', error.message);
     process.exit(1);
   });

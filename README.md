@@ -14,6 +14,32 @@ To learn how to use the OpenAI API, check out our [API Reference](https://platfo
 npm install openai
 ```
 
+## Command Line Interface
+
+The library includes a powerful CLI for quick interactions with the OpenAI API:
+
+```bash
+# Validate your API key
+openai validate-key
+
+# List available models
+openai models
+
+# Quick chat
+openai chat "What's the weather like?"
+
+# Upload files
+openai upload document.txt
+
+# Check usage
+openai usage
+
+# Migrate your code
+openai migrate ./src
+```
+
+See [CLI.md](CLI.md) for complete documentation.
+
 ### Installation from JSR
 
 ```sh
