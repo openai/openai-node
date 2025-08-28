@@ -22,8 +22,8 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
       throw new Error(
         [
           'Cannot open Realtime WebSocket with a function-based apiKey.',
-          'Use the factory so the key is resolved just before connecting:',
-          '- OpenAIRealtimeWS.create(client, { model })',
+          'Use the .create() method so that the key is resolved before connecting:',
+          'await OpenAIRealtimeWS.create(client, { model })',
         ].join('\n'),
       );
     }
@@ -75,7 +75,7 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     client: Pick<AzureOpenAI, '_callApiKey' | 'apiVersion' | 'apiKey' | 'baseURL' | 'deploymentName'>,
     props: { deploymentName?: string; options?: WS.ClientOptions | undefined } = {},
   ): Promise<OpenAIRealtimeWS> {
-    const isToken = await client._callApiKey();
+    const isApiKeyProvider = await client._callApiKey();
     const deploymentName = props.deploymentName ?? client.deploymentName;
     if (!deploymentName) {
       throw new Error('No deployment name provided');
@@ -87,10 +87,10 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
           ...props.options,
           headers: {
             ...props.options?.headers,
-            ...(isToken ? {} : { 'api-key': client.apiKey }),
+            ...(isApiKeyProvider ? {} : { 'api-key': client.apiKey }),
           },
         },
-        __resolvedApiKey: isToken,
+        __resolvedApiKey: isApiKeyProvider,
       },
       client,
     );

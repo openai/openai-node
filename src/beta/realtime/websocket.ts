@@ -54,8 +54,8 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
       throw new Error(
         [
           'Cannot open Realtime WebSocket with a function-based apiKey.',
-          'Use the factory so the key is resolved before connecting:',
-          '- OpenAIRealtimeWebSocket.create(client, { model })',
+          'Use the .create() method so that the key is resolved before connecting:',
+          'await OpenAIRealtimeWebSocket.create(client, { model })',
         ].join('\n'),
       );
     }
@@ -116,9 +116,9 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
     client: Pick<AzureOpenAI, '_callApiKey' | 'apiVersion' | 'apiKey' | 'baseURL' | 'deploymentName'>,
     options: { deploymentName?: string; dangerouslyAllowBrowser?: boolean } = {},
   ): Promise<OpenAIRealtimeWebSocket> {
-    const isToken = await client._callApiKey();
+    const isApiKeyProvider = await client._callApiKey();
     function onURL(url: URL) {
-      if (isToken) {
+      if (isApiKeyProvider) {
         url.searchParams.set('Authorization', `Bearer ${client.apiKey}`);
       } else {
         url.searchParams.set('api-key', client.apiKey);
@@ -134,7 +134,7 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
         model: deploymentName,
         onURL,
         ...(dangerouslyAllowBrowser ? { dangerouslyAllowBrowser } : {}),
-        __resolvedApiKey: isToken,
+        __resolvedApiKey: isApiKeyProvider,
       },
       client,
     );
