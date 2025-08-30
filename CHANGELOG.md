@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.16.1 (2025-08-30)
+
+Full Changelog: [v5.16.0...v5.16.1](https://github.com/openai/openai-node/compare/v5.16.0...v5.16.1)
+
+### Chores
+
+* **internal:** update global Error reference ([e566ff3](https://github.com/openai/openai-node/commit/e566ff321642a100756224b75a67d44e262e5bea))
+
 ## 5.16.0 (2025-08-26)
 
 Full Changelog: [v5.15.0...v5.16.0](https://github.com/openai/openai-node/compare/v5.15.0...v5.16.0)
