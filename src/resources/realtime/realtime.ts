@@ -2223,7 +2223,8 @@ export interface RealtimeSession {
     | 'gpt-4o-realtime-preview-2024-12-17'
     | 'gpt-4o-realtime-preview-2025-06-03'
     | 'gpt-4o-mini-realtime-preview'
-    | 'gpt-4o-mini-realtime-preview-2024-12-17';
+    | 'gpt-4o-mini-realtime-preview-2024-12-17'
+    | 'gpt-realtime';
 
   /**
    * The object type. Always `realtime.session`.
