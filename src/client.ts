@@ -121,6 +121,7 @@ import {
 } from './resources/evals/evals';
 import { FineTuning } from './resources/fine-tuning/fine-tuning';
 import { Graders } from './resources/graders/graders';
+import { Realtime } from './resources/realtime/realtime';
 import { Responses } from './resources/responses/responses';
 import {
   Upload,
@@ -961,6 +962,7 @@ export class OpenAI {
   batches: API.Batches = new API.Batches(this);
   uploads: API.Uploads = new API.Uploads(this);
   responses: API.Responses = new API.Responses(this);
+  realtime: API.Realtime = new API.Realtime(this);
   conversations: API.Conversations = new API.Conversations(this);
   evals: API.Evals = new API.Evals(this);
   containers: API.Containers = new API.Containers(this);
@@ -982,6 +984,7 @@ OpenAI.Beta = Beta;
 OpenAI.Batches = Batches;
 OpenAI.Uploads = UploadsAPIUploads;
 OpenAI.Responses = Responses;
+OpenAI.Realtime = Realtime;
 OpenAI.Conversations = Conversations;
 OpenAI.Evals = Evals;
 OpenAI.Containers = Containers;
@@ -1163,6 +1166,8 @@ export declare namespace OpenAI {
   };
 
   export { Responses as Responses };
+
+  export { Realtime as Realtime };
 
   export { Conversations as Conversations };
 

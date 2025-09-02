@@ -31,9 +31,6 @@ TEST_PATHS=(
 	tests/api-resources/vector-stores/files.test.ts
 	tests/api-resources/vector-stores/file-batches.test.ts
 	tests/api-resources/beta/beta.test.ts
-	tests/api-resources/beta/realtime/realtime.test.ts
-	tests/api-resources/beta/realtime/sessions.test.ts
-	tests/api-resources/beta/realtime/transcription-sessions.test.ts
 	tests/api-resources/beta/assistants.test.ts
 	tests/api-resources/beta/threads/threads.test.ts
 	tests/api-resources/beta/threads/runs/runs.test.ts
@@ -44,6 +41,8 @@ TEST_PATHS=(
 	tests/api-resources/uploads/parts.test.ts
 	tests/api-resources/responses/responses.test.ts
 	tests/api-resources/responses/input-items.test.ts
+	tests/api-resources/realtime/realtime.test.ts
+	tests/api-resources/realtime/client-secrets.test.ts
 	tests/api-resources/conversations/conversations.test.ts
 	tests/api-resources/conversations/items.test.ts
 	tests/api-resources/evals/evals.test.ts
