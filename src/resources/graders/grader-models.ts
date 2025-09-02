@@ -50,7 +50,13 @@ export namespace LabelModelGrader {
     /**
      * Inputs to the model - can contain template strings.
      */
-    content: string | ResponsesAPI.ResponseInputText | Input.OutputText | Input.InputImage | Array<unknown>;
+    content:
+      | string
+      | ResponsesAPI.ResponseInputText
+      | Input.OutputText
+      | Input.InputImage
+      | ResponsesAPI.ResponseInputAudio
+      | Array<unknown>;
 
     /**
      * The role of the message input. One of `user`, `assistant`, `system`, or
@@ -202,7 +208,13 @@ export namespace ScoreModelGrader {
     /**
      * Inputs to the model - can contain template strings.
      */
-    content: string | ResponsesAPI.ResponseInputText | Input.OutputText | Input.InputImage | Array<unknown>;
+    content:
+      | string
+      | ResponsesAPI.ResponseInputText
+      | Input.OutputText
+      | Input.InputImage
+      | ResponsesAPI.ResponseInputAudio
+      | Array<unknown>;
 
     /**
      * The role of the message input. One of `user`, `assistant`, `system`, or

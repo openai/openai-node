@@ -213,6 +213,7 @@ export namespace CreateEvalCompletionsRunDataSource {
         | ResponsesAPI.ResponseInputText
         | EvalItem.OutputText
         | EvalItem.InputImage
+        | ResponsesAPI.ResponseInputAudio
         | Array<unknown>;
 
       /**
@@ -645,6 +646,7 @@ export namespace RunCreateResponse {
           | ResponsesAPI.ResponseInputText
           | EvalItem.OutputText
           | EvalItem.InputImage
+          | ResponsesAPI.ResponseInputAudio
           | Array<unknown>;
 
         /**
@@ -1118,6 +1120,7 @@ export namespace RunRetrieveResponse {
           | ResponsesAPI.ResponseInputText
           | EvalItem.OutputText
           | EvalItem.InputImage
+          | ResponsesAPI.ResponseInputAudio
           | Array<unknown>;
 
         /**
@@ -1588,6 +1591,7 @@ export namespace RunListResponse {
           | ResponsesAPI.ResponseInputText
           | EvalItem.OutputText
           | EvalItem.InputImage
+          | ResponsesAPI.ResponseInputAudio
           | Array<unknown>;
 
         /**
@@ -2069,6 +2073,7 @@ export namespace RunCancelResponse {
           | ResponsesAPI.ResponseInputText
           | EvalItem.OutputText
           | EvalItem.InputImage
+          | ResponsesAPI.ResponseInputAudio
           | Array<unknown>;
 
         /**
@@ -2489,6 +2494,7 @@ export namespace RunCreateParams {
           | ResponsesAPI.ResponseInputText
           | EvalItem.OutputText
           | EvalItem.InputImage
+          | ResponsesAPI.ResponseInputAudio
           | Array<unknown>;
 
         /**

@@ -391,7 +391,7 @@ export interface Response {
    *   Learn more about
    *   [built-in tools](https://platform.openai.com/docs/guides/tools).
    * - **MCP Tools**: Integrations with third-party systems via custom MCP servers or
-   *   predefined connectors such as Google Drive and Notion. Learn more about
+   *   predefined connectors such as Google Drive and SharePoint. Learn more about
    *   [MCP Tools](https://platform.openai.com/docs/guides/tools-connectors-mcp).
    * - **Function calls (custom tools)**: Functions that are defined by you, enabling
    *   the model to call your own code with strongly typed arguments and outputs.
@@ -1214,6 +1214,7 @@ export type ResponseContent =
   | ResponseInputText
   | ResponseInputImage
   | ResponseInputFile
+  | ResponseInputAudio
   | ResponseOutputText
   | ResponseOutputRefusal;
 
@@ -2146,15 +2147,7 @@ export type ResponseInput = Array<ResponseInputItem>;
  * An audio input to the model.
  */
 export interface ResponseInputAudio {
-  /**
-   * Base64-encoded audio data.
-   */
-  data: string;
-
-  /**
-   * The format of the audio data. Currently supported formats are `mp3` and `wav`.
-   */
-  format: 'mp3' | 'wav';
+  input_audio: ResponseInputAudio.InputAudio;
 
   /**
    * The type of the input item. Always `input_audio`.
@@ -2162,10 +2155,28 @@ export interface ResponseInputAudio {
   type: 'input_audio';
 }
 
+export namespace ResponseInputAudio {
+  export interface InputAudio {
+    /**
+     * Base64-encoded audio data.
+     */
+    data: string;
+
+    /**
+     * The format of the audio data. Currently supported formats are `mp3` and `wav`.
+     */
+    format: 'mp3' | 'wav';
+  }
+}
+
 /**
  * A text input to the model.
  */
-export type ResponseInputContent = ResponseInputText | ResponseInputImage | ResponseInputFile;
+export type ResponseInputContent =
+  | ResponseInputText
+  | ResponseInputImage
+  | ResponseInputFile
+  | ResponseInputAudio;
 
 /**
  * A file input to the model.
@@ -5367,7 +5378,7 @@ export interface ResponseCreateParamsBase {
    *   Learn more about
    *   [built-in tools](https://platform.openai.com/docs/guides/tools).
    * - **MCP Tools**: Integrations with third-party systems via custom MCP servers or
-   *   predefined connectors such as Google Drive and Notion. Learn more about
+   *   predefined connectors such as Google Drive and SharePoint. Learn more about
    *   [MCP Tools](https://platform.openai.com/docs/guides/tools-connectors-mcp).
    * - **Function calls (custom tools)**: Functions that are defined by you, enabling
    *   the model to call your own code with strongly typed arguments and outputs.
