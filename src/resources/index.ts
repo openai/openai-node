@@ -95,6 +95,7 @@ export {
   type ModerationCreateResponse,
   type ModerationCreateParams,
 } from './moderations';
+export { Realtime } from './realtime/realtime';
 export { Responses } from './responses/responses';
 export { Uploads, type Upload, type UploadCreateParams, type UploadCompleteParams } from './uploads/uploads';
 export {
