@@ -463,7 +463,7 @@ export interface Response {
    * An array of tools the model may call while generating a response. You can
    * specify which tool to use by setting the `tool_choice` parameter.
    *
-   * The two categories of tools you can provide the model are:
+   * We support the following categories of tools:
    *
    * - **Built-in tools**: Tools that are provided by OpenAI that extend the model's
    *   capabilities, like
@@ -471,6 +471,9 @@ export interface Response {
    *   [file search](https://platform.openai.com/docs/guides/tools-file-search).
    *   Learn more about
    *   [built-in tools](https://platform.openai.com/docs/guides/tools).
+   * - **MCP Tools**: Integrations with third-party systems via custom MCP servers or
+   *   predefined connectors such as Google Drive and Notion. Learn more about
+   *   [MCP Tools](https://platform.openai.com/docs/guides/tools-connectors-mcp).
    * - **Function calls (custom tools)**: Functions that are defined by you, enabling
    *   the model to call your own code with strongly typed arguments and outputs.
    *   Learn more about
@@ -4654,89 +4657,15 @@ export type Tool =
   | FunctionTool
   | FileSearchTool
   | ComputerTool
-  | Tool.WebSearchTool
+  | WebSearchTool
   | Tool.Mcp
   | Tool.CodeInterpreter
   | Tool.ImageGeneration
   | Tool.LocalShell
   | CustomTool
-  | WebSearchTool;
+  | WebSearchPreviewTool;
 
 export namespace Tool {
-  /**
-   * Search the Internet for sources related to the prompt. Learn more about the
-   * [web search tool](https://platform.openai.com/docs/guides/tools-web-search).
-   */
-  export interface WebSearchTool {
-    /**
-     * The type of the web search tool. One of `web_search` or `web_search_2025_08_26`.
-     */
-    type: 'web_search' | 'web_search_2025_08_26';
-
-    /**
-     * Filters for the search.
-     */
-    filters?: WebSearchTool.Filters | null;
-
-    /**
-     * High level guidance for the amount of context window space to use for the
-     * search. One of `low`, `medium`, or `high`. `medium` is the default.
-     */
-    search_context_size?: 'low' | 'medium' | 'high';
-
-    /**
-     * The approximate location of the user.
-     */
-    user_location?: WebSearchTool.UserLocation | null;
-  }
-
-  export namespace WebSearchTool {
-    /**
-     * Filters for the search.
-     */
-    export interface Filters {
-      /**
-       * Allowed domains for the search. If not provided, all domains are allowed.
-       * Subdomains of the provided domains are allowed as well.
-       *
-       * Example: `["pubmed.ncbi.nlm.nih.gov"]`
-       */
-      allowed_domains?: Array<string> | null;
-    }
-
-    /**
-     * The approximate location of the user.
-     */
-    export interface UserLocation {
-      /**
-       * Free text input for the city of the user, e.g. `San Francisco`.
-       */
-      city?: string | null;
-
-      /**
-       * The two-letter [ISO country code](https://en.wikipedia.org/wiki/ISO_3166-1) of
-       * the user, e.g. `US`.
-       */
-      country?: string | null;
-
-      /**
-       * Free text input for the region of the user, e.g. `California`.
-       */
-      region?: string | null;
-
-      /**
-       * The [IANA timezone](https://timeapi.io/documentation/iana-timezones) of the
-       * user, e.g. `America/Los_Angeles`.
-       */
-      timezone?: string | null;
-
-      /**
-       * The type of location approximation. Always `approximate`.
-       */
-      type?: 'approximate';
-    }
-  }
-
   /**
    * Give the model access to additional tools via remote Model Context Protocol
    * (MCP) servers.
@@ -5151,7 +5080,7 @@ export interface ToolChoiceTypes {
  * about the
  * [web search tool](https://platform.openai.com/docs/guides/tools-web-search).
  */
-export interface WebSearchTool {
+export interface WebSearchPreviewTool {
   /**
    * The type of the web search tool. One of `web_search_preview` or
    * `web_search_preview_2025_03_11`.
@@ -5167,10 +5096,10 @@ export interface WebSearchTool {
   /**
    * The user's location.
    */
-  user_location?: WebSearchTool.UserLocation | null;
+  user_location?: WebSearchPreviewTool.UserLocation | null;
 }
 
-export namespace WebSearchTool {
+export namespace WebSearchPreviewTool {
   /**
    * The user's location.
    */
@@ -5201,6 +5130,80 @@ export namespace WebSearchTool {
      * user, e.g. `America/Los_Angeles`.
      */
     timezone?: string | null;
+  }
+}
+
+/**
+ * Search the Internet for sources related to the prompt. Learn more about the
+ * [web search tool](https://platform.openai.com/docs/guides/tools-web-search).
+ */
+export interface WebSearchTool {
+  /**
+   * The type of the web search tool. One of `web_search` or `web_search_2025_08_26`.
+   */
+  type: 'web_search' | 'web_search_2025_08_26';
+
+  /**
+   * Filters for the search.
+   */
+  filters?: WebSearchTool.Filters | null;
+
+  /**
+   * High level guidance for the amount of context window space to use for the
+   * search. One of `low`, `medium`, or `high`. `medium` is the default.
+   */
+  search_context_size?: 'low' | 'medium' | 'high';
+
+  /**
+   * The approximate location of the user.
+   */
+  user_location?: WebSearchTool.UserLocation | null;
+}
+
+export namespace WebSearchTool {
+  /**
+   * Filters for the search.
+   */
+  export interface Filters {
+    /**
+     * Allowed domains for the search. If not provided, all domains are allowed.
+     * Subdomains of the provided domains are allowed as well.
+     *
+     * Example: `["pubmed.ncbi.nlm.nih.gov"]`
+     */
+    allowed_domains?: Array<string> | null;
+  }
+
+  /**
+   * The approximate location of the user.
+   */
+  export interface UserLocation {
+    /**
+     * Free text input for the city of the user, e.g. `San Francisco`.
+     */
+    city?: string | null;
+
+    /**
+     * The two-letter [ISO country code](https://en.wikipedia.org/wiki/ISO_3166-1) of
+     * the user, e.g. `US`.
+     */
+    country?: string | null;
+
+    /**
+     * Free text input for the region of the user, e.g. `California`.
+     */
+    region?: string | null;
+
+    /**
+     * The [IANA timezone](https://timeapi.io/documentation/iana-timezones) of the
+     * user, e.g. `America/Los_Angeles`.
+     */
+    timezone?: string | null;
+
+    /**
+     * The type of location approximation. Always `approximate`.
+     */
+    type?: 'approximate';
   }
 }
 
@@ -5410,7 +5413,7 @@ export interface ResponseCreateParamsBase {
    * An array of tools the model may call while generating a response. You can
    * specify which tool to use by setting the `tool_choice` parameter.
    *
-   * The two categories of tools you can provide the model are:
+   * We support the following categories of tools:
    *
    * - **Built-in tools**: Tools that are provided by OpenAI that extend the model's
    *   capabilities, like
@@ -5418,6 +5421,9 @@ export interface ResponseCreateParamsBase {
    *   [file search](https://platform.openai.com/docs/guides/tools-file-search).
    *   Learn more about
    *   [built-in tools](https://platform.openai.com/docs/guides/tools).
+   * - **MCP Tools**: Integrations with third-party systems via custom MCP servers or
+   *   predefined connectors such as Google Drive and Notion. Learn more about
+   *   [MCP Tools](https://platform.openai.com/docs/guides/tools-connectors-mcp).
    * - **Function calls (custom tools)**: Functions that are defined by you, enabling
    *   the model to call your own code with strongly typed arguments and outputs.
    *   Learn more about
@@ -5673,6 +5679,7 @@ export declare namespace Responses {
     type ToolChoiceMcp as ToolChoiceMcp,
     type ToolChoiceOptions as ToolChoiceOptions,
     type ToolChoiceTypes as ToolChoiceTypes,
+    type WebSearchPreviewTool as WebSearchPreviewTool,
     type WebSearchTool as WebSearchTool,
     type ResponseCreateParams as ResponseCreateParams,
     type ResponseCreateParamsNonStreaming as ResponseCreateParamsNonStreaming,

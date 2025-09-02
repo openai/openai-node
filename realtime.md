@@ -1,4 +1,4 @@
-## Realtime API beta
+## Realtime API
 
 The Realtime API enables you to build low-latency, multi-modal conversational experiences. It currently supports text and audio as both input and output, as well as [function calling](https://platform.openai.com/docs/guides/function-calling) through a `WebSocket` connection.
 
@@ -10,9 +10,9 @@ Basic text based example with `ws`:
 
 ```ts
 // requires `yarn add ws @types/ws`
-import { OpenAIRealtimeWS } from 'openai/beta/realtime/ws';
+import { OpenAIRealtimeWS } from 'openai/realtime/ws';
 
-const rt = new OpenAIRealtimeWS({ model: 'gpt-4o-realtime-preview-2024-12-17' });
+const rt = new OpenAIRealtimeWS({ model: 'gpt-realtime' });
 
 // access the underlying `ws.WebSocket` instance
 rt.socket.on('open', () => {
@@ -59,9 +59,9 @@ rt.socket.on('close', () => console.log('\nConnection closed!'));
 To use the web API `WebSocket` implementation, replace `OpenAIRealtimeWS` with `OpenAIRealtimeWebSocket` and adjust any `rt.socket` access:
 
 ```ts
-import { OpenAIRealtimeWebSocket } from 'openai/beta/realtime/websocket';
+import { OpenAIRealtimeWebSocket } from 'openai/realtime/websocket';
 
-const rt = new OpenAIRealtimeWebSocket({ model: 'gpt-4o-realtime-preview-2024-12-17' });
+const rt = new OpenAIRealtimeWebSocket({ model: 'gpt-realtime' });
 // ...
 rt.socket.addEventListener('open', () => {
   // ...
@@ -77,7 +77,7 @@ When an error is encountered, either on the client side or returned from the ser
 It is **highly recommended** that you register an `error` event listener and handle errors appropriately as typically the underlying connection is still usable.
 
 ```ts
-const rt = new OpenAIRealtimeWS({ model: 'gpt-4o-realtime-preview-2024-12-17' });
+const rt = new OpenAIRealtimeWS({ model: 'gpt-realtime' });
 rt.on('error', (err) => {
   // in a real world scenario this should be logged somewhere as you
   // likely want to continue processing events regardless of any errors

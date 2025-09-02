@@ -5,6 +5,7 @@
     ".": "./index.ts",
     "./helpers/zod": "./helpers/zod.ts",
     "./beta/realtime/websocket": "./beta/realtime/websocket.ts"
+    "./realtime/websocket": "./realtime/websocket.ts"
   },
   "imports": {
     "zod": "npm:zod@3"
