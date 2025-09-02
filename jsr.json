@@ -1,6 +1,6 @@
 {
   "name": "@openai/openai",
-  "version": "5.18.0",
+  "version": "5.18.1",
   "exports": "./index.ts",
   "publish": {
     "exclude": ["!."]
