@@ -207,12 +207,21 @@ import {
 } from './internal/utils/log';
 import { isEmptyObj } from './internal/utils/values';
 
+export type ApiKeySetter = () => Promise<string>;
+
 export interface ClientOptions {
   /**
-   * Defaults to process.env['OPENAI_API_KEY'].
+   * API key used for authentication.
+   *
+   * - Accepts either a static string or an async function that resolves to a string.
+   * - Defaults to process.env['OPENAI_API_KEY'].
+   * - When a function is provided, it is invoked before each request so you can rotate
+   *   or refresh credentials at runtime.
+   * - The function must return a non-empty string; otherwise an OpenAIError is thrown.
+   * - If the function throws, the error is wrapped in an OpenAIError with the original
+   *   error available as `cause`.
    */
-  apiKey?: string | undefined;
-
+  apiKey?: string | ApiKeySetter | undefined;
   /**
    * Defaults to process.env['OPENAI_ORG_ID'].
    */
@@ -350,7 +359,7 @@ export class OpenAI {
   }: ClientOptions = {}) {
     if (apiKey === undefined) {
       throw new Errors.OpenAIError(
-        "The OPENAI_API_KEY environment variable is missing or empty; either provide it, or instantiate the OpenAI client with an apiKey option, like new OpenAI({ apiKey: 'My API Key' }).",
+        'Missing credentials. Please pass an `apiKey`, or set the `OPENAI_API_KEY` environment variable.',
       );
     }
 
@@ -386,7 +395,7 @@ export class OpenAI {
 
     this._options = options;
 
-    this.apiKey = apiKey;
+    this.apiKey = typeof apiKey === 'string' ? apiKey : 'Missing Key';
     this.organization = organization;
     this.project = project;
     this.webhookSecret = webhookSecret;
@@ -454,6 +463,31 @@ export class OpenAI {
     return Errors.APIError.generate(status, error, message, headers);
   }
 
+  async _callApiKey(): Promise<boolean> {
+    const apiKey = this._options.apiKey;
+    if (typeof apiKey !== 'function') return false;
+
+    let token: unknown;
+    try {
+      token = await apiKey();
+    } catch (err: any) {
+      if (err instanceof Errors.OpenAIError) throw err;
+      throw new Errors.OpenAIError(
+        `Failed to get token from 'apiKey' function: ${err.message}`,
+        // @ts-ignore
+        { cause: err },
+      );
+    }
+
+    if (typeof token !== 'string' || !token) {
+      throw new Errors.OpenAIError(
+        `Expected 'apiKey' function argument to return a string but it returned ${token}`,
+      );
+    }
+    this.apiKey = token;
+    return true;
+  }
+
   buildURL(
     path: string,
     query: Record<string, unknown> | null | undefined,
@@ -480,7 +514,9 @@ export class OpenAI {
   /**
    * Used as a callback for mutating the given `FinalRequestOptions` object.
    */
-  protected async prepareOptions(options: FinalRequestOptions): Promise<void> {}
+  protected async prepareOptions(options: FinalRequestOptions): Promise<void> {
+    await this._callApiKey();
+  }
 
   /**
    * Used as a callback for mutating the given `RequestInit` object.
