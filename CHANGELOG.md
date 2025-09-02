@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.18.1 (2025-09-02)
+
+Full Changelog: [v5.18.0...v5.18.1](https://github.com/openai/openai-node/compare/v5.18.0...v5.18.1)
+
+### Chores
+
+* **api:** manual updates for ResponseInputAudio ([570501b](https://github.com/openai/openai-node/commit/570501b8c66f3f23d0dca05bc948339623732a8e))
+
 ## 5.18.0 (2025-09-02)
 
 Full Changelog: [v5.17.0...v5.18.0](https://github.com/openai/openai-node/compare/v5.17.0...v5.18.0)
