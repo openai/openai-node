@@ -8,18 +8,31 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
   socket: WS.WebSocket;
 
   constructor(
-    props: { model: string; options?: WS.ClientOptions | undefined },
+    props: {
+      model: string;
+      options?: WS.ClientOptions | undefined;
+      /** @internal */ __resolvedApiKey?: boolean;
+    },
     client?: Pick<OpenAI, 'apiKey' | 'baseURL'>,
   ) {
     super();
     client ??= new OpenAI();
-
+    const hasProvider = typeof (client as any)?._options?.apiKey === 'function';
+    if (hasProvider && !props.__resolvedApiKey) {
+      throw new Error(
+        [
+          'Cannot open Realtime WebSocket with a function-based apiKey.',
+          'Use the .create() method so that the key is resolved before connecting:',
+          'await OpenAIRealtimeWS.create(client, { model })',
+        ].join('\n'),
+      );
+    }
     this.url = buildRealtimeURL(client, props.model);
     this.socket = new WS.WebSocket(this.url, {
       ...props.options,
       headers: {
         ...props.options?.headers,
-        ...(isAzure(client) ? {} : { Authorization: `Bearer ${client.apiKey}` }),
+        ...(isAzure(client) && !props.__resolvedApiKey ? {} : { Authorization: `Bearer ${client.apiKey}` }),
         'OpenAI-Beta': 'realtime=v1',
       },
     });
@@ -51,16 +64,34 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     });
   }
 
-  static async azure(
-    client: Pick<AzureOpenAI, '_getAzureADToken' | 'apiVersion' | 'apiKey' | 'baseURL' | 'deploymentName'>,
-    options: { deploymentName?: string; options?: WS.ClientOptions | undefined } = {},
+  static async create(
+    client: Pick<OpenAI, 'apiKey' | 'baseURL' | '_callApiKey'>,
+    props: { model: string; options?: WS.ClientOptions | undefined },
   ): Promise<OpenAIRealtimeWS> {
-    const deploymentName = options.deploymentName ?? client.deploymentName;
+    return new OpenAIRealtimeWS({ ...props, __resolvedApiKey: await client._callApiKey() }, client);
+  }
+
+  static async azure(
+    client: Pick<AzureOpenAI, '_callApiKey' | 'apiVersion' | 'apiKey' | 'baseURL' | 'deploymentName'>,
+    props: { deploymentName?: string; options?: WS.ClientOptions | undefined } = {},
+  ): Promise<OpenAIRealtimeWS> {
+    const isApiKeyProvider = await client._callApiKey();
+    const deploymentName = props.deploymentName ?? client.deploymentName;
     if (!deploymentName) {
       throw new Error('No deployment name provided');
     }
     return new OpenAIRealtimeWS(
-      { model: deploymentName, options: { headers: await getAzureHeaders(client) } },
+      {
+        model: deploymentName,
+        options: {
+          ...props.options,
+          headers: {
+            ...props.options?.headers,
+            ...(isApiKeyProvider ? {} : { 'api-key': client.apiKey }),
+          },
+        },
+        __resolvedApiKey: isApiKeyProvider,
+      },
       client,
     );
   }
@@ -78,19 +109,6 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
       this.socket.close(props?.code ?? 1000, props?.reason ?? 'OK');
     } catch (err) {
       this._onError(null, 'could not close the connection', err);
-    }
-  }
-}
-
-async function getAzureHeaders(client: Pick<AzureOpenAI, '_getAzureADToken' | 'apiKey'>) {
-  if (client.apiKey !== '<Missing Key>') {
-    return { 'api-key': client.apiKey };
-  } else {
-    const token = await client._getAzureADToken();
-    if (token) {
-      return { Authorization: `Bearer ${token}` };
-    } else {
-      throw new Error('AzureOpenAI is not instantiated correctly. No API key or token provided.');
     }
   }
 }
