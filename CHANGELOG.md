@@ -1,5 +1,18 @@
 # Changelog
 
+## 5.18.0 (2025-09-02)
+
+Full Changelog: [v5.17.0...v5.18.0](https://github.com/openai/openai-node/compare/v5.17.0...v5.18.0)
+
+### Features
+
+* **client:** support api key provider functions ([#1587](https://github.com/openai/openai-node/issues/1587)) ([c3a92c7](https://github.com/openai/openai-node/commit/c3a92c7ee6f5f7c26c9297be04343326c9854bfd))
+
+
+### Bug Fixes
+
+* update non beta realtime websockets helpers ([265a42f](https://github.com/openai/openai-node/commit/265a42f9101b0479b7d8dcbf05d45ce29539a7f3))
+
 ## 5.17.0 (2025-09-02)
 
 Full Changelog: [v5.16.0...v5.17.0](https://github.com/openai/openai-node/compare/v5.16.0...v5.17.0)
