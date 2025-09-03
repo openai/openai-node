@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.19.1 (2025-09-03)
+
+Full Changelog: [v5.19.0...v5.19.1](https://github.com/openai/openai-node/compare/v5.19.0...v5.19.1)
+
+### Bug Fixes
+
+* **azure:** correctly send API key ([#1635](https://github.com/openai/openai-node/issues/1635)) ([08f6178](https://github.com/openai/openai-node/commit/08f6178ff0d4ccc6b80462c86a36f11eb3bfd5fe))
+
 ## 5.19.0 (2025-09-03)
 
 Full Changelog: [v5.18.1...v5.19.0](https://github.com/openai/openai-node/compare/v5.18.1...v5.19.0)
