@@ -2218,6 +2218,8 @@ export interface RealtimeSession {
    * The Realtime model used for this session.
    */
   model?:
+    | 'gpt-realtime'
+    | 'gpt-realtime-2025-08-28'
     | 'gpt-4o-realtime-preview'
     | 'gpt-4o-realtime-preview-2024-10-01'
     | 'gpt-4o-realtime-preview-2024-12-17'
@@ -2480,6 +2482,8 @@ export interface RealtimeSessionCreateRequest {
    */
   model:
     | (string & {})
+    | 'gpt-realtime'
+    | 'gpt-realtime-2025-08-28'
     | 'gpt-4o-realtime'
     | 'gpt-4o-mini-realtime'
     | 'gpt-4o-realtime-preview'
