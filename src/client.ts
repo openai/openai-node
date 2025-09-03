@@ -331,7 +331,7 @@ export class OpenAI {
   private fetch: Fetch;
   #encoder: Opts.RequestEncoder;
   protected idempotencyHeader?: string;
-  private _options: ClientOptions;
+  protected _options: ClientOptions;
 
   /**
    * API Client for interfacing with the OpenAI API.
