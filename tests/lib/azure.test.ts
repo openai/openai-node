@@ -307,6 +307,22 @@ describe('instantiate azure client', () => {
     });
   });
 
+  test('uses api-key header when apiKey is provided', async () => {
+    const testFetch = async (url: RequestInfo, { headers }: RequestInit = {}): Promise<Response> => {
+      return new Response(JSON.stringify({ a: 1 }), { headers: headers ?? [] });
+    };
+    const client = new AzureOpenAI({
+      baseURL: 'http://localhost:5000/',
+      apiKey: 'My API Key',
+      apiVersion,
+      fetch: testFetch,
+    });
+
+    const res = await client.request({ method: 'post', path: 'https://example.com' }).asResponse();
+    expect(res.headers.get('api-key')).toEqual('My API Key');
+    expect(res.headers.get('authorization')).toEqual(null);
+  });
+
   test('with endpoint', () => {
     const client = new AzureOpenAI({ endpoint: 'https://example.com', apiKey: 'My API Key', apiVersion });
     expect(client.baseURL).toEqual('https://example.com/openai');

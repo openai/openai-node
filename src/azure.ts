@@ -1,4 +1,6 @@
 import type { RequestInit } from './internal/builtin-types';
+import type { NullableHeaders } from './internal/headers';
+import { buildHeaders } from './internal/headers';
 import * as Errors from './error';
 import { FinalRequestOptions } from './internal/request-options';
 import { isObj, readEnv } from './internal/utils';
@@ -133,6 +135,13 @@ export class AzureOpenAI extends OpenAI {
       }
     }
     return super.buildRequest(options, props);
+  }
+
+  protected override async authHeaders(opts: FinalRequestOptions): Promise<NullableHeaders | undefined> {
+    if (typeof this._options.apiKey === 'string') {
+      return buildHeaders([{ 'api-key': this.apiKey }]);
+    }
+    return super.authHeaders(opts);
   }
 }
 
