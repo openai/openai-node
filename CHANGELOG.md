@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.19.0 (2025-09-03)
+
+Full Changelog: [v5.18.1...v5.19.0](https://github.com/openai/openai-node/compare/v5.18.1...v5.19.0)
+
+### Features
+
+* **api:** Add gpt-realtime models ([256d932](https://github.com/openai/openai-node/commit/256d93247da7f31e34f5f80d8added0bc6f52fe9))
+
 ## 5.18.1 (2025-09-02)
 
 Full Changelog: [v5.18.0...v5.18.1](https://github.com/openai/openai-node/compare/v5.18.0...v5.18.1)
