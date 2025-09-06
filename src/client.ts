@@ -15,7 +15,14 @@ import * as qs from './internal/qs';
 import { VERSION } from './version';
 import * as Errors from './core/error';
 import * as Pagination from './core/pagination';
-import { AbstractPage, type CursorPageParams, CursorPageResponse, PageResponse } from './core/pagination';
+import {
+  AbstractPage,
+  type ConversationCursorPageParams,
+  ConversationCursorPageResponse,
+  type CursorPageParams,
+  CursorPageResponse,
+  PageResponse,
+} from './core/pagination';
 import * as Uploads from './core/uploads';
 import * as API from './resources/index';
 import { APIPromise } from './core/api-promise';
@@ -97,6 +104,7 @@ import {
   ContainerRetrieveResponse,
   Containers,
 } from './resources/containers/containers';
+import { Conversations } from './resources/conversations/conversations';
 import {
   EvalCreateParams,
   EvalCreateResponse,
@@ -113,6 +121,7 @@ import {
 } from './resources/evals/evals';
 import { FineTuning } from './resources/fine-tuning/fine-tuning';
 import { Graders } from './resources/graders/graders';
+import { Realtime } from './resources/realtime/realtime';
 import { Responses } from './resources/responses/responses';
 import {
   Upload,
@@ -141,6 +150,8 @@ import {
 } from './resources/vector-stores/vector-stores';
 import {
   ChatCompletion,
+  ChatCompletionAllowedToolChoice,
+  ChatCompletionAllowedTools,
   ChatCompletionAssistantMessageParam,
   ChatCompletionAudio,
   ChatCompletionAudioParam,
@@ -153,16 +164,21 @@ import {
   ChatCompletionCreateParams,
   ChatCompletionCreateParamsNonStreaming,
   ChatCompletionCreateParamsStreaming,
+  ChatCompletionCustomTool,
   ChatCompletionDeleted,
   ChatCompletionDeveloperMessageParam,
   ChatCompletionFunctionCallOption,
   ChatCompletionFunctionMessageParam,
+  ChatCompletionFunctionTool,
   ChatCompletionListParams,
   ChatCompletionMessage,
+  ChatCompletionMessageCustomToolCall,
+  ChatCompletionMessageFunctionToolCall,
   ChatCompletionMessageParam,
   ChatCompletionMessageToolCall,
   ChatCompletionModality,
   ChatCompletionNamedToolChoice,
+  ChatCompletionNamedToolChoiceCustom,
   ChatCompletionPredictionContent,
   ChatCompletionReasoningEffort,
   ChatCompletionRole,
@@ -191,12 +207,21 @@ import {
 } from './internal/utils/log';
 import { isEmptyObj } from './internal/utils/values';
 
+export type ApiKeySetter = () => Promise<string>;
+
 export interface ClientOptions {
   /**
-   * Defaults to process.env['OPENAI_API_KEY'].
+   * API key used for authentication.
+   *
+   * - Accepts either a static string or an async function that resolves to a string.
+   * - Defaults to process.env['OPENAI_API_KEY'].
+   * - When a function is provided, it is invoked before each request so you can rotate
+   *   or refresh credentials at runtime.
+   * - The function must return a non-empty string; otherwise an OpenAIError is thrown.
+   * - If the function throws, the error is wrapped in an OpenAIError with the original
+   *   error available as `cause`.
    */
-  apiKey?: string | undefined;
-
+  apiKey?: string | ApiKeySetter | undefined;
   /**
    * Defaults to process.env['OPENAI_ORG_ID'].
    */
@@ -306,7 +331,7 @@ export class OpenAI {
   private fetch: Fetch;
   #encoder: Opts.RequestEncoder;
   protected idempotencyHeader?: string;
-  private _options: ClientOptions;
+  protected _options: ClientOptions;
 
   /**
    * API Client for interfacing with the OpenAI API.
@@ -334,7 +359,7 @@ export class OpenAI {
   }: ClientOptions = {}) {
     if (apiKey === undefined) {
       throw new Errors.OpenAIError(
-        "The OPENAI_API_KEY environment variable is missing or empty; either provide it, or instantiate the OpenAI client with an apiKey option, like new OpenAI({ apiKey: 'My API Key' }).",
+        'Missing credentials. Please pass an `apiKey`, or set the `OPENAI_API_KEY` environment variable.',
       );
     }
 
@@ -370,7 +395,7 @@ export class OpenAI {
 
     this._options = options;
 
-    this.apiKey = apiKey;
+    this.apiKey = typeof apiKey === 'string' ? apiKey : 'Missing Key';
     this.organization = organization;
     this.project = project;
     this.webhookSecret = webhookSecret;
@@ -438,6 +463,31 @@ export class OpenAI {
     return Errors.APIError.generate(status, error, message, headers);
   }
 
+  async _callApiKey(): Promise<boolean> {
+    const apiKey = this._options.apiKey;
+    if (typeof apiKey !== 'function') return false;
+
+    let token: unknown;
+    try {
+      token = await apiKey();
+    } catch (err: any) {
+      if (err instanceof Errors.OpenAIError) throw err;
+      throw new Errors.OpenAIError(
+        `Failed to get token from 'apiKey' function: ${err.message}`,
+        // @ts-ignore
+        { cause: err },
+      );
+    }
+
+    if (typeof token !== 'string' || !token) {
+      throw new Errors.OpenAIError(
+        `Expected 'apiKey' function argument to return a string but it returned ${token}`,
+      );
+    }
+    this.apiKey = token;
+    return true;
+  }
+
   buildURL(
     path: string,
     query: Record<string, unknown> | null | undefined,
@@ -464,7 +514,9 @@ export class OpenAI {
   /**
    * Used as a callback for mutating the given `FinalRequestOptions` object.
    */
-  protected async prepareOptions(options: FinalRequestOptions): Promise<void> {}
+  protected async prepareOptions(options: FinalRequestOptions): Promise<void> {
+    await this._callApiKey();
+  }
 
   /**
    * Used as a callback for mutating the given `RequestInit` object.
@@ -559,7 +611,7 @@ export class OpenAI {
     const response = await this.fetchWithTimeout(url, req, timeout, controller).catch(castToError);
     const headersTime = Date.now();
 
-    if (response instanceof Error) {
+    if (response instanceof globalThis.Error) {
       const retryMessage = `retrying, ${retriesRemaining} attempts remaining`;
       if (options.signal?.aborted) {
         throw new Errors.APIUserAbortError();
@@ -891,7 +943,7 @@ export class OpenAI {
         // Preserve legacy string encoding behavior for now
         headers.values.has('content-type')) ||
       // `Blob` is superset of `File`
-      body instanceof Blob ||
+      ((globalThis as any).Blob && body instanceof (globalThis as any).Blob) ||
       // `FormData` -> `multipart/form-data`
       body instanceof FormData ||
       // `URLSearchParams` -> `application/x-www-form-urlencoded`
@@ -947,9 +999,12 @@ export class OpenAI {
   batches: API.Batches = new API.Batches(this);
   uploads: API.Uploads = new API.Uploads(this);
   responses: API.Responses = new API.Responses(this);
+  realtime: API.Realtime = new API.Realtime(this);
+  conversations: API.Conversations = new API.Conversations(this);
   evals: API.Evals = new API.Evals(this);
   containers: API.Containers = new API.Containers(this);
 }
+
 OpenAI.Completions = Completions;
 OpenAI.Chat = Chat;
 OpenAI.Embeddings = Embeddings;
@@ -966,8 +1021,11 @@ OpenAI.Beta = Beta;
 OpenAI.Batches = Batches;
 OpenAI.Uploads = UploadsAPIUploads;
 OpenAI.Responses = Responses;
+OpenAI.Realtime = Realtime;
+OpenAI.Conversations = Conversations;
 OpenAI.Evals = Evals;
 OpenAI.Containers = Containers;
+
 export declare namespace OpenAI {
   export type RequestOptions = Opts.RequestOptions;
 
@@ -976,6 +1034,12 @@ export declare namespace OpenAI {
 
   export import CursorPage = Pagination.CursorPage;
   export { type CursorPageParams as CursorPageParams, type CursorPageResponse as CursorPageResponse };
+
+  export import ConversationCursorPage = Pagination.ConversationCursorPage;
+  export {
+    type ConversationCursorPageParams as ConversationCursorPageParams,
+    type ConversationCursorPageResponse as ConversationCursorPageResponse,
+  };
 
   export {
     Completions as Completions,
@@ -990,6 +1054,7 @@ export declare namespace OpenAI {
   export {
     Chat as Chat,
     type ChatCompletion as ChatCompletion,
+    type ChatCompletionAllowedToolChoice as ChatCompletionAllowedToolChoice,
     type ChatCompletionAssistantMessageParam as ChatCompletionAssistantMessageParam,
     type ChatCompletionAudio as ChatCompletionAudio,
     type ChatCompletionAudioParam as ChatCompletionAudioParam,
@@ -999,15 +1064,20 @@ export declare namespace OpenAI {
     type ChatCompletionContentPartInputAudio as ChatCompletionContentPartInputAudio,
     type ChatCompletionContentPartRefusal as ChatCompletionContentPartRefusal,
     type ChatCompletionContentPartText as ChatCompletionContentPartText,
+    type ChatCompletionCustomTool as ChatCompletionCustomTool,
     type ChatCompletionDeleted as ChatCompletionDeleted,
     type ChatCompletionDeveloperMessageParam as ChatCompletionDeveloperMessageParam,
     type ChatCompletionFunctionCallOption as ChatCompletionFunctionCallOption,
     type ChatCompletionFunctionMessageParam as ChatCompletionFunctionMessageParam,
+    type ChatCompletionFunctionTool as ChatCompletionFunctionTool,
     type ChatCompletionMessage as ChatCompletionMessage,
+    type ChatCompletionMessageCustomToolCall as ChatCompletionMessageCustomToolCall,
+    type ChatCompletionMessageFunctionToolCall as ChatCompletionMessageFunctionToolCall,
     type ChatCompletionMessageParam as ChatCompletionMessageParam,
     type ChatCompletionMessageToolCall as ChatCompletionMessageToolCall,
     type ChatCompletionModality as ChatCompletionModality,
     type ChatCompletionNamedToolChoice as ChatCompletionNamedToolChoice,
+    type ChatCompletionNamedToolChoiceCustom as ChatCompletionNamedToolChoiceCustom,
     type ChatCompletionPredictionContent as ChatCompletionPredictionContent,
     type ChatCompletionRole as ChatCompletionRole,
     type ChatCompletionStoreMessage as ChatCompletionStoreMessage,
@@ -1018,6 +1088,7 @@ export declare namespace OpenAI {
     type ChatCompletionToolChoiceOption as ChatCompletionToolChoiceOption,
     type ChatCompletionToolMessageParam as ChatCompletionToolMessageParam,
     type ChatCompletionUserMessageParam as ChatCompletionUserMessageParam,
+    type ChatCompletionAllowedTools as ChatCompletionAllowedTools,
     type ChatCompletionReasoningEffort as ChatCompletionReasoningEffort,
     type ChatCompletionsPage as ChatCompletionsPage,
     type ChatCompletionCreateParams as ChatCompletionCreateParams,
@@ -1133,6 +1204,10 @@ export declare namespace OpenAI {
 
   export { Responses as Responses };
 
+  export { Realtime as Realtime };
+
+  export { Conversations as Conversations };
+
   export {
     Evals as Evals,
     type EvalCustomDataSourceConfig as EvalCustomDataSourceConfig,
@@ -1162,6 +1237,7 @@ export declare namespace OpenAI {
   export type ChatModel = API.ChatModel;
   export type ComparisonFilter = API.ComparisonFilter;
   export type CompoundFilter = API.CompoundFilter;
+  export type CustomToolInputFormat = API.CustomToolInputFormat;
   export type ErrorObject = API.ErrorObject;
   export type FunctionDefinition = API.FunctionDefinition;
   export type FunctionParameters = API.FunctionParameters;
@@ -1171,5 +1247,7 @@ export declare namespace OpenAI {
   export type ResponseFormatJSONObject = API.ResponseFormatJSONObject;
   export type ResponseFormatJSONSchema = API.ResponseFormatJSONSchema;
   export type ResponseFormatText = API.ResponseFormatText;
+  export type ResponseFormatTextGrammar = API.ResponseFormatTextGrammar;
+  export type ResponseFormatTextPython = API.ResponseFormatTextPython;
   export type ResponsesModel = API.ResponsesModel;
 }

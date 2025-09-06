@@ -130,12 +130,12 @@ class RunnerListener {
   readonly contents: string[] = [];
   readonly messages: ChatCompletionMessageParam[] = [];
   readonly chatCompletions: OpenAI.Chat.ChatCompletion[] = [];
-  readonly functionCalls: OpenAI.Chat.ChatCompletionMessageToolCall.Function[] = [];
+  readonly functionCalls: OpenAI.Chat.ChatCompletionMessageFunctionToolCall.Function[] = [];
   readonly functionCallResults: string[] = [];
   finalContent: string | null = null;
   finalMessage: ChatCompletionMessageParam | undefined;
   finalChatCompletion: OpenAI.Chat.ChatCompletion | undefined;
-  finalFunctionCall: OpenAI.Chat.ChatCompletionMessageToolCall.Function | undefined;
+  finalFunctionCall: OpenAI.Chat.ChatCompletionMessageFunctionToolCall.Function | undefined;
   finalFunctionCallResult: string | undefined;
   totalUsage: OpenAI.CompletionUsage | undefined;
   error: OpenAIError | undefined;
@@ -247,13 +247,13 @@ class StreamingRunnerListener {
   readonly eventContents: [string, string][] = [];
   readonly eventMessages: ChatCompletionMessageParam[] = [];
   readonly eventChatCompletions: OpenAI.Chat.ChatCompletion[] = [];
-  readonly eventFunctionCalls: OpenAI.Chat.ChatCompletionMessageToolCall.Function[] = [];
+  readonly eventFunctionCalls: OpenAI.Chat.ChatCompletionMessageFunctionToolCall.Function[] = [];
   readonly eventFunctionCallResults: string[] = [];
 
   finalContent: string | null = null;
   finalMessage: ChatCompletionMessageParam | undefined;
   finalChatCompletion: OpenAI.Chat.ChatCompletion | undefined;
-  finalFunctionCall: OpenAI.Chat.ChatCompletionMessageToolCall.Function | undefined;
+  finalFunctionCall: OpenAI.Chat.ChatCompletionMessageFunctionToolCall.Function | undefined;
   finalFunctionCallResult: string | undefined;
   error: OpenAIError | undefined;
   gotConnect = false;

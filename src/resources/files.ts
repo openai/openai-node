@@ -15,7 +15,7 @@ export class Files extends APIResource {
   /**
    * Upload a file that can be used across various endpoints. Individual files can be
    * up to 512 MB, and the size of all files uploaded by one organization can be up
-   * to 100 GB.
+   * to 1 TB.
    *
    * The Assistants API supports files up to 2 million tokens and of specific file
    * types. See the
@@ -196,6 +196,32 @@ export interface FileCreateParams {
    * Flexible file type for any purpose - `evals`: Used for eval data sets
    */
   purpose: FilePurpose;
+
+  /**
+   * The expiration policy for a file. By default, files with `purpose=batch` expire
+   * after 30 days and all other files are persisted until they are manually deleted.
+   */
+  expires_after?: FileCreateParams.ExpiresAfter;
+}
+
+export namespace FileCreateParams {
+  /**
+   * The expiration policy for a file. By default, files with `purpose=batch` expire
+   * after 30 days and all other files are persisted until they are manually deleted.
+   */
+  export interface ExpiresAfter {
+    /**
+     * Anchor timestamp after which the expiration policy applies. Supported anchors:
+     * `created_at`.
+     */
+    anchor: 'created_at';
+
+    /**
+     * The number of seconds after the anchor time that the file will expire. Must be
+     * between 3600 (1 hour) and 2592000 (30 days).
+     */
+    seconds: number;
+  }
 }
 
 export interface FileListParams extends CursorPageParams {

@@ -203,11 +203,11 @@ export class Completions extends APIResource {
   }
 }
 
-export interface ParsedFunction extends ChatCompletionMessageToolCall.Function {
+export interface ParsedFunction extends ChatCompletionMessageFunctionToolCall.Function {
   parsed_arguments?: unknown;
 }
 
-export interface ParsedFunctionToolCall extends ChatCompletionMessageToolCall {
+export interface ParsedFunctionToolCall extends ChatCompletionMessageFunctionToolCall {
   function: ParsedFunction;
 }
 
@@ -281,9 +281,8 @@ export interface ChatCompletion {
    * - If set to 'default', then the request will be processed with the standard
    *   pricing and performance for the selected model.
    * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)' or
-   *   'priority', then the request will be processed with the corresponding service
-   *   tier. [Contact sales](https://openai.com/contact-sales) to learn more about
-   *   Priority processing.
+   *   '[priority](https://openai.com/api-priority-processing/)', then the request
+   *   will be processed with the corresponding service tier.
    * - When not set, the default behavior is 'auto'.
    *
    * When the `service_tier` parameter is set, the response body will include the
@@ -294,7 +293,8 @@ export interface ChatCompletion {
   service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | null;
 
   /**
-   * This fingerprint represents the backend configuration that the model runs with.
+   * @deprecated This fingerprint represents the backend configuration that the model
+   * runs with.
    *
    * Can be used in conjunction with the `seed` request parameter to understand when
    * backend changes have been made that might impact determinism.
@@ -351,6 +351,21 @@ export namespace ChatCompletion {
       refusal: Array<CompletionsCompletionsAPI.ChatCompletionTokenLogprob> | null;
     }
   }
+}
+
+/**
+ * Constrains the tools available to the model to a pre-defined set.
+ */
+export interface ChatCompletionAllowedToolChoice {
+  /**
+   * Constrains the tools available to the model to a pre-defined set.
+   */
+  allowed_tools: ChatCompletionAllowedTools;
+
+  /**
+   * Allowed tool configuration type. Always `allowed_tools`.
+   */
+  type: 'allowed_tools';
 }
 
 /**
@@ -474,7 +489,18 @@ export interface ChatCompletionAudioParam {
    * The voice the model uses to respond. Supported voices are `alloy`, `ash`,
    * `ballad`, `coral`, `echo`, `fable`, `nova`, `onyx`, `sage`, and `shimmer`.
    */
-  voice: (string & {}) | 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse';
+  voice:
+    | (string & {})
+    | 'alloy'
+    | 'ash'
+    | 'ballad'
+    | 'coral'
+    | 'echo'
+    | 'sage'
+    | 'shimmer'
+    | 'verse'
+    | 'marin'
+    | 'cedar';
 }
 
 /**
@@ -520,9 +546,8 @@ export interface ChatCompletionChunk {
    * - If set to 'default', then the request will be processed with the standard
    *   pricing and performance for the selected model.
    * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)' or
-   *   'priority', then the request will be processed with the corresponding service
-   *   tier. [Contact sales](https://openai.com/contact-sales) to learn more about
-   *   Priority processing.
+   *   '[priority](https://openai.com/api-priority-processing/)', then the request
+   *   will be processed with the corresponding service tier.
    * - When not set, the default behavior is 'auto'.
    *
    * When the `service_tier` parameter is set, the response body will include the
@@ -533,9 +558,9 @@ export interface ChatCompletionChunk {
   service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | null;
 
   /**
-   * This fingerprint represents the backend configuration that the model runs with.
-   * Can be used in conjunction with the `seed` request parameter to understand when
-   * backend changes have been made that might impact determinism.
+   * @deprecated This fingerprint represents the backend configuration that the model
+   * runs with. Can be used in conjunction with the `seed` request parameter to
+   * understand when backend changes have been made that might impact determinism.
    */
   system_fingerprint?: string;
 
@@ -805,6 +830,87 @@ export interface ChatCompletionContentPartText {
   type: 'text';
 }
 
+/**
+ * A custom tool that processes input using a specified format.
+ */
+export interface ChatCompletionCustomTool {
+  /**
+   * Properties of the custom tool.
+   */
+  custom: ChatCompletionCustomTool.Custom;
+
+  /**
+   * The type of the custom tool. Always `custom`.
+   */
+  type: 'custom';
+}
+
+export namespace ChatCompletionCustomTool {
+  /**
+   * Properties of the custom tool.
+   */
+  export interface Custom {
+    /**
+     * The name of the custom tool, used to identify it in tool calls.
+     */
+    name: string;
+
+    /**
+     * Optional description of the custom tool, used to provide more context.
+     */
+    description?: string;
+
+    /**
+     * The input format for the custom tool. Default is unconstrained text.
+     */
+    format?: Custom.Text | Custom.Grammar;
+  }
+
+  export namespace Custom {
+    /**
+     * Unconstrained free-form text.
+     */
+    export interface Text {
+      /**
+       * Unconstrained text format. Always `text`.
+       */
+      type: 'text';
+    }
+
+    /**
+     * A grammar defined by the user.
+     */
+    export interface Grammar {
+      /**
+       * Your chosen grammar.
+       */
+      grammar: Grammar.Grammar;
+
+      /**
+       * Grammar format. Always `grammar`.
+       */
+      type: 'grammar';
+    }
+
+    export namespace Grammar {
+      /**
+       * Your chosen grammar.
+       */
+      export interface Grammar {
+        /**
+         * The grammar definition.
+         */
+        definition: string;
+
+        /**
+         * The syntax of the grammar definition. One of `lark` or `regex`.
+         */
+        syntax: 'lark' | 'regex';
+      }
+    }
+  }
+}
+
 export interface ChatCompletionDeleted {
   /**
    * The ID of the chat completion that was deleted.
@@ -874,6 +980,18 @@ export interface ChatCompletionFunctionMessageParam {
    * The role of the messages author, in this case `function`.
    */
   role: 'function';
+}
+
+/**
+ * A function tool that can be used to generate a response.
+ */
+export interface ChatCompletionFunctionTool {
+  function: Shared.FunctionDefinition;
+
+  /**
+   * The type of the tool. Currently, only `function` is supported.
+   */
+  type: 'function';
 }
 
 /**
@@ -984,19 +1102,46 @@ export namespace ChatCompletionMessage {
 }
 
 /**
- * Developer-provided instructions that the model should follow, regardless of
- * messages sent by the user. With o1 models and newer, `developer` messages
- * replace the previous `system` messages.
+ * A call to a custom tool created by the model.
  */
-export type ChatCompletionMessageParam =
-  | ChatCompletionDeveloperMessageParam
-  | ChatCompletionSystemMessageParam
-  | ChatCompletionUserMessageParam
-  | ChatCompletionAssistantMessageParam
-  | ChatCompletionToolMessageParam
-  | ChatCompletionFunctionMessageParam;
+export interface ChatCompletionMessageCustomToolCall {
+  /**
+   * The ID of the tool call.
+   */
+  id: string;
 
-export interface ChatCompletionMessageToolCall {
+  /**
+   * The custom tool that the model called.
+   */
+  custom: ChatCompletionMessageCustomToolCall.Custom;
+
+  /**
+   * The type of the tool. Always `custom`.
+   */
+  type: 'custom';
+}
+
+export namespace ChatCompletionMessageCustomToolCall {
+  /**
+   * The custom tool that the model called.
+   */
+  export interface Custom {
+    /**
+     * The input for the custom tool call generated by the model.
+     */
+    input: string;
+
+    /**
+     * The name of the custom tool to call.
+     */
+    name: string;
+  }
+}
+
+/**
+ * A call to a function tool created by the model.
+ */
+export interface ChatCompletionMessageFunctionToolCall {
   /**
    * The ID of the tool call.
    */
@@ -1005,7 +1150,7 @@ export interface ChatCompletionMessageToolCall {
   /**
    * The function that the model called.
    */
-  function: ChatCompletionMessageToolCall.Function;
+  function: ChatCompletionMessageFunctionToolCall.Function;
 
   /**
    * The type of the tool. Currently, only `function` is supported.
@@ -1013,7 +1158,7 @@ export interface ChatCompletionMessageToolCall {
   type: 'function';
 }
 
-export namespace ChatCompletionMessageToolCall {
+export namespace ChatCompletionMessageFunctionToolCall {
   /**
    * The function that the model called.
    */
@@ -1033,6 +1178,26 @@ export namespace ChatCompletionMessageToolCall {
   }
 }
 
+/**
+ * Developer-provided instructions that the model should follow, regardless of
+ * messages sent by the user. With o1 models and newer, `developer` messages
+ * replace the previous `system` messages.
+ */
+export type ChatCompletionMessageParam =
+  | ChatCompletionDeveloperMessageParam
+  | ChatCompletionSystemMessageParam
+  | ChatCompletionUserMessageParam
+  | ChatCompletionAssistantMessageParam
+  | ChatCompletionToolMessageParam
+  | ChatCompletionFunctionMessageParam;
+
+/**
+ * A call to a function tool created by the model.
+ */
+export type ChatCompletionMessageToolCall =
+  | ChatCompletionMessageFunctionToolCall
+  | ChatCompletionMessageCustomToolCall;
+
 export type ChatCompletionModality = 'text' | 'audio';
 
 /**
@@ -1043,7 +1208,7 @@ export interface ChatCompletionNamedToolChoice {
   function: ChatCompletionNamedToolChoice.Function;
 
   /**
-   * The type of the tool. Currently, only `function` is supported.
+   * For function calling, the type is always `function`.
    */
   type: 'function';
 }
@@ -1052,6 +1217,28 @@ export namespace ChatCompletionNamedToolChoice {
   export interface Function {
     /**
      * The name of the function to call.
+     */
+    name: string;
+  }
+}
+
+/**
+ * Specifies a tool the model should use. Use to force the model to call a specific
+ * custom tool.
+ */
+export interface ChatCompletionNamedToolChoiceCustom {
+  custom: ChatCompletionNamedToolChoiceCustom.Custom;
+
+  /**
+   * For custom tool calling, the type is always `custom`.
+   */
+  type: 'custom';
+}
+
+export namespace ChatCompletionNamedToolChoiceCustom {
+  export interface Custom {
+    /**
+     * The name of the custom tool to call.
      */
     name: string;
   }
@@ -1089,12 +1276,28 @@ export interface ChatCompletionStoreMessage extends ChatCompletionMessage {
    * The identifier of the chat message.
    */
   id: string;
+
+  /**
+   * If a content parts array was provided, this is an array of `text` and
+   * `image_url` parts. Otherwise, null.
+   */
+  content_parts?: Array<ChatCompletionContentPartText | ChatCompletionContentPartImage> | null;
 }
 
 /**
  * Options for streaming response. Only set this when you set `stream: true`.
  */
 export interface ChatCompletionStreamOptions {
+  /**
+   * When true, stream obfuscation will be enabled. Stream obfuscation adds random
+   * characters to an `obfuscation` field on streaming delta events to normalize
+   * payload sizes as a mitigation to certain side-channel attacks. These obfuscation
+   * fields are included by default, but add a small amount of overhead to the data
+   * stream. You can set `include_obfuscation` to false to optimize for bandwidth if
+   * you trust the network links between your application and the OpenAI API.
+   */
+  include_obfuscation?: boolean;
+
   /**
    * If set, an additional chunk will be streamed before the `data: [DONE]` message.
    * The `usage` field on this chunk shows the token usage statistics for the entire
@@ -1183,14 +1386,10 @@ export namespace ChatCompletionTokenLogprob {
   }
 }
 
-export interface ChatCompletionTool {
-  function: Shared.FunctionDefinition;
-
-  /**
-   * The type of the tool. Currently, only `function` is supported.
-   */
-  type: 'function';
-}
+/**
+ * A function tool that can be used to generate a response.
+ */
+export type ChatCompletionTool = ChatCompletionFunctionTool | ChatCompletionCustomTool;
 
 /**
  * Controls which (if any) tool is called by the model. `none` means the model will
@@ -1203,7 +1402,13 @@ export interface ChatCompletionTool {
  * `none` is the default when no tools are present. `auto` is the default if tools
  * are present.
  */
-export type ChatCompletionToolChoiceOption = 'none' | 'auto' | 'required' | ChatCompletionNamedToolChoice;
+export type ChatCompletionToolChoiceOption =
+  | 'none'
+  | 'auto'
+  | 'required'
+  | ChatCompletionAllowedToolChoice
+  | ChatCompletionNamedToolChoice
+  | ChatCompletionNamedToolChoiceCustom;
 
 export interface ChatCompletionToolMessageParam {
   /**
@@ -1242,6 +1447,35 @@ export interface ChatCompletionUserMessageParam {
    * differentiate between participants of the same role.
    */
   name?: string;
+}
+
+/**
+ * Constrains the tools available to the model to a pre-defined set.
+ */
+export interface ChatCompletionAllowedTools {
+  /**
+   * Constrains the tools available to the model to a pre-defined set.
+   *
+   * `auto` allows the model to pick from among the allowed tools and generate a
+   * message.
+   *
+   * `required` requires the model to call one or more of the allowed tools.
+   */
+  mode: 'auto' | 'required';
+
+  /**
+   * A list of tool definitions that the model should be allowed to call.
+   *
+   * For the Chat Completions API, the list of tool definitions might look like:
+   *
+   * ```json
+   * [
+   *   { "type": "function", "function": { "name": "get_weather" } },
+   *   { "type": "function", "function": { "name": "get_time" } }
+   * ]
+   * ```
+   */
+  tools: Array<{ [key: string]: unknown }>;
 }
 
 export type ChatCompletionReasoningEffort = Shared.ReasoningEffort | null;
@@ -1398,12 +1632,18 @@ export interface ChatCompletionCreateParamsBase {
   presence_penalty?: number | null;
 
   /**
-   * **o-series models only**
-   *
+   * Used by OpenAI to cache responses for similar requests to optimize your cache
+   * hit rates. Replaces the `user` field.
+   * [Learn more](https://platform.openai.com/docs/guides/prompt-caching).
+   */
+  prompt_cache_key?: string;
+
+  /**
    * Constrains effort on reasoning for
    * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
-   * supported values are `low`, `medium`, and `high`. Reducing reasoning effort can
-   * result in faster responses and fewer tokens used on reasoning in a response.
+   * supported values are `minimal`, `low`, `medium`, and `high`. Reducing reasoning
+   * effort can result in faster responses and fewer tokens used on reasoning in a
+   * response.
    */
   reasoning_effort?: Shared.ReasoningEffort | null;
 
@@ -1425,11 +1665,20 @@ export interface ChatCompletionCreateParamsBase {
     | Shared.ResponseFormatJSONObject;
 
   /**
-   * This feature is in Beta. If specified, our system will make a best effort to
-   * sample deterministically, such that repeated requests with the same `seed` and
-   * parameters should return the same result. Determinism is not guaranteed, and you
-   * should refer to the `system_fingerprint` response parameter to monitor changes
-   * in the backend.
+   * A stable identifier used to help detect users of your application that may be
+   * violating OpenAI's usage policies. The IDs should be a string that uniquely
+   * identifies each user. We recommend hashing their username or email address, in
+   * order to avoid sending us any identifying information.
+   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
+   */
+  safety_identifier?: string;
+
+  /**
+   * @deprecated This feature is in Beta. If specified, our system will make a best
+   * effort to sample deterministically, such that repeated requests with the same
+   * `seed` and parameters should return the same result. Determinism is not
+   * guaranteed, and you should refer to the `system_fingerprint` response parameter
+   * to monitor changes in the backend.
    */
   seed?: number | null;
 
@@ -1442,9 +1691,8 @@ export interface ChatCompletionCreateParamsBase {
    * - If set to 'default', then the request will be processed with the standard
    *   pricing and performance for the selected model.
    * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)' or
-   *   'priority', then the request will be processed with the corresponding service
-   *   tier. [Contact sales](https://openai.com/contact-sales) to learn more about
-   *   Priority processing.
+   *   '[priority](https://openai.com/api-priority-processing/)', then the request
+   *   will be processed with the corresponding service tier.
    * - When not set, the default behavior is 'auto'.
    *
    * When the `service_tier` parameter is set, the response body will include the
@@ -1467,7 +1715,7 @@ export interface ChatCompletionCreateParamsBase {
    * our [model distillation](https://platform.openai.com/docs/guides/distillation)
    * or [evals](https://platform.openai.com/docs/guides/evals) products.
    *
-   * Supports text and image inputs. Note: image inputs over 10MB will be dropped.
+   * Supports text and image inputs. Note: image inputs over 8MB will be dropped.
    */
   store?: boolean | null;
 
@@ -1510,9 +1758,9 @@ export interface ChatCompletionCreateParamsBase {
   tool_choice?: ChatCompletionToolChoiceOption;
 
   /**
-   * A list of tools the model may call. Currently, only functions are supported as a
-   * tool. Use this to provide a list of functions the model may generate JSON inputs
-   * for. A max of 128 functions are supported.
+   * A list of tools the model may call. You can provide either
+   * [custom tools](https://platform.openai.com/docs/guides/function-calling#custom-tools)
+   * or [function tools](https://platform.openai.com/docs/guides/function-calling).
    */
   tools?: Array<ChatCompletionTool>;
 
@@ -1533,11 +1781,21 @@ export interface ChatCompletionCreateParamsBase {
   top_p?: number | null;
 
   /**
-   * A stable identifier for your end-users. Used to boost cache hit rates by better
-   * bucketing similar requests and to help OpenAI detect and prevent abuse.
-   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#end-user-ids).
+   * @deprecated This field is being replaced by `safety_identifier` and
+   * `prompt_cache_key`. Use `prompt_cache_key` instead to maintain caching
+   * optimizations. A stable identifier for your end-users. Used to boost cache hit
+   * rates by better bucketing similar requests and to help OpenAI detect and prevent
+   * abuse.
+   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
    */
   user?: string;
+
+  /**
+   * Constrains the verbosity of the model's response. Lower values will result in
+   * more concise responses, while higher values will result in more verbose
+   * responses. Currently supported values are `low`, `medium`, and `high`.
+   */
+  verbosity?: 'low' | 'medium' | 'high' | null;
 
   /**
    * This tool searches the web for relevant results to use in a response. Learn more
@@ -1711,6 +1969,7 @@ Completions.Messages = Messages;
 export declare namespace Completions {
   export {
     type ChatCompletion as ChatCompletion,
+    type ChatCompletionAllowedToolChoice as ChatCompletionAllowedToolChoice,
     type ChatCompletionAssistantMessageParam as ChatCompletionAssistantMessageParam,
     type ChatCompletionAudio as ChatCompletionAudio,
     type ChatCompletionAudioParam as ChatCompletionAudioParam,
@@ -1720,15 +1979,20 @@ export declare namespace Completions {
     type ChatCompletionContentPartInputAudio as ChatCompletionContentPartInputAudio,
     type ChatCompletionContentPartRefusal as ChatCompletionContentPartRefusal,
     type ChatCompletionContentPartText as ChatCompletionContentPartText,
+    type ChatCompletionCustomTool as ChatCompletionCustomTool,
     type ChatCompletionDeleted as ChatCompletionDeleted,
     type ChatCompletionDeveloperMessageParam as ChatCompletionDeveloperMessageParam,
     type ChatCompletionFunctionCallOption as ChatCompletionFunctionCallOption,
     type ChatCompletionFunctionMessageParam as ChatCompletionFunctionMessageParam,
+    type ChatCompletionFunctionTool as ChatCompletionFunctionTool,
     type ChatCompletionMessage as ChatCompletionMessage,
+    type ChatCompletionMessageCustomToolCall as ChatCompletionMessageCustomToolCall,
+    type ChatCompletionMessageFunctionToolCall as ChatCompletionMessageFunctionToolCall,
     type ChatCompletionMessageParam as ChatCompletionMessageParam,
     type ChatCompletionMessageToolCall as ChatCompletionMessageToolCall,
     type ChatCompletionModality as ChatCompletionModality,
     type ChatCompletionNamedToolChoice as ChatCompletionNamedToolChoice,
+    type ChatCompletionNamedToolChoiceCustom as ChatCompletionNamedToolChoiceCustom,
     type ChatCompletionPredictionContent as ChatCompletionPredictionContent,
     type ChatCompletionRole as ChatCompletionRole,
     type ChatCompletionStoreMessage as ChatCompletionStoreMessage,
@@ -1739,6 +2003,7 @@ export declare namespace Completions {
     type ChatCompletionToolChoiceOption as ChatCompletionToolChoiceOption,
     type ChatCompletionToolMessageParam as ChatCompletionToolMessageParam,
     type ChatCompletionUserMessageParam as ChatCompletionUserMessageParam,
+    type ChatCompletionAllowedTools as ChatCompletionAllowedTools,
     type ChatCompletionReasoningEffort as ChatCompletionReasoningEffort,
     type ChatCompletionsPage as ChatCompletionsPage,
     type ChatCompletionCreateParams as ChatCompletionCreateParams,

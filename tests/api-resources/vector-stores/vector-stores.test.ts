@@ -89,7 +89,7 @@ describe('resource vectorStores', () => {
       query: 'string',
       filters: { key: 'key', type: 'eq', value: 'string' },
       max_num_results: 1,
-      ranking_options: { ranker: 'auto', score_threshold: 0 },
+      ranking_options: { ranker: 'none', score_threshold: 0 },
       rewrite_query: true,
     });
   });

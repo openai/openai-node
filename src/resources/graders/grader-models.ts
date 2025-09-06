@@ -50,7 +50,13 @@ export namespace LabelModelGrader {
     /**
      * Inputs to the model - can contain template strings.
      */
-    content: string | ResponsesAPI.ResponseInputText | Input.OutputText | Input.InputImage | Array<unknown>;
+    content:
+      | string
+      | ResponsesAPI.ResponseInputText
+      | Input.OutputText
+      | Input.InputImage
+      | ResponsesAPI.ResponseInputAudio
+      | Array<unknown>;
 
     /**
      * The role of the message input. One of `user`, `assistant`, `system`, or
@@ -202,7 +208,13 @@ export namespace ScoreModelGrader {
     /**
      * Inputs to the model - can contain template strings.
      */
-    content: string | ResponsesAPI.ResponseInputText | Input.OutputText | Input.InputImage | Array<unknown>;
+    content:
+      | string
+      | ResponsesAPI.ResponseInputText
+      | Input.OutputText
+      | Input.InputImage
+      | ResponsesAPI.ResponseInputAudio
+      | Array<unknown>;
 
     /**
      * The role of the message input. One of `user`, `assistant`, `system`, or
@@ -291,10 +303,11 @@ export interface StringCheckGrader {
  */
 export interface TextSimilarityGrader {
   /**
-   * The evaluation metric to use. One of `fuzzy_match`, `bleu`, `gleu`, `meteor`,
-   * `rouge_1`, `rouge_2`, `rouge_3`, `rouge_4`, `rouge_5`, or `rouge_l`.
+   * The evaluation metric to use. One of `cosine`, `fuzzy_match`, `bleu`, `gleu`,
+   * `meteor`, `rouge_1`, `rouge_2`, `rouge_3`, `rouge_4`, `rouge_5`, or `rouge_l`.
    */
   evaluation_metric:
+    | 'cosine'
     | 'fuzzy_match'
     | 'bleu'
     | 'gleu'

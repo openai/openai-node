@@ -15,6 +15,13 @@ export type AllModels =
   | 'computer-use-preview-2025-03-11';
 
 export type ChatModel =
+  | 'gpt-5'
+  | 'gpt-5-mini'
+  | 'gpt-5-nano'
+  | 'gpt-5-2025-08-07'
+  | 'gpt-5-mini-2025-08-07'
+  | 'gpt-5-nano-2025-08-07'
+  | 'gpt-5-chat-latest'
   | 'gpt-4.1'
   | 'gpt-4.1-mini'
   | 'gpt-4.1-nano'
@@ -116,6 +123,43 @@ export interface CompoundFilter {
   type: 'and' | 'or';
 }
 
+/**
+ * The input format for the custom tool. Default is unconstrained text.
+ */
+export type CustomToolInputFormat = CustomToolInputFormat.Text | CustomToolInputFormat.Grammar;
+
+export namespace CustomToolInputFormat {
+  /**
+   * Unconstrained free-form text.
+   */
+  export interface Text {
+    /**
+     * Unconstrained text format. Always `text`.
+     */
+    type: 'text';
+  }
+
+  /**
+   * A grammar defined by the user.
+   */
+  export interface Grammar {
+    /**
+     * The grammar definition.
+     */
+    definition: string;
+
+    /**
+     * The syntax of the grammar definition. One of `lark` or `regex`.
+     */
+    syntax: 'lark' | 'regex';
+
+    /**
+     * Grammar format. Always `grammar`.
+     */
+    type: 'grammar';
+  }
+}
+
 export interface ErrorObject {
   code: string | null;
 
@@ -182,19 +226,18 @@ export type FunctionParameters = { [key: string]: unknown };
 export type Metadata = { [key: string]: string };
 
 /**
- * **o-series models only**
+ * **gpt-5 and o-series models only**
  *
  * Configuration options for
  * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
  */
 export interface Reasoning {
   /**
-   * **o-series models only**
-   *
    * Constrains effort on reasoning for
    * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
-   * supported values are `low`, `medium`, and `high`. Reducing reasoning effort can
-   * result in faster responses and fewer tokens used on reasoning in a response.
+   * supported values are `minimal`, `low`, `medium`, and `high`. Reducing reasoning
+   * effort can result in faster responses and fewer tokens used on reasoning in a
+   * response.
    */
   effort?: ReasoningEffort | null;
 
@@ -216,14 +259,13 @@ export interface Reasoning {
 }
 
 /**
- * **o-series models only**
- *
  * Constrains effort on reasoning for
  * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
- * supported values are `low`, `medium`, and `high`. Reducing reasoning effort can
- * result in faster responses and fewer tokens used on reasoning in a response.
+ * supported values are `minimal`, `low`, `medium`, and `high`. Reducing reasoning
+ * effort can result in faster responses and fewer tokens used on reasoning in a
+ * response.
  */
-export type ReasoningEffort = 'low' | 'medium' | 'high' | null;
+export type ReasoningEffort = 'minimal' | 'low' | 'medium' | 'high' | null;
 
 /**
  * JSON object response format. An older method of generating JSON responses. Using
@@ -296,6 +338,34 @@ export interface ResponseFormatText {
    * The type of response format being defined. Always `text`.
    */
   type: 'text';
+}
+
+/**
+ * A custom grammar for the model to follow when generating text. Learn more in the
+ * [custom grammars guide](https://platform.openai.com/docs/guides/custom-grammars).
+ */
+export interface ResponseFormatTextGrammar {
+  /**
+   * The custom grammar for the model to follow.
+   */
+  grammar: string;
+
+  /**
+   * The type of response format being defined. Always `grammar`.
+   */
+  type: 'grammar';
+}
+
+/**
+ * Configure the model to generate valid Python code. See the
+ * [custom grammars guide](https://platform.openai.com/docs/guides/custom-grammars)
+ * for more details.
+ */
+export interface ResponseFormatTextPython {
+  /**
+   * The type of response format being defined. Always `python`.
+   */
+  type: 'python';
 }
 
 export type ResponsesModel =

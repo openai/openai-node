@@ -1,5 +1,179 @@
 # Changelog
 
+## 5.19.1 (2025-09-03)
+
+Full Changelog: [v5.19.0...v5.19.1](https://github.com/openai/openai-node/compare/v5.19.0...v5.19.1)
+
+### Bug Fixes
+
+* **azure:** correctly send API key ([#1635](https://github.com/openai/openai-node/issues/1635)) ([08f6178](https://github.com/openai/openai-node/commit/08f6178ff0d4ccc6b80462c86a36f11eb3bfd5fe))
+
+## 5.19.0 (2025-09-03)
+
+Full Changelog: [v5.18.1...v5.19.0](https://github.com/openai/openai-node/compare/v5.18.1...v5.19.0)
+
+### Features
+
+* **api:** Add gpt-realtime models ([256d932](https://github.com/openai/openai-node/commit/256d93247da7f31e34f5f80d8added0bc6f52fe9))
+
+## 5.18.1 (2025-09-02)
+
+Full Changelog: [v5.18.0...v5.18.1](https://github.com/openai/openai-node/compare/v5.18.0...v5.18.1)
+
+### Chores
+
+* **api:** manual updates for ResponseInputAudio ([570501b](https://github.com/openai/openai-node/commit/570501b8c66f3f23d0dca05bc948339623732a8e))
+
+## 5.18.0 (2025-09-02)
+
+Full Changelog: [v5.17.0...v5.18.0](https://github.com/openai/openai-node/compare/v5.17.0...v5.18.0)
+
+### Features
+
+* **client:** support api key provider functions ([#1587](https://github.com/openai/openai-node/issues/1587)) ([c3a92c7](https://github.com/openai/openai-node/commit/c3a92c7ee6f5f7c26c9297be04343326c9854bfd))
+
+
+### Bug Fixes
+
+* update non beta realtime websockets helpers ([265a42f](https://github.com/openai/openai-node/commit/265a42f9101b0479b7d8dcbf05d45ce29539a7f3))
+
+## 5.17.0 (2025-09-02)
+
+Full Changelog: [v5.16.0...v5.17.0](https://github.com/openai/openai-node/compare/v5.16.0...v5.17.0)
+
+### Features
+
+* **api:** realtime API updates ([e817255](https://github.com/openai/openai-node/commit/e817255e6ff9e3ad6bd08b001644c335e0459537))
+
+
+### Chores
+
+* **internal:** update global Error reference ([e566ff3](https://github.com/openai/openai-node/commit/e566ff321642a100756224b75a67d44e262e5bea))
+
+## 5.16.0 (2025-08-26)
+
+Full Changelog: [v5.15.0...v5.16.0](https://github.com/openai/openai-node/compare/v5.15.0...v5.16.0)
+
+### Features
+
+* **api:** add web search filters ([975b141](https://github.com/openai/openai-node/commit/975b1417052bdcc0111f546ce3fbbea2e71414af))
+
+
+### Chores
+
+* **client:** qualify global Blob ([7998d3f](https://github.com/openai/openai-node/commit/7998d3fd3715ab2c06ea011155420ac126681649))
+* update CI script ([accb0c1](https://github.com/openai/openai-node/commit/accb0c1188dbaef20c1a40bd3047087960c99a07))
+
+## 5.15.0 (2025-08-21)
+
+Full Changelog: [v5.14.0...v5.15.0](https://github.com/openai/openai-node/compare/v5.14.0...v5.15.0)
+
+### Features
+
+* **api:** Add connectors support for MCP tool ([048bee3](https://github.com/openai/openai-node/commit/048bee3693822c75181012c47b4f54074e1efdd6))
+* **api:** adding support for /v1/conversations to the API ([1380d17](https://github.com/openai/openai-node/commit/1380d1734b1e7eeb5d10fb73fe9cfce6199e5c8e))
+
+
+### Chores
+
+* add package to package.json ([6748b2b](https://github.com/openai/openai-node/commit/6748b2b64f6c06ee324694b95ae7df99493ff08d))
+
+## 5.14.0 (2025-08-20)
+
+Full Changelog: [v5.13.1...v5.14.0](https://github.com/openai/openai-node/compare/v5.13.1...v5.14.0)
+
+### Features
+
+* **mcp:** add code execution tool ([3f8264c](https://github.com/openai/openai-node/commit/3f8264cfaafb8d03aedabe53a0d17a7e3dc326d8))
+
+
+### Chores
+
+* **internal/ci:** setup breaking change detection ([87e8004](https://github.com/openai/openai-node/commit/87e8004d05eb27d14a11d433239af525c9c493b9))
+
+## 5.13.1 (2025-08-19)
+
+Full Changelog: [v5.13.0...v5.13.1](https://github.com/openai/openai-node/compare/v5.13.0...v5.13.1)
+
+### Chores
+
+* **api:** accurately represent shape for verbosity on Chat Completions ([5ddac3c](https://github.com/openai/openai-node/commit/5ddac3c7535e2df4b562fe1237b639e112bf5eef))
+
+## 5.13.0 (2025-08-18)
+
+Full Changelog: [v5.12.3...v5.13.0](https://github.com/openai/openai-node/compare/v5.12.3...v5.13.0)
+
+### Features
+
+* **api:** add new text parameters, expiration options ([499179c](https://github.com/openai/openai-node/commit/499179c095eae77dcccec5e2758ab72c8d829ea7))
+
+
+### Chores
+
+* **deps:** update dependency @types/node to v20.17.58 ([7812d0d](https://github.com/openai/openai-node/commit/7812d0db43309144cb46714a64fe97a3e12f5b04))
+* **internal:** formatting change ([56b2073](https://github.com/openai/openai-node/commit/56b2073ac3553d6b9cca1185fe52a7e697d0b733))
+
+## 5.12.3 (2025-08-12)
+
+Full Changelog: [v5.12.2...v5.12.3](https://github.com/openai/openai-node/compare/v5.12.2...v5.12.3)
+
+### Chores
+
+* **internal:** update comment in script ([2488faf](https://github.com/openai/openai-node/commit/2488faf387da1c9bd7565d4bb5aded7bb53b8799))
+* update @stainless-api/prism-cli to v5.15.0 ([db44a7d](https://github.com/openai/openai-node/commit/db44a7d2afa4e0330f4981c106f9abf2fd4ab432))
+
+## 5.12.2 (2025-08-08)
+
+Full Changelog: [v5.12.1...v5.12.2](https://github.com/openai/openai-node/compare/v5.12.1...v5.12.2)
+
+### Bug Fixes
+
+* **client:** fix verbosity parameter location in Responses ([eaa246f](https://github.com/openai/openai-node/commit/eaa246ffe00ffcdec45c695a96aeed3d87bb3f74))
+
+## 5.12.1 (2025-08-07)
+
+Full Changelog: [v5.12.0...v5.12.1](https://github.com/openai/openai-node/compare/v5.12.0...v5.12.1)
+
+### Features
+
+* **api:** adds GPT-5 and new API features: platform.openai.com/docs/guides/gpt-5 ([59acd85](https://github.com/openai/openai-node/commit/59acd85a3e0d4db7f7eca9a287b23ec00191fa68))
+
+
+### Chores
+
+* **internal:** move publish config ([b3d02f6](https://github.com/openai/openai-node/commit/b3d02f6faab5aa8e62998446485e43ebc802d68e))
+
+## 5.12.0 (2025-08-05)
+
+Full Changelog: [v5.11.0...v5.12.0](https://github.com/openai/openai-node/compare/v5.11.0...v5.12.0)
+
+### Features
+
+* **api:** manual updates ([f0d3056](https://github.com/openai/openai-node/commit/f0d3056932adb8e448fd1141eae4b07ad0c66ddb))
+
+## 5.11.0 (2025-07-30)
+
+Full Changelog: [v5.10.3...v5.11.0](https://github.com/openai/openai-node/compare/v5.10.3...v5.11.0)
+
+### Features
+
+* **api:** manual updates ([442dc25](https://github.com/openai/openai-node/commit/442dc25d7b31a374daf440f32f5694c3b6c20a81))
+
+## 5.10.3 (2025-07-30)
+
+Full Changelog: [v5.10.2...v5.10.3](https://github.com/openai/openai-node/compare/v5.10.2...v5.10.3)
+
+### Bug Fixes
+
+* **zod:** avoid adding redundant not to optional schemas [#1593](https://github.com/openai/openai-node/issues/1593) ([162b697](https://github.com/openai/openai-node/commit/162b697d1b946dc4af213c8efcdb7a7b5317bb6e))
+
+
+### Chores
+
+* **client:** refactor streaming slightly to better future proof it ([292427f](https://github.com/openai/openai-node/commit/292427f7f39f6dd64e46ba4360b0b96c8e49adc9))
+* **internal:** remove redundant imports config ([28dd66d](https://github.com/openai/openai-node/commit/28dd66de15032d6ee620d3cf9f3e33ba61cad4e7))
+* **internal:** version bump ([56e0760](https://github.com/openai/openai-node/commit/56e076090a9ce5c6b7f4ac4d84d33ca3f6522973))
+
 ## 5.10.2 (2025-07-22)
 
 Full Changelog: [v5.10.1...v5.10.2](https://github.com/openai/openai-node/compare/v5.10.1...v5.10.2)

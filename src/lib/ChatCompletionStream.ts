@@ -1,36 +1,37 @@
+import { partialParse } from '../_vendor/partial-json-parser/parser';
 import {
-  OpenAIError,
   APIUserAbortError,
-  LengthFinishReasonError,
   ContentFilterFinishReasonError,
+  LengthFinishReasonError,
+  OpenAIError,
 } from '../error';
-import {
-  ChatCompletionTokenLogprob,
-  type ChatCompletion,
-  type ChatCompletionChunk,
-  type ChatCompletionCreateParams,
-  type ChatCompletionCreateParamsStreaming,
-  type ChatCompletionCreateParamsBase,
-  type ChatCompletionRole,
-} from '../resources/chat/completions/completions';
-import {
-  AbstractChatCompletionRunner,
-  type AbstractChatCompletionRunnerEvents,
-} from './AbstractChatCompletionRunner';
-import { type ReadableStream } from '../internal/shim-types';
-import { Stream } from '../streaming';
 import OpenAI from '../index';
-import { ParsedChatCompletion } from '../resources/chat/completions';
+import { RequestOptions } from '../internal/request-options';
+import { type ReadableStream } from '../internal/shim-types';
 import {
   AutoParseableResponseFormat,
   hasAutoParseableInput,
   isAutoParsableResponseFormat,
   isAutoParsableTool,
+  isChatCompletionFunctionTool,
   maybeParseChatCompletion,
   shouldParseToolCall,
 } from '../lib/parser';
-import { partialParse } from '../_vendor/partial-json-parser/parser';
-import { RequestOptions } from '../internal/request-options';
+import { ChatCompletionFunctionTool, ParsedChatCompletion } from '../resources/chat/completions';
+import {
+  ChatCompletionTokenLogprob,
+  type ChatCompletion,
+  type ChatCompletionChunk,
+  type ChatCompletionCreateParams,
+  type ChatCompletionCreateParamsBase,
+  type ChatCompletionCreateParamsStreaming,
+  type ChatCompletionRole,
+} from '../resources/chat/completions/completions';
+import { Stream } from '../streaming';
+import {
+  AbstractChatCompletionRunner,
+  type AbstractChatCompletionRunnerEvents,
+} from './AbstractChatCompletionRunner';
 
 export interface ContentDeltaEvent {
   delta: string;
@@ -303,8 +304,8 @@ export class ChatCompletionStream<ParsedT = null>
 
     if (toolCallSnapshot.type === 'function') {
       const inputTool = this.#params?.tools?.find(
-        (tool) => tool.type === 'function' && tool.function.name === toolCallSnapshot.function.name,
-      );
+        (tool) => isChatCompletionFunctionTool(tool) && tool.function.name === toolCallSnapshot.function.name,
+      ) as ChatCompletionFunctionTool | undefined; // TS doesn't narrow based on isChatCompletionTool
 
       this._emit('tool_calls.function.arguments.done', {
         name: toolCallSnapshot.function.name,

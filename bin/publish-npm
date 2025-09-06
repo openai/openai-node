@@ -58,4 +58,4 @@ else
 fi
 
 # Publish with the appropriate tag
-yarn publish --access public --tag "$TAG"
+yarn publish --tag "$TAG"

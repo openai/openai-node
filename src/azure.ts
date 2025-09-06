@@ -1,9 +1,10 @@
 import type { RequestInit } from './internal/builtin-types';
+import type { NullableHeaders } from './internal/headers';
+import { buildHeaders } from './internal/headers';
 import * as Errors from './error';
 import { FinalRequestOptions } from './internal/request-options';
 import { isObj, readEnv } from './internal/utils';
 import { ClientOptions, OpenAI } from './client';
-import { buildHeaders, NullableHeaders } from './internal/headers';
 
 /** API Client for interfacing with the Azure OpenAI API. */
 export interface AzureClientOptions extends ClientOptions {
@@ -37,7 +38,6 @@ export interface AzureClientOptions extends ClientOptions {
 
 /** API Client for interfacing with the Azure OpenAI API. */
 export class AzureOpenAI extends OpenAI {
-  private _azureADTokenProvider: (() => Promise<string>) | undefined;
   deploymentName: string | undefined;
   apiVersion: string = '';
 
@@ -90,9 +90,6 @@ export class AzureOpenAI extends OpenAI {
       );
     }
 
-    // define a sentinel value to avoid any typing issues
-    apiKey ??= API_KEY_SENTINEL;
-
     opts.defaultQuery = { ...opts.defaultQuery, 'api-version': apiVersion };
 
     if (!baseURL) {
@@ -114,13 +111,12 @@ export class AzureOpenAI extends OpenAI {
     }
 
     super({
-      apiKey,
+      apiKey: azureADTokenProvider ?? apiKey,
       baseURL,
       ...opts,
       ...(dangerouslyAllowBrowser !== undefined ? { dangerouslyAllowBrowser } : {}),
     });
 
-    this._azureADTokenProvider = azureADTokenProvider;
     this.apiVersion = apiVersion;
     this.deploymentName = deployment;
   }
@@ -141,45 +137,11 @@ export class AzureOpenAI extends OpenAI {
     return super.buildRequest(options, props);
   }
 
-  async _getAzureADToken(): Promise<string | undefined> {
-    if (typeof this._azureADTokenProvider === 'function') {
-      const token = await this._azureADTokenProvider();
-      if (!token || typeof token !== 'string') {
-        throw new Errors.OpenAIError(
-          `Expected 'azureADTokenProvider' argument to return a string but it returned ${token}`,
-        );
-      }
-      return token;
-    }
-    return undefined;
-  }
-
   protected override async authHeaders(opts: FinalRequestOptions): Promise<NullableHeaders | undefined> {
-    return;
-  }
-
-  protected override async prepareOptions(opts: FinalRequestOptions): Promise<void> {
-    opts.headers = buildHeaders([opts.headers]);
-
-    /**
-     * The user should provide a bearer token provider if they want
-     * to use Azure AD authentication. The user shouldn't set the
-     * Authorization header manually because the header is overwritten
-     * with the Azure AD token if a bearer token provider is provided.
-     */
-    if (opts.headers.values.get('Authorization') || opts.headers.values.get('api-key')) {
-      return super.prepareOptions(opts);
+    if (typeof this._options.apiKey === 'string') {
+      return buildHeaders([{ 'api-key': this.apiKey }]);
     }
-
-    const token = await this._getAzureADToken();
-    if (token) {
-      opts.headers.values.set('Authorization', `Bearer ${token}`);
-    } else if (this.apiKey !== API_KEY_SENTINEL) {
-      opts.headers.values.set('api-key', this.apiKey);
-    } else {
-      throw new Errors.OpenAIError('Unable to handle auth');
-    }
-    return super.prepareOptions(opts);
+    return super.authHeaders(opts);
   }
 }
 
@@ -194,5 +156,3 @@ const _deployments_endpoints = new Set([
   '/batches',
   '/images/edits',
 ]);
-
-const API_KEY_SENTINEL = '<Missing Key>';

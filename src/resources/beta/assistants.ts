@@ -1158,12 +1158,11 @@ export interface AssistantCreateParams {
   name?: string | null;
 
   /**
-   * **o-series models only**
-   *
    * Constrains effort on reasoning for
    * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
-   * supported values are `low`, `medium`, and `high`. Reducing reasoning effort can
-   * result in faster responses and fewer tokens used on reasoning in a response.
+   * supported values are `minimal`, `low`, `medium`, and `high`. Reducing reasoning
+   * effort can result in faster responses and fewer tokens used on reasoning in a
+   * response.
    */
   reasoning_effort?: Shared.ReasoningEffort | null;
 
@@ -1363,6 +1362,12 @@ export interface AssistantUpdateParams {
    */
   model?:
     | (string & {})
+    | 'gpt-5'
+    | 'gpt-5-mini'
+    | 'gpt-5-nano'
+    | 'gpt-5-2025-08-07'
+    | 'gpt-5-mini-2025-08-07'
+    | 'gpt-5-nano-2025-08-07'
     | 'gpt-4.1'
     | 'gpt-4.1-mini'
     | 'gpt-4.1-nano'
@@ -1406,12 +1411,11 @@ export interface AssistantUpdateParams {
   name?: string | null;
 
   /**
-   * **o-series models only**
-   *
    * Constrains effort on reasoning for
    * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
-   * supported values are `low`, `medium`, and `high`. Reducing reasoning effort can
-   * result in faster responses and fewer tokens used on reasoning in a response.
+   * supported values are `minimal`, `low`, `medium`, and `high`. Reducing reasoning
+   * effort can result in faster responses and fewer tokens used on reasoning in a
+   * response.
    */
   reasoning_effort?: Shared.ReasoningEffort | null;
 

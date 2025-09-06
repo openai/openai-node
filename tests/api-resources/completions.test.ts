@@ -34,7 +34,7 @@ describe('resource completions', () => {
       seed: 0,
       stop: '\n',
       stream: false,
-      stream_options: { include_usage: true },
+      stream_options: { include_obfuscation: true, include_usage: true },
       suffix: 'test.',
       temperature: 1,
       top_p: 1,

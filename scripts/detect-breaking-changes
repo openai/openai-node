@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+
+set -e
+
+cd "$(dirname "$0")/.."
+
+echo "==> Detecting breaking changes"
+
+TEST_PATHS=(
+	tests/api-resources/completions.test.ts
+	tests/api-resources/chat/chat.test.ts
+	tests/api-resources/chat/completions/completions.test.ts
+	tests/api-resources/chat/completions/messages.test.ts
+	tests/api-resources/embeddings.test.ts
+	tests/api-resources/files.test.ts
+	tests/api-resources/images.test.ts
+	tests/api-resources/audio/audio.test.ts
+	tests/api-resources/audio/transcriptions.test.ts
+	tests/api-resources/audio/translations.test.ts
+	tests/api-resources/audio/speech.test.ts
+	tests/api-resources/moderations.test.ts
+	tests/api-resources/models.test.ts
+	tests/api-resources/fine-tuning/fine-tuning.test.ts
+	tests/api-resources/fine-tuning/jobs/jobs.test.ts
+	tests/api-resources/fine-tuning/jobs/checkpoints.test.ts
+	tests/api-resources/fine-tuning/checkpoints/checkpoints.test.ts
+	tests/api-resources/fine-tuning/checkpoints/permissions.test.ts
+	tests/api-resources/fine-tuning/alpha/alpha.test.ts
+	tests/api-resources/fine-tuning/alpha/graders.test.ts
+	tests/api-resources/vector-stores/vector-stores.test.ts
+	tests/api-resources/vector-stores/files.test.ts
+	tests/api-resources/vector-stores/file-batches.test.ts
+	tests/api-resources/beta/beta.test.ts
+	tests/api-resources/beta/realtime/realtime.test.ts
+	tests/api-resources/beta/realtime/sessions.test.ts
+	tests/api-resources/beta/realtime/transcription-sessions.test.ts
+	tests/api-resources/beta/assistants.test.ts
+	tests/api-resources/beta/threads/threads.test.ts
+	tests/api-resources/beta/threads/runs/runs.test.ts
+	tests/api-resources/beta/threads/runs/steps.test.ts
+	tests/api-resources/beta/threads/messages.test.ts
+	tests/api-resources/batches.test.ts
+	tests/api-resources/uploads/uploads.test.ts
+	tests/api-resources/uploads/parts.test.ts
+	tests/api-resources/responses/responses.test.ts
+	tests/api-resources/responses/input-items.test.ts
+	tests/api-resources/realtime/realtime.test.ts
+	tests/api-resources/realtime/client-secrets.test.ts
+	tests/api-resources/conversations/conversations.test.ts
+	tests/api-resources/conversations/items.test.ts
+	tests/api-resources/evals/evals.test.ts
+	tests/api-resources/evals/runs/runs.test.ts
+	tests/api-resources/evals/runs/output-items.test.ts
+	tests/api-resources/containers/containers.test.ts
+	tests/api-resources/containers/files/files.test.ts
+	tests/api-resources/containers/files/content.test.ts
+	tests/index.test.ts
+)
+
+for PATHSPEC in "${TEST_PATHS[@]}"; do
+    # Try to check out previous versions of the test files
+    # with the current SDK.
+    git checkout "$1" -- "${PATHSPEC}" 2>/dev/null || true
+done
+
+# Instead of running the tests, use the linter to check if an
+# older test is no longer compatible with the latest SDK.
+./scripts/lint

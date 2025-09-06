@@ -17,6 +17,9 @@ import {
   TranscriptionSessions,
 } from './transcription-sessions';
 
+/**
+ * @deprecated Realtime has now launched and is generally available. The old beta API is now deprecated.
+ */
 export class Realtime extends APIResource {
   sessions: SessionsAPI.Sessions = new SessionsAPI.Sessions(this._client);
   transcriptionSessions: TranscriptionSessionsAPI.TranscriptionSessions =
@@ -1545,7 +1548,8 @@ export interface ResponseAudioTranscriptDoneEvent {
 
 /**
  * Send this event to cancel an in-progress response. The server will respond with
- * a `response.cancelled` event or an error if there is no response to cancel.
+ * a `response.done` event with a status of `response.status=cancelled`. If there
+ * is no response to cancel, the server will respond with an error.
  */
 export interface ResponseCancelEvent {
   /**
@@ -2287,7 +2291,7 @@ export namespace SessionUpdateEvent {
      * set to `null` to turn off, in which case the client must manually trigger model
      * response. Server VAD means that the model will detect the start and end of
      * speech based on audio volume and respond at the end of user speech. Semantic VAD
-     * is more advanced and uses a turn detection model (in conjuction with VAD) to
+     * is more advanced and uses a turn detection model (in conjunction with VAD) to
      * semantically estimate whether the user has finished speaking, then dynamically
      * sets a timeout based on this probability. For example, if user audio trails off
      * with "uhhm", the model will score a low probability of turn end and wait longer
@@ -2435,7 +2439,7 @@ export namespace SessionUpdateEvent {
      * set to `null` to turn off, in which case the client must manually trigger model
      * response. Server VAD means that the model will detect the start and end of
      * speech based on audio volume and respond at the end of user speech. Semantic VAD
-     * is more advanced and uses a turn detection model (in conjuction with VAD) to
+     * is more advanced and uses a turn detection model (in conjunction with VAD) to
      * semantically estimate whether the user has finished speaking, then dynamically
      * sets a timeout based on this probability. For example, if user audio trails off
      * with "uhhm", the model will score a low probability of turn end and wait longer
@@ -2583,7 +2587,7 @@ export namespace TranscriptionSessionUpdate {
      * set to `null` to turn off, in which case the client must manually trigger model
      * response. Server VAD means that the model will detect the start and end of
      * speech based on audio volume and respond at the end of user speech. Semantic VAD
-     * is more advanced and uses a turn detection model (in conjuction with VAD) to
+     * is more advanced and uses a turn detection model (in conjunction with VAD) to
      * semantically estimate whether the user has finished speaking, then dynamically
      * sets a timeout based on this probability. For example, if user audio trails off
      * with "uhhm", the model will score a low probability of turn end and wait longer
@@ -2673,7 +2677,7 @@ export namespace TranscriptionSessionUpdate {
      * set to `null` to turn off, in which case the client must manually trigger model
      * response. Server VAD means that the model will detect the start and end of
      * speech based on audio volume and respond at the end of user speech. Semantic VAD
-     * is more advanced and uses a turn detection model (in conjuction with VAD) to
+     * is more advanced and uses a turn detection model (in conjunction with VAD) to
      * semantically estimate whether the user has finished speaking, then dynamically
      * sets a timeout based on this probability. For example, if user audio trails off
      * with "uhhm", the model will score a low probability of turn end and wait longer

@@ -76,8 +76,9 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   },
 ];
 
-async function callTool(tool_call: OpenAI.Chat.Completions.ChatCompletionMessageToolCall): Promise<any> {
-  if (tool_call.type !== 'function') throw new Error('Unexpected tool_call type:' + tool_call.type);
+async function callTool(
+  tool_call: OpenAI.Chat.Completions.ChatCompletionMessageFunctionToolCall,
+): Promise<any> {
   const args = JSON.parse(tool_call.function.arguments);
   switch (tool_call.function.name) {
     case 'list':
@@ -143,6 +144,9 @@ async function main() {
 
     // If there are tool calls, we generate a new message with the role 'tool' for each tool call.
     for (const toolCall of message.tool_calls) {
+      if (toolCall.type !== 'function') {
+        throw new Error(`Unexpected tool call type: ${toolCall.type}`);
+      }
       const result = await callTool(toolCall);
       const newMessage = {
         tool_call_id: toolCall.id,
