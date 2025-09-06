@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.19.2 (2025-09-06)
+
+Full Changelog: [v5.19.1...v5.19.2](https://github.com/openai/openai-node/compare/v5.19.1...v5.19.2)
+
+### Chores
+
+* ci build action ([c8ce143](https://github.com/openai/openai-node/commit/c8ce143196fdbc7ee1c7832bce2417b6e3d25885))
+
 ## 5.19.1 (2025-09-03)
 
 Full Changelog: [v5.19.0...v5.19.1](https://github.com/openai/openai-node/compare/v5.19.0...v5.19.1)
