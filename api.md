@@ -776,6 +776,7 @@ Methods:
 
 Types:
 
+- <code><a href="./src/resources/realtime/realtime.ts">AudioTranscription</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">ConversationCreatedEvent</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">ConversationItem</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">ConversationItemAdded</a></code>
@@ -804,11 +805,16 @@ Types:
 - <code><a href="./src/resources/realtime/realtime.ts">McpListToolsCompleted</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">McpListToolsFailed</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">McpListToolsInProgress</a></code>
+- <code><a href="./src/resources/realtime/realtime.ts">Models</a></code>
+- <code><a href="./src/resources/realtime/realtime.ts">NoiseReductionType</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">OutputAudioBufferClearEvent</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">RateLimitsUpdatedEvent</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">RealtimeAudioConfig</a></code>
+- <code><a href="./src/resources/realtime/realtime.ts">RealtimeAudioConfigInput</a></code>
+- <code><a href="./src/resources/realtime/realtime.ts">RealtimeAudioConfigOutput</a></code>
+- <code><a href="./src/resources/realtime/realtime.ts">RealtimeAudioFormats</a></code>
+- <code><a href="./src/resources/realtime/realtime.ts">RealtimeAudioInputTurnDetection</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">RealtimeClientEvent</a></code>
-- <code><a href="./src/resources/realtime/realtime.ts">RealtimeClientSecretConfig</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">RealtimeConversationItemAssistantMessage</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">RealtimeConversationItemFunctionCall</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">RealtimeConversationItemFunctionCallOutput</a></code>
@@ -824,6 +830,9 @@ Types:
 - <code><a href="./src/resources/realtime/realtime.ts">RealtimeMcpToolExecutionError</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">RealtimeMcphttpError</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">RealtimeResponse</a></code>
+- <code><a href="./src/resources/realtime/realtime.ts">RealtimeResponseCreateAudioOutput</a></code>
+- <code><a href="./src/resources/realtime/realtime.ts">RealtimeResponseCreateMcpTool</a></code>
+- <code><a href="./src/resources/realtime/realtime.ts">RealtimeResponseCreateParams</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">RealtimeResponseStatus</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">RealtimeResponseUsage</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">RealtimeResponseUsageInputTokenDetails</a></code>
@@ -835,8 +844,12 @@ Types:
 - <code><a href="./src/resources/realtime/realtime.ts">RealtimeToolsConfig</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">RealtimeToolsConfigUnion</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">RealtimeTracingConfig</a></code>
+- <code><a href="./src/resources/realtime/realtime.ts">RealtimeTranscriptionSessionAudio</a></code>
+- <code><a href="./src/resources/realtime/realtime.ts">RealtimeTranscriptionSessionAudioInput</a></code>
+- <code><a href="./src/resources/realtime/realtime.ts">RealtimeTranscriptionSessionAudioInputTurnDetection</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">RealtimeTranscriptionSessionCreateRequest</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">RealtimeTruncation</a></code>
+- <code><a href="./src/resources/realtime/realtime.ts">RealtimeTruncationRetentionRatio</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">ResponseAudioDeltaEvent</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">ResponseAudioDoneEvent</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">ResponseAudioTranscriptDeltaEvent</a></code>
@@ -869,7 +882,12 @@ Types:
 
 Types:
 
+- <code><a href="./src/resources/realtime/client-secrets.ts">RealtimeSessionClientSecret</a></code>
 - <code><a href="./src/resources/realtime/client-secrets.ts">RealtimeSessionCreateResponse</a></code>
+- <code><a href="./src/resources/realtime/client-secrets.ts">RealtimeTranscriptionSessionClientSecret</a></code>
+- <code><a href="./src/resources/realtime/client-secrets.ts">RealtimeTranscriptionSessionCreateResponse</a></code>
+- <code><a href="./src/resources/realtime/client-secrets.ts">RealtimeTranscriptionSessionInputAudioTranscription</a></code>
+- <code><a href="./src/resources/realtime/client-secrets.ts">RealtimeTranscriptionSessionTurnDetection</a></code>
 - <code><a href="./src/resources/realtime/client-secrets.ts">ClientSecretCreateResponse</a></code>
 
 Methods:

@@ -8,12 +8,41 @@ import {
   ClientSecretCreateParams,
   ClientSecretCreateResponse,
   ClientSecrets,
+  RealtimeSessionClientSecret,
   RealtimeSessionCreateResponse,
+  RealtimeTranscriptionSessionClientSecret,
+  RealtimeTranscriptionSessionCreateResponse,
+  RealtimeTranscriptionSessionInputAudioTranscription,
+  RealtimeTranscriptionSessionTurnDetection,
 } from './client-secrets';
 import * as ResponsesAPI from '../responses/responses';
 
 export class Realtime extends APIResource {
   clientSecrets: ClientSecretsAPI.ClientSecrets = new ClientSecretsAPI.ClientSecrets(this._client);
+}
+
+export interface AudioTranscription {
+  /**
+   * The language of the input audio. Supplying the input language in
+   * [ISO-639-1](https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes) (e.g. `en`)
+   * format will improve accuracy and latency.
+   */
+  language?: string;
+
+  /**
+   * The model to use for transcription. Current options are `whisper-1`,
+   * `gpt-4o-transcribe-latest`, `gpt-4o-mini-transcribe`, and `gpt-4o-transcribe`.
+   */
+  model?: 'whisper-1' | 'gpt-4o-transcribe-latest' | 'gpt-4o-mini-transcribe' | 'gpt-4o-transcribe';
+
+  /**
+   * An optional text to guide the model's style or continue a previous audio
+   * segment. For `whisper-1`, the
+   * [prompt is a list of keywords](https://platform.openai.com/docs/guides/speech-to-text#prompting).
+   * For `gpt-4o-transcribe` models, the prompt is a free text string, for example
+   * "expect words related to technology".
+   */
+  prompt?: string;
 }
 
 /**
@@ -68,7 +97,20 @@ export type ConversationItem =
   | RealtimeMcpApprovalRequest;
 
 /**
- * Returned when a conversation item is added.
+ * Sent by the server when an Item is added to the default Conversation. This can
+ * happen in several cases:
+ *
+ * - When the client sends a `conversation.item.create` event.
+ * - When the input audio buffer is committed. In this case the item will be a user
+ *   message containing the audio from the buffer.
+ * - When the model is generating a Response. In this case the
+ *   `conversation.item.added` event will be sent when the model starts generating
+ *   a specific Item, and thus it will not yet have any content (and `status` will
+ *   be `in_progress`).
+ *
+ * The event will include the full content of the Item (except when model is
+ * generating a Response) except for audio data, which can be retrieved separately
+ * with a `conversation.item.retrieve` event if necessary.
  */
 export interface ConversationItemAdded {
   /**
@@ -212,6 +254,9 @@ export interface ConversationItemDeletedEvent {
 
 /**
  * Returned when a conversation item is finalized.
+ *
+ * The event will include the full content of the Item except for audio data, which
+ * can be retrieved separately with a `conversation.item.retrieve` event if needed.
  */
 export interface ConversationItemDone {
   /**
@@ -239,9 +284,9 @@ export interface ConversationItemDone {
 /**
  * This event is the output of audio transcription for user audio written to the
  * user audio buffer. Transcription begins when the input audio buffer is committed
- * by the client or server (in `server_vad` mode). Transcription runs
- * asynchronously with Response creation, so this event may come before or after
- * the Response events.
+ * by the client or server (when VAD is enabled). Transcription runs asynchronously
+ * with Response creation, so this event may come before or after the Response
+ * events.
  *
  * Realtime API models accept audio natively, and thus input transcription is a
  * separate process run on a separate ASR (Automatic Speech Recognition) model. The
@@ -260,7 +305,7 @@ export interface ConversationItemInputAudioTranscriptionCompletedEvent {
   event_id: string;
 
   /**
-   * The ID of the user message item containing the audio.
+   * The ID of the item containing the audio that is being transcribed.
    */
   item_id: string;
 
@@ -275,7 +320,8 @@ export interface ConversationItemInputAudioTranscriptionCompletedEvent {
   type: 'conversation.item.input_audio_transcription.completed';
 
   /**
-   * Usage statistics for the transcription.
+   * Usage statistics for the transcription, this is billed according to the ASR
+   * model's pricing rather than the realtime model's pricing.
    */
   usage:
     | ConversationItemInputAudioTranscriptionCompletedEvent.TranscriptTextUsageTokens
@@ -353,7 +399,7 @@ export namespace ConversationItemInputAudioTranscriptionCompletedEvent {
 
 /**
  * Returned when the text value of an input audio transcription content part is
- * updated.
+ * updated with incremental transcription results.
  */
 export interface ConversationItemInputAudioTranscriptionDeltaEvent {
   /**
@@ -362,7 +408,7 @@ export interface ConversationItemInputAudioTranscriptionDeltaEvent {
   event_id: string;
 
   /**
-   * The ID of the item.
+   * The ID of the item containing the audio that is being transcribed.
    */
   item_id: string;
 
@@ -382,7 +428,12 @@ export interface ConversationItemInputAudioTranscriptionDeltaEvent {
   delta?: string;
 
   /**
-   * The log probabilities of the transcription.
+   * The log probabilities of the transcription. These can be enabled by
+   * configurating the session with
+   * `"include": ["item.input_audio_transcription.logprobs"]`. Each entry in the
+   * array corresponds a log probability of which token would be selected for this
+   * chunk of transcription. This can help to identify if it was possible there were
+   * multiple valid options for a given chunk of transcription.
    */
   logprobs?: Array<LogProbProperties> | null;
 }
@@ -542,7 +593,7 @@ export interface ConversationItemTruncateEvent {
   audio_end_ms: number;
 
   /**
-   * The index of the content part to truncate. Set this to 0.
+   * The index of the content part to truncate. Set this to `0`.
    */
   content_index: number;
 
@@ -701,14 +752,19 @@ export namespace ConversationItemWithReference {
 
 /**
  * Send this event to append audio bytes to the input audio buffer. The audio
- * buffer is temporary storage you can write to and later commit. In Server VAD
- * mode, the audio buffer is used to detect speech and the server will decide when
- * to commit. When Server VAD is disabled, you must commit the audio buffer
- * manually.
+ * buffer is temporary storage you can write to and later commit. A "commit" will
+ * create a new user message item in the conversation history from the buffer
+ * content and clear the buffer. Input audio transcription (if enabled) will be
+ * generated when the buffer is committed.
+ *
+ * If VAD is enabled the audio buffer is used to detect speech and the server will
+ * decide when to commit. When Server VAD is disabled, you must commit the audio
+ * buffer manually. Input audio noise reduction operates on writes to the audio
+ * buffer.
  *
  * The client may choose how much audio to place in each event up to a maximum of
  * 15 MiB, for example streaming smaller chunks from the client may allow the VAD
- * to be more responsive. Unlike made other client events, the server will not send
+ * to be more responsive. Unlike most other client events, the server will not send
  * a confirmation response to this event.
  */
 export interface InputAudioBufferAppendEvent {
@@ -988,6 +1044,36 @@ export interface McpListToolsInProgress {
   type: 'mcp_list_tools.in_progress';
 }
 
+export interface Models {
+  /**
+   * The description of the function, including guidance on when and how to call it,
+   * and guidance about what to tell the user when calling (if anything).
+   */
+  description?: string;
+
+  /**
+   * The name of the function.
+   */
+  name?: string;
+
+  /**
+   * Parameters of the function in JSON Schema.
+   */
+  parameters?: unknown;
+
+  /**
+   * The type of the tool, i.e. `function`.
+   */
+  type?: 'function';
+}
+
+/**
+ * Type of noise reduction. `near_field` is for close-talking microphones such as
+ * headphones, `far_field` is for far-field microphones such as laptop or
+ * conference room microphones.
+ */
+export type NoiseReductionType = 'near_field' | 'far_field';
+
 /**
  * **WebRTC Only:** Emit to cut off the current audio response. This will trigger
  * the server to stop generating audio and emit a `output_audio_buffer.cleared`
@@ -1058,212 +1144,217 @@ export namespace RateLimitsUpdatedEvent {
  * Configuration for input and output audio.
  */
 export interface RealtimeAudioConfig {
-  input?: RealtimeAudioConfig.Input;
+  input?: RealtimeAudioConfigInput;
 
-  output?: RealtimeAudioConfig.Output;
+  output?: RealtimeAudioConfigOutput;
 }
 
-export namespace RealtimeAudioConfig {
-  export interface Input {
+export interface RealtimeAudioConfigInput {
+  /**
+   * The format of the input audio.
+   */
+  format?: RealtimeAudioFormats;
+
+  /**
+   * Configuration for input audio noise reduction. This can be set to `null` to turn
+   * off. Noise reduction filters audio added to the input audio buffer before it is
+   * sent to VAD and the model. Filtering the audio can improve VAD and turn
+   * detection accuracy (reducing false positives) and model performance by improving
+   * perception of the input audio.
+   */
+  noise_reduction?: RealtimeAudioConfigInput.NoiseReduction;
+
+  /**
+   * Configuration for input audio transcription, defaults to off and can be set to
+   * `null` to turn off once on. Input audio transcription is not native to the
+   * model, since the model consumes audio directly. Transcription runs
+   * asynchronously through
+   * [the /audio/transcriptions endpoint](https://platform.openai.com/docs/api-reference/audio/createTranscription)
+   * and should be treated as guidance of input audio content rather than precisely
+   * what the model heard. The client can optionally set the language and prompt for
+   * transcription, these offer additional guidance to the transcription service.
+   */
+  transcription?: AudioTranscription;
+
+  /**
+   * Configuration for turn detection, ether Server VAD or Semantic VAD. This can be
+   * set to `null` to turn off, in which case the client must manually trigger model
+   * response. Server VAD means that the model will detect the start and end of
+   * speech based on audio volume and respond at the end of user speech. Semantic VAD
+   * is more advanced and uses a turn detection model (in conjunction with VAD) to
+   * semantically estimate whether the user has finished speaking, then dynamically
+   * sets a timeout based on this probability. For example, if user audio trails off
+   * with "uhhm", the model will score a low probability of turn end and wait longer
+   * for the user to continue speaking. This can be useful for more natural
+   * conversations, but may have a higher latency.
+   */
+  turn_detection?: RealtimeAudioInputTurnDetection;
+}
+
+export namespace RealtimeAudioConfigInput {
+  /**
+   * Configuration for input audio noise reduction. This can be set to `null` to turn
+   * off. Noise reduction filters audio added to the input audio buffer before it is
+   * sent to VAD and the model. Filtering the audio can improve VAD and turn
+   * detection accuracy (reducing false positives) and model performance by improving
+   * perception of the input audio.
+   */
+  export interface NoiseReduction {
     /**
-     * The format of input audio. Options are `pcm16`, `g711_ulaw`, or `g711_alaw`. For
-     * `pcm16`, input audio must be 16-bit PCM at a 24kHz sample rate, single channel
-     * (mono), and little-endian byte order.
+     * Type of noise reduction. `near_field` is for close-talking microphones such as
+     * headphones, `far_field` is for far-field microphones such as laptop or
+     * conference room microphones.
      */
-    format?: 'pcm16' | 'g711_ulaw' | 'g711_alaw';
+    type?: RealtimeAPI.NoiseReductionType;
+  }
+}
+
+export interface RealtimeAudioConfigOutput {
+  /**
+   * The format of the output audio.
+   */
+  format?: RealtimeAudioFormats;
+
+  /**
+   * The speed of the model's spoken response as a multiple of the original speed.
+   * 1.0 is the default speed. 0.25 is the minimum speed. 1.5 is the maximum speed.
+   * This value can only be changed in between model turns, not while a response is
+   * in progress.
+   *
+   * This parameter is a post-processing adjustment to the audio after it is
+   * generated, it's also possible to prompt the model to speak faster or slower.
+   */
+  speed?: number;
+
+  /**
+   * The voice the model uses to respond. Voice cannot be changed during the session
+   * once the model has responded with audio at least once. Current voice options are
+   * `alloy`, `ash`, `ballad`, `coral`, `echo`, `sage`, `shimmer`, `verse`, `marin`,
+   * and `cedar`. We recommend `marin` and `cedar` for best quality.
+   */
+  voice?:
+    | (string & {})
+    | 'alloy'
+    | 'ash'
+    | 'ballad'
+    | 'coral'
+    | 'echo'
+    | 'sage'
+    | 'shimmer'
+    | 'verse'
+    | 'marin'
+    | 'cedar';
+}
+
+/**
+ * The PCM audio format. Only a 24kHz sample rate is supported.
+ */
+export type RealtimeAudioFormats =
+  | RealtimeAudioFormats.AudioPCM
+  | RealtimeAudioFormats.AudioPCMU
+  | RealtimeAudioFormats.AudioPCMA;
+
+export namespace RealtimeAudioFormats {
+  /**
+   * The PCM audio format. Only a 24kHz sample rate is supported.
+   */
+  export interface AudioPCM {
+    /**
+     * The sample rate of the audio. Always `24000`.
+     */
+    rate?: 24000;
 
     /**
-     * Configuration for input audio noise reduction. This can be set to `null` to turn
-     * off. Noise reduction filters audio added to the input audio buffer before it is
-     * sent to VAD and the model. Filtering the audio can improve VAD and turn
-     * detection accuracy (reducing false positives) and model performance by improving
-     * perception of the input audio.
+     * The audio format. Always `audio/pcm`.
      */
-    noise_reduction?: Input.NoiseReduction;
-
-    /**
-     * Configuration for input audio transcription, defaults to off and can be set to
-     * `null` to turn off once on. Input audio transcription is not native to the
-     * model, since the model consumes audio directly. Transcription runs
-     * asynchronously through
-     * [the /audio/transcriptions endpoint](https://platform.openai.com/docs/api-reference/audio/createTranscription)
-     * and should be treated as guidance of input audio content rather than precisely
-     * what the model heard. The client can optionally set the language and prompt for
-     * transcription, these offer additional guidance to the transcription service.
-     */
-    transcription?: Input.Transcription;
-
-    /**
-     * Configuration for turn detection, ether Server VAD or Semantic VAD. This can be
-     * set to `null` to turn off, in which case the client must manually trigger model
-     * response. Server VAD means that the model will detect the start and end of
-     * speech based on audio volume and respond at the end of user speech. Semantic VAD
-     * is more advanced and uses a turn detection model (in conjunction with VAD) to
-     * semantically estimate whether the user has finished speaking, then dynamically
-     * sets a timeout based on this probability. For example, if user audio trails off
-     * with "uhhm", the model will score a low probability of turn end and wait longer
-     * for the user to continue speaking. This can be useful for more natural
-     * conversations, but may have a higher latency.
-     */
-    turn_detection?: Input.TurnDetection;
+    type?: 'audio/pcm';
   }
 
-  export namespace Input {
+  /**
+   * The G.711 μ-law format.
+   */
+  export interface AudioPCMU {
     /**
-     * Configuration for input audio noise reduction. This can be set to `null` to turn
-     * off. Noise reduction filters audio added to the input audio buffer before it is
-     * sent to VAD and the model. Filtering the audio can improve VAD and turn
-     * detection accuracy (reducing false positives) and model performance by improving
-     * perception of the input audio.
+     * The audio format. Always `audio/pcmu`.
      */
-    export interface NoiseReduction {
-      /**
-       * Type of noise reduction. `near_field` is for close-talking microphones such as
-       * headphones, `far_field` is for far-field microphones such as laptop or
-       * conference room microphones.
-       */
-      type?: 'near_field' | 'far_field';
-    }
-
-    /**
-     * Configuration for input audio transcription, defaults to off and can be set to
-     * `null` to turn off once on. Input audio transcription is not native to the
-     * model, since the model consumes audio directly. Transcription runs
-     * asynchronously through
-     * [the /audio/transcriptions endpoint](https://platform.openai.com/docs/api-reference/audio/createTranscription)
-     * and should be treated as guidance of input audio content rather than precisely
-     * what the model heard. The client can optionally set the language and prompt for
-     * transcription, these offer additional guidance to the transcription service.
-     */
-    export interface Transcription {
-      /**
-       * The language of the input audio. Supplying the input language in
-       * [ISO-639-1](https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes) (e.g. `en`)
-       * format will improve accuracy and latency.
-       */
-      language?: string;
-
-      /**
-       * The model to use for transcription. Current options are `whisper-1`,
-       * `gpt-4o-transcribe-latest`, `gpt-4o-mini-transcribe`, `gpt-4o-transcribe`, and
-       * `gpt-4o-transcribe-diarize`.
-       */
-      model?:
-        | 'whisper-1'
-        | 'gpt-4o-transcribe-latest'
-        | 'gpt-4o-mini-transcribe'
-        | 'gpt-4o-transcribe'
-        | 'gpt-4o-transcribe-diarize';
-
-      /**
-       * An optional text to guide the model's style or continue a previous audio
-       * segment. For `whisper-1`, the
-       * [prompt is a list of keywords](https://platform.openai.com/docs/guides/speech-to-text#prompting).
-       * For `gpt-4o-transcribe` models, the prompt is a free text string, for example
-       * "expect words related to technology".
-       */
-      prompt?: string;
-    }
-
-    /**
-     * Configuration for turn detection, ether Server VAD or Semantic VAD. This can be
-     * set to `null` to turn off, in which case the client must manually trigger model
-     * response. Server VAD means that the model will detect the start and end of
-     * speech based on audio volume and respond at the end of user speech. Semantic VAD
-     * is more advanced and uses a turn detection model (in conjunction with VAD) to
-     * semantically estimate whether the user has finished speaking, then dynamically
-     * sets a timeout based on this probability. For example, if user audio trails off
-     * with "uhhm", the model will score a low probability of turn end and wait longer
-     * for the user to continue speaking. This can be useful for more natural
-     * conversations, but may have a higher latency.
-     */
-    export interface TurnDetection {
-      /**
-       * Whether or not to automatically generate a response when a VAD stop event
-       * occurs.
-       */
-      create_response?: boolean;
-
-      /**
-       * Used only for `semantic_vad` mode. The eagerness of the model to respond. `low`
-       * will wait longer for the user to continue speaking, `high` will respond more
-       * quickly. `auto` is the default and is equivalent to `medium`.
-       */
-      eagerness?: 'low' | 'medium' | 'high' | 'auto';
-
-      /**
-       * Optional idle timeout after which turn detection will auto-timeout when no
-       * additional audio is received.
-       */
-      idle_timeout_ms?: number | null;
-
-      /**
-       * Whether or not to automatically interrupt any ongoing response with output to
-       * the default conversation (i.e. `conversation` of `auto`) when a VAD start event
-       * occurs.
-       */
-      interrupt_response?: boolean;
-
-      /**
-       * Used only for `server_vad` mode. Amount of audio to include before the VAD
-       * detected speech (in milliseconds). Defaults to 300ms.
-       */
-      prefix_padding_ms?: number;
-
-      /**
-       * Used only for `server_vad` mode. Duration of silence to detect speech stop (in
-       * milliseconds). Defaults to 500ms. With shorter values the model will respond
-       * more quickly, but may jump in on short pauses from the user.
-       */
-      silence_duration_ms?: number;
-
-      /**
-       * Used only for `server_vad` mode. Activation threshold for VAD (0.0 to 1.0), this
-       * defaults to 0.5. A higher threshold will require louder audio to activate the
-       * model, and thus might perform better in noisy environments.
-       */
-      threshold?: number;
-
-      /**
-       * Type of turn detection.
-       */
-      type?: 'server_vad' | 'semantic_vad';
-    }
+    type?: 'audio/pcmu';
   }
 
-  export interface Output {
+  /**
+   * The G.711 A-law format.
+   */
+  export interface AudioPCMA {
     /**
-     * The format of output audio. Options are `pcm16`, `g711_ulaw`, or `g711_alaw`.
-     * For `pcm16`, output audio is sampled at a rate of 24kHz.
+     * The audio format. Always `audio/pcma`.
      */
-    format?: 'pcm16' | 'g711_ulaw' | 'g711_alaw';
-
-    /**
-     * The speed of the model's spoken response. 1.0 is the default speed. 0.25 is the
-     * minimum speed. 1.5 is the maximum speed. This value can only be changed in
-     * between model turns, not while a response is in progress.
-     */
-    speed?: number;
-
-    /**
-     * The voice the model uses to respond. Voice cannot be changed during the session
-     * once the model has responded with audio at least once. Current voice options are
-     * `alloy`, `ash`, `ballad`, `coral`, `echo`, `sage`, `shimmer`, `verse`, `marin`,
-     * and `cedar`.
-     */
-    voice?:
-      | (string & {})
-      | 'alloy'
-      | 'ash'
-      | 'ballad'
-      | 'coral'
-      | 'echo'
-      | 'sage'
-      | 'shimmer'
-      | 'verse'
-      | 'marin'
-      | 'cedar';
+    type?: 'audio/pcma';
   }
+}
+
+/**
+ * Configuration for turn detection, ether Server VAD or Semantic VAD. This can be
+ * set to `null` to turn off, in which case the client must manually trigger model
+ * response. Server VAD means that the model will detect the start and end of
+ * speech based on audio volume and respond at the end of user speech. Semantic VAD
+ * is more advanced and uses a turn detection model (in conjunction with VAD) to
+ * semantically estimate whether the user has finished speaking, then dynamically
+ * sets a timeout based on this probability. For example, if user audio trails off
+ * with "uhhm", the model will score a low probability of turn end and wait longer
+ * for the user to continue speaking. This can be useful for more natural
+ * conversations, but may have a higher latency.
+ */
+export interface RealtimeAudioInputTurnDetection {
+  /**
+   * Whether or not to automatically generate a response when a VAD stop event
+   * occurs.
+   */
+  create_response?: boolean;
+
+  /**
+   * Used only for `semantic_vad` mode. The eagerness of the model to respond. `low`
+   * will wait longer for the user to continue speaking, `high` will respond more
+   * quickly. `auto` is the default and is equivalent to `medium`. `low`, `medium`,
+   * and `high` have max timeouts of 8s, 4s, and 2s respectively.
+   */
+  eagerness?: 'low' | 'medium' | 'high' | 'auto';
+
+  /**
+   * Optional idle timeout after which turn detection will auto-timeout when no
+   * additional audio is received.
+   */
+  idle_timeout_ms?: number | null;
+
+  /**
+   * Whether or not to automatically interrupt any ongoing response with output to
+   * the default conversation (i.e. `conversation` of `auto`) when a VAD start event
+   * occurs.
+   */
+  interrupt_response?: boolean;
+
+  /**
+   * Used only for `server_vad` mode. Amount of audio to include before the VAD
+   * detected speech (in milliseconds). Defaults to 300ms.
+   */
+  prefix_padding_ms?: number;
+
+  /**
+   * Used only for `server_vad` mode. Duration of silence to detect speech stop (in
+   * milliseconds). Defaults to 500ms. With shorter values the model will respond
+   * more quickly, but may jump in on short pauses from the user.
+   */
+  silence_duration_ms?: number;
+
+  /**
+   * Used only for `server_vad` mode. Activation threshold for VAD (0.0 to 1.0), this
+   * defaults to 0.5. A higher threshold will require louder audio to activate the
+   * model, and thus might perform better in noisy environments.
+   */
+  threshold?: number;
+
+  /**
+   * Type of turn detection.
+   */
+  type?: 'server_vad' | 'semantic_vad';
 }
 
 /**
@@ -1282,35 +1373,6 @@ export type RealtimeClientEvent =
   | ResponseCreateEvent
   | SessionUpdateEvent
   | TranscriptionSessionUpdate;
-
-/**
- * Configuration options for the generated client secret.
- */
-export interface RealtimeClientSecretConfig {
-  /**
-   * Configuration for the ephemeral token expiration.
-   */
-  expires_after?: RealtimeClientSecretConfig.ExpiresAfter;
-}
-
-export namespace RealtimeClientSecretConfig {
-  /**
-   * Configuration for the ephemeral token expiration.
-   */
-  export interface ExpiresAfter {
-    /**
-     * The anchor point for the ephemeral token expiration. Only `created_at` is
-     * currently supported.
-     */
-    anchor: 'created_at';
-
-    /**
-     * The number of seconds from the anchor point to the expiration. Select a value
-     * between `10` and `7200`.
-     */
-    seconds?: number;
-  }
-}
 
 /**
  * An assistant message item in a Realtime conversation.
@@ -1332,12 +1394,14 @@ export interface RealtimeConversationItemAssistantMessage {
   type: 'message';
 
   /**
-   * The unique ID of the item.
+   * The unique ID of the item. This may be provided by the client or generated by
+   * the server.
    */
   id?: string;
 
   /**
-   * Identifier for the API object being returned - always `realtime.item`.
+   * Identifier for the API object being returned - always `realtime.item`. Optional
+   * when creating a new item.
    */
   object?: 'realtime.item';
 
@@ -1350,14 +1414,28 @@ export interface RealtimeConversationItemAssistantMessage {
 export namespace RealtimeConversationItemAssistantMessage {
   export interface Content {
     /**
+     * Base64-encoded audio bytes, these will be parsed as the format specified in the
+     * session output audio type configuration. This defaults to PCM 16-bit 24kHz mono
+     * if not specified.
+     */
+    audio?: string;
+
+    /**
      * The text content.
      */
     text?: string;
 
     /**
-     * The content type. Always `text` for assistant messages.
+     * The transcript of the audio content, this will always be present if the output
+     * type is `audio`.
      */
-    type?: 'text';
+    transcript?: string;
+
+    /**
+     * The content type, `output_text` or `output_audio` depending on the session
+     * `output_modalities` configuration.
+     */
+    type?: 'output_text' | 'output_audio';
   }
 }
 
@@ -1366,7 +1444,9 @@ export namespace RealtimeConversationItemAssistantMessage {
  */
 export interface RealtimeConversationItemFunctionCall {
   /**
-   * The arguments of the function call.
+   * The arguments of the function call. This is a JSON-encoded string representing
+   * the arguments passed to the function, for example
+   * `{"arg1": "value1", "arg2": 42}`.
    */
   arguments: string;
 
@@ -1381,7 +1461,8 @@ export interface RealtimeConversationItemFunctionCall {
   type: 'function_call';
 
   /**
-   * The unique ID of the item.
+   * The unique ID of the item. This may be provided by the client or generated by
+   * the server.
    */
   id?: string;
 
@@ -1391,7 +1472,8 @@ export interface RealtimeConversationItemFunctionCall {
   call_id?: string;
 
   /**
-   * Identifier for the API object being returned - always `realtime.item`.
+   * Identifier for the API object being returned - always `realtime.item`. Optional
+   * when creating a new item.
    */
   object?: 'realtime.item';
 
@@ -1411,7 +1493,8 @@ export interface RealtimeConversationItemFunctionCallOutput {
   call_id: string;
 
   /**
-   * The output of the function call.
+   * The output of the function call, this is free text and can contain any
+   * information or simply be empty.
    */
   output: string;
 
@@ -1421,12 +1504,14 @@ export interface RealtimeConversationItemFunctionCallOutput {
   type: 'function_call_output';
 
   /**
-   * The unique ID of the item.
+   * The unique ID of the item. This may be provided by the client or generated by
+   * the server.
    */
   id?: string;
 
   /**
-   * Identifier for the API object being returned - always `realtime.item`.
+   * Identifier for the API object being returned - always `realtime.item`. Optional
+   * when creating a new item.
    */
   object?: 'realtime.item';
 
@@ -1437,7 +1522,12 @@ export interface RealtimeConversationItemFunctionCallOutput {
 }
 
 /**
- * A system message item in a Realtime conversation.
+ * A system message in a Realtime conversation can be used to provide additional
+ * context or instructions to the model. This is similar but distinct from the
+ * instruction prompt provided at the start of a conversation, as system messages
+ * can be added at any point in the conversation. For major changes to the
+ * conversation's behavior, use instructions, but for smaller updates (e.g. "the
+ * user is now asking about a different topic"), use system messages.
  */
 export interface RealtimeConversationItemSystemMessage {
   /**
@@ -1456,12 +1546,14 @@ export interface RealtimeConversationItemSystemMessage {
   type: 'message';
 
   /**
-   * The unique ID of the item.
+   * The unique ID of the item. This may be provided by the client or generated by
+   * the server.
    */
   id?: string;
 
   /**
-   * Identifier for the API object being returned - always `realtime.item`.
+   * Identifier for the API object being returned - always `realtime.item`. Optional
+   * when creating a new item.
    */
   object?: 'realtime.item';
 
@@ -1505,12 +1597,14 @@ export interface RealtimeConversationItemUserMessage {
   type: 'message';
 
   /**
-   * The unique ID of the item.
+   * The unique ID of the item. This may be provided by the client or generated by
+   * the server.
    */
   id?: string;
 
   /**
-   * Identifier for the API object being returned - always `realtime.item`.
+   * Identifier for the API object being returned - always `realtime.item`. Optional
+   * when creating a new item.
    */
   object?: 'realtime.item';
 
@@ -1523,9 +1617,24 @@ export interface RealtimeConversationItemUserMessage {
 export namespace RealtimeConversationItemUserMessage {
   export interface Content {
     /**
-     * Base64-encoded audio bytes (for `input_audio`).
+     * Base64-encoded audio bytes (for `input_audio`), these will be parsed as the
+     * format specified in the session input audio type configuration. This defaults to
+     * PCM 16-bit 24kHz mono if not specified.
      */
     audio?: string;
+
+    /**
+     * The detail level of the image (for `input_image`). `auto` will default to
+     * `high`.
+     */
+    detail?: 'auto' | 'low' | 'high';
+
+    /**
+     * Base64-encoded image bytes (for `input_image`) as a data URI. For example
+     * `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...`. Supported formats are PNG
+     * and JPEG.
+     */
+    image_url?: string;
 
     /**
      * The text content (for `input_text`).
@@ -1533,14 +1642,15 @@ export namespace RealtimeConversationItemUserMessage {
     text?: string;
 
     /**
-     * Transcript of the audio (for `input_audio`).
+     * Transcript of the audio (for `input_audio`). This is not sent to the model, but
+     * will be attached to the message item for reference.
      */
     transcript?: string;
 
     /**
-     * The content type (`input_text` or `input_audio`).
+     * The content type (`input_text`, `input_audio`, or `input_image`).
      */
-    type?: 'input_text' | 'input_audio';
+    type?: 'input_text' | 'input_audio' | 'input_image';
   }
 }
 
@@ -1780,9 +1890,14 @@ export interface RealtimeMcphttpError {
  */
 export interface RealtimeResponse {
   /**
-   * The unique ID of the response.
+   * The unique ID of the response, will look like `resp_1234`.
    */
   id?: string;
+
+  /**
+   * Configuration for audio output.
+   */
+  audio?: RealtimeResponse.Audio;
 
   /**
    * Which conversation the response is added to, determined by the `conversation`
@@ -1790,8 +1905,7 @@ export interface RealtimeResponse {
    * the default conversation and the value of `conversation_id` will be an id like
    * `conv_1234`. If `none`, the response will not be added to any conversation and
    * the value of `conversation_id` will be `null`. If responses are being triggered
-   * by server VAD, the response will be added to the default conversation, thus the
-   * `conversation_id` will be an id like `conv_1234`.
+   * automatically by VAD the response will be added to the default conversation
    */
   conversation_id?: string;
 
@@ -1812,13 +1926,6 @@ export interface RealtimeResponse {
   metadata?: Shared.Metadata | null;
 
   /**
-   * The set of modalities the model used to respond. If there are multiple
-   * modalities, the model will pick one, for example if `modalities` is
-   * `["text", "audio"]`, the model could be responding in either text or audio.
-   */
-  modalities?: Array<'text' | 'audio'>;
-
-  /**
    * The object type, must be `realtime.response`.
    */
   object?: 'realtime.response';
@@ -1829,9 +1936,12 @@ export interface RealtimeResponse {
   output?: Array<ConversationItem>;
 
   /**
-   * The format of output audio. Options are `pcm16`, `g711_ulaw`, or `g711_alaw`.
+   * The set of modalities the model used to respond, currently the only possible
+   * values are `[\"audio\"]`, `[\"text\"]`. Audio output always include a text
+   * transcript. Setting the output to mode `text` will disable audio output from the
+   * model.
    */
-  output_audio_format?: 'pcm16' | 'g711_ulaw' | 'g711_alaw';
+  output_modalities?: Array<'text' | 'audio'>;
 
   /**
    * The final status of the response (`completed`, `cancelled`, `failed`, or
@@ -1845,34 +1955,319 @@ export interface RealtimeResponse {
   status_details?: RealtimeResponseStatus;
 
   /**
-   * Sampling temperature for the model, limited to [0.6, 1.2]. Defaults to 0.8.
-   */
-  temperature?: number;
-
-  /**
    * Usage statistics for the Response, this will correspond to billing. A Realtime
    * API session will maintain a conversation context and append new Items to the
    * Conversation, thus output from previous turns (text and audio tokens) will
    * become the input for later turns.
    */
   usage?: RealtimeResponseUsage;
+}
+
+export namespace RealtimeResponse {
+  /**
+   * Configuration for audio output.
+   */
+  export interface Audio {
+    output?: Audio.Output;
+  }
+
+  export namespace Audio {
+    export interface Output {
+      /**
+       * The format of the output audio.
+       */
+      format?: RealtimeAPI.RealtimeAudioFormats;
+
+      /**
+       * The voice the model uses to respond. Voice cannot be changed during the session
+       * once the model has responded with audio at least once. Current voice options are
+       * `alloy`, `ash`, `ballad`, `coral`, `echo`, `sage`, `shimmer`, `verse`, `marin`,
+       * and `cedar`. We recommend `marin` and `cedar` for best quality.
+       */
+      voice?:
+        | (string & {})
+        | 'alloy'
+        | 'ash'
+        | 'ballad'
+        | 'coral'
+        | 'echo'
+        | 'sage'
+        | 'shimmer'
+        | 'verse'
+        | 'marin'
+        | 'cedar';
+    }
+  }
+}
+
+/**
+ * Configuration for audio input and output.
+ */
+export interface RealtimeResponseCreateAudioOutput {
+  output?: RealtimeResponseCreateAudioOutput.Output;
+}
+
+export namespace RealtimeResponseCreateAudioOutput {
+  export interface Output {
+    /**
+     * The format of the output audio.
+     */
+    format?: RealtimeAPI.RealtimeAudioFormats;
+
+    /**
+     * The voice the model uses to respond. Voice cannot be changed during the session
+     * once the model has responded with audio at least once. Current voice options are
+     * `alloy`, `ash`, `ballad`, `coral`, `echo`, `sage`, `shimmer`, `verse`, `marin`,
+     * and `cedar`. We recommend `marin` and `cedar` for best quality.
+     */
+    voice?:
+      | (string & {})
+      | 'alloy'
+      | 'ash'
+      | 'ballad'
+      | 'coral'
+      | 'echo'
+      | 'sage'
+      | 'shimmer'
+      | 'verse'
+      | 'marin'
+      | 'cedar';
+  }
+}
+
+/**
+ * Give the model access to additional tools via remote Model Context Protocol
+ * (MCP) servers.
+ * [Learn more about MCP](https://platform.openai.com/docs/guides/tools-remote-mcp).
+ */
+export interface RealtimeResponseCreateMcpTool {
+  /**
+   * A label for this MCP server, used to identify it in tool calls.
+   */
+  server_label: string;
 
   /**
-   * The voice the model used to respond. Current voice options are `alloy`, `ash`,
-   * `ballad`, `coral`, `echo`, `sage`, `shimmer`, and `verse`.
+   * The type of the MCP tool. Always `mcp`.
    */
-  voice?:
-    | (string & {})
-    | 'alloy'
-    | 'ash'
-    | 'ballad'
-    | 'coral'
-    | 'echo'
-    | 'sage'
-    | 'shimmer'
-    | 'verse'
-    | 'marin'
-    | 'cedar';
+  type: 'mcp';
+
+  /**
+   * List of allowed tool names or a filter object.
+   */
+  allowed_tools?: Array<string> | RealtimeResponseCreateMcpTool.McpToolFilter | null;
+
+  /**
+   * An OAuth access token that can be used with a remote MCP server, either with a
+   * custom MCP server URL or a service connector. Your application must handle the
+   * OAuth authorization flow and provide the token here.
+   */
+  authorization?: string;
+
+  /**
+   * Identifier for service connectors, like those available in ChatGPT. One of
+   * `server_url` or `connector_id` must be provided. Learn more about service
+   * connectors
+   * [here](https://platform.openai.com/docs/guides/tools-remote-mcp#connectors).
+   *
+   * Currently supported `connector_id` values are:
+   *
+   * - Dropbox: `connector_dropbox`
+   * - Gmail: `connector_gmail`
+   * - Google Calendar: `connector_googlecalendar`
+   * - Google Drive: `connector_googledrive`
+   * - Microsoft Teams: `connector_microsoftteams`
+   * - Outlook Calendar: `connector_outlookcalendar`
+   * - Outlook Email: `connector_outlookemail`
+   * - SharePoint: `connector_sharepoint`
+   */
+  connector_id?:
+    | 'connector_dropbox'
+    | 'connector_gmail'
+    | 'connector_googlecalendar'
+    | 'connector_googledrive'
+    | 'connector_microsoftteams'
+    | 'connector_outlookcalendar'
+    | 'connector_outlookemail'
+    | 'connector_sharepoint';
+
+  /**
+   * Optional HTTP headers to send to the MCP server. Use for authentication or other
+   * purposes.
+   */
+  headers?: { [key: string]: string } | null;
+
+  /**
+   * Specify which of the MCP server's tools require approval.
+   */
+  require_approval?: RealtimeResponseCreateMcpTool.McpToolApprovalFilter | 'always' | 'never' | null;
+
+  /**
+   * Optional description of the MCP server, used to provide more context.
+   */
+  server_description?: string;
+
+  /**
+   * The URL for the MCP server. One of `server_url` or `connector_id` must be
+   * provided.
+   */
+  server_url?: string;
+}
+
+export namespace RealtimeResponseCreateMcpTool {
+  /**
+   * A filter object to specify which tools are allowed.
+   */
+  export interface McpToolFilter {
+    /**
+     * Indicates whether or not a tool modifies data or is read-only. If an MCP server
+     * is
+     * [annotated with `readOnlyHint`](https://modelcontextprotocol.io/specification/2025-06-18/schema#toolannotations-readonlyhint),
+     * it will match this filter.
+     */
+    read_only?: boolean;
+
+    /**
+     * List of allowed tool names.
+     */
+    tool_names?: Array<string>;
+  }
+
+  /**
+   * Specify which of the MCP server's tools require approval. Can be `always`,
+   * `never`, or a filter object associated with tools that require approval.
+   */
+  export interface McpToolApprovalFilter {
+    /**
+     * A filter object to specify which tools are allowed.
+     */
+    always?: McpToolApprovalFilter.Always;
+
+    /**
+     * A filter object to specify which tools are allowed.
+     */
+    never?: McpToolApprovalFilter.Never;
+  }
+
+  export namespace McpToolApprovalFilter {
+    /**
+     * A filter object to specify which tools are allowed.
+     */
+    export interface Always {
+      /**
+       * Indicates whether or not a tool modifies data or is read-only. If an MCP server
+       * is
+       * [annotated with `readOnlyHint`](https://modelcontextprotocol.io/specification/2025-06-18/schema#toolannotations-readonlyhint),
+       * it will match this filter.
+       */
+      read_only?: boolean;
+
+      /**
+       * List of allowed tool names.
+       */
+      tool_names?: Array<string>;
+    }
+
+    /**
+     * A filter object to specify which tools are allowed.
+     */
+    export interface Never {
+      /**
+       * Indicates whether or not a tool modifies data or is read-only. If an MCP server
+       * is
+       * [annotated with `readOnlyHint`](https://modelcontextprotocol.io/specification/2025-06-18/schema#toolannotations-readonlyhint),
+       * it will match this filter.
+       */
+      read_only?: boolean;
+
+      /**
+       * List of allowed tool names.
+       */
+      tool_names?: Array<string>;
+    }
+  }
+}
+
+/**
+ * Create a new Realtime response with these parameters
+ */
+export interface RealtimeResponseCreateParams {
+  /**
+   * Configuration for audio input and output.
+   */
+  audio?: RealtimeResponseCreateAudioOutput;
+
+  /**
+   * Controls which conversation the response is added to. Currently supports `auto`
+   * and `none`, with `auto` as the default value. The `auto` value means that the
+   * contents of the response will be added to the default conversation. Set this to
+   * `none` to create an out-of-band response which will not add items to default
+   * conversation.
+   */
+  conversation?: (string & {}) | 'auto' | 'none';
+
+  /**
+   * Input items to include in the prompt for the model. Using this field creates a
+   * new context for this Response instead of using the default conversation. An
+   * empty array `[]` will clear the context for this Response. Note that this can
+   * include references to items that previously appeared in the session using their
+   * id.
+   */
+  input?: Array<ConversationItem>;
+
+  /**
+   * The default system instructions (i.e. system message) prepended to model calls.
+   * This field allows the client to guide the model on desired responses. The model
+   * can be instructed on response content and format, (e.g. "be extremely succinct",
+   * "act friendly", "here are examples of good responses") and on audio behavior
+   * (e.g. "talk quickly", "inject emotion into your voice", "laugh frequently"). The
+   * instructions are not guaranteed to be followed by the model, but they provide
+   * guidance to the model on the desired behavior. Note that the server sets default
+   * instructions which will be used if this field is not set and are visible in the
+   * `session.created` event at the start of the session.
+   */
+  instructions?: string;
+
+  /**
+   * Maximum number of output tokens for a single assistant response, inclusive of
+   * tool calls. Provide an integer between 1 and 4096 to limit output tokens, or
+   * `inf` for the maximum available tokens for a given model. Defaults to `inf`.
+   */
+  max_output_tokens?: number | 'inf';
+
+  /**
+   * Set of 16 key-value pairs that can be attached to an object. This can be useful
+   * for storing additional information about the object in a structured format, and
+   * querying for objects via API or the dashboard.
+   *
+   * Keys are strings with a maximum length of 64 characters. Values are strings with
+   * a maximum length of 512 characters.
+   */
+  metadata?: Shared.Metadata | null;
+
+  /**
+   * The set of modalities the model used to respond, currently the only possible
+   * values are `[\"audio\"]`, `[\"text\"]`. Audio output always include a text
+   * transcript. Setting the output to mode `text` will disable audio output from the
+   * model.
+   */
+  output_modalities?: Array<'text' | 'audio'>;
+
+  /**
+   * Reference to a prompt template and its variables.
+   * [Learn more](https://platform.openai.com/docs/guides/text?api-mode=responses#reusable-prompts).
+   */
+  prompt?: ResponsesAPI.ResponsePrompt | null;
+
+  /**
+   * How the model chooses tools. Provide one of the string modes or force a specific
+   * function/MCP tool.
+   */
+  tool_choice?: ResponsesAPI.ToolChoiceOptions | ResponsesAPI.ToolChoiceFunction | ResponsesAPI.ToolChoiceMcp;
+
+  /**
+   * Tools available to the model.
+   */
+  tools?: Array<Models | RealtimeResponseCreateMcpTool>;
 }
 
 /**
@@ -1927,7 +2322,10 @@ export namespace RealtimeResponseStatus {
  */
 export interface RealtimeResponseUsage {
   /**
-   * Details about the input tokens used in the Response.
+   * Details about the input tokens used in the Response. Cached tokens are tokens
+   * from previous turns in the conversation that are included as context for the
+   * current response. Cached tokens here are counted as a subset of input tokens,
+   * meaning input tokens will include cached and uncached tokens.
    */
   input_token_details?: RealtimeResponseUsageInputTokenDetails;
 
@@ -1956,23 +2354,58 @@ export interface RealtimeResponseUsage {
 }
 
 /**
- * Details about the input tokens used in the Response.
+ * Details about the input tokens used in the Response. Cached tokens are tokens
+ * from previous turns in the conversation that are included as context for the
+ * current response. Cached tokens here are counted as a subset of input tokens,
+ * meaning input tokens will include cached and uncached tokens.
  */
 export interface RealtimeResponseUsageInputTokenDetails {
   /**
-   * The number of audio tokens used in the Response.
+   * The number of audio tokens used as input for the Response.
    */
   audio_tokens?: number;
 
   /**
-   * The number of cached tokens used in the Response.
+   * The number of cached tokens used as input for the Response.
    */
   cached_tokens?: number;
 
   /**
-   * The number of text tokens used in the Response.
+   * Details about the cached tokens used as input for the Response.
+   */
+  cached_tokens_details?: RealtimeResponseUsageInputTokenDetails.CachedTokensDetails;
+
+  /**
+   * The number of image tokens used as input for the Response.
+   */
+  image_tokens?: number;
+
+  /**
+   * The number of text tokens used as input for the Response.
    */
   text_tokens?: number;
+}
+
+export namespace RealtimeResponseUsageInputTokenDetails {
+  /**
+   * Details about the cached tokens used as input for the Response.
+   */
+  export interface CachedTokensDetails {
+    /**
+     * The number of cached audio tokens used as input for the Response.
+     */
+    audio_tokens?: number;
+
+    /**
+     * The number of cached image tokens used as input for the Response.
+     */
+    image_tokens?: number;
+
+    /**
+     * The number of cached text tokens used as input for the Response.
+     */
+    text_tokens?: number;
+  }
 }
 
 /**
@@ -2045,7 +2478,10 @@ export type RealtimeServerEvent =
 export namespace RealtimeServerEvent {
   /**
    * Returned when a conversation item is retrieved with
-   * `conversation.item.retrieve`.
+   * `conversation.item.retrieve`. This is provided as a way to fetch the server's
+   * representation of an item, for example to get access to the post-processed audio
+   * data after noise cancellation and VAD. It includes the full content of the Item,
+   * including audio data.
    */
   export interface ConversationItemRetrieved {
     /**
@@ -2184,7 +2620,7 @@ export interface RealtimeSession {
    * what the model heard. The client can optionally set the language and prompt for
    * transcription, these offer additional guidance to the transcription service.
    */
-  input_audio_transcription?: RealtimeSession.InputAudioTranscription | null;
+  input_audio_transcription?: AudioTranscription | null;
 
   /**
    * The default system instructions (i.e. system message) prepended to model calls.
@@ -2266,7 +2702,7 @@ export interface RealtimeSession {
   /**
    * Tools (functions) available to the model.
    */
-  tools?: Array<RealtimeSession.Tool>;
+  tools?: Array<Models>;
 
   /**
    * Configuration options for tracing. Set to null to disable tracing. Once tracing
@@ -2324,64 +2760,7 @@ export namespace RealtimeSession {
      * headphones, `far_field` is for far-field microphones such as laptop or
      * conference room microphones.
      */
-    type?: 'near_field' | 'far_field';
-  }
-
-  /**
-   * Configuration for input audio transcription, defaults to off and can be set to
-   * `null` to turn off once on. Input audio transcription is not native to the
-   * model, since the model consumes audio directly. Transcription runs
-   * asynchronously through
-   * [the /audio/transcriptions endpoint](https://platform.openai.com/docs/api-reference/audio/createTranscription)
-   * and should be treated as guidance of input audio content rather than precisely
-   * what the model heard. The client can optionally set the language and prompt for
-   * transcription, these offer additional guidance to the transcription service.
-   */
-  export interface InputAudioTranscription {
-    /**
-     * The language of the input audio. Supplying the input language in
-     * [ISO-639-1](https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes) (e.g. `en`)
-     * format will improve accuracy and latency.
-     */
-    language?: string;
-
-    /**
-     * The model to use for transcription, current options are `gpt-4o-transcribe`,
-     * `gpt-4o-mini-transcribe`, and `whisper-1`.
-     */
-    model?: string;
-
-    /**
-     * An optional text to guide the model's style or continue a previous audio
-     * segment. For `whisper-1`, the
-     * [prompt is a list of keywords](https://platform.openai.com/docs/guides/speech-to-text#prompting).
-     * For `gpt-4o-transcribe` models, the prompt is a free text string, for example
-     * "expect words related to technology".
-     */
-    prompt?: string;
-  }
-
-  export interface Tool {
-    /**
-     * The description of the function, including guidance on when and how to call it,
-     * and guidance about what to tell the user when calling (if anything).
-     */
-    description?: string;
-
-    /**
-     * The name of the function.
-     */
-    name?: string;
-
-    /**
-     * Parameters of the function in JSON Schema.
-     */
-    parameters?: unknown;
-
-    /**
-     * The type of the tool, i.e. `function`.
-     */
-    type?: 'function';
+    type?: RealtimeAPI.NoiseReductionType;
   }
 
   /**
@@ -2478,22 +2857,6 @@ export namespace RealtimeSession {
  */
 export interface RealtimeSessionCreateRequest {
   /**
-   * The Realtime model used for this session.
-   */
-  model:
-    | (string & {})
-    | 'gpt-realtime'
-    | 'gpt-realtime-2025-08-28'
-    | 'gpt-4o-realtime'
-    | 'gpt-4o-mini-realtime'
-    | 'gpt-4o-realtime-preview'
-    | 'gpt-4o-realtime-preview-2024-10-01'
-    | 'gpt-4o-realtime-preview-2024-12-17'
-    | 'gpt-4o-realtime-preview-2025-06-03'
-    | 'gpt-4o-mini-realtime-preview'
-    | 'gpt-4o-mini-realtime-preview-2024-12-17';
-
-  /**
    * The type of session to create. Always `realtime` for the Realtime API.
    */
   type: 'realtime';
@@ -2504,15 +2867,10 @@ export interface RealtimeSessionCreateRequest {
   audio?: RealtimeAudioConfig;
 
   /**
-   * Configuration options for the generated client secret.
-   */
-  client_secret?: RealtimeClientSecretConfig;
-
-  /**
    * Additional fields to include in server outputs.
    *
-   * - `item.input_audio_transcription.logprobs`: Include logprobs for input audio
-   *   transcription.
+   * `item.input_audio_transcription.logprobs`: Include logprobs for input audio
+   * transcription.
    */
   include?: Array<'item.input_audio_transcription.logprobs'>;
 
@@ -2539,8 +2897,24 @@ export interface RealtimeSessionCreateRequest {
   max_output_tokens?: number | 'inf';
 
   /**
-   * The set of modalities the model can respond with. To disable audio, set this to
-   * ["text"].
+   * The Realtime model used for this session.
+   */
+  model?:
+    | (string & {})
+    | 'gpt-realtime'
+    | 'gpt-realtime-2025-08-28'
+    | 'gpt-4o-realtime-preview'
+    | 'gpt-4o-realtime-preview-2024-10-01'
+    | 'gpt-4o-realtime-preview-2024-12-17'
+    | 'gpt-4o-realtime-preview-2025-06-03'
+    | 'gpt-4o-mini-realtime-preview'
+    | 'gpt-4o-mini-realtime-preview-2024-12-17';
+
+  /**
+   * The set of modalities the model can respond with. It defaults to `["audio"]`,
+   * indicating that the model will respond with audio plus a transcript. `["text"]`
+   * can be used to make the model respond with text only. It is not possible to
+   * request both `text` and `audio` at the same time.
    */
   output_modalities?: Array<'text' | 'audio'>;
 
@@ -2549,12 +2923,6 @@ export interface RealtimeSessionCreateRequest {
    * [Learn more](https://platform.openai.com/docs/guides/text?api-mode=responses#reusable-prompts).
    */
   prompt?: ResponsesAPI.ResponsePrompt | null;
-
-  /**
-   * Sampling temperature for the model, limited to [0.6, 1.2]. For audio models a
-   * temperature of 0.8 is highly recommended for best performance.
-   */
-  temperature?: number;
 
   /**
    * How the model chooses tools. Provide one of the string modes or force a specific
@@ -2568,8 +2936,9 @@ export interface RealtimeSessionCreateRequest {
   tools?: RealtimeToolsConfig;
 
   /**
-   * Configuration options for tracing. Set to null to disable tracing. Once tracing
-   * is enabled for a session, the configuration cannot be modified.
+   * Realtime API can write session traces to the
+   * [Traces Dashboard](/logs?api=traces). Set to null to disable tracing. Once
+   * tracing is enabled for a session, the configuration cannot be modified.
    *
    * `auto` will create a trace for the session with default values for the workflow
    * name, group id, and metadata.
@@ -2578,8 +2947,7 @@ export interface RealtimeSessionCreateRequest {
 
   /**
    * Controls how the realtime conversation is truncated prior to model inference.
-   * The default is `auto`. When set to `retention_ratio`, the server retains a
-   * fraction of the conversation tokens prior to the instructions.
+   * The default is `auto`.
    */
   truncation?: RealtimeTruncation;
 }
@@ -2603,32 +2971,9 @@ export type RealtimeToolsConfig = Array<RealtimeToolsConfigUnion>;
  * (MCP) servers.
  * [Learn more about MCP](https://platform.openai.com/docs/guides/tools-remote-mcp).
  */
-export type RealtimeToolsConfigUnion = RealtimeToolsConfigUnion.Function | RealtimeToolsConfigUnion.Mcp;
+export type RealtimeToolsConfigUnion = Models | RealtimeToolsConfigUnion.Mcp;
 
 export namespace RealtimeToolsConfigUnion {
-  export interface Function {
-    /**
-     * The description of the function, including guidance on when and how to call it,
-     * and guidance about what to tell the user when calling (if anything).
-     */
-    description?: string;
-
-    /**
-     * The name of the function.
-     */
-    name?: string;
-
-    /**
-     * Parameters of the function in JSON Schema.
-     */
-    parameters?: unknown;
-
-    /**
-     * The type of the tool, i.e. `function`.
-     */
-    type?: 'function';
-  }
-
   /**
    * Give the model access to additional tools via remote Model Context Protocol
    * (MCP) servers.
@@ -2783,8 +3128,9 @@ export namespace RealtimeToolsConfigUnion {
 }
 
 /**
- * Configuration options for tracing. Set to null to disable tracing. Once tracing
- * is enabled for a session, the configuration cannot be modified.
+ * Realtime API can write session traces to the
+ * [Traces Dashboard](/logs?api=traces). Set to null to disable tracing. Once
+ * tracing is enabled for a session, the configuration cannot be modified.
  *
  * `auto` will create a trace for the session with default values for the workflow
  * name, group id, and metadata.
@@ -2798,22 +3144,154 @@ export namespace RealtimeTracingConfig {
   export interface TracingConfiguration {
     /**
      * The group id to attach to this trace to enable filtering and grouping in the
-     * traces dashboard.
+     * Traces Dashboard.
      */
     group_id?: string;
 
     /**
-     * The arbitrary metadata to attach to this trace to enable filtering in the traces
-     * dashboard.
+     * The arbitrary metadata to attach to this trace to enable filtering in the Traces
+     * Dashboard.
      */
     metadata?: unknown;
 
     /**
      * The name of the workflow to attach to this trace. This is used to name the trace
-     * in the traces dashboard.
+     * in the Traces Dashboard.
      */
     workflow_name?: string;
   }
+}
+
+/**
+ * Configuration for input and output audio.
+ */
+export interface RealtimeTranscriptionSessionAudio {
+  input?: RealtimeTranscriptionSessionAudioInput;
+}
+
+export interface RealtimeTranscriptionSessionAudioInput {
+  /**
+   * The PCM audio format. Only a 24kHz sample rate is supported.
+   */
+  format?: RealtimeAudioFormats;
+
+  /**
+   * Configuration for input audio noise reduction. This can be set to `null` to turn
+   * off. Noise reduction filters audio added to the input audio buffer before it is
+   * sent to VAD and the model. Filtering the audio can improve VAD and turn
+   * detection accuracy (reducing false positives) and model performance by improving
+   * perception of the input audio.
+   */
+  noise_reduction?: RealtimeTranscriptionSessionAudioInput.NoiseReduction;
+
+  /**
+   * Configuration for input audio transcription, defaults to off and can be set to
+   * `null` to turn off once on. Input audio transcription is not native to the
+   * model, since the model consumes audio directly. Transcription runs
+   * asynchronously through
+   * [the /audio/transcriptions endpoint](https://platform.openai.com/docs/api-reference/audio/createTranscription)
+   * and should be treated as guidance of input audio content rather than precisely
+   * what the model heard. The client can optionally set the language and prompt for
+   * transcription, these offer additional guidance to the transcription service.
+   */
+  transcription?: AudioTranscription;
+
+  /**
+   * Configuration for turn detection, ether Server VAD or Semantic VAD. This can be
+   * set to `null` to turn off, in which case the client must manually trigger model
+   * response. Server VAD means that the model will detect the start and end of
+   * speech based on audio volume and respond at the end of user speech. Semantic VAD
+   * is more advanced and uses a turn detection model (in conjunction with VAD) to
+   * semantically estimate whether the user has finished speaking, then dynamically
+   * sets a timeout based on this probability. For example, if user audio trails off
+   * with "uhhm", the model will score a low probability of turn end and wait longer
+   * for the user to continue speaking. This can be useful for more natural
+   * conversations, but may have a higher latency.
+   */
+  turn_detection?: RealtimeTranscriptionSessionAudioInputTurnDetection;
+}
+
+export namespace RealtimeTranscriptionSessionAudioInput {
+  /**
+   * Configuration for input audio noise reduction. This can be set to `null` to turn
+   * off. Noise reduction filters audio added to the input audio buffer before it is
+   * sent to VAD and the model. Filtering the audio can improve VAD and turn
+   * detection accuracy (reducing false positives) and model performance by improving
+   * perception of the input audio.
+   */
+  export interface NoiseReduction {
+    /**
+     * Type of noise reduction. `near_field` is for close-talking microphones such as
+     * headphones, `far_field` is for far-field microphones such as laptop or
+     * conference room microphones.
+     */
+    type?: RealtimeAPI.NoiseReductionType;
+  }
+}
+
+/**
+ * Configuration for turn detection, ether Server VAD or Semantic VAD. This can be
+ * set to `null` to turn off, in which case the client must manually trigger model
+ * response. Server VAD means that the model will detect the start and end of
+ * speech based on audio volume and respond at the end of user speech. Semantic VAD
+ * is more advanced and uses a turn detection model (in conjunction with VAD) to
+ * semantically estimate whether the user has finished speaking, then dynamically
+ * sets a timeout based on this probability. For example, if user audio trails off
+ * with "uhhm", the model will score a low probability of turn end and wait longer
+ * for the user to continue speaking. This can be useful for more natural
+ * conversations, but may have a higher latency.
+ */
+export interface RealtimeTranscriptionSessionAudioInputTurnDetection {
+  /**
+   * Whether or not to automatically generate a response when a VAD stop event
+   * occurs.
+   */
+  create_response?: boolean;
+
+  /**
+   * Used only for `semantic_vad` mode. The eagerness of the model to respond. `low`
+   * will wait longer for the user to continue speaking, `high` will respond more
+   * quickly. `auto` is the default and is equivalent to `medium`.
+   */
+  eagerness?: 'low' | 'medium' | 'high' | 'auto';
+
+  /**
+   * Optional idle timeout after which turn detection will auto-timeout when no
+   * additional audio is received.
+   */
+  idle_timeout_ms?: number | null;
+
+  /**
+   * Whether or not to automatically interrupt any ongoing response with output to
+   * the default conversation (i.e. `conversation` of `auto`) when a VAD start event
+   * occurs.
+   */
+  interrupt_response?: boolean;
+
+  /**
+   * Used only for `server_vad` mode. Amount of audio to include before the VAD
+   * detected speech (in milliseconds). Defaults to 300ms.
+   */
+  prefix_padding_ms?: number;
+
+  /**
+   * Used only for `server_vad` mode. Duration of silence to detect speech stop (in
+   * milliseconds). Defaults to 500ms. With shorter values the model will respond
+   * more quickly, but may jump in on short pauses from the user.
+   */
+  silence_duration_ms?: number;
+
+  /**
+   * Used only for `server_vad` mode. Activation threshold for VAD (0.0 to 1.0), this
+   * defaults to 0.5. A higher threshold will require louder audio to activate the
+   * model, and thus might perform better in noisy environments.
+   */
+  threshold?: number;
+
+  /**
+   * Type of turn detection.
+   */
+  type?: 'server_vad' | 'semantic_vad';
 }
 
 /**
@@ -2821,163 +3299,47 @@ export namespace RealtimeTracingConfig {
  */
 export interface RealtimeTranscriptionSessionCreateRequest {
   /**
-   * ID of the model to use. The options are `gpt-4o-transcribe`,
-   * `gpt-4o-mini-transcribe`, and `whisper-1` (which is powered by our open source
-   * Whisper V2 model).
-   */
-  model: (string & {}) | 'whisper-1' | 'gpt-4o-transcribe' | 'gpt-4o-mini-transcribe';
-
-  /**
    * The type of session to create. Always `transcription` for transcription
    * sessions.
    */
   type: 'transcription';
 
   /**
-   * The set of items to include in the transcription. Current available items are:
+   * Configuration for input and output audio.
+   */
+  audio?: RealtimeTranscriptionSessionAudio;
+
+  /**
+   * Additional fields to include in server outputs.
    *
-   * - `item.input_audio_transcription.logprobs`
+   * `item.input_audio_transcription.logprobs`: Include logprobs for input audio
+   * transcription.
    */
   include?: Array<'item.input_audio_transcription.logprobs'>;
-
-  /**
-   * The format of input audio. Options are `pcm16`, `g711_ulaw`, or `g711_alaw`. For
-   * `pcm16`, input audio must be 16-bit PCM at a 24kHz sample rate, single channel
-   * (mono), and little-endian byte order.
-   */
-  input_audio_format?: 'pcm16' | 'g711_ulaw' | 'g711_alaw';
-
-  /**
-   * Configuration for input audio noise reduction. This can be set to `null` to turn
-   * off. Noise reduction filters audio added to the input audio buffer before it is
-   * sent to VAD and the model. Filtering the audio can improve VAD and turn
-   * detection accuracy (reducing false positives) and model performance by improving
-   * perception of the input audio.
-   */
-  input_audio_noise_reduction?: RealtimeTranscriptionSessionCreateRequest.InputAudioNoiseReduction;
-
-  /**
-   * Configuration for input audio transcription. The client can optionally set the
-   * language and prompt for transcription, these offer additional guidance to the
-   * transcription service.
-   */
-  input_audio_transcription?: RealtimeTranscriptionSessionCreateRequest.InputAudioTranscription;
-
-  /**
-   * Configuration for turn detection. Can be set to `null` to turn off. Server VAD
-   * means that the model will detect the start and end of speech based on audio
-   * volume and respond at the end of user speech.
-   */
-  turn_detection?: RealtimeTranscriptionSessionCreateRequest.TurnDetection;
-}
-
-export namespace RealtimeTranscriptionSessionCreateRequest {
-  /**
-   * Configuration for input audio noise reduction. This can be set to `null` to turn
-   * off. Noise reduction filters audio added to the input audio buffer before it is
-   * sent to VAD and the model. Filtering the audio can improve VAD and turn
-   * detection accuracy (reducing false positives) and model performance by improving
-   * perception of the input audio.
-   */
-  export interface InputAudioNoiseReduction {
-    /**
-     * Type of noise reduction. `near_field` is for close-talking microphones such as
-     * headphones, `far_field` is for far-field microphones such as laptop or
-     * conference room microphones.
-     */
-    type?: 'near_field' | 'far_field';
-  }
-
-  /**
-   * Configuration for input audio transcription. The client can optionally set the
-   * language and prompt for transcription, these offer additional guidance to the
-   * transcription service.
-   */
-  export interface InputAudioTranscription {
-    /**
-     * The language of the input audio. Supplying the input language in
-     * [ISO-639-1](https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes) (e.g. `en`)
-     * format will improve accuracy and latency.
-     */
-    language?: string;
-
-    /**
-     * The model to use for transcription, current options are `gpt-4o-transcribe`,
-     * `gpt-4o-mini-transcribe`, and `whisper-1`.
-     */
-    model?: 'gpt-4o-transcribe' | 'gpt-4o-mini-transcribe' | 'whisper-1';
-
-    /**
-     * An optional text to guide the model's style or continue a previous audio
-     * segment. For `whisper-1`, the
-     * [prompt is a list of keywords](https://platform.openai.com/docs/guides/speech-to-text#prompting).
-     * For `gpt-4o-transcribe` models, the prompt is a free text string, for example
-     * "expect words related to technology".
-     */
-    prompt?: string;
-  }
-
-  /**
-   * Configuration for turn detection. Can be set to `null` to turn off. Server VAD
-   * means that the model will detect the start and end of speech based on audio
-   * volume and respond at the end of user speech.
-   */
-  export interface TurnDetection {
-    /**
-     * Amount of audio to include before the VAD detected speech (in milliseconds).
-     * Defaults to 300ms.
-     */
-    prefix_padding_ms?: number;
-
-    /**
-     * Duration of silence to detect speech stop (in milliseconds). Defaults to 500ms.
-     * With shorter values the model will respond more quickly, but may jump in on
-     * short pauses from the user.
-     */
-    silence_duration_ms?: number;
-
-    /**
-     * Activation threshold for VAD (0.0 to 1.0), this defaults to 0.5. A higher
-     * threshold will require louder audio to activate the model, and thus might
-     * perform better in noisy environments.
-     */
-    threshold?: number;
-
-    /**
-     * Type of turn detection. Only `server_vad` is currently supported for
-     * transcription sessions.
-     */
-    type?: 'server_vad';
-  }
 }
 
 /**
  * Controls how the realtime conversation is truncated prior to model inference.
- * The default is `auto`. When set to `retention_ratio`, the server retains a
- * fraction of the conversation tokens prior to the instructions.
+ * The default is `auto`.
  */
-export type RealtimeTruncation = 'auto' | 'disabled' | RealtimeTruncation.RetentionRatioTruncation;
+export type RealtimeTruncation = 'auto' | 'disabled' | RealtimeTruncationRetentionRatio;
 
-export namespace RealtimeTruncation {
+/**
+ * Retain a fraction of the conversation tokens when the conversation exceeds the
+ * input token limit. This allows you to amortize truncations across multiple
+ * turns, which can help improve cached token usage.
+ */
+export interface RealtimeTruncationRetentionRatio {
   /**
-   * Retain a fraction of the conversation tokens.
+   * Fraction of post-instruction conversation tokens to retain (0.0 - 1.0) when the
+   * conversation exceeds the input token limit.
    */
-  export interface RetentionRatioTruncation {
-    /**
-     * Fraction of pre-instruction conversation tokens to retain (0.0 - 1.0).
-     */
-    retention_ratio: number;
+  retention_ratio: number;
 
-    /**
-     * Use retention ratio truncation.
-     */
-    type: 'retention_ratio';
-
-    /**
-     * Optional cap on tokens allowed after the instructions.
-     */
-    post_instructions_token_limit?: number | null;
-  }
+  /**
+   * Use retention ratio truncation.
+   */
+  type: 'retention_ratio';
 }
 
 /**
@@ -3141,7 +3503,9 @@ export interface ResponseAudioTranscriptDoneEvent {
 /**
  * Send this event to cancel an in-progress response. The server will respond with
  * a `response.done` event with a status of `response.status=cancelled`. If there
- * is no response to cancel, the server will respond with an error.
+ * is no response to cancel, the server will respond with an error. It's safe to
+ * call `response.cancel` even if no response is in progress, an error will be
+ * returned the session will remain unaffected.
  */
 export interface ResponseCancelEvent {
   /**
@@ -3304,15 +3668,26 @@ export namespace ResponseContentPartDoneEvent {
  *
  * A Response will include at least one Item, and may have two, in which case the
  * second will be a function call. These Items will be appended to the conversation
- * history.
+ * history by default.
  *
  * The server will respond with a `response.created` event, events for Items and
  * content created, and finally a `response.done` event to indicate the Response is
  * complete.
  *
- * The `response.create` event includes inference configuration like
- * `instructions`, and `temperature`. These fields will override the Session's
- * configuration for this Response only.
+ * The `response.create` event includes inference configuration like `instructions`
+ * and `tools`. If these are set, they will override the Session's configuration
+ * for this Response only.
+ *
+ * Responses can be created out-of-band of the default Conversation, meaning that
+ * they can have arbitrary input, and it's possible to disable writing the output
+ * to the Conversation. Only one Response can write to the default Conversation at
+ * a time, but otherwise multiple Responses can be created in parallel. The
+ * `metadata` field is a good way to disambiguate multiple simultaneous Responses.
+ *
+ * Clients can set `conversation` to `none` to create a Response that does not
+ * write to the default Conversation. Arbitrary input can be provided with the
+ * `input` field, which is an array accepting raw Items and references to existing
+ * Items.
  */
 export interface ResponseCreateEvent {
   /**
@@ -3328,142 +3703,7 @@ export interface ResponseCreateEvent {
   /**
    * Create a new Realtime response with these parameters
    */
-  response?: ResponseCreateEvent.Response;
-}
-
-export namespace ResponseCreateEvent {
-  /**
-   * Create a new Realtime response with these parameters
-   */
-  export interface Response {
-    /**
-     * Controls which conversation the response is added to. Currently supports `auto`
-     * and `none`, with `auto` as the default value. The `auto` value means that the
-     * contents of the response will be added to the default conversation. Set this to
-     * `none` to create an out-of-band response which will not add items to default
-     * conversation.
-     */
-    conversation?: (string & {}) | 'auto' | 'none';
-
-    /**
-     * Input items to include in the prompt for the model. Using this field creates a
-     * new context for this Response instead of using the default conversation. An
-     * empty array `[]` will clear the context for this Response. Note that this can
-     * include references to items from the default conversation.
-     */
-    input?: Array<RealtimeAPI.ConversationItem>;
-
-    /**
-     * The default system instructions (i.e. system message) prepended to model calls.
-     * This field allows the client to guide the model on desired responses. The model
-     * can be instructed on response content and format, (e.g. "be extremely succinct",
-     * "act friendly", "here are examples of good responses") and on audio behavior
-     * (e.g. "talk quickly", "inject emotion into your voice", "laugh frequently"). The
-     * instructions are not guaranteed to be followed by the model, but they provide
-     * guidance to the model on the desired behavior.
-     *
-     * Note that the server sets default instructions which will be used if this field
-     * is not set and are visible in the `session.created` event at the start of the
-     * session.
-     */
-    instructions?: string;
-
-    /**
-     * Maximum number of output tokens for a single assistant response, inclusive of
-     * tool calls. Provide an integer between 1 and 4096 to limit output tokens, or
-     * `inf` for the maximum available tokens for a given model. Defaults to `inf`.
-     */
-    max_output_tokens?: number | 'inf';
-
-    /**
-     * Set of 16 key-value pairs that can be attached to an object. This can be useful
-     * for storing additional information about the object in a structured format, and
-     * querying for objects via API or the dashboard.
-     *
-     * Keys are strings with a maximum length of 64 characters. Values are strings with
-     * a maximum length of 512 characters.
-     */
-    metadata?: Shared.Metadata | null;
-
-    /**
-     * The set of modalities the model can respond with. To disable audio, set this to
-     * ["text"].
-     */
-    modalities?: Array<'text' | 'audio'>;
-
-    /**
-     * The format of output audio. Options are `pcm16`, `g711_ulaw`, or `g711_alaw`.
-     */
-    output_audio_format?: 'pcm16' | 'g711_ulaw' | 'g711_alaw';
-
-    /**
-     * Reference to a prompt template and its variables.
-     * [Learn more](https://platform.openai.com/docs/guides/text?api-mode=responses#reusable-prompts).
-     */
-    prompt?: ResponsesAPI.ResponsePrompt | null;
-
-    /**
-     * Sampling temperature for the model, limited to [0.6, 1.2]. Defaults to 0.8.
-     */
-    temperature?: number;
-
-    /**
-     * How the model chooses tools. Provide one of the string modes or force a specific
-     * function/MCP tool.
-     */
-    tool_choice?:
-      | ResponsesAPI.ToolChoiceOptions
-      | ResponsesAPI.ToolChoiceFunction
-      | ResponsesAPI.ToolChoiceMcp;
-
-    /**
-     * Tools (functions) available to the model.
-     */
-    tools?: Array<Response.Tool>;
-
-    /**
-     * The voice the model uses to respond. Voice cannot be changed during the session
-     * once the model has responded with audio at least once. Current voice options are
-     * `alloy`, `ash`, `ballad`, `coral`, `echo`, `sage`, `shimmer`, and `verse`.
-     */
-    voice?:
-      | (string & {})
-      | 'alloy'
-      | 'ash'
-      | 'ballad'
-      | 'coral'
-      | 'echo'
-      | 'sage'
-      | 'shimmer'
-      | 'verse'
-      | 'marin'
-      | 'cedar';
-  }
-
-  export namespace Response {
-    export interface Tool {
-      /**
-       * The description of the function, including guidance on when and how to call it,
-       * and guidance about what to tell the user when calling (if anything).
-       */
-      description?: string;
-
-      /**
-       * The name of the function.
-       */
-      name?: string;
-
-      /**
-       * Parameters of the function in JSON Schema.
-       */
-      parameters?: unknown;
-
-      /**
-       * The type of the tool, i.e. `function`.
-       */
-      type?: 'function';
-    }
-  }
+  response?: RealtimeResponseCreateParams;
 }
 
 /**
@@ -3491,6 +3731,13 @@ export interface ResponseCreatedEvent {
  * Returned when a Response is done streaming. Always emitted, no matter the final
  * state. The Response object included in the `response.done` event will include
  * all output Items in the Response but will omit the raw audio data.
+ *
+ * Clients should check the `status` field of the Response to determine if it was
+ * successful (`completed`) or if there was another outcome: `cancelled`, `failed`,
+ * or `incomplete`.
+ *
+ * A response will contain all output items that were generated during the
+ * response, excluding any audio content.
  */
 export interface ResponseDoneEvent {
   /**
@@ -3894,9 +4141,9 @@ export interface SessionCreatedEvent {
   event_id: string;
 
   /**
-   * Realtime session object.
+   * The session configuration.
    */
-  session: RealtimeSession;
+  session: RealtimeSessionCreateRequest | RealtimeTranscriptionSessionCreateRequest;
 
   /**
    * The event type, must be `session.created`.
@@ -3905,21 +4152,22 @@ export interface SessionCreatedEvent {
 }
 
 /**
- * Send this event to update the session’s default configuration. The client may
- * send this event at any time to update any field, except for `voice`. However,
- * note that once a session has been initialized with a particular `model`, it
- * can’t be changed to another model using `session.update`.
+ * Send this event to update the session’s configuration. The client may send this
+ * event at any time to update any field except for `voice` and `model`. `voice`
+ * can be updated only if there have been no other audio outputs yet.
  *
  * When the server receives a `session.update`, it will respond with a
  * `session.updated` event showing the full, effective configuration. Only the
- * fields that are present are updated. To clear a field like `instructions`, pass
- * an empty string.
+ * fields that are present in the `session.update` are updated. To clear a field
+ * like `instructions`, pass an empty string. To clear a field like `tools`, pass
+ * an empty array. To clear a field like `turn_detection`, pass `null`.
  */
 export interface SessionUpdateEvent {
   /**
-   * Realtime session object configuration.
+   * Update the Realtime session. Choose either a realtime session or a transcription
+   * session.
    */
-  session: RealtimeSessionCreateRequest;
+  session: RealtimeSessionCreateRequest | RealtimeTranscriptionSessionCreateRequest;
 
   /**
    * The event type, must be `session.update`.
@@ -3927,7 +4175,10 @@ export interface SessionUpdateEvent {
   type: 'session.update';
 
   /**
-   * Optional client-generated ID used to identify this event.
+   * Optional client-generated ID used to identify this event. This is an arbitrary
+   * string that a client may assign. It will be passed back if there is an error
+   * with the event, but the corresponding `session.updated` event will not include
+   * it.
    */
   event_id?: string;
 }
@@ -3943,9 +4194,9 @@ export interface SessionUpdatedEvent {
   event_id: string;
 
   /**
-   * Realtime session object.
+   * The session configuration.
    */
-  session: RealtimeSession;
+  session: RealtimeSessionCreateRequest | RealtimeTranscriptionSessionCreateRequest;
 
   /**
    * The event type, must be `session.updated`.
@@ -3963,133 +4214,18 @@ export interface TranscriptionSessionCreated {
   event_id: string;
 
   /**
-   * A Realtime transcription session configuration object.
+   * A new Realtime transcription session configuration.
+   *
+   * When a session is created on the server via REST API, the session object also
+   * contains an ephemeral key. Default TTL for keys is 10 minutes. This property is
+   * not present when a session is updated via the WebSocket API.
    */
-  session: TranscriptionSessionCreated.Session;
+  session: ClientSecretsAPI.RealtimeTranscriptionSessionCreateResponse;
 
   /**
    * The event type, must be `transcription_session.created`.
    */
   type: 'transcription_session.created';
-}
-
-export namespace TranscriptionSessionCreated {
-  /**
-   * A Realtime transcription session configuration object.
-   */
-  export interface Session {
-    /**
-     * Unique identifier for the session that looks like `sess_1234567890abcdef`.
-     */
-    id?: string;
-
-    /**
-     * Configuration for input audio for the session.
-     */
-    audio?: Session.Audio;
-
-    /**
-     * Expiration timestamp for the session, in seconds since epoch.
-     */
-    expires_at?: number;
-
-    /**
-     * Additional fields to include in server outputs.
-     *
-     * - `item.input_audio_transcription.logprobs`: Include logprobs for input audio
-     *   transcription.
-     */
-    include?: Array<'item.input_audio_transcription.logprobs'>;
-
-    /**
-     * The object type. Always `realtime.transcription_session`.
-     */
-    object?: string;
-  }
-
-  export namespace Session {
-    /**
-     * Configuration for input audio for the session.
-     */
-    export interface Audio {
-      input?: Audio.Input;
-    }
-
-    export namespace Audio {
-      export interface Input {
-        /**
-         * The format of input audio. Options are `pcm16`, `g711_ulaw`, or `g711_alaw`.
-         */
-        format?: string;
-
-        /**
-         * Configuration for input audio noise reduction.
-         */
-        noise_reduction?: Input.NoiseReduction;
-
-        /**
-         * Configuration of the transcription model.
-         */
-        transcription?: Input.Transcription;
-
-        /**
-         * Configuration for turn detection.
-         */
-        turn_detection?: Input.TurnDetection;
-      }
-
-      export namespace Input {
-        /**
-         * Configuration for input audio noise reduction.
-         */
-        export interface NoiseReduction {
-          type?: 'near_field' | 'far_field';
-        }
-
-        /**
-         * Configuration of the transcription model.
-         */
-        export interface Transcription {
-          /**
-           * The language of the input audio. Supplying the input language in
-           * [ISO-639-1](https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes) (e.g. `en`)
-           * format will improve accuracy and latency.
-           */
-          language?: string;
-
-          /**
-           * The model to use for transcription. Can be `gpt-4o-transcribe`,
-           * `gpt-4o-mini-transcribe`, or `whisper-1`.
-           */
-          model?: 'gpt-4o-transcribe' | 'gpt-4o-mini-transcribe' | 'whisper-1';
-
-          /**
-           * An optional text to guide the model's style or continue a previous audio
-           * segment. The
-           * [prompt](https://platform.openai.com/docs/guides/speech-to-text#prompting)
-           * should match the audio language.
-           */
-          prompt?: string;
-        }
-
-        /**
-         * Configuration for turn detection.
-         */
-        export interface TurnDetection {
-          prefix_padding_ms?: number;
-
-          silence_duration_ms?: number;
-
-          threshold?: number;
-
-          /**
-           * Type of turn detection, only `server_vad` is currently supported.
-           */
-          type?: string;
-        }
-      }
-    }
-  }
 }
 
 /**
@@ -4099,7 +4235,7 @@ export interface TranscriptionSessionUpdate {
   /**
    * Realtime transcription session object configuration.
    */
-  session: RealtimeTranscriptionSessionCreateRequest;
+  session: TranscriptionSessionUpdate.Session;
 
   /**
    * The event type, must be `transcription_session.update`.
@@ -4110,6 +4246,100 @@ export interface TranscriptionSessionUpdate {
    * Optional client-generated ID used to identify this event.
    */
   event_id?: string;
+}
+
+export namespace TranscriptionSessionUpdate {
+  /**
+   * Realtime transcription session object configuration.
+   */
+  export interface Session {
+    /**
+     * The set of items to include in the transcription. Current available items are:
+     * `item.input_audio_transcription.logprobs`
+     */
+    include?: Array<'item.input_audio_transcription.logprobs'>;
+
+    /**
+     * The format of input audio. Options are `pcm16`, `g711_ulaw`, or `g711_alaw`. For
+     * `pcm16`, input audio must be 16-bit PCM at a 24kHz sample rate, single channel
+     * (mono), and little-endian byte order.
+     */
+    input_audio_format?: 'pcm16' | 'g711_ulaw' | 'g711_alaw';
+
+    /**
+     * Configuration for input audio noise reduction. This can be set to `null` to turn
+     * off. Noise reduction filters audio added to the input audio buffer before it is
+     * sent to VAD and the model. Filtering the audio can improve VAD and turn
+     * detection accuracy (reducing false positives) and model performance by improving
+     * perception of the input audio.
+     */
+    input_audio_noise_reduction?: Session.InputAudioNoiseReduction;
+
+    /**
+     * Configuration for input audio transcription. The client can optionally set the
+     * language and prompt for transcription, these offer additional guidance to the
+     * transcription service.
+     */
+    input_audio_transcription?: RealtimeAPI.AudioTranscription;
+
+    /**
+     * Configuration for turn detection. Can be set to `null` to turn off. Server VAD
+     * means that the model will detect the start and end of speech based on audio
+     * volume and respond at the end of user speech.
+     */
+    turn_detection?: Session.TurnDetection;
+  }
+
+  export namespace Session {
+    /**
+     * Configuration for input audio noise reduction. This can be set to `null` to turn
+     * off. Noise reduction filters audio added to the input audio buffer before it is
+     * sent to VAD and the model. Filtering the audio can improve VAD and turn
+     * detection accuracy (reducing false positives) and model performance by improving
+     * perception of the input audio.
+     */
+    export interface InputAudioNoiseReduction {
+      /**
+       * Type of noise reduction. `near_field` is for close-talking microphones such as
+       * headphones, `far_field` is for far-field microphones such as laptop or
+       * conference room microphones.
+       */
+      type?: RealtimeAPI.NoiseReductionType;
+    }
+
+    /**
+     * Configuration for turn detection. Can be set to `null` to turn off. Server VAD
+     * means that the model will detect the start and end of speech based on audio
+     * volume and respond at the end of user speech.
+     */
+    export interface TurnDetection {
+      /**
+       * Amount of audio to include before the VAD detected speech (in milliseconds).
+       * Defaults to 300ms.
+       */
+      prefix_padding_ms?: number;
+
+      /**
+       * Duration of silence to detect speech stop (in milliseconds). Defaults to 500ms.
+       * With shorter values the model will respond more quickly, but may jump in on
+       * short pauses from the user.
+       */
+      silence_duration_ms?: number;
+
+      /**
+       * Activation threshold for VAD (0.0 to 1.0), this defaults to 0.5. A higher
+       * threshold will require louder audio to activate the model, and thus might
+       * perform better in noisy environments.
+       */
+      threshold?: number;
+
+      /**
+       * Type of turn detection. Only `server_vad` is currently supported for
+       * transcription sessions.
+       */
+      type?: 'server_vad';
+    }
+  }
 }
 
 /**
@@ -4123,9 +4353,13 @@ export interface TranscriptionSessionUpdatedEvent {
   event_id: string;
 
   /**
-   * A Realtime transcription session configuration object.
+   * A new Realtime transcription session configuration.
+   *
+   * When a session is created on the server via REST API, the session object also
+   * contains an ephemeral key. Default TTL for keys is 10 minutes. This property is
+   * not present when a session is updated via the WebSocket API.
    */
-  session: TranscriptionSessionUpdatedEvent.Session;
+  session: ClientSecretsAPI.RealtimeTranscriptionSessionCreateResponse;
 
   /**
    * The event type, must be `transcription_session.updated`.
@@ -4133,129 +4367,11 @@ export interface TranscriptionSessionUpdatedEvent {
   type: 'transcription_session.updated';
 }
 
-export namespace TranscriptionSessionUpdatedEvent {
-  /**
-   * A Realtime transcription session configuration object.
-   */
-  export interface Session {
-    /**
-     * Unique identifier for the session that looks like `sess_1234567890abcdef`.
-     */
-    id?: string;
-
-    /**
-     * Configuration for input audio for the session.
-     */
-    audio?: Session.Audio;
-
-    /**
-     * Expiration timestamp for the session, in seconds since epoch.
-     */
-    expires_at?: number;
-
-    /**
-     * Additional fields to include in server outputs.
-     *
-     * - `item.input_audio_transcription.logprobs`: Include logprobs for input audio
-     *   transcription.
-     */
-    include?: Array<'item.input_audio_transcription.logprobs'>;
-
-    /**
-     * The object type. Always `realtime.transcription_session`.
-     */
-    object?: string;
-  }
-
-  export namespace Session {
-    /**
-     * Configuration for input audio for the session.
-     */
-    export interface Audio {
-      input?: Audio.Input;
-    }
-
-    export namespace Audio {
-      export interface Input {
-        /**
-         * The format of input audio. Options are `pcm16`, `g711_ulaw`, or `g711_alaw`.
-         */
-        format?: string;
-
-        /**
-         * Configuration for input audio noise reduction.
-         */
-        noise_reduction?: Input.NoiseReduction;
-
-        /**
-         * Configuration of the transcription model.
-         */
-        transcription?: Input.Transcription;
-
-        /**
-         * Configuration for turn detection.
-         */
-        turn_detection?: Input.TurnDetection;
-      }
-
-      export namespace Input {
-        /**
-         * Configuration for input audio noise reduction.
-         */
-        export interface NoiseReduction {
-          type?: 'near_field' | 'far_field';
-        }
-
-        /**
-         * Configuration of the transcription model.
-         */
-        export interface Transcription {
-          /**
-           * The language of the input audio. Supplying the input language in
-           * [ISO-639-1](https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes) (e.g. `en`)
-           * format will improve accuracy and latency.
-           */
-          language?: string;
-
-          /**
-           * The model to use for transcription. Can be `gpt-4o-transcribe`,
-           * `gpt-4o-mini-transcribe`, or `whisper-1`.
-           */
-          model?: 'gpt-4o-transcribe' | 'gpt-4o-mini-transcribe' | 'whisper-1';
-
-          /**
-           * An optional text to guide the model's style or continue a previous audio
-           * segment. The
-           * [prompt](https://platform.openai.com/docs/guides/speech-to-text#prompting)
-           * should match the audio language.
-           */
-          prompt?: string;
-        }
-
-        /**
-         * Configuration for turn detection.
-         */
-        export interface TurnDetection {
-          prefix_padding_ms?: number;
-
-          silence_duration_ms?: number;
-
-          threshold?: number;
-
-          /**
-           * Type of turn detection, only `server_vad` is currently supported.
-           */
-          type?: string;
-        }
-      }
-    }
-  }
-}
-
 Realtime.ClientSecrets = ClientSecrets;
 
 export declare namespace Realtime {
   export {
+    type AudioTranscription as AudioTranscription,
     type ConversationCreatedEvent as ConversationCreatedEvent,
     type ConversationItem as ConversationItem,
     type ConversationItemAdded as ConversationItemAdded,
@@ -4284,11 +4400,16 @@ export declare namespace Realtime {
     type McpListToolsCompleted as McpListToolsCompleted,
     type McpListToolsFailed as McpListToolsFailed,
     type McpListToolsInProgress as McpListToolsInProgress,
+    type Models as Models,
+    type NoiseReductionType as NoiseReductionType,
     type OutputAudioBufferClearEvent as OutputAudioBufferClearEvent,
     type RateLimitsUpdatedEvent as RateLimitsUpdatedEvent,
     type RealtimeAudioConfig as RealtimeAudioConfig,
+    type RealtimeAudioConfigInput as RealtimeAudioConfigInput,
+    type RealtimeAudioConfigOutput as RealtimeAudioConfigOutput,
+    type RealtimeAudioFormats as RealtimeAudioFormats,
+    type RealtimeAudioInputTurnDetection as RealtimeAudioInputTurnDetection,
     type RealtimeClientEvent as RealtimeClientEvent,
-    type RealtimeClientSecretConfig as RealtimeClientSecretConfig,
     type RealtimeConversationItemAssistantMessage as RealtimeConversationItemAssistantMessage,
     type RealtimeConversationItemFunctionCall as RealtimeConversationItemFunctionCall,
     type RealtimeConversationItemFunctionCallOutput as RealtimeConversationItemFunctionCallOutput,
@@ -4304,6 +4425,9 @@ export declare namespace Realtime {
     type RealtimeMcpToolExecutionError as RealtimeMcpToolExecutionError,
     type RealtimeMcphttpError as RealtimeMcphttpError,
     type RealtimeResponse as RealtimeResponse,
+    type RealtimeResponseCreateAudioOutput as RealtimeResponseCreateAudioOutput,
+    type RealtimeResponseCreateMcpTool as RealtimeResponseCreateMcpTool,
+    type RealtimeResponseCreateParams as RealtimeResponseCreateParams,
     type RealtimeResponseStatus as RealtimeResponseStatus,
     type RealtimeResponseUsage as RealtimeResponseUsage,
     type RealtimeResponseUsageInputTokenDetails as RealtimeResponseUsageInputTokenDetails,
@@ -4315,8 +4439,12 @@ export declare namespace Realtime {
     type RealtimeToolsConfig as RealtimeToolsConfig,
     type RealtimeToolsConfigUnion as RealtimeToolsConfigUnion,
     type RealtimeTracingConfig as RealtimeTracingConfig,
+    type RealtimeTranscriptionSessionAudio as RealtimeTranscriptionSessionAudio,
+    type RealtimeTranscriptionSessionAudioInput as RealtimeTranscriptionSessionAudioInput,
+    type RealtimeTranscriptionSessionAudioInputTurnDetection as RealtimeTranscriptionSessionAudioInputTurnDetection,
     type RealtimeTranscriptionSessionCreateRequest as RealtimeTranscriptionSessionCreateRequest,
     type RealtimeTruncation as RealtimeTruncation,
+    type RealtimeTruncationRetentionRatio as RealtimeTruncationRetentionRatio,
     type ResponseAudioDeltaEvent as ResponseAudioDeltaEvent,
     type ResponseAudioDoneEvent as ResponseAudioDoneEvent,
     type ResponseAudioTranscriptDeltaEvent as ResponseAudioTranscriptDeltaEvent,
@@ -4348,7 +4476,12 @@ export declare namespace Realtime {
 
   export {
     ClientSecrets as ClientSecrets,
+    type RealtimeSessionClientSecret as RealtimeSessionClientSecret,
     type RealtimeSessionCreateResponse as RealtimeSessionCreateResponse,
+    type RealtimeTranscriptionSessionClientSecret as RealtimeTranscriptionSessionClientSecret,
+    type RealtimeTranscriptionSessionCreateResponse as RealtimeTranscriptionSessionCreateResponse,
+    type RealtimeTranscriptionSessionInputAudioTranscription as RealtimeTranscriptionSessionInputAudioTranscription,
+    type RealtimeTranscriptionSessionTurnDetection as RealtimeTranscriptionSessionTurnDetection,
     type ClientSecretCreateResponse as ClientSecretCreateResponse,
     type ClientSecretCreateParams as ClientSecretCreateParams,
   };
