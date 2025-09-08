@@ -1,5 +1,18 @@
 # Changelog
 
+## 5.20.0 (2025-09-08)
+
+Full Changelog: [v5.19.1...v5.20.0](https://github.com/openai/openai-node/compare/v5.19.1...v5.20.0)
+
+### Features
+
+* **api:** ship the RealtimeGA API shape ([4286ddd](https://github.com/openai/openai-node/commit/4286ddd4f990dd26e15e510039457f17d787820d))
+
+
+### Chores
+
+* ci build action ([c8ce143](https://github.com/openai/openai-node/commit/c8ce143196fdbc7ee1c7832bce2417b6e3d25885))
+
 ## 5.19.1 (2025-09-03)
 
 Full Changelog: [v5.19.0...v5.19.1](https://github.com/openai/openai-node/compare/v5.19.0...v5.19.1)
