@@ -268,9 +268,9 @@ describe('instantiate azure client', () => {
       );
     });
 
-    test.skip('AAD token is refreshed', async () => {
+    test('AAD token is refreshed', async () => {
       let fail = true;
-      const testFetch = async (url: RequestInfo, req: RequestInit | undefined): Promise<Response> => {
+      const testFetch = async (url: RequestInfo, { headers }: RequestInit = {}): Promise<Response> => {
         if (fail) {
           fail = false;
           return new Response(undefined, {
@@ -280,8 +280,8 @@ describe('instantiate azure client', () => {
             },
           });
         }
-        return new Response(JSON.stringify({ auth: (req?.headers as Headers).get('authorization') }), {
-          headers: { 'content-type': 'application/json' },
+        return new Response(JSON.stringify({}), {
+          headers: headers ?? [],
         });
       };
       let counter = 0;
@@ -295,14 +295,32 @@ describe('instantiate azure client', () => {
         fetch: testFetch,
       });
       expect(
-        await client.chat.completions.create({
-          model,
-          messages: [{ role: 'system', content: 'Hello' }],
-        }),
-      ).toStrictEqual({
-        auth: 'Bearer token-1',
-      });
+        (
+          await client.chat.completions
+            .create({
+              model,
+              messages: [{ role: 'system', content: 'Hello' }],
+            })
+            .asResponse()
+        ).headers.get('authorization'),
+      ).toEqual('Bearer token-1');
     });
+  });
+
+  test('uses api-key header when apiKey is provided', async () => {
+    const testFetch = async (url: RequestInfo, { headers }: RequestInit = {}): Promise<Response> => {
+      return new Response(JSON.stringify({ a: 1 }), { headers: headers ?? [] });
+    };
+    const client = new AzureOpenAI({
+      baseURL: 'http://localhost:5000/',
+      apiKey: 'My API Key',
+      apiVersion,
+      fetch: testFetch,
+    });
+
+    const res = await client.request({ method: 'post', path: 'https://example.com' }).asResponse();
+    expect(res.headers.get('api-key')).toEqual('My API Key');
+    expect(res.headers.get('authorization')).toEqual(null);
   });
 
   test('with endpoint', () => {

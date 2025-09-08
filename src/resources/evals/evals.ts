@@ -776,6 +776,7 @@ export namespace EvalCreateParams {
         | ResponsesAPI.ResponseInputText
         | EvalItem.OutputText
         | EvalItem.InputImage
+        | ResponsesAPI.ResponseInputAudio
         | Array<unknown>;
 
       /**

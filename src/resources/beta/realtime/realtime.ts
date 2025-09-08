@@ -17,6 +17,9 @@ import {
   TranscriptionSessions,
 } from './transcription-sessions';
 
+/**
+ * @deprecated Realtime has now launched and is generally available. The old beta API is now deprecated.
+ */
 export class Realtime extends APIResource {
   sessions: SessionsAPI.Sessions = new SessionsAPI.Sessions(this._client);
   transcriptionSessions: TranscriptionSessionsAPI.TranscriptionSessions =

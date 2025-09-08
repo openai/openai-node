@@ -560,6 +560,70 @@ export namespace FineTuningJobSucceededWebhookEvent {
 }
 
 /**
+ * Sent when Realtime API Receives a incoming SIP call.
+ */
+export interface RealtimeCallIncomingWebhookEvent {
+  /**
+   * The unique ID of the event.
+   */
+  id: string;
+
+  /**
+   * The Unix timestamp (in seconds) of when the model response was completed.
+   */
+  created_at: number;
+
+  /**
+   * Event data payload.
+   */
+  data: RealtimeCallIncomingWebhookEvent.Data;
+
+  /**
+   * The type of the event. Always `realtime.call.incoming`.
+   */
+  type: 'realtime.call.incoming';
+
+  /**
+   * The object of the event. Always `event`.
+   */
+  object?: 'event';
+}
+
+export namespace RealtimeCallIncomingWebhookEvent {
+  /**
+   * Event data payload.
+   */
+  export interface Data {
+    /**
+     * The unique ID of this call.
+     */
+    call_id: string;
+
+    /**
+     * Headers from the SIP Invite.
+     */
+    sip_headers: Array<Data.SipHeader>;
+  }
+
+  export namespace Data {
+    /**
+     * A header from the SIP Invite.
+     */
+    export interface SipHeader {
+      /**
+       * Name of the SIP Header.
+       */
+      name: string;
+
+      /**
+       * Value of the SIP Header.
+       */
+      value: string;
+    }
+  }
+}
+
+/**
  * Sent when a background response has been cancelled.
  */
 export interface ResponseCancelledWebhookEvent {
@@ -741,6 +805,7 @@ export type UnwrapWebhookEvent =
   | FineTuningJobCancelledWebhookEvent
   | FineTuningJobFailedWebhookEvent
   | FineTuningJobSucceededWebhookEvent
+  | RealtimeCallIncomingWebhookEvent
   | ResponseCancelledWebhookEvent
   | ResponseCompletedWebhookEvent
   | ResponseFailedWebhookEvent
@@ -758,6 +823,7 @@ export declare namespace Webhooks {
     type FineTuningJobCancelledWebhookEvent as FineTuningJobCancelledWebhookEvent,
     type FineTuningJobFailedWebhookEvent as FineTuningJobFailedWebhookEvent,
     type FineTuningJobSucceededWebhookEvent as FineTuningJobSucceededWebhookEvent,
+    type RealtimeCallIncomingWebhookEvent as RealtimeCallIncomingWebhookEvent,
     type ResponseCancelledWebhookEvent as ResponseCancelledWebhookEvent,
     type ResponseCompletedWebhookEvent as ResponseCompletedWebhookEvent,
     type ResponseFailedWebhookEvent as ResponseFailedWebhookEvent,
