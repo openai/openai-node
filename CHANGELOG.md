@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.20.1 (2025-09-10)
+
+Full Changelog: [v5.20.0...v5.20.1](https://github.com/openai/openai-node/compare/v5.20.0...v5.20.1)
+
+### Chores
+
+* **api:** fix realtime GA types ([1c0d314](https://github.com/openai/openai-node/commit/1c0d3145e920a55f3c710323849bcac1fd60b703))
+
 ## 5.20.0 (2025-09-08)
 
 Full Changelog: [v5.19.1...v5.20.0](https://github.com/openai/openai-node/compare/v5.19.1...v5.20.0)
