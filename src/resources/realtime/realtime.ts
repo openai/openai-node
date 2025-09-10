@@ -10,9 +10,7 @@ import {
   ClientSecrets,
   RealtimeSessionClientSecret,
   RealtimeSessionCreateResponse,
-  RealtimeTranscriptionSessionClientSecret,
   RealtimeTranscriptionSessionCreateResponse,
-  RealtimeTranscriptionSessionInputAudioTranscription,
   RealtimeTranscriptionSessionTurnDetection,
 } from './client-secrets';
 import * as ResponsesAPI from '../responses/responses';
@@ -1044,29 +1042,6 @@ export interface McpListToolsInProgress {
   type: 'mcp_list_tools.in_progress';
 }
 
-export interface Models {
-  /**
-   * The description of the function, including guidance on when and how to call it,
-   * and guidance about what to tell the user when calling (if anything).
-   */
-  description?: string;
-
-  /**
-   * The name of the function.
-   */
-  name?: string;
-
-  /**
-   * Parameters of the function in JSON Schema.
-   */
-  parameters?: unknown;
-
-  /**
-   * The type of the tool, i.e. `function`.
-   */
-  type?: 'function';
-}
-
 /**
  * Type of noise reduction. `near_field` is for close-talking microphones such as
  * headphones, `far_field` is for far-field microphones such as laptop or
@@ -1320,7 +1295,7 @@ export interface RealtimeAudioInputTurnDetection {
 
   /**
    * Optional idle timeout after which turn detection will auto-timeout when no
-   * additional audio is received.
+   * additional audio is received and emits a `timeout_triggered` event.
    */
   idle_timeout_ms?: number | null;
 
@@ -1371,8 +1346,7 @@ export type RealtimeClientEvent =
   | InputAudioBufferCommitEvent
   | ResponseCancelEvent
   | ResponseCreateEvent
-  | SessionUpdateEvent
-  | TranscriptionSessionUpdate;
+  | SessionUpdateEvent;
 
 /**
  * An assistant message item in a Realtime conversation.
@@ -1704,6 +1678,29 @@ export interface RealtimeErrorEvent {
    * The event type, must be `error`.
    */
   type: 'error';
+}
+
+export interface RealtimeFunctionTool {
+  /**
+   * The description of the function, including guidance on when and how to call it,
+   * and guidance about what to tell the user when calling (if anything).
+   */
+  description?: string;
+
+  /**
+   * The name of the function.
+   */
+  name?: string;
+
+  /**
+   * Parameters of the function in JSON Schema.
+   */
+  parameters?: unknown;
+
+  /**
+   * The type of the tool, i.e. `function`.
+   */
+  type?: 'function';
 }
 
 /**
@@ -2267,7 +2264,7 @@ export interface RealtimeResponseCreateParams {
   /**
    * Tools available to the model.
    */
-  tools?: Array<Models | RealtimeResponseCreateMcpTool>;
+  tools?: Array<RealtimeFunctionTool | RealtimeResponseCreateMcpTool>;
 }
 
 /**
@@ -2457,8 +2454,6 @@ export type RealtimeServerEvent =
   | ResponseTextDoneEvent
   | SessionCreatedEvent
   | SessionUpdatedEvent
-  | TranscriptionSessionUpdatedEvent
-  | TranscriptionSessionCreated
   | RealtimeServerEvent.OutputAudioBufferStarted
   | RealtimeServerEvent.OutputAudioBufferStopped
   | RealtimeServerEvent.OutputAudioBufferCleared
@@ -2702,7 +2697,7 @@ export interface RealtimeSession {
   /**
    * Tools (functions) available to the model.
    */
-  tools?: Array<Models>;
+  tools?: Array<RealtimeFunctionTool>;
 
   /**
    * Configuration options for tracing. Set to null to disable tracing. Once tracing
@@ -2971,7 +2966,7 @@ export type RealtimeToolsConfig = Array<RealtimeToolsConfigUnion>;
  * (MCP) servers.
  * [Learn more about MCP](https://platform.openai.com/docs/guides/tools-remote-mcp).
  */
-export type RealtimeToolsConfigUnion = Models | RealtimeToolsConfigUnion.Mcp;
+export type RealtimeToolsConfigUnion = RealtimeFunctionTool | RealtimeToolsConfigUnion.Mcp;
 
 export namespace RealtimeToolsConfigUnion {
   /**
@@ -4205,30 +4200,6 @@ export interface SessionUpdatedEvent {
 }
 
 /**
- * Returned when a transcription session is created.
- */
-export interface TranscriptionSessionCreated {
-  /**
-   * The unique ID of the server event.
-   */
-  event_id: string;
-
-  /**
-   * A new Realtime transcription session configuration.
-   *
-   * When a session is created on the server via REST API, the session object also
-   * contains an ephemeral key. Default TTL for keys is 10 minutes. This property is
-   * not present when a session is updated via the WebSocket API.
-   */
-  session: ClientSecretsAPI.RealtimeTranscriptionSessionCreateResponse;
-
-  /**
-   * The event type, must be `transcription_session.created`.
-   */
-  type: 'transcription_session.created';
-}
-
-/**
  * Send this event to update a transcription session.
  */
 export interface TranscriptionSessionUpdate {
@@ -4359,12 +4330,105 @@ export interface TranscriptionSessionUpdatedEvent {
    * contains an ephemeral key. Default TTL for keys is 10 minutes. This property is
    * not present when a session is updated via the WebSocket API.
    */
-  session: ClientSecretsAPI.RealtimeTranscriptionSessionCreateResponse;
+  session: TranscriptionSessionUpdatedEvent.Session;
 
   /**
    * The event type, must be `transcription_session.updated`.
    */
   type: 'transcription_session.updated';
+}
+
+export namespace TranscriptionSessionUpdatedEvent {
+  /**
+   * A new Realtime transcription session configuration.
+   *
+   * When a session is created on the server via REST API, the session object also
+   * contains an ephemeral key. Default TTL for keys is 10 minutes. This property is
+   * not present when a session is updated via the WebSocket API.
+   */
+  export interface Session {
+    /**
+     * Ephemeral key returned by the API. Only present when the session is created on
+     * the server via REST API.
+     */
+    client_secret: Session.ClientSecret;
+
+    /**
+     * The format of input audio. Options are `pcm16`, `g711_ulaw`, or `g711_alaw`.
+     */
+    input_audio_format?: string;
+
+    /**
+     * Configuration of the transcription model.
+     */
+    input_audio_transcription?: RealtimeAPI.AudioTranscription;
+
+    /**
+     * The set of modalities the model can respond with. To disable audio, set this to
+     * ["text"].
+     */
+    modalities?: Array<'text' | 'audio'>;
+
+    /**
+     * Configuration for turn detection. Can be set to `null` to turn off. Server VAD
+     * means that the model will detect the start and end of speech based on audio
+     * volume and respond at the end of user speech.
+     */
+    turn_detection?: Session.TurnDetection;
+  }
+
+  export namespace Session {
+    /**
+     * Ephemeral key returned by the API. Only present when the session is created on
+     * the server via REST API.
+     */
+    export interface ClientSecret {
+      /**
+       * Timestamp for when the token expires. Currently, all tokens expire after one
+       * minute.
+       */
+      expires_at: number;
+
+      /**
+       * Ephemeral key usable in client environments to authenticate connections to the
+       * Realtime API. Use this in client-side environments rather than a standard API
+       * token, which should only be used server-side.
+       */
+      value: string;
+    }
+
+    /**
+     * Configuration for turn detection. Can be set to `null` to turn off. Server VAD
+     * means that the model will detect the start and end of speech based on audio
+     * volume and respond at the end of user speech.
+     */
+    export interface TurnDetection {
+      /**
+       * Amount of audio to include before the VAD detected speech (in milliseconds).
+       * Defaults to 300ms.
+       */
+      prefix_padding_ms?: number;
+
+      /**
+       * Duration of silence to detect speech stop (in milliseconds). Defaults to 500ms.
+       * With shorter values the model will respond more quickly, but may jump in on
+       * short pauses from the user.
+       */
+      silence_duration_ms?: number;
+
+      /**
+       * Activation threshold for VAD (0.0 to 1.0), this defaults to 0.5. A higher
+       * threshold will require louder audio to activate the model, and thus might
+       * perform better in noisy environments.
+       */
+      threshold?: number;
+
+      /**
+       * Type of turn detection, only `server_vad` is currently supported.
+       */
+      type?: string;
+    }
+  }
 }
 
 Realtime.ClientSecrets = ClientSecrets;
@@ -4400,7 +4464,6 @@ export declare namespace Realtime {
     type McpListToolsCompleted as McpListToolsCompleted,
     type McpListToolsFailed as McpListToolsFailed,
     type McpListToolsInProgress as McpListToolsInProgress,
-    type Models as Models,
     type NoiseReductionType as NoiseReductionType,
     type OutputAudioBufferClearEvent as OutputAudioBufferClearEvent,
     type RateLimitsUpdatedEvent as RateLimitsUpdatedEvent,
@@ -4417,6 +4480,7 @@ export declare namespace Realtime {
     type RealtimeConversationItemUserMessage as RealtimeConversationItemUserMessage,
     type RealtimeError as RealtimeError,
     type RealtimeErrorEvent as RealtimeErrorEvent,
+    type RealtimeFunctionTool as RealtimeFunctionTool,
     type RealtimeMcpApprovalRequest as RealtimeMcpApprovalRequest,
     type RealtimeMcpApprovalResponse as RealtimeMcpApprovalResponse,
     type RealtimeMcpListTools as RealtimeMcpListTools,
@@ -4469,7 +4533,6 @@ export declare namespace Realtime {
     type SessionCreatedEvent as SessionCreatedEvent,
     type SessionUpdateEvent as SessionUpdateEvent,
     type SessionUpdatedEvent as SessionUpdatedEvent,
-    type TranscriptionSessionCreated as TranscriptionSessionCreated,
     type TranscriptionSessionUpdate as TranscriptionSessionUpdate,
     type TranscriptionSessionUpdatedEvent as TranscriptionSessionUpdatedEvent,
   };
@@ -4478,9 +4541,7 @@ export declare namespace Realtime {
     ClientSecrets as ClientSecrets,
     type RealtimeSessionClientSecret as RealtimeSessionClientSecret,
     type RealtimeSessionCreateResponse as RealtimeSessionCreateResponse,
-    type RealtimeTranscriptionSessionClientSecret as RealtimeTranscriptionSessionClientSecret,
     type RealtimeTranscriptionSessionCreateResponse as RealtimeTranscriptionSessionCreateResponse,
-    type RealtimeTranscriptionSessionInputAudioTranscription as RealtimeTranscriptionSessionInputAudioTranscription,
     type RealtimeTranscriptionSessionTurnDetection as RealtimeTranscriptionSessionTurnDetection,
     type ClientSecretCreateResponse as ClientSecretCreateResponse,
     type ClientSecretCreateParams as ClientSecretCreateParams,
