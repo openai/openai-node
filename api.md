@@ -712,7 +712,6 @@ Types:
 - <code><a href="./src/resources/realtime/realtime.ts">McpListToolsCompleted</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">McpListToolsFailed</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">McpListToolsInProgress</a></code>
-- <code><a href="./src/resources/realtime/realtime.ts">Models</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">NoiseReductionType</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">OutputAudioBufferClearEvent</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">RateLimitsUpdatedEvent</a></code>
@@ -729,6 +728,7 @@ Types:
 - <code><a href="./src/resources/realtime/realtime.ts">RealtimeConversationItemUserMessage</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">RealtimeError</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">RealtimeErrorEvent</a></code>
+- <code><a href="./src/resources/realtime/realtime.ts">RealtimeFunctionTool</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">RealtimeMcpApprovalRequest</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">RealtimeMcpApprovalResponse</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">RealtimeMcpListTools</a></code>
@@ -781,7 +781,6 @@ Types:
 - <code><a href="./src/resources/realtime/realtime.ts">SessionCreatedEvent</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">SessionUpdateEvent</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">SessionUpdatedEvent</a></code>
-- <code><a href="./src/resources/realtime/realtime.ts">TranscriptionSessionCreated</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">TranscriptionSessionUpdate</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">TranscriptionSessionUpdatedEvent</a></code>
 
@@ -791,9 +790,7 @@ Types:
 
 - <code><a href="./src/resources/realtime/client-secrets.ts">RealtimeSessionClientSecret</a></code>
 - <code><a href="./src/resources/realtime/client-secrets.ts">RealtimeSessionCreateResponse</a></code>
-- <code><a href="./src/resources/realtime/client-secrets.ts">RealtimeTranscriptionSessionClientSecret</a></code>
 - <code><a href="./src/resources/realtime/client-secrets.ts">RealtimeTranscriptionSessionCreateResponse</a></code>
-- <code><a href="./src/resources/realtime/client-secrets.ts">RealtimeTranscriptionSessionInputAudioTranscription</a></code>
 - <code><a href="./src/resources/realtime/client-secrets.ts">RealtimeTranscriptionSessionTurnDetection</a></code>
 - <code><a href="./src/resources/realtime/client-secrets.ts">ClientSecretCreateResponse</a></code>
 

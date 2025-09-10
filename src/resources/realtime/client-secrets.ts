@@ -1,6 +1,7 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../core/resource';
+import * as ClientSecretsAPI from './client-secrets';
 import * as RealtimeAPI from './realtime';
 import * as ResponsesAPI from '../responses/responses';
 import { APIPromise } from '../../core/api-promise';
@@ -39,14 +40,19 @@ export interface RealtimeSessionClientSecret {
  */
 export interface RealtimeSessionCreateResponse {
   /**
+   * Ephemeral key returned by the API.
+   */
+  client_secret: RealtimeSessionClientSecret;
+
+  /**
+   * The type of session to create. Always `realtime` for the Realtime API.
+   */
+  type: 'realtime';
+
+  /**
    * Configuration for input and output audio.
    */
   audio?: RealtimeSessionCreateResponse.Audio;
-
-  /**
-   * Ephemeral key returned by the API.
-   */
-  client_secret?: RealtimeSessionClientSecret;
 
   /**
    * Additional fields to include in server outputs.
@@ -115,7 +121,7 @@ export interface RealtimeSessionCreateResponse {
   /**
    * Tools available to the model.
    */
-  tools?: Array<RealtimeAPI.Models | RealtimeSessionCreateResponse.McpTool>;
+  tools?: Array<RealtimeAPI.RealtimeFunctionTool | RealtimeSessionCreateResponse.McpTool>;
 
   /**
    * Realtime API can write session traces to the
@@ -132,11 +138,6 @@ export interface RealtimeSessionCreateResponse {
    * The default is `auto`.
    */
   truncation?: RealtimeAPI.RealtimeTruncation;
-
-  /**
-   * The type of session to create. Always `realtime` for the Realtime API.
-   */
-  type?: 'realtime';
 }
 
 export namespace RealtimeSessionCreateResponse {
@@ -238,7 +239,7 @@ export namespace RealtimeSessionCreateResponse {
 
         /**
          * Optional idle timeout after which turn detection will auto-timeout when no
-         * additional audio is received.
+         * additional audio is received and emits a `timeout_triggered` event.
          */
         idle_timeout_ms?: number | null;
 
@@ -491,87 +492,90 @@ export namespace RealtimeSessionCreateResponse {
 }
 
 /**
- * Ephemeral key returned by the API. Only present when the session is created on
- * the server via REST API.
- */
-export interface RealtimeTranscriptionSessionClientSecret {
-  /**
-   * Timestamp for when the token expires. Currently, all tokens expire after one
-   * minute.
-   */
-  expires_at: number;
-
-  /**
-   * Ephemeral key usable in client environments to authenticate connections to the
-   * Realtime API. Use this in client-side environments rather than a standard API
-   * token, which should only be used server-side.
-   */
-  value: string;
-}
-
-/**
- * A new Realtime transcription session configuration.
- *
- * When a session is created on the server via REST API, the session object also
- * contains an ephemeral key. Default TTL for keys is 10 minutes. This property is
- * not present when a session is updated via the WebSocket API.
+ * A Realtime transcription session configuration object.
  */
 export interface RealtimeTranscriptionSessionCreateResponse {
   /**
-   * Ephemeral key returned by the API. Only present when the session is created on
-   * the server via REST API.
+   * Unique identifier for the session that looks like `sess_1234567890abcdef`.
    */
-  client_secret: RealtimeTranscriptionSessionClientSecret;
+  id: string;
 
   /**
-   * The format of input audio. Options are `pcm16`, `g711_ulaw`, or `g711_alaw`.
+   * The object type. Always `realtime.transcription_session`.
    */
-  input_audio_format?: string;
+  object: string;
 
   /**
-   * Configuration of the transcription model.
+   * The type of session. Always `transcription` for transcription sessions.
    */
-  input_audio_transcription?: RealtimeTranscriptionSessionInputAudioTranscription;
+  type: 'transcription';
 
   /**
-   * The set of modalities the model can respond with. To disable audio, set this to
-   * ["text"].
+   * Configuration for input audio for the session.
    */
-  modalities?: Array<'text' | 'audio'>;
+  audio?: RealtimeTranscriptionSessionCreateResponse.Audio;
 
   /**
-   * Configuration for turn detection. Can be set to `null` to turn off. Server VAD
-   * means that the model will detect the start and end of speech based on audio
-   * volume and respond at the end of user speech.
+   * Expiration timestamp for the session, in seconds since epoch.
    */
-  turn_detection?: RealtimeTranscriptionSessionTurnDetection;
+  expires_at?: number;
+
+  /**
+   * Additional fields to include in server outputs.
+   *
+   * - `item.input_audio_transcription.logprobs`: Include logprobs for input audio
+   *   transcription.
+   */
+  include?: Array<'item.input_audio_transcription.logprobs'>;
 }
 
-/**
- * Configuration of the transcription model.
- */
-export interface RealtimeTranscriptionSessionInputAudioTranscription {
+export namespace RealtimeTranscriptionSessionCreateResponse {
   /**
-   * The language of the input audio. Supplying the input language in
-   * [ISO-639-1](https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes) (e.g. `en`)
-   * format will improve accuracy and latency.
+   * Configuration for input audio for the session.
    */
-  language?: string;
+  export interface Audio {
+    input?: Audio.Input;
+  }
 
-  /**
-   * The model to use for transcription. Current options are `whisper-1`,
-   * `gpt-4o-transcribe-latest`, `gpt-4o-mini-transcribe`, and `gpt-4o-transcribe`.
-   */
-  model?: 'whisper-1' | 'gpt-4o-transcribe-latest' | 'gpt-4o-mini-transcribe' | 'gpt-4o-transcribe';
+  export namespace Audio {
+    export interface Input {
+      /**
+       * The PCM audio format. Only a 24kHz sample rate is supported.
+       */
+      format?: RealtimeAPI.RealtimeAudioFormats;
 
-  /**
-   * An optional text to guide the model's style or continue a previous audio
-   * segment. For `whisper-1`, the
-   * [prompt is a list of keywords](https://platform.openai.com/docs/guides/speech-to-text#prompting).
-   * For `gpt-4o-transcribe` models, the prompt is a free text string, for example
-   * "expect words related to technology".
-   */
-  prompt?: string;
+      /**
+       * Configuration for input audio noise reduction.
+       */
+      noise_reduction?: Input.NoiseReduction;
+
+      /**
+       * Configuration of the transcription model.
+       */
+      transcription?: RealtimeAPI.AudioTranscription;
+
+      /**
+       * Configuration for turn detection. Can be set to `null` to turn off. Server VAD
+       * means that the model will detect the start and end of speech based on audio
+       * volume and respond at the end of user speech.
+       */
+      turn_detection?: ClientSecretsAPI.RealtimeTranscriptionSessionTurnDetection;
+    }
+
+    export namespace Input {
+      /**
+       * Configuration for input audio noise reduction.
+       */
+      export interface NoiseReduction {
+        /**
+         * Type of noise reduction. `near_field` is for close-talking microphones such as
+         * headphones, `far_field` is for far-field microphones such as laptop or
+         * conference room microphones.
+         */
+        type?: RealtimeAPI.NoiseReductionType;
+      }
+    }
+  }
 }
 
 /**
@@ -670,9 +674,7 @@ export declare namespace ClientSecrets {
   export {
     type RealtimeSessionClientSecret as RealtimeSessionClientSecret,
     type RealtimeSessionCreateResponse as RealtimeSessionCreateResponse,
-    type RealtimeTranscriptionSessionClientSecret as RealtimeTranscriptionSessionClientSecret,
     type RealtimeTranscriptionSessionCreateResponse as RealtimeTranscriptionSessionCreateResponse,
-    type RealtimeTranscriptionSessionInputAudioTranscription as RealtimeTranscriptionSessionInputAudioTranscription,
     type RealtimeTranscriptionSessionTurnDetection as RealtimeTranscriptionSessionTurnDetection,
     type ClientSecretCreateResponse as ClientSecretCreateResponse,
     type ClientSecretCreateParams as ClientSecretCreateParams,
