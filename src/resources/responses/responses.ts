@@ -352,7 +352,7 @@ export interface FunctionTool {
   /**
    * Whether to enforce strict parameter validation. Default `true`.
    */
-  strict: boolean | null;
+  strict?: boolean | null;
 
   /**
    * The type of the function tool. Always `function`.
