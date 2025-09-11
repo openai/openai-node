@@ -933,16 +933,33 @@ export interface InputAudioBufferSpeechStoppedEvent {
 }
 
 /**
- * Returned when the server VAD timeout is triggered for the input audio buffer.
+ * Returned when the Server VAD timeout is triggered for the input audio buffer.
+ * This is configured with `idle_timeout_ms` in the `turn_detection` settings of
+ * the session, and it indicates that there hasn't been any speech detected for the
+ * configured duration.
+ *
+ * The `audio_start_ms` and `audio_end_ms` fields indicate the segment of audio
+ * after the last model response up to the triggering time, as an offset from the
+ * beginning of audio written to the input audio buffer. This means it demarcates
+ * the segment of audio that was silent and the difference between the start and
+ * end values will roughly match the configured timeout.
+ *
+ * The empty audio will be committed to the conversation as an `input_audio` item
+ * (there will be a `input_audio_buffer.committed` event) and a model response will
+ * be generated. There may be speech that didn't trigger VAD but is still detected
+ * by the model, so the model may respond with something relevant to the
+ * conversation or a prompt to continue speaking.
  */
 export interface InputAudioBufferTimeoutTriggered {
   /**
-   * Millisecond offset where speech ended within the buffered audio.
+   * Millisecond offset of audio written to the input audio buffer at the time the
+   * timeout was triggered.
    */
   audio_end_ms: number;
 
   /**
-   * Millisecond offset where speech started within the buffered audio.
+   * Millisecond offset of audio written to the input audio buffer that was after the
+   * playback time of the last model response.
    */
   audio_start_ms: number;
 
@@ -1154,16 +1171,19 @@ export interface RealtimeAudioConfigInput {
   /**
    * Configuration for turn detection, ether Server VAD or Semantic VAD. This can be
    * set to `null` to turn off, in which case the client must manually trigger model
-   * response. Server VAD means that the model will detect the start and end of
-   * speech based on audio volume and respond at the end of user speech. Semantic VAD
-   * is more advanced and uses a turn detection model (in conjunction with VAD) to
-   * semantically estimate whether the user has finished speaking, then dynamically
-   * sets a timeout based on this probability. For example, if user audio trails off
-   * with "uhhm", the model will score a low probability of turn end and wait longer
-   * for the user to continue speaking. This can be useful for more natural
-   * conversations, but may have a higher latency.
+   * response.
+   *
+   * Server VAD means that the model will detect the start and end of speech based on
+   * audio volume and respond at the end of user speech.
+   *
+   * Semantic VAD is more advanced and uses a turn detection model (in conjunction
+   * with VAD) to semantically estimate whether the user has finished speaking, then
+   * dynamically sets a timeout based on this probability. For example, if user audio
+   * trails off with "uhhm", the model will score a low probability of turn end and
+   * wait longer for the user to continue speaking. This can be useful for more
+   * natural conversations, but may have a higher latency.
    */
-  turn_detection?: RealtimeAudioInputTurnDetection;
+  turn_detection?: RealtimeAudioInputTurnDetection | null;
 }
 
 export namespace RealtimeAudioConfigInput {
@@ -1269,67 +1289,114 @@ export namespace RealtimeAudioFormats {
 /**
  * Configuration for turn detection, ether Server VAD or Semantic VAD. This can be
  * set to `null` to turn off, in which case the client must manually trigger model
- * response. Server VAD means that the model will detect the start and end of
- * speech based on audio volume and respond at the end of user speech. Semantic VAD
- * is more advanced and uses a turn detection model (in conjunction with VAD) to
- * semantically estimate whether the user has finished speaking, then dynamically
- * sets a timeout based on this probability. For example, if user audio trails off
- * with "uhhm", the model will score a low probability of turn end and wait longer
- * for the user to continue speaking. This can be useful for more natural
- * conversations, but may have a higher latency.
+ * response.
+ *
+ * Server VAD means that the model will detect the start and end of speech based on
+ * audio volume and respond at the end of user speech.
+ *
+ * Semantic VAD is more advanced and uses a turn detection model (in conjunction
+ * with VAD) to semantically estimate whether the user has finished speaking, then
+ * dynamically sets a timeout based on this probability. For example, if user audio
+ * trails off with "uhhm", the model will score a low probability of turn end and
+ * wait longer for the user to continue speaking. This can be useful for more
+ * natural conversations, but may have a higher latency.
  */
-export interface RealtimeAudioInputTurnDetection {
+export type RealtimeAudioInputTurnDetection =
+  | RealtimeAudioInputTurnDetection.ServerVad
+  | RealtimeAudioInputTurnDetection.SemanticVad;
+
+export namespace RealtimeAudioInputTurnDetection {
   /**
-   * Whether or not to automatically generate a response when a VAD stop event
-   * occurs.
+   * Server-side voice activity detection (VAD) which flips on when user speech is
+   * detected and off after a period of silence.
    */
-  create_response?: boolean;
+  export interface ServerVad {
+    /**
+     * Type of turn detection, `server_vad` to turn on simple Server VAD.
+     */
+    type: 'server_vad';
+
+    /**
+     * Whether or not to automatically generate a response when a VAD stop event
+     * occurs.
+     */
+    create_response?: boolean;
+
+    /**
+     * Optional timeout after which a model response will be triggered automatically.
+     * This is useful for situations in which a long pause from the user is unexpected,
+     * such as a phone call. The model will effectively prompt the user to continue the
+     * conversation based on the current context.
+     *
+     * The timeout value will be applied after the last model response's audio has
+     * finished playing, i.e. it's set to the `response.done` time plus audio playback
+     * duration.
+     *
+     * An `input_audio_buffer.timeout_triggered` event (plus events associated with the
+     * Response) will be emitted when the timeout is reached. Idle timeout is currently
+     * only supported for `server_vad` mode.
+     */
+    idle_timeout_ms?: number | null;
+
+    /**
+     * Whether or not to automatically interrupt any ongoing response with output to
+     * the default conversation (i.e. `conversation` of `auto`) when a VAD start event
+     * occurs.
+     */
+    interrupt_response?: boolean;
+
+    /**
+     * Used only for `server_vad` mode. Amount of audio to include before the VAD
+     * detected speech (in milliseconds). Defaults to 300ms.
+     */
+    prefix_padding_ms?: number;
+
+    /**
+     * Used only for `server_vad` mode. Duration of silence to detect speech stop (in
+     * milliseconds). Defaults to 500ms. With shorter values the model will respond
+     * more quickly, but may jump in on short pauses from the user.
+     */
+    silence_duration_ms?: number;
+
+    /**
+     * Used only for `server_vad` mode. Activation threshold for VAD (0.0 to 1.0), this
+     * defaults to 0.5. A higher threshold will require louder audio to activate the
+     * model, and thus might perform better in noisy environments.
+     */
+    threshold?: number;
+  }
 
   /**
-   * Used only for `semantic_vad` mode. The eagerness of the model to respond. `low`
-   * will wait longer for the user to continue speaking, `high` will respond more
-   * quickly. `auto` is the default and is equivalent to `medium`. `low`, `medium`,
-   * and `high` have max timeouts of 8s, 4s, and 2s respectively.
+   * Server-side semantic turn detection which uses a model to determine when the
+   * user has finished speaking.
    */
-  eagerness?: 'low' | 'medium' | 'high' | 'auto';
+  export interface SemanticVad {
+    /**
+     * Type of turn detection, `semantic_vad` to turn on Semantic VAD.
+     */
+    type: 'semantic_vad';
 
-  /**
-   * Optional idle timeout after which turn detection will auto-timeout when no
-   * additional audio is received and emits a `timeout_triggered` event.
-   */
-  idle_timeout_ms?: number | null;
+    /**
+     * Whether or not to automatically generate a response when a VAD stop event
+     * occurs.
+     */
+    create_response?: boolean;
 
-  /**
-   * Whether or not to automatically interrupt any ongoing response with output to
-   * the default conversation (i.e. `conversation` of `auto`) when a VAD start event
-   * occurs.
-   */
-  interrupt_response?: boolean;
+    /**
+     * Used only for `semantic_vad` mode. The eagerness of the model to respond. `low`
+     * will wait longer for the user to continue speaking, `high` will respond more
+     * quickly. `auto` is the default and is equivalent to `medium`. `low`, `medium`,
+     * and `high` have max timeouts of 8s, 4s, and 2s respectively.
+     */
+    eagerness?: 'low' | 'medium' | 'high' | 'auto';
 
-  /**
-   * Used only for `server_vad` mode. Amount of audio to include before the VAD
-   * detected speech (in milliseconds). Defaults to 300ms.
-   */
-  prefix_padding_ms?: number;
-
-  /**
-   * Used only for `server_vad` mode. Duration of silence to detect speech stop (in
-   * milliseconds). Defaults to 500ms. With shorter values the model will respond
-   * more quickly, but may jump in on short pauses from the user.
-   */
-  silence_duration_ms?: number;
-
-  /**
-   * Used only for `server_vad` mode. Activation threshold for VAD (0.0 to 1.0), this
-   * defaults to 0.5. A higher threshold will require louder audio to activate the
-   * model, and thus might perform better in noisy environments.
-   */
-  threshold?: number;
-
-  /**
-   * Type of turn detection.
-   */
-  type?: 'server_vad' | 'semantic_vad';
+    /**
+     * Whether or not to automatically interrupt any ongoing response with output to
+     * the default conversation (i.e. `conversation` of `auto`) when a VAD start event
+     * occurs.
+     */
+    interrupt_response?: boolean;
+  }
 }
 
 /**
@@ -2568,7 +2635,7 @@ export namespace RealtimeServerEvent {
 }
 
 /**
- * Realtime session object.
+ * Realtime session object for the beta interface.
  */
 export interface RealtimeSession {
   /**
@@ -2711,16 +2778,19 @@ export interface RealtimeSession {
   /**
    * Configuration for turn detection, ether Server VAD or Semantic VAD. This can be
    * set to `null` to turn off, in which case the client must manually trigger model
-   * response. Server VAD means that the model will detect the start and end of
-   * speech based on audio volume and respond at the end of user speech. Semantic VAD
-   * is more advanced and uses a turn detection model (in conjunction with VAD) to
-   * semantically estimate whether the user has finished speaking, then dynamically
-   * sets a timeout based on this probability. For example, if user audio trails off
-   * with "uhhm", the model will score a low probability of turn end and wait longer
-   * for the user to continue speaking. This can be useful for more natural
-   * conversations, but may have a higher latency.
+   * response.
+   *
+   * Server VAD means that the model will detect the start and end of speech based on
+   * audio volume and respond at the end of user speech.
+   *
+   * Semantic VAD is more advanced and uses a turn detection model (in conjunction
+   * with VAD) to semantically estimate whether the user has finished speaking, then
+   * dynamically sets a timeout based on this probability. For example, if user audio
+   * trails off with "uhhm", the model will score a low probability of turn end and
+   * wait longer for the user to continue speaking. This can be useful for more
+   * natural conversations, but may have a higher latency.
    */
-  turn_detection?: RealtimeSession.TurnDetection | null;
+  turn_detection?: RealtimeSession.ServerVad | RealtimeSession.SemanticVad | null;
 
   /**
    * The voice the model uses to respond. Voice cannot be changed during the session
@@ -2782,18 +2852,15 @@ export namespace RealtimeSession {
   }
 
   /**
-   * Configuration for turn detection, ether Server VAD or Semantic VAD. This can be
-   * set to `null` to turn off, in which case the client must manually trigger model
-   * response. Server VAD means that the model will detect the start and end of
-   * speech based on audio volume and respond at the end of user speech. Semantic VAD
-   * is more advanced and uses a turn detection model (in conjunction with VAD) to
-   * semantically estimate whether the user has finished speaking, then dynamically
-   * sets a timeout based on this probability. For example, if user audio trails off
-   * with "uhhm", the model will score a low probability of turn end and wait longer
-   * for the user to continue speaking. This can be useful for more natural
-   * conversations, but may have a higher latency.
+   * Server-side voice activity detection (VAD) which flips on when user speech is
+   * detected and off after a period of silence.
    */
-  export interface TurnDetection {
+  export interface ServerVad {
+    /**
+     * Type of turn detection, `server_vad` to turn on simple Server VAD.
+     */
+    type: 'server_vad';
+
     /**
      * Whether or not to automatically generate a response when a VAD stop event
      * occurs.
@@ -2801,15 +2868,18 @@ export namespace RealtimeSession {
     create_response?: boolean;
 
     /**
-     * Used only for `semantic_vad` mode. The eagerness of the model to respond. `low`
-     * will wait longer for the user to continue speaking, `high` will respond more
-     * quickly. `auto` is the default and is equivalent to `medium`.
-     */
-    eagerness?: 'low' | 'medium' | 'high' | 'auto';
-
-    /**
-     * Optional idle timeout after which turn detection will auto-timeout when no
-     * additional audio is received.
+     * Optional timeout after which a model response will be triggered automatically.
+     * This is useful for situations in which a long pause from the user is unexpected,
+     * such as a phone call. The model will effectively prompt the user to continue the
+     * conversation based on the current context.
+     *
+     * The timeout value will be applied after the last model response's audio has
+     * finished playing, i.e. it's set to the `response.done` time plus audio playback
+     * duration.
+     *
+     * An `input_audio_buffer.timeout_triggered` event (plus events associated with the
+     * Response) will be emitted when the timeout is reached. Idle timeout is currently
+     * only supported for `server_vad` mode.
      */
     idle_timeout_ms?: number | null;
 
@@ -2839,11 +2909,38 @@ export namespace RealtimeSession {
      * model, and thus might perform better in noisy environments.
      */
     threshold?: number;
+  }
+
+  /**
+   * Server-side semantic turn detection which uses a model to determine when the
+   * user has finished speaking.
+   */
+  export interface SemanticVad {
+    /**
+     * Type of turn detection, `semantic_vad` to turn on Semantic VAD.
+     */
+    type: 'semantic_vad';
 
     /**
-     * Type of turn detection.
+     * Whether or not to automatically generate a response when a VAD stop event
+     * occurs.
      */
-    type?: 'server_vad' | 'semantic_vad';
+    create_response?: boolean;
+
+    /**
+     * Used only for `semantic_vad` mode. The eagerness of the model to respond. `low`
+     * will wait longer for the user to continue speaking, `high` will respond more
+     * quickly. `auto` is the default and is equivalent to `medium`. `low`, `medium`,
+     * and `high` have max timeouts of 8s, 4s, and 2s respectively.
+     */
+    eagerness?: 'low' | 'medium' | 'high' | 'auto';
+
+    /**
+     * Whether or not to automatically interrupt any ongoing response with output to
+     * the default conversation (i.e. `conversation` of `auto`) when a VAD start event
+     * occurs.
+     */
+    interrupt_response?: boolean;
   }
 }
 
@@ -3194,16 +3291,19 @@ export interface RealtimeTranscriptionSessionAudioInput {
   /**
    * Configuration for turn detection, ether Server VAD or Semantic VAD. This can be
    * set to `null` to turn off, in which case the client must manually trigger model
-   * response. Server VAD means that the model will detect the start and end of
-   * speech based on audio volume and respond at the end of user speech. Semantic VAD
-   * is more advanced and uses a turn detection model (in conjunction with VAD) to
-   * semantically estimate whether the user has finished speaking, then dynamically
-   * sets a timeout based on this probability. For example, if user audio trails off
-   * with "uhhm", the model will score a low probability of turn end and wait longer
-   * for the user to continue speaking. This can be useful for more natural
-   * conversations, but may have a higher latency.
+   * response.
+   *
+   * Server VAD means that the model will detect the start and end of speech based on
+   * audio volume and respond at the end of user speech.
+   *
+   * Semantic VAD is more advanced and uses a turn detection model (in conjunction
+   * with VAD) to semantically estimate whether the user has finished speaking, then
+   * dynamically sets a timeout based on this probability. For example, if user audio
+   * trails off with "uhhm", the model will score a low probability of turn end and
+   * wait longer for the user to continue speaking. This can be useful for more
+   * natural conversations, but may have a higher latency.
    */
-  turn_detection?: RealtimeTranscriptionSessionAudioInputTurnDetection;
+  turn_detection?: RealtimeTranscriptionSessionAudioInputTurnDetection | null;
 }
 
 export namespace RealtimeTranscriptionSessionAudioInput {
@@ -3227,66 +3327,114 @@ export namespace RealtimeTranscriptionSessionAudioInput {
 /**
  * Configuration for turn detection, ether Server VAD or Semantic VAD. This can be
  * set to `null` to turn off, in which case the client must manually trigger model
- * response. Server VAD means that the model will detect the start and end of
- * speech based on audio volume and respond at the end of user speech. Semantic VAD
- * is more advanced and uses a turn detection model (in conjunction with VAD) to
- * semantically estimate whether the user has finished speaking, then dynamically
- * sets a timeout based on this probability. For example, if user audio trails off
- * with "uhhm", the model will score a low probability of turn end and wait longer
- * for the user to continue speaking. This can be useful for more natural
- * conversations, but may have a higher latency.
+ * response.
+ *
+ * Server VAD means that the model will detect the start and end of speech based on
+ * audio volume and respond at the end of user speech.
+ *
+ * Semantic VAD is more advanced and uses a turn detection model (in conjunction
+ * with VAD) to semantically estimate whether the user has finished speaking, then
+ * dynamically sets a timeout based on this probability. For example, if user audio
+ * trails off with "uhhm", the model will score a low probability of turn end and
+ * wait longer for the user to continue speaking. This can be useful for more
+ * natural conversations, but may have a higher latency.
  */
-export interface RealtimeTranscriptionSessionAudioInputTurnDetection {
+export type RealtimeTranscriptionSessionAudioInputTurnDetection =
+  | RealtimeTranscriptionSessionAudioInputTurnDetection.ServerVad
+  | RealtimeTranscriptionSessionAudioInputTurnDetection.SemanticVad;
+
+export namespace RealtimeTranscriptionSessionAudioInputTurnDetection {
   /**
-   * Whether or not to automatically generate a response when a VAD stop event
-   * occurs.
+   * Server-side voice activity detection (VAD) which flips on when user speech is
+   * detected and off after a period of silence.
    */
-  create_response?: boolean;
+  export interface ServerVad {
+    /**
+     * Type of turn detection, `server_vad` to turn on simple Server VAD.
+     */
+    type: 'server_vad';
+
+    /**
+     * Whether or not to automatically generate a response when a VAD stop event
+     * occurs.
+     */
+    create_response?: boolean;
+
+    /**
+     * Optional timeout after which a model response will be triggered automatically.
+     * This is useful for situations in which a long pause from the user is unexpected,
+     * such as a phone call. The model will effectively prompt the user to continue the
+     * conversation based on the current context.
+     *
+     * The timeout value will be applied after the last model response's audio has
+     * finished playing, i.e. it's set to the `response.done` time plus audio playback
+     * duration.
+     *
+     * An `input_audio_buffer.timeout_triggered` event (plus events associated with the
+     * Response) will be emitted when the timeout is reached. Idle timeout is currently
+     * only supported for `server_vad` mode.
+     */
+    idle_timeout_ms?: number | null;
+
+    /**
+     * Whether or not to automatically interrupt any ongoing response with output to
+     * the default conversation (i.e. `conversation` of `auto`) when a VAD start event
+     * occurs.
+     */
+    interrupt_response?: boolean;
+
+    /**
+     * Used only for `server_vad` mode. Amount of audio to include before the VAD
+     * detected speech (in milliseconds). Defaults to 300ms.
+     */
+    prefix_padding_ms?: number;
+
+    /**
+     * Used only for `server_vad` mode. Duration of silence to detect speech stop (in
+     * milliseconds). Defaults to 500ms. With shorter values the model will respond
+     * more quickly, but may jump in on short pauses from the user.
+     */
+    silence_duration_ms?: number;
+
+    /**
+     * Used only for `server_vad` mode. Activation threshold for VAD (0.0 to 1.0), this
+     * defaults to 0.5. A higher threshold will require louder audio to activate the
+     * model, and thus might perform better in noisy environments.
+     */
+    threshold?: number;
+  }
 
   /**
-   * Used only for `semantic_vad` mode. The eagerness of the model to respond. `low`
-   * will wait longer for the user to continue speaking, `high` will respond more
-   * quickly. `auto` is the default and is equivalent to `medium`.
+   * Server-side semantic turn detection which uses a model to determine when the
+   * user has finished speaking.
    */
-  eagerness?: 'low' | 'medium' | 'high' | 'auto';
+  export interface SemanticVad {
+    /**
+     * Type of turn detection, `semantic_vad` to turn on Semantic VAD.
+     */
+    type: 'semantic_vad';
 
-  /**
-   * Optional idle timeout after which turn detection will auto-timeout when no
-   * additional audio is received.
-   */
-  idle_timeout_ms?: number | null;
+    /**
+     * Whether or not to automatically generate a response when a VAD stop event
+     * occurs.
+     */
+    create_response?: boolean;
 
-  /**
-   * Whether or not to automatically interrupt any ongoing response with output to
-   * the default conversation (i.e. `conversation` of `auto`) when a VAD start event
-   * occurs.
-   */
-  interrupt_response?: boolean;
+    /**
+     * Used only for `semantic_vad` mode. The eagerness of the model to respond. `low`
+     * will wait longer for the user to continue speaking, `high` will respond more
+     * quickly. `auto` is the default and is equivalent to `medium`. `low`, `medium`,
+     * and `high` have max timeouts of 8s, 4s, and 2s respectively.
+     */
+    eagerness?: 'low' | 'medium' | 'high' | 'auto';
 
-  /**
-   * Used only for `server_vad` mode. Amount of audio to include before the VAD
-   * detected speech (in milliseconds). Defaults to 300ms.
-   */
-  prefix_padding_ms?: number;
-
-  /**
-   * Used only for `server_vad` mode. Duration of silence to detect speech stop (in
-   * milliseconds). Defaults to 500ms. With shorter values the model will respond
-   * more quickly, but may jump in on short pauses from the user.
-   */
-  silence_duration_ms?: number;
-
-  /**
-   * Used only for `server_vad` mode. Activation threshold for VAD (0.0 to 1.0), this
-   * defaults to 0.5. A higher threshold will require louder audio to activate the
-   * model, and thus might perform better in noisy environments.
-   */
-  threshold?: number;
-
-  /**
-   * Type of turn detection.
-   */
-  type?: 'server_vad' | 'semantic_vad';
+    /**
+     * Whether or not to automatically interrupt any ongoing response with output to
+     * the default conversation (i.e. `conversation` of `auto`) when a VAD start event
+     * occurs.
+     */
+    interrupt_response?: boolean;
+  }
 }
 
 /**
