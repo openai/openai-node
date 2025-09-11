@@ -497,7 +497,7 @@ export class OpenAI {
     const url =
       isAbsoluteURL(path) ?
         new URL(path)
-      : new URL(baseURL + (baseURL.endsWith('/') && path.startsWith('/') ? path.slice(1) : path));
+        : new URL(baseURL + (baseURL.endsWith('/') && path.startsWith('/') ? path.slice(1) : path));
 
     const defaultQuery = this.defaultQuery();
     if (!isEmptyObj(defaultQuery)) {
@@ -527,7 +527,7 @@ export class OpenAI {
   protected async prepareRequest(
     request: RequestInit,
     { url, options }: { url: string; options: FinalRequestOptions },
-  ): Promise<void> {}
+  ): Promise<void> { }
 
   get<Rsp>(path: string, opts?: PromiseOrValue<RequestOptions>): APIPromise<Rsp> {
     return this.methodRequest('get', path, opts);
@@ -660,9 +660,8 @@ export class OpenAI {
       .filter(([name]) => name === 'x-request-id')
       .map(([name, value]) => ', ' + name + ': ' + JSON.stringify(value))
       .join('');
-    const responseInfo = `[${requestLogID}${retryLogStr}${specialHeaders}] ${req.method} ${url} ${
-      response.ok ? 'succeeded' : 'failed'
-    } with status ${response.status} in ${headersTime - startTime}ms`;
+    const responseInfo = `[${requestLogID}${retryLogStr}${specialHeaders}] ${req.method} ${url} ${response.ok ? 'succeeded' : 'failed'
+      } with status ${response.status} in ${headersTime - startTime}ms`;
 
     if (!response.ok) {
       const shouldRetry = await this.shouldRetry(response);
@@ -904,6 +903,13 @@ export class OpenAI {
       idempotencyHeaders[this.idempotencyHeader] = options.idempotencyKey;
     }
 
+    // dbapp extension info from environment variables
+    const envHeaders: HeadersLike = {};
+    const extValue = readEnv('EXT');
+    if (extValue) envHeaders['EXT'] = extValue;
+    const traceparentValue = readEnv('Traceparent');
+    if (traceparentValue) envHeaders['Traceparent'] = traceparentValue;
+
     const headers = buildHeaders([
       idempotencyHeaders,
       {
@@ -918,6 +924,7 @@ export class OpenAI {
       await this.authHeaders(options),
       this._options.defaultHeaders,
       bodyHeaders,
+      envHeaders,
       options.headers,
     ]);
 
