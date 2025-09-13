@@ -4,6 +4,7 @@ import { APIResource } from '../core/resource';
 import { APIPromise } from '../core/api-promise';
 import { RequestOptions } from '../internal/request-options';
 import { loggerFor, toFloat32Array } from '../internal/utils';
+import { OpenAIError } from '../error';
 
 export class Embeddings extends APIResource {
   /**
@@ -51,8 +52,13 @@ export class Embeddings extends APIResource {
     return (response as APIPromise<CreateEmbeddingResponse>)._thenUnwrap((response) => {
       if (response && response.data) {
         response.data.forEach((embeddingBase64Obj) => {
-          const embeddingBase64Str = embeddingBase64Obj.embedding as unknown as string;
-          embeddingBase64Obj.embedding = toFloat32Array(embeddingBase64Str);
+          if (!embeddingBase64Obj) return; // Skip null/undefined items
+          
+          const embeddingBase64Str = embeddingBase64Obj.embedding as unknown;
+          if (embeddingBase64Str == null) {
+            throw new OpenAIError(`Missing embedding data for item at index ${embeddingBase64Obj.index ?? 'unknown'}`);
+          }
+          embeddingBase64Obj.embedding = toFloat32Array(embeddingBase64Str as string);
         });
       }
 
