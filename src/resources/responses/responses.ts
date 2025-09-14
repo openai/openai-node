@@ -2170,6 +2170,7 @@ export interface ResponseInProgressEvent {
  *   in code interpreter tool call items.
  */
 export type ResponseIncludable =
+  | 'web_search_call.action.sources'
   | 'file_search_call.results'
   | 'message.input_image.image_url'
   | 'computer_call_output.output.image_url'
