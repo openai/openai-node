@@ -435,6 +435,7 @@ response is given as the first argument to the callback.
 #### `.on('content.delta', (props: ContentDeltaEvent) => ...)`
 
 The event fired for every chunk containing new content. The `props` object contains:
+
 - `delta`: The new content string received in this chunk
 - `snapshot`: The accumulated content so far
 - `parsed`: The partially parsed content (if applicable)
@@ -442,23 +443,27 @@ The event fired for every chunk containing new content. The `props` object conta
 #### `.on('content.done', (props: ContentDoneEvent<ParsedT>) => ...)`
 
 The event fired when the content generation is complete. The `props` object contains:
+
 - `content`: The full generated content
 - `parsed`: The fully parsed content (if applicable)
 
 #### `.on('refusal.delta', (props: RefusalDeltaEvent) => ...)`
 
 The event fired when a chunk contains part of a content refusal. The `props` object contains:
+
 - `delta`: The new refusal content string received in this chunk
 - `snapshot`: The accumulated refusal content string so far
 
 #### `.on('refusal.done', (props: RefusalDoneEvent) => ...)`
 
 The event fired when the refusal content is complete. The `props` object contains:
+
 - `refusal`: The full refusal content
 
 #### `.on('tool_calls.function.arguments.delta', (props: FunctionToolCallArgumentsDeltaEvent) => ...)`
 
 The event fired when a chunk contains part of a function tool call's arguments. The `props` object contains:
+
 - `name`: The name of the function being called
 - `index`: The index of the tool call
 - `arguments`: The accumulated raw JSON string of arguments
@@ -468,6 +473,7 @@ The event fired when a chunk contains part of a function tool call's arguments. 
 #### `.on('tool_calls.function.arguments.done', (props: FunctionToolCallArgumentsDoneEvent) => ...)`
 
 The event fired when a function tool call's arguments are complete. The `props` object contains:
+
 - `name`: The name of the function being called
 - `index`: The index of the tool call
 - `arguments`: The full raw JSON string of arguments
@@ -476,23 +482,27 @@ The event fired when a function tool call's arguments are complete. The `props` 
 #### `.on('logprobs.content.delta', (props: LogProbsContentDeltaEvent) => ...)`
 
 The event fired when a chunk contains new content log probabilities. The `props` object contains:
+
 - `content`: A list of the new log probabilities received in this chunk
 - `snapshot`: A list of the accumulated log probabilities so far
 
 #### `.on('logprobs.content.done', (props: LogProbsContentDoneEvent) => ...)`
 
 The event fired when all content log probabilities have been received. The `props` object contains:
+
 - `content`: The full list of token log probabilities for the content
 
 #### `.on('logprobs.refusal.delta', (props: LogProbsRefusalDeltaEvent) => ...)`
 
 The event fired when a chunk contains new refusal log probabilities. The `props` object contains:
+
 - `refusal`: A list of the new log probabilities received in this chunk
 - `snapshot`: A list of the accumulated log probabilities so far
 
 #### `.on('logprobs.refusal.done', (props: LogProbsRefusalDoneEvent) => ...)`
 
 The event fired when all refusal log probabilities have been received. The `props` object contains:
+
 - `refusal`: The full list of token log probabilities for the refusal
 
 #### `.on('finalChatCompletion', (completion: ChatCompletion) => …)`

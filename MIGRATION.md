@@ -388,14 +388,14 @@ The `beta.chat` namespace has been removed. All chat completion methods that wer
 
 ```ts
 // Before
-client.beta.chat.completions.parse()
-client.beta.chat.completions.stream()
-client.beta.chat.completions.runTools()
+client.beta.chat.completions.parse();
+client.beta.chat.completions.stream();
+client.beta.chat.completions.runTools();
 
 // After
-client.chat.completions.parse()
-client.chat.completions.stream()
-client.chat.completions.runTools()
+client.chat.completions.parse();
+client.chat.completions.stream();
+client.chat.completions.runTools();
 ```
 
 Additionally, related types have been moved:
@@ -440,12 +440,14 @@ openai.chat.completions
 ```
 
 The following event names have been changed:
+
 - `functionCall` → `functionToolCall`
 - `functionCallResult` → `functionToolCallResult`
 - `finalFunctionCall` → `finalFunctionToolCall`
 - `finalFunctionCallResult` → `finalFunctionToolCallResult`
 
 Additionally, the following methods have been renamed:
+
 - `runner.finalFunctionCall()` → `runner.finalFunctionToolCall()`
 - `runner.finalFunctionCallResult()` → `runner.finalFunctionToolCallResult()`
 
