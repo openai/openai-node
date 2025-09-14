@@ -10,15 +10,18 @@ import { maybeObj } from '../internal/utils/values';
 
 export type PageRequestOptions = Pick<FinalRequestOptions, 'query' | 'headers' | 'body' | 'path' | 'method'>;
 
+// Associate pages with their client via a module WeakMap to avoid
+// JS private-field brand checks across bundles/copies.
+const pageClient = /* @__PURE__ */ new WeakMap<object, OpenAI>();
+
 export abstract class AbstractPage<Item> implements AsyncIterable<Item> {
-  #client: OpenAI;
   protected options: FinalRequestOptions;
 
   protected response: Response;
   protected body: unknown;
 
   constructor(client: OpenAI, response: Response, body: unknown, options: FinalRequestOptions) {
-    this.#client = client;
+    pageClient.set(this, client);
     this.options = options;
     this.response = response;
     this.body = body;
@@ -42,7 +45,9 @@ export abstract class AbstractPage<Item> implements AsyncIterable<Item> {
       );
     }
 
-    return await this.#client.requestAPIList(this.constructor as any, nextOptions);
+    const client = pageClient.get(this);
+    if (!client) throw new OpenAIError('Illegal invocation of Page method');
+    return await client.requestAPIList(this.constructor as any, nextOptions);
   }
 
   async *iterPages(): AsyncGenerator<this> {
