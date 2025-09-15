@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.20.3 (2025-09-15)
+
+Full Changelog: [v5.20.2...v5.20.3](https://github.com/openai/openai-node/compare/v5.20.2...v5.20.3)
+
+### Chores
+
+* **api:** docs and spec refactoring ([05b4498](https://github.com/openai/openai-node/commit/05b44987c699f7683b8706c8de363165150e5f31))
+
 ## 5.20.2 (2025-09-12)
 
 Full Changelog: [v5.20.1...v5.20.2](https://github.com/openai/openai-node/compare/v5.20.1...v5.20.2)
