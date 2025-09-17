@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.21.0 (2025-09-17)
+
+Full Changelog: [v5.20.3...v5.21.0](https://github.com/openai/openai-node/compare/v5.20.3...v5.21.0)
+
+### Features
+
+* **api:** type updates for conversations, reasoning_effort and results for evals ([f243f54](https://github.com/openai/openai-node/commit/f243f54072d00cb8d83b8c6093accaaabf34d4cf))
+
 ## 5.20.3 (2025-09-15)
 
 Full Changelog: [v5.20.2...v5.20.3](https://github.com/openai/openai-node/compare/v5.20.2...v5.20.3)
