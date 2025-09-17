@@ -803,22 +803,17 @@ Methods:
 Types:
 
 - <code><a href="./src/resources/conversations/conversations.ts">ComputerScreenshotContent</a></code>
-- <code><a href="./src/resources/conversations/conversations.ts">ContainerFileCitationBody</a></code>
 - <code><a href="./src/resources/conversations/conversations.ts">Conversation</a></code>
 - <code><a href="./src/resources/conversations/conversations.ts">ConversationDeleted</a></code>
 - <code><a href="./src/resources/conversations/conversations.ts">ConversationDeletedResource</a></code>
-- <code><a href="./src/resources/conversations/conversations.ts">FileCitationBody</a></code>
-- <code><a href="./src/resources/conversations/conversations.ts">InputFileContent</a></code>
-- <code><a href="./src/resources/conversations/conversations.ts">InputImageContent</a></code>
-- <code><a href="./src/resources/conversations/conversations.ts">InputTextContent</a></code>
-- <code><a href="./src/resources/conversations/conversations.ts">LobProb</a></code>
 - <code><a href="./src/resources/conversations/conversations.ts">Message</a></code>
-- <code><a href="./src/resources/conversations/conversations.ts">OutputTextContent</a></code>
-- <code><a href="./src/resources/conversations/conversations.ts">RefusalContent</a></code>
 - <code><a href="./src/resources/conversations/conversations.ts">SummaryTextContent</a></code>
 - <code><a href="./src/resources/conversations/conversations.ts">TextContent</a></code>
-- <code><a href="./src/resources/conversations/conversations.ts">TopLogProb</a></code>
-- <code><a href="./src/resources/conversations/conversations.ts">URLCitationBody</a></code>
+- <code><a href="./src/resources/conversations/conversations.ts">InputTextContent</a></code>
+- <code><a href="./src/resources/conversations/conversations.ts">OutputTextContent</a></code>
+- <code><a href="./src/resources/conversations/conversations.ts">RefusalContent</a></code>
+- <code><a href="./src/resources/conversations/conversations.ts">InputImageContent</a></code>
+- <code><a href="./src/resources/conversations/conversations.ts">InputFileContent</a></code>
 
 Methods:
 
