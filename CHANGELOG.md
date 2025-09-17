@@ -1,5 +1,47 @@
 # Changelog
 
+## 5.20.3 (2025-09-15)
+
+Full Changelog: [v5.20.2...v5.20.3](https://github.com/openai/openai-node/compare/v5.20.2...v5.20.3)
+
+### Chores
+
+* **api:** docs and spec refactoring ([05b4498](https://github.com/openai/openai-node/commit/05b44987c699f7683b8706c8de363165150e5f31))
+
+## 5.20.2 (2025-09-12)
+
+Full Changelog: [v5.20.1...v5.20.2](https://github.com/openai/openai-node/compare/v5.20.1...v5.20.2)
+
+### Bug Fixes
+
+* coerce nullable values to undefined ([836d1b4](https://github.com/openai/openai-node/commit/836d1b4cdd077c206e1c647c762f4c16e9db444c))
+
+
+### Chores
+
+* **api:** Minor docs and type updates for realtime ([ccb00dc](https://github.com/openai/openai-node/commit/ccb00dcbd1466976045aafee152cbc038bb293b9))
+
+## 5.20.1 (2025-09-10)
+
+Full Changelog: [v5.20.0...v5.20.1](https://github.com/openai/openai-node/compare/v5.20.0...v5.20.1)
+
+### Chores
+
+* **api:** fix realtime GA types ([1c0d314](https://github.com/openai/openai-node/commit/1c0d3145e920a55f3c710323849bcac1fd60b703))
+
+## 5.20.0 (2025-09-08)
+
+Full Changelog: [v5.19.1...v5.20.0](https://github.com/openai/openai-node/compare/v5.19.1...v5.20.0)
+
+### Features
+
+* **api:** ship the RealtimeGA API shape ([4286ddd](https://github.com/openai/openai-node/commit/4286ddd4f990dd26e15e510039457f17d787820d))
+
+
+### Chores
+
+* ci build action ([c8ce143](https://github.com/openai/openai-node/commit/c8ce143196fdbc7ee1c7832bce2417b6e3d25885))
+
 ## 5.19.1 (2025-09-03)
 
 Full Changelog: [v5.19.0...v5.19.1](https://github.com/openai/openai-node/compare/v5.19.0...v5.19.1)
