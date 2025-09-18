@@ -286,6 +286,15 @@ export namespace CreateEvalCompletionsRunDataSource {
     max_completion_tokens?: number;
 
     /**
+     * Constrains effort on reasoning for
+     * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
+     * supported values are `minimal`, `low`, `medium`, and `high`. Reducing reasoning
+     * effort can result in faster responses and fewer tokens used on reasoning in a
+     * response.
+     */
+    reasoning_effort?: Shared.ReasoningEffort | null;
+
+    /**
      * An object specifying the format that the model must output.
      *
      * Setting to `{ "type": "json_schema", "json_schema": {...} }` enables Structured
@@ -578,8 +587,11 @@ export namespace RunCreateResponse {
       model?: string | null;
 
       /**
-       * Optional reasoning effort parameter. This is a query parameter used to select
-       * responses.
+       * Constrains effort on reasoning for
+       * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
+       * supported values are `minimal`, `low`, `medium`, and `high`. Reducing reasoning
+       * effort can result in faster responses and fewer tokens used on reasoning in a
+       * response.
        */
       reasoning_effort?: Shared.ReasoningEffort | null;
 
@@ -717,6 +729,15 @@ export namespace RunCreateResponse {
        * The maximum number of tokens in the generated output.
        */
       max_completion_tokens?: number;
+
+      /**
+       * Constrains effort on reasoning for
+       * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
+       * supported values are `minimal`, `low`, `medium`, and `high`. Reducing reasoning
+       * effort can result in faster responses and fewer tokens used on reasoning in a
+       * response.
+       */
+      reasoning_effort?: Shared.ReasoningEffort | null;
 
       /**
        * A seed value to initialize the randomness, during sampling.
@@ -1052,8 +1073,11 @@ export namespace RunRetrieveResponse {
       model?: string | null;
 
       /**
-       * Optional reasoning effort parameter. This is a query parameter used to select
-       * responses.
+       * Constrains effort on reasoning for
+       * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
+       * supported values are `minimal`, `low`, `medium`, and `high`. Reducing reasoning
+       * effort can result in faster responses and fewer tokens used on reasoning in a
+       * response.
        */
       reasoning_effort?: Shared.ReasoningEffort | null;
 
@@ -1191,6 +1215,15 @@ export namespace RunRetrieveResponse {
        * The maximum number of tokens in the generated output.
        */
       max_completion_tokens?: number;
+
+      /**
+       * Constrains effort on reasoning for
+       * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
+       * supported values are `minimal`, `low`, `medium`, and `high`. Reducing reasoning
+       * effort can result in faster responses and fewer tokens used on reasoning in a
+       * response.
+       */
+      reasoning_effort?: Shared.ReasoningEffort | null;
 
       /**
        * A seed value to initialize the randomness, during sampling.
@@ -1523,8 +1556,11 @@ export namespace RunListResponse {
       model?: string | null;
 
       /**
-       * Optional reasoning effort parameter. This is a query parameter used to select
-       * responses.
+       * Constrains effort on reasoning for
+       * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
+       * supported values are `minimal`, `low`, `medium`, and `high`. Reducing reasoning
+       * effort can result in faster responses and fewer tokens used on reasoning in a
+       * response.
        */
       reasoning_effort?: Shared.ReasoningEffort | null;
 
@@ -1662,6 +1698,15 @@ export namespace RunListResponse {
        * The maximum number of tokens in the generated output.
        */
       max_completion_tokens?: number;
+
+      /**
+       * Constrains effort on reasoning for
+       * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
+       * supported values are `minimal`, `low`, `medium`, and `high`. Reducing reasoning
+       * effort can result in faster responses and fewer tokens used on reasoning in a
+       * response.
+       */
+      reasoning_effort?: Shared.ReasoningEffort | null;
 
       /**
        * A seed value to initialize the randomness, during sampling.
@@ -2005,8 +2050,11 @@ export namespace RunCancelResponse {
       model?: string | null;
 
       /**
-       * Optional reasoning effort parameter. This is a query parameter used to select
-       * responses.
+       * Constrains effort on reasoning for
+       * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
+       * supported values are `minimal`, `low`, `medium`, and `high`. Reducing reasoning
+       * effort can result in faster responses and fewer tokens used on reasoning in a
+       * response.
        */
       reasoning_effort?: Shared.ReasoningEffort | null;
 
@@ -2144,6 +2192,15 @@ export namespace RunCancelResponse {
        * The maximum number of tokens in the generated output.
        */
       max_completion_tokens?: number;
+
+      /**
+       * Constrains effort on reasoning for
+       * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
+       * supported values are `minimal`, `low`, `medium`, and `high`. Reducing reasoning
+       * effort can result in faster responses and fewer tokens used on reasoning in a
+       * response.
+       */
+      reasoning_effort?: Shared.ReasoningEffort | null;
 
       /**
        * A seed value to initialize the randomness, during sampling.
@@ -2426,8 +2483,11 @@ export namespace RunCreateParams {
       model?: string | null;
 
       /**
-       * Optional reasoning effort parameter. This is a query parameter used to select
-       * responses.
+       * Constrains effort on reasoning for
+       * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
+       * supported values are `minimal`, `low`, `medium`, and `high`. Reducing reasoning
+       * effort can result in faster responses and fewer tokens used on reasoning in a
+       * response.
        */
       reasoning_effort?: Shared.ReasoningEffort | null;
 
@@ -2565,6 +2625,15 @@ export namespace RunCreateParams {
        * The maximum number of tokens in the generated output.
        */
       max_completion_tokens?: number;
+
+      /**
+       * Constrains effort on reasoning for
+       * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
+       * supported values are `minimal`, `low`, `medium`, and `high`. Reducing reasoning
+       * effort can result in faster responses and fewer tokens used on reasoning in a
+       * response.
+       */
+      reasoning_effort?: Shared.ReasoningEffort | null;
 
       /**
        * A seed value to initialize the randomness, during sampling.

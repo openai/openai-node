@@ -74,9 +74,9 @@ export interface OutputItemRetrieveResponse {
   object: 'eval.run.output_item';
 
   /**
-   * A list of results from the evaluation run.
+   * A list of grader results for this output item.
    */
-  results: Array<{ [key: string]: unknown }>;
+  results: Array<OutputItemRetrieveResponse.Result>;
 
   /**
    * The identifier of the evaluation run associated with this output item.
@@ -95,6 +95,38 @@ export interface OutputItemRetrieveResponse {
 }
 
 export namespace OutputItemRetrieveResponse {
+  /**
+   * A single grader result for an evaluation run output item.
+   */
+  export interface Result {
+    /**
+     * The name of the grader.
+     */
+    name: string;
+
+    /**
+     * Whether the grader considered the output a pass.
+     */
+    passed: boolean;
+
+    /**
+     * The numeric score produced by the grader.
+     */
+    score: number;
+
+    /**
+     * Optional sample or intermediate data produced by the grader.
+     */
+    sample?: { [key: string]: unknown } | null;
+
+    /**
+     * The grader type (for example, "string-check-grader").
+     */
+    type?: string;
+
+    [k: string]: unknown;
+  }
+
   /**
    * A sample containing the input and output of the evaluation run.
    */
@@ -240,9 +272,9 @@ export interface OutputItemListResponse {
   object: 'eval.run.output_item';
 
   /**
-   * A list of results from the evaluation run.
+   * A list of grader results for this output item.
    */
-  results: Array<{ [key: string]: unknown }>;
+  results: Array<OutputItemListResponse.Result>;
 
   /**
    * The identifier of the evaluation run associated with this output item.
@@ -261,6 +293,38 @@ export interface OutputItemListResponse {
 }
 
 export namespace OutputItemListResponse {
+  /**
+   * A single grader result for an evaluation run output item.
+   */
+  export interface Result {
+    /**
+     * The name of the grader.
+     */
+    name: string;
+
+    /**
+     * Whether the grader considered the output a pass.
+     */
+    passed: boolean;
+
+    /**
+     * The numeric score produced by the grader.
+     */
+    score: number;
+
+    /**
+     * Optional sample or intermediate data produced by the grader.
+     */
+    sample?: { [key: string]: unknown } | null;
+
+    /**
+     * The grader type (for example, "string-check-grader").
+     */
+    type?: string;
+
+    [k: string]: unknown;
+  }
+
   /**
    * A sample containing the input and output of the evaluation run.
    */
