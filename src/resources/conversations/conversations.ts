@@ -135,6 +135,7 @@ export interface Message {
     | ResponsesAPI.ResponseOutputText
     | TextContent
     | SummaryTextContent
+    | Message.ReasoningText
     | ResponsesAPI.ResponseOutputRefusal
     | ResponsesAPI.ResponseInputImage
     | ComputerScreenshotContent
@@ -159,12 +160,35 @@ export interface Message {
   type: 'message';
 }
 
+export namespace Message {
+  /**
+   * Reasoning text from the model.
+   */
+  export interface ReasoningText {
+    /**
+     * The reasoning text from the model.
+     */
+    text: string;
+
+    /**
+     * The type of the reasoning text. Always `reasoning_text`.
+     */
+    type: 'reasoning_text';
+  }
+}
+
 /**
  * A summary text from the model.
  */
 export interface SummaryTextContent {
+  /**
+   * A summary of the reasoning output from the model so far.
+   */
   text: string;
 
+  /**
+   * The type of the object. Always `summary_text`.
+   */
   type: 'summary_text';
 }
 
