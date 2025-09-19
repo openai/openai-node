@@ -1216,7 +1216,25 @@ export type ResponseContent =
   | ResponseInputFile
   | ResponseInputAudio
   | ResponseOutputText
-  | ResponseOutputRefusal;
+  | ResponseOutputRefusal
+  | ResponseContent.ReasoningTextContent;
+
+export namespace ResponseContent {
+  /**
+   * Reasoning text from the model.
+   */
+  export interface ReasoningTextContent {
+    /**
+     * The reasoning text from the model.
+     */
+    text: string;
+
+    /**
+     * The type of the reasoning text. Always `reasoning_text`.
+     */
+    type: 'reasoning_text';
+  }
+}
 
 /**
  * Emitted when a new content part is added.
@@ -1240,7 +1258,7 @@ export interface ResponseContentPartAddedEvent {
   /**
    * The content part that was added.
    */
-  part: ResponseOutputText | ResponseOutputRefusal;
+  part: ResponseOutputText | ResponseOutputRefusal | ResponseContentPartAddedEvent.ReasoningText;
 
   /**
    * The sequence number of this event.
@@ -1251,6 +1269,23 @@ export interface ResponseContentPartAddedEvent {
    * The type of the event. Always `response.content_part.added`.
    */
   type: 'response.content_part.added';
+}
+
+export namespace ResponseContentPartAddedEvent {
+  /**
+   * Reasoning text from the model.
+   */
+  export interface ReasoningText {
+    /**
+     * The reasoning text from the model.
+     */
+    text: string;
+
+    /**
+     * The type of the reasoning text. Always `reasoning_text`.
+     */
+    type: 'reasoning_text';
+  }
 }
 
 /**
@@ -1275,7 +1310,7 @@ export interface ResponseContentPartDoneEvent {
   /**
    * The content part that is done.
    */
-  part: ResponseOutputText | ResponseOutputRefusal;
+  part: ResponseOutputText | ResponseOutputRefusal | ResponseContentPartDoneEvent.ReasoningText;
 
   /**
    * The sequence number of this event.
@@ -1286,6 +1321,23 @@ export interface ResponseContentPartDoneEvent {
    * The type of the event. Always `response.content_part.done`.
    */
   type: 'response.content_part.done';
+}
+
+export namespace ResponseContentPartDoneEvent {
+  /**
+   * Reasoning text from the model.
+   */
+  export interface ReasoningText {
+    /**
+     * The reasoning text from the model.
+     */
+    text: string;
+
+    /**
+     * The type of the reasoning text. Always `reasoning_text`.
+     */
+    type: 'reasoning_text';
+  }
 }
 
 /**
@@ -3881,6 +3933,9 @@ export interface ResponseReasoningItem {
 }
 
 export namespace ResponseReasoningItem {
+  /**
+   * A summary text from the model.
+   */
   export interface Summary {
     /**
      * A summary of the reasoning output from the model so far.
@@ -3893,14 +3948,17 @@ export namespace ResponseReasoningItem {
     type: 'summary_text';
   }
 
+  /**
+   * Reasoning text from the model.
+   */
   export interface Content {
     /**
-     * Reasoning text output from the model.
+     * The reasoning text from the model.
      */
     text: string;
 
     /**
-     * The type of the object. Always `reasoning_text`.
+     * The type of the reasoning text. Always `reasoning_text`.
      */
     type: 'reasoning_text';
   }
