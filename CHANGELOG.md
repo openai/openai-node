@@ -1,5 +1,18 @@
 # Changelog
 
+## 5.22.0 (2025-09-19)
+
+Full Changelog: [v5.21.0...v5.22.0](https://github.com/openai/openai-node/compare/v5.21.0...v5.22.0)
+
+### Features
+
+* **api:** add reasoning_text ([7ff6186](https://github.com/openai/openai-node/commit/7ff61860a14ae20d0734b4f592002dfe67330488))
+
+
+### Chores
+
+* **api:** manual fixes for streaming ([3a2ae4c](https://github.com/openai/openai-node/commit/3a2ae4ce2a0796f5201dd9373f103bd94689b733))
+
 ## 5.21.0 (2025-09-17)
 
 Full Changelog: [v5.20.3...v5.21.0](https://github.com/openai/openai-node/compare/v5.20.3...v5.21.0)
