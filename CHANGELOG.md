@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.22.1 (2025-09-20)
+
+Full Changelog: [v5.22.0...v5.22.1](https://github.com/openai/openai-node/compare/v5.22.0...v5.22.1)
+
+### Chores
+
+* do not install brew dependencies in ./scripts/bootstrap by default ([6f5e45f](https://github.com/openai/openai-node/commit/6f5e45fc8a0c2dee1f68d00b135034653ed23200))
+
 ## 5.22.0 (2025-09-19)
 
 Full Changelog: [v5.21.0...v5.22.0](https://github.com/openai/openai-node/compare/v5.21.0...v5.22.0)
