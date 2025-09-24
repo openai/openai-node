@@ -12,7 +12,8 @@ export type AllModels =
   | 'o4-mini-deep-research'
   | 'o4-mini-deep-research-2025-06-26'
   | 'computer-use-preview'
-  | 'computer-use-preview-2025-03-11';
+  | 'computer-use-preview-2025-03-11'
+  | 'gpt-5-codex';
 
 export type ChatModel =
   | 'gpt-5'
@@ -380,4 +381,5 @@ export type ResponsesModel =
   | 'o4-mini-deep-research'
   | 'o4-mini-deep-research-2025-06-26'
   | 'computer-use-preview'
-  | 'computer-use-preview-2025-03-11';
+  | 'computer-use-preview-2025-03-11'
+  | 'gpt-5-codex';

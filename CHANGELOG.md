@@ -1,5 +1,49 @@
 # Changelog
 
+## 5.23.0 (2025-09-23)
+
+Full Changelog: [v5.22.1...v5.23.0](https://github.com/openai/openai-node/compare/v5.22.1...v5.23.0)
+
+### Features
+
+* **api:** gpt-5-codex ([2e4ece6](https://github.com/openai/openai-node/commit/2e4ece6a01e1b7c4c69627137900b7f70558a85b))
+
+## 5.22.1 (2025-09-22)
+
+Full Changelog: [v5.22.0...v5.22.1](https://github.com/openai/openai-node/compare/v5.22.0...v5.22.1)
+
+### Bug Fixes
+
+* **api:** fix mcp tool name ([fa9f305](https://github.com/openai/openai-node/commit/fa9f3055c63f83ddc19085ebeb7ac38cb303673a))
+
+
+### Chores
+
+* **api:** openapi updates for conversations ([975c075](https://github.com/openai/openai-node/commit/975c0757da3474439d166a27d61ba6606d439bb0))
+* do not install brew dependencies in ./scripts/bootstrap by default ([6f5e45f](https://github.com/openai/openai-node/commit/6f5e45fc8a0c2dee1f68d00b135034653ed23200))
+* improve example values ([b336a64](https://github.com/openai/openai-node/commit/b336a642fd9507bf28e0ed8976ec102d796f9b9d))
+
+## 5.22.0 (2025-09-19)
+
+Full Changelog: [v5.21.0...v5.22.0](https://github.com/openai/openai-node/compare/v5.21.0...v5.22.0)
+
+### Features
+
+* **api:** add reasoning_text ([7ff6186](https://github.com/openai/openai-node/commit/7ff61860a14ae20d0734b4f592002dfe67330488))
+
+
+### Chores
+
+* **api:** manual fixes for streaming ([3a2ae4c](https://github.com/openai/openai-node/commit/3a2ae4ce2a0796f5201dd9373f103bd94689b733))
+
+## 5.21.0 (2025-09-17)
+
+Full Changelog: [v5.20.3...v5.21.0](https://github.com/openai/openai-node/compare/v5.20.3...v5.21.0)
+
+### Features
+
+* **api:** type updates for conversations, reasoning_effort and results for evals ([f243f54](https://github.com/openai/openai-node/commit/f243f54072d00cb8d83b8c6093accaaabf34d4cf))
+
 ## 5.20.3 (2025-09-15)
 
 Full Changelog: [v5.20.2...v5.20.3](https://github.com/openai/openai-node/compare/v5.20.2...v5.20.3)

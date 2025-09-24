@@ -1,6 +1,7 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../core/resource';
+import * as Shared from '../shared';
 import * as ResponsesAPI from '../responses/responses';
 
 export class GraderModels extends APIResource {}
@@ -193,7 +194,7 @@ export interface ScoreModelGrader {
   /**
    * The sampling parameters for the model.
    */
-  sampling_params?: unknown;
+  sampling_params?: ScoreModelGrader.SamplingParams;
 }
 
 export namespace ScoreModelGrader {
@@ -264,6 +265,40 @@ export namespace ScoreModelGrader {
        */
       detail?: string;
     }
+  }
+
+  /**
+   * The sampling parameters for the model.
+   */
+  export interface SamplingParams {
+    /**
+     * The maximum number of tokens the grader model may generate in its response.
+     */
+    max_completions_tokens?: number | null;
+
+    /**
+     * Constrains effort on reasoning for
+     * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
+     * supported values are `minimal`, `low`, `medium`, and `high`. Reducing reasoning
+     * effort can result in faster responses and fewer tokens used on reasoning in a
+     * response.
+     */
+    reasoning_effort?: Shared.ReasoningEffort | null;
+
+    /**
+     * A seed value to initialize the randomness, during sampling.
+     */
+    seed?: number | null;
+
+    /**
+     * A higher temperature increases randomness in the outputs.
+     */
+    temperature?: number | null;
+
+    /**
+     * An alternative to temperature for nucleus sampling; 1.0 includes all tokens.
+     */
+    top_p?: number | null;
   }
 }
 
