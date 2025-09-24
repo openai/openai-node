@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.23.0 (2025-09-23)
+
+Full Changelog: [v5.22.1...v5.23.0](https://github.com/openai/openai-node/compare/v5.22.1...v5.23.0)
+
+### Features
+
+* **api:** gpt-5-codex ([2e4ece6](https://github.com/openai/openai-node/commit/2e4ece6a01e1b7c4c69627137900b7f70558a85b))
+
 ## 5.22.1 (2025-09-22)
 
 Full Changelog: [v5.22.0...v5.22.1](https://github.com/openai/openai-node/compare/v5.22.0...v5.22.1)
