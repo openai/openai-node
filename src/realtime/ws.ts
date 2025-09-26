@@ -33,7 +33,6 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
       headers: {
         ...props.options?.headers,
         ...(isAzure(client) && !props.__resolvedApiKey ? {} : { Authorization: `Bearer ${client.apiKey}` }),
-        'OpenAI-Beta': 'realtime=v1',
       },
     });
 
