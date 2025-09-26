@@ -653,7 +653,7 @@ export class OpenAI {
       if (isTimeout) {
         throw new Errors.APIConnectionTimeoutError();
       }
-      throw new Errors.APIConnectionError({ cause: response });
+      throw new Errors.APIConnectionError({ message: response.message, cause: response });
     }
 
     const specialHeaders = [...response.headers.entries()]
