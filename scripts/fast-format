@@ -35,6 +35,6 @@ echo "==> Running prettier --write"
 PRETTIER_FILES="$(grep '\.\(js\|json\)$' "$FILE_LIST" || true)"
 if ! [ -z "$PRETTIER_FILES" ]; then
    echo "$PRETTIER_FILES" | xargs ./node_modules/.bin/prettier \
-      --write --cache --cache-strategy metadata \
+      --write --cache --cache-strategy metadata --no-error-on-unmatched-pattern \
       '!**/dist' '!**/*.ts' '!**/*.mts' '!**/*.cts' '!**/*.js' '!**/*.mjs' '!**/*.cjs'
 fi
