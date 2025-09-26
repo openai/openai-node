@@ -1,5 +1,24 @@
 # Changelog
 
+## 5.23.1 (2025-09-26)
+
+Full Changelog: [v5.23.0...v5.23.1](https://github.com/openai/openai-node/compare/v5.23.0...v5.23.1)
+
+### Bug Fixes
+
+* **realtime:** remove beta header from GA classes ([a5e9e70](https://github.com/openai/openai-node/commit/a5e9e70af8691f2850ad7ccfec966e5fb0d5b56d))
+
+
+### Performance Improvements
+
+* faster formatting ([d56f309](https://github.com/openai/openai-node/commit/d56f309f359f7f4d87c95bfaaffdc463312850e4))
+
+
+### Chores
+
+* **internal:** fix incremental formatting in some cases ([166d28f](https://github.com/openai/openai-node/commit/166d28ff34edb6b1c3ef310bc825952dcb30ba4b))
+* **internal:** remove deprecated `compilerOptions.baseUrl` from tsconfig.json ([dfab408](https://github.com/openai/openai-node/commit/dfab40857547b272cdad4309baf84e43a07775ed))
+
 ## 5.23.0 (2025-09-23)
 
 Full Changelog: [v5.22.1...v5.23.0](https://github.com/openai/openai-node/compare/v5.22.1...v5.23.0)
