@@ -1,5 +1,5 @@
 import { zodResponseFormat } from 'openai/helpers/zod';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 describe('zodResponseFormat', () => {
   it('does the thing', () => {

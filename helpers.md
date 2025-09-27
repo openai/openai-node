@@ -13,7 +13,7 @@ into a JSON schema, send it to the API and parse the response content back using
 ```ts
 import { zodResponseFormat } from 'openai/helpers/zod';
 import OpenAI from 'openai/index';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 const Step = z.object({
   explanation: z.string(),
@@ -57,7 +57,7 @@ For example:
 ```ts
 import { zodFunction } from 'openai/helpers/zod';
 import OpenAI from 'openai/index';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 const Table = z.enum(['orders', 'customers', 'products']);
 
@@ -630,7 +630,7 @@ assistant's response to make sure it conforms to a schema. Paired with [`zod-to-
 
 ```ts
 import OpenAI from 'openai';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 
 const client = new OpenAI();

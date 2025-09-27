@@ -1,5 +1,5 @@
 import { ResponseFormatJSONSchema } from '../resources/index';
-import type { infer as zodInfer, ZodType } from 'zod';
+import type { infer as zodInfer, ZodType } from 'zod/v3';
 import {
   AutoParseableResponseFormat,
   AutoParseableTextFormat,
