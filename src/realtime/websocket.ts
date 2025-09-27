@@ -67,7 +67,6 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
     this.socket = new WebSocket(this.url.toString(), [
       'realtime',
       ...(isAzure(client) ? [] : [`openai-insecure-api-key.${client.apiKey}`]),
-      'openai-beta.realtime-v1',
     ]);
 
     this.socket.addEventListener('message', (websocketEvent: MessageEvent) => {

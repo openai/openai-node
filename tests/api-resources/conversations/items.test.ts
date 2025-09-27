@@ -10,7 +10,7 @@ const client = new OpenAI({
 describe('resource items', () => {
   test('create: only required params', async () => {
     const responsePromise = client.conversations.items.create('conv_123', {
-      items: [{ content: 'string', role: 'user' }],
+      items: [{ content: 'string', role: 'user', type: 'message' }],
     });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);

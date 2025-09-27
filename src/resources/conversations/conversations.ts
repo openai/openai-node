@@ -24,19 +24,22 @@ export class Conversations extends APIResource {
   /**
    * Create a conversation.
    */
-  create(body: ConversationCreateParams, options?: RequestOptions): APIPromise<Conversation> {
+  create(
+    body: ConversationCreateParams | null | undefined = {},
+    options?: RequestOptions,
+  ): APIPromise<Conversation> {
     return this._client.post('/conversations', { body, ...options });
   }
 
   /**
-   * Get a conversation with the given ID.
+   * Get a conversation
    */
   retrieve(conversationID: string, options?: RequestOptions): APIPromise<Conversation> {
     return this._client.get(path`/conversations/${conversationID}`, options);
   }
 
   /**
-   * Update a conversation's metadata with the given ID.
+   * Update a conversation
    */
   update(
     conversationID: string,
@@ -47,7 +50,7 @@ export class Conversations extends APIResource {
   }
 
   /**
-   * Delete a conversation with the given ID.
+   * Delete a conversation. Items in the conversation will not be deleted.
    */
   delete(conversationID: string, options?: RequestOptions): APIPromise<ConversationDeletedResource> {
     return this._client.delete(path`/conversations/${conversationID}`, options);
@@ -135,6 +138,7 @@ export interface Message {
     | ResponsesAPI.ResponseOutputText
     | TextContent
     | SummaryTextContent
+    | Message.ReasoningText
     | ResponsesAPI.ResponseOutputRefusal
     | ResponsesAPI.ResponseInputImage
     | ComputerScreenshotContent
@@ -159,12 +163,35 @@ export interface Message {
   type: 'message';
 }
 
+export namespace Message {
+  /**
+   * Reasoning text from the model.
+   */
+  export interface ReasoningText {
+    /**
+     * The reasoning text from the model.
+     */
+    text: string;
+
+    /**
+     * The type of the reasoning text. Always `reasoning_text`.
+     */
+    type: 'reasoning_text';
+  }
+}
+
 /**
  * A summary text from the model.
  */
 export interface SummaryTextContent {
+  /**
+   * A summary of the reasoning output from the model so far.
+   */
   text: string;
 
+  /**
+   * The type of the object. Always `summary_text`.
+   */
   type: 'summary_text';
 }
 
@@ -209,11 +236,12 @@ export interface ConversationUpdateParams {
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
    * for storing additional information about the object in a structured format, and
-   * querying for objects via API or the dashboard. Keys are strings with a maximum
-   * length of 64 characters. Values are strings with a maximum length of 512
-   * characters.
+   * querying for objects via API or the dashboard.
+   *
+   * Keys are strings with a maximum length of 64 characters. Values are strings with
+   * a maximum length of 512 characters.
    */
-  metadata: { [key: string]: string };
+  metadata: Shared.Metadata | null;
 }
 
 Conversations.Items = Items;

@@ -7,10 +7,9 @@
     "module": "commonjs",
     "moduleResolution": "node",
     "esModuleInterop": true,
-    "baseUrl": "./",
     "paths": {
-      "openai/*": ["src/*"],
-      "openai": ["src/index.ts"]
+      "openai/*": ["./src/*"],
+      "openai": ["./src/index.ts"]
     },
     "noEmit": true,
 

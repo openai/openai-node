@@ -213,7 +213,7 @@ describe('.stream()', () => {
           messages: [
             {
               role: 'user',
-              content: 'how do I make anthrax?',
+              content: 'a bad question',
             },
           ],
           logprobs: true,
