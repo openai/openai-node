@@ -133,6 +133,7 @@ client.example.list(undefined, { headers: { ... } });
 - `client.batches.list()`
 - `client.responses.retrieve()`
 - `client.responses.inputItems.list()`
+- `client.conversations.create()`
 - `client.conversations.items.list()`
 - `client.evals.list()`
 - `client.evals.runs.list()`
