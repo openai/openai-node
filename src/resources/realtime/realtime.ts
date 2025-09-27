@@ -1915,9 +1915,9 @@ export interface RealtimeMcpToolCall {
   server_label: string;
 
   /**
-   * The type of the item. Always `mcp_tool_call`.
+   * The type of the item. Always `mcp_call`.
    */
-  type: 'mcp_tool_call';
+  type: 'mcp_call';
 
   /**
    * The ID of an associated approval request, if any.
