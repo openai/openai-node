@@ -1,5 +1,15 @@
 # Changelog
 
+## 5.23.2 (2025-09-29)
+
+Full Changelog: [v5.23.1...v5.23.2](https://github.com/openai/openai-node/compare/v5.23.1...v5.23.2)
+
+### Chores
+
+* **env-tests:** upgrade jest-fixed-jsdom 0.0.9 -&gt; 0.0.10 ([6d6d0b0](https://github.com/openai/openai-node/commit/6d6d0b0eaaff86a99141af031f55b7cc6a22772a))
+* **internal:** codegen related update ([1b684af](https://github.com/openai/openai-node/commit/1b684afd387ccd7b16d226dca3adee92db6e4878))
+* **internal:** ignore .eslintcache ([da9e146](https://github.com/openai/openai-node/commit/da9e1468d62aa9044ee9d236b419f744f8792bdb))
+
 ## 5.23.1 (2025-09-26)
 
 Full Changelog: [v5.23.0...v5.23.1](https://github.com/openai/openai-node/compare/v5.23.0...v5.23.1)
