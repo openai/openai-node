@@ -20,9 +20,9 @@ const commands = {
       if (result.status !== 0) {
         process.exit(result.status);
       }
-    },
-  },
-};
+    }
+  }
+}
 
 function exitWithHelp() {
   console.log(`Usage: openai <subcommand>`);
