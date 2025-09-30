@@ -521,6 +521,7 @@ Types:
 - <code><a href="./src/resources/batches.ts">Batch</a></code>
 - <code><a href="./src/resources/batches.ts">BatchError</a></code>
 - <code><a href="./src/resources/batches.ts">BatchRequestCounts</a></code>
+- <code><a href="./src/resources/batches.ts">BatchUsage</a></code>
 
 Methods:
 
@@ -595,6 +596,8 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponseFormatTextJSONSchemaConfig</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseFunctionCallArgumentsDeltaEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseFunctionCallArgumentsDoneEvent</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseFunctionCallOutputItem</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseFunctionCallOutputItemList</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseFunctionToolCall</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseFunctionToolCallItem</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseFunctionToolCallOutputItem</a></code>
@@ -610,11 +613,14 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponseInputAudio</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseInputContent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseInputFile</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseInputFileContent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseInputImage</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseInputImageContent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseInputItem</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseInputMessageContentList</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseInputMessageItem</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseInputText</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseInputTextContent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseItem</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseMcpCallArgumentsDeltaEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseMcpCallArgumentsDoneEvent</a></code>

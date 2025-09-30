@@ -8,6 +8,7 @@ export {
   type Batch,
   type BatchError,
   type BatchRequestCounts,
+  type BatchUsage,
   type BatchCreateParams,
   type BatchListParams,
   type BatchesPage,

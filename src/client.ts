@@ -32,6 +32,7 @@ import {
   BatchError,
   BatchListParams,
   BatchRequestCounts,
+  BatchUsage,
   Batches,
   BatchesPage,
 } from './resources/batches';
@@ -1153,6 +1154,7 @@ export declare namespace OpenAI {
     type Batch as Batch,
     type BatchError as BatchError,
     type BatchRequestCounts as BatchRequestCounts,
+    type BatchUsage as BatchUsage,
     type BatchesPage as BatchesPage,
     type BatchCreateParams as BatchCreateParams,
     type BatchListParams as BatchListParams,
