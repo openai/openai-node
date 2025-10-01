@@ -1,5 +1,6 @@
 import { ResponseFormatJSONSchema } from '../resources/index';
 import type { infer as zodInfer, ZodType } from 'zod/v3';
+import { toJSONSchema, type infer as zodInferV4, type ZodType as ZodTypeV4 } from 'zod/v4';
 import {
   AutoParseableResponseFormat,
   AutoParseableTextFormat,
@@ -11,6 +12,8 @@ import {
 import { zodToJsonSchema as _zodToJsonSchema } from '../_vendor/zod-to-json-schema';
 import { AutoParseableResponseTool, makeParseableResponseTool } from '../lib/ResponsesParser';
 import { type ResponseFormatTextJSONSchemaConfig } from '../resources/responses/responses';
+import { toStrictJsonSchema } from '../lib/transform';
+import { JSONSchema } from '../lib/jsonschema';
 
 function zodToJsonSchema(schema: ZodType, options: { name: string }): Record<string, unknown> {
   return _zodToJsonSchema(schema, {
@@ -20,6 +23,10 @@ function zodToJsonSchema(schema: ZodType, options: { name: string }): Record<str
     $refStrategy: 'extract-to-root',
     nullableStrategy: 'property',
   });
+}
+
+function isZodV4(zodObject: ZodType | ZodTypeV4): zodObject is ZodTypeV4 {
+  return '_zod' in zodObject;
 }
 
 /**
@@ -63,7 +70,17 @@ export function zodResponseFormat<ZodInput extends ZodType>(
   zodObject: ZodInput,
   name: string,
   props?: Omit<ResponseFormatJSONSchema.JSONSchema, 'schema' | 'strict' | 'name'>,
-): AutoParseableResponseFormat<zodInfer<ZodInput>> {
+): AutoParseableResponseFormat<zodInfer<ZodInput>>;
+export function zodResponseFormat<ZodInput extends ZodTypeV4>(
+  zodObject: ZodInput,
+  name: string,
+  props?: Omit<ResponseFormatJSONSchema.JSONSchema, 'schema' | 'strict' | 'name'>,
+): AutoParseableResponseFormat<zodInferV4<ZodInput>>;
+export function zodResponseFormat<ZodInput extends ZodType | ZodTypeV4>(
+  zodObject: ZodInput,
+  name: string,
+  props?: Omit<ResponseFormatJSONSchema.JSONSchema, 'schema' | 'strict' | 'name'>,
+): unknown {
   return makeParseableResponseFormat(
     {
       type: 'json_schema',
@@ -71,7 +88,10 @@ export function zodResponseFormat<ZodInput extends ZodType>(
         ...props,
         name,
         strict: true,
-        schema: zodToJsonSchema(zodObject, { name }),
+        schema:
+          isZodV4(zodObject) ?
+            (toStrictJsonSchema(toJSONSchema(zodObject) as JSONSchema) as Record<string, unknown>)
+          : zodToJsonSchema(zodObject, { name }),
       },
     },
     (content) => zodObject.parse(JSON.parse(content)),
@@ -82,14 +102,27 @@ export function zodTextFormat<ZodInput extends ZodType>(
   zodObject: ZodInput,
   name: string,
   props?: Omit<ResponseFormatTextJSONSchemaConfig, 'schema' | 'type' | 'strict' | 'name'>,
-): AutoParseableTextFormat<zodInfer<ZodInput>> {
+): AutoParseableTextFormat<zodInfer<ZodInput>>;
+export function zodTextFormat<ZodInput extends ZodTypeV4>(
+  zodObject: ZodInput,
+  name: string,
+  props?: Omit<ResponseFormatTextJSONSchemaConfig, 'schema' | 'type' | 'strict' | 'name'>,
+): AutoParseableTextFormat<zodInferV4<ZodInput>>;
+export function zodTextFormat<ZodInput extends ZodType | ZodTypeV4>(
+  zodObject: ZodInput,
+  name: string,
+  props?: Omit<ResponseFormatTextJSONSchemaConfig, 'schema' | 'type' | 'strict' | 'name'>,
+): unknown {
   return makeParseableTextFormat(
     {
       type: 'json_schema',
       ...props,
       name,
       strict: true,
-      schema: zodToJsonSchema(zodObject, { name }),
+      schema:
+        isZodV4(zodObject) ?
+          (toStrictJsonSchema(toJSONSchema(zodObject) as JSONSchema) as Record<string, unknown>)
+        : zodToJsonSchema(zodObject, { name }),
     },
     (content) => zodObject.parse(JSON.parse(content)),
   );
