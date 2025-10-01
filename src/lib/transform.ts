@@ -98,10 +98,10 @@ function ensureStrictJsonSchema(
 
     const resolved = resolveRef(root, ref);
     if (typeof resolved === 'boolean') {
-      throw new ValueError(`Expected \`$ref: ${ref}\` to resolve to an object schema but got boolean`);
+      throw new Error(`Expected \`$ref: ${ref}\` to resolve to an object schema but got boolean`);
     }
     if (!isDict(resolved)) {
-      throw new ValueError(
+      throw new Error(
         `Expected \`$ref: ${ref}\` to resolve to a dictionary but got ${JSON.stringify(resolved)}`,
       );
     }
@@ -120,7 +120,7 @@ function ensureStrictJsonSchema(
 
 function resolveRef(root: JSONSchema, ref: string): JSONSchemaDefinition {
   if (!ref.startsWith('#/')) {
-    throw new ValueError(`Unexpected $ref format ${JSON.stringify(ref)}; Does not start with #/`);
+    throw new Error(`Unexpected $ref format ${JSON.stringify(ref)}; Does not start with #/`);
   }
 
   const pathParts = ref.slice(2).split('/');
@@ -155,11 +155,4 @@ function hasMoreThanNKeys(obj: Record<string, any>, n: number): boolean {
     }
   }
   return false;
-}
-
-class ValueError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'ValueError';
-  }
 }

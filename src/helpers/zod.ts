@@ -142,14 +142,32 @@ export function zodFunction<Parameters extends ZodType>(options: {
   arguments: Parameters;
   name: string;
   function: (args: zodInfer<Parameters>) => unknown;
-}> {
-  // @ts-expect-error TODO
+}>;
+export function zodFunction<Parameters extends ZodTypeV4>(options: {
+  name: string;
+  parameters: Parameters;
+  function?: ((args: zodInferV4<Parameters>) => unknown | Promise<unknown>) | undefined;
+  description?: string | undefined;
+}): AutoParseableTool<{
+  arguments: Parameters;
+  name: string;
+  function: (args: zodInferV4<Parameters>) => unknown;
+}>;
+export function zodFunction<Parameters extends ZodType | ZodTypeV4>(options: {
+  name: string;
+  parameters: Parameters;
+  function?: ((args: any) => unknown | Promise<unknown>) | undefined;
+  description?: string | undefined;
+}): unknown {
   return makeParseableTool<any>(
     {
       type: 'function',
       function: {
         name: options.name,
-        parameters: zodToJsonSchema(options.parameters, { name: options.name }),
+        parameters:
+          isZodV4(options.parameters) ?
+            toJSONSchema(options.parameters)
+          : zodToJsonSchema(options.parameters, { name: options.name }),
         strict: true,
         ...(options.description ? { description: options.description } : undefined),
       },
