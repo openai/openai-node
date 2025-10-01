@@ -1,7 +1,11 @@
 import { zodResponseFormat } from 'openai/helpers/zod';
-import { z } from 'zod/v3';
+import { z as zv3 } from 'zod/v3';
+import { z as zv4 } from 'zod';
 
-describe('zodResponseFormat', () => {
+describe.each([
+  { version: 'v3', z: zv3 as any },
+  { version: 'v4', z: zv4 as any },
+])('zodResponseFormat (Zod $version)', ({ version, z }) => {
   it('does the thing', () => {
     expect(
       zodResponseFormat(
@@ -286,7 +290,7 @@ describe('zodResponseFormat', () => {
     `);
   });
 
-  it('throws error on optional fields', () => {
+  (version === 'v4' ? it.skip : it)('throws error on optional fields', () => {
     expect(() =>
       zodResponseFormat(
         z.object({
@@ -301,7 +305,7 @@ describe('zodResponseFormat', () => {
     );
   });
 
-  it('throws error on nested optional fields', () => {
+  (version === 'v4' ? it.skip : it)('throws error on nested optional fields', () => {
     expect(() =>
       zodResponseFormat(
         z.object({

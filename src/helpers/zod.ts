@@ -25,6 +25,10 @@ function zodToJsonSchema(schema: ZodType, options: { name: string }): Record<str
   });
 }
 
+function nativeToJsonSchema(schema: ZodTypeV4): Record<string, unknown> {
+  return toJSONSchema(schema, { target: 'draft-7' }) as Record<string, unknown>;
+}
+
 function isZodV4(zodObject: ZodType | ZodTypeV4): zodObject is ZodTypeV4 {
   return '_zod' in zodObject;
 }
@@ -90,7 +94,7 @@ export function zodResponseFormat<ZodInput extends ZodType | ZodTypeV4>(
         strict: true,
         schema:
           isZodV4(zodObject) ?
-            (toStrictJsonSchema(toJSONSchema(zodObject) as JSONSchema) as Record<string, unknown>)
+            (toStrictJsonSchema(nativeToJsonSchema(zodObject)) as Record<string, unknown>)
           : zodToJsonSchema(zodObject, { name }),
       },
     },
@@ -121,7 +125,7 @@ export function zodTextFormat<ZodInput extends ZodType | ZodTypeV4>(
       strict: true,
       schema:
         isZodV4(zodObject) ?
-          (toStrictJsonSchema(toJSONSchema(zodObject) as JSONSchema) as Record<string, unknown>)
+          (toStrictJsonSchema(nativeToJsonSchema(zodObject)) as Record<string, unknown>)
         : zodToJsonSchema(zodObject, { name }),
     },
     (content) => zodObject.parse(JSON.parse(content)),
@@ -166,7 +170,7 @@ export function zodFunction<Parameters extends ZodType | ZodTypeV4>(options: {
         name: options.name,
         parameters:
           isZodV4(options.parameters) ?
-            toJSONSchema(options.parameters)
+            nativeToJsonSchema(options.parameters)
           : zodToJsonSchema(options.parameters, { name: options.name }),
         strict: true,
         ...(options.description ? { description: options.description } : undefined),
