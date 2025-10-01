@@ -1,5 +1,13 @@
 # Changelog
 
+## 6.0.1 (2025-10-01)
+
+Full Changelog: [v6.0.0...v6.0.1](https://github.com/openai/openai-node/compare/v6.0.0...v6.0.1)
+
+### Bug Fixes
+
+* **api:** add status, approval_request_id to MCP tool call ([498c6a5](https://github.com/openai/openai-node/commit/498c6a5d4cab7ad10e31acd01cb49915a70e576a))
+
 ## 6.0.0 (2025-09-30)
 
 Full Changelog: [v5.23.2...v6.0.0](https://github.com/openai/openai-node/compare/v5.23.2...v6.0.0)
