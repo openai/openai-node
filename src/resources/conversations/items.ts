@@ -361,6 +361,13 @@ export namespace ConversationItem {
     type: 'mcp_call';
 
     /**
+     * Unique identifier for the MCP tool call approval request. Include this value in
+     * a subsequent `mcp_approval_response` input to approve or reject the
+     * corresponding tool call.
+     */
+    approval_request_id?: string | null;
+
+    /**
      * The error from the tool call, if any.
      */
     error?: string | null;
@@ -369,6 +376,12 @@ export namespace ConversationItem {
      * The output from the tool call.
      */
     output?: string | null;
+
+    /**
+     * The status of the tool call. One of `in_progress`, `completed`, `incomplete`,
+     * `calling`, or `failed`.
+     */
+    status?: 'in_progress' | 'completed' | 'incomplete' | 'calling' | 'failed';
   }
 }
 
