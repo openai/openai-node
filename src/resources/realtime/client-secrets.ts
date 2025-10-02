@@ -10,6 +10,12 @@ import { RequestOptions } from '../../internal/request-options';
 export class ClientSecrets extends APIResource {
   /**
    * Create a Realtime client secret with an associated session configuration.
+   *
+   * @example
+   * ```ts
+   * const clientSecret =
+   *   await client.realtime.clientSecrets.create();
+   * ```
    */
   create(body: ClientSecretCreateParams, options?: RequestOptions): APIPromise<ClientSecretCreateResponse> {
     return this._client.post('/realtime/client_secrets', { body, ...options });
