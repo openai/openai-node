@@ -13,6 +13,7 @@ import { zodToJsonSchema as _zodToJsonSchema } from '../_vendor/zod-to-json-sche
 import { AutoParseableResponseTool, makeParseableResponseTool } from '../lib/ResponsesParser';
 import { type ResponseFormatTextJSONSchemaConfig } from '../resources/responses/responses';
 import { toStrictJsonSchema } from '../lib/transform';
+import { JSONSchema } from '../lib/jsonschema';
 
 function zodV3ToJsonSchema(schema: z3.ZodType, options: { name: string }): Record<string, unknown> {
   return _zodToJsonSchema(schema, {
@@ -28,7 +29,7 @@ function zodV4ToJsonSchema(schema: z4.ZodType, options: { name: string }): Recor
   return toStrictJsonSchema(
     z4.toJSONSchema(schema, {
       target: 'draft-7',
-    }) as Record<string, unknown>,
+    }) as JSONSchema,
   ) as Record<string, unknown>;
 }
 
