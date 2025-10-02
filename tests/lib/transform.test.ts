@@ -9,6 +9,7 @@ describe('Strict JSON Schema Validation', () => {
         properties: {
           name: { type: 'string' },
         },
+        required: ['name'],
       };
 
       const strict = toStrictJsonSchema(schema);
@@ -18,8 +19,8 @@ describe('Strict JSON Schema Validation', () => {
     test('root schema cannot use anyOf', () => {
       const schema: JSONSchema = {
         anyOf: [
-          { type: 'object', properties: { a: { type: 'string' } } },
-          { type: 'object', properties: { b: { type: 'number' } } },
+          { type: 'object', properties: { a: { type: 'string' } }, required: ['a'] },
+          { type: 'object', properties: { b: { type: 'number' } }, required: ['b'] },
         ],
       };
 
@@ -37,6 +38,7 @@ describe('Strict JSON Schema Validation', () => {
           age: { type: 'number' },
           email: { type: 'string' },
         },
+        required: ['name', 'age', 'email'],
       };
 
       const strict = toStrictJsonSchema(schema);
@@ -52,6 +54,7 @@ describe('Strict JSON Schema Validation', () => {
             anyOf: [{ type: 'string' }, { type: 'null' }],
           },
         },
+        required: ['name', 'nickname'],
       };
 
       const strict = toStrictJsonSchema(schema);
@@ -70,8 +73,10 @@ describe('Strict JSON Schema Validation', () => {
             properties: {
               value: { type: 'string' },
             },
+            required: ['value'],
           },
         },
+        required: ['nested'],
       };
 
       const strict = toStrictJsonSchema(schema);
@@ -89,6 +94,7 @@ describe('Strict JSON Schema Validation', () => {
           apple: { type: 'string' },
           middle: { type: 'string' },
         },
+        required: ['zebra', 'apple', 'middle'],
       };
 
       const strict = toStrictJsonSchema(schema);
@@ -109,6 +115,7 @@ describe('Strict JSON Schema Validation', () => {
               pattern: '^[A-Z]{3}-\\d{4}$',
             },
           },
+          required: ['code'],
         };
 
         const strict = toStrictJsonSchema(schema);
@@ -138,6 +145,7 @@ describe('Strict JSON Schema Validation', () => {
                 format: fmt,
               },
             },
+            required: ['field'],
           };
 
           const strict = toStrictJsonSchema(schema);
@@ -157,6 +165,7 @@ describe('Strict JSON Schema Validation', () => {
               multipleOf: 5,
             },
           },
+          required: ['score'],
         };
 
         const strict = toStrictJsonSchema(schema);
@@ -174,6 +183,7 @@ describe('Strict JSON Schema Validation', () => {
               maximum: 150,
             },
           },
+          required: ['age'],
         };
 
         const strict = toStrictJsonSchema(schema);
@@ -192,6 +202,7 @@ describe('Strict JSON Schema Validation', () => {
               exclusiveMaximum: 100,
             },
           },
+          required: ['rating'],
         };
 
         const strict = toStrictJsonSchema(schema);
@@ -213,6 +224,7 @@ describe('Strict JSON Schema Validation', () => {
               maxItems: 10,
             },
           },
+          required: ['tags'],
         };
 
         const strict = toStrictJsonSchema(schema);
@@ -235,6 +247,7 @@ describe('Strict JSON Schema Validation', () => {
           properties: {
             nested: createNested(depth - 1),
           },
+          required: ['nested'],
         };
       };
 
@@ -256,6 +269,7 @@ describe('Strict JSON Schema Validation', () => {
       const schema: JSONSchema = {
         type: 'object',
         properties,
+        required: Object.keys(properties),
       };
 
       const strict = toStrictJsonSchema(schema);
@@ -272,6 +286,7 @@ describe('Strict JSON Schema Validation', () => {
             enum: ['pending', 'active', 'completed', 'cancelled'],
           },
         },
+        required: ['status'],
       };
 
       const strict = toStrictJsonSchema(schema);
@@ -290,6 +305,7 @@ describe('Strict JSON Schema Validation', () => {
             enum: enumValues,
           },
         },
+        required: ['code'],
       };
 
       const strict = toStrictJsonSchema(schema);
@@ -307,6 +323,7 @@ describe('Strict JSON Schema Validation', () => {
             anyOf: [{ type: 'string' }, { type: 'number' }, { type: 'boolean' }],
           },
         },
+        required: ['value'],
       };
 
       const strict = toStrictJsonSchema(schema);
@@ -329,8 +346,10 @@ describe('Strict JSON Schema Validation', () => {
               name: { type: 'string' },
               email: { type: 'string', format: 'email' },
             },
+            required: ['name', 'email'],
           },
         },
+        required: ['user', 'admin'],
       };
 
       const strict = toStrictJsonSchema(schema);
@@ -351,6 +370,7 @@ describe('Strict JSON Schema Validation', () => {
             items: { $ref: '#' },
           },
         },
+        required: ['value', 'children'],
       };
 
       const strict = toStrictJsonSchema(schema);
@@ -375,8 +395,10 @@ describe('Strict JSON Schema Validation', () => {
               left: { $ref: '#/$defs/TreeNode' },
               right: { $ref: '#/$defs/TreeNode' },
             },
+            required: ['value', 'left', 'right'],
           },
         },
+        required: ['tree'],
       };
 
       const strict = toStrictJsonSchema(schema);
@@ -393,11 +415,12 @@ describe('Strict JSON Schema Validation', () => {
         properties: {
           combined: {
             allOf: [
-              { type: 'object', properties: { a: { type: 'string' } } },
-              { type: 'object', properties: { b: { type: 'number' } } },
+              { type: 'object', properties: { a: { type: 'string' } }, required: ['a'] },
+              { type: 'object', properties: { b: { type: 'number' } }, required: ['b'] },
             ],
           },
         },
+        required: ['combined'],
       };
 
       // Our function processes allOf, but in strict mode it should be avoided
@@ -418,6 +441,7 @@ describe('Strict JSON Schema Validation', () => {
             not: { type: 'null' },
           },
         } as any,
+        required: ['value'],
       };
 
       // Our function doesn't handle 'not', it would pass through
@@ -435,12 +459,15 @@ describe('Strict JSON Schema Validation', () => {
           properties: {
             value: { const: 'special' },
           },
+          required: ['value'],
         } as any,
         then: {
           properties: {
             extra: { type: 'string' },
           },
+          required: ['extra'],
         } as any,
+        required: ['value'],
       };
 
       // Our function doesn't handle if/then/else, it would pass through
@@ -458,6 +485,7 @@ describe('Strict JSON Schema Validation', () => {
           '^S_': { type: 'string' },
           '^I_': { type: 'integer' },
         },
+        required: ['data'],
       };
 
       // Our function doesn't remove patternProperties
@@ -478,6 +506,7 @@ describe('Strict JSON Schema Validation', () => {
             pattern: '^[a-zA-Z0-9_]+$',
           },
         },
+        required: ['username'],
       };
 
       const strict = toStrictJsonSchema(schema);
@@ -500,6 +529,7 @@ describe('Strict JSON Schema Validation', () => {
             multipleOf: 0.01,
           },
         },
+        required: ['price'],
       };
 
       const strict = toStrictJsonSchema(schema);
@@ -522,6 +552,7 @@ describe('Strict JSON Schema Validation', () => {
             maxItems: 100,
           },
         },
+        required: ['items'],
       };
 
       const strict = toStrictJsonSchema(schema);

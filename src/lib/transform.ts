@@ -4,6 +4,23 @@ export function toStrictJsonSchema(schema: JSONSchema): JSONSchema {
   return ensureStrictJsonSchema(schema, [], schema);
 }
 
+function isNullable(schema: JSONSchemaDefinition): boolean {
+  if (typeof schema === 'boolean') {
+    return false;
+  }
+  for (const oneOfVariant of schema.oneOf ?? []) {
+    if (typeof oneOfVariant !== 'boolean' && oneOfVariant.type === 'null') {
+      return true;
+    }
+  }
+  for (const allOfVariant of schema.anyOf ?? []) {
+    if (typeof allOfVariant !== 'boolean' && allOfVariant.type === 'null') {
+      return true;
+    }
+  }
+  return false;
+}
+
 function ensureStrictJsonSchema(
   jsonSchema: JSONSchemaDefinition,
   path: string[],
@@ -43,9 +60,20 @@ function ensureStrictJsonSchema(
     jsonSchema.additionalProperties = false;
   }
 
+  const required = jsonSchema.required ?? [];
+
   // Handle object properties
   const properties = jsonSchema.properties;
   if (isDict(properties)) {
+    for (const [key, value] of Object.entries(properties)) {
+      if (!isNullable(value) && !required.includes(key)) {
+        throw new Error(
+          `Zod field at \`${['#', 'definitions', 'schema', ...path, 'properties', key].join(
+            '/',
+          )}\` uses \`.optional()\` without \`.nullable()\` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required`,
+        );
+      }
+    }
     jsonSchema.required = Object.keys(properties);
     jsonSchema.properties = Object.fromEntries(
       Object.entries(properties).map(([key, propSchema]) => [
