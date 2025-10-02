@@ -12,6 +12,8 @@ import { zodToJsonSchema as _zodToJsonSchema } from '../_vendor/zod-to-json-sche
 import { AutoParseableResponseTool, makeParseableResponseTool } from '../lib/ResponsesParser';
 import { type ResponseFormatTextJSONSchemaConfig } from '../resources/responses/responses';
 
+type Prettify<T> = { [K in keyof T]: T[K] } & {};
+
 function zodToJsonSchema(schema: ZodType, options: { name: string }): Record<string, unknown> {
   return _zodToJsonSchema(schema, {
     openaiStrictMode: true,
@@ -63,7 +65,7 @@ export function zodResponseFormat<ZodInput extends ZodType>(
   zodObject: ZodInput,
   name: string,
   props?: Omit<ResponseFormatJSONSchema.JSONSchema, 'schema' | 'strict' | 'name'>,
-): AutoParseableResponseFormat<zodInfer<ZodInput>> {
+): AutoParseableResponseFormat<Prettify<zodInfer<ZodInput>>> {
   return makeParseableResponseFormat(
     {
       type: 'json_schema',
@@ -82,7 +84,7 @@ export function zodTextFormat<ZodInput extends ZodType>(
   zodObject: ZodInput,
   name: string,
   props?: Omit<ResponseFormatTextJSONSchemaConfig, 'schema' | 'type' | 'strict' | 'name'>,
-): AutoParseableTextFormat<zodInfer<ZodInput>> {
+): AutoParseableTextFormat<Prettify<zodInfer<ZodInput>>> {
   return makeParseableTextFormat(
     {
       type: 'json_schema',
@@ -103,12 +105,12 @@ export function zodTextFormat<ZodInput extends ZodType>(
 export function zodFunction<Parameters extends ZodType>(options: {
   name: string;
   parameters: Parameters;
-  function?: ((args: zodInfer<Parameters>) => unknown | Promise<unknown>) | undefined;
+  function?: ((args: Prettify<zodInfer<Parameters>>) => unknown | Promise<unknown>) | undefined;
   description?: string | undefined;
 }): AutoParseableTool<{
-  arguments: Parameters;
+  arguments: Prettify<zodInfer<Parameters>>;
   name: string;
-  function: (args: zodInfer<Parameters>) => unknown;
+  function: (args: Prettify<zodInfer<Parameters>>) => unknown;
 }> {
   // @ts-expect-error TODO
   return makeParseableTool<any>(
@@ -131,12 +133,12 @@ export function zodFunction<Parameters extends ZodType>(options: {
 export function zodResponsesFunction<Parameters extends ZodType>(options: {
   name: string;
   parameters: Parameters;
-  function?: ((args: zodInfer<Parameters>) => unknown | Promise<unknown>) | undefined;
+  function?: ((args: Prettify<zodInfer<Parameters>>) => unknown | Promise<unknown>) | undefined;
   description?: string | undefined;
 }): AutoParseableResponseTool<{
-  arguments: Parameters;
+  arguments: Prettify<zodInfer<Parameters>>;
   name: string;
-  function: (args: zodInfer<Parameters>) => unknown;
+  function: (args: Prettify<zodInfer<Parameters>>) => unknown;
 }> {
   return makeParseableResponseTool<any>(
     {
