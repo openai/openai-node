@@ -1,5 +1,5 @@
 import { zodResponseFormat } from 'openai/helpers/zod';
-import { z as zv3 } from 'zod/v3';
+import { z as zv3 } from 'zod/v4';
 import { z as zv4 } from 'zod/v4';
 
 describe.each([

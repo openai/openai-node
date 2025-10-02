@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { z } from 'zod/v3';
+import { z } from 'zod/v4';
 import { zodResponseFormat } from 'openai/helpers/zod';
 
 const openai = new OpenAI();

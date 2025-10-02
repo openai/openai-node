@@ -1,6 +1,6 @@
 import { zodFunction } from 'openai/helpers/zod';
 import OpenAI from 'openai/index';
-import { z } from 'zod/v3';
+import { z } from 'zod/v4';
 
 const Table = z.enum(['orders', 'customers', 'products']);
 
