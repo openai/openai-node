@@ -2235,15 +2235,14 @@ export interface ResponseInProgressEvent {
  *   multi-turn conversations when using the Responses API statelessly (like when
  *   the `store` parameter is set to `false`, or when an organization is enrolled
  *   in the zero data retention program).
- * - `code_interpreter_call.outputs`: Includes the outputs of python code execution
- *   in code interpreter tool call items.
  */
 export type ResponseIncludable =
+  | 'web_search_call.action.sources'
+  | 'code_interpreter_call.outputs'
+  | 'computer_call_output.output.image_url'
   | 'file_search_call.results'
   | 'message.input_image.image_url'
-  | 'computer_call_output.output.image_url'
-  | 'reasoning.encrypted_content'
-  | 'code_interpreter_call.outputs';
+  | 'reasoning.encrypted_content';
 
 /**
  * An event that is emitted when a response finishes as incomplete.
