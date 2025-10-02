@@ -804,6 +804,15 @@ Methods:
 
 - <code title="post /realtime/client_secrets">client.realtime.clientSecrets.<a href="./src/resources/realtime/client-secrets.ts">create</a>({ ...params }) -> ClientSecretCreateResponse</code>
 
+## Calls
+
+Methods:
+
+- <code title="post /realtime/calls/{call_id}/accept">client.realtime.calls.<a href="./src/resources/realtime/calls.ts">accept</a>(callID, { ...params }) -> void</code>
+- <code title="post /realtime/calls/{call_id}/hangup">client.realtime.calls.<a href="./src/resources/realtime/calls.ts">hangup</a>(callID) -> void</code>
+- <code title="post /realtime/calls/{call_id}/refer">client.realtime.calls.<a href="./src/resources/realtime/calls.ts">refer</a>(callID, { ...params }) -> void</code>
+- <code title="post /realtime/calls/{call_id}/reject">client.realtime.calls.<a href="./src/resources/realtime/calls.ts">reject</a>(callID, { ...params }) -> void</code>
+
 # Conversations
 
 Types:

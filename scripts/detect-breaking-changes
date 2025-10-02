@@ -43,6 +43,7 @@ TEST_PATHS=(
 	tests/api-resources/responses/input-items.test.ts
 	tests/api-resources/realtime/realtime.test.ts
 	tests/api-resources/realtime/client-secrets.test.ts
+	tests/api-resources/realtime/calls.test.ts
 	tests/api-resources/conversations/conversations.test.ts
 	tests/api-resources/conversations/items.test.ts
 	tests/api-resources/evals/evals.test.ts
