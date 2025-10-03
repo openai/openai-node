@@ -1,5 +1,13 @@
 # Changelog
 
+## 6.1.0 (2025-10-02)
+
+Full Changelog: [v6.0.1...v6.1.0](https://github.com/openai/openai-node/compare/v6.0.1...v6.1.0)
+
+### Features
+
+* **api:** add support for realtime calls ([5de9585](https://github.com/openai/openai-node/commit/5de958556679182dfbdce95b4db6b65ca742aa61))
+
 ## 6.0.1 (2025-10-01)
 
 Full Changelog: [v6.0.0...v6.0.1](https://github.com/openai/openai-node/compare/v6.0.0...v6.0.1)
