@@ -25,7 +25,7 @@ function zodV3ToJsonSchema(schema: z3.ZodType, options: { name: string }): Recor
   });
 }
 
-function zodV4ToJsonSchema(schema: z4.ZodType, options: { name: string }): Record<string, unknown> {
+function zodV4ToJsonSchema(schema: z4.ZodType): Record<string, unknown> {
   return toStrictJsonSchema(
     z4.toJSONSchema(schema, {
       target: 'draft-7',
@@ -96,10 +96,7 @@ export function zodResponseFormat<ZodInput extends z3.ZodType | z4.ZodType>(
         ...props,
         name,
         strict: true,
-        schema:
-          isZodV4(zodObject) ?
-            zodV4ToJsonSchema(zodObject, { name })
-          : zodV3ToJsonSchema(zodObject, { name }),
+        schema: isZodV4(zodObject) ? zodV4ToJsonSchema(zodObject) : zodV3ToJsonSchema(zodObject, { name }),
       },
     },
     (content) => zodObject.parse(JSON.parse(content)),
@@ -127,8 +124,7 @@ export function zodTextFormat<ZodInput extends z3.ZodType | z4.ZodType>(
       ...props,
       name,
       strict: true,
-      schema:
-        isZodV4(zodObject) ? zodV4ToJsonSchema(zodObject, { name }) : zodV3ToJsonSchema(zodObject, { name }),
+      schema: isZodV4(zodObject) ? zodV4ToJsonSchema(zodObject) : zodV3ToJsonSchema(zodObject, { name }),
     },
     (content) => zodObject.parse(JSON.parse(content)),
   );
@@ -172,7 +168,7 @@ export function zodFunction<Parameters extends z3.ZodType | z4.ZodType>(options:
         name: options.name,
         parameters:
           isZodV4(options.parameters) ?
-            zodV4ToJsonSchema(options.parameters, { name: options.name })
+            zodV4ToJsonSchema(options.parameters)
           : zodV3ToJsonSchema(options.parameters, { name: options.name }),
         strict: true,
         ...(options.description ? { description: options.description } : undefined),
@@ -221,7 +217,7 @@ export function zodResponsesFunction<Parameters extends z3.ZodType | z4.ZodType>
       name: options.name,
       parameters:
         isZodV4(options.parameters) ?
-          zodV4ToJsonSchema(options.parameters, { name: options.name })
+          zodV4ToJsonSchema(options.parameters)
         : zodV3ToJsonSchema(options.parameters, { name: options.name }),
       strict: true,
       ...(options.description ? { description: options.description } : undefined),
