@@ -132,6 +132,30 @@ export interface JSONSchema {
   not?: JSONSchemaDefinition | undefined;
 
   /**
+   * @see https://json-schema.org/draft/2020-12/json-schema-core.html#section-8.2.4
+   */
+  $defs?:
+    | {
+        [key: string]: JSONSchemaDefinition;
+      }
+    | undefined;
+
+  /**
+   * @deprecated Use $defs instead (draft 2019-09+)
+   * @see https://tools.ietf.org/doc/html/draft-handrews-json-schema-validation-01#page-22
+   */
+  definitions?:
+    | {
+        [key: string]: JSONSchemaDefinition;
+      }
+    | undefined;
+
+  /**
+   * @see https://json-schema.org/draft/2020-12/json-schema-core#ref
+   */
+  $ref?: string | undefined;
+
+  /**
    * @see https://tools.ietf.org/html/draft-handrews-json-schema-validation-01#section-7
    */
   format?: string | undefined;
