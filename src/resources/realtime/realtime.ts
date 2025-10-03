@@ -3,6 +3,8 @@
 import { APIResource } from '../../core/resource';
 import * as RealtimeAPI from './realtime';
 import * as Shared from '../shared';
+import * as CallsAPI from './calls';
+import { CallAcceptParams, CallReferParams, CallRejectParams, Calls } from './calls';
 import * as ClientSecretsAPI from './client-secrets';
 import {
   ClientSecretCreateParams,
@@ -17,6 +19,7 @@ import * as ResponsesAPI from '../responses/responses';
 
 export class Realtime extends APIResource {
   clientSecrets: ClientSecretsAPI.ClientSecrets = new ClientSecretsAPI.ClientSecrets(this._client);
+  calls: CallsAPI.Calls = new CallsAPI.Calls(this._client);
 }
 
 export interface AudioTranscription {
@@ -4580,6 +4583,7 @@ export namespace TranscriptionSessionUpdatedEvent {
 }
 
 Realtime.ClientSecrets = ClientSecrets;
+Realtime.Calls = Calls;
 
 export declare namespace Realtime {
   export {
@@ -4693,5 +4697,12 @@ export declare namespace Realtime {
     type RealtimeTranscriptionSessionTurnDetection as RealtimeTranscriptionSessionTurnDetection,
     type ClientSecretCreateResponse as ClientSecretCreateResponse,
     type ClientSecretCreateParams as ClientSecretCreateParams,
+  };
+
+  export {
+    Calls as Calls,
+    type CallAcceptParams as CallAcceptParams,
+    type CallReferParams as CallReferParams,
+    type CallRejectParams as CallRejectParams,
   };
 }
