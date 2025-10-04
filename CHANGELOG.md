@@ -1,5 +1,13 @@
 # Changelog
 
+## 6.1.1 (2025-10-04)
+
+Full Changelog: [v6.1.0...v6.1.1](https://github.com/openai/openai-node/compare/v6.1.0...v6.1.1)
+
+### Chores
+
+* **jsdoc:** fix [@link](https://github.com/link) annotations to refer only to parts of the package‘s public interface ([73e465d](https://github.com/openai/openai-node/commit/73e465d382a45389ab47a0a92575e4415e8d3276))
+
 ## 6.1.0 (2025-10-02)
 
 Full Changelog: [v6.0.1...v6.1.0](https://github.com/openai/openai-node/compare/v6.0.1...v6.1.0)
