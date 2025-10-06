@@ -118,4 +118,18 @@ export {
   type VectorStoresPage,
   type VectorStoreSearchResponsesPage,
 } from './vector-stores/vector-stores';
+export {
+  Videos,
+  type Video,
+  type VideoCreateError,
+  type VideoModel,
+  type VideoSeconds,
+  type VideoSize,
+  type VideoDeleteResponse,
+  type VideoCreateParams,
+  type VideoListParams,
+  type VideoDownloadContentParams,
+  type VideoRemixParams,
+  type VideosPage,
+} from './videos';
 export { Webhooks } from './webhooks';
