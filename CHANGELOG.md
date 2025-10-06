@@ -1,5 +1,19 @@
 # Changelog
 
+## 6.2.0 (2025-10-06)
+
+Full Changelog: [v6.1.0...v6.2.0](https://github.com/openai/openai-node/compare/v6.1.0...v6.2.0)
+
+### Features
+
+* **api:** dev day 2025 launches ([f2816db](https://github.com/openai/openai-node/commit/f2816dbc6ae162d39017e7bafb0d23d0b51dd585))
+
+
+### Chores
+
+* **internal:** codegen related update ([b6f64b7](https://github.com/openai/openai-node/commit/b6f64b70ea681b174695d930f957aa49194553ed))
+* **jsdoc:** fix [@link](https://github.com/link) annotations to refer only to parts of the package‘s public interface ([73e465d](https://github.com/openai/openai-node/commit/73e465d382a45389ab47a0a92575e4415e8d3276))
+
 ## 6.1.0 (2025-10-02)
 
 Full Changelog: [v6.0.1...v6.1.0](https://github.com/openai/openai-node/compare/v6.0.1...v6.1.0)
