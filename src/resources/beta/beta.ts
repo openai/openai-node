@@ -20,6 +20,15 @@ import {
   RunStreamEvent,
   ThreadStreamEvent,
 } from './assistants';
+import * as ChatKitAPI from './chatkit/chatkit';
+import {
+  ChatKit,
+  ChatKitUploadFileParams,
+  ChatKitUploadFileResponse,
+  ChatKitWorkflow,
+  FilePart,
+  ImagePart,
+} from './chatkit/chatkit';
 import * as ThreadsAPI from './threads/threads';
 import {
   AssistantResponseFormatOption,
@@ -37,14 +46,25 @@ import {
 } from './threads/threads';
 
 export class Beta extends APIResource {
+  chatkit: ChatKitAPI.ChatKit = new ChatKitAPI.ChatKit(this._client);
   assistants: AssistantsAPI.Assistants = new AssistantsAPI.Assistants(this._client);
   threads: ThreadsAPI.Threads = new ThreadsAPI.Threads(this._client);
 }
 
+Beta.ChatKit = ChatKit;
 Beta.Assistants = Assistants;
 Beta.Threads = Threads;
 
 export declare namespace Beta {
+  export {
+    ChatKit as ChatKit,
+    type ChatKitWorkflow as ChatKitWorkflow,
+    type FilePart as FilePart,
+    type ImagePart as ImagePart,
+    type ChatKitUploadFileResponse as ChatKitUploadFileResponse,
+    type ChatKitUploadFileParams as ChatKitUploadFileParams,
+  };
+
   export {
     Assistants as Assistants,
     type Assistant as Assistant,

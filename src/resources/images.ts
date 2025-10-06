@@ -386,7 +386,7 @@ export interface ImageGenPartialImageEvent {
  */
 export type ImageGenStreamEvent = ImageGenPartialImageEvent | ImageGenCompletedEvent;
 
-export type ImageModel = 'dall-e-2' | 'dall-e-3' | 'gpt-image-1';
+export type ImageModel = 'dall-e-2' | 'dall-e-3' | 'gpt-image-1' | 'gpt-image-1-mini';
 
 /**
  * The response from the image generation endpoint.
@@ -547,7 +547,8 @@ export interface ImageEditParamsBase {
   /**
    * Control how much effort the model will exert to match the style and features,
    * especially facial features, of input images. This parameter is only supported
-   * for `gpt-image-1`. Supports `high` and `low`. Defaults to `low`.
+   * for `gpt-image-1`. Unsupported for `gpt-image-1-mini`. Supports `high` and
+   * `low`. Defaults to `low`.
    */
   input_fidelity?: 'high' | 'low' | null;
 

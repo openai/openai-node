@@ -126,6 +126,8 @@ client.example.list(undefined, { headers: { ... } });
 - `client.fineTuning.checkpoints.permissions.retrieve()`
 - `client.vectorStores.list()`
 - `client.vectorStores.files.list()`
+- `client.beta.chatkit.threads.list()`
+- `client.beta.chatkit.threads.listItems()`
 - `client.beta.assistants.list()`
 - `client.beta.threads.create()`
 - `client.beta.threads.runs.list()`
@@ -140,6 +142,8 @@ client.example.list(undefined, { headers: { ... } });
 - `client.evals.runs.list()`
 - `client.containers.list()`
 - `client.containers.files.list()`
+- `client.videos.list()`
+- `client.videos.downloadContent()`
 
 </details>
 

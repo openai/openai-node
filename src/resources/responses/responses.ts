@@ -5009,7 +5009,8 @@ export namespace Tool {
     /**
      * Control how much effort the model will exert to match the style and features,
      * especially facial features, of input images. This parameter is only supported
-     * for `gpt-image-1`. Supports `high` and `low`. Defaults to `low`.
+     * for `gpt-image-1`. Unsupported for `gpt-image-1-mini`. Supports `high` and
+     * `low`. Defaults to `low`.
      */
     input_fidelity?: 'high' | 'low' | null;
 
@@ -5022,7 +5023,7 @@ export namespace Tool {
     /**
      * The image generation model to use. Default: `gpt-image-1`.
      */
-    model?: 'gpt-image-1';
+    model?: 'gpt-image-1' | 'gpt-image-1-mini';
 
     /**
      * Moderation level for the generated image. Default: `auto`.

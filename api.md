@@ -385,6 +385,57 @@ Methods:
 
 # Beta
 
+## ChatKit
+
+Types:
+
+- <code><a href="./src/resources/beta/chatkit/chatkit.ts">ChatKitWorkflow</a></code>
+- <code><a href="./src/resources/beta/chatkit/chatkit.ts">FilePart</a></code>
+- <code><a href="./src/resources/beta/chatkit/chatkit.ts">ImagePart</a></code>
+- <code><a href="./src/resources/beta/chatkit/chatkit.ts">ChatKitUploadFileResponse</a></code>
+
+Methods:
+
+- <code title="post /chatkit/files">client.beta.chatkit.<a href="./src/resources/beta/chatkit/chatkit.ts">uploadFile</a>({ ...params }) -> ChatKitUploadFileResponse</code>
+
+### Sessions
+
+Methods:
+
+- <code title="post /chatkit/sessions">client.beta.chatkit.sessions.<a href="./src/resources/beta/chatkit/sessions.ts">create</a>({ ...params }) -> ChatSession</code>
+- <code title="post /chatkit/sessions/{session_id}/cancel">client.beta.chatkit.sessions.<a href="./src/resources/beta/chatkit/sessions.ts">cancel</a>(sessionID) -> ChatSession</code>
+
+### Threads
+
+Types:
+
+- <code><a href="./src/resources/beta/chatkit/threads.ts">ChatSession</a></code>
+- <code><a href="./src/resources/beta/chatkit/threads.ts">ChatSessionAutomaticThreadTitling</a></code>
+- <code><a href="./src/resources/beta/chatkit/threads.ts">ChatSessionChatKitConfiguration</a></code>
+- <code><a href="./src/resources/beta/chatkit/threads.ts">ChatSessionChatKitConfigurationParam</a></code>
+- <code><a href="./src/resources/beta/chatkit/threads.ts">ChatSessionExpiresAfterParam</a></code>
+- <code><a href="./src/resources/beta/chatkit/threads.ts">ChatSessionFileUpload</a></code>
+- <code><a href="./src/resources/beta/chatkit/threads.ts">ChatSessionHistory</a></code>
+- <code><a href="./src/resources/beta/chatkit/threads.ts">ChatSessionRateLimits</a></code>
+- <code><a href="./src/resources/beta/chatkit/threads.ts">ChatSessionRateLimitsParam</a></code>
+- <code><a href="./src/resources/beta/chatkit/threads.ts">ChatSessionStatus</a></code>
+- <code><a href="./src/resources/beta/chatkit/threads.ts">ChatSessionWorkflowParam</a></code>
+- <code><a href="./src/resources/beta/chatkit/threads.ts">ChatKitAttachment</a></code>
+- <code><a href="./src/resources/beta/chatkit/threads.ts">ChatKitResponseOutputText</a></code>
+- <code><a href="./src/resources/beta/chatkit/threads.ts">ChatKitThread</a></code>
+- <code><a href="./src/resources/beta/chatkit/threads.ts">ChatKitThreadAssistantMessageItem</a></code>
+- <code><a href="./src/resources/beta/chatkit/threads.ts">ChatKitThreadItemList</a></code>
+- <code><a href="./src/resources/beta/chatkit/threads.ts">ChatKitThreadUserMessageItem</a></code>
+- <code><a href="./src/resources/beta/chatkit/threads.ts">ChatKitWidgetItem</a></code>
+- <code><a href="./src/resources/beta/chatkit/threads.ts">ThreadDeleteResponse</a></code>
+
+Methods:
+
+- <code title="get /chatkit/threads/{thread_id}">client.beta.chatkit.threads.<a href="./src/resources/beta/chatkit/threads.ts">retrieve</a>(threadID) -> ChatKitThread</code>
+- <code title="get /chatkit/threads">client.beta.chatkit.threads.<a href="./src/resources/beta/chatkit/threads.ts">list</a>({ ...params }) -> ChatKitThreadsPage</code>
+- <code title="delete /chatkit/threads/{thread_id}">client.beta.chatkit.threads.<a href="./src/resources/beta/chatkit/threads.ts">delete</a>(threadID) -> ThreadDeleteResponse</code>
+- <code title="get /chatkit/threads/{thread_id}/items">client.beta.chatkit.threads.<a href="./src/resources/beta/chatkit/threads.ts">listItems</a>(threadID, { ...params }) -> ChatKitThreadItemListDataPage</code>
+
 ## Assistants
 
 Types:
@@ -939,3 +990,23 @@ Methods:
 Methods:
 
 - <code title="get /containers/{container_id}/files/{file_id}/content">client.containers.files.content.<a href="./src/resources/containers/files/content.ts">retrieve</a>(fileID, { ...params }) -> Response</code>
+
+# Videos
+
+Types:
+
+- <code><a href="./src/resources/videos.ts">Video</a></code>
+- <code><a href="./src/resources/videos.ts">VideoCreateError</a></code>
+- <code><a href="./src/resources/videos.ts">VideoModel</a></code>
+- <code><a href="./src/resources/videos.ts">VideoSeconds</a></code>
+- <code><a href="./src/resources/videos.ts">VideoSize</a></code>
+- <code><a href="./src/resources/videos.ts">VideoDeleteResponse</a></code>
+
+Methods:
+
+- <code title="post /videos">client.videos.<a href="./src/resources/videos.ts">create</a>({ ...params }) -> Video</code>
+- <code title="get /videos/{video_id}">client.videos.<a href="./src/resources/videos.ts">retrieve</a>(videoID) -> Video</code>
+- <code title="get /videos">client.videos.<a href="./src/resources/videos.ts">list</a>({ ...params }) -> VideosPage</code>
+- <code title="delete /videos/{video_id}">client.videos.<a href="./src/resources/videos.ts">delete</a>(videoID) -> VideoDeleteResponse</code>
+- <code title="get /videos/{video_id}/content">client.videos.<a href="./src/resources/videos.ts">downloadContent</a>(videoID, { ...params }) -> Response</code>
+- <code title="post /videos/{video_id}/remix">client.videos.<a href="./src/resources/videos.ts">remix</a>(videoID, { ...params }) -> Video</code>
