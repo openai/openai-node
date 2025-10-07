@@ -21,6 +21,14 @@ export {
 export { Beta } from './beta';
 export { Realtime } from './realtime/index';
 export {
+  ChatKit,
+  type ChatKitWorkflow,
+  type FilePart,
+  type ImagePart,
+  type ChatKitUploadFileResponse,
+  type ChatKitUploadFileParams,
+} from './chatkit/index';
+export {
   Threads,
   type AssistantResponseFormatOption,
   type AssistantToolChoice,
