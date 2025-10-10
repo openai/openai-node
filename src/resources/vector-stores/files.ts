@@ -264,7 +264,7 @@ export namespace VectorStoreFile {
    */
   export interface LastError {
     /**
-     * One of `server_error` or `rate_limit_exceeded`.
+     * One of `server_error`, `unsupported_file`, or `invalid_file`.
      */
     code: 'server_error' | 'unsupported_file' | 'invalid_file';
 

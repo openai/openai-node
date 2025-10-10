@@ -92,7 +92,8 @@ export interface ComparisonFilter {
   key: string;
 
   /**
-   * Specifies the comparison operator: `eq`, `ne`, `gt`, `gte`, `lt`, `lte`.
+   * Specifies the comparison operator: `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `in`,
+   * `nin`.
    *
    * - `eq`: equals
    * - `ne`: not equal
@@ -100,6 +101,8 @@ export interface ComparisonFilter {
    * - `gte`: greater than or equal
    * - `lt`: less than
    * - `lte`: less than or equal
+   * - `in`: in
+   * - `nin`: not in
    */
   type: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte';
 
@@ -107,7 +110,7 @@ export interface ComparisonFilter {
    * The value to compare against the attribute key; supports string, number, or
    * boolean types.
    */
-  value: string | number | boolean;
+  value: string | number | boolean | Array<string | number>;
 }
 
 /**
@@ -241,6 +244,9 @@ export interface Reasoning {
    * supported values are `minimal`, `low`, `medium`, and `high`. Reducing reasoning
    * effort can result in faster responses and fewer tokens used on reasoning in a
    * response.
+   *
+   * Note: The `gpt-5-pro` model defaults to (and only supports) `high` reasoning
+   * effort.
    */
   effort?: ReasoningEffort | null;
 
@@ -267,6 +273,9 @@ export interface Reasoning {
  * supported values are `minimal`, `low`, `medium`, and `high`. Reducing reasoning
  * effort can result in faster responses and fewer tokens used on reasoning in a
  * response.
+ *
+ * Note: The `gpt-5-pro` model defaults to (and only supports) `high` reasoning
+ * effort.
  */
 export type ReasoningEffort = 'minimal' | 'low' | 'medium' | 'high' | null;
 

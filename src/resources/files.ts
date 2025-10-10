@@ -57,7 +57,7 @@ export class Files extends APIResource {
   }
 
   /**
-   * Delete a file.
+   * Delete a file and remove it from all vector stores.
    */
   delete(fileID: string, options?: RequestOptions): APIPromise<FileDeleted> {
     return this._client.delete(path`/files/${fileID}`, options);
