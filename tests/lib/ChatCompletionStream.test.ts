@@ -1,6 +1,6 @@
 import { zodResponseFormat } from 'openai/helpers/zod';
 import { ChatCompletionTokenLogprob } from 'openai/resources';
-import { z } from 'zod/v3';
+import { z } from 'zod/v4';
 import { makeStreamSnapshotRequest } from '../utils/mock-snapshots';
 
 jest.setTimeout(1000 * 30);
