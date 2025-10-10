@@ -1162,6 +1162,9 @@ export interface AssistantCreateParams {
    * supported values are `minimal`, `low`, `medium`, and `high`. Reducing reasoning
    * effort can result in faster responses and fewer tokens used on reasoning in a
    * response.
+   *
+   * Note: The `gpt-5-pro` model defaults to (and only supports) `high` reasoning
+   * effort.
    */
   reasoning_effort?: Shared.ReasoningEffort | null;
 
@@ -1415,6 +1418,9 @@ export interface AssistantUpdateParams {
    * supported values are `minimal`, `low`, `medium`, and `high`. Reducing reasoning
    * effort can result in faster responses and fewer tokens used on reasoning in a
    * response.
+   *
+   * Note: The `gpt-5-pro` model defaults to (and only supports) `high` reasoning
+   * effort.
    */
   reasoning_effort?: Shared.ReasoningEffort | null;
 
