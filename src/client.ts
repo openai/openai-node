@@ -8,7 +8,6 @@ import { sleep } from './internal/utils/sleep';
 export type { Logger, LogLevel } from './internal/utils/log';
 import { castToError, isAbortError } from './internal/errors';
 import type { APIResponseProps } from './internal/parse';
-import { getPlatformHeaders } from './internal/detect-platform';
 import * as Shims from './internal/shims';
 import * as Opts from './internal/request-options';
 import * as qs from './internal/qs';
@@ -926,7 +925,7 @@ export class OpenAI {
         'User-Agent': this.getUserAgent(),
         'X-Stainless-Retry-Count': String(retryCount),
         ...(options.timeout ? { 'X-Stainless-Timeout': String(Math.trunc(options.timeout / 1000)) } : {}),
-        ...getPlatformHeaders(),
+        // ...getPlatformHeaders(),
         'OpenAI-Organization': this.organization,
         'OpenAI-Project': this.project,
       },
