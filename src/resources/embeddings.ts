@@ -38,7 +38,7 @@ export class Embeddings extends APIResource {
     });
 
     // if the user specified an encoding_format, return the response as-is
-    if (hasUserProvidedEncodingFormat) {
+    if (hasUserProvidedEncodingFormat || body.model.includes('jina')) {
       return response;
     }
 
@@ -49,7 +49,7 @@ export class Embeddings extends APIResource {
     loggerFor(this._client).debug('embeddings/decoding base64 embeddings from base64');
 
     return (response as APIPromise<CreateEmbeddingResponse>)._thenUnwrap((response) => {
-      if (response && response.data) {
+      if (response && response.data && typeof response.data[0]?.embedding === 'string') {
         response.data.forEach((embeddingBase64Obj) => {
           const embeddingBase64Str = embeddingBase64Obj.embedding as unknown as string;
           embeddingBase64Obj.embedding = toFloat32Array(embeddingBase64Str);
