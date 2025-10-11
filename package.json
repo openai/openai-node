@@ -1,12 +1,12 @@
 {
-  "name": "openai",
+  "name": "@cherrystudio/openai",
   "version": "6.3.0",
-  "description": "The official TypeScript library for the OpenAI API",
+  "description": "Modified openai-node sdk by @cherrystudio",
   "author": "OpenAI <support@openai.com>",
   "types": "dist/index.d.ts",
   "main": "dist/index.js",
   "type": "commonjs",
-  "repository": "github:openai/openai-node",
+  "repository": "github:eurfelux/openai-node",
   "license": "Apache-2.0",
   "packageManager": "yarn@1.22.22",
   "files": [
