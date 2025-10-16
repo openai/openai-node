@@ -156,11 +156,14 @@ Types:
 Types:
 
 - <code><a href="./src/resources/audio/transcriptions.ts">Transcription</a></code>
+- <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionDiarized</a></code>
+- <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionDiarizedSegment</a></code>
 - <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionInclude</a></code>
 - <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionSegment</a></code>
 - <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionStreamEvent</a></code>
 - <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionTextDeltaEvent</a></code>
 - <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionTextDoneEvent</a></code>
+- <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionTextSegmentEvent</a></code>
 - <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionVerbose</a></code>
 - <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionWord</a></code>
 - <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionCreateResponse</a></code>

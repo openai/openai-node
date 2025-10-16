@@ -28,6 +28,8 @@ describe('resource transcriptions', () => {
       model: 'gpt-4o-transcribe',
       chunking_strategy: 'auto',
       include: ['logprobs'],
+      known_speaker_names: ['string'],
+      known_speaker_references: ['string'],
       language: 'language',
       prompt: 'prompt',
       response_format: 'json',
