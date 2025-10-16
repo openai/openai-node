@@ -166,6 +166,138 @@ export namespace Transcription {
   }
 }
 
+/**
+ * Represents a diarized transcription response returned by the model, including
+ * the combined transcript and speaker-segment annotations.
+ */
+export interface TranscriptionDiarized {
+  /**
+   * Duration of the input audio in seconds.
+   */
+  duration: number;
+
+  /**
+   * Segments of the transcript annotated with timestamps and speaker labels.
+   */
+  segments: Array<TranscriptionDiarizedSegment>;
+
+  /**
+   * The type of task that was run. Always `transcribe`.
+   */
+  task: 'transcribe';
+
+  /**
+   * The concatenated transcript text for the entire audio input.
+   */
+  text: string;
+
+  /**
+   * Token or duration usage statistics for the request.
+   */
+  usage?: TranscriptionDiarized.Tokens | TranscriptionDiarized.Duration;
+}
+
+export namespace TranscriptionDiarized {
+  /**
+   * Usage statistics for models billed by token usage.
+   */
+  export interface Tokens {
+    /**
+     * Number of input tokens billed for this request.
+     */
+    input_tokens: number;
+
+    /**
+     * Number of output tokens generated.
+     */
+    output_tokens: number;
+
+    /**
+     * Total number of tokens used (input + output).
+     */
+    total_tokens: number;
+
+    /**
+     * The type of the usage object. Always `tokens` for this variant.
+     */
+    type: 'tokens';
+
+    /**
+     * Details about the input tokens billed for this request.
+     */
+    input_token_details?: Tokens.InputTokenDetails;
+  }
+
+  export namespace Tokens {
+    /**
+     * Details about the input tokens billed for this request.
+     */
+    export interface InputTokenDetails {
+      /**
+       * Number of audio tokens billed for this request.
+       */
+      audio_tokens?: number;
+
+      /**
+       * Number of text tokens billed for this request.
+       */
+      text_tokens?: number;
+    }
+  }
+
+  /**
+   * Usage statistics for models billed by audio input duration.
+   */
+  export interface Duration {
+    /**
+     * Duration of the input audio in seconds.
+     */
+    seconds: number;
+
+    /**
+     * The type of the usage object. Always `duration` for this variant.
+     */
+    type: 'duration';
+  }
+}
+
+/**
+ * A segment of diarized transcript text with speaker metadata.
+ */
+export interface TranscriptionDiarizedSegment {
+  /**
+   * Unique identifier for the segment.
+   */
+  id: string;
+
+  /**
+   * End timestamp of the segment in seconds.
+   */
+  end: number;
+
+  /**
+   * Speaker label for this segment. When known speakers are provided, the label
+   * matches `known_speaker_names[]`. Otherwise speakers are labeled sequentially
+   * using capital letters (`A`, `B`, ...).
+   */
+  speaker: string;
+
+  /**
+   * Start timestamp of the segment in seconds.
+   */
+  start: number;
+
+  /**
+   * Transcript text for this segment.
+   */
+  text: string;
+
+  /**
+   * The type of the segment. Always `transcript.text.segment`.
+   */
+  type: 'transcript.text.segment';
+}
+
 export type TranscriptionInclude = 'logprobs';
 
 export interface TranscriptionSegment {
@@ -224,12 +356,15 @@ export interface TranscriptionSegment {
 }
 
 /**
- * Emitted when there is an additional text delta. This is also the first event
- * emitted when the transcription starts. Only emitted when you
+ * Emitted when a diarized transcription returns a completed segment with speaker
+ * information. Only emitted when you
  * [create a transcription](https://platform.openai.com/docs/api-reference/audio/create-transcription)
- * with the `Stream` parameter set to `true`.
+ * with `stream` set to `true` and `response_format` set to `diarized_json`.
  */
-export type TranscriptionStreamEvent = TranscriptionTextDeltaEvent | TranscriptionTextDoneEvent;
+export type TranscriptionStreamEvent =
+  | TranscriptionTextSegmentEvent
+  | TranscriptionTextDeltaEvent
+  | TranscriptionTextDoneEvent;
 
 /**
  * Emitted when there is an additional text delta. This is also the first event
@@ -254,6 +389,12 @@ export interface TranscriptionTextDeltaEvent {
    * with the `include[]` parameter set to `logprobs`.
    */
   logprobs?: Array<TranscriptionTextDeltaEvent.Logprob>;
+
+  /**
+   * Identifier of the diarized segment that this delta belongs to. Only present when
+   * using `gpt-4o-transcribe-diarize`.
+   */
+  segment_id?: string;
 }
 
 export namespace TranscriptionTextDeltaEvent {
@@ -373,6 +514,44 @@ export namespace TranscriptionTextDoneEvent {
 }
 
 /**
+ * Emitted when a diarized transcription returns a completed segment with speaker
+ * information. Only emitted when you
+ * [create a transcription](https://platform.openai.com/docs/api-reference/audio/create-transcription)
+ * with `stream` set to `true` and `response_format` set to `diarized_json`.
+ */
+export interface TranscriptionTextSegmentEvent {
+  /**
+   * Unique identifier for the segment.
+   */
+  id: string;
+
+  /**
+   * End timestamp of the segment in seconds.
+   */
+  end: number;
+
+  /**
+   * Speaker label for this segment.
+   */
+  speaker: string;
+
+  /**
+   * Start timestamp of the segment in seconds.
+   */
+  start: number;
+
+  /**
+   * Transcript text for this segment.
+   */
+  text: string;
+
+  /**
+   * The type of the event. Always `transcript.text.segment`.
+   */
+  type: 'transcript.text.segment';
+}
+
+/**
  * Represents a verbose json transcription response returned by model, based on the
  * provided input.
  */
@@ -446,7 +625,7 @@ export interface TranscriptionWord {
  * Represents a transcription response returned by model, based on the provided
  * input.
  */
-export type TranscriptionCreateResponse = Transcription | TranscriptionVerbose;
+export type TranscriptionCreateResponse = Transcription | TranscriptionDiarized | TranscriptionVerbose;
 
 export type TranscriptionCreateParams<
   ResponseFormat extends AudioAPI.AudioResponseFormat | undefined = AudioAPI.AudioResponseFormat | undefined,
@@ -463,8 +642,8 @@ export interface TranscriptionCreateParamsBase<
 
   /**
    * ID of the model to use. The options are `gpt-4o-transcribe`,
-   * `gpt-4o-mini-transcribe`, and `whisper-1` (which is powered by our open source
-   * Whisper V2 model).
+   * `gpt-4o-mini-transcribe`, `whisper-1` (which is powered by our open source
+   * Whisper V2 model), and `gpt-4o-transcribe-diarize`.
    */
   model: (string & {}) | AudioAPI.AudioModel;
 
@@ -473,6 +652,8 @@ export interface TranscriptionCreateParamsBase<
    * first normalizes loudness and then uses voice activity detection (VAD) to choose
    * boundaries. `server_vad` object can be provided to tweak VAD detection
    * parameters manually. If unset, the audio is transcribed as a single block.
+   * Required when using `gpt-4o-transcribe-diarize` for inputs longer than 30
+   * seconds.
    */
   chunking_strategy?: 'auto' | TranscriptionCreateParams.VadConfig | null;
 
@@ -481,9 +662,26 @@ export interface TranscriptionCreateParamsBase<
    * return the log probabilities of the tokens in the response to understand the
    * model's confidence in the transcription. `logprobs` only works with
    * response_format set to `json` and only with the models `gpt-4o-transcribe` and
-   * `gpt-4o-mini-transcribe`.
+   * `gpt-4o-mini-transcribe`. This field is not supported when using
+   * `gpt-4o-transcribe-diarize`.
    */
   include?: Array<TranscriptionInclude>;
+
+  /**
+   * Optional list of speaker names that correspond to the audio samples provided in
+   * `known_speaker_references[]`. Each entry should be a short identifier (for
+   * example `customer` or `agent`). Up to 4 speakers are supported.
+   */
+  known_speaker_names?: Array<string>;
+
+  /**
+   * Optional list of audio samples (as
+   * [data URLs](https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/Data_URLs))
+   * that contain known speaker references matching `known_speaker_names[]`. Each
+   * sample must be between 2 and 10 seconds, and can use any of the same input audio
+   * formats supported by `file`.
+   */
+  known_speaker_references?: Array<string>;
 
   /**
    * The language of the input audio. Supplying the input language in
@@ -496,14 +694,17 @@ export interface TranscriptionCreateParamsBase<
    * An optional text to guide the model's style or continue a previous audio
    * segment. The
    * [prompt](https://platform.openai.com/docs/guides/speech-to-text#prompting)
-   * should match the audio language.
+   * should match the audio language. This field is not supported when using
+   * `gpt-4o-transcribe-diarize`.
    */
   prompt?: string;
 
   /**
    * The format of the output, in one of these options: `json`, `text`, `srt`,
-   * `verbose_json`, or `vtt`. For `gpt-4o-transcribe` and `gpt-4o-mini-transcribe`,
-   * the only supported format is `json`.
+   * `verbose_json`, `vtt`, or `diarized_json`. For `gpt-4o-transcribe` and
+   * `gpt-4o-mini-transcribe`, the only supported format is `json`. For
+   * `gpt-4o-transcribe-diarize`, the supported formats are `json`, `text`, and
+   * `diarized_json`, with `diarized_json` required to receive speaker annotations.
    */
   response_format?: ResponseFormat;
 
@@ -533,7 +734,8 @@ export interface TranscriptionCreateParamsBase<
    * `response_format` must be set `verbose_json` to use timestamp granularities.
    * Either or both of these options are supported: `word`, or `segment`. Note: There
    * is no additional latency for segment timestamps, but generating word timestamps
-   * incurs additional latency.
+   * incurs additional latency. This option is not available for
+   * `gpt-4o-transcribe-diarize`.
    */
   timestamp_granularities?: Array<'word' | 'segment'>;
 }
@@ -602,11 +804,14 @@ export interface TranscriptionCreateParamsStreaming extends TranscriptionCreateP
 export declare namespace Transcriptions {
   export {
     type Transcription as Transcription,
+    type TranscriptionDiarized as TranscriptionDiarized,
+    type TranscriptionDiarizedSegment as TranscriptionDiarizedSegment,
     type TranscriptionInclude as TranscriptionInclude,
     type TranscriptionSegment as TranscriptionSegment,
     type TranscriptionStreamEvent as TranscriptionStreamEvent,
     type TranscriptionTextDeltaEvent as TranscriptionTextDeltaEvent,
     type TranscriptionTextDoneEvent as TranscriptionTextDoneEvent,
+    type TranscriptionTextSegmentEvent as TranscriptionTextSegmentEvent,
     type TranscriptionVerbose as TranscriptionVerbose,
     type TranscriptionWord as TranscriptionWord,
     type TranscriptionCreateResponse as TranscriptionCreateResponse,

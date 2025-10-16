@@ -1,5 +1,26 @@
 # Changelog
 
+## 6.4.0 (2025-10-16)
+
+Full Changelog: [v6.3.0...v6.4.0](https://github.com/openai/openai-node/compare/v6.3.0...v6.4.0)
+
+### Features
+
+* **api:** Add support for gpt-4o-transcribe-diarize on audio/transcriptions endpoint ([2d27392](https://github.com/openai/openai-node/commit/2d27392ac1cd082f7defb730326d11d8e733353f))
+
+## 6.3.0 (2025-10-10)
+
+Full Changelog: [v6.2.0...v6.3.0](https://github.com/openai/openai-node/compare/v6.2.0...v6.3.0)
+
+### Features
+
+* **api:** comparison filter in/not in ([1a733c6](https://github.com/openai/openai-node/commit/1a733c69ffff094568707b3f615d110c7e2edd6e))
+
+
+### Chores
+
+* **internal:** use npm pack for build uploads ([a532410](https://github.com/openai/openai-node/commit/a53241032e1177a390337986399da57e39be25ec))
+
 ## 6.2.0 (2025-10-06)
 
 Full Changelog: [v6.1.0...v6.2.0](https://github.com/openai/openai-node/compare/v6.1.0...v6.2.0)
