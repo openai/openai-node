@@ -364,6 +364,12 @@ export interface VectorStoreCreateParams {
   chunking_strategy?: FileChunkingStrategyParam;
 
   /**
+   * A description for the vector store. Can be used to describe the vector store's
+   * purpose.
+   */
+  description?: string;
+
+  /**
    * The expiration policy for a vector store.
    */
   expires_after?: VectorStoreCreateParams.ExpiresAfter;
