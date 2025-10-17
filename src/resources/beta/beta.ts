@@ -74,14 +74,7 @@ import {
   TranscriptionSessionUpdatedEvent,
 } from './realtime/realtime';
 import * as ChatKitAPI from './chatkit/chatkit';
-import {
-  ChatKit,
-  ChatKitUploadFileParams,
-  ChatKitUploadFileResponse,
-  ChatKitWorkflow,
-  FilePart,
-  ImagePart,
-} from './chatkit/chatkit';
+import { ChatKit, ChatKitWorkflow } from './chatkit/chatkit';
 import * as ThreadsAPI from './threads/threads';
 import {
   AssistantResponseFormatOption,
@@ -166,10 +159,6 @@ export declare namespace Beta {
     type TranscriptionSessionUpdatedEvent as TranscriptionSessionUpdatedEvent,
     ChatKit as ChatKit,
     type ChatKitWorkflow as ChatKitWorkflow,
-    type FilePart as FilePart,
-    type ImagePart as ImagePart,
-    type ChatKitUploadFileResponse as ChatKitUploadFileResponse,
-    type ChatKitUploadFileParams as ChatKitUploadFileParams,
   };
 
   export {
