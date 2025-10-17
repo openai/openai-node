@@ -42,7 +42,7 @@ describe('resource responses', () => {
       client.responses.retrieve(
         'resp_677efb5139a88190b512bc3fef8e535d',
         {
-          include: ['code_interpreter_call.outputs'],
+          include: ['file_search_call.results'],
           include_obfuscation: true,
           starting_after: 0,
           stream: false,
