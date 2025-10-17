@@ -18,9 +18,12 @@ export type ServerSentEvent = {
   raw: string[];
 };
 
+// Associate Stream instances with their client via a module WeakMap to avoid
+// JS private-field brand checks across bundles/copies.
+const streamClient = /* @__PURE__ */ new WeakMap<object, OpenAI | undefined>();
+
 export class Stream<Item> implements AsyncIterable<Item> {
   controller: AbortController;
-  #client: OpenAI | undefined;
 
   constructor(
     private iterator: () => AsyncIterator<Item>,
@@ -28,7 +31,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
     client?: OpenAI,
   ) {
     this.controller = controller;
-    this.#client = client;
+    streamClient.set(this, client);
   }
 
   static fromSSEResponse<Item>(
@@ -75,8 +78,8 @@ export class Stream<Item> implements AsyncIterable<Item> {
             try {
               data = JSON.parse(sse.data);
             } catch (e) {
-              console.error(`Could not parse message into JSON:`, sse.data);
-              console.error(`From chunk:`, sse.raw);
+              logger.error(`Could not parse message into JSON:`, sse.data);
+              logger.error(`From chunk:`, sse.raw);
               throw e;
             }
             // TODO: Is this where the error should be thrown?
@@ -177,9 +180,10 @@ export class Stream<Item> implements AsyncIterable<Item> {
       };
     };
 
+    const client = streamClient.get(this);
     return [
-      new Stream(() => teeIterator(left), this.controller, this.#client),
-      new Stream(() => teeIterator(right), this.controller, this.#client),
+      new Stream(() => teeIterator(left), this.controller, client),
+      new Stream(() => teeIterator(right), this.controller, client),
     ];
   }
 
