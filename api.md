@@ -477,13 +477,6 @@ Methods:
 Types:
 
 - <code><a href="./src/resources/beta/chatkit/chatkit.ts">ChatKitWorkflow</a></code>
-- <code><a href="./src/resources/beta/chatkit/chatkit.ts">FilePart</a></code>
-- <code><a href="./src/resources/beta/chatkit/chatkit.ts">ImagePart</a></code>
-- <code><a href="./src/resources/beta/chatkit/chatkit.ts">ChatKitUploadFileResponse</a></code>
-
-Methods:
-
-- <code title="post /chatkit/files">client.beta.chatkit.<a href="./src/resources/beta/chatkit/chatkit.ts">uploadFile</a>({ ...params }) -> ChatKitUploadFileResponse</code>
 
 ### Sessions
 
