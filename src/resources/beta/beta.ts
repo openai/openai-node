@@ -159,10 +159,6 @@ export declare namespace Beta {
     type TranscriptionSessionUpdatedEvent as TranscriptionSessionUpdatedEvent,
     ChatKit as ChatKit,
     type ChatKitWorkflow as ChatKitWorkflow,
-    type FilePart as FilePart,
-    type ImagePart as ImagePart,
-    type ChatKitUploadFileResponse as ChatKitUploadFileResponse,
-    type ChatKitUploadFileParams as ChatKitUploadFileParams,
   };
 
   export {
