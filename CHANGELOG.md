@@ -1,5 +1,13 @@
 # Changelog
 
+## 6.5.1 (2025-10-18)
+
+Full Changelog: [v6.5.0...v6.5.1](https://github.com/openai/openai-node/compare/v6.5.0...v6.5.1)
+
+### Bug Fixes
+
+* **api:** internal openapi updates ([d4aaef9](https://github.com/openai/openai-node/commit/d4aaef9c2e3d9f00b33d59e569149a937e5bd3f5))
+
 ## 6.5.0 (2025-10-17)
 
 Full Changelog: [v6.4.0...v6.5.0](https://github.com/openai/openai-node/compare/v6.4.0...v6.5.0)
