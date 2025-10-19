@@ -68,6 +68,112 @@ describe('resource embeddings', () => {
 
     expect(typeof response.data?.at(0)?.embedding).toBe('string');
   });
+
+  test('create: should handle null embedding objects gracefully', async () => {
+    const client = makeClientWithCustomResponse({
+      object: 'list',
+      data: [
+        { object: 'embedding', index: 0, embedding: [-0.1, 0.2, 0.3] },
+        null as any, // null embedding object
+        { object: 'embedding', index: 2, embedding: [0.4, 0.5, 0.6] },
+      ],
+      model: 'test-model',
+      usage: { prompt_tokens: 1, total_tokens: 1 },
+    });
+
+    const response = await client.embeddings.create({
+      input: 'test',
+      model: 'test-model',
+    });
+
+    // Should skip null items and process valid ones
+    expect(response.data.length).toBe(3);
+    expect(Array.isArray(response.data[0]?.embedding)).toBe(true);
+    expect(response.data[1]).toBe(null);
+    expect(Array.isArray(response.data[2]?.embedding)).toBe(true);
+  });
+
+  test('create: should throw error for missing embedding data', async () => {
+    const client = makeClientWithCustomResponse({
+      object: 'list',
+      data: [
+        { object: 'embedding', index: 0, embedding: null as any }, // missing embedding data
+      ],
+      model: 'test-model',
+      usage: { prompt_tokens: 1, total_tokens: 1 },
+    });
+
+    await expect(
+      client.embeddings.create({
+        input: 'test',
+        model: 'test-model',
+      }),
+    ).rejects.toThrow('Missing embedding data for item at index 0');
+  });
+
+  test('create: should throw error for undefined embedding data', async () => {
+    const client = makeClientWithCustomResponse({
+      object: 'list',
+      data: [
+        { object: 'embedding', index: 1, embedding: undefined as any }, // undefined embedding data
+      ],
+      model: 'test-model',
+      usage: { prompt_tokens: 1, total_tokens: 1 },
+    });
+
+    await expect(
+      client.embeddings.create({
+        input: 'test',
+        model: 'test-model',
+      }),
+    ).rejects.toThrow('Missing embedding data for item at index 1');
+  });
+
+  test('create: should throw error for missing embedding data without index', async () => {
+    const client = makeClientWithCustomResponse({
+      object: 'list',
+      data: [
+        { object: 'embedding', embedding: null as any }, // missing embedding data and index
+      ],
+      model: 'test-model',
+      usage: { prompt_tokens: 1, total_tokens: 1 },
+    });
+
+    await expect(
+      client.embeddings.create({
+        input: 'test',
+        model: 'test-model',
+      }),
+    ).rejects.toThrow('Missing embedding data for item at index unknown');
+  });
+
+  test('create: should handle mixed valid and invalid embedding objects', async () => {
+    const client = makeClientWithCustomResponse({
+      object: 'list',
+      data: [
+        { object: 'embedding', index: 0, embedding: [0.1, 0.2] }, // valid
+        null as any, // null object
+        { object: 'embedding', index: 2, embedding: [0.3, 0.4] }, // valid
+        undefined as any, // undefined object
+        { object: 'embedding', index: 4, embedding: [0.5, 0.6] }, // valid
+      ],
+      model: 'test-model',
+      usage: { prompt_tokens: 1, total_tokens: 1 },
+    });
+
+    const response = await client.embeddings.create({
+      input: ['test1', 'test2', 'test3', 'test4', 'test5'],
+      model: 'test-model',
+    });
+
+    // Should process valid items and skip null/undefined ones
+    expect(response.data.length).toBe(5);
+    expect(Array.isArray(response.data[0]?.embedding)).toBe(true);
+    expect(response.data[1]).toBe(null);
+    expect(Array.isArray(response.data[2]?.embedding)).toBe(true);
+    expect(response.data[3]).toBe(null); // undefined becomes null when serialized to JSON
+    expect(Array.isArray(response.data[4]?.embedding)).toBe(true);
+  });
 });
 
 function makeClient(): OpenAI {
@@ -96,6 +202,25 @@ function makeClient(): OpenAI {
         },
       },
     );
+  });
+
+  return new OpenAI({
+    fetch,
+    apiKey: 'My API Key',
+    baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
+  });
+}
+
+function makeClientWithCustomResponse(responseBody: any): OpenAI {
+  const { fetch, handleRequest } = mockFetch();
+
+  handleRequest(async () => {
+    return new Response(JSON.stringify(responseBody), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
   });
 
   return new OpenAI({
