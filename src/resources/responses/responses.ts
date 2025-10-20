@@ -12,6 +12,8 @@ import * as ResponsesAPI from './responses';
 import * as Shared from '../shared';
 import * as InputItemsAPI from './input-items';
 import { InputItemListParams, InputItems, ResponseItemList } from './input-items';
+import * as InputTokensAPI from './input-tokens';
+import { InputTokenCountParams, InputTokenCountResponse, InputTokens } from './input-tokens';
 import { APIPromise } from '../../core/api-promise';
 import { CursorPage } from '../../core/pagination';
 import { Stream } from '../../core/streaming';
@@ -58,6 +60,7 @@ export type ResponseParseParams = ResponseCreateParamsNonStreaming;
 
 export class Responses extends APIResource {
   inputItems: InputItemsAPI.InputItems = new InputItemsAPI.InputItems(this._client);
+  inputTokens: InputTokensAPI.InputTokens = new InputTokensAPI.InputTokens(this._client);
 
   /**
    * Creates a model response. Provide
@@ -5763,6 +5766,7 @@ export interface ResponseRetrieveParamsStreaming extends ResponseRetrieveParamsB
 }
 
 Responses.InputItems = InputItems;
+Responses.InputTokens = InputTokens;
 
 export declare namespace Responses {
   export {
@@ -5889,5 +5893,11 @@ export declare namespace Responses {
     InputItems as InputItems,
     type ResponseItemList as ResponseItemList,
     type InputItemListParams as InputItemListParams,
+  };
+
+  export {
+    InputTokens as InputTokens,
+    type InputTokenCountResponse as InputTokenCountResponse,
+    type InputTokenCountParams as InputTokenCountParams,
   };
 }
