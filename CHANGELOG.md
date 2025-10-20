@@ -1,5 +1,18 @@
 # Changelog
 
+## 6.6.0 (2025-10-20)
+
+Full Changelog: [v6.5.0...v6.6.0](https://github.com/openai/openai-node/compare/v6.5.0...v6.6.0)
+
+### Features
+
+* **api:** Add responses.input_tokens.count ([520c8a9](https://github.com/openai/openai-node/commit/520c8a95c857307b9329c4725cb40707d4e3eeee))
+
+
+### Bug Fixes
+
+* **api:** internal openapi updates ([d4aaef9](https://github.com/openai/openai-node/commit/d4aaef9c2e3d9f00b33d59e569149a937e5bd3f5))
+
 ## 6.5.0 (2025-10-17)
 
 Full Changelog: [v6.4.0...v6.5.0](https://github.com/openai/openai-node/compare/v6.4.0...v6.5.0)
