@@ -824,6 +824,16 @@ Methods:
 
 - <code title="get /responses/{response_id}/input_items">client.responses.inputItems.<a href="./src/resources/responses/input-items.ts">list</a>(responseID, { ...params }) -> ResponseItemsPage</code>
 
+## InputTokens
+
+Types:
+
+- <code><a href="./src/resources/responses/input-tokens.ts">InputTokenCountResponse</a></code>
+
+Methods:
+
+- <code title="post /responses/input_tokens">client.responses.inputTokens.<a href="./src/resources/responses/input-tokens.ts">count</a>({ ...params }) -> InputTokenCountResponse</code>
+
 # Realtime
 
 Types:

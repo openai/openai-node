@@ -135,6 +135,7 @@ client.example.list(undefined, { headers: { ... } });
 - `client.batches.list()`
 - `client.responses.retrieve()`
 - `client.responses.inputItems.list()`
+- `client.responses.inputTokens.count()`
 - `client.realtime.calls.reject()`
 - `client.conversations.create()`
 - `client.conversations.items.list()`
