@@ -3,8 +3,8 @@ import { z as zv3 } from 'zod/v3';
 import { z as zv4 } from 'zod/v4';
 
 describe.each([
-  { version: 'v3', z: zv3 as any },
-  { version: 'v4', z: zv4 as any },
+  { version: 'v3', z: zv3 },
+  { version: 'v4', z: zv4 as any as typeof zv3 },
 ])('zodResponseFormat (Zod $version)', ({ version, z }) => {
   it('does the thing', () => {
     expect(

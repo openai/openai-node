@@ -6,8 +6,8 @@ import { makeSnapshotRequest } from '../utils/mock-snapshots';
 jest.setTimeout(1000 * 30);
 
 describe.each([
-  { version: 'v4', z: z4 as any },
-  { version: 'v3', z: z3 as any },
+  { version: 'v3', z: z3 },
+  { version: 'v4', z: z4 as any as typeof z3 },
 ])('.parse()', ({ z, version }) => {
   describe('zod', () => {
     it('deserialises response_format', async () => {
@@ -1048,12 +1048,12 @@ describe.each([
       const baseLinkedListNodeSchema = z.object({
         value: z.number(),
       });
-      //@ts-ignore(2503)
-      type LinkedListNode = z.infer<typeof baseLinkedListNodeSchema> & {
+
+      type LinkedListNode = z3.infer<typeof baseLinkedListNodeSchema> & {
         next: LinkedListNode | null;
       };
-      //@ts-ignore(2503)
-      const linkedListNodeSchema: z.ZodType<LinkedListNode> = baseLinkedListNodeSchema.extend({
+
+      const linkedListNodeSchema: z3.ZodType<LinkedListNode> = baseLinkedListNodeSchema.extend({
         next: z.lazy(() => z.union([linkedListNodeSchema, z.null()])),
       });
 

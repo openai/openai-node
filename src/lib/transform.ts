@@ -1,20 +1,30 @@
 import type { JSONSchema, JSONSchemaDefinition } from './jsonschema';
 
 export function toStrictJsonSchema(schema: JSONSchema): JSONSchema {
-  return ensureStrictJsonSchema(schema, [], schema);
+  if (schema.type !== 'object') {
+    throw new Error(
+      `Root schema must have type: 'object' but got type: ${schema.type ? `'${schema.type}'` : 'undefined'}`,
+    );
+  }
+
+  const schemaCopy = structuredClone(schema);
+  return ensureStrictJsonSchema(schemaCopy, [], schemaCopy);
 }
 
 function isNullable(schema: JSONSchemaDefinition): boolean {
   if (typeof schema === 'boolean') {
     return false;
   }
+  if (schema.type === 'null') {
+    return true;
+  }
   for (const oneOfVariant of schema.oneOf ?? []) {
-    if (typeof oneOfVariant !== 'boolean' && oneOfVariant.type === 'null') {
+    if (isNullable(oneOfVariant)) {
       return true;
     }
   }
   for (const allOfVariant of schema.anyOf ?? []) {
-    if (typeof allOfVariant !== 'boolean' && allOfVariant.type === 'null') {
+    if (isNullable(allOfVariant)) {
       return true;
     }
   }
