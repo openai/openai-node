@@ -1,5 +1,18 @@
 # Changelog
 
+## 6.7.0 (2025-10-24)
+
+Full Changelog: [v6.6.0...v6.7.0](https://github.com/openai/openai-node/compare/v6.6.0...v6.7.0)
+
+### Features
+
+* add support for zod@4 schemas ([#1666](https://github.com/openai/openai-node/issues/1666)) ([10ef7ff](https://github.com/openai/openai-node/commit/10ef7ff4cb4aefeaa831b239943118ff52872f5c))
+
+
+### Bug Fixes
+
+* **api:** docs updates ([2591c21](https://github.com/openai/openai-node/commit/2591c211bce29d078579445d9a3b45d8de453ec3))
+
 ## 6.6.0 (2025-10-20)
 
 Full Changelog: [v6.5.0...v6.6.0](https://github.com/openai/openai-node/compare/v6.5.0...v6.6.0)
