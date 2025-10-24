@@ -44,13 +44,13 @@ function ensureStrictJsonSchema(
     throw new TypeError(`Expected object schema but got boolean; path=${path.join('/')}`);
   }
 
-  if (!isDict(jsonSchema)) {
-    throw new TypeError(`Expected ${JSON.stringify(jsonSchema)} to be a dictionary; path=${path.join('/')}`);
+  if (!isObject(jsonSchema)) {
+    throw new TypeError(`Expected ${JSON.stringify(jsonSchema)} to be an object; path=${path.join('/')}`);
   }
 
   // Handle $defs (non-standard but sometimes used)
   const defs = (jsonSchema as any).$defs;
-  if (isDict(defs)) {
+  if (isObject(defs)) {
     for (const [defName, defSchema] of Object.entries(defs)) {
       ensureStrictJsonSchema(defSchema as JSONSchema, [...path, '$defs', defName], root);
     }
@@ -58,7 +58,7 @@ function ensureStrictJsonSchema(
 
   // Handle definitions (draft-04 style, deprecated in draft-07 but still used)
   const definitions = (jsonSchema as any).definitions;
-  if (isDict(definitions)) {
+  if (isObject(definitions)) {
     for (const [definitionName, definitionSchema] of Object.entries(definitions)) {
       ensureStrictJsonSchema(definitionSchema as JSONSchema, [...path, 'definitions', definitionName], root);
     }
@@ -74,7 +74,7 @@ function ensureStrictJsonSchema(
 
   // Handle object properties
   const properties = jsonSchema.properties;
-  if (isDict(properties)) {
+  if (isObject(properties)) {
     for (const [key, value] of Object.entries(properties)) {
       if (!isNullable(value) && !required.includes(key)) {
         throw new Error(
@@ -95,7 +95,7 @@ function ensureStrictJsonSchema(
 
   // Handle arrays
   const items = jsonSchema.items;
-  if (isDict(items)) {
+  if (isObject(items)) {
     jsonSchema.items = ensureStrictJsonSchema(items, [...path, 'items'], root);
   }
 
@@ -137,9 +137,9 @@ function ensureStrictJsonSchema(
     if (typeof resolved === 'boolean') {
       throw new Error(`Expected \`$ref: ${ref}\` to resolve to an object schema but got boolean`);
     }
-    if (!isDict(resolved)) {
+    if (!isObject(resolved)) {
       throw new Error(
-        `Expected \`$ref: ${ref}\` to resolve to a dictionary but got ${JSON.stringify(resolved)}`,
+        `Expected \`$ref: ${ref}\` to resolve to an object but got ${JSON.stringify(resolved)}`,
       );
     }
 
@@ -164,10 +164,8 @@ function resolveRef(root: JSONSchema, ref: string): JSONSchemaDefinition {
   let resolved: any = root;
 
   for (const key of pathParts) {
-    if (!isDict(resolved)) {
-      throw new Error(
-        `encountered non-dictionary entry while resolving ${ref} - ${JSON.stringify(resolved)}`,
-      );
+    if (!isObject(resolved)) {
+      throw new Error(`encountered non-object entry while resolving ${ref} - ${JSON.stringify(resolved)}`);
     }
     const value = resolved[key];
     if (value === undefined) {
@@ -179,7 +177,7 @@ function resolveRef(root: JSONSchema, ref: string): JSONSchemaDefinition {
   return resolved;
 }
 
-function isDict<T>(obj: T | Array<any>): obj is Extract<T, Record<string, any>> {
+function isObject<T>(obj: T | Array<any>): obj is Extract<T, Record<string, any>> {
   return typeof obj === 'object' && obj !== null && !Array.isArray(obj);
 }
 
