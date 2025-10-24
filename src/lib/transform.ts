@@ -52,7 +52,7 @@ function ensureStrictJsonSchema(
   const defs = (jsonSchema as any).$defs;
   if (isDict(defs)) {
     for (const [defName, defSchema] of Object.entries(defs)) {
-      ensureStrictJsonSchema(defSchema, [...path, '$defs', defName], root);
+      ensureStrictJsonSchema(defSchema as JSONSchema, [...path, '$defs', defName], root);
     }
   }
 
@@ -60,7 +60,7 @@ function ensureStrictJsonSchema(
   const definitions = (jsonSchema as any).definitions;
   if (isDict(definitions)) {
     for (const [definitionName, definitionSchema] of Object.entries(definitions)) {
-      ensureStrictJsonSchema(definitionSchema, [...path, 'definitions', definitionName], root);
+      ensureStrictJsonSchema(definitionSchema as JSONSchema, [...path, 'definitions', definitionName], root);
     }
   }
 
@@ -96,7 +96,6 @@ function ensureStrictJsonSchema(
   // Handle arrays
   const items = jsonSchema.items;
   if (isDict(items)) {
-    // @ts-ignore(2345)
     jsonSchema.items = ensureStrictJsonSchema(items, [...path, 'items'], root);
   }
 
@@ -180,7 +179,7 @@ function resolveRef(root: JSONSchema, ref: string): JSONSchemaDefinition {
   return resolved;
 }
 
-function isDict(obj: any): obj is Record<string, any> {
+function isDict<T>(obj: T | Array<any>): obj is Extract<T, Record<string, any>> {
   return typeof obj === 'object' && obj !== null && !Array.isArray(obj);
 }
 
