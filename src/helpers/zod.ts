@@ -15,7 +15,6 @@ import { type ResponseFormatTextJSONSchemaConfig } from '../resources/responses/
 import { toStrictJsonSchema } from '../lib/transform';
 import { JSONSchema } from '../lib/jsonschema';
 
-// Add this helper type at the top
 type InferZodType<T> =
   T extends z4.ZodType ? z4.infer<T>
   : T extends z3.ZodType ? z3.infer<T>
