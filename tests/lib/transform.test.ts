@@ -375,7 +375,7 @@ describe('toStrictJsonSchema', () => {
   });
 
   describe('$ref Resolution', () => {
-    test('resolves and inlines $ref', () => {
+    test('processes definitions', () => {
       const schema: JSONSchema = {
         type: 'object',
         properties: {
