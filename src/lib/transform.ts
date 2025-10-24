@@ -130,7 +130,7 @@ function ensureStrictJsonSchema(
   const ref = (jsonSchema as any).$ref;
   if (ref && hasMoreThanNKeys(jsonSchema, 1)) {
     if (typeof ref !== 'string') {
-      throw new TypeError(`Received non-string $ref - ${ref}`);
+      throw new TypeError(`Received non-string $ref - ${ref}; path=${path.join('/')}`);
     }
 
     const resolved = resolveRef(root, ref);
