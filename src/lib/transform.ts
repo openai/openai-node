@@ -31,15 +31,15 @@ function isNullable(schema: JSONSchemaDefinition): boolean {
   return false;
 }
 
+/**
+ * Mutates the given JSON schema to ensure it conforms to the `strict` standard
+ * that the API expects.
+ */
 function ensureStrictJsonSchema(
   jsonSchema: JSONSchemaDefinition,
   path: string[],
   root: JSONSchema,
 ): JSONSchema {
-  /**
-   * Mutates the given JSON schema to ensure it conforms to the `strict` standard
-   * that the API expects.
-   */
   if (typeof jsonSchema === 'boolean') {
     throw new TypeError(`Expected object schema but got boolean; path=${path.join('/')}`);
   }
