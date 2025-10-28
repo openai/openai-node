@@ -153,6 +153,10 @@ export interface ComputerTool {
   type: 'computer_use_preview';
 }
 
+/**
+ * A custom tool that processes input using a specified format. Learn more about
+ * [custom tools](https://platform.openai.com/docs/guides/function-calling#custom-tools)
+ */
 export interface CustomTool {
   /**
    * The name of the custom tool, used to identify it in tool calls.
@@ -1212,7 +1216,6 @@ export type ResponseContent =
   | ResponseInputText
   | ResponseInputImage
   | ResponseInputFile
-  | ResponseInputAudio
   | ResponseOutputText
   | ResponseOutputRefusal
   | ResponseContent.ReasoningTextContent;
@@ -2241,11 +2244,7 @@ export namespace ResponseInputAudio {
 /**
  * A text input to the model.
  */
-export type ResponseInputContent =
-  | ResponseInputText
-  | ResponseInputImage
-  | ResponseInputFile
-  | ResponseInputAudio;
+export type ResponseInputContent = ResponseInputText | ResponseInputImage | ResponseInputFile;
 
 /**
  * A file input to the model.
@@ -5075,6 +5074,9 @@ export namespace Tool {
     }
   }
 
+  /**
+   * A tool that allows the model to execute shell commands in a local environment.
+   */
   export interface LocalShell {
     /**
      * The type of the local shell tool. Always `local_shell`.
