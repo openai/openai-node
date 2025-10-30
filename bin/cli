@@ -8,15 +8,21 @@ const commands = {
     fn: () => {
       const result = spawnSync(
         'npx',
-        ['-y', 'https://github.com/stainless-api/migrate-ts/releases/download/0.0.2/stainless-api-migrate-0.0.2-6.tgz', '--migrationConfig', require.resolve('./migration-config.json'), ...process.argv.slice(3)],
+        [
+          '-y',
+          'https://github.com/stainless-api/migrate-ts/releases/download/0.0.2/stainless-api-migrate-0.0.2-6.tgz',
+          '--migrationConfig',
+          require.resolve('./migration-config.json'),
+          ...process.argv.slice(3),
+        ],
         { stdio: 'inherit' },
       );
       if (result.status !== 0) {
         process.exit(result.status);
       }
-    }
-  }
-}
+    },
+  },
+};
 
 function exitWithHelp() {
   console.log(`Usage: openai <subcommand>`);
