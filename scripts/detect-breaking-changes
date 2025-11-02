@@ -34,6 +34,9 @@ TEST_PATHS=(
 	tests/api-resources/beta/realtime/realtime.test.ts
 	tests/api-resources/beta/realtime/sessions.test.ts
 	tests/api-resources/beta/realtime/transcription-sessions.test.ts
+	tests/api-resources/beta/chatkit/chatkit.test.ts
+	tests/api-resources/beta/chatkit/sessions.test.ts
+	tests/api-resources/beta/chatkit/threads.test.ts
 	tests/api-resources/beta/assistants.test.ts
 	tests/api-resources/beta/threads/threads.test.ts
 	tests/api-resources/beta/threads/runs/runs.test.ts
@@ -44,6 +47,7 @@ TEST_PATHS=(
 	tests/api-resources/uploads/parts.test.ts
 	tests/api-resources/responses/responses.test.ts
 	tests/api-resources/responses/input-items.test.ts
+	tests/api-resources/responses/input-tokens.test.ts
 	tests/api-resources/realtime/realtime.test.ts
 	tests/api-resources/realtime/client-secrets.test.ts
 	tests/api-resources/realtime/calls.test.ts
@@ -55,6 +59,7 @@ TEST_PATHS=(
 	tests/api-resources/containers/containers.test.ts
 	tests/api-resources/containers/files/files.test.ts
 	tests/api-resources/containers/files/content.test.ts
+	tests/api-resources/videos.test.ts
 	tests/index.test.ts
 )
 

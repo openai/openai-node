@@ -12,6 +12,8 @@ import * as ResponsesAPI from './responses';
 import * as Shared from '../shared';
 import * as InputItemsAPI from './input-items';
 import { InputItemListParams, InputItems, ResponseItemList } from './input-items';
+import * as InputTokensAPI from './input-tokens';
+import { InputTokenCountParams, InputTokenCountResponse, InputTokens } from './input-tokens';
 import { APIPromise } from '../../core/api-promise';
 import { CursorPage } from '../../core/pagination';
 import { Stream } from '../../core/streaming';
@@ -58,6 +60,7 @@ export type ResponseParseParams = ResponseCreateParamsNonStreaming;
 
 export class Responses extends APIResource {
   inputItems: InputItemsAPI.InputItems = new InputItemsAPI.InputItems(this._client);
+  inputTokens: InputTokensAPI.InputTokens = new InputTokensAPI.InputTokens(this._client);
 
   /**
    * Creates a model response. Provide
@@ -229,10 +232,6 @@ export interface ComputerTool {
   type: 'computer_use_preview';
 }
 
-/**
- * A custom tool that processes input using a specified format. Learn more about
- * [custom tools](https://platform.openai.com/docs/guides/function-calling#custom-tools).
- */
 export interface CustomTool {
   /**
    * The name of the custom tool, used to identify it in tool calls.
@@ -890,7 +889,7 @@ export namespace ResponseCodeInterpreterToolCall {
     logs: string;
 
     /**
-     * The type of the output. Always 'logs'.
+     * The type of the output. Always `logs`.
      */
     type: 'logs';
   }
@@ -900,7 +899,7 @@ export namespace ResponseCodeInterpreterToolCall {
    */
   export interface Image {
     /**
-     * The type of the output. Always 'image'.
+     * The type of the output. Always `image`.
      */
     type: 'image';
 
@@ -990,8 +989,7 @@ export namespace ResponseComputerToolCall {
     button: 'left' | 'right' | 'wheel' | 'back' | 'forward';
 
     /**
-     * Specifies the event type. For a click action, this property is always set to
-     * `click`.
+     * Specifies the event type. For a click action, this property is always `click`.
      */
     type: 'click';
 
@@ -1053,7 +1051,7 @@ export namespace ResponseComputerToolCall {
 
   export namespace Drag {
     /**
-     * A series of x/y coordinate pairs in the drag path.
+     * An x/y coordinate pair, e.g. `{ x: 100, y: 200 }`.
      */
     export interface Path {
       /**
@@ -1187,12 +1185,12 @@ export namespace ResponseComputerToolCall {
     /**
      * The type of the pending safety check.
      */
-    code: string;
+    code?: string | null;
 
     /**
      * Details about the pending safety check.
      */
-    message: string;
+    message?: string | null;
   }
 }
 
@@ -1243,12 +1241,12 @@ export namespace ResponseComputerToolCallOutputItem {
     /**
      * The type of the pending safety check.
      */
-    code: string;
+    code?: string | null;
 
     /**
      * Details about the pending safety check.
      */
-    message: string;
+    message?: string | null;
   }
 }
 
@@ -2240,10 +2238,13 @@ export interface ResponseInProgressEvent {
  */
 export type ResponseIncludable =
   | 'file_search_call.results'
+  | 'web_search_call.results'
+  | 'web_search_call.action.sources'
   | 'message.input_image.image_url'
   | 'computer_call_output.output.image_url'
+  | 'code_interpreter_call.outputs'
   | 'reasoning.encrypted_content'
-  | 'code_interpreter_call.outputs';
+  | 'message.output_text.logprobs';
 
 /**
  * An event that is emitted when a response finishes as incomplete.
@@ -5066,9 +5067,7 @@ export namespace Tool {
     background?: 'transparent' | 'opaque' | 'auto';
 
     /**
-     * Control how much effort the model will exert to match the style and features,
-     * especially facial features, of input images. This parameter is only supported
-     * for `gpt-image-1`. Supports `high` and `low`. Defaults to `low`.
+     * Control how much effort the model will exert to match the style and features, especially facial features, of input images. This parameter is only supported for `gpt-image-1`. Unsupported for `gpt-image-1-mini`. Supports `high` and `low`. Defaults to `low`.
      */
     input_fidelity?: 'high' | 'low' | null;
 
@@ -5081,7 +5080,7 @@ export namespace Tool {
     /**
      * The image generation model to use. Default: `gpt-image-1`.
      */
-    model?: 'gpt-image-1';
+    model?: 'gpt-image-1' | 'gpt-image-1-mini';
 
     /**
      * Moderation level for the generated image. Default: `auto`.
@@ -5136,9 +5135,6 @@ export namespace Tool {
     }
   }
 
-  /**
-   * A tool that allows the model to execute shell commands in a local environment.
-   */
   export interface LocalShell {
     /**
      * The type of the local shell tool. Always `local_shell`.
@@ -5770,6 +5766,7 @@ export interface ResponseRetrieveParamsStreaming extends ResponseRetrieveParamsB
 }
 
 Responses.InputItems = InputItems;
+Responses.InputTokens = InputTokens;
 
 export declare namespace Responses {
   export {
@@ -5896,5 +5893,11 @@ export declare namespace Responses {
     InputItems as InputItems,
     type ResponseItemList as ResponseItemList,
     type InputItemListParams as InputItemListParams,
+  };
+
+  export {
+    InputTokens as InputTokens,
+    type InputTokenCountResponse as InputTokenCountResponse,
+    type InputTokenCountParams as InputTokenCountParams,
   };
 }
