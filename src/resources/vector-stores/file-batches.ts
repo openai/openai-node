@@ -256,13 +256,6 @@ export namespace VectorStoreFileBatch {
 
 export interface FileBatchCreateParams {
   /**
-   * A list of [File](https://platform.openai.com/docs/api-reference/files) IDs that
-   * the vector store should use. Useful for tools like `file_search` that can access
-   * files.
-   */
-  file_ids: Array<string>;
-
-  /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
    * for storing additional information about the object in a structured format, and
    * querying for objects via API or the dashboard. Keys are strings with a maximum
@@ -276,6 +269,48 @@ export interface FileBatchCreateParams {
    * strategy. Only applicable if `file_ids` is non-empty.
    */
   chunking_strategy?: VectorStoresAPI.FileChunkingStrategyParam;
+
+  /**
+   * A list of [File](https://platform.openai.com/docs/api-reference/files) IDs that
+   * the vector store should use. Useful for tools like `file_search` that can access
+   * files. If `attributes` or `chunking_strategy` are provided, they will be applied
+   * to all files in the batch. Mutually exclusive with `files`.
+   */
+  file_ids?: Array<string>;
+
+  /**
+   * A list of objects that each include a `file_id` plus optional `attributes` or
+   * `chunking_strategy`. Use this when you need to override metadata for specific
+   * files. The global `attributes` or `chunking_strategy` will be ignored and must
+   * be specified for each file. Mutually exclusive with `file_ids`.
+   */
+  files?: Array<FileBatchCreateParams.File>;
+}
+
+export namespace FileBatchCreateParams {
+  export interface File {
+    /**
+     * A [File](https://platform.openai.com/docs/api-reference/files) ID that the
+     * vector store should use. Useful for tools like `file_search` that can access
+     * files.
+     */
+    file_id: string;
+
+    /**
+     * Set of 16 key-value pairs that can be attached to an object. This can be useful
+     * for storing additional information about the object in a structured format, and
+     * querying for objects via API or the dashboard. Keys are strings with a maximum
+     * length of 64 characters. Values are strings with a maximum length of 512
+     * characters, booleans, or numbers.
+     */
+    attributes?: { [key: string]: string | number | boolean } | null;
+
+    /**
+     * The chunking strategy used to chunk the file(s). If not set, will use the `auto`
+     * strategy. Only applicable if `file_ids` is non-empty.
+     */
+    chunking_strategy?: VectorStoresAPI.FileChunkingStrategyParam;
+  }
 }
 
 export interface FileBatchRetrieveParams {

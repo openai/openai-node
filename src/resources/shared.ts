@@ -135,6 +135,9 @@ export interface CompoundFilter {
 export type CustomToolInputFormat = CustomToolInputFormat.Text | CustomToolInputFormat.Grammar;
 
 export namespace CustomToolInputFormat {
+  /**
+   * Unconstrained free-form text.
+   */
   export interface Text {
     /**
      * Unconstrained text format. Always `text`.
@@ -142,6 +145,9 @@ export namespace CustomToolInputFormat {
     type: 'text';
   }
 
+  /**
+   * A grammar defined by the user.
+   */
   export interface Grammar {
     /**
      * The grammar definition.
