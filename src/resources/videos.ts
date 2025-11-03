@@ -115,6 +115,11 @@ export interface Video {
   progress: number;
 
   /**
+   * The prompt that was used to generate the video.
+   */
+  prompt: string | null;
+
+  /**
    * Identifier of the source video if this video is a remix.
    */
   remixed_from_video_id: string | null;
