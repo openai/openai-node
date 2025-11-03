@@ -323,6 +323,12 @@ export namespace FileSearchTool {
    */
   export interface RankingOptions {
     /**
+     * Weights that control how reciprocal rank fusion balances semantic embedding
+     * matches versus sparse keyword matches when hybrid search is enabled.
+     */
+    hybrid_search?: RankingOptions.HybridSearch;
+
+    /**
      * The ranker to use for the file search.
      */
     ranker?: 'auto' | 'default-2024-11-15';
@@ -333,6 +339,24 @@ export namespace FileSearchTool {
      * return fewer results.
      */
     score_threshold?: number;
+  }
+
+  export namespace RankingOptions {
+    /**
+     * Weights that control how reciprocal rank fusion balances semantic embedding
+     * matches versus sparse keyword matches when hybrid search is enabled.
+     */
+    export interface HybridSearch {
+      /**
+       * The weight of the embedding in the reciprocal ranking fusion.
+       */
+      embedding_weight: number;
+
+      /**
+       * The weight of the text in the reciprocal ranking fusion.
+       */
+      text_weight: number;
+    }
   }
 }
 
@@ -3846,6 +3870,8 @@ export interface ResponseOutputText {
     | ResponseOutputText.FilePath
   >;
 
+  logprobs: Array<ResponseOutputText.Logprob>;
+
   /**
    * The text output from the model.
    */
@@ -3855,8 +3881,6 @@ export interface ResponseOutputText {
    * The type of the output text. Always `output_text`.
    */
   type: 'output_text';
-
-  logprobs?: Array<ResponseOutputText.Logprob>;
 }
 
 export namespace ResponseOutputText {
@@ -5047,6 +5071,8 @@ export namespace Tool {
        * An optional list of uploaded files to make available to your code.
        */
       file_ids?: Array<string>;
+
+      memory_limit?: '1g' | '4g' | '16g' | '64g' | null;
     }
   }
 
@@ -5066,7 +5092,10 @@ export namespace Tool {
     background?: 'transparent' | 'opaque' | 'auto';
 
     /**
-     * Control how much effort the model will exert to match the style and features, especially facial features, of input images. This parameter is only supported for `gpt-image-1`. Unsupported for `gpt-image-1-mini`. Supports `high` and `low`. Defaults to `low`.
+     * Control how much effort the model will exert to match the style and features,
+     * especially facial features, of input images. This parameter is only supported
+     * for `gpt-image-1`. Unsupported for `gpt-image-1-mini`. Supports `high` and
+     * `low`. Defaults to `low`.
      */
     input_fidelity?: 'high' | 'low' | null;
 
