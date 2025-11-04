@@ -3810,8 +3810,6 @@ export interface ResponseOutputText {
     | ResponseOutputText.FilePath
   >;
 
-  logprobs: Array<ResponseOutputText.Logprob>;
-
   /**
    * The text output from the model.
    */
@@ -3821,6 +3819,8 @@ export interface ResponseOutputText {
    * The type of the output text. Always `output_text`.
    */
   type: 'output_text';
+
+  logprobs?: Array<ResponseOutputText.Logprob>;
 }
 
 export namespace ResponseOutputText {
