@@ -38,7 +38,7 @@ describe('resource runs', () => {
       metadata: { foo: 'string' },
       model: 'string',
       parallel_tool_calls: true,
-      reasoning_effort: 'minimal',
+      reasoning_effort: 'none',
       response_format: 'auto',
       stream: false,
       temperature: 1,
