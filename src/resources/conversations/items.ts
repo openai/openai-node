@@ -89,6 +89,10 @@ export type ConversationItem =
   | ResponsesAPI.ResponseCodeInterpreterToolCall
   | ConversationItem.LocalShellCall
   | ConversationItem.LocalShellCallOutput
+  | ResponsesAPI.ResponseFunctionShellToolCall
+  | ResponsesAPI.ResponseFunctionShellToolCallOutput
+  | ResponsesAPI.ResponseApplyPatchToolCall
+  | ResponsesAPI.ResponseApplyPatchToolCallOutput
   | ConversationItem.McpListTools
   | ConversationItem.McpApprovalRequest
   | ConversationItem.McpApprovalResponse

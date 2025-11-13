@@ -695,12 +695,16 @@ Methods:
 
 Types:
 
+- <code><a href="./src/resources/responses/responses.ts">ApplyPatchTool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ComputerTool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">CustomTool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">EasyInputMessage</a></code>
 - <code><a href="./src/resources/responses/responses.ts">FileSearchTool</a></code>
+- <code><a href="./src/resources/responses/responses.ts">FunctionShellTool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">FunctionTool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">Response</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseApplyPatchToolCall</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseApplyPatchToolCallOutput</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseAudioDeltaEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseAudioDoneEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseAudioTranscriptDeltaEvent</a></code>
@@ -737,6 +741,9 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponseFunctionCallArgumentsDoneEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseFunctionCallOutputItem</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseFunctionCallOutputItemList</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseFunctionShellCallOutputContent</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseFunctionShellToolCall</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseFunctionShellToolCallOutput</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseFunctionToolCall</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseFunctionToolCallItem</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseFunctionToolCallOutputItem</a></code>
@@ -799,10 +806,12 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponseWebSearchCallSearchingEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">Tool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ToolChoiceAllowed</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ToolChoiceApplyPatch</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ToolChoiceCustom</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ToolChoiceFunction</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ToolChoiceMcp</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ToolChoiceOptions</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ToolChoiceShell</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ToolChoiceTypes</a></code>
 - <code><a href="./src/resources/responses/responses.ts">WebSearchPreviewTool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">WebSearchTool</a></code>
