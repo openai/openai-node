@@ -100,6 +100,8 @@ export interface InputTokenCountParams {
     | ResponsesAPI.ToolChoiceFunction
     | ResponsesAPI.ToolChoiceMcp
     | ResponsesAPI.ToolChoiceCustom
+    | ResponsesAPI.ToolChoiceApplyPatch
+    | ResponsesAPI.ToolChoiceShell
     | null;
 
   /**
