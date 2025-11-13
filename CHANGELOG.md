@@ -1,5 +1,18 @@
 # Changelog
 
+## 6.9.0 (2025-11-13)
+
+Full Changelog: [v6.8.1...v6.9.0](https://github.com/openai/openai-node/compare/v6.8.1...v6.9.0)
+
+### Features
+
+* **api:** gpt 5.1 ([58e78a8](https://github.com/openai/openai-node/commit/58e78a86899b43eb9afdb6f0afd60b912eae41f2))
+
+
+### Chores
+
+* add typescript-estree dependency for jsr readme script ([3759514](https://github.com/openai/openai-node/commit/37595149720edd7bf4c11760084cad7753c2f289))
+
 ## 6.8.1 (2025-11-05)
 
 Full Changelog: [v6.8.0...v6.8.1](https://github.com/openai/openai-node/compare/v6.8.0...v6.8.1)
