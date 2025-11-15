@@ -1,6 +1,6 @@
 import { ResponseFormatJSONSchema } from '../resources/index';
-import { z as z3 } from 'zod/v3';
-import { z as z4 } from 'zod/v4';
+import * as z3 from 'zod/v3';
+import * as z4 from 'zod/v4';
 import {
   AutoParseableResponseFormat,
   AutoParseableTextFormat,
