@@ -359,4 +359,33 @@ describe.each([
 
     expect(consoleSpy).toHaveBeenCalledTimes(0);
   });
+
+  it('sanitizes property names with spaces in $ref values', () => {
+    const Thing = z.object({ id: z.string() });
+    const Root = z.object({
+      group: z.object({
+        'Thing With Spaces': Thing,
+        AnotherUsage: Thing,
+      }),
+    });
+
+    const result = zodResponseFormat(Root, 'example-scope');
+    const schema = result.json_schema.schema;
+
+    // Check definitions keys (draft-07 uses "definitions" not "$defs")
+    const defs = (schema as any).definitions || (schema as any).$defs || {};
+    const defsKeys = Object.keys(defs);
+    const defsWithSpaces = defsKeys.filter((key: string) => key.includes(' '));
+    expect(defsWithSpaces).toEqual([]);
+
+    // Check all $ref values don't contain spaces
+    const schemaStr = JSON.stringify(schema);
+    const refMatches = schemaStr.match(/"\$ref"\s*:\s*"([^"]+)"/g) || [];
+
+    refMatches.forEach((match) => {
+      const refValue = match.match(/"\$ref"\s*:\s*"([^"]+)"/)?.[1];
+      expect(refValue).toBeDefined();
+      expect(refValue).not.toContain(' ');
+    });
+  });
 });
