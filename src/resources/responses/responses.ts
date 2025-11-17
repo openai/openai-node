@@ -640,6 +640,15 @@ export interface ResponseApplyPatchToolCall {
   call_id: string;
 
   /**
+   * One of the create_file, delete_file, or update_file operations applied via
+   * apply_patch.
+   */
+  operation:
+    | ResponseApplyPatchToolCall.CreateFile
+    | ResponseApplyPatchToolCall.DeleteFile
+    | ResponseApplyPatchToolCall.UpdateFile;
+
+  /**
    * The status of the apply patch tool call. One of `in_progress` or `completed`.
    */
   status: 'in_progress' | 'completed';
@@ -653,15 +662,6 @@ export interface ResponseApplyPatchToolCall {
    * The ID of the entity that created this tool call.
    */
   created_by?: string;
-
-  /**
-   * One of the create_file, delete_file, or update_file operations applied via
-   * apply_patch.
-   */
-  operation?:
-    | ResponseApplyPatchToolCall.CreateFile
-    | ResponseApplyPatchToolCall.DeleteFile
-    | ResponseApplyPatchToolCall.UpdateFile;
 }
 
 export namespace ResponseApplyPatchToolCall {
@@ -737,11 +737,6 @@ export interface ResponseApplyPatchToolCallOutput {
   call_id: string;
 
   /**
-   * Optional textual output returned by the apply patch tool.
-   */
-  output: string | null;
-
-  /**
    * The status of the apply patch tool call output. One of `completed` or `failed`.
    */
   status: 'completed' | 'failed';
@@ -755,6 +750,11 @@ export interface ResponseApplyPatchToolCallOutput {
    * The ID of the entity that created this tool call output.
    */
   created_by?: string;
+
+  /**
+   * Optional textual output returned by the apply patch tool.
+   */
+  output?: string | null;
 }
 
 /**
@@ -3211,7 +3211,7 @@ export namespace ResponseInputItem {
      * Optional human-readable log text from the apply patch tool (e.g., patch results
      * or errors).
      */
-    output?: string;
+    output?: string | null;
   }
 
   /**
