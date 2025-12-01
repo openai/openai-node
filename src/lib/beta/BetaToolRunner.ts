@@ -72,6 +72,11 @@ export class BetaToolRunner<Stream extends boolean> {
     this.#completion = promiseWithResolvers();
   }
 
+  get #firstChoiceInCurrentMessage(): ChatCompletionMessageParam | null {
+    const lastMessage = this.#state.params.messages[this.#state.params.messages.length - 1];
+    return lastMessage ?? null;
+  }
+
   async *[Symbol.asyncIterator](): AsyncIterator<
     Stream extends true ?
       ChatCompletionStream // TODO: for now!
@@ -112,18 +117,38 @@ export class BetaToolRunner<Stream extends boolean> {
             // this.#message.catch(() => {});
             // yield stream as any;
           } else {
-            this.#message = this.client.beta.chat.completions.create({ ...params, stream: false });
+            console.log('making request with params:', JSON.stringify(params, null, 2));
+            this.#message = this.client.beta.chat.completions.create({
+              stream: false,
+              tools: params.tools,
+              messages: params.messages,
+              model: params.model,
+            });
+            console.log('Message created:', JSON.stringify(await this.#message, null, 2));
             yield this.#message as any;
           }
 
-          if (!this.#mutated) {
-            const { choices } = await this.#message;
-            const { role, content } = choices[0]!.message; // TODO: ensure there's at least one choice
-            // this.#state.params.messages.push({ role, content }); TODO: we want to add all
-            this.#state.params.messages.push({ role, content });
+          if (!this.#message) {
+            throw new Error('No message created'); // TODO: use better error
           }
 
-          const toolMessage = await this.#generateToolResponse(this.#state.params.messages.at(-1)!);
+          // TODO: we should probably hit the user with a callback or somehow offer for them to choice between the choices
+          const { choices } = await this.#message;
+
+          if (!this.#firstChoiceInCurrentMessage) {
+            throw new Error('No choices found in message'); // TODO: use better error
+          }
+
+          const { role: firstChoiceRole, content: firstChoiceContent } = this.#firstChoiceInCurrentMessage;
+
+          if (!this.#mutated) {
+            console.log(choices);
+            // this.#state.params.messages.push({ role, content }); TODO: we want to add all
+            this.#state.params.messages.push(this.#firstChoiceInCurrentMessage as ChatCompletionMessageParam);
+          }
+
+          const toolMessage = await this.#generateToolResponse((await this.#message).choices[0]!);
+          console.log('Tool message:', toolMessage);
           if (toolMessage) {
             this.#state.params.messages.push(toolMessage);
           }
@@ -204,15 +229,17 @@ export class BetaToolRunner<Stream extends boolean> {
     if (!message) {
       return null;
     }
+    console.log("Message:", message[0]);
     // TODO: this cast is probably bad
-    return this.#generateToolResponse(message as ChatCompletionMessageParam);
+    return this.#generateToolResponse(message[0]);
   }
 
-  async #generateToolResponse(lastMessage: ChatCompletionMessageParam) {
+  async #generateToolResponse(lastMessage: ChatCompletion.Choice) {
+    console.log('Last message:', lastMessage.message);
     if (this.#toolResponse !== undefined) {
       return this.#toolResponse;
     }
-    this.#toolResponse = generateToolResponse(this.#state.params, lastMessage);
+    this.#toolResponse = generateToolResponse(this.#state.params, lastMessage.message!); // TODO: maybe undefined
     return this.#toolResponse;
   }
 
@@ -313,19 +340,19 @@ export class BetaToolRunner<Stream extends boolean> {
 
 async function generateToolResponse(
   params: BetaToolRunnerParams,
-  lastMessage = params.messages.at(-1),
+  lastMessageFirstChoice = params.messages.at(-1),
 ): Promise<ChatCompletionToolMessageParam | null> {
   // Only process if the last message is from the assistant and has tool use blocks
   if (
-    !lastMessage ||
-    lastMessage.role !== 'assistant' ||
-    !lastMessage.tool_calls ||
-    lastMessage.tool_calls.length === 0
+    !lastMessageFirstChoice ||
+    lastMessageFirstChoice.role !== 'assistant' ||
+    !lastMessageFirstChoice.tool_calls ||
+    lastMessageFirstChoice.tool_calls.length === 0
   ) {
     return null;
   }
 
-  const toolUseBlocks = lastMessage.tool_calls.filter((toolCall) => toolCall.type === 'function');
+  const toolUseBlocks = lastMessageFirstChoice.tool_calls.filter((toolCall) => toolCall.type === 'function');
   if (toolUseBlocks.length === 0) {
     return null;
   }
