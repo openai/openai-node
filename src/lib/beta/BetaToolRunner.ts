@@ -45,7 +45,7 @@ export class BetaToolRunner<Stream extends boolean> {
   /** Promise for the last message received from the assistant */
   #message?: Promise<ChatCompletion> | undefined;
   /** Cached tool response to avoid redundant executions */
-  #toolResponse?: Promise<ChatCompletionToolMessageParam | null> | undefined;
+  #toolResponse?: Promise<null | ChatCompletionToolMessageParam[]> | undefined;
   /** Promise resolvers for waiting on completion */
   #completion: {
     promise: Promise<ChatCompletion>;
@@ -107,24 +107,21 @@ export class BetaToolRunner<Stream extends boolean> {
           this.#toolResponse = undefined;
           this.#iterationCount++;
 
-          const { max_iterations, ...params } = this.#state.params;
+          const { ...params } = this.#state.params;
           if (params.stream) {
-            throw new Error('TODO'); // TODO
-            // stream = this.client.beta.chat.completions.stream({ ...params });
-            // this.#message = stream.finalMessage();
-            // // Make sure that this promise doesn't throw before we get the option to do something about it.
-            // // Error will be caught when we call await this.#message ultimately
-            // this.#message.catch(() => {});
-            // yield stream as any;
+            stream = this.client.beta.chat.completions.stream({ ...params, stream: true });
+            this.#message = stream.finalMessage();
+            // Make sure that this promise doesn't throw before we get the option to do something about it.
+            // Error will be caught when we call await this.#message ultimately
+            this.#message?.catch(() => {});
+            yield stream as any;
           } else {
-            console.log('making request with params:', JSON.stringify(params, null, 2));
             this.#message = this.client.beta.chat.completions.create({
               stream: false,
               tools: params.tools,
               messages: params.messages,
               model: params.model,
             });
-            console.log('Message created:', JSON.stringify(await this.#message, null, 2));
             yield this.#message as any;
           }
 
@@ -133,27 +130,24 @@ export class BetaToolRunner<Stream extends boolean> {
           }
 
           // TODO: we should probably hit the user with a callback or somehow offer for them to choice between the choices
-          const { choices } = await this.#message;
-
           if (!this.#firstChoiceInCurrentMessage) {
             throw new Error('No choices found in message'); // TODO: use better error
           }
 
-          const { role: firstChoiceRole, content: firstChoiceContent } = this.#firstChoiceInCurrentMessage;
-
           if (!this.#mutated) {
-            console.log(choices);
             // this.#state.params.messages.push({ role, content }); TODO: we want to add all
-            this.#state.params.messages.push(this.#firstChoiceInCurrentMessage as ChatCompletionMessageParam);
+            this.#state.params.messages.push(this.#firstChoiceInCurrentMessage);
           }
 
-          const toolMessage = await this.#generateToolResponse((await this.#message).choices[0]!);
-          console.log('Tool message:', toolMessage);
-          if (toolMessage) {
-            this.#state.params.messages.push(toolMessage);
+          const toolMessages = await this.#generateToolResponse(await this.#message);
+          if (toolMessages) {
+            for (const toolMessage of toolMessages) {
+              this.#state.params.messages.push(toolMessage);
+            }
           }
 
-          if (!toolMessage && !this.#mutated) {
+          // TODO: make sure this is correct?
+          if (!toolMessages && !this.#mutated) {
             break;
           }
         } finally {
@@ -229,17 +223,17 @@ export class BetaToolRunner<Stream extends boolean> {
     if (!message) {
       return null;
     }
-    console.log("Message:", message[0]);
-    // TODO: this cast is probably bad
-    return this.#generateToolResponse(message[0]);
+    return this.#generateToolResponse(message);
   }
 
-  async #generateToolResponse(lastMessage: ChatCompletion.Choice) {
-    console.log('Last message:', lastMessage.message);
+  async #generateToolResponse(lastMessage: ChatCompletion | ChatCompletionMessageParam) {
     if (this.#toolResponse !== undefined) {
       return this.#toolResponse;
     }
-    this.#toolResponse = generateToolResponse(this.#state.params, lastMessage.message!); // TODO: maybe undefined
+    this.#toolResponse = generateToolResponse(
+      lastMessage,
+      this.#state.params.tools.filter((tool): tool is BetaRunnableTool<any> => 'run' in tool),
+    );
     return this.#toolResponse;
   }
 
@@ -339,70 +333,79 @@ export class BetaToolRunner<Stream extends boolean> {
 }
 
 async function generateToolResponse(
-  params: BetaToolRunnerParams,
-  lastMessageFirstChoice = params.messages.at(-1),
-): Promise<ChatCompletionToolMessageParam | null> {
+  params: ChatCompletion | ChatCompletionMessageParam,
+  tools: BetaRunnableTool<any>[],
+): Promise<null | ChatCompletionToolMessageParam[]> {
+  if (!('choices' in params)) {
+    return null;
+  }
+  const { choices } = params;
+  const lastMessage = choices[0]?.message;
+  if (!lastMessage) {
+    return null;
+  }
+
   // Only process if the last message is from the assistant and has tool use blocks
   if (
-    !lastMessageFirstChoice ||
-    lastMessageFirstChoice.role !== 'assistant' ||
-    !lastMessageFirstChoice.tool_calls ||
-    lastMessageFirstChoice.tool_calls.length === 0
+    !lastMessage ||
+    lastMessage.role !== 'assistant' ||
+    !lastMessage.content ||
+    typeof lastMessage.content === 'string'
   ) {
     return null;
   }
 
-  const toolUseBlocks = lastMessageFirstChoice.tool_calls.filter((toolCall) => toolCall.type === 'function');
-  if (toolUseBlocks.length === 0) {
+  const { tool_calls: prevToolCalls = [] } = lastMessage;
+
+  if ((lastMessage.tool_calls ?? []).length === 0) {
     return null;
   }
 
-  const toolResults = await Promise.all(
-    toolUseBlocks.map(async (toolUse) => {
-      // TODO: we should be able to infer that toolUseBlocks is FunctionDefinition[] or can cast it (maybe!)
-      const tool = params.tools.find(
-        (t) =>
-          ('name' in t && 'function' in t ? t.function.name
-          : 'name' in t ? t.name
-          : undefined) === toolUse.function.name,
-      );
-      if (!tool || !('run' in tool)) {
-        return {
-          type: 'tool_result' as const,
-          tool_use_id: toolUse.id,
-          content: `Error: Tool '${toolUse.function.name}' not found`,
-          is_error: true,
-        };
-      }
+  return (
+    await Promise.all(
+      prevToolCalls.map(async (toolUse) => {
+        if (toolUse.type !== 'function') return; // TODO: what about other calls?
 
-      try {
-        let input = JSON.parse(toolUse.function.arguments);
-        if ('parse' in tool && tool.parse) {
-          input = tool.parse(input);
+        const tool = tools.find(
+          (t) => t.type === 'function' && toolUse.function.name === t.function.name,
+        ) as BetaRunnableTool;
+
+        if (!tool || !('run' in tool)) {
+          return {
+            type: 'tool_result' as const,
+            tool_call_id: toolUse.id,
+            content: `Error: Tool '${toolUse.function.name}' not found`,
+            is_error: true,
+          };
         }
 
-        const result = await tool.run(input);
-        return {
-          type: 'tool_result' as const,
-          tool_use_id: toolUse.id,
-          content: result,
-        };
-      } catch (error) {
-        return {
-          type: 'tool_result' as const,
-          tool_use_id: toolUse.id,
-          content: `Error: ${error instanceof Error ? error.message : String(error)}`,
-          is_error: true,
-        };
-      }
-    }),
-  );
+        try {
+          let input = toolUse.function.arguments;
+          input = tool.parse(input);
 
-  return {
-    role: 'tool' as const,
-    content: JSON.stringify(toolResults),
-    tool_call_id: toolUseBlocks[0]!.id,
-  };
+          const result = await tool.run(input);
+          return {
+            type: 'tool_result' as const,
+            tool_call_id: toolUse.id,
+            content: typeof result === 'string' ? result : JSON.stringify(result),
+          };
+        } catch (error) {
+          return {
+            type: 'tool_result' as const,
+            tool_call_id: toolUse.id,
+            content: `Error: ${error instanceof Error ? error.message : String(error)}`,
+            is_error: true,
+          };
+        }
+      }),
+    )
+  )
+    .filter((result): result is NonNullable<typeof result> => result != null)
+    .map((toolResult) => ({
+      role: 'tool' as const,
+      content: toolResult.content,
+      tool_call_id: toolResult.tool_call_id,
+    }));
 }
 
 // vendored from typefest just to make things look a bit nicer on hover
