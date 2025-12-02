@@ -100,6 +100,7 @@ async function main() {
       console.log();
     }
   }
+  console.log(JSON.stringify(runner.params.messages, null, 2));
 }
 
 main();

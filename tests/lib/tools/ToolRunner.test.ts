@@ -5,7 +5,7 @@ import OpenAI from 'openai';
 // import { Fetch } from 'openai/sdk/internal/builtin-types';
 import { mockFetch } from '../../utils/mock-fetch';
 import { BetaRunnableTool } from 'openai/lib/beta/BetaRunnableTool';
-import { ChatCompletion, ChatCompletionChunk, ChatCompletionCreateParams, ChatCompletionMessage } from 'openai/resources';
+import { ChatCompletion, ChatCompletionChunk, ChatCompletionMessage, ChatCompletionTool, ChatCompletionToolMessageParam } from 'openai/resources';
 import { Fetch } from 'openai/internal/builtin-types';
 import { ChatCompletionStream } from 'openai/lib/ChatCompletionStream';
 
@@ -48,12 +48,12 @@ const calculatorTool: BetaRunnableTool<{ a: number; b: number; operation: string
 };
 
 // Helper functions to create content blocks
-function getWeatherToolUse(location: string, id: string = 'tool_1'): BetaContentBlock {
+function getWeatherToolUse(location: string, id: string = 'tool_1'): ChatCompletionFunctionTool {
   return { type: 'tool_use', id, name: 'getWeather', input: { location } };
 }
 
-function getWeatherToolResult(location: string, id: string = 'tool_1'): BetaToolResultBlockParam {
-  return { type: 'tool_result', tool_use_id: id, content: `Sunny in ${location}` };
+function getWeatherToolResult(location: string, id: string = 'tool_1'): ChatCompletionToolMessageParam {
+  return { role: 'tool', tool_use_id: id, content: `Sunny in ${location}` };
 }
 
 function getCalculatorToolUse(
@@ -294,7 +294,7 @@ function setupTest(params: Partial<ToolRunnerParams> = {}): SetupTestResult<bool
     };
 
     handleStreamEvents(betaMessageToStreamEvents(message));
-    return new ChatCompletionStream(message as ChatCompletionCreateParams);
+    return new ChatCompletionStream(message);
   };
 
   const client = new OpenAI({ apiKey: 'test-key', fetch: fetch, maxRetries: 0 });
