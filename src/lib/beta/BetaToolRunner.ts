@@ -1,3 +1,5 @@
+import type { OpenAI } from '../..';
+import { OpenAIError } from '../../core/error';
 import type {
   ChatCompletion,
   ChatCompletionCreateParams,
@@ -6,8 +8,6 @@ import type {
   ChatCompletionTool,
   ChatCompletionToolMessageParam,
 } from '../../resources/chat/completions';
-import type { OpenAI } from '../..';
-import { OpenAIError } from '../../core/error';
 import type { BetaRunnableTool } from './BetaRunnableTool';
 // BetaMessage, BetaMessageParam, BetaToolUnion, MessageCreateParams
 // import { BetaMessageStream } from '../BetaMessageStream';
@@ -72,11 +72,6 @@ export class BetaToolRunner<Stream extends boolean> {
     this.#completion = promiseWithResolvers();
   }
 
-  get #firstChoiceInCurrentMessage(): ChatCompletionMessageParam | null {
-    const lastMessage = this.#state.params.messages[this.#state.params.messages.length - 1];
-    return lastMessage ?? null;
-  }
-
   async *[Symbol.asyncIterator](): AsyncIterator<
     Stream extends true ?
       ChatCompletionStream // TODO: for now!
@@ -130,13 +125,16 @@ export class BetaToolRunner<Stream extends boolean> {
           }
 
           // TODO: we should probably hit the user with a callback or somehow offer for them to choice between the choices
-          if (!this.#firstChoiceInCurrentMessage) {
+          if (!this.#message) {
             throw new Error('No choices found in message'); // TODO: use better error
           }
 
           if (!this.#mutated) {
-            // this.#state.params.messages.push({ role, content }); TODO: we want to add all
-            this.#state.params.messages.push(this.#firstChoiceInCurrentMessage);
+            const completion = await this.#message;
+            // TODO: what if it is empty?
+            if (completion?.choices && completion.choices.length > 0 && completion.choices[0]!.message) {
+              this.#state.params.messages.push(completion.choices[0]!.message);
+            }
           }
 
           const toolMessages = await this.#generateToolResponse(await this.#message);
@@ -230,11 +228,12 @@ export class BetaToolRunner<Stream extends boolean> {
     if (this.#toolResponse !== undefined) {
       return this.#toolResponse;
     }
-    this.#toolResponse = generateToolResponse(
+    const toolsResponse = generateToolResponse(
       lastMessage,
       this.#state.params.tools.filter((tool): tool is BetaRunnableTool<any> => 'run' in tool),
     );
-    return this.#toolResponse;
+    this.#toolResponse = toolsResponse;
+    return toolsResponse;
   }
 
   /**
@@ -349,7 +348,7 @@ async function generateToolResponse(
   if (
     !lastMessage ||
     lastMessage.role !== 'assistant' ||
-    !lastMessage.content ||
+    // !lastMessage.content || TODO: openai doesn't give content at the same time. ensure this is really always true though
     typeof lastMessage.content === 'string'
   ) {
     return null;
@@ -381,6 +380,10 @@ async function generateToolResponse(
 
         try {
           let input = toolUse.function.arguments;
+          // TODO: is this always safe?
+          if (typeof input === 'string') {
+            input = JSON.parse(input);
+          }
           input = tool.parse(input);
 
           const result = await tool.run(input);

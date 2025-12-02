@@ -63,11 +63,15 @@ async function main() {
     const { choices } = message;
     const firstChoice = choices.at(0)!;
 
-    console.log(`${firstChoice.message.content}\n`); // text
-    // each tool call (could be many)
-    for (const toolCall of firstChoice.message.tool_calls ?? []) {
-      if (toolCall.type === 'function') {
-        console.log(`${toolCall.function.name}(${JSON.stringify(toolCall.function.arguments, null, 2)})\n`);
+    // When we get a tool call request it's null
+    if (firstChoice.message.content !== null) {
+      console.log(`${firstChoice.message.content}\n`);
+    } else {
+      // each tool call (could be many)
+      for (const toolCall of firstChoice.message.tool_calls ?? []) {
+        if (toolCall.type === 'function') {
+          console.log(`${toolCall.function.name}(${JSON.stringify(toolCall.function.arguments, null, 2)})\n`);
+        }
       }
     }
 
@@ -75,25 +79,25 @@ async function main() {
     console.log();
     console.log();
 
-    // const defaultResponse = await runner.generateToolResponse();
-    // if (defaultResponse && typeof defaultResponse.content !== 'string') {
-    //   console.log(`┌─ Response `.padEnd(process.stdout.columns, '─'));
-    //   console.log();
+    const defaultResponse = await runner.generateToolResponse();
+    if (defaultResponse && Array.isArray(defaultResponse)) {
+      console.log(`┌─ Response `.padEnd(process.stdout.columns, '─'));
+      console.log();
 
-    //   for (const block of defaultResponse.content) {
-    //     if (block.type === 'tool_result') {
-    //       const toolUseBlock = message.content.find((b): b is BetaToolUseBlock => {
-    //         return b.type === 'tool_use' && b.id === block.tool_use_id;
-    //       })!;
-    //       console.log(`${toolUseBlock.name}(): ${block.content}`);
-    //     }
-    //   }
+      for (const toolResponse of defaultResponse) {
+        if (toolResponse.role === 'tool') {
+          const toolCall = firstChoice.message.tool_calls?.find((tc) => tc.id === toolResponse.tool_call_id);
+          if (toolCall && toolCall.type === 'function') {
+            console.log(`${toolCall.function.name}(): ${toolResponse.content}`);
+          }
+        }
+      }
 
-    //   console.log();
-    //   console.log(`└─`.padEnd(process.stdout.columns, '─'));
-    //   console.log();
-    //   console.log();
-    // }
+      console.log();
+      console.log(`└─`.padEnd(process.stdout.columns, '─'));
+      console.log();
+      console.log();
+    }
   }
 }
 
