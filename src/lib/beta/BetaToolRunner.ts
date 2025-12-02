@@ -1,5 +1,7 @@
 import type { OpenAI } from '../..';
 import { OpenAIError } from '../../core/error';
+import { buildHeaders } from '../../internal/headers';
+import type { RequestOptions } from '../../internal/request-options';
 import type {
   ChatCompletion,
   ChatCompletionCreateParams,
@@ -42,6 +44,7 @@ export class BetaToolRunner<Stream extends boolean> {
   #mutated = false;
   /** Current state containing the request parameters */
   #state: { params: BetaToolRunnerParams };
+  #options: BetaToolRunnerRequestOptions;
   /** Promise for the last message received from the assistant */
   #message?: Promise<ChatCompletion> | undefined;
   /** Cached tool response to avoid redundant executions */
@@ -58,6 +61,7 @@ export class BetaToolRunner<Stream extends boolean> {
   constructor(
     private client: OpenAI,
     params: BetaToolRunnerParams,
+    options?: BetaToolRunnerRequestOptions,
   ) {
     this.#state = {
       params: {
@@ -69,6 +73,10 @@ export class BetaToolRunner<Stream extends boolean> {
       },
     };
 
+    this.#options = {
+      ...options,
+      headers: buildHeaders([{ 'x-stainless-helper': 'BetaToolRunner' }, options?.headers]),
+    };
     this.#completion = promiseWithResolvers();
   }
 
@@ -104,19 +112,22 @@ export class BetaToolRunner<Stream extends boolean> {
 
           const { ...params } = this.#state.params;
           if (params.stream) {
-            stream = this.client.beta.chat.completions.stream({ ...params, stream: true });
+            stream = this.client.beta.chat.completions.stream({ ...params, stream: true }, this.#options);
             this.#message = stream.finalMessage();
             // Make sure that this promise doesn't throw before we get the option to do something about it.
             // Error will be caught when we call await this.#message ultimately
             this.#message?.catch(() => {});
             yield stream as any;
           } else {
-            this.#message = this.client.beta.chat.completions.create({
-              stream: false,
-              tools: params.tools,
-              messages: params.messages,
-              model: params.model,
-            });
+            this.#message = this.client.beta.chat.completions.create(
+              {
+                stream: false,
+                tools: params.tools,
+                messages: params.messages,
+                model: params.model,
+              },
+              this.#options,
+            );
             yield this.#message as any;
           }
 
@@ -428,3 +439,5 @@ export type BetaToolRunnerParams = Simplify<
     max_iterations?: number;
   }
 >;
+
+export type BetaToolRunnerRequestOptions = Pick<RequestOptions, 'headers'>;

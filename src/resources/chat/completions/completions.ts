@@ -19,7 +19,7 @@ import { ChatCompletionToolRunnerParams } from '../../../lib/ChatCompletionRunne
 import { ChatCompletionStreamingToolRunnerParams } from '../../../lib/ChatCompletionStreamingRunner';
 import { ChatCompletionStream, type ChatCompletionStreamParams } from '../../../lib/ChatCompletionStream';
 import { ExtractParsedContentFromParams, parseChatCompletion, validateInputTools } from '../../../lib/parser';
-import { BetaToolRunner, type BetaToolRunnerParams } from '../../../lib/beta/BetaToolRunner';
+import { BetaToolRunner, BetaToolRunnerRequestOptions, type BetaToolRunnerParams } from '../../../lib/beta/BetaToolRunner';
 import type OpenAI from '../../../index';
 
 export class Completions extends APIResource {

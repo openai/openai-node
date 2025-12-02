@@ -99,6 +99,8 @@ async function main() {
       console.log();
     }
   }
+
+  console.log(JSON.stringify(runner.params, null, 2));
 }
 
 main();
