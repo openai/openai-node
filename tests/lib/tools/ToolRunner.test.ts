@@ -5,7 +5,15 @@ import OpenAI from 'openai';
 // import { Fetch } from 'openai/sdk/internal/builtin-types';
 import { mockFetch } from '../../utils/mock-fetch';
 import { BetaRunnableTool } from 'openai/lib/beta/BetaRunnableTool';
-import { ChatCompletion, ChatCompletionChunk, ChatCompletionMessage, ChatCompletionTool, ChatCompletionToolMessageParam } from 'openai/resources';
+import {
+  ChatCompletion,
+  ChatCompletionChunk,
+  ChatCompletionFunctionTool,
+  ChatCompletionMessage,
+  ChatCompletionMessageToolCall,
+  ChatCompletionTool,
+  ChatCompletionToolMessageParam,
+} from 'openai/resources';
 import { Fetch } from 'openai/internal/builtin-types';
 import { ChatCompletionStream } from 'openai/lib/ChatCompletionStream';
 
@@ -48,12 +56,19 @@ const calculatorTool: BetaRunnableTool<{ a: number; b: number; operation: string
 };
 
 // Helper functions to create content blocks
-function getWeatherToolUse(location: string, id: string = 'tool_1'): ChatCompletionFunctionTool {
-  return { type: 'tool_use', id, name: 'getWeather', input: { location } };
+function getWeatherToolUse(location: string, id: string = 'tool_1'): ChatCompletionMessageToolCall {
+  return {
+    id: id,
+    type: 'function',
+    function: {
+      name: 'getWeather',
+      arguments: JSON.stringify({ location }),
+    },
+  };
 }
 
 function getWeatherToolResult(location: string, id: string = 'tool_1'): ChatCompletionToolMessageParam {
-  return { role: 'tool', tool_use_id: id, content: `Sunny in ${location}` };
+  return { role: 'tool', tool_call_id: id, content: `Sunny in ${location}` };
 }
 
 function getCalculatorToolUse(
@@ -61,12 +76,14 @@ function getCalculatorToolUse(
   b: number,
   operation: string,
   id: string = 'tool_2',
-): BetaContentBlock {
+): ChatCompletionMessageToolCall {
   return {
-    type: 'tool_use',
-    id,
-    name: 'calculate',
-    input: { a, b, operation },
+    id: id,
+    type: 'function',
+    function: {
+      name: 'calculate',
+      arguments: JSON.stringify({ a, b, operation }),
+    },
   };
 }
 
@@ -75,7 +92,7 @@ function getCalculatorToolResult(
   b: number,
   operation: string,
   id: string = 'tool_2',
-): BetaToolResultBlockParam {
+): ChatCompletionToolMessageParam {
   let result: string;
   if (operation === 'add') {
     result = String(a + b);
@@ -85,13 +102,13 @@ function getCalculatorToolResult(
     result = `Error: Unknown operation: ${operation}`;
   }
   return {
-    type: 'tool_result',
-    tool_use_id: id,
+    role: 'tool',
+    tool_call_id: id,
     content: result,
   };
 }
 
-function getTextContent(text?: string): BetaContentBlock {
+function getTextContent(text?: string): ChatCompletionMessage {
   return {
     type: 'text',
     text: text || 'Some text content',
@@ -213,11 +230,13 @@ interface SetupTestResult<Stream extends boolean> {
   runner: OpenAI.Beta.Chat.Completions.BetaToolRunner<Stream>;
   fetch: ReturnType<typeof mockFetch>['fetch'];
   handleRequest: (fetch: Fetch) => void;
-  handleAssistantMessage: (...content: ChatCompletionMessage[]) => ChatCompletion;
+  handleAssistantMessage: (firstChoice: ToolCallsOrMessage) => ChatCompletion;
   handleAssistantMessageStream: (toolCalls?: ChatCompletionChunk[]) => ChatCompletionStream;
 }
 
 type ToolRunnerParams = Parameters<typeof OpenAI.Beta.Chat.Completions.prototype.toolRunner>[0];
+
+type ToolCallsOrMessage = ChatCompletionMessageToolCall[] | ChatCompletionMessage;
 
 function setupTest(params?: Partial<ToolRunnerParams> & { stream?: false }): SetupTestResult<false>;
 function setupTest(params: Partial<ToolRunnerParams> & { stream: true }): SetupTestResult<true>;
@@ -225,9 +244,20 @@ function setupTest(params: Partial<ToolRunnerParams> = {}): SetupTestResult<bool
   const { handleRequest, handleStreamEvents, fetch } = mockFetch();
   let messageIdCounter = 0;
 
-  const handleAssistantMessage: SetupTestResult<false>['handleAssistantMessage'] = (...content) => {
-    const hasToolUse = content.some((block) => (block.tool_calls?.length ?? 0) > 0);
-    const stop_reason = hasToolUse ? 'tool_use' : 'end_turn';
+  const handleAssistantMessage: SetupTestResult<false>['handleAssistantMessage'] = (
+    messageContentOrToolCalls,
+  ) => {
+    const isToolCalls = Array.isArray(messageContentOrToolCalls);
+
+    const messageContent =
+      isToolCalls ?
+        {
+          role: 'assistant' as const,
+          tool_calls: messageContentOrToolCalls,
+          refusal: null,
+          content: null,
+        }
+      : (messageContentOrToolCalls as ChatCompletionMessage); // TODO: check that this is right
 
     const message: ChatCompletion = {
       id: `msg_${messageIdCounter++}`,
@@ -237,12 +267,8 @@ function setupTest(params: Partial<ToolRunnerParams> = {}): SetupTestResult<bool
       choices: [
         {
           index: 0,
-          message: {
-            role: 'assistant',
-            content: JSON.stringify(content),
-            refusal: null,
-          },
-          finish_reason: stop_reason === 'tool_use' ? 'tool_calls' : 'stop',
+          message: messageContent,
+          finish_reason: 'stop',
           logprobs: null,
         },
       ],
@@ -252,6 +278,7 @@ function setupTest(params: Partial<ToolRunnerParams> = {}): SetupTestResult<bool
         total_tokens: 30,
       },
     };
+
     handleRequest(async () => {
       return new Response(JSON.stringify(message), {
         status: 200,
@@ -261,11 +288,9 @@ function setupTest(params: Partial<ToolRunnerParams> = {}): SetupTestResult<bool
     return message;
   };
 
-  const handleAssistantMessageStream: SetupTestResult<true>['handleAssistantMessageStream'] = (
-    ...content
-  ) => {
-    const hasToolUse = content.some(
-      (block) => (block?.at(0)?.choices?.at(0)?.delta?.tool_calls?.length ?? 0) > 0,
+  const handleAssistantMessageStream: SetupTestResult<true>['handleAssistantMessageStream'] = (...chunks) => {
+    const hasToolUse = chunks.some(
+      (chunk) => (chunk?.at(0)?.choices?.at(0)?.delta?.tool_calls?.length ?? 0) > 0,
     );
     const stop_reason = hasToolUse ? 'tool_use' : 'end_turn';
 
@@ -279,7 +304,7 @@ function setupTest(params: Partial<ToolRunnerParams> = {}): SetupTestResult<bool
           index: 0,
           message: {
             role: 'assistant',
-            content: JSON.stringify(content),
+            content: JSON.stringify(chunks),
             refusal: null,
           },
           finish_reason: stop_reason === 'tool_use' ? 'tool_calls' : 'stop',
@@ -348,19 +373,21 @@ describe('ToolRunner', () => {
   });
 
   describe('iterator.next()', () => {
-    it('yields BetaMessage', async () => {
+    it('yields CompletionMessage', async () => {
       const { runner, handleAssistantMessage } = setupTest();
 
       const iterator = runner[Symbol.asyncIterator]();
 
-      handleAssistantMessage(getWeatherToolUse('SF'));
+      handleAssistantMessage([getWeatherToolUse('SF')]);
+
       await expectEvent(iterator, (message) => {
-        expect(message.content).toMatchObject([getWeatherToolUse('SF')]);
+        expect(message?.choices[0]?.message.tool_calls).toMatchObject([getWeatherToolUse('SF')]);
       });
 
       handleAssistantMessage(getTextContent());
+
       await expectEvent(iterator, (message) => {
-        expect(message.content).toMatchObject([getTextContent()]);
+        expect(message?.choices[0]?.message).toMatchObject(getTextContent());
       });
 
       await expectDone(iterator);
@@ -411,32 +438,34 @@ describe('ToolRunner', () => {
 
       const iterator = runner[Symbol.asyncIterator]();
 
-      handleAssistantMessage(getWeatherToolUse('NYC'), getCalculatorToolUse(2, 3, 'add'));
+      handleAssistantMessage([getWeatherToolUse('NYC'), getCalculatorToolUse(2, 3, 'add')]);
       await expectEvent(iterator, (message) => {
-        expect(message.content).toHaveLength(2);
-        expect(message.content).toMatchObject([getWeatherToolUse('NYC'), getCalculatorToolUse(2, 3, 'add')]);
+        expect(message?.choices).toHaveLength(1);
+        expect(message?.choices[0]?.message.tool_calls).toHaveLength(2);
+        expect(message?.choices[0]?.message.tool_calls).toMatchObject([
+          getWeatherToolUse('NYC'),
+          getCalculatorToolUse(2, 3, 'add'),
+        ]);
       });
 
       // Assistant provides final response
       handleAssistantMessage(getTextContent());
       await expectEvent(iterator, (message) => {
-        expect(message.content).toMatchObject([getTextContent()]);
+        expect(message?.choices).toHaveLength(1);
+        expect(message?.choices[0]?.message).toMatchObject(getTextContent());
       });
 
       // Check that we have both tool results in the messages
       // Second message should be assistant with tool uses
       // Third message should be user with both tool results
       const messages = runner.params.messages;
-      expect(messages).toHaveLength(3); // user message, assistant with tools, user with results
+      expect(messages).toHaveLength(4); // user message, assistant with tools, tool result 1, tool result 2, assistant final
       expect(messages[1]).toMatchObject({
         role: 'assistant',
-        content: [getWeatherToolUse('NYC'), getCalculatorToolUse(2, 3, 'add')],
+        tool_calls: [getWeatherToolUse('NYC'), getCalculatorToolUse(2, 3, 'add')],
       });
-      expect(messages[2]).toMatchObject({
-        role: 'user',
-        content: [getWeatherToolResult('NYC'), getCalculatorToolResult(2, 3, 'add', 'tool_2')],
-      });
-
+      expect(messages[2]).toMatchObject(getWeatherToolResult('NYC'));
+      expect(messages[3]).toMatchObject(getCalculatorToolResult(2, 3, 'add', 'tool_2'));
       await expectDone(iterator);
     });
 
