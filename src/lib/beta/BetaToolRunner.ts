@@ -52,6 +52,12 @@ export class BetaToolRunner<Stream extends boolean> {
    * This resolves to undefined in non-streaming mode if there are no choices provided.
    */
   #message?: Promise<ChatCompletionMessage> | undefined;
+  /**
+   * Resolves to the last (entire) chat completion received from the assistant.
+   * We want to return an attribute of ourself so that the promise keeps running
+   * after the yield, and we can access it later.
+   */
+  #chatCompletion?: Promise<ChatCompletion>;
   /** Cached tool response to avoid redundant executions */
   #toolResponse?: Promise<null | ChatCompletionToolMessageParam[]> | undefined;
   /** Promise resolvers for waiting on completion */
@@ -127,7 +133,7 @@ export class BetaToolRunner<Stream extends boolean> {
             this.#message?.catch(() => {});
             yield stream as any;
           } else {
-            const currentCompletion = this.client.beta.chat.completions.create(
+            this.#chatCompletion = this.client.beta.chat.completions.create(
               {
                 ...apiParams, // spread and explicit so we get better types
                 stream: false,
@@ -138,9 +144,10 @@ export class BetaToolRunner<Stream extends boolean> {
               this.#options,
             );
 
-            yield currentCompletion as any;
+            this.#message = this.#chatCompletion.then((resp) => resp.choices.at(0)!.message);
+            await this.#message; // TODO: we would like to not need to await it
 
-            this.#message = currentCompletion.then((resp) => resp.choices.at(0)!.message);
+            yield this.#chatCompletion as any;
           }
 
           const prevMessage = await this.#message;
