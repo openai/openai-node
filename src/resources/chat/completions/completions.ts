@@ -19,7 +19,11 @@ import { ChatCompletionToolRunnerParams } from '../../../lib/ChatCompletionRunne
 import { ChatCompletionStreamingToolRunnerParams } from '../../../lib/ChatCompletionStreamingRunner';
 import { ChatCompletionStream, type ChatCompletionStreamParams } from '../../../lib/ChatCompletionStream';
 import { ExtractParsedContentFromParams, parseChatCompletion, validateInputTools } from '../../../lib/parser';
-import { BetaToolRunner, BetaToolRunnerRequestOptions, type BetaToolRunnerParams } from '../../../lib/beta/BetaToolRunner';
+import {
+  BetaToolRunner,
+  type BetaToolRunnerRequestOptions,
+  type BetaToolRunnerParams,
+} from '../../../lib/beta/BetaToolRunner';
 import type OpenAI from '../../../index';
 
 export class Completions extends APIResource {
@@ -1998,6 +2002,7 @@ export interface ChatCompletionListParams extends CursorPageParams {
 }
 
 Completions.Messages = Messages;
+Completions.BetaToolRunner = BetaToolRunner;
 
 export declare namespace Completions {
   export {
@@ -2047,4 +2052,6 @@ export declare namespace Completions {
   };
 
   export { Messages as Messages, type MessageListParams as MessageListParams };
+
+  export { BetaToolRunner };
 }

@@ -2,7 +2,6 @@
 
 import OpenAI from 'openai';
 import { betaZodTool } from 'openai/helpers/beta/zod';
-// import { BetaToolUseBlock } from 'openai/helpers/beta';
 import { z } from 'zod';
 
 const client = new OpenAI();
@@ -12,7 +11,7 @@ async function main() {
     messages: [
       {
         role: 'user',
-        content: `I'm planning a trip to San Francisco and I need some information. Can you help me with the weather, current time, and currency exchange rates (from EUR)? Please use parallel tool use`,
+        content: `I'm planning a trip to San Francisco and I need some information. Can you help me with the weather, current time, and currency exchange rates (from EUR)? Please use parallel tool use.`,
       },
     ],
     tools: [
@@ -57,6 +56,8 @@ async function main() {
   console.log(`\n🚀 Running tools...\n`);
 
   for await (const message of runner) {
+    if (!message) continue;
+
     console.log(`┌─ Message ${message.id} `.padEnd(process.stdout.columns, '─'));
     console.log();
 
@@ -99,8 +100,6 @@ async function main() {
       console.log();
     }
   }
-
-  console.log(JSON.stringify(runner.params, null, 2));
 }
 
 main();

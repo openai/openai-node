@@ -1,10 +1,11 @@
-import type { OpenAI } from '../..';
+import { OpenAI } from '../..';
 import { OpenAIError } from '../../core/error';
 import { buildHeaders } from '../../internal/headers';
 import type { RequestOptions } from '../../internal/request-options';
 import type {
   ChatCompletion,
   ChatCompletionCreateParams,
+  ChatCompletionMessage,
   ChatCompletionMessageParam,
   ChatCompletionStream,
   ChatCompletionTool,
@@ -45,14 +46,18 @@ export class BetaToolRunner<Stream extends boolean> {
   /** Current state containing the request parameters */
   #state: { params: BetaToolRunnerParams };
   #options: BetaToolRunnerRequestOptions;
-  /** Promise for the last message received from the assistant */
-  #message?: Promise<ChatCompletion> | undefined;
+  /**
+   * Promise for the last message received from the assistant.
+   *
+   * This resolves to undefined in non-streaming mode if there are no choices provided.
+   */
+  #message?: Promise<ChatCompletionMessage> | undefined;
   /** Cached tool response to avoid redundant executions */
   #toolResponse?: Promise<null | ChatCompletionToolMessageParam[]> | undefined;
   /** Promise resolvers for waiting on completion */
   #completion: {
-    promise: Promise<ChatCompletion>;
-    resolve: (value: ChatCompletion) => void;
+    promise: Promise<ChatCompletionMessage>;
+    resolve: (value: ChatCompletionMessage) => void;
     reject: (reason?: any) => void;
   };
   /** Number of iterations (API requests) made so far */
@@ -83,8 +88,7 @@ export class BetaToolRunner<Stream extends boolean> {
   async *[Symbol.asyncIterator](): AsyncIterator<
     Stream extends true ?
       ChatCompletionStream // TODO: for now!
-    : Stream extends false ? ChatCompletion
-    : ChatCompletionCreateParams | ChatCompletionCreateParams
+    : ChatCompletion | undefined
   > {
     if (this.#consumed) {
       throw new OpenAIError('Cannot iterate over a consumed stream');
@@ -96,7 +100,7 @@ export class BetaToolRunner<Stream extends boolean> {
 
     try {
       while (true) {
-        let stream: any;
+        let stream: ChatCompletionStream<null> | undefined;
         try {
           if (
             this.#state.params.max_iterations &&
@@ -111,16 +115,21 @@ export class BetaToolRunner<Stream extends boolean> {
           this.#iterationCount++;
 
           const { ...params } = this.#state.params;
+          const apiParams = { ...params };
+          delete apiParams.max_iterations; // our own param
+
           if (params.stream) {
-            stream = this.client.beta.chat.completions.stream({ ...params, stream: true }, this.#options);
+            stream = this.client.beta.chat.completions.stream({ ...apiParams, stream: true }, this.#options);
             this.#message = stream.finalMessage();
+
             // Make sure that this promise doesn't throw before we get the option to do something about it.
             // Error will be caught when we call await this.#message ultimately
             this.#message?.catch(() => {});
             yield stream as any;
           } else {
-            this.#message = this.client.beta.chat.completions.create(
+            const currentCompletion = this.client.beta.chat.completions.create(
               {
+                ...apiParams, // spread and explicit so we get better types
                 stream: false,
                 tools: params.tools,
                 messages: params.messages,
@@ -128,27 +137,26 @@ export class BetaToolRunner<Stream extends boolean> {
               },
               this.#options,
             );
-            yield this.#message as any;
+
+            yield currentCompletion as any;
+
+            this.#message = currentCompletion.then((resp) => resp.choices.at(0)!.message);
           }
 
-          if (!this.#message) {
-            throw new Error('No message created'); // TODO: use better error
-          }
+          const prevMessage = await this.#message;
 
-          // TODO: we should probably hit the user with a callback or somehow offer for them to choice between the choices
-          if (!this.#message) {
-            throw new Error('No choices found in message'); // TODO: use better error
+          if (!prevMessage) {
+            throw new OpenAIError('ToolRunner concluded without a message from the server');
           }
 
           if (!this.#mutated) {
-            const completion = await this.#message;
             // TODO: what if it is empty?
-            if (completion?.choices && completion.choices.length > 0 && completion.choices[0]!.message) {
-              this.#state.params.messages.push(completion.choices[0]!.message);
+            if (prevMessage) {
+              this.#state.params.messages.push(prevMessage);
             }
           }
 
-          const toolMessages = await this.#generateToolResponse(await this.#message);
+          const toolMessages = await this.#generateToolResponse(prevMessage);
           if (toolMessages) {
             for (const toolMessage of toolMessages) {
               this.#state.params.messages.push(toolMessage);
@@ -228,15 +236,16 @@ export class BetaToolRunner<Stream extends boolean> {
    * }
    */
   async generateToolResponse() {
-    const message = (await this.#message) ?? this.params.messages.at(-1);
+    // The most recent message from the assistant. This prev had this.params.messages.at(-1) but I think that's wrong.
+    const message = await this.#message;
     if (!message) {
       return null;
     }
     return this.#generateToolResponse(message);
   }
 
-  async #generateToolResponse(lastMessage: ChatCompletion | ChatCompletionMessageParam) {
-    if (this.#toolResponse !== undefined) {
+  async #generateToolResponse(lastMessage: ChatCompletionMessage) {
+    if (this.#toolResponse) {
       return this.#toolResponse;
     }
     const toolsResponse = generateToolResponse(
@@ -263,8 +272,8 @@ export class BetaToolRunner<Stream extends boolean> {
    * const finalMessage = await runner.done();
    * console.log('Final response:', finalMessage.content);
    */
-  done(): Promise<ChatCompletion> {
-    return this.#completion.promise;
+  done(): Promise<ChatCompletionMessage> {
+    return this.#completion.promise; // TODO: find a more type safe way to do this
   }
 
   /**
@@ -280,7 +289,7 @@ export class BetaToolRunner<Stream extends boolean> {
    * const finalMessage = await runner.runUntilDone();
    * console.log('Final response:', finalMessage.content);
    */
-  async runUntilDone(): Promise<ChatCompletion> {
+  async runUntilDone(): Promise<ChatCompletionMessage> {
     // If not yet consumed, start consuming and wait for completion
     if (!this.#consumed) {
       for await (const _ of this) {
@@ -334,8 +343,8 @@ export class BetaToolRunner<Stream extends boolean> {
    * Makes the ToolRunner directly awaitable, equivalent to calling .runUntilDone()
    * This allows using `await runner` instead of `await runner.runUntilDone()`
    */
-  then<TResult1 = ChatCompletion, TResult2 = never>(
-    onfulfilled?: ((value: ChatCompletion) => TResult1 | PromiseLike<TResult1>) | undefined | null,
+  then<TResult1 = ChatCompletionMessage, TResult2 = never>( // TODO: make sure these types are OK
+    onfulfilled?: ((value: ChatCompletionMessage) => TResult1 | PromiseLike<TResult1>) | undefined | null,
     onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null,
   ): Promise<TResult1 | TResult2> {
     return this.runUntilDone().then(onfulfilled, onrejected);
@@ -343,18 +352,9 @@ export class BetaToolRunner<Stream extends boolean> {
 }
 
 async function generateToolResponse(
-  params: ChatCompletion | ChatCompletionMessageParam,
+  lastMessage: ChatCompletionMessage,
   tools: BetaRunnableTool<any>[],
 ): Promise<null | ChatCompletionToolMessageParam[]> {
-  if (!('choices' in params)) {
-    return null;
-  }
-  const { choices } = params;
-  const lastMessage = choices[0]?.message;
-  if (!lastMessage) {
-    return null;
-  }
-
   // Only process if the last message is from the assistant and has tool use blocks
   if (
     !lastMessage ||

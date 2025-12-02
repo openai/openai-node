@@ -93,6 +93,7 @@ import {
   ThreadUpdateParams,
   Threads,
 } from './threads/threads';
+import { Chat } from './../chat';
 
 export class Beta extends APIResource {
   realtime: RealtimeAPI.Realtime = new RealtimeAPI.Realtime(this._client);
@@ -106,8 +107,11 @@ Beta.Realtime = Realtime;
 Beta.ChatKit = ChatKit;
 Beta.Assistants = Assistants;
 Beta.Threads = Threads;
+Beta.Chat = Chat;
 
 export declare namespace Beta {
+  export { Chat };
+
   export {
     Realtime as Realtime,
     type ConversationCreatedEvent as ConversationCreatedEvent,
