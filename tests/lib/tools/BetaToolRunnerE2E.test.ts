@@ -1,9 +1,10 @@
 import { OpenAI } from '../../../src';
 import { betaZodFunctionTool } from '../../../src/helpers/beta/zod';
-import * as z from 'zod';
+import { z } from 'zod/v4';
 import nock from 'nock';
 import { gunzipSync } from 'zlib';
 import { RequestInfo } from 'openai/internal/builtin-types';
+import * as fs from 'node:fs/promises';
 
 describe('toolRunner integration tests', () => {
   let client: OpenAI;
@@ -270,6 +271,49 @@ describe('toolRunner integration tests', () => {
       expect(params.model).toBe('gpt-4o');
       expect(params.max_tokens).toBe(500);
       expect(params.messages).toEqual([{ role: 'user', content: 'Updated message' }]);
+    });
+  });
+
+  describe('Non string returning tools', () => {
+    it('should handle non-string returning tools', async () => {
+      const exampleImageBuffer = await fs.readFile(__dirname + '/logo.png');
+      const exampleImageBase64 = exampleImageBuffer.toString('base64');
+      const exampleImageUrl = `data:image/png;base64,${exampleImageBase64}`;
+
+      const tool = betaZodFunctionTool({
+        name: 'cool_logo_getter_tool',
+        description: 'query for a company logo',
+        parameters: z.object({
+          name: z.string().min(1).max(100).describe('the name of the company whose logo you want'),
+        }),
+        run: async () => {
+          return [
+            {
+              type: 'image_url' as const,
+              image_url: {
+                url: exampleImageUrl,
+              },
+            },
+          ];
+        },
+      });
+
+      const runner = client.beta.chat.completions.toolRunner({
+        model: 'gpt-4o',
+        max_tokens: 1000,
+        messages: [
+          {
+            role: 'user',
+            content:
+              'what is the dominant colour of the logo of the company "Stainless"? One word response nothing else',
+          },
+        ],
+        tools: [tool],
+      });
+
+      const finalMessage = await runner.runUntilDone();
+      const color = finalMessage.content?.toLowerCase();
+      expect(['blue', 'black', 'gray', 'grey']).toContain(color); // ai is bad at colours apparently
     });
   });
 });

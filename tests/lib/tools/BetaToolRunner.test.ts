@@ -11,6 +11,7 @@ import type {
 } from 'openai/resources';
 import type { Fetch } from 'openai/internal/builtin-types';
 import type { BetaToolRunnerParams } from 'openai/lib/beta/BetaToolRunner';
+import { betaZodFunctionTool } from 'openai/helpers/beta/zod';
 
 const weatherTool: BetaRunnableTool<{ location: string }> = {
   type: 'function',
@@ -1006,6 +1007,63 @@ describe('ToolRunner', () => {
       // (responded to automatically by the ToolRunner)
       expect(runner.params.messages[2]).toMatchObject(getWeatherToolResult('Paris', 'tool_1'));
       await expectDone(iterator);
+    });
+
+    it('allows you to use non-string returning custom tools', async () => {
+      const customTool: BetaRunnableTool<{ location: string }> = {
+        type: 'function',
+        function: {
+          name: 'getWeather',
+          description: 'Get the weather in a given location',
+          parameters: {
+            type: 'object',
+            properties: {
+              location: { type: 'string' },
+            },
+          },
+        },
+        run: async ({ location }) => {
+          return [
+            {
+              type: 'image_url' as const,
+              image_url: {
+                url: `https://example.com/weather-${location}.jpg`,
+              },
+            },
+          ];
+        },
+        parse: (input: unknown) => input as { location: string },
+      };
+
+      const { runner, handleAssistantMessage } = setupTest({
+        messages: [{ role: 'user', content: 'Test done method' }],
+        tools: [customTool],
+      });
+
+      const iterator = runner[Symbol.asyncIterator]();
+
+      // Assistant requests the custom tool
+      handleAssistantMessage([getWeatherToolUse('Paris')]);
+      await expectEvent(iterator, (message) => {
+        expect(message?.choices[0]?.message?.tool_calls).toMatchObject([getWeatherToolUse('Paris')]);
+      });
+
+      // Verify generateToolResponse returns the custom tool result
+      const toolResponse = await runner.generateToolResponse();
+      expect(toolResponse).toMatchObject([
+        {
+          role: 'tool',
+          tool_call_id: 'tool_1',
+          content: JSON.stringify([
+            {
+              type: 'image_url',
+              image_url: {
+                url: 'https://example.com/weather-Paris.jpg',
+              },
+            },
+          ]),
+        },
+      ]);
     });
   });
 
