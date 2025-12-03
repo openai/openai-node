@@ -120,7 +120,7 @@ function betaMessageToStreamEvents(message: ChatCompletion): ChatCompletionChunk
   const messageContent = message.choices[0]!.message;
 
   // Check if it's a text message
-  if (messageContent.content && typeof messageContent.content === 'string') {
+  if (messageContent.content) {
     // Initial chunk with role only (no content in first chunk for text messages)
     events.push({
       choices: message.choices.map(

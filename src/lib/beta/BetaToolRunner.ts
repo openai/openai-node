@@ -12,8 +12,6 @@ import type {
   ChatCompletionToolMessageParam,
 } from '../../resources/chat/completions';
 import type { BetaRunnableTool } from './BetaRunnableTool';
-// BetaMessage, BetaMessageParam, BetaToolUnion, MessageCreateParams
-// import { BetaMessageStream } from '../BetaMessageStream';
 
 /**
  * Just Promise.withResolvers(), which is not available in all environments.

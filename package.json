@@ -27,6 +27,7 @@
     "fix": "./scripts/format"
   },
   "dependencies": {
+    "json-schema-to-ts": "3.1.1",
     "nock": "^14.0.10"
   },
   "devDependencies": {
