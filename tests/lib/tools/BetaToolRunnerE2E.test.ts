@@ -1,5 +1,5 @@
 import { OpenAI } from '../../../src';
-import { betaZodTool } from '../../../src/helpers/beta/zod';
+import { betaZodFunctionTool } from '../../../src/helpers/beta/zod';
 import * as z from 'zod';
 import nock from 'nock';
 import { gunzipSync } from 'zlib';
@@ -102,7 +102,7 @@ describe('toolRunner integration tests', () => {
       run: (args: any) => any;
     }> = {},
   ) {
-    return betaZodTool({
+    return betaZodFunctionTool({
       name: 'test_tool',
       parameters: z.object({ value: z.string() }),
       description: 'A test tool',
@@ -112,7 +112,7 @@ describe('toolRunner integration tests', () => {
   }
 
   function createCounterTool() {
-    return betaZodTool({
+    return betaZodFunctionTool({
       name: 'test_tool',
       parameters: z.object({ count: z.number() }),
       description: 'A test tool',

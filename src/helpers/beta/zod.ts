@@ -9,7 +9,7 @@ import type { FunctionTool } from '../../resources/beta';
  * converted into JSON Schema when passed to the API. The provided function's
  * input arguments will also be validated against the provided schema.
  */
-export function betaZodTool<InputSchema extends ZodType>(options: {
+export function betaZodFunctionTool<InputSchema extends ZodType>(options: {
   name: string;
   parameters: InputSchema;
   description: string;

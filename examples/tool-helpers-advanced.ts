@@ -1,7 +1,7 @@
 #!/usr/bin/env -S npm run tsn -T
 
 import OpenAI from 'openai';
-import { betaZodTool } from 'openai/helpers/beta/zod';
+import { betaZodFunctionTool } from 'openai/helpers/beta/zod';
 import { z } from 'zod';
 
 const client = new OpenAI();
@@ -15,7 +15,7 @@ async function main() {
       },
     ],
     tools: [
-      betaZodTool({
+      betaZodFunctionTool({
         name: 'getWeather',
         description: 'Get the weather at a specific location',
         parameters: z.object({

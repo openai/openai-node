@@ -124,7 +124,7 @@ export class BetaToolRunner<Stream extends boolean>
           this.#toolResponse = undefined;
           this.#iterationCount++;
 
-          const { max_iterations, ...params } = this.#state.params;
+          const { max_iterations: _, ...params } = this.#state.params;
 
           if (params.stream) {
             stream = this.client.chat.completions.stream({ ...params, stream: true }, this.#options);

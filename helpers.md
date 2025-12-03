@@ -302,6 +302,128 @@ If you need to cancel a stream, you can `break` from a `for await` loop or call 
 
 See an example of streaming helpers in action in [`examples/stream.ts`](examples/stream.ts).
 
+### Automated function calls via Beta Tool Runner
+
+We now offer an easier to use tool calling approach via the `openai.beta.chat.completions.toolRunner({…})` helper. The SDK provides helper functions to create runnable tools that can be automatically invoked by the .toolRunner() method. These helpers simplify tool creation with JSON Schema or Zod validation.
+
+#### Usage
+
+```ts
+import OpenAI from 'openai';
+
+import { betaZodFunctionTool } from 'openai/helpers/beta/zod';
+import { z } from 'zod/v4';
+
+const client = new OpenAI();
+
+async function main() {
+  const addTool = betaZodFunctionTool({
+    name: 'add',
+    parameters: z.object({
+      a: z.number(),
+      b: z.number(),
+    }),
+    description: 'Add two numbers together',
+    run: (input) => {
+      return String(input.a + input.b);
+    },
+  });
+
+  const multiplyTool = betaZodFunctionTool({
+    name: 'multiply',
+    parameters: z.object({
+      a: z.number(),
+      b: z.number(),
+    }),
+    description: 'Multiply two numbers together',
+    run: (input) => {
+      return String(input.a * input.b);
+    },
+  });
+
+  const finalMessage = await client.beta.chat.completions.toolRunner({
+    model: 'gpt-4o',
+    max_tokens: 1000,
+    messages: [{ role: 'user', content: 'What is 5 plus 3, and then multiply that result by 4?' }],
+    tools: [addTool, multiplyTool],
+  });
+  console.log(finalMessage);
+}
+
+main();
+```
+
+#### Advanced Usage
+
+You can also use the `toolRunner` as an async generator to act as the logic runs in.
+
+```ts
+// or, instead of using "await client.beta.messages.toolRunner", you can use:
+const toolRunner = client.beta.chat.completions.toolRunner({
+  model: 'gpt-4o',
+  max_tokens: 1000,
+  messages: [{ role: 'user', content: 'What is 5 plus 3, and then multiply that result by 4?' }],
+  tools: [addTool, multiplyTool],
+});
+
+for await (const event of toolRunner) {
+  console.log(event.choices[0]!.message.content);
+
+  // If the most recent message triggered a tool call, you can get the result of
+  // that tool call
+  const toolResponse = await toolRunner.generateToolResponse();
+  console.log(toolResponse);
+}
+```
+
+When you just "await" the `toolRunner`, it simply automatically iterates until the end of the async generator.
+
+#### Streaming
+
+```ts
+const runner = anthropic.beta.messages.toolRunner({
+  model: 'gpt-4o',
+  max_tokens: 1000,
+  messages: [{ role: 'user', content: 'What is the weather in San Francisco?' }],
+  tools: [calculatorTool],
+  stream: true,
+});
+
+// When streaming, the runner returns ChatCompletionStream
+for await (const messageStream of runner) {
+  for await (const event of messageStream) {
+    console.log('event:', event);
+  }
+  console.log('message:', await messageStream.finalMessage());
+}
+
+console.log(await runner);
+```
+
+See [./examples/tool-helpers-advanced-streaming.ts] for a more in-depth example.
+
+#### Beta Zod Tool
+
+Zod schemas can be used to define the input schema for your tools:
+
+```ts
+import { betaZodFunctionTool } from 'openai/helpers/beta/zod';
+
+const weatherTool = betaZodFunctionTool({
+  name: 'get_weather',
+  inputSchema: z.object({
+    location: z.string().describe('The city and state, e.g. San Francisco, CA'),
+    unit: z.enum(['celsius', 'fahrenheit']).default('fahrenheit'),
+  }),
+  description: 'Get the current weather in a given location',
+  run: async (input) => {
+    return `The weather in ${input.location} is ${input.unit === 'celsius' ? '22°C' : '72°F'}`;
+  },
+});
+```
+
+The AI's generated inputs will be directly validated and fed into your function automatically.
+
 ### Automated function calls
 
 We provide the `openai.chat.completions.runTools({…})`
@@ -316,6 +438,8 @@ Otherwise, the args will be passed to the function you provide as a string.
 
 If you pass `tool_choice: {function: {name: …}}` instead of `auto`,
 it returns immediately after calling that function (and only loops to auto-recover parsing errors).
+
+#### Beta Tool
 
 ```ts
 import OpenAI from 'openai';

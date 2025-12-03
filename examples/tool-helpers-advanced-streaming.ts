@@ -1,7 +1,7 @@
 #!/usr/bin/env -S npm run tsn -T
 
 import OpenAI from 'openai';
-import { betaZodTool } from 'openai/helpers/beta/zod';
+import { betaZodFunctionTool } from 'openai/helpers/beta/zod';
 import { z } from 'zod';
 
 const client = new OpenAI();
@@ -15,7 +15,7 @@ async function main() {
       },
     ],
     tools: [
-      betaZodTool({
+      betaZodFunctionTool({
         name: 'getWeather',
         description: 'Get the weather at a specific location',
         parameters: z.object({
@@ -25,7 +25,7 @@ async function main() {
           return `The weather is sunny with a temperature of 20°C in ${location}.`;
         },
       }),
-      betaZodTool({
+      betaZodFunctionTool({
         name: 'getTime',
         description: 'Get the current time in a specific timezone',
         parameters: z.object({
@@ -35,7 +35,7 @@ async function main() {
           return `The current time in ${timezone} is 3:00 PM.`;
         },
       }),
-      betaZodTool({
+      betaZodFunctionTool({
         name: 'getCurrencyExchangeRate',
         description: 'Get the exchange rate between two currencies',
         parameters: z.object({
