@@ -17,10 +17,6 @@ export function betaZodFunctionTool<InputSchema extends ZodType>(options: {
 }): BetaRunnableTool<zodInfer<InputSchema>> {
   const jsonSchema = z.toJSONSchema(options.parameters, { reused: 'ref' });
 
-  if (jsonSchema.type !== 'object') {
-    throw new Error(`Zod schema for tool "${options.name}" must be an object, but got ${jsonSchema.type}`);
-  }
-
   // TypeScript doesn't narrow the type after the runtime check, so we need to assert it
   const objectSchema = jsonSchema as typeof jsonSchema & { type: 'object' };
 
