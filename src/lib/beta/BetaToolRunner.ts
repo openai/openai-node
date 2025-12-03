@@ -147,7 +147,8 @@ export class BetaToolRunner<Stream extends boolean> {
               this.#options,
             );
 
-            this.#message = this.#chatCompletion.then((resp) => resp.choices.at(0)!.message).catch(() => {});
+            this.#message = this.#chatCompletion.then((resp) => resp.choices.at(0)!.message);
+            this.#message.catch(() => {});
 
             yield this.#chatCompletion as any;
           }
