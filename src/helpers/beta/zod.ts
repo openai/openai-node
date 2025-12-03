@@ -1,5 +1,5 @@
-import type { infer as zodInfer, ZodType } from 'zod';
-import * as z from 'zod';
+import type { infer as zodInfer, ZodType } from 'zod/v4';
+import * as z from 'zod/v4';
 import type { BetaRunnableTool, Promisable } from '../../lib/beta/BetaRunnableTool';
 import type { FunctionTool } from '../../resources/beta';
 
