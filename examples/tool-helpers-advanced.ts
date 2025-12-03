@@ -7,7 +7,7 @@ import { z } from 'zod';
 const client = new OpenAI();
 
 async function main() {
-  const message = await client.chat.completions.toolRunner({
+  const message = await client.beta.chat.completions.toolRunner({
     messages: [
       {
         role: 'user',

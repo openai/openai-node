@@ -74,7 +74,7 @@ import {
   TranscriptionSessionUpdatedEvent,
 } from './realtime/realtime';
 import * as ChatKitAPI from './chatkit/chatkit';
-import * as ChatAPI from '../chat/chat';
+import { BetaChat as BetaChatAPI } from './chat';
 import { ChatKit, ChatKitWorkflow } from './chatkit/chatkit';
 import * as ThreadsAPI from './threads/threads';
 import {
@@ -100,7 +100,7 @@ export class Beta extends APIResource {
   chatkit: ChatKitAPI.ChatKit = new ChatKitAPI.ChatKit(this._client);
   assistants: AssistantsAPI.Assistants = new AssistantsAPI.Assistants(this._client);
   threads: ThreadsAPI.Threads = new ThreadsAPI.Threads(this._client);
-  chat: ChatAPI.Chat = new ChatAPI.Chat(this._client);
+  chat: BetaChatAPI = new BetaChatAPI(this._client);
 }
 
 Beta.Realtime = Realtime;

@@ -19,12 +19,7 @@ import { ChatCompletionToolRunnerParams } from '../../../lib/ChatCompletionRunne
 import { ChatCompletionStreamingToolRunnerParams } from '../../../lib/ChatCompletionStreamingRunner';
 import { ChatCompletionStream, type ChatCompletionStreamParams } from '../../../lib/ChatCompletionStream';
 import { ExtractParsedContentFromParams, parseChatCompletion, validateInputTools } from '../../../lib/parser';
-import {
-  BetaToolRunner,
-  type BetaToolRunnerRequestOptions,
-  type BetaToolRunnerParams,
-} from '../../../lib/beta/BetaToolRunner';
-import type OpenAI from '../../../index';
+import { BetaToolRunner } from '../../../lib/beta/BetaToolRunner';
 
 export class Completions extends APIResource {
   messages: MessagesAPI.Messages = new MessagesAPI.Messages(this._client);
@@ -196,19 +191,6 @@ export class Completions extends APIResource {
     }
 
     return ChatCompletionRunner.runTools(this._client, body as ChatCompletionToolRunnerParams<any>, options);
-  }
-
-  toolRunner(
-    body: BetaToolRunnerParams & { stream?: false },
-    options?: BetaToolRunnerRequestOptions,
-  ): BetaToolRunner<false>;
-  toolRunner(
-    body: BetaToolRunnerParams & { stream: true },
-    options?: BetaToolRunnerRequestOptions,
-  ): BetaToolRunner<true>;
-  toolRunner(body: BetaToolRunnerParams, options?: BetaToolRunnerRequestOptions): BetaToolRunner<boolean>;
-  toolRunner(body: BetaToolRunnerParams, options?: BetaToolRunnerRequestOptions): BetaToolRunner<boolean> {
-    return new BetaToolRunner(this._client as OpenAI, body, options);
   }
 
   /**
