@@ -126,6 +126,8 @@ await client.files.create({
 
 ## Streaming Helpers
 
+The SDK makes it easy to stream responses, by providing an emitter helper via `.stream()`:
+
 ```ts
 import OpenAI from 'openai';
 
@@ -153,6 +155,10 @@ async function main() {
 
 main();
 ```
+
+With `.stream()` you get event handlers, accumulation, and an async iterable.
+
+Alternatively, you can use `client.chat.completions({ ..., stream: true })` which only returns an async iterable of the events in the stream and thus uses less memory (it does not build up a final message object for you).
 
 ## Tool Helpers
 

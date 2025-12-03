@@ -304,7 +304,7 @@ See an example of streaming helpers in action in [`examples/stream.ts`](examples
 
 ### Automated function calls via Beta Tool Runner
 
-We now offer an easier to use tool calling approach via the `openai.beta.chat.completions.toolRunner({…})` helper. The SDK provides helper functions to create runnable tools that can be automatically invoked by the .toolRunner() method. These helpers simplify tool creation with JSON Schema or Zod validation.
+The SDK provides a convenient tool runner helper at `openai.beta.chat.completions.toolRunner({…})` that simplifies [function tool calling](https://platform.openai.com/docs/guides/function-calling). This helper allows you to define functions with their associated schemas, and the SDK will automatically invoke them as the AI requests and validate the parameters for you.
 
 #### Usage
 
@@ -376,6 +376,8 @@ for await (const event of toolRunner) {
 }
 ```
 
+The tool runner will invoke the AI with your tool offering and initial message history, and then the AI may respond by invoking your tools. Eventually the AI will respond without a tool call message, which is the "final" message in the chain. As the AI repeatedly invokes tools, you can view the responses via the async iterator.
+
 When you just "await" the `toolRunner`, it simply automatically iterates until the end of the async generator.
 
 #### Streaming
@@ -424,9 +426,9 @@ const weatherTool = betaZodFunctionTool({
 
 The AI's generated inputs will be directly validated and fed into your function automatically.
 
-### Automated function calls
+### Legacy Automated function calls
 
-We provide the `openai.chat.completions.runTools({…})`
+We also provide the `openai.chat.completions.runTools({…})`
 convenience helper for using function tool calls with the `/chat/completions` endpoint
 which automatically call the JavaScript functions you provide
 and sends their results back to the `/chat/completions` endpoint,
@@ -438,8 +440,6 @@ Otherwise, the args will be passed to the function you provide as a string.
 
 If you pass `tool_choice: {function: {name: …}}` instead of `auto`,
 it returns immediately after calling that function (and only loops to auto-recover parsing errors).
-
-#### Beta Tool
 
 ```ts
 import OpenAI from 'openai';
