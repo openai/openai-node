@@ -472,9 +472,132 @@ describe('ToolRunner', () => {
         for await (const event of stream) {
           events.push(event);
         }
-        // Verify we get the expected number of events (with chunked JSON, we'll get more deltas), but we
-        // should get at least 6 including
-        expect(events.length).toBeGreaterThanOrEqual(6);
+
+        // 1. Initial chunk with role only (no content, no tool_calls)
+        expect(events[0]).toMatchObject({
+          choices: [
+            {
+              delta: {
+                content: null,
+                refusal: null,
+                role: 'assistant',
+              },
+              finish_reason: null,
+              index: 0,
+            },
+          ],
+          object: 'chat.completion.chunk',
+        });
+
+        // 2. Tool call chunk with function name
+        expect(events[1]).toMatchObject({
+          choices: [
+            {
+              delta: {
+                tool_calls: [
+                  {
+                    index: 0,
+                    id: 'tool_1',
+                    type: 'function',
+                    function: {
+                      name: 'getWeather',
+                    },
+                  },
+                ],
+                content: null,
+                refusal: null,
+              },
+              finish_reason: null,
+            },
+          ],
+          object: 'chat.completion.chunk',
+        });
+
+        // 3-5. Argument chunks (3 chunks for the JSON string)
+        expect(events[2]).toMatchObject({
+          choices: [
+            {
+              delta: {
+                tool_calls: [
+                  {
+                    index: 0,
+                    function: {
+                      arguments: expect.any(String),
+                    },
+                  },
+                ],
+                content: null,
+                refusal: null,
+              },
+              finish_reason: null,
+            },
+          ],
+          object: 'chat.completion.chunk',
+        });
+
+        expect(events[3]).toMatchObject({
+          choices: [
+            {
+              delta: {
+                tool_calls: [
+                  {
+                    index: 0,
+                    function: {
+                      arguments: expect.any(String),
+                    },
+                  },
+                ],
+                content: null,
+                refusal: null,
+              },
+              finish_reason: null,
+            },
+          ],
+          object: 'chat.completion.chunk',
+        });
+
+        expect(events[4]).toMatchObject({
+          choices: [
+            {
+              delta: {
+                tool_calls: [
+                  {
+                    index: 0,
+                    function: {
+                      arguments: expect.any(String),
+                    },
+                  },
+                ],
+                content: null,
+                refusal: null,
+              },
+              finish_reason: null,
+            },
+          ],
+          object: 'chat.completion.chunk',
+        });
+
+        // 6. Final chunk with finish_reason
+        expect(events[5]).toMatchObject({
+          choices: [
+            {
+              delta: {
+                content: null,
+                role: 'assistant',
+                refusal: null,
+              },
+              finish_reason: 'tool_calls',
+            },
+          ],
+          object: 'chat.completion.chunk',
+          usage: {
+            prompt_tokens: 10,
+            completion_tokens: 20,
+            total_tokens: 30,
+          },
+        });
+
+        expect(events.length).toBe(6);
       });
 
       // Second iteration: assistant provides final response
@@ -487,11 +610,75 @@ describe('ToolRunner', () => {
       for await (const event of stream2) {
         events2.push(event);
       }
+      // Assert the expected structure of events2
+      expect(events2).toHaveLength(4);
 
-      // With chunked text, we'll get multiple text_delta events
-      // expect(events2.length).toBeGreaterThanOrEqual(6);
-      // const textDeltas = events2.filter((e) => e.type === 'content_block_delta');
-      // expect(textDeltas.length).toBeGreaterThanOrEqual(1);
+      // 1. Initial chunk with role only
+      expect(events2[0]).toMatchObject({
+        choices: [
+          {
+            delta: {
+              content: null,
+              refusal: null,
+              role: 'assistant',
+            },
+            finish_reason: null,
+            index: 0,
+          },
+        ],
+        object: 'chat.completion.chunk',
+      });
+
+      // 2. First text content delta
+      expect(events2[1]).toMatchObject({
+        choices: [
+          {
+            delta: {
+              content: 'Some text ',
+              refusal: null,
+            },
+            index: 0,
+            finish_reason: null,
+          },
+        ],
+        object: 'chat.completion.chunk',
+      });
+
+      // 3. Second text content delta
+      expect(events2[2]).toMatchObject({
+        choices: [
+          {
+            delta: {
+              content: 'content',
+              refusal: null,
+            },
+            index: 0,
+            finish_reason: null,
+          },
+        ],
+        object: 'chat.completion.chunk',
+      });
+
+      // 4. Final chunk with finish_reason and usage
+      expect(events2[3]).toMatchObject({
+        choices: [
+          {
+            delta: {
+              content: null,
+              role: 'assistant',
+              refusal: null,
+            },
+            index: 0,
+            finish_reason: 'stop',
+          },
+        ],
+        object: 'chat.completion.chunk',
+        usage: {
+          prompt_tokens: 10,
+          completion_tokens: 20,
+          total_tokens: 30,
+        },
+      });
 
       await expectDone(iterator);
     });
@@ -692,7 +879,7 @@ describe('ToolRunner', () => {
 
     it('respects max_iterations parameter', async () => {
       const { runner, handleAssistantMessage } = setupTest({
-        messages: [{ role: 'user', content: 'Use tools repeatedly' }],
+        messages: [{ role: 'user', content: 'Use tools repeatedly, one at a time' }],
         max_iterations: 2, // Limit to 2 iterations
       });
 
