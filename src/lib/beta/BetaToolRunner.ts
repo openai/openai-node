@@ -72,6 +72,11 @@ export class BetaToolRunner<Stream extends boolean> {
     params: BetaToolRunnerParams,
     options?: BetaToolRunnerRequestOptions,
   ) {
+    params.n ??= 1;
+    if (params && params.n > 1) {
+      throw new Error('BetaToolRunner does not support n > 1');
+    }
+
     this.#state = {
       params: {
         // You can't clone the entire params since there are functions as handlers.

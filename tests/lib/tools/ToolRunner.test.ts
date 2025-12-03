@@ -1,8 +1,4 @@
 import OpenAI from 'openai';
-// import { BetaMessage, BetaContentBlock, BetaToolResultBlockParam } from 'openai/sdk/resources/beta';
-// import { BetaRunnableTool } from 'openai/sdk/lib/tools/BetaRunnableTool';
-// import { BetaRawMessageStreamEvent } from 'openai/sdk/resources/beta/messages';
-// import { Fetch } from 'openai/sdk/internal/builtin-types';
 import { mockFetch } from '../../utils/mock-fetch';
 import { BetaRunnableTool } from 'openai/lib/beta/BetaRunnableTool';
 import {
@@ -430,6 +426,16 @@ describe('ToolRunner', () => {
     expect(async () => await runner[Symbol.asyncIterator]().next()).rejects.toThrow(
       'Cannot iterate over a consumed stream',
     );
+  });
+
+  it('throws when constructed with n>1', async () => {
+    expect(() => {
+      setupTest({ n: 999 });
+    }).toThrow('BetaToolRunner does not support n > 1');
+
+    expect(() => {
+      setupTest({ n: null });
+    }).not.toThrow();
   });
 
   describe('iterator.next()', () => {
