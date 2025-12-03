@@ -1,47 +1,70 @@
-import { Fetch, RequestInfo, RequestInit } from 'openai/internal/builtin-types';
+import { type Fetch, type RequestInfo, type RequestInit, type Response } from 'openai/internal/builtin-types';
 import { PassThrough } from 'stream';
 
+/**
+ * Creates a mock `fetch` function and a `handleRequest` function for intercepting `fetch` calls.
+ *
+ * You call `handleRequest` with a callback function that handles the next `fetch` call.
+ * It returns a Promise that:
+ * - waits for the next call to `fetch`
+ * - calls the callback with the `fetch` arguments
+ * - resolves `fetch` with the callback output
+ */
 export function mockFetch(): {
   fetch: Fetch;
   handleRequest: (handle: Fetch) => void;
   handleStreamEvents: (events: any[]) => void;
   handleMessageStreamEvents: (iter: AsyncIterable<any>) => void;
 } {
-  const queue: Promise<typeof fetch>[] = [];
-  const readResolvers: ((handler: typeof fetch) => void)[] = [];
+  const fetchQueue: ((handler: typeof fetch) => void)[] = [];
+  const handlerQueue: Promise<typeof fetch>[] = [];
 
-  let index = 0;
+  const enqueueHandler = () => {
+    handlerQueue.push(
+      new Promise<typeof fetch>((resolve) => {
+        fetchQueue.push((handle: typeof fetch) => {
+          enqueueHandler();
+          resolve(handle);
+        });
+      }),
+    );
+  };
+  enqueueHandler();
 
   async function fetch(req: string | RequestInfo, init?: RequestInit): Promise<Response> {
-    const idx = index++;
-    if (!queue[idx]) {
-      queue.push(new Promise((resolve) => readResolvers.push(resolve)));
-    }
-
-    const handler = await queue[idx]!;
+    const handler = await handlerQueue.shift();
+    if (!handler) throw new Error('expected handler to be defined');
+    const signal = init?.signal;
+    if (!signal) return await handler(req, init);
     return await Promise.race([
       handler(req, init),
-      new Promise<Response>((_resolve, reject) => {
-        if (init?.signal?.aborted) {
-          // @ts-ignore
+      new Promise<Response>((resolve, reject) => {
+        if (signal.aborted) {
+          // @ts-ignore does exist in Node
           reject(new DOMException('The user aborted a request.', 'AbortError'));
           return;
         }
-        init?.signal?.addEventListener('abort', (_e) => {
-          // @ts-ignore
+        signal.addEventListener('abort', (e) => {
+          // @ts-ignore does exist in Node
           reject(new DOMException('The user aborted a request.', 'AbortError'));
         });
       }),
     ]);
   }
 
-  function handleRequest(handler: typeof fetch): void {
-    if (readResolvers.length) {
-      const resolver = readResolvers.shift()!;
-      resolver(handler);
-      return;
-    }
-    queue.push(Promise.resolve(handler));
+  function handleRequest(handle: typeof fetch): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      fetchQueue.shift()?.(async (req, init) => {
+        try {
+          return await handle(req, init);
+        } catch (err) {
+          reject(err);
+          return err as any;
+        } finally {
+          resolve();
+        }
+      });
+    });
   }
 
   function handleStreamEvents(events: any[]) {
