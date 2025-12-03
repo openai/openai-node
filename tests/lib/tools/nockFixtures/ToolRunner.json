@@ -1,474 +1,480 @@
 [
-  {
-    "scope": "https://api.openai.com:443",
-    "method": "POST",
-    "path": "/v1/chat/completions",
-    "body": {
-      "model": "gpt-4o",
-      "max_tokens": 1000,
-      "messages": [
-        {
-          "role": "user",
-          "content": "Use the test_tool with value \"test\", then provide a final response that includes the word 'foo'."
-        }
-      ],
-      "tools": [
-        {
-          "type": "function",
-          "function": {
-            "name": "test_tool",
-            "description": "A test tool",
-            "parameters": {
-              "type": "object",
-              "properties": {
-                "value": {
-                  "type": "string"
+    {
+        "scope": "https://api.openai.com:443",
+        "method": "POST",
+        "path": "/v1/chat/completions",
+        "body": {
+            "model": "gpt-4o",
+            "max_tokens": 1000,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "Use the test_tool with value \"test\", then provide a final response that includes the word 'foo'."
                 }
-              }
-            }
-          }
-        }
-      ],
-      "stream": false
-    },
-    "status": 200,
-    "response": [
-      "1b3404201c07ce392f9674370bc94efe64815e55fdd411cb03dfd840a050cf2b7479e5956869eb28b0f43db8dc3fbf2db4986eb607beb7b91f131b3c45c3b28453ca361b41a33e11419d36a7a73dab77eb50ec0144f2676e5e65ec2e7e8e1fddefc93c885f77d12593efbb9b2970a565d898cfd8d0104531f4010924c1fd7c06a2ae29ba600a82baa18d306f8755c72a259ba65356308e4d6de3fc37777f06febea0712f81c05ce4514c406e8b9a329b3a88fb11864b86f5617918038634885adab74df99faaab40f61f28fd3c26ce97adc9dfb5f1f4ba3d1efdc22d859718d30262c122e18b13514847128621b8a00ee45d525796590b2d1a66105dacbf08b1ff0b4feff917c77af13a2daf37f887062fd8999b42d4c4d6dad6b990bc949561d5944eabddac0235295d8ca8c39bd9c2569cd6c7b45bb5fa79d551b2efb54093e6528c0be19ea8608a84204fd7a2376c11ffc39e6f94e12d4f26ca36ccee304696c7db93f6f6e480abe322dc159382d0a2e743a89ba824bfa8a92275b3759cf587d4c57e03504711a7bad0a237f860b941fa7ead48334cc7f60cdfb4d105"
-    ],
-    "rawHeaders": {
-      "access-control-expose-headers": "X-Request-ID",
-      "alt-svc": "h3=\":443\"; ma=86400",
-      "cf-cache-status": "DYNAMIC",
-      "cf-ray": "9a7dbb91b9d442f8-EWR",
-      "connection": "keep-alive",
-      "content-encoding": "br",
-      "content-type": "application/json",
-      "date": "Tue, 02 Dec 2025 20:56:45 GMT",
-      "openai-organization": "stainless-lo3pdl",
-      "openai-processing-ms": "332",
-      "openai-project": "proj_FSQrMfywhpvjH41RhwSodie7",
-      "openai-version": "2020-10-01",
-      "server": "cloudflare",
-      "set-cookie": "_cfuvid=lpPj9JFyqlPPHP_HkoosAVe0qXpd8Sv7nn2TbPz.7XU-1764709005788-0.0.1.1-604800000; path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None",
-      "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
-      "transfer-encoding": "chunked",
-      "x-content-type-options": "nosniff",
-      "x-envoy-upstream-service-time": "648",
-      "x-openai-proxy-wasm": "v0.1",
-      "x-ratelimit-limit-requests": "10000",
-      "x-ratelimit-limit-tokens": "30000000",
-      "x-ratelimit-remaining-requests": "9999",
-      "x-ratelimit-remaining-tokens": "29999974",
-      "x-ratelimit-reset-requests": "6ms",
-      "x-ratelimit-reset-tokens": "0s",
-      "x-request-id": "req_f2c619799e6a49df915d7151b34af812"
-    },
-    "responseIsBinary": false
-  },
-  {
-    "scope": "https://api.openai.com:443",
-    "method": "POST",
-    "path": "/v1/chat/completions",
-    "body": {
-      "model": "gpt-4o",
-      "max_tokens": 1000,
-      "messages": [
-        {
-          "role": "user",
-          "content": "Use the test_tool with value \"test\", then provide a final response that includes the word 'foo'."
-        },
-        {
-          "role": "assistant",
-          "content": null,
-          "tool_calls": [
-            {
-              "id": "call_kXFjbYa63Zq8QTBFFenco0Si",
-              "type": "function",
-              "function": {
-                "name": "test_tool",
-                "arguments": "{\"value\":\"test\"}"
-              }
-            }
-          ],
-          "refusal": null,
-          "annotations": []
-        },
-        {
-          "role": "tool",
-          "content": "Tool result",
-          "tool_call_id": "call_kXFjbYa63Zq8QTBFFenco0Si"
-        }
-      ],
-      "tools": [
-        {
-          "type": "function",
-          "function": {
-            "name": "test_tool",
-            "description": "A test tool",
-            "parameters": {
-              "type": "object",
-              "properties": {
-                "value": {
-                  "type": "string"
+            ],
+            "tools": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "test_tool",
+                        "description": "A test tool",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "value": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
                 }
-              }
-            }
-          }
-        }
-      ],
-      "stream": false
+            ],
+            "n": 1,
+            "stream": false
+        },
+        "status": 200,
+        "response": [
+            "1b3404201c07ce392f9674370bc94efe64a16ed37e734d47c4f46b02248853a8e715babcf24ab4b4751458fa1e5cee9f9f1fed996e36d6f036f7636283a76818269c52b6d588a0ad3e11418db6ae8ef6eceed37f288f0022f9b3f0cc4f622d2f98957da6dbeaf2e23693e2f7736deb75377ae562146043431445cf0f482009ee670654e57dc3b61dd35416b411e6dd943f44838969da1315e75cb276ce7f737f37f08f218d7b0514e1268fa20b723b7463a7a98ab89f60b8645803967b31604891a8a57dd392fd97ea2a90fd07aa18c5477b76da3abfde9f8bda64d12959b35ef4312d2016ac12be20118574245e18820bea40de153d183b35cfaa6106d1e17f8f102ff7f0f45ef738b6abd76576bdc17f68f08a7f7293879ad8cadbaa1792b74e2ce53716dcb54b55a012a58be17778295bd88af39e31adc5b7e5993f28d90feec0d2e64c8cf3e0b66a608a7820dbb6fc0f2c13ffbd9e2f96e1e548c6cf36cc6e2f469607db13f5f1e4809bf34b7a282605a14cef074f377e49fe50932375b3759cf5c7f4c8e31b401d459cea4299bee083e506e9fb9593e5b8811f39b1eba30b"
+        ],
+        "rawHeaders": {
+            "access-control-expose-headers": "X-Request-ID",
+            "alt-svc": "h3=\":443\"; ma=86400",
+            "cf-cache-status": "DYNAMIC",
+            "cf-ray": "9a845d712abc8c27-EWR",
+            "connection": "keep-alive",
+            "content-encoding": "br",
+            "content-type": "application/json",
+            "date": "Wed, 03 Dec 2025 16:15:50 GMT",
+            "openai-organization": "stainless-lo3pdl",
+            "openai-processing-ms": "375",
+            "openai-project": "proj_FSQrMfywhpvjH41RhwSodie7",
+            "openai-version": "2020-10-01",
+            "server": "cloudflare",
+            "set-cookie": "_cfuvid=23PiD.Xem7RLutUsn3Z8kgcrKzxIJ6umxTQi.bA72wI-1764778550408-0.0.1.1-604800000; path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None",
+            "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+            "transfer-encoding": "chunked",
+            "x-content-type-options": "nosniff",
+            "x-envoy-upstream-service-time": "388",
+            "x-openai-proxy-wasm": "v0.1",
+            "x-ratelimit-limit-requests": "10000",
+            "x-ratelimit-limit-tokens": "30000000",
+            "x-ratelimit-remaining-requests": "9999",
+            "x-ratelimit-remaining-tokens": "29999974",
+            "x-ratelimit-reset-requests": "6ms",
+            "x-ratelimit-reset-tokens": "0s",
+            "x-request-id": "req_f7524cf93f5a4270a594f5dd1572b544"
+        },
+        "responseIsBinary": false
     },
-    "status": 200,
-    "response": [
-      "1b6603081c056eacc77324e1504f6156da56b599addfbcc35ad5bc0970c1ac411494fab6820e4b57ffffaf768687561aa1c063f9dbf2da16d174bd53bb15771248c3b284b3989b591b471afd303be6a72f0c558a603bff961cc541ee54e36a48c3a2d77fce75db6b3e5df25b6bb47cf5ec76b030cc534bc3271224a68c7d4774d7b15ccdd734bb1603e5d162216eb245b2adce64cdeb46a7564e20996fa8ea2f019367fe4493186a2a4304ab946f10376336ff0683d4cc794ed3a75d6607f6942046dffb945d0e91f22b6df15dcc0edb8a17819c4831a17e03984507410e00605bc5e4e865f73f9db70e54880bc5571511d61bf9514b3c0ee310d216d86e5ddf576209e2424771e314e18a479e935c609f00aa745b1c2c643fd27429247e6c70dd03884129d8dc24410a04e4f8778fead03ee4023c599d8a16016d47c4dd2acebc81abe78dda328b9dfe155936f9adca2e08dc8f80249d88df7c23ac94a3bf73c11dcf8fa3d4cbfc080e"
-    ],
-    "rawHeaders": {
-      "access-control-expose-headers": "X-Request-ID",
-      "alt-svc": "h3=\":443\"; ma=86400",
-      "cf-cache-status": "DYNAMIC",
-      "cf-ray": "9a7dbb966db942f8-EWR",
-      "connection": "keep-alive",
-      "content-encoding": "br",
-      "content-type": "application/json",
-      "date": "Tue, 02 Dec 2025 20:56:46 GMT",
-      "openai-organization": "stainless-lo3pdl",
-      "openai-processing-ms": "453",
-      "openai-project": "proj_FSQrMfywhpvjH41RhwSodie7",
-      "openai-version": "2020-10-01",
-      "server": "cloudflare",
-      "set-cookie": "_cfuvid=dIQGF8J5UWhZ4SvG6kU7vUjxKahEtpjMKX7lCEQJmWA-1764709006362-0.0.1.1-604800000; path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None",
-      "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
-      "transfer-encoding": "chunked",
-      "x-content-type-options": "nosniff",
-      "x-envoy-upstream-service-time": "470",
-      "x-openai-proxy-wasm": "v0.1",
-      "x-ratelimit-limit-requests": "10000",
-      "x-ratelimit-limit-tokens": "30000000",
-      "x-ratelimit-remaining-requests": "9999",
-      "x-ratelimit-remaining-tokens": "29999969",
-      "x-ratelimit-reset-requests": "6ms",
-      "x-ratelimit-reset-tokens": "0s",
-      "x-request-id": "req_94e15302a82b469cb4d179718e715ba0"
-    },
-    "responseIsBinary": false
-  },
-  {
-    "scope": "https://api.openai.com:443",
-    "method": "POST",
-    "path": "/v1/chat/completions",
-    "body": {
-      "model": "gpt-4o",
-      "max_tokens": 1000,
-      "messages": [
-        {
-          "role": "user",
-          "content": "Use the test_tool with count 1, then use it again with count 2, then say '231' in the final message"
-        }
-      ],
-      "tools": [
-        {
-          "type": "function",
-          "function": {
-            "name": "test_tool",
-            "description": "A test tool",
-            "parameters": {
-              "type": "object",
-              "properties": {
-                "count": {
-                  "type": "number"
+    {
+        "scope": "https://api.openai.com:443",
+        "method": "POST",
+        "path": "/v1/chat/completions",
+        "body": {
+            "model": "gpt-4o",
+            "max_tokens": 1000,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "Use the test_tool with value \"test\", then provide a final response that includes the word 'foo'."
+                },
+                {
+                    "role": "assistant",
+                    "content": null,
+                    "tool_calls": [
+                        {
+                            "id": "call_A4jx2uIH3pqsuUCQUIkoFDjL",
+                            "type": "function",
+                            "function": {
+                                "name": "test_tool",
+                                "arguments": "{\"value\":\"test\"}"
+                            }
+                        }
+                    ],
+                    "refusal": null,
+                    "annotations": []
+                },
+                {
+                    "role": "tool",
+                    "content": "Tool result",
+                    "tool_call_id": "call_A4jx2uIH3pqsuUCQUIkoFDjL"
                 }
-              }
-            }
-          }
-        }
-      ],
-      "stream": false
-    },
-    "status": 200,
-    "response": [
-      "1b1205601c0776d356336ef452185b7fa2989c27747bf5885a1bdb4a7d19d3c8f1223edcdf538745e18f7b779fe3d0c2147abb318777f19e1e25169695684a89628b6ec24c3f62d29e6ccf6e287400c8e3d7ecb448483ddc84eba0eb95ac3ed07c39163efadc6ea7eac1daacd6f09083ca36f6f311182f5a5e03ac2c0932a3328cf4260bf1d4ef170d29e46493d64946210ffc96ee773e5d076e80bc76b20c01121f7280aa4899e90190f53318abfd95a4c6c731581f418cae6996e7fa6d58a090f217509905c754284ec38b255ffaa3fd32bb74b3bdc9c33c585678d5e44d233084f9318ec4d42233966e108db4a75d2dc94858fade2ae0e02df097ff88cfbf8dc3f7f16f81df6a617c5905523c49fc8fa46d4b2be2c7fc7af19ab3757d132dffd5d0779a5101635d47e76b5ba41e2bc9fda2caad9a37dce01ac691c099a8a54896b00d97b5e51aafb8b5d2a2c1716ca00624e5b456338d61dd8240dd3f86b8c7b21c212f82bd3d1ef250a357c4a198ec241ab9c6316cf87473e615cefedf1c66fed7303ad84570ee132553e96427541e59945d2f23da3036a15b0130471096c7bc08ee9d888652aadbb705ba0aabbabcc02b16f401"
-    ],
-    "rawHeaders": {
-      "access-control-expose-headers": "X-Request-ID",
-      "alt-svc": "h3=\":443\"; ma=86400",
-      "cf-cache-status": "DYNAMIC",
-      "cf-ray": "9a7dbb99e86742f8-EWR",
-      "connection": "keep-alive",
-      "content-encoding": "br",
-      "content-type": "application/json",
-      "date": "Tue, 02 Dec 2025 20:56:47 GMT",
-      "openai-organization": "stainless-lo3pdl",
-      "openai-processing-ms": "1458",
-      "openai-project": "proj_FSQrMfywhpvjH41RhwSodie7",
-      "openai-version": "2020-10-01",
-      "server": "cloudflare",
-      "set-cookie": "_cfuvid=qi330.nZqpWAjkxgfpHpx2xbkc2UcZcgIVqzaBpJOJc-1764709007921-0.0.1.1-604800000; path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None",
-      "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
-      "transfer-encoding": "chunked",
-      "x-content-type-options": "nosniff",
-      "x-envoy-upstream-service-time": "1470",
-      "x-openai-proxy-wasm": "v0.1",
-      "x-ratelimit-limit-requests": "10000",
-      "x-ratelimit-limit-tokens": "30000000",
-      "x-ratelimit-remaining-requests": "9999",
-      "x-ratelimit-remaining-tokens": "29999973",
-      "x-ratelimit-reset-requests": "6ms",
-      "x-ratelimit-reset-tokens": "0s",
-      "x-request-id": "req_5d9e0413b7b942aeb8212d70c86dc374"
-    },
-    "responseIsBinary": false
-  },
-  {
-    "scope": "https://api.openai.com:443",
-    "method": "POST",
-    "path": "/v1/chat/completions",
-    "body": {
-      "model": "gpt-4o",
-      "max_tokens": 1000,
-      "messages": [
-        {
-          "role": "user",
-          "content": "Use the test_tool with count 1, then use it again with count 2, then say '231' in the final message"
-        },
-        {
-          "role": "assistant",
-          "content": null,
-          "tool_calls": [
-            {
-              "id": "call_8LhWm4pXGZb7ZEHUOnZvLUa3",
-              "type": "function",
-              "function": {
-                "name": "test_tool",
-                "arguments": "{\"count\": 1}"
-              }
-            },
-            {
-              "id": "call_3SAikZPh6kJlgz6ASqbj3I3Q",
-              "type": "function",
-              "function": {
-                "name": "test_tool",
-                "arguments": "{\"count\": 2}"
-              }
-            }
-          ],
-          "refusal": null,
-          "annotations": []
-        },
-        {
-          "role": "tool",
-          "content": "Called with 1",
-          "tool_call_id": "call_8LhWm4pXGZb7ZEHUOnZvLUa3"
-        },
-        {
-          "role": "tool",
-          "content": "Called with 2",
-          "tool_call_id": "call_3SAikZPh6kJlgz6ASqbj3I3Q"
-        }
-      ],
-      "tools": [
-        {
-          "type": "function",
-          "function": {
-            "name": "test_tool",
-            "description": "A test tool",
-            "parameters": {
-              "type": "object",
-              "properties": {
-                "count": {
-                  "type": "number"
+            ],
+            "tools": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "test_tool",
+                        "description": "A test tool",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "value": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
                 }
-              }
-            }
-          }
-        }
-      ],
-      "stream": false
-    },
-    "status": 200,
-    "response": [
-      "1b4903201c056eacc77324e150cf1165c4dc52dd7d9e6945bdd9c404681085abbeada0c3d275eae63d4771420b30965fedc18145d15ab6388134cdb4053d8b9111aef1af2f044207811d988d9d1609350f6fe17d71de620ce65e789b66c7eba3f5db6cbd6f8e021602262a84ad1f904030a89c6f84536451613596558f5847b428fb4543893955a619c5aad7967ca4f50ff22707ee8b09bbe198b0e493d48a10e1d1358a0d92a0c67d87c1a9d1684b5ec9815aa9c1bdb56b6d3ffdc0d37881a3a7fff48f35139cf92d582b665873fb7bf7afebab24f78b2ab76a6a0ba569e979040c645a086b1ec47b6d5b333d149b222d1a3dffa535c209e20a516823280b9c361dd0954ab2b4f5a4687bd544dabbceb91d029cf26d18d1bd5fa1b1ec89f137c3cc3fb7614a95d87ad36c1bddc1a4df5e244b7534f3a7a550d79bd0ad1034170c27c562eb5f6b836b106155bd42771d59141cf49226c101"
-    ],
-    "rawHeaders": {
-      "access-control-expose-headers": "X-Request-ID",
-      "alt-svc": "h3=\":443\"; ma=86400",
-      "cf-cache-status": "DYNAMIC",
-      "cf-ray": "9a7dbba3983a42f8-EWR",
-      "connection": "keep-alive",
-      "content-encoding": "br",
-      "content-type": "application/json",
-      "date": "Tue, 02 Dec 2025 20:56:48 GMT",
-      "openai-organization": "stainless-lo3pdl",
-      "openai-processing-ms": "570",
-      "openai-project": "proj_FSQrMfywhpvjH41RhwSodie7",
-      "openai-version": "2020-10-01",
-      "server": "cloudflare",
-      "set-cookie": "_cfuvid=BUCKnZnfZHCGps3vl2nGYAx9wF.sgTuV.Mr9F4AhkTk-1764709008586-0.0.1.1-604800000; path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None",
-      "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
-      "transfer-encoding": "chunked",
-      "x-content-type-options": "nosniff",
-      "x-envoy-upstream-service-time": "585",
-      "x-openai-proxy-wasm": "v0.1",
-      "x-ratelimit-limit-requests": "10000",
-      "x-ratelimit-limit-tokens": "30000000",
-      "x-ratelimit-remaining-requests": "9999",
-      "x-ratelimit-remaining-tokens": "29999963",
-      "x-ratelimit-reset-requests": "6ms",
-      "x-ratelimit-reset-tokens": "0s",
-      "x-request-id": "req_7d1925a5797891a7b7bb58f383b71d92"
-    },
-    "responseIsBinary": false
-  },
-  {
-    "scope": "https://api.openai.com:443",
-    "method": "POST",
-    "path": "/v1/chat/completions",
-    "body": {
-      "model": "gpt-4o",
-      "max_tokens": 1000,
-      "messages": [
-        {
-          "role": "user",
-          "content": "Use the test_tool with input \"test\", then provide a final response with the word '231'"
-        }
-      ],
-      "tools": [
-        {
-          "type": "function",
-          "function": {
-            "name": "test_tool",
-            "description": "A test tool",
-            "parameters": {
-              "type": "object",
-              "properties": {
-                "input": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        }
-      ],
-      "stream": false
-    },
-    "status": 200,
-    "response": [
-      "1b3404201c07ce392f9674370bc94efe64819ed37e73c4b9103ead4353a8e715babcf24ab4b4751458fafefce5ee385b6831f4e66f0f3c6f73372636788a866509a7946d3522d8a53e11418db6ae8ef6ecee5d3b64bf0122f9b3971f796cc75edb9b57642741a771627d3fdf4ffaf96fa0652b63696343535445cf0f48600919e73310754dd10553108c9d6cc4b6fd8b325609d9349db282716e6abbe4bfbd7b19f8c782e6bd04027353663101b92d4a426fe920ee4718ae19d687e55e0c19d2206a99b1f364ffa57115cafe0365b3774739471d63775ad6ddbc7614d9eeb83b13d34262e1aae10b123190998917c6e0a23a92774959187addb39a30a3e8a2bd22e8ce159edef315c776f1baccae37e40f0d565a889b3cd4a4dedadeb990bce485bf28099fa976b30ad4a474b1fc0e6f668b58715a1ed36ed1e6f85146c9be97024d6c9918e7c14ba24229e2814abaea7f608bf8eff57ca30c6fbd65fc6ca3ecf6626c79b03d511fcf0eb8da0e7e87c1b420b4e8fde019c62f291f6a2acbb8397792f58794d99f04a08e12ce75a1455ff0a17243f4fd1ad1c710cd8facc8c6135d"
-    ],
-    "rawHeaders": {
-      "access-control-expose-headers": "X-Request-ID",
-      "alt-svc": "h3=\":443\"; ma=86400",
-      "cf-cache-status": "DYNAMIC",
-      "cf-ray": "9a7dbba86c8b42f8-EWR",
-      "connection": "keep-alive",
-      "content-encoding": "br",
-      "content-type": "application/json",
-      "date": "Tue, 02 Dec 2025 20:56:49 GMT",
-      "openai-organization": "stainless-lo3pdl",
-      "openai-processing-ms": "985",
-      "openai-project": "proj_FSQrMfywhpvjH41RhwSodie7",
-      "openai-version": "2020-10-01",
-      "server": "cloudflare",
-      "set-cookie": "_cfuvid=oJb88Mguy0KPy3QsA56AonUav8eXZp4Vndi.eTdWPoE-1764709009776-0.0.1.1-604800000; path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None",
-      "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
-      "transfer-encoding": "chunked",
-      "x-content-type-options": "nosniff",
-      "x-envoy-upstream-service-time": "1002",
-      "x-openai-proxy-wasm": "v0.1",
-      "x-ratelimit-limit-requests": "10000",
-      "x-ratelimit-limit-tokens": "30000000",
-      "x-ratelimit-remaining-requests": "9999",
-      "x-ratelimit-remaining-tokens": "29999976",
-      "x-ratelimit-reset-requests": "6ms",
-      "x-ratelimit-reset-tokens": "0s",
-      "x-request-id": "req_dc3243bab67944a1b586d7a40f600776"
-    },
-    "responseIsBinary": false
-  },
-  {
-    "scope": "https://api.openai.com:443",
-    "method": "POST",
-    "path": "/v1/chat/completions",
-    "body": {
-      "model": "gpt-4o",
-      "max_tokens": 1000,
-      "messages": [
-        {
-          "role": "user",
-          "content": "Use the test_tool with input \"test\", then provide a final response with the word '231'"
+            ],
+            "n": 1,
+            "stream": false
         },
-        {
-          "role": "assistant",
-          "content": null,
-          "tool_calls": [
-            {
-              "id": "call_tMdC4ZpC8UYPyDuyj43iCkU9",
-              "type": "function",
-              "function": {
-                "name": "test_tool",
-                "arguments": "{\"input\":\"test\"}"
-              }
-            }
-          ],
-          "refusal": null,
-          "annotations": []
+        "status": 200,
+        "response": [
+            "1b8003209c0576b33291acec5a442b1f61a0ca79859aaa9fe8d9e29cca471707247fc59c31b7028bce9c38f1fbbf6fe7f3a795120a3c96eebc99d61d344cd7fb6bb7bc1d300dcb124e616cda093da63ef2d3a365212420f9b7a06a4bbaccf2c698c760b82dae61f47a9e2e52f3fb5325f7cf8b07a239d114d217487032d49cef90d23434d3b4745df462476493493b52ada1341d5261cdab46affcf7461fec328f95dc9d8ffb82ec5457f4217928810d4c28e07e028aaba3513fafe6e85620ee44c5a902df19077b0d21f90145f8cfa5aaf34cce2486cf0bc7b86998b9fa0b0103af04b5588cb01617d7ae6dcc8d6f954dd2f68d3fa8ae46e92a863faf0c21b4039459e8c9f1e43d53b57d53b523f2067a762da338083c124fa42da18d85ce099da4350c4b0c4625b6d4423969e484292ce6acbeda429b6aefdc7e655627238b19b96a78ac6547a764ea871ee554f0677fcaa0318e59d46361c72411771cabe1a7e1087521eb77dca261d9be175a91ed0103"
+        ],
+        "rawHeaders": {
+            "access-control-expose-headers": "X-Request-ID",
+            "alt-svc": "h3=\":443\"; ma=86400",
+            "cf-cache-status": "DYNAMIC",
+            "cf-ray": "9a845d761f1c8c27-EWR",
+            "connection": "keep-alive",
+            "content-encoding": "br",
+            "content-type": "application/json",
+            "date": "Wed, 03 Dec 2025 16:15:51 GMT",
+            "openai-organization": "stainless-lo3pdl",
+            "openai-processing-ms": "596",
+            "openai-project": "proj_FSQrMfywhpvjH41RhwSodie7",
+            "openai-version": "2020-10-01",
+            "server": "cloudflare",
+            "set-cookie": "_cfuvid=DxyeRhO5K1.8vDJnFHChY4psCYa11f1v643RPYuvmss-1764778551422-0.0.1.1-604800000; path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None",
+            "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+            "transfer-encoding": "chunked",
+            "x-content-type-options": "nosniff",
+            "x-envoy-upstream-service-time": "617",
+            "x-openai-proxy-wasm": "v0.1",
+            "x-ratelimit-limit-requests": "10000",
+            "x-ratelimit-limit-tokens": "30000000",
+            "x-ratelimit-remaining-requests": "9999",
+            "x-ratelimit-remaining-tokens": "29999969",
+            "x-ratelimit-reset-requests": "6ms",
+            "x-ratelimit-reset-tokens": "0s",
+            "x-request-id": "req_b8080ce1b79341bd940565c356af3ea5"
         },
-        {
-          "role": "tool",
-          "content": "Tool result",
-          "tool_call_id": "call_tMdC4ZpC8UYPyDuyj43iCkU9"
-        }
-      ],
-      "tools": [
-        {
-          "type": "function",
-          "function": {
-            "name": "test_tool",
-            "description": "A test tool",
-            "parameters": {
-              "type": "object",
-              "properties": {
-                "input": {
-                  "type": "string"
+        "responseIsBinary": false
+    },
+    {
+        "scope": "https://api.openai.com:443",
+        "method": "POST",
+        "path": "/v1/chat/completions",
+        "body": {
+            "model": "gpt-4o",
+            "max_tokens": 1000,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "Use the test_tool with count 1, then use it again with count 2, then say '231' in the final message"
                 }
-              }
-            }
-          }
-        }
-      ],
-      "stream": false
+            ],
+            "tools": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "test_tool",
+                        "description": "A test tool",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "count": {
+                                    "type": "number"
+                                }
+                            }
+                        }
+                    }
+                }
+            ],
+            "n": 1,
+            "stream": false
+        },
+        "status": 200,
+        "response": [
+            "1b1205201c0776d356336ef452185b7fa24acf5f68b2ea256a6e49af69cf5c1d343ec4940f20755814feff7bf7e338b43085ce9ded01be0675ee6b2cdad826fb91a6141066d3869a74f1b118b387475b80039f767eff681d0310c9af45fbd3ceceac374765aecdc1bdbe3c5dd68c05224d44463fc9ad3f828f4c948e66010924c1f37c0688925c292d0439514768bdcbd3cde6473b4d6bb6a77f53f2e4fc0ff44f0efed524bb5b8067dd642baa40ae41b1811934ee7b302e195680e516038624915a3a37ee76f02aae02d95fc0763eb5bb7cf8592ffabdd32adedd9adb0bb9ad77702f20161c12be59220aa9251686e04277206f02d5d4af1e1a66106d7ea751383175fde13ff1cdddb87c5be99b7e778ad9866eec4f85fdf298ff841e9323521d97b788a9b6cd176afeb786d136870326eff073ece5abe776c7e52a21765d7ba72aaf29ac059ecba654bab01687dd099b6e91f3cdd30d2b198cdc94dac2364a27838738c7fc37d03b42a835621ab3db3a3d59fd4ac7326e2e61edb218b6dd5368d1e1c90357af0fcb4b312977697cfa99695c497e0d5558eae7e0b8a64de36d9d5c00784a204e552f8def27c2628acc9d3861124bce62f11e23a005"
+        ],
+        "rawHeaders": {
+            "access-control-expose-headers": "X-Request-ID",
+            "alt-svc": "h3=\":443\"; ma=86400",
+            "cf-cache-status": "DYNAMIC",
+            "cf-ray": "9a845d7c7ba58c27-EWR",
+            "connection": "keep-alive",
+            "content-encoding": "br",
+            "content-type": "application/json",
+            "date": "Wed, 03 Dec 2025 16:15:52 GMT",
+            "openai-organization": "stainless-lo3pdl",
+            "openai-processing-ms": "760",
+            "openai-project": "proj_FSQrMfywhpvjH41RhwSodie7",
+            "openai-version": "2020-10-01",
+            "server": "cloudflare",
+            "set-cookie": "_cfuvid=fW433MHslfoC7JTSFlm4_zUnCx_1akGUNhJDEcL4e_c-1764778552600-0.0.1.1-604800000; path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None",
+            "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+            "transfer-encoding": "chunked",
+            "x-content-type-options": "nosniff",
+            "x-envoy-upstream-service-time": "783",
+            "x-openai-proxy-wasm": "v0.1",
+            "x-ratelimit-limit-requests": "10000",
+            "x-ratelimit-limit-tokens": "30000000",
+            "x-ratelimit-remaining-requests": "9999",
+            "x-ratelimit-remaining-tokens": "29999973",
+            "x-ratelimit-reset-requests": "6ms",
+            "x-ratelimit-reset-tokens": "0s",
+            "x-request-id": "req_8b967c6196c74f4885ff26753d969711"
+        },
+        "responseIsBinary": false
     },
-    "status": 200,
-    "response": [
-      "1b2303201c076eac66e4a0959313a8725ea1a6ea277ab6b4add4974f1cc86fd1930ef7d4615198ba79cf6dce3496ff6f4f0ea4eb7c2d4b274918269c8a6e88495279076f8f56a54090e46f4937b6f4503daa57b2cc7be44517af39c5f2f1be5f57a10e8b27603488f2858d0f4810cf909e53044acf99260f84086afc8e282b17e34acd40cd34a5c29f9bae97ec1f641fecf84723dc308e05d929a148c079256d1edad801b96fe0e3126854ef949683f41b7f5cd462b56e640d81e0d7b22e71f6228fdaa118e7215eae36b33b139504e8a0460154c2cc38c0eb0d83db58e5ddb8a272a37b86be2d1631dc386ea90c6b44f332ca6bdfcf427137f93252682b3da74d2e56e6e631f1c5bb5f67e8ed45e437abbe189bc764fdb7d01d3621b7ce94c22512a4b04c4c52f22aae553603c16de0e3a2195818600db62e74d6773e62e6cb20d346fb313400"
-    ],
-    "rawHeaders": {
-      "access-control-expose-headers": "X-Request-ID",
-      "alt-svc": "h3=\":443\"; ma=86400",
-      "cf-cache-status": "DYNAMIC",
-      "cf-ray": "9a7dbbaf5bd142f8-EWR",
-      "connection": "keep-alive",
-      "content-encoding": "br",
-      "content-type": "application/json",
-      "date": "Tue, 02 Dec 2025 20:56:50 GMT",
-      "openai-organization": "stainless-lo3pdl",
-      "openai-processing-ms": "422",
-      "openai-project": "proj_FSQrMfywhpvjH41RhwSodie7",
-      "openai-version": "2020-10-01",
-      "server": "cloudflare",
-      "set-cookie": "_cfuvid=cePexYFkijPVWrWqH3vLF2RIg.1dy1YjD_.Dp8_n7Nk-1764709010314-0.0.1.1-604800000; path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None",
-      "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
-      "transfer-encoding": "chunked",
-      "x-content-type-options": "nosniff",
-      "x-envoy-upstream-service-time": "435",
-      "x-openai-proxy-wasm": "v0.1",
-      "x-ratelimit-limit-requests": "10000",
-      "x-ratelimit-limit-tokens": "30000000",
-      "x-ratelimit-remaining-requests": "9999",
-      "x-ratelimit-remaining-tokens": "29999971",
-      "x-ratelimit-reset-requests": "6ms",
-      "x-ratelimit-reset-tokens": "0s",
-      "x-request-id": "req_4e047e9ec0344280be4d034850f217b5"
+    {
+        "scope": "https://api.openai.com:443",
+        "method": "POST",
+        "path": "/v1/chat/completions",
+        "body": {
+            "model": "gpt-4o",
+            "max_tokens": 1000,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "Use the test_tool with count 1, then use it again with count 2, then say '231' in the final message"
+                },
+                {
+                    "role": "assistant",
+                    "content": null,
+                    "tool_calls": [
+                        {
+                            "id": "call_RFAlrz4q8fVUphdltPkr1til",
+                            "type": "function",
+                            "function": {
+                                "name": "test_tool",
+                                "arguments": "{\"count\": 1}"
+                            }
+                        },
+                        {
+                            "id": "call_BySHDO8OmpGmBILLU36Y1LZJ",
+                            "type": "function",
+                            "function": {
+                                "name": "test_tool",
+                                "arguments": "{\"count\": 2}"
+                            }
+                        }
+                    ],
+                    "refusal": null,
+                    "annotations": []
+                },
+                {
+                    "role": "tool",
+                    "content": "Called with 1",
+                    "tool_call_id": "call_RFAlrz4q8fVUphdltPkr1til"
+                },
+                {
+                    "role": "tool",
+                    "content": "Called with 2",
+                    "tool_call_id": "call_BySHDO8OmpGmBILLU36Y1LZJ"
+                }
+            ],
+            "tools": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "test_tool",
+                        "description": "A test tool",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "count": {
+                                    "type": "number"
+                                }
+                            }
+                        }
+                    }
+                }
+            ],
+            "n": 1,
+            "stream": false
+        },
+        "status": 200,
+        "response": [
+            "1b2503001c07762c33326c3cb8f9269f7e5da9fe7979c57850bb062de40651e8ea9b3a2c0a5337efb9cd890618cb37c6e0c09ea2b52c9d246191f6d0cd4e26f4abbe2d21885c0055fee664654a1fa2b8d0c6267f5da5ea7c571ec56eb8bd5e8d95e483dae010f0a8a46c7c4182042223fa06bcaa48aaaac9b2308b440a151a942d2d15b49f6634a7ed2c65960300c83f99d82526188779c25157653652004408415da4b90bc56f3080ccb5d0ef04915fe4fff863ac54b4eb46d5d0884897bdc2dd287994164159177693dc82e359869500037614a21656e68fe375c78487b22bb2b235ac9bdb005e9416907103c2161ad1265a0909a5fd48dbd0785364266cda76d7b67c457b6ede9468ef2668e8f325e66f4679b0366f2a2e601b11b1c9740b547e35112f55d0d826db79d56823af06881c2280e409b6f1ce1ad1c104b0b25f1a9eab48a20b8fe8327a"
+        ],
+        "rawHeaders": {
+            "access-control-expose-headers": "X-Request-ID",
+            "alt-svc": "h3=\":443\"; ma=86400",
+            "cf-cache-status": "DYNAMIC",
+            "cf-ray": "9a845d8378c38c27-EWR",
+            "connection": "keep-alive",
+            "content-encoding": "br",
+            "content-type": "application/json",
+            "date": "Wed, 03 Dec 2025 16:15:53 GMT",
+            "openai-organization": "stainless-lo3pdl",
+            "openai-processing-ms": "346",
+            "openai-project": "proj_FSQrMfywhpvjH41RhwSodie7",
+            "openai-version": "2020-10-01",
+            "server": "cloudflare",
+            "set-cookie": "_cfuvid=1yYWcIHwMGbk77yjyEEnd1UAcxqAb8lTI6P7da_g0XE-1764778553298-0.0.1.1-604800000; path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None",
+            "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+            "transfer-encoding": "chunked",
+            "x-content-type-options": "nosniff",
+            "x-envoy-upstream-service-time": "361",
+            "x-openai-proxy-wasm": "v0.1",
+            "x-ratelimit-limit-requests": "10000",
+            "x-ratelimit-limit-tokens": "30000000",
+            "x-ratelimit-remaining-requests": "9999",
+            "x-ratelimit-remaining-tokens": "29999963",
+            "x-ratelimit-reset-requests": "6ms",
+            "x-ratelimit-reset-tokens": "0s",
+            "x-request-id": "req_88771ad4f2e7420fb19f3172cfa904a8"
+        },
+        "responseIsBinary": false
     },
-    "responseIsBinary": false
-  }
+    {
+        "scope": "https://api.openai.com:443",
+        "method": "POST",
+        "path": "/v1/chat/completions",
+        "body": {
+            "model": "gpt-4o",
+            "max_tokens": 1000,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "Use the test_tool with input \"test\", then provide a final response with the word '231'"
+                }
+            ],
+            "tools": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "test_tool",
+                        "description": "A test tool",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "input": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            ],
+            "n": 1,
+            "stream": false
+        },
+        "status": 200,
+        "response": [
+            "1b3404201c07ce392f9674370bc94efe64d1b6529f8c69864f6e8bf91dbc18857a5ea1cb2baf444b5b4781a5efcf5fee8eb38516436ffef6c0f33677636283a7685896704ad95623825dea1311d468ebea68cfeedefd87ca0420923f8b5bde885e5931f73b5317e5c77bbaa78f3352fdbb53e45bf33e3f6143535445cf0f48600919e733506dcbb06dc734f59d6cc4b69df3876830314da7a2e29c9bd62ef96fef9e07feb1a0792f8122dc94594c406e8b06d62c1dc4fd08c335c3fab0dc8b21431a442d33769eecbf34ae42d97f204fe9fcefe6ee1e7da31f1f3bf3154fe3e77ab3c6b49058b86af882440c6466e28531b8a88ee45dd283b1a67b561366145dfc2f08ba7381a7f77cc1b15dbc2eb3eb0df943839516e2260f35a9b7b6772e242f352ce7038beedacd2a5093d2c5f23bbc992d62c569cf9876e39bd3f20725fbde1d586acbc4380f5e520d4a110f54b24dff035bc47fafe71b65782b91f1b38db2db8bb1e5c1f6447d3c3be0eab2cb0f83694168d1fbc1338c5f523ed454967173ee24eb0fe951a603401d259ceb428bbee043e586e8fb9553eaa86eaa1bba13a10b"
+        ],
+        "rawHeaders": {
+            "access-control-expose-headers": "X-Request-ID",
+            "alt-svc": "h3=\":443\"; ma=86400",
+            "cf-cache-status": "DYNAMIC",
+            "cf-ray": "9a845d877c0e8c27-EWR",
+            "connection": "keep-alive",
+            "content-encoding": "br",
+            "content-type": "application/json",
+            "date": "Wed, 03 Dec 2025 16:15:54 GMT",
+            "openai-organization": "stainless-lo3pdl",
+            "openai-processing-ms": "485",
+            "openai-project": "proj_FSQrMfywhpvjH41RhwSodie7",
+            "openai-version": "2020-10-01",
+            "server": "cloudflare",
+            "set-cookie": "_cfuvid=ypLA4M9G6mnG7MBUSFm_Iglqo2scXgDPcHoPMb.wzeM-1764778554082-0.0.1.1-604800000; path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None",
+            "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+            "transfer-encoding": "chunked",
+            "x-content-type-options": "nosniff",
+            "x-envoy-upstream-service-time": "507",
+            "x-openai-proxy-wasm": "v0.1",
+            "x-ratelimit-limit-requests": "10000",
+            "x-ratelimit-limit-tokens": "30000000",
+            "x-ratelimit-remaining-requests": "9999",
+            "x-ratelimit-remaining-tokens": "29999976",
+            "x-ratelimit-reset-requests": "6ms",
+            "x-ratelimit-reset-tokens": "0s",
+            "x-request-id": "req_074137d9ba50430ba0f643913c8eaf97"
+        },
+        "responseIsBinary": false
+    },
+    {
+        "scope": "https://api.openai.com:443",
+        "method": "POST",
+        "path": "/v1/chat/completions",
+        "body": {
+            "model": "gpt-4o",
+            "max_tokens": 1000,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "Use the test_tool with input \"test\", then provide a final response with the word '231'"
+                },
+                {
+                    "role": "assistant",
+                    "content": null,
+                    "tool_calls": [
+                        {
+                            "id": "call_C0nDyTs9YD4qKYn5vcMcuSTS",
+                            "type": "function",
+                            "function": {
+                                "name": "test_tool",
+                                "arguments": "{\"input\":\"test\"}"
+                            }
+                        }
+                    ],
+                    "refusal": null,
+                    "annotations": []
+                },
+                {
+                    "role": "tool",
+                    "content": "Tool result",
+                    "tool_call_id": "call_C0nDyTs9YD4qKYn5vcMcuSTS"
+                }
+            ],
+            "tools": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "test_tool",
+                        "description": "A test tool",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "input": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            ],
+            "n": 1,
+            "stream": false
+        },
+        "status": 200,
+        "response": [
+            "1b2303201c07762c33326c3cb8f92623e696eaeef34c23125d262640832874f54d1d1685a99bf7dce64c63f96f6f0eec295acbd24912166907799b1478f077f5f60d81d001f0e46f765a24d4228cf2599e6ecc7dbf56fafdf27c5e4fab3d57b1f7cdc1c121a0a282d8f801091284cce71b708a2c2a8a2a49e24594110db85f34949853699a51acfa68c91739ff41feccc17f63426fd8262cf9a1ac450a701841a0ca93d685df37f87b5969b4ee7881bbca7fe38f331331ac1b43c321a258f63af72fc8a324f78b2ab76a6c0b7967e941020c8451886638986f85d7ad0e1e8aa5488b460f6e443352a569010b37beb7f9418c88261aa5b4e9d9babb9bf63211d0b603d336ae18cccdef24c1bbc5194a5ed2fc6698f9b7e6774afcdb7a396caadc8294cf4b2448b532f19783bcaa37a15b01940df17b290d6cfd8435627621a8b257e8ae238b82038e69127a"
+        ],
+        "rawHeaders": {
+            "access-control-expose-headers": "X-Request-ID",
+            "alt-svc": "h3=\":443\"; ma=86400",
+            "cf-cache-status": "DYNAMIC",
+            "cf-ray": "9a845d8ea9d58c27-EWR",
+            "connection": "keep-alive",
+            "content-encoding": "br",
+            "content-type": "application/json",
+            "date": "Wed, 03 Dec 2025 16:15:55 GMT",
+            "openai-organization": "stainless-lo3pdl",
+            "openai-processing-ms": "379",
+            "openai-project": "proj_FSQrMfywhpvjH41RhwSodie7",
+            "openai-version": "2020-10-01",
+            "server": "cloudflare",
+            "set-cookie": "_cfuvid=nv4APHcc7JiLRnjDkeab5uhoAoOa3wZ0qYhw8ZbJtUg-1764778555117-0.0.1.1-604800000; path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None",
+            "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+            "transfer-encoding": "chunked",
+            "x-content-type-options": "nosniff",
+            "x-envoy-upstream-service-time": "391",
+            "x-openai-proxy-wasm": "v0.1",
+            "x-ratelimit-limit-requests": "10000",
+            "x-ratelimit-limit-tokens": "30000000",
+            "x-ratelimit-remaining-requests": "9999",
+            "x-ratelimit-remaining-tokens": "29999971",
+            "x-ratelimit-reset-requests": "6ms",
+            "x-ratelimit-reset-tokens": "0s",
+            "x-request-id": "req_bdb05ea440404ab4b82c83580f7cd7ed"
+        },
+        "responseIsBinary": false
+    }
 ]
