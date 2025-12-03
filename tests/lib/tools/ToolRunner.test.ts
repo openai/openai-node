@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 import { mockFetch } from '../../utils/mock-fetch';
-import { BetaRunnableTool } from 'openai/lib/beta/BetaRunnableTool';
-import {
+import type { BetaRunnableTool } from 'openai/lib/beta/BetaRunnableTool';
+import type {
   ChatCompletion,
   ChatCompletionChunk,
   ChatCompletionMessage,
@@ -9,7 +9,8 @@ import {
   ChatCompletionMessageToolCall,
   ChatCompletionToolMessageParam,
 } from 'openai/resources';
-import { Fetch } from 'openai/internal/builtin-types';
+import type { Fetch } from 'openai/internal/builtin-types';
+import type { BetaToolRunnerParams } from 'openai/lib/beta/BetaToolRunner';
 
 const weatherTool: BetaRunnableTool<{ location: string }> = {
   type: 'function',
@@ -286,13 +287,11 @@ interface SetupTestResult<Stream extends boolean> {
   handleAssistantMessageStream: (messageContentOrToolCalls?: ToolCallsOrMessage) => ChatCompletion;
 }
 
-type ToolRunnerParams = Parameters<typeof OpenAI.Beta.Chat.Completions.prototype.toolRunner>[0];
-
 type ToolCallsOrMessage = ChatCompletionMessageToolCall[] | ChatCompletionMessage;
 
-function setupTest(params?: Partial<ToolRunnerParams> & { stream?: false }): SetupTestResult<false>;
-function setupTest(params: Partial<ToolRunnerParams> & { stream: true }): SetupTestResult<true>;
-function setupTest(params: Partial<ToolRunnerParams> = {}): SetupTestResult<boolean> {
+function setupTest(params?: Partial<BetaToolRunnerParams> & { stream?: false }): SetupTestResult<false>;
+function setupTest(params: Partial<BetaToolRunnerParams> & { stream: true }): SetupTestResult<true>;
+function setupTest(params: Partial<BetaToolRunnerParams> = {}): SetupTestResult<boolean> {
   const { handleRequest, handleStreamEvents, fetch } = mockFetch();
   let messageIdCounter = 0;
   const handleAssistantMessage: SetupTestResult<false>['handleAssistantMessage'] = (
@@ -380,7 +379,7 @@ function setupTest(params: Partial<ToolRunnerParams> = {}): SetupTestResult<bool
 
   const client = new OpenAI({ apiKey: 'test-key', fetch: fetch, maxRetries: 0 });
 
-  const runnerParams: ToolRunnerParams = {
+  const runnerParams: BetaToolRunnerParams = {
     messages: params.messages || [{ role: 'user', content: 'What is the weather?' }],
     model: params.model || 'gpt-4o',
     max_tokens: params.max_tokens || 1000,

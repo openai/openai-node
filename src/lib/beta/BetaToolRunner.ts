@@ -246,7 +246,7 @@ export class BetaToolRunner<Stream extends boolean> {
    * }
    */
   async generateToolResponse() {
-    // The most recent message from the assistant. This prev had this.params.messages.at(-1) but I think that's wrong.
+    // The most recent message from the assistant. TODO: do we want || this.params.messages.at(-1)?
     const message = await this.#message;
     if (!message) {
       return null;
