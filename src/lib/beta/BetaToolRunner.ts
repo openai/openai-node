@@ -147,8 +147,7 @@ export class BetaToolRunner<Stream extends boolean> {
               this.#options,
             );
 
-            this.#message = this.#chatCompletion.then((resp) => resp.choices.at(0)!.message);
-            await this.#message; // TODO: we would like to not need to await it
+            this.#message = this.#chatCompletion.then((resp) => resp.choices.at(0)!.message).catch(() => {});
 
             yield this.#chatCompletion as any;
           }
