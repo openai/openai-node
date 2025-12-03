@@ -18,7 +18,7 @@ async function main() {
       betaZodTool({
         name: 'getWeather',
         description: 'Get the weather at a specific location',
-        inputSchema: z.object({
+        parameters: z.object({
           location: z.string().describe('The city and state, e.g. San Francisco, CA'),
         }),
         run: ({ location }) => {
@@ -28,7 +28,7 @@ async function main() {
       betaZodTool({
         name: 'getTime',
         description: 'Get the current time in a specific timezone',
-        inputSchema: z.object({
+        parameters: z.object({
           timezone: z.string().describe('The timezone, e.g. America/Los_Angeles'),
         }),
         run: ({ timezone }) => {
@@ -38,7 +38,7 @@ async function main() {
       betaZodTool({
         name: 'getCurrencyExchangeRate',
         description: 'Get the exchange rate between two currencies',
-        inputSchema: z.object({
+        parameters: z.object({
           from_currency: z.string().describe('The currency to convert from, e.g. USD'),
           to_currency: z.string().describe('The currency to convert to, e.g. EUR'),
         }),

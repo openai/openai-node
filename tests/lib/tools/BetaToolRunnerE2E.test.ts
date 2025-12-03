@@ -104,7 +104,7 @@ describe('toolRunner integration tests', () => {
   ) {
     return betaZodTool({
       name: 'test_tool',
-      inputSchema: z.object({ value: z.string() }),
+      parameters: z.object({ value: z.string() }),
       description: 'A test tool',
       run: () => 'Tool result',
       ...customConfig,
@@ -114,7 +114,7 @@ describe('toolRunner integration tests', () => {
   function createCounterTool() {
     return betaZodTool({
       name: 'test_tool',
-      inputSchema: z.object({ count: z.number() }),
+      parameters: z.object({ count: z.number() }),
       description: 'A test tool',
       run: (args) => `Called with ${args.count}`,
     });
@@ -259,7 +259,7 @@ describe('toolRunner integration tests', () => {
       });
 
       // Update parameters
-      runner.setMessagesParams({
+      runner.setChatParams({
         model: 'gpt-4o',
         max_tokens: 500,
         messages: [{ role: 'user', content: 'Updated message' }],

@@ -4,9 +4,8 @@ import {
   type BetaToolRunnerParams,
   type BetaToolRunnerRequestOptions,
 } from '../../lib/beta/BetaToolRunner';
-import { Chat as ChatResource } from '../../resources';
 
-export class BetaCompletions extends ChatResource.Completions {
+export class BetaCompletions extends APIResource {
   toolRunner(
     body: BetaToolRunnerParams & { stream?: false },
     options?: BetaToolRunnerRequestOptions,

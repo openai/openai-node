@@ -18,7 +18,7 @@ async function main() {
       betaZodTool({
         name: 'getWeather',
         description: 'Get the weather at a specific location',
-        inputSchema: z.object({
+        parameters: z.object({
           location: z.string().describe('The city and state, e.g. San Francisco, CA'),
         }),
         run: ({ location }) => {

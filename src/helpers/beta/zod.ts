@@ -11,11 +11,11 @@ import type { FunctionTool } from '../../resources/beta';
  */
 export function betaZodTool<InputSchema extends ZodType>(options: {
   name: string;
-  inputSchema: InputSchema;
+  parameters: InputSchema;
   description: string;
   run: (args: zodInfer<InputSchema>) => Promisable<string | Array<FunctionTool>>; // TODO: I changed this but double check
 }): BetaRunnableTool<zodInfer<InputSchema>> {
-  const jsonSchema = z.toJSONSchema(options.inputSchema, { reused: 'ref' });
+  const jsonSchema = z.toJSONSchema(options.parameters, { reused: 'ref' });
 
   if (jsonSchema.type !== 'object') {
     throw new Error(`Zod schema for tool "${options.name}" must be an object, but got ${jsonSchema.type}`);
@@ -35,6 +35,6 @@ export function betaZodTool<InputSchema extends ZodType>(options: {
       },
     },
     run: options.run,
-    parse: (args: unknown) => options.inputSchema.parse(args) as zodInfer<InputSchema>,
+    parse: (args: unknown) => options.parameters.parse(args),
   };
 }

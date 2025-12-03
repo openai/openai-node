@@ -942,7 +942,7 @@ describe('ToolRunner', () => {
       });
 
       // Update parameters before iteration
-      runner.setMessagesParams({
+      runner.setChatParams({
         messages: [{ role: 'user', content: 'Updated message' }],
         model: 'gpt-4o',
         max_tokens: 200,
@@ -981,7 +981,7 @@ describe('ToolRunner', () => {
       expect(toolResponse).toMatchObject([getWeatherToolResult('Paris')]);
 
       // Update params to append a custom tool_use block to messages
-      runner.setMessagesParams({
+      runner.setChatParams({
         ...runner.params,
         messages: [
           ...runner.params.messages,

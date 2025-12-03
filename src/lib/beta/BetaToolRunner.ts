@@ -31,12 +31,14 @@ function promiseWithResolvers<T>(): {
 }
 
 /**
- * A ToolRunner handles the automatic conversation loop between the assistant and tools.
+ * A BetaToolRunner handles the automatic conversation loop between the assistant and tools.
  *
- * A ToolRunner is an async iterable that yields either BetaMessage or BetaMessageStream objects
- * depending on the streaming configuration.
+ * A BetaToolRunner is an async iterable that yields either ChatCompletion or
+ * ChatCompletionStream objects depending on the streaming configuration.
  */
-export class BetaToolRunner<Stream extends boolean> {
+export class BetaToolRunner<Stream extends boolean>
+  implements AsyncIterable<Stream extends true ? ChatCompletionStream : ChatCompletion>
+{
   /** Whether the async iterator has been consumed */
   #consumed = false;
   /** Whether parameters have been mutated since the last API call */
@@ -72,8 +74,7 @@ export class BetaToolRunner<Stream extends boolean> {
     params: BetaToolRunnerParams,
     options?: BetaToolRunnerRequestOptions,
   ) {
-    params.n ??= 1;
-    if (params && params.n > 1) {
+    if (params.n && params.n > 1) {
       throw new Error('BetaToolRunner does not support n > 1');
     }
 
@@ -97,7 +98,7 @@ export class BetaToolRunner<Stream extends boolean> {
   async *[Symbol.asyncIterator](): AsyncIterator<
     Stream extends true ?
       ChatCompletionStream // TODO: for now!
-    : ChatCompletion | undefined
+    : ChatCompletion
   > {
     if (this.#consumed) {
       throw new OpenAIError('Cannot iterate over a consumed stream');
@@ -123,12 +124,10 @@ export class BetaToolRunner<Stream extends boolean> {
           this.#toolResponse = undefined;
           this.#iterationCount++;
 
-          const { ...params } = this.#state.params;
-          const apiParams = { ...params };
-          delete apiParams.max_iterations; // our own param
+          const { max_iterations, ...params } = this.#state.params;
 
           if (params.stream) {
-            stream = this.client.beta.chat.completions.stream({ ...apiParams, stream: true }, this.#options);
+            stream = this.client.chat.completions.stream({ ...params, stream: true }, this.#options);
             this.#message = stream.finalMessage();
 
             // Make sure that this promise doesn't throw before we get the option to do something about it.
@@ -136,13 +135,10 @@ export class BetaToolRunner<Stream extends boolean> {
             this.#message?.catch(() => {});
             yield stream as any;
           } else {
-            this.#chatCompletion = this.client.beta.chat.completions.create(
+            this.#chatCompletion = this.client.chat.completions.create(
               {
-                ...apiParams, // spread and explicit so we get better types
+                ...params, // spread and explicit so we get better types
                 stream: false,
-                tools: params.tools,
-                messages: params.messages,
-                model: params.model,
               },
               this.#options,
             );
@@ -155,15 +151,8 @@ export class BetaToolRunner<Stream extends boolean> {
 
           const prevMessage = await this.#message;
 
-          if (!prevMessage) {
-            throw new OpenAIError('ToolRunner concluded without a message from the server');
-          }
-
           if (!this.#mutated) {
-            // TODO: what if it is empty?
-            if (prevMessage) {
-              this.#state.params.messages.push(prevMessage);
-            }
+            this.#state.params.messages.push(prevMessage);
           }
 
           const toolMessages = await this.#generateToolResponse(prevMessage);
@@ -173,7 +162,6 @@ export class BetaToolRunner<Stream extends boolean> {
             }
           }
 
-          // TODO: make sure this is correct?
           if (!toolMessages && !this.#mutated) {
             break;
           }
@@ -206,21 +194,28 @@ export class BetaToolRunner<Stream extends boolean> {
    *
    * @example
    * // Direct parameter update
-   * runner.setMessagesParams({
+   * runner.setChatParams({
    *   model: 'gpt-4o',
    *   max_tokens: 500,
    * });
    *
    * @example
    * // Using a mutator function
-   * runner.setMessagesParams((params) => ({
+   * runner.setChatParams((params) => ({
    *   ...params,
    *   max_tokens: 100,
    * }));
+   *
+   * @example
+   * // Appending a user message
+   * runner.setChatParams((params) => ({
+   *   ...params,
+   *   messages: [...params.messages, { role: 'user', content: 'What colour is the sky?' }],
+   * }));
    */
-  setMessagesParams(params: BetaToolRunnerParams): void;
-  setMessagesParams(mutator: (prevParams: BetaToolRunnerParams) => BetaToolRunnerParams): void;
-  setMessagesParams(
+  setChatParams(params: BetaToolRunnerParams): void;
+  setChatParams(mutator: (prevParams: BetaToolRunnerParams) => BetaToolRunnerParams): void;
+  setChatParams(
     paramsOrMutator: BetaToolRunnerParams | ((prevParams: BetaToolRunnerParams) => BetaToolRunnerParams),
   ) {
     if (typeof paramsOrMutator === 'function') {
@@ -343,7 +338,7 @@ export class BetaToolRunner<Stream extends boolean> {
    * );
    */
   pushMessages(...messages: ChatCompletionMessageParam[]) {
-    this.setMessagesParams((params) => ({
+    this.setChatParams((params) => ({
       ...params,
       messages: [...params.messages, ...messages],
     }));
