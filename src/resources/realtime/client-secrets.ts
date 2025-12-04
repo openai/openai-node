@@ -148,15 +148,20 @@ export interface RealtimeSessionCreateResponse {
    * limit, the conversation be truncated, meaning messages (starting from the
    * oldest) will not be included in the model's context. A 32k context model with
    * 4,096 max output tokens can only include 28,224 tokens in the context before
-   * truncation occurs. Clients can configure truncation behavior to truncate with a
-   * lower max token limit, which is an effective way to control token usage and
-   * cost. Truncation will reduce the number of cached tokens on the next turn
-   * (busting the cache), since messages are dropped from the beginning of the
-   * context. However, clients can also configure truncation to retain messages up to
-   * a fraction of the maximum context size, which will reduce the need for future
-   * truncations and thus improve the cache rate. Truncation can be disabled
-   * entirely, which means the server will never truncate but would instead return an
-   * error if the conversation exceeds the model's input token limit.
+   * truncation occurs.
+   *
+   * Clients can configure truncation behavior to truncate with a lower max token
+   * limit, which is an effective way to control token usage and cost.
+   *
+   * Truncation will reduce the number of cached tokens on the next turn (busting the
+   * cache), since messages are dropped from the beginning of the context. However,
+   * clients can also configure truncation to retain messages up to a fraction of the
+   * maximum context size, which will reduce the need for future truncations and thus
+   * improve the cache rate.
+   *
+   * Truncation can be disabled entirely, which means the server will never truncate
+   * but would instead return an error if the conversation exceeds the model's input
+   * token limit.
    */
   truncation?: RealtimeAPI.RealtimeTruncation;
 }
@@ -246,7 +251,11 @@ export namespace RealtimeSessionCreateResponse {
 
         /**
          * Whether or not to automatically generate a response when a VAD stop event
-         * occurs.
+         * occurs. If `interrupt_response` is set to `false` this may fail to create a
+         * response if the model is already responding.
+         *
+         * If both `create_response` and `interrupt_response` are set to `false`, the model
+         * will never respond automatically but VAD events will still be emitted.
          */
         create_response?: boolean;
 
@@ -267,9 +276,13 @@ export namespace RealtimeSessionCreateResponse {
         idle_timeout_ms?: number | null;
 
         /**
-         * Whether or not to automatically interrupt any ongoing response with output to
-         * the default conversation (i.e. `conversation` of `auto`) when a VAD start event
-         * occurs.
+         * Whether or not to automatically interrupt (cancel) any ongoing response with
+         * output to the default conversation (i.e. `conversation` of `auto`) when a VAD
+         * start event occurs. If `true` then the response will be cancelled, otherwise it
+         * will continue until complete.
+         *
+         * If both `create_response` and `interrupt_response` are set to `false`, the model
+         * will never respond automatically but VAD events will still be emitted.
          */
         interrupt_response?: boolean;
 
