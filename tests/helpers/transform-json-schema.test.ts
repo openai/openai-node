@@ -144,4 +144,26 @@ describe('transformJsonSchema', () => {
 
     expect(transformedSchema).toEqual(expected);
   });
+
+  it('throws when not anyOf/oneOf/allOf and type not defined', () => {
+    const input = {
+      type: 'object',
+      properties: {
+        employees: {
+          type: 'array',
+          items: {
+            properties: {
+              bonus: {
+                type: 'integer',
+              },
+            },
+          },
+        },
+      },
+    };
+
+    expect(() => transformJSONSchema(input)).toThrow(
+      'JSON schema must have a type defined if anyOf/oneOf/allOf are not used',
+    );
+  });
 });
