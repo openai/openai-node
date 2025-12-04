@@ -1,7 +1,7 @@
 #!/usr/bin/env -S npm run tsn -T
 
 import OpenAI from 'openai';
-import { betaTool } from 'openai/helpers/beta/json-schema';
+import { betaFunctionTool } from 'openai/helpers/beta/json-schema';
 
 const client = new OpenAI();
 
@@ -14,7 +14,7 @@ async function main() {
       },
     ],
     tools: [
-      betaTool({
+      betaFunctionTool({
         name: 'getWeather',
         description: 'Get the weather at a specific location',
         inputSchema: {

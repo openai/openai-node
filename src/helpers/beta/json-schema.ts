@@ -10,7 +10,9 @@ type NoInfer<T> = T extends infer R ? R : never;
  * to the `.toolRunner()` method. The schema is used to automatically validate
  * the input arguments for the tool.
  */
-export function betaTool<const Schema extends Exclude<JSONSchema, boolean> & { type: 'object' }>(options: {
+export function betaFunctionTool<
+  const Schema extends Exclude<JSONSchema, boolean> & { type: 'object' },
+>(options: {
   name: string;
   inputSchema: Schema;
   description: string;
