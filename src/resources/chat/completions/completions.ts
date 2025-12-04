@@ -1478,6 +1478,27 @@ export interface ChatCompletionAllowedTools {
   tools: Array<{ [key: string]: unknown }>;
 }
 
+/**
+ * Expression value for guided generation constraints.
+ * Used for guided_choice_expr, guided_json_expr, and guided_regex_expr.
+ */
+export interface ExprValue {
+  /**
+   * The type of the expression.
+   */
+  type?: string;
+
+  /**
+   * The expression string.
+   */
+  expr?: string;
+
+  /**
+   * Nested text expression value.
+   */
+  text?: ExprValue;
+}
+
 export type ChatCompletionReasoningEffort = Shared.ReasoningEffort | null;
 
 export type ChatCompletionCreateParams =
@@ -1542,6 +1563,24 @@ export interface ChatCompletionCreateParamsBase {
    * A list of functions the model may generate JSON inputs for.
    */
   functions?: Array<ChatCompletionCreateParams.Function>;
+
+  /**
+   * Guided choice expression for constrained generation.
+   * Constrains the model output to one of the specified choices.
+   */
+  guided_choice_expr?: ExprValue | null;
+
+  /**
+   * Guided JSON expression for constrained generation.
+   * Constrains the model output to match a JSON schema.
+   */
+  guided_json_expr?: ExprValue | null;
+
+  /**
+   * Guided regex expression for constrained generation.
+   * Constrains the model output to match a regular expression pattern.
+   */
+  guided_regex_expr?: ExprValue | null;
 
   /**
    * Modify the likelihood of specified tokens appearing in the completion.
@@ -1982,6 +2021,7 @@ export declare namespace Completions {
     type ChatCompletionCustomTool as ChatCompletionCustomTool,
     type ChatCompletionDeleted as ChatCompletionDeleted,
     type ChatCompletionDeveloperMessageParam as ChatCompletionDeveloperMessageParam,
+    type ExprValue as ExprValue,
     type ChatCompletionFunctionCallOption as ChatCompletionFunctionCallOption,
     type ChatCompletionFunctionMessageParam as ChatCompletionFunctionMessageParam,
     type ChatCompletionFunctionTool as ChatCompletionFunctionTool,
