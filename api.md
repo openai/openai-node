@@ -604,6 +604,7 @@ Methods:
 Types:
 
 - <code><a href="./src/resources/responses/responses.ts">ApplyPatchTool</a></code>
+- <code><a href="./src/resources/responses/responses.ts">CompactedResponse</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ComputerTool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">CustomTool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">EasyInputMessage</a></code>
@@ -623,6 +624,8 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponseCodeInterpreterCallInProgressEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseCodeInterpreterCallInterpretingEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseCodeInterpreterToolCall</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseCompactionItem</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseCompactionItemParam</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseCompletedEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseComputerToolCall</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseComputerToolCallOutputItem</a></code>
@@ -730,6 +733,7 @@ Methods:
 - <code title="get /responses/{response_id}">client.responses.<a href="./src/resources/responses/responses.ts">retrieve</a>(responseID, { ...params }) -> Response</code>
 - <code title="delete /responses/{response_id}">client.responses.<a href="./src/resources/responses/responses.ts">delete</a>(responseID) -> void</code>
 - <code title="post /responses/{response_id}/cancel">client.responses.<a href="./src/resources/responses/responses.ts">cancel</a>(responseID) -> Response</code>
+- <code title="post /responses/compact">client.responses.<a href="./src/resources/responses/responses.ts">compact</a>({ ...params }) -> CompactedResponse</code>
 
 ## InputItems
 
@@ -777,6 +781,7 @@ Types:
 - <code><a href="./src/resources/realtime/realtime.ts">InputAudioBufferClearedEvent</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">InputAudioBufferCommitEvent</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">InputAudioBufferCommittedEvent</a></code>
+- <code><a href="./src/resources/realtime/realtime.ts">InputAudioBufferDtmfEventReceivedEvent</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">InputAudioBufferSpeechStartedEvent</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">InputAudioBufferSpeechStoppedEvent</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">InputAudioBufferTimeoutTriggered</a></code>

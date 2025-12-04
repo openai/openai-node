@@ -24,6 +24,7 @@ describe('resource containers', () => {
       name: 'name',
       expires_after: { anchor: 'last_active_at', minutes: 0 },
       file_ids: ['string'],
+      memory_limit: '1g',
     });
   });
 

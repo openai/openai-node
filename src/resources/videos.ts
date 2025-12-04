@@ -184,17 +184,19 @@ export interface VideoCreateParams {
   input_reference?: Uploadable;
 
   /**
-   * The video generation model to use. Defaults to `sora-2`.
+   * The video generation model to use (allowed values: sora-2, sora-2-pro). Defaults
+   * to `sora-2`.
    */
   model?: VideoModel;
 
   /**
-   * Clip duration in seconds. Defaults to 4 seconds.
+   * Clip duration in seconds (allowed values: 4, 8, 12). Defaults to 4 seconds.
    */
   seconds?: VideoSeconds;
 
   /**
-   * Output resolution formatted as width x height. Defaults to 720x1280.
+   * Output resolution formatted as width x height (allowed values: 720x1280,
+   * 1280x720, 1024x1792, 1792x1024). Defaults to 720x1280.
    */
   size?: VideoSize;
 }
