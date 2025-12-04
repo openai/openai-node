@@ -1,4 +1,4 @@
-import { pop } from '../internal/utils';
+import { pop } from './utils';
 
 export type JSONSchema = Record<string, any>;
 

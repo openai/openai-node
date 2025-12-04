@@ -1,4 +1,4 @@
-import { transformJSONSchema } from '../../src/lib/transform-json-schema';
+import { transformJSONSchema } from '../../src/internal/transform-json-schema';
 
 describe('transformJsonSchema', () => {
   it('should not mutate the original schema', () => {
