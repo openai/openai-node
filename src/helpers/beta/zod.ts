@@ -1,6 +1,6 @@
 import type { infer as zodInfer, ZodType } from 'zod/v4';
 import * as z from 'zod/v4';
-import type { BetaRunnableTool, Promisable } from '../../lib/beta/BetaRunnableTool';
+import type { BetaRunnableChatCompletionFunctionTool, Promisable } from '../../lib/beta/BetaRunnableTool';
 import type { ChatCompletionContentPart } from '../../resources';
 
 /**
@@ -14,7 +14,7 @@ export function betaZodFunctionTool<InputSchema extends ZodType>(options: {
   parameters: InputSchema;
   description: string;
   run: (args: zodInfer<InputSchema>) => Promisable<string | ChatCompletionContentPart[]>;
-}): BetaRunnableTool<zodInfer<InputSchema>> {
+}): BetaRunnableChatCompletionFunctionTool<zodInfer<InputSchema>> {
   const jsonSchema = z.toJSONSchema(options.parameters, { reused: 'ref' });
 
   return {

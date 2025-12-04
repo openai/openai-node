@@ -1,5 +1,5 @@
 import type { FromSchema, JSONSchema } from 'json-schema-to-ts';
-import type { BetaRunnableTool, Promisable } from '../../lib/beta/BetaRunnableTool';
+import type { BetaRunnableChatCompletionFunctionTool, Promisable } from '../../lib/beta/BetaRunnableTool';
 import type { FunctionTool } from '../../resources/beta';
 import { OpenAIError } from '../../error';
 
@@ -15,7 +15,7 @@ export function betaTool<const Schema extends Exclude<JSONSchema, boolean> & { t
   inputSchema: Schema;
   description: string;
   run: (args: NoInfer<FromSchema<Schema>>) => Promisable<string | Array<FunctionTool>>;
-}): BetaRunnableTool<NoInfer<FromSchema<Schema>>> {
+}): BetaRunnableChatCompletionFunctionTool<NoInfer<FromSchema<Schema>>> {
   if (options.inputSchema.type !== 'object') {
     throw new OpenAIError(
       `JSON schema for tool "${options.name}" must be an object, but got ${options.inputSchema.type}`,

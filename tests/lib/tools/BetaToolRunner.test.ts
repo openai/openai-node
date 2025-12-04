@@ -1,6 +1,6 @@
 import OpenAI from 'openai';
 import { mockFetch } from '../../utils/mock-fetch';
-import type { BetaRunnableTool } from 'openai/lib/beta/BetaRunnableTool';
+import type { BetaRunnableChatCompletionFunctionTool } from 'openai/lib/beta/BetaRunnableTool';
 import type {
   ChatCompletion,
   ChatCompletionChunk,
@@ -11,9 +11,8 @@ import type {
 } from 'openai/resources';
 import type { Fetch } from 'openai/internal/builtin-types';
 import type { BetaToolRunnerParams } from 'openai/lib/beta/BetaToolRunner';
-import { betaZodFunctionTool } from 'openai/helpers/beta/zod';
 
-const weatherTool: BetaRunnableTool<{ location: string }> = {
+const weatherTool: BetaRunnableChatCompletionFunctionTool<{ location: string }> = {
   type: 'function',
   function: {
     name: 'getWeather',
@@ -29,7 +28,7 @@ const weatherTool: BetaRunnableTool<{ location: string }> = {
   parse: (input: unknown) => input as { location: string },
 };
 
-const calculatorTool: BetaRunnableTool<{ a: number; b: number; operation: string }> = {
+const calculatorTool: BetaRunnableChatCompletionFunctionTool<{ a: number; b: number; operation: string }> = {
   type: 'function',
   function: {
     name: 'calculate',
@@ -766,7 +765,7 @@ describe('ToolRunner', () => {
     });
 
     it('handles tool execution errors', async () => {
-      const errorTool: BetaRunnableTool<{ shouldFail: boolean }> = {
+      const errorTool: BetaRunnableChatCompletionFunctionTool<{ shouldFail: boolean }> = {
         type: 'function',
         function: {
           name: 'errorTool',
@@ -1010,7 +1009,7 @@ describe('ToolRunner', () => {
     });
 
     it('allows you to use non-string returning custom tools', async () => {
-      const customTool: BetaRunnableTool<{ location: string }> = {
+      const customTool: BetaRunnableChatCompletionFunctionTool<{ location: string }> = {
         type: 'function',
         function: {
           name: 'getWeather',
@@ -1140,7 +1139,7 @@ describe('ToolRunner', () => {
 
     it('calls tools at most once', async () => {
       let weatherToolCallCount = 0;
-      const trackingWeatherTool: BetaRunnableTool<{ location: string }> = {
+      const trackingWeatherTool: BetaRunnableChatCompletionFunctionTool<{ location: string }> = {
         type: 'function',
         function: {
           name: 'getWeather',

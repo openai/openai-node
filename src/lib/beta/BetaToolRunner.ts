@@ -11,7 +11,7 @@ import type {
   ChatCompletionTool,
   ChatCompletionToolMessageParam,
 } from '../../resources/chat/completions';
-import type { BetaRunnableTool } from './BetaRunnableTool';
+import type { BetaRunnableChatCompletionFunctionTool } from './BetaRunnableTool';
 
 /**
  * Just Promise.withResolvers(), which is not available in all environments.
@@ -255,7 +255,10 @@ export class BetaToolRunner<Stream extends boolean>
     }
     const toolsResponse = generateToolResponse(
       lastMessage,
-      this.#state.params.tools.filter((tool): tool is BetaRunnableTool<any> => 'run' in tool),
+      this.#state.params.tools.filter(
+        (tool): tool is BetaRunnableChatCompletionFunctionTool<any> =>
+          'run' in tool && tool.type === 'function',
+      ),
     );
     this.#toolResponse = toolsResponse;
     return toolsResponse;
@@ -358,7 +361,7 @@ export class BetaToolRunner<Stream extends boolean>
 
 async function generateToolResponse(
   lastMessage: ChatCompletionMessage,
-  tools: BetaRunnableTool<any>[],
+  tools: BetaRunnableChatCompletionFunctionTool<any>[],
 ): Promise<null | ChatCompletionToolMessageParam[]> {
   // Only process if the last message is from the assistant and has tool use blocks
   if (
@@ -383,7 +386,7 @@ async function generateToolResponse(
 
         const tool = tools.find(
           (t) => t.type === 'function' && toolUse.function.name === t.function.name,
-        ) as BetaRunnableTool;
+        ) as BetaRunnableChatCompletionFunctionTool;
 
         if (!tool || !('run' in tool)) {
           return {
@@ -435,7 +438,7 @@ type Simplify<T> = { [KeyType in keyof T]: T[KeyType] } & {};
  */
 export type BetaToolRunnerParams = Simplify<
   Omit<ChatCompletionCreateParams, 'tools'> & {
-    tools: (ChatCompletionTool | BetaRunnableTool<any>)[];
+    tools: (ChatCompletionTool | BetaRunnableChatCompletionFunctionTool<any>)[];
     /**
      * Maximum number of iterations (API requests) to make in the tool execution loop.
      * Each iteration consists of: assistant response → tool execution → tool results.
