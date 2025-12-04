@@ -1,25 +1,5 @@
 import { pop } from '../internal/utils';
 
-const SUPPORTED_STRING_FORMATS = new Set([
-  'date-time',
-  'time',
-  'date',
-  'duration',
-  'email',
-  'hostname',
-  'ipv4',
-  'ipv6',
-  'uuid',
-]);
-
-const SUPPORTED_NUMBER_PROPERTIES = new Set([
-  'multipleOf',
-  'maximum',
-  'exclusiveMaximum',
-  'minimum',
-  'exclusiveMinimum',
-]);
-
 export type JSONSchema = Record<string, any>;
 
 function deepClone<T>(obj: T): T {
@@ -32,120 +12,51 @@ export function transformJSONSchema(jsonSchema: JSONSchema): JSONSchema {
 }
 
 function _transformJSONSchema(jsonSchema: JSONSchema): JSONSchema {
-  const strictSchema: JSONSchema = {};
-
-  const ref = pop(jsonSchema, '$ref');
-  if (ref !== undefined) {
-    strictSchema['$ref'] = ref;
-    return strictSchema;
-  }
-
   const defs = pop(jsonSchema, '$defs');
   if (defs !== undefined) {
     const strictDefs: Record<string, any> = {};
-    strictSchema['$defs'] = strictDefs;
+    jsonSchema['$defs'] = strictDefs;
     for (const [name, defSchema] of Object.entries(defs)) {
       strictDefs[name] = _transformJSONSchema(defSchema as JSONSchema);
     }
   }
 
-  const type = pop(jsonSchema, 'type');
+  const type = jsonSchema['type'];
   const anyOf = pop(jsonSchema, 'anyOf');
   const oneOf = pop(jsonSchema, 'oneOf');
   const allOf = pop(jsonSchema, 'allOf');
 
   if (Array.isArray(anyOf)) {
-    strictSchema['anyOf'] = anyOf.map((variant) => _transformJSONSchema(variant as JSONSchema));
+    jsonSchema['anyOf'] = anyOf.map((variant) => _transformJSONSchema(variant as JSONSchema));
   } else if (Array.isArray(oneOf)) {
-    strictSchema['anyOf'] = oneOf.map((variant) => _transformJSONSchema(variant as JSONSchema));
+    jsonSchema['anyOf'] = oneOf.map((variant) => _transformJSONSchema(variant as JSONSchema));
   } else if (Array.isArray(allOf)) {
-    strictSchema['allOf'] = allOf.map((entry) => _transformJSONSchema(entry as JSONSchema));
+    jsonSchema['allOf'] = allOf.map((entry) => _transformJSONSchema(entry as JSONSchema));
   } else {
     if (type === undefined) {
       throw new Error('JSON schema must have a type defined if anyOf/oneOf/allOf are not used');
     }
-    strictSchema['type'] = type;
-  }
 
-  const description = pop(jsonSchema, 'description');
-  if (description !== undefined) {
-    strictSchema['description'] = description;
-  }
-
-  const title = pop(jsonSchema, 'title');
-  if (title !== undefined) {
-    strictSchema['title'] = title;
-  }
-
-  switch (type) {
-    case 'object': {
-      const properties = pop(jsonSchema, 'properties') || {};
-
-      strictSchema['properties'] = Object.fromEntries(
-        Object.entries(properties).map(([key, propSchema]) => [
-          key,
-          _transformJSONSchema(propSchema as JSONSchema),
-        ]),
-      );
-
-      pop(jsonSchema, 'additionalProperties');
-      strictSchema['additionalProperties'] = false;
-
-      const required = pop(jsonSchema, 'required');
-      if (required !== undefined) {
-        strictSchema['required'] = required;
+    switch (type) {
+      case 'object': {
+        const properties = pop(jsonSchema, 'properties') || {};
+        jsonSchema['properties'] = Object.fromEntries(
+          Object.entries(properties).map(([key, propSchema]) => [
+            key,
+            _transformJSONSchema(propSchema as JSONSchema),
+          ]),
+        );
+        break;
       }
-      break;
-    }
-    case 'string': {
-      const format = pop(jsonSchema, 'format');
-      if (format !== undefined && SUPPORTED_STRING_FORMATS.has(format)) {
-        strictSchema['format'] = format;
-      } else if (format !== undefined) {
-        jsonSchema['format'] = format;
-      }
-      break;
-    }
-    case 'array': {
-      const minItems = pop(jsonSchema, 'minItems');
-      if (minItems !== undefined) {
-        strictSchema['minItems'] = minItems;
-      }
-
-      const maxItems = pop(jsonSchema, 'maxItems');
-      if (maxItems !== undefined) {
-        strictSchema['maxItems'] = maxItems;
-      }
-
-      const items = pop(jsonSchema, 'items');
-      if (items !== undefined) {
-        strictSchema['items'] = _transformJSONSchema(items as JSONSchema);
-      }
-
-      break;
-    }
-    case 'number': {
-      for (const key of SUPPORTED_NUMBER_PROPERTIES) {
-        // only load supported properties into strictSchema
-        const value = pop(jsonSchema, key);
-        if (value !== undefined) {
-          strictSchema[key] = value;
+      case 'array': {
+        const items = pop(jsonSchema, 'items');
+        if (items !== undefined) {
+          jsonSchema['items'] = _transformJSONSchema(items as JSONSchema);
         }
+        break;
       }
-      break;
     }
   }
 
-  if (Object.keys(jsonSchema).length > 0) {
-    const existingDescription = strictSchema['description'];
-    strictSchema['description'] =
-      (existingDescription ? existingDescription + '\n\n' : '') +
-      '{' +
-      Object.entries(jsonSchema)
-        .map(([key, value]) => `${key}: ${JSON.stringify(value)}`)
-        .join(', ') +
-      '}';
-  }
-
-  return strictSchema;
+  return jsonSchema;
 }
