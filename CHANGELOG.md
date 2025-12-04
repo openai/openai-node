@@ -1,5 +1,19 @@
 # Changelog
 
+## 6.10.0 (2025-12-04)
+
+Full Changelog: [v6.9.1...v6.10.0](https://github.com/openai/openai-node/compare/v6.9.1...v6.10.0)
+
+### Features
+
+* **api:** gpt-5.1-codex-max and responses/compact ([935f79e](https://github.com/openai/openai-node/commit/935f79efbb090d1d6016ac6874456594f5fd4553))
+
+
+### Chores
+
+* **client:** fix logger property type ([fdc671f](https://github.com/openai/openai-node/commit/fdc671f1b21249a8610b38e2535910d956dc3611))
+* **internal:** upgrade eslint ([9de0f90](https://github.com/openai/openai-node/commit/9de0f905bbd965a5d945ddb70c66dc0c6403ed35))
+
 ## 6.9.1 (2025-11-17)
 
 Full Changelog: [v6.9.0...v6.9.1](https://github.com/openai/openai-node/compare/v6.9.0...v6.9.1)
