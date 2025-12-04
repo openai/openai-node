@@ -166,4 +166,39 @@ describe('transformJsonSchema', () => {
       'JSON schema must have a type defined if anyOf/oneOf/allOf are not used',
     );
   });
+
+  it('should preserve additionalProperties recursively', () => {
+    const input = {
+      type: 'object',
+      properties: {
+        employees: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string' },
+              metadata: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string' },
+                },
+                additionalProperties: {
+                  type: 'string',
+                  maxLength: 100,
+                },
+              },
+            },
+            additionalProperties: true,
+          },
+        },
+      },
+      additionalProperties: false,
+    };
+
+    const expected = structuredClone(input);
+
+    const transformedSchema = transformJSONSchema(input);
+
+    expect(transformedSchema).toEqual(expected);
+  });
 });
