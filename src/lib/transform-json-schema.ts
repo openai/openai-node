@@ -1,6 +1,5 @@
 import { pop } from '../internal/utils';
 
-// Supported string formats
 const SUPPORTED_STRING_FORMATS = new Set([
   'date-time',
   'time',
@@ -8,7 +7,6 @@ const SUPPORTED_STRING_FORMATS = new Set([
   'duration',
   'email',
   'hostname',
-  'uri',
   'ipv4',
   'ipv6',
   'uuid',
