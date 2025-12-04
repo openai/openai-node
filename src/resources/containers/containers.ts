@@ -91,6 +91,16 @@ export interface ContainerCreateResponse {
    * before the container expires.
    */
   expires_after?: ContainerCreateResponse.ExpiresAfter;
+
+  /**
+   * Unix timestamp (in seconds) when the container was last active.
+   */
+  last_active_at?: number;
+
+  /**
+   * The memory limit configured for the container.
+   */
+  memory_limit?: '1g' | '4g' | '16g' | '64g';
 }
 
 export namespace ContainerCreateResponse {
@@ -144,6 +154,16 @@ export interface ContainerRetrieveResponse {
    * before the container expires.
    */
   expires_after?: ContainerRetrieveResponse.ExpiresAfter;
+
+  /**
+   * Unix timestamp (in seconds) when the container was last active.
+   */
+  last_active_at?: number;
+
+  /**
+   * The memory limit configured for the container.
+   */
+  memory_limit?: '1g' | '4g' | '16g' | '64g';
 }
 
 export namespace ContainerRetrieveResponse {
@@ -197,6 +217,16 @@ export interface ContainerListResponse {
    * before the container expires.
    */
   expires_after?: ContainerListResponse.ExpiresAfter;
+
+  /**
+   * Unix timestamp (in seconds) when the container was last active.
+   */
+  last_active_at?: number;
+
+  /**
+   * The memory limit configured for the container.
+   */
+  memory_limit?: '1g' | '4g' | '16g' | '64g';
 }
 
 export namespace ContainerListResponse {
@@ -233,6 +263,11 @@ export interface ContainerCreateParams {
    * IDs of files to copy to the container.
    */
   file_ids?: Array<string>;
+
+  /**
+   * Optional memory limit for the container. Defaults to "1g".
+   */
+  memory_limit?: '1g' | '4g' | '16g' | '64g';
 }
 
 export namespace ContainerCreateParams {

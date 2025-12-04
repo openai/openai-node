@@ -73,4 +73,25 @@ describe('resource responses', () => {
     expect(dataAndResponse.data).toBe(response);
     expect(dataAndResponse.response).toBe(rawResponse);
   });
+
+  test('compact', async () => {
+    const responsePromise = client.responses.compact();
+    const rawResponse = await responsePromise.asResponse();
+    expect(rawResponse).toBeInstanceOf(Response);
+    const response = await responsePromise;
+    expect(response).not.toBeInstanceOf(Response);
+    const dataAndResponse = await responsePromise.withResponse();
+    expect(dataAndResponse.data).toBe(response);
+    expect(dataAndResponse.response).toBe(rawResponse);
+  });
+
+  test('compact: request options and params are passed correctly', async () => {
+    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
+    await expect(
+      client.responses.compact(
+        { input: 'string', instructions: 'instructions', model: 'gpt-5.1', previous_response_id: 'resp_123' },
+        { path: '/_stainless_unknown_path' },
+      ),
+    ).rejects.toThrow(OpenAI.NotFoundError);
+  });
 });
