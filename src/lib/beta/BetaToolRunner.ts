@@ -96,9 +96,7 @@ export class BetaToolRunner<Stream extends boolean>
   }
 
   async *[Symbol.asyncIterator](): AsyncIterator<
-    Stream extends true ?
-      ChatCompletionStream // TODO: for now!
-    : ChatCompletion
+    Stream extends true ? ChatCompletionStream : ChatCompletion
   > {
     if (this.#consumed) {
       throw new OpenAIError('Cannot iterate over a consumed stream');
@@ -241,7 +239,7 @@ export class BetaToolRunner<Stream extends boolean>
    * }
    */
   async generateToolResponse() {
-    // The most recent message from the assistant. TODO: do we want || this.params.messages.at(-1)?
+    // The most recent message from the assistant.
     const message = await this.#message;
     if (!message) {
       return null;
@@ -281,7 +279,7 @@ export class BetaToolRunner<Stream extends boolean>
    * console.log('Final response:', finalMessage.content);
    */
   done(): Promise<ChatCompletionMessage> {
-    return this.#completion.promise; // TODO: find a more type safe way to do this
+    return this.#completion.promise;
   }
 
   /**
@@ -351,7 +349,7 @@ export class BetaToolRunner<Stream extends boolean>
    * Makes the ToolRunner directly awaitable, equivalent to calling .runUntilDone()
    * This allows using `await runner` instead of `await runner.runUntilDone()`
    */
-  then<TResult1 = ChatCompletionMessage, TResult2 = never>( // TODO: make sure these types are OK
+  then<TResult1 = ChatCompletionMessage, TResult2 = never>(
     onfulfilled?: ((value: ChatCompletionMessage) => TResult1 | PromiseLike<TResult1>) | undefined | null,
     onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null,
   ): Promise<TResult1 | TResult2> {
@@ -364,12 +362,7 @@ async function generateToolResponse(
   tools: BetaRunnableChatCompletionFunctionTool<any>[],
 ): Promise<null | ChatCompletionToolMessageParam[]> {
   // Only process if the last message is from the assistant and has tool use blocks
-  if (
-    !lastMessage ||
-    lastMessage.role !== 'assistant' ||
-    // !lastMessage.content || TODO: openai doesn't give content at the same time. ensure this is really always true though
-    typeof lastMessage.content === 'string'
-  ) {
+  if (!lastMessage || lastMessage.role !== 'assistant' || typeof lastMessage.content === 'string') {
     return null;
   }
 
@@ -382,7 +375,7 @@ async function generateToolResponse(
   return (
     await Promise.all(
       prevToolCalls.map(async (toolUse) => {
-        if (toolUse.type !== 'function') return; // TODO: what about other calls?
+        if (toolUse.type !== 'function') return; // TODO: eventually we should support additional tool call types
 
         const tool = tools.find(
           (t) => t.type === 'function' && toolUse.function.name === t.function.name,
@@ -398,14 +391,7 @@ async function generateToolResponse(
         }
 
         try {
-          let input = toolUse.function.arguments;
-          // TODO: is this always safe?
-          if (typeof input === 'string') {
-            input = JSON.parse(input);
-          }
-          input = tool.parse(input);
-
-          const result = await tool.run(input);
+          const result = await tool.run(tool.parse(JSON.parse(toolUse.function.arguments)));
           return {
             type: 'tool_result' as const,
             tool_call_id: toolUse.id,

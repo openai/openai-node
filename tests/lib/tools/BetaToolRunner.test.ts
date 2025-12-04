@@ -11,6 +11,7 @@ import type {
 } from 'openai/resources';
 import type { Fetch } from 'openai/internal/builtin-types';
 import type { BetaToolRunnerParams } from 'openai/lib/beta/BetaToolRunner';
+import { betaZodFunctionTool } from 'openai/helpers/beta/zod';
 
 const weatherTool: BetaRunnableChatCompletionFunctionTool<{ location: string }> = {
   type: 'function',
@@ -1201,5 +1202,66 @@ describe('ToolRunner', () => {
       expect(toolResponse).toBeNull();
       await expectDone(iterator);
     });
+  });
+
+  it('caches tool responses properly and handles text messages', async () => {
+    let callCount = 0;
+
+    const { runner, handleAssistantMessage } = setupTest({
+      messages: [{ role: 'user', content: 'What is the weather?' }],
+      tools: [
+        {
+          type: 'function',
+          function: {
+            name: 'getWeather',
+            description: 'Get weather information',
+            parameters: {
+              type: 'object',
+              properties: {
+                location: {
+                  type: 'string',
+                  description: 'The location to get weather information for',
+                },
+              },
+            },
+          },
+          run: async ({ location }: { location: string }) => {
+            callCount++;
+            return `Sunny in ${location}`;
+          },
+          parse: (input: unknown) => input as { location: string },
+        },
+      ],
+    });
+
+    const iterator = runner[Symbol.asyncIterator]();
+
+    // Initial tool response should be null (no assistant message yet)
+    const initialResponse = await runner.generateToolResponse();
+    expect(initialResponse).toBeNull();
+    expect(callCount).toBe(0);
+
+    // Assistant requests weather tool
+    handleAssistantMessage([getWeatherToolUse('Paris')]);
+    await iterator.next();
+
+    // Tool response should be cached
+    const toolResponse1 = await runner.generateToolResponse();
+    expect(toolResponse1).toMatchObject([getWeatherToolResult('Paris')]);
+    expect(callCount).toBe(1);
+
+    const toolResponse2 = await runner.generateToolResponse();
+    expect(toolResponse2).toMatchObject([getWeatherToolResult('Paris')]);
+    expect(callCount).toBe(1); // Still 1 - cached response
+
+    // Now test with a text message
+    handleAssistantMessage(getTextContent());
+    await iterator.next();
+
+    const textResponse = await runner.generateToolResponse();
+    expect(textResponse).toBeNull(); // Text messages return null
+    expect(callCount).toBe(1); // Still 1 - no new tool calls
+
+    await expectDone(iterator);
   });
 });
