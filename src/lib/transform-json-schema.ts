@@ -12,6 +12,14 @@ const SUPPORTED_STRING_FORMATS = new Set([
   'uuid',
 ]);
 
+const SUPPORTED_NUMBER_PROPERTIES = new Set([
+  'multipleOf',
+  'maximum',
+  'exclusiveMaximum',
+  'minimum',
+  'exclusiveMinimum',
+]);
+
 export type JSONSchema = Record<string, any>;
 
 function deepClone<T>(obj: T): T {
@@ -69,41 +77,62 @@ function _transformJSONSchema(jsonSchema: JSONSchema): JSONSchema {
     strictSchema['title'] = title;
   }
 
-  if (type === 'object') {
-    const properties = pop(jsonSchema, 'properties') || {};
+  switch (type) {
+    case 'object': {
+      const properties = pop(jsonSchema, 'properties') || {};
 
-    strictSchema['properties'] = Object.fromEntries(
-      Object.entries(properties).map(([key, propSchema]) => [
-        key,
-        _transformJSONSchema(propSchema as JSONSchema),
-      ]),
-    );
+      strictSchema['properties'] = Object.fromEntries(
+        Object.entries(properties).map(([key, propSchema]) => [
+          key,
+          _transformJSONSchema(propSchema as JSONSchema),
+        ]),
+      );
 
-    pop(jsonSchema, 'additionalProperties');
-    strictSchema['additionalProperties'] = false;
+      pop(jsonSchema, 'additionalProperties');
+      strictSchema['additionalProperties'] = false;
 
-    const required = pop(jsonSchema, 'required');
-    if (required !== undefined) {
-      strictSchema['required'] = required;
+      const required = pop(jsonSchema, 'required');
+      if (required !== undefined) {
+        strictSchema['required'] = required;
+      }
+      break;
     }
-  } else if (type === 'string') {
-    const format = pop(jsonSchema, 'format');
-    if (format !== undefined && SUPPORTED_STRING_FORMATS.has(format)) {
-      strictSchema['format'] = format;
-    } else if (format !== undefined) {
-      jsonSchema['format'] = format;
+    case 'string': {
+      const format = pop(jsonSchema, 'format');
+      if (format !== undefined && SUPPORTED_STRING_FORMATS.has(format)) {
+        strictSchema['format'] = format;
+      } else if (format !== undefined) {
+        jsonSchema['format'] = format;
+      }
+      break;
     }
-  } else if (type === 'array') {
-    const items = pop(jsonSchema, 'items');
-    if (items !== undefined) {
-      strictSchema['items'] = _transformJSONSchema(items as JSONSchema);
-    }
+    case 'array': {
+      const minItems = pop(jsonSchema, 'minItems');
+      if (minItems !== undefined) {
+        strictSchema['minItems'] = minItems;
+      }
 
-    const minItems = pop(jsonSchema, 'minItems');
-    if (minItems !== undefined && (minItems === 0 || minItems === 1)) {
-      strictSchema['minItems'] = minItems;
-    } else if (minItems !== undefined) {
-      jsonSchema['minItems'] = minItems;
+      const maxItems = pop(jsonSchema, 'maxItems');
+      if (maxItems !== undefined) {
+        strictSchema['maxItems'] = maxItems;
+      }
+
+      const items = pop(jsonSchema, 'items');
+      if (items !== undefined) {
+        strictSchema['items'] = _transformJSONSchema(items as JSONSchema);
+      }
+
+      break;
+    }
+    case 'number': {
+      for (const key of SUPPORTED_NUMBER_PROPERTIES) {
+        // only load supported properties into strictSchema
+        const value = pop(jsonSchema, key);
+        if (value !== undefined) {
+          strictSchema[key] = value;
+        }
+      }
+      break;
     }
   }
 

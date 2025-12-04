@@ -2,9 +2,9 @@
 
 exports[`.parse() allows zod v4 discriminated unions 1`] = `
 "{
-  "id": "chatcmpl-Cj67GpjpWEwEp7WLJFnVdeE2Kob4C",
+  "id": "chatcmpl-Cj6L9EhAnLN4VdmS3WOlztNifBTib",
   "object": "chat.completion",
-  "created": 1764864306,
+  "created": 1764865167,
   "model": "gpt-4o-2024-08-06",
   "choices": [
     {
@@ -42,9 +42,9 @@ exports[`.parse() allows zod v4 discriminated unions 1`] = `
 
 exports[`.parse() allows zod v4 discriminated unions 3`] = `
 "{
-  "id": "chatcmpl-Cj67H3J7eowW1OKJP2EVjiRW5Cmlg",
+  "id": "chatcmpl-Cj6LAo9OYmTKdatrog7EX6Eza5sWm",
   "object": "chat.completion",
-  "created": 1764864307,
+  "created": 1764865168,
   "model": "gpt-4o-2024-08-06",
   "choices": [
     {

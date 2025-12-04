@@ -128,31 +128,6 @@ describe('transformJsonSchema', () => {
 `);
   });
 
-  it('should remove unsupported minItems values (> 1)', () => {
-    const input = {
-      type: 'array',
-      items: { type: 'string' },
-      minItems: 3,
-      description: 'List of items',
-    };
-
-    const result = transformJSONSchema(input);
-    const diff = detailedDiff(input, result);
-    expect(diff).toMatchInlineSnapshot(`
-{
-  "added": {},
-  "deleted": {
-    "minItems": undefined,
-  },
-  "updated": {
-    "description": "List of items
-
-{minItems: 3}",
-  },
-}
-`);
-  });
-
   it('should handle nested objects recursively', () => {
     const input = {
       type: 'object',
@@ -307,7 +282,6 @@ describe('transformJsonSchema', () => {
       properties: {
         email: { type: 'string', format: 'email' },
         date: { type: 'string', format: 'date-time' },
-        website: { type: 'string', format: 'uri' },
       },
     };
 
@@ -399,16 +373,6 @@ describe('transformJsonSchema', () => {
           },
           additionalProperties: true,
         },
-        {
-          type: 'object',
-          properties: {
-            tags: {
-              type: 'array',
-              items: { type: 'string' },
-              minItems: 5,
-            },
-          },
-        },
       ],
     };
 
@@ -433,14 +397,6 @@ describe('transformJsonSchema', () => {
           },
         },
       },
-      "2": {
-        "additionalProperties": false,
-        "properties": {
-          "tags": {
-            "description": "{minItems: 5}",
-          },
-        },
-      },
     },
   },
   "deleted": {
@@ -458,13 +414,6 @@ describe('transformJsonSchema', () => {
           "name": {
             "minLength": undefined,
             "pattern": undefined,
-          },
-        },
-      },
-      "2": {
-        "properties": {
-          "tags": {
-            "minItems": undefined,
           },
         },
       },
