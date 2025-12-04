@@ -17,18 +17,12 @@ export function betaZodFunctionTool<InputSchema extends ZodType>(options: {
 }): BetaRunnableTool<zodInfer<InputSchema>> {
   const jsonSchema = z.toJSONSchema(options.parameters, { reused: 'ref' });
 
-  // TypeScript doesn't narrow the type after the runtime check, so we need to assert it
-  const objectSchema = jsonSchema as typeof jsonSchema & { type: 'object' };
-
   return {
     type: 'function',
     function: {
       name: options.name,
       description: options.description,
-      parameters: {
-        type: 'object',
-        properties: objectSchema.properties,
-      },
+      parameters: jsonSchema,
     },
     run: options.run,
     parse: (args: unknown) => options.parameters.parse(args),
