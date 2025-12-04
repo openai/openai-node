@@ -112,7 +112,7 @@ function getTextContent(text?: string): ChatCompletionMessage {
   };
 }
 
-function betaMessageToStreamEvents(message: ChatCompletion): ChatCompletionChunk[] {
+function chunkChatCompletion(message: ChatCompletion): ChatCompletionChunk[] {
   const events: ChatCompletionChunk[] = [];
 
   const messageContent = message.choices[0]!.message;
@@ -374,7 +374,7 @@ function setupTest(params: Partial<BetaToolRunnerParams> = {}): SetupTestResult<
       },
     };
 
-    handleStreamEvents(betaMessageToStreamEvents(message));
+    handleStreamEvents(chunkChatCompletion(message));
     return message;
   };
 
@@ -459,7 +459,7 @@ describe('ToolRunner', () => {
       await expectDone(iterator);
     });
 
-    it('yields BetaMessageStream when stream=true', async () => {
+    it('yields ChatCompletionStream when stream=true', async () => {
       const { runner, handleAssistantMessageStream } = setupTest({ stream: true });
 
       const iterator = runner[Symbol.asyncIterator]();

@@ -31,10 +31,10 @@ function promiseWithResolvers<T>(): {
 }
 
 /**
- * A BetaToolRunner handles the automatic conversation loop between the assistant and tools.
+ * A `BetaToolRunner` handles the automatic conversation loop between the assistant and tools.
  *
- * A BetaToolRunner is an async iterable that yields either ChatCompletion or
- * ChatCompletionStream objects depending on the streaming configuration.
+ * A `BetaToolRunner` is an async iterable that yields either `ChatCompletion` or
+ * `ChatCompletionStream` objects depending on the streaming configuration.
  */
 export class BetaToolRunner<Stream extends boolean>
   implements AsyncIterable<Stream extends true ? ChatCompletionStream : ChatCompletion>
@@ -230,7 +230,7 @@ export class BetaToolRunner<Stream extends boolean>
    * Get the tool response for the last message from the assistant.
    * Avoids redundant tool executions by caching results.
    *
-   * @returns A promise that resolves to a BetaMessageParam containing tool results, or null if no tools need to be executed
+   * @returns A promise that resolves to a `ChatCompletionToolMessageParam` containing tool results, or null if no tools need to be executed
    *
    * @example
    * const toolResponse = await runner.generateToolResponse();
@@ -238,7 +238,7 @@ export class BetaToolRunner<Stream extends boolean>
    *   console.log('Tool results:', toolResponse.content);
    * }
    */
-  async generateToolResponse() {
+  async generateToolResponse(): Promise<ChatCompletionToolMessageParam[] | null> {
     // The most recent message from the assistant.
     const message = await this.#message;
     if (!message) {
@@ -266,7 +266,7 @@ export class BetaToolRunner<Stream extends boolean>
    * Wait for the async iterator to complete. This works even if the async iterator hasn't yet started, and
    * will wait for an instance to start and go to completion.
    *
-   * @returns A promise that resolves to the final BetaMessage when the iterator completes
+   * @returns A promise that resolves to the final `ChatComletionMessage` when the iterator completes
    *
    * @example
    * // Start consuming the iterator
@@ -283,12 +283,14 @@ export class BetaToolRunner<Stream extends boolean>
   }
 
   /**
-   * Returns a promise indicating that the stream is done. Unlike .done(), this will eagerly read the stream:
-   * * If the iterator has not been consumed, consume the entire iterator and return the final message from the
-   * assistant.
-   * * If the iterator has been consumed, waits for it to complete and returns the final message.
+   * Returns a promise indicating that the stream is done. Unlike .done(), this
+   * will eagerly read the stream:
    *
-   * @returns A promise that resolves to the final BetaMessage from the conversation
+   * - If the iterator has not been consumed, consume the entire iterator and
+   *   return the final message from the assistant.
+   * - If the iterator has been consumed, waits for it to complete and returns the final message.
+   *
+   * @returns A promise that resolves to the final `ChatCompletionMessage` from the conversation
    * @throws {OpenAIError} If no messages were processed during the conversation
    *
    * @example
@@ -308,9 +310,9 @@ export class BetaToolRunner<Stream extends boolean>
   }
 
   /**
-   * Get the current parameters being used by the ToolRunner.
+   * Get the current parameters being used by the `BetaToolRunner`.
    *
-   * @returns A readonly view of the current ToolRunnerParams
+   * @returns A readonly view of the current `BetaToolRunnerParams`
    *
    * @example
    * const currentParams = runner.params;
@@ -324,7 +326,7 @@ export class BetaToolRunner<Stream extends boolean>
   /**
    * Add one or more messages to the conversation history.
    *
-   * @param messages - One or more BetaMessageParam objects to add to the conversation
+   * @param messages - One or more `ChatCompletionMessageParam` objects to add to the conversation
    *
    * @example
    * runner.pushMessages(
