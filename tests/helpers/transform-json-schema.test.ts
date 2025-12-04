@@ -429,4 +429,57 @@ describe('transformJsonSchema', () => {
 }
 `);
   });
+
+  it('should filter out unsupported number properties', () => {
+    const input = {
+      type: 'object',
+      properties: {
+        score: {
+          type: 'number',
+          // Supported properties
+          minimum: 0,
+          maximum: 100,
+          // Unsupported properties
+          precision: 2,
+          step: 0.5,
+          format: 'float',
+        },
+      },
+    };
+
+    const result = transformJSONSchema(input);
+    const diff = detailedDiff(input, result);
+    expect(diff).toMatchInlineSnapshot(`
+   {
+     "added": {
+       "additionalProperties": false,
+       "properties": {
+         "score": {
+           "description": "{precision: 2, step: 0.5, format: "float"}",
+         },
+       },
+     },
+     "deleted": {
+       "properties": {
+         "score": {
+           "format": undefined,
+           "precision": undefined,
+           "step": undefined,
+         },
+       },
+     },
+     "updated": {},
+   }
+   `);
+
+    expect(result['properties']['score'].minimum).toBe(0);
+    expect(result['properties']['score'].maximum).toBe(100);
+
+    expect(result['properties']['score'].precision).toBeUndefined();
+    expect(result['properties']['score'].step).toBeUndefined();
+    expect(result['properties']['score'].format).toBeUndefined();
+    expect(result['properties']['score'].description).toContain('precision: 2');
+    expect(result['properties']['score'].description).toContain('step: 0.5');
+    expect(result['properties']['score'].description).toContain('format: "float"');
+  });
 });
