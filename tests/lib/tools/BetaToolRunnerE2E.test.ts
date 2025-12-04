@@ -316,4 +316,36 @@ describe('toolRunner integration tests', () => {
       expect(['blue', 'black', 'gray', 'grey']).toContain(color); // ai is bad at colours apparently
     });
   });
+
+  it('top level non-object schemas throw', async () => {
+    // At least for now, openai does not support non-object schemas at top level
+    const runner = client.beta.chat.completions.toolRunner({
+      model: 'gpt-4o',
+      max_tokens: 1000,
+      max_iterations: 5,
+      messages: [
+        {
+          role: 'user',
+          content:
+            'Use the array_tool with the array ["hello", "world"], then provide a final response that includes the word \'foo\'.',
+        },
+      ],
+      tools: [
+        betaZodFunctionTool({
+          name: 'array_tool',
+          description: 'Tool for array operations',
+          parameters: z.array(z.string()).describe('Array of strings'),
+          run: async (input: string[]) => {
+            return input.map((item) => item.toUpperCase()).join(', ');
+          },
+        }),
+      ],
+    });
+    await expect(async () => {
+      const messages = [];
+      for await (const message of runner) {
+        messages.push(message);
+      }
+    }).rejects.toThrow();
+  });
 });
