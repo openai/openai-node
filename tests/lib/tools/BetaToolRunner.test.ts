@@ -11,7 +11,6 @@ import type {
 } from 'openai/resources';
 import type { Fetch } from 'openai/internal/builtin-types';
 import type { BetaToolRunnerParams } from 'openai/lib/beta/BetaToolRunner';
-import { betaZodFunctionTool } from 'openai/helpers/beta/zod';
 
 const weatherTool: BetaRunnableChatCompletionFunctionTool<{ location: string }> = {
   type: 'function',
