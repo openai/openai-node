@@ -361,7 +361,7 @@ export class BetaToolRunner<Stream extends boolean>
 
 async function generateToolResponse(
   lastMessage: ChatCompletionMessage,
-  tools: BetaRunnableChatCompletionFunctionTool<any>[],
+  tools: BetaRunnableChatCompletionFunctionTool<unknown>[],
 ): Promise<null | ChatCompletionToolMessageParam[]> {
   // Only process if the last message is from the assistant and has tool use blocks
   if (!lastMessage || lastMessage.role !== 'assistant' || typeof lastMessage.content === 'string') {
@@ -376,46 +376,40 @@ async function generateToolResponse(
 
   return (
     await Promise.all(
-      prevToolCalls.map(async (toolUse) => {
-        if (toolUse.type !== 'function') return; // TODO: eventually we should support additional tool call types
+      prevToolCalls.map(
+        async (toolUse): Promise<OpenAI.Chat.Completions.ChatCompletionToolMessageParam | null> => {
+          if (toolUse.type !== 'function') return null; // TODO: eventually we should support additional tool call types
 
-        const tool = tools.find(
-          (t) => t.type === 'function' && toolUse.function.name === t.function.name,
-        ) as BetaRunnableChatCompletionFunctionTool;
+          const tool = tools.find(
+            (t) => t.type === 'function' && toolUse.function.name === t.function.name,
+          ) as BetaRunnableChatCompletionFunctionTool;
 
-        if (!tool || !('run' in tool)) {
-          return {
-            type: 'tool_result' as const,
-            tool_call_id: toolUse.id,
-            content: `Error: Tool '${toolUse.function.name}' not found`,
-            is_error: true,
-          };
-        }
+          if (!tool || !('run' in tool)) {
+            return {
+              role: 'tool',
+              tool_call_id: toolUse.id,
+              content: `Error: Tool '${toolUse.function.name}' not found`,
+            };
+          }
 
-        try {
-          const result = await tool.run(tool.parse(JSON.parse(toolUse.function.arguments)));
-          return {
-            type: 'tool_result' as const,
-            tool_call_id: toolUse.id,
-            content: typeof result === 'string' ? result : JSON.stringify(result),
-          };
-        } catch (error) {
-          return {
-            type: 'tool_result' as const,
-            tool_call_id: toolUse.id,
-            content: `Error: ${error instanceof Error ? error.message : String(error)}`,
-            is_error: true,
-          };
-        }
-      }),
+          try {
+            const result = await tool.run(tool.parse(JSON.parse(toolUse.function.arguments)));
+            return {
+              role: 'tool',
+              tool_call_id: toolUse.id,
+              content: typeof result === 'string' ? result : JSON.stringify(result),
+            };
+          } catch (error) {
+            return {
+              role: 'tool',
+              tool_call_id: toolUse.id,
+              content: `Error: ${error instanceof Error ? error.message : String(error)}`,
+            };
+          }
+        },
+      ),
     )
-  )
-    .filter((result): result is NonNullable<typeof result> => result != null)
-    .map((toolResult) => ({
-      role: 'tool' as const,
-      content: toolResult.content,
-      tool_call_id: toolResult.tool_call_id,
-    }));
+  ).filter((result): result is NonNullable<typeof result> => result != null);
 }
 
 // vendored from typefest just to make things look a bit nicer on hover
