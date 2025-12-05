@@ -254,7 +254,7 @@ export class BetaToolRunner<Stream extends boolean>
     const toolsResponse = generateToolResponse(
       lastMessage,
       this.#state.params.tools.filter(
-        (tool): tool is BetaRunnableChatCompletionFunctionTool<any> =>
+        (tool): tool is BetaRunnableChatCompletionFunctionTool<unknown> =>
           'run' in tool && tool.type === 'function',
       ),
     );
@@ -420,7 +420,7 @@ type Simplify<T> = { [KeyType in keyof T]: T[KeyType] } & {};
  */
 export type BetaToolRunnerParams = Simplify<
   Omit<ChatCompletionCreateParams, 'tools'> & {
-    tools: (ChatCompletionTool | BetaRunnableChatCompletionFunctionTool<any>)[];
+    tools: (ChatCompletionTool | BetaRunnableChatCompletionFunctionTool<unknown>)[];
     /**
      * Maximum number of iterations (API requests) to make in the tool execution loop.
      * Each iteration consists of: assistant response → tool execution → tool results.
