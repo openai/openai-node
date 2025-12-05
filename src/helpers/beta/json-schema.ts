@@ -1,7 +1,6 @@
 import type { FromSchema, JSONSchema } from 'json-schema-to-ts';
 import type { BetaRunnableChatCompletionFunctionTool, Promisable } from '../../lib/beta/BetaRunnableTool';
 import type { FunctionTool } from '../../resources/beta';
-import { OpenAIError } from '../../error';
 
 type NoInfer<T> = T extends infer R ? R : never;
 
@@ -18,12 +17,6 @@ export function betaFunctionTool<
   description: string;
   run: (args: NoInfer<FromSchema<Schema>>) => Promisable<string | Array<FunctionTool>>;
 }): BetaRunnableChatCompletionFunctionTool<NoInfer<FromSchema<Schema>>> {
-  if (options.parameters.type !== 'object') {
-    throw new OpenAIError(
-      `JSON schema for tool "${options.name}" must be an object, but got ${options.parameters.type}`,
-    );
-  }
-
   return {
     type: 'function',
     function: {
