@@ -41,7 +41,7 @@ describe('resource completions', () => {
       prediction: { content: 'string', type: 'content' },
       presence_penalty: -2,
       prompt_cache_key: 'prompt-cache-key-1234',
-      prompt_cache_retention: 'in-memory',
+      prompt_cache_retention: 'in_memory',
       reasoning_effort: 'none',
       response_format: { type: 'text' },
       safety_identifier: 'safety-identifier-1234',
