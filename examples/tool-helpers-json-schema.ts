@@ -17,7 +17,7 @@ async function main() {
       betaFunctionTool({
         name: 'getWeather',
         description: 'Get the weather at a specific location',
-        inputSchema: {
+        parameters: {
           type: 'object',
           properties: {
             location: {

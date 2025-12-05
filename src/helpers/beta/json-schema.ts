@@ -14,13 +14,13 @@ export function betaFunctionTool<
   const Schema extends Exclude<JSONSchema, boolean> & { type: 'object' },
 >(options: {
   name: string;
-  inputSchema: Schema;
+  parameters: Schema;
   description: string;
   run: (args: NoInfer<FromSchema<Schema>>) => Promisable<string | Array<FunctionTool>>;
 }): BetaRunnableChatCompletionFunctionTool<NoInfer<FromSchema<Schema>>> {
-  if (options.inputSchema.type !== 'object') {
+  if (options.parameters.type !== 'object') {
     throw new OpenAIError(
-      `JSON schema for tool "${options.name}" must be an object, but got ${options.inputSchema.type}`,
+      `JSON schema for tool "${options.name}" must be an object, but got ${options.parameters.type}`,
     );
   }
 
@@ -28,7 +28,7 @@ export function betaFunctionTool<
     type: 'function',
     function: {
       name: options.name,
-      parameters: options.inputSchema,
+      parameters: options.parameters,
       description: options.description,
     },
     run: options.run,
