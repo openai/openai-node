@@ -129,13 +129,12 @@ export class Responses extends APIResource {
    *
    * @example
    * ```ts
-   * const compactedResponse = await client.responses.compact();
+   * const compactedResponse = await client.responses.compact({
+   *   model: 'gpt-5.1',
+   * });
    * ```
    */
-  compact(
-    body: ResponseCompactParams | null | undefined = {},
-    options?: RequestOptions,
-  ): APIPromise<CompactedResponse> {
+  compact(body: ResponseCompactParams, options?: RequestOptions): APIPromise<CompactedResponse> {
     return this._client.post('/responses/compact', { body, ...options });
   }
 }
@@ -6433,26 +6432,13 @@ export interface ResponseRetrieveParamsStreaming extends ResponseRetrieveParamsB
 
 export interface ResponseCompactParams {
   /**
-   * Text, image, or file inputs to the model, used to generate a response
-   */
-  input?: string | Array<ResponseInputItem> | null;
-
-  /**
-   * A system (or developer) message inserted into the model's context. When used
-   * along with `previous_response_id`, the instructions from a previous response
-   * will not be carried over to the next response. This makes it simple to swap out
-   * system (or developer) messages in new responses.
-   */
-  instructions?: string | null;
-
-  /**
    * Model ID used to generate the response, like `gpt-5` or `o3`. OpenAI offers a
    * wide range of models with different capabilities, performance characteristics,
    * and price points. Refer to the
    * [model guide](https://platform.openai.com/docs/models) to browse and compare
    * available models.
    */
-  model?:
+  model:
     | 'gpt-5.1'
     | 'gpt-5.1-2025-11-13'
     | 'gpt-5.1-codex'
@@ -6536,6 +6522,19 @@ export interface ResponseCompactParams {
     | 'gpt-5.1-codex-max'
     | (string & {})
     | null;
+
+  /**
+   * Text, image, or file inputs to the model, used to generate a response
+   */
+  input?: string | Array<ResponseInputItem> | null;
+
+  /**
+   * A system (or developer) message inserted into the model's context. When used
+   * along with `previous_response_id`, the instructions from a previous response
+   * will not be carried over to the next response. This makes it simple to swap out
+   * system (or developer) messages in new responses.
+   */
+  instructions?: string | null;
 
   /**
    * The unique ID of the previous response to the model. Use this to create
