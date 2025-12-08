@@ -134,7 +134,6 @@ client.example.list(undefined, { headers: { ... } });
 - `client.beta.threads.messages.list()`
 - `client.batches.list()`
 - `client.responses.retrieve()`
-- `client.responses.compact()`
 - `client.responses.inputItems.list()`
 - `client.responses.inputTokens.count()`
 - `client.realtime.calls.reject()`
