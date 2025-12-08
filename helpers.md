@@ -383,7 +383,7 @@ When you just "await" the `toolRunner`, it simply automatically iterates until t
 #### Streaming
 
 ```ts
-const runner = anthropic.beta.messages.toolRunner({
+const runner = client.beta.chat.completions.toolRunner({
   model: 'gpt-4o',
   max_tokens: 1000,
   messages: [{ role: 'user', content: 'What is the weather in San Francisco?' }],
