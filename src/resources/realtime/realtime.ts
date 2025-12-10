@@ -3,6 +3,8 @@
 import { APIResource } from '../../core/resource';
 import * as RealtimeAPI from './realtime';
 import * as Shared from '../shared';
+import * as CallsAPI from './calls';
+import { CallAcceptParams, CallReferParams, CallRejectParams, Calls } from './calls';
 import * as ClientSecretsAPI from './client-secrets';
 import {
   ClientSecretCreateParams,
@@ -17,6 +19,7 @@ import * as ResponsesAPI from '../responses/responses';
 
 export class Realtime extends APIResource {
   clientSecrets: ClientSecretsAPI.ClientSecrets = new ClientSecretsAPI.ClientSecrets(this._client);
+  calls: CallsAPI.Calls = new CallsAPI.Calls(this._client);
 }
 
 export interface AudioTranscription {
@@ -29,16 +32,17 @@ export interface AudioTranscription {
 
   /**
    * The model to use for transcription. Current options are `whisper-1`,
-   * `gpt-4o-transcribe-latest`, `gpt-4o-mini-transcribe`, and `gpt-4o-transcribe`.
+   * `gpt-4o-mini-transcribe`, `gpt-4o-transcribe`, and `gpt-4o-transcribe-diarize`.
+   * Use `gpt-4o-transcribe-diarize` when you need diarization with speaker labels.
    */
-  model?: 'whisper-1' | 'gpt-4o-transcribe-latest' | 'gpt-4o-mini-transcribe' | 'gpt-4o-transcribe';
+  model?: 'whisper-1' | 'gpt-4o-mini-transcribe' | 'gpt-4o-transcribe' | 'gpt-4o-transcribe-diarize';
 
   /**
    * An optional text to guide the model's style or continue a previous audio
    * segment. For `whisper-1`, the
    * [prompt is a list of keywords](https://platform.openai.com/docs/guides/speech-to-text#prompting).
-   * For `gpt-4o-transcribe` models, the prompt is a free text string, for example
-   * "expect words related to technology".
+   * For `gpt-4o-transcribe` models (excluding `gpt-4o-transcribe-diarize`), the
+   * prompt is a free text string, for example "expect words related to technology".
    */
   prompt?: string;
 }
@@ -867,6 +871,29 @@ export interface InputAudioBufferCommittedEvent {
 }
 
 /**
+ * **SIP Only:** Returned when an DTMF event is received. A DTMF event is a message
+ * that represents a telephone keypad press (0–9, \*, #, A–D). The `event` property
+ * is the keypad that the user press. The `received_at` is the UTC Unix Timestamp
+ * that the server received the event.
+ */
+export interface InputAudioBufferDtmfEventReceivedEvent {
+  /**
+   * The telephone keypad that was pressed by the user.
+   */
+  event: string;
+
+  /**
+   * UTC Unix Timestamp when DTMF Event was received by server.
+   */
+  received_at: number;
+
+  /**
+   * The event type, must be `input_audio_buffer.dtmf_event_received`.
+   */
+  type: 'input_audio_buffer.dtmf_event_received';
+}
+
+/**
  * Sent by the server when in `server_vad` mode to indicate that speech has been
  * detected in the audio buffer. This can happen any time audio is added to the
  * buffer (unless speech is already detected). The client may want to use this
@@ -1067,10 +1094,10 @@ export interface McpListToolsInProgress {
 export type NoiseReductionType = 'near_field' | 'far_field';
 
 /**
- * **WebRTC Only:** Emit to cut off the current audio response. This will trigger
- * the server to stop generating audio and emit a `output_audio_buffer.cleared`
- * event. This event should be preceded by a `response.cancel` client event to stop
- * the generation of the current response.
+ * **WebRTC/SIP Only:** Emit to cut off the current audio response. This will
+ * trigger the server to stop generating audio and emit a
+ * `output_audio_buffer.cleared` event. This event should be preceded by a
+ * `response.cancel` client event to stop the generation of the current response.
  * [Learn more](https://platform.openai.com/docs/guides/realtime-conversations#client-and-server-events-for-audio-in-webrtc).
  */
 export interface OutputAudioBufferClearEvent {
@@ -1318,7 +1345,11 @@ export namespace RealtimeAudioInputTurnDetection {
 
     /**
      * Whether or not to automatically generate a response when a VAD stop event
-     * occurs.
+     * occurs. If `interrupt_response` is set to `false` this may fail to create a
+     * response if the model is already responding.
+     *
+     * If both `create_response` and `interrupt_response` are set to `false`, the model
+     * will never respond automatically but VAD events will still be emitted.
      */
     create_response?: boolean;
 
@@ -1339,9 +1370,13 @@ export namespace RealtimeAudioInputTurnDetection {
     idle_timeout_ms?: number | null;
 
     /**
-     * Whether or not to automatically interrupt any ongoing response with output to
-     * the default conversation (i.e. `conversation` of `auto`) when a VAD start event
-     * occurs.
+     * Whether or not to automatically interrupt (cancel) any ongoing response with
+     * output to the default conversation (i.e. `conversation` of `auto`) when a VAD
+     * start event occurs. If `true` then the response will be cancelled, otherwise it
+     * will continue until complete.
+     *
+     * If both `create_response` and `interrupt_response` are set to `false`, the model
+     * will never respond automatically but VAD events will still be emitted.
      */
     interrupt_response?: boolean;
 
@@ -2502,6 +2537,7 @@ export type RealtimeServerEvent =
   | RealtimeErrorEvent
   | InputAudioBufferClearedEvent
   | InputAudioBufferCommittedEvent
+  | InputAudioBufferDtmfEventReceivedEvent
   | InputAudioBufferSpeechStartedEvent
   | InputAudioBufferSpeechStoppedEvent
   | RateLimitsUpdatedEvent
@@ -2563,8 +2599,8 @@ export namespace RealtimeServerEvent {
   }
 
   /**
-   * **WebRTC Only:** Emitted when the server begins streaming audio to the client.
-   * This event is emitted after an audio content part has been added
+   * **WebRTC/SIP Only:** Emitted when the server begins streaming audio to the
+   * client. This event is emitted after an audio content part has been added
    * (`response.content_part.added`) to the response.
    * [Learn more](https://platform.openai.com/docs/guides/realtime-conversations#client-and-server-events-for-audio-in-webrtc).
    */
@@ -2586,7 +2622,7 @@ export namespace RealtimeServerEvent {
   }
 
   /**
-   * **WebRTC Only:** Emitted when the output audio buffer has been completely
+   * **WebRTC/SIP Only:** Emitted when the output audio buffer has been completely
    * drained on the server, and no more audio is forthcoming. This event is emitted
    * after the full response data has been sent to the client (`response.done`).
    * [Learn more](https://platform.openai.com/docs/guides/realtime-conversations#client-and-server-events-for-audio-in-webrtc).
@@ -2609,8 +2645,8 @@ export namespace RealtimeServerEvent {
   }
 
   /**
-   * **WebRTC Only:** Emitted when the output audio buffer is cleared. This happens
-   * either in VAD mode when the user has interrupted
+   * **WebRTC/SIP Only:** Emitted when the output audio buffer is cleared. This
+   * happens either in VAD mode when the user has interrupted
    * (`input_audio_buffer.speech_started`), or when the client has emitted the
    * `output_audio_buffer.clear` event to manually cut off the current audio
    * response.
@@ -2723,7 +2759,11 @@ export interface RealtimeSession {
     | 'gpt-4o-realtime-preview-2024-12-17'
     | 'gpt-4o-realtime-preview-2025-06-03'
     | 'gpt-4o-mini-realtime-preview'
-    | 'gpt-4o-mini-realtime-preview-2024-12-17';
+    | 'gpt-4o-mini-realtime-preview-2024-12-17'
+    | 'gpt-realtime-mini'
+    | 'gpt-realtime-mini-2025-10-06'
+    | 'gpt-audio-mini'
+    | 'gpt-audio-mini-2025-10-06';
 
   /**
    * The object type. Always `realtime.session`.
@@ -2863,7 +2903,11 @@ export namespace RealtimeSession {
 
     /**
      * Whether or not to automatically generate a response when a VAD stop event
-     * occurs.
+     * occurs. If `interrupt_response` is set to `false` this may fail to create a
+     * response if the model is already responding.
+     *
+     * If both `create_response` and `interrupt_response` are set to `false`, the model
+     * will never respond automatically but VAD events will still be emitted.
      */
     create_response?: boolean;
 
@@ -2884,9 +2928,13 @@ export namespace RealtimeSession {
     idle_timeout_ms?: number | null;
 
     /**
-     * Whether or not to automatically interrupt any ongoing response with output to
-     * the default conversation (i.e. `conversation` of `auto`) when a VAD start event
-     * occurs.
+     * Whether or not to automatically interrupt (cancel) any ongoing response with
+     * output to the default conversation (i.e. `conversation` of `auto`) when a VAD
+     * start event occurs. If `true` then the response will be cancelled, otherwise it
+     * will continue until complete.
+     *
+     * If both `create_response` and `interrupt_response` are set to `false`, the model
+     * will never respond automatically but VAD events will still be emitted.
      */
     interrupt_response?: boolean;
 
@@ -3000,7 +3048,11 @@ export interface RealtimeSessionCreateRequest {
     | 'gpt-4o-realtime-preview-2024-12-17'
     | 'gpt-4o-realtime-preview-2025-06-03'
     | 'gpt-4o-mini-realtime-preview'
-    | 'gpt-4o-mini-realtime-preview-2024-12-17';
+    | 'gpt-4o-mini-realtime-preview-2024-12-17'
+    | 'gpt-realtime-mini'
+    | 'gpt-realtime-mini-2025-10-06'
+    | 'gpt-audio-mini'
+    | 'gpt-audio-mini-2025-10-06';
 
   /**
    * The set of modalities the model can respond with. It defaults to `["audio"]`,
@@ -3038,8 +3090,24 @@ export interface RealtimeSessionCreateRequest {
   tracing?: RealtimeTracingConfig | null;
 
   /**
-   * Controls how the realtime conversation is truncated prior to model inference.
-   * The default is `auto`.
+   * When the number of tokens in a conversation exceeds the model's input token
+   * limit, the conversation be truncated, meaning messages (starting from the
+   * oldest) will not be included in the model's context. A 32k context model with
+   * 4,096 max output tokens can only include 28,224 tokens in the context before
+   * truncation occurs.
+   *
+   * Clients can configure truncation behavior to truncate with a lower max token
+   * limit, which is an effective way to control token usage and cost.
+   *
+   * Truncation will reduce the number of cached tokens on the next turn (busting the
+   * cache), since messages are dropped from the beginning of the context. However,
+   * clients can also configure truncation to retain messages up to a fraction of the
+   * maximum context size, which will reduce the need for future truncations and thus
+   * improve the cache rate.
+   *
+   * Truncation can be disabled entirely, which means the server will never truncate
+   * but would instead return an error if the conversation exceeds the model's input
+   * token limit.
    */
   truncation?: RealtimeTruncation;
 }
@@ -3356,7 +3424,11 @@ export namespace RealtimeTranscriptionSessionAudioInputTurnDetection {
 
     /**
      * Whether or not to automatically generate a response when a VAD stop event
-     * occurs.
+     * occurs. If `interrupt_response` is set to `false` this may fail to create a
+     * response if the model is already responding.
+     *
+     * If both `create_response` and `interrupt_response` are set to `false`, the model
+     * will never respond automatically but VAD events will still be emitted.
      */
     create_response?: boolean;
 
@@ -3377,9 +3449,13 @@ export namespace RealtimeTranscriptionSessionAudioInputTurnDetection {
     idle_timeout_ms?: number | null;
 
     /**
-     * Whether or not to automatically interrupt any ongoing response with output to
-     * the default conversation (i.e. `conversation` of `auto`) when a VAD start event
-     * occurs.
+     * Whether or not to automatically interrupt (cancel) any ongoing response with
+     * output to the default conversation (i.e. `conversation` of `auto`) when a VAD
+     * start event occurs. If `true` then the response will be cancelled, otherwise it
+     * will continue until complete.
+     *
+     * If both `create_response` and `interrupt_response` are set to `false`, the model
+     * will never respond automatically but VAD events will still be emitted.
      */
     interrupt_response?: boolean;
 
@@ -3462,8 +3538,24 @@ export interface RealtimeTranscriptionSessionCreateRequest {
 }
 
 /**
- * Controls how the realtime conversation is truncated prior to model inference.
- * The default is `auto`.
+ * When the number of tokens in a conversation exceeds the model's input token
+ * limit, the conversation be truncated, meaning messages (starting from the
+ * oldest) will not be included in the model's context. A 32k context model with
+ * 4,096 max output tokens can only include 28,224 tokens in the context before
+ * truncation occurs.
+ *
+ * Clients can configure truncation behavior to truncate with a lower max token
+ * limit, which is an effective way to control token usage and cost.
+ *
+ * Truncation will reduce the number of cached tokens on the next turn (busting the
+ * cache), since messages are dropped from the beginning of the context. However,
+ * clients can also configure truncation to retain messages up to a fraction of the
+ * maximum context size, which will reduce the need for future truncations and thus
+ * improve the cache rate.
+ *
+ * Truncation can be disabled entirely, which means the server will never truncate
+ * but would instead return an error if the conversation exceeds the model's input
+ * token limit.
  */
 export type RealtimeTruncation = 'auto' | 'disabled' | RealtimeTruncationRetentionRatio;
 
@@ -3474,8 +3566,10 @@ export type RealtimeTruncation = 'auto' | 'disabled' | RealtimeTruncationRetenti
  */
 export interface RealtimeTruncationRetentionRatio {
   /**
-   * Fraction of post-instruction conversation tokens to retain (0.0 - 1.0) when the
-   * conversation exceeds the input token limit.
+   * Fraction of post-instruction conversation tokens to retain (`0.0` - `1.0`) when
+   * the conversation exceeds the input token limit. Setting this to `0.8` means that
+   * messages will be dropped until 80% of the maximum allowed tokens are used. This
+   * helps reduce the frequency of truncations and improve cache rates.
    */
   retention_ratio: number;
 
@@ -3483,6 +3577,29 @@ export interface RealtimeTruncationRetentionRatio {
    * Use retention ratio truncation.
    */
   type: 'retention_ratio';
+
+  /**
+   * Optional custom token limits for this truncation strategy. If not provided, the
+   * model's default token limits will be used.
+   */
+  token_limits?: RealtimeTruncationRetentionRatio.TokenLimits;
+}
+
+export namespace RealtimeTruncationRetentionRatio {
+  /**
+   * Optional custom token limits for this truncation strategy. If not provided, the
+   * model's default token limits will be used.
+   */
+  export interface TokenLimits {
+    /**
+     * Maximum tokens allowed in the conversation after instructions (which including
+     * tool definitions). For example, setting this to 5,000 would mean that truncation
+     * would occur when the conversation exceeds 5,000 tokens after instructions. This
+     * cannot be higher than the model's context window size minus the maximum output
+     * tokens.
+     */
+    post_instructions?: number;
+  }
 }
 
 /**
@@ -4580,6 +4697,7 @@ export namespace TranscriptionSessionUpdatedEvent {
 }
 
 Realtime.ClientSecrets = ClientSecrets;
+Realtime.Calls = Calls;
 
 export declare namespace Realtime {
   export {
@@ -4605,6 +4723,7 @@ export declare namespace Realtime {
     type InputAudioBufferClearedEvent as InputAudioBufferClearedEvent,
     type InputAudioBufferCommitEvent as InputAudioBufferCommitEvent,
     type InputAudioBufferCommittedEvent as InputAudioBufferCommittedEvent,
+    type InputAudioBufferDtmfEventReceivedEvent as InputAudioBufferDtmfEventReceivedEvent,
     type InputAudioBufferSpeechStartedEvent as InputAudioBufferSpeechStartedEvent,
     type InputAudioBufferSpeechStoppedEvent as InputAudioBufferSpeechStoppedEvent,
     type InputAudioBufferTimeoutTriggered as InputAudioBufferTimeoutTriggered,
@@ -4693,5 +4812,12 @@ export declare namespace Realtime {
     type RealtimeTranscriptionSessionTurnDetection as RealtimeTranscriptionSessionTurnDetection,
     type ClientSecretCreateResponse as ClientSecretCreateResponse,
     type ClientSecretCreateParams as ClientSecretCreateParams,
+  };
+
+  export {
+    Calls as Calls,
+    type CallAcceptParams as CallAcceptParams,
+    type CallReferParams as CallReferParams,
+    type CallRejectParams as CallRejectParams,
   };
 }

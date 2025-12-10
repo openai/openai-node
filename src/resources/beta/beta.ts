@@ -73,6 +73,8 @@ import {
   TranscriptionSessionUpdate,
   TranscriptionSessionUpdatedEvent,
 } from './realtime/realtime';
+import * as ChatKitAPI from './chatkit/chatkit';
+import { ChatKit, ChatKitWorkflow } from './chatkit/chatkit';
 import * as ThreadsAPI from './threads/threads';
 import {
   AssistantResponseFormatOption,
@@ -93,11 +95,13 @@ import {
 
 export class Beta extends APIResource {
   realtime: RealtimeAPI.Realtime = new RealtimeAPI.Realtime(this._client);
+  chatkit: ChatKitAPI.ChatKit = new ChatKitAPI.ChatKit(this._client);
   assistants: AssistantsAPI.Assistants = new AssistantsAPI.Assistants(this._client);
   threads: ThreadsAPI.Threads = new ThreadsAPI.Threads(this._client);
 }
 
 Beta.Realtime = Realtime;
+Beta.ChatKit = ChatKit;
 Beta.Assistants = Assistants;
 Beta.Threads = Threads;
 
@@ -153,6 +157,8 @@ export declare namespace Beta {
     type SessionUpdatedEvent as SessionUpdatedEvent,
     type TranscriptionSessionUpdate as TranscriptionSessionUpdate,
     type TranscriptionSessionUpdatedEvent as TranscriptionSessionUpdatedEvent,
+    ChatKit as ChatKit,
+    type ChatKitWorkflow as ChatKitWorkflow,
   };
 
   export {

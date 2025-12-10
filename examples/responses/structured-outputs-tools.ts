@@ -2,7 +2,7 @@
 
 import { OpenAI } from 'openai';
 import { zodResponsesFunction } from 'openai/helpers/zod';
-import { z } from 'zod';
+import { z } from 'zod/v4'; // Also works for 'zod/v3'
 
 const Table = z.enum(['orders', 'customers', 'products']);
 const Column = z.enum([

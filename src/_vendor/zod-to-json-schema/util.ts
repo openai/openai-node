@@ -1,4 +1,4 @@
-import type { ZodSchema, ZodTypeDef } from 'zod';
+import type { ZodSchema, ZodTypeDef } from 'zod/v3';
 
 export const zodDef = (zodSchema: ZodSchema | ZodTypeDef): ZodTypeDef => {
   return '_def' in zodSchema ? zodSchema._def : zodSchema;

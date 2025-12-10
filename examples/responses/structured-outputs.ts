@@ -2,7 +2,7 @@
 
 import { OpenAI } from 'openai';
 import { zodTextFormat } from 'openai/helpers/zod';
-import { z } from 'zod';
+import { z } from 'zod/v4'; // Also works for 'zod/v3'
 
 const Step = z.object({
   explanation: z.string(),

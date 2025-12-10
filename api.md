@@ -156,11 +156,14 @@ Types:
 Types:
 
 - <code><a href="./src/resources/audio/transcriptions.ts">Transcription</a></code>
+- <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionDiarized</a></code>
+- <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionDiarizedSegment</a></code>
 - <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionInclude</a></code>
 - <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionSegment</a></code>
 - <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionStreamEvent</a></code>
 - <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionTextDeltaEvent</a></code>
 - <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionTextDoneEvent</a></code>
+- <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionTextSegmentEvent</a></code>
 - <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionVerbose</a></code>
 - <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionWord</a></code>
 - <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionCreateResponse</a></code>
@@ -469,6 +472,49 @@ Types:
 Methods:
 
 - <code title="post /realtime/transcription_sessions">client.beta.realtime.transcriptionSessions.<a href="./src/resources/beta/realtime/transcription-sessions.ts">create</a>({ ...params }) -> TranscriptionSession</code>
+## ChatKit
+
+Types:
+
+- <code><a href="./src/resources/beta/chatkit/chatkit.ts">ChatKitWorkflow</a></code>
+
+### Sessions
+
+Methods:
+
+- <code title="post /chatkit/sessions">client.beta.chatkit.sessions.<a href="./src/resources/beta/chatkit/sessions.ts">create</a>({ ...params }) -> ChatSession</code>
+- <code title="post /chatkit/sessions/{session_id}/cancel">client.beta.chatkit.sessions.<a href="./src/resources/beta/chatkit/sessions.ts">cancel</a>(sessionID) -> ChatSession</code>
+
+### Threads
+
+Types:
+
+- <code><a href="./src/resources/beta/chatkit/threads.ts">ChatSession</a></code>
+- <code><a href="./src/resources/beta/chatkit/threads.ts">ChatSessionAutomaticThreadTitling</a></code>
+- <code><a href="./src/resources/beta/chatkit/threads.ts">ChatSessionChatKitConfiguration</a></code>
+- <code><a href="./src/resources/beta/chatkit/threads.ts">ChatSessionChatKitConfigurationParam</a></code>
+- <code><a href="./src/resources/beta/chatkit/threads.ts">ChatSessionExpiresAfterParam</a></code>
+- <code><a href="./src/resources/beta/chatkit/threads.ts">ChatSessionFileUpload</a></code>
+- <code><a href="./src/resources/beta/chatkit/threads.ts">ChatSessionHistory</a></code>
+- <code><a href="./src/resources/beta/chatkit/threads.ts">ChatSessionRateLimits</a></code>
+- <code><a href="./src/resources/beta/chatkit/threads.ts">ChatSessionRateLimitsParam</a></code>
+- <code><a href="./src/resources/beta/chatkit/threads.ts">ChatSessionStatus</a></code>
+- <code><a href="./src/resources/beta/chatkit/threads.ts">ChatSessionWorkflowParam</a></code>
+- <code><a href="./src/resources/beta/chatkit/threads.ts">ChatKitAttachment</a></code>
+- <code><a href="./src/resources/beta/chatkit/threads.ts">ChatKitResponseOutputText</a></code>
+- <code><a href="./src/resources/beta/chatkit/threads.ts">ChatKitThread</a></code>
+- <code><a href="./src/resources/beta/chatkit/threads.ts">ChatKitThreadAssistantMessageItem</a></code>
+- <code><a href="./src/resources/beta/chatkit/threads.ts">ChatKitThreadItemList</a></code>
+- <code><a href="./src/resources/beta/chatkit/threads.ts">ChatKitThreadUserMessageItem</a></code>
+- <code><a href="./src/resources/beta/chatkit/threads.ts">ChatKitWidgetItem</a></code>
+- <code><a href="./src/resources/beta/chatkit/threads.ts">ThreadDeleteResponse</a></code>
+
+Methods:
+
+- <code title="get /chatkit/threads/{thread_id}">client.beta.chatkit.threads.<a href="./src/resources/beta/chatkit/threads.ts">retrieve</a>(threadID) -> ChatKitThread</code>
+- <code title="get /chatkit/threads">client.beta.chatkit.threads.<a href="./src/resources/beta/chatkit/threads.ts">list</a>({ ...params }) -> ChatKitThreadsPage</code>
+- <code title="delete /chatkit/threads/{thread_id}">client.beta.chatkit.threads.<a href="./src/resources/beta/chatkit/threads.ts">delete</a>(threadID) -> ThreadDeleteResponse</code>
+- <code title="get /chatkit/threads/{thread_id}/items">client.beta.chatkit.threads.<a href="./src/resources/beta/chatkit/threads.ts">listItems</a>(threadID, { ...params }) -> ChatKitThreadItemListDataPage</code>
 
 ## Assistants
 
@@ -614,6 +660,7 @@ Types:
 - <code><a href="./src/resources/batches.ts">Batch</a></code>
 - <code><a href="./src/resources/batches.ts">BatchError</a></code>
 - <code><a href="./src/resources/batches.ts">BatchRequestCounts</a></code>
+- <code><a href="./src/resources/batches.ts">BatchUsage</a></code>
 
 Methods:
 
@@ -648,12 +695,17 @@ Methods:
 
 Types:
 
+- <code><a href="./src/resources/responses/responses.ts">ApplyPatchTool</a></code>
+- <code><a href="./src/resources/responses/responses.ts">CompactedResponse</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ComputerTool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">CustomTool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">EasyInputMessage</a></code>
 - <code><a href="./src/resources/responses/responses.ts">FileSearchTool</a></code>
+- <code><a href="./src/resources/responses/responses.ts">FunctionShellTool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">FunctionTool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">Response</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseApplyPatchToolCall</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseApplyPatchToolCallOutput</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseAudioDeltaEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseAudioDoneEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseAudioTranscriptDeltaEvent</a></code>
@@ -664,6 +716,8 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponseCodeInterpreterCallInProgressEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseCodeInterpreterCallInterpretingEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseCodeInterpreterToolCall</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseCompactionItem</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseCompactionItemParam</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseCompletedEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseComputerToolCall</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseComputerToolCallOutputItem</a></code>
@@ -688,6 +742,11 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponseFormatTextJSONSchemaConfig</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseFunctionCallArgumentsDeltaEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseFunctionCallArgumentsDoneEvent</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseFunctionCallOutputItem</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseFunctionCallOutputItemList</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseFunctionShellCallOutputContent</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseFunctionShellToolCall</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseFunctionShellToolCallOutput</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseFunctionToolCall</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseFunctionToolCallItem</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseFunctionToolCallOutputItem</a></code>
@@ -703,11 +762,14 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponseInputAudio</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseInputContent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseInputFile</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseInputFileContent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseInputImage</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseInputImageContent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseInputItem</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseInputMessageContentList</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseInputMessageItem</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseInputText</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseInputTextContent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseItem</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseMcpCallArgumentsDeltaEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseMcpCallArgumentsDoneEvent</a></code>
@@ -747,10 +809,12 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponseWebSearchCallSearchingEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">Tool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ToolChoiceAllowed</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ToolChoiceApplyPatch</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ToolChoiceCustom</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ToolChoiceFunction</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ToolChoiceMcp</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ToolChoiceOptions</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ToolChoiceShell</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ToolChoiceTypes</a></code>
 - <code><a href="./src/resources/responses/responses.ts">WebSearchPreviewTool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">WebSearchTool</a></code>
@@ -761,6 +825,7 @@ Methods:
 - <code title="get /responses/{response_id}">client.responses.<a href="./src/resources/responses/responses.ts">retrieve</a>(responseID, { ...params }) -> Response</code>
 - <code title="delete /responses/{response_id}">client.responses.<a href="./src/resources/responses/responses.ts">delete</a>(responseID) -> void</code>
 - <code title="post /responses/{response_id}/cancel">client.responses.<a href="./src/resources/responses/responses.ts">cancel</a>(responseID) -> Response</code>
+- <code title="post /responses/compact">client.responses.<a href="./src/resources/responses/responses.ts">compact</a>({ ...params }) -> CompactedResponse</code>
 
 ## InputItems
 
@@ -771,6 +836,16 @@ Types:
 Methods:
 
 - <code title="get /responses/{response_id}/input_items">client.responses.inputItems.<a href="./src/resources/responses/input-items.ts">list</a>(responseID, { ...params }) -> ResponseItemsPage</code>
+
+## InputTokens
+
+Types:
+
+- <code><a href="./src/resources/responses/input-tokens.ts">InputTokenCountResponse</a></code>
+
+Methods:
+
+- <code title="post /responses/input_tokens">client.responses.inputTokens.<a href="./src/resources/responses/input-tokens.ts">count</a>({ ...params }) -> InputTokenCountResponse</code>
 
 # Realtime
 
@@ -798,6 +873,7 @@ Types:
 - <code><a href="./src/resources/realtime/realtime.ts">InputAudioBufferClearedEvent</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">InputAudioBufferCommitEvent</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">InputAudioBufferCommittedEvent</a></code>
+- <code><a href="./src/resources/realtime/realtime.ts">InputAudioBufferDtmfEventReceivedEvent</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">InputAudioBufferSpeechStartedEvent</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">InputAudioBufferSpeechStoppedEvent</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">InputAudioBufferTimeoutTriggered</a></code>
@@ -890,6 +966,15 @@ Types:
 Methods:
 
 - <code title="post /realtime/client_secrets">client.realtime.clientSecrets.<a href="./src/resources/realtime/client-secrets.ts">create</a>({ ...params }) -> ClientSecretCreateResponse</code>
+
+## Calls
+
+Methods:
+
+- <code title="post /realtime/calls/{call_id}/accept">client.realtime.calls.<a href="./src/resources/realtime/calls.ts">accept</a>(callID, { ...params }) -> void</code>
+- <code title="post /realtime/calls/{call_id}/hangup">client.realtime.calls.<a href="./src/resources/realtime/calls.ts">hangup</a>(callID) -> void</code>
+- <code title="post /realtime/calls/{call_id}/refer">client.realtime.calls.<a href="./src/resources/realtime/calls.ts">refer</a>(callID, { ...params }) -> void</code>
+- <code title="post /realtime/calls/{call_id}/reject">client.realtime.calls.<a href="./src/resources/realtime/calls.ts">reject</a>(callID, { ...params }) -> void</code>
 
 # Conversations
 
@@ -1017,3 +1102,23 @@ Methods:
 Methods:
 
 - <code title="get /containers/{container_id}/files/{file_id}/content">client.containers.files.content.<a href="./src/resources/containers/files/content.ts">retrieve</a>(fileID, { ...params }) -> Response</code>
+
+# Videos
+
+Types:
+
+- <code><a href="./src/resources/videos.ts">Video</a></code>
+- <code><a href="./src/resources/videos.ts">VideoCreateError</a></code>
+- <code><a href="./src/resources/videos.ts">VideoModel</a></code>
+- <code><a href="./src/resources/videos.ts">VideoSeconds</a></code>
+- <code><a href="./src/resources/videos.ts">VideoSize</a></code>
+- <code><a href="./src/resources/videos.ts">VideoDeleteResponse</a></code>
+
+Methods:
+
+- <code title="post /videos">client.videos.<a href="./src/resources/videos.ts">create</a>({ ...params }) -> Video</code>
+- <code title="get /videos/{video_id}">client.videos.<a href="./src/resources/videos.ts">retrieve</a>(videoID) -> Video</code>
+- <code title="get /videos">client.videos.<a href="./src/resources/videos.ts">list</a>({ ...params }) -> VideosPage</code>
+- <code title="delete /videos/{video_id}">client.videos.<a href="./src/resources/videos.ts">delete</a>(videoID) -> VideoDeleteResponse</code>
+- <code title="get /videos/{video_id}/content">client.videos.<a href="./src/resources/videos.ts">downloadContent</a>(videoID, { ...params }) -> Response</code>
+- <code title="post /videos/{video_id}/remix">client.videos.<a href="./src/resources/videos.ts">remix</a>(videoID, { ...params }) -> Video</code>

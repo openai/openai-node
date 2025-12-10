@@ -32,6 +32,7 @@ import {
   BatchError,
   BatchListParams,
   BatchRequestCounts,
+  BatchUsage,
   Batches,
   BatchesPage,
 } from './resources/batches';
@@ -91,6 +92,20 @@ import {
   ModerationTextInput,
   Moderations,
 } from './resources/moderations';
+import {
+  Video,
+  VideoCreateError,
+  VideoCreateParams,
+  VideoDeleteResponse,
+  VideoDownloadContentParams,
+  VideoListParams,
+  VideoModel,
+  VideoRemixParams,
+  VideoSeconds,
+  VideoSize,
+  Videos,
+  VideosPage,
+} from './resources/videos';
 import { Webhooks } from './resources/webhooks';
 import { Audio, AudioModel, AudioResponseFormat } from './resources/audio/audio';
 import { Beta } from './resources/beta/beta';
@@ -324,7 +339,7 @@ export class OpenAI {
   baseURL: string;
   maxRetries: number;
   timeout: number;
-  logger: Logger | undefined;
+  logger: Logger;
   logLevel: LogLevel | undefined;
   fetchOptions: MergedRequestInit | undefined;
 
@@ -1003,6 +1018,7 @@ export class OpenAI {
   conversations: API.Conversations = new API.Conversations(this);
   evals: API.Evals = new API.Evals(this);
   containers: API.Containers = new API.Containers(this);
+  videos: API.Videos = new API.Videos(this);
 }
 
 OpenAI.Completions = Completions;
@@ -1025,6 +1041,7 @@ OpenAI.Realtime = Realtime;
 OpenAI.Conversations = Conversations;
 OpenAI.Evals = Evals;
 OpenAI.Containers = Containers;
+OpenAI.Videos = Videos;
 
 export declare namespace OpenAI {
   export type RequestOptions = Opts.RequestOptions;
@@ -1190,6 +1207,7 @@ export declare namespace OpenAI {
     type Batch as Batch,
     type BatchError as BatchError,
     type BatchRequestCounts as BatchRequestCounts,
+    type BatchUsage as BatchUsage,
     type BatchesPage as BatchesPage,
     type BatchCreateParams as BatchCreateParams,
     type BatchListParams as BatchListParams,
@@ -1231,6 +1249,21 @@ export declare namespace OpenAI {
     type ContainerListResponsesPage as ContainerListResponsesPage,
     type ContainerCreateParams as ContainerCreateParams,
     type ContainerListParams as ContainerListParams,
+  };
+
+  export {
+    Videos as Videos,
+    type Video as Video,
+    type VideoCreateError as VideoCreateError,
+    type VideoModel as VideoModel,
+    type VideoSeconds as VideoSeconds,
+    type VideoSize as VideoSize,
+    type VideoDeleteResponse as VideoDeleteResponse,
+    type VideosPage as VideosPage,
+    type VideoCreateParams as VideoCreateParams,
+    type VideoListParams as VideoListParams,
+    type VideoDownloadContentParams as VideoDownloadContentParams,
+    type VideoRemixParams as VideoRemixParams,
   };
 
   export type AllModels = API.AllModels;
