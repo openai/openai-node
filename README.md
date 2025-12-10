@@ -280,25 +280,29 @@ For more information see [realtime.md](realtime.md).
 
 ## Microsoft Azure OpenAI
 
-To use this library with [Azure OpenAI](https://learn.microsoft.com/azure/ai-services/openai/overview), use the `AzureOpenAI`
-class instead of the `OpenAI` class.
+To use this library with [Azure OpenAI](https://learn.microsoft.com/azure/ai-services/openai/overview), use the `OpenAI` class and set `baseURL` to your Azure resource endpoint with the `/openai/v1` suffix (for example, `https://<resource>.openai.azure.com/openai/v1`).
 
 > [!IMPORTANT]
-> The Azure API shape slightly differs from the core API shape which means that the static types for responses / params
-> won't always be correct.
+> You must append `/openai/v1` to your Azure resource endpoint. Calls made to the root endpoint (without `/openai/v1`) will fail.
+
+> [!NOTE]
+> In Azure, the `model` parameter must be the name of your deployment (not the base model ID like `gpt-4o`). Create and deploy the model in your Azure OpenAI resource first, then use that deployment name in requests.
+
 
 ```ts
-import { AzureOpenAI } from 'openai';
+import { OpenAI } from 'openai';
 import { getBearerTokenProvider, DefaultAzureCredential } from '@azure/identity';
 
+const deployment = '<your-deployment-name>';
+const baseURL = process.env?.['AZURE_OPENAI_ENDPOINT'];
 const credential = new DefaultAzureCredential();
 const scope = 'https://cognitiveservices.azure.com/.default';
-const azureADTokenProvider = getBearerTokenProvider(credential, scope);
+const apiKey = getBearerTokenProvider(credential, scope);
 
-const openai = new AzureOpenAI({ azureADTokenProvider });
+const openai = new OpenAI({ baseURL: baseURL + '/openai/v1', apiKey });
 
 const result = await openai.chat.completions.create({
-  model: 'gpt-4o',
+  model: deployment,
   messages: [{ role: 'user', content: 'Say hello!' }],
 });
 
@@ -414,38 +418,6 @@ rt.on('response.text.delta', (event) => process.stdout.write(event.delta));
 ```
 
 For more information see [realtime.md](realtime.md).
-
-## Microsoft Azure OpenAI
-
-To use this library with [Azure OpenAI](https://learn.microsoft.com/azure/ai-services/openai/overview), use the `AzureOpenAI`
-class instead of the `OpenAI` class.
-
-> [!IMPORTANT]
-> The Azure API shape slightly differs from the core API shape which means that the static types for responses / params
-> won't always be correct.
-
-```ts
-import { AzureOpenAI } from 'openai';
-import { getBearerTokenProvider, DefaultAzureCredential } from '@azure/identity';
-
-const credential = new DefaultAzureCredential();
-const scope = 'https://cognitiveservices.azure.com/.default';
-const azureADTokenProvider = getBearerTokenProvider(credential, scope);
-
-const openai = new AzureOpenAI({
-  azureADTokenProvider,
-  apiVersion: '<The API version, e.g. 2024-10-01-preview>',
-});
-
-const result = await openai.chat.completions.create({
-  model: 'gpt-4o',
-  messages: [{ role: 'user', content: 'Say hello!' }],
-});
-
-console.log(result.choices[0]!.message?.content);
-```
-
-For more information on support for the Azure API, see [azure.md](azure.md).
 
 ## Advanced Usage
 
