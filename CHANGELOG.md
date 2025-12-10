@@ -1,5 +1,25 @@
 # Changelog
 
+## 6.11.0 (2025-12-10)
+
+Full Changelog: [v6.10.0...v6.11.0](https://github.com/openai/openai-node/compare/v6.10.0...v6.11.0)
+
+### Features
+
+* **api:** make model required for the responses/compact endpoint ([0b52b12](https://github.com/openai/openai-node/commit/0b52b12e535b07ef3b1213892ccb50dc4030ecf4))
+
+
+### Bug Fixes
+
+* **mcp:** correct code tool API endpoint ([e3f2a33](https://github.com/openai/openai-node/commit/e3f2a33bc7ae941d0870e7bc0a333951e88925e2))
+* **mcp:** return correct lines on typescript errors ([f485c3c](https://github.com/openai/openai-node/commit/f485c3c36ebb3cb9c2dbff676872a5470d1a9e47))
+
+
+### Chores
+
+* **internal:** codegen related update ([5af1c38](https://github.com/openai/openai-node/commit/5af1c38043118fd8e6f0fd072243bc63660963e4))
+* **internal:** codegen related update ([e43a8d9](https://github.com/openai/openai-node/commit/e43a8d97fd3e9be7c6ae0ebaf6e85d68dbb33432))
+
 ## 6.10.0 (2025-12-04)
 
 Full Changelog: [v6.9.1...v6.10.0](https://github.com/openai/openai-node/compare/v6.9.1...v6.10.0)
