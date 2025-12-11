@@ -14,6 +14,7 @@ import { AutoParseableResponseTool, makeParseableResponseTool } from '../lib/Res
 import { type ResponseFormatTextJSONSchemaConfig } from '../resources/responses/responses';
 import { toStrictJsonSchema } from '../lib/transform';
 import { JSONSchema } from '../lib/jsonschema';
+import { transformJSONSchema } from '../lib/transform-json-schema';
 
 type InferZodType<T> =
   T extends z4.ZodType ? z4.infer<T>
@@ -21,21 +22,25 @@ type InferZodType<T> =
   : never;
 
 function zodV3ToJsonSchema(schema: z3.ZodType, options: { name: string }): Record<string, unknown> {
-  return _zodToJsonSchema(schema, {
-    openaiStrictMode: true,
-    name: options.name,
-    nameStrategy: 'duplicate-ref',
-    $refStrategy: 'extract-to-root',
-    nullableStrategy: 'property',
-  });
+  return transformJSONSchema(
+    _zodToJsonSchema(schema, {
+      openaiStrictMode: true,
+      name: options.name,
+      nameStrategy: 'duplicate-ref',
+      $refStrategy: 'extract-to-root',
+      nullableStrategy: 'property',
+    }),
+  );
 }
 
 function zodV4ToJsonSchema(schema: z4.ZodType): Record<string, unknown> {
-  return toStrictJsonSchema(
-    z4.toJSONSchema(schema, {
-      target: 'draft-7',
-    }) as JSONSchema,
-  ) as Record<string, unknown>;
+  return transformJSONSchema(
+    toStrictJsonSchema(
+      z4.toJSONSchema(schema, {
+        target: 'draft-7',
+      }) as JSONSchema,
+    ) as Record<string, unknown>,
+  );
 }
 
 function isZodV4(zodObject: z3.ZodType | z4.ZodType): zodObject is z4.ZodType {
