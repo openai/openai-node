@@ -19,6 +19,11 @@ export type AllModels =
   | 'gpt-5.1-codex-max';
 
 export type ChatModel =
+  | 'gpt-5.2'
+  | 'gpt-5.2-2025-12-11'
+  | 'gpt-5.2-chat-latest'
+  | 'gpt-5.2-pro'
+  | 'gpt-5.2-pro-2025-12-11'
   | 'gpt-5.1'
   | 'gpt-5.1-2025-11-13'
   | 'gpt-5.1-codex'
@@ -257,7 +262,7 @@ export interface Reasoning {
    * - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
    *   support `none`.
    * - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
-   * - `xhigh` is currently only supported for `gpt-5.1-codex-max`.
+   * - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
    */
   effort?: ReasoningEffort | null;
 
@@ -275,7 +280,8 @@ export interface Reasoning {
    * debugging and understanding the model's reasoning process. One of `auto`,
    * `concise`, or `detailed`.
    *
-   * `concise` is only supported for `computer-use-preview` models.
+   * `concise` is supported for `computer-use-preview` models and all reasoning
+   * models after `gpt-5`.
    */
   summary?: 'auto' | 'concise' | 'detailed' | null;
 }
@@ -293,7 +299,7 @@ export interface Reasoning {
  * - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
  *   support `none`.
  * - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
- * - `xhigh` is currently only supported for `gpt-5.1-codex-max`.
+ * - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
  */
 export type ReasoningEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | null;
 
