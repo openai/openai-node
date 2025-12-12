@@ -130,7 +130,7 @@ export class AzureOpenAI extends OpenAI {
         throw new Error('Expected request body to be an object');
       }
       const model = this.deploymentName || options.body['model'] || options.__metadata?.['model'];
-      if (model !== undefined && !this.baseURL.includes('/deployments')) {
+      if (model !== undefined && !this.baseURL.includes('/deployments') && !this.baseURL.includes('/v1')) {
         options.path = `/deployments/${model}${options.path}`;
       }
     }
