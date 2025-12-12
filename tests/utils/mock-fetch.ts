@@ -1,4 +1,5 @@
 import { type Fetch, type RequestInfo, type RequestInit, type Response } from 'openai/internal/builtin-types';
+import { PassThrough } from 'stream';
 
 /**
  * Creates a mock `fetch` function and a `handleRequest` function for intercepting `fetch` calls.
@@ -9,7 +10,12 @@ import { type Fetch, type RequestInfo, type RequestInit, type Response } from 'o
  * - calls the callback with the `fetch` arguments
  * - resolves `fetch` with the callback output
  */
-export function mockFetch(): { fetch: Fetch; handleRequest: (handle: Fetch) => Promise<void> } {
+export function mockFetch(): {
+  fetch: Fetch;
+  handleRequest: (handle: Fetch) => void;
+  handleStreamEvents: (events: any[]) => void;
+  handleMessageStreamEvents: (iter: AsyncIterable<any>) => void;
+} {
   const fetchQueue: ((handler: typeof fetch) => void)[] = [];
   const handlerQueue: Promise<typeof fetch>[] = [];
 
@@ -61,5 +67,43 @@ export function mockFetch(): { fetch: Fetch; handleRequest: (handle: Fetch) => P
     });
   }
 
-  return { fetch, handleRequest };
+  function handleStreamEvents(events: any[]) {
+    handleRequest(async () => {
+      const stream = new PassThrough();
+      (async () => {
+        for (const event of events) {
+          stream.write(`event: ${event.type}\n`);
+          stream.write(`data: ${JSON.stringify(event)}\n\n`);
+        }
+        stream.end(`\n`);
+      })();
+      return new Response(stream, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Transfer-Encoding': 'chunked',
+        },
+      });
+    });
+  }
+
+  function handleMessageStreamEvents(iter: AsyncIterable<any>) {
+    handleRequest(async () => {
+      const stream = new PassThrough();
+      (async () => {
+        for await (const chunk of iter) {
+          stream.write(`event: ${chunk.type}\n`);
+          stream.write(`data: ${JSON.stringify(chunk)}\n\n`);
+        }
+        stream.end(`\n`);
+      })();
+      return new Response(stream, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Transfer-Encoding': 'chunked',
+        },
+      });
+    });
+  }
+
+  return { fetch: fetch as any, handleRequest, handleStreamEvents, handleMessageStreamEvents };
 }
