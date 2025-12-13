@@ -1,10 +1,61 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../core/resource';
+import * as GraderModelsAPI from './grader-models';
 import * as Shared from '../shared';
 import * as ResponsesAPI from '../responses/responses';
 
 export class GraderModels extends APIResource {}
+
+/**
+ * A list of inputs, each of which may be either an input text, output text, input
+ * image, or input audio object.
+ */
+export type GraderInputs = Array<
+  | string
+  | ResponsesAPI.ResponseInputText
+  | GraderInputs.OutputText
+  | GraderInputs.InputImage
+  | ResponsesAPI.ResponseInputAudio
+>;
+
+export namespace GraderInputs {
+  /**
+   * A text output from the model.
+   */
+  export interface OutputText {
+    /**
+     * The text output from the model.
+     */
+    text: string;
+
+    /**
+     * The type of the output text. Always `output_text`.
+     */
+    type: 'output_text';
+  }
+
+  /**
+   * An image input block used within EvalItem content arrays.
+   */
+  export interface InputImage {
+    /**
+     * The URL of the image input.
+     */
+    image_url: string;
+
+    /**
+     * The type of the image input. Always `input_image`.
+     */
+    type: 'input_image';
+
+    /**
+     * The detail level of the image to be sent to the model. One of `high`, `low`, or
+     * `auto`. Defaults to `auto`.
+     */
+    detail?: string;
+  }
+}
 
 /**
  * A LabelModelGrader object which uses a model to assign labels to each item in
@@ -49,7 +100,8 @@ export namespace LabelModelGrader {
    */
   export interface Input {
     /**
-     * Inputs to the model - can contain template strings.
+     * Inputs to the model - can contain template strings. Supports text, output text,
+     * input images, and input audio, either as a single item or an array of items.
      */
     content:
       | string
@@ -57,7 +109,7 @@ export namespace LabelModelGrader {
       | Input.OutputText
       | Input.InputImage
       | ResponsesAPI.ResponseInputAudio
-      | Array<unknown>;
+      | GraderModelsAPI.GraderInputs;
 
     /**
      * The role of the message input. One of `user`, `assistant`, `system`, or
@@ -88,7 +140,7 @@ export namespace LabelModelGrader {
     }
 
     /**
-     * An image input to the model.
+     * An image input block used within EvalItem content arrays.
      */
     export interface InputImage {
       /**
@@ -208,7 +260,8 @@ export namespace ScoreModelGrader {
    */
   export interface Input {
     /**
-     * Inputs to the model - can contain template strings.
+     * Inputs to the model - can contain template strings. Supports text, output text,
+     * input images, and input audio, either as a single item or an array of items.
      */
     content:
       | string
@@ -216,7 +269,7 @@ export namespace ScoreModelGrader {
       | Input.OutputText
       | Input.InputImage
       | ResponsesAPI.ResponseInputAudio
-      | Array<unknown>;
+      | GraderModelsAPI.GraderInputs;
 
     /**
      * The role of the message input. One of `user`, `assistant`, `system`, or
@@ -247,7 +300,7 @@ export namespace ScoreModelGrader {
     }
 
     /**
-     * An image input to the model.
+     * An image input block used within EvalItem content arrays.
      */
     export interface InputImage {
       /**
@@ -386,6 +439,7 @@ export interface TextSimilarityGrader {
 
 export declare namespace GraderModels {
   export {
+    type GraderInputs as GraderInputs,
     type LabelModelGrader as LabelModelGrader,
     type MultiGrader as MultiGrader,
     type PythonGrader as PythonGrader,

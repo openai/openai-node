@@ -146,7 +146,12 @@ export interface VideoCreateError {
   message: string;
 }
 
-export type VideoModel = 'sora-2' | 'sora-2-pro';
+export type VideoModel =
+  | 'sora-2'
+  | 'sora-2-pro'
+  | 'sora-2-2025-10-06'
+  | 'sora-2-pro-2025-10-06'
+  | 'sora-2-2025-12-08';
 
 export type VideoSeconds = '4' | '8' | '12';
 

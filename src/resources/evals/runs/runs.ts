@@ -2,6 +2,7 @@
 
 import { APIResource } from '../../../core/resource';
 import * as Shared from '../../shared';
+import * as GraderModelsAPI from '../../graders/grader-models';
 import * as ResponsesAPI from '../../responses/responses';
 import * as CompletionsAPI from '../../chat/completions/completions';
 import * as OutputItemsAPI from './output-items';
@@ -206,7 +207,8 @@ export namespace CreateEvalCompletionsRunDataSource {
      */
     export interface EvalItem {
       /**
-       * Inputs to the model - can contain template strings.
+       * Inputs to the model - can contain template strings. Supports text, output text,
+       * input images, and input audio, either as a single item or an array of items.
        */
       content:
         | string
@@ -214,7 +216,7 @@ export namespace CreateEvalCompletionsRunDataSource {
         | EvalItem.OutputText
         | EvalItem.InputImage
         | ResponsesAPI.ResponseInputAudio
-        | Array<unknown>;
+        | GraderModelsAPI.GraderInputs;
 
       /**
        * The role of the message input. One of `user`, `assistant`, `system`, or
@@ -245,7 +247,7 @@ export namespace CreateEvalCompletionsRunDataSource {
       }
 
       /**
-       * An image input to the model.
+       * An image input block used within EvalItem content arrays.
        */
       export interface InputImage {
         /**
@@ -667,7 +669,8 @@ export namespace RunCreateResponse {
        */
       export interface EvalItem {
         /**
-         * Inputs to the model - can contain template strings.
+         * Inputs to the model - can contain template strings. Supports text, output text,
+         * input images, and input audio, either as a single item or an array of items.
          */
         content:
           | string
@@ -675,7 +678,7 @@ export namespace RunCreateResponse {
           | EvalItem.OutputText
           | EvalItem.InputImage
           | ResponsesAPI.ResponseInputAudio
-          | Array<unknown>;
+          | GraderModelsAPI.GraderInputs;
 
         /**
          * The role of the message input. One of `user`, `assistant`, `system`, or
@@ -706,7 +709,7 @@ export namespace RunCreateResponse {
         }
 
         /**
-         * An image input to the model.
+         * An image input block used within EvalItem content arrays.
          */
         export interface InputImage {
           /**
@@ -1169,7 +1172,8 @@ export namespace RunRetrieveResponse {
        */
       export interface EvalItem {
         /**
-         * Inputs to the model - can contain template strings.
+         * Inputs to the model - can contain template strings. Supports text, output text,
+         * input images, and input audio, either as a single item or an array of items.
          */
         content:
           | string
@@ -1177,7 +1181,7 @@ export namespace RunRetrieveResponse {
           | EvalItem.OutputText
           | EvalItem.InputImage
           | ResponsesAPI.ResponseInputAudio
-          | Array<unknown>;
+          | GraderModelsAPI.GraderInputs;
 
         /**
          * The role of the message input. One of `user`, `assistant`, `system`, or
@@ -1208,7 +1212,7 @@ export namespace RunRetrieveResponse {
         }
 
         /**
-         * An image input to the model.
+         * An image input block used within EvalItem content arrays.
          */
         export interface InputImage {
           /**
@@ -1668,7 +1672,8 @@ export namespace RunListResponse {
        */
       export interface EvalItem {
         /**
-         * Inputs to the model - can contain template strings.
+         * Inputs to the model - can contain template strings. Supports text, output text,
+         * input images, and input audio, either as a single item or an array of items.
          */
         content:
           | string
@@ -1676,7 +1681,7 @@ export namespace RunListResponse {
           | EvalItem.OutputText
           | EvalItem.InputImage
           | ResponsesAPI.ResponseInputAudio
-          | Array<unknown>;
+          | GraderModelsAPI.GraderInputs;
 
         /**
          * The role of the message input. One of `user`, `assistant`, `system`, or
@@ -1707,7 +1712,7 @@ export namespace RunListResponse {
         }
 
         /**
-         * An image input to the model.
+         * An image input block used within EvalItem content arrays.
          */
         export interface InputImage {
           /**
@@ -2178,7 +2183,8 @@ export namespace RunCancelResponse {
        */
       export interface EvalItem {
         /**
-         * Inputs to the model - can contain template strings.
+         * Inputs to the model - can contain template strings. Supports text, output text,
+         * input images, and input audio, either as a single item or an array of items.
          */
         content:
           | string
@@ -2186,7 +2192,7 @@ export namespace RunCancelResponse {
           | EvalItem.OutputText
           | EvalItem.InputImage
           | ResponsesAPI.ResponseInputAudio
-          | Array<unknown>;
+          | GraderModelsAPI.GraderInputs;
 
         /**
          * The role of the message input. One of `user`, `assistant`, `system`, or
@@ -2217,7 +2223,7 @@ export namespace RunCancelResponse {
         }
 
         /**
-         * An image input to the model.
+         * An image input block used within EvalItem content arrays.
          */
         export interface InputImage {
           /**
@@ -2627,7 +2633,8 @@ export namespace RunCreateParams {
        */
       export interface EvalItem {
         /**
-         * Inputs to the model - can contain template strings.
+         * Inputs to the model - can contain template strings. Supports text, output text,
+         * input images, and input audio, either as a single item or an array of items.
          */
         content:
           | string
@@ -2635,7 +2642,7 @@ export namespace RunCreateParams {
           | EvalItem.OutputText
           | EvalItem.InputImage
           | ResponsesAPI.ResponseInputAudio
-          | Array<unknown>;
+          | GraderModelsAPI.GraderInputs;
 
         /**
          * The role of the message input. One of `user`, `assistant`, `system`, or
@@ -2666,7 +2673,7 @@ export namespace RunCreateParams {
         }
 
         /**
-         * An image input to the model.
+         * An image input block used within EvalItem content arrays.
          */
         export interface InputImage {
           /**
