@@ -776,15 +776,9 @@ export namespace EvalCreateParams {
         | string
         | ResponsesAPI.ResponseInputText
         | EvalItem.OutputText
-        | EvalItem.EvalItemInputImage
+        | EvalItem.InputImage
         | ResponsesAPI.ResponseInputAudio
-        | Array<
-            | string
-            | ResponsesAPI.ResponseInputText
-            | EvalItem.OutputText
-            | EvalItem.EvalItemInputImage
-            | ResponsesAPI.ResponseInputAudio
-          >;
+        | GraderModelsAPI.GraderInputs;
 
       /**
        * The role of the message input. One of `user`, `assistant`, `system`, or
@@ -817,43 +811,7 @@ export namespace EvalCreateParams {
       /**
        * An image input block used within EvalItem content arrays.
        */
-      export interface EvalItemInputImage {
-        /**
-         * The URL of the image input.
-         */
-        image_url: string;
-
-        /**
-         * The type of the image input. Always `input_image`.
-         */
-        type: 'input_image';
-
-        /**
-         * The detail level of the image to be sent to the model. One of `high`, `low`, or
-         * `auto`. Defaults to `auto`.
-         */
-        detail?: string;
-      }
-
-      /**
-       * A text output from the model.
-       */
-      export interface OutputText {
-        /**
-         * The text output from the model.
-         */
-        text: string;
-
-        /**
-         * The type of the output text. Always `output_text`.
-         */
-        type: 'output_text';
-      }
-
-      /**
-       * An image input block used within EvalItem content arrays.
-       */
-      export interface EvalItemInputImage {
+      export interface InputImage {
         /**
          * The URL of the image input.
          */
