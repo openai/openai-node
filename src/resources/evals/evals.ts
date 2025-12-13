@@ -769,15 +769,22 @@ export namespace EvalCreateParams {
      */
     export interface EvalItem {
       /**
-       * Inputs to the model - can contain template strings.
+       * Inputs to the model - can contain template strings. Supports text, output text,
+       * input images, and input audio, either as a single item or an array of items.
        */
       content:
         | string
         | ResponsesAPI.ResponseInputText
         | EvalItem.OutputText
-        | EvalItem.InputImage
+        | EvalItem.EvalItemInputImage
         | ResponsesAPI.ResponseInputAudio
-        | Array<unknown>;
+        | Array<
+            | string
+            | ResponsesAPI.ResponseInputText
+            | EvalItem.OutputText
+            | EvalItem.EvalItemInputImage
+            | ResponsesAPI.ResponseInputAudio
+          >;
 
       /**
        * The role of the message input. One of `user`, `assistant`, `system`, or
@@ -808,9 +815,45 @@ export namespace EvalCreateParams {
       }
 
       /**
-       * An image input to the model.
+       * An image input block used within EvalItem content arrays.
        */
-      export interface InputImage {
+      export interface EvalItemInputImage {
+        /**
+         * The URL of the image input.
+         */
+        image_url: string;
+
+        /**
+         * The type of the image input. Always `input_image`.
+         */
+        type: 'input_image';
+
+        /**
+         * The detail level of the image to be sent to the model. One of `high`, `low`, or
+         * `auto`. Defaults to `auto`.
+         */
+        detail?: string;
+      }
+
+      /**
+       * A text output from the model.
+       */
+      export interface OutputText {
+        /**
+         * The text output from the model.
+         */
+        text: string;
+
+        /**
+         * The type of the output text. Always `output_text`.
+         */
+        type: 'output_text';
+      }
+
+      /**
+       * An image input block used within EvalItem content arrays.
+       */
+      export interface EvalItemInputImage {
         /**
          * The URL of the image input.
          */
