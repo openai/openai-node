@@ -300,6 +300,7 @@ Methods:
 
 Types:
 
+- <code><a href="./src/resources/graders/grader-models.ts">GraderInputs</a></code>
 - <code><a href="./src/resources/graders/grader-models.ts">LabelModelGrader</a></code>
 - <code><a href="./src/resources/graders/grader-models.ts">MultiGrader</a></code>
 - <code><a href="./src/resources/graders/grader-models.ts">PythonGrader</a></code>
