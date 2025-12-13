@@ -1,10 +1,61 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../core/resource';
+import * as GraderModelsAPI from './grader-models';
 import * as Shared from '../shared';
 import * as ResponsesAPI from '../responses/responses';
 
 export class GraderModels extends APIResource {}
+
+/**
+ * A list of inputs, each of which may be either an input text, output text, input
+ * image, or input audio object.
+ */
+export type GraderInputs = Array<
+  | string
+  | ResponsesAPI.ResponseInputText
+  | GraderInputs.OutputText
+  | GraderInputs.InputImage
+  | ResponsesAPI.ResponseInputAudio
+>;
+
+export namespace GraderInputs {
+  /**
+   * A text output from the model.
+   */
+  export interface OutputText {
+    /**
+     * The text output from the model.
+     */
+    text: string;
+
+    /**
+     * The type of the output text. Always `output_text`.
+     */
+    type: 'output_text';
+  }
+
+  /**
+   * An image input block used within EvalItem content arrays.
+   */
+  export interface InputImage {
+    /**
+     * The URL of the image input.
+     */
+    image_url: string;
+
+    /**
+     * The type of the image input. Always `input_image`.
+     */
+    type: 'input_image';
+
+    /**
+     * The detail level of the image to be sent to the model. One of `high`, `low`, or
+     * `auto`. Defaults to `auto`.
+     */
+    detail?: string;
+  }
+}
 
 /**
  * A LabelModelGrader object which uses a model to assign labels to each item in
@@ -56,15 +107,9 @@ export namespace LabelModelGrader {
       | string
       | ResponsesAPI.ResponseInputText
       | Input.OutputText
-      | Input.EvalItemInputImage
+      | Input.InputImage
       | ResponsesAPI.ResponseInputAudio
-      | Array<
-          | string
-          | ResponsesAPI.ResponseInputText
-          | Input.OutputText
-          | Input.EvalItemInputImage
-          | ResponsesAPI.ResponseInputAudio
-        >;
+      | GraderModelsAPI.GraderInputs;
 
     /**
      * The role of the message input. One of `user`, `assistant`, `system`, or
@@ -97,43 +142,7 @@ export namespace LabelModelGrader {
     /**
      * An image input block used within EvalItem content arrays.
      */
-    export interface EvalItemInputImage {
-      /**
-       * The URL of the image input.
-       */
-      image_url: string;
-
-      /**
-       * The type of the image input. Always `input_image`.
-       */
-      type: 'input_image';
-
-      /**
-       * The detail level of the image to be sent to the model. One of `high`, `low`, or
-       * `auto`. Defaults to `auto`.
-       */
-      detail?: string;
-    }
-
-    /**
-     * A text output from the model.
-     */
-    export interface OutputText {
-      /**
-       * The text output from the model.
-       */
-      text: string;
-
-      /**
-       * The type of the output text. Always `output_text`.
-       */
-      type: 'output_text';
-    }
-
-    /**
-     * An image input block used within EvalItem content arrays.
-     */
-    export interface EvalItemInputImage {
+    export interface InputImage {
       /**
        * The URL of the image input.
        */
@@ -258,15 +267,9 @@ export namespace ScoreModelGrader {
       | string
       | ResponsesAPI.ResponseInputText
       | Input.OutputText
-      | Input.EvalItemInputImage
+      | Input.InputImage
       | ResponsesAPI.ResponseInputAudio
-      | Array<
-          | string
-          | ResponsesAPI.ResponseInputText
-          | Input.OutputText
-          | Input.EvalItemInputImage
-          | ResponsesAPI.ResponseInputAudio
-        >;
+      | GraderModelsAPI.GraderInputs;
 
     /**
      * The role of the message input. One of `user`, `assistant`, `system`, or
@@ -299,43 +302,7 @@ export namespace ScoreModelGrader {
     /**
      * An image input block used within EvalItem content arrays.
      */
-    export interface EvalItemInputImage {
-      /**
-       * The URL of the image input.
-       */
-      image_url: string;
-
-      /**
-       * The type of the image input. Always `input_image`.
-       */
-      type: 'input_image';
-
-      /**
-       * The detail level of the image to be sent to the model. One of `high`, `low`, or
-       * `auto`. Defaults to `auto`.
-       */
-      detail?: string;
-    }
-
-    /**
-     * A text output from the model.
-     */
-    export interface OutputText {
-      /**
-       * The text output from the model.
-       */
-      text: string;
-
-      /**
-       * The type of the output text. Always `output_text`.
-       */
-      type: 'output_text';
-    }
-
-    /**
-     * An image input block used within EvalItem content arrays.
-     */
-    export interface EvalItemInputImage {
+    export interface InputImage {
       /**
        * The URL of the image input.
        */
@@ -472,6 +439,7 @@ export interface TextSimilarityGrader {
 
 export declare namespace GraderModels {
   export {
+    type GraderInputs as GraderInputs,
     type LabelModelGrader as LabelModelGrader,
     type MultiGrader as MultiGrader,
     type PythonGrader as PythonGrader,
