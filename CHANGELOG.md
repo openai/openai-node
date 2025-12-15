@@ -1,5 +1,14 @@
 # Changelog
 
+## 6.13.0 (2025-12-15)
+
+Full Changelog: [v6.12.0...v6.13.0](https://github.com/openai/openai-node/compare/v6.12.0...v6.13.0)
+
+### Features
+
+* **api:** api update ([bc759dc](https://github.com/openai/openai-node/commit/bc759dc39518412b58b2ebf7e57758776971ce15))
+* **api:** fix grader input list, add dated slugs for sora-2 ([6b2a38f](https://github.com/openai/openai-node/commit/6b2a38fb040eb45535818fb0157ae55949033dc1))
+
 ## 6.12.0 (2025-12-11)
 
 Full Changelog: [v6.11.0...v6.12.0](https://github.com/openai/openai-node/compare/v6.11.0...v6.12.0)
