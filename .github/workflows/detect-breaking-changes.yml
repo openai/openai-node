@@ -1,0 +1,71 @@
+name: CI
+on:
+  pull_request:
+    branches:
+      - main
+      - next
+
+jobs:
+  agents_sdk:
+    runs-on: 'ubuntu-latest'
+    name: Detect Agents SDK regressions
+    if: github.repository == 'openai/openai-node'
+    steps:
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.25.0
+          run_install: false
+
+      # Setup this sdk
+      - uses: actions/checkout@v4
+        with:
+          path: openai-node
+
+      - name: Bootstrap
+        working-directory: openai-node
+        run: ./scripts/bootstrap
+
+      - name: Build
+        working-directory: openai-node
+        run: ./scripts/build
+
+
+      # Setup the agents libs
+      - uses: actions/checkout@v4
+        with:
+          repository: openai/openai-agents-js
+          path: openai-agents-js
+
+      - name: Link agents-core to local SDK
+        working-directory: openai-agents-js/packages/agents-core
+        run: pnpm add file:../../../openai-node/dist
+
+      - name: Link link agents-openai to local SDK
+        working-directory: openai-agents-js/packages/agents-openai
+        run: pnpm add file:../../../openai-node/dist
+
+      - name: Link agents to local SDK
+        working-directory: openai-agents-js/packages/agents
+        run: pnpm add file:../../../openai-node/dist
+
+      - name: Install dependencies
+        working-directory: openai-agents-js
+        run: pnpm install
+
+      - name: Build all packages
+        working-directory: openai-agents-js
+        run: pnpm build
+
+      - name: Run linter
+        working-directory: openai-agents-js
+        run: pnpm lint
+
+      - name: Type-check docs scripts
+        working-directory: openai-agents-js
+        run: pnpm docs:scripts:check
