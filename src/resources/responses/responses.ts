@@ -5736,7 +5736,7 @@ export namespace Tool {
   }
 
   /**
-   * A tool that generates images using a model like `gpt-image-1`.
+   * A tool that generates images using the GPT image models.
    */
   export interface ImageGeneration {
     /**
@@ -5767,7 +5767,7 @@ export namespace Tool {
     /**
      * The image generation model to use. Default: `gpt-image-1`.
      */
-    model?: 'gpt-image-1' | 'gpt-image-1-mini';
+    model?: (string & {}) | 'gpt-image-1' | 'gpt-image-1-mini';
 
     /**
      * Moderation level for the generated image. Default: `auto`.
