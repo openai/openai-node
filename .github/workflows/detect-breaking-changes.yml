@@ -42,7 +42,7 @@ jobs:
           path: openai-agents-js
 
       - name: Link agents packages to local SDKs
-        working-directory: openai-agents-js/packages/agents-core
+        working-directory: openai-agents-js
         run: pnpm --filter @openai/agents-core --filter @openai/agents-openai --filter @openai/agents add file:../../../openai-node/dist
 
       - name: Install dependencies
