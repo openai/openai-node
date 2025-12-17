@@ -35,24 +35,15 @@ jobs:
         working-directory: openai-node
         run: ./scripts/build
 
-
-      # Setup the agents libs
+      # Setup the agents packages
       - uses: actions/checkout@v4
         with:
           repository: openai/openai-agents-js
           path: openai-agents-js
 
-      - name: Link agents-core to local SDK
+      - name: Link agents packages to local SDKs
         working-directory: openai-agents-js/packages/agents-core
-        run: pnpm add file:../../../openai-node/dist
-
-      - name: Link link agents-openai to local SDK
-        working-directory: openai-agents-js/packages/agents-openai
-        run: pnpm add file:../../../openai-node/dist
-
-      - name: Link agents to local SDK
-        working-directory: openai-agents-js/packages/agents
-        run: pnpm add file:../../../openai-node/dist
+        run: pnpm --filter @openai/agents-core --filter @openai/agents-openai --filter @openai/agents add file:../../../openai-node/dist
 
       - name: Install dependencies
         working-directory: openai-agents-js
