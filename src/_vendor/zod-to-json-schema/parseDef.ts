@@ -131,7 +131,10 @@ const get$ref = (
     // `["#","definitions","contactPerson","properties","person1","properties","name"]`
     // then we'll extract it out to `contactPerson_properties_person1_properties_name`
     case 'extract-to-root':
-      const name = item.path.slice(refs.basePath.length + 1).join('_');
+      const name = item.path
+        .slice(refs.basePath.length + 1)
+        .map((segment) => segment.replace(/\s+/g, '_'))
+        .join('_');
 
       // we don't need to extract the root schema in this case, as it's already
       // been added to the definitions
