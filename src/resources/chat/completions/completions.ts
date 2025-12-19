@@ -65,9 +65,36 @@ export class Completions extends APIResource {
     body: ChatCompletionCreateParams,
     options?: RequestOptions,
   ): APIPromise<ChatCompletion> | APIPromise<Stream<ChatCompletionChunk>> {
-    return this._client.post('/chat/completions', { body, ...options, stream: body.stream ?? false }) as
+    const transformedBody = this._transformGuidedParams(body);
+    return this._client.post('/chat/completions', { body: transformedBody, ...options, stream: body.stream ?? false }) as
       | APIPromise<ChatCompletion>
       | APIPromise<Stream<ChatCompletionChunk>>;
+  }
+
+  /**
+   * Transform guided expression parameters from SDK format to API format.
+   * - guided_choice_expr -> guided_choice
+   * - guided_json_expr -> guided_json
+   * - guided_regex_expr -> guided_regex
+   */
+  private _transformGuidedParams(body: ChatCompletionCreateParams): Record<string, unknown> {
+    const bodyAny = body as any;
+    const transformed: Record<string, unknown> = { ...bodyAny };
+
+    if (bodyAny.guided_choice_expr !== undefined) {
+      transformed['guided_choice'] = bodyAny.guided_choice_expr;
+      delete transformed['guided_choice_expr'];
+    }
+    if (bodyAny.guided_json_expr !== undefined) {
+      transformed['guided_json'] = bodyAny.guided_json_expr;
+      delete transformed['guided_json_expr'];
+    }
+    if (bodyAny.guided_regex_expr !== undefined) {
+      transformed['guided_regex'] = bodyAny.guided_regex_expr;
+      delete transformed['guided_regex_expr'];
+    }
+
+    return transformed;
   }
 
   /**
