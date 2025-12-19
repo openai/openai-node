@@ -147,6 +147,7 @@ export interface VideoCreateError {
 }
 
 export type VideoModel =
+  | (string & {})
   | 'sora-2'
   | 'sora-2-pro'
   | 'sora-2-2025-10-06'
