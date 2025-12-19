@@ -31,7 +31,7 @@ export class Speech extends APIResource {
   }
 }
 
-export type SpeechModel = 'tts-1' | 'tts-1-hd' | 'gpt-4o-mini-tts';
+export type SpeechModel = 'tts-1' | 'tts-1-hd' | 'gpt-4o-mini-tts' | 'gpt-4o-mini-tts-2025-12-15';
 
 export interface SpeechCreateParams {
   /**
@@ -41,7 +41,7 @@ export interface SpeechCreateParams {
 
   /**
    * One of the available [TTS models](https://platform.openai.com/docs/models#tts):
-   * `tts-1`, `tts-1-hd` or `gpt-4o-mini-tts`.
+   * `tts-1`, `tts-1-hd`, `gpt-4o-mini-tts`, or `gpt-4o-mini-tts-2025-12-15`.
    */
   model: (string & {}) | SpeechModel;
 

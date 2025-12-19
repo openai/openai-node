@@ -41,6 +41,7 @@ export type AudioModel =
   | 'whisper-1'
   | 'gpt-4o-transcribe'
   | 'gpt-4o-mini-transcribe'
+  | 'gpt-4o-mini-transcribe-2025-12-15'
   | 'gpt-4o-transcribe-diarize';
 
 /**

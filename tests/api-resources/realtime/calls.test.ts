@@ -26,7 +26,7 @@ describe('resource calls', () => {
         input: {
           format: { rate: 24000, type: 'audio/pcm' },
           noise_reduction: { type: 'near_field' },
-          transcription: { language: 'language', model: 'whisper-1', prompt: 'prompt' },
+          transcription: { language: 'language', model: 'string', prompt: 'prompt' },
           turn_detection: {
             type: 'server_vad',
             create_response: true,
