@@ -1,5 +1,13 @@
 # Changelog
 
+## 6.15.0 (2025-12-19)
+
+Full Changelog: [v6.14.0...v6.15.0](https://github.com/openai/openai-node/compare/v6.14.0...v6.15.0)
+
+### Bug Fixes
+
+* rebuild ([5627b41](https://github.com/openai/openai-node/commit/5627b4181775981e48991ea246e091afdfdc3caf))
+
 ## 6.14.0 (2025-12-16)
 
 Full Changelog: [v6.13.0...v6.14.0](https://github.com/openai/openai-node/compare/v6.13.0...v6.14.0)
