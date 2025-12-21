@@ -19,6 +19,7 @@ import { ChatCompletionToolRunnerParams } from '../../../lib/ChatCompletionRunne
 import { ChatCompletionStreamingToolRunnerParams } from '../../../lib/ChatCompletionStreamingRunner';
 import { ChatCompletionStream, type ChatCompletionStreamParams } from '../../../lib/ChatCompletionStream';
 import { ExtractParsedContentFromParams, parseChatCompletion, validateInputTools } from '../../../lib/parser';
+import { BetaToolRunner } from '../../../lib/beta/BetaToolRunner';
 
 export class Completions extends APIResource {
   messages: MessagesAPI.Messages = new MessagesAPI.Messages(this._client);
@@ -1984,6 +1985,7 @@ export interface ChatCompletionListParams extends CursorPageParams {
 }
 
 Completions.Messages = Messages;
+Completions.BetaToolRunner = BetaToolRunner;
 
 export declare namespace Completions {
   export {
@@ -2033,4 +2035,6 @@ export declare namespace Completions {
   };
 
   export { Messages as Messages, type MessageListParams as MessageListParams };
+
+  export { BetaToolRunner };
 }
