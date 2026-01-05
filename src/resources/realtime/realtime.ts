@@ -32,10 +32,17 @@ export interface AudioTranscription {
 
   /**
    * The model to use for transcription. Current options are `whisper-1`,
-   * `gpt-4o-mini-transcribe`, `gpt-4o-transcribe`, and `gpt-4o-transcribe-diarize`.
-   * Use `gpt-4o-transcribe-diarize` when you need diarization with speaker labels.
+   * `gpt-4o-mini-transcribe`, `gpt-4o-mini-transcribe-2025-12-15`,
+   * `gpt-4o-transcribe`, and `gpt-4o-transcribe-diarize`. Use
+   * `gpt-4o-transcribe-diarize` when you need diarization with speaker labels.
    */
-  model?: 'whisper-1' | 'gpt-4o-mini-transcribe' | 'gpt-4o-transcribe' | 'gpt-4o-transcribe-diarize';
+  model?:
+    | (string & {})
+    | 'whisper-1'
+    | 'gpt-4o-mini-transcribe'
+    | 'gpt-4o-mini-transcribe-2025-12-15'
+    | 'gpt-4o-transcribe'
+    | 'gpt-4o-transcribe-diarize';
 
   /**
    * An optional text to guide the model's style or continue a previous audio
@@ -2752,6 +2759,7 @@ export interface RealtimeSession {
    * The Realtime model used for this session.
    */
   model?:
+    | (string & {})
     | 'gpt-realtime'
     | 'gpt-realtime-2025-08-28'
     | 'gpt-4o-realtime-preview'
@@ -2762,8 +2770,10 @@ export interface RealtimeSession {
     | 'gpt-4o-mini-realtime-preview-2024-12-17'
     | 'gpt-realtime-mini'
     | 'gpt-realtime-mini-2025-10-06'
+    | 'gpt-realtime-mini-2025-12-15'
     | 'gpt-audio-mini'
-    | 'gpt-audio-mini-2025-10-06';
+    | 'gpt-audio-mini-2025-10-06'
+    | 'gpt-audio-mini-2025-12-15';
 
   /**
    * The object type. Always `realtime.session`.
@@ -3051,8 +3061,10 @@ export interface RealtimeSessionCreateRequest {
     | 'gpt-4o-mini-realtime-preview-2024-12-17'
     | 'gpt-realtime-mini'
     | 'gpt-realtime-mini-2025-10-06'
+    | 'gpt-realtime-mini-2025-12-15'
     | 'gpt-audio-mini'
-    | 'gpt-audio-mini-2025-10-06';
+    | 'gpt-audio-mini-2025-10-06'
+    | 'gpt-audio-mini-2025-12-15';
 
   /**
    * The set of modalities the model can respond with. It defaults to `["audio"]`,
