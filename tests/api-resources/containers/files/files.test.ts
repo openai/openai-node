@@ -50,7 +50,11 @@ describe('resource files', () => {
     await expect(
       client.containers.files.list(
         'container_id',
-        { after: 'after', limit: 0, order: 'asc' },
+        {
+          after: 'after',
+          limit: 0,
+          order: 'asc',
+        },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);

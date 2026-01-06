@@ -24,12 +24,24 @@ describe('resource completions', () => {
 
   test('create: required and optional params', async () => {
     const response = await client.chat.completions.create({
-      messages: [{ content: 'string', role: 'developer', name: 'name' }],
+      messages: [
+        {
+          content: 'string',
+          role: 'developer',
+          name: 'name',
+        },
+      ],
       model: 'gpt-4o',
       audio: { format: 'wav', voice: 'ash' },
       frequency_penalty: -2,
       function_call: 'none',
-      functions: [{ name: 'name', description: 'description', parameters: { foo: 'bar' } }],
+      functions: [
+        {
+          name: 'name',
+          description: 'description',
+          parameters: { foo: 'bar' },
+        },
+      ],
       logit_bias: { foo: 0 },
       logprobs: true,
       max_completion_tokens: 0,
@@ -55,7 +67,12 @@ describe('resource completions', () => {
       tool_choice: 'none',
       tools: [
         {
-          function: { name: 'name', description: 'description', parameters: { foo: 'bar' }, strict: true },
+          function: {
+            name: 'name',
+            description: 'description',
+            parameters: { foo: 'bar' },
+            strict: true,
+          },
           type: 'function',
         },
       ],
@@ -66,7 +83,12 @@ describe('resource completions', () => {
       web_search_options: {
         search_context_size: 'low',
         user_location: {
-          approximate: { city: 'city', country: 'country', region: 'region', timezone: 'timezone' },
+          approximate: {
+            city: 'city',
+            country: 'country',
+            region: 'region',
+            timezone: 'timezone',
+          },
           type: 'approximate',
         },
       },
@@ -114,7 +136,13 @@ describe('resource completions', () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
       client.chat.completions.list(
-        { after: 'after', limit: 0, metadata: { foo: 'string' }, model: 'model', order: 'asc' },
+        {
+          after: 'after',
+          limit: 0,
+          metadata: { foo: 'string' },
+          model: 'model',
+          order: 'asc',
+        },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);

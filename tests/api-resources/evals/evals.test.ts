@@ -10,7 +10,10 @@ const client = new OpenAI({
 describe('resource evals', () => {
   test('create: only required params', async () => {
     const responsePromise = client.evals.create({
-      data_source_config: { item_schema: { foo: 'bar' }, type: 'custom' },
+      data_source_config: {
+        item_schema: { foo: 'bar' },
+        type: 'custom',
+      },
       testing_criteria: [
         {
           input: [{ content: 'content', role: 'role' }],
@@ -33,7 +36,11 @@ describe('resource evals', () => {
 
   test('create: required and optional params', async () => {
     const response = await client.evals.create({
-      data_source_config: { item_schema: { foo: 'bar' }, type: 'custom', include_sample_schema: true },
+      data_source_config: {
+        item_schema: { foo: 'bar' },
+        type: 'custom',
+        include_sample_schema: true,
+      },
       testing_criteria: [
         {
           input: [{ content: 'content', role: 'role' }],
@@ -86,7 +93,12 @@ describe('resource evals', () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
       client.evals.list(
-        { after: 'after', limit: 0, order: 'asc', order_by: 'created_at' },
+        {
+          after: 'after',
+          limit: 0,
+          order: 'asc',
+          order_by: 'created_at',
+        },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);

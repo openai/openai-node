@@ -24,7 +24,11 @@ describe('resource messages', () => {
     await expect(
       client.chat.completions.messages.list(
         'completion_id',
-        { after: 'after', limit: 0, order: 'asc' },
+        {
+          after: 'after',
+          limit: 0,
+          order: 'asc',
+        },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);
