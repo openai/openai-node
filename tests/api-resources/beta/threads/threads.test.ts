@@ -38,7 +38,11 @@ describe('resource threads', () => {
             file_search: {
               vector_store_ids: ['string'],
               vector_stores: [
-                { chunking_strategy: { type: 'auto' }, file_ids: ['string'], metadata: { foo: 'string' } },
+                {
+                  chunking_strategy: { type: 'auto' },
+                  file_ids: ['string'],
+                  metadata: { foo: 'string' },
+                },
               ],
             },
           },
@@ -119,7 +123,11 @@ describe('resource threads', () => {
           file_search: {
             vector_store_ids: ['string'],
             vector_stores: [
-              { chunking_strategy: { type: 'auto' }, file_ids: ['string'], metadata: { foo: 'string' } },
+              {
+                chunking_strategy: { type: 'auto' },
+                file_ids: ['string'],
+                metadata: { foo: 'string' },
+              },
             ],
           },
         },

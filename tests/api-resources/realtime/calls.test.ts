@@ -26,7 +26,11 @@ describe('resource calls', () => {
         input: {
           format: { rate: 24000, type: 'audio/pcm' },
           noise_reduction: { type: 'near_field' },
-          transcription: { language: 'language', model: 'string', prompt: 'prompt' },
+          transcription: {
+            language: 'language',
+            model: 'string',
+            prompt: 'prompt',
+          },
           turn_detection: {
             type: 'server_vad',
             create_response: true,
@@ -37,16 +41,31 @@ describe('resource calls', () => {
             threshold: 0,
           },
         },
-        output: { format: { rate: 24000, type: 'audio/pcm' }, speed: 0.25, voice: 'ash' },
+        output: {
+          format: { rate: 24000, type: 'audio/pcm' },
+          speed: 0.25,
+          voice: 'ash',
+        },
       },
       include: ['item.input_audio_transcription.logprobs'],
       instructions: 'instructions',
       max_output_tokens: 0,
       model: 'string',
       output_modalities: ['text'],
-      prompt: { id: 'id', variables: { foo: 'string' }, version: 'version' },
+      prompt: {
+        id: 'id',
+        variables: { foo: 'string' },
+        version: 'version',
+      },
       tool_choice: 'none',
-      tools: [{ description: 'description', name: 'name', parameters: {}, type: 'function' }],
+      tools: [
+        {
+          description: 'description',
+          name: 'name',
+          parameters: {},
+          type: 'function',
+        },
+      ],
       tracing: 'auto',
       truncation: 'auto',
     });

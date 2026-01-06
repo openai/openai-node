@@ -54,7 +54,14 @@ describe('resource videos', () => {
   test('list: request options and params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      client.videos.list({ after: 'after', limit: 0, order: 'asc' }, { path: '/_stainless_unknown_path' }),
+      client.videos.list(
+        {
+          after: 'after',
+          limit: 0,
+          order: 'asc',
+        },
+        { path: '/_stainless_unknown_path' },
+      ),
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 

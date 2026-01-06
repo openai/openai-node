@@ -80,7 +80,13 @@ describe('resource messages', () => {
     await expect(
       client.beta.threads.messages.list(
         'thread_id',
-        { after: 'after', before: 'before', limit: 0, order: 'asc', run_id: 'run_id' },
+        {
+          after: 'after',
+          before: 'before',
+          limit: 0,
+          order: 'asc',
+          run_id: 'run_id',
+        },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);

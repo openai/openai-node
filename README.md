@@ -111,7 +111,10 @@ await client.files.create({ file: fs.createReadStream('input.jsonl'), purpose: '
 await client.files.create({ file: new File(['my bytes'], 'input.jsonl'), purpose: 'fine-tune' });
 
 // You can also pass a `fetch` `Response`:
-await client.files.create({ file: await fetch('https://somesite/input.jsonl'), purpose: 'fine-tune' });
+await client.files.create({
+  file: await fetch('https://somesite/input.jsonl'),
+  purpose: 'fine-tune',
+});
 
 // Finally, if none of the above are convenient, you can use our `toFile` helper:
 await client.files.create({
