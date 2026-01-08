@@ -1,6 +1,7 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { type OpenAI } from '../client';
+import { OpenAIError } from './error';
 
 import { type PromiseOrValue } from '../internal/types';
 import {
@@ -14,9 +15,12 @@ import {
  * A subclass of `Promise` providing additional helper methods
  * for interacting with the SDK.
  */
+// Associate instance with client via a module WeakMap to avoid
+// JS private-field brand checks across bundles/copies.
+const apiPromiseClient = /* @__PURE__ */ new WeakMap<object, OpenAI>();
+
 export class APIPromise<T> extends Promise<WithRequestID<T>> {
   private parsedPromise: Promise<WithRequestID<T>> | undefined;
-  #client: OpenAI;
 
   constructor(
     client: OpenAI,
@@ -32,11 +36,13 @@ export class APIPromise<T> extends Promise<WithRequestID<T>> {
       // to parse the response
       resolve(null as any);
     });
-    this.#client = client;
+    apiPromiseClient.set(this, client);
   }
 
   _thenUnwrap<U>(transform: (data: T, props: APIResponseProps) => U): APIPromise<U> {
-    return new APIPromise(this.#client, this.responsePromise, async (client, props) =>
+    const client = apiPromiseClient.get(this);
+    if (!client) throw new OpenAIError('Illegal invocation of APIPromise method');
+    return new APIPromise(client, this.responsePromise, async (client, props) =>
       addRequestID(transform(await this.parseResponse(client, props), props), props.response),
     );
   }
@@ -75,8 +81,10 @@ export class APIPromise<T> extends Promise<WithRequestID<T>> {
 
   private parse(): Promise<WithRequestID<T>> {
     if (!this.parsedPromise) {
+      const client = apiPromiseClient.get(this);
+      if (!client) throw new OpenAIError('Illegal invocation of APIPromise method');
       this.parsedPromise = this.responsePromise.then((data) =>
-        this.parseResponse(this.#client, data),
+        this.parseResponse(client, data),
       ) as any as Promise<WithRequestID<T>>;
     }
     return this.parsedPromise;
