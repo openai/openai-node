@@ -89,9 +89,7 @@ export interface InputTokenCountParams {
   text?: InputTokenCountParams.Text | null;
 
   /**
-   * How the model should select which tool (or tools) to use when generating a
-   * response. See the `tools` parameter to see how to specify which tools the model
-   * can call.
+   * Controls which tool the model should use, if any.
    */
   tool_choice?:
     | ResponsesAPI.ToolChoiceOptions

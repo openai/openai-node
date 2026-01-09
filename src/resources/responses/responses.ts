@@ -595,8 +595,14 @@ export interface Response {
   background?: boolean | null;
 
   /**
-   * The conversation that this response belongs to. Input items and output items
-   * from this response are automatically added to this conversation.
+   * Unix timestamp (in seconds) of when this Response was completed. Only present
+   * when the status is `completed`.
+   */
+  completed_at?: number | null;
+
+  /**
+   * The conversation that this response belonged to. Input items and output items
+   * from this response were automatically added to this conversation.
    */
   conversation?: Response.Conversation | null;
 
@@ -727,12 +733,12 @@ export namespace Response {
   }
 
   /**
-   * The conversation that this response belongs to. Input items and output items
-   * from this response are automatically added to this conversation.
+   * The conversation that this response belonged to. Input items and output items
+   * from this response were automatically added to this conversation.
    */
   export interface Conversation {
     /**
-     * The unique ID of the conversation.
+     * The unique ID of the conversation that this response was associated with.
      */
     id: string;
   }
@@ -1159,6 +1165,9 @@ export interface ResponseCompactionItem {
    */
   id: string;
 
+  /**
+   * The encrypted content that was produced by compaction.
+   */
   encrypted_content: string;
 
   /**
@@ -1166,6 +1175,9 @@ export interface ResponseCompactionItem {
    */
   type: 'compaction';
 
+  /**
+   * The identifier of the actor that created the item.
+   */
   created_by?: string;
 }
 
@@ -1174,6 +1186,9 @@ export interface ResponseCompactionItem {
  * [`v1/responses/compact` API](https://platform.openai.com/docs/api-reference/responses/compact).
  */
 export interface ResponseCompactionItemParam {
+  /**
+   * The encrypted content of the compaction summary.
+   */
   encrypted_content: string;
 
   /**
@@ -2172,13 +2187,16 @@ export interface ResponseFunctionCallArgumentsDoneEvent {
 }
 
 /**
- * A text input to the model.
+ * A piece of message content, such as text, an image, or a file.
  */
 export type ResponseFunctionCallOutputItem =
   | ResponseInputTextContent
   | ResponseInputImageContent
   | ResponseInputFileContent;
 
+/**
+ * An array of content outputs (text, image, file) for the function tool call.
+ */
 export type ResponseFunctionCallOutputItemList = Array<ResponseFunctionCallOutputItem>;
 
 /**
@@ -2285,7 +2303,7 @@ export namespace ResponseFunctionShellToolCall {
 }
 
 /**
- * The output of a shell tool call.
+ * The output of a shell tool call that was emitted.
  */
 export interface ResponseFunctionShellToolCallOutput {
   /**
@@ -2315,12 +2333,15 @@ export interface ResponseFunctionShellToolCallOutput {
    */
   type: 'shell_call_output';
 
+  /**
+   * The identifier of the actor that created the item.
+   */
   created_by?: string;
 }
 
 export namespace ResponseFunctionShellToolCallOutput {
   /**
-   * The content of a shell call output.
+   * The content of a shell tool call output that was emitted.
    */
   export interface Output {
     /**
@@ -2329,10 +2350,19 @@ export namespace ResponseFunctionShellToolCallOutput {
      */
     outcome: Output.Timeout | Output.Exit;
 
+    /**
+     * The standard error output that was captured.
+     */
     stderr: string;
 
+    /**
+     * The standard output that was captured.
+     */
     stdout: string;
 
+    /**
+     * The identifier of the actor that created the item.
+     */
     created_by?: string;
   }
 
@@ -2471,7 +2501,7 @@ export namespace ResponseFunctionWebSearch {
    */
   export interface Search {
     /**
-     * The search query.
+     * [DEPRECATED] The search query.
      */
     query: string;
 
@@ -2479,6 +2509,11 @@ export namespace ResponseFunctionWebSearch {
      * The action type.
      */
     type: 'search';
+
+    /**
+     * The search queries.
+     */
+    queries?: Array<string>;
 
     /**
      * The sources used in the search.
@@ -5731,6 +5766,9 @@ export namespace Tool {
        */
       file_ids?: Array<string>;
 
+      /**
+       * The memory limit for the code interpreter container.
+       */
       memory_limit?: '1g' | '4g' | '16g' | '64g' | null;
     }
   }
