@@ -46,9 +46,10 @@ export interface SpeechCreateParams {
   model: (string & {}) | SpeechModel;
 
   /**
-   * The voice to use when generating the audio. Supported voices are `alloy`, `ash`,
-   * `ballad`, `coral`, `echo`, `fable`, `onyx`, `nova`, `sage`, `shimmer`, and
-   * `verse`. Previews of the voices are available in the
+   * The voice to use when generating the audio. Supported built-in voices are
+   * `alloy`, `ash`, `ballad`, `coral`, `echo`, `fable`, `onyx`, `nova`, `sage`,
+   * `shimmer`, `verse`, `marin`, and `cedar`. Previews of the voices are available
+   * in the
    * [Text to speech guide](https://platform.openai.com/docs/guides/text-to-speech#voice-options).
    */
   voice:

@@ -140,9 +140,18 @@ export interface Video {
   status: 'queued' | 'in_progress' | 'completed' | 'failed';
 }
 
+/**
+ * An error that occurred while generating the response.
+ */
 export interface VideoCreateError {
+  /**
+   * A machine-readable error code that was returned.
+   */
   code: string;
 
+  /**
+   * A human-readable description of the error that was returned.
+   */
   message: string;
 }
 

@@ -10,7 +10,13 @@ const client = new OpenAI({
 describe('resource items', () => {
   test('create: only required params', async () => {
     const responsePromise = client.conversations.items.create('conv_123', {
-      items: [{ content: 'string', role: 'user', type: 'message' }],
+      items: [
+        {
+          content: 'string',
+          role: 'user',
+          type: 'message',
+        },
+      ],
     });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
@@ -23,7 +29,13 @@ describe('resource items', () => {
 
   test('create: required and optional params', async () => {
     const response = await client.conversations.items.create('conv_123', {
-      items: [{ content: 'string', role: 'user', type: 'message' }],
+      items: [
+        {
+          content: 'string',
+          role: 'user',
+          type: 'message',
+        },
+      ],
       include: ['file_search_call.results'],
     });
   });
@@ -62,7 +74,12 @@ describe('resource items', () => {
     await expect(
       client.conversations.items.list(
         'conv_123',
-        { after: 'after', include: ['file_search_call.results'], limit: 0, order: 'asc' },
+        {
+          after: 'after',
+          include: ['file_search_call.results'],
+          limit: 0,
+          order: 'asc',
+        },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);

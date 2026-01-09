@@ -1,0 +1,90 @@
+name: CI
+on:
+  pull_request:
+    branches:
+      - main
+      - next
+
+jobs:
+  detect_breaking_changes:
+    runs-on: 'ubuntu-latest'
+    name: detect-breaking-changes
+    if: github.repository == 'openai/openai-node'
+    steps:
+      - name: Calculate fetch-depth
+        run: |
+          echo "FETCH_DEPTH=$(expr ${{ github.event.pull_request.commits }} + 1)" >> $GITHUB_ENV
+
+      - uses: actions/checkout@v4
+        with:
+          # Ensure we can check out the pull request base in the script below.
+          fetch-depth: ${{ env.FETCH_DEPTH }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        run: |
+          yarn install
+
+      - name: Detect breaking changes
+        run: |
+          # Try to check out previous versions of the breaking change detection script. This ensures that
+          # we still detect breaking changes when entire files and their tests are removed.
+          git checkout "${{ github.event.pull_request.base.sha }}" -- ./scripts/detect-breaking-changes 2>/dev/null || true
+          ./scripts/detect-breaking-changes ${{ github.event.pull_request.base.sha }}
+  agents_sdk:
+    runs-on: 'ubuntu-latest'
+    name: Detect Agents SDK regressions
+    if: github.repository == 'openai/openai-node'
+    steps:
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.25.0
+          run_install: false
+
+      # Setup this sdk
+      - uses: actions/checkout@v4
+        with:
+          path: openai-node
+
+      - name: Bootstrap
+        working-directory: openai-node
+        run: ./scripts/bootstrap
+
+      - name: Build
+        working-directory: openai-node
+        run: ./scripts/build
+
+      # Setup the agents packages
+      - uses: actions/checkout@v4
+        with:
+          repository: openai/openai-agents-js
+          path: openai-agents-js
+
+      - name: Link agents packages to local SDKs
+        working-directory: openai-agents-js
+        run: pnpm --filter @openai/agents-core --filter @openai/agents-openai --filter @openai/agents add file:../../../openai-node/dist
+
+      - name: Install dependencies
+        working-directory: openai-agents-js
+        run: pnpm install
+
+      - name: Build all packages
+        working-directory: openai-agents-js
+        run: pnpm build
+
+      - name: Run linter
+        working-directory: openai-agents-js
+        run: pnpm lint
+
+      - name: Type-check docs scripts
+        working-directory: openai-agents-js
+        run: pnpm docs:scripts:check
