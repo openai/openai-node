@@ -1,5 +1,20 @@
 # Changelog
 
+## 6.16.0 (2026-01-09)
+
+Full Changelog: [v6.15.0...v6.16.0](https://github.com/openai/openai-node/compare/v6.15.0...v6.16.0)
+
+### Features
+
+* **api:** add new Response completed_at prop ([ca40534](https://github.com/openai/openai-node/commit/ca40534778311def52bc7dbbab043d925cdaf847))
+* **ci:** add breaking change detection workflow ([a6f3dea](https://github.com/openai/openai-node/commit/a6f3deaf89ea0ef85cc57e1150032bb6b807c3b9))
+
+
+### Chores
+
+* break long lines in snippets into multiline ([80dee2f](https://github.com/openai/openai-node/commit/80dee2fe64d1b13f181bd482b31eb06fd6c5f3f4))
+* **internal:** codegen related update ([b2fac3e](https://github.com/openai/openai-node/commit/b2fac3ecdc3aecc3303c26304c4c94deda061edb))
+
 ## 6.15.0 (2025-12-19)
 
 Full Changelog: [v6.14.0...v6.15.0](https://github.com/openai/openai-node/compare/v6.14.0...v6.15.0)
