@@ -302,9 +302,133 @@ If you need to cancel a stream, you can `break` from a `for await` loop or call 
 
 See an example of streaming helpers in action in [`examples/stream.ts`](examples/stream.ts).
 
-### Automated function calls
+### Automated function calls via Beta Tool Runner
 
-We provide the `openai.chat.completions.runTools({…})`
+The SDK provides a convenient tool runner helper at `openai.beta.chat.completions.toolRunner({…})` that simplifies [function tool calling](https://platform.openai.com/docs/guides/function-calling). This helper allows you to define functions with their associated schemas, and the SDK will automatically invoke them as the AI requests and validate the parameters for you.
+
+#### Usage
+
+```ts
+import OpenAI from 'openai';
+
+import { betaZodFunctionTool } from 'openai/helpers/beta/zod';
+import { z } from 'zod/v4';
+
+const client = new OpenAI();
+
+async function main() {
+  const addTool = betaZodFunctionTool({
+    name: 'add',
+    parameters: z.object({
+      a: z.number(),
+      b: z.number(),
+    }),
+    description: 'Add two numbers together',
+    run: (input) => {
+      return String(input.a + input.b);
+    },
+  });
+
+  const multiplyTool = betaZodFunctionTool({
+    name: 'multiply',
+    parameters: z.object({
+      a: z.number(),
+      b: z.number(),
+    }),
+    description: 'Multiply two numbers together',
+    run: (input) => {
+      return String(input.a * input.b);
+    },
+  });
+
+  const finalMessage = await client.beta.chat.completions.toolRunner({
+    model: 'gpt-4o',
+    max_tokens: 1000,
+    messages: [{ role: 'user', content: 'What is 5 plus 3, and then multiply that result by 4?' }],
+    tools: [addTool, multiplyTool],
+  });
+  console.log(finalMessage);
+}
+
+main();
+```
+
+#### Advanced Usage
+
+You can also use the `toolRunner` as an async generator to act as the logic runs in.
+
+```ts
+// or, instead of using "await client.beta.messages.toolRunner", you can use:
+const toolRunner = client.beta.chat.completions.toolRunner({
+  model: 'gpt-4o',
+  max_tokens: 1000,
+  messages: [{ role: 'user', content: 'What is 5 plus 3, and then multiply that result by 4?' }],
+  tools: [addTool, multiplyTool],
+});
+
+for await (const event of toolRunner) {
+  console.log(event.choices[0]!.message.content);
+
+  // If the most recent message triggered a tool call, you can get the result of
+  // that tool call
+  const toolResponse = await toolRunner.generateToolResponse();
+  console.log(toolResponse);
+}
+```
+
+The tool runner will invoke the AI with your tool offering and initial message history, and then the AI may respond by invoking your tools. Eventually the AI will respond without a tool call message, which is the "final" message in the chain. As the AI repeatedly invokes tools, you can view the responses via the async iterator.
+
+When you just "await" the `toolRunner`, it simply automatically iterates until the end of the async generator.
+
+#### Streaming
+
+```ts
+const runner = client.beta.chat.completions.toolRunner({
+  model: 'gpt-4o',
+  max_tokens: 1000,
+  messages: [{ role: 'user', content: 'What is the weather in San Francisco?' }],
+  tools: [calculatorTool],
+  stream: true,
+});
+
+// When streaming, the runner returns ChatCompletionStream
+for await (const messageStream of runner) {
+  for await (const event of messageStream) {
+    console.log('event:', event);
+  }
+  console.log('message:', await messageStream.finalMessage());
+}
+
+console.log(await runner);
+```
+
+See [./examples/tool-helpers-advanced-streaming.ts] for a more in-depth example.
+
+#### Beta Zod Tool
+
+Zod schemas can be used to define the input schema for your tools:
+
+```ts
+import { betaZodFunctionTool } from 'openai/helpers/beta/zod';
+
+const weatherTool = betaZodFunctionTool({
+  name: 'get_weather',
+  inputSchema: z.object({
+    location: z.string().describe('The city and state, e.g. San Francisco, CA'),
+    unit: z.enum(['celsius', 'fahrenheit']).default('fahrenheit'),
+  }),
+  description: 'Get the current weather in a given location',
+  run: async (input) => {
+    return `The weather in ${input.location} is ${input.unit === 'celsius' ? '22°C' : '72°F'}`;
+  },
+});
+```
+
+The AI's generated inputs will be directly validated and fed into your function automatically.
+
+### Legacy Automated function calls
+
+We also provide the `openai.chat.completions.runTools({…})`
 convenience helper for using function tool calls with the `/chat/completions` endpoint
 which automatically call the JavaScript functions you provide
 and sends their results back to the `/chat/completions` endpoint,
