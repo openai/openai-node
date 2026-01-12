@@ -180,6 +180,16 @@ export namespace CompletionUsage {
      * Cached tokens present in the prompt.
      */
     cached_tokens?: number;
+
+    /**
+     * Image input tokens present in the prompt.
+     */
+    image_tokens?: number;
+
+    /**
+     * Text input tokens present in the prompt.
+     */
+    text_tokens?: number;
   }
 }
 
