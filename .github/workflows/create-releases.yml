@@ -17,7 +17,7 @@ jobs:
       id-token: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: stainless-api/trigger-release-please@v1
         id: release
@@ -47,3 +47,4 @@ jobs:
         if: ${{ steps.release.outputs.releases_created }}
         run: |
           bash ./bin/publish-jsr
+
