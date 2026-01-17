@@ -63,7 +63,24 @@ export class Files extends APIResource {
   }
 
   /**
-   * Returns the contents of the specified file.
+   * Returns the contents of the specified file as a Response object.
+   *
+   * The Response object provides methods to consume the file content in different formats:
+   * - `.text()` - Returns file content as a string
+   * - `.blob()` - Returns file content as a Blob
+   * - `.arrayBuffer()` - Returns file content as an ArrayBuffer
+   *
+   * @example
+   * ```ts
+   * // Get file content as text (e.g., for JSONL files)
+   * const response = await client.files.content('file-abc123');
+   * const text = await response.text();
+   * console.log(text);
+   *
+   * // Get file content as blob (e.g., for images)
+   * const response = await client.files.content('file-abc123');
+   * const blob = await response.blob();
+   * ```
    */
   content(fileID: string, options?: RequestOptions): APIPromise<Response> {
     return this._client.get(path`/files/${fileID}/content`, {
