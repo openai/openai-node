@@ -1,5 +1,14 @@
 # Changelog
 
+## 6.16.1 (2026-01-18)
+
+Full Changelog: [v6.16.0...v6.16.1](https://github.com/openai/openai-node/compare/v6.16.0...v6.16.1)
+
+### Chores
+
+* **internal:** update `actions/checkout` version ([f163b77](https://github.com/openai/openai-node/commit/f163b77bf2bb127f8049a0a7b1a2795c4f2bae50))
+* **internal:** upgrade babel, qs, js-yaml ([2e2f3c6](https://github.com/openai/openai-node/commit/2e2f3c66ed61c0666e19831b123ea13d42978112))
+
 ## 6.16.0 (2026-01-09)
 
 Full Changelog: [v6.15.0...v6.16.0](https://github.com/openai/openai-node/compare/v6.15.0...v6.16.0)
