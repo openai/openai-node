@@ -17,12 +17,7 @@ export class Assistants extends APIResource {
   /**
    * Create an assistant with a model and instructions.
    *
-   * @example
-   * ```ts
-   * const assistant = await client.beta.assistants.create({
-   *   model: 'gpt-4o',
-   * });
-   * ```
+   * @deprecated
    */
   create(body: AssistantCreateParams, options?: RequestOptions): APIPromise<Assistant> {
     return this._client.post('/assistants', {
@@ -35,12 +30,7 @@ export class Assistants extends APIResource {
   /**
    * Retrieves an assistant.
    *
-   * @example
-   * ```ts
-   * const assistant = await client.beta.assistants.retrieve(
-   *   'assistant_id',
-   * );
-   * ```
+   * @deprecated
    */
   retrieve(assistantID: string, options?: RequestOptions): APIPromise<Assistant> {
     return this._client.get(path`/assistants/${assistantID}`, {
@@ -52,12 +42,7 @@ export class Assistants extends APIResource {
   /**
    * Modifies an assistant.
    *
-   * @example
-   * ```ts
-   * const assistant = await client.beta.assistants.update(
-   *   'assistant_id',
-   * );
-   * ```
+   * @deprecated
    */
   update(assistantID: string, body: AssistantUpdateParams, options?: RequestOptions): APIPromise<Assistant> {
     return this._client.post(path`/assistants/${assistantID}`, {
@@ -70,13 +55,7 @@ export class Assistants extends APIResource {
   /**
    * Returns a list of assistants.
    *
-   * @example
-   * ```ts
-   * // Automatically fetches more pages as needed.
-   * for await (const assistant of client.beta.assistants.list()) {
-   *   // ...
-   * }
-   * ```
+   * @deprecated
    */
   list(
     query: AssistantListParams | null | undefined = {},
@@ -92,11 +71,7 @@ export class Assistants extends APIResource {
   /**
    * Delete an assistant.
    *
-   * @example
-   * ```ts
-   * const assistantDeleted =
-   *   await client.beta.assistants.delete('assistant_id');
-   * ```
+   * @deprecated
    */
   delete(assistantID: string, options?: RequestOptions): APIPromise<AssistantDeleted> {
     return this._client.delete(path`/assistants/${assistantID}`, {
@@ -109,7 +84,7 @@ export class Assistants extends APIResource {
 export type AssistantsPage = CursorPage<Assistant>;
 
 /**
- * Represents an `assistant` that can call the model and use tools.
+ * @deprecated Represents an `assistant` that can call the model and use tools.
  */
 export interface Assistant {
   /**

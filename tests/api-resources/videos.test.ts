@@ -22,6 +22,7 @@ describe('resource videos', () => {
   test('create: required and optional params', async () => {
     const response = await client.videos.create({
       prompt: 'x',
+      character_ids: ['char_123'],
       input_reference: await toFile(Buffer.from('# my file contents'), 'README.md'),
       model: 'string',
       seconds: '4',
