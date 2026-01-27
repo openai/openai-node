@@ -194,11 +194,6 @@ export interface VideoCreateParams {
   prompt: string;
 
   /**
-   * Character IDs to include in the generation.
-   */
-  character_ids?: Array<string>;
-
-  /**
    * Optional image reference that guides generation.
    */
   input_reference?: Uploadable;
