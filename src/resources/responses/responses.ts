@@ -2258,6 +2258,12 @@ export interface ResponseFunctionShellToolCallOutput {
   output: Array<ResponseFunctionShellToolCallOutput.Output>;
 
   /**
+   * The status of the shell call output. One of `in_progress`, `completed`, or
+   * `incomplete`.
+   */
+  status: 'in_progress' | 'completed' | 'incomplete';
+
+  /**
    * The type of the shell call output. Always `shell_call_output`.
    */
   type: 'shell_call_output';
