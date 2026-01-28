@@ -1,5 +1,27 @@
 # Changelog
 
+## 6.17.0 (2026-01-28)
+
+Full Changelog: [v6.16.0...v6.17.0](https://github.com/openai/openai-node/compare/v6.16.0...v6.17.0)
+
+### Features
+
+* **api:** add shell_call_output status field ([edf9590](https://github.com/openai/openai-node/commit/edf95904294cce6cdcac521ee75dc8e0a033df4c))
+* **api:** api update ([6a2eb80](https://github.com/openai/openai-node/commit/6a2eb80f53c21f52ff217faef9b783e1cf9846c1))
+* **api:** api updates ([19ca100](https://github.com/openai/openai-node/commit/19ca100e9ebb2d03983da923c4bf944aa23c1f00))
+
+
+### Bug Fixes
+
+* **api:** mark assistants as deprecated ([3ae2a14](https://github.com/openai/openai-node/commit/3ae2a1439bc30d83c81e30ab30ddd06f91fee61f))
+
+
+### Chores
+
+* **ci:** upgrade `actions/github-script` ([4ea73d3](https://github.com/openai/openai-node/commit/4ea73d389b1b96d88c4c37c1a3a08ea143317c08))
+* **internal:** update `actions/checkout` version ([f163b77](https://github.com/openai/openai-node/commit/f163b77bf2bb127f8049a0a7b1a2795c4f2bae50))
+* **internal:** upgrade babel, qs, js-yaml ([2e2f3c6](https://github.com/openai/openai-node/commit/2e2f3c66ed61c0666e19831b123ea13d42978112))
+
 ## 6.16.0 (2026-01-09)
 
 Full Changelog: [v6.15.0...v6.16.0](https://github.com/openai/openai-node/compare/v6.15.0...v6.16.0)
