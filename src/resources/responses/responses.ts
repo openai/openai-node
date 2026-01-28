@@ -3213,6 +3213,11 @@ export namespace ResponseInputItem {
      * output.
      */
     max_output_length?: number | null;
+
+    /**
+     * The status of the shell call output.
+     */
+    status?: 'in_progress' | 'completed' | 'incomplete' | null;
   }
 
   /**
