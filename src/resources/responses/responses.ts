@@ -2421,7 +2421,7 @@ export interface ResponseFunctionWebSearch {
 
   /**
    * An object describing the specific action taken in this web search call. Includes
-   * details on how the model used the web (search, open_page, find).
+   * details on how the model used the web (search, open_page, find_in_page).
    */
   action:
     | ResponseFunctionWebSearch.Search
@@ -2494,7 +2494,7 @@ export namespace ResponseFunctionWebSearch {
     /**
      * The URL opened by the model.
      */
-    url: string;
+    url?: string | null;
   }
 
   /**
@@ -5729,6 +5729,11 @@ export namespace Tool {
     type: 'image_generation';
 
     /**
+     * Whether to generate a new image or edit an existing image. Default: `auto`.
+     */
+    action?: 'generate' | 'edit' | 'auto';
+
+    /**
      * Background type for the generated image. One of `transparent`, `opaque`, or
      * `auto`. Default: `auto`.
      */
@@ -5751,7 +5756,7 @@ export namespace Tool {
     /**
      * The image generation model to use. Default: `gpt-image-1`.
      */
-    model?: (string & {}) | 'gpt-image-1' | 'gpt-image-1-mini';
+    model?: (string & {}) | 'gpt-image-1' | 'gpt-image-1-mini' | 'gpt-image-1.5';
 
     /**
      * Moderation level for the generated image. Default: `auto`.
