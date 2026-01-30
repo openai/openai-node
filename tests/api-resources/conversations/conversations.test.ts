@@ -23,7 +23,16 @@ describe('resource conversations', () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
       client.conversations.create(
-        { items: [{ content: 'string', role: 'user', type: 'message' }], metadata: { foo: 'string' } },
+        {
+          items: [
+            {
+              content: 'string',
+              role: 'user',
+              type: 'message',
+            },
+          ],
+          metadata: { foo: 'string' },
+        },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);

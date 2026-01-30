@@ -1,5 +1,152 @@
 # Changelog
 
+## 6.17.0 (2026-01-28)
+
+Full Changelog: [v6.16.0...v6.17.0](https://github.com/openai/openai-node/compare/v6.16.0...v6.17.0)
+
+### Features
+
+* **api:** add shell_call_output status field ([edf9590](https://github.com/openai/openai-node/commit/edf95904294cce6cdcac521ee75dc8e0a033df4c))
+* **api:** api update ([6a2eb80](https://github.com/openai/openai-node/commit/6a2eb80f53c21f52ff217faef9b783e1cf9846c1))
+* **api:** api updates ([19ca100](https://github.com/openai/openai-node/commit/19ca100e9ebb2d03983da923c4bf944aa23c1f00))
+
+
+### Bug Fixes
+
+* **api:** mark assistants as deprecated ([3ae2a14](https://github.com/openai/openai-node/commit/3ae2a1439bc30d83c81e30ab30ddd06f91fee61f))
+
+
+### Chores
+
+* **ci:** upgrade `actions/github-script` ([4ea73d3](https://github.com/openai/openai-node/commit/4ea73d389b1b96d88c4c37c1a3a08ea143317c08))
+* **internal:** update `actions/checkout` version ([f163b77](https://github.com/openai/openai-node/commit/f163b77bf2bb127f8049a0a7b1a2795c4f2bae50))
+* **internal:** upgrade babel, qs, js-yaml ([2e2f3c6](https://github.com/openai/openai-node/commit/2e2f3c66ed61c0666e19831b123ea13d42978112))
+
+## 6.16.0 (2026-01-09)
+
+Full Changelog: [v6.15.0...v6.16.0](https://github.com/openai/openai-node/compare/v6.15.0...v6.16.0)
+
+### Features
+
+* **api:** add new Response completed_at prop ([ca40534](https://github.com/openai/openai-node/commit/ca40534778311def52bc7dbbab043d925cdaf847))
+* **ci:** add breaking change detection workflow ([a6f3dea](https://github.com/openai/openai-node/commit/a6f3deaf89ea0ef85cc57e1150032bb6b807c3b9))
+
+
+### Chores
+
+* break long lines in snippets into multiline ([80dee2f](https://github.com/openai/openai-node/commit/80dee2fe64d1b13f181bd482b31eb06fd6c5f3f4))
+* **internal:** codegen related update ([b2fac3e](https://github.com/openai/openai-node/commit/b2fac3ecdc3aecc3303c26304c4c94deda061edb))
+
+## 6.15.0 (2025-12-19)
+
+Full Changelog: [v6.14.0...v6.15.0](https://github.com/openai/openai-node/compare/v6.14.0...v6.15.0)
+
+### Bug Fixes
+
+* rebuild ([5627b41](https://github.com/openai/openai-node/commit/5627b4181775981e48991ea246e091afdfdc3caf))
+
+## 6.14.0 (2025-12-16)
+
+Full Changelog: [v6.13.0...v6.14.0](https://github.com/openai/openai-node/compare/v6.13.0...v6.14.0)
+
+### Features
+
+* **api:** gpt-image-1.5 ([6c1ac1d](https://github.com/openai/openai-node/commit/6c1ac1d8a2947c59f38aabaf07795a244c45a688))
+
+## 6.13.0 (2025-12-15)
+
+Full Changelog: [v6.12.0...v6.13.0](https://github.com/openai/openai-node/compare/v6.12.0...v6.13.0)
+
+### Features
+
+* **api:** api update ([bc759dc](https://github.com/openai/openai-node/commit/bc759dc39518412b58b2ebf7e57758776971ce15))
+* **api:** fix grader input list, add dated slugs for sora-2 ([6b2a38f](https://github.com/openai/openai-node/commit/6b2a38fb040eb45535818fb0157ae55949033dc1))
+
+## 6.12.0 (2025-12-11)
+
+Full Changelog: [v6.11.0...v6.12.0](https://github.com/openai/openai-node/compare/v6.11.0...v6.12.0)
+
+### Features
+
+* **api:** gpt 5.2 ([7000ddb](https://github.com/openai/openai-node/commit/7000ddb09ad4e272f43fe0d70cb1f6e5ca9ff725))
+
+## 6.11.0 (2025-12-10)
+
+Full Changelog: [v6.10.0...v6.11.0](https://github.com/openai/openai-node/compare/v6.10.0...v6.11.0)
+
+### Features
+
+* **api:** make model required for the responses/compact endpoint ([0b52b12](https://github.com/openai/openai-node/commit/0b52b12e535b07ef3b1213892ccb50dc4030ecf4))
+
+
+### Bug Fixes
+
+* **mcp:** correct code tool API endpoint ([e3f2a33](https://github.com/openai/openai-node/commit/e3f2a33bc7ae941d0870e7bc0a333951e88925e2))
+* **mcp:** return correct lines on typescript errors ([f485c3c](https://github.com/openai/openai-node/commit/f485c3c36ebb3cb9c2dbff676872a5470d1a9e47))
+
+
+### Chores
+
+* **internal:** codegen related update ([5af1c38](https://github.com/openai/openai-node/commit/5af1c38043118fd8e6f0fd072243bc63660963e4))
+* **internal:** codegen related update ([e43a8d9](https://github.com/openai/openai-node/commit/e43a8d97fd3e9be7c6ae0ebaf6e85d68dbb33432))
+
+## 6.10.0 (2025-12-04)
+
+Full Changelog: [v6.9.1...v6.10.0](https://github.com/openai/openai-node/compare/v6.9.1...v6.10.0)
+
+### Features
+
+* **api:** gpt-5.1-codex-max and responses/compact ([935f79e](https://github.com/openai/openai-node/commit/935f79efbb090d1d6016ac6874456594f5fd4553))
+
+
+### Chores
+
+* **client:** fix logger property type ([fdc671f](https://github.com/openai/openai-node/commit/fdc671f1b21249a8610b38e2535910d956dc3611))
+* **internal:** upgrade eslint ([9de0f90](https://github.com/openai/openai-node/commit/9de0f905bbd965a5d945ddb70c66dc0c6403ed35))
+
+## 6.9.1 (2025-11-17)
+
+Full Changelog: [v6.9.0...v6.9.1](https://github.com/openai/openai-node/compare/v6.9.0...v6.9.1)
+
+### Bug Fixes
+
+* **api:** align types of input items / output items for typescript ([99adaa7](https://github.com/openai/openai-node/commit/99adaa70dc31d07d5c7fa4d67194ac4de375c98f))
+
+## 6.9.0 (2025-11-13)
+
+Full Changelog: [v6.8.1...v6.9.0](https://github.com/openai/openai-node/compare/v6.8.1...v6.9.0)
+
+### Features
+
+* **api:** gpt 5.1 ([58e78a8](https://github.com/openai/openai-node/commit/58e78a86899b43eb9afdb6f0afd60b912eae41f2))
+
+
+### Chores
+
+* add typescript-estree dependency for jsr readme script ([3759514](https://github.com/openai/openai-node/commit/37595149720edd7bf4c11760084cad7753c2f289))
+
+## 6.8.1 (2025-11-05)
+
+Full Changelog: [v6.8.0...v6.8.1](https://github.com/openai/openai-node/compare/v6.8.0...v6.8.1)
+
+### Bug Fixes
+
+* **api:** fix nullability of logprobs ([40a403c](https://github.com/openai/openai-node/commit/40a403cc9a35b11cc665ccde19f9c5ef07247585))
+
+## 6.8.0 (2025-11-03)
+
+Full Changelog: [v6.7.0...v6.8.0](https://github.com/openai/openai-node/compare/v6.7.0...v6.8.0)
+
+### Features
+
+* **api:** Realtime API token_limits, Hybrid searching ranking options ([6a5b48c](https://github.com/openai/openai-node/commit/6a5b48c9c8961bc7409c20546d9d845a4f2674ce))
+* **api:** remove InputAudio from ResponseInputContent ([9909fef](https://github.com/openai/openai-node/commit/9909fef596280fc16174679d97c3e81543c68646))
+
+
+### Chores
+
+* **internal:** codegen related update ([3ad52aa](https://github.com/openai/openai-node/commit/3ad52aaa94cdbe1926fee1e5f8eacebefdfc399d))
+
 ## 6.7.0 (2025-10-24)
 
 Full Changelog: [v6.6.0...v6.7.0](https://github.com/openai/openai-node/compare/v6.6.0...v6.7.0)

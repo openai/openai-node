@@ -14,8 +14,8 @@ import { path } from '../internal/utils/path';
 export class Files extends APIResource {
   /**
    * Upload a file that can be used across various endpoints. Individual files can be
-   * up to 512 MB, and the size of all files uploaded by one organization can be up
-   * to 1 TB.
+   * up to 512 MB, and each project can store up to 2.5 TB of files in total. There
+   * is no organization-wide storage limit.
    *
    * - The Assistants API supports files up to 2 million tokens and of specific file
    *   types. See the
@@ -175,10 +175,14 @@ export interface FileObject {
 }
 
 /**
- * The intended purpose of the uploaded file. One of: - `assistants`: Used in the
- * Assistants API - `batch`: Used in the Batch API - `fine-tune`: Used for
- * fine-tuning - `vision`: Images used for vision fine-tuning - `user_data`:
- * Flexible file type for any purpose - `evals`: Used for eval data sets
+ * The intended purpose of the uploaded file. One of:
+ *
+ * - `assistants`: Used in the Assistants API
+ * - `batch`: Used in the Batch API
+ * - `fine-tune`: Used for fine-tuning
+ * - `vision`: Images used for vision fine-tuning
+ * - `user_data`: Flexible file type for any purpose
+ * - `evals`: Used for eval data sets
  */
 export type FilePurpose = 'assistants' | 'batch' | 'fine-tune' | 'vision' | 'user_data' | 'evals';
 
@@ -189,10 +193,14 @@ export interface FileCreateParams {
   file: Uploadable;
 
   /**
-   * The intended purpose of the uploaded file. One of: - `assistants`: Used in the
-   * Assistants API - `batch`: Used in the Batch API - `fine-tune`: Used for
-   * fine-tuning - `vision`: Images used for vision fine-tuning - `user_data`:
-   * Flexible file type for any purpose - `evals`: Used for eval data sets
+   * The intended purpose of the uploaded file. One of:
+   *
+   * - `assistants`: Used in the Assistants API
+   * - `batch`: Used in the Batch API
+   * - `fine-tune`: Used for fine-tuning
+   * - `vision`: Images used for vision fine-tuning
+   * - `user_data`: Flexible file type for any purpose
+   * - `evals`: Used for eval data sets
    */
   purpose: FilePurpose;
 

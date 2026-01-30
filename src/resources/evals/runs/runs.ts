@@ -2,6 +2,7 @@
 
 import { APIResource } from '../../../core/resource';
 import * as Shared from '../../shared';
+import * as GraderModelsAPI from '../../graders/grader-models';
 import * as ResponsesAPI from '../../responses/responses';
 import * as CompletionsAPI from '../../chat/completions/completions';
 import * as OutputItemsAPI from './output-items';
@@ -206,7 +207,8 @@ export namespace CreateEvalCompletionsRunDataSource {
      */
     export interface EvalItem {
       /**
-       * Inputs to the model - can contain template strings.
+       * Inputs to the model - can contain template strings. Supports text, output text,
+       * input images, and input audio, either as a single item or an array of items.
        */
       content:
         | string
@@ -214,7 +216,7 @@ export namespace CreateEvalCompletionsRunDataSource {
         | EvalItem.OutputText
         | EvalItem.InputImage
         | ResponsesAPI.ResponseInputAudio
-        | Array<unknown>;
+        | GraderModelsAPI.GraderInputs;
 
       /**
        * The role of the message input. One of `user`, `assistant`, `system`, or
@@ -245,7 +247,7 @@ export namespace CreateEvalCompletionsRunDataSource {
       }
 
       /**
-       * An image input to the model.
+       * An image input block used within EvalItem content arrays.
        */
       export interface InputImage {
         /**
@@ -288,12 +290,17 @@ export namespace CreateEvalCompletionsRunDataSource {
     /**
      * Constrains effort on reasoning for
      * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
-     * supported values are `minimal`, `low`, `medium`, and `high`. Reducing reasoning
-     * effort can result in faster responses and fewer tokens used on reasoning in a
-     * response.
+     * supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
+     * Reducing reasoning effort can result in faster responses and fewer tokens used
+     * on reasoning in a response.
      *
-     * Note: The `gpt-5-pro` model defaults to (and only supports) `high` reasoning
-     * effort.
+     * - `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported
+     *   reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool
+     *   calls are supported for all reasoning values in gpt-5.1.
+     * - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
+     *   support `none`.
+     * - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
+     * - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
      */
     reasoning_effort?: Shared.ReasoningEffort | null;
 
@@ -592,12 +599,17 @@ export namespace RunCreateResponse {
       /**
        * Constrains effort on reasoning for
        * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
-       * supported values are `minimal`, `low`, `medium`, and `high`. Reducing reasoning
-       * effort can result in faster responses and fewer tokens used on reasoning in a
-       * response.
+       * supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
+       * Reducing reasoning effort can result in faster responses and fewer tokens used
+       * on reasoning in a response.
        *
-       * Note: The `gpt-5-pro` model defaults to (and only supports) `high` reasoning
-       * effort.
+       * - `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported
+       *   reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool
+       *   calls are supported for all reasoning values in gpt-5.1.
+       * - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
+       *   support `none`.
+       * - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
+       * - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
        */
       reasoning_effort?: Shared.ReasoningEffort | null;
 
@@ -657,7 +669,8 @@ export namespace RunCreateResponse {
        */
       export interface EvalItem {
         /**
-         * Inputs to the model - can contain template strings.
+         * Inputs to the model - can contain template strings. Supports text, output text,
+         * input images, and input audio, either as a single item or an array of items.
          */
         content:
           | string
@@ -665,7 +678,7 @@ export namespace RunCreateResponse {
           | EvalItem.OutputText
           | EvalItem.InputImage
           | ResponsesAPI.ResponseInputAudio
-          | Array<unknown>;
+          | GraderModelsAPI.GraderInputs;
 
         /**
          * The role of the message input. One of `user`, `assistant`, `system`, or
@@ -696,7 +709,7 @@ export namespace RunCreateResponse {
         }
 
         /**
-         * An image input to the model.
+         * An image input block used within EvalItem content arrays.
          */
         export interface InputImage {
           /**
@@ -739,12 +752,17 @@ export namespace RunCreateResponse {
       /**
        * Constrains effort on reasoning for
        * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
-       * supported values are `minimal`, `low`, `medium`, and `high`. Reducing reasoning
-       * effort can result in faster responses and fewer tokens used on reasoning in a
-       * response.
+       * supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
+       * Reducing reasoning effort can result in faster responses and fewer tokens used
+       * on reasoning in a response.
        *
-       * Note: The `gpt-5-pro` model defaults to (and only supports) `high` reasoning
-       * effort.
+       * - `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported
+       *   reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool
+       *   calls are supported for all reasoning values in gpt-5.1.
+       * - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
+       *   support `none`.
+       * - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
+       * - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
        */
       reasoning_effort?: Shared.ReasoningEffort | null;
 
@@ -1084,12 +1102,17 @@ export namespace RunRetrieveResponse {
       /**
        * Constrains effort on reasoning for
        * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
-       * supported values are `minimal`, `low`, `medium`, and `high`. Reducing reasoning
-       * effort can result in faster responses and fewer tokens used on reasoning in a
-       * response.
+       * supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
+       * Reducing reasoning effort can result in faster responses and fewer tokens used
+       * on reasoning in a response.
        *
-       * Note: The `gpt-5-pro` model defaults to (and only supports) `high` reasoning
-       * effort.
+       * - `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported
+       *   reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool
+       *   calls are supported for all reasoning values in gpt-5.1.
+       * - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
+       *   support `none`.
+       * - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
+       * - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
        */
       reasoning_effort?: Shared.ReasoningEffort | null;
 
@@ -1149,7 +1172,8 @@ export namespace RunRetrieveResponse {
        */
       export interface EvalItem {
         /**
-         * Inputs to the model - can contain template strings.
+         * Inputs to the model - can contain template strings. Supports text, output text,
+         * input images, and input audio, either as a single item or an array of items.
          */
         content:
           | string
@@ -1157,7 +1181,7 @@ export namespace RunRetrieveResponse {
           | EvalItem.OutputText
           | EvalItem.InputImage
           | ResponsesAPI.ResponseInputAudio
-          | Array<unknown>;
+          | GraderModelsAPI.GraderInputs;
 
         /**
          * The role of the message input. One of `user`, `assistant`, `system`, or
@@ -1188,7 +1212,7 @@ export namespace RunRetrieveResponse {
         }
 
         /**
-         * An image input to the model.
+         * An image input block used within EvalItem content arrays.
          */
         export interface InputImage {
           /**
@@ -1231,12 +1255,17 @@ export namespace RunRetrieveResponse {
       /**
        * Constrains effort on reasoning for
        * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
-       * supported values are `minimal`, `low`, `medium`, and `high`. Reducing reasoning
-       * effort can result in faster responses and fewer tokens used on reasoning in a
-       * response.
+       * supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
+       * Reducing reasoning effort can result in faster responses and fewer tokens used
+       * on reasoning in a response.
        *
-       * Note: The `gpt-5-pro` model defaults to (and only supports) `high` reasoning
-       * effort.
+       * - `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported
+       *   reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool
+       *   calls are supported for all reasoning values in gpt-5.1.
+       * - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
+       *   support `none`.
+       * - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
+       * - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
        */
       reasoning_effort?: Shared.ReasoningEffort | null;
 
@@ -1573,12 +1602,17 @@ export namespace RunListResponse {
       /**
        * Constrains effort on reasoning for
        * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
-       * supported values are `minimal`, `low`, `medium`, and `high`. Reducing reasoning
-       * effort can result in faster responses and fewer tokens used on reasoning in a
-       * response.
+       * supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
+       * Reducing reasoning effort can result in faster responses and fewer tokens used
+       * on reasoning in a response.
        *
-       * Note: The `gpt-5-pro` model defaults to (and only supports) `high` reasoning
-       * effort.
+       * - `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported
+       *   reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool
+       *   calls are supported for all reasoning values in gpt-5.1.
+       * - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
+       *   support `none`.
+       * - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
+       * - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
        */
       reasoning_effort?: Shared.ReasoningEffort | null;
 
@@ -1638,7 +1672,8 @@ export namespace RunListResponse {
        */
       export interface EvalItem {
         /**
-         * Inputs to the model - can contain template strings.
+         * Inputs to the model - can contain template strings. Supports text, output text,
+         * input images, and input audio, either as a single item or an array of items.
          */
         content:
           | string
@@ -1646,7 +1681,7 @@ export namespace RunListResponse {
           | EvalItem.OutputText
           | EvalItem.InputImage
           | ResponsesAPI.ResponseInputAudio
-          | Array<unknown>;
+          | GraderModelsAPI.GraderInputs;
 
         /**
          * The role of the message input. One of `user`, `assistant`, `system`, or
@@ -1677,7 +1712,7 @@ export namespace RunListResponse {
         }
 
         /**
-         * An image input to the model.
+         * An image input block used within EvalItem content arrays.
          */
         export interface InputImage {
           /**
@@ -1720,12 +1755,17 @@ export namespace RunListResponse {
       /**
        * Constrains effort on reasoning for
        * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
-       * supported values are `minimal`, `low`, `medium`, and `high`. Reducing reasoning
-       * effort can result in faster responses and fewer tokens used on reasoning in a
-       * response.
+       * supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
+       * Reducing reasoning effort can result in faster responses and fewer tokens used
+       * on reasoning in a response.
        *
-       * Note: The `gpt-5-pro` model defaults to (and only supports) `high` reasoning
-       * effort.
+       * - `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported
+       *   reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool
+       *   calls are supported for all reasoning values in gpt-5.1.
+       * - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
+       *   support `none`.
+       * - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
+       * - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
        */
       reasoning_effort?: Shared.ReasoningEffort | null;
 
@@ -2073,12 +2113,17 @@ export namespace RunCancelResponse {
       /**
        * Constrains effort on reasoning for
        * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
-       * supported values are `minimal`, `low`, `medium`, and `high`. Reducing reasoning
-       * effort can result in faster responses and fewer tokens used on reasoning in a
-       * response.
+       * supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
+       * Reducing reasoning effort can result in faster responses and fewer tokens used
+       * on reasoning in a response.
        *
-       * Note: The `gpt-5-pro` model defaults to (and only supports) `high` reasoning
-       * effort.
+       * - `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported
+       *   reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool
+       *   calls are supported for all reasoning values in gpt-5.1.
+       * - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
+       *   support `none`.
+       * - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
+       * - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
        */
       reasoning_effort?: Shared.ReasoningEffort | null;
 
@@ -2138,7 +2183,8 @@ export namespace RunCancelResponse {
        */
       export interface EvalItem {
         /**
-         * Inputs to the model - can contain template strings.
+         * Inputs to the model - can contain template strings. Supports text, output text,
+         * input images, and input audio, either as a single item or an array of items.
          */
         content:
           | string
@@ -2146,7 +2192,7 @@ export namespace RunCancelResponse {
           | EvalItem.OutputText
           | EvalItem.InputImage
           | ResponsesAPI.ResponseInputAudio
-          | Array<unknown>;
+          | GraderModelsAPI.GraderInputs;
 
         /**
          * The role of the message input. One of `user`, `assistant`, `system`, or
@@ -2177,7 +2223,7 @@ export namespace RunCancelResponse {
         }
 
         /**
-         * An image input to the model.
+         * An image input block used within EvalItem content arrays.
          */
         export interface InputImage {
           /**
@@ -2220,12 +2266,17 @@ export namespace RunCancelResponse {
       /**
        * Constrains effort on reasoning for
        * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
-       * supported values are `minimal`, `low`, `medium`, and `high`. Reducing reasoning
-       * effort can result in faster responses and fewer tokens used on reasoning in a
-       * response.
+       * supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
+       * Reducing reasoning effort can result in faster responses and fewer tokens used
+       * on reasoning in a response.
        *
-       * Note: The `gpt-5-pro` model defaults to (and only supports) `high` reasoning
-       * effort.
+       * - `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported
+       *   reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool
+       *   calls are supported for all reasoning values in gpt-5.1.
+       * - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
+       *   support `none`.
+       * - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
+       * - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
        */
       reasoning_effort?: Shared.ReasoningEffort | null;
 
@@ -2512,12 +2563,17 @@ export namespace RunCreateParams {
       /**
        * Constrains effort on reasoning for
        * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
-       * supported values are `minimal`, `low`, `medium`, and `high`. Reducing reasoning
-       * effort can result in faster responses and fewer tokens used on reasoning in a
-       * response.
+       * supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
+       * Reducing reasoning effort can result in faster responses and fewer tokens used
+       * on reasoning in a response.
        *
-       * Note: The `gpt-5-pro` model defaults to (and only supports) `high` reasoning
-       * effort.
+       * - `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported
+       *   reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool
+       *   calls are supported for all reasoning values in gpt-5.1.
+       * - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
+       *   support `none`.
+       * - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
+       * - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
        */
       reasoning_effort?: Shared.ReasoningEffort | null;
 
@@ -2577,7 +2633,8 @@ export namespace RunCreateParams {
        */
       export interface EvalItem {
         /**
-         * Inputs to the model - can contain template strings.
+         * Inputs to the model - can contain template strings. Supports text, output text,
+         * input images, and input audio, either as a single item or an array of items.
          */
         content:
           | string
@@ -2585,7 +2642,7 @@ export namespace RunCreateParams {
           | EvalItem.OutputText
           | EvalItem.InputImage
           | ResponsesAPI.ResponseInputAudio
-          | Array<unknown>;
+          | GraderModelsAPI.GraderInputs;
 
         /**
          * The role of the message input. One of `user`, `assistant`, `system`, or
@@ -2616,7 +2673,7 @@ export namespace RunCreateParams {
         }
 
         /**
-         * An image input to the model.
+         * An image input block used within EvalItem content arrays.
          */
         export interface InputImage {
           /**
@@ -2659,12 +2716,17 @@ export namespace RunCreateParams {
       /**
        * Constrains effort on reasoning for
        * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
-       * supported values are `minimal`, `low`, `medium`, and `high`. Reducing reasoning
-       * effort can result in faster responses and fewer tokens used on reasoning in a
-       * response.
+       * supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
+       * Reducing reasoning effort can result in faster responses and fewer tokens used
+       * on reasoning in a response.
        *
-       * Note: The `gpt-5-pro` model defaults to (and only supports) `high` reasoning
-       * effort.
+       * - `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported
+       *   reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool
+       *   calls are supported for all reasoning values in gpt-5.1.
+       * - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
+       *   support `none`.
+       * - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
+       * - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
        */
       reasoning_effort?: Shared.ReasoningEffort | null;
 

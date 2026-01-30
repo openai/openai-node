@@ -45,7 +45,12 @@ describe('resource permissions', () => {
     await expect(
       client.fineTuning.checkpoints.permissions.retrieve(
         'ft-AF1WoRqd3aJAHsqc9NY7iL8F',
-        { after: 'after', limit: 0, order: 'ascending', project_id: 'project_id' },
+        {
+          after: 'after',
+          limit: 0,
+          order: 'ascending',
+          project_id: 'project_id',
+        },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);

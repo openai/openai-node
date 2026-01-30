@@ -301,6 +301,7 @@ Methods:
 
 Types:
 
+- <code><a href="./src/resources/graders/grader-models.ts">GraderInputs</a></code>
 - <code><a href="./src/resources/graders/grader-models.ts">LabelModelGrader</a></code>
 - <code><a href="./src/resources/graders/grader-models.ts">MultiGrader</a></code>
 - <code><a href="./src/resources/graders/grader-models.ts">PythonGrader</a></code>
@@ -695,12 +696,17 @@ Methods:
 
 Types:
 
+- <code><a href="./src/resources/responses/responses.ts">ApplyPatchTool</a></code>
+- <code><a href="./src/resources/responses/responses.ts">CompactedResponse</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ComputerTool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">CustomTool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">EasyInputMessage</a></code>
 - <code><a href="./src/resources/responses/responses.ts">FileSearchTool</a></code>
+- <code><a href="./src/resources/responses/responses.ts">FunctionShellTool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">FunctionTool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">Response</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseApplyPatchToolCall</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseApplyPatchToolCallOutput</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseAudioDeltaEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseAudioDoneEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseAudioTranscriptDeltaEvent</a></code>
@@ -711,6 +717,8 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponseCodeInterpreterCallInProgressEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseCodeInterpreterCallInterpretingEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseCodeInterpreterToolCall</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseCompactionItem</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseCompactionItemParam</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseCompletedEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseComputerToolCall</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseComputerToolCallOutputItem</a></code>
@@ -737,6 +745,9 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponseFunctionCallArgumentsDoneEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseFunctionCallOutputItem</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseFunctionCallOutputItemList</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseFunctionShellCallOutputContent</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseFunctionShellToolCall</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseFunctionShellToolCallOutput</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseFunctionToolCall</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseFunctionToolCallItem</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseFunctionToolCallOutputItem</a></code>
@@ -799,10 +810,12 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponseWebSearchCallSearchingEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">Tool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ToolChoiceAllowed</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ToolChoiceApplyPatch</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ToolChoiceCustom</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ToolChoiceFunction</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ToolChoiceMcp</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ToolChoiceOptions</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ToolChoiceShell</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ToolChoiceTypes</a></code>
 - <code><a href="./src/resources/responses/responses.ts">WebSearchPreviewTool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">WebSearchTool</a></code>
@@ -813,6 +826,7 @@ Methods:
 - <code title="get /responses/{response_id}">client.responses.<a href="./src/resources/responses/responses.ts">retrieve</a>(responseID, { ...params }) -> Response</code>
 - <code title="delete /responses/{response_id}">client.responses.<a href="./src/resources/responses/responses.ts">delete</a>(responseID) -> void</code>
 - <code title="post /responses/{response_id}/cancel">client.responses.<a href="./src/resources/responses/responses.ts">cancel</a>(responseID) -> Response</code>
+- <code title="post /responses/compact">client.responses.<a href="./src/resources/responses/responses.ts">compact</a>({ ...params }) -> CompactedResponse</code>
 
 ## InputItems
 
@@ -860,6 +874,7 @@ Types:
 - <code><a href="./src/resources/realtime/realtime.ts">InputAudioBufferClearedEvent</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">InputAudioBufferCommitEvent</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">InputAudioBufferCommittedEvent</a></code>
+- <code><a href="./src/resources/realtime/realtime.ts">InputAudioBufferDtmfEventReceivedEvent</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">InputAudioBufferSpeechStartedEvent</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">InputAudioBufferSpeechStoppedEvent</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">InputAudioBufferTimeoutTriggered</a></code>

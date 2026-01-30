@@ -13,7 +13,7 @@ jobs:
     if: github.repository == 'openai/openai-node' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'release-please') || github.head_ref == 'next')
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Check release environment
         run: |
@@ -21,3 +21,4 @@ jobs:
         env:
           STAINLESS_API_KEY: ${{ secrets.STAINLESS_API_KEY }}
           NPM_TOKEN: ${{ secrets.OPENAI_NPM_TOKEN || secrets.NPM_TOKEN }}
+

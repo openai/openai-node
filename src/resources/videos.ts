@@ -115,6 +115,11 @@ export interface Video {
   progress: number;
 
   /**
+   * The prompt that was used to generate the video.
+   */
+  prompt: string | null;
+
+  /**
    * Identifier of the source video if this video is a remix.
    */
   remixed_from_video_id: string | null;
@@ -135,13 +140,28 @@ export interface Video {
   status: 'queued' | 'in_progress' | 'completed' | 'failed';
 }
 
+/**
+ * An error that occurred while generating the response.
+ */
 export interface VideoCreateError {
+  /**
+   * A machine-readable error code that was returned.
+   */
   code: string;
 
+  /**
+   * A human-readable description of the error that was returned.
+   */
   message: string;
 }
 
-export type VideoModel = 'sora-2' | 'sora-2-pro';
+export type VideoModel =
+  | (string & {})
+  | 'sora-2'
+  | 'sora-2-pro'
+  | 'sora-2-2025-10-06'
+  | 'sora-2-pro-2025-10-06'
+  | 'sora-2-2025-12-08';
 
 export type VideoSeconds = '4' | '8' | '12';
 
@@ -179,17 +199,19 @@ export interface VideoCreateParams {
   input_reference?: Uploadable;
 
   /**
-   * The video generation model to use. Defaults to `sora-2`.
+   * The video generation model to use (allowed values: sora-2, sora-2-pro). Defaults
+   * to `sora-2`.
    */
   model?: VideoModel;
 
   /**
-   * Clip duration in seconds. Defaults to 4 seconds.
+   * Clip duration in seconds (allowed values: 4, 8, 12). Defaults to 4 seconds.
    */
   seconds?: VideoSeconds;
 
   /**
-   * Output resolution formatted as width x height. Defaults to 720x1280.
+   * Output resolution formatted as width x height (allowed values: 720x1280,
+   * 1280x720, 1024x1792, 1792x1024). Defaults to 720x1280.
    */
   size?: VideoSize;
 }

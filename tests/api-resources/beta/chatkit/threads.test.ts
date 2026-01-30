@@ -34,7 +34,13 @@ describe('resource threads', () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
       client.beta.chatkit.threads.list(
-        { after: 'after', before: 'before', limit: 0, order: 'asc', user: 'x' },
+        {
+          after: 'after',
+          before: 'before',
+          limit: 0,
+          order: 'asc',
+          user: 'x',
+        },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);
@@ -67,7 +73,12 @@ describe('resource threads', () => {
     await expect(
       client.beta.chatkit.threads.listItems(
         'cthr_123',
-        { after: 'after', before: 'before', limit: 0, order: 'asc' },
+        {
+          after: 'after',
+          before: 'before',
+          limit: 0,
+          order: 'asc',
+        },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);

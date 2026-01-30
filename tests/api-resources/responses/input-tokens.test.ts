@@ -30,8 +30,15 @@ describe('resource inputTokens', () => {
           model: 'model',
           parallel_tool_calls: true,
           previous_response_id: 'resp_123',
-          reasoning: { effort: 'minimal', generate_summary: 'auto', summary: 'auto' },
-          text: { format: { type: 'text' }, verbosity: 'low' },
+          reasoning: {
+            effort: 'none',
+            generate_summary: 'auto',
+            summary: 'auto',
+          },
+          text: {
+            format: { type: 'text' },
+            verbosity: 'low',
+          },
           tool_choice: 'none',
           tools: [
             {

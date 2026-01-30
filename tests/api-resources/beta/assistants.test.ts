@@ -26,7 +26,7 @@ describe('resource assistants', () => {
       instructions: 'instructions',
       metadata: { foo: 'string' },
       name: 'name',
-      reasoning_effort: 'minimal',
+      reasoning_effort: 'none',
       response_format: 'auto',
       temperature: 1,
       tool_resources: {
@@ -34,7 +34,11 @@ describe('resource assistants', () => {
         file_search: {
           vector_store_ids: ['string'],
           vector_stores: [
-            { chunking_strategy: { type: 'auto' }, file_ids: ['string'], metadata: { foo: 'string' } },
+            {
+              chunking_strategy: { type: 'auto' },
+              file_ids: ['string'],
+              metadata: { foo: 'string' },
+            },
           ],
         },
       },
@@ -80,7 +84,12 @@ describe('resource assistants', () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
       client.beta.assistants.list(
-        { after: 'after', before: 'before', limit: 0, order: 'asc' },
+        {
+          after: 'after',
+          before: 'before',
+          limit: 0,
+          order: 'asc',
+        },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);

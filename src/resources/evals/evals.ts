@@ -769,7 +769,8 @@ export namespace EvalCreateParams {
      */
     export interface EvalItem {
       /**
-       * Inputs to the model - can contain template strings.
+       * Inputs to the model - can contain template strings. Supports text, output text,
+       * input images, and input audio, either as a single item or an array of items.
        */
       content:
         | string
@@ -777,7 +778,7 @@ export namespace EvalCreateParams {
         | EvalItem.OutputText
         | EvalItem.InputImage
         | ResponsesAPI.ResponseInputAudio
-        | Array<unknown>;
+        | GraderModelsAPI.GraderInputs;
 
       /**
        * The role of the message input. One of `user`, `assistant`, `system`, or
@@ -808,7 +809,7 @@ export namespace EvalCreateParams {
       }
 
       /**
-       * An image input to the model.
+       * An image input block used within EvalItem content arrays.
        */
       export interface InputImage {
         /**

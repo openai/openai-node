@@ -38,7 +38,7 @@ describe('resource runs', () => {
       metadata: { foo: 'string' },
       model: 'string',
       parallel_tool_calls: true,
-      reasoning_effort: 'minimal',
+      reasoning_effort: 'none',
       response_format: 'auto',
       stream: false,
       temperature: 1,
@@ -98,7 +98,12 @@ describe('resource runs', () => {
     await expect(
       client.beta.threads.runs.list(
         'thread_id',
-        { after: 'after', before: 'before', limit: 0, order: 'asc' },
+        {
+          after: 'after',
+          before: 'before',
+          limit: 0,
+          order: 'asc',
+        },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);

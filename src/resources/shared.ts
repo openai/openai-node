@@ -15,9 +15,20 @@ export type AllModels =
   | 'computer-use-preview-2025-03-11'
   | 'gpt-5-codex'
   | 'gpt-5-pro'
-  | 'gpt-5-pro-2025-10-06';
+  | 'gpt-5-pro-2025-10-06'
+  | 'gpt-5.1-codex-max';
 
 export type ChatModel =
+  | 'gpt-5.2'
+  | 'gpt-5.2-2025-12-11'
+  | 'gpt-5.2-chat-latest'
+  | 'gpt-5.2-pro'
+  | 'gpt-5.2-pro-2025-12-11'
+  | 'gpt-5.1'
+  | 'gpt-5.1-2025-11-13'
+  | 'gpt-5.1-codex'
+  | 'gpt-5.1-mini'
+  | 'gpt-5.1-chat-latest'
   | 'gpt-5'
   | 'gpt-5-mini'
   | 'gpt-5-nano'
@@ -135,6 +146,9 @@ export interface CompoundFilter {
 export type CustomToolInputFormat = CustomToolInputFormat.Text | CustomToolInputFormat.Grammar;
 
 export namespace CustomToolInputFormat {
+  /**
+   * Unconstrained free-form text.
+   */
   export interface Text {
     /**
      * Unconstrained text format. Always `text`.
@@ -142,6 +156,9 @@ export namespace CustomToolInputFormat {
     type: 'text';
   }
 
+  /**
+   * A grammar defined by the user.
+   */
   export interface Grammar {
     /**
      * The grammar definition.
@@ -235,12 +252,17 @@ export interface Reasoning {
   /**
    * Constrains effort on reasoning for
    * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
-   * supported values are `minimal`, `low`, `medium`, and `high`. Reducing reasoning
-   * effort can result in faster responses and fewer tokens used on reasoning in a
-   * response.
+   * supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
+   * Reducing reasoning effort can result in faster responses and fewer tokens used
+   * on reasoning in a response.
    *
-   * Note: The `gpt-5-pro` model defaults to (and only supports) `high` reasoning
-   * effort.
+   * - `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported
+   *   reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool
+   *   calls are supported for all reasoning values in gpt-5.1.
+   * - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
+   *   support `none`.
+   * - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
+   * - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
    */
   effort?: ReasoningEffort | null;
 
@@ -258,7 +280,8 @@ export interface Reasoning {
    * debugging and understanding the model's reasoning process. One of `auto`,
    * `concise`, or `detailed`.
    *
-   * `concise` is only supported for `computer-use-preview` models.
+   * `concise` is supported for `computer-use-preview` models and all reasoning
+   * models after `gpt-5`.
    */
   summary?: 'auto' | 'concise' | 'detailed' | null;
 }
@@ -266,14 +289,19 @@ export interface Reasoning {
 /**
  * Constrains effort on reasoning for
  * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
- * supported values are `minimal`, `low`, `medium`, and `high`. Reducing reasoning
- * effort can result in faster responses and fewer tokens used on reasoning in a
- * response.
+ * supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
+ * Reducing reasoning effort can result in faster responses and fewer tokens used
+ * on reasoning in a response.
  *
- * Note: The `gpt-5-pro` model defaults to (and only supports) `high` reasoning
- * effort.
+ * - `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported
+ *   reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool
+ *   calls are supported for all reasoning values in gpt-5.1.
+ * - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
+ *   support `none`.
+ * - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
+ * - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
  */
-export type ReasoningEffort = 'minimal' | 'low' | 'medium' | 'high' | null;
+export type ReasoningEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | null;
 
 /**
  * JSON object response format. An older method of generating JSON responses. Using
@@ -391,4 +419,5 @@ export type ResponsesModel =
   | 'computer-use-preview-2025-03-11'
   | 'gpt-5-codex'
   | 'gpt-5-pro'
-  | 'gpt-5-pro-2025-10-06';
+  | 'gpt-5-pro-2025-10-06'
+  | 'gpt-5.1-codex-max';

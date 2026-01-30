@@ -42,9 +42,14 @@ export type ParsedResponseOutputItem<ParsedT> =
   | ResponseFunctionWebSearch
   | ResponseComputerToolCall
   | ResponseReasoningItem
+  | ResponseCompactionItem
   | ResponseOutputItem.ImageGenerationCall
   | ResponseCodeInterpreterToolCall
   | ResponseOutputItem.LocalShellCall
+  | ResponseFunctionShellToolCall
+  | ResponseFunctionShellToolCallOutput
+  | ResponseApplyPatchToolCall
+  | ResponseApplyPatchToolCallOutput
   | ResponseOutputItem.McpCall
   | ResponseOutputItem.McpListTools
   | ResponseOutputItem.McpApprovalRequest
@@ -202,9 +207,62 @@ export class Responses extends APIResource {
   cancel(responseID: string, options?: RequestOptions): APIPromise<Response> {
     return this._client.post(path`/responses/${responseID}/cancel`, options);
   }
+
+  /**
+   * Compact conversation
+   *
+   * @example
+   * ```ts
+   * const compactedResponse = await client.responses.compact({
+   *   model: 'gpt-5.2',
+   * });
+   * ```
+   */
+  compact(body: ResponseCompactParams, options?: RequestOptions): APIPromise<CompactedResponse> {
+    return this._client.post('/responses/compact', { body, ...options });
+  }
 }
 
 export type ResponseItemsPage = CursorPage<ResponseItem>;
+
+/**
+ * Allows the assistant to create, delete, or update files using unified diffs.
+ */
+export interface ApplyPatchTool {
+  /**
+   * The type of the tool. Always `apply_patch`.
+   */
+  type: 'apply_patch';
+}
+
+export interface CompactedResponse {
+  /**
+   * The unique identifier for the compacted response.
+   */
+  id: string;
+
+  /**
+   * Unix timestamp (in seconds) when the compacted conversation was created.
+   */
+  created_at: number;
+
+  /**
+   * The object type. Always `response.compaction`.
+   */
+  object: 'response.compaction';
+
+  /**
+   * The compacted list of output items. This is a list of all user messages,
+   * followed by a single compaction item.
+   */
+  output: Array<ResponseOutputItem>;
+
+  /**
+   * Token accounting for the compaction pass, including cached, reasoning, and total
+   * tokens.
+   */
+  usage: ResponseUsage;
+}
 
 /**
  * A tool that controls a virtual computer. Learn more about the
@@ -232,6 +290,10 @@ export interface ComputerTool {
   type: 'computer_use_preview';
 }
 
+/**
+ * A custom tool that processes input using a specified format. Learn more about
+ * [custom tools](https://platform.openai.com/docs/guides/function-calling#custom-tools)
+ */
 export interface CustomTool {
   /**
    * The name of the custom tool, used to identify it in tool calls.
@@ -319,6 +381,12 @@ export namespace FileSearchTool {
    */
   export interface RankingOptions {
     /**
+     * Weights that control how reciprocal rank fusion balances semantic embedding
+     * matches versus sparse keyword matches when hybrid search is enabled.
+     */
+    hybrid_search?: RankingOptions.HybridSearch;
+
+    /**
      * The ranker to use for the file search.
      */
     ranker?: 'auto' | 'default-2024-11-15';
@@ -330,6 +398,34 @@ export namespace FileSearchTool {
      */
     score_threshold?: number;
   }
+
+  export namespace RankingOptions {
+    /**
+     * Weights that control how reciprocal rank fusion balances semantic embedding
+     * matches versus sparse keyword matches when hybrid search is enabled.
+     */
+    export interface HybridSearch {
+      /**
+       * The weight of the embedding in the reciprocal ranking fusion.
+       */
+      embedding_weight: number;
+
+      /**
+       * The weight of the text in the reciprocal ranking fusion.
+       */
+      text_weight: number;
+    }
+  }
+}
+
+/**
+ * A tool that allows the model to execute shell commands.
+ */
+export interface FunctionShellTool {
+  /**
+   * The type of the shell tool. Always `shell`.
+   */
+  type: 'shell';
 }
 
 /**
@@ -456,7 +552,9 @@ export interface Response {
     | ToolChoiceTypes
     | ToolChoiceFunction
     | ToolChoiceMcp
-    | ToolChoiceCustom;
+    | ToolChoiceCustom
+    | ToolChoiceApplyPatch
+    | ToolChoiceShell;
 
   /**
    * An array of tools the model may call while generating a response. You can
@@ -497,8 +595,14 @@ export interface Response {
   background?: boolean | null;
 
   /**
-   * The conversation that this response belongs to. Input items and output items
-   * from this response are automatically added to this conversation.
+   * Unix timestamp (in seconds) of when this Response was completed. Only present
+   * when the status is `completed`.
+   */
+  completed_at?: number | null;
+
+  /**
+   * The conversation that this response belonged to. Input items and output items
+   * from this response were automatically added to this conversation.
    */
   conversation?: Response.Conversation | null;
 
@@ -529,6 +633,14 @@ export interface Response {
    * [Learn more](https://platform.openai.com/docs/guides/prompt-caching).
    */
   prompt_cache_key?: string;
+
+  /**
+   * The retention policy for the prompt cache. Set to `24h` to enable extended
+   * prompt caching, which keeps cached prefixes active for longer, up to a maximum
+   * of 24 hours.
+   * [Learn more](https://platform.openai.com/docs/guides/prompt-caching#prompt-cache-retention).
+   */
+  prompt_cache_retention?: 'in-memory' | '24h' | null;
 
   /**
    * **gpt-5 and o-series models only**
@@ -621,15 +733,148 @@ export namespace Response {
   }
 
   /**
-   * The conversation that this response belongs to. Input items and output items
-   * from this response are automatically added to this conversation.
+   * The conversation that this response belonged to. Input items and output items
+   * from this response were automatically added to this conversation.
    */
   export interface Conversation {
     /**
-     * The unique ID of the conversation.
+     * The unique ID of the conversation that this response was associated with.
      */
     id: string;
   }
+}
+
+/**
+ * A tool call that applies file diffs by creating, deleting, or updating files.
+ */
+export interface ResponseApplyPatchToolCall {
+  /**
+   * The unique ID of the apply patch tool call. Populated when this item is returned
+   * via API.
+   */
+  id: string;
+
+  /**
+   * The unique ID of the apply patch tool call generated by the model.
+   */
+  call_id: string;
+
+  /**
+   * One of the create_file, delete_file, or update_file operations applied via
+   * apply_patch.
+   */
+  operation:
+    | ResponseApplyPatchToolCall.CreateFile
+    | ResponseApplyPatchToolCall.DeleteFile
+    | ResponseApplyPatchToolCall.UpdateFile;
+
+  /**
+   * The status of the apply patch tool call. One of `in_progress` or `completed`.
+   */
+  status: 'in_progress' | 'completed';
+
+  /**
+   * The type of the item. Always `apply_patch_call`.
+   */
+  type: 'apply_patch_call';
+
+  /**
+   * The ID of the entity that created this tool call.
+   */
+  created_by?: string;
+}
+
+export namespace ResponseApplyPatchToolCall {
+  /**
+   * Instruction describing how to create a file via the apply_patch tool.
+   */
+  export interface CreateFile {
+    /**
+     * Diff to apply.
+     */
+    diff: string;
+
+    /**
+     * Path of the file to create.
+     */
+    path: string;
+
+    /**
+     * Create a new file with the provided diff.
+     */
+    type: 'create_file';
+  }
+
+  /**
+   * Instruction describing how to delete a file via the apply_patch tool.
+   */
+  export interface DeleteFile {
+    /**
+     * Path of the file to delete.
+     */
+    path: string;
+
+    /**
+     * Delete the specified file.
+     */
+    type: 'delete_file';
+  }
+
+  /**
+   * Instruction describing how to update a file via the apply_patch tool.
+   */
+  export interface UpdateFile {
+    /**
+     * Diff to apply.
+     */
+    diff: string;
+
+    /**
+     * Path of the file to update.
+     */
+    path: string;
+
+    /**
+     * Update an existing file with the provided diff.
+     */
+    type: 'update_file';
+  }
+}
+
+/**
+ * The output emitted by an apply patch tool call.
+ */
+export interface ResponseApplyPatchToolCallOutput {
+  /**
+   * The unique ID of the apply patch tool call output. Populated when this item is
+   * returned via API.
+   */
+  id: string;
+
+  /**
+   * The unique ID of the apply patch tool call generated by the model.
+   */
+  call_id: string;
+
+  /**
+   * The status of the apply patch tool call output. One of `completed` or `failed`.
+   */
+  status: 'completed' | 'failed';
+
+  /**
+   * The type of the item. Always `apply_patch_call_output`.
+   */
+  type: 'apply_patch_call_output';
+
+  /**
+   * The ID of the entity that created this tool call output.
+   */
+  created_by?: string;
+
+  /**
+   * Optional textual output returned by the apply patch tool.
+   */
+  output?: string | null;
 }
 
 /**
@@ -908,6 +1153,53 @@ export namespace ResponseCodeInterpreterToolCall {
      */
     url: string;
   }
+}
+
+/**
+ * A compaction item generated by the
+ * [`v1/responses/compact` API](https://platform.openai.com/docs/api-reference/responses/compact).
+ */
+export interface ResponseCompactionItem {
+  /**
+   * The unique ID of the compaction item.
+   */
+  id: string;
+
+  /**
+   * The encrypted content that was produced by compaction.
+   */
+  encrypted_content: string;
+
+  /**
+   * The type of the item. Always `compaction`.
+   */
+  type: 'compaction';
+
+  /**
+   * The identifier of the actor that created the item.
+   */
+  created_by?: string;
+}
+
+/**
+ * A compaction item generated by the
+ * [`v1/responses/compact` API](https://platform.openai.com/docs/api-reference/responses/compact).
+ */
+export interface ResponseCompactionItemParam {
+  /**
+   * The encrypted content of the compaction summary.
+   */
+  encrypted_content: string;
+
+  /**
+   * The type of the item. Always `compaction`.
+   */
+  type: 'compaction';
+
+  /**
+   * The ID of the compaction item.
+   */
+  id?: string | null;
 }
 
 /**
@@ -1278,7 +1570,6 @@ export type ResponseContent =
   | ResponseInputText
   | ResponseInputImage
   | ResponseInputFile
-  | ResponseInputAudio
   | ResponseOutputText
   | ResponseOutputRefusal
   | ResponseContent.ReasoningTextContent;
@@ -1896,14 +2187,218 @@ export interface ResponseFunctionCallArgumentsDoneEvent {
 }
 
 /**
- * A text input to the model.
+ * A piece of message content, such as text, an image, or a file.
  */
 export type ResponseFunctionCallOutputItem =
   | ResponseInputTextContent
   | ResponseInputImageContent
   | ResponseInputFileContent;
 
+/**
+ * An array of content outputs (text, image, file) for the function tool call.
+ */
 export type ResponseFunctionCallOutputItemList = Array<ResponseFunctionCallOutputItem>;
+
+/**
+ * Captured stdout and stderr for a portion of a shell tool call output.
+ */
+export interface ResponseFunctionShellCallOutputContent {
+  /**
+   * The exit or timeout outcome associated with this shell call.
+   */
+  outcome: ResponseFunctionShellCallOutputContent.Timeout | ResponseFunctionShellCallOutputContent.Exit;
+
+  /**
+   * Captured stderr output for the shell call.
+   */
+  stderr: string;
+
+  /**
+   * Captured stdout output for the shell call.
+   */
+  stdout: string;
+}
+
+export namespace ResponseFunctionShellCallOutputContent {
+  /**
+   * Indicates that the shell call exceeded its configured time limit.
+   */
+  export interface Timeout {
+    /**
+     * The outcome type. Always `timeout`.
+     */
+    type: 'timeout';
+  }
+
+  /**
+   * Indicates that the shell commands finished and returned an exit code.
+   */
+  export interface Exit {
+    /**
+     * The exit code returned by the shell process.
+     */
+    exit_code: number;
+
+    /**
+     * The outcome type. Always `exit`.
+     */
+    type: 'exit';
+  }
+}
+
+/**
+ * A tool call that executes one or more shell commands in a managed environment.
+ */
+export interface ResponseFunctionShellToolCall {
+  /**
+   * The unique ID of the shell tool call. Populated when this item is returned via
+   * API.
+   */
+  id: string;
+
+  /**
+   * The shell commands and limits that describe how to run the tool call.
+   */
+  action: ResponseFunctionShellToolCall.Action;
+
+  /**
+   * The unique ID of the shell tool call generated by the model.
+   */
+  call_id: string;
+
+  /**
+   * The status of the shell call. One of `in_progress`, `completed`, or
+   * `incomplete`.
+   */
+  status: 'in_progress' | 'completed' | 'incomplete';
+
+  /**
+   * The type of the item. Always `shell_call`.
+   */
+  type: 'shell_call';
+
+  /**
+   * The ID of the entity that created this tool call.
+   */
+  created_by?: string;
+}
+
+export namespace ResponseFunctionShellToolCall {
+  /**
+   * The shell commands and limits that describe how to run the tool call.
+   */
+  export interface Action {
+    commands: Array<string>;
+
+    /**
+     * Optional maximum number of characters to return from each command.
+     */
+    max_output_length: number | null;
+
+    /**
+     * Optional timeout in milliseconds for the commands.
+     */
+    timeout_ms: number | null;
+  }
+}
+
+/**
+ * The output of a shell tool call that was emitted.
+ */
+export interface ResponseFunctionShellToolCallOutput {
+  /**
+   * The unique ID of the shell call output. Populated when this item is returned via
+   * API.
+   */
+  id: string;
+
+  /**
+   * The unique ID of the shell tool call generated by the model.
+   */
+  call_id: string;
+
+  /**
+   * The maximum length of the shell command output. This is generated by the model
+   * and should be passed back with the raw output.
+   */
+  max_output_length: number | null;
+
+  /**
+   * An array of shell call output contents
+   */
+  output: Array<ResponseFunctionShellToolCallOutput.Output>;
+
+  /**
+   * The status of the shell call output. One of `in_progress`, `completed`, or
+   * `incomplete`.
+   */
+  status: 'in_progress' | 'completed' | 'incomplete';
+
+  /**
+   * The type of the shell call output. Always `shell_call_output`.
+   */
+  type: 'shell_call_output';
+
+  /**
+   * The identifier of the actor that created the item.
+   */
+  created_by?: string;
+}
+
+export namespace ResponseFunctionShellToolCallOutput {
+  /**
+   * The content of a shell tool call output that was emitted.
+   */
+  export interface Output {
+    /**
+     * Represents either an exit outcome (with an exit code) or a timeout outcome for a
+     * shell call output chunk.
+     */
+    outcome: Output.Timeout | Output.Exit;
+
+    /**
+     * The standard error output that was captured.
+     */
+    stderr: string;
+
+    /**
+     * The standard output that was captured.
+     */
+    stdout: string;
+
+    /**
+     * The identifier of the actor that created the item.
+     */
+    created_by?: string;
+  }
+
+  export namespace Output {
+    /**
+     * Indicates that the shell call exceeded its configured time limit.
+     */
+    export interface Timeout {
+      /**
+       * The outcome type. Always `timeout`.
+       */
+      type: 'timeout';
+    }
+
+    /**
+     * Indicates that the shell commands finished and returned an exit code.
+     */
+    export interface Exit {
+      /**
+       * Exit code from the shell process.
+       */
+      exit_code: number;
+
+      /**
+       * The outcome type. Always `exit`.
+       */
+      type: 'exit';
+    }
+  }
+}
 
 /**
  * A tool call to run a function. See the
@@ -2012,7 +2507,7 @@ export namespace ResponseFunctionWebSearch {
    */
   export interface Search {
     /**
-     * The search query.
+     * [DEPRECATED] The search query.
      */
     query: string;
 
@@ -2020,6 +2515,11 @@ export namespace ResponseFunctionWebSearch {
      * The action type.
      */
     type: 'search';
+
+    /**
+     * The search queries.
+     */
+    queries?: Array<string>;
 
     /**
      * The sources used in the search.
@@ -2301,11 +2801,7 @@ export namespace ResponseInputAudio {
 /**
  * A text input to the model.
  */
-export type ResponseInputContent =
-  | ResponseInputText
-  | ResponseInputImage
-  | ResponseInputFile
-  | ResponseInputAudio;
+export type ResponseInputContent = ResponseInputText | ResponseInputImage | ResponseInputFile;
 
 /**
  * A file input to the model.
@@ -2441,10 +2937,15 @@ export type ResponseInputItem =
   | ResponseFunctionToolCall
   | ResponseInputItem.FunctionCallOutput
   | ResponseReasoningItem
+  | ResponseCompactionItemParam
   | ResponseInputItem.ImageGenerationCall
   | ResponseCodeInterpreterToolCall
   | ResponseInputItem.LocalShellCall
   | ResponseInputItem.LocalShellCallOutput
+  | ResponseInputItem.ShellCall
+  | ResponseInputItem.ShellCallOutput
+  | ResponseInputItem.ApplyPatchCall
+  | ResponseInputItem.ApplyPatchCallOutput
   | ResponseInputItem.McpListTools
   | ResponseInputItem.McpApprovalRequest
   | ResponseInputItem.McpApprovalResponse
@@ -2689,6 +3190,221 @@ export namespace ResponseInputItem {
      * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
      */
     status?: 'in_progress' | 'completed' | 'incomplete' | null;
+  }
+
+  /**
+   * A tool representing a request to execute one or more shell commands.
+   */
+  export interface ShellCall {
+    /**
+     * The shell commands and limits that describe how to run the tool call.
+     */
+    action: ShellCall.Action;
+
+    /**
+     * The unique ID of the shell tool call generated by the model.
+     */
+    call_id: string;
+
+    /**
+     * The type of the item. Always `shell_call`.
+     */
+    type: 'shell_call';
+
+    /**
+     * The unique ID of the shell tool call. Populated when this item is returned via
+     * API.
+     */
+    id?: string | null;
+
+    /**
+     * The status of the shell call. One of `in_progress`, `completed`, or
+     * `incomplete`.
+     */
+    status?: 'in_progress' | 'completed' | 'incomplete' | null;
+  }
+
+  export namespace ShellCall {
+    /**
+     * The shell commands and limits that describe how to run the tool call.
+     */
+    export interface Action {
+      /**
+       * Ordered shell commands for the execution environment to run.
+       */
+      commands: Array<string>;
+
+      /**
+       * Maximum number of UTF-8 characters to capture from combined stdout and stderr
+       * output.
+       */
+      max_output_length?: number | null;
+
+      /**
+       * Maximum wall-clock time in milliseconds to allow the shell commands to run.
+       */
+      timeout_ms?: number | null;
+    }
+  }
+
+  /**
+   * The streamed output items emitted by a shell tool call.
+   */
+  export interface ShellCallOutput {
+    /**
+     * The unique ID of the shell tool call generated by the model.
+     */
+    call_id: string;
+
+    /**
+     * Captured chunks of stdout and stderr output, along with their associated
+     * outcomes.
+     */
+    output: Array<ResponsesAPI.ResponseFunctionShellCallOutputContent>;
+
+    /**
+     * The type of the item. Always `shell_call_output`.
+     */
+    type: 'shell_call_output';
+
+    /**
+     * The unique ID of the shell tool call output. Populated when this item is
+     * returned via API.
+     */
+    id?: string | null;
+
+    /**
+     * The maximum number of UTF-8 characters captured for this shell call's combined
+     * output.
+     */
+    max_output_length?: number | null;
+
+    /**
+     * The status of the shell call output.
+     */
+    status?: 'in_progress' | 'completed' | 'incomplete' | null;
+  }
+
+  /**
+   * A tool call representing a request to create, delete, or update files using diff
+   * patches.
+   */
+  export interface ApplyPatchCall {
+    /**
+     * The unique ID of the apply patch tool call generated by the model.
+     */
+    call_id: string;
+
+    /**
+     * The specific create, delete, or update instruction for the apply_patch tool
+     * call.
+     */
+    operation: ApplyPatchCall.CreateFile | ApplyPatchCall.DeleteFile | ApplyPatchCall.UpdateFile;
+
+    /**
+     * The status of the apply patch tool call. One of `in_progress` or `completed`.
+     */
+    status: 'in_progress' | 'completed';
+
+    /**
+     * The type of the item. Always `apply_patch_call`.
+     */
+    type: 'apply_patch_call';
+
+    /**
+     * The unique ID of the apply patch tool call. Populated when this item is returned
+     * via API.
+     */
+    id?: string | null;
+  }
+
+  export namespace ApplyPatchCall {
+    /**
+     * Instruction for creating a new file via the apply_patch tool.
+     */
+    export interface CreateFile {
+      /**
+       * Unified diff content to apply when creating the file.
+       */
+      diff: string;
+
+      /**
+       * Path of the file to create relative to the workspace root.
+       */
+      path: string;
+
+      /**
+       * The operation type. Always `create_file`.
+       */
+      type: 'create_file';
+    }
+
+    /**
+     * Instruction for deleting an existing file via the apply_patch tool.
+     */
+    export interface DeleteFile {
+      /**
+       * Path of the file to delete relative to the workspace root.
+       */
+      path: string;
+
+      /**
+       * The operation type. Always `delete_file`.
+       */
+      type: 'delete_file';
+    }
+
+    /**
+     * Instruction for updating an existing file via the apply_patch tool.
+     */
+    export interface UpdateFile {
+      /**
+       * Unified diff content to apply to the existing file.
+       */
+      diff: string;
+
+      /**
+       * Path of the file to update relative to the workspace root.
+       */
+      path: string;
+
+      /**
+       * The operation type. Always `update_file`.
+       */
+      type: 'update_file';
+    }
+  }
+
+  /**
+   * The streamed output emitted by an apply patch tool call.
+   */
+  export interface ApplyPatchCallOutput {
+    /**
+     * The unique ID of the apply patch tool call generated by the model.
+     */
+    call_id: string;
+
+    /**
+     * The status of the apply patch tool call output. One of `completed` or `failed`.
+     */
+    status: 'completed' | 'failed';
+
+    /**
+     * The type of the item. Always `apply_patch_call_output`.
+     */
+    type: 'apply_patch_call_output';
+
+    /**
+     * The unique ID of the apply patch tool call output. Populated when this item is
+     * returned via API.
+     */
+    id?: string | null;
+
+    /**
+     * Optional human-readable log text from the apply patch tool (e.g., patch results
+     * or errors).
+     */
+    output?: string | null;
   }
 
   /**
@@ -2958,6 +3674,10 @@ export type ResponseItem =
   | ResponseCodeInterpreterToolCall
   | ResponseItem.LocalShellCall
   | ResponseItem.LocalShellCallOutput
+  | ResponseFunctionShellToolCall
+  | ResponseFunctionShellToolCallOutput
+  | ResponseApplyPatchToolCall
+  | ResponseApplyPatchToolCallOutput
   | ResponseItem.McpListTools
   | ResponseItem.McpApprovalRequest
   | ResponseItem.McpApprovalResponse
@@ -3495,9 +4215,14 @@ export type ResponseOutputItem =
   | ResponseFunctionWebSearch
   | ResponseComputerToolCall
   | ResponseReasoningItem
+  | ResponseCompactionItem
   | ResponseOutputItem.ImageGenerationCall
   | ResponseCodeInterpreterToolCall
   | ResponseOutputItem.LocalShellCall
+  | ResponseFunctionShellToolCall
+  | ResponseFunctionShellToolCallOutput
+  | ResponseApplyPatchToolCall
+  | ResponseApplyPatchToolCallOutput
   | ResponseOutputItem.McpCall
   | ResponseOutputItem.McpListTools
   | ResponseOutputItem.McpApprovalRequest
@@ -4861,8 +5586,10 @@ export type Tool =
   | Tool.CodeInterpreter
   | Tool.ImageGeneration
   | Tool.LocalShell
+  | FunctionShellTool
   | CustomTool
-  | WebSearchPreviewTool;
+  | WebSearchPreviewTool
+  | ApplyPatchTool;
 
 export namespace Tool {
   /**
@@ -5023,7 +5750,8 @@ export namespace Tool {
   export interface CodeInterpreter {
     /**
      * The code interpreter container. Can be a container ID or an object that
-     * specifies uploaded file IDs to make available to your code.
+     * specifies uploaded file IDs to make available to your code, along with an
+     * optional `memory_limit` setting.
      */
     container: string | CodeInterpreter.CodeInterpreterToolAuto;
 
@@ -5048,11 +5776,16 @@ export namespace Tool {
        * An optional list of uploaded files to make available to your code.
        */
       file_ids?: Array<string>;
+
+      /**
+       * The memory limit for the code interpreter container.
+       */
+      memory_limit?: '1g' | '4g' | '16g' | '64g' | null;
     }
   }
 
   /**
-   * A tool that generates images using a model like `gpt-image-1`.
+   * A tool that generates images using the GPT image models.
    */
   export interface ImageGeneration {
     /**
@@ -5067,7 +5800,10 @@ export namespace Tool {
     background?: 'transparent' | 'opaque' | 'auto';
 
     /**
-     * Control how much effort the model will exert to match the style and features, especially facial features, of input images. This parameter is only supported for `gpt-image-1`. Unsupported for `gpt-image-1-mini`. Supports `high` and `low`. Defaults to `low`.
+     * Control how much effort the model will exert to match the style and features,
+     * especially facial features, of input images. This parameter is only supported
+     * for `gpt-image-1`. Unsupported for `gpt-image-1-mini`. Supports `high` and
+     * `low`. Defaults to `low`.
      */
     input_fidelity?: 'high' | 'low' | null;
 
@@ -5080,7 +5816,7 @@ export namespace Tool {
     /**
      * The image generation model to use. Default: `gpt-image-1`.
      */
-    model?: 'gpt-image-1' | 'gpt-image-1-mini';
+    model?: (string & {}) | 'gpt-image-1' | 'gpt-image-1-mini';
 
     /**
      * Moderation level for the generated image. Default: `auto`.
@@ -5135,6 +5871,9 @@ export namespace Tool {
     }
   }
 
+  /**
+   * A tool that allows the model to execute shell commands in a local environment.
+   */
   export interface LocalShell {
     /**
      * The type of the local shell tool. Always `local_shell`.
@@ -5176,6 +5915,16 @@ export interface ToolChoiceAllowed {
    * Allowed tool configuration type. Always `allowed_tools`.
    */
   type: 'allowed_tools';
+}
+
+/**
+ * Forces the model to call the apply_patch tool when executing a tool call.
+ */
+export interface ToolChoiceApplyPatch {
+  /**
+   * The tool to call. Always `apply_patch`.
+   */
+  type: 'apply_patch';
 }
 
 /**
@@ -5240,6 +5989,16 @@ export interface ToolChoiceMcp {
  * `required` means the model must call one or more tools.
  */
 export type ToolChoiceOptions = 'none' | 'auto' | 'required';
+
+/**
+ * Forces the model to call the shell tool when a tool call is required.
+ */
+export interface ToolChoiceShell {
+  /**
+   * The tool to call. Always `shell`.
+   */
+  type: 'shell';
+}
 
 /**
  * Indicates that the model should use a built-in tool to generate a response.
@@ -5518,6 +6277,14 @@ export interface ResponseCreateParamsBase {
   prompt_cache_key?: string;
 
   /**
+   * The retention policy for the prompt cache. Set to `24h` to enable extended
+   * prompt caching, which keeps cached prefixes active for longer, up to a maximum
+   * of 24 hours.
+   * [Learn more](https://platform.openai.com/docs/guides/prompt-caching#prompt-cache-retention).
+   */
+  prompt_cache_retention?: 'in-memory' | '24h' | null;
+
+  /**
    * **gpt-5 and o-series models only**
    *
    * Configuration options for
@@ -5601,7 +6368,9 @@ export interface ResponseCreateParamsBase {
     | ToolChoiceTypes
     | ToolChoiceFunction
     | ToolChoiceMcp
-    | ToolChoiceCustom;
+    | ToolChoiceCustom
+    | ToolChoiceApplyPatch
+    | ToolChoiceShell;
 
   /**
    * An array of tools the model may call while generating a response. You can
@@ -5765,17 +6534,142 @@ export interface ResponseRetrieveParamsStreaming extends ResponseRetrieveParamsB
   stream: true;
 }
 
+export interface ResponseCompactParams {
+  /**
+   * Model ID used to generate the response, like `gpt-5` or `o3`. OpenAI offers a
+   * wide range of models with different capabilities, performance characteristics,
+   * and price points. Refer to the
+   * [model guide](https://platform.openai.com/docs/models) to browse and compare
+   * available models.
+   */
+  model:
+    | 'gpt-5.2'
+    | 'gpt-5.2-2025-12-11'
+    | 'gpt-5.2-chat-latest'
+    | 'gpt-5.2-pro'
+    | 'gpt-5.2-pro-2025-12-11'
+    | 'gpt-5.1'
+    | 'gpt-5.1-2025-11-13'
+    | 'gpt-5.1-codex'
+    | 'gpt-5.1-mini'
+    | 'gpt-5.1-chat-latest'
+    | 'gpt-5'
+    | 'gpt-5-mini'
+    | 'gpt-5-nano'
+    | 'gpt-5-2025-08-07'
+    | 'gpt-5-mini-2025-08-07'
+    | 'gpt-5-nano-2025-08-07'
+    | 'gpt-5-chat-latest'
+    | 'gpt-4.1'
+    | 'gpt-4.1-mini'
+    | 'gpt-4.1-nano'
+    | 'gpt-4.1-2025-04-14'
+    | 'gpt-4.1-mini-2025-04-14'
+    | 'gpt-4.1-nano-2025-04-14'
+    | 'o4-mini'
+    | 'o4-mini-2025-04-16'
+    | 'o3'
+    | 'o3-2025-04-16'
+    | 'o3-mini'
+    | 'o3-mini-2025-01-31'
+    | 'o1'
+    | 'o1-2024-12-17'
+    | 'o1-preview'
+    | 'o1-preview-2024-09-12'
+    | 'o1-mini'
+    | 'o1-mini-2024-09-12'
+    | 'gpt-4o'
+    | 'gpt-4o-2024-11-20'
+    | 'gpt-4o-2024-08-06'
+    | 'gpt-4o-2024-05-13'
+    | 'gpt-4o-audio-preview'
+    | 'gpt-4o-audio-preview-2024-10-01'
+    | 'gpt-4o-audio-preview-2024-12-17'
+    | 'gpt-4o-audio-preview-2025-06-03'
+    | 'gpt-4o-mini-audio-preview'
+    | 'gpt-4o-mini-audio-preview-2024-12-17'
+    | 'gpt-4o-search-preview'
+    | 'gpt-4o-mini-search-preview'
+    | 'gpt-4o-search-preview-2025-03-11'
+    | 'gpt-4o-mini-search-preview-2025-03-11'
+    | 'chatgpt-4o-latest'
+    | 'codex-mini-latest'
+    | 'gpt-4o-mini'
+    | 'gpt-4o-mini-2024-07-18'
+    | 'gpt-4-turbo'
+    | 'gpt-4-turbo-2024-04-09'
+    | 'gpt-4-0125-preview'
+    | 'gpt-4-turbo-preview'
+    | 'gpt-4-1106-preview'
+    | 'gpt-4-vision-preview'
+    | 'gpt-4'
+    | 'gpt-4-0314'
+    | 'gpt-4-0613'
+    | 'gpt-4-32k'
+    | 'gpt-4-32k-0314'
+    | 'gpt-4-32k-0613'
+    | 'gpt-3.5-turbo'
+    | 'gpt-3.5-turbo-16k'
+    | 'gpt-3.5-turbo-0301'
+    | 'gpt-3.5-turbo-0613'
+    | 'gpt-3.5-turbo-1106'
+    | 'gpt-3.5-turbo-0125'
+    | 'gpt-3.5-turbo-16k-0613'
+    | 'o1-pro'
+    | 'o1-pro-2025-03-19'
+    | 'o3-pro'
+    | 'o3-pro-2025-06-10'
+    | 'o3-deep-research'
+    | 'o3-deep-research-2025-06-26'
+    | 'o4-mini-deep-research'
+    | 'o4-mini-deep-research-2025-06-26'
+    | 'computer-use-preview'
+    | 'computer-use-preview-2025-03-11'
+    | 'gpt-5-codex'
+    | 'gpt-5-pro'
+    | 'gpt-5-pro-2025-10-06'
+    | 'gpt-5.1-codex-max'
+    | (string & {})
+    | null;
+
+  /**
+   * Text, image, or file inputs to the model, used to generate a response
+   */
+  input?: string | Array<ResponseInputItem> | null;
+
+  /**
+   * A system (or developer) message inserted into the model's context. When used
+   * along with `previous_response_id`, the instructions from a previous response
+   * will not be carried over to the next response. This makes it simple to swap out
+   * system (or developer) messages in new responses.
+   */
+  instructions?: string | null;
+
+  /**
+   * The unique ID of the previous response to the model. Use this to create
+   * multi-turn conversations. Learn more about
+   * [conversation state](https://platform.openai.com/docs/guides/conversation-state).
+   * Cannot be used in conjunction with `conversation`.
+   */
+  previous_response_id?: string | null;
+}
+
 Responses.InputItems = InputItems;
 Responses.InputTokens = InputTokens;
 
 export declare namespace Responses {
   export {
+    type ApplyPatchTool as ApplyPatchTool,
+    type CompactedResponse as CompactedResponse,
     type ComputerTool as ComputerTool,
     type CustomTool as CustomTool,
     type EasyInputMessage as EasyInputMessage,
     type FileSearchTool as FileSearchTool,
+    type FunctionShellTool as FunctionShellTool,
     type FunctionTool as FunctionTool,
     type Response as Response,
+    type ResponseApplyPatchToolCall as ResponseApplyPatchToolCall,
+    type ResponseApplyPatchToolCallOutput as ResponseApplyPatchToolCallOutput,
     type ResponseAudioDeltaEvent as ResponseAudioDeltaEvent,
     type ResponseAudioDoneEvent as ResponseAudioDoneEvent,
     type ResponseAudioTranscriptDeltaEvent as ResponseAudioTranscriptDeltaEvent,
@@ -5786,6 +6680,8 @@ export declare namespace Responses {
     type ResponseCodeInterpreterCallInProgressEvent as ResponseCodeInterpreterCallInProgressEvent,
     type ResponseCodeInterpreterCallInterpretingEvent as ResponseCodeInterpreterCallInterpretingEvent,
     type ResponseCodeInterpreterToolCall as ResponseCodeInterpreterToolCall,
+    type ResponseCompactionItem as ResponseCompactionItem,
+    type ResponseCompactionItemParam as ResponseCompactionItemParam,
     type ResponseCompletedEvent as ResponseCompletedEvent,
     type ResponseComputerToolCall as ResponseComputerToolCall,
     type ResponseComputerToolCallOutputItem as ResponseComputerToolCallOutputItem,
@@ -5812,6 +6708,9 @@ export declare namespace Responses {
     type ResponseFunctionCallArgumentsDoneEvent as ResponseFunctionCallArgumentsDoneEvent,
     type ResponseFunctionCallOutputItem as ResponseFunctionCallOutputItem,
     type ResponseFunctionCallOutputItemList as ResponseFunctionCallOutputItemList,
+    type ResponseFunctionShellCallOutputContent as ResponseFunctionShellCallOutputContent,
+    type ResponseFunctionShellToolCall as ResponseFunctionShellToolCall,
+    type ResponseFunctionShellToolCallOutput as ResponseFunctionShellToolCallOutput,
     type ResponseFunctionToolCall as ResponseFunctionToolCall,
     type ResponseFunctionToolCallItem as ResponseFunctionToolCallItem,
     type ResponseFunctionToolCallOutputItem as ResponseFunctionToolCallOutputItem,
@@ -5874,10 +6773,12 @@ export declare namespace Responses {
     type ResponseWebSearchCallSearchingEvent as ResponseWebSearchCallSearchingEvent,
     type Tool as Tool,
     type ToolChoiceAllowed as ToolChoiceAllowed,
+    type ToolChoiceApplyPatch as ToolChoiceApplyPatch,
     type ToolChoiceCustom as ToolChoiceCustom,
     type ToolChoiceFunction as ToolChoiceFunction,
     type ToolChoiceMcp as ToolChoiceMcp,
     type ToolChoiceOptions as ToolChoiceOptions,
+    type ToolChoiceShell as ToolChoiceShell,
     type ToolChoiceTypes as ToolChoiceTypes,
     type WebSearchPreviewTool as WebSearchPreviewTool,
     type WebSearchTool as WebSearchTool,
@@ -5887,6 +6788,7 @@ export declare namespace Responses {
     type ResponseRetrieveParams as ResponseRetrieveParams,
     type ResponseRetrieveParamsNonStreaming as ResponseRetrieveParamsNonStreaming,
     type ResponseRetrieveParamsStreaming as ResponseRetrieveParamsStreaming,
+    type ResponseCompactParams as ResponseCompactParams,
   };
 
   export {
