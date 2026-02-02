@@ -2426,7 +2426,7 @@ export interface ResponseFunctionWebSearch {
   action:
     | ResponseFunctionWebSearch.Search
     | ResponseFunctionWebSearch.OpenPage
-    | ResponseFunctionWebSearch.Find;
+    | ResponseFunctionWebSearch.FindInPage;
 
   /**
    * The status of the web search tool call.
@@ -2498,9 +2498,9 @@ export namespace ResponseFunctionWebSearch {
   }
 
   /**
-   * Action type "find": Searches for a pattern within a loaded page.
+   * Action type "find_in_page": Searches for a pattern within a loaded page.
    */
-  export interface Find {
+  export interface FindInPage {
     /**
      * The pattern or text to search for within the page.
      */
@@ -2509,7 +2509,7 @@ export namespace ResponseFunctionWebSearch {
     /**
      * The action type.
      */
-    type: 'find';
+    type: 'find_in_page';
 
     /**
      * The URL of the page searched for the pattern.
