@@ -47,6 +47,12 @@ export async function defaultParseResponse<T>(
     const mediaType = contentType?.split(';')[0]?.trim();
     const isJSON = mediaType?.includes('application/json') || mediaType?.endsWith('+json');
     if (isJSON) {
+      const contentLength = response.headers.get('content-length');
+      if (contentLength === '0') {
+        // if there is no content we can't do anything
+        return undefined as T;
+      }
+
       const json = await response.json();
       return addRequestID(json as T, response);
     }
