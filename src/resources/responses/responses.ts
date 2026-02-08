@@ -5816,8 +5816,8 @@ export namespace Tool {
     /**
      * Control how much effort the model will exert to match the style and features,
      * especially facial features, of input images. This parameter is only supported
-     * for `gpt-image-1`. Unsupported for `gpt-image-1-mini`. Supports `high` and
-     * `low`. Defaults to `low`.
+     * for `gpt-image-1` and `gpt-image-1.5` and later models, unsupported for
+     * `gpt-image-1-mini`. Supports `high` and `low`. Defaults to `low`.
      */
     input_fidelity?: 'high' | 'low' | null;
 
@@ -6184,6 +6184,11 @@ export interface ResponseCreateParamsBase {
   background?: boolean | null;
 
   /**
+   * Context management configuration for this request.
+   */
+  context_management?: Array<ResponseCreateParams.ContextManagement> | null;
+
+  /**
    * The conversation that this response belongs to. Items from this conversation are
    * prepended to `input_items` for this response request. Input items and output
    * items from this response are automatically added to this conversation after this
@@ -6441,6 +6446,18 @@ export interface ResponseCreateParamsBase {
 }
 
 export namespace ResponseCreateParams {
+  export interface ContextManagement {
+    /**
+     * The context management entry type. Currently only 'compaction' is supported.
+     */
+    type: string;
+
+    /**
+     * Token threshold at which compaction should be triggered for this entry.
+     */
+    compact_threshold?: number | null;
+  }
+
   /**
    * Options for streaming responses. Only set this when you set `stream: true`.
    */

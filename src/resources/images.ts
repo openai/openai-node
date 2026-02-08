@@ -573,8 +573,8 @@ export interface ImageEditParamsBase {
   /**
    * Control how much effort the model will exert to match the style and features,
    * especially facial features, of input images. This parameter is only supported
-   * for `gpt-image-1`. Unsupported for `gpt-image-1-mini`. Supports `high` and
-   * `low`. Defaults to `low`.
+   * for `gpt-image-1` and `gpt-image-1.5` and later models, unsupported for
+   * `gpt-image-1-mini`. Supports `high` and `low`. Defaults to `low`.
    */
   input_fidelity?: 'high' | 'low' | null;
 
