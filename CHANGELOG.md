@@ -1,5 +1,13 @@
 # Changelog
 
+## 6.19.0 (2026-02-09)
+
+Full Changelog: [v6.18.0...v6.19.0](https://github.com/openai/openai-node/compare/v6.18.0...v6.19.0)
+
+### Features
+
+* **api:** responses context_management ([40e7671](https://github.com/openai/openai-node/commit/40e7671675159966fe219b3aebfb24b9b03f2c95))
+
 ## 6.18.0 (2026-02-05)
 
 Full Changelog: [v6.17.0...v6.18.0](https://github.com/openai/openai-node/compare/v6.17.0...v6.18.0)
