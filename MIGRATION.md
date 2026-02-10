@@ -83,6 +83,9 @@ client.parents.children.retrieve('c_456', { parent_id: 'p_123' });
 - `client.containers.files.retrieve()`
 - `client.containers.files.delete()`
 - `client.containers.files.content.retrieve()`
+- `client.skills.versions.retrieve()`
+- `client.skills.versions.delete()`
+- `client.skills.versions.content.retrieve()`
 
 </details>
 
@@ -143,6 +146,10 @@ client.example.list(undefined, { headers: { ... } });
 - `client.evals.runs.list()`
 - `client.containers.list()`
 - `client.containers.files.list()`
+- `client.skills.create()`
+- `client.skills.list()`
+- `client.skills.versions.create()`
+- `client.skills.versions.list()`
 - `client.videos.list()`
 - `client.videos.downloadContent()`
 

@@ -607,11 +607,20 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ApplyPatchTool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">CompactedResponse</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ComputerTool</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ContainerAuto</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ContainerNetworkPolicyAllowlist</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ContainerNetworkPolicyDisabled</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ContainerNetworkPolicyDomainSecret</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ContainerReference</a></code>
 - <code><a href="./src/resources/responses/responses.ts">CustomTool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">EasyInputMessage</a></code>
 - <code><a href="./src/resources/responses/responses.ts">FileSearchTool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">FunctionShellTool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">FunctionTool</a></code>
+- <code><a href="./src/resources/responses/responses.ts">InlineSkill</a></code>
+- <code><a href="./src/resources/responses/responses.ts">InlineSkillSource</a></code>
+- <code><a href="./src/resources/responses/responses.ts">LocalEnvironment</a></code>
+- <code><a href="./src/resources/responses/responses.ts">LocalSkill</a></code>
 - <code><a href="./src/resources/responses/responses.ts">Response</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseApplyPatchToolCall</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseApplyPatchToolCallOutput</a></code>
@@ -631,6 +640,7 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponseComputerToolCall</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseComputerToolCallOutputItem</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseComputerToolCallOutputScreenshot</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseContainerReference</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseContent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseContentPartAddedEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseContentPartDoneEvent</a></code>
@@ -680,6 +690,7 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponseInputText</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseInputTextContent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseItem</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseLocalEnvironment</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseMcpCallArgumentsDeltaEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseMcpCallArgumentsDoneEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseMcpCallCompletedEvent</a></code>
@@ -716,6 +727,7 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponseWebSearchCallCompletedEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseWebSearchCallInProgressEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseWebSearchCallSearchingEvent</a></code>
+- <code><a href="./src/resources/responses/responses.ts">SkillReference</a></code>
 - <code><a href="./src/resources/responses/responses.ts">Tool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ToolChoiceAllowed</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ToolChoiceApplyPatch</a></code>
@@ -1011,6 +1023,49 @@ Methods:
 Methods:
 
 - <code title="get /containers/{container_id}/files/{file_id}/content">client.containers.files.content.<a href="./src/resources/containers/files/content.ts">retrieve</a>(fileID, { ...params }) -> Response</code>
+
+# Skills
+
+Types:
+
+- <code><a href="./src/resources/skills/skills.ts">DeletedSkill</a></code>
+- <code><a href="./src/resources/skills/skills.ts">Skill</a></code>
+- <code><a href="./src/resources/skills/skills.ts">SkillList</a></code>
+
+Methods:
+
+- <code title="post /skills">client.skills.<a href="./src/resources/skills/skills.ts">create</a>({ ...params }) -> Skill</code>
+- <code title="get /skills/{skill_id}">client.skills.<a href="./src/resources/skills/skills.ts">retrieve</a>(skillID) -> Skill</code>
+- <code title="post /skills/{skill_id}">client.skills.<a href="./src/resources/skills/skills.ts">update</a>(skillID, { ...params }) -> Skill</code>
+- <code title="get /skills">client.skills.<a href="./src/resources/skills/skills.ts">list</a>({ ...params }) -> SkillsPage</code>
+- <code title="delete /skills/{skill_id}">client.skills.<a href="./src/resources/skills/skills.ts">delete</a>(skillID) -> DeletedSkill</code>
+
+## Content
+
+Methods:
+
+- <code title="get /skills/{skill_id}/content">client.skills.content.<a href="./src/resources/skills/content.ts">retrieve</a>(skillID) -> Response</code>
+
+## Versions
+
+Types:
+
+- <code><a href="./src/resources/skills/versions/versions.ts">DeletedSkillVersion</a></code>
+- <code><a href="./src/resources/skills/versions/versions.ts">SkillVersion</a></code>
+- <code><a href="./src/resources/skills/versions/versions.ts">SkillVersionList</a></code>
+
+Methods:
+
+- <code title="post /skills/{skill_id}/versions">client.skills.versions.<a href="./src/resources/skills/versions/versions.ts">create</a>(skillID, { ...params }) -> SkillVersion</code>
+- <code title="get /skills/{skill_id}/versions/{version}">client.skills.versions.<a href="./src/resources/skills/versions/versions.ts">retrieve</a>(version, { ...params }) -> SkillVersion</code>
+- <code title="get /skills/{skill_id}/versions">client.skills.versions.<a href="./src/resources/skills/versions/versions.ts">list</a>(skillID, { ...params }) -> SkillVersionsPage</code>
+- <code title="delete /skills/{skill_id}/versions/{version}">client.skills.versions.<a href="./src/resources/skills/versions/versions.ts">delete</a>(version, { ...params }) -> DeletedSkillVersion</code>
+
+### Content
+
+Methods:
+
+- <code title="get /skills/{skill_id}/versions/{version}/content">client.skills.versions.content.<a href="./src/resources/skills/versions/content.ts">retrieve</a>(version, { ...params }) -> Response</code>
 
 # Videos
 
