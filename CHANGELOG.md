@@ -1,5 +1,13 @@
 # Changelog
 
+## 6.21.0 (2026-02-10)
+
+Full Changelog: [v6.20.0...v6.21.0](https://github.com/openai/openai-node/compare/v6.20.0...v6.21.0)
+
+### Features
+
+* **api:** support for images in batch api ([017ba1c](https://github.com/openai/openai-node/commit/017ba1cb5a08428ca59197764cff460c70950e84))
+
 ## 6.20.0 (2026-02-10)
 
 Full Changelog: [v6.19.0...v6.20.0](https://github.com/openai/openai-node/compare/v6.19.0...v6.20.0)
