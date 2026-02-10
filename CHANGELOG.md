@@ -1,5 +1,13 @@
 # Changelog
 
+## 6.20.0 (2026-02-10)
+
+Full Changelog: [v6.19.0...v6.20.0](https://github.com/openai/openai-node/compare/v6.19.0...v6.20.0)
+
+### Features
+
+* **api:** skills and hosted shell ([e4bdd62](https://github.com/openai/openai-node/commit/e4bdd6205a0225d662ddeb07367f26094eaadbdd))
+
 ## 6.19.0 (2026-02-09)
 
 Full Changelog: [v6.18.0...v6.19.0](https://github.com/openai/openai-node/compare/v6.18.0...v6.19.0)
