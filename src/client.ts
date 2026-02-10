@@ -139,6 +139,16 @@ import { Graders } from './resources/graders/graders';
 import { Realtime } from './resources/realtime/realtime';
 import { Responses } from './resources/responses/responses';
 import {
+  DeletedSkill,
+  Skill,
+  SkillCreateParams,
+  SkillList,
+  SkillListParams,
+  SkillUpdateParams,
+  Skills,
+  SkillsPage,
+} from './resources/skills/skills';
+import {
   Upload,
   UploadCompleteParams,
   UploadCreateParams,
@@ -1030,6 +1040,7 @@ export class OpenAI {
   conversations: API.Conversations = new API.Conversations(this);
   evals: API.Evals = new API.Evals(this);
   containers: API.Containers = new API.Containers(this);
+  skills: API.Skills = new API.Skills(this);
   videos: API.Videos = new API.Videos(this);
 }
 
@@ -1053,6 +1064,7 @@ OpenAI.Realtime = Realtime;
 OpenAI.Conversations = Conversations;
 OpenAI.Evals = Evals;
 OpenAI.Containers = Containers;
+OpenAI.Skills = Skills;
 OpenAI.Videos = Videos;
 
 export declare namespace OpenAI {
@@ -1261,6 +1273,17 @@ export declare namespace OpenAI {
     type ContainerListResponsesPage as ContainerListResponsesPage,
     type ContainerCreateParams as ContainerCreateParams,
     type ContainerListParams as ContainerListParams,
+  };
+
+  export {
+    Skills as Skills,
+    type DeletedSkill as DeletedSkill,
+    type Skill as Skill,
+    type SkillList as SkillList,
+    type SkillsPage as SkillsPage,
+    type SkillCreateParams as SkillCreateParams,
+    type SkillUpdateParams as SkillUpdateParams,
+    type SkillListParams as SkillListParams,
   };
 
   export {

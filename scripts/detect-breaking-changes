@@ -59,6 +59,10 @@ TEST_PATHS=(
 	tests/api-resources/containers/containers.test.ts
 	tests/api-resources/containers/files/files.test.ts
 	tests/api-resources/containers/files/content.test.ts
+	tests/api-resources/skills/skills.test.ts
+	tests/api-resources/skills/content.test.ts
+	tests/api-resources/skills/versions/versions.test.ts
+	tests/api-resources/skills/versions/content.test.ts
 	tests/api-resources/videos.test.ts
 	tests/index.test.ts
 )

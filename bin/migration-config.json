@@ -934,6 +934,105 @@
           "type": "options"
         }
       ]
+    },
+    {
+      "base": "skills.versions",
+      "name": "retrieve",
+      "params": [
+        {
+          "type": "param",
+          "key": "version",
+          "location": "path"
+        },
+        {
+          "type": "params",
+          "maybeOverload": false
+        },
+        {
+          "type": "options"
+        }
+      ],
+      "oldParams": [
+        {
+          "type": "param",
+          "key": "skill_id",
+          "location": "path"
+        },
+        {
+          "type": "param",
+          "key": "version",
+          "location": "path"
+        },
+        {
+          "type": "options"
+        }
+      ]
+    },
+    {
+      "base": "skills.versions",
+      "name": "delete",
+      "params": [
+        {
+          "type": "param",
+          "key": "version",
+          "location": "path"
+        },
+        {
+          "type": "params",
+          "maybeOverload": false
+        },
+        {
+          "type": "options"
+        }
+      ],
+      "oldParams": [
+        {
+          "type": "param",
+          "key": "skill_id",
+          "location": "path"
+        },
+        {
+          "type": "param",
+          "key": "version",
+          "location": "path"
+        },
+        {
+          "type": "options"
+        }
+      ]
+    },
+    {
+      "base": "skills.versions.content",
+      "name": "retrieve",
+      "params": [
+        {
+          "type": "param",
+          "key": "version",
+          "location": "path"
+        },
+        {
+          "type": "params",
+          "maybeOverload": false
+        },
+        {
+          "type": "options"
+        }
+      ],
+      "oldParams": [
+        {
+          "type": "param",
+          "key": "skill_id",
+          "location": "path"
+        },
+        {
+          "type": "param",
+          "key": "version",
+          "location": "path"
+        },
+        {
+          "type": "options"
+        }
+      ]
     }
   ]
 }
