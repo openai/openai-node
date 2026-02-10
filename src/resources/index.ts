@@ -98,6 +98,16 @@ export {
 } from './moderations';
 export { Realtime } from './realtime/realtime';
 export { Responses } from './responses/responses';
+export {
+  Skills,
+  type DeletedSkill,
+  type Skill,
+  type SkillList,
+  type SkillCreateParams,
+  type SkillUpdateParams,
+  type SkillListParams,
+  type SkillsPage,
+} from './skills/skills';
 export { Uploads, type Upload, type UploadCreateParams, type UploadCompleteParams } from './uploads/uploads';
 export {
   VectorStores,
