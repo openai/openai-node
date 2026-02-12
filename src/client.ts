@@ -106,7 +106,6 @@ import {
   Videos,
   VideosPage,
 } from './resources/videos';
-import { Webhooks } from './resources/webhooks';
 import { Audio, AudioModel, AudioResponseFormat } from './resources/audio/audio';
 import { Beta } from './resources/beta/beta';
 import { Chat } from './resources/chat/chat';
@@ -173,6 +172,7 @@ import {
   VectorStores,
   VectorStoresPage,
 } from './resources/vector-stores/vector-stores';
+import { Webhooks } from './resources/webhooks/webhooks';
 import {
   ChatCompletion,
   ChatCompletionAllowedToolChoice,
