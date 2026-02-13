@@ -25,6 +25,14 @@ describe('resource containers', () => {
       expires_after: { anchor: 'last_active_at', minutes: 0 },
       file_ids: ['string'],
       memory_limit: '1g',
+      network_policy: { type: 'disabled' },
+      skills: [
+        {
+          skill_id: 'x',
+          type: 'skill_reference',
+          version: 'version',
+        },
+      ],
     });
   });
 
@@ -57,6 +65,7 @@ describe('resource containers', () => {
         {
           after: 'after',
           limit: 0,
+          name: 'name',
           order: 'asc',
         },
         { path: '/_stainless_unknown_path' },
