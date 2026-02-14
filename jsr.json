@@ -10,8 +10,6 @@
     "zod": "npm:zod@3"
   },
   "publish": {
-    "exclude": [
-      "!."
-    ]
+    "exclude": ["!."]
   }
 }

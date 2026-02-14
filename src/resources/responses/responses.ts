@@ -2916,6 +2916,7 @@ export interface ResponseInProgressEvent {
  *   in code interpreter tool call items.
  */
 export type ResponseIncludable =
+  | 'web_search_call.action.sources'
   | 'file_search_call.results'
   | 'web_search_call.results'
   | 'web_search_call.action.sources'
