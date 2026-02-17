@@ -474,7 +474,9 @@ async function withRetry(
       if (retriesLeft <= 0 || !shouldRetry(err)) throw err;
       retriesLeft -= 1;
       console.error(
-        `${identifier} failed due to ${errorMessage(err)}; retries left ${retriesLeft}, next retry in ${retryDelayMs}ms`,
+        `${identifier} failed due to ${errorMessage(
+          err,
+        )}; retries left ${retriesLeft}, next retry in ${retryDelayMs}ms`,
       );
       await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
     }
@@ -482,7 +484,12 @@ async function withRetry(
 }
 
 function errorMessage(err: unknown): string {
-  if (err && typeof err === 'object' && 'shortMessage' in err && typeof (err as any).shortMessage === 'string') {
+  if (
+    err &&
+    typeof err === 'object' &&
+    'shortMessage' in err &&
+    typeof (err as any).shortMessage === 'string'
+  ) {
     return (err as any).shortMessage;
   }
   return String(err);
