@@ -210,6 +210,7 @@ function parseArgs() {
 type Args = Awaited<ReturnType<typeof parseArgs>>;
 
 let state: Args & { rootDir: string };
+type ChildOutputChunk = { dest: 'stdout' | 'stderr'; data: string | Buffer };
 
 async function main() {
   if (!process.env['OPENAI_API_KEY']) {
@@ -358,29 +359,43 @@ async function main() {
             }
 
             // preserve interleaved ordering of writes to stdout/stderr
-            const chunks: { dest: 'stdout' | 'stderr'; data: string | Buffer }[] = [];
+            const chunks: ChildOutputChunk[] = [];
             try {
               runningProjects.add(project);
-              const child = execa(
-                'yarn',
-                [
-                  'tsn',
-                  __filename,
-                  project,
-                  '--skip-pack',
-                  '--noCleanup',
-                  `--retry=${args.retry}`,
-                  ...(args.live ? ['--live'] : []),
-                  ...(args.verbose ? ['--verbose'] : []),
-                  ...(args.deploy ? ['--deploy'] : []),
-                  ...(args.fromNpm ? ['--from-npm'] : []),
-                ],
-                { stdio: 'pipe', encoding: 'utf8', maxBuffer: 100 * 1024 * 1024 },
+              await withRetry(
+                async () => {
+                  const child = execa(
+                    'yarn',
+                    [
+                      'tsn',
+                      __filename,
+                      project,
+                      '--skip-pack',
+                      '--noCleanup',
+                      `--retry=${args.retry}`,
+                      ...(args.live ? ['--live'] : []),
+                      ...(args.verbose ? ['--verbose'] : []),
+                      ...(args.deploy ? ['--deploy'] : []),
+                      ...(args.fromNpm ? ['--from-npm'] : []),
+                    ],
+                    {
+                      stdio: 'pipe',
+                      encoding: 'utf8',
+                      maxBuffer: 100 * 1024 * 1024,
+                      env: {
+                        DISABLE_V8_COMPILE_CACHE: process.env['DISABLE_V8_COMPILE_CACHE'] ?? '1',
+                      },
+                    },
+                  );
+                  child.stdout?.on('data', (data) => chunks.push({ dest: 'stdout', data }));
+                  child.stderr?.on('data', (data) => chunks.push({ dest: 'stderr', data }));
+                  await child;
+                },
+                `${project} worker process`,
+                args.retry,
+                args.retryDelay,
+                isLikelyNodeCrash,
               );
-              child.stdout?.on('data', (data) => chunks.push({ dest: 'stdout', data }));
-              child.stderr?.on('data', (data) => chunks.push({ dest: 'stderr', data }));
-
-              await child;
             } catch (error) {
               failed.push(project);
             } finally {
@@ -449,18 +464,39 @@ async function withRetry(
   identifier: string,
   retryAmount: number,
   retryDelayMs: number,
+  shouldRetry: (err: unknown) => boolean = () => true,
 ): Promise<void> {
-  do {
+  let retriesLeft = retryAmount;
+  while (true) {
     try {
       return await fn();
     } catch (err) {
-      if (--retryAmount <= 0) throw err;
+      if (retriesLeft <= 0 || !shouldRetry(err)) throw err;
+      retriesLeft -= 1;
       console.error(
-        `${identifier} failed due to ${err}; retries left ${retryAmount}, next retry in ${retryDelayMs}ms`,
+        `${identifier} failed due to ${errorMessage(err)}; retries left ${retriesLeft}, next retry in ${retryDelayMs}ms`,
       );
       await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
     }
-  } while (retryAmount > 0);
+  }
+}
+
+function errorMessage(err: unknown): string {
+  if (err && typeof err === 'object' && 'shortMessage' in err && typeof (err as any).shortMessage === 'string') {
+    return (err as any).shortMessage;
+  }
+  return String(err);
+}
+
+function isLikelyNodeCrash(err: unknown): boolean {
+  const signal = err && typeof err === 'object' ? (err as any).signal : undefined;
+  if (signal === 'SIGABRT' || signal === 'SIGSEGV' || signal === 'SIGBUS' || signal === 'SIGILL') {
+    return true;
+  }
+
+  const output =
+    err && typeof err === 'object' ? `${(err as any).stderr || ''}\n${(err as any).stdout || ''}` : '';
+  return /Fatal error in|Check failed:|Segmentation fault|core dumped/i.test(output);
 }
 
 function centerPad(text: string, width = text.length, char = ' '): string {
