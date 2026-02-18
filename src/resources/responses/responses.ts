@@ -6460,6 +6460,14 @@ export interface ResponseCreateParamsBase {
   max_output_tokens?: number | null;
 
   /**
+   * The maximum number of total calls to built-in tools that can be processed in a
+   * response. This maximum number applies across all built-in tool calls, not per
+   * individual tool. Any further attempts to call a tool by the model will be
+   * ignored.
+   */
+  max_tool_calls?: number | null;
+
+  /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
    * for storing additional information about the object in a structured format, and
    * querying for objects via API or the dashboard.
