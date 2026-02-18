@@ -69,6 +69,36 @@ const completion = await client.chat.completions.create({
 console.log(completion.choices[0].message.content);
 ```
 
+## vision
+Use the `responses` endpoint to generate text from images and text input. 
+Useful for describing and analyzing visual content.
+
+```ts
+const response = await openai.responses.create({
+    model: 'gpt-4o',
+    input: [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'input_text',
+            text: 'What is in this image?',
+          },
+          {
+            type: 'input_image',
+            detail: 'auto', //can be 'low', 'high', or 'auto'
+            // Replace with a real, accessible image
+            image_url: 'https://example.com/image.jpg',
+          },
+        ],
+      },
+    ],
+  });
+
+  console.log(response.output_text);
+
+```
+
 ## Streaming responses
 
 We provide support for streaming responses using Server Sent Events (SSE).
