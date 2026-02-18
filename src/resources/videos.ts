@@ -11,21 +11,21 @@ import { path } from '../internal/utils/path';
 
 export class Videos extends APIResource {
   /**
-   * Create a video
+   * Create a new video generation job from a prompt and optional reference assets.
    */
   create(body: VideoCreateParams, options?: RequestOptions): APIPromise<Video> {
     return this._client.post('/videos', maybeMultipartFormRequestOptions({ body, ...options }, this._client));
   }
 
   /**
-   * Retrieve a video
+   * Fetch the latest metadata for a generated video.
    */
   retrieve(videoID: string, options?: RequestOptions): APIPromise<Video> {
     return this._client.get(path`/videos/${videoID}`, options);
   }
 
   /**
-   * List videos
+   * List recently generated videos for the current project.
    */
   list(
     query: VideoListParams | null | undefined = {},
@@ -35,14 +35,16 @@ export class Videos extends APIResource {
   }
 
   /**
-   * Delete a video
+   * Permanently delete a completed or failed video and its stored assets.
    */
   delete(videoID: string, options?: RequestOptions): APIPromise<VideoDeleteResponse> {
     return this._client.delete(path`/videos/${videoID}`, options);
   }
 
   /**
-   * Download video content
+   * Download the generated video bytes or a derived preview asset.
+   *
+   * Streams the rendered video content for the specified video job.
    */
   downloadContent(
     videoID: string,
@@ -58,7 +60,7 @@ export class Videos extends APIResource {
   }
 
   /**
-   * Create a video remix
+   * Create a remix of a completed video using a refreshed prompt.
    */
   remix(videoID: string, body: VideoRemixParams, options?: RequestOptions): APIPromise<Video> {
     return this._client.post(

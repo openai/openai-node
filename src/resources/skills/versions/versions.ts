@@ -14,7 +14,7 @@ export class Versions extends APIResource {
   content: ContentAPI.Content = new ContentAPI.Content(this._client);
 
   /**
-   * Create Skill Version
+   * Create a new immutable skill version.
    */
   create(
     skillID: string,
@@ -28,7 +28,7 @@ export class Versions extends APIResource {
   }
 
   /**
-   * Get Skill Version
+   * Get a specific skill version.
    */
   retrieve(
     version: string,
@@ -40,7 +40,7 @@ export class Versions extends APIResource {
   }
 
   /**
-   * List Skill Versions
+   * List skill versions for a skill.
    */
   list(
     skillID: string,
@@ -54,7 +54,7 @@ export class Versions extends APIResource {
   }
 
   /**
-   * Delete Skill Version
+   * Delete a skill version.
    */
   delete(
     version: string,

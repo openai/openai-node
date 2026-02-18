@@ -9,6 +9,8 @@ export class Speech extends APIResource {
   /**
    * Generates audio from the input text.
    *
+   * Returns the audio file content, or a stream of audio events.
+   *
    * @example
    * ```ts
    * const speech = await client.audio.speech.create({

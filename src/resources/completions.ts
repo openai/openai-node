@@ -11,6 +11,9 @@ export class Completions extends APIResource {
   /**
    * Creates a completion for the provided prompt and parameters.
    *
+   * Returns a completion object, or a sequence of completion objects if the request
+   * is streamed.
+   *
    * @example
    * ```ts
    * const completion = await client.completions.create({
