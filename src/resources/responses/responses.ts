@@ -3051,7 +3051,7 @@ export interface ResponseInputImage {
    * The detail level of the image to be sent to the model. One of `high`, `low`, or
    * `auto`. Defaults to `auto`.
    */
-  detail: 'low' | 'high' | 'auto';
+  detail?: 'low' | 'high' | 'auto';
 
   /**
    * The type of the input item. Always `input_image`.
