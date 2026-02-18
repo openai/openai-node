@@ -31,7 +31,7 @@ export function maybeParseResponse<
   ParsedT = Params extends null ? null : ExtractParsedContentFromParams<NonNullable<Params>>,
 >(response: Response, params: Params): ParsedResponse<ParsedT> {
   if (!params || !hasAutoParseableInput(params)) {
-    return {
+    const parsed = {
       ...response,
       output_parsed: null,
       output: response.output.map((item) => {
@@ -55,6 +55,12 @@ export function maybeParseResponse<
         }
       }),
     };
+
+    if (needsOutputText(response, parsed)) {
+      addOutputText(parsed as Response);
+    }
+
+    return parsed;
   }
 
   return parseResponse(response, params);
@@ -95,7 +101,7 @@ export function parseResponse<
   );
 
   const parsed: Omit<ParsedResponse<ParsedT>, 'output_parsed'> = Object.assign({}, response, { output });
-  if (!Object.getOwnPropertyDescriptor(response, 'output_text')) {
+  if (needsOutputText(response, parsed)) {
     addOutputText(parsed);
   }
 
@@ -245,6 +251,13 @@ export function validateInputTools(tools: ChatCompletionTool[] | undefined) {
       );
     }
   }
+}
+
+function needsOutputText(
+  response: Response,
+  target: { output_text?: Response['output_text'] | null },
+): boolean {
+  return !Object.getOwnPropertyDescriptor(response, 'output_text') || target.output_text == null;
 }
 
 export function addOutputText(rsp: Response): void {
