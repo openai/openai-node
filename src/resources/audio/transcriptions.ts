@@ -13,6 +13,9 @@ export class Transcriptions extends APIResource {
   /**
    * Transcribes audio into the input language.
    *
+   * Returns a transcription object in `json`, `diarized_json`, or `verbose_json`
+   * format, or a stream of transcript events.
+   *
    * @example
    * ```ts
    * const transcription =

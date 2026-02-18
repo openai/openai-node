@@ -8,7 +8,7 @@ import { path } from '../../../internal/utils/path';
 
 export class Content extends APIResource {
   /**
-   * Get Skill Version Content
+   * Download a skill version zip bundle.
    */
   retrieve(version: string, params: ContentRetrieveParams, options?: RequestOptions): APIPromise<Response> {
     const { skill_id } = params;

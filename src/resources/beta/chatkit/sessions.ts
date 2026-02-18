@@ -9,7 +9,7 @@ import { path } from '../../../internal/utils/path';
 
 export class Sessions extends APIResource {
   /**
-   * Create a ChatKit session
+   * Create a ChatKit session.
    *
    * @example
    * ```ts
@@ -29,7 +29,9 @@ export class Sessions extends APIResource {
   }
 
   /**
-   * Cancel a ChatKit session
+   * Cancel an active ChatKit session and return its most recent metadata.
+   *
+   * Cancelling prevents new requests from using the issued client secret.
    *
    * @example
    * ```ts

@@ -8,7 +8,7 @@ import { path } from '../../internal/utils/path';
 
 export class Content extends APIResource {
   /**
-   * Get Skill Content
+   * Download a skill zip bundle by its ID.
    */
   retrieve(skillID: string, options?: RequestOptions): APIPromise<Response> {
     return this._client.get(path`/skills/${skillID}/content`, {
