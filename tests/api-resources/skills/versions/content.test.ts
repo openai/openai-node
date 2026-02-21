@@ -8,7 +8,8 @@ const client = new OpenAI({
 });
 
 describe('resource content', () => {
-  test('retrieve: required and optional params', async () => {
+  // Mock server doesn't support application/binary responses
+  test.skip('retrieve: required and optional params', async () => {
     const response = await client.skills.versions.content.retrieve('version', { skill_id: 'skill_123' });
   });
 });
