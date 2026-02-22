@@ -4924,7 +4924,11 @@ export interface ResponseOutputTextAnnotationAddedEvent {
   /**
    * The annotation object being added. (See annotation schema for details.)
    */
-  annotation: unknown;
+  annotation:
+    | ResponseOutputText.FileCitation
+    | ResponseOutputText.URLCitation
+    | ResponseOutputText.ContainerFileCitation
+    | ResponseOutputText.FilePath;
 
   /**
    * The index of the annotation within the content part.
