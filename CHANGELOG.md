@@ -1,5 +1,21 @@
 # Changelog
 
+## 6.22.1 (2026-02-22)
+
+Full Changelog: [v6.22.0...v6.22.1](https://github.com/openai/openai-node/compare/v6.22.0...v6.22.1)
+
+### Chores
+
+* **internal/client:** fix form-urlencoded requests ([646cedd](https://github.com/openai/openai-node/commit/646cedd2842716b1768d81705110cc573d6ddc33))
+* update mock server docs ([29f78f3](https://github.com/openai/openai-node/commit/29f78f310b7c336318705c382fd92a324d4b1ea2))
+
+
+### Documentation
+
+* **api:** document 2000 file limit in file-batches create parameters ([ff7bde0](https://github.com/openai/openai-node/commit/ff7bde08d8d02b8bda5f4e50bef65271a8f2a190))
+* **api:** enhance method descriptions across audio/chat/skills/videos/responses ([f5e02a1](https://github.com/openai/openai-node/commit/f5e02a1dcad492fd3dab2d1a289c12af082cdef4))
+* **api:** update safety_identifier description in chat/responses ([a55e0ef](https://github.com/openai/openai-node/commit/a55e0ef720cfb231e09e598ff0e8e60ef91e9088))
+
 ## 6.22.0 (2026-02-14)
 
 Full Changelog: [v6.21.0...v6.22.0](https://github.com/openai/openai-node/compare/v6.21.0...v6.22.0)
