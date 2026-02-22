@@ -139,4 +139,5 @@ jobs:
         run: |
           yarn tsn ecosystem-tests/cli.ts --live --verbose --parallel --jobs=4 --retry=3
         env:
+          DISABLE_V8_COMPILE_CACHE: '1'
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}

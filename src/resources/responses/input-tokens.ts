@@ -8,7 +8,10 @@ import { RequestOptions } from '../../internal/request-options';
 
 export class InputTokens extends APIResource {
   /**
-   * Get input token counts
+   * Returns input token counts of the request.
+   *
+   * Returns an object with `object` set to `response.input_tokens` and an
+   * `input_tokens` count.
    *
    * @example
    * ```ts

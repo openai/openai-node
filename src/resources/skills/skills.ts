@@ -27,28 +27,28 @@ export class Skills extends APIResource {
   versions: VersionsAPI.Versions = new VersionsAPI.Versions(this._client);
 
   /**
-   * Create Skill
+   * Create a new skill.
    */
   create(body: SkillCreateParams | null | undefined = {}, options?: RequestOptions): APIPromise<Skill> {
     return this._client.post('/skills', maybeMultipartFormRequestOptions({ body, ...options }, this._client));
   }
 
   /**
-   * Get Skill
+   * Get a skill by its ID.
    */
   retrieve(skillID: string, options?: RequestOptions): APIPromise<Skill> {
     return this._client.get(path`/skills/${skillID}`, options);
   }
 
   /**
-   * Update Skill Default Version
+   * Update the default version pointer for a skill.
    */
   update(skillID: string, body: SkillUpdateParams, options?: RequestOptions): APIPromise<Skill> {
     return this._client.post(path`/skills/${skillID}`, { body, ...options });
   }
 
   /**
-   * List Skills
+   * List all skills for the current project.
    */
   list(
     query: SkillListParams | null | undefined = {},
@@ -58,7 +58,7 @@ export class Skills extends APIResource {
   }
 
   /**
-   * Delete Skill
+   * Delete a skill by its ID.
    */
   delete(skillID: string, options?: RequestOptions): APIPromise<DeletedSkill> {
     return this._client.delete(path`/skills/${skillID}`, options);

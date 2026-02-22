@@ -42,6 +42,9 @@ export class Completions extends APIResource {
    * unsupported parameters in reasoning models,
    * [refer to the reasoning guide](https://platform.openai.com/docs/guides/reasoning).
    *
+   * Returns a chat completion object, or a streamed sequence of chat completion
+   * chunk objects if the request is streamed.
+   *
    * @example
    * ```ts
    * const chatCompletion = await client.chat.completions.create(
@@ -1684,8 +1687,9 @@ export interface ChatCompletionCreateParamsBase {
   /**
    * A stable identifier used to help detect users of your application that may be
    * violating OpenAI's usage policies. The IDs should be a string that uniquely
-   * identifies each user. We recommend hashing their username or email address, in
-   * order to avoid sending us any identifying information.
+   * identifies each user, with a maximum length of 64 characters. We recommend
+   * hashing their username or email address, in order to avoid sending us any
+   * identifying information.
    * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
    */
   safety_identifier?: string;
