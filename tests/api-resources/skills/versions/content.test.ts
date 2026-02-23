@@ -8,7 +8,7 @@ const client = new OpenAI({
 });
 
 describe('resource content', () => {
-  // Prism rejects the generated binary Accept header (`application/binary`) for this endpoint.
+  // Mock server (Prism) doesn't support the generated binary Accept header (`application/binary`) for this endpoint.
   test.skip('retrieve: required and optional params', async () => {
     const response = await client.skills.versions.content.retrieve('version', { skill_id: 'skill_123' });
   });
