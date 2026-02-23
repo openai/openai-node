@@ -125,6 +125,8 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponseWebSearchCallCompletedEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseWebSearchCallInProgressEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseWebSearchCallSearchingEvent</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponsesClientEvent</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponsesServerEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">SkillReference</a></code>
 - <code><a href="./src/resources/responses/responses.ts">Tool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ToolChoiceAllowed</a></code>
