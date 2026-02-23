@@ -2765,6 +2765,7 @@ export interface RealtimeSession {
   model?:
     | (string & {})
     | 'gpt-realtime'
+    | 'gpt-realtime-1.5'
     | 'gpt-realtime-2025-08-28'
     | 'gpt-4o-realtime-preview'
     | 'gpt-4o-realtime-preview-2024-10-01'
@@ -2775,6 +2776,7 @@ export interface RealtimeSession {
     | 'gpt-realtime-mini'
     | 'gpt-realtime-mini-2025-10-06'
     | 'gpt-realtime-mini-2025-12-15'
+    | 'gpt-audio-1.5'
     | 'gpt-audio-mini'
     | 'gpt-audio-mini-2025-10-06'
     | 'gpt-audio-mini-2025-12-15';
@@ -3056,6 +3058,7 @@ export interface RealtimeSessionCreateRequest {
   model?:
     | (string & {})
     | 'gpt-realtime'
+    | 'gpt-realtime-1.5'
     | 'gpt-realtime-2025-08-28'
     | 'gpt-4o-realtime-preview'
     | 'gpt-4o-realtime-preview-2024-10-01'
@@ -3066,6 +3069,7 @@ export interface RealtimeSessionCreateRequest {
     | 'gpt-realtime-mini'
     | 'gpt-realtime-mini-2025-10-06'
     | 'gpt-realtime-mini-2025-12-15'
+    | 'gpt-audio-1.5'
     | 'gpt-audio-mini'
     | 'gpt-audio-mini-2025-10-06'
     | 'gpt-audio-mini-2025-12-15';
