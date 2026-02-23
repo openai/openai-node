@@ -1,5 +1,32 @@
 # Changelog
 
+## 6.23.0 (2026-02-23)
+
+Full Changelog: [v6.22.0...v6.23.0](https://github.com/openai/openai-node/compare/v6.22.0...v6.23.0)
+
+### Features
+
+* **api:** websockets for responses api ([c6b96b8](https://github.com/openai/openai-node/commit/c6b96b8b8d5f8132e0a4c5f7399a04185302adcc))
+
+
+### Bug Fixes
+
+* **docs/contributing:** correct pnpm link command ([8a198a5](https://github.com/openai/openai-node/commit/8a198a5aa60209e26509651cdad110aadf164527))
+* **internal:** skip tests that depend on mock server ([3d88cb0](https://github.com/openai/openai-node/commit/3d88cb061a9a4d187931d4c892a87bd5e5f09c4d))
+
+
+### Chores
+
+* **internal/client:** fix form-urlencoded requests ([646cedd](https://github.com/openai/openai-node/commit/646cedd2842716b1768d81705110cc573d6ddc33))
+* update mock server docs ([29f78f3](https://github.com/openai/openai-node/commit/29f78f310b7c336318705c382fd92a324d4b1ea2))
+
+
+### Documentation
+
+* **api:** document 2000 file limit in file-batches create parameters ([ff7bde0](https://github.com/openai/openai-node/commit/ff7bde08d8d02b8bda5f4e50bef65271a8f2a190))
+* **api:** enhance method descriptions across audio/chat/skills/videos/responses ([f5e02a1](https://github.com/openai/openai-node/commit/f5e02a1dcad492fd3dab2d1a289c12af082cdef4))
+* **api:** update safety_identifier description in chat/responses ([a55e0ef](https://github.com/openai/openai-node/commit/a55e0ef720cfb231e09e598ff0e8e60ef91e9088))
+
 ## 6.22.0 (2026-02-14)
 
 Full Changelog: [v6.21.0...v6.22.0](https://github.com/openai/openai-node/compare/v6.21.0...v6.22.0)
