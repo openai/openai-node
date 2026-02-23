@@ -60,7 +60,7 @@ $ yarn link openai
 # With pnpm
 $ pnpm link --global
 $ cd ../my-package
-$ pnpm link -—global openai
+$ pnpm link --global openai
 ```
 
 ## Running tests
