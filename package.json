@@ -47,6 +47,8 @@
     "jest": "^29.4.0",
     "prettier": "^3.0.0",
     "publint": "^0.2.12",
+    "ws": "^8.18.3",
+    "@types/ws": "^8.5.13",
     "ts-jest": "^29.1.0",
     "ts-node": "^10.5.0",
     "tsc-multi": "https://github.com/stainless-api/tsc-multi/releases/download/v1.1.9/tsc-multi.tgz",
@@ -56,6 +58,14 @@
     "ws": "^8.18.0",
     "zod": "^3.25 || ^4.0",
     "typescript-eslint": "8.31.1"
+  },
+  "peerDependencies": {
+    "ws": "^8.18.0"
+  },
+  "peerDependenciesMeta": {
+    "ws": {
+      "optional": true
+    }
   },
   "bin": {
     "openai": "bin/cli"
