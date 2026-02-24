@@ -72,6 +72,7 @@ export class Runs extends APIResource {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
       stream: params.stream ?? false,
+      __synthesizeEventData: true,
     }) as APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
   }
 
@@ -166,6 +167,7 @@ export class Runs extends APIResource {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
       stream: params.stream ?? false,
+      __synthesizeEventData: true,
     }) as APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
   }
 }
