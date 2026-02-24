@@ -1,5 +1,24 @@
 # Changelog
 
+## 6.25.0 (2026-02-24)
+
+Full Changelog: [v6.24.0...v6.25.0](https://github.com/openai/openai-node/compare/v6.24.0...v6.25.0)
+
+### Features
+
+* **api:** add phase ([e32b853](https://github.com/openai/openai-node/commit/e32b853c3c57f2d0e4c05b09177b94677aed0e5a))
+
+
+### Bug Fixes
+
+* **api:** fix phase enum ([2ffe1be](https://github.com/openai/openai-node/commit/2ffe1be2600d0154b3355eefa61707470a341a95))
+* **api:** phase docs ([7fdfa38](https://github.com/openai/openai-node/commit/7fdfa38c1fa2bd383e1171510918c6db5f0937d8))
+
+
+### Chores
+
+* **internal:** refactor sse event parsing ([0ea2380](https://github.com/openai/openai-node/commit/0ea238054c0473adc97f4173a0ad5ba8bcfa4e29))
+
 ## 6.24.0 (2026-02-24)
 
 Full Changelog: [v6.23.0...v6.24.0](https://github.com/openai/openai-node/compare/v6.23.0...v6.24.0)
