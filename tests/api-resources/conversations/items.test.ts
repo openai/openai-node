@@ -33,7 +33,6 @@ describe('resource items', () => {
         {
           content: 'string',
           role: 'user',
-          phase: 'commentary',
           type: 'message',
         },
       ],
