@@ -152,6 +152,7 @@ export class Threads extends APIResource {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
       stream: body.stream ?? false,
+      __synthesizeEventData: true,
     }) as APIPromise<RunsAPI.Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
   }
 

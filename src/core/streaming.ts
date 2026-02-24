@@ -35,6 +35,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
     response: Response,
     controller: AbortController,
     client?: OpenAI,
+    synthesizeEventData?: boolean,
   ): Stream<Item> {
     let consumed = false;
     const logger = client ? loggerFor(client) : console;
@@ -69,7 +70,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
               throw new APIError(undefined, data.error, undefined, response.headers);
             }
 
-            yield data;
+            yield synthesizeEventData ? { event: sse.event, data } : data;
           } else {
             let data;
             try {
