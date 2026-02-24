@@ -422,12 +422,14 @@ export interface EasyInputMessage {
   role: 'user' | 'assistant' | 'system' | 'developer';
 
   /**
-   * Labels an `assistant` message as intermediate commentary (`commentary`) or the
-   * final answer (`final_answer`). For models like `gpt-5.3-codex` and beyond, when
-   * sending follow-up requests, preserve and resend phase on all assistant messages
-   * — dropping it can degrade performance. Not used for user messages.
+   * The phase of an assistant message.
+   *
+   * Use `commentary` for an intermediate assistant message and `final_answer` for
+   * the final assistant message. For follow-up requests with models like
+   * `gpt-5.3-codex` and later, preserve and resend phase on all assistant messages.
+   * Omitting it can degrade performance. Not used for user messages.
    */
-  phase?: 'commentary' | null;
+  phase?: 'commentary' | 'final_answer' | null;
 
   /**
    * The type of the message input. Always `message`.
@@ -4751,12 +4753,14 @@ export interface ResponseOutputMessage {
   type: 'message';
 
   /**
-   * Labels an `assistant` message as intermediate commentary (`commentary`) or the
-   * final answer (`final_answer`). For models like `gpt-5.3-codex` and beyond, when
-   * sending follow-up requests, preserve and resend phase on all assistant messages
-   * — dropping it can degrade performance. Not used for user messages.
+   * The phase of an assistant message.
+   *
+   * Use `commentary` for an intermediate assistant message and `final_answer` for
+   * the final assistant message. For follow-up requests with models like
+   * `gpt-5.3-codex` and later, preserve and resend phase on all assistant messages.
+   * Omitting it can degrade performance. Not used for user messages.
    */
-  phase?: 'commentary' | null;
+  phase?: 'commentary' | 'final_answer' | null;
 }
 
 /**
