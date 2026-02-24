@@ -28,7 +28,6 @@ describe('resource conversations', () => {
             {
               content: 'string',
               role: 'user',
-              phase: 'commentary',
               type: 'message',
             },
           ],

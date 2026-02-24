@@ -338,16 +338,6 @@ export interface EasyInputMessage {
   role: 'user' | 'assistant' | 'system' | 'developer';
 
   /**
-   * The phase of an assistant message.
-   *
-   * Use `commentary` for an intermediate assistant message and `final_answer` for
-   * the final assistant message. For follow-up requests with models like
-   * `gpt-5.3-codex` and later, preserve and resend phase on all assistant messages.
-   * Omitting it can degrade performance. Not used for user messages.
-   */
-  phase?: 'commentary' | 'final_answer' | null;
-
-  /**
    * The type of the message input. Always `message`.
    */
   type?: 'message';
@@ -4677,16 +4667,6 @@ export interface ResponseOutputMessage {
    * The type of the output message. Always `message`.
    */
   type: 'message';
-
-  /**
-   * The phase of an assistant message.
-   *
-   * Use `commentary` for an intermediate assistant message and `final_answer` for
-   * the final assistant message. For follow-up requests with models like
-   * `gpt-5.3-codex` and later, preserve and resend phase on all assistant messages.
-   * Omitting it can degrade performance. Not used for user messages.
-   */
-  phase?: 'commentary' | 'final_answer' | null;
 }
 
 /**
@@ -7229,11 +7209,6 @@ export interface ResponseCompactParams {
    * Cannot be used in conjunction with `conversation`.
    */
   previous_response_id?: string | null;
-
-  /**
-   * A key to use when reading from or writing to the prompt cache.
-   */
-  prompt_cache_key?: string | null;
 }
 
 Responses.InputItems = InputItems;

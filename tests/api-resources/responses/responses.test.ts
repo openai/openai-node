@@ -85,7 +85,6 @@ describe('resource responses', () => {
       input: 'string',
       instructions: 'instructions',
       previous_response_id: 'resp_123',
-      prompt_cache_key: 'prompt_cache_key',
     });
   });
 });
