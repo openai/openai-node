@@ -348,7 +348,7 @@ export interface EasyInputMessage {
    * `gpt-5.3-codex` and later, preserve and resend phase on all assistant messages.
    * Omitting it can degrade performance. Not used for user messages.
    */
-  phase?: 'commentary' | null;
+  phase?: 'commentary' | 'final_answer' | null;
 
   /**
    * The type of the message input. Always `message`.
@@ -4692,7 +4692,7 @@ export interface ResponseOutputMessage {
    * `gpt-5.3-codex` and later, preserve and resend phase on all assistant messages.
    * Omitting it can degrade performance. Not used for user messages.
    */
-  phase?: 'commentary' | null;
+  phase?: 'commentary' | 'final_answer' | null;
 }
 
 /**
