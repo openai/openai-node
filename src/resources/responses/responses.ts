@@ -5419,7 +5419,7 @@ export interface ResponseRefusalDoneEvent {
 export type ResponseStatus = 'completed' | 'failed' | 'in_progress' | 'cancelled' | 'queued' | 'incomplete';
 
 /**
- * Emitted when there is a partial audio response.
+ * Events emitted during response streaming.
  */
 export type ResponseStreamEvent =
   | ResponseAudioDeltaEvent
