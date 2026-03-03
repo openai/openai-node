@@ -4,6 +4,9 @@ import { APIResource } from '../core/resource';
 import { APIPromise } from '../core/api-promise';
 import { RequestOptions } from '../internal/request-options';
 
+/**
+ * Get a vector representation of a given input that can be easily consumed by machine learning models and algorithms.
+ */
 export class Embeddings extends APIResource {
   /**
    * Creates an embedding vector representing the input text.

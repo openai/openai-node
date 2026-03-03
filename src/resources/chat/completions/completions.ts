@@ -12,6 +12,9 @@ import { Stream } from '../../../core/streaming';
 import { RequestOptions } from '../../../internal/request-options';
 import { path } from '../../../internal/utils/path';
 
+/**
+ * Given a list of messages comprising a conversation, the model will return a response.
+ */
 export class Completions extends APIResource {
   messages: MessagesAPI.Messages = new MessagesAPI.Messages(this._client);
 

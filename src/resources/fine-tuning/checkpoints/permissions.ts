@@ -6,6 +6,9 @@ import { Page, PagePromise } from '../../../core/pagination';
 import { RequestOptions } from '../../../internal/request-options';
 import { path } from '../../../internal/utils/path';
 
+/**
+ * Manage fine-tuning jobs to tailor a model to your specific training data.
+ */
 export class Permissions extends APIResource {
   /**
    * **NOTE:** Calling this endpoint requires an [admin API key](../admin-api-keys).

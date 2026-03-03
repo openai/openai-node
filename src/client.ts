@@ -991,24 +991,54 @@ export class OpenAI {
 
   static toFile = Uploads.toFile;
 
+  /**
+   * Given a prompt, the model will return one or more predicted completions, and can also return the probabilities of alternative tokens at each position.
+   */
   completions: API.Completions = new API.Completions(this);
   chat: API.Chat = new API.Chat(this);
+  /**
+   * Get a vector representation of a given input that can be easily consumed by machine learning models and algorithms.
+   */
   embeddings: API.Embeddings = new API.Embeddings(this);
+  /**
+   * Files are used to upload documents that can be used with features like Assistants and Fine-tuning.
+   */
   files: API.Files = new API.Files(this);
+  /**
+   * Given a prompt and/or an input image, the model will generate a new image.
+   */
   images: API.Images = new API.Images(this);
   audio: API.Audio = new API.Audio(this);
+  /**
+   * Given text and/or image inputs, classifies if those inputs are potentially harmful.
+   */
   moderations: API.Moderations = new API.Moderations(this);
+  /**
+   * List and describe the various models available in the API.
+   */
   models: API.Models = new API.Models(this);
   fineTuning: API.FineTuning = new API.FineTuning(this);
   graders: API.Graders = new API.Graders(this);
   vectorStores: API.VectorStores = new API.VectorStores(this);
   webhooks: API.Webhooks = new API.Webhooks(this);
   beta: API.Beta = new API.Beta(this);
+  /**
+   * Create large batches of API requests to run asynchronously.
+   */
   batches: API.Batches = new API.Batches(this);
+  /**
+   * Use Uploads to upload large files in multiple parts.
+   */
   uploads: API.Uploads = new API.Uploads(this);
   responses: API.Responses = new API.Responses(this);
   realtime: API.Realtime = new API.Realtime(this);
+  /**
+   * Manage conversations and conversation items.
+   */
   conversations: API.Conversations = new API.Conversations(this);
+  /**
+   * Manage and run evals in the OpenAI platform.
+   */
   evals: API.Evals = new API.Evals(this);
   containers: API.Containers = new API.Containers(this);
   skills: API.Skills = new API.Skills(this);
