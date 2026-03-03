@@ -11,6 +11,9 @@ import { APIConnectionTimeoutError } from '../error';
 import { multipartFormRequestOptions } from '../internal/uploads';
 import { path } from '../internal/utils/path';
 
+/**
+ * Files are used to upload documents that can be used with features like Assistants and Fine-tuning.
+ */
 export class Files extends APIResource {
   /**
    * Upload a file that can be used across various endpoints. Individual files can be

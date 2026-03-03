@@ -12,6 +12,9 @@ import {
 import { RequestOptions } from '../../internal/request-options';
 import { path } from '../../internal/utils/path';
 
+/**
+ * Manage conversations and conversation items.
+ */
 export class Items extends APIResource {
   /**
    * Create items in a conversation with the given ID.

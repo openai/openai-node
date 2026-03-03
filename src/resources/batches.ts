@@ -8,6 +8,9 @@ import { CursorPage, type CursorPageParams, PagePromise } from '../core/paginati
 import { RequestOptions } from '../internal/request-options';
 import { path } from '../internal/utils/path';
 
+/**
+ * Create large batches of API requests to run asynchronously.
+ */
 export class Batches extends APIResource {
   /**
    * Creates and executes a batch from an uploaded file of requests

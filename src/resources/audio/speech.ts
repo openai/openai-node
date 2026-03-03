@@ -5,6 +5,9 @@ import { APIPromise } from '../../core/api-promise';
 import { buildHeaders } from '../../internal/headers';
 import { RequestOptions } from '../../internal/request-options';
 
+/**
+ * Turn audio into text or text into audio.
+ */
 export class Speech extends APIResource {
   /**
    * Generates audio from the input text.

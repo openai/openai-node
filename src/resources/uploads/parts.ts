@@ -7,6 +7,9 @@ import { RequestOptions } from '../../internal/request-options';
 import { multipartFormRequestOptions } from '../../internal/uploads';
 import { path } from '../../internal/utils/path';
 
+/**
+ * Use Uploads to upload large files in multiple parts.
+ */
 export class Parts extends APIResource {
   /**
    * Adds a
