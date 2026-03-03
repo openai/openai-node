@@ -20,6 +20,9 @@ import { ChatCompletionStreamingToolRunnerParams } from '../../../lib/ChatComple
 import { ChatCompletionStream, type ChatCompletionStreamParams } from '../../../lib/ChatCompletionStream';
 import { ExtractParsedContentFromParams, parseChatCompletion, validateInputTools } from '../../../lib/parser';
 
+/**
+ * Given a list of messages comprising a conversation, the model will return a response.
+ */
 export class Completions extends APIResource {
   messages: MessagesAPI.Messages = new MessagesAPI.Messages(this._client);
 

@@ -8,6 +8,9 @@ import { APIPromise } from '../../core/api-promise';
 import { RequestOptions } from '../../internal/request-options';
 import { path } from '../../internal/utils/path';
 
+/**
+ * Use Uploads to upload large files in multiple parts.
+ */
 export class Uploads extends APIResource {
   parts: PartsAPI.Parts = new PartsAPI.Parts(this._client);
 

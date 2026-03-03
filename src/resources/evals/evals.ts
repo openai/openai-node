@@ -27,6 +27,9 @@ import { CursorPage, type CursorPageParams, PagePromise } from '../../core/pagin
 import { RequestOptions } from '../../internal/request-options';
 import { path } from '../../internal/utils/path';
 
+/**
+ * Manage and run evals in the OpenAI platform.
+ */
 export class Evals extends APIResource {
   runs: RunsAPI.Runs = new RunsAPI.Runs(this._client);
 

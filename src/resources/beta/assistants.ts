@@ -13,6 +13,9 @@ import { RequestOptions } from '../../internal/request-options';
 import { path } from '../../internal/utils/path';
 import { AssistantStream } from '../../lib/AssistantStream';
 
+/**
+ * Build Assistants that can call models and use tools.
+ */
 export class Assistants extends APIResource {
   /**
    * Create an assistant with a model and instructions.

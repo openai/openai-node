@@ -42,6 +42,8 @@ import { RunSubmitToolOutputsParamsStream } from '../../../../lib/AssistantStrea
 import { path } from '../../../../internal/utils/path';
 
 /**
+ * Build Assistants that can call models and use tools.
+ *
  * @deprecated The Assistants API is deprecated in favor of the Responses API
  */
 export class Runs extends APIResource {

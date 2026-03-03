@@ -6,6 +6,9 @@ import { Page, PagePromise } from '../core/pagination';
 import { RequestOptions } from '../internal/request-options';
 import { path } from '../internal/utils/path';
 
+/**
+ * List and describe the various models available in the API.
+ */
 export class Models extends APIResource {
   /**
    * Retrieves a model instance, providing basic information about the model such as

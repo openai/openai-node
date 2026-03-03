@@ -7,6 +7,9 @@ import { APIPromise } from '../core/api-promise';
 import { Stream } from '../core/streaming';
 import { RequestOptions } from '../internal/request-options';
 
+/**
+ * Given a prompt, the model will return one or more predicted completions, and can also return the probabilities of alternative tokens at each position.
+ */
 export class Completions extends APIResource {
   /**
    * Creates a completion for the provided prompt and parameters.

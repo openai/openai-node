@@ -5,6 +5,7 @@ import { OpenAI } from '../../client';
 
 import { EventEmitter } from '../../core/EventEmitter';
 import { OpenAIError } from '../../core/error';
+import { stringifyQuery } from '../../internal/utils';
 
 export class WebSocketError extends OpenAIError {
   /**
@@ -72,10 +73,13 @@ export abstract class ResponsesEmitter extends EventEmitter<WebsocketEvents> {
   }
 }
 
-export function buildURL(client: OpenAI): URL {
+export function buildURL(client: OpenAI, query?: object | null): URL {
   const path = '/responses';
   const baseURL = client.baseURL;
   const url = new URL(baseURL + (baseURL.endsWith('/') ? path.slice(1) : path));
+  if (query) {
+    url.search = stringifyQuery(query);
+  }
   url.protocol = 'wss';
   return url;
 }

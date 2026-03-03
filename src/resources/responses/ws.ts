@@ -10,10 +10,10 @@ export class ResponsesWS extends ResponsesEmitter {
   socket: WS.WebSocket;
   private client: OpenAI;
 
-  constructor(client: OpenAI, options?: WS.ClientOptions | undefined) {
+  constructor(client: OpenAI, options?: WS.ClientOptions | null | undefined) {
     super();
     this.client = client;
-    this.url = buildURL(client);
+    this.url = buildURL(client, {});
     this.socket = new WS.WebSocket(this.url, {
       ...options,
       headers: {
