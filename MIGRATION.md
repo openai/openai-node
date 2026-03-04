@@ -127,6 +127,7 @@ client.example.list(undefined, { headers: { ... } });
 - `client.fineTuning.jobs.listEvents()`
 - `client.fineTuning.jobs.checkpoints.list()`
 - `client.fineTuning.checkpoints.permissions.retrieve()`
+- `client.fineTuning.checkpoints.permissions.list()`
 - `client.vectorStores.list()`
 - `client.vectorStores.files.list()`
 - `client.beta.chatkit.threads.list()`
