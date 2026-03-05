@@ -408,6 +408,17 @@ export type ComputerActionList = Array<ComputerAction>;
  */
 export interface ComputerTool {
   /**
+   * The type of the computer tool. Always `computer`.
+   */
+  type: 'computer';
+}
+
+/**
+ * A tool that controls a virtual computer. Learn more about the
+ * [computer tool](https://platform.openai.com/docs/guides/tools-computer-use).
+ */
+export interface ComputerUsePreviewTool {
+  /**
    * The height of the computer display.
    */
   display_height: number;
@@ -426,17 +437,6 @@ export interface ComputerTool {
    * The type of the computer use tool. Always `computer_use_preview`.
    */
   type: 'computer_use_preview';
-}
-
-/**
- * A tool that controls a virtual computer. Learn more about the
- * [computer tool](https://platform.openai.com/docs/guides/tools-computer-use).
- */
-export interface ComputerUseTool {
-  /**
-   * The type of the computer tool. Always `computer`.
-   */
-  type: 'computer';
 }
 
 export interface ContainerAuto {
@@ -6562,8 +6562,8 @@ export interface SkillReference {
 export type Tool =
   | FunctionTool
   | FileSearchTool
-  | ComputerUseTool
   | ComputerTool
+  | ComputerUsePreviewTool
   | WebSearchTool
   | Tool.Mcp
   | Tool.CodeInterpreter
@@ -7732,7 +7732,7 @@ export declare namespace Responses {
     type ComputerAction as ComputerAction,
     type ComputerActionList as ComputerActionList,
     type ComputerTool as ComputerTool,
-    type ComputerUseTool as ComputerUseTool,
+    type ComputerUsePreviewTool as ComputerUsePreviewTool,
     type ContainerAuto as ContainerAuto,
     type ContainerNetworkPolicyAllowlist as ContainerNetworkPolicyAllowlist,
     type ContainerNetworkPolicyDisabled as ContainerNetworkPolicyDisabled,
