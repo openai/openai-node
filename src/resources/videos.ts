@@ -127,9 +127,10 @@ export interface Video {
   remixed_from_video_id: string | null;
 
   /**
-   * Duration of the generated clip in seconds.
+   * Duration of the generated clip in seconds. For extensions, this is the stitched
+   * total duration.
    */
-  seconds: VideoSeconds;
+  seconds: (string & {}) | VideoSeconds;
 
   /**
    * The resolution of the generated video.
@@ -196,7 +197,7 @@ export interface VideoCreateParams {
   prompt: string;
 
   /**
-   * Optional image reference that guides generation.
+   * Optional multipart reference asset that guides generation.
    */
   input_reference?: Uploadable;
 

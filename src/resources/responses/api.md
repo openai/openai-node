@@ -4,7 +4,10 @@ Types:
 
 - <code><a href="./src/resources/responses/responses.ts">ApplyPatchTool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">CompactedResponse</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ComputerAction</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ComputerActionList</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ComputerTool</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ComputerUseTool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ContainerAuto</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ContainerNetworkPolicyAllowlist</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ContainerNetworkPolicyDisabled</a></code>
@@ -19,6 +22,7 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">InlineSkillSource</a></code>
 - <code><a href="./src/resources/responses/responses.ts">LocalEnvironment</a></code>
 - <code><a href="./src/resources/responses/responses.ts">LocalSkill</a></code>
+- <code><a href="./src/resources/responses/responses.ts">NamespaceTool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">Response</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseApplyPatchToolCall</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseApplyPatchToolCallOutput</a></code>
@@ -121,6 +125,9 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponseTextConfig</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseTextDeltaEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseTextDoneEvent</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseToolSearchCall</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseToolSearchOutputItem</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseToolSearchOutputItemParam</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseUsage</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseWebSearchCallCompletedEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseWebSearchCallInProgressEvent</a></code>
@@ -137,6 +144,7 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ToolChoiceOptions</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ToolChoiceShell</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ToolChoiceTypes</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ToolSearchTool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">WebSearchPreviewTool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">WebSearchTool</a></code>
 

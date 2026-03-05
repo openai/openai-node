@@ -88,6 +88,8 @@ export type ConversationItem =
   | ConversationItem.ImageGenerationCall
   | ResponsesAPI.ResponseComputerToolCall
   | ResponsesAPI.ResponseComputerToolCallOutputItem
+  | ResponsesAPI.ResponseToolSearchCall
+  | ResponsesAPI.ResponseToolSearchOutputItem
   | ResponsesAPI.ResponseReasoningItem
   | ResponsesAPI.ResponseCodeInterpreterToolCall
   | ConversationItem.LocalShellCall

@@ -135,7 +135,7 @@ export class Responses extends APIResource {
    * @example
    * ```ts
    * const compactedResponse = await client.responses.compact({
-   *   model: 'gpt-5.2',
+   *   model: 'gpt-5.4',
    * });
    * ```
    */
@@ -186,6 +186,223 @@ export interface CompactedResponse {
 }
 
 /**
+ * A click action.
+ */
+export type ComputerAction =
+  | ComputerAction.Click
+  | ComputerAction.DoubleClick
+  | ComputerAction.Drag
+  | ComputerAction.Keypress
+  | ComputerAction.Move
+  | ComputerAction.Screenshot
+  | ComputerAction.Scroll
+  | ComputerAction.Type
+  | ComputerAction.Wait;
+
+export namespace ComputerAction {
+  /**
+   * A click action.
+   */
+  export interface Click {
+    /**
+     * Indicates which mouse button was pressed during the click. One of `left`,
+     * `right`, `wheel`, `back`, or `forward`.
+     */
+    button: 'left' | 'right' | 'wheel' | 'back' | 'forward';
+
+    /**
+     * Specifies the event type. For a click action, this property is always `click`.
+     */
+    type: 'click';
+
+    /**
+     * The x-coordinate where the click occurred.
+     */
+    x: number;
+
+    /**
+     * The y-coordinate where the click occurred.
+     */
+    y: number;
+  }
+
+  /**
+   * A double click action.
+   */
+  export interface DoubleClick {
+    /**
+     * Specifies the event type. For a double click action, this property is always set
+     * to `double_click`.
+     */
+    type: 'double_click';
+
+    /**
+     * The x-coordinate where the double click occurred.
+     */
+    x: number;
+
+    /**
+     * The y-coordinate where the double click occurred.
+     */
+    y: number;
+  }
+
+  /**
+   * A drag action.
+   */
+  export interface Drag {
+    /**
+     * An array of coordinates representing the path of the drag action. Coordinates
+     * will appear as an array of objects, eg
+     *
+     * ```
+     * [
+     *   { x: 100, y: 200 },
+     *   { x: 200, y: 300 }
+     * ]
+     * ```
+     */
+    path: Array<Drag.Path>;
+
+    /**
+     * Specifies the event type. For a drag action, this property is always set to
+     * `drag`.
+     */
+    type: 'drag';
+  }
+
+  export namespace Drag {
+    /**
+     * An x/y coordinate pair, e.g. `{ x: 100, y: 200 }`.
+     */
+    export interface Path {
+      /**
+       * The x-coordinate.
+       */
+      x: number;
+
+      /**
+       * The y-coordinate.
+       */
+      y: number;
+    }
+  }
+
+  /**
+   * A collection of keypresses the model would like to perform.
+   */
+  export interface Keypress {
+    /**
+     * The combination of keys the model is requesting to be pressed. This is an array
+     * of strings, each representing a key.
+     */
+    keys: Array<string>;
+
+    /**
+     * Specifies the event type. For a keypress action, this property is always set to
+     * `keypress`.
+     */
+    type: 'keypress';
+  }
+
+  /**
+   * A mouse move action.
+   */
+  export interface Move {
+    /**
+     * Specifies the event type. For a move action, this property is always set to
+     * `move`.
+     */
+    type: 'move';
+
+    /**
+     * The x-coordinate to move to.
+     */
+    x: number;
+
+    /**
+     * The y-coordinate to move to.
+     */
+    y: number;
+  }
+
+  /**
+   * A screenshot action.
+   */
+  export interface Screenshot {
+    /**
+     * Specifies the event type. For a screenshot action, this property is always set
+     * to `screenshot`.
+     */
+    type: 'screenshot';
+  }
+
+  /**
+   * A scroll action.
+   */
+  export interface Scroll {
+    /**
+     * The horizontal scroll distance.
+     */
+    scroll_x: number;
+
+    /**
+     * The vertical scroll distance.
+     */
+    scroll_y: number;
+
+    /**
+     * Specifies the event type. For a scroll action, this property is always set to
+     * `scroll`.
+     */
+    type: 'scroll';
+
+    /**
+     * The x-coordinate where the scroll occurred.
+     */
+    x: number;
+
+    /**
+     * The y-coordinate where the scroll occurred.
+     */
+    y: number;
+  }
+
+  /**
+   * An action to type in text.
+   */
+  export interface Type {
+    /**
+     * The text to type.
+     */
+    text: string;
+
+    /**
+     * Specifies the event type. For a type action, this property is always set to
+     * `type`.
+     */
+    type: 'type';
+  }
+
+  /**
+   * A wait action.
+   */
+  export interface Wait {
+    /**
+     * Specifies the event type. For a wait action, this property is always set to
+     * `wait`.
+     */
+    type: 'wait';
+  }
+}
+
+/**
+ * Flattened batched actions for `computer_use`. Each action includes an `type`
+ * discriminator and action-specific fields.
+ */
+export type ComputerActionList = Array<ComputerAction>;
+
+/**
  * A tool that controls a virtual computer. Learn more about the
  * [computer tool](https://platform.openai.com/docs/guides/tools-computer-use).
  */
@@ -209,6 +426,17 @@ export interface ComputerTool {
    * The type of the computer use tool. Always `computer_use_preview`.
    */
   type: 'computer_use_preview';
+}
+
+/**
+ * A tool that controls a virtual computer. Learn more about the
+ * [computer tool](https://platform.openai.com/docs/guides/tools-computer-use).
+ */
+export interface ComputerUseTool {
+  /**
+   * The type of the computer tool. Always `computer`.
+   */
+  type: 'computer';
 }
 
 export interface ContainerAuto {
@@ -307,6 +535,11 @@ export interface CustomTool {
   type: 'custom';
 
   /**
+   * Whether this tool should be deferred and discovered via tool search.
+   */
+  defer_loading?: boolean;
+
+  /**
    * Optional description of the custom tool, used to provide more context.
    */
   description?: string;
@@ -342,11 +575,6 @@ export interface EasyInputMessage {
    * final answer (`final_answer`). For models like `gpt-5.3-codex` and beyond, when
    * sending follow-up requests, preserve and resend phase on all assistant messages
    * — dropping it can degrade performance. Not used for user messages.
-   *
-   * Use `commentary` for an intermediate assistant message and `final_answer` for
-   * the final assistant message. For follow-up requests with models like
-   * `gpt-5.3-codex` and later, preserve and resend phase on all assistant messages.
-   * Omitting it can degrade performance. Not used for user messages.
    */
   phase?: 'commentary' | 'final_answer' | null;
 
@@ -471,6 +699,11 @@ export interface FunctionTool {
   type: 'function';
 
   /**
+   * Whether this function is deferred and loaded via tool search.
+   */
+  defer_loading?: boolean;
+
+  /**
    * A description of the function. Used by the model to determine whether or not to
    * call the function.
    */
@@ -546,6 +779,45 @@ export interface LocalSkill {
    * The path to the directory containing the skill.
    */
   path: string;
+}
+
+/**
+ * Groups function/custom tools under a shared namespace.
+ */
+export interface NamespaceTool {
+  /**
+   * A description of the namespace shown to the model.
+   */
+  description: string;
+
+  /**
+   * The namespace name used in tool calls (for example, `crm`).
+   */
+  name: string;
+
+  /**
+   * The function/custom tools available inside this namespace.
+   */
+  tools: Array<NamespaceTool.Function | CustomTool>;
+
+  /**
+   * The type of the tool. Always `namespace`.
+   */
+  type: 'namespace';
+}
+
+export namespace NamespaceTool {
+  export interface Function {
+    name: string;
+
+    type: 'function';
+
+    description?: string | null;
+
+    parameters?: unknown | null;
+
+    strict?: boolean | null;
+  }
 }
 
 export interface Response {
@@ -1335,20 +1607,6 @@ export interface ResponseComputerToolCall {
   id: string;
 
   /**
-   * A click action.
-   */
-  action:
-    | ResponseComputerToolCall.Click
-    | ResponseComputerToolCall.DoubleClick
-    | ResponseComputerToolCall.Drag
-    | ResponseComputerToolCall.Keypress
-    | ResponseComputerToolCall.Move
-    | ResponseComputerToolCall.Screenshot
-    | ResponseComputerToolCall.Scroll
-    | ResponseComputerToolCall.Type
-    | ResponseComputerToolCall.Wait;
-
-  /**
    * An identifier used when responding to the tool call with output.
    */
   call_id: string;
@@ -1368,9 +1626,49 @@ export interface ResponseComputerToolCall {
    * The type of the computer call. Always `computer_call`.
    */
   type: 'computer_call';
+
+  /**
+   * A click action.
+   */
+  action?:
+    | ResponseComputerToolCall.Click
+    | ResponseComputerToolCall.DoubleClick
+    | ResponseComputerToolCall.Drag
+    | ResponseComputerToolCall.Keypress
+    | ResponseComputerToolCall.Move
+    | ResponseComputerToolCall.Screenshot
+    | ResponseComputerToolCall.Scroll
+    | ResponseComputerToolCall.Type
+    | ResponseComputerToolCall.Wait;
+
+  /**
+   * Flattened batched actions for `computer_use`. Each action includes an `type`
+   * discriminator and action-specific fields.
+   */
+  actions?: ComputerActionList;
 }
 
 export namespace ResponseComputerToolCall {
+  /**
+   * A pending safety check for the computer call.
+   */
+  export interface PendingSafetyCheck {
+    /**
+     * The ID of the pending safety check.
+     */
+    id: string;
+
+    /**
+     * The type of the pending safety check.
+     */
+    code?: string | null;
+
+    /**
+     * Details about the pending safety check.
+     */
+    message?: string | null;
+  }
+
   /**
    * A click action.
    */
@@ -1564,26 +1862,6 @@ export namespace ResponseComputerToolCall {
      * `wait`.
      */
     type: 'wait';
-  }
-
-  /**
-   * A pending safety check for the computer call.
-   */
-  export interface PendingSafetyCheck {
-    /**
-     * The ID of the pending safety check.
-     */
-    id: string;
-
-    /**
-     * The type of the pending safety check.
-     */
-    code?: string | null;
-
-    /**
-     * Details about the pending safety check.
-     */
-    message?: string | null;
   }
 }
 
@@ -1866,6 +2144,11 @@ export interface ResponseCustomToolCall {
    * The unique ID of the custom tool call in the OpenAI platform.
    */
   id?: string;
+
+  /**
+   * The namespace of the custom tool being called.
+   */
+  namespace?: string;
 }
 
 /**
@@ -2550,6 +2833,11 @@ export interface ResponseFunctionToolCall {
   id?: string;
 
   /**
+   * The namespace of the function to run.
+   */
+  namespace?: string;
+
+  /**
    * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
    * Populated when items are returned via API.
    */
@@ -2937,6 +3225,12 @@ export interface ResponseInputFile {
   type: 'input_file';
 
   /**
+   * The detail level of the file to be sent to the model. One of `high` or `low`.
+   * Defaults to `high`.
+   */
+  detail?: 'low' | 'high';
+
+  /**
    * The content of the file to be sent to the model.
    */
   file_data?: string;
@@ -2967,6 +3261,12 @@ export interface ResponseInputFileContent {
   type: 'input_file';
 
   /**
+   * The detail level of the file to be sent to the model. One of `high` or `low`.
+   * Defaults to `high`.
+   */
+  detail?: 'high' | 'low';
+
+  /**
    * The base64-encoded data of the file to be sent to the model.
    */
   file_data?: string | null;
@@ -2993,10 +3293,10 @@ export interface ResponseInputFileContent {
  */
 export interface ResponseInputImage {
   /**
-   * The detail level of the image to be sent to the model. One of `high`, `low`, or
-   * `auto`. Defaults to `auto`.
+   * The detail level of the image to be sent to the model. One of `high`, `low`,
+   * `auto`, or `original`. Defaults to `auto`.
    */
-  detail: 'low' | 'high' | 'auto';
+  detail: 'low' | 'high' | 'auto' | 'original';
 
   /**
    * The type of the input item. Always `input_image`.
@@ -3026,10 +3326,10 @@ export interface ResponseInputImageContent {
   type: 'input_image';
 
   /**
-   * The detail level of the image to be sent to the model. One of `high`, `low`, or
-   * `auto`. Defaults to `auto`.
+   * The detail level of the image to be sent to the model. One of `high`, `low`,
+   * `auto`, or `original`. Defaults to `auto`.
    */
-  detail?: 'low' | 'high' | 'auto' | null;
+  detail?: 'low' | 'high' | 'auto' | 'original' | null;
 
   /**
    * The ID of the file to be sent to the model.
@@ -3060,6 +3360,8 @@ export type ResponseInputItem =
   | ResponseFunctionWebSearch
   | ResponseFunctionToolCall
   | ResponseInputItem.FunctionCallOutput
+  | ResponseInputItem.ToolSearchCall
+  | ResponseToolSearchOutputItemParam
   | ResponseReasoningItem
   | ResponseCompactionItemParam
   | ResponseInputItem.ImageGenerationCall
@@ -3195,6 +3497,38 @@ export namespace ResponseInputItem {
     /**
      * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
      * Populated when items are returned via API.
+     */
+    status?: 'in_progress' | 'completed' | 'incomplete' | null;
+  }
+
+  export interface ToolSearchCall {
+    /**
+     * The arguments supplied to the tool search call.
+     */
+    arguments: unknown;
+
+    /**
+     * The item type. Always `tool_search_call`.
+     */
+    type: 'tool_search_call';
+
+    /**
+     * The unique ID of this tool search call.
+     */
+    id?: string | null;
+
+    /**
+     * The unique ID of the tool search call generated by the model.
+     */
+    call_id?: string | null;
+
+    /**
+     * Whether tool search was executed by the server or by the client.
+     */
+    execution?: 'server' | 'client';
+
+    /**
+     * The status of the tool search call.
      */
     status?: 'in_progress' | 'completed' | 'incomplete' | null;
   }
@@ -3799,6 +4133,8 @@ export type ResponseItem =
   | ResponseFunctionWebSearch
   | ResponseFunctionToolCallItem
   | ResponseFunctionToolCallOutputItem
+  | ResponseToolSearchCall
+  | ResponseToolSearchOutputItem
   | ResponseItem.ImageGenerationCall
   | ResponseCodeInterpreterToolCall
   | ResponseItem.LocalShellCall
@@ -4354,6 +4690,8 @@ export type ResponseOutputItem =
   | ResponseFunctionWebSearch
   | ResponseComputerToolCall
   | ResponseReasoningItem
+  | ResponseToolSearchCall
+  | ResponseToolSearchOutputItem
   | ResponseCompactionItem
   | ResponseOutputItem.ImageGenerationCall
   | ResponseCodeInterpreterToolCall
@@ -4686,11 +5024,6 @@ export interface ResponseOutputMessage {
    * final answer (`final_answer`). For models like `gpt-5.3-codex` and beyond, when
    * sending follow-up requests, preserve and resend phase on all assistant messages
    * — dropping it can degrade performance. Not used for user messages.
-   *
-   * Use `commentary` for an intermediate assistant message and `final_answer` for
-   * the final assistant message. For follow-up requests with models like
-   * `gpt-5.3-codex` and later, preserve and resend phase on all assistant messages.
-   * Omitting it can degrade performance. Not used for user messages.
    */
   phase?: 'commentary' | 'final_answer' | null;
 }
@@ -5597,6 +5930,112 @@ export namespace ResponseTextDoneEvent {
   }
 }
 
+export interface ResponseToolSearchCall {
+  /**
+   * The unique ID of the tool search call item.
+   */
+  id: string;
+
+  /**
+   * Arguments used for the tool search call.
+   */
+  arguments: unknown;
+
+  /**
+   * The unique ID of the tool search call generated by the model.
+   */
+  call_id: string | null;
+
+  /**
+   * Whether tool search was executed by the server or by the client.
+   */
+  execution: 'server' | 'client';
+
+  /**
+   * The status of the tool search call item that was recorded.
+   */
+  status: 'in_progress' | 'completed' | 'incomplete';
+
+  /**
+   * The type of the item. Always `tool_search_call`.
+   */
+  type: 'tool_search_call';
+
+  /**
+   * The identifier of the actor that created the item.
+   */
+  created_by?: string;
+}
+
+export interface ResponseToolSearchOutputItem {
+  /**
+   * The unique ID of the tool search output item.
+   */
+  id: string;
+
+  /**
+   * The unique ID of the tool search call generated by the model.
+   */
+  call_id: string | null;
+
+  /**
+   * Whether tool search was executed by the server or by the client.
+   */
+  execution: 'server' | 'client';
+
+  /**
+   * The status of the tool search output item that was recorded.
+   */
+  status: 'in_progress' | 'completed' | 'incomplete';
+
+  /**
+   * The loaded tool definitions returned by tool search.
+   */
+  tools: Array<Tool>;
+
+  /**
+   * The type of the item. Always `tool_search_output`.
+   */
+  type: 'tool_search_output';
+
+  /**
+   * The identifier of the actor that created the item.
+   */
+  created_by?: string;
+}
+
+export interface ResponseToolSearchOutputItemParam {
+  /**
+   * The loaded tool definitions returned by the tool search output.
+   */
+  tools: Array<Tool>;
+
+  /**
+   * The item type. Always `tool_search_output`.
+   */
+  type: 'tool_search_output';
+
+  /**
+   * The unique ID of this tool search output.
+   */
+  id?: string | null;
+
+  /**
+   * The unique ID of the tool search call generated by the model.
+   */
+  call_id?: string | null;
+
+  /**
+   * Whether tool search was executed by the server or by the client.
+   */
+  execution?: 'server' | 'client';
+
+  /**
+   * The status of the tool search output.
+   */
+  status?: 'in_progress' | 'completed' | 'incomplete' | null;
+}
+
 /**
  * Represents token usage details including input tokens, output tokens, a
  * breakdown of output tokens, and the total tokens used.
@@ -6123,6 +6562,7 @@ export interface SkillReference {
 export type Tool =
   | FunctionTool
   | FileSearchTool
+  | ComputerUseTool
   | ComputerTool
   | WebSearchTool
   | Tool.Mcp
@@ -6131,6 +6571,8 @@ export type Tool =
   | Tool.LocalShell
   | FunctionShellTool
   | CustomTool
+  | NamespaceTool
+  | ToolSearchTool
   | WebSearchPreviewTool
   | ApplyPatchTool;
 
@@ -6189,6 +6631,11 @@ export namespace Tool {
       | 'connector_outlookcalendar'
       | 'connector_outlookemail'
       | 'connector_sharepoint';
+
+    /**
+     * Whether this MCP tool is deferred and discovered via tool search.
+     */
+    defer_loading?: boolean;
 
     /**
      * Optional HTTP headers to send to the MCP server. Use for authentication or other
@@ -6568,17 +7015,46 @@ export interface ToolChoiceTypes {
    *
    * - `file_search`
    * - `web_search_preview`
+   * - `computer`
    * - `computer_use_preview`
+   * - `computer_use`
    * - `code_interpreter`
    * - `image_generation`
    */
   type:
     | 'file_search'
     | 'web_search_preview'
+    | 'computer'
     | 'computer_use_preview'
+    | 'computer_use'
     | 'web_search_preview_2025_03_11'
     | 'image_generation'
     | 'code_interpreter';
+}
+
+/**
+ * Hosted or BYOT tool search configuration for deferred tools.
+ */
+export interface ToolSearchTool {
+  /**
+   * The type of the tool. Always `tool_search`.
+   */
+  type: 'tool_search';
+
+  /**
+   * Description shown to the model for a client-executed tool search tool.
+   */
+  description?: string | null;
+
+  /**
+   * Whether tool search is executed by the server or by the client.
+   */
+  execution?: 'server' | 'client';
+
+  /**
+   * Parameter schema for a client-executed tool search tool.
+   */
+  parameters?: unknown | null;
 }
 
 /**
@@ -6592,6 +7068,8 @@ export interface WebSearchPreviewTool {
    * `web_search_preview_2025_03_11`.
    */
   type: 'web_search_preview' | 'web_search_preview_2025_03_11';
+
+  search_content_types?: Array<'text' | 'image'>;
 
   /**
    * High level guidance for the amount of context window space to use for the
@@ -7126,6 +7604,8 @@ export interface ResponseCompactParams {
    * available models.
    */
   model:
+    | 'gpt-5.4'
+    | 'gpt-5.3-chat-latest'
     | 'gpt-5.2'
     | 'gpt-5.2-2025-12-11'
     | 'gpt-5.2-chat-latest'
@@ -7249,7 +7729,10 @@ export declare namespace Responses {
   export {
     type ApplyPatchTool as ApplyPatchTool,
     type CompactedResponse as CompactedResponse,
+    type ComputerAction as ComputerAction,
+    type ComputerActionList as ComputerActionList,
     type ComputerTool as ComputerTool,
+    type ComputerUseTool as ComputerUseTool,
     type ContainerAuto as ContainerAuto,
     type ContainerNetworkPolicyAllowlist as ContainerNetworkPolicyAllowlist,
     type ContainerNetworkPolicyDisabled as ContainerNetworkPolicyDisabled,
@@ -7264,6 +7747,7 @@ export declare namespace Responses {
     type InlineSkillSource as InlineSkillSource,
     type LocalEnvironment as LocalEnvironment,
     type LocalSkill as LocalSkill,
+    type NamespaceTool as NamespaceTool,
     type Response as Response,
     type ResponseApplyPatchToolCall as ResponseApplyPatchToolCall,
     type ResponseApplyPatchToolCallOutput as ResponseApplyPatchToolCallOutput,
@@ -7366,6 +7850,9 @@ export declare namespace Responses {
     type ResponseTextConfig as ResponseTextConfig,
     type ResponseTextDeltaEvent as ResponseTextDeltaEvent,
     type ResponseTextDoneEvent as ResponseTextDoneEvent,
+    type ResponseToolSearchCall as ResponseToolSearchCall,
+    type ResponseToolSearchOutputItem as ResponseToolSearchOutputItem,
+    type ResponseToolSearchOutputItemParam as ResponseToolSearchOutputItemParam,
     type ResponseUsage as ResponseUsage,
     type ResponseWebSearchCallCompletedEvent as ResponseWebSearchCallCompletedEvent,
     type ResponseWebSearchCallInProgressEvent as ResponseWebSearchCallInProgressEvent,
@@ -7382,6 +7869,7 @@ export declare namespace Responses {
     type ToolChoiceOptions as ToolChoiceOptions,
     type ToolChoiceShell as ToolChoiceShell,
     type ToolChoiceTypes as ToolChoiceTypes,
+    type ToolSearchTool as ToolSearchTool,
     type WebSearchPreviewTool as WebSearchPreviewTool,
     type WebSearchTool as WebSearchTool,
     type ResponseCreateParams as ResponseCreateParams,
