@@ -19,6 +19,8 @@ export type AllModels =
   | 'gpt-5.1-codex-max';
 
 export type ChatModel =
+  | 'gpt-5.4'
+  | 'gpt-5.3-chat-latest'
   | 'gpt-5.2'
   | 'gpt-5.2-2025-12-11'
   | 'gpt-5.2-chat-latest'

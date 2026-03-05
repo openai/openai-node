@@ -53,7 +53,7 @@ export class Completions extends APIResource {
    * const chatCompletion = await client.chat.completions.create(
    *   {
    *     messages: [{ content: 'string', role: 'developer' }],
-   *     model: 'gpt-4o',
+   *     model: 'gpt-5.4',
    *   },
    * );
    * ```
