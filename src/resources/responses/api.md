@@ -7,7 +7,7 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ComputerAction</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ComputerActionList</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ComputerTool</a></code>
-- <code><a href="./src/resources/responses/responses.ts">ComputerUseTool</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ComputerUsePreviewTool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ContainerAuto</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ContainerNetworkPolicyAllowlist</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ContainerNetworkPolicyDisabled</a></code>
