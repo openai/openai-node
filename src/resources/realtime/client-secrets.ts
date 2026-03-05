@@ -452,6 +452,11 @@ export namespace RealtimeSessionCreateResponse {
       | 'connector_sharepoint';
 
     /**
+     * Whether this MCP tool is deferred and discovered via tool search.
+     */
+    defer_loading?: boolean;
+
+    /**
      * Optional HTTP headers to send to the MCP server. Use for authentication or other
      * purposes.
      */
