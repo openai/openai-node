@@ -27,7 +27,7 @@ jobs:
 
       - name: Set up Node
         if: ${{ steps.release.outputs.releases_created }}
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v6
         with:
           node-version: '20'
 
