@@ -10,7 +10,7 @@ const client = new OpenAI({
 describe('resource transcriptions', () => {
   test('create: only required params', async () => {
     const responsePromise = client.audio.transcriptions.create({
-      file: await toFile(Buffer.from('# my file contents'), 'README.md'),
+      file: await toFile(Buffer.from('Example data'), 'README.md'),
       model: 'gpt-4o-transcribe',
     });
     const rawResponse = await responsePromise.asResponse();
@@ -24,7 +24,7 @@ describe('resource transcriptions', () => {
 
   test('create: required and optional params', async () => {
     const response = await client.audio.transcriptions.create({
-      file: await toFile(Buffer.from('# my file contents'), 'README.md'),
+      file: await toFile(Buffer.from('Example data'), 'README.md'),
       model: 'gpt-4o-transcribe',
       chunking_strategy: 'auto',
       include: ['logprobs'],

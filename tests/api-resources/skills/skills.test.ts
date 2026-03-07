@@ -23,7 +23,7 @@ describe('resource skills', () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
       client.skills.create(
-        { files: [await toFile(Buffer.from('# my file contents'), 'README.md')] },
+        { files: [await toFile(Buffer.from('Example data'), 'README.md')] },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);
