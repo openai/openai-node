@@ -10,7 +10,7 @@ const client = new OpenAI({
 describe('resource parts', () => {
   test('create: only required params', async () => {
     const responsePromise = client.uploads.parts.create('upload_abc123', {
-      data: await toFile(Buffer.from('# my file contents'), 'README.md'),
+      data: await toFile(Buffer.from('Example data'), 'README.md'),
     });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
@@ -23,7 +23,7 @@ describe('resource parts', () => {
 
   test('create: required and optional params', async () => {
     const response = await client.uploads.parts.create('upload_abc123', {
-      data: await toFile(Buffer.from('# my file contents'), 'README.md'),
+      data: await toFile(Buffer.from('Example data'), 'README.md'),
     });
   });
 });
