@@ -24,7 +24,7 @@ describe('resource versions', () => {
     await expect(
       client.skills.versions.create(
         'skill_123',
-        { default: true, files: [await toFile(Buffer.from('# my file contents'), 'README.md')] },
+        { default: true, files: [await toFile(Buffer.from('Example data'), 'README.md')] },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);
