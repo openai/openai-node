@@ -1,5 +1,13 @@
 # Changelog
 
+## 6.27.1 (2026-03-08)
+
+Full Changelog: [v6.27.0...v6.27.1](https://github.com/openai/openai-node/compare/v6.27.0...v6.27.1)
+
+### Chores
+
+* **mcp-server:** improve instructions ([aad9ca1](https://github.com/openai/openai-node/commit/aad9ca15ddbb8dbc27ed6b2aa9b242af9bbf7b8f))
+
 ## 6.27.0 (2026-03-05)
 
 Full Changelog: [v6.26.0...v6.27.0](https://github.com/openai/openai-node/compare/v6.26.0...v6.27.0)

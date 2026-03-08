@@ -10,7 +10,7 @@ const client = new OpenAI({
 describe('resource images', () => {
   test('createVariation: only required params', async () => {
     const responsePromise = client.images.createVariation({
-      image: await toFile(Buffer.from('# my file contents'), 'README.md'),
+      image: await toFile(Buffer.from('Example data'), 'README.md'),
     });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
@@ -23,7 +23,7 @@ describe('resource images', () => {
 
   test('createVariation: required and optional params', async () => {
     const response = await client.images.createVariation({
-      image: await toFile(Buffer.from('# my file contents'), 'README.md'),
+      image: await toFile(Buffer.from('Example data'), 'README.md'),
       model: 'string',
       n: 1,
       response_format: 'url',
@@ -34,7 +34,7 @@ describe('resource images', () => {
 
   test('edit: only required params', async () => {
     const responsePromise = client.images.edit({
-      image: await toFile(Buffer.from('# my file contents'), 'README.md'),
+      image: await toFile(Buffer.from('Example data'), 'README.md'),
       prompt: 'A cute baby sea otter wearing a beret',
     });
     const rawResponse = await responsePromise.asResponse();
@@ -48,11 +48,11 @@ describe('resource images', () => {
 
   test('edit: required and optional params', async () => {
     const response = await client.images.edit({
-      image: await toFile(Buffer.from('# my file contents'), 'README.md'),
+      image: await toFile(Buffer.from('Example data'), 'README.md'),
       prompt: 'A cute baby sea otter wearing a beret',
       background: 'transparent',
       input_fidelity: 'high',
-      mask: await toFile(Buffer.from('# my file contents'), 'README.md'),
+      mask: await toFile(Buffer.from('Example data'), 'README.md'),
       model: 'string',
       n: 1,
       output_compression: 100,
