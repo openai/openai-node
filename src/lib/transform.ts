@@ -99,12 +99,28 @@ function ensureStrictJsonSchema(
     jsonSchema.items = ensureStrictJsonSchema(items, [...path, 'items'], root);
   }
 
-  // Handle unions (anyOf)
+  // Handle unions (anyOf).
   const anyOf = jsonSchema.anyOf;
   if (Array.isArray(anyOf)) {
     jsonSchema.anyOf = anyOf.map((variant, i) =>
       ensureStrictJsonSchema(variant, [...path, 'anyOf', String(i)], root),
     );
+  }
+
+  // Handle oneOf — Zod v4 emits `oneOf` for discriminated unions (https://github.com/colinhacks/zod/pull/5453),
+  // but the OpenAI strict-mode API only accepts `anyOf`.  The semantics are equivalent for the union types
+  // that Zod produces here, so we convert in-place and recurse into each variant.
+  // Merge into an existing anyOf array when one is already present (schemas that legitimately
+  // declare both anyOf and oneOf would otherwise lose the anyOf constraints).
+  const oneOf = (jsonSchema as any).oneOf;
+  if (Array.isArray(oneOf)) {
+    const convertedOneOf = oneOf.map((variant: JSONSchemaDefinition, i: number) =>
+      ensureStrictJsonSchema(variant, [...path, 'oneOf', String(i)], root),
+    );
+    jsonSchema.anyOf = Array.isArray(jsonSchema.anyOf)
+      ? [...jsonSchema.anyOf, ...convertedOneOf]
+      : convertedOneOf;
+    delete (jsonSchema as any).oneOf;
   }
 
   // Handle intersections (allOf)
