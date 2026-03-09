@@ -117,7 +117,7 @@ export interface ComparisonFilter {
    * - `in`: in
    * - `nin`: not in
    */
-  type: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte';
+  type: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'nin';
 
   /**
    * The value to compare against the attribute key; supports string, number, or
