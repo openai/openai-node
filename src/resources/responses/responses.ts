@@ -3225,12 +3225,6 @@ export interface ResponseInputFile {
   type: 'input_file';
 
   /**
-   * The detail level of the file to be sent to the model. One of `high` or `low`.
-   * Defaults to `high`.
-   */
-  detail?: 'low' | 'high';
-
-  /**
    * The content of the file to be sent to the model.
    */
   file_data?: string;
@@ -3259,12 +3253,6 @@ export interface ResponseInputFileContent {
    * The type of the input item. Always `input_file`.
    */
   type: 'input_file';
-
-  /**
-   * The detail level of the file to be sent to the model. One of `high` or `low`.
-   * Defaults to `high`.
-   */
-  detail?: 'high' | 'low';
 
   /**
    * The base64-encoded data of the file to be sent to the model.
