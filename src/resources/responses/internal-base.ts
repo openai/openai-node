@@ -80,7 +80,7 @@ export function buildURL(client: OpenAI, query?: object | null): URL {
   if (query) {
     url.search = stringifyQuery(query);
   }
-  url.protocol = 'wss';
+  url.protocol = url.protocol === 'http:' ? 'ws:' : 'wss:';
   return url;
 }
 
