@@ -1,6 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import OpenAI from 'openai';
+import OpenAI, { toFile } from 'openai';
 
 const client = new OpenAI({
   apiKey: 'My API Key',
@@ -22,7 +22,7 @@ describe('resource videos', () => {
   test('create: required and optional params', async () => {
     const response = await client.videos.create({
       prompt: 'x',
-      input_reference: { file_id: 'file-123', image_url: 'image_url' },
+      input_reference: await toFile(Buffer.from('Example data'), 'README.md'),
       model: 'string',
       seconds: '4',
       size: '720x1280',
@@ -87,7 +87,7 @@ describe('resource videos', () => {
   test('edit: only required params', async () => {
     const responsePromise = client.videos.edit({
       prompt: 'x',
-      video: { id: 'video_123' },
+      video: await toFile(Buffer.from('Example data'), 'README.md'),
     });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
@@ -101,7 +101,7 @@ describe('resource videos', () => {
   test('edit: required and optional params', async () => {
     const response = await client.videos.edit({
       prompt: 'x',
-      video: { id: 'video_123' },
+      video: await toFile(Buffer.from('Example data'), 'README.md'),
     });
   });
 

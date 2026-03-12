@@ -9,9 +9,10 @@ import {
   type ConversationCursorPageParams,
   PagePromise,
 } from '../../core/pagination';
+import { type Uploadable } from '../../core/uploads';
 import { buildHeaders } from '../../internal/headers';
 import { RequestOptions } from '../../internal/request-options';
-import { maybeMultipartFormRequestOptions } from '../../internal/uploads';
+import { maybeMultipartFormRequestOptions, multipartFormRequestOptions } from '../../internal/uploads';
 import { path } from '../../internal/utils/path';
 
 export class Videos extends APIResource {
@@ -21,7 +22,7 @@ export class Videos extends APIResource {
    * Create a new video generation job from a prompt and optional reference assets.
    */
   create(body: VideoCreateParams, options?: RequestOptions): APIPromise<Video> {
-    return this._client.post('/videos', maybeMultipartFormRequestOptions({ body, ...options }, this._client));
+    return this._client.post('/videos', multipartFormRequestOptions({ body, ...options }, this._client));
   }
 
   /**
@@ -73,7 +74,7 @@ export class Videos extends APIResource {
   edit(body: VideoEditParams, options?: RequestOptions): APIPromise<Video> {
     return this._client.post(
       '/videos/edits',
-      maybeMultipartFormRequestOptions({ body, ...options }, this._client),
+      multipartFormRequestOptions({ body, ...options }, this._client),
     );
   }
 
@@ -83,7 +84,7 @@ export class Videos extends APIResource {
   extend(body: VideoExtendParams, options?: RequestOptions): APIPromise<Video> {
     return this._client.post(
       '/videos/extensions',
-      maybeMultipartFormRequestOptions({ body, ...options }, this._client),
+      multipartFormRequestOptions({ body, ...options }, this._client),
     );
   }
 
@@ -225,10 +226,9 @@ export interface VideoCreateParams {
   prompt: string;
 
   /**
-   * Optional reference object that guides generation. Provide exactly one of
-   * `image_url` or `file_id`.
+   * Optional reference asset upload or reference object that guides generation.
    */
-  input_reference?: VideoCreateParams.InputReference;
+  input_reference?: Uploadable | VideoCreateParams.ImageRefParam2;
 
   /**
    * The video generation model to use (allowed values: sora-2, sora-2-pro). Defaults
@@ -249,11 +249,7 @@ export interface VideoCreateParams {
 }
 
 export namespace VideoCreateParams {
-  /**
-   * Optional reference object that guides generation. Provide exactly one of
-   * `image_url` or `file_id`.
-   */
-  export interface InputReference {
+  export interface ImageRefParam2 {
     file_id?: string;
 
     /**
@@ -287,14 +283,14 @@ export interface VideoEditParams {
   /**
    * Reference to the completed video to edit.
    */
-  video: VideoEditParams.Video;
+  video: Uploadable | VideoEditParams.VideoReferenceInputParam;
 }
 
 export namespace VideoEditParams {
   /**
-   * Reference to the completed video to edit.
+   * Reference to the completed video.
    */
-  export interface Video {
+  export interface VideoReferenceInputParam {
     /**
      * The identifier of the completed video.
      */
@@ -315,16 +311,16 @@ export interface VideoExtendParams {
   seconds: VideoSeconds;
 
   /**
-   * Reference to the completed video to extend.
+   * Reference to the completed video.
    */
-  video: VideoExtendParams.Video;
+  video: VideoExtendParams.VideoReferenceInputParam | Uploadable;
 }
 
 export namespace VideoExtendParams {
   /**
-   * Reference to the completed video to extend.
+   * Reference to the completed video.
    */
-  export interface Video {
+  export interface VideoReferenceInputParam {
     /**
      * The identifier of the completed video.
      */
