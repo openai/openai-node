@@ -139,7 +139,9 @@ export {
   type VideoCreateParams,
   type VideoListParams,
   type VideoDownloadContentParams,
+  type VideoEditParams,
+  type VideoExtendParams,
   type VideoRemixParams,
   type VideosPage,
-} from './videos';
+} from './videos/videos';
 export { Webhooks } from './webhooks';
