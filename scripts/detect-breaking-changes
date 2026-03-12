@@ -60,7 +60,8 @@ TEST_PATHS=(
 	tests/api-resources/skills/content.test.ts
 	tests/api-resources/skills/versions/versions.test.ts
 	tests/api-resources/skills/versions/content.test.ts
-	tests/api-resources/videos.test.ts
+	tests/api-resources/videos/videos.test.ts
+	tests/api-resources/videos/character.test.ts
 	tests/index.test.ts
 )
 
