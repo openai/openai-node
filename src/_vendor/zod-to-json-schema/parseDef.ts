@@ -217,7 +217,7 @@ const selectParser = (
     case ZodFirstPartyTypeKind.ZodLazy:
       return parseDef(def.getter()._def, refs);
     case ZodFirstPartyTypeKind.ZodPromise:
-      return parsePromiseDef(def, refs);
+      return parsePromiseDef(def, refs, forceResolution);
     case ZodFirstPartyTypeKind.ZodNaN:
     case ZodFirstPartyTypeKind.ZodNever:
       return parseNeverDef();
@@ -228,13 +228,13 @@ const selectParser = (
     case ZodFirstPartyTypeKind.ZodUnknown:
       return parseUnknownDef();
     case ZodFirstPartyTypeKind.ZodDefault:
-      return parseDefaultDef(def, refs);
+      return parseDefaultDef(def, refs, forceResolution);
     case ZodFirstPartyTypeKind.ZodBranded:
       return parseBrandedDef(def, refs, forceResolution);
     case ZodFirstPartyTypeKind.ZodReadonly:
-      return parseReadonlyDef(def, refs);
+      return parseReadonlyDef(def, refs, forceResolution);
     case ZodFirstPartyTypeKind.ZodCatch:
-      return parseCatchDef(def, refs);
+      return parseCatchDef(def, refs, forceResolution);
     case ZodFirstPartyTypeKind.ZodPipeline:
       return parsePipelineDef(def, refs);
     case ZodFirstPartyTypeKind.ZodFunction:
