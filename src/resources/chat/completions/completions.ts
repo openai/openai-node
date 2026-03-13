@@ -494,10 +494,11 @@ export interface ChatCompletionAudioParam {
   /**
    * The voice the model uses to respond. Supported built-in voices are `alloy`,
    * `ash`, `ballad`, `coral`, `echo`, `fable`, `nova`, `onyx`, `sage`, `shimmer`,
-   * `marin`, and `cedar`.
+   * `marin`, and `cedar`. You may also provide a custom voice object with an `id`,
+   * for example `{ "id": "voice_1234" }`.
    */
   voice:
-    | (string & {})
+    | string
     | 'alloy'
     | 'ash'
     | 'ballad'
@@ -507,7 +508,20 @@ export interface ChatCompletionAudioParam {
     | 'shimmer'
     | 'verse'
     | 'marin'
-    | 'cedar';
+    | 'cedar'
+    | ChatCompletionAudioParam.ID;
+}
+
+export namespace ChatCompletionAudioParam {
+  /**
+   * Custom voice reference.
+   */
+  export interface ID {
+    /**
+     * The custom voice ID, e.g. `voice_1234`.
+     */
+    id: string;
+  }
 }
 
 /**
