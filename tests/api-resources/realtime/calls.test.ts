@@ -44,7 +44,7 @@ describe('resource calls', () => {
         output: {
           format: { rate: 24000, type: 'audio/pcm' },
           speed: 0.25,
-          voice: 'ash',
+          voice: 'string',
         },
       },
       include: ['item.input_audio_transcription.logprobs'],

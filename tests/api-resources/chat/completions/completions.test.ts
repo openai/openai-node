@@ -32,7 +32,7 @@ describe('resource completions', () => {
         },
       ],
       model: 'gpt-5.4',
-      audio: { format: 'wav', voice: 'ash' },
+      audio: { format: 'wav', voice: 'string' },
       frequency_penalty: -2,
       function_call: 'none',
       functions: [
