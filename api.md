@@ -721,32 +721,25 @@ Methods:
 
 Types:
 
-- <code><a href="./src/resources/videos/videos.ts">Video</a></code>
-- <code><a href="./src/resources/videos/videos.ts">VideoCreateError</a></code>
-- <code><a href="./src/resources/videos/videos.ts">VideoModel</a></code>
-- <code><a href="./src/resources/videos/videos.ts">VideoSeconds</a></code>
-- <code><a href="./src/resources/videos/videos.ts">VideoSize</a></code>
-- <code><a href="./src/resources/videos/videos.ts">VideoDeleteResponse</a></code>
+- <code><a href="./src/resources/videos.ts">ImageInputReferenceParam</a></code>
+- <code><a href="./src/resources/videos.ts">Video</a></code>
+- <code><a href="./src/resources/videos.ts">VideoCreateError</a></code>
+- <code><a href="./src/resources/videos.ts">VideoModel</a></code>
+- <code><a href="./src/resources/videos.ts">VideoSeconds</a></code>
+- <code><a href="./src/resources/videos.ts">VideoSize</a></code>
+- <code><a href="./src/resources/videos.ts">VideoDeleteResponse</a></code>
+- <code><a href="./src/resources/videos.ts">VideoCreateCharacterResponse</a></code>
+- <code><a href="./src/resources/videos.ts">VideoGetCharacterResponse</a></code>
 
 Methods:
 
-- <code title="post /videos">client.videos.<a href="./src/resources/videos/videos.ts">create</a>({ ...params }) -> Video</code>
-- <code title="get /videos/{video_id}">client.videos.<a href="./src/resources/videos/videos.ts">retrieve</a>(videoID) -> Video</code>
-- <code title="get /videos">client.videos.<a href="./src/resources/videos/videos.ts">list</a>({ ...params }) -> VideosPage</code>
-- <code title="delete /videos/{video_id}">client.videos.<a href="./src/resources/videos/videos.ts">delete</a>(videoID) -> VideoDeleteResponse</code>
-- <code title="get /videos/{video_id}/content">client.videos.<a href="./src/resources/videos/videos.ts">downloadContent</a>(videoID, { ...params }) -> Response</code>
-- <code title="post /videos/edits">client.videos.<a href="./src/resources/videos/videos.ts">edit</a>({ ...params }) -> Video</code>
-- <code title="post /videos/extensions">client.videos.<a href="./src/resources/videos/videos.ts">extend</a>({ ...params }) -> Video</code>
-- <code title="post /videos/{video_id}/remix">client.videos.<a href="./src/resources/videos/videos.ts">remix</a>(videoID, { ...params }) -> Video</code>
-
-## Character
-
-Types:
-
-- <code><a href="./src/resources/videos/character.ts">CharacterCreateResponse</a></code>
-- <code><a href="./src/resources/videos/character.ts">CharacterGetResponse</a></code>
-
-Methods:
-
-- <code title="post /videos/characters">client.videos.character.<a href="./src/resources/videos/character.ts">create</a>({ ...params }) -> CharacterCreateResponse</code>
-- <code title="get /videos/characters/{character_id}">client.videos.character.<a href="./src/resources/videos/character.ts">get</a>(characterID) -> CharacterGetResponse</code>
+- <code title="post /videos">client.videos.<a href="./src/resources/videos.ts">create</a>({ ...params }) -> Video</code>
+- <code title="get /videos/{video_id}">client.videos.<a href="./src/resources/videos.ts">retrieve</a>(videoID) -> Video</code>
+- <code title="get /videos">client.videos.<a href="./src/resources/videos.ts">list</a>({ ...params }) -> VideosPage</code>
+- <code title="delete /videos/{video_id}">client.videos.<a href="./src/resources/videos.ts">delete</a>(videoID) -> VideoDeleteResponse</code>
+- <code title="post /videos/characters">client.videos.<a href="./src/resources/videos.ts">createCharacter</a>({ ...params }) -> VideoCreateCharacterResponse</code>
+- <code title="get /videos/{video_id}/content">client.videos.<a href="./src/resources/videos.ts">downloadContent</a>(videoID, { ...params }) -> Response</code>
+- <code title="post /videos/edits">client.videos.<a href="./src/resources/videos.ts">edit</a>({ ...params }) -> Video</code>
+- <code title="post /videos/extensions">client.videos.<a href="./src/resources/videos.ts">extend</a>({ ...params }) -> Video</code>
+- <code title="get /videos/characters/{character_id}">client.videos.<a href="./src/resources/videos.ts">getCharacter</a>(characterID) -> VideoGetCharacterResponse</code>
+- <code title="post /videos/{video_id}/remix">client.videos.<a href="./src/resources/videos.ts">remix</a>(videoID, { ...params }) -> Video</code>

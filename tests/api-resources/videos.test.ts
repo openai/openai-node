@@ -76,6 +76,27 @@ describe('resource videos', () => {
     expect(dataAndResponse.response).toBe(rawResponse);
   });
 
+  test('createCharacter: only required params', async () => {
+    const responsePromise = client.videos.createCharacter({
+      name: 'x',
+      video: await toFile(Buffer.from('Example data'), 'README.md'),
+    });
+    const rawResponse = await responsePromise.asResponse();
+    expect(rawResponse).toBeInstanceOf(Response);
+    const response = await responsePromise;
+    expect(response).not.toBeInstanceOf(Response);
+    const dataAndResponse = await responsePromise.withResponse();
+    expect(dataAndResponse.data).toBe(response);
+    expect(dataAndResponse.response).toBe(rawResponse);
+  });
+
+  test('createCharacter: required and optional params', async () => {
+    const response = await client.videos.createCharacter({
+      name: 'x',
+      video: await toFile(Buffer.from('Example data'), 'README.md'),
+    });
+  });
+
   // Mock server doesn't support application/binary responses
   test.skip('downloadContent: request options and params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
@@ -109,7 +130,7 @@ describe('resource videos', () => {
     const responsePromise = client.videos.extend({
       prompt: 'x',
       seconds: '4',
-      video: { id: 'video_123' },
+      video: await toFile(Buffer.from('Example data'), 'README.md'),
     });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
@@ -124,8 +145,19 @@ describe('resource videos', () => {
     const response = await client.videos.extend({
       prompt: 'x',
       seconds: '4',
-      video: { id: 'video_123' },
+      video: await toFile(Buffer.from('Example data'), 'README.md'),
     });
+  });
+
+  test('getCharacter', async () => {
+    const responsePromise = client.videos.getCharacter('char_123');
+    const rawResponse = await responsePromise.asResponse();
+    expect(rawResponse).toBeInstanceOf(Response);
+    const response = await responsePromise;
+    expect(response).not.toBeInstanceOf(Response);
+    const dataAndResponse = await responsePromise.withResponse();
+    expect(dataAndResponse.data).toBe(response);
+    expect(dataAndResponse.response).toBe(rawResponse);
   });
 
   test('remix: only required params', async () => {

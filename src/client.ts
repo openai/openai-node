@@ -92,6 +92,26 @@ import {
   ModerationTextInput,
   Moderations,
 } from './resources/moderations';
+import {
+  ImageInputReferenceParam,
+  Video,
+  VideoCreateCharacterParams,
+  VideoCreateCharacterResponse,
+  VideoCreateError,
+  VideoCreateParams,
+  VideoDeleteResponse,
+  VideoDownloadContentParams,
+  VideoEditParams,
+  VideoExtendParams,
+  VideoGetCharacterResponse,
+  VideoListParams,
+  VideoModel,
+  VideoRemixParams,
+  VideoSeconds,
+  VideoSize,
+  Videos,
+  VideosPage,
+} from './resources/videos';
 import { Audio, AudioModel, AudioResponseFormat } from './resources/audio/audio';
 import { Beta } from './resources/beta/beta';
 import { Chat } from './resources/chat/chat';
@@ -158,22 +178,6 @@ import {
   VectorStores,
   VectorStoresPage,
 } from './resources/vector-stores/vector-stores';
-import {
-  Video,
-  VideoCreateError,
-  VideoCreateParams,
-  VideoDeleteResponse,
-  VideoDownloadContentParams,
-  VideoEditParams,
-  VideoExtendParams,
-  VideoListParams,
-  VideoModel,
-  VideoRemixParams,
-  VideoSeconds,
-  VideoSize,
-  Videos,
-  VideosPage,
-} from './resources/videos/videos';
 import { Webhooks } from './resources/webhooks/webhooks';
 import {
   ChatCompletion,
@@ -1292,15 +1296,19 @@ export declare namespace OpenAI {
 
   export {
     Videos as Videos,
+    type ImageInputReferenceParam as ImageInputReferenceParam,
     type Video as Video,
     type VideoCreateError as VideoCreateError,
     type VideoModel as VideoModel,
     type VideoSeconds as VideoSeconds,
     type VideoSize as VideoSize,
     type VideoDeleteResponse as VideoDeleteResponse,
+    type VideoCreateCharacterResponse as VideoCreateCharacterResponse,
+    type VideoGetCharacterResponse as VideoGetCharacterResponse,
     type VideosPage as VideosPage,
     type VideoCreateParams as VideoCreateParams,
     type VideoListParams as VideoListParams,
+    type VideoCreateCharacterParams as VideoCreateCharacterParams,
     type VideoDownloadContentParams as VideoDownloadContentParams,
     type VideoEditParams as VideoEditParams,
     type VideoExtendParams as VideoExtendParams,
