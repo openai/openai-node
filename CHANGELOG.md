@@ -1,5 +1,13 @@
 # Changelog
 
+## 6.29.0 (2026-03-13)
+
+Full Changelog: [v6.28.0...v6.29.0](https://github.com/openai/openai-node/compare/v6.28.0...v6.29.0)
+
+### Features
+
+* **api:** custom voices ([a11307a](https://github.com/openai/openai-node/commit/a11307afab49299fdf7e7ed3675d3e277d9b5c60))
+
 ## 6.28.0 (2026-03-13)
 
 Full Changelog: [v6.27.0...v6.28.0](https://github.com/openai/openai-node/compare/v6.27.0...v6.28.0)
