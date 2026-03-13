@@ -1,4 +1,4 @@
-import { zodResponseFormat } from 'openai/helpers/zod';
+import { zodResponseFormat, zodTextFormat } from 'openai/helpers/zod';
 import { z as zv3 } from 'zod/v3';
 import { z as zv4 } from 'zod/v4';
 
@@ -359,4 +359,40 @@ describe.each([
 
     expect(consoleSpy).toHaveBeenCalledTimes(0);
   });
+
+  if (version === 'v3') {
+    it('does not produce circular $ref for branded types used in multiple fields', () => {
+      const BlockIdSchema = z.string().brand<'BlockId'>();
+
+      const schema = z.object({
+        slides: z.array(
+          z.object({
+            subtitle: z.array(BlockIdSchema).nullable(),
+            content: z.array(BlockIdSchema).min(1),
+          }),
+        ),
+      });
+
+      const result = zodResponseFormat(schema, 'slidePlan');
+      const jsonSchema = result.json_schema.schema as Record<string, any>;
+      const definitions = jsonSchema.definitions || {};
+
+      // No definition should be a self-referencing $ref
+      for (const [key, value] of Object.entries(definitions)) {
+        if (typeof value === 'object' && value !== null && '$ref' in value) {
+          const refTarget = (value as any).$ref;
+          expect(refTarget).not.toBe(`#/definitions/${key}`);
+        }
+      }
+
+      // The branded type should resolve to {type: "string"}, not a $ref
+      const contentItems =
+        jsonSchema.properties?.slides?.items?.properties?.content?.items;
+      if (contentItems && '$ref' in contentItems) {
+        const refName = contentItems.$ref.replace('#/definitions/', '');
+        const refDef = definitions[refName];
+        expect(refDef).toHaveProperty('type', 'string');
+      }
+    });
+  }
 });
