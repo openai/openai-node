@@ -1262,11 +1262,13 @@ export interface RealtimeAudioConfigOutput {
   /**
    * The voice the model uses to respond. Supported built-in voices are `alloy`,
    * `ash`, `ballad`, `coral`, `echo`, `sage`, `shimmer`, `verse`, `marin`, and
-   * `cedar`. Voice cannot be changed during the session once the model has responded
-   * with audio at least once. We recommend `marin` and `cedar` for best quality.
+   * `cedar`. You may also provide a custom voice object with an `id`, for example
+   * `{ "id": "voice_1234" }`. Voice cannot be changed during the session once the
+   * model has responded with audio at least once. We recommend `marin` and `cedar`
+   * for best quality.
    */
   voice?:
-    | (string & {})
+    | string
     | 'alloy'
     | 'ash'
     | 'ballad'
@@ -1276,7 +1278,20 @@ export interface RealtimeAudioConfigOutput {
     | 'shimmer'
     | 'verse'
     | 'marin'
-    | 'cedar';
+    | 'cedar'
+    | RealtimeAudioConfigOutput.ID;
+}
+
+export namespace RealtimeAudioConfigOutput {
+  /**
+   * Custom voice reference.
+   */
+  export interface ID {
+    /**
+     * The custom voice ID, e.g. `voice_1234`.
+     */
+    id: string;
+  }
 }
 
 /**
@@ -2127,11 +2142,13 @@ export namespace RealtimeResponseCreateAudioOutput {
     /**
      * The voice the model uses to respond. Supported built-in voices are `alloy`,
      * `ash`, `ballad`, `coral`, `echo`, `sage`, `shimmer`, `verse`, `marin`, and
-     * `cedar`. Voice cannot be changed during the session once the model has responded
-     * with audio at least once.
+     * `cedar`. You may also provide a custom voice object with an `id`, for example
+     * `{ "id": "voice_1234" }`. Voice cannot be changed during the session once the
+     * model has responded with audio at least once. We recommend `marin` and `cedar`
+     * for best quality.
      */
     voice?:
-      | (string & {})
+      | string
       | 'alloy'
       | 'ash'
       | 'ballad'
@@ -2141,7 +2158,20 @@ export namespace RealtimeResponseCreateAudioOutput {
       | 'shimmer'
       | 'verse'
       | 'marin'
-      | 'cedar';
+      | 'cedar'
+      | Output.ID;
+  }
+
+  export namespace Output {
+    /**
+     * Custom voice reference.
+     */
+    export interface ID {
+      /**
+       * The custom voice ID, e.g. `voice_1234`.
+       */
+      id: string;
+    }
   }
 }
 
