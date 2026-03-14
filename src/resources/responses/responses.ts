@@ -812,6 +812,11 @@ export namespace NamespaceTool {
 
     type: 'function';
 
+    /**
+     * Whether this function should be deferred and discovered via tool search.
+     */
+    defer_loading?: boolean;
+
     description?: string | null;
 
     parameters?: unknown | null;
