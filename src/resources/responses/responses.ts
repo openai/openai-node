@@ -7208,6 +7208,12 @@ export interface WebSearchTool {
    * The approximate location of the user.
    */
   user_location?: WebSearchTool.UserLocation | null;
+
+  /**
+   * Whether to allow the model to use external web access during the search.
+   * When `false`, the model will not access external web sources.
+   */
+  external_web_access?: boolean | null;
 }
 
 export namespace WebSearchTool {
