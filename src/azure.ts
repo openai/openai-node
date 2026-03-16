@@ -103,7 +103,7 @@ export class AzureOpenAI extends OpenAI {
         );
       }
 
-      baseURL = `${endpoint}/openai`;
+      baseURL = `${endpoint.replace(/\/+$/, '')}/openai`;
     } else {
       if (endpoint) {
         throw new Errors.OpenAIError('baseURL and endpoint are mutually exclusive');
