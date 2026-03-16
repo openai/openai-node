@@ -5,6 +5,7 @@ codegen.log
 Brewfile.lock.json
 dist
 dist-deno
+/oidc
 /*.tgz
 .idea/
 tmp
