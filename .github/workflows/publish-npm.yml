@@ -8,6 +8,9 @@ jobs:
   publish:
     name: publish
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     environment: publish
 
     steps:
@@ -25,5 +28,3 @@ jobs:
       - name: Publish to NPM
         run: |
           bash ./bin/publish-npm
-        env:
-          NPM_TOKEN: ${{ secrets.OPENAI_NPM_TOKEN || secrets.NPM_TOKEN }}

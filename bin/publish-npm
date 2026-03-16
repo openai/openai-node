@@ -2,7 +2,12 @@
 
 set -eux
 
-npm config set '//registry.npmjs.org/:_authToken' "$NPM_TOKEN"
+if [[ ${NPM_TOKEN:-} ]]; then
+  npm config set '//registry.npmjs.org/:_authToken' "$NPM_TOKEN"
+elif [[ ! ${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-} ]]; then
+  echo "ERROR: NPM_TOKEN must be set if not running in a Github Action with id-token permission"
+  exit 1
+fi
 
 yarn build
 cd dist
@@ -57,5 +62,9 @@ else
   TAG="latest"
 fi
 
+# Install OIDC compatible npm version
+npm install --prefix ../oidc/ npm@11.6.2
+
 # Publish with the appropriate tag
-yarn publish --tag "$TAG"
+export npm_config_registry='https://registry.npmjs.org'
+../oidc/node_modules/.bin/npm publish --tag "$TAG"
