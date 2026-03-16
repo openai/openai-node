@@ -1,5 +1,13 @@
 # Changelog
 
+## 6.31.0 (2026-03-16)
+
+Full Changelog: [v6.30.1...v6.31.0](https://github.com/openai/openai-node/compare/v6.30.1...v6.31.0)
+
+### Features
+
+* **api:** add in/nin filter types to ComparisonFilter ([b2eda27](https://github.com/openai/openai-node/commit/b2eda274418ceb9bbdb3778cb6a5ee28090df8ad))
+
 ## 6.30.1 (2026-03-16)
 
 Full Changelog: [v6.30.0...v6.30.1](https://github.com/openai/openai-node/compare/v6.30.0...v6.30.1)
