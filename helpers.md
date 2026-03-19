@@ -129,7 +129,116 @@ The `chat.completions.parse()` method imposes some additional restrictions on it
 
 # Streaming Helpers
 
-OpenAI supports streaming responses when interacting with the [Chat](#chat-streaming) or [Assistant](#assistant-streaming-api) APIs.
+OpenAI supports streaming responses when interacting with the [Responses](#responses-streaming), [Chat](#chat-streaming), or [Assistant](#assistant-streaming-api) APIs.
+
+## Responses Streaming
+
+The Responses API supports streaming via Server-Sent Events. The SDK provides a `.stream()` helper
+that lets you subscribe to typed events as they arrive.
+
+### Event lifecycle
+
+The following diagram shows the sequence of events emitted during a typical Responses API stream:
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant OpenAI API
+
+    Client->>OpenAI API: responses.stream({ model, input })
+    OpenAI API-->>Client: response.created
+    OpenAI API-->>Client: response.in_progress
+    OpenAI API-->>Client: response.output_item.added
+    OpenAI API-->>Client: response.content_part.added
+    loop Token generation
+        OpenAI API-->>Client: response.output_text.delta
+    end
+    OpenAI API-->>Client: response.content_part.done
+    OpenAI API-->>Client: response.output_item.done
+    OpenAI API-->>Client: response.completed
+    Note over Client: Stream ends
+```
+
+### Basic streaming example
+
+```ts
+import OpenAI from 'openai';
+
+const client = new OpenAI();
+
+const stream = client.responses.stream({
+  model: 'gpt-4o',
+  input: 'Explain how streaming works in three sentences.',
+});
+
+// Subscribe to specific event types
+stream.on('response.output_text.delta', (event) => {
+  process.stdout.write(event.delta);
+});
+
+stream.on('response.completed', (event) => {
+  console.log('\n\nDone. Usage:', event.response.usage);
+});
+
+// Or iterate over all events
+for await (const event of stream) {
+  if (event.type === 'response.output_text.delta') {
+    process.stdout.write(event.delta);
+  }
+}
+```
+
+### Responses stream events
+
+Every event has a `type` field you can match on. The main event types are:
+
+| Event type | Description |
+| --- | --- |
+| `response.created` | Response object created |
+| `response.in_progress` | Generation has started |
+| `response.output_item.added` | A new output item (message, tool call, etc.) was added |
+| `response.content_part.added` | A new content part was added to an output item |
+| `response.output_text.delta` | A text chunk was generated (has `delta` and `snapshot` fields) |
+| `response.output_text.done` | Text generation finished for this content part |
+| `response.function_call_arguments.delta` | A chunk of function call arguments (has `delta` and `snapshot` fields) |
+| `response.function_call_arguments.done` | Function call arguments are complete |
+| `response.content_part.done` | Content part is complete |
+| `response.output_item.done` | Output item is complete |
+| `response.completed` | The full response is complete |
+| `response.failed` | The response failed |
+| `response.incomplete` | The response was cut short (e.g., max tokens) |
+
+### Responses streaming with tool calls
+
+When the model calls a function tool, the event flow changes:
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant OpenAI API
+
+    Client->>OpenAI API: responses.stream({ model, input, tools })
+    OpenAI API-->>Client: response.created
+    OpenAI API-->>Client: response.in_progress
+    OpenAI API-->>Client: response.output_item.added (type: function_call)
+    loop Argument tokens
+        OpenAI API-->>Client: response.function_call_arguments.delta
+    end
+    OpenAI API-->>Client: response.function_call_arguments.done
+    OpenAI API-->>Client: response.output_item.done
+    OpenAI API-->>Client: response.completed
+    Note over Client: Execute function, send result back
+```
+
+### Helper methods
+
+The stream object provides convenience methods to collect final results:
+
+```ts
+const stream = client.responses.stream({ model: 'gpt-4o', input: '...' });
+
+const response = await stream.finalResponse(); // Wait for the complete Response object
+```
 
 ## Assistant Streaming API
 
@@ -138,20 +247,77 @@ so you can subscribe to the types of events you are interested in as well as rec
 
 More information can be found in the documentation: [Assistant Streaming](https://platform.openai.com/docs/assistants/overview?lang=node.js)
 
-#### An example of creating a run and subscribing to some events
+### Understanding assistant stream events
+
+The Assistants API sends raw SSE events with names like `thread.run.created`, `thread.message.delta`, etc.
+The SDK's streaming helper maps these to **convenience event names** (like `textDelta`, `toolCallCreated`)
+so you can subscribe to higher-level concepts without parsing raw events yourself.
+
+**You can use either approach:**
+
+1. **Convenience events** -- camelCase names like `textDelta`, `runStepCreated` (shown in the example below)
+2. **Raw events** -- use `.on('event', callback)` to receive every SSE event with its original `thread.*` type
+
+Here's how the convenience events map to the underlying SSE events:
+
+| Convenience event | Triggered by raw SSE event(s) | Callback signature |
+| --- | --- | --- |
+| `event` | _all events_ | `(event: AssistantStreamEvent) => void` |
+| `runStepCreated` | `thread.run.step.created` | `(runStep: RunStep) => void` |
+| `runStepDelta` | `thread.run.step.delta` | `(delta: RunStepDelta, snapshot: RunStep) => void` |
+| `runStepDone` | `thread.run.step.completed` | `(runStep: RunStep) => void` |
+| `messageCreated` | `thread.message.created` | `(message: Message) => void` |
+| `messageDelta` | `thread.message.delta` | `(delta: MessageDelta, snapshot: Message) => void` |
+| `messageDone` | `thread.message.completed` | `(message: Message) => void` |
+| `textCreated` | `thread.message.delta` (first text content) | `(content: Text) => void` |
+| `textDelta` | `thread.message.delta` (subsequent text) | `(delta: TextDelta, snapshot: Text) => void` |
+| `textDone` | `thread.message.completed` | `(content: Text, snapshot: Message) => void` |
+| `toolCallCreated` | `thread.run.step.delta` (first tool call) | `(toolCall: ToolCall) => void` |
+| `toolCallDelta` | `thread.run.step.delta` (subsequent) | `(delta: ToolCallDelta, snapshot: ToolCall) => void` |
+| `toolCallDone` | `thread.run.step.completed` | `(toolCall: ToolCall) => void` |
+| `imageFileDone` | `thread.message.completed` | `(content: ImageFile, snapshot: Message) => void` |
+| `end` | stream closed | `() => void` |
+
+### Assistant streaming lifecycle
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant OpenAI API
+
+    Client->>OpenAI API: threads.runs.stream(threadId, { assistant_id })
+    OpenAI API-->>Client: thread.run.created
+    OpenAI API-->>Client: thread.run.queued
+    OpenAI API-->>Client: thread.run.in_progress
+    OpenAI API-->>Client: thread.run.step.created
+    OpenAI API-->>Client: thread.run.step.in_progress
+    OpenAI API-->>Client: thread.message.created
+    OpenAI API-->>Client: thread.message.in_progress
+    loop Token generation
+        OpenAI API-->>Client: thread.message.delta
+        Note right of Client: SDK emits textDelta
+    end
+    OpenAI API-->>Client: thread.message.completed
+    Note right of Client: SDK emits textDone, messageDone
+    OpenAI API-->>Client: thread.run.step.completed
+    OpenAI API-->>Client: thread.run.completed
+    Note over Client: Stream ends, SDK emits end
+```
+
+#### Example: using convenience events
 
 ```ts
 const run = openai.beta.threads.runs
   .stream(thread.id, { assistant_id: assistant.id })
-  .on('textCreated', (text) => process.stdout.write('\nassistant > '))
-  .on('textDelta', (textDelta, snapshot) => process.stdout.write(textDelta.value))
+  .on('textCreated', () => process.stdout.write('\nassistant > '))
+  .on('textDelta', (textDelta) => process.stdout.write(textDelta.value ?? ''))
   .on('toolCallCreated', (toolCall) => process.stdout.write(`\nassistant > ${toolCall.type}\n\n`))
-  .on('toolCallDelta', (toolCallDelta, snapshot) => {
+  .on('toolCallDelta', (toolCallDelta) => {
     if (toolCallDelta.type === 'code_interpreter') {
-      if (toolCallDelta.code_interpreter.input) {
+      if (toolCallDelta.code_interpreter?.input) {
         process.stdout.write(toolCallDelta.code_interpreter.input);
       }
-      if (toolCallDelta.code_interpreter.outputs) {
+      if (toolCallDelta.code_interpreter?.outputs) {
         process.stdout.write('\noutput >\n');
         toolCallDelta.code_interpreter.outputs.forEach((output) => {
           if (output.type === 'logs') {
@@ -159,6 +325,32 @@ const run = openai.beta.threads.runs
           }
         });
       }
+    }
+  });
+```
+
+#### Example: using raw events
+
+If you need access to events like `thread.run.completed` or `thread.run.requires_action`
+that don't have convenience wrappers, use the `event` listener:
+
+```ts
+const run = openai.beta.threads.runs
+  .stream(thread.id, { assistant_id: assistant.id })
+  .on('event', ({ event, data }) => {
+    switch (event) {
+      case 'thread.run.completed':
+        console.log('Run finished:', data.id);
+        break;
+      case 'thread.run.requires_action':
+        console.log('Action required:', data.required_action);
+        break;
+      case 'thread.message.delta':
+        const chunk = data.delta.content?.[0];
+        if (chunk && 'text' in chunk && chunk.text?.value) {
+          process.stdout.write(chunk.text.value);
+        }
+        break;
     }
   });
 ```
@@ -186,18 +378,26 @@ openai.beta.threads.runs.submitToolOutputsStream();
 
 This method can be used to submit a tool output to a run waiting on the output and start a stream.
 
-### Assistant Events
+### Assistant Events Reference
 
-The assistant API provides events you can subscribe to for the following events.
+The assistant API provides two ways to subscribe to events:
+
+#### Raw event listener
 
 ```ts
 .on('event', (event: AssistantStreamEvent) => ...)
 ```
 
-This allows you to subscribe to all the possible raw events sent by the OpenAI streaming API.
-In many cases it will be more convenient to subscribe to a more specific set of events for your use case.
+Receives every SSE event from the API with its original type (e.g., `thread.run.completed`,
+`thread.message.delta`). The full list of raw event types is documented in the
+[API reference](https://platform.openai.com/docs/api-reference/assistants-streaming/events).
+Use this when you need events like `thread.run.completed` or `thread.run.requires_action` that
+don't have convenience wrappers.
 
-More information on the types of events can be found here: [Events](https://platform.openai.com/docs/api-reference/assistants-streaming/events)
+#### Convenience event listeners
+
+These fire at meaningful moments during the stream, derived from the raw events above.
+See the [mapping table](#understanding-assistant-stream-events) for which raw events trigger each one.
 
 ```ts
 .on('runStepCreated', (runStep: RunStep) => ...)
@@ -205,9 +405,8 @@ More information on the types of events can be found here: [Events](https://plat
 .on('runStepDone', (runStep: RunStep) => ...)
 ```
 
-These events allow you to subscribe to the creation, delta and completion of a RunStep.
-
-For more information on how Runs and RunSteps work see the documentation [Runs and RunSteps](https://platform.openai.com/docs/assistants/how-it-works/runs-and-run-steps)
+Subscribe to the creation, delta, and completion of a RunStep.
+See [Runs and RunSteps](https://platform.openai.com/docs/assistants/how-it-works/runs-and-run-steps).
 
 ```ts
 .on('messageCreated', (message: Message) => ...)
@@ -215,12 +414,9 @@ For more information on how Runs and RunSteps work see the documentation [Runs a
 .on('messageDone', (message: Message) => ...)
 ```
 
-This allows you to subscribe to Message creation, delta and completion events. Messages can contain
-different types of content that can be sent from a model (and events are available for specific content types).
-For convenience, the delta event includes both the incremental update and an accumulated snapshot of the content.
-
-More information on messages can be found
-on in the documentation page [Message](https://platform.openai.com/docs/api-reference/messages/object).
+Subscribe to Message creation, delta, and completion events. The delta callback includes both the
+incremental update and an accumulated snapshot.
+See [Message object](https://platform.openai.com/docs/api-reference/messages/object).
 
 ```ts
 .on('textCreated', (content: Text) => ...)
@@ -228,14 +424,14 @@ on in the documentation page [Message](https://platform.openai.com/docs/api-refe
 .on('textDone', (content: Text, snapshot: Message) => ...)
 ```
 
-These events allow you to subscribe to the creation, delta and completion of a Text content (a specific type of message).
-For convenience, the delta event includes both the incremental update and an accumulated snapshot of the content.
+Subscribe to text content creation, deltas, and completion. The delta callback includes both the
+incremental update and an accumulated snapshot.
 
 ```ts
 .on('imageFileDone', (content: ImageFile, snapshot: Message) => ...)
 ```
 
-Image files are not sent incrementally so an event is provided for when a image file is available.
+Image files are not sent incrementally, so only a completion event is provided.
 
 ```ts
 .on('toolCallCreated', (toolCall: ToolCall) => ...)
@@ -243,15 +439,14 @@ Image files are not sent incrementally so an event is provided for when a image 
 .on('toolCallDone', (toolCall: ToolCall) => ...)
 ```
 
-These events allow you to subscribe to events for the creation, delta and completion of a ToolCall.
-
-More information on tools can be found here [Tools](https://platform.openai.com/docs/assistants/tools)
+Subscribe to ToolCall creation, deltas, and completion.
+See [Tools](https://platform.openai.com/docs/assistants/tools).
 
 ```ts
 .on('end', () => ...)
 ```
 
-The last event send when a stream ends.
+The last event fired when a stream ends.
 
 ### Assistant Methods
 

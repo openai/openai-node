@@ -73,11 +73,58 @@ console.log(completion.choices[0].message.content);
 
 We provide support for streaming responses using Server Sent Events (SSE).
 
+The stream emits typed events that follow a predictable lifecycle. For the Responses API:
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant OpenAI API
+
+    Client->>OpenAI API: responses.stream({ model, input })
+    OpenAI API-->>Client: response.created
+    OpenAI API-->>Client: response.in_progress
+    OpenAI API-->>Client: response.output_item.added
+    OpenAI API-->>Client: response.content_part.added
+    loop Token generation
+        OpenAI API-->>Client: response.output_text.delta
+    end
+    OpenAI API-->>Client: response.content_part.done
+    OpenAI API-->>Client: response.output_item.done
+    OpenAI API-->>Client: response.completed
+```
+
+You can subscribe to specific event types using `.on()`, or iterate over all events with `for await...of`:
+
 ```ts
 import OpenAI from 'openai';
 
 const client = new OpenAI();
 
+// Using the stream helper with event listeners
+const stream = client.responses.stream({
+  model: 'gpt-5.2',
+  input: 'Say "Sheep sleep deep" ten times fast!',
+});
+
+stream.on('response.output_text.delta', (event) => {
+  process.stdout.write(event.delta);
+});
+
+stream.on('response.completed', (event) => {
+  console.log('\nDone.');
+});
+
+// Or iterate over all events
+for await (const event of stream) {
+  if (event.type === 'response.output_text.delta') {
+    process.stdout.write(event.delta);
+  }
+}
+```
+
+You can also use the lower-level `.create()` method with `stream: true`, which returns a raw async iterable of SSE events:
+
+```ts
 const stream = await client.responses.create({
   model: 'gpt-5.2',
   input: 'Say "Sheep sleep deep" ten times fast!',
@@ -85,9 +132,11 @@ const stream = await client.responses.create({
 });
 
 for await (const event of stream) {
-  console.log(event);
+  console.log(event.type, event);
 }
 ```
+
+For a full reference of streaming events, helper methods, and the Assistants streaming API, see [helpers.md](helpers.md#streaming-helpers).
 
 ## File uploads
 
