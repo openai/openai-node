@@ -2,7 +2,6 @@
 
 import * as ResponsesAPI from './responses';
 import { OpenAI } from '../../client';
-
 import { EventEmitter } from '../../core/EventEmitter';
 import { OpenAIError } from '../../core/error';
 import { stringifyQuery } from '../../internal/utils';
