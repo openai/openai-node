@@ -1,6 +1,6 @@
 import { APIPromise } from 'openai/api-promise';
 import OpenAI from 'openai/index';
-import { compareType } from './utils/typing';
+import { compareType, expectType } from './utils/typing';
 
 const client = new OpenAI({ apiKey: 'example-api-key' });
 
@@ -133,5 +133,24 @@ describe('request id', () => {
     const result = await promise;
     expect(result).toBe('hello world');
     expect((result as any)._request_id).toBeUndefined();
+  });
+});
+
+describe('responses request typing', () => {
+  test('web_search tools accept external_web_access', () => {
+    const webSearchTool: OpenAI.Responses.WebSearchTool = {
+      type: 'web_search',
+      external_web_access: false,
+    };
+    expectType<boolean | undefined>(webSearchTool.external_web_access);
+
+    const request: OpenAI.Responses.ResponseCreateParamsNonStreaming = {
+      model: 'gpt-5.1',
+      input: "What is NVDA's latest stock price?",
+      tools: [webSearchTool],
+    };
+    expectType<Array<OpenAI.Responses.Tool> | undefined>(request.tools);
+
+    expect(true).toBe(true);
   });
 });
