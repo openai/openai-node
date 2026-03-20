@@ -6,6 +6,11 @@ import { EventEmitter } from '../../core/EventEmitter';
 import { OpenAIError } from '../../core/error';
 import { stringifyQuery } from '../../internal/utils';
 
+export type ResponsesStreamMessage =
+  | { type: 'connecting' | 'open' | 'closing' | 'close' }
+  | { type: 'message'; message: ResponsesAPI.ResponsesServerEvent }
+  | { type: 'error'; error: WebSocketError };
+
 export class WebSocketError extends OpenAIError {
   /**
    * The error data that the API sent back in an error event.
