@@ -4073,15 +4073,15 @@ export interface ResponseInputMessageItem {
   role: 'user' | 'system' | 'developer';
 
   /**
+   * The type of the message input. Always set to `message`.
+   */
+  type: 'message';
+
+  /**
    * The status of item. One of `in_progress`, `completed`, or `incomplete`.
    * Populated when items are returned via API.
    */
   status?: 'in_progress' | 'completed' | 'incomplete';
-
-  /**
-   * The type of the message input. Always set to `message`.
-   */
-  type?: 'message';
 }
 
 /**
