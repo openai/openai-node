@@ -1937,6 +1937,12 @@ export interface ResponseComputerToolCallOutputItem {
   output: ResponseComputerToolCallOutputScreenshot;
 
   /**
+   * The status of the message input. One of `in_progress`, `completed`, or
+   * `incomplete`. Populated when input items are returned via API.
+   */
+  status: 'completed' | 'incomplete' | 'failed' | 'in_progress';
+
+  /**
    * The type of the computer tool call output. Always `computer_call_output`.
    */
   type: 'computer_call_output';
@@ -1948,10 +1954,9 @@ export interface ResponseComputerToolCallOutputItem {
   acknowledged_safety_checks?: Array<ResponseComputerToolCallOutputItem.AcknowledgedSafetyCheck>;
 
   /**
-   * The status of the message input. One of `in_progress`, `completed`, or
-   * `incomplete`. Populated when input items are returned via API.
+   * The identifier of the actor that created the item.
    */
-  status?: 'in_progress' | 'completed' | 'incomplete';
+  created_by?: string;
 }
 
 export namespace ResponseComputerToolCallOutputItem {
@@ -2267,6 +2272,27 @@ export interface ResponseCustomToolCallInputDoneEvent {
 }
 
 /**
+ * A call to a custom tool created by the model.
+ */
+export interface ResponseCustomToolCallItem extends ResponseCustomToolCall {
+  /**
+   * The unique ID of the custom tool call item.
+   */
+  id: string;
+
+  /**
+   * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
+   * Populated when items are returned via API.
+   */
+  status: 'in_progress' | 'completed' | 'incomplete';
+
+  /**
+   * The identifier of the actor that created the item.
+   */
+  created_by?: string;
+}
+
+/**
  * The output of a custom tool call from your code, being sent back to the model.
  */
 export interface ResponseCustomToolCallOutput {
@@ -2290,6 +2316,27 @@ export interface ResponseCustomToolCallOutput {
    * The unique ID of the custom tool call output in the OpenAI platform.
    */
   id?: string;
+}
+
+/**
+ * The output of a custom tool call from your code, being sent back to the model.
+ */
+export interface ResponseCustomToolCallOutputItem extends ResponseCustomToolCallOutput {
+  /**
+   * The unique ID of the custom tool call output item.
+   */
+  id: string;
+
+  /**
+   * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
+   * Populated when items are returned via API.
+   */
+  status: 'in_progress' | 'completed' | 'incomplete';
+
+  /**
+   * The identifier of the actor that created the item.
+   */
+  created_by?: string;
 }
 
 /**
@@ -2909,6 +2956,17 @@ export interface ResponseFunctionToolCallItem extends ResponseFunctionToolCall {
    * The unique ID of the function tool call.
    */
   id: string;
+
+  /**
+   * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
+   * Populated when items are returned via API.
+   */
+  status: 'in_progress' | 'completed' | 'incomplete';
+
+  /**
+   * The identifier of the actor that created the item.
+   */
+  created_by?: string;
 }
 
 export interface ResponseFunctionToolCallOutputItem {
@@ -2929,15 +2987,20 @@ export interface ResponseFunctionToolCallOutputItem {
   output: string | Array<ResponseInputText | ResponseInputImage | ResponseInputFile>;
 
   /**
+   * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
+   * Populated when items are returned via API.
+   */
+  status: 'in_progress' | 'completed' | 'incomplete';
+
+  /**
    * The type of the function tool call output. Always `function_call_output`.
    */
   type: 'function_call_output';
 
   /**
-   * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
-   * Populated when items are returned via API.
+   * The identifier of the actor that created the item.
    */
-  status?: 'in_progress' | 'completed' | 'incomplete';
+  created_by?: string;
 }
 
 /**
@@ -4178,6 +4241,8 @@ export type ResponseItem =
   | ResponseFunctionToolCallOutputItem
   | ResponseToolSearchCall
   | ResponseToolSearchOutputItem
+  | ResponseReasoningItem
+  | ResponseCompactionItem
   | ResponseItem.ImageGenerationCall
   | ResponseCodeInterpreterToolCall
   | ResponseItem.LocalShellCall
@@ -4189,7 +4254,9 @@ export type ResponseItem =
   | ResponseItem.McpListTools
   | ResponseItem.McpApprovalRequest
   | ResponseItem.McpApprovalResponse
-  | ResponseItem.McpCall;
+  | ResponseItem.McpCall
+  | ResponseCustomToolCallItem
+  | ResponseCustomToolCallOutputItem;
 
 export namespace ResponseItem {
   /**
@@ -4730,8 +4797,10 @@ export type ResponseOutputItem =
   | ResponseOutputMessage
   | ResponseFileSearchToolCall
   | ResponseFunctionToolCall
+  | ResponseFunctionToolCallOutputItem
   | ResponseFunctionWebSearch
   | ResponseComputerToolCall
+  | ResponseComputerToolCallOutputItem
   | ResponseReasoningItem
   | ResponseToolSearchCall
   | ResponseToolSearchOutputItem
@@ -4739,6 +4808,7 @@ export type ResponseOutputItem =
   | ResponseOutputItem.ImageGenerationCall
   | ResponseCodeInterpreterToolCall
   | ResponseOutputItem.LocalShellCall
+  | ResponseOutputItem.LocalShellCallOutput
   | ResponseFunctionShellToolCall
   | ResponseFunctionShellToolCallOutput
   | ResponseApplyPatchToolCall
@@ -4746,7 +4816,9 @@ export type ResponseOutputItem =
   | ResponseOutputItem.McpCall
   | ResponseOutputItem.McpListTools
   | ResponseOutputItem.McpApprovalRequest
-  | ResponseCustomToolCall;
+  | ResponseOutputItem.McpApprovalResponse
+  | ResponseCustomToolCall
+  | ResponseCustomToolCallOutputItem;
 
 export namespace ResponseOutputItem {
   /**
@@ -4839,6 +4911,31 @@ export namespace ResponseOutputItem {
        */
       working_directory?: string | null;
     }
+  }
+
+  /**
+   * The output of a local shell tool call.
+   */
+  export interface LocalShellCallOutput {
+    /**
+     * The unique ID of the local shell tool call generated by the model.
+     */
+    id: string;
+
+    /**
+     * A JSON string of the output of the local shell tool call.
+     */
+    output: string;
+
+    /**
+     * The type of the local shell tool call output. Always `local_shell_call_output`.
+     */
+    type: 'local_shell_call_output';
+
+    /**
+     * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
+     */
+    status?: 'in_progress' | 'completed' | 'incomplete' | null;
   }
 
   /**
@@ -4979,6 +5076,36 @@ export namespace ResponseOutputItem {
      * The type of the item. Always `mcp_approval_request`.
      */
     type: 'mcp_approval_request';
+  }
+
+  /**
+   * A response to an MCP approval request.
+   */
+  export interface McpApprovalResponse {
+    /**
+     * The unique ID of the approval response
+     */
+    id: string;
+
+    /**
+     * The ID of the approval request being answered.
+     */
+    approval_request_id: string;
+
+    /**
+     * Whether the request was approved.
+     */
+    approve: boolean;
+
+    /**
+     * The type of the item. Always `mcp_approval_response`.
+     */
+    type: 'mcp_approval_response';
+
+    /**
+     * Optional reason for the decision.
+     */
+    reason?: string | null;
   }
 }
 
@@ -7823,7 +7950,9 @@ export declare namespace Responses {
     type ResponseCustomToolCall as ResponseCustomToolCall,
     type ResponseCustomToolCallInputDeltaEvent as ResponseCustomToolCallInputDeltaEvent,
     type ResponseCustomToolCallInputDoneEvent as ResponseCustomToolCallInputDoneEvent,
+    type ResponseCustomToolCallItem as ResponseCustomToolCallItem,
     type ResponseCustomToolCallOutput as ResponseCustomToolCallOutput,
+    type ResponseCustomToolCallOutputItem as ResponseCustomToolCallOutputItem,
     type ResponseError as ResponseError,
     type ResponseErrorEvent as ResponseErrorEvent,
     type ResponseFailedEvent as ResponseFailedEvent,
