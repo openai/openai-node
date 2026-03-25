@@ -1,4 +1,7 @@
 import OpenAI from 'openai/index';
+import { toResponseInputItems } from 'openai/lib/responses/ResponseInputItems';
+import type { ResponseInputItem, ResponseOutputItem } from 'openai/resources/responses';
+
 const openai = new OpenAI({ apiKey: 'example-api-key' });
 
 describe('responses item types', () => {
@@ -12,10 +15,25 @@ const unused = async () => {
     model: 'gpt-5.1',
     input: 'You are a helpful assistant.',
   });
+
+  const history: Array<ResponseInputItem | ResponseOutputItem> = [
+    {
+      type: 'function_call_output',
+      call_id: 'call_123',
+      output: 'done',
+    },
+    ...response.output,
+  ];
+
   await openai.responses.create({
     model: 'gpt-5.1',
     // check type compatibility
     input: response.output,
+  });
+  await openai.responses.create({
+    model: 'gpt-5.1',
+    // check mixed history normalization
+    input: toResponseInputItems(history),
   });
   expect(true).toBe(true);
 };
