@@ -224,12 +224,22 @@ export namespace ComputerAction {
      * The y-coordinate where the click occurred.
      */
     y: number;
+
+    /**
+     * The keys being held while clicking.
+     */
+    keys?: Array<string> | null;
   }
 
   /**
    * A double click action.
    */
   export interface DoubleClick {
+    /**
+     * The keys being held while double-clicking.
+     */
+    keys: Array<string> | null;
+
     /**
      * Specifies the event type. For a double click action, this property is always set
      * to `double_click`.
@@ -269,6 +279,11 @@ export namespace ComputerAction {
      * `drag`.
      */
     type: 'drag';
+
+    /**
+     * The keys being held while dragging the mouse.
+     */
+    keys?: Array<string> | null;
   }
 
   export namespace Drag {
@@ -324,6 +339,11 @@ export namespace ComputerAction {
      * The y-coordinate to move to.
      */
     y: number;
+
+    /**
+     * The keys being held while moving the mouse.
+     */
+    keys?: Array<string> | null;
   }
 
   /**
@@ -366,6 +386,11 @@ export namespace ComputerAction {
      * The y-coordinate where the scroll occurred.
      */
     y: number;
+
+    /**
+     * The keys being held while scrolling.
+     */
+    keys?: Array<string> | null;
   }
 
   /**
@@ -1698,12 +1723,22 @@ export namespace ResponseComputerToolCall {
      * The y-coordinate where the click occurred.
      */
     y: number;
+
+    /**
+     * The keys being held while clicking.
+     */
+    keys?: Array<string> | null;
   }
 
   /**
    * A double click action.
    */
   export interface DoubleClick {
+    /**
+     * The keys being held while double-clicking.
+     */
+    keys: Array<string> | null;
+
     /**
      * Specifies the event type. For a double click action, this property is always set
      * to `double_click`.
@@ -1743,6 +1778,11 @@ export namespace ResponseComputerToolCall {
      * `drag`.
      */
     type: 'drag';
+
+    /**
+     * The keys being held while dragging the mouse.
+     */
+    keys?: Array<string> | null;
   }
 
   export namespace Drag {
@@ -1798,6 +1838,11 @@ export namespace ResponseComputerToolCall {
      * The y-coordinate to move to.
      */
     y: number;
+
+    /**
+     * The keys being held while moving the mouse.
+     */
+    keys?: Array<string> | null;
   }
 
   /**
@@ -1840,6 +1885,11 @@ export namespace ResponseComputerToolCall {
      * The y-coordinate where the scroll occurred.
      */
     y: number;
+
+    /**
+     * The keys being held while scrolling.
+     */
+    keys?: Array<string> | null;
   }
 
   /**
