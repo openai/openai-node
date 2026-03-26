@@ -1,7 +1,7 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import * as WS from 'ws';
-import { ResponsesEmitter, buildURL } from './internal-base';
+import { ResponsesEmitter, ResponsesStreamMessage, WebSocketError, buildURL } from './internal-base';
 import * as ResponsesAPI from './responses';
 import { OpenAI } from '../../client';
 
@@ -63,6 +63,135 @@ export class ResponsesWS extends ResponsesEmitter {
     } catch (err) {
       this._onError(null, 'could not close the connection', err);
     }
+  }
+
+  /**
+   * Returns an async iterator over WebSocket lifecycle and message events,
+   * providing an alternative to the event-based `.on()` API.
+   * The iterator will exit if the socket closes but breaking out of the iterator
+   * does not close the socket.
+   *
+   * @example
+   * ```ts
+   * for await (const event of connection.stream()) {
+   *   switch (event.type) {
+   *     case 'message':
+   *       console.log('received:', event.message);
+   *       break;
+   *     case 'error':
+   *       console.error(event.error);
+   *       break;
+   *     case 'close':
+   *       console.log('connection closed');
+   *       break;
+   *   }
+   * }
+   * ```
+   */
+  stream(): AsyncIterableIterator<ResponsesStreamMessage> {
+    return this[Symbol.asyncIterator]();
+  }
+
+  [Symbol.asyncIterator](): AsyncIterableIterator<ResponsesStreamMessage> {
+    // Two-queue async iterator: `queue` buffers incoming messages,
+    // `resolvers` buffers waiting next() calls. A push wakes the
+    // oldest next(); a next() drains the oldest message.
+    const queue: ResponsesStreamMessage[] = [];
+    const resolvers: (() => void)[] = [];
+    let done = false;
+
+    const push = (msg: ResponsesStreamMessage) => {
+      queue.push(msg);
+      resolvers.shift()?.();
+    };
+
+    const onEvent = (event: ResponsesAPI.ResponsesServerEvent) => {
+      if (event.type === 'error') return; // handled by onEmitterError
+      push({ type: 'message', message: event });
+    };
+
+    // Catches both API-level and socket-level errors via _onError → _emit('error')
+    const onEmitterError = (err: WebSocketError) => {
+      push({ type: 'error', error: err });
+    };
+
+    const onOpen = () => {
+      push({ type: 'open' });
+    };
+
+    const flushResolvers = () => {
+      for (let resolver = resolvers.shift(); resolver; resolver = resolvers.shift()) {
+        resolver();
+      }
+    };
+
+    const onClose = () => {
+      push({ type: 'close' });
+      done = true;
+      flushResolvers();
+      cleanup();
+    };
+
+    const cleanup = () => {
+      this.off('event', onEvent);
+      this.off('error', onEmitterError);
+      this.socket.off('open', onOpen);
+      this.socket.off('close', onClose);
+    };
+
+    this.on('event', onEvent);
+    this.on('error', onEmitterError);
+    this.socket.on('open', onOpen);
+    this.socket.on('close', onClose);
+
+    switch (this.socket.readyState) {
+      case WS.WebSocket.CONNECTING:
+        push({ type: 'connecting' });
+        break;
+      case WS.WebSocket.OPEN:
+        push({ type: 'open' });
+        break;
+      case WS.WebSocket.CLOSING:
+        push({ type: 'closing' });
+        break;
+      case WS.WebSocket.CLOSED:
+        push({ type: 'close' });
+        done = true;
+        cleanup();
+        break;
+    }
+
+    const resolve = (res: (value: IteratorResult<ResponsesStreamMessage>) => void) => {
+      if (queue.length > 0) {
+        res({ value: queue.shift()!, done: false });
+      } else if (done) {
+        res({ value: undefined, done: true });
+      } else {
+        return false;
+      }
+      return true;
+    };
+
+    const next = (): Promise<IteratorResult<ResponsesStreamMessage>> =>
+      new Promise((res) => {
+        if (resolve(res)) return;
+        resolvers.push(() => {
+          resolve(res);
+        });
+      });
+
+    return {
+      next,
+      return: (): Promise<IteratorReturnResult<undefined>> => {
+        done = true;
+        cleanup();
+        flushResolvers();
+        return Promise.resolve({ value: undefined, done: true });
+      },
+      [Symbol.asyncIterator]() {
+        return this;
+      },
+    };
   }
 
   private authHeaders(): Record<string, string> {
