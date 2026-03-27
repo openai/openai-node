@@ -2809,7 +2809,7 @@ export interface ResponseShellCallCommandDeltaEvent {
   /**
    * An opaque obfuscation token for sensitive command text.
    */
-  obfuscation: string;
+  obfuscation?: string;
 
   /**
    * The index of the shell call output item.

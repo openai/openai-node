@@ -60,6 +60,7 @@ describe('.stream()', () => {
 
   it('hosted shell events work', async () => {
     const commandEvents: string[] = [];
+    const obfuscations: Array<string | undefined> = [];
     const outputDeltas: Array<{ stdout?: string; stderr?: string }> = [];
     const outputDoneEvents: Array<
       Array<{ stdout: string; stderr: string; outcome: { type: 'exit'; exit_code: number } }>
@@ -70,6 +71,7 @@ describe('.stream()', () => {
         openai.responses.stream({
           model: 'gpt-4.1',
           input: 'Use the shell tool to print 55',
+          stream_options: { include_obfuscation: false },
           tools: [{ type: 'shell' }],
         }),
       )
@@ -78,7 +80,7 @@ describe('.stream()', () => {
         commandEvents.push(event.command);
       })
       .on('response.shell_call_command.delta', (event) => {
-        expect(typeof event.obfuscation).toBe('string');
+        obfuscations.push(event.obfuscation);
         commandEvents.push(event.delta);
       })
       .on('response.shell_call_command.done', (event) => {
@@ -94,6 +96,7 @@ describe('.stream()', () => {
     const final = await stream.finalResponse();
 
     expect(commandEvents).toEqual(['', 'python ', '-c "print(55)"', 'python -c "print(55)"']);
+    expect(obfuscations).toEqual([undefined, undefined]);
     expect(outputDeltas).toEqual([{ stdout: '55\\n' }]);
     expect(outputDoneEvents).toEqual([
       [{ stdout: '55\\n', stderr: '', outcome: { type: 'exit', exit_code: 0 } }],

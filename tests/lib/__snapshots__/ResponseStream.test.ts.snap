@@ -57,9 +57,9 @@ data: {\"item\":{\"id\":\"sh_1\",\"type\":\"shell_call\",\"call_id\":\"call_shel
 
 data: {\"command\":\"\",\"command_index\":0,\"output_index\":0,\"sequence_number\":2,\"type\":\"response.shell_call_command.added\"}
 
-data: {\"command_index\":0,\"delta\":\"python \",\"obfuscation\":\"\",\"output_index\":0,\"sequence_number\":3,\"type\":\"response.shell_call_command.delta\"}
+data: {\"command_index\":0,\"delta\":\"python \",\"output_index\":0,\"sequence_number\":3,\"type\":\"response.shell_call_command.delta\"}
 
-data: {\"command_index\":0,\"delta\":\"-c \\\"print(55)\\\"\",\"obfuscation\":\"\",\"output_index\":0,\"sequence_number\":4,\"type\":\"response.shell_call_command.delta\"}
+data: {\"command_index\":0,\"delta\":\"-c \\\"print(55)\\\"\",\"output_index\":0,\"sequence_number\":4,\"type\":\"response.shell_call_command.delta\"}
 
 data: {\"command\":\"python -c \\\"print(55)\\\"\",\"command_index\":0,\"output_index\":0,\"sequence_number\":5,\"type\":\"response.shell_call_command.done\"}
 
