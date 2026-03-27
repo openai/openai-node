@@ -230,7 +230,7 @@ const selectParser = (
     case ZodFirstPartyTypeKind.ZodDefault:
       return parseDefaultDef(def, refs);
     case ZodFirstPartyTypeKind.ZodBranded:
-      return parseBrandedDef(def, refs);
+      return parseBrandedDef(def, refs, forceResolution);
     case ZodFirstPartyTypeKind.ZodReadonly:
       return parseReadonlyDef(def, refs);
     case ZodFirstPartyTypeKind.ZodCatch:
