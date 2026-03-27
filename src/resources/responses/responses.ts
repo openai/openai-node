@@ -3349,7 +3349,6 @@ export interface ResponseInProgressEvent {
  */
 export type ResponseIncludable =
   | 'file_search_call.results'
-  | 'web_search_call.results'
   | 'web_search_call.action.sources'
   | 'message.input_image.image_url'
   | 'computer_call_output.output.image_url'
