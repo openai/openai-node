@@ -241,6 +241,95 @@ describe('instantiate client', () => {
     expect(response).toEqual({ url: 'http://localhost:5000/foo', custom: true });
   });
 
+  test('keeps Next.js patched fetch for standard requests', async () => {
+    const originalFetch = jest.fn(async () => {
+      return new Response(JSON.stringify({ source: 'original' }), {
+        headers: { 'Content-Type': 'application/json' },
+      });
+    });
+    const patchedFetch = Object.assign(
+      jest.fn(async () => {
+        return new Response(JSON.stringify({ source: 'patched' }), {
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }),
+      {
+        __nextPatched: true as const,
+        _nextOriginalFetch: originalFetch,
+      },
+    );
+
+    const previousFetch = globalThis.fetch;
+    globalThis.fetch = patchedFetch as typeof fetch;
+
+    try {
+      const client = new OpenAI({
+        baseURL: 'http://localhost:5000/',
+        apiKey: 'My API Key',
+      });
+
+      const response = await client.get('/foo');
+      expect(response).toEqual({ source: 'patched' });
+      expect(patchedFetch).toHaveBeenCalledTimes(1);
+      expect(originalFetch).not.toHaveBeenCalled();
+    } finally {
+      globalThis.fetch = previousFetch;
+    }
+  });
+
+  test('uses Next.js original fetch when dispatcher is set', async () => {
+    const dispatcher = { type: 'dispatcher' };
+    const originalFetch = jest.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      return new Response(
+        JSON.stringify({
+          source: 'original',
+          hasDispatcher: Boolean(init && 'dispatcher' in (init as Record<string, unknown>)),
+        }),
+        {
+          headers: { 'Content-Type': 'application/json' },
+        },
+      );
+    });
+    const patchedFetch = Object.assign(
+      jest.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+        const { dispatcher: _dispatcher, ...nextInit } = ((init as Record<string, unknown> | undefined) ??
+          {}) as Record<string, unknown>;
+        return new Response(
+          JSON.stringify({
+            source: 'patched',
+            hasDispatcher: 'dispatcher' in nextInit,
+          }),
+          {
+            headers: { 'Content-Type': 'application/json' },
+          },
+        );
+      }),
+      {
+        __nextPatched: true as const,
+        _nextOriginalFetch: originalFetch,
+      },
+    );
+
+    const previousFetch = globalThis.fetch;
+    globalThis.fetch = patchedFetch as typeof fetch;
+
+    try {
+      const client = new OpenAI({
+        baseURL: 'http://localhost:5000/',
+        apiKey: 'My API Key',
+        fetchOptions: { dispatcher } as any,
+      });
+
+      const response = await client.get('/foo');
+      expect(response).toEqual({ source: 'original', hasDispatcher: true });
+      expect(patchedFetch).not.toHaveBeenCalled();
+      expect(originalFetch).toHaveBeenCalledTimes(1);
+      expect((originalFetch.mock.calls[0]?.[1] as Record<string, unknown>)['dispatcher']).toBe(dispatcher);
+    } finally {
+      globalThis.fetch = previousFetch;
+    }
+  });
+
   test('explicit global fetch', async () => {
     // make sure the global fetch type is assignable to our Fetch type
     const client = new OpenAI({

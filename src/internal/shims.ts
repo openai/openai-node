@@ -20,6 +20,28 @@ export function getDefaultFetch(): Fetch {
   );
 }
 
+type NextPatchedFetch = Fetch & {
+  __nextPatched?: true;
+  _nextOriginalFetch?: Fetch;
+};
+
+export function getRequestFetch(fetch: Fetch, init?: RequestInit): Fetch {
+  if (!hasNodeDispatcher(init)) return fetch;
+
+  const nextPatchedFetch = fetch as NextPatchedFetch;
+  // Next.js stores the underlying Node fetch on `_nextOriginalFetch`; use it
+  // when dispatcher-based undici options would otherwise be stripped.
+  if (nextPatchedFetch.__nextPatched && typeof nextPatchedFetch._nextOriginalFetch === 'function') {
+    return nextPatchedFetch._nextOriginalFetch;
+  }
+
+  return fetch;
+}
+
+function hasNodeDispatcher(init?: RequestInit): boolean {
+  return Boolean(init && typeof init === 'object' && 'dispatcher' in (init as Record<string, unknown>));
+}
+
 type ReadableStreamArgs = ConstructorParameters<typeof ReadableStream>;
 
 export function makeReadableStream(...args: ReadableStreamArgs): ReadableStream {
