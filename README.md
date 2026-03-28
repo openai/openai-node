@@ -652,6 +652,41 @@ const client = new OpenAI({
 });
 ```
 
+#### Using custom CA certificates in Node
+
+If your Node runtime does not pick up `NODE_EXTRA_CA_CERTS` for `fetch`, you can create an `undici.Agent`
+with a combined CA bundle and pass it through `fetchOptions`.
+
+```ts
+import fs from 'fs';
+import tls from 'tls';
+import OpenAI from 'openai';
+import * as undici from 'undici';
+
+const extraCAPath = process.env.NODE_EXTRA_CA_CERTS;
+const extraCA = extraCAPath ? fs.readFileSync(extraCAPath, 'utf8') : undefined;
+const ca = extraCA ? [...tls.rootCertificates, extraCA] : tls.rootCertificates;
+
+const dispatcher = new undici.Agent({ connect: { ca } });
+const client = new OpenAI({
+  fetchOptions: {
+    dispatcher,
+  },
+});
+```
+
+Frameworks that patch `globalThis.fetch` may drop `dispatcher`. In those environments, pass a custom
+`fetch` implementation that calls `undici.fetch` directly:
+
+```ts
+const client = new OpenAI({
+  fetch: (url, init) => undici.fetch(url, { ...init, dispatcher }),
+});
+```
+
+Passing `ca` replaces the default trust store, so include `tls.rootCertificates` along with your
+private CA chain.
+
 ## Frequently Asked Questions
 
 ## Semantic versioning
