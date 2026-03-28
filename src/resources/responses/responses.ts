@@ -75,6 +75,12 @@ export class Responses extends APIResource {
   inputItems: InputItemsAPI.InputItems = new InputItemsAPI.InputItems(this._client);
   inputTokens: InputTokensAPI.InputTokens = new InputTokensAPI.InputTokens(this._client);
 
+  private hydrateResponseHelpers(response: Response): Response {
+    addOutputText(response);
+    addOutputAsInput(response);
+    return response;
+  }
+
   /**
    * Creates a model response. Provide
    * [text](https://platform.openai.com/docs/guides/text) or
@@ -112,8 +118,7 @@ export class Responses extends APIResource {
         | APIPromise<Stream<ResponseStreamEvent>>
     )._thenUnwrap((rsp) => {
       if ('object' in rsp && rsp.object === 'response') {
-        addOutputText(rsp as Response);
-        addOutputAsInput(rsp as Response);
+        return this.hydrateResponseHelpers(rsp as Response);
       }
 
       return rsp;
@@ -158,8 +163,7 @@ export class Responses extends APIResource {
       }) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>
     )._thenUnwrap((rsp) => {
       if ('object' in rsp && rsp.object === 'response') {
-        addOutputText(rsp as Response);
-        addOutputAsInput(rsp as Response);
+        return this.hydrateResponseHelpers(rsp as Response);
       }
 
       return rsp;
@@ -215,7 +219,13 @@ export class Responses extends APIResource {
    * ```
    */
   cancel(responseID: string, options?: RequestOptions): APIPromise<Response> {
-    return this._client.post(path`/responses/${responseID}/cancel`, options);
+    return this._client.post(path`/responses/${responseID}/cancel`, options)._thenUnwrap((rsp) => {
+      if ('object' in rsp && rsp.object === 'response') {
+        return this.hydrateResponseHelpers(rsp as Response);
+      }
+
+      return rsp;
+    }) as APIPromise<Response>;
   }
 
   /**

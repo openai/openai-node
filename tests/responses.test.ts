@@ -54,6 +54,34 @@ describe('request id', () => {
     expect(JSON.stringify(rsp)).toBe('{"id":"bar"}');
   });
 
+  test('responses.cancel hydrates output helpers', async () => {
+    const client = new OpenAI({
+      apiKey: 'dummy',
+      fetch: async () =>
+        new Response(
+          JSON.stringify({
+            id: 'resp_123',
+            object: 'response',
+            output: [
+              {
+                id: 'msg_123',
+                type: 'message',
+                role: 'assistant',
+                status: 'completed',
+                content: [{ type: 'output_text', text: 'hello', annotations: [] }],
+              },
+            ],
+          }),
+          { headers: { 'content-type': 'application/json' } },
+        ),
+    });
+
+    const response = await client.responses.cancel('resp_123');
+
+    expect(response.output_text).toBe('hello');
+    expect(response.output_as_input).toEqual(response.output);
+  });
+
   test('envelope response', async () => {
     const promise = new APIPromise<{ data: { foo: string } }>(
       client,
