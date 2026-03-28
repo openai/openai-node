@@ -6,6 +6,7 @@ import util from 'node:util';
 import OpenAI from 'openai';
 import { APIUserAbortError } from 'openai';
 const defaultFetch = fetch;
+const defaultGetBuiltinModule = (process as typeof process & { getBuiltinModule?: unknown }).getBuiltinModule;
 
 describe('instantiate client', () => {
   const env = process.env;
@@ -17,6 +18,12 @@ describe('instantiate client', () => {
 
   afterEach(() => {
     process.env = env;
+    const processWithBuiltins = process as typeof process & { getBuiltinModule?: unknown };
+    if (defaultGetBuiltinModule === undefined) {
+      delete processWithBuiltins.getBuiltinModule;
+    } else {
+      processWithBuiltins.getBuiltinModule = defaultGetBuiltinModule;
+    }
   });
 
   describe('defaultHeaders', () => {
@@ -248,6 +255,47 @@ describe('instantiate client', () => {
       apiKey: 'My API Key',
       fetch: defaultFetch,
     });
+  });
+
+  test('merges NODE_EXTRA_CA_CERTS into the default Node CA store before using global fetch', async () => {
+    const getCACertificates = jest.fn((type?: 'default' | 'extra') =>
+      type === 'extra' ? ['extra-ca'] : ['default-ca'],
+    );
+    const setDefaultCACertificates = jest.fn();
+    const processWithBuiltins = process as typeof process & {
+      getBuiltinModule?: (id: string) => unknown;
+    };
+
+    process.env['NODE_EXTRA_CA_CERTS'] = '/tmp/corporate-ca.pem';
+    processWithBuiltins.getBuiltinModule = jest.fn((id: string) =>
+      id === 'node:tls' ? { getCACertificates, setDefaultCACertificates } : undefined,
+    );
+
+    new OpenAI({
+      baseURL: 'http://localhost:5000/',
+      apiKey: 'My API Key',
+    });
+
+    expect(getCACertificates).toHaveBeenCalledWith('extra');
+    expect(getCACertificates).toHaveBeenCalledWith('default');
+    expect(setDefaultCACertificates).toHaveBeenCalledWith(['default-ca', 'extra-ca']);
+  });
+
+  test('skips NODE_EXTRA_CA_CERTS setup when Node does not expose the CA APIs', async () => {
+    const processWithBuiltins = process as typeof process & {
+      getBuiltinModule?: (id: string) => unknown;
+    };
+
+    process.env['NODE_EXTRA_CA_CERTS'] = '/tmp/corporate-ca.pem';
+    processWithBuiltins.getBuiltinModule = jest.fn(() => ({}));
+
+    expect(
+      () =>
+        new OpenAI({
+          baseURL: 'http://localhost:5000/',
+          apiKey: 'My API Key',
+        }),
+    ).not.toThrow();
   });
 
   test('custom signal', async () => {

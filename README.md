@@ -652,6 +652,26 @@ const client = new OpenAI({
 });
 ```
 
+#### Configuring custom CA certificates
+
+On Node.js `22.19+` and `24.5+`, the SDK will merge certificates from `NODE_EXTRA_CA_CERTS` into Node's
+default TLS CA store before it uses the default global `fetch`. This keeps certificate verification enabled
+while allowing requests to trust your additional corporate or private root CAs.
+
+```sh
+export NODE_EXTRA_CA_CERTS=/path/to/corporate-ca-chain.pem
+```
+
+```ts
+import OpenAI from 'openai';
+
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+```
+
+If you need per-client CA behavior instead of a process-wide default, pass a custom `fetch` implementation.
+
 ## Frequently Asked Questions
 
 ## Semantic versioning
