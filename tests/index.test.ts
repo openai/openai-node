@@ -341,6 +341,36 @@ describe('instantiate client', () => {
     expect(capturedRequest?.method).toEqual('PATCH');
   });
 
+  test('passes merged fetchOptions through to custom fetch', async () => {
+    let capturedRequest: RequestInit | undefined;
+    const clientDispatcher = { scope: 'client' } as any;
+    const requestDispatcher = { scope: 'request' } as any;
+
+    const client = new OpenAI({
+      baseURL: 'http://localhost:5000/',
+      apiKey: 'My API Key',
+      fetchOptions: { cache: 'no-store', dispatcher: clientDispatcher } as any,
+      fetch: async (url: string | URL | Request, init: RequestInit = {}): Promise<Response> => {
+        capturedRequest = init;
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { 'Content-Type': 'application/json' },
+        });
+      },
+    });
+
+    await client.get('/foo', {
+      fetchOptions: { dispatcher: requestDispatcher, integrity: 'request-integrity' } as any,
+    });
+
+    expect(capturedRequest).toMatchObject({
+      method: 'GET',
+      cache: 'no-store',
+      integrity: 'request-integrity',
+      dispatcher: requestDispatcher,
+    });
+    expect((capturedRequest as any)?.dispatcher).not.toBe(clientDispatcher);
+  });
+
   describe('baseUrl', () => {
     test('trailing slash', () => {
       const client = new OpenAI({ baseURL: 'http://localhost:5000/custom/path/', apiKey: 'My API Key' });

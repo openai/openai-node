@@ -596,7 +596,7 @@ const client = new OpenAI({ fetch });
 
 ### Fetch options
 
-If you want to set custom `fetch` options without overriding the `fetch` function, you can provide a `fetchOptions` object when instantiating the client or making a request. (Request-specific options override client options.)
+If you want to set custom `fetch` options without overriding the `fetch` function, you can provide a `fetchOptions` object when instantiating the client or making a request. (Request-specific options override client options.) These options are forwarded to the active `fetch` implementation unchanged, so runtime-specific fields such as Undici's `dispatcher` only work when the underlying `fetch` supports them.
 
 ```ts
 import OpenAI from 'openai';
@@ -670,7 +670,31 @@ const client = new OpenAI({
 });
 ```
 
-If you need per-client CA behavior instead of a process-wide default, pass a custom `fetch` implementation.
+If you need per-client CA behavior instead of a process-wide default, or you're running in a framework that patches `globalThis.fetch` and ignores Undici-specific options such as `dispatcher`, pass a custom `fetch` implementation:
+
+```ts
+import fs from 'node:fs';
+import tls from 'node:tls';
+import OpenAI from 'openai';
+import { Agent, fetch as undiciFetch } from 'undici';
+
+const extraCAPath = process.env.NODE_EXTRA_CA_CERTS;
+const extraCA = extraCAPath ? fs.readFileSync(extraCAPath, 'utf8') : undefined;
+
+const dispatcher =
+  extraCA ?
+    new Agent({
+      connect: {
+        // Supplying `ca` replaces the default trust store, so keep Node's roots too.
+        ca: [...tls.rootCertificates, extraCA],
+      },
+    })
+  : undefined;
+
+const client = new OpenAI({
+  fetch: dispatcher ? (url, init) => undiciFetch(url, { ...init, dispatcher }) : undefined,
+});
+```
 
 ## Frequently Asked Questions
 
