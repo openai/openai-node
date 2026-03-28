@@ -20,6 +20,8 @@ describe('resource responses', () => {
 
     expect(response).toHaveProperty('output_text');
     expect(typeof response.output_text).toBe('string');
+    expect(response).toHaveProperty('output_as_input');
+    expect(Array.isArray(response.output_as_input)).toBe(true);
   });
 
   test('retrieve', async () => {
@@ -34,6 +36,8 @@ describe('resource responses', () => {
 
     expect(response).toHaveProperty('output_text');
     expect(typeof response.output_text).toBe('string');
+    expect(response).toHaveProperty('output_as_input');
+    expect(Array.isArray(response.output_as_input)).toBe(true);
   });
 
   test('retrieve: request options and params are passed correctly', async () => {

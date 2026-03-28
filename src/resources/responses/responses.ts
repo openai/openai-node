@@ -2,6 +2,7 @@
 
 import {
   type ExtractParsedContentFromParams,
+  addOutputAsInput,
   parseResponse,
   type ResponseCreateParamsWithTools,
   addOutputText,
@@ -112,6 +113,7 @@ export class Responses extends APIResource {
     )._thenUnwrap((rsp) => {
       if ('object' in rsp && rsp.object === 'response') {
         addOutputText(rsp as Response);
+        addOutputAsInput(rsp as Response);
       }
 
       return rsp;
@@ -157,6 +159,7 @@ export class Responses extends APIResource {
     )._thenUnwrap((rsp) => {
       if ('object' in rsp && rsp.object === 'response') {
         addOutputText(rsp as Response);
+        addOutputAsInput(rsp as Response);
       }
 
       return rsp;
@@ -953,6 +956,15 @@ export interface Response {
   created_at: number;
 
   output_text: string;
+
+  /**
+   * A replay-safe version of `output` for manual multi-turn conversations.
+   *
+   * This preserves the original item ordering so reasoning/message pairs stay
+   * adjacent, and normalizes output-only item shapes such as
+   * `computer_call_output` before they are passed back as `input`.
+   */
+  output_as_input: Array<ResponseInputItem>;
 
   /**
    * An error object returned when the model fails to generate a Response.
