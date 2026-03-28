@@ -1,4 +1,5 @@
 import { makeStreamSnapshotRequest } from '../utils/mock-snapshots';
+import { expectType } from '../utils/typing';
 
 jest.setTimeout(1000 * 30);
 
@@ -80,6 +81,7 @@ describe('.stream()', () => {
         commandEvents.push(event.command);
       })
       .on('response.shell_call_command.delta', (event) => {
+        expectType<string | undefined>(event.obfuscation);
         obfuscations.push(event.obfuscation);
         commandEvents.push(event.delta);
       })
@@ -87,6 +89,7 @@ describe('.stream()', () => {
         commandEvents.push(event.command);
       })
       .on('response.shell_call_output_content.delta', (event) => {
+        expectType<{ stdout?: string; stderr?: string }>(event.delta);
         outputDeltas.push(event.delta);
       })
       .on('response.shell_call_output_content.done', (event) => {
@@ -106,12 +109,14 @@ describe('.stream()', () => {
     const shellCall = final.output[0];
     expect(shellCall?.type).toBe('shell_call');
     if (shellCall?.type === 'shell_call') {
+      expectType<string[]>(shellCall.action.commands);
       expect(shellCall.action.commands).toEqual(['python -c "print(55)"']);
     }
 
     const shellOutput = final.output[1];
     expect(shellOutput?.type).toBe('shell_call_output');
     if (shellOutput?.type === 'shell_call_output') {
+      expectType<Array<{ stdout: string; stderr: string }>>(shellOutput.output);
       expect(shellOutput.output).toEqual([
         { stdout: '55\\n', stderr: '', outcome: { type: 'exit', exit_code: 0 } },
       ]);
