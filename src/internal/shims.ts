@@ -9,7 +9,6 @@
 
 import type { Fetch } from './builtin-types';
 import type { ReadableStream } from './shim-types';
-import { readEnv } from './utils/env';
 
 type NodeTLSModule = {
   getCACertificates?: ((type?: 'default' | 'extra') => string[]) | undefined;
@@ -23,8 +22,6 @@ function getNodeTLSModule(): NodeTLSModule | undefined {
 }
 
 function applyNodeExtraCACertificates(): void {
-  if (!readEnv('NODE_EXTRA_CA_CERTS')) return;
-
   const tls = getNodeTLSModule();
   if (typeof tls?.getCACertificates !== 'function' || typeof tls?.setDefaultCACertificates !== 'function') {
     return;

@@ -281,6 +281,30 @@ describe('instantiate client', () => {
     expect(setDefaultCACertificates).toHaveBeenCalledWith(['default-ca', 'extra-ca']);
   });
 
+  test('merges loaded extra CA certificates even after NODE_EXTRA_CA_CERTS is scrubbed', async () => {
+    const getCACertificates = jest.fn((type?: 'default' | 'extra') =>
+      type === 'extra' ? ['extra-ca'] : ['default-ca'],
+    );
+    const setDefaultCACertificates = jest.fn();
+    const processWithBuiltins = process as typeof process & {
+      getBuiltinModule?: (id: string) => unknown;
+    };
+
+    delete process.env['NODE_EXTRA_CA_CERTS'];
+    processWithBuiltins.getBuiltinModule = jest.fn((id: string) =>
+      id === 'node:tls' ? { getCACertificates, setDefaultCACertificates } : undefined,
+    );
+
+    new OpenAI({
+      baseURL: 'http://localhost:5000/',
+      apiKey: 'My API Key',
+    });
+
+    expect(getCACertificates).toHaveBeenCalledWith('extra');
+    expect(getCACertificates).toHaveBeenCalledWith('default');
+    expect(setDefaultCACertificates).toHaveBeenCalledWith(['default-ca', 'extra-ca']);
+  });
+
   test('skips NODE_EXTRA_CA_CERTS setup when Node does not expose the CA APIs', async () => {
     const processWithBuiltins = process as typeof process & {
       getBuiltinModule?: (id: string) => unknown;
