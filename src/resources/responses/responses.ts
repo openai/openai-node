@@ -5786,9 +5786,10 @@ export interface ResponseShellCallCommandDeltaEvent {
   delta: string;
 
   /**
-   * Opaque obfuscation token (unused).
+   * Opaque obfuscation token. Only present when `stream_options.include_obfuscation`
+   * is true (the default). When obfuscation is disabled, this field is omitted.
    */
-  obfuscation: string;
+  obfuscation?: string;
 
   /**
    * Index of the parent shell_call output item.
