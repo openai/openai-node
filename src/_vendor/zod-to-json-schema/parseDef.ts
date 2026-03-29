@@ -98,8 +98,14 @@ export function parseDef(
   // For branded types, treat them as transparent and parse the underlying type directly.
   // This prevents circular $ref issues when the same branded type is used multiple times.
   // See: https://github.com/openai/openai-node/issues/1739
+  // Preserve metadata (description, etc.) from the branded wrapper by applying
+  // addMeta after parsing the underlying type.
   if ((def as any).typeName === ZodFirstPartyTypeKind.ZodBranded) {
-    return parseDef((def as any).type._def, refs, forceResolution);
+    const jsonSchema = parseDef((def as any).type._def, refs, forceResolution);
+    if (jsonSchema) {
+      addMeta(def, refs, jsonSchema);
+    }
+    return jsonSchema;
   }
 
   const newItem: Seen = { def, path: refs.currentPath, jsonSchema: undefined };
