@@ -46,6 +46,17 @@ const response = await client.responses.create({
   input: 'Are semicolons optional in JavaScript?',
 });
 
+###  Multi-turn conversations and reasoning items
+
+When using the Responses API, reasoning and message items must be preserved as pairs.
+
+A common mistake is filtering `response.output` to keep only messages.
+This can lead to 400 errors due to missing reasoning items.
+
+Recommended:
+- Pass `response.output` directly, OR
+- Preserve reasoning-message pairs when constructing history
+
 console.log(response.output_text);
 ```
 
