@@ -360,7 +360,9 @@ export class OpenAI {
   fetchOptions: MergedRequestInit | undefined;
 
   private fetch: Fetch;
-  #encoder: Opts.RequestEncoder;
+  // Use a normal private field instead of JS #private to avoid
+  // brand-check crashes when methods are invoked across copies.
+  private encoder: Opts.RequestEncoder;
   protected idempotencyHeader?: string;
   protected _options: ClientOptions;
 
@@ -422,7 +424,7 @@ export class OpenAI {
     this.fetchOptions = options.fetchOptions;
     this.maxRetries = options.maxRetries ?? 2;
     this.fetch = options.fetch ?? Shims.getDefaultFetch();
-    this.#encoder = Opts.FallbackEncoder;
+    this.encoder = Opts.FallbackEncoder;
 
     this._options = options;
 
@@ -457,7 +459,7 @@ export class OpenAI {
   /**
    * Check whether the base URL is set to its default.
    */
-  #baseURLOverridden(): boolean {
+  private baseURLOverridden(): boolean {
     return this.baseURL !== 'https://api.openai.com/v1';
   }
 
@@ -524,7 +526,7 @@ export class OpenAI {
     query: Record<string, unknown> | null | undefined,
     defaultBaseURL?: string | undefined,
   ): string {
-    const baseURL = (!this.#baseURLOverridden() && defaultBaseURL) || this.baseURL;
+    const baseURL = (!this.baseURLOverridden() && defaultBaseURL) || this.baseURL;
     const url =
       isAbsoluteURL(path) ?
         new URL(path)
@@ -1011,7 +1013,7 @@ export class OpenAI {
         body: this.stringifyQuery(body),
       };
     } else {
-      return this.#encoder({ body, headers });
+      return this.encoder({ body, headers });
     }
   }
 
