@@ -91,6 +91,7 @@ export type ConversationItem =
   | ResponsesAPI.ResponseToolSearchCall
   | ResponsesAPI.ResponseToolSearchOutputItem
   | ResponsesAPI.ResponseReasoningItem
+  | ResponsesAPI.ResponseCompactionItem
   | ResponsesAPI.ResponseCodeInterpreterToolCall
   | ConversationItem.LocalShellCall
   | ConversationItem.LocalShellCallOutput
