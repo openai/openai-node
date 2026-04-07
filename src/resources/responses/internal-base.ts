@@ -6,8 +6,12 @@ import { EventEmitter } from '../../core/EventEmitter';
 import { OpenAIError } from '../../core/error';
 import { stringifyQuery } from '../../internal/utils';
 
+import type { ReconnectingEvent } from '../../internal/ws';
+
 export type ResponsesStreamMessage =
   | { type: 'connecting' | 'open' | 'closing' | 'close' }
+  | { type: 'reconnecting'; reconnect: ReconnectingEvent }
+  | { type: 'reconnected' }
   | { type: 'message'; message: ResponsesAPI.ResponsesServerEvent }
   | { type: 'error'; error: WebSocketError };
 
@@ -28,8 +32,11 @@ type Simplify<T> = { [KeyType in keyof T]: T[KeyType] } & {};
 
 type WebSocketEvents = Simplify<
   {
+    close: () => void;
     event: (event: ResponsesAPI.ResponsesServerEvent) => void;
     error: (error: WebSocketError) => void;
+    reconnecting: (event: ReconnectingEvent) => void;
+    reconnected: () => void;
   } & {
     [EventType in Exclude<NonNullable<ResponsesAPI.ResponsesServerEvent['type']>, 'error'>]: (
       event: Extract<ResponsesAPI.ResponsesServerEvent, { type?: EventType }>,
