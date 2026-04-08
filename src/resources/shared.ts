@@ -248,6 +248,8 @@ export type FunctionParameters = { [key: string]: unknown };
  */
 export type Metadata = { [key: string]: string };
 
+export type OAuthErrorCode = 'invalid_grant' | 'invalid_subject_token' | (string & {});
+
 /**
  * **gpt-5 and o-series models only**
  *

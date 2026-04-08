@@ -11,6 +11,7 @@ Types:
 - <code><a href="./src/resources/shared.ts">FunctionDefinition</a></code>
 - <code><a href="./src/resources/shared.ts">FunctionParameters</a></code>
 - <code><a href="./src/resources/shared.ts">Metadata</a></code>
+- <code><a href="./src/resources/shared.ts">OAuthErrorCode</a></code>
 - <code><a href="./src/resources/shared.ts">Reasoning</a></code>
 - <code><a href="./src/resources/shared.ts">ReasoningEffort</a></code>
 - <code><a href="./src/resources/shared.ts">ResponseFormatJSONObject</a></code>

@@ -4,7 +4,8 @@ import { buildHeaders } from './internal/headers';
 import * as Errors from './error';
 import { FinalRequestOptions } from './internal/request-options';
 import { isObj, readEnv } from './internal/utils';
-import { ClientOptions, OpenAI } from './client';
+import { OpenAI } from './client';
+import type { ClientOptions } from './client';
 
 /** API Client for interfacing with the Azure OpenAI API. */
 export interface AzureClientOptions extends ClientOptions {

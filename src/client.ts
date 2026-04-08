@@ -15,6 +15,9 @@ import { stringifyQuery } from './internal/utils/query';
 import { VERSION } from './version';
 import * as Errors from './core/error';
 import * as Pagination from './core/pagination';
+import type { WorkloadIdentity } from './auth/types';
+import { WorkloadIdentityAuth } from './auth/workload-identity-auth';
+import { OAuthError, SubjectTokenProviderError } from './core/error';
 import {
   AbstractPage,
   type ConversationCursorPageParams,
@@ -238,6 +241,8 @@ import {
 } from './internal/utils/log';
 import { isEmptyObj } from './internal/utils/values';
 
+const WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER = 'workload-identity-auth';
+
 export type ApiKeySetter = () => Promise<string>;
 
 export interface ClientOptions {
@@ -251,8 +256,10 @@ export interface ClientOptions {
    * - The function must return a non-empty string; otherwise an OpenAIError is thrown.
    * - If the function throws, the error is wrapped in an OpenAIError with the original
    *   error available as `cause`.
+   * - Mutually exclusive with `workloadIdentity`.
    */
   apiKey?: string | ApiKeySetter | undefined;
+
   /**
    * Defaults to process.env['OPENAI_ORG_ID'].
    */
@@ -285,6 +292,7 @@ export interface ClientOptions {
    * @unit milliseconds
    */
   timeout?: number | undefined;
+
   /**
    * Additional `RequestInit` options to be passed to `fetch` calls.
    * Properties will be overridden by per-request `fetchOptions`.
@@ -341,6 +349,12 @@ export interface ClientOptions {
    * Defaults to globalThis.console.
    */
   logger?: Logger | undefined;
+
+  /**
+   * Workload identity configuration for OAuth2 token exchange authentication.
+   * Mutually exclusive with `apiKey`.
+   */
+  workloadIdentity?: WorkloadIdentity | undefined;
 }
 
 /**
@@ -363,6 +377,7 @@ export class OpenAI {
   #encoder: Opts.RequestEncoder;
   protected idempotencyHeader?: string;
   protected _options: ClientOptions;
+  private _workloadIdentityAuth?: WorkloadIdentityAuth;
 
   /**
    * API Client for interfacing with the OpenAI API.
@@ -386,11 +401,19 @@ export class OpenAI {
     organization = readEnv('OPENAI_ORG_ID') ?? null,
     project = readEnv('OPENAI_PROJECT_ID') ?? null,
     webhookSecret = readEnv('OPENAI_WEBHOOK_SECRET') ?? null,
+    workloadIdentity,
     ...opts
   }: ClientOptions = {}) {
-    if (apiKey === undefined) {
+    if (workloadIdentity) {
+      if (apiKey && apiKey !== WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER) {
+        throw new Errors.OpenAIError(
+          'The `apiKey` and `workloadIdentity` arguments are mutually exclusive; only one can be passed at a time.',
+        );
+      }
+      apiKey = WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER;
+    } else if (apiKey === undefined) {
       throw new Errors.OpenAIError(
-        'Missing credentials. Please pass an `apiKey`, or set the `OPENAI_API_KEY` environment variable.',
+        'Missing credentials. Please pass an `apiKey`, `workloadIdentity`, or set the `OPENAI_API_KEY` environment variable.',
       );
     }
 
@@ -399,6 +422,7 @@ export class OpenAI {
       organization,
       project,
       webhookSecret,
+      workloadIdentity,
       ...opts,
       baseURL: baseURL || `https://api.openai.com/v1`,
     };
@@ -426,6 +450,10 @@ export class OpenAI {
 
     this._options = options;
 
+    if (workloadIdentity) {
+      this._workloadIdentityAuth = new WorkloadIdentityAuth(workloadIdentity, this.fetch);
+    }
+
     this.apiKey = typeof apiKey === 'string' ? apiKey : 'Missing Key';
     this.organization = organization;
     this.project = project;
@@ -446,6 +474,7 @@ export class OpenAI {
       fetch: this.fetch,
       fetchOptions: this.fetchOptions,
       apiKey: this.apiKey,
+      workloadIdentity: this._options.workloadIdentity,
       organization: this.organization,
       project: this.project,
       webhookSecret: this.webhookSecret,
@@ -640,7 +669,7 @@ export class OpenAI {
     }
 
     const controller = new AbortController();
-    const response = await this.fetchWithTimeout(url, req, timeout, controller).catch(castToError);
+    const response = await this.fetchWithAuth(url, req, timeout, controller).catch(castToError);
     const headersTime = Date.now();
 
     if (response instanceof globalThis.Error) {
@@ -682,6 +711,9 @@ export class OpenAI {
           message: response.message,
         }),
       );
+      if (response instanceof OAuthError || response instanceof SubjectTokenProviderError) {
+        throw response;
+      }
       if (isTimeout) {
         throw new Errors.APIConnectionTimeoutError();
       }
@@ -697,6 +729,28 @@ export class OpenAI {
     } with status ${response.status} in ${headersTime - startTime}ms`;
 
     if (!response.ok) {
+      if (
+        response.status === 401 &&
+        this._workloadIdentityAuth &&
+        !options.__metadata?.['hasStreamingBody'] &&
+        !options.__metadata?.['workloadIdentityTokenRefreshed']
+      ) {
+        await Shims.CancelReadableStream(response.body);
+        this._workloadIdentityAuth.invalidateToken();
+
+        return this.makeRequest(
+          {
+            ...options,
+            __metadata: {
+              ...options.__metadata,
+              workloadIdentityTokenRefreshed: true,
+            },
+          },
+          retriesRemaining,
+          retryOfRequestLogID ?? requestLogID,
+        );
+      }
+
       const shouldRetry = await this.shouldRetry(response);
       if (retriesRemaining && shouldRetry) {
         const retryMessage = `retrying, ${retriesRemaining} attempts remaining`;
@@ -783,6 +837,26 @@ export class OpenAI {
   ): Pagination.PagePromise<PageClass, Item> {
     const request = this.makeRequest(options, null, undefined);
     return new Pagination.PagePromise<PageClass, Item>(this as any as OpenAI, request, Page);
+  }
+
+  protected async fetchWithAuth(
+    url: RequestInfo,
+    init: RequestInit,
+    timeout: number,
+    controller: AbortController,
+  ): Promise<Response> {
+    if (this._workloadIdentityAuth) {
+      const headers = init.headers as Headers;
+      const authHeader = headers.get('Authorization');
+      if (!authHeader || authHeader === `Bearer ${WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}`) {
+        const token = await this._workloadIdentityAuth.getToken();
+        headers.set('Authorization', `Bearer ${token}`);
+      }
+    }
+
+    const response = await this.fetchWithTimeout(url, init, timeout, controller);
+
+    return response;
   }
 
   async fetchWithTimeout(
@@ -908,7 +982,15 @@ export class OpenAI {
     const url = this.buildURL(path!, query as Record<string, unknown>, defaultBaseURL);
     if ('timeout' in options) validatePositiveInteger('timeout', options.timeout);
     options.timeout = options.timeout ?? this.timeout;
-    const { bodyHeaders, body } = this.buildBody({ options });
+    const { bodyHeaders, body, isStreamingBody } = this.buildBody({ options });
+
+    if (isStreamingBody) {
+      inputOptions.__metadata = {
+        ...inputOptions.__metadata,
+        hasStreamingBody: true,
+      };
+    }
+
     const reqHeaders = await this.buildHeaders({ options: inputOptions, method, bodyHeaders, retryCount });
 
     const req: FinalizedRequestInit = {
@@ -973,11 +1055,26 @@ export class OpenAI {
   private buildBody({ options: { body, headers: rawHeaders } }: { options: FinalRequestOptions }): {
     bodyHeaders: HeadersLike;
     body: BodyInit | undefined;
+    isStreamingBody: boolean;
   } {
     if (!body) {
-      return { bodyHeaders: undefined, body: undefined };
+      return { bodyHeaders: undefined, body: undefined, isStreamingBody: false };
     }
     const headers = buildHeaders([rawHeaders]);
+
+    const isReadableStream =
+      typeof (globalThis as any).ReadableStream !== 'undefined' &&
+      body instanceof (globalThis as any).ReadableStream;
+
+    const isRetryableBody =
+      !isReadableStream &&
+      (typeof body === 'string' ||
+        body instanceof ArrayBuffer ||
+        ArrayBuffer.isView(body) ||
+        (typeof (globalThis as any).Blob !== 'undefined' && body instanceof (globalThis as any).Blob) ||
+        body instanceof URLSearchParams ||
+        body instanceof FormData);
+
     if (
       // Pass raw type verbatim
       ArrayBuffer.isView(body) ||
@@ -993,15 +1090,19 @@ export class OpenAI {
       // `URLSearchParams` -> `application/x-www-form-urlencoded`
       body instanceof URLSearchParams ||
       // Send chunked stream (each chunk has own `length`)
-      ((globalThis as any).ReadableStream && body instanceof (globalThis as any).ReadableStream)
+      isReadableStream
     ) {
-      return { bodyHeaders: undefined, body: body as BodyInit };
+      return { bodyHeaders: undefined, body: body as BodyInit, isStreamingBody: !isRetryableBody };
     } else if (
       typeof body === 'object' &&
       (Symbol.asyncIterator in body ||
         (Symbol.iterator in body && 'next' in body && typeof body.next === 'function'))
     ) {
-      return { bodyHeaders: undefined, body: Shims.ReadableStreamFrom(body as AsyncIterable<Uint8Array>) };
+      return {
+        bodyHeaders: undefined,
+        body: Shims.ReadableStreamFrom(body as AsyncIterable<Uint8Array>),
+        isStreamingBody: true,
+      };
     } else if (
       typeof body === 'object' &&
       headers.values.get('content-type') === 'application/x-www-form-urlencoded'
@@ -1009,9 +1110,10 @@ export class OpenAI {
       return {
         bodyHeaders: { 'content-type': 'application/x-www-form-urlencoded' },
         body: this.stringifyQuery(body),
+        isStreamingBody: false,
       };
     } else {
-      return this.#encoder({ body, headers });
+      return { ...this.#encoder({ body, headers }), isStreamingBody: false };
     }
   }
 
@@ -1361,6 +1463,7 @@ export declare namespace OpenAI {
   export type FunctionDefinition = API.FunctionDefinition;
   export type FunctionParameters = API.FunctionParameters;
   export type Metadata = API.Metadata;
+  export type OAuthErrorCode = API.OAuthErrorCode;
   export type Reasoning = API.Reasoning;
   export type ReasoningEffort = API.ReasoningEffort;
   export type ResponseFormatJSONObject = API.ResponseFormatJSONObject;

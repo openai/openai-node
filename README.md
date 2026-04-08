@@ -69,6 +69,102 @@ const completion = await client.chat.completions.create({
 console.log(completion.choices[0].message.content);
 ```
 
+## Workload Identity Authentication
+
+For secure, automated environments like cloud-managed Kubernetes, Azure, and GCP, you can use workload identity authentication with short-lived tokens from cloud identity providers instead of long-lived API keys.
+
+The `workloadIdentity` parameter is mutually exclusive with `apiKey`.
+
+### Kubernetes (service account tokens)
+
+```ts
+import OpenAI from 'openai';
+import { k8sServiceAccountTokenProvider } from 'openai/auth';
+
+const client = new OpenAI({
+  workloadIdentity: {
+    clientId: 'your-client-id',
+    identityProviderId: 'idp-123',
+    serviceAccountId: 'sa-456',
+    provider: k8sServiceAccountTokenProvider('/var/run/secrets/kubernetes.io/serviceaccount/token'),
+  },
+});
+
+const response = await client.chat.completions.create({
+  model: 'gpt-4',
+  messages: [{ role: 'user', content: 'Hello!' }],
+});
+```
+
+### Azure (managed identity)
+
+```ts
+import OpenAI from 'openai';
+import { azureManagedIdentityTokenProvider } from 'openai/auth';
+
+const client = new OpenAI({
+  workloadIdentity: {
+    clientId: 'your-client-id',
+    identityProviderId: 'idp-123',
+    serviceAccountId: 'sa-456',
+    provider: azureManagedIdentityTokenProvider(),
+  },
+});
+```
+
+### GCP (compute engine metadata)
+
+```ts
+import OpenAI from 'openai';
+import { gcpIDTokenProvider } from 'openai/auth';
+
+const client = new OpenAI({
+  workloadIdentity: {
+    clientId: 'your-client-id',
+    identityProviderId: 'idp-123',
+    serviceAccountId: 'sa-456',
+    provider: gcpIDTokenProvider(),
+  },
+});
+```
+
+### Custom subject token provider
+
+```ts
+import OpenAI from 'openai';
+
+const client = new OpenAI({
+  workloadIdentity: {
+    clientId: 'your-client-id',
+    identityProviderId: 'idp-123',
+    serviceAccountId: 'sa-456',
+    provider: {
+      tokenType: 'jwt',
+      getToken: async () => {
+        return 'your-jwt-token';
+      },
+    },
+  },
+});
+```
+
+You can also customize the token refresh buffer (default is 1200 seconds (20 minutes) before expiration):
+
+```ts
+import OpenAI from 'openai';
+import { k8sServiceAccountTokenProvider } from 'openai/auth';
+
+const client = new OpenAI({
+  workloadIdentity: {
+    clientId: 'your-client-id',
+    identityProviderId: 'idp-123',
+    serviceAccountId: 'sa-456',
+    provider: k8sServiceAccountTokenProvider('/var/token'),
+    refreshBufferSeconds: 120.0,
+  },
+});
+```
+
 ## Streaming responses
 
 We provide support for streaming responses using Server Sent Events (SSE).
