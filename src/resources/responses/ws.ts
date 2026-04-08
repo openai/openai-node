@@ -47,7 +47,7 @@ export class ResponsesWS extends ResponsesEmitter {
   socket: WS.WebSocket;
 
   private _client: OpenAI;
-  private _parameters: Record<string, unknown> | undefined;
+  private _parameters: Record<string, unknown> | null | undefined;
   private _wsOptions: WS.ClientOptions | null | undefined;
   private _reconnectOptions: ResponsesWSReconnectOptions | null;
   private _sendQueue: string[] = [];
@@ -265,7 +265,7 @@ export class ResponsesWS extends ResponsesEmitter {
   }
 
   private _connect(): WS.WebSocket {
-    this.url = buildURL(this._client, this._parameters);
+    this.url = buildURL(this._client, {});
 
     const socket = new WS.WebSocket(this.url, {
       ...this._wsOptions,
