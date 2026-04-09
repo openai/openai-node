@@ -6,14 +6,20 @@ import { EventEmitter } from '../../core/EventEmitter';
 import { OpenAIError } from '../../core/error';
 import { stringifyQuery } from '../../internal/utils';
 
-import type { ReconnectingEvent } from '../../internal/ws';
+import type { RawWebSocketData, ReconnectingEvent, UnsentMessage } from '../../internal/ws';
 
 export type ResponsesStreamMessage =
   | { type: 'connecting' | 'open' | 'closing' }
-  | { type: 'close'; code: number; reason: string; unsent: ResponsesAPI.ResponsesClientEvent[] }
+  | {
+      type: 'close';
+      code: number;
+      reason: string;
+      unsent: UnsentMessage<ResponsesAPI.ResponsesClientEvent>[];
+    }
   | { type: 'reconnecting'; reconnect: ReconnectingEvent }
   | { type: 'reconnected' }
   | { type: 'message'; message: ResponsesAPI.ResponsesServerEvent }
+  | { type: 'raw'; data: RawWebSocketData }
   | { type: 'error'; error: WebSocketError };
 
 export class WebSocketError extends OpenAIError {
@@ -34,8 +40,9 @@ type Simplify<T> = { [KeyType in keyof T]: T[KeyType] } & {};
 type WebSocketEvents = Simplify<
   {
     event: (event: ResponsesAPI.ResponsesServerEvent) => void;
+    raw: (data: RawWebSocketData) => void;
     error: (error: WebSocketError) => void;
-    close: (code: number, reason: string, unsent: ResponsesAPI.ResponsesClientEvent[]) => void;
+    close: (code: number, reason: string, unsent: UnsentMessage<ResponsesAPI.ResponsesClientEvent>[]) => void;
     reconnecting: (event: ReconnectingEvent) => void;
     reconnected: () => void;
   } & {
@@ -50,6 +57,11 @@ export abstract class ResponsesEmitter extends EventEmitter<WebSocketEvents> {
    * Send an event to the API.
    */
   abstract send(event: ResponsesAPI.ResponsesClientEvent): void;
+
+  /**
+   * Send raw data over the WebSocket without JSON serialization.
+   */
+  abstract sendRaw(data: RawWebSocketData): void;
 
   /**
    * Close the WebSocket connection.
