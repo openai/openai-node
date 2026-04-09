@@ -7381,6 +7381,12 @@ export interface WebSearchTool {
   type: 'web_search' | 'web_search_2025_08_26';
 
   /**
+   * Whether to allow the model to access web content outside the search snippets
+   * returned by the tool.
+   */
+  external_web_access?: boolean;
+
+  /**
    * Filters for the search.
    */
   filters?: WebSearchTool.Filters | null;
