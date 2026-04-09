@@ -1324,6 +1324,7 @@ export declare namespace OpenAI {
   export type FunctionDefinition = API.FunctionDefinition;
   export type FunctionParameters = API.FunctionParameters;
   export type Metadata = API.Metadata;
+  export type OAuthErrorCode = API.OAuthErrorCode;
   export type Reasoning = API.Reasoning;
   export type ReasoningEffort = API.ReasoningEffort;
   export type ResponseFormatJSONObject = API.ResponseFormatJSONObject;
