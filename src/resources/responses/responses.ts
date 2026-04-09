@@ -2763,6 +2763,188 @@ export interface ResponseFunctionCallArgumentsDoneEvent {
 }
 
 /**
+ * Emitted when a shell command starts streaming.
+ */
+export interface ResponseShellCallCommandAddedEvent {
+  /**
+   * The initial command text.
+   */
+  command: string;
+
+  /**
+   * The index of the command in the shell call action.
+   */
+  command_index: number;
+
+  /**
+   * The index of the shell call output item.
+   */
+  output_index: number;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
+   * The type of the event. Always `response.shell_call_command.added`.
+   */
+  type: 'response.shell_call_command.added';
+}
+
+/**
+ * Emitted when a shell command receives a partial delta.
+ */
+export interface ResponseShellCallCommandDeltaEvent {
+  /**
+   * The index of the command in the shell call action.
+   */
+  command_index: number;
+
+  /**
+   * The command delta that was added.
+   */
+  delta: string;
+
+  /**
+   * An opaque obfuscation token for sensitive command text.
+   */
+  obfuscation?: string;
+
+  /**
+   * The index of the shell call output item.
+   */
+  output_index: number;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
+   * The type of the event. Always `response.shell_call_command.delta`.
+   */
+  type: 'response.shell_call_command.delta';
+}
+
+/**
+ * Emitted when a shell command is finalized.
+ */
+export interface ResponseShellCallCommandDoneEvent {
+  /**
+   * The fully assembled command text.
+   */
+  command: string;
+
+  /**
+   * The index of the command in the shell call action.
+   */
+  command_index: number;
+
+  /**
+   * The index of the shell call output item.
+   */
+  output_index: number;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
+   * The type of the event. Always `response.shell_call_command.done`.
+   */
+  type: 'response.shell_call_command.done';
+}
+
+/**
+ * Emitted when a shell call output receives a partial delta.
+ */
+export interface ResponseShellCallOutputContentDeltaEvent {
+  /**
+   * The index of the command this output belongs to.
+   */
+  command_index: number;
+
+  /**
+   * The partial stdout or stderr delta.
+   */
+  delta: ResponseShellCallOutputContentDeltaEvent.Delta;
+
+  /**
+   * The ID of the shell call output item.
+   */
+  item_id: string;
+
+  /**
+   * The index of the shell call output item.
+   */
+  output_index: number;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
+   * The type of the event. Always `response.shell_call_output_content.delta`.
+   */
+  type: 'response.shell_call_output_content.delta';
+}
+
+export namespace ResponseShellCallOutputContentDeltaEvent {
+  /**
+   * A partial shell output chunk for stdout or stderr.
+   */
+  export interface Delta {
+    /**
+     * The stderr text delta.
+     */
+    stderr?: string;
+
+    /**
+     * The stdout text delta.
+     */
+    stdout?: string;
+  }
+}
+
+/**
+ * Emitted when shell call output content is finalized.
+ */
+export interface ResponseShellCallOutputContentDoneEvent {
+  /**
+   * The index of the command this output belongs to.
+   */
+  command_index: number;
+
+  /**
+   * The ID of the shell call output item.
+   */
+  item_id: string;
+
+  /**
+   * The finalized shell call output chunks.
+   */
+  output: Array<ResponseFunctionShellCallOutputContent>;
+
+  /**
+   * The index of the shell call output item.
+   */
+  output_index: number;
+
+  /**
+   * The sequence number of this event.
+   */
+  sequence_number: number;
+
+  /**
+   * The type of the event. Always `response.shell_call_output_content.done`.
+   */
+  type: 'response.shell_call_output_content.done';
+}
+
+/**
  * A piece of message content, such as text, an image, or a file.
  */
 export type ResponseFunctionCallOutputItem =
@@ -5957,6 +6139,11 @@ export type ResponseStreamEvent =
   | ResponseFileSearchCallSearchingEvent
   | ResponseFunctionCallArgumentsDeltaEvent
   | ResponseFunctionCallArgumentsDoneEvent
+  | ResponseShellCallCommandAddedEvent
+  | ResponseShellCallCommandDeltaEvent
+  | ResponseShellCallCommandDoneEvent
+  | ResponseShellCallOutputContentDeltaEvent
+  | ResponseShellCallOutputContentDoneEvent
   | ResponseInProgressEvent
   | ResponseFailedEvent
   | ResponseIncompleteEvent
@@ -6755,6 +6942,11 @@ export type ResponsesServerEvent =
   | ResponseFileSearchCallSearchingEvent
   | ResponseFunctionCallArgumentsDeltaEvent
   | ResponseFunctionCallArgumentsDoneEvent
+  | ResponseShellCallCommandAddedEvent
+  | ResponseShellCallCommandDeltaEvent
+  | ResponseShellCallCommandDoneEvent
+  | ResponseShellCallOutputContentDeltaEvent
+  | ResponseShellCallOutputContentDoneEvent
   | ResponseInProgressEvent
   | ResponseFailedEvent
   | ResponseIncompleteEvent
@@ -8093,6 +8285,11 @@ export declare namespace Responses {
     type ResponseRefusalDeltaEvent as ResponseRefusalDeltaEvent,
     type ResponseRefusalDoneEvent as ResponseRefusalDoneEvent,
     type ResponseStatus as ResponseStatus,
+    type ResponseShellCallCommandAddedEvent as ResponseShellCallCommandAddedEvent,
+    type ResponseShellCallCommandDeltaEvent as ResponseShellCallCommandDeltaEvent,
+    type ResponseShellCallCommandDoneEvent as ResponseShellCallCommandDoneEvent,
+    type ResponseShellCallOutputContentDeltaEvent as ResponseShellCallOutputContentDeltaEvent,
+    type ResponseShellCallOutputContentDoneEvent as ResponseShellCallOutputContentDoneEvent,
     type ResponseStreamEvent as ResponseStreamEvent,
     type ResponseTextConfig as ResponseTextConfig,
     type ResponseTextDeltaEvent as ResponseTextDeltaEvent,

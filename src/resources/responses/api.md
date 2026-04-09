@@ -123,6 +123,11 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponseRefusalDeltaEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseRefusalDoneEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseStatus</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseShellCallCommandAddedEvent</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseShellCallCommandDeltaEvent</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseShellCallCommandDoneEvent</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseShellCallOutputContentDeltaEvent</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseShellCallOutputContentDoneEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseStreamEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseTextConfig</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseTextDeltaEvent</a></code>

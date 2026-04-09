@@ -1,4 +1,5 @@
 import { makeStreamSnapshotRequest } from '../utils/mock-snapshots';
+import { expectType } from '../utils/typing';
 
 jest.setTimeout(1000 * 30);
 
@@ -56,5 +57,69 @@ describe('.stream()', () => {
       expect(final.output[1].content[0]).toMatchObject({ type: 'output_text', text: 'The answer is 42' });
     }
     expect(final.output_text).toBe('The answer is 42');
+  });
+
+  it('hosted shell events work', async () => {
+    const commandEvents: string[] = [];
+    const obfuscations: Array<string | undefined> = [];
+    const outputDeltas: Array<{ stdout?: string; stderr?: string }> = [];
+    const outputDoneEvents: Array<
+      Array<{ stdout: string; stderr: string; outcome: { type: 'exit'; exit_code: number } }>
+    > = [];
+
+    const stream = (
+      await makeStreamSnapshotRequest((openai) =>
+        openai.responses.stream({
+          model: 'gpt-4.1',
+          input: 'Use the shell tool to print 55',
+          stream_options: { include_obfuscation: false },
+          tools: [{ type: 'shell' }],
+        }),
+      )
+    )
+      .on('response.shell_call_command.added', (event) => {
+        commandEvents.push(event.command);
+      })
+      .on('response.shell_call_command.delta', (event) => {
+        expectType<string | undefined>(event.obfuscation);
+        obfuscations.push(event.obfuscation);
+        commandEvents.push(event.delta);
+      })
+      .on('response.shell_call_command.done', (event) => {
+        commandEvents.push(event.command);
+      })
+      .on('response.shell_call_output_content.delta', (event) => {
+        expectType<{ stdout?: string; stderr?: string }>(event.delta);
+        outputDeltas.push(event.delta);
+      })
+      .on('response.shell_call_output_content.done', (event) => {
+        outputDoneEvents.push(event.output as (typeof outputDoneEvents)[number]);
+      });
+
+    const final = await stream.finalResponse();
+
+    expect(commandEvents).toEqual(['', 'python ', '-c "print(55)"', 'python -c "print(55)"']);
+    expect(obfuscations).toEqual([undefined, undefined]);
+    expect(outputDeltas).toEqual([{ stdout: '55\\n' }]);
+    expect(outputDoneEvents).toEqual([
+      [{ stdout: '55\\n', stderr: '', outcome: { type: 'exit', exit_code: 0 } }],
+    ]);
+    expect(final.output_text).toBe('');
+
+    const shellCall = final.output[0];
+    expect(shellCall?.type).toBe('shell_call');
+    if (shellCall?.type === 'shell_call') {
+      expectType<string[]>(shellCall.action.commands);
+      expect(shellCall.action.commands).toEqual(['python -c "print(55)"']);
+    }
+
+    const shellOutput = final.output[1];
+    expect(shellOutput?.type).toBe('shell_call_output');
+    if (shellOutput?.type === 'shell_call_output') {
+      expectType<Array<{ stdout: string; stderr: string }>>(shellOutput.output);
+      expect(shellOutput.output).toEqual([
+        { stdout: '55\\n', stderr: '', outcome: { type: 'exit', exit_code: 0 } },
+      ]);
+    }
   });
 });
