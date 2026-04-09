@@ -6,9 +6,12 @@ import { InternalEventEmitter } from '../../core/EventEmitter';
 import { sleep } from '../../internal/utils/sleep';
 import {
   SendQueue,
+  flattenRawData,
   isRecoverableClose,
+  type RawWebSocketData,
   type ReconnectingEvent,
   type ReconnectingOverrides,
+  type UnsentMessage,
 } from '../../internal/ws';
 import * as ResponsesAPI from './responses';
 import { OpenAI } from '../../client';
@@ -77,7 +80,7 @@ export class ResponsesWS extends ResponsesEmitter {
     socketSwap: (oldSocket: WS.WebSocket, newSocket: WS.WebSocket) => void;
     reconnecting: (event: ReconnectingEvent<Record<string, unknown>>) => void;
     reconnected: () => void;
-    close: (code: number, reason: string, unsent: ResponsesAPI.ResponsesClientEvent[]) => void;
+    close: (code: number, reason: string, unsent: UnsentMessage<ResponsesAPI.ResponsesClientEvent>[]) => void;
   }>();
 
   constructor(client: OpenAI, options?: ResponsesWSClientOptions | null | undefined) {
@@ -105,6 +108,24 @@ export class ResponsesWS extends ResponsesEmitter {
     }
     try {
       this.socket.send(JSON.stringify(event));
+    } catch (err) {
+      this._onError(null, 'could not send data', err);
+    }
+  }
+
+  sendRaw(data: RawWebSocketData) {
+    if (this._isReconnecting || this.socket.readyState === WS.WebSocket.CONNECTING) {
+      if (!this._sendQueue.enqueueRaw(data)) {
+        this._onError(null, 'send queue is full, message discarded', undefined);
+      }
+      return;
+    }
+    if (this.socket.readyState !== WS.WebSocket.OPEN) {
+      this._onError(null, 'cannot send on a closed WebSocket', undefined);
+      return;
+    }
+    try {
+      this.socket.send(flattenRawData(data));
     } catch (err) {
       this._onError(null, 'could not send data', err);
     }
@@ -167,6 +188,10 @@ export class ResponsesWS extends ResponsesEmitter {
       push({ type: 'message', message: event });
     };
 
+    const onRaw = (data: RawWebSocketData) => {
+      push({ type: 'raw', data });
+    };
+
     // All errors (API + socket) funnel through _onError → 'error' event
     const onEmitterError = (err: WebSocketError) => {
       push({ type: 'error', error: err });
@@ -190,7 +215,11 @@ export class ResponsesWS extends ResponsesEmitter {
       }
     };
 
-    const onClose = (code: number, reason: string, unsent: ResponsesAPI.ResponsesClientEvent[]) => {
+    const onClose = (
+      code: number,
+      reason: string,
+      unsent: UnsentMessage<ResponsesAPI.ResponsesClientEvent>[],
+    ) => {
       push({ type: 'close', code, reason, unsent });
       done = true;
       flushResolvers();
@@ -205,6 +234,7 @@ export class ResponsesWS extends ResponsesEmitter {
 
     const cleanup = () => {
       this.off('event', onEvent);
+      this.off('raw', onRaw);
       this.off('error', onEmitterError);
       currentSocket.off('open', onOpen);
       this._internalEvents.off('close', onClose);
@@ -214,6 +244,7 @@ export class ResponsesWS extends ResponsesEmitter {
     };
 
     this.on('event', onEvent);
+    this.on('raw', onRaw);
     this.on('error', onEmitterError);
     this.socket.on('open', onOpen);
     this._internalEvents.on('close', onClose);
@@ -297,25 +328,27 @@ export class ResponsesWS extends ResponsesEmitter {
       },
     });
 
-    socket.on('message', (wsEvent) => {
-      const event = (() => {
-        try {
-          return JSON.parse(wsEvent.toString()) as ResponsesAPI.ResponsesServerEvent;
-        } catch (err) {
-          this._onError(null, 'could not parse websocket event', err);
-          return null;
-        }
-      })();
+    socket.on('message', (wsEvent, isBinary) => {
+      if (isBinary) {
+        this._emit('raw', wsEvent as RawWebSocketData);
+        return;
+      }
 
-      if (event) {
-        this._emit('event', event);
+      let event: ResponsesAPI.ResponsesServerEvent;
+      try {
+        event = JSON.parse(wsEvent.toString()) as ResponsesAPI.ResponsesServerEvent;
+      } catch {
+        this._emit('raw', wsEvent as RawWebSocketData);
+        return;
+      }
 
-        if (event.type === 'error') {
-          this._onError(event);
-        } else {
-          // @ts-ignore TS isn't smart enough to get the relationship right here
-          this._emit(event.type, event);
-        }
+      this._emit('event', event);
+
+      if (event.type === 'error') {
+        this._onError(event);
+      } else {
+        // @ts-ignore TS isn't smart enough to get the relationship right here
+        this._emit(event.type, event);
       }
     });
 
@@ -523,7 +556,9 @@ export class ResponsesWS extends ResponsesEmitter {
 
   private _flushSendQueue(): void {
     try {
-      this._sendQueue.flush((data) => this.socket.send(data));
+      this._sendQueue.flush((data) =>
+        this.socket.send(typeof data === 'string' ? data : flattenRawData(data)),
+      );
     } catch (err) {
       this._onError(null, 'could not send queued data', err);
     }
