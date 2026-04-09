@@ -218,7 +218,13 @@ export type VideoModel =
 
 export type VideoSeconds = '4' | '8' | '12';
 
-export type VideoSize = '720x1280' | '1280x720' | '1024x1792' | '1792x1024';
+export type VideoSize =
+  | '720x1280'
+  | '1280x720'
+  | '1024x1792'
+  | '1792x1024'
+  | '1920x1080'
+  | '1080x1920';
 
 /**
  * Confirmation payload returned after deleting a video.
