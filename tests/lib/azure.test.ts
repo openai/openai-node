@@ -1,4 +1,4 @@
-import { AzureOpenAI } from 'openai';
+import { AzureOpenAI, type AzureClientOptions } from 'openai';
 import { APIUserAbortError } from 'openai';
 import { type Response, RequestInit, RequestInfo } from 'openai/internal/builtin-types';
 
@@ -64,6 +64,17 @@ describe('instantiate azure client', () => {
       );
       expect(req.headers.get('x-stainless-retry-count')).toEqual('1');
     });
+  });
+
+  test('exports AzureClientOptions from the root package', () => {
+    const options: AzureClientOptions = {
+      baseURL: 'https://example.com',
+      apiKey: 'My API Key',
+      apiVersion,
+    };
+
+    const client = new AzureOpenAI(options);
+    expect(client.baseURL).toEqual('https://example.com');
   });
 
   describe('defaultQuery', () => {
