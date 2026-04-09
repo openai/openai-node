@@ -9,7 +9,8 @@ import { stringifyQuery } from '../../internal/utils';
 import type { ReconnectingEvent } from '../../internal/ws';
 
 export type ResponsesStreamMessage =
-  | { type: 'connecting' | 'open' | 'closing' | 'close' }
+  | { type: 'connecting' | 'open' | 'closing' }
+  | { type: 'close'; code: number; reason: string; unsent: ResponsesAPI.ResponsesClientEvent[] }
   | { type: 'reconnecting'; reconnect: ReconnectingEvent }
   | { type: 'reconnected' }
   | { type: 'message'; message: ResponsesAPI.ResponsesServerEvent }
@@ -32,9 +33,9 @@ type Simplify<T> = { [KeyType in keyof T]: T[KeyType] } & {};
 
 type WebSocketEvents = Simplify<
   {
-    close: () => void;
     event: (event: ResponsesAPI.ResponsesServerEvent) => void;
     error: (error: WebSocketError) => void;
+    close: (code: number, reason: string, unsent: ResponsesAPI.ResponsesClientEvent[]) => void;
     reconnecting: (event: ReconnectingEvent) => void;
     reconnected: () => void;
   } & {
