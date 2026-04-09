@@ -1,4 +1,4 @@
-import { AzureOpenAI } from 'openai';
+import { AzureOpenAI, type AzureClientOptions } from 'openai';
 import { APIUserAbortError } from 'openai';
 import { type Response, RequestInit, RequestInfo } from 'openai/internal/builtin-types';
 
@@ -10,6 +10,16 @@ const model = 'unused model';
 
 describe('instantiate azure client', () => {
   const env = process.env;
+
+  test('exports AzureClientOptions from the root package', () => {
+    const options: AzureClientOptions = {
+      endpoint: 'https://example-resource.openai.azure.com',
+      apiKey: 'My API Key',
+      apiVersion,
+    };
+
+    expect(options.apiVersion).toEqual(apiVersion);
+  });
 
   beforeEach(() => {
     jest.resetModules();
