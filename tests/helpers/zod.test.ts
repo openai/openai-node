@@ -1,4 +1,4 @@
-import { zodResponseFormat } from 'openai/helpers/zod';
+import { zodResponseFormat, zodTextFormat } from 'openai/helpers/zod';
 import { z as zv3 } from 'zod/v3';
 import { z as zv4 } from 'zod/v4';
 
@@ -358,5 +358,31 @@ describe.each([
     );
 
     expect(consoleSpy).toHaveBeenCalledTimes(0);
+  });
+
+  it('does not emit circular refs for branded zodTextFormat array items', () => {
+    if (version !== 'v3') {
+      return;
+    }
+
+    const BlockIdSchema = z.string().brand<'SlideId'>();
+    const SlidePlanSchema = z.object({
+      slides: z.array(
+        z.object({
+          subtitle: z.array(BlockIdSchema).nullable(),
+          content: z.array(BlockIdSchema).min(1),
+        }),
+      ),
+    });
+
+    const jsonSchema = zodTextFormat(SlidePlanSchema, 'slidePlan').schema as {
+      definitions?: Record<string, unknown>;
+    };
+
+    expect(
+      jsonSchema.definitions?.['slidePlan_properties_slides_items_properties_subtitle_anyOf_0_items'],
+    ).toEqual({
+      type: 'string',
+    });
   });
 });
