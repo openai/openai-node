@@ -888,8 +888,9 @@ export class OpenAI {
     }
 
     try {
+      const requestFetch = Shims.getRequestFetch(this.fetch, fetchOptions);
       // use undefined this binding; fetch errors if bound to something else in browser/cloudflare
-      return await this.fetch.call(undefined, url, fetchOptions);
+      return await requestFetch.call(undefined, url, fetchOptions);
     } finally {
       clearTimeout(timeout);
     }
