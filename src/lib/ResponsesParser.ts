@@ -11,6 +11,8 @@ import {
   type ResponseCreateParamsBase,
   type ResponseCreateParamsNonStreaming,
   type ResponseFunctionToolCall,
+  type ResponseInputItem,
+  type ResponseOutputItem,
   type Tool,
 } from '../resources/responses/responses';
 import { type AutoParseableTextFormat, isAutoParsableResponseFormat } from '../lib/parser';
@@ -30,6 +32,13 @@ export function maybeParseResponse<
   Params extends ResponseCreateParamsBase | null,
   ParsedT = Params extends null ? null : ExtractParsedContentFromParams<NonNullable<Params>>,
 >(response: Response, params: Params): ParsedResponse<ParsedT> {
+  if (!Object.getOwnPropertyDescriptor(response, 'output_text')) {
+    addOutputText(response);
+  }
+  if (!Object.getOwnPropertyDescriptor(response, 'output_as_input')) {
+    addOutputAsInput(response);
+  }
+
   if (!params || !hasAutoParseableInput(params)) {
     return {
       ...response,
@@ -95,9 +104,6 @@ export function parseResponse<
   );
 
   const parsed: Omit<ParsedResponse<ParsedT>, 'output_parsed'> = Object.assign({}, response, { output });
-  if (!Object.getOwnPropertyDescriptor(response, 'output_text')) {
-    addOutputText(parsed);
-  }
 
   Object.defineProperty(parsed, 'output_parsed', {
     enumerable: true,
@@ -262,4 +268,32 @@ export function addOutputText(rsp: Response): void {
   }
 
   rsp.output_text = texts.join('');
+}
+
+export function addOutputAsInput(rsp: Response): void {
+  rsp.output_as_input = rsp.output.map(outputItemToInputItem);
+}
+
+function outputItemToInputItem(item: ResponseOutputItem): ResponseInputItem {
+  if (item.type === 'computer_call_output') {
+    const inputItem: ResponseInputItem.ComputerCallOutput = {
+      call_id: item.call_id,
+      output: item.output,
+      type: 'computer_call_output',
+    };
+
+    if (item.id) {
+      inputItem.id = item.id;
+    }
+    if (item.acknowledged_safety_checks) {
+      inputItem.acknowledged_safety_checks = item.acknowledged_safety_checks;
+    }
+    if (item.status !== 'failed') {
+      inputItem.status = item.status;
+    }
+
+    return inputItem;
+  }
+
+  return item;
 }
