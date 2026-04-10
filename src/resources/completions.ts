@@ -20,7 +20,7 @@ export class Completions extends APIResource {
    * @example
    * ```ts
    * const completion = await client.completions.create({
-   *   model: 'string',
+   *   model: 'gpt-3.5-turbo-instruct',
    *   prompt: 'This is a test.',
    * });
    * ```

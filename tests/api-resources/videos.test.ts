@@ -23,7 +23,7 @@ describe('resource videos', () => {
     const response = await client.videos.create({
       prompt: 'x',
       input_reference: await toFile(Buffer.from('Example data'), 'README.md'),
-      model: 'string',
+      model: 'sora-2',
       seconds: '4',
       size: '720x1280',
     });
