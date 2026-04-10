@@ -1,3 +1,5 @@
+import { concatBytes, encodeUTF8 } from './utils/bytes';
+
 /** Reconnection event passed to the `onReconnecting` handler and event listeners. */
 export interface ReconnectingEvent<Parameters = Record<string, unknown>> {
   /** Which retry attempt this is (1-based). */
@@ -34,7 +36,7 @@ export type ReconnectingOverrides<Parameters = Record<string, unknown>> =
 /**
  * Raw data types that can be sent over a WebSocket without serialization.
  */
-export type RawWebSocketData = string | ArrayBufferLike | ArrayBufferView | Buffer[];
+export type RawWebSocketData = string | ArrayBufferLike | ArrayBufferView | ArrayBufferView[];
 
 export type UnsentMessage<T> = { type: 'message'; message: T } | { type: 'raw'; data: RawWebSocketData };
 
@@ -42,26 +44,33 @@ type QueueEntry =
   | { kind: 'json'; data: string; byteLength: number }
   | { kind: 'raw'; data: RawWebSocketData; byteLength: number };
 
+function toUint8Array(view: ArrayBufferView): Uint8Array {
+  if (view instanceof Uint8Array) return view;
+  return new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
+}
+
 /**
- * Flatten `Buffer[]` fragments into a single `Buffer` so that `ws.send()`
- * transmits the correct bytes.
+ * Flatten `ArrayBufferView[]` fragments into a single `Uint8Array` so that
+ * `ws.send()` transmits the correct bytes.
  */
-export function flattenRawData(data: RawWebSocketData): Exclude<RawWebSocketData, Buffer[]> {
-  if (Array.isArray(data)) return Buffer.concat(data);
+export function flattenRawData(data: RawWebSocketData): Exclude<RawWebSocketData, ArrayBufferView[]> {
+  if (Array.isArray(data)) return concatBytes(data.map(toUint8Array));
   return data;
 }
 
-function snapshotRawData(data: RawWebSocketData): Exclude<RawWebSocketData, Buffer[]> {
+function snapshotRawData(data: RawWebSocketData): Exclude<RawWebSocketData, ArrayBufferView[]> {
   if (typeof data === 'string') return data;
-  if (Array.isArray(data)) return Buffer.concat(data);
+  if (Array.isArray(data)) return concatBytes(data.map(toUint8Array));
   if (ArrayBuffer.isView(data)) {
-    return Buffer.from(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength));
+    const copy = new Uint8Array(data.byteLength);
+    copy.set(toUint8Array(data));
+    return copy;
   }
   return data.slice(0);
 }
 
 function rawByteLength(data: RawWebSocketData): number {
-  if (typeof data === 'string') return Buffer.byteLength(data, 'utf8');
+  if (typeof data === 'string') return encodeUTF8(data).byteLength;
   if (Array.isArray(data)) return data.reduce((sum, buf) => sum + buf.byteLength, 0);
   if ('byteLength' in data) return data.byteLength;
   return 0;
@@ -88,7 +97,7 @@ export class SendQueue<T = unknown> {
    */
   enqueue(event: T): boolean {
     const data = JSON.stringify(event);
-    const byteLength = Buffer.byteLength(data, 'utf8');
+    const byteLength = encodeUTF8(data).byteLength;
     if (this._bytes + byteLength > this._maxBytes) {
       return false;
     }
@@ -117,7 +126,7 @@ export class SendQueue<T = unknown> {
    * message and all subsequent messages are re-queued and the error is
    * re-thrown so the caller can report it.
    */
-  flush(send: (data: string | RawWebSocketData) => void): void {
+  flush(send: (data: RawWebSocketData) => void): void {
     const pending = this._queue.splice(0);
     this._bytes = 0;
     for (let i = 0; i < pending.length; i++) {

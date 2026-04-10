@@ -4,7 +4,6 @@ import * as ResponsesAPI from './responses';
 import { OpenAI } from '../../client';
 import { EventEmitter } from '../../core/EventEmitter';
 import { OpenAIError } from '../../core/error';
-import { stringifyQuery } from '../../internal/utils';
 
 import type { RawWebSocketData, ReconnectingEvent, UnsentMessage } from '../../internal/ws';
 
@@ -100,20 +99,7 @@ export abstract class ResponsesEmitter extends EventEmitter<WebSocketEvents> {
 export function buildURL(client: OpenAI, parameters: Record<string, unknown>): URL {
   const { ...query } = parameters;
   const endpoint = '/responses';
-  const baseURL = client.baseURL;
-  const url = new URL(baseURL);
-  url.pathname +=
-    url.pathname.endsWith('/') ?
-      endpoint.startsWith('/') ?
-        endpoint.slice(1)
-      : endpoint
-    : endpoint.startsWith('/') ? endpoint
-    : `/${endpoint}`;
-  if (url.search) {
-    url.search += `&${stringifyQuery(query)}`;
-  } else {
-    url.search = stringifyQuery(query);
-  }
+  const url = new URL(client.buildURL(endpoint, query, undefined));
   url.protocol = url.protocol === 'http:' || url.protocol === 'ws:' ? 'ws:' : 'wss:';
   return url;
 }
