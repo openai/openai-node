@@ -575,6 +575,21 @@ console.log(raw.headers.get('X-My-Header'));
 console.log(modelResponse);
 ```
 
+### Reading file contents from `files.content()`
+
+`client.files.content(fileId)` returns the underlying web-standard `Response`.
+Read the response body explicitly depending on your expected content type.
+
+```ts
+const response = await client.files.content('file-abc123');
+
+// text files
+const text = await response.text();
+
+// binary files
+const bytes = new Uint8Array(await response.arrayBuffer());
+```
+
 ### Logging
 
 > [!IMPORTANT]
