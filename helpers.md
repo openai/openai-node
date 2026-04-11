@@ -592,6 +592,10 @@ The underlying `AbortController` for the runner.
 If you have a function call flow which you intend to _end_ with a certain function call, then you can use the second
 argument `runner` given to the function to either mutate `runner.messages` or call `runner.abort()`.
 
+When you abort the runner, promise helpers that require a completed run (for example
+`finalFunctionCall()`, `finalFunctionCallResult()`, and `totalUsage()`) may throw. Use
+event handlers and `await runner.done()` when aborting intentionally.
+
 ```ts
 import OpenAI from 'openai';
 
@@ -607,17 +611,24 @@ async function main() {
           type: 'function',
           function: {
             function: function updateDatabase(props, runner) {
-              runner.abort()
+              runner.abort();
+              return 'aborted after persistence';
             },
-            …
-          }
+            // other fields omitted for brevity
+          },
         },
       ],
     })
     .on('message', (message) => console.log(message));
 
-  const finalFunctionCall = await runner.finalFunctionCall();
-  console.log('Final function call:', finalFunctionCall);
+  try {
+    await runner.done();
+  } catch (err) {
+    console.log('Runner aborted intentionally.');
+  }
+
+  const lastMessage = runner.messages.at(-1);
+  console.log('Last observed message:', lastMessage);
 }
 
 main();
@@ -627,6 +638,11 @@ main();
 
 [`zod`](https://www.npmjs.com/package/zod) is a schema validation library which can help with validating the
 assistant's response to make sure it conforms to a schema. Paired with [`zod-to-json-schema`](https://www.npmjs.com/package/zod-to-json-schema), the validation schema also acts as the `parameters` JSON Schema passed to the API.
+
+The SDK can convert many zod constructs, but the API enforces the model against the
+Structured Outputs JSON-schema subset. zod transforms/refinements/default values and
+description text are useful for local validation/documentation, but they are not all
+independently enforced by the model.
 
 ```ts
 import OpenAI from 'openai';
@@ -693,12 +709,12 @@ The polling methods are:
 
 ```ts
 client.beta.threads.createAndRunPoll(...)
-client.beta.threads.runs.createAndPoll((...)
-client.beta.threads.runs.submitToolOutputsAndPoll((...)
-client.beta.vectorStores.files.uploadAndPoll((...)
-client.beta.vectorStores.files.createAndPoll((...)
-client.beta.vectorStores.fileBatches.createAndPoll((...)
-client.beta.vectorStores.fileBatches.uploadAndPoll((...)
+client.beta.threads.runs.createAndPoll(...)
+client.beta.threads.runs.submitToolOutputsAndPoll(...)
+client.beta.vectorStores.files.uploadAndPoll(...)
+client.beta.vectorStores.files.createAndPoll(...)
+client.beta.vectorStores.fileBatches.createAndPoll(...)
+client.beta.vectorStores.fileBatches.uploadAndPoll(...)
 ```
 
 # Bulk Upload Helpers
@@ -712,5 +728,6 @@ const fileList = [
   ...
 ];
 
-const batch = await openai.vectorStores.fileBatches.uploadAndPoll(vectorStore.id, {files: fileList});
+// uploadAndPoll expects an object with a `files` array.
+const batch = await openai.vectorStores.fileBatches.uploadAndPoll(vectorStore.id, { files: fileList });
 ```
