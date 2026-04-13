@@ -268,12 +268,33 @@ describe('instantiate client', () => {
     });
 
     const controller = new AbortController();
-    setTimeout(() => controller.abort(), 200);
+    setTimeout(() => controller.abort('abort test'), 200);
 
-    const spy = jest.spyOn(client, 'request');
+    const requestSpy = jest.spyOn(client, 'request');
+    const fetchWithTimeoutSpy = jest.spyOn(client, 'fetchWithTimeout');
 
-    await expect(client.get('/foo', { signal: controller.signal })).rejects.toThrowError(APIUserAbortError);
-    expect(spy).toHaveBeenCalledTimes(1);
+    const abortedRequest = client.get('/foo', { signal: controller.signal });
+    await expect(abortedRequest).rejects.toThrow(APIUserAbortError);
+    await expect(abortedRequest).rejects.toEqual(expect.objectContaining({ message: 'abort test' }));
+
+    expect(requestSpy).toHaveBeenCalledTimes(1);
+    expect(fetchWithTimeoutSpy).toHaveBeenCalledTimes(1);
+  });
+
+  test('should not make a request if the signal is aborted', async () => {
+    const client = new OpenAI({ baseURL: 'http://localhost:5000/', apiKey: 'My API Key' });
+    const requestSpy = jest.spyOn(client, 'request');
+    const fetchWithTimeoutSpy = jest.spyOn(client, 'fetchWithTimeout');
+    const controller = new AbortController();
+    controller.abort();
+    const abortedRequest = client.get('/foo', { signal: controller.signal });
+    await expect(abortedRequest).rejects.toThrow(APIUserAbortError);
+    await expect(abortedRequest).rejects.toEqual(
+      expect.objectContaining({ message: 'AbortError: This operation was aborted' }),
+    );
+
+    expect(requestSpy).toHaveBeenCalledTimes(1);
+    expect(fetchWithTimeoutSpy).toHaveBeenCalledTimes(0);
   });
 
   test('normalized method', async () => {
