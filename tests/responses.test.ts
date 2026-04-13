@@ -1,6 +1,6 @@
 import { APIPromise } from 'openai/api-promise';
 import OpenAI from 'openai/index';
-import { compareType } from './utils/typing';
+import { compareType, expectType } from './utils/typing';
 
 const client = new OpenAI({ apiKey: 'example-api-key' });
 
@@ -135,3 +135,94 @@ describe('request id', () => {
     expect((result as any)._request_id).toBeUndefined();
   });
 });
+
+describe('responses stream typing', () => {
+  test('hosted shell stream events are typed', () => {
+    const commandAdded: Extract<
+      OpenAI.Responses.ResponseStreamEvent,
+      { type: 'response.shell_call_command.added' }
+    > = {
+      type: 'response.shell_call_command.added',
+      command: '',
+      command_index: 0,
+      output_index: 0,
+      sequence_number: 1,
+    };
+    expectType<string>(commandAdded.command);
+
+    const commandDelta: Extract<
+      OpenAI.Responses.ResponseStreamEvent,
+      { type: 'response.shell_call_command.delta' }
+    > = {
+      type: 'response.shell_call_command.delta',
+      command_index: 0,
+      delta: 'python',
+      obfuscation: '',
+      output_index: 0,
+      sequence_number: 2,
+    };
+    expectType<string>(commandDelta.delta);
+
+    const commandDone: Extract<
+      OpenAI.Responses.ResponseStreamEvent,
+      { type: 'response.shell_call_command.done' }
+    > = {
+      type: 'response.shell_call_command.done',
+      command: 'python main.py',
+      command_index: 0,
+      output_index: 0,
+      sequence_number: 3,
+    };
+    expectType<string>(commandDone.command);
+
+    const outputDelta: Extract<
+      OpenAI.Responses.ResponseStreamEvent,
+      { type: 'response.shell_call_output_content.delta' }
+    > = {
+      type: 'response.shell_call_output_content.delta',
+      command_index: 0,
+      delta: { stdout: '42' },
+      item_id: 'item_1',
+      output_index: 0,
+      sequence_number: 4,
+    };
+    expectType<string | undefined>(outputDelta.delta.stdout);
+
+    const outputDone: Extract<
+      OpenAI.Responses.ResponseStreamEvent,
+      { type: 'response.shell_call_output_content.done' }
+    > = {
+      type: 'response.shell_call_output_content.done',
+      command_index: 0,
+      item_id: 'item_1',
+      output: [
+        {
+          stdout: '42',
+          stderr: '',
+          outcome: { type: 'exit', exit_code: 0 },
+        },
+      ],
+      output_index: 0,
+      sequence_number: 5,
+    };
+    expectType<Array<OpenAI.Responses.ResponseFunctionShellCallOutputContent>>(outputDone.output);
+
+    expect(true).toBe(true);
+  });
+});
+
+const unused = async () => {
+  const stream = await client.responses.stream({
+    model: 'gpt-5.1',
+    input: 'Run a shell command.',
+    tools: [{ type: 'shell' }],
+  });
+
+  stream.on('response.shell_call_command.delta', (event) => {
+    expectType<string>(event.delta);
+  });
+
+  stream.on('response.shell_call_output_content.done', (event) => {
+    expectType<Array<OpenAI.Responses.ResponseFunctionShellCallOutputContent>>(event.output);
+  });
+};
