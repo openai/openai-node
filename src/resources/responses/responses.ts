@@ -7979,6 +7979,11 @@ export interface ResponseCompactParams {
    * A key to use when reading from or writing to the prompt cache.
    */
   prompt_cache_key?: string | null;
+
+  /**
+   * How long to retain a prompt cache entry created by this request.
+   */
+  prompt_cache_retention?: 'in_memory' | '24h' | null;
 }
 
 Responses.InputItems = InputItems;
