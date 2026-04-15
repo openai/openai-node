@@ -243,6 +243,62 @@ import { isEmptyObj } from './internal/utils/values';
 
 const WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER = 'workload-identity-auth';
 
+/**
+ * Wrap a `Response` so that the given `clearRequestTimeout` callback runs
+ * exactly once, when the body is either fully read, cancelled, or errors.
+ * Responses without a body have the timeout cleared synchronously.
+ *
+ * This lets the request-timeout timer stay armed across the body-read phase
+ * (e.g. `await response.json()`), which native `await fetch()` does not cover.
+ */
+function wrapResponseForRequestTimeout(response: Response, clearRequestTimeout: () => void): Response {
+  if (!response.body) {
+    clearRequestTimeout();
+    return response;
+  }
+
+  let cleared = false;
+  const clearOnce = () => {
+    if (cleared) return;
+    cleared = true;
+    clearRequestTimeout();
+  };
+
+  const originalBody = response.body;
+  const wrappedBody = new ReadableStream({
+    async start(controller) {
+      const reader = originalBody.getReader();
+      try {
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          controller.enqueue(value);
+        }
+        controller.close();
+      } catch (err) {
+        controller.error(err);
+      } finally {
+        clearOnce();
+        try {
+          reader.releaseLock();
+        } catch {
+          // reader may already be released
+        }
+      }
+    },
+    cancel(reason) {
+      clearOnce();
+      return originalBody.cancel(reason);
+    },
+  });
+
+  return new Response(wrappedBody, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
+}
+
 export type ApiKeySetter = () => Promise<string>;
 
 export interface ClientOptions {
@@ -887,12 +943,22 @@ export class OpenAI {
       fetchOptions.method = method.toUpperCase();
     }
 
+    let response: Response;
     try {
       // use undefined this binding; fetch errors if bound to something else in browser/cloudflare
-      return await this.fetch.call(undefined, url, fetchOptions);
-    } finally {
+      response = await this.fetch.call(undefined, url, fetchOptions);
+    } catch (err) {
       clearTimeout(timeout);
+      throw err;
     }
+
+    // Keep the timer armed until the body is fully read, cancelled, or errored.
+    // The `await fetch()` above resolves as soon as response *headers* arrive, so
+    // clearing the timeout here would leave subsequent body readers — e.g.
+    // `await response.json()` in `internal/parse.ts` — without any timeout.
+    // Servers that flush 200 headers fast and then stall mid-body would cause
+    // the SDK to hang indefinitely. See openai/openai-node#1825.
+    return wrapResponseForRequestTimeout(response, () => clearTimeout(timeout));
   }
 
   private async shouldRetry(response: Response): Promise<boolean> {

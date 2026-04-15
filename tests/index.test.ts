@@ -544,6 +544,56 @@ describe('default encoder', () => {
   });
 });
 
+describe('timeout covers body read phase', () => {
+  // Regression for https://github.com/openai/openai-node/issues/1825
+  // The SDK must abort the request if the server sends headers fast but
+  // stalls while streaming the body. Previously the internal timer was
+  // cleared as soon as `await fetch()` resolved (at headers arrival),
+  // leaving `response.json()` unguarded and able to hang forever.
+  test('rejects when the body read stalls past the configured timeout', async () => {
+    const CONFIGURED_TIMEOUT_MS = 50;
+    const BODY_STALL_MS = 2000;
+
+    const testFetch = async (
+      _url: string | URL | Request,
+      { signal }: RequestInit = {},
+    ): Promise<Response> => {
+      // Server-style body: headers are returned instantly, but the body
+      // stream never produces any chunks. We honour the AbortSignal so the
+      // SDK's retry/timeout path can still short-circuit it.
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          signal?.addEventListener('abort', () => controller.error(new Error('aborted')), { once: true });
+          // Safety net so the test never actually hangs longer than
+          // BODY_STALL_MS, regardless of whether the fix is in place.
+          setTimeout(() => {
+            controller.close();
+          }, BODY_STALL_MS).unref?.();
+        },
+      });
+
+      return new Response(body, {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    };
+
+    const client = new OpenAI({
+      apiKey: 'My API Key',
+      timeout: CONFIGURED_TIMEOUT_MS,
+      maxRetries: 0,
+      fetch: testFetch,
+    });
+
+    const started = Date.now();
+    await expect(client.request({ path: '/foo', method: 'get' })).rejects.toThrow();
+    const elapsed = Date.now() - started;
+
+    // Must reject well before the body stall would naturally complete.
+    expect(elapsed).toBeLessThan(BODY_STALL_MS);
+  });
+});
+
 describe('retries', () => {
   test('retry on timeout', async () => {
     let count = 0;
