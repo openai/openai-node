@@ -98,7 +98,7 @@ export class SendQueue<T = unknown> {
   enqueue(event: T): boolean {
     const data = JSON.stringify(event);
     const byteLength = encodeUTF8(data).byteLength;
-    if (this._bytes + byteLength > this._maxBytes) {
+    if (this._bytes + byteLength > this._maxBytes && this._queue.length > 0) {
       return false;
     }
     this._queue.push({ kind: 'json', data, byteLength });
@@ -113,7 +113,7 @@ export class SendQueue<T = unknown> {
   enqueueRaw(data: RawWebSocketData): boolean {
     const snapshot = snapshotRawData(data);
     const byteLength = rawByteLength(snapshot);
-    if (this._bytes + byteLength > this._maxBytes) {
+    if (this._bytes + byteLength > this._maxBytes && this._queue.length > 0) {
       return false;
     }
     this._queue.push({ kind: 'raw', data: snapshot, byteLength });
