@@ -27,6 +27,19 @@ These commands will make the module importable from the `@openai/openai` scope. 
 import OpenAI from 'jsr:@openai/openai';
 ```
 
+### Runtime quickstart
+
+Use the same SDK across common server-side JavaScript runtimes:
+
+| Runtime            | Install / import                                                            | API key source                   | Minimal client setup                                                     |
+| ------------------ | --------------------------------------------------------------------------- | -------------------------------- | ------------------------------------------------------------------------ |
+| Node.js            | `npm install openai` + `import OpenAI from 'openai';`                       | `process.env.OPENAI_API_KEY`     | `const client = new OpenAI();`                                           |
+| Bun                | `bun add openai` + `import OpenAI from 'openai';`                           | `process.env.OPENAI_API_KEY`     | `const client = new OpenAI();`                                           |
+| Deno               | `deno add jsr:@openai/openai` or `import OpenAI from 'jsr:@openai/openai';` | `Deno.env.get('OPENAI_API_KEY')` | `const client = new OpenAI({ apiKey: Deno.env.get('OPENAI_API_KEY') });` |
+| Cloudflare Workers | `npm install openai` + `import OpenAI from 'openai';`                       | `env.OPENAI_API_KEY`             | `const client = new OpenAI({ apiKey: env.OPENAI_API_KEY });`             |
+
+These are all server-side runtimes. In browsers, keep `dangerouslyAllowBrowser` disabled unless you understand the security tradeoffs.
+
 ## Usage
 
 The full API of this library can be found in [api.md file](api.md) along with many [code examples](https://github.com/openai/openai-node/tree/master/examples).
@@ -68,6 +81,29 @@ const completion = await client.chat.completions.create({
 
 console.log(completion.choices[0].message.content);
 ```
+
+### Tool-calling examples
+
+If you want runnable tool-calling examples, start here:
+
+- [Responses API tool calling with Zod parsing](examples/responses/structured-outputs-tools.ts)
+- [Responses API streaming tool events](examples/responses/streaming-tools.ts)
+- [Chat Completions `runTools()` helper](examples/tool-call-helpers.ts)
+- [Chat Completions `runTools()` with Zod helpers](examples/tool-call-helpers-zod.ts)
+- [Manual chat tool loop with streamed tool calls](examples/tool-calls-stream.ts)
+
+### Migrating older chat-style examples
+
+Many older examples in this repository use Chat Completions because they predate the Responses API. They still work, but new integrations should usually start with `client.responses.create()`.
+
+| Older example pattern                              | Prefer for new code                                                         |
+| -------------------------------------------------- | --------------------------------------------------------------------------- |
+| `client.chat.completions.create({ messages })`     | `client.responses.create({ input })`                                        |
+| `completion.choices[0].message.content`            | `response.output_text`                                                      |
+| `functions` / `function_call`                      | `tools` / `tool_choice`                                                     |
+| Appending `role: 'tool'` messages in a manual loop | `previous_response_id` plus `type: 'function_call_output'` items in `input` |
+
+If you need to stay on Chat Completions, prefer the newer `tools` examples in this repo over the older `functions` / `function_call` examples. For SDK-level migration changes, see [MIGRATION.md](MIGRATION.md).
 
 ## Workload Identity Authentication
 
@@ -229,6 +265,15 @@ Verifying webhook signatures is _optional but encouraged_.
 
 For more information about webhooks, see [the API docs](https://platform.openai.com/docs/guides/webhooks).
 
+Webhook verification needs to happen in a server-side handler that can read the raw request body. Before you call `.unwrap()` or `.verifySignature()`:
+
+- Put your webhook secret in `OPENAI_WEBHOOK_SECRET`, or pass `webhookSecret` explicitly when you create the client.
+- Read the raw body with `request.text()`.
+- Pass the original request headers through to the SDK.
+- Only parse the JSON after the signature check succeeds.
+
+The examples below use a Fetch-style `Request`, but the same raw-body requirement applies in Express, Fastify, Cloudflare Workers, and other server runtimes.
+
 ### Parsing webhook payloads
 
 For most use cases, you will likely want to verify the webhook and parse the payload at the same time. To achieve this, we provide the method `client.webhooks.unwrap()`, which parses a webhook request and verifies that it was sent by OpenAI. This method will throw an error if the signature is invalid.
@@ -308,21 +353,35 @@ When the library is unable to connect to the API,
 or if the API returns a non-success status code (i.e., 4xx or 5xx response),
 a subclass of `APIError` will be thrown:
 
-<!-- prettier-ignore -->
 ```ts
-const job = await client.fineTuning.jobs
-  .create({ model: 'gpt-4o', training_file: 'file-abc123' })
-  .catch(async (err) => {
+import OpenAI from 'openai';
+
+const client = new OpenAI();
+
+async function main() {
+  try {
+    const job = await client.fineTuning.jobs.create({
+      model: 'gpt-4o',
+      training_file: 'file-abc123',
+    });
+
+    console.log(job.id);
+  } catch (err) {
     if (err instanceof OpenAI.APIError) {
-      console.log(err.request_id);
-      console.log(err.status); // 400
-      console.log(err.name); // BadRequestError
-      console.log(err.headers); // {server: 'nginx', ...}
+      console.error(err.request_id);
+      console.error(err.status); // 400
+      console.error(err.name); // BadRequestError
+      console.error(err.headers); // {server: 'nginx', ...}
     } else {
       throw err;
     }
-  });
+  }
+}
+
+main().catch(console.error);
 ```
+
+For a runnable version of this pattern, see [examples/errors.ts](examples/errors.ts).
 
 Error codes are as follows:
 
@@ -787,7 +846,6 @@ The following runtimes are supported:
   ### When might this not be dangerous?
 
   In certain scenarios where enabling browser support might not pose significant risks:
-
   - Internal Tools: If the application is used solely within a controlled internal environment where the users are trusted, the risk of credential exposure can be mitigated.
   - Public APIs with Limited Scope: If your API has very limited scope and the exposed credentials do not grant access to sensitive data or critical operations, the potential impact of exposure is reduced.
   - Development or debugging purpose: Enabling this feature temporarily might be acceptable, provided the credentials are short-lived, aren't also used in production environments, or are frequently rotated.
