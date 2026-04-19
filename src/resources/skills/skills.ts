@@ -30,7 +30,10 @@ export class Skills extends APIResource {
    * Create a new skill.
    */
   create(body: SkillCreateParams | null | undefined = {}, options?: RequestOptions): APIPromise<Skill> {
-    return this._client.post('/skills', maybeMultipartFormRequestOptions({ body, ...options }, this._client));
+    return this._client.post(
+      '/skills',
+      maybeMultipartFormRequestOptions({ body, ...options }, this._client, { stripFilenames: false }),
+    );
   }
 
   /**

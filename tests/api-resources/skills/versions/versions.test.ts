@@ -1,6 +1,8 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import OpenAI, { toFile } from 'openai';
+import { mockFetch } from '../../../utils/mock-fetch';
+import { File } from 'node:buffer';
 
 const client = new OpenAI({
   apiKey: 'My API Key',
@@ -28,6 +30,36 @@ describe('resource versions', () => {
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);
+  });
+
+  test('create: preserves nested skill file paths', async () => {
+    const { fetch, handleRequest } = mockFetch();
+    const client = new OpenAI({ apiKey: 'My API Key', fetch });
+
+    handleRequest(async (_, init) => {
+      const files = (init!.body as FormData).getAll('files[]');
+      expect(files).toHaveLength(1);
+      expect(files[0]).toBeInstanceOf(File);
+      expect((files[0] as File).name).toEqual('my-skill/SKILL.md');
+
+      return new Response(
+        JSON.stringify({
+          id: 'skillver_123',
+          created_at: 0,
+          description: '',
+          name: 'my-skill',
+          object: 'skill.version',
+          skill_id: 'skill_123',
+          version: '1',
+        }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        },
+      );
+    });
+
+    await client.skills.versions.create('skill_123', { files: [new File(['# skill'], 'my-skill/SKILL.md')] });
   });
 
   test('retrieve: only required params', async () => {
