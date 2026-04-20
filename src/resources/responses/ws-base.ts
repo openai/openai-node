@@ -60,9 +60,9 @@ export interface ResponsesWSBaseOptions {
   maxQueueSize?: number | undefined;
 }
 
-export abstract class ResponsesWSBase extends ResponsesEmitter {
-  url: URL | undefined;
-  socket: WebSocketLike | undefined;
+export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends ResponsesEmitter {
+  url!: URL;
+  socket!: TSocket;
 
   protected _client: OpenAI;
   protected _parameters: Record<string, unknown> | null | undefined;
@@ -77,7 +77,7 @@ export abstract class ResponsesWSBase extends ResponsesEmitter {
 
   // Necessary to keep the public event interface clean while we manage reconnecting
   private _internalEvents = new InternalEventEmitter<{
-    socketSwap: (oldSocket: WebSocketLike, newSocket: WebSocketLike) => void;
+    socketSwap: (oldSocket: TSocket, newSocket: TSocket) => void;
     reconnecting: (event: ReconnectingEvent<Record<string, unknown>>) => void;
     reconnected: () => void;
     close: (code: number, reason: string, unsent: UnsentMessage<ResponsesAPI.ResponsesClientEvent>[]) => void;
@@ -98,7 +98,7 @@ export abstract class ResponsesWSBase extends ResponsesEmitter {
   }
 
   /** Creates a platform-specific WebSocket for the given URL and auth headers. */
-  protected abstract _createSocket(url: URL, authHeaders: Record<string, string>): WebSocketLike;
+  protected abstract _createSocket(url: URL, authHeaders: Record<string, string>): TSocket;
 
   send(event: ResponsesAPI.ResponsesClientEvent) {
     if (!this.socket) {
@@ -247,7 +247,7 @@ export abstract class ResponsesWSBase extends ResponsesEmitter {
       cleanup();
     };
 
-    const onSocketSwap = (oldSocket: WebSocketLike, newSocket: WebSocketLike) => {
+    const onSocketSwap = (oldSocket: TSocket, newSocket: TSocket) => {
       oldSocket.off('open', onOpen);
       newSocket.on('open', onOpen);
       currentSocket = newSocket;
@@ -338,7 +338,7 @@ export abstract class ResponsesWSBase extends ResponsesEmitter {
     };
   }
 
-  private _connect(): WebSocketLike {
+  private _connect(): TSocket {
     this.url = buildURL(this._client, this._parameters ?? {});
 
     const socket = this._createSocket(this.url, this._authHeaders());
@@ -517,7 +517,7 @@ export abstract class ResponsesWSBase extends ResponsesEmitter {
         // await so the code is captured even when ws emits 'close'
         // in the same tick as 'error' (e.g. abortHandshake).
         closeCodePromise = new Promise<number>((resolve) => {
-          this.socket?.once('close', resolve);
+          this.socket.once('close', resolve);
         });
 
         await this._awaitOpen(this.socket);
@@ -551,7 +551,7 @@ export abstract class ResponsesWSBase extends ResponsesEmitter {
   /**
    * Resolves once the socket is open, rejects if it errors or closes first
    */
-  private _awaitOpen(socket: WebSocketLike): Promise<void> {
+  private _awaitOpen(socket: TSocket): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       const cleanup = () => {
         socket.off('open', onOpen);
@@ -582,7 +582,7 @@ export abstract class ResponsesWSBase extends ResponsesEmitter {
     }
 
     try {
-      this._sendQueue.flush((data) => this.socket?.send(flattenRawData(data)));
+      this._sendQueue.flush((data) => this.socket.send(flattenRawData(data)));
     } catch (err) {
       this._onError(null, 'could not send queued data', err);
     }
