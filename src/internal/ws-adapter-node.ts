@@ -14,6 +14,11 @@ export class NodeWebSocket implements WebSocketLike {
     this._ws = ws;
   }
 
+  /** The underlying platform-specific socket. Code that accesses this will not be isomorphic across server and browser environments. */
+  get platformSocket(): WS.WebSocket {
+    return this._ws;
+  }
+
   get readyState(): number {
     return this._ws.readyState;
   }

@@ -2,7 +2,6 @@
 
 import * as WS from 'ws';
 import { NodeWebSocket } from '../../internal/ws-adapter-node';
-import type { WebSocketLike } from '../../internal/ws-adapter';
 import { ResponsesWSBase, type ResponsesWSBaseOptions } from './ws-base';
 import { OpenAI } from '../../client';
 
@@ -10,7 +9,7 @@ export type { ResponsesWSReconnectOptions } from './ws-base';
 
 export interface ResponsesWSClientOptions extends WS.ClientOptions, ResponsesWSBaseOptions {}
 
-export class ResponsesWS extends ResponsesWSBase {
+export class ResponsesWS extends ResponsesWSBase<NodeWebSocket> {
   private _wsOptions: WS.ClientOptions | null | undefined;
 
   constructor(client: OpenAI, options?: ResponsesWSClientOptions | null | undefined) {
@@ -26,7 +25,7 @@ export class ResponsesWS extends ResponsesWSBase {
     this._connectInitial();
   }
 
-  protected _createSocket(url: URL, authHeaders: Record<string, string>): WebSocketLike {
+  protected _createSocket(url: URL, authHeaders: Record<string, string>): NodeWebSocket {
     const ws = new WS.WebSocket(url, {
       ...this._wsOptions,
       headers: {
