@@ -167,7 +167,7 @@ const client = new OpenAI({
 
 ## Streaming responses
 
-We provide support for streaming responses using Server Sent Events (SSE).
+We provide support for streaming responses using Server-Sent Events (SSE).
 
 ```ts
 import OpenAI from 'openai';
@@ -500,20 +500,6 @@ while (page.hasNextPage()) {
 }
 ```
 
-## Realtime API
-
-The Realtime API enables you to build low-latency, multi-modal conversational experiences. It currently supports text and audio as both input and output, as well as [function calling](https://platform.openai.com/docs/guides/function-calling) through a `WebSocket` connection.
-
-```ts
-import { OpenAIRealtimeWebSocket } from 'openai/realtime/websocket';
-
-const rt = new OpenAIRealtimeWebSocket({ model: 'gpt-realtime' });
-
-rt.on('response.text.delta', (event) => process.stdout.write(event.delta));
-```
-
-For more information see [realtime.md](realtime.md).
-
 ## Microsoft Azure OpenAI
 
 To use this library with [Azure OpenAI](https://learn.microsoft.com/azure/ai-services/openai/overview), use the `AzureOpenAI`
@@ -775,7 +761,7 @@ The following runtimes are supported:
 - Vercel Edge Runtime.
 - Jest 28 or greater with the `"node"` environment (`"jsdom"` is not supported at this time).
 - Nitro v2.6 or greater.
-- Web browsers: disabled by default to avoid exposing your secret API credentials. Enable browser support by explicitly setting `dangerouslyAllowBrowser` to true'.
+- Web browsers: disabled by default to avoid exposing your secret API credentials. Enable browser support by explicitly setting `dangerouslyAllowBrowser` to `true`.
   <details>
     <summary>More explanation</summary>
 
