@@ -39,13 +39,18 @@ export type ParsedResponseOutputItem<ParsedT> =
   | ParsedResponseOutputMessage<ParsedT>
   | ParsedResponseFunctionToolCall
   | ResponseFileSearchToolCall
+  | ResponseFunctionToolCallOutputItem
   | ResponseFunctionWebSearch
   | ResponseComputerToolCall
+  | ResponseComputerToolCallOutputItem
+  | ResponseToolSearchCall
+  | ResponseToolSearchOutputItem
   | ResponseReasoningItem
   | ResponseCompactionItem
   | ResponseOutputItem.ImageGenerationCall
   | ResponseCodeInterpreterToolCall
   | ResponseOutputItem.LocalShellCall
+  | ResponseOutputItem.LocalShellCallOutput
   | ResponseFunctionShellToolCall
   | ResponseFunctionShellToolCallOutput
   | ResponseApplyPatchToolCall
@@ -53,7 +58,9 @@ export type ParsedResponseOutputItem<ParsedT> =
   | ResponseOutputItem.McpCall
   | ResponseOutputItem.McpListTools
   | ResponseOutputItem.McpApprovalRequest
-  | ResponseCustomToolCall;
+  | ResponseOutputItem.McpApprovalResponse
+  | ResponseCustomToolCall
+  | ResponseCustomToolCallOutputItem;
 
 export interface ParsedResponse<ParsedT> extends Response {
   output: Array<ParsedResponseOutputItem<ParsedT>>;
@@ -209,12 +216,17 @@ export class Responses extends APIResource {
   }
 
   /**
-   * Compact conversation
+   * Compact a conversation. Returns a compacted response object.
+   *
+   * Learn when and how to compact long-running conversations in the
+   * [conversation state guide](https://platform.openai.com/docs/guides/conversation-state#managing-the-context-window).
+   * For ZDR-compatible compaction details, see
+   * [Compaction (advanced)](https://platform.openai.com/docs/guides/conversation-state#compaction-advanced).
    *
    * @example
    * ```ts
    * const compactedResponse = await client.responses.compact({
-   *   model: 'gpt-5.2',
+   *   model: 'gpt-5.4',
    * });
    * ```
    */
@@ -265,10 +277,263 @@ export interface CompactedResponse {
 }
 
 /**
+ * A click action.
+ */
+export type ComputerAction =
+  | ComputerAction.Click
+  | ComputerAction.DoubleClick
+  | ComputerAction.Drag
+  | ComputerAction.Keypress
+  | ComputerAction.Move
+  | ComputerAction.Screenshot
+  | ComputerAction.Scroll
+  | ComputerAction.Type
+  | ComputerAction.Wait;
+
+export namespace ComputerAction {
+  /**
+   * A click action.
+   */
+  export interface Click {
+    /**
+     * Indicates which mouse button was pressed during the click. One of `left`,
+     * `right`, `wheel`, `back`, or `forward`.
+     */
+    button: 'left' | 'right' | 'wheel' | 'back' | 'forward';
+
+    /**
+     * Specifies the event type. For a click action, this property is always `click`.
+     */
+    type: 'click';
+
+    /**
+     * The x-coordinate where the click occurred.
+     */
+    x: number;
+
+    /**
+     * The y-coordinate where the click occurred.
+     */
+    y: number;
+
+    /**
+     * The keys being held while clicking.
+     */
+    keys?: Array<string> | null;
+  }
+
+  /**
+   * A double click action.
+   */
+  export interface DoubleClick {
+    /**
+     * The keys being held while double-clicking.
+     */
+    keys: Array<string> | null;
+
+    /**
+     * Specifies the event type. For a double click action, this property is always set
+     * to `double_click`.
+     */
+    type: 'double_click';
+
+    /**
+     * The x-coordinate where the double click occurred.
+     */
+    x: number;
+
+    /**
+     * The y-coordinate where the double click occurred.
+     */
+    y: number;
+  }
+
+  /**
+   * A drag action.
+   */
+  export interface Drag {
+    /**
+     * An array of coordinates representing the path of the drag action. Coordinates
+     * will appear as an array of objects, eg
+     *
+     * ```
+     * [
+     *   { x: 100, y: 200 },
+     *   { x: 200, y: 300 }
+     * ]
+     * ```
+     */
+    path: Array<Drag.Path>;
+
+    /**
+     * Specifies the event type. For a drag action, this property is always set to
+     * `drag`.
+     */
+    type: 'drag';
+
+    /**
+     * The keys being held while dragging the mouse.
+     */
+    keys?: Array<string> | null;
+  }
+
+  export namespace Drag {
+    /**
+     * An x/y coordinate pair, e.g. `{ x: 100, y: 200 }`.
+     */
+    export interface Path {
+      /**
+       * The x-coordinate.
+       */
+      x: number;
+
+      /**
+       * The y-coordinate.
+       */
+      y: number;
+    }
+  }
+
+  /**
+   * A collection of keypresses the model would like to perform.
+   */
+  export interface Keypress {
+    /**
+     * The combination of keys the model is requesting to be pressed. This is an array
+     * of strings, each representing a key.
+     */
+    keys: Array<string>;
+
+    /**
+     * Specifies the event type. For a keypress action, this property is always set to
+     * `keypress`.
+     */
+    type: 'keypress';
+  }
+
+  /**
+   * A mouse move action.
+   */
+  export interface Move {
+    /**
+     * Specifies the event type. For a move action, this property is always set to
+     * `move`.
+     */
+    type: 'move';
+
+    /**
+     * The x-coordinate to move to.
+     */
+    x: number;
+
+    /**
+     * The y-coordinate to move to.
+     */
+    y: number;
+
+    /**
+     * The keys being held while moving the mouse.
+     */
+    keys?: Array<string> | null;
+  }
+
+  /**
+   * A screenshot action.
+   */
+  export interface Screenshot {
+    /**
+     * Specifies the event type. For a screenshot action, this property is always set
+     * to `screenshot`.
+     */
+    type: 'screenshot';
+  }
+
+  /**
+   * A scroll action.
+   */
+  export interface Scroll {
+    /**
+     * The horizontal scroll distance.
+     */
+    scroll_x: number;
+
+    /**
+     * The vertical scroll distance.
+     */
+    scroll_y: number;
+
+    /**
+     * Specifies the event type. For a scroll action, this property is always set to
+     * `scroll`.
+     */
+    type: 'scroll';
+
+    /**
+     * The x-coordinate where the scroll occurred.
+     */
+    x: number;
+
+    /**
+     * The y-coordinate where the scroll occurred.
+     */
+    y: number;
+
+    /**
+     * The keys being held while scrolling.
+     */
+    keys?: Array<string> | null;
+  }
+
+  /**
+   * An action to type in text.
+   */
+  export interface Type {
+    /**
+     * The text to type.
+     */
+    text: string;
+
+    /**
+     * Specifies the event type. For a type action, this property is always set to
+     * `type`.
+     */
+    type: 'type';
+  }
+
+  /**
+   * A wait action.
+   */
+  export interface Wait {
+    /**
+     * Specifies the event type. For a wait action, this property is always set to
+     * `wait`.
+     */
+    type: 'wait';
+  }
+}
+
+/**
+ * Flattened batched actions for `computer_use`. Each action includes an `type`
+ * discriminator and action-specific fields.
+ */
+export type ComputerActionList = Array<ComputerAction>;
+
+/**
  * A tool that controls a virtual computer. Learn more about the
  * [computer tool](https://platform.openai.com/docs/guides/tools-computer-use).
  */
 export interface ComputerTool {
+  /**
+   * The type of the computer tool. Always `computer`.
+   */
+  type: 'computer';
+}
+
+/**
+ * A tool that controls a virtual computer. Learn more about the
+ * [computer tool](https://platform.openai.com/docs/guides/tools-computer-use).
+ */
+export interface ComputerUsePreviewTool {
   /**
    * The height of the computer display.
    */
@@ -290,6 +555,86 @@ export interface ComputerTool {
   type: 'computer_use_preview';
 }
 
+export interface ContainerAuto {
+  /**
+   * Automatically creates a container for this request
+   */
+  type: 'container_auto';
+
+  /**
+   * An optional list of uploaded files to make available to your code.
+   */
+  file_ids?: Array<string>;
+
+  /**
+   * The memory limit for the container.
+   */
+  memory_limit?: '1g' | '4g' | '16g' | '64g' | null;
+
+  /**
+   * Network access policy for the container.
+   */
+  network_policy?: ContainerNetworkPolicyDisabled | ContainerNetworkPolicyAllowlist;
+
+  /**
+   * An optional list of skills referenced by id or inline data.
+   */
+  skills?: Array<SkillReference | InlineSkill>;
+}
+
+export interface ContainerNetworkPolicyAllowlist {
+  /**
+   * A list of allowed domains when type is `allowlist`.
+   */
+  allowed_domains: Array<string>;
+
+  /**
+   * Allow outbound network access only to specified domains. Always `allowlist`.
+   */
+  type: 'allowlist';
+
+  /**
+   * Optional domain-scoped secrets for allowlisted domains.
+   */
+  domain_secrets?: Array<ContainerNetworkPolicyDomainSecret>;
+}
+
+export interface ContainerNetworkPolicyDisabled {
+  /**
+   * Disable outbound network access. Always `disabled`.
+   */
+  type: 'disabled';
+}
+
+export interface ContainerNetworkPolicyDomainSecret {
+  /**
+   * The domain associated with the secret.
+   */
+  domain: string;
+
+  /**
+   * The name of the secret to inject for the domain.
+   */
+  name: string;
+
+  /**
+   * The secret value to inject for the domain.
+   */
+  value: string;
+}
+
+export interface ContainerReference {
+  /**
+   * The ID of the referenced container.
+   */
+  container_id: string;
+
+  /**
+   * References a container created with the /v1/containers endpoint
+   */
+  type: 'container_reference';
+}
+
 /**
  * A custom tool that processes input using a specified format. Learn more about
  * [custom tools](https://platform.openai.com/docs/guides/function-calling#custom-tools)
@@ -304,6 +649,11 @@ export interface CustomTool {
    * The type of the custom tool. Always `custom`.
    */
   type: 'custom';
+
+  /**
+   * Whether this tool should be deferred and discovered via tool search.
+   */
+  defer_loading?: boolean;
 
   /**
    * Optional description of the custom tool, used to provide more context.
@@ -335,6 +685,14 @@ export interface EasyInputMessage {
    * `developer`.
    */
   role: 'user' | 'assistant' | 'system' | 'developer';
+
+  /**
+   * Labels an `assistant` message as intermediate commentary (`commentary`) or the
+   * final answer (`final_answer`). For models like `gpt-5.3-codex` and beyond, when
+   * sending follow-up requests, preserve and resend phase on all assistant messages
+   * — dropping it can degrade performance. Not used for user messages.
+   */
+  phase?: 'commentary' | 'final_answer' | null;
 
   /**
    * The type of the message input. Always `message`.
@@ -426,6 +784,8 @@ export interface FunctionShellTool {
    * The type of the shell tool. Always `shell`.
    */
   type: 'shell';
+
+  environment?: ContainerAuto | LocalEnvironment | ContainerReference | null;
 }
 
 /**
@@ -455,10 +815,130 @@ export interface FunctionTool {
   type: 'function';
 
   /**
+   * Whether this function is deferred and loaded via tool search.
+   */
+  defer_loading?: boolean;
+
+  /**
    * A description of the function. Used by the model to determine whether or not to
    * call the function.
    */
   description?: string | null;
+}
+
+export interface InlineSkill {
+  /**
+   * The description of the skill.
+   */
+  description: string;
+
+  /**
+   * The name of the skill.
+   */
+  name: string;
+
+  /**
+   * Inline skill payload
+   */
+  source: InlineSkillSource;
+
+  /**
+   * Defines an inline skill for this request.
+   */
+  type: 'inline';
+}
+
+/**
+ * Inline skill payload
+ */
+export interface InlineSkillSource {
+  /**
+   * Base64-encoded skill zip bundle.
+   */
+  data: string;
+
+  /**
+   * The media type of the inline skill payload. Must be `application/zip`.
+   */
+  media_type: 'application/zip';
+
+  /**
+   * The type of the inline skill source. Must be `base64`.
+   */
+  type: 'base64';
+}
+
+export interface LocalEnvironment {
+  /**
+   * Use a local computer environment.
+   */
+  type: 'local';
+
+  /**
+   * An optional list of skills.
+   */
+  skills?: Array<LocalSkill>;
+}
+
+export interface LocalSkill {
+  /**
+   * The description of the skill.
+   */
+  description: string;
+
+  /**
+   * The name of the skill.
+   */
+  name: string;
+
+  /**
+   * The path to the directory containing the skill.
+   */
+  path: string;
+}
+
+/**
+ * Groups function/custom tools under a shared namespace.
+ */
+export interface NamespaceTool {
+  /**
+   * A description of the namespace shown to the model.
+   */
+  description: string;
+
+  /**
+   * The namespace name used in tool calls (for example, `crm`).
+   */
+  name: string;
+
+  /**
+   * The function/custom tools available inside this namespace.
+   */
+  tools: Array<NamespaceTool.Function | CustomTool>;
+
+  /**
+   * The type of the tool. Always `namespace`.
+   */
+  type: 'namespace';
+}
+
+export namespace NamespaceTool {
+  export interface Function {
+    name: string;
+
+    type: 'function';
+
+    /**
+     * Whether this function should be deferred and discovered via tool search.
+     */
+    defer_loading?: boolean;
+
+    description?: string | null;
+
+    parameters?: unknown | null;
+
+    strict?: boolean | null;
+  }
 }
 
 export interface Response {
@@ -653,8 +1133,9 @@ export interface Response {
   /**
    * A stable identifier used to help detect users of your application that may be
    * violating OpenAI's usage policies. The IDs should be a string that uniquely
-   * identifies each user. We recommend hashing their username or email address, in
-   * order to avoid sending us any identifying information.
+   * identifies each user, with a maximum length of 64 characters. We recommend
+   * hashing their username or email address, in order to avoid sending us any
+   * identifying information.
    * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
    */
   safety_identifier?: string;
@@ -1234,20 +1715,6 @@ export interface ResponseComputerToolCall {
   id: string;
 
   /**
-   * A click action.
-   */
-  action:
-    | ResponseComputerToolCall.Click
-    | ResponseComputerToolCall.DoubleClick
-    | ResponseComputerToolCall.Drag
-    | ResponseComputerToolCall.Keypress
-    | ResponseComputerToolCall.Move
-    | ResponseComputerToolCall.Screenshot
-    | ResponseComputerToolCall.Scroll
-    | ResponseComputerToolCall.Type
-    | ResponseComputerToolCall.Wait;
-
-  /**
    * An identifier used when responding to the tool call with output.
    */
   call_id: string;
@@ -1267,9 +1734,49 @@ export interface ResponseComputerToolCall {
    * The type of the computer call. Always `computer_call`.
    */
   type: 'computer_call';
+
+  /**
+   * A click action.
+   */
+  action?:
+    | ResponseComputerToolCall.Click
+    | ResponseComputerToolCall.DoubleClick
+    | ResponseComputerToolCall.Drag
+    | ResponseComputerToolCall.Keypress
+    | ResponseComputerToolCall.Move
+    | ResponseComputerToolCall.Screenshot
+    | ResponseComputerToolCall.Scroll
+    | ResponseComputerToolCall.Type
+    | ResponseComputerToolCall.Wait;
+
+  /**
+   * Flattened batched actions for `computer_use`. Each action includes an `type`
+   * discriminator and action-specific fields.
+   */
+  actions?: ComputerActionList;
 }
 
 export namespace ResponseComputerToolCall {
+  /**
+   * A pending safety check for the computer call.
+   */
+  export interface PendingSafetyCheck {
+    /**
+     * The ID of the pending safety check.
+     */
+    id: string;
+
+    /**
+     * The type of the pending safety check.
+     */
+    code?: string | null;
+
+    /**
+     * Details about the pending safety check.
+     */
+    message?: string | null;
+  }
+
   /**
    * A click action.
    */
@@ -1294,12 +1801,22 @@ export namespace ResponseComputerToolCall {
      * The y-coordinate where the click occurred.
      */
     y: number;
+
+    /**
+     * The keys being held while clicking.
+     */
+    keys?: Array<string> | null;
   }
 
   /**
    * A double click action.
    */
   export interface DoubleClick {
+    /**
+     * The keys being held while double-clicking.
+     */
+    keys: Array<string> | null;
+
     /**
      * Specifies the event type. For a double click action, this property is always set
      * to `double_click`.
@@ -1339,6 +1856,11 @@ export namespace ResponseComputerToolCall {
      * `drag`.
      */
     type: 'drag';
+
+    /**
+     * The keys being held while dragging the mouse.
+     */
+    keys?: Array<string> | null;
   }
 
   export namespace Drag {
@@ -1394,6 +1916,11 @@ export namespace ResponseComputerToolCall {
      * The y-coordinate to move to.
      */
     y: number;
+
+    /**
+     * The keys being held while moving the mouse.
+     */
+    keys?: Array<string> | null;
   }
 
   /**
@@ -1436,6 +1963,11 @@ export namespace ResponseComputerToolCall {
      * The y-coordinate where the scroll occurred.
      */
     y: number;
+
+    /**
+     * The keys being held while scrolling.
+     */
+    keys?: Array<string> | null;
   }
 
   /**
@@ -1464,26 +1996,6 @@ export namespace ResponseComputerToolCall {
      */
     type: 'wait';
   }
-
-  /**
-   * A pending safety check for the computer call.
-   */
-  export interface PendingSafetyCheck {
-    /**
-     * The ID of the pending safety check.
-     */
-    id: string;
-
-    /**
-     * The type of the pending safety check.
-     */
-    code?: string | null;
-
-    /**
-     * Details about the pending safety check.
-     */
-    message?: string | null;
-  }
 }
 
 export interface ResponseComputerToolCallOutputItem {
@@ -1503,6 +2015,12 @@ export interface ResponseComputerToolCallOutputItem {
   output: ResponseComputerToolCallOutputScreenshot;
 
   /**
+   * The status of the message input. One of `in_progress`, `completed`, or
+   * `incomplete`. Populated when input items are returned via API.
+   */
+  status: 'completed' | 'incomplete' | 'failed' | 'in_progress';
+
+  /**
    * The type of the computer tool call output. Always `computer_call_output`.
    */
   type: 'computer_call_output';
@@ -1514,10 +2032,9 @@ export interface ResponseComputerToolCallOutputItem {
   acknowledged_safety_checks?: Array<ResponseComputerToolCallOutputItem.AcknowledgedSafetyCheck>;
 
   /**
-   * The status of the message input. One of `in_progress`, `completed`, or
-   * `incomplete`. Populated when input items are returned via API.
+   * The identifier of the actor that created the item.
    */
-  status?: 'in_progress' | 'completed' | 'incomplete';
+  created_by?: string;
 }
 
 export namespace ResponseComputerToolCallOutputItem {
@@ -1561,6 +2078,18 @@ export interface ResponseComputerToolCallOutputScreenshot {
    * The URL of the screenshot image.
    */
   image_url?: string;
+}
+
+/**
+ * Represents a container created with /v1/containers.
+ */
+export interface ResponseContainerReference {
+  container_id: string;
+
+  /**
+   * The environment type. Always `container_reference`.
+   */
+  type: 'container_reference';
 }
 
 /**
@@ -1753,6 +2282,11 @@ export interface ResponseCustomToolCall {
    * The unique ID of the custom tool call in the OpenAI platform.
    */
   id?: string;
+
+  /**
+   * The namespace of the custom tool being called.
+   */
+  namespace?: string;
 }
 
 /**
@@ -1816,6 +2350,27 @@ export interface ResponseCustomToolCallInputDoneEvent {
 }
 
 /**
+ * A call to a custom tool created by the model.
+ */
+export interface ResponseCustomToolCallItem extends ResponseCustomToolCall {
+  /**
+   * The unique ID of the custom tool call item.
+   */
+  id: string;
+
+  /**
+   * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
+   * Populated when items are returned via API.
+   */
+  status: 'in_progress' | 'completed' | 'incomplete';
+
+  /**
+   * The identifier of the actor that created the item.
+   */
+  created_by?: string;
+}
+
+/**
  * The output of a custom tool call from your code, being sent back to the model.
  */
 export interface ResponseCustomToolCallOutput {
@@ -1839,6 +2394,27 @@ export interface ResponseCustomToolCallOutput {
    * The unique ID of the custom tool call output in the OpenAI platform.
    */
   id?: string;
+}
+
+/**
+ * The output of a custom tool call from your code, being sent back to the model.
+ */
+export interface ResponseCustomToolCallOutputItem extends ResponseCustomToolCallOutput {
+  /**
+   * The unique ID of the custom tool call output item.
+   */
+  id: string;
+
+  /**
+   * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
+   * Populated when items are returned via API.
+   */
+  status: 'in_progress' | 'completed' | 'incomplete';
+
+  /**
+   * The identifier of the actor that created the item.
+   */
+  created_by?: string;
 }
 
 /**
@@ -2267,6 +2843,11 @@ export interface ResponseFunctionShellToolCall {
   call_id: string;
 
   /**
+   * Represents the use of a local environment to perform shell actions.
+   */
+  environment: ResponseLocalEnvironment | ResponseContainerReference | null;
+
+  /**
    * The status of the shell call. One of `in_progress`, `completed`, or
    * `incomplete`.
    */
@@ -2327,6 +2908,12 @@ export interface ResponseFunctionShellToolCallOutput {
    * An array of shell call output contents
    */
   output: Array<ResponseFunctionShellToolCallOutput.Output>;
+
+  /**
+   * The status of the shell call output. One of `in_progress`, `completed`, or
+   * `incomplete`.
+   */
+  status: 'in_progress' | 'completed' | 'incomplete';
 
   /**
    * The type of the shell call output. Always `shell_call_output`.
@@ -2426,6 +3013,11 @@ export interface ResponseFunctionToolCall {
   id?: string;
 
   /**
+   * The namespace of the function to run.
+   */
+  namespace?: string;
+
+  /**
    * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
    * Populated when items are returned via API.
    */
@@ -2442,6 +3034,17 @@ export interface ResponseFunctionToolCallItem extends ResponseFunctionToolCall {
    * The unique ID of the function tool call.
    */
   id: string;
+
+  /**
+   * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
+   * Populated when items are returned via API.
+   */
+  status: 'in_progress' | 'completed' | 'incomplete';
+
+  /**
+   * The identifier of the actor that created the item.
+   */
+  created_by?: string;
 }
 
 export interface ResponseFunctionToolCallOutputItem {
@@ -2462,15 +3065,20 @@ export interface ResponseFunctionToolCallOutputItem {
   output: string | Array<ResponseInputText | ResponseInputImage | ResponseInputFile>;
 
   /**
+   * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
+   * Populated when items are returned via API.
+   */
+  status: 'in_progress' | 'completed' | 'incomplete';
+
+  /**
    * The type of the function tool call output. Always `function_call_output`.
    */
   type: 'function_call_output';
 
   /**
-   * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
-   * Populated when items are returned via API.
+   * The identifier of the actor that created the item.
    */
-  status?: 'in_progress' | 'completed' | 'incomplete';
+  created_by?: string;
 }
 
 /**
@@ -2483,6 +3091,15 @@ export interface ResponseFunctionWebSearch {
    * The unique ID of the web search tool call.
    */
   id: string;
+
+  /**
+   * An object describing the specific action taken in this web search call. Includes
+   * details on how the model used the web (search, open_page, find_in_page).
+   */
+  action:
+    | ResponseFunctionWebSearch.Search
+    | ResponseFunctionWebSearch.OpenPage
+    | ResponseFunctionWebSearch.Find;
 
   /**
    * The status of the web search tool call.
@@ -2550,11 +3167,11 @@ export namespace ResponseFunctionWebSearch {
     /**
      * The URL opened by the model.
      */
-    url: string;
+    url?: string | null;
   }
 
   /**
-   * Action type "find": Searches for a pattern within a loaded page.
+   * Action type "find_in_page": Searches for a pattern within a loaded page.
    */
   export interface Find {
     /**
@@ -2565,7 +3182,7 @@ export namespace ResponseFunctionWebSearch {
     /**
      * The action type.
      */
-    type: 'find';
+    type: 'find_in_page';
 
     /**
      * The URL of the page searched for the pattern.
@@ -2863,10 +3480,10 @@ export interface ResponseInputFileContent {
  */
 export interface ResponseInputImage {
   /**
-   * The detail level of the image to be sent to the model. One of `high`, `low`, or
-   * `auto`. Defaults to `auto`.
+   * The detail level of the image to be sent to the model. One of `high`, `low`,
+   * `auto`, or `original`. Defaults to `auto`.
    */
-  detail: 'low' | 'high' | 'auto';
+  detail: 'low' | 'high' | 'auto' | 'original';
 
   /**
    * The type of the input item. Always `input_image`.
@@ -2896,10 +3513,10 @@ export interface ResponseInputImageContent {
   type: 'input_image';
 
   /**
-   * The detail level of the image to be sent to the model. One of `high`, `low`, or
-   * `auto`. Defaults to `auto`.
+   * The detail level of the image to be sent to the model. One of `high`, `low`,
+   * `auto`, or `original`. Defaults to `auto`.
    */
-  detail?: 'low' | 'high' | 'auto' | null;
+  detail?: 'low' | 'high' | 'auto' | 'original' | null;
 
   /**
    * The ID of the file to be sent to the model.
@@ -2930,6 +3547,8 @@ export type ResponseInputItem =
   | ResponseFunctionWebSearch
   | ResponseFunctionToolCall
   | ResponseInputItem.FunctionCallOutput
+  | ResponseInputItem.ToolSearchCall
+  | ResponseToolSearchOutputItemParam
   | ResponseReasoningItem
   | ResponseCompactionItemParam
   | ResponseInputItem.ImageGenerationCall
@@ -3065,6 +3684,38 @@ export namespace ResponseInputItem {
     /**
      * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
      * Populated when items are returned via API.
+     */
+    status?: 'in_progress' | 'completed' | 'incomplete' | null;
+  }
+
+  export interface ToolSearchCall {
+    /**
+     * The arguments supplied to the tool search call.
+     */
+    arguments: unknown;
+
+    /**
+     * The item type. Always `tool_search_call`.
+     */
+    type: 'tool_search_call';
+
+    /**
+     * The unique ID of this tool search call.
+     */
+    id?: string | null;
+
+    /**
+     * The unique ID of the tool search call generated by the model.
+     */
+    call_id?: string | null;
+
+    /**
+     * Whether tool search was executed by the server or by the client.
+     */
+    execution?: 'server' | 'client';
+
+    /**
+     * The status of the tool search call.
      */
     status?: 'in_progress' | 'completed' | 'incomplete' | null;
   }
@@ -3212,6 +3863,11 @@ export namespace ResponseInputItem {
     id?: string | null;
 
     /**
+     * The environment to execute the shell commands in.
+     */
+    environment?: ResponsesAPI.LocalEnvironment | ResponsesAPI.ContainerReference | null;
+
+    /**
      * The status of the shell call. One of `in_progress`, `completed`, or
      * `incomplete`.
      */
@@ -3272,6 +3928,11 @@ export namespace ResponseInputItem {
      * output.
      */
     max_output_length?: number | null;
+
+    /**
+     * The status of the shell call output.
+     */
+    status?: 'in_progress' | 'completed' | 'incomplete' | null;
   }
 
   /**
@@ -3606,15 +4267,15 @@ export interface ResponseInputMessageItem {
   role: 'user' | 'system' | 'developer';
 
   /**
+   * The type of the message input. Always set to `message`.
+   */
+  type: 'message';
+
+  /**
    * The status of item. One of `in_progress`, `completed`, or `incomplete`.
    * Populated when items are returned via API.
    */
   status?: 'in_progress' | 'completed' | 'incomplete';
-
-  /**
-   * The type of the message input. Always set to `message`.
-   */
-  type?: 'message';
 }
 
 /**
@@ -3659,6 +4320,10 @@ export type ResponseItem =
   | ResponseFunctionWebSearch
   | ResponseFunctionToolCallItem
   | ResponseFunctionToolCallOutputItem
+  | ResponseToolSearchCall
+  | ResponseToolSearchOutputItem
+  | ResponseReasoningItem
+  | ResponseCompactionItem
   | ResponseItem.ImageGenerationCall
   | ResponseCodeInterpreterToolCall
   | ResponseItem.LocalShellCall
@@ -3670,7 +4335,9 @@ export type ResponseItem =
   | ResponseItem.McpListTools
   | ResponseItem.McpApprovalRequest
   | ResponseItem.McpApprovalResponse
-  | ResponseItem.McpCall;
+  | ResponseItem.McpCall
+  | ResponseCustomToolCallItem
+  | ResponseCustomToolCallOutputItem;
 
 export namespace ResponseItem {
   /**
@@ -3962,6 +4629,16 @@ export namespace ResponseItem {
 }
 
 /**
+ * Represents the use of a local environment to perform shell actions.
+ */
+export interface ResponseLocalEnvironment {
+  /**
+   * The environment type. Always `local`.
+   */
+  type: 'local';
+}
+
+/**
  * Emitted when there is a delta (partial update) to the arguments of an MCP tool
  * call.
  */
@@ -4201,13 +4878,18 @@ export type ResponseOutputItem =
   | ResponseOutputMessage
   | ResponseFileSearchToolCall
   | ResponseFunctionToolCall
+  | ResponseFunctionToolCallOutputItem
   | ResponseFunctionWebSearch
   | ResponseComputerToolCall
+  | ResponseComputerToolCallOutputItem
   | ResponseReasoningItem
+  | ResponseToolSearchCall
+  | ResponseToolSearchOutputItem
   | ResponseCompactionItem
   | ResponseOutputItem.ImageGenerationCall
   | ResponseCodeInterpreterToolCall
   | ResponseOutputItem.LocalShellCall
+  | ResponseOutputItem.LocalShellCallOutput
   | ResponseFunctionShellToolCall
   | ResponseFunctionShellToolCallOutput
   | ResponseApplyPatchToolCall
@@ -4215,7 +4897,9 @@ export type ResponseOutputItem =
   | ResponseOutputItem.McpCall
   | ResponseOutputItem.McpListTools
   | ResponseOutputItem.McpApprovalRequest
-  | ResponseCustomToolCall;
+  | ResponseOutputItem.McpApprovalResponse
+  | ResponseCustomToolCall
+  | ResponseCustomToolCallOutputItem;
 
 export namespace ResponseOutputItem {
   /**
@@ -4308,6 +4992,31 @@ export namespace ResponseOutputItem {
        */
       working_directory?: string | null;
     }
+  }
+
+  /**
+   * The output of a local shell tool call.
+   */
+  export interface LocalShellCallOutput {
+    /**
+     * The unique ID of the local shell tool call generated by the model.
+     */
+    id: string;
+
+    /**
+     * A JSON string of the output of the local shell tool call.
+     */
+    output: string;
+
+    /**
+     * The type of the local shell tool call output. Always `local_shell_call_output`.
+     */
+    type: 'local_shell_call_output';
+
+    /**
+     * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
+     */
+    status?: 'in_progress' | 'completed' | 'incomplete' | null;
   }
 
   /**
@@ -4449,6 +5158,36 @@ export namespace ResponseOutputItem {
      */
     type: 'mcp_approval_request';
   }
+
+  /**
+   * A response to an MCP approval request.
+   */
+  export interface McpApprovalResponse {
+    /**
+     * The unique ID of the approval response
+     */
+    id: string;
+
+    /**
+     * The ID of the approval request being answered.
+     */
+    approval_request_id: string;
+
+    /**
+     * Whether the request was approved.
+     */
+    approve: boolean;
+
+    /**
+     * The type of the item. Always `mcp_approval_response`.
+     */
+    type: 'mcp_approval_response';
+
+    /**
+     * Optional reason for the decision.
+     */
+    reason?: string | null;
+  }
 }
 
 /**
@@ -4530,6 +5269,14 @@ export interface ResponseOutputMessage {
    * The type of the output message. Always `message`.
    */
   type: 'message';
+
+  /**
+   * Labels an `assistant` message as intermediate commentary (`commentary`) or the
+   * final answer (`final_answer`). For models like `gpt-5.3-codex` and beyond, when
+   * sending follow-up requests, preserve and resend phase on all assistant messages
+   * — dropping it can degrade performance. Not used for user messages.
+   */
+  phase?: 'commentary' | 'final_answer' | null;
 }
 
 /**
@@ -5434,6 +6181,112 @@ export namespace ResponseTextDoneEvent {
   }
 }
 
+export interface ResponseToolSearchCall {
+  /**
+   * The unique ID of the tool search call item.
+   */
+  id: string;
+
+  /**
+   * Arguments used for the tool search call.
+   */
+  arguments: unknown;
+
+  /**
+   * The unique ID of the tool search call generated by the model.
+   */
+  call_id: string | null;
+
+  /**
+   * Whether tool search was executed by the server or by the client.
+   */
+  execution: 'server' | 'client';
+
+  /**
+   * The status of the tool search call item that was recorded.
+   */
+  status: 'in_progress' | 'completed' | 'incomplete';
+
+  /**
+   * The type of the item. Always `tool_search_call`.
+   */
+  type: 'tool_search_call';
+
+  /**
+   * The identifier of the actor that created the item.
+   */
+  created_by?: string;
+}
+
+export interface ResponseToolSearchOutputItem {
+  /**
+   * The unique ID of the tool search output item.
+   */
+  id: string;
+
+  /**
+   * The unique ID of the tool search call generated by the model.
+   */
+  call_id: string | null;
+
+  /**
+   * Whether tool search was executed by the server or by the client.
+   */
+  execution: 'server' | 'client';
+
+  /**
+   * The status of the tool search output item that was recorded.
+   */
+  status: 'in_progress' | 'completed' | 'incomplete';
+
+  /**
+   * The loaded tool definitions returned by tool search.
+   */
+  tools: Array<Tool>;
+
+  /**
+   * The type of the item. Always `tool_search_output`.
+   */
+  type: 'tool_search_output';
+
+  /**
+   * The identifier of the actor that created the item.
+   */
+  created_by?: string;
+}
+
+export interface ResponseToolSearchOutputItemParam {
+  /**
+   * The loaded tool definitions returned by the tool search output.
+   */
+  tools: Array<Tool>;
+
+  /**
+   * The item type. Always `tool_search_output`.
+   */
+  type: 'tool_search_output';
+
+  /**
+   * The unique ID of this tool search output.
+   */
+  id?: string | null;
+
+  /**
+   * The unique ID of the tool search call generated by the model.
+   */
+  call_id?: string | null;
+
+  /**
+   * Whether tool search was executed by the server or by the client.
+   */
+  execution?: 'server' | 'client';
+
+  /**
+   * The status of the tool search output.
+   */
+  status?: 'in_progress' | 'completed' | 'incomplete' | null;
+}
+
 /**
  * Represents token usage details including input tokens, output tokens, a
  * breakdown of output tokens, and the total tokens used.
@@ -5563,6 +6416,397 @@ export interface ResponseWebSearchCallSearchingEvent {
   type: 'response.web_search_call.searching';
 }
 
+export interface ResponsesClientEvent {
+  /**
+   * The type of the client event. Always `response.create`.
+   */
+  type: 'response.create';
+
+  /**
+   * Whether to run the model response in the background.
+   * [Learn more](https://platform.openai.com/docs/guides/background).
+   */
+  background?: boolean | null;
+
+  /**
+   * Context management configuration for this request.
+   */
+  context_management?: Array<ResponsesClientEvent.ContextManagement> | null;
+
+  /**
+   * The conversation that this response belongs to. Items from this conversation are
+   * prepended to `input_items` for this response request. Input items and output
+   * items from this response are automatically added to this conversation after this
+   * response completes.
+   */
+  conversation?: string | ResponseConversationParam | null;
+
+  /**
+   * Specify additional output data to include in the model response. Currently
+   * supported values are:
+   *
+   * - `web_search_call.action.sources`: Include the sources of the web search tool
+   *   call.
+   * - `code_interpreter_call.outputs`: Includes the outputs of python code execution
+   *   in code interpreter tool call items.
+   * - `computer_call_output.output.image_url`: Include image urls from the computer
+   *   call output.
+   * - `file_search_call.results`: Include the search results of the file search tool
+   *   call.
+   * - `message.input_image.image_url`: Include image urls from the input message.
+   * - `message.output_text.logprobs`: Include logprobs with assistant messages.
+   * - `reasoning.encrypted_content`: Includes an encrypted version of reasoning
+   *   tokens in reasoning item outputs. This enables reasoning items to be used in
+   *   multi-turn conversations when using the Responses API statelessly (like when
+   *   the `store` parameter is set to `false`, or when an organization is enrolled
+   *   in the zero data retention program).
+   */
+  include?: Array<ResponseIncludable> | null;
+
+  /**
+   * Text, image, or file inputs to the model, used to generate a response.
+   *
+   * Learn more:
+   *
+   * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
+   * - [Image inputs](https://platform.openai.com/docs/guides/images)
+   * - [File inputs](https://platform.openai.com/docs/guides/pdf-files)
+   * - [Conversation state](https://platform.openai.com/docs/guides/conversation-state)
+   * - [Function calling](https://platform.openai.com/docs/guides/function-calling)
+   */
+  input?: string | ResponseInput;
+
+  /**
+   * A system (or developer) message inserted into the model's context.
+   *
+   * When using along with `previous_response_id`, the instructions from a previous
+   * response will not be carried over to the next response. This makes it simple to
+   * swap out system (or developer) messages in new responses.
+   */
+  instructions?: string | null;
+
+  /**
+   * An upper bound for the number of tokens that can be generated for a response,
+   * including visible output tokens and
+   * [reasoning tokens](https://platform.openai.com/docs/guides/reasoning).
+   */
+  max_output_tokens?: number | null;
+
+  /**
+   * The maximum number of total calls to built-in tools that can be processed in a
+   * response. This maximum number applies across all built-in tool calls, not per
+   * individual tool. Any further attempts to call a tool by the model will be
+   * ignored.
+   */
+  max_tool_calls?: number | null;
+
+  /**
+   * Set of 16 key-value pairs that can be attached to an object. This can be useful
+   * for storing additional information about the object in a structured format, and
+   * querying for objects via API or the dashboard.
+   *
+   * Keys are strings with a maximum length of 64 characters. Values are strings with
+   * a maximum length of 512 characters.
+   */
+  metadata?: Shared.Metadata | null;
+
+  /**
+   * Model ID used to generate the response, like `gpt-4o` or `o3`. OpenAI offers a
+   * wide range of models with different capabilities, performance characteristics,
+   * and price points. Refer to the
+   * [model guide](https://platform.openai.com/docs/models) to browse and compare
+   * available models.
+   */
+  model?: Shared.ResponsesModel;
+
+  /**
+   * Whether to allow the model to run tool calls in parallel.
+   */
+  parallel_tool_calls?: boolean | null;
+
+  /**
+   * The unique ID of the previous response to the model. Use this to create
+   * multi-turn conversations. Learn more about
+   * [conversation state](https://platform.openai.com/docs/guides/conversation-state).
+   * Cannot be used in conjunction with `conversation`.
+   */
+  previous_response_id?: string | null;
+
+  /**
+   * Reference to a prompt template and its variables.
+   * [Learn more](https://platform.openai.com/docs/guides/text?api-mode=responses#reusable-prompts).
+   */
+  prompt?: ResponsePrompt | null;
+
+  /**
+   * Used by OpenAI to cache responses for similar requests to optimize your cache
+   * hit rates. Replaces the `user` field.
+   * [Learn more](https://platform.openai.com/docs/guides/prompt-caching).
+   */
+  prompt_cache_key?: string;
+
+  /**
+   * The retention policy for the prompt cache. Set to `24h` to enable extended
+   * prompt caching, which keeps cached prefixes active for longer, up to a maximum
+   * of 24 hours.
+   * [Learn more](https://platform.openai.com/docs/guides/prompt-caching#prompt-cache-retention).
+   */
+  prompt_cache_retention?: 'in-memory' | '24h' | null;
+
+  /**
+   * **gpt-5 and o-series models only**
+   *
+   * Configuration options for
+   * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
+   */
+  reasoning?: Shared.Reasoning | null;
+
+  /**
+   * A stable identifier used to help detect users of your application that may be
+   * violating OpenAI's usage policies. The IDs should be a string that uniquely
+   * identifies each user, with a maximum length of 64 characters. We recommend
+   * hashing their username or email address, in order to avoid sending us any
+   * identifying information.
+   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
+   */
+  safety_identifier?: string;
+
+  /**
+   * Specifies the processing type used for serving the request.
+   *
+   * - If set to 'auto', then the request will be processed with the service tier
+   *   configured in the Project settings. Unless otherwise configured, the Project
+   *   will use 'default'.
+   * - If set to 'default', then the request will be processed with the standard
+   *   pricing and performance for the selected model.
+   * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)' or
+   *   '[priority](https://openai.com/api-priority-processing/)', then the request
+   *   will be processed with the corresponding service tier.
+   * - When not set, the default behavior is 'auto'.
+   *
+   * When the `service_tier` parameter is set, the response body will include the
+   * `service_tier` value based on the processing mode actually used to serve the
+   * request. This response value may be different from the value set in the
+   * parameter.
+   */
+  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | null;
+
+  /**
+   * Whether to store the generated model response for later retrieval via API.
+   */
+  store?: boolean | null;
+
+  /**
+   * If set to true, the model response data will be streamed to the client as it is
+   * generated using
+   * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
+   * See the
+   * [Streaming section below](https://platform.openai.com/docs/api-reference/responses-streaming)
+   * for more information.
+   */
+  stream?: boolean | null;
+
+  /**
+   * Options for streaming responses. Only set this when you set `stream: true`.
+   */
+  stream_options?: ResponsesClientEvent.StreamOptions | null;
+
+  /**
+   * What sampling temperature to use, between 0 and 2. Higher values like 0.8 will
+   * make the output more random, while lower values like 0.2 will make it more
+   * focused and deterministic. We generally recommend altering this or `top_p` but
+   * not both.
+   */
+  temperature?: number | null;
+
+  /**
+   * Configuration options for a text response from the model. Can be plain text or
+   * structured JSON data. Learn more:
+   *
+   * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
+   * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+   */
+  text?: ResponseTextConfig;
+
+  /**
+   * How the model should select which tool (or tools) to use when generating a
+   * response. See the `tools` parameter to see how to specify which tools the model
+   * can call.
+   */
+  tool_choice?:
+    | ToolChoiceOptions
+    | ToolChoiceAllowed
+    | ToolChoiceTypes
+    | ToolChoiceFunction
+    | ToolChoiceMcp
+    | ToolChoiceCustom
+    | ToolChoiceApplyPatch
+    | ToolChoiceShell;
+
+  /**
+   * An array of tools the model may call while generating a response. You can
+   * specify which tool to use by setting the `tool_choice` parameter.
+   *
+   * We support the following categories of tools:
+   *
+   * - **Built-in tools**: Tools that are provided by OpenAI that extend the model's
+   *   capabilities, like
+   *   [web search](https://platform.openai.com/docs/guides/tools-web-search) or
+   *   [file search](https://platform.openai.com/docs/guides/tools-file-search).
+   *   Learn more about
+   *   [built-in tools](https://platform.openai.com/docs/guides/tools).
+   * - **MCP Tools**: Integrations with third-party systems via custom MCP servers or
+   *   predefined connectors such as Google Drive and SharePoint. Learn more about
+   *   [MCP Tools](https://platform.openai.com/docs/guides/tools-connectors-mcp).
+   * - **Function calls (custom tools)**: Functions that are defined by you, enabling
+   *   the model to call your own code with strongly typed arguments and outputs.
+   *   Learn more about
+   *   [function calling](https://platform.openai.com/docs/guides/function-calling).
+   *   You can also use custom tools to call your own code.
+   */
+  tools?: Array<Tool>;
+
+  /**
+   * An integer between 0 and 20 specifying the number of most likely tokens to
+   * return at each token position, each with an associated log probability.
+   */
+  top_logprobs?: number | null;
+
+  /**
+   * An alternative to sampling with temperature, called nucleus sampling, where the
+   * model considers the results of the tokens with top_p probability mass. So 0.1
+   * means only the tokens comprising the top 10% probability mass are considered.
+   *
+   * We generally recommend altering this or `temperature` but not both.
+   */
+  top_p?: number | null;
+
+  /**
+   * The truncation strategy to use for the model response.
+   *
+   * - `auto`: If the input to this Response exceeds the model's context window size,
+   *   the model will truncate the response to fit the context window by dropping
+   *   items from the beginning of the conversation.
+   * - `disabled` (default): If the input size will exceed the context window size
+   *   for a model, the request will fail with a 400 error.
+   */
+  truncation?: 'auto' | 'disabled' | null;
+
+  /**
+   * @deprecated This field is being replaced by `safety_identifier` and
+   * `prompt_cache_key`. Use `prompt_cache_key` instead to maintain caching
+   * optimizations. A stable identifier for your end-users. Used to boost cache hit
+   * rates by better bucketing similar requests and to help OpenAI detect and prevent
+   * abuse.
+   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
+   */
+  user?: string;
+}
+
+export namespace ResponsesClientEvent {
+  export interface ContextManagement {
+    /**
+     * The context management entry type. Currently only 'compaction' is supported.
+     */
+    type: string;
+
+    /**
+     * Token threshold at which compaction should be triggered for this entry.
+     */
+    compact_threshold?: number | null;
+  }
+
+  /**
+   * Options for streaming responses. Only set this when you set `stream: true`.
+   */
+  export interface StreamOptions {
+    /**
+     * When true, stream obfuscation will be enabled. Stream obfuscation adds random
+     * characters to an `obfuscation` field on streaming delta events to normalize
+     * payload sizes as a mitigation to certain side-channel attacks. These obfuscation
+     * fields are included by default, but add a small amount of overhead to the data
+     * stream. You can set `include_obfuscation` to false to optimize for bandwidth if
+     * you trust the network links between your application and the OpenAI API.
+     */
+    include_obfuscation?: boolean;
+  }
+}
+
+/**
+ * Server events emitted by the Responses WebSocket server.
+ */
+export type ResponsesServerEvent =
+  | ResponseAudioDeltaEvent
+  | ResponseAudioDoneEvent
+  | ResponseAudioTranscriptDeltaEvent
+  | ResponseAudioTranscriptDoneEvent
+  | ResponseCodeInterpreterCallCodeDeltaEvent
+  | ResponseCodeInterpreterCallCodeDoneEvent
+  | ResponseCodeInterpreterCallCompletedEvent
+  | ResponseCodeInterpreterCallInProgressEvent
+  | ResponseCodeInterpreterCallInterpretingEvent
+  | ResponseCompletedEvent
+  | ResponseContentPartAddedEvent
+  | ResponseContentPartDoneEvent
+  | ResponseCreatedEvent
+  | ResponseErrorEvent
+  | ResponseFileSearchCallCompletedEvent
+  | ResponseFileSearchCallInProgressEvent
+  | ResponseFileSearchCallSearchingEvent
+  | ResponseFunctionCallArgumentsDeltaEvent
+  | ResponseFunctionCallArgumentsDoneEvent
+  | ResponseInProgressEvent
+  | ResponseFailedEvent
+  | ResponseIncompleteEvent
+  | ResponseOutputItemAddedEvent
+  | ResponseOutputItemDoneEvent
+  | ResponseReasoningSummaryPartAddedEvent
+  | ResponseReasoningSummaryPartDoneEvent
+  | ResponseReasoningSummaryTextDeltaEvent
+  | ResponseReasoningSummaryTextDoneEvent
+  | ResponseReasoningTextDeltaEvent
+  | ResponseReasoningTextDoneEvent
+  | ResponseRefusalDeltaEvent
+  | ResponseRefusalDoneEvent
+  | ResponseTextDeltaEvent
+  | ResponseTextDoneEvent
+  | ResponseWebSearchCallCompletedEvent
+  | ResponseWebSearchCallInProgressEvent
+  | ResponseWebSearchCallSearchingEvent
+  | ResponseImageGenCallCompletedEvent
+  | ResponseImageGenCallGeneratingEvent
+  | ResponseImageGenCallInProgressEvent
+  | ResponseImageGenCallPartialImageEvent
+  | ResponseMcpCallArgumentsDeltaEvent
+  | ResponseMcpCallArgumentsDoneEvent
+  | ResponseMcpCallCompletedEvent
+  | ResponseMcpCallFailedEvent
+  | ResponseMcpCallInProgressEvent
+  | ResponseMcpListToolsCompletedEvent
+  | ResponseMcpListToolsFailedEvent
+  | ResponseMcpListToolsInProgressEvent
+  | ResponseOutputTextAnnotationAddedEvent
+  | ResponseQueuedEvent
+  | ResponseCustomToolCallInputDeltaEvent
+  | ResponseCustomToolCallInputDoneEvent;
+
+export interface SkillReference {
+  /**
+   * The ID of the referenced skill.
+   */
+  skill_id: string;
+
+  /**
+   * References a skill created with the /v1/skills endpoint.
+   */
+  type: 'skill_reference';
+
+  /**
+   * Optional skill version. Use a positive integer or 'latest'. Omit for default.
+   */
+  version?: string;
+}
+
 /**
  * A tool that can be used to generate a response.
  */
@@ -5570,6 +6814,7 @@ export type Tool =
   | FunctionTool
   | FileSearchTool
   | ComputerTool
+  | ComputerUsePreviewTool
   | WebSearchTool
   | Tool.Mcp
   | Tool.CodeInterpreter
@@ -5577,6 +6822,8 @@ export type Tool =
   | Tool.LocalShell
   | FunctionShellTool
   | CustomTool
+  | NamespaceTool
+  | ToolSearchTool
   | WebSearchPreviewTool
   | ApplyPatchTool;
 
@@ -5635,6 +6882,11 @@ export namespace Tool {
       | 'connector_outlookcalendar'
       | 'connector_outlookemail'
       | 'connector_sharepoint';
+
+    /**
+     * Whether this MCP tool is deferred and discovered via tool search.
+     */
+    defer_loading?: boolean;
 
     /**
      * Optional HTTP headers to send to the MCP server. Use for authentication or other
@@ -5770,6 +7022,13 @@ export namespace Tool {
        * The memory limit for the code interpreter container.
        */
       memory_limit?: '1g' | '4g' | '16g' | '64g' | null;
+
+      /**
+       * Network access policy for the container.
+       */
+      network_policy?:
+        | ResponsesAPI.ContainerNetworkPolicyDisabled
+        | ResponsesAPI.ContainerNetworkPolicyAllowlist;
     }
   }
 
@@ -5783,6 +7042,11 @@ export namespace Tool {
     type: 'image_generation';
 
     /**
+     * Whether to generate a new image or edit an existing image. Default: `auto`.
+     */
+    action?: 'generate' | 'edit' | 'auto';
+
+    /**
      * Background type for the generated image. One of `transparent`, `opaque`, or
      * `auto`. Default: `auto`.
      */
@@ -5791,8 +7055,8 @@ export namespace Tool {
     /**
      * Control how much effort the model will exert to match the style and features,
      * especially facial features, of input images. This parameter is only supported
-     * for `gpt-image-1`. Unsupported for `gpt-image-1-mini`. Supports `high` and
-     * `low`. Defaults to `low`.
+     * for `gpt-image-1` and `gpt-image-1.5` and later models, unsupported for
+     * `gpt-image-1-mini`. Supports `high` and `low`. Defaults to `low`.
      */
     input_fidelity?: 'high' | 'low' | null;
 
@@ -5805,7 +7069,7 @@ export namespace Tool {
     /**
      * The image generation model to use. Default: `gpt-image-1`.
      */
-    model?: (string & {}) | 'gpt-image-1' | 'gpt-image-1-mini';
+    model?: (string & {}) | 'gpt-image-1' | 'gpt-image-1-mini' | 'gpt-image-1.5';
 
     /**
      * Moderation level for the generated image. Default: `auto`.
@@ -6002,7 +7266,9 @@ export interface ToolChoiceTypes {
    *
    * - `file_search`
    * - `web_search_preview`
+   * - `computer`
    * - `computer_use_preview`
+   * - `computer_use`
    * - `code_interpreter`
    * - `mcp`
    * - `image_generation`
@@ -6010,11 +7276,38 @@ export interface ToolChoiceTypes {
   type:
     | 'file_search'
     | 'web_search_preview'
+    | 'computer'
     | 'computer_use_preview'
+    | 'computer_use'
     | 'web_search_preview_2025_03_11'
     | 'image_generation'
     | 'code_interpreter'
     | 'mcp';
+}
+
+/**
+ * Hosted or BYOT tool search configuration for deferred tools.
+ */
+export interface ToolSearchTool {
+  /**
+   * The type of the tool. Always `tool_search`.
+   */
+  type: 'tool_search';
+
+  /**
+   * Description shown to the model for a client-executed tool search tool.
+   */
+  description?: string | null;
+
+  /**
+   * Whether tool search is executed by the server or by the client.
+   */
+  execution?: 'server' | 'client';
+
+  /**
+   * Parameter schema for a client-executed tool search tool.
+   */
+  parameters?: unknown | null;
 }
 
 /**
@@ -6028,6 +7321,8 @@ export interface WebSearchPreviewTool {
    * `web_search_preview_2025_03_11`.
    */
   type: 'web_search_preview' | 'web_search_preview_2025_03_11';
+
+  search_content_types?: Array<'text' | 'image'>;
 
   /**
    * High level guidance for the amount of context window space to use for the
@@ -6159,6 +7454,11 @@ export interface ResponseCreateParamsBase {
   background?: boolean | null;
 
   /**
+   * Context management configuration for this request.
+   */
+  context_management?: Array<ResponseCreateParams.ContextManagement> | null;
+
+  /**
    * The conversation that this response belongs to. Items from this conversation are
    * prepended to `input_items` for this response request. Input items and output
    * items from this response are automatically added to this conversation after this
@@ -6284,8 +7584,9 @@ export interface ResponseCreateParamsBase {
   /**
    * A stable identifier used to help detect users of your application that may be
    * violating OpenAI's usage policies. The IDs should be a string that uniquely
-   * identifies each user. We recommend hashing their username or email address, in
-   * order to avoid sending us any identifying information.
+   * identifies each user, with a maximum length of 64 characters. We recommend
+   * hashing their username or email address, in order to avoid sending us any
+   * identifying information.
    * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
    */
   safety_identifier?: string;
@@ -6416,6 +7717,18 @@ export interface ResponseCreateParamsBase {
 }
 
 export namespace ResponseCreateParams {
+  export interface ContextManagement {
+    /**
+     * The context management entry type. Currently only 'compaction' is supported.
+     */
+    type: string;
+
+    /**
+     * Token threshold at which compaction should be triggered for this entry.
+     */
+    compact_threshold?: number | null;
+  }
+
   /**
    * Options for streaming responses. Only set this when you set `stream: true`.
    */
@@ -6532,6 +7845,12 @@ export interface ResponseCompactParams {
    * available models.
    */
   model:
+    | 'gpt-5.4'
+    | 'gpt-5.4-mini'
+    | 'gpt-5.4-nano'
+    | 'gpt-5.4-mini-2026-03-17'
+    | 'gpt-5.4-nano-2026-03-17'
+    | 'gpt-5.3-chat-latest'
     | 'gpt-5.2'
     | 'gpt-5.2-2025-12-11'
     | 'gpt-5.2-chat-latest'
@@ -6641,6 +7960,11 @@ export interface ResponseCompactParams {
    * Cannot be used in conjunction with `conversation`.
    */
   previous_response_id?: string | null;
+
+  /**
+   * A key to use when reading from or writing to the prompt cache.
+   */
+  prompt_cache_key?: string | null;
 }
 
 Responses.InputItems = InputItems;
@@ -6650,12 +7974,25 @@ export declare namespace Responses {
   export {
     type ApplyPatchTool as ApplyPatchTool,
     type CompactedResponse as CompactedResponse,
+    type ComputerAction as ComputerAction,
+    type ComputerActionList as ComputerActionList,
     type ComputerTool as ComputerTool,
+    type ComputerUsePreviewTool as ComputerUsePreviewTool,
+    type ContainerAuto as ContainerAuto,
+    type ContainerNetworkPolicyAllowlist as ContainerNetworkPolicyAllowlist,
+    type ContainerNetworkPolicyDisabled as ContainerNetworkPolicyDisabled,
+    type ContainerNetworkPolicyDomainSecret as ContainerNetworkPolicyDomainSecret,
+    type ContainerReference as ContainerReference,
     type CustomTool as CustomTool,
     type EasyInputMessage as EasyInputMessage,
     type FileSearchTool as FileSearchTool,
     type FunctionShellTool as FunctionShellTool,
     type FunctionTool as FunctionTool,
+    type InlineSkill as InlineSkill,
+    type InlineSkillSource as InlineSkillSource,
+    type LocalEnvironment as LocalEnvironment,
+    type LocalSkill as LocalSkill,
+    type NamespaceTool as NamespaceTool,
     type Response as Response,
     type ResponseApplyPatchToolCall as ResponseApplyPatchToolCall,
     type ResponseApplyPatchToolCallOutput as ResponseApplyPatchToolCallOutput,
@@ -6675,6 +8012,7 @@ export declare namespace Responses {
     type ResponseComputerToolCall as ResponseComputerToolCall,
     type ResponseComputerToolCallOutputItem as ResponseComputerToolCallOutputItem,
     type ResponseComputerToolCallOutputScreenshot as ResponseComputerToolCallOutputScreenshot,
+    type ResponseContainerReference as ResponseContainerReference,
     type ResponseContent as ResponseContent,
     type ResponseContentPartAddedEvent as ResponseContentPartAddedEvent,
     type ResponseContentPartDoneEvent as ResponseContentPartDoneEvent,
@@ -6683,7 +8021,9 @@ export declare namespace Responses {
     type ResponseCustomToolCall as ResponseCustomToolCall,
     type ResponseCustomToolCallInputDeltaEvent as ResponseCustomToolCallInputDeltaEvent,
     type ResponseCustomToolCallInputDoneEvent as ResponseCustomToolCallInputDoneEvent,
+    type ResponseCustomToolCallItem as ResponseCustomToolCallItem,
     type ResponseCustomToolCallOutput as ResponseCustomToolCallOutput,
+    type ResponseCustomToolCallOutputItem as ResponseCustomToolCallOutputItem,
     type ResponseError as ResponseError,
     type ResponseErrorEvent as ResponseErrorEvent,
     type ResponseFailedEvent as ResponseFailedEvent,
@@ -6724,6 +8064,7 @@ export declare namespace Responses {
     type ResponseInputText as ResponseInputText,
     type ResponseInputTextContent as ResponseInputTextContent,
     type ResponseItem as ResponseItem,
+    type ResponseLocalEnvironment as ResponseLocalEnvironment,
     type ResponseMcpCallArgumentsDeltaEvent as ResponseMcpCallArgumentsDeltaEvent,
     type ResponseMcpCallArgumentsDoneEvent as ResponseMcpCallArgumentsDoneEvent,
     type ResponseMcpCallCompletedEvent as ResponseMcpCallCompletedEvent,
@@ -6756,10 +8097,16 @@ export declare namespace Responses {
     type ResponseTextConfig as ResponseTextConfig,
     type ResponseTextDeltaEvent as ResponseTextDeltaEvent,
     type ResponseTextDoneEvent as ResponseTextDoneEvent,
+    type ResponseToolSearchCall as ResponseToolSearchCall,
+    type ResponseToolSearchOutputItem as ResponseToolSearchOutputItem,
+    type ResponseToolSearchOutputItemParam as ResponseToolSearchOutputItemParam,
     type ResponseUsage as ResponseUsage,
     type ResponseWebSearchCallCompletedEvent as ResponseWebSearchCallCompletedEvent,
     type ResponseWebSearchCallInProgressEvent as ResponseWebSearchCallInProgressEvent,
     type ResponseWebSearchCallSearchingEvent as ResponseWebSearchCallSearchingEvent,
+    type ResponsesClientEvent as ResponsesClientEvent,
+    type ResponsesServerEvent as ResponsesServerEvent,
+    type SkillReference as SkillReference,
     type Tool as Tool,
     type ToolChoiceAllowed as ToolChoiceAllowed,
     type ToolChoiceApplyPatch as ToolChoiceApplyPatch,
@@ -6769,6 +8116,7 @@ export declare namespace Responses {
     type ToolChoiceOptions as ToolChoiceOptions,
     type ToolChoiceShell as ToolChoiceShell,
     type ToolChoiceTypes as ToolChoiceTypes,
+    type ToolSearchTool as ToolSearchTool,
     type WebSearchPreviewTool as WebSearchPreviewTool,
     type WebSearchTool as WebSearchTool,
     type ResponseCreateParams as ResponseCreateParams,

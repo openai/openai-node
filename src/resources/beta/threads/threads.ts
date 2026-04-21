@@ -73,6 +73,8 @@ import { AssistantStream, ThreadCreateAndRunParamsBaseStream } from '../../../li
 import { path } from '../../../internal/utils/path';
 
 /**
+ * Build Assistants that can call models and use tools.
+ *
  * @deprecated The Assistants API is deprecated in favor of the Responses API
  */
 export class Threads extends APIResource {
@@ -152,6 +154,7 @@ export class Threads extends APIResource {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
       stream: body.stream ?? false,
+      __synthesizeEventData: true,
     }) as APIPromise<RunsAPI.Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
   }
 
@@ -449,8 +452,9 @@ export namespace ThreadCreateParams {
 
         /**
          * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs to
-         * add to the vector store. There can be a maximum of 10000 files in a vector
-         * store.
+         * add to the vector store. For vector stores created before Nov 2025, there can be
+         * a maximum of 10,000 files in a vector store. For vector stores created starting
+         * in Nov 2025, the limit is 100,000,000 files.
          */
         file_ids?: Array<string>;
 
@@ -845,8 +849,9 @@ export namespace ThreadCreateAndRunParams {
 
           /**
            * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs to
-           * add to the vector store. There can be a maximum of 10000 files in a vector
-           * store.
+           * add to the vector store. For vector stores created before Nov 2025, there can be
+           * a maximum of 10,000 files in a vector store. For vector stores created starting
+           * in Nov 2025, the limit is 100,000,000 files.
            */
           file_ids?: Array<string>;
 

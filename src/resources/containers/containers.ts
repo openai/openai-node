@@ -1,6 +1,7 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../core/resource';
+import * as ResponsesAPI from '../responses/responses';
 import * as FilesAPI from './files/files';
 import {
   FileCreateParams,
@@ -101,6 +102,11 @@ export interface ContainerCreateResponse {
    * The memory limit configured for the container.
    */
   memory_limit?: '1g' | '4g' | '16g' | '64g';
+
+  /**
+   * Network access policy for the container.
+   */
+  network_policy?: ContainerCreateResponse.NetworkPolicy;
 }
 
 export namespace ContainerCreateResponse {
@@ -119,6 +125,21 @@ export namespace ContainerCreateResponse {
      * The number of minutes after the anchor before the container expires.
      */
     minutes?: number;
+  }
+
+  /**
+   * Network access policy for the container.
+   */
+  export interface NetworkPolicy {
+    /**
+     * The network policy mode.
+     */
+    type: 'allowlist' | 'disabled';
+
+    /**
+     * Allowed outbound domains when `type` is `allowlist`.
+     */
+    allowed_domains?: Array<string>;
   }
 }
 
@@ -164,6 +185,11 @@ export interface ContainerRetrieveResponse {
    * The memory limit configured for the container.
    */
   memory_limit?: '1g' | '4g' | '16g' | '64g';
+
+  /**
+   * Network access policy for the container.
+   */
+  network_policy?: ContainerRetrieveResponse.NetworkPolicy;
 }
 
 export namespace ContainerRetrieveResponse {
@@ -182,6 +208,21 @@ export namespace ContainerRetrieveResponse {
      * The number of minutes after the anchor before the container expires.
      */
     minutes?: number;
+  }
+
+  /**
+   * Network access policy for the container.
+   */
+  export interface NetworkPolicy {
+    /**
+     * The network policy mode.
+     */
+    type: 'allowlist' | 'disabled';
+
+    /**
+     * Allowed outbound domains when `type` is `allowlist`.
+     */
+    allowed_domains?: Array<string>;
   }
 }
 
@@ -227,6 +268,11 @@ export interface ContainerListResponse {
    * The memory limit configured for the container.
    */
   memory_limit?: '1g' | '4g' | '16g' | '64g';
+
+  /**
+   * Network access policy for the container.
+   */
+  network_policy?: ContainerListResponse.NetworkPolicy;
 }
 
 export namespace ContainerListResponse {
@@ -245,6 +291,21 @@ export namespace ContainerListResponse {
      * The number of minutes after the anchor before the container expires.
      */
     minutes?: number;
+  }
+
+  /**
+   * Network access policy for the container.
+   */
+  export interface NetworkPolicy {
+    /**
+     * The network policy mode.
+     */
+    type: 'allowlist' | 'disabled';
+
+    /**
+     * Allowed outbound domains when `type` is `allowlist`.
+     */
+    allowed_domains?: Array<string>;
   }
 }
 
@@ -268,6 +329,16 @@ export interface ContainerCreateParams {
    * Optional memory limit for the container. Defaults to "1g".
    */
   memory_limit?: '1g' | '4g' | '16g' | '64g';
+
+  /**
+   * Network access policy for the container.
+   */
+  network_policy?: ResponsesAPI.ContainerNetworkPolicyDisabled | ResponsesAPI.ContainerNetworkPolicyAllowlist;
+
+  /**
+   * An optional list of skills referenced by id or inline data.
+   */
+  skills?: Array<ResponsesAPI.SkillReference | ResponsesAPI.InlineSkill>;
 }
 
 export namespace ContainerCreateParams {
@@ -286,6 +357,11 @@ export namespace ContainerCreateParams {
 }
 
 export interface ContainerListParams extends CursorPageParams {
+  /**
+   * Filter results by container name.
+   */
+  name?: string;
+
   /**
    * Sort order by the `created_at` timestamp of the objects. `asc` for ascending
    * order and `desc` for descending order.

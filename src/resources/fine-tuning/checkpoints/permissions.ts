@@ -2,10 +2,18 @@
 
 import { APIResource } from '../../../core/resource';
 import { APIPromise } from '../../../core/api-promise';
-import { Page, PagePromise } from '../../../core/pagination';
+import {
+  ConversationCursorPage,
+  type ConversationCursorPageParams,
+  Page,
+  PagePromise,
+} from '../../../core/pagination';
 import { RequestOptions } from '../../../internal/request-options';
 import { path } from '../../../internal/utils/path';
 
+/**
+ * Manage fine-tuning jobs to tailor a model to your specific training data.
+ */
 export class Permissions extends APIResource {
   /**
    * **NOTE:** Calling this endpoint requires an [admin API key](../admin-api-keys).
@@ -42,13 +50,7 @@ export class Permissions extends APIResource {
    * Organization owners can use this endpoint to view all permissions for a
    * fine-tuned model checkpoint.
    *
-   * @example
-   * ```ts
-   * const permission =
-   *   await client.fineTuning.checkpoints.permissions.retrieve(
-   *     'ft-AF1WoRqd3aJAHsqc9NY7iL8F',
-   *   );
-   * ```
+   * @deprecated Retrieve is deprecated. Please swap to the paginated list method instead.
    */
   retrieve(
     fineTunedModelCheckpoint: string,
@@ -59,6 +61,34 @@ export class Permissions extends APIResource {
       query,
       ...options,
     });
+  }
+
+  /**
+   * **NOTE:** This endpoint requires an [admin API key](../admin-api-keys).
+   *
+   * Organization owners can use this endpoint to view all permissions for a
+   * fine-tuned model checkpoint.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const permissionListResponse of client.fineTuning.checkpoints.permissions.list(
+   *   'ft-AF1WoRqd3aJAHsqc9NY7iL8F',
+   * )) {
+   *   // ...
+   * }
+   * ```
+   */
+  list(
+    fineTunedModelCheckpoint: string,
+    query: PermissionListParams | null | undefined = {},
+    options?: RequestOptions,
+  ): PagePromise<PermissionListResponsesPage, PermissionListResponse> {
+    return this._client.getAPIList(
+      path`/fine_tuning/checkpoints/${fineTunedModelCheckpoint}/permissions`,
+      ConversationCursorPage<PermissionListResponse>,
+      { query, ...options },
+    );
   }
 
   /**
@@ -94,6 +124,8 @@ export class Permissions extends APIResource {
 
 // Note: no pagination actually occurs yet, this is for forwards-compatibility.
 export type PermissionCreateResponsesPage = Page<PermissionCreateResponse>;
+
+export type PermissionListResponsesPage = ConversationCursorPage<PermissionListResponse>;
 
 /**
  * The `checkpoint.permission` object represents a permission for a fine-tuned
@@ -161,6 +193,32 @@ export namespace PermissionRetrieveResponse {
   }
 }
 
+/**
+ * The `checkpoint.permission` object represents a permission for a fine-tuned
+ * model checkpoint.
+ */
+export interface PermissionListResponse {
+  /**
+   * The permission identifier, which can be referenced in the API endpoints.
+   */
+  id: string;
+
+  /**
+   * The Unix timestamp (in seconds) for when the permission was created.
+   */
+  created_at: number;
+
+  /**
+   * The object type, which is always "checkpoint.permission".
+   */
+  object: 'checkpoint.permission';
+
+  /**
+   * The project identifier that the permission is for.
+   */
+  project_id: string;
+}
+
 export interface PermissionDeleteResponse {
   /**
    * The ID of the fine-tuned model checkpoint permission that was deleted.
@@ -207,6 +265,18 @@ export interface PermissionRetrieveParams {
   project_id?: string;
 }
 
+export interface PermissionListParams extends ConversationCursorPageParams {
+  /**
+   * The order in which to retrieve permissions.
+   */
+  order?: 'ascending' | 'descending';
+
+  /**
+   * The ID of the project to get permissions for.
+   */
+  project_id?: string;
+}
+
 export interface PermissionDeleteParams {
   /**
    * The ID of the fine-tuned model checkpoint to delete a permission for.
@@ -218,10 +288,13 @@ export declare namespace Permissions {
   export {
     type PermissionCreateResponse as PermissionCreateResponse,
     type PermissionRetrieveResponse as PermissionRetrieveResponse,
+    type PermissionListResponse as PermissionListResponse,
     type PermissionDeleteResponse as PermissionDeleteResponse,
     type PermissionCreateResponsesPage as PermissionCreateResponsesPage,
+    type PermissionListResponsesPage as PermissionListResponsesPage,
     type PermissionCreateParams as PermissionCreateParams,
     type PermissionRetrieveParams as PermissionRetrieveParams,
+    type PermissionListParams as PermissionListParams,
     type PermissionDeleteParams as PermissionDeleteParams,
   };
 }

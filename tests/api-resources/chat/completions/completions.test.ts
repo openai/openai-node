@@ -11,7 +11,7 @@ describe('resource completions', () => {
   test('create: only required params', async () => {
     const responsePromise = client.chat.completions.create({
       messages: [{ content: 'string', role: 'developer' }],
-      model: 'gpt-4o',
+      model: 'gpt-5.4',
     });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
@@ -31,8 +31,8 @@ describe('resource completions', () => {
           name: 'name',
         },
       ],
-      model: 'gpt-4o',
-      audio: { format: 'wav', voice: 'ash' },
+      model: 'gpt-5.4',
+      audio: { format: 'wav', voice: 'string' },
       frequency_penalty: -2,
       function_call: 'none',
       functions: [

@@ -46,6 +46,7 @@ describe('resource inputTokens', () => {
               parameters: { foo: 'bar' },
               strict: true,
               type: 'function',
+              defer_loading: true,
               description: 'description',
             },
           ],

@@ -5,16 +5,21 @@ import { APIPromise } from '../../core/api-promise';
 import { buildHeaders } from '../../internal/headers';
 import { RequestOptions } from '../../internal/request-options';
 
+/**
+ * Turn audio into text or text into audio.
+ */
 export class Speech extends APIResource {
   /**
    * Generates audio from the input text.
+   *
+   * Returns the audio file content, or a stream of audio events.
    *
    * @example
    * ```ts
    * const speech = await client.audio.speech.create({
    *   input: 'input',
    *   model: 'string',
-   *   voice: 'ash',
+   *   voice: 'string',
    * });
    *
    * const content = await speech.blob();
@@ -48,12 +53,13 @@ export interface SpeechCreateParams {
   /**
    * The voice to use when generating the audio. Supported built-in voices are
    * `alloy`, `ash`, `ballad`, `coral`, `echo`, `fable`, `onyx`, `nova`, `sage`,
-   * `shimmer`, `verse`, `marin`, and `cedar`. Previews of the voices are available
-   * in the
+   * `shimmer`, `verse`, `marin`, and `cedar`. You may also provide a custom voice
+   * object with an `id`, for example `{ "id": "voice_1234" }`. Previews of the
+   * voices are available in the
    * [Text to speech guide](https://platform.openai.com/docs/guides/text-to-speech#voice-options).
    */
   voice:
-    | (string & {})
+    | string
     | 'alloy'
     | 'ash'
     | 'ballad'
@@ -63,7 +69,8 @@ export interface SpeechCreateParams {
     | 'shimmer'
     | 'verse'
     | 'marin'
-    | 'cedar';
+    | 'cedar'
+    | SpeechCreateParams.ID;
 
   /**
    * Control the voice of your generated audio with additional instructions. Does not
@@ -88,6 +95,18 @@ export interface SpeechCreateParams {
    * `sse` is not supported for `tts-1` or `tts-1-hd`.
    */
   stream_format?: 'sse' | 'audio';
+}
+
+export namespace SpeechCreateParams {
+  /**
+   * Custom voice reference.
+   */
+  export interface ID {
+    /**
+     * The custom voice ID, e.g. `voice_1234`.
+     */
+    id: string;
+  }
 }
 
 export declare namespace Speech {

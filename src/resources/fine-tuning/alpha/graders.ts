@@ -5,6 +5,9 @@ import * as GraderModelsAPI from '../../graders/grader-models';
 import { APIPromise } from '../../../core/api-promise';
 import { RequestOptions } from '../../../internal/request-options';
 
+/**
+ * Manage fine-tuning jobs to tailor a model to your specific training data.
+ */
 export class Graders extends APIResource {
   /**
    * Run a grader.

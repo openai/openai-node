@@ -8,7 +8,7 @@ import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pa
 import { type Uploadable } from '../../../core/uploads';
 import { buildHeaders } from '../../../internal/headers';
 import { RequestOptions } from '../../../internal/request-options';
-import { multipartFormRequestOptions } from '../../../internal/uploads';
+import { maybeMultipartFormRequestOptions } from '../../../internal/uploads';
 import { path } from '../../../internal/utils/path';
 
 export class Files extends APIResource {
@@ -27,7 +27,7 @@ export class Files extends APIResource {
   ): APIPromise<FileCreateResponse> {
     return this._client.post(
       path`/containers/${containerID}/files`,
-      multipartFormRequestOptions({ body, ...options }, this._client),
+      maybeMultipartFormRequestOptions({ body, ...options }, this._client),
     );
   }
 

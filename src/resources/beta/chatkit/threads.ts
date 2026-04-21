@@ -14,7 +14,7 @@ import { path } from '../../../internal/utils/path';
 
 export class Threads extends APIResource {
   /**
-   * Retrieve a ChatKit thread
+   * Retrieve a ChatKit thread by its identifier.
    *
    * @example
    * ```ts
@@ -30,7 +30,7 @@ export class Threads extends APIResource {
   }
 
   /**
-   * List ChatKit threads
+   * List ChatKit threads with optional pagination and user filters.
    *
    * @example
    * ```ts
@@ -52,7 +52,7 @@ export class Threads extends APIResource {
   }
 
   /**
-   * Delete a ChatKit thread
+   * Delete a ChatKit thread along with its items and stored attachments.
    *
    * @example
    * ```ts
@@ -69,7 +69,7 @@ export class Threads extends APIResource {
   }
 
   /**
-   * List ChatKit thread items
+   * List items that belong to a ChatKit thread.
    *
    * @example
    * ```ts

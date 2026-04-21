@@ -19,6 +19,12 @@ export type AllModels =
   | 'gpt-5.1-codex-max';
 
 export type ChatModel =
+  | 'gpt-5.4'
+  | 'gpt-5.4-mini'
+  | 'gpt-5.4-nano'
+  | 'gpt-5.4-mini-2026-03-17'
+  | 'gpt-5.4-nano-2026-03-17'
+  | 'gpt-5.3-chat-latest'
   | 'gpt-5.2'
   | 'gpt-5.2-2025-12-11'
   | 'gpt-5.2-chat-latest'
@@ -115,7 +121,7 @@ export interface ComparisonFilter {
    * - `in`: in
    * - `nin`: not in
    */
-  type: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte';
+  type: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'nin';
 
   /**
    * The value to compare against the attribute key; supports string, number, or
@@ -241,6 +247,8 @@ export type FunctionParameters = { [key: string]: unknown };
  * a maximum length of 512 characters.
  */
 export type Metadata = { [key: string]: string };
+
+export type OAuthErrorCode = 'invalid_grant' | 'invalid_subject_token' | (string & {});
 
 /**
  * **gpt-5 and o-series models only**

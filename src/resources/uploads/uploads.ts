@@ -8,6 +8,9 @@ import { APIPromise } from '../../core/api-promise';
 import { RequestOptions } from '../../internal/request-options';
 import { path } from '../../internal/utils/path';
 
+/**
+ * Use Uploads to upload large files in multiple parts.
+ */
 export class Uploads extends APIResource {
   parts: PartsAPI.Parts = new PartsAPI.Parts(this._client);
 
@@ -31,6 +34,8 @@ export class Uploads extends APIResource {
    * For guidance on the proper filename extensions for each purpose, please follow
    * the documentation on
    * [creating a File](https://platform.openai.com/docs/api-reference/files/create).
+   *
+   * Returns the Upload object with status `pending`.
    */
   create(body: UploadCreateParams, options?: RequestOptions): APIPromise<Upload> {
     return this._client.post('/uploads', { body, ...options });
@@ -38,6 +43,8 @@ export class Uploads extends APIResource {
 
   /**
    * Cancels the Upload. No Parts may be added after an Upload is cancelled.
+   *
+   * Returns the Upload object with status `cancelled`.
    */
   cancel(uploadID: string, options?: RequestOptions): APIPromise<Upload> {
     return this._client.post(path`/uploads/${uploadID}/cancel`, options);
@@ -56,7 +63,9 @@ export class Uploads extends APIResource {
    *
    * The number of bytes uploaded upon completion must match the number of bytes
    * initially specified when creating the Upload object. No Parts may be added after
-   * an Upload is completed.
+   * an Upload is completed. Returns the Upload object with status `completed`,
+   * including an additional `file` property containing the created usable File
+   * object.
    */
   complete(uploadID: string, body: UploadCompleteParams, options?: RequestOptions): APIPromise<Upload> {
     return this._client.post(path`/uploads/${uploadID}/complete`, { body, ...options });
