@@ -34,7 +34,7 @@ jobs:
       - name: Install dependencies
         if: ${{ steps.release.outputs.releases_created }}
         run: |
-          yarn install
+          ./scripts/bootstrap
 
       - name: Publish to NPM
         if: ${{ steps.release.outputs.releases_created }}
@@ -45,4 +45,3 @@ jobs:
         if: ${{ steps.release.outputs.releases_created }}
         run: |
           bash ./bin/publish-jsr
-

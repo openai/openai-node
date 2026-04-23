@@ -365,8 +365,9 @@ async function main() {
               await withRetry(
                 async () => {
                   const child = execa(
-                    'yarn',
+                    'corepack',
                     [
+                      'pnpm',
                       'tsn',
                       __filename,
                       project,
@@ -532,12 +533,16 @@ async function buildPackage() {
   // Run our build script to ensure all of our build artifacts are up to date.
   // This matters the most for deno as it directly relies on build artifacts
   // instead of the pack file
-  await run('yarn', ['build']);
+  await run('corepack', ['pnpm', 'build']);
 
-  const proc = await run('npm', ['pack', '--ignore-scripts', '--json'], {
-    cwd: path.join(process.cwd(), 'dist'),
-    alwaysPipe: true,
-  });
+  const proc = await run(
+    path.join(state.rootDir, 'node_modules/.bin/npm'),
+    ['pack', '--ignore-scripts', '--json'],
+    {
+      cwd: path.join(process.cwd(), 'dist'),
+      alwaysPipe: true,
+    },
+  );
 
   const pack = JSON.parse(proc.stdout);
   assert(Array.isArray(pack), `Expected pack output to be an array but got ${typeof pack}`);

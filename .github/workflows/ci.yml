@@ -108,12 +108,12 @@ jobs:
           node-version: '20'
       - name: Install dependencies
         run: |
-          yarn install
+          ./scripts/bootstrap
 
       - env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          yarn tsn examples/demo.ts
+          corepack pnpm tsn examples/demo.ts
 
   ecosystem_tests:
     name: ecosystem tests (v${{ matrix.node-version }})
@@ -138,12 +138,16 @@ jobs:
 
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
 
+      - name: Verify Bun install policy
+        working-directory: ecosystem-tests/bun
+        run: bun install --frozen-lockfile
+
       - name: Bootstrap
         run: ./scripts/bootstrap
 
       - name: Run ecosystem tests
         run: |
-          yarn tsn ecosystem-tests/cli.ts --live --verbose --parallel --jobs=4 --retry=3
+          corepack pnpm tsn ecosystem-tests/cli.ts --live --verbose --parallel --jobs=4 --retry=3
         env:
           DISABLE_V8_COMPILE_CACHE: '1'
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}

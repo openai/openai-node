@@ -20,4 +20,4 @@ node scripts/utils/attw-report.cjs
 echo "==> Running publint"
 ./node_modules/.bin/publint dist
 echo "==> Running jsr publish --dry-run"
-(cd dist-deno && npx jsr publish --dry-run --allow-dirty)
+(cd dist-deno && ../node_modules/.bin/jsr publish --dry-run --allow-dirty)
