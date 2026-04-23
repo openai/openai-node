@@ -535,14 +535,10 @@ async function buildPackage() {
   // instead of the pack file
   await run('corepack', ['pnpm', 'build']);
 
-  const proc = await run(
-    getPinnedNpmCommand(),
-    ['pack', '--ignore-scripts', '--json'],
-    {
-      cwd: path.join(process.cwd(), 'dist'),
-      alwaysPipe: true,
-    },
-  );
+  const proc = await run(getPinnedNpmCommand(), ['pack', '--ignore-scripts', '--json'], {
+    cwd: path.join(process.cwd(), 'dist'),
+    alwaysPipe: true,
+  });
 
   const pack = JSON.parse(proc.stdout);
   assert(Array.isArray(pack), `Expected pack output to be an array but got ${typeof pack}`);
