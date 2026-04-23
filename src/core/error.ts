@@ -36,6 +36,25 @@ export class APIError<
     this.type = data?.['type'];
   }
 
+  /**
+   * Returns a JSON-serializable representation of this error, with `headers`
+   * converted from a `Headers` instance to a plain object so that all headers
+   * (including rate-limit headers such as `x-ratelimit-reset-requests`) are
+   * visible when the error is logged or serialised with `JSON.stringify`.
+   */
+  toJSON() {
+    return {
+      status: this.status,
+      headers: this.headers ? Object.fromEntries(this.headers.entries()) : undefined,
+      error: this.error,
+      code: this.code,
+      param: this.param,
+      type: this.type,
+      requestID: this.requestID,
+      message: this.message,
+    };
+  }
+
   private static makeMessage(status: number | undefined, error: any, message: string | undefined) {
     const msg =
       error?.message ?
