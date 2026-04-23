@@ -72,8 +72,8 @@ importers:
         specifier: 0.14.3
         version: 0.14.3
       npm:
-        specifier: 11.6.2
-        version: 11.6.2
+        specifier: 11.12.1
+        version: 11.12.1
       prettier:
         specifier: ^3.0.0
         version: 3.1.1
@@ -2046,8 +2046,8 @@ packages:
     resolution: {integrity: sha512-S48WzZW777zhNIrn7gxOlISNAqi9ZC/uQFnRdbeIHhZhCA6UqpkOT8T1G7BvfdgP4Er8gF4sUbaS0i7QvIfCWw==}
     engines: {node: '>=8'}
 
-  npm@11.6.2:
-    resolution: {integrity: sha512-7iKzNfy8lWYs3zq4oFPa8EXZz5xt9gQNKJZau3B1ErLBb6bF7sBJ00x09485DOvRT2l5Gerbl3VlZNT57MxJVA==}
+  npm@11.12.1:
+    resolution: {integrity: sha512-zcoUuF1kezGSAo0CqtvoLXX3mkRqzuqYdL6Y5tdo8g69NVV3CkjQ6ZBhBgB4d7vGkPcV6TcvLi3GRKPDFX+xTA==}
     engines: {node: ^20.17.0 || >=22.9.0}
     hasBin: true
     bundledDependencies:
@@ -2056,6 +2056,7 @@ packages:
       - '@npmcli/config'
       - '@npmcli/fs'
       - '@npmcli/map-workspaces'
+      - '@npmcli/metavuln-calculator'
       - '@npmcli/package-json'
       - '@npmcli/promise-spawn'
       - '@npmcli/redact'
@@ -2066,7 +2067,6 @@ packages:
       - cacache
       - chalk
       - ci-info
-      - cli-columns
       - fastest-levenshtein
       - fs-minipass
       - glob
@@ -4982,7 +4982,7 @@ snapshots:
     dependencies:
       path-key: 3.1.1
 
-  npm@11.6.2: {}
+  npm@11.12.1: {}
 
   object-assign@4.1.1: {}
 

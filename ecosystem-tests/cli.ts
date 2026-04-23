@@ -13,9 +13,9 @@ const IS_CI = Boolean(process.env['CI'] && process.env['CI'] !== 'false');
 
 async function defaultNodeRunner() {
   await installPackage();
-  await run('npm', ['run', 'tsc']);
+  await runNpm(['run', 'tsc']);
   if (state.live) {
-    await run('npm', ['test']);
+    await runNpm(['test']);
   }
 }
 
@@ -34,11 +34,11 @@ const projectRunners = {
   'ts-browser-webpack': async () => {
     await installPackage();
 
-    await run('npm', ['run', 'tsc']);
-    await run('npm', ['run', 'build']);
+    await runNpm(['run', 'tsc']);
+    await runNpm(['run', 'build']);
 
     if (state.live) {
-      await run('npm', ['run', 'test:ci']);
+      await runNpm(['run', 'test:ci']);
     }
   },
   'browser-direct-import': async () => {
@@ -47,38 +47,38 @@ const projectRunners = {
     await fs.rm('public/node_modules', { force: true });
     await fs.symlink('../node_modules', 'public/node_modules');
 
-    await run('npm', ['run', 'tsc']);
+    await runNpm(['run', 'tsc']);
 
     if (state.live) {
-      await run('npm', ['run', 'test:ci']);
+      await runNpm(['run', 'test:ci']);
     }
   },
   'vercel-edge': async () => {
     await installPackage();
 
     if (state.live) {
-      await run('npm', ['run', 'test:ci:dev']);
+      await runNpm(['run', 'test:ci:dev']);
     }
-    await run('npm', ['run', 'build']);
+    await runNpm(['run', 'build']);
 
     if (state.live) {
-      await run('npm', ['run', 'test:ci']);
+      await runNpm(['run', 'test:ci']);
     }
     if (state.deploy) {
-      await run('npm', ['run', 'vercel', 'deploy', '--prod', '--force']);
+      await runNpm(['run', 'vercel', 'deploy', '--prod', '--force']);
     }
   },
   'cloudflare-worker': async () => {
     await installPackage();
 
     await fs.writeFile('.dev.vars', `OPENAI_API_KEY='${process.env['OPENAI_API_KEY']}'`);
-    await run('npm', ['run', 'tsc']);
+    await runNpm(['run', 'tsc']);
 
     if (state.live) {
-      await run('npm', ['run', 'test:ci']);
+      await runNpm(['run', 'test:ci']);
     }
     if (state.deploy) {
-      await run('npm', ['run', 'deploy']);
+      await runNpm(['run', 'deploy']);
     }
   },
   bun: async () => {
@@ -91,7 +91,7 @@ const projectRunners = {
     await fs.copyFile(packFile, `./${TAR_NAME}`);
     await run('bun', ['install', '-D', `./${TAR_NAME}`]);
 
-    await run('npm', ['run', 'tsc']);
+    await runNpm(['run', 'tsc']);
 
     if (state.live) {
       await run('bun', ['test']);
@@ -536,7 +536,7 @@ async function buildPackage() {
   await run('corepack', ['pnpm', 'build']);
 
   const proc = await run(
-    path.join(state.rootDir, 'node_modules/.bin/npm'),
+    getPinnedNpmCommand(),
     ['pack', '--ignore-scripts', '--json'],
     {
       cwd: path.join(process.cwd(), 'dist'),
@@ -557,7 +557,7 @@ async function buildPackage() {
 
 async function installPackage() {
   if (state.fromNpm) {
-    await run('npm', ['install', '-D', state.fromNpm]);
+    await runNpm(['install', '-D', state.fromNpm]);
     return;
   }
 
@@ -568,7 +568,7 @@ async function installPackage() {
 
   const packFile = getPackFile();
   await fs.copyFile(packFile, `./${TAR_NAME}`);
-  return await run('npm', ['install', '-D', `./${TAR_NAME}`]);
+  return await runNpm(['install', '-D', `./${TAR_NAME}`]);
 }
 
 function getPackFile() {
@@ -579,6 +579,14 @@ function getPackFile() {
 
 interface RunOpts extends execa.Options {
   alwaysPipe?: boolean;
+}
+
+function getPinnedNpmCommand(): string {
+  return path.join(state.rootDir, 'node_modules/.bin/npm');
+}
+
+async function runNpm(args: string[], config?: RunOpts): Promise<execa.ExecaReturnValue> {
+  return await run(getPinnedNpmCommand(), args, config);
 }
 
 async function run(command: string, args: string[], config?: RunOpts): Promise<execa.ExecaReturnValue> {
