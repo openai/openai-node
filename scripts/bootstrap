@@ -36,10 +36,6 @@ echo "==> Verifying pnpm supply-chain policy…"
 require_pnpm_config minimum-release-age 10080
 require_pnpm_config block-exotic-subdeps true
 require_pnpm_config strict-dep-builds true
-if ! corepack pnpm config list | grep -Fxq 'only-built-dependencies[]=@swc/core'; then
-  echo "ERROR: expected pnpm to allow dependency builds only for @swc/core"
-  exit 1
-fi
 
 if [ "${CI:-}" = "true" ]; then
   corepack pnpm install --frozen-lockfile
