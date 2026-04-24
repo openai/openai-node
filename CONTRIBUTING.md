@@ -6,11 +6,13 @@ Other package managers may work but are not officially supported for development
 To set up the repository, run:
 
 ```sh
-$ corepack pnpm install
+$ ./scripts/bootstrap
 $ corepack pnpm build
 ```
 
 This will install all the required dependencies and build output files to `dist/`.
+`./scripts/bootstrap` uses the committed `pnpm-lock.yaml` and will fail if it is out of sync with `package.json`.
+When intentionally changing dependencies, update them explicitly with `corepack pnpm add`, `corepack pnpm up`, or `corepack pnpm install`, then commit the resulting lockfile changes.
 
 ## Modifying/Adding code
 

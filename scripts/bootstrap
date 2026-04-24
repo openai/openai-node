@@ -37,8 +37,4 @@ require_pnpm_config minimum-release-age 10080
 require_pnpm_config block-exotic-subdeps true
 require_pnpm_config strict-dep-builds true
 
-if [ "${CI:-}" = "true" ]; then
-  corepack pnpm install --frozen-lockfile
-else
-  corepack pnpm install
-fi
+corepack pnpm install --frozen-lockfile
