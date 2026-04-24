@@ -7,30 +7,7 @@ import * as AssistantsAPI from '../../assistants';
 import * as MessagesAPI from '../messages';
 import * as ThreadsAPI from '../threads';
 import * as StepsAPI from './steps';
-import {
-  CodeInterpreterLogs,
-  CodeInterpreterOutputImage,
-  CodeInterpreterToolCall,
-  CodeInterpreterToolCallDelta,
-  FileSearchToolCall,
-  FileSearchToolCallDelta,
-  FunctionToolCall,
-  FunctionToolCallDelta,
-  MessageCreationStepDetails,
-  RunStep,
-  RunStepDelta,
-  RunStepDeltaEvent,
-  RunStepDeltaMessageDelta,
-  RunStepInclude,
-  RunStepsPage,
-  StepListParams,
-  StepRetrieveParams,
-  Steps,
-  ToolCall,
-  ToolCallDelta,
-  ToolCallDeltaObject,
-  ToolCallsStepDetails,
-} from './steps';
+import { CodeInterpreterLogs, CodeInterpreterOutputImage, CodeInterpreterToolCall, CodeInterpreterToolCallDelta, FileSearchToolCall, FileSearchToolCallDelta, FunctionToolCall, FunctionToolCallDelta, MessageCreationStepDetails, RunStep, RunStepDelta, RunStepDeltaEvent, RunStepDeltaMessageDelta, RunStepInclude, RunStepsPage, StepListParams, StepRetrieveParams, Steps, ToolCall, ToolCallDelta, ToolCallDeltaObject, ToolCallsStepDetails } from './steps';
 import { APIPromise } from '../../../../core/api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../../core/pagination';
 import { Stream } from '../../../../core/streaming';
@@ -54,31 +31,12 @@ export class Runs extends APIResource {
    *
    * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
-  create(threadID: string, params: RunCreateParamsNonStreaming, options?: RequestOptions): APIPromise<Run>;
-  create(
-    threadID: string,
-    params: RunCreateParamsStreaming,
-    options?: RequestOptions,
-  ): APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
-  create(
-    threadID: string,
-    params: RunCreateParamsBase,
-    options?: RequestOptions,
-  ): APIPromise<Stream<AssistantsAPI.AssistantStreamEvent> | Run>;
-  create(
-    threadID: string,
-    params: RunCreateParams,
-    options?: RequestOptions,
-  ): APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>> {
-    const { include, ...body } = params;
-    return this._client.post(path`/threads/${threadID}/runs`, {
-      query: { include },
-      body,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      stream: params.stream ?? false,
-      __synthesizeEventData: true,
-    }) as APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
+  create(threadID: string, params: RunCreateParamsNonStreaming, options?: RequestOptions): APIPromise<Run>
+  create(threadID: string, params: RunCreateParamsStreaming, options?: RequestOptions): APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>
+  create(threadID: string, params: RunCreateParamsBase, options?: RequestOptions): APIPromise<Stream<AssistantsAPI.AssistantStreamEvent> | Run>
+  create(threadID: string, params: RunCreateParams, options?: RequestOptions): APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>> {
+    const { include, ...body } = params
+    return this._client.post(path`/threads/${threadID}/runs`, { query: { include }, body, ...options, headers: buildHeaders([{'OpenAI-Beta': 'assistants=v2'}, options?.headers]), stream: params.stream ?? false, __synthesizeEventData: true }) as APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
   }
 
   /**
@@ -87,11 +45,8 @@ export class Runs extends APIResource {
    * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
   retrieve(runID: string, params: RunRetrieveParams, options?: RequestOptions): APIPromise<Run> {
-    const { thread_id } = params;
-    return this._client.get(path`/threads/${thread_id}/runs/${runID}`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-    });
+    const { thread_id } = params
+    return this._client.get(path`/threads/${thread_id}/runs/${runID}`, { ...options, headers: buildHeaders([{'OpenAI-Beta': 'assistants=v2'}, options?.headers]) });
   }
 
   /**
@@ -100,12 +55,8 @@ export class Runs extends APIResource {
    * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
   update(runID: string, params: RunUpdateParams, options?: RequestOptions): APIPromise<Run> {
-    const { thread_id, ...body } = params;
-    return this._client.post(path`/threads/${thread_id}/runs/${runID}`, {
-      body,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-    });
+    const { thread_id, ...body } = params
+    return this._client.post(path`/threads/${thread_id}/runs/${runID}`, { body, ...options, headers: buildHeaders([{'OpenAI-Beta': 'assistants=v2'}, options?.headers]) });
   }
 
   /**
@@ -113,16 +64,8 @@ export class Runs extends APIResource {
    *
    * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
-  list(
-    threadID: string,
-    query: RunListParams | null | undefined = {},
-    options?: RequestOptions,
-  ): PagePromise<RunsPage, Run> {
-    return this._client.getAPIList(path`/threads/${threadID}/runs`, CursorPage<Run>, {
-      query,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-    });
+  list(threadID: string, query: RunListParams | null | undefined = {}, options?: RequestOptions): PagePromise<RunsPage, Run> {
+    return this._client.getAPIList(path`/threads/${threadID}/runs`, CursorPage<Run>, { query, ...options, headers: buildHeaders([{'OpenAI-Beta': 'assistants=v2'}, options?.headers]) });
   }
 
   /**
@@ -131,11 +74,8 @@ export class Runs extends APIResource {
    * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
   cancel(runID: string, params: RunCancelParams, options?: RequestOptions): APIPromise<Run> {
-    const { thread_id } = params;
-    return this._client.post(path`/threads/${thread_id}/runs/${runID}/cancel`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-    });
+    const { thread_id } = params
+    return this._client.post(path`/threads/${thread_id}/runs/${runID}/cancel`, { ...options, headers: buildHeaders([{'OpenAI-Beta': 'assistants=v2'}, options?.headers]) });
   }
 
   /**
@@ -236,34 +176,12 @@ export class Runs extends APIResource {
    *
    * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
-  submitToolOutputs(
-    runID: string,
-    params: RunSubmitToolOutputsParamsNonStreaming,
-    options?: RequestOptions,
-  ): APIPromise<Run>;
-  submitToolOutputs(
-    runID: string,
-    params: RunSubmitToolOutputsParamsStreaming,
-    options?: RequestOptions,
-  ): APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
-  submitToolOutputs(
-    runID: string,
-    params: RunSubmitToolOutputsParamsBase,
-    options?: RequestOptions,
-  ): APIPromise<Stream<AssistantsAPI.AssistantStreamEvent> | Run>;
-  submitToolOutputs(
-    runID: string,
-    params: RunSubmitToolOutputsParams,
-    options?: RequestOptions,
-  ): APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>> {
-    const { thread_id, ...body } = params;
-    return this._client.post(path`/threads/${thread_id}/runs/${runID}/submit_tool_outputs`, {
-      body,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      stream: params.stream ?? false,
-      __synthesizeEventData: true,
-    }) as APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
+  submitToolOutputs(runID: string, params: RunSubmitToolOutputsParamsNonStreaming, options?: RequestOptions): APIPromise<Run>
+  submitToolOutputs(runID: string, params: RunSubmitToolOutputsParamsStreaming, options?: RequestOptions): APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>
+  submitToolOutputs(runID: string, params: RunSubmitToolOutputsParamsBase, options?: RequestOptions): APIPromise<Stream<AssistantsAPI.AssistantStreamEvent> | Run>
+  submitToolOutputs(runID: string, params: RunSubmitToolOutputsParams, options?: RequestOptions): APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>> {
+    const { thread_id, ...body } = params
+    return this._client.post(path`/threads/${thread_id}/runs/${runID}/submit_tool_outputs`, { body, ...options, headers: buildHeaders([{'OpenAI-Beta': 'assistants=v2'}, options?.headers]), stream: params.stream ?? false, __synthesizeEventData: true }) as APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
   }
 
   /**
@@ -294,7 +212,7 @@ export class Runs extends APIResource {
   }
 }
 
-export type RunsPage = CursorPage<Run>;
+export type RunsPage = CursorPage<Run>
 
 /**
  * Tool call objects
@@ -630,18 +548,9 @@ export namespace Run {
  * `requires_action`, `cancelling`, `cancelled`, `failed`, `completed`,
  * `incomplete`, or `expired`.
  */
-export type RunStatus =
-  | 'queued'
-  | 'in_progress'
-  | 'requires_action'
-  | 'cancelling'
-  | 'cancelled'
-  | 'failed'
-  | 'completed'
-  | 'incomplete'
-  | 'expired';
+export type RunStatus = 'queued' | 'in_progress' | 'requires_action' | 'cancelling' | 'cancelled' | 'failed' | 'completed' | 'incomplete' | 'expired'
 
-export type RunCreateParams = RunCreateParamsNonStreaming | RunCreateParamsStreaming;
+export type RunCreateParams = RunCreateParamsNonStreaming | RunCreateParamsStreaming
 
 export interface RunCreateParamsBase {
   /**
@@ -892,8 +801,8 @@ export namespace RunCreateParams {
     last_messages?: number | null;
   }
 
-  export type RunCreateParamsNonStreaming = RunsAPI.RunCreateParamsNonStreaming;
-  export type RunCreateParamsStreaming = RunsAPI.RunCreateParamsStreaming;
+  export type RunCreateParamsNonStreaming = RunsAPI.RunCreateParamsNonStreaming
+  export type RunCreateParamsStreaming = RunsAPI.RunCreateParamsStreaming
 }
 
 export interface RunCreateParamsNonStreaming extends RunCreateParamsBase {
@@ -969,9 +878,7 @@ export type RunCreateAndStreamParams = RunCreateParamsBaseStream;
 
 export type RunStreamParams = RunCreateParamsBaseStream;
 
-export type RunSubmitToolOutputsParams =
-  | RunSubmitToolOutputsParamsNonStreaming
-  | RunSubmitToolOutputsParamsStreaming;
+export type RunSubmitToolOutputsParams = RunSubmitToolOutputsParamsNonStreaming | RunSubmitToolOutputsParamsStreaming
 
 export interface RunSubmitToolOutputsParamsBase {
   /**
@@ -1008,8 +915,8 @@ export namespace RunSubmitToolOutputsParams {
     tool_call_id?: string;
   }
 
-  export type RunSubmitToolOutputsParamsNonStreaming = RunsAPI.RunSubmitToolOutputsParamsNonStreaming;
-  export type RunSubmitToolOutputsParamsStreaming = RunsAPI.RunSubmitToolOutputsParamsStreaming;
+  export type RunSubmitToolOutputsParamsNonStreaming = RunsAPI.RunSubmitToolOutputsParamsNonStreaming
+  export type RunSubmitToolOutputsParamsStreaming = RunsAPI.RunSubmitToolOutputsParamsStreaming
 }
 
 export interface RunSubmitToolOutputsParamsNonStreaming extends RunSubmitToolOutputsParamsBase {
@@ -1079,6 +986,6 @@ export declare namespace Runs {
     type ToolCallsStepDetails as ToolCallsStepDetails,
     type RunStepsPage as RunStepsPage,
     type StepRetrieveParams as StepRetrieveParams,
-    type StepListParams as StepListParams,
+    type StepListParams as StepListParams
   };
 }

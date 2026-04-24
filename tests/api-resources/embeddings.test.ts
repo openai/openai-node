@@ -5,17 +5,11 @@ import { mockFetch } from '../utils/mock-fetch';
 import fs from 'fs/promises';
 import Path from 'path';
 
-const client = new OpenAI({
-  apiKey: 'My API Key',
-  baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
-});
+const client = new OpenAI({ apiKey: 'My API Key', baseURL: process.env["TEST_API_BASE_URL"] ?? 'http://127.0.0.1:4010' });
 
 describe('resource embeddings', () => {
   test('create: only required params', async () => {
-    const responsePromise = client.embeddings.create({
-      input: 'The quick brown fox jumped over the lazy dog',
-      model: 'text-embedding-3-small',
-    });
+    const responsePromise = client.embeddings.create({ input: 'The quick brown fox jumped over the lazy dog', model: 'text-embedding-3-small' });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -27,12 +21,12 @@ describe('resource embeddings', () => {
 
   test('create: required and optional params', async () => {
     const response = await client.embeddings.create({
-      input: 'The quick brown fox jumped over the lazy dog',
-      model: 'text-embedding-3-small',
-      dimensions: 1,
-      encoding_format: 'float',
-      user: 'user-1234',
-    });
+    input: 'The quick brown fox jumped over the lazy dog',
+    model: 'text-embedding-3-small',
+    dimensions: 1,
+    encoding_format: 'float',
+    user: 'user-1234',
+  });
   });
 
   test('create: encoding_format=default should create float32 embeddings', async () => {

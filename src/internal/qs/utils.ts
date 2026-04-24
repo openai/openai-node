@@ -62,7 +62,10 @@ export function merge(
     if (isArray(target)) {
       target.push(source);
     } else if (target && typeof target === 'object') {
-      if ((options && (options.plainObjects || options.allowPrototypes)) || !has(Object.prototype, source)) {
+      if (
+        (options && (options.plainObjects || options.allowPrototypes)) ||
+        !has(Object.prototype, source)
+      ) {
         target[source] = true;
       }
     } else {

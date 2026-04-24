@@ -25,10 +25,7 @@ export class Parts extends APIResource {
    * [complete the Upload](https://platform.openai.com/docs/api-reference/uploads/complete).
    */
   create(uploadID: string, body: PartCreateParams, options?: RequestOptions): APIPromise<UploadPart> {
-    return this._client.post(
-      path`/uploads/${uploadID}/parts`,
-      multipartFormRequestOptions({ body, ...options }, this._client),
-    );
+    return this._client.post(path`/uploads/${uploadID}/parts`, multipartFormRequestOptions({ body, ...options }, this._client));
   }
 }
 
@@ -65,5 +62,8 @@ export interface PartCreateParams {
 }
 
 export declare namespace Parts {
-  export { type UploadPart as UploadPart, type PartCreateParams as PartCreateParams };
+  export {
+    type UploadPart as UploadPart,
+    type PartCreateParams as PartCreateParams
+  };
 }

@@ -16,58 +16,31 @@ export class Files extends APIResource {
    * [File](https://platform.openai.com/docs/api-reference/files) to a
    * [vector store](https://platform.openai.com/docs/api-reference/vector-stores/object).
    */
-  create(
-    vectorStoreID: string,
-    body: FileCreateParams,
-    options?: RequestOptions,
-  ): APIPromise<VectorStoreFile> {
-    return this._client.post(path`/vector_stores/${vectorStoreID}/files`, {
-      body,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-    });
+  create(vectorStoreID: string, body: FileCreateParams, options?: RequestOptions): APIPromise<VectorStoreFile> {
+    return this._client.post(path`/vector_stores/${vectorStoreID}/files`, { body, ...options, headers: buildHeaders([{'OpenAI-Beta': 'assistants=v2'}, options?.headers]) });
   }
 
   /**
    * Retrieves a vector store file.
    */
-  retrieve(
-    fileID: string,
-    params: FileRetrieveParams,
-    options?: RequestOptions,
-  ): APIPromise<VectorStoreFile> {
-    const { vector_store_id } = params;
-    return this._client.get(path`/vector_stores/${vector_store_id}/files/${fileID}`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-    });
+  retrieve(fileID: string, params: FileRetrieveParams, options?: RequestOptions): APIPromise<VectorStoreFile> {
+    const { vector_store_id } = params
+    return this._client.get(path`/vector_stores/${vector_store_id}/files/${fileID}`, { ...options, headers: buildHeaders([{'OpenAI-Beta': 'assistants=v2'}, options?.headers]) });
   }
 
   /**
    * Update attributes on a vector store file.
    */
   update(fileID: string, params: FileUpdateParams, options?: RequestOptions): APIPromise<VectorStoreFile> {
-    const { vector_store_id, ...body } = params;
-    return this._client.post(path`/vector_stores/${vector_store_id}/files/${fileID}`, {
-      body,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-    });
+    const { vector_store_id, ...body } = params
+    return this._client.post(path`/vector_stores/${vector_store_id}/files/${fileID}`, { body, ...options, headers: buildHeaders([{'OpenAI-Beta': 'assistants=v2'}, options?.headers]) });
   }
 
   /**
    * Returns a list of vector store files.
    */
-  list(
-    vectorStoreID: string,
-    query: FileListParams | null | undefined = {},
-    options?: RequestOptions,
-  ): PagePromise<VectorStoreFilesPage, VectorStoreFile> {
-    return this._client.getAPIList(path`/vector_stores/${vectorStoreID}/files`, CursorPage<VectorStoreFile>, {
-      query,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-    });
+  list(vectorStoreID: string, query: FileListParams | null | undefined = {}, options?: RequestOptions): PagePromise<VectorStoreFilesPage, VectorStoreFile> {
+    return this._client.getAPIList(path`/vector_stores/${vectorStoreID}/files`, CursorPage<VectorStoreFile>, { query, ...options, headers: buildHeaders([{'OpenAI-Beta': 'assistants=v2'}, options?.headers]) });
   }
 
   /**
@@ -76,16 +49,9 @@ export class Files extends APIResource {
    * [delete file](https://platform.openai.com/docs/api-reference/files/delete)
    * endpoint.
    */
-  delete(
-    fileID: string,
-    params: FileDeleteParams,
-    options?: RequestOptions,
-  ): APIPromise<VectorStoreFileDeleted> {
-    const { vector_store_id } = params;
-    return this._client.delete(path`/vector_stores/${vector_store_id}/files/${fileID}`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-    });
+  delete(fileID: string, params: FileDeleteParams, options?: RequestOptions): APIPromise<VectorStoreFileDeleted> {
+    const { vector_store_id } = params
+    return this._client.delete(path`/vector_stores/${vector_store_id}/files/${fileID}`, { ...options, headers: buildHeaders([{'OpenAI-Beta': 'assistants=v2'}, options?.headers]) });
   }
 
   /**
@@ -177,24 +143,16 @@ export class Files extends APIResource {
   /**
    * Retrieve the parsed contents of a vector store file.
    */
-  content(
-    fileID: string,
-    params: FileContentParams,
-    options?: RequestOptions,
-  ): PagePromise<FileContentResponsesPage, FileContentResponse> {
-    const { vector_store_id } = params;
-    return this._client.getAPIList(
-      path`/vector_stores/${vector_store_id}/files/${fileID}/content`,
-      Page<FileContentResponse>,
-      { ...options, headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]) },
-    );
+  content(fileID: string, params: FileContentParams, options?: RequestOptions): PagePromise<FileContentResponsesPage, FileContentResponse> {
+    const { vector_store_id } = params
+    return this._client.getAPIList(path`/vector_stores/${vector_store_id}/files/${fileID}/content`, Page<FileContentResponse>, { ...options, headers: buildHeaders([{'OpenAI-Beta': 'assistants=v2'}, options?.headers]) });
   }
 }
 
-export type VectorStoreFilesPage = CursorPage<VectorStoreFile>;
+export type VectorStoreFilesPage = CursorPage<VectorStoreFile>
 
 // Note: no pagination actually occurs yet, this is for forwards-compatibility.
-export type FileContentResponsesPage = Page<FileContentResponse>;
+export type FileContentResponsesPage = Page<FileContentResponse>
 
 /**
  * A list of files attached to a vector store.
@@ -391,6 +349,6 @@ export declare namespace Files {
     type FileUpdateParams as FileUpdateParams,
     type FileListParams as FileListParams,
     type FileDeleteParams as FileDeleteParams,
-    type FileContentParams as FileContentParams,
+    type FileContentParams as FileContentParams
   };
 }

@@ -3,16 +3,7 @@
 import { APIResource } from '../../core/resource';
 import * as Shared from '../shared';
 import * as ItemsAPI from './items';
-import {
-  ConversationItem,
-  ConversationItemList,
-  ConversationItemsPage,
-  ItemCreateParams,
-  ItemDeleteParams,
-  ItemListParams,
-  ItemRetrieveParams,
-  Items,
-} from './items';
+import { ConversationItem, ConversationItemList, ConversationItemsPage, ItemCreateParams, ItemDeleteParams, ItemListParams, ItemRetrieveParams, Items } from './items';
 import * as ResponsesAPI from '../responses/responses';
 import { APIPromise } from '../../core/api-promise';
 import { RequestOptions } from '../../internal/request-options';
@@ -27,10 +18,7 @@ export class Conversations extends APIResource {
   /**
    * Create a conversation.
    */
-  create(
-    body: ConversationCreateParams | null | undefined = {},
-    options?: RequestOptions,
-  ): APIPromise<Conversation> {
+  create(body: ConversationCreateParams | null | undefined = {}, options?: RequestOptions): APIPromise<Conversation> {
     return this._client.post('/conversations', { body, ...options });
   }
 
@@ -44,11 +32,7 @@ export class Conversations extends APIResource {
   /**
    * Update a conversation
    */
-  update(
-    conversationID: string,
-    body: ConversationUpdateParams,
-    options?: RequestOptions,
-  ): APIPromise<Conversation> {
+  update(conversationID: string, body: ConversationUpdateParams, options?: RequestOptions): APIPromise<Conversation> {
     return this._client.post(path`/conversations/${conversationID}`, { body, ...options });
   }
 
@@ -142,17 +126,7 @@ export interface Message {
   /**
    * The content of the message
    */
-  content: Array<
-    | ResponsesAPI.ResponseInputText
-    | ResponsesAPI.ResponseOutputText
-    | TextContent
-    | SummaryTextContent
-    | Message.ReasoningText
-    | ResponsesAPI.ResponseOutputRefusal
-    | ResponsesAPI.ResponseInputImage
-    | ComputerScreenshotContent
-    | ResponsesAPI.ResponseInputFile
-  >;
+  content: Array<ResponsesAPI.ResponseInputText | ResponsesAPI.ResponseOutputText | TextContent | SummaryTextContent | Message.ReasoningText | ResponsesAPI.ResponseOutputRefusal | ResponsesAPI.ResponseInputImage | ComputerScreenshotContent | ResponsesAPI.ResponseInputFile>;
 
   /**
    * The role of the message. One of `unknown`, `user`, `assistant`, `system`,
@@ -221,15 +195,15 @@ export interface TextContent {
   type: 'text';
 }
 
-export type InputTextContent = ResponsesAPI.ResponseInputText;
+export type InputTextContent = ResponsesAPI.ResponseInputText
 
-export type OutputTextContent = ResponsesAPI.ResponseOutputText;
+export type OutputTextContent = ResponsesAPI.ResponseOutputText
 
-export type RefusalContent = ResponsesAPI.ResponseOutputRefusal;
+export type RefusalContent = ResponsesAPI.ResponseOutputRefusal
 
-export type InputImageContent = ResponsesAPI.ResponseInputImage;
+export type InputImageContent = ResponsesAPI.ResponseInputImage
 
-export type InputFileContent = ResponsesAPI.ResponseInputFile;
+export type InputFileContent = ResponsesAPI.ResponseInputFile
 
 export interface ConversationCreateParams {
   /**
@@ -278,7 +252,7 @@ export declare namespace Conversations {
     type InputImageContent as InputImageContent,
     type InputFileContent as InputFileContent,
     type ConversationCreateParams as ConversationCreateParams,
-    type ConversationUpdateParams as ConversationUpdateParams,
+    type ConversationUpdateParams as ConversationUpdateParams
   };
 
   export {
@@ -289,6 +263,6 @@ export declare namespace Conversations {
     type ItemCreateParams as ItemCreateParams,
     type ItemRetrieveParams as ItemRetrieveParams,
     type ItemListParams as ItemListParams,
-    type ItemDeleteParams as ItemDeleteParams,
+    type ItemDeleteParams as ItemDeleteParams
   };
 }

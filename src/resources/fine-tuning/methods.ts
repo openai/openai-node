@@ -3,7 +3,9 @@
 import { APIResource } from '../../core/resource';
 import * as GraderModelsAPI from '../graders/grader-models';
 
-export class Methods extends APIResource {}
+export class Methods extends APIResource {
+
+}
 
 /**
  * The hyperparameters used for the DPO fine-tuning job.
@@ -94,12 +96,7 @@ export interface ReinforcementMethod {
   /**
    * The grader used for the fine-tuning job.
    */
-  grader:
-    | GraderModelsAPI.StringCheckGrader
-    | GraderModelsAPI.TextSimilarityGrader
-    | GraderModelsAPI.PythonGrader
-    | GraderModelsAPI.ScoreModelGrader
-    | GraderModelsAPI.MultiGrader;
+  grader: GraderModelsAPI.StringCheckGrader | GraderModelsAPI.TextSimilarityGrader | GraderModelsAPI.PythonGrader | GraderModelsAPI.ScoreModelGrader | GraderModelsAPI.MultiGrader;
 
   /**
    * The hyperparameters used for the reinforcement fine-tuning job.
@@ -147,6 +144,6 @@ export declare namespace Methods {
     type ReinforcementHyperparameters as ReinforcementHyperparameters,
     type ReinforcementMethod as ReinforcementMethod,
     type SupervisedHyperparameters as SupervisedHyperparameters,
-    type SupervisedMethod as SupervisedMethod,
+    type SupervisedMethod as SupervisedMethod
   };
 }

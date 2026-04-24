@@ -2,10 +2,7 @@
 
 import OpenAI from 'openai';
 
-const client = new OpenAI({
-  apiKey: 'My API Key',
-  baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
-});
+const client = new OpenAI({ apiKey: 'My API Key', baseURL: process.env["TEST_API_BASE_URL"] ?? 'http://127.0.0.1:4010' });
 
 describe('resource containers', () => {
   test('create: only required params', async () => {
@@ -21,19 +18,17 @@ describe('resource containers', () => {
 
   test('create: required and optional params', async () => {
     const response = await client.containers.create({
-      name: 'name',
-      expires_after: { anchor: 'last_active_at', minutes: 0 },
-      file_ids: ['string'],
-      memory_limit: '1g',
-      network_policy: { type: 'disabled' },
-      skills: [
-        {
-          skill_id: 'x',
-          type: 'skill_reference',
-          version: 'version',
-        },
-      ],
-    });
+    name: 'name',
+    expires_after: { anchor: 'last_active_at', minutes: 0 },
+    file_ids: ['string'],
+    memory_limit: '1g',
+    network_policy: { type: 'disabled' },
+    skills: [{
+    skill_id: 'x',
+    type: 'skill_reference',
+    version: 'version',
+  }],
+  });
   });
 
   test('retrieve', async () => {
@@ -60,17 +55,14 @@ describe('resource containers', () => {
 
   test('list: request options and params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(
-      client.containers.list(
-        {
-          after: 'after',
-          limit: 0,
-          name: 'name',
-          order: 'asc',
-        },
-        { path: '/_stainless_unknown_path' },
-      ),
-    ).rejects.toThrow(OpenAI.NotFoundError);
+    await expect(client.containers.list({
+    after: 'after',
+    limit: 0,
+    name: 'name',
+    order: 'asc',
+  }, { path: '/_stainless_unknown_path' }))
+      .rejects
+      .toThrow(OpenAI.NotFoundError);
   });
 
   test('delete', async () => {

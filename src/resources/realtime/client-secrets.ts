@@ -107,24 +107,7 @@ export interface RealtimeSessionCreateResponse {
   /**
    * The Realtime model used for this session.
    */
-  model?:
-    | (string & {})
-    | 'gpt-realtime'
-    | 'gpt-realtime-1.5'
-    | 'gpt-realtime-2025-08-28'
-    | 'gpt-4o-realtime-preview'
-    | 'gpt-4o-realtime-preview-2024-10-01'
-    | 'gpt-4o-realtime-preview-2024-12-17'
-    | 'gpt-4o-realtime-preview-2025-06-03'
-    | 'gpt-4o-mini-realtime-preview'
-    | 'gpt-4o-mini-realtime-preview-2024-12-17'
-    | 'gpt-realtime-mini'
-    | 'gpt-realtime-mini-2025-10-06'
-    | 'gpt-realtime-mini-2025-12-15'
-    | 'gpt-audio-1.5'
-    | 'gpt-audio-mini'
-    | 'gpt-audio-mini-2025-10-06'
-    | 'gpt-audio-mini-2025-12-15';
+  model?: (string & {}) | 'gpt-realtime' | 'gpt-realtime-1.5' | 'gpt-realtime-2025-08-28' | 'gpt-4o-realtime-preview' | 'gpt-4o-realtime-preview-2024-10-01' | 'gpt-4o-realtime-preview-2024-12-17' | 'gpt-4o-realtime-preview-2025-06-03' | 'gpt-4o-mini-realtime-preview' | 'gpt-4o-mini-realtime-preview-2024-12-17' | 'gpt-realtime-mini' | 'gpt-realtime-mini-2025-10-06' | 'gpt-realtime-mini-2025-12-15' | 'gpt-audio-1.5' | 'gpt-audio-mini' | 'gpt-audio-mini-2025-10-06' | 'gpt-audio-mini-2025-12-15';
 
   /**
    * The set of modalities the model can respond with. It defaults to `["audio"]`,
@@ -382,18 +365,7 @@ export namespace RealtimeSessionCreateResponse {
        * `alloy`, `ash`, `ballad`, `coral`, `echo`, `sage`, `shimmer`, `verse`, `marin`,
        * and `cedar`. We recommend `marin` and `cedar` for best quality.
        */
-      voice?:
-        | (string & {})
-        | 'alloy'
-        | 'ash'
-        | 'ballad'
-        | 'coral'
-        | 'echo'
-        | 'sage'
-        | 'shimmer'
-        | 'verse'
-        | 'marin'
-        | 'cedar';
+      voice?: (string & {}) | 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse' | 'marin' | 'cedar';
     }
   }
 
@@ -442,15 +414,7 @@ export namespace RealtimeSessionCreateResponse {
      * - Outlook Email: `connector_outlookemail`
      * - SharePoint: `connector_sharepoint`
      */
-    connector_id?:
-      | 'connector_dropbox'
-      | 'connector_gmail'
-      | 'connector_googlecalendar'
-      | 'connector_googledrive'
-      | 'connector_microsoftteams'
-      | 'connector_outlookcalendar'
-      | 'connector_outlookemail'
-      | 'connector_sharepoint';
+    connector_id?: 'connector_dropbox' | 'connector_gmail' | 'connector_googlecalendar' | 'connector_googledrive' | 'connector_microsoftteams' | 'connector_outlookcalendar' | 'connector_outlookemail' | 'connector_sharepoint';
 
     /**
      * Whether this MCP tool is deferred and discovered via tool search.
@@ -764,6 +728,6 @@ export declare namespace ClientSecrets {
     type RealtimeTranscriptionSessionCreateResponse as RealtimeTranscriptionSessionCreateResponse,
     type RealtimeTranscriptionSessionTurnDetection as RealtimeTranscriptionSessionTurnDetection,
     type ClientSecretCreateResponse as ClientSecretCreateResponse,
-    type ClientSecretCreateParams as ClientSecretCreateParams,
+    type ClientSecretCreateParams as ClientSecretCreateParams
   };
 }

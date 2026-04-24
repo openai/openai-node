@@ -21,11 +21,7 @@ export class Messages extends APIResource {
    * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
   create(threadID: string, body: MessageCreateParams, options?: RequestOptions): APIPromise<Message> {
-    return this._client.post(path`/threads/${threadID}/messages`, {
-      body,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-    });
+    return this._client.post(path`/threads/${threadID}/messages`, { body, ...options, headers: buildHeaders([{'OpenAI-Beta': 'assistants=v2'}, options?.headers]) });
   }
 
   /**
@@ -34,11 +30,8 @@ export class Messages extends APIResource {
    * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
   retrieve(messageID: string, params: MessageRetrieveParams, options?: RequestOptions): APIPromise<Message> {
-    const { thread_id } = params;
-    return this._client.get(path`/threads/${thread_id}/messages/${messageID}`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-    });
+    const { thread_id } = params
+    return this._client.get(path`/threads/${thread_id}/messages/${messageID}`, { ...options, headers: buildHeaders([{'OpenAI-Beta': 'assistants=v2'}, options?.headers]) });
   }
 
   /**
@@ -47,12 +40,8 @@ export class Messages extends APIResource {
    * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
   update(messageID: string, params: MessageUpdateParams, options?: RequestOptions): APIPromise<Message> {
-    const { thread_id, ...body } = params;
-    return this._client.post(path`/threads/${thread_id}/messages/${messageID}`, {
-      body,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-    });
+    const { thread_id, ...body } = params
+    return this._client.post(path`/threads/${thread_id}/messages/${messageID}`, { body, ...options, headers: buildHeaders([{'OpenAI-Beta': 'assistants=v2'}, options?.headers]) });
   }
 
   /**
@@ -60,16 +49,8 @@ export class Messages extends APIResource {
    *
    * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
-  list(
-    threadID: string,
-    query: MessageListParams | null | undefined = {},
-    options?: RequestOptions,
-  ): PagePromise<MessagesPage, Message> {
-    return this._client.getAPIList(path`/threads/${threadID}/messages`, CursorPage<Message>, {
-      query,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-    });
+  list(threadID: string, query: MessageListParams | null | undefined = {}, options?: RequestOptions): PagePromise<MessagesPage, Message> {
+    return this._client.getAPIList(path`/threads/${threadID}/messages`, CursorPage<Message>, { query, ...options, headers: buildHeaders([{'OpenAI-Beta': 'assistants=v2'}, options?.headers]) });
   }
 
   /**
@@ -77,34 +58,27 @@ export class Messages extends APIResource {
    *
    * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
-  delete(
-    messageID: string,
-    params: MessageDeleteParams,
-    options?: RequestOptions,
-  ): APIPromise<MessageDeleted> {
-    const { thread_id } = params;
-    return this._client.delete(path`/threads/${thread_id}/messages/${messageID}`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-    });
+  delete(messageID: string, params: MessageDeleteParams, options?: RequestOptions): APIPromise<MessageDeleted> {
+    const { thread_id } = params
+    return this._client.delete(path`/threads/${thread_id}/messages/${messageID}`, { ...options, headers: buildHeaders([{'OpenAI-Beta': 'assistants=v2'}, options?.headers]) });
   }
 }
 
-export type MessagesPage = CursorPage<Message>;
+export type MessagesPage = CursorPage<Message>
 
 /**
  * A citation within the message that points to a specific quote from a specific
  * File associated with the assistant or the message. Generated when the assistant
  * uses the "file_search" tool to search files.
  */
-export type Annotation = FileCitationAnnotation | FilePathAnnotation;
+export type Annotation = FileCitationAnnotation | FilePathAnnotation
 
 /**
  * A citation within the message that points to a specific quote from a specific
  * File associated with the assistant or the message. Generated when the assistant
  * uses the "file_search" tool to search files.
  */
-export type AnnotationDelta = FileCitationDeltaAnnotation | FilePathDeltaAnnotation;
+export type AnnotationDelta = FileCitationDeltaAnnotation | FilePathDeltaAnnotation
 
 /**
  * A citation within the message that points to a specific quote from a specific
@@ -489,27 +463,19 @@ export namespace Message {
  * References an image [File](https://platform.openai.com/docs/api-reference/files)
  * in the content of a message.
  */
-export type MessageContent =
-  | ImageFileContentBlock
-  | ImageURLContentBlock
-  | TextContentBlock
-  | RefusalContentBlock;
+export type MessageContent = ImageFileContentBlock | ImageURLContentBlock | TextContentBlock | RefusalContentBlock
 
 /**
  * References an image [File](https://platform.openai.com/docs/api-reference/files)
  * in the content of a message.
  */
-export type MessageContentDelta =
-  | ImageFileDeltaBlock
-  | TextDeltaBlock
-  | RefusalDeltaBlock
-  | ImageURLDeltaBlock;
+export type MessageContentDelta = ImageFileDeltaBlock | TextDeltaBlock | RefusalDeltaBlock | ImageURLDeltaBlock
 
 /**
  * References an image [File](https://platform.openai.com/docs/api-reference/files)
  * in the content of a message.
  */
-export type MessageContentPartParam = ImageFileContentBlock | ImageURLContentBlock | TextContentBlockParam;
+export type MessageContentPartParam = ImageFileContentBlock | ImageURLContentBlock | TextContentBlockParam
 
 export interface MessageDeleted {
   id: string;
@@ -789,6 +755,6 @@ export declare namespace Messages {
     type MessageRetrieveParams as MessageRetrieveParams,
     type MessageUpdateParams as MessageUpdateParams,
     type MessageListParams as MessageListParams,
-    type MessageDeleteParams as MessageDeleteParams,
+    type MessageDeleteParams as MessageDeleteParams
   };
 }

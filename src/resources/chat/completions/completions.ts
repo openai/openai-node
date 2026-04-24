@@ -58,22 +58,11 @@ export class Completions extends APIResource {
    * );
    * ```
    */
-  create(body: ChatCompletionCreateParamsNonStreaming, options?: RequestOptions): APIPromise<ChatCompletion>;
-  create(
-    body: ChatCompletionCreateParamsStreaming,
-    options?: RequestOptions,
-  ): APIPromise<Stream<ChatCompletionChunk>>;
-  create(
-    body: ChatCompletionCreateParamsBase,
-    options?: RequestOptions,
-  ): APIPromise<Stream<ChatCompletionChunk> | ChatCompletion>;
-  create(
-    body: ChatCompletionCreateParams,
-    options?: RequestOptions,
-  ): APIPromise<ChatCompletion> | APIPromise<Stream<ChatCompletionChunk>> {
-    return this._client.post('/chat/completions', { body, ...options, stream: body.stream ?? false }) as
-      | APIPromise<ChatCompletion>
-      | APIPromise<Stream<ChatCompletionChunk>>;
+  create(body: ChatCompletionCreateParamsNonStreaming, options?: RequestOptions): APIPromise<ChatCompletion>
+  create(body: ChatCompletionCreateParamsStreaming, options?: RequestOptions): APIPromise<Stream<ChatCompletionChunk>>
+  create(body: ChatCompletionCreateParamsBase, options?: RequestOptions): APIPromise<Stream<ChatCompletionChunk> | ChatCompletion>
+  create(body: ChatCompletionCreateParams, options?: RequestOptions): APIPromise<ChatCompletion> | APIPromise<Stream<ChatCompletionChunk>> {
+    return this._client.post('/chat/completions', { body, ...options, stream: body.stream ?? false }) as APIPromise<ChatCompletion> | APIPromise<Stream<ChatCompletionChunk>>;
   }
 
   /**
@@ -103,11 +92,7 @@ export class Completions extends APIResource {
    * );
    * ```
    */
-  update(
-    completionID: string,
-    body: ChatCompletionUpdateParams,
-    options?: RequestOptions,
-  ): APIPromise<ChatCompletion> {
+  update(completionID: string, body: ChatCompletionUpdateParams, options?: RequestOptions): APIPromise<ChatCompletion> {
     return this._client.post(path`/chat/completions/${completionID}`, { body, ...options });
   }
 
@@ -123,10 +108,7 @@ export class Completions extends APIResource {
    * }
    * ```
    */
-  list(
-    query: ChatCompletionListParams | null | undefined = {},
-    options?: RequestOptions,
-  ): PagePromise<ChatCompletionsPage, ChatCompletion> {
+  list(query: ChatCompletionListParams | null | undefined = {}, options?: RequestOptions): PagePromise<ChatCompletionsPage, ChatCompletion> {
     return this._client.getAPIList('/chat/completions', CursorPage<ChatCompletion>, { query, ...options });
   }
 
@@ -243,9 +225,9 @@ export { type ChatCompletionStreamingToolRunnerParams } from '../../../lib/ChatC
 export { ChatCompletionStream, type ChatCompletionStreamParams } from '../../../lib/ChatCompletionStream';
 export { ChatCompletionRunner } from '../../../lib/ChatCompletionRunner';
 
-export type ChatCompletionsPage = CursorPage<ChatCompletion>;
+export type ChatCompletionsPage = CursorPage<ChatCompletion>
 
-export type ChatCompletionStoreMessagesPage = CursorPage<ChatCompletionStoreMessage>;
+export type ChatCompletionStoreMessagesPage = CursorPage<ChatCompletionStoreMessage>
 
 /**
  * Represents a chat completion response returned by model, based on the provided
@@ -497,19 +479,7 @@ export interface ChatCompletionAudioParam {
    * `marin`, and `cedar`. You may also provide a custom voice object with an `id`,
    * for example `{ "id": "voice_1234" }`.
    */
-  voice:
-    | string
-    | 'alloy'
-    | 'ash'
-    | 'ballad'
-    | 'coral'
-    | 'echo'
-    | 'sage'
-    | 'shimmer'
-    | 'verse'
-    | 'marin'
-    | 'cedar'
-    | ChatCompletionAudioParam.ID;
+  voice: string | 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse' | 'marin' | 'cedar' | ChatCompletionAudioParam.ID;
 }
 
 export namespace ChatCompletionAudioParam {
@@ -729,11 +699,7 @@ export namespace ChatCompletionChunk {
  * Learn about
  * [text inputs](https://platform.openai.com/docs/guides/text-generation).
  */
-export type ChatCompletionContentPart =
-  | ChatCompletionContentPartText
-  | ChatCompletionContentPartImage
-  | ChatCompletionContentPartInputAudio
-  | ChatCompletionContentPart.File;
+export type ChatCompletionContentPart = ChatCompletionContentPartText | ChatCompletionContentPartImage | ChatCompletionContentPartInputAudio | ChatCompletionContentPart.File
 
 export namespace ChatCompletionContentPart {
   /**
@@ -1204,22 +1170,14 @@ export namespace ChatCompletionMessageFunctionToolCall {
  * messages sent by the user. With o1 models and newer, `developer` messages
  * replace the previous `system` messages.
  */
-export type ChatCompletionMessageParam =
-  | ChatCompletionDeveloperMessageParam
-  | ChatCompletionSystemMessageParam
-  | ChatCompletionUserMessageParam
-  | ChatCompletionAssistantMessageParam
-  | ChatCompletionToolMessageParam
-  | ChatCompletionFunctionMessageParam;
+export type ChatCompletionMessageParam = ChatCompletionDeveloperMessageParam | ChatCompletionSystemMessageParam | ChatCompletionUserMessageParam | ChatCompletionAssistantMessageParam | ChatCompletionToolMessageParam | ChatCompletionFunctionMessageParam
 
 /**
  * A call to a function tool created by the model.
  */
-export type ChatCompletionMessageToolCall =
-  | ChatCompletionMessageFunctionToolCall
-  | ChatCompletionMessageCustomToolCall;
+export type ChatCompletionMessageToolCall = ChatCompletionMessageFunctionToolCall | ChatCompletionMessageCustomToolCall
 
-export type ChatCompletionModality = 'text' | 'audio';
+export type ChatCompletionModality = 'text' | 'audio'
 
 /**
  * Specifies a tool the model should use. Use to force the model to call a specific
@@ -1287,7 +1245,7 @@ export interface ChatCompletionPredictionContent {
 /**
  * The role of the author of a message
  */
-export type ChatCompletionRole = 'developer' | 'system' | 'user' | 'assistant' | 'tool' | 'function';
+export type ChatCompletionRole = 'developer' | 'system' | 'user' | 'assistant' | 'tool' | 'function'
 
 /**
  * A chat completion message generated by the model.
@@ -1410,7 +1368,7 @@ export namespace ChatCompletionTokenLogprob {
 /**
  * A function tool that can be used to generate a response.
  */
-export type ChatCompletionTool = ChatCompletionFunctionTool | ChatCompletionCustomTool;
+export type ChatCompletionTool = ChatCompletionFunctionTool | ChatCompletionCustomTool
 
 /**
  * Controls which (if any) tool is called by the model. `none` means the model will
@@ -1423,13 +1381,7 @@ export type ChatCompletionTool = ChatCompletionFunctionTool | ChatCompletionCust
  * `none` is the default when no tools are present. `auto` is the default if tools
  * are present.
  */
-export type ChatCompletionToolChoiceOption =
-  | 'none'
-  | 'auto'
-  | 'required'
-  | ChatCompletionAllowedToolChoice
-  | ChatCompletionNamedToolChoice
-  | ChatCompletionNamedToolChoiceCustom;
+export type ChatCompletionToolChoiceOption = 'none' | 'auto' | 'required' | ChatCompletionAllowedToolChoice | ChatCompletionNamedToolChoice | ChatCompletionNamedToolChoiceCustom
 
 export interface ChatCompletionToolMessageParam {
   /**
@@ -1499,11 +1451,9 @@ export interface ChatCompletionAllowedTools {
   tools: Array<{ [key: string]: unknown }>;
 }
 
-export type ChatCompletionReasoningEffort = Shared.ReasoningEffort | null;
+export type ChatCompletionReasoningEffort = Shared.ReasoningEffort | null
 
-export type ChatCompletionCreateParams =
-  | ChatCompletionCreateParamsNonStreaming
-  | ChatCompletionCreateParamsStreaming;
+export type ChatCompletionCreateParams = ChatCompletionCreateParamsNonStreaming | ChatCompletionCreateParamsStreaming
 
 export interface ChatCompletionCreateParamsBase {
   /**
@@ -1696,10 +1646,7 @@ export interface ChatCompletionCreateParamsBase {
    * ensures the message the model generates is valid JSON. Using `json_schema` is
    * preferred for models that support it.
    */
-  response_format?:
-    | Shared.ResponseFormatText
-    | Shared.ResponseFormatJSONSchema
-    | Shared.ResponseFormatJSONObject;
+  response_format?: Shared.ResponseFormatText | Shared.ResponseFormatJSONSchema | Shared.ResponseFormatJSONObject;
 
   /**
    * A stable identifier used to help detect users of your application that may be
@@ -1936,9 +1883,8 @@ export namespace ChatCompletionCreateParams {
     }
   }
 
-  export type ChatCompletionCreateParamsNonStreaming =
-    ChatCompletionsAPI.ChatCompletionCreateParamsNonStreaming;
-  export type ChatCompletionCreateParamsStreaming = ChatCompletionsAPI.ChatCompletionCreateParamsStreaming;
+  export type ChatCompletionCreateParamsNonStreaming = ChatCompletionsAPI.ChatCompletionCreateParamsNonStreaming
+  export type ChatCompletionCreateParamsStreaming = ChatCompletionsAPI.ChatCompletionCreateParamsStreaming
 }
 
 export interface ChatCompletionCreateParamsNonStreaming extends ChatCompletionCreateParamsBase {
@@ -2047,8 +1993,11 @@ export declare namespace Completions {
     type ChatCompletionCreateParamsNonStreaming as ChatCompletionCreateParamsNonStreaming,
     type ChatCompletionCreateParamsStreaming as ChatCompletionCreateParamsStreaming,
     type ChatCompletionUpdateParams as ChatCompletionUpdateParams,
-    type ChatCompletionListParams as ChatCompletionListParams,
+    type ChatCompletionListParams as ChatCompletionListParams
   };
 
-  export { Messages as Messages, type MessageListParams as MessageListParams };
+  export {
+    Messages as Messages,
+    type MessageListParams as MessageListParams
+  };
 }

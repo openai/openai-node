@@ -4,15 +4,7 @@ import { ResponsesEmitter, ResponsesStreamMessage, WebSocketError, buildURL } fr
 import { InternalEventEmitter } from '../../core/EventEmitter';
 import { sleep } from '../../internal/utils/sleep';
 import { type WebSocketLike, ReadyState } from '../../internal/ws-adapter';
-import {
-  SendQueue,
-  flattenRawData,
-  isRecoverableClose,
-  type RawWebSocketData,
-  type ReconnectingEvent,
-  type ReconnectingOverrides,
-  type UnsentMessage,
-} from '../../internal/ws';
+import { SendQueue, flattenRawData, isRecoverableClose, type RawWebSocketData, type ReconnectingEvent, type ReconnectingOverrides, type UnsentMessage } from '../../internal/ws';
 import * as ResponsesAPI from './responses';
 import { OpenAI } from '../../client';
 import { OpenAIError } from '../../core/error';
@@ -22,9 +14,7 @@ export interface ResponsesWSReconnectOptions {
    * Called before each reconnect attempt. Return an object with
    * `parameters` to override query parameters for the next connection.
    */
-  onReconnecting(
-    event: ReconnectingEvent<Record<string, unknown>>,
-  ): ReconnectingOverrides<Record<string, unknown>> | void;
+  onReconnecting(event: ReconnectingEvent<Record<string, unknown>>): ReconnectingOverrides<Record<string, unknown>> | void;
 
   /**
    * Maximum number of reconnection attempts. Default: 5.
@@ -83,7 +73,8 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
     close: (code: number, reason: string, unsent: UnsentMessage<ResponsesAPI.ResponsesClientEvent>[]) => void;
   }>();
 
-  constructor(client: OpenAI, options?: ResponsesWSBaseOptions | undefined) {
+  constructor(client: OpenAI,
+options?: ResponsesWSBaseOptions | undefined) {
     super();
     this._client = client;
     this._parameters = undefined;
@@ -236,11 +227,7 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
       }
     };
 
-    const onClose = (
-      code: number,
-      reason: string,
-      unsent: UnsentMessage<ResponsesAPI.ResponsesClientEvent>[],
-    ) => {
+    const onClose = (code: number, reason: string, unsent: UnsentMessage<ResponsesAPI.ResponsesClientEvent>[]) => {
       push({ type: 'close', code, reason, unsent });
       done = true;
       flushResolvers();
@@ -293,12 +280,7 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
           push({ type: 'closing' });
           break;
         case ReadyState.CLOSED:
-          push({
-            type: 'close',
-            code: this._lastCloseCode,
-            reason: this._lastCloseReason,
-            unsent: this._sendQueue.drain(),
-          });
+          push({ type: 'close', code: this._lastCloseCode, reason: this._lastCloseReason, unsent: this._sendQueue.drain() });
           done = true;
           cleanup();
           break;
@@ -421,16 +403,9 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
       if (!this._canReconnect(closeCode)) {
         this._isReconnecting = false;
         if (!this._intentionallyClosed) {
-          this._onError(
-            null,
-            `WebSocket reconnect aborted: non-recoverable close code ${closeCode}`,
-            undefined,
-          );
+          this._onError(null, `WebSocket reconnect aborted: non-recoverable close code ${closeCode}`, undefined);
         }
-        this._emitPermanentClose(
-          this._intentionallyClosed ? this._closeCode : closeCode,
-          this._intentionallyClosed ? this._closeReason : 'reconnect aborted',
-        );
+        this._emitPermanentClose(this._intentionallyClosed ? this._closeCode : closeCode, this._intentionallyClosed ? this._closeReason : 'reconnect aborted');
         return;
       }
 
@@ -478,16 +453,9 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
       if (!this._canReconnect(closeCode)) {
         this._isReconnecting = false;
         if (!this._intentionallyClosed) {
-          this._onError(
-            null,
-            `WebSocket reconnect aborted: non-recoverable close code ${closeCode}`,
-            undefined,
-          );
+          this._onError(null, `WebSocket reconnect aborted: non-recoverable close code ${closeCode}`, undefined);
         }
-        this._emitPermanentClose(
-          this._intentionallyClosed ? this._closeCode : closeCode,
-          this._intentionallyClosed ? this._closeReason : 'reconnect aborted',
-        );
+        this._emitPermanentClose(this._intentionallyClosed ? this._closeCode : closeCode, this._intentionallyClosed ? this._closeReason : 'reconnect aborted');
         return;
       }
 
@@ -496,16 +464,9 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
       if (!this._canReconnect(closeCode)) {
         this._isReconnecting = false;
         if (!this._intentionallyClosed) {
-          this._onError(
-            null,
-            `WebSocket reconnect aborted: non-recoverable close code ${closeCode}`,
-            undefined,
-          );
+          this._onError(null, `WebSocket reconnect aborted: non-recoverable close code ${closeCode}`, undefined);
         }
-        this._emitPermanentClose(
-          this._intentionallyClosed ? this._closeCode : closeCode,
-          this._intentionallyClosed ? this._closeReason : 'reconnect aborted',
-        );
+        this._emitPermanentClose(this._intentionallyClosed ? this._closeCode : closeCode, this._intentionallyClosed ? this._closeReason : 'reconnect aborted');
         return;
       }
 
@@ -540,11 +501,7 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
     // All retries exhausted — surface an error so consumers can
     // distinguish retry failure from a clean close.
     this._isReconnecting = false;
-    this._onError(
-      null,
-      `WebSocket reconnect failed after ${maxRetries} attempts (close code: ${closeCode})`,
-      undefined,
-    );
+    this._onError(null, `WebSocket reconnect failed after ${maxRetries} attempts (close code: ${closeCode})`, undefined);
     this._emitPermanentClose(closeCode, `reconnect failed after ${maxRetries} attempts`);
   }
 
@@ -603,7 +560,7 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
   }
 
   protected _authHeaders(): Record<string, string> {
-    return { Authorization: `Bearer ${this._client.apiKey}` };
+    return { 'Authorization': `Bearer ${this._client.apiKey}` }
     return {};
   }
 }

@@ -18,20 +18,18 @@ export interface ReconnectingEvent<Parameters = Record<string, unknown>> {
  * Optional overrides returned from the `onReconnecting` handler
  * to customize the next reconnection attempt.
  */
-export type ReconnectingOverrides<Parameters = Record<string, unknown>> =
-  | {
-      /**
-       * If provided, assigns the query parameters for the next connection.
-       * Set to `undefined` to clear all query parameters.
-       */
-      parameters?: (Parameters & Record<string, unknown>) | undefined;
-    }
-  | {
-      /**
-       * If set, will stop attempting to reconnect.
-       */
-      abort: true;
-    };
+export type ReconnectingOverrides<Parameters = Record<string, unknown>> = {
+  /**
+   * If provided, assigns the query parameters for the next connection.
+   * Set to `undefined` to clear all query parameters.
+   */
+  parameters?: (Parameters & Record<string, unknown>) | undefined;
+} | {
+  /**
+   * If set, will stop attempting to reconnect.
+   */
+  abort: true
+}
 
 /**
  * Raw data types that can be sent over a WebSocket without serialization.

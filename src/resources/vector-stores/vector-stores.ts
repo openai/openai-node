@@ -3,29 +3,9 @@
 import { APIResource } from '../../core/resource';
 import * as Shared from '../shared';
 import * as FileBatchesAPI from './file-batches';
-import {
-  FileBatchCancelParams,
-  FileBatchCreateParams,
-  FileBatchListFilesParams,
-  FileBatchRetrieveParams,
-  FileBatches,
-  VectorStoreFileBatch,
-} from './file-batches';
+import { FileBatchCancelParams, FileBatchCreateParams, FileBatchListFilesParams, FileBatchRetrieveParams, FileBatches, VectorStoreFileBatch } from './file-batches';
 import * as FilesAPI from './files';
-import {
-  FileContentParams,
-  FileContentResponse,
-  FileContentResponsesPage,
-  FileCreateParams,
-  FileDeleteParams,
-  FileListParams,
-  FileRetrieveParams,
-  FileUpdateParams,
-  Files,
-  VectorStoreFile,
-  VectorStoreFileDeleted,
-  VectorStoreFilesPage,
-} from './files';
+import { FileContentParams, FileContentResponse, FileContentResponsesPage, FileCreateParams, FileDeleteParams, FileListParams, FileRetrieveParams, FileUpdateParams, Files, VectorStoreFile, VectorStoreFileDeleted, VectorStoreFilesPage } from './files';
 import { APIPromise } from '../../core/api-promise';
 import { CursorPage, type CursorPageParams, Page, PagePromise } from '../../core/pagination';
 import { buildHeaders } from '../../internal/headers';
@@ -40,88 +20,50 @@ export class VectorStores extends APIResource {
    * Create a vector store.
    */
   create(body: VectorStoreCreateParams, options?: RequestOptions): APIPromise<VectorStore> {
-    return this._client.post('/vector_stores', {
-      body,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-    });
+    return this._client.post('/vector_stores', { body, ...options, headers: buildHeaders([{'OpenAI-Beta': 'assistants=v2'}, options?.headers]) });
   }
 
   /**
    * Retrieves a vector store.
    */
   retrieve(vectorStoreID: string, options?: RequestOptions): APIPromise<VectorStore> {
-    return this._client.get(path`/vector_stores/${vectorStoreID}`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-    });
+    return this._client.get(path`/vector_stores/${vectorStoreID}`, { ...options, headers: buildHeaders([{'OpenAI-Beta': 'assistants=v2'}, options?.headers]) });
   }
 
   /**
    * Modifies a vector store.
    */
-  update(
-    vectorStoreID: string,
-    body: VectorStoreUpdateParams,
-    options?: RequestOptions,
-  ): APIPromise<VectorStore> {
-    return this._client.post(path`/vector_stores/${vectorStoreID}`, {
-      body,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-    });
+  update(vectorStoreID: string, body: VectorStoreUpdateParams, options?: RequestOptions): APIPromise<VectorStore> {
+    return this._client.post(path`/vector_stores/${vectorStoreID}`, { body, ...options, headers: buildHeaders([{'OpenAI-Beta': 'assistants=v2'}, options?.headers]) });
   }
 
   /**
    * Returns a list of vector stores.
    */
-  list(
-    query: VectorStoreListParams | null | undefined = {},
-    options?: RequestOptions,
-  ): PagePromise<VectorStoresPage, VectorStore> {
-    return this._client.getAPIList('/vector_stores', CursorPage<VectorStore>, {
-      query,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-    });
+  list(query: VectorStoreListParams | null | undefined = {}, options?: RequestOptions): PagePromise<VectorStoresPage, VectorStore> {
+    return this._client.getAPIList('/vector_stores', CursorPage<VectorStore>, { query, ...options, headers: buildHeaders([{'OpenAI-Beta': 'assistants=v2'}, options?.headers]) });
   }
 
   /**
    * Delete a vector store.
    */
   delete(vectorStoreID: string, options?: RequestOptions): APIPromise<VectorStoreDeleted> {
-    return this._client.delete(path`/vector_stores/${vectorStoreID}`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-    });
+    return this._client.delete(path`/vector_stores/${vectorStoreID}`, { ...options, headers: buildHeaders([{'OpenAI-Beta': 'assistants=v2'}, options?.headers]) });
   }
 
   /**
    * Search a vector store for relevant chunks based on a query and file attributes
    * filter.
    */
-  search(
-    vectorStoreID: string,
-    body: VectorStoreSearchParams,
-    options?: RequestOptions,
-  ): PagePromise<VectorStoreSearchResponsesPage, VectorStoreSearchResponse> {
-    return this._client.getAPIList(
-      path`/vector_stores/${vectorStoreID}/search`,
-      Page<VectorStoreSearchResponse>,
-      {
-        body,
-        method: 'post',
-        ...options,
-        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      },
-    );
+  search(vectorStoreID: string, body: VectorStoreSearchParams, options?: RequestOptions): PagePromise<VectorStoreSearchResponsesPage, VectorStoreSearchResponse> {
+    return this._client.getAPIList(path`/vector_stores/${vectorStoreID}/search`, Page<VectorStoreSearchResponse>, { body, method: 'post', ...options, headers: buildHeaders([{'OpenAI-Beta': 'assistants=v2'}, options?.headers]) });
   }
 }
 
-export type VectorStoresPage = CursorPage<VectorStore>;
+export type VectorStoresPage = CursorPage<VectorStore>
 
 // Note: no pagination actually occurs yet, this is for forwards-compatibility.
-export type VectorStoreSearchResponsesPage = Page<VectorStoreSearchResponse>;
+export type VectorStoreSearchResponsesPage = Page<VectorStoreSearchResponse>
 
 /**
  * The default strategy. This strategy currently uses a `max_chunk_size_tokens` of
@@ -137,13 +79,13 @@ export interface AutoFileChunkingStrategyParam {
 /**
  * The strategy used to chunk the file.
  */
-export type FileChunkingStrategy = StaticFileChunkingStrategyObject | OtherFileChunkingStrategyObject;
+export type FileChunkingStrategy = StaticFileChunkingStrategyObject | OtherFileChunkingStrategyObject
 
 /**
  * The chunking strategy used to chunk the file(s). If not set, will use the `auto`
  * strategy. Only applicable if `file_ids` is non-empty.
  */
-export type FileChunkingStrategyParam = AutoFileChunkingStrategyParam | StaticFileChunkingStrategyObjectParam;
+export type FileChunkingStrategyParam = AutoFileChunkingStrategyParam | StaticFileChunkingStrategyObjectParam
 
 /**
  * This is returned when the chunking strategy is unknown. Typically, this is
@@ -533,7 +475,7 @@ export declare namespace VectorStores {
     type VectorStoreCreateParams as VectorStoreCreateParams,
     type VectorStoreUpdateParams as VectorStoreUpdateParams,
     type VectorStoreListParams as VectorStoreListParams,
-    type VectorStoreSearchParams as VectorStoreSearchParams,
+    type VectorStoreSearchParams as VectorStoreSearchParams
   };
 
   export {
@@ -548,7 +490,7 @@ export declare namespace VectorStores {
     type FileUpdateParams as FileUpdateParams,
     type FileListParams as FileListParams,
     type FileDeleteParams as FileDeleteParams,
-    type FileContentParams as FileContentParams,
+    type FileContentParams as FileContentParams
   };
 
   export {
@@ -557,6 +499,6 @@ export declare namespace VectorStores {
     type FileBatchCreateParams as FileBatchCreateParams,
     type FileBatchRetrieveParams as FileBatchRetrieveParams,
     type FileBatchCancelParams as FileBatchCancelParams,
-    type FileBatchListFilesParams as FileBatchListFilesParams,
+    type FileBatchListFilesParams as FileBatchListFilesParams
   };
 }

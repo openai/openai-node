@@ -3,13 +3,10 @@
 import { castToError } from '../internal/errors';
 import type { OAuthErrorCode } from '../resources/shared';
 
-export class OpenAIError extends Error {}
+export class OpenAIError extends Error {
+}
 
-export class APIError<
-  TStatus extends number | undefined = number | undefined,
-  THeaders extends Headers | undefined = Headers | undefined,
-  TError extends Object | undefined = Object | undefined,
-> extends OpenAIError {
+export class APIError<TStatus extends number | undefined = number | undefined, THeaders extends Headers | undefined = Headers | undefined, TError extends Object | undefined = Object | undefined> extends OpenAIError {
   /** HTTP status for the response that caused the error */
   readonly status: TStatus;
   /** HTTP headers for the response that caused the error */
@@ -39,8 +36,7 @@ export class APIError<
   private static makeMessage(status: number | undefined, error: any, message: string | undefined) {
     const msg =
       error?.message ?
-        typeof error.message === 'string' ?
-          error.message
+        typeof error.message === 'string' ? error.message
         : JSON.stringify(error.message)
       : error ? JSON.stringify(error)
       : message;
@@ -57,12 +53,7 @@ export class APIError<
     return '(no status code or body)';
   }
 
-  static generate(
-    status: number | undefined,
-    errorResponse: Object | undefined,
-    message: string | undefined,
-    headers: Headers | undefined,
-  ): APIError {
+  static generate(status: number | undefined, errorResponse: Object | undefined, message: string | undefined, headers: Headers | undefined): APIError {
     if (!status || !headers) {
       return new APIConnectionError({ message, cause: castToError(errorResponse) });
     }
@@ -126,21 +117,29 @@ export class APIConnectionTimeoutError extends APIConnectionError {
   }
 }
 
-export class BadRequestError extends APIError<400, Headers> {}
+export class BadRequestError extends APIError<400, Headers> {
+}
 
-export class AuthenticationError extends APIError<401, Headers> {}
+export class AuthenticationError extends APIError<401, Headers> {
+}
 
-export class PermissionDeniedError extends APIError<403, Headers> {}
+export class PermissionDeniedError extends APIError<403, Headers> {
+}
 
-export class NotFoundError extends APIError<404, Headers> {}
+export class NotFoundError extends APIError<404, Headers> {
+}
 
-export class ConflictError extends APIError<409, Headers> {}
+export class ConflictError extends APIError<409, Headers> {
+}
 
-export class UnprocessableEntityError extends APIError<422, Headers> {}
+export class UnprocessableEntityError extends APIError<422, Headers> {
+}
 
-export class RateLimitError extends APIError<429, Headers> {}
+export class RateLimitError extends APIError<429, Headers> {
+}
 
-export class InternalServerError extends APIError<number, Headers> {}
+export class InternalServerError extends APIError<number, Headers> {
+}
 
 export class LengthFinishReasonError extends OpenAIError {
   constructor() {

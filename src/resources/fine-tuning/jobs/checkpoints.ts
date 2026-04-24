@@ -22,20 +22,12 @@ export class Checkpoints extends APIResource {
    * }
    * ```
    */
-  list(
-    fineTuningJobID: string,
-    query: CheckpointListParams | null | undefined = {},
-    options?: RequestOptions,
-  ): PagePromise<FineTuningJobCheckpointsPage, FineTuningJobCheckpoint> {
-    return this._client.getAPIList(
-      path`/fine_tuning/jobs/${fineTuningJobID}/checkpoints`,
-      CursorPage<FineTuningJobCheckpoint>,
-      { query, ...options },
-    );
+  list(fineTuningJobID: string, query: CheckpointListParams | null | undefined = {}, options?: RequestOptions): PagePromise<FineTuningJobCheckpointsPage, FineTuningJobCheckpoint> {
+    return this._client.getAPIList(path`/fine_tuning/jobs/${fineTuningJobID}/checkpoints`, CursorPage<FineTuningJobCheckpoint>, { query, ...options });
   }
 }
 
-export type FineTuningJobCheckpointsPage = CursorPage<FineTuningJobCheckpoint>;
+export type FineTuningJobCheckpointsPage = CursorPage<FineTuningJobCheckpoint>
 
 /**
  * The `fine_tuning.job.checkpoint` object represents a model checkpoint for a
@@ -99,12 +91,13 @@ export namespace FineTuningJobCheckpoint {
   }
 }
 
-export interface CheckpointListParams extends CursorPageParams {}
+export interface CheckpointListParams extends CursorPageParams {
+}
 
 export declare namespace Checkpoints {
   export {
     type FineTuningJobCheckpoint as FineTuningJobCheckpoint,
     type FineTuningJobCheckpointsPage as FineTuningJobCheckpointsPage,
-    type CheckpointListParams as CheckpointListParams,
+    type CheckpointListParams as CheckpointListParams
   };
 }

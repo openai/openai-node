@@ -197,8 +197,12 @@ export declare namespace Uploads {
   export {
     type Upload as Upload,
     type UploadCreateParams as UploadCreateParams,
-    type UploadCompleteParams as UploadCompleteParams,
+    type UploadCompleteParams as UploadCompleteParams
   };
 
-  export { Parts as Parts, type UploadPart as UploadPart, type PartCreateParams as PartCreateParams };
+  export {
+    Parts as Parts,
+    type UploadPart as UploadPart,
+    type PartCreateParams as PartCreateParams
+  };
 }

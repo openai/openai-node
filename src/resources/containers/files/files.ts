@@ -20,56 +20,35 @@ export class Files extends APIResource {
    * You can send either a multipart/form-data request with the raw file content, or
    * a JSON request with a file ID.
    */
-  create(
-    containerID: string,
-    body: FileCreateParams,
-    options?: RequestOptions,
-  ): APIPromise<FileCreateResponse> {
-    return this._client.post(
-      path`/containers/${containerID}/files`,
-      maybeMultipartFormRequestOptions({ body, ...options }, this._client),
-    );
+  create(containerID: string, body: FileCreateParams, options?: RequestOptions): APIPromise<FileCreateResponse> {
+    return this._client.post(path`/containers/${containerID}/files`, maybeMultipartFormRequestOptions({ body, ...options }, this._client));
   }
 
   /**
    * Retrieve Container File
    */
-  retrieve(
-    fileID: string,
-    params: FileRetrieveParams,
-    options?: RequestOptions,
-  ): APIPromise<FileRetrieveResponse> {
-    const { container_id } = params;
+  retrieve(fileID: string, params: FileRetrieveParams, options?: RequestOptions): APIPromise<FileRetrieveResponse> {
+    const { container_id } = params
     return this._client.get(path`/containers/${container_id}/files/${fileID}`, options);
   }
 
   /**
    * List Container files
    */
-  list(
-    containerID: string,
-    query: FileListParams | null | undefined = {},
-    options?: RequestOptions,
-  ): PagePromise<FileListResponsesPage, FileListResponse> {
-    return this._client.getAPIList(path`/containers/${containerID}/files`, CursorPage<FileListResponse>, {
-      query,
-      ...options,
-    });
+  list(containerID: string, query: FileListParams | null | undefined = {}, options?: RequestOptions): PagePromise<FileListResponsesPage, FileListResponse> {
+    return this._client.getAPIList(path`/containers/${containerID}/files`, CursorPage<FileListResponse>, { query, ...options });
   }
 
   /**
    * Delete Container File
    */
   delete(fileID: string, params: FileDeleteParams, options?: RequestOptions): APIPromise<void> {
-    const { container_id } = params;
-    return this._client.delete(path`/containers/${container_id}/files/${fileID}`, {
-      ...options,
-      headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
-    });
+    const { container_id } = params
+    return this._client.delete(path`/containers/${container_id}/files/${fileID}`, { ...options, headers: buildHeaders([{Accept: '*/*'}, options?.headers]) });
   }
 }
 
-export type FileListResponsesPage = CursorPage<FileListResponse>;
+export type FileListResponsesPage = CursorPage<FileListResponse>
 
 export interface FileCreateResponse {
   /**
@@ -221,8 +200,11 @@ export declare namespace Files {
     type FileCreateParams as FileCreateParams,
     type FileRetrieveParams as FileRetrieveParams,
     type FileListParams as FileListParams,
-    type FileDeleteParams as FileDeleteParams,
+    type FileDeleteParams as FileDeleteParams
   };
 
-  export { Content as Content, type ContentRetrieveParams as ContentRetrieveParams };
+  export {
+    Content as Content,
+    type ContentRetrieveParams as ContentRetrieveParams
+  };
 }

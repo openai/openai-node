@@ -92,23 +92,12 @@ export class Responses extends APIResource {
    * const response = await client.responses.create();
    * ```
    */
-  create(body: ResponseCreateParamsNonStreaming, options?: RequestOptions): APIPromise<Response>;
-  create(
-    body: ResponseCreateParamsStreaming,
-    options?: RequestOptions,
-  ): APIPromise<Stream<ResponseStreamEvent>>;
-  create(
-    body: ResponseCreateParamsBase,
-    options?: RequestOptions,
-  ): APIPromise<Stream<ResponseStreamEvent> | Response>;
-  create(
-    body: ResponseCreateParams,
-    options?: RequestOptions,
-  ): APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>> {
+  create(body: ResponseCreateParamsNonStreaming, options?: RequestOptions): APIPromise<Response>
+  create(body: ResponseCreateParamsStreaming, options?: RequestOptions): APIPromise<Stream<ResponseStreamEvent>>
+  create(body: ResponseCreateParamsBase, options?: RequestOptions): APIPromise<Stream<ResponseStreamEvent> | Response>
+  create(body: ResponseCreateParams, options?: RequestOptions): APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>> {
     return (
-      this._client.post('/responses', { body, ...options, stream: body.stream ?? false }) as
-        | APIPromise<Response>
-        | APIPromise<Stream<ResponseStreamEvent>>
+      this._client.post('/responses', { body, ...options, stream: body.stream ?? false }) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>
     )._thenUnwrap((rsp) => {
       if ('object' in rsp && rsp.object === 'response') {
         addOutputText(rsp as Response);
@@ -128,32 +117,12 @@ export class Responses extends APIResource {
    * );
    * ```
    */
-  retrieve(
-    responseID: string,
-    query?: ResponseRetrieveParamsNonStreaming,
-    options?: RequestOptions,
-  ): APIPromise<Response>;
-  retrieve(
-    responseID: string,
-    query: ResponseRetrieveParamsStreaming,
-    options?: RequestOptions,
-  ): APIPromise<Stream<ResponseStreamEvent>>;
-  retrieve(
-    responseID: string,
-    query?: ResponseRetrieveParamsBase | undefined,
-    options?: RequestOptions,
-  ): APIPromise<Stream<ResponseStreamEvent> | Response>;
-  retrieve(
-    responseID: string,
-    query: ResponseRetrieveParams | undefined = {},
-    options?: RequestOptions,
-  ): APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>> {
+  retrieve(responseID: string, query?: ResponseRetrieveParamsNonStreaming, options?: RequestOptions): APIPromise<Response>
+  retrieve(responseID: string, query: ResponseRetrieveParamsStreaming, options?: RequestOptions): APIPromise<Stream<ResponseStreamEvent>>
+  retrieve(responseID: string, query?: ResponseRetrieveParamsBase | undefined, options?: RequestOptions): APIPromise<Stream<ResponseStreamEvent> | Response>
+  retrieve(responseID: string, query: ResponseRetrieveParams | undefined = {}, options?: RequestOptions): APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>> {
     return (
-      this._client.get(path`/responses/${responseID}`, {
-        query,
-        ...options,
-        stream: query?.stream ?? false,
-      }) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>
+      this._client.get(path`/responses/${responseID}`, { query, ...options, stream: query?.stream ?? false }) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>
     )._thenUnwrap((rsp) => {
       if ('object' in rsp && rsp.object === 'response') {
         addOutputText(rsp as Response);
@@ -174,10 +143,7 @@ export class Responses extends APIResource {
    * ```
    */
   delete(responseID: string, options?: RequestOptions): APIPromise<void> {
-    return this._client.delete(path`/responses/${responseID}`, {
-      ...options,
-      headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
-    });
+    return this._client.delete(path`/responses/${responseID}`, { ...options, headers: buildHeaders([{Accept: '*/*'}, options?.headers]) });
   }
 
   parse<Params extends ResponseCreateParamsWithTools, ParsedT = ExtractParsedContentFromParams<Params>>(
@@ -235,7 +201,7 @@ export class Responses extends APIResource {
   }
 }
 
-export type ResponseItemsPage = CursorPage<ResponseItem>;
+export type ResponseItemsPage = CursorPage<ResponseItem>
 
 /**
  * Allows the assistant to create, delete, or update files using unified diffs.
@@ -279,16 +245,7 @@ export interface CompactedResponse {
 /**
  * A click action.
  */
-export type ComputerAction =
-  | ComputerAction.Click
-  | ComputerAction.DoubleClick
-  | ComputerAction.Drag
-  | ComputerAction.Keypress
-  | ComputerAction.Move
-  | ComputerAction.Screenshot
-  | ComputerAction.Scroll
-  | ComputerAction.Type
-  | ComputerAction.Wait;
+export type ComputerAction = ComputerAction.Click | ComputerAction.DoubleClick | ComputerAction.Drag | ComputerAction.Keypress | ComputerAction.Move | ComputerAction.Screenshot | ComputerAction.Scroll | ComputerAction.Type | ComputerAction.Wait
 
 export namespace ComputerAction {
   /**
@@ -516,7 +473,7 @@ export namespace ComputerAction {
  * Flattened batched actions for `computer_use`. Each action includes an `type`
  * discriminator and action-specific fields.
  */
-export type ComputerActionList = Array<ComputerAction>;
+export type ComputerActionList = Array<ComputerAction>
 
 /**
  * A tool that controls a virtual computer. Learn more about the
@@ -1026,15 +983,7 @@ export interface Response {
    * response. See the `tools` parameter to see how to specify which tools the model
    * can call.
    */
-  tool_choice:
-    | ToolChoiceOptions
-    | ToolChoiceAllowed
-    | ToolChoiceTypes
-    | ToolChoiceFunction
-    | ToolChoiceMcp
-    | ToolChoiceCustom
-    | ToolChoiceApplyPatch
-    | ToolChoiceShell;
+  tool_choice: ToolChoiceOptions | ToolChoiceAllowed | ToolChoiceTypes | ToolChoiceFunction | ToolChoiceMcp | ToolChoiceCustom | ToolChoiceApplyPatch | ToolChoiceShell;
 
   /**
    * An array of tools the model may call while generating a response. You can
@@ -1244,10 +1193,7 @@ export interface ResponseApplyPatchToolCall {
    * One of the create_file, delete_file, or update_file operations applied via
    * apply_patch.
    */
-  operation:
-    | ResponseApplyPatchToolCall.CreateFile
-    | ResponseApplyPatchToolCall.DeleteFile
-    | ResponseApplyPatchToolCall.UpdateFile;
+  operation: ResponseApplyPatchToolCall.CreateFile | ResponseApplyPatchToolCall.DeleteFile | ResponseApplyPatchToolCall.UpdateFile;
 
   /**
    * The status of the apply patch tool call. One of `in_progress` or `completed`.
@@ -1738,16 +1684,7 @@ export interface ResponseComputerToolCall {
   /**
    * A click action.
    */
-  action?:
-    | ResponseComputerToolCall.Click
-    | ResponseComputerToolCall.DoubleClick
-    | ResponseComputerToolCall.Drag
-    | ResponseComputerToolCall.Keypress
-    | ResponseComputerToolCall.Move
-    | ResponseComputerToolCall.Screenshot
-    | ResponseComputerToolCall.Scroll
-    | ResponseComputerToolCall.Type
-    | ResponseComputerToolCall.Wait;
+  action?: ResponseComputerToolCall.Click | ResponseComputerToolCall.DoubleClick | ResponseComputerToolCall.Drag | ResponseComputerToolCall.Keypress | ResponseComputerToolCall.Move | ResponseComputerToolCall.Screenshot | ResponseComputerToolCall.Scroll | ResponseComputerToolCall.Type | ResponseComputerToolCall.Wait;
 
   /**
    * Flattened batched actions for `computer_use`. Each action includes an `type`
@@ -2095,13 +2032,7 @@ export interface ResponseContainerReference {
 /**
  * Multi-modal input and output contents.
  */
-export type ResponseContent =
-  | ResponseInputText
-  | ResponseInputImage
-  | ResponseInputFile
-  | ResponseOutputText
-  | ResponseOutputRefusal
-  | ResponseContent.ReasoningTextContent;
+export type ResponseContent = ResponseInputText | ResponseInputImage | ResponseInputFile | ResponseOutputText | ResponseOutputRefusal | ResponseContent.ReasoningTextContent
 
 export namespace ResponseContent {
   /**
@@ -2424,25 +2355,7 @@ export interface ResponseError {
   /**
    * The error code for the response.
    */
-  code:
-    | 'server_error'
-    | 'rate_limit_exceeded'
-    | 'invalid_prompt'
-    | 'vector_store_timeout'
-    | 'invalid_image'
-    | 'invalid_image_format'
-    | 'invalid_base64_image'
-    | 'invalid_image_url'
-    | 'image_too_large'
-    | 'image_too_small'
-    | 'image_parse_error'
-    | 'image_content_policy_violation'
-    | 'invalid_image_mode'
-    | 'image_file_too_large'
-    | 'unsupported_image_media_type'
-    | 'empty_image_file'
-    | 'failed_to_download_image'
-    | 'image_file_not_found';
+  code: 'server_error' | 'rate_limit_exceeded' | 'invalid_prompt' | 'vector_store_timeout' | 'invalid_image' | 'invalid_image_format' | 'invalid_base64_image' | 'invalid_image_url' | 'image_too_large' | 'image_too_small' | 'image_parse_error' | 'image_content_policy_violation' | 'invalid_image_mode' | 'image_file_too_large' | 'unsupported_image_media_type' | 'empty_image_file' | 'failed_to_download_image' | 'image_file_not_found';
 
   /**
    * A human-readable description of the error.
@@ -2656,10 +2569,7 @@ export namespace ResponseFileSearchToolCall {
  * ensures the message the model generates is valid JSON. Using `json_schema` is
  * preferred for models that support it.
  */
-export type ResponseFormatTextConfig =
-  | Shared.ResponseFormatText
-  | ResponseFormatTextJSONSchemaConfig
-  | Shared.ResponseFormatJSONObject;
+export type ResponseFormatTextConfig = Shared.ResponseFormatText | ResponseFormatTextJSONSchemaConfig | Shared.ResponseFormatJSONObject
 
 /**
  * JSON Schema response format. Used to generate structured JSON responses. Learn
@@ -2765,15 +2675,12 @@ export interface ResponseFunctionCallArgumentsDoneEvent {
 /**
  * A piece of message content, such as text, an image, or a file.
  */
-export type ResponseFunctionCallOutputItem =
-  | ResponseInputTextContent
-  | ResponseInputImageContent
-  | ResponseInputFileContent;
+export type ResponseFunctionCallOutputItem = ResponseInputTextContent | ResponseInputImageContent | ResponseInputFileContent
 
 /**
  * An array of content outputs (text, image, file) for the function tool call.
  */
-export type ResponseFunctionCallOutputItemList = Array<ResponseFunctionCallOutputItem>;
+export type ResponseFunctionCallOutputItemList = Array<ResponseFunctionCallOutputItem>
 
 /**
  * Captured stdout and stderr for a portion of a shell tool call output.
@@ -3096,10 +3003,7 @@ export interface ResponseFunctionWebSearch {
    * An object describing the specific action taken in this web search call. Includes
    * details on how the model used the web (search, open_page, find_in_page).
    */
-  action:
-    | ResponseFunctionWebSearch.Search
-    | ResponseFunctionWebSearch.OpenPage
-    | ResponseFunctionWebSearch.Find;
+  action:  ResponseFunctionWebSearch.Search | ResponseFunctionWebSearch.OpenPage | ResponseFunctionWebSearch.Find;
 
   /**
    * The status of the web search tool call.
@@ -3347,15 +3251,7 @@ export interface ResponseInProgressEvent {
  * - `code_interpreter_call.outputs`: Includes the outputs of python code execution
  *   in code interpreter tool call items.
  */
-export type ResponseIncludable =
-  | 'file_search_call.results'
-  | 'web_search_call.results'
-  | 'web_search_call.action.sources'
-  | 'message.input_image.image_url'
-  | 'computer_call_output.output.image_url'
-  | 'code_interpreter_call.outputs'
-  | 'reasoning.encrypted_content'
-  | 'message.output_text.logprobs';
+export type ResponseIncludable = 'file_search_call.results' | 'web_search_call.results' | 'web_search_call.action.sources' | 'message.input_image.image_url' | 'computer_call_output.output.image_url' | 'code_interpreter_call.outputs' | 'reasoning.encrypted_content' | 'message.output_text.logprobs'
 
 /**
  * An event that is emitted when a response finishes as incomplete.
@@ -3381,7 +3277,7 @@ export interface ResponseIncompleteEvent {
  * A list of one or many input items to the model, containing different content
  * types.
  */
-export type ResponseInput = Array<ResponseInputItem>;
+export type ResponseInput = Array<ResponseInputItem>
 
 /**
  * An audio input to the model.
@@ -3412,7 +3308,7 @@ export namespace ResponseInputAudio {
 /**
  * A text input to the model.
  */
-export type ResponseInputContent = ResponseInputText | ResponseInputImage | ResponseInputFile;
+export type ResponseInputContent = ResponseInputText | ResponseInputImage | ResponseInputFile
 
 /**
  * A file input to the model.
@@ -3551,35 +3447,7 @@ export interface ResponseInputImageContent {
  * `assistant` role are presumed to have been generated by the model in previous
  * interactions.
  */
-export type ResponseInputItem =
-  | EasyInputMessage
-  | ResponseInputItem.Message
-  | ResponseOutputMessage
-  | ResponseFileSearchToolCall
-  | ResponseComputerToolCall
-  | ResponseInputItem.ComputerCallOutput
-  | ResponseFunctionWebSearch
-  | ResponseFunctionToolCall
-  | ResponseInputItem.FunctionCallOutput
-  | ResponseInputItem.ToolSearchCall
-  | ResponseToolSearchOutputItemParam
-  | ResponseReasoningItem
-  | ResponseCompactionItemParam
-  | ResponseInputItem.ImageGenerationCall
-  | ResponseCodeInterpreterToolCall
-  | ResponseInputItem.LocalShellCall
-  | ResponseInputItem.LocalShellCallOutput
-  | ResponseInputItem.ShellCall
-  | ResponseInputItem.ShellCallOutput
-  | ResponseInputItem.ApplyPatchCall
-  | ResponseInputItem.ApplyPatchCallOutput
-  | ResponseInputItem.McpListTools
-  | ResponseInputItem.McpApprovalRequest
-  | ResponseInputItem.McpApprovalResponse
-  | ResponseInputItem.McpCall
-  | ResponseCustomToolCallOutput
-  | ResponseCustomToolCall
-  | ResponseInputItem.ItemReference;
+export type ResponseInputItem = EasyInputMessage | ResponseInputItem.Message | ResponseOutputMessage | ResponseFileSearchToolCall | ResponseComputerToolCall | ResponseInputItem.ComputerCallOutput | ResponseFunctionWebSearch | ResponseFunctionToolCall | ResponseInputItem.FunctionCallOutput | ResponseInputItem.ToolSearchCall | ResponseToolSearchOutputItemParam | ResponseReasoningItem | ResponseCompactionItemParam | ResponseInputItem.ImageGenerationCall | ResponseCodeInterpreterToolCall | ResponseInputItem.LocalShellCall | ResponseInputItem.LocalShellCallOutput | ResponseInputItem.ShellCall | ResponseInputItem.ShellCallOutput | ResponseInputItem.ApplyPatchCall | ResponseInputItem.ApplyPatchCallOutput | ResponseInputItem.McpListTools | ResponseInputItem.McpApprovalRequest | ResponseInputItem.McpApprovalResponse | ResponseInputItem.McpCall | ResponseCustomToolCallOutput | ResponseCustomToolCall | ResponseInputItem.ItemReference
 
 export namespace ResponseInputItem {
   /**
@@ -4261,7 +4129,7 @@ export namespace ResponseInputItem {
  * A list of one or many input items to the model, containing different content
  * types.
  */
-export type ResponseInputMessageContentList = Array<ResponseInputContent>;
+export type ResponseInputMessageContentList = Array<ResponseInputContent>
 
 export interface ResponseInputMessageItem {
   /**
@@ -4325,33 +4193,7 @@ export interface ResponseInputTextContent {
 /**
  * Content item used to generate a response.
  */
-export type ResponseItem =
-  | ResponseInputMessageItem
-  | ResponseOutputMessage
-  | ResponseFileSearchToolCall
-  | ResponseComputerToolCall
-  | ResponseComputerToolCallOutputItem
-  | ResponseFunctionWebSearch
-  | ResponseFunctionToolCallItem
-  | ResponseFunctionToolCallOutputItem
-  | ResponseToolSearchCall
-  | ResponseToolSearchOutputItem
-  | ResponseReasoningItem
-  | ResponseCompactionItem
-  | ResponseItem.ImageGenerationCall
-  | ResponseCodeInterpreterToolCall
-  | ResponseItem.LocalShellCall
-  | ResponseItem.LocalShellCallOutput
-  | ResponseFunctionShellToolCall
-  | ResponseFunctionShellToolCallOutput
-  | ResponseApplyPatchToolCall
-  | ResponseApplyPatchToolCallOutput
-  | ResponseItem.McpListTools
-  | ResponseItem.McpApprovalRequest
-  | ResponseItem.McpApprovalResponse
-  | ResponseItem.McpCall
-  | ResponseCustomToolCallItem
-  | ResponseCustomToolCallOutputItem;
+export type ResponseItem = ResponseInputMessageItem | ResponseOutputMessage | ResponseFileSearchToolCall | ResponseComputerToolCall | ResponseComputerToolCallOutputItem | ResponseFunctionWebSearch | ResponseFunctionToolCallItem | ResponseFunctionToolCallOutputItem | ResponseToolSearchCall | ResponseToolSearchOutputItem | ResponseReasoningItem | ResponseCompactionItem | ResponseItem.ImageGenerationCall | ResponseCodeInterpreterToolCall | ResponseItem.LocalShellCall | ResponseItem.LocalShellCallOutput | ResponseFunctionShellToolCall | ResponseFunctionShellToolCallOutput | ResponseApplyPatchToolCall | ResponseApplyPatchToolCallOutput | ResponseItem.McpListTools | ResponseItem.McpApprovalRequest | ResponseItem.McpApprovalResponse | ResponseItem.McpCall | ResponseCustomToolCallItem | ResponseCustomToolCallOutputItem
 
 export namespace ResponseItem {
   /**
@@ -4888,32 +4730,7 @@ export interface ResponseOutputAudio {
 /**
  * An output message from the model.
  */
-export type ResponseOutputItem =
-  | ResponseOutputMessage
-  | ResponseFileSearchToolCall
-  | ResponseFunctionToolCall
-  | ResponseFunctionToolCallOutputItem
-  | ResponseFunctionWebSearch
-  | ResponseComputerToolCall
-  | ResponseComputerToolCallOutputItem
-  | ResponseReasoningItem
-  | ResponseToolSearchCall
-  | ResponseToolSearchOutputItem
-  | ResponseCompactionItem
-  | ResponseOutputItem.ImageGenerationCall
-  | ResponseCodeInterpreterToolCall
-  | ResponseOutputItem.LocalShellCall
-  | ResponseOutputItem.LocalShellCallOutput
-  | ResponseFunctionShellToolCall
-  | ResponseFunctionShellToolCallOutput
-  | ResponseApplyPatchToolCall
-  | ResponseApplyPatchToolCallOutput
-  | ResponseOutputItem.McpCall
-  | ResponseOutputItem.McpListTools
-  | ResponseOutputItem.McpApprovalRequest
-  | ResponseOutputItem.McpApprovalResponse
-  | ResponseCustomToolCall
-  | ResponseCustomToolCallOutputItem;
+export type ResponseOutputItem = ResponseOutputMessage | ResponseFileSearchToolCall | ResponseFunctionToolCall | ResponseFunctionToolCallOutputItem | ResponseFunctionWebSearch | ResponseComputerToolCall | ResponseComputerToolCallOutputItem | ResponseReasoningItem | ResponseToolSearchCall | ResponseToolSearchOutputItem | ResponseCompactionItem | ResponseOutputItem.ImageGenerationCall | ResponseCodeInterpreterToolCall | ResponseOutputItem.LocalShellCall | ResponseOutputItem.LocalShellCallOutput | ResponseFunctionShellToolCall | ResponseFunctionShellToolCallOutput | ResponseApplyPatchToolCall | ResponseApplyPatchToolCallOutput | ResponseOutputItem.McpCall | ResponseOutputItem.McpListTools | ResponseOutputItem.McpApprovalRequest | ResponseOutputItem.McpApprovalResponse | ResponseCustomToolCall | ResponseCustomToolCallOutputItem
 
 export namespace ResponseOutputItem {
   /**
@@ -5315,12 +5132,7 @@ export interface ResponseOutputText {
   /**
    * The annotations of the text output.
    */
-  annotations: Array<
-    | ResponseOutputText.FileCitation
-    | ResponseOutputText.URLCitation
-    | ResponseOutputText.ContainerFileCitation
-    | ResponseOutputText.FilePath
-  >;
+  annotations: Array<ResponseOutputText.FileCitation | ResponseOutputText.URLCitation | ResponseOutputText.ContainerFileCitation | ResponseOutputText.FilePath>;
 
   /**
    * The text output from the model.
@@ -5946,65 +5758,12 @@ export interface ResponseRefusalDoneEvent {
  * The status of the response generation. One of `completed`, `failed`,
  * `in_progress`, `cancelled`, `queued`, or `incomplete`.
  */
-export type ResponseStatus = 'completed' | 'failed' | 'in_progress' | 'cancelled' | 'queued' | 'incomplete';
+export type ResponseStatus = 'completed' | 'failed' | 'in_progress' | 'cancelled' | 'queued' | 'incomplete'
 
 /**
  * Emitted when there is a partial audio response.
  */
-export type ResponseStreamEvent =
-  | ResponseAudioDeltaEvent
-  | ResponseAudioDoneEvent
-  | ResponseAudioTranscriptDeltaEvent
-  | ResponseAudioTranscriptDoneEvent
-  | ResponseCodeInterpreterCallCodeDeltaEvent
-  | ResponseCodeInterpreterCallCodeDoneEvent
-  | ResponseCodeInterpreterCallCompletedEvent
-  | ResponseCodeInterpreterCallInProgressEvent
-  | ResponseCodeInterpreterCallInterpretingEvent
-  | ResponseCompletedEvent
-  | ResponseContentPartAddedEvent
-  | ResponseContentPartDoneEvent
-  | ResponseCreatedEvent
-  | ResponseErrorEvent
-  | ResponseFileSearchCallCompletedEvent
-  | ResponseFileSearchCallInProgressEvent
-  | ResponseFileSearchCallSearchingEvent
-  | ResponseFunctionCallArgumentsDeltaEvent
-  | ResponseFunctionCallArgumentsDoneEvent
-  | ResponseInProgressEvent
-  | ResponseFailedEvent
-  | ResponseIncompleteEvent
-  | ResponseOutputItemAddedEvent
-  | ResponseOutputItemDoneEvent
-  | ResponseReasoningSummaryPartAddedEvent
-  | ResponseReasoningSummaryPartDoneEvent
-  | ResponseReasoningSummaryTextDeltaEvent
-  | ResponseReasoningSummaryTextDoneEvent
-  | ResponseReasoningTextDeltaEvent
-  | ResponseReasoningTextDoneEvent
-  | ResponseRefusalDeltaEvent
-  | ResponseRefusalDoneEvent
-  | ResponseTextDeltaEvent
-  | ResponseTextDoneEvent
-  | ResponseWebSearchCallCompletedEvent
-  | ResponseWebSearchCallInProgressEvent
-  | ResponseWebSearchCallSearchingEvent
-  | ResponseImageGenCallCompletedEvent
-  | ResponseImageGenCallGeneratingEvent
-  | ResponseImageGenCallInProgressEvent
-  | ResponseImageGenCallPartialImageEvent
-  | ResponseMcpCallArgumentsDeltaEvent
-  | ResponseMcpCallArgumentsDoneEvent
-  | ResponseMcpCallCompletedEvent
-  | ResponseMcpCallFailedEvent
-  | ResponseMcpCallInProgressEvent
-  | ResponseMcpListToolsCompletedEvent
-  | ResponseMcpListToolsFailedEvent
-  | ResponseMcpListToolsInProgressEvent
-  | ResponseOutputTextAnnotationAddedEvent
-  | ResponseQueuedEvent
-  | ResponseCustomToolCallInputDeltaEvent
-  | ResponseCustomToolCallInputDoneEvent;
+export type ResponseStreamEvent = ResponseAudioDeltaEvent | ResponseAudioDoneEvent | ResponseAudioTranscriptDeltaEvent | ResponseAudioTranscriptDoneEvent | ResponseCodeInterpreterCallCodeDeltaEvent | ResponseCodeInterpreterCallCodeDoneEvent | ResponseCodeInterpreterCallCompletedEvent | ResponseCodeInterpreterCallInProgressEvent | ResponseCodeInterpreterCallInterpretingEvent | ResponseCompletedEvent | ResponseContentPartAddedEvent | ResponseContentPartDoneEvent | ResponseCreatedEvent | ResponseErrorEvent | ResponseFileSearchCallCompletedEvent | ResponseFileSearchCallInProgressEvent | ResponseFileSearchCallSearchingEvent | ResponseFunctionCallArgumentsDeltaEvent | ResponseFunctionCallArgumentsDoneEvent | ResponseInProgressEvent | ResponseFailedEvent | ResponseIncompleteEvent | ResponseOutputItemAddedEvent | ResponseOutputItemDoneEvent | ResponseReasoningSummaryPartAddedEvent | ResponseReasoningSummaryPartDoneEvent | ResponseReasoningSummaryTextDeltaEvent | ResponseReasoningSummaryTextDoneEvent | ResponseReasoningTextDeltaEvent | ResponseReasoningTextDoneEvent | ResponseRefusalDeltaEvent | ResponseRefusalDoneEvent | ResponseTextDeltaEvent | ResponseTextDoneEvent | ResponseWebSearchCallCompletedEvent | ResponseWebSearchCallInProgressEvent | ResponseWebSearchCallSearchingEvent | ResponseImageGenCallCompletedEvent | ResponseImageGenCallGeneratingEvent | ResponseImageGenCallInProgressEvent | ResponseImageGenCallPartialImageEvent | ResponseMcpCallArgumentsDeltaEvent | ResponseMcpCallArgumentsDoneEvent | ResponseMcpCallCompletedEvent | ResponseMcpCallFailedEvent | ResponseMcpCallInProgressEvent | ResponseMcpListToolsCompletedEvent | ResponseMcpListToolsFailedEvent | ResponseMcpListToolsInProgressEvent | ResponseOutputTextAnnotationAddedEvent | ResponseQueuedEvent | ResponseCustomToolCallInputDeltaEvent | ResponseCustomToolCallInputDoneEvent
 
 /**
  * Configuration options for a text response from the model. Can be plain text or
@@ -6647,15 +6406,7 @@ export interface ResponsesClientEvent {
    * response. See the `tools` parameter to see how to specify which tools the model
    * can call.
    */
-  tool_choice?:
-    | ToolChoiceOptions
-    | ToolChoiceAllowed
-    | ToolChoiceTypes
-    | ToolChoiceFunction
-    | ToolChoiceMcp
-    | ToolChoiceCustom
-    | ToolChoiceApplyPatch
-    | ToolChoiceShell;
+  tool_choice?: ToolChoiceOptions | ToolChoiceAllowed | ToolChoiceTypes | ToolChoiceFunction | ToolChoiceMcp | ToolChoiceCustom | ToolChoiceApplyPatch | ToolChoiceShell;
 
   /**
    * An array of tools the model may call while generating a response. You can
@@ -6749,60 +6500,7 @@ export namespace ResponsesClientEvent {
 /**
  * Server events emitted by the Responses WebSocket server.
  */
-export type ResponsesServerEvent =
-  | ResponseAudioDeltaEvent
-  | ResponseAudioDoneEvent
-  | ResponseAudioTranscriptDeltaEvent
-  | ResponseAudioTranscriptDoneEvent
-  | ResponseCodeInterpreterCallCodeDeltaEvent
-  | ResponseCodeInterpreterCallCodeDoneEvent
-  | ResponseCodeInterpreterCallCompletedEvent
-  | ResponseCodeInterpreterCallInProgressEvent
-  | ResponseCodeInterpreterCallInterpretingEvent
-  | ResponseCompletedEvent
-  | ResponseContentPartAddedEvent
-  | ResponseContentPartDoneEvent
-  | ResponseCreatedEvent
-  | ResponseErrorEvent
-  | ResponseFileSearchCallCompletedEvent
-  | ResponseFileSearchCallInProgressEvent
-  | ResponseFileSearchCallSearchingEvent
-  | ResponseFunctionCallArgumentsDeltaEvent
-  | ResponseFunctionCallArgumentsDoneEvent
-  | ResponseInProgressEvent
-  | ResponseFailedEvent
-  | ResponseIncompleteEvent
-  | ResponseOutputItemAddedEvent
-  | ResponseOutputItemDoneEvent
-  | ResponseReasoningSummaryPartAddedEvent
-  | ResponseReasoningSummaryPartDoneEvent
-  | ResponseReasoningSummaryTextDeltaEvent
-  | ResponseReasoningSummaryTextDoneEvent
-  | ResponseReasoningTextDeltaEvent
-  | ResponseReasoningTextDoneEvent
-  | ResponseRefusalDeltaEvent
-  | ResponseRefusalDoneEvent
-  | ResponseTextDeltaEvent
-  | ResponseTextDoneEvent
-  | ResponseWebSearchCallCompletedEvent
-  | ResponseWebSearchCallInProgressEvent
-  | ResponseWebSearchCallSearchingEvent
-  | ResponseImageGenCallCompletedEvent
-  | ResponseImageGenCallGeneratingEvent
-  | ResponseImageGenCallInProgressEvent
-  | ResponseImageGenCallPartialImageEvent
-  | ResponseMcpCallArgumentsDeltaEvent
-  | ResponseMcpCallArgumentsDoneEvent
-  | ResponseMcpCallCompletedEvent
-  | ResponseMcpCallFailedEvent
-  | ResponseMcpCallInProgressEvent
-  | ResponseMcpListToolsCompletedEvent
-  | ResponseMcpListToolsFailedEvent
-  | ResponseMcpListToolsInProgressEvent
-  | ResponseOutputTextAnnotationAddedEvent
-  | ResponseQueuedEvent
-  | ResponseCustomToolCallInputDeltaEvent
-  | ResponseCustomToolCallInputDoneEvent;
+export type ResponsesServerEvent = ResponseAudioDeltaEvent | ResponseAudioDoneEvent | ResponseAudioTranscriptDeltaEvent | ResponseAudioTranscriptDoneEvent | ResponseCodeInterpreterCallCodeDeltaEvent | ResponseCodeInterpreterCallCodeDoneEvent | ResponseCodeInterpreterCallCompletedEvent | ResponseCodeInterpreterCallInProgressEvent | ResponseCodeInterpreterCallInterpretingEvent | ResponseCompletedEvent | ResponseContentPartAddedEvent | ResponseContentPartDoneEvent | ResponseCreatedEvent | ResponseErrorEvent | ResponseFileSearchCallCompletedEvent | ResponseFileSearchCallInProgressEvent | ResponseFileSearchCallSearchingEvent | ResponseFunctionCallArgumentsDeltaEvent | ResponseFunctionCallArgumentsDoneEvent | ResponseInProgressEvent | ResponseFailedEvent | ResponseIncompleteEvent | ResponseOutputItemAddedEvent | ResponseOutputItemDoneEvent | ResponseReasoningSummaryPartAddedEvent | ResponseReasoningSummaryPartDoneEvent | ResponseReasoningSummaryTextDeltaEvent | ResponseReasoningSummaryTextDoneEvent | ResponseReasoningTextDeltaEvent | ResponseReasoningTextDoneEvent | ResponseRefusalDeltaEvent | ResponseRefusalDoneEvent | ResponseTextDeltaEvent | ResponseTextDoneEvent | ResponseWebSearchCallCompletedEvent | ResponseWebSearchCallInProgressEvent | ResponseWebSearchCallSearchingEvent | ResponseImageGenCallCompletedEvent | ResponseImageGenCallGeneratingEvent | ResponseImageGenCallInProgressEvent | ResponseImageGenCallPartialImageEvent | ResponseMcpCallArgumentsDeltaEvent | ResponseMcpCallArgumentsDoneEvent | ResponseMcpCallCompletedEvent | ResponseMcpCallFailedEvent | ResponseMcpCallInProgressEvent | ResponseMcpListToolsCompletedEvent | ResponseMcpListToolsFailedEvent | ResponseMcpListToolsInProgressEvent | ResponseOutputTextAnnotationAddedEvent | ResponseQueuedEvent | ResponseCustomToolCallInputDeltaEvent | ResponseCustomToolCallInputDoneEvent
 
 export interface SkillReference {
   /**
@@ -6824,22 +6522,7 @@ export interface SkillReference {
 /**
  * A tool that can be used to generate a response.
  */
-export type Tool =
-  | FunctionTool
-  | FileSearchTool
-  | ComputerTool
-  | ComputerUsePreviewTool
-  | WebSearchTool
-  | Tool.Mcp
-  | Tool.CodeInterpreter
-  | Tool.ImageGeneration
-  | Tool.LocalShell
-  | FunctionShellTool
-  | CustomTool
-  | NamespaceTool
-  | ToolSearchTool
-  | WebSearchPreviewTool
-  | ApplyPatchTool;
+export type Tool = FunctionTool | FileSearchTool | ComputerTool | ComputerUsePreviewTool | WebSearchTool | Tool.Mcp | Tool.CodeInterpreter | Tool.ImageGeneration | Tool.LocalShell | FunctionShellTool | CustomTool | NamespaceTool | ToolSearchTool | WebSearchPreviewTool | ApplyPatchTool
 
 export namespace Tool {
   /**
@@ -6887,15 +6570,7 @@ export namespace Tool {
      * - Outlook Email: `connector_outlookemail`
      * - SharePoint: `connector_sharepoint`
      */
-    connector_id?:
-      | 'connector_dropbox'
-      | 'connector_gmail'
-      | 'connector_googlecalendar'
-      | 'connector_googledrive'
-      | 'connector_microsoftteams'
-      | 'connector_outlookcalendar'
-      | 'connector_outlookemail'
-      | 'connector_sharepoint';
+    connector_id?: 'connector_dropbox' | 'connector_gmail' | 'connector_googlecalendar' | 'connector_googledrive' | 'connector_microsoftteams' | 'connector_outlookcalendar' | 'connector_outlookemail' | 'connector_sharepoint';
 
     /**
      * Whether this MCP tool is deferred and discovered via tool search.
@@ -7040,9 +6715,7 @@ export namespace Tool {
       /**
        * Network access policy for the container.
        */
-      network_policy?:
-        | ResponsesAPI.ContainerNetworkPolicyDisabled
-        | ResponsesAPI.ContainerNetworkPolicyAllowlist;
+      network_policy?: ResponsesAPI.ContainerNetworkPolicyDisabled | ResponsesAPI.ContainerNetworkPolicyAllowlist;
     }
   }
 
@@ -7255,7 +6928,7 @@ export interface ToolChoiceMcp {
  *
  * `required` means the model must call one or more tools.
  */
-export type ToolChoiceOptions = 'none' | 'auto' | 'required';
+export type ToolChoiceOptions = 'none' | 'auto' | 'required'
 
 /**
  * Forces the model to call the shell tool when a tool call is required.
@@ -7287,16 +6960,8 @@ export interface ToolChoiceTypes {
    * - `mcp`
    * - `image_generation`
    */
-  type:
-    | 'file_search'
-    | 'web_search_preview'
-    | 'computer'
-    | 'computer_use_preview'
-    | 'computer_use'
-    | 'web_search_preview_2025_03_11'
-    | 'image_generation'
-    | 'code_interpreter'
-    | 'mcp';
+  type:  'file_search' | 'web_search_preview' | 'computer' | 'computer_use_preview' | 'computer_use' | 'web_search_preview_2025_03_11' | 'image_generation' | 'code_interpreter'
+  | 'mcp';
 }
 
 /**
@@ -7458,7 +7123,7 @@ export namespace WebSearchTool {
   }
 }
 
-export type ResponseCreateParams = ResponseCreateParamsNonStreaming | ResponseCreateParamsStreaming;
+export type ResponseCreateParams = ResponseCreateParamsNonStreaming | ResponseCreateParamsStreaming
 
 export interface ResponseCreateParamsBase {
   /**
@@ -7666,15 +7331,7 @@ export interface ResponseCreateParamsBase {
    * response. See the `tools` parameter to see how to specify which tools the model
    * can call.
    */
-  tool_choice?:
-    | ToolChoiceOptions
-    | ToolChoiceAllowed
-    | ToolChoiceTypes
-    | ToolChoiceFunction
-    | ToolChoiceMcp
-    | ToolChoiceCustom
-    | ToolChoiceApplyPatch
-    | ToolChoiceShell;
+  tool_choice?: ToolChoiceOptions | ToolChoiceAllowed | ToolChoiceTypes | ToolChoiceFunction | ToolChoiceMcp | ToolChoiceCustom | ToolChoiceApplyPatch | ToolChoiceShell;
 
   /**
    * An array of tools the model may call while generating a response. You can
@@ -7758,8 +7415,8 @@ export namespace ResponseCreateParams {
     include_obfuscation?: boolean;
   }
 
-  export type ResponseCreateParamsNonStreaming = ResponsesAPI.ResponseCreateParamsNonStreaming;
-  export type ResponseCreateParamsStreaming = ResponsesAPI.ResponseCreateParamsStreaming;
+  export type ResponseCreateParamsNonStreaming = ResponsesAPI.ResponseCreateParamsNonStreaming
+  export type ResponseCreateParamsStreaming = ResponsesAPI.ResponseCreateParamsStreaming
 }
 
 export interface ResponseCreateParamsNonStreaming extends ResponseCreateParamsBase {
@@ -7786,7 +7443,7 @@ export interface ResponseCreateParamsStreaming extends ResponseCreateParamsBase 
   stream: true;
 }
 
-export type ResponseRetrieveParams = ResponseRetrieveParamsNonStreaming | ResponseRetrieveParamsStreaming;
+export type ResponseRetrieveParams = ResponseRetrieveParamsNonStreaming | ResponseRetrieveParamsStreaming
 
 export interface ResponseRetrieveParamsBase {
   /**
@@ -7822,8 +7479,8 @@ export interface ResponseRetrieveParamsBase {
 }
 
 export namespace ResponseRetrieveParams {
-  export type ResponseRetrieveParamsNonStreaming = ResponsesAPI.ResponseRetrieveParamsNonStreaming;
-  export type ResponseRetrieveParamsStreaming = ResponsesAPI.ResponseRetrieveParamsStreaming;
+  export type ResponseRetrieveParamsNonStreaming = ResponsesAPI.ResponseRetrieveParamsNonStreaming
+  export type ResponseRetrieveParamsStreaming = ResponsesAPI.ResponseRetrieveParamsStreaming
 }
 
 export interface ResponseRetrieveParamsNonStreaming extends ResponseRetrieveParamsBase {
@@ -7858,101 +7515,7 @@ export interface ResponseCompactParams {
    * [model guide](https://platform.openai.com/docs/models) to browse and compare
    * available models.
    */
-  model:
-    | 'gpt-5.4'
-    | 'gpt-5.4-mini'
-    | 'gpt-5.4-nano'
-    | 'gpt-5.4-mini-2026-03-17'
-    | 'gpt-5.4-nano-2026-03-17'
-    | 'gpt-5.3-chat-latest'
-    | 'gpt-5.2'
-    | 'gpt-5.2-2025-12-11'
-    | 'gpt-5.2-chat-latest'
-    | 'gpt-5.2-pro'
-    | 'gpt-5.2-pro-2025-12-11'
-    | 'gpt-5.1'
-    | 'gpt-5.1-2025-11-13'
-    | 'gpt-5.1-codex'
-    | 'gpt-5.1-mini'
-    | 'gpt-5.1-chat-latest'
-    | 'gpt-5'
-    | 'gpt-5-mini'
-    | 'gpt-5-nano'
-    | 'gpt-5-2025-08-07'
-    | 'gpt-5-mini-2025-08-07'
-    | 'gpt-5-nano-2025-08-07'
-    | 'gpt-5-chat-latest'
-    | 'gpt-4.1'
-    | 'gpt-4.1-mini'
-    | 'gpt-4.1-nano'
-    | 'gpt-4.1-2025-04-14'
-    | 'gpt-4.1-mini-2025-04-14'
-    | 'gpt-4.1-nano-2025-04-14'
-    | 'o4-mini'
-    | 'o4-mini-2025-04-16'
-    | 'o3'
-    | 'o3-2025-04-16'
-    | 'o3-mini'
-    | 'o3-mini-2025-01-31'
-    | 'o1'
-    | 'o1-2024-12-17'
-    | 'o1-preview'
-    | 'o1-preview-2024-09-12'
-    | 'o1-mini'
-    | 'o1-mini-2024-09-12'
-    | 'gpt-4o'
-    | 'gpt-4o-2024-11-20'
-    | 'gpt-4o-2024-08-06'
-    | 'gpt-4o-2024-05-13'
-    | 'gpt-4o-audio-preview'
-    | 'gpt-4o-audio-preview-2024-10-01'
-    | 'gpt-4o-audio-preview-2024-12-17'
-    | 'gpt-4o-audio-preview-2025-06-03'
-    | 'gpt-4o-mini-audio-preview'
-    | 'gpt-4o-mini-audio-preview-2024-12-17'
-    | 'gpt-4o-search-preview'
-    | 'gpt-4o-mini-search-preview'
-    | 'gpt-4o-search-preview-2025-03-11'
-    | 'gpt-4o-mini-search-preview-2025-03-11'
-    | 'chatgpt-4o-latest'
-    | 'codex-mini-latest'
-    | 'gpt-4o-mini'
-    | 'gpt-4o-mini-2024-07-18'
-    | 'gpt-4-turbo'
-    | 'gpt-4-turbo-2024-04-09'
-    | 'gpt-4-0125-preview'
-    | 'gpt-4-turbo-preview'
-    | 'gpt-4-1106-preview'
-    | 'gpt-4-vision-preview'
-    | 'gpt-4'
-    | 'gpt-4-0314'
-    | 'gpt-4-0613'
-    | 'gpt-4-32k'
-    | 'gpt-4-32k-0314'
-    | 'gpt-4-32k-0613'
-    | 'gpt-3.5-turbo'
-    | 'gpt-3.5-turbo-16k'
-    | 'gpt-3.5-turbo-0301'
-    | 'gpt-3.5-turbo-0613'
-    | 'gpt-3.5-turbo-1106'
-    | 'gpt-3.5-turbo-0125'
-    | 'gpt-3.5-turbo-16k-0613'
-    | 'o1-pro'
-    | 'o1-pro-2025-03-19'
-    | 'o3-pro'
-    | 'o3-pro-2025-06-10'
-    | 'o3-deep-research'
-    | 'o3-deep-research-2025-06-26'
-    | 'o4-mini-deep-research'
-    | 'o4-mini-deep-research-2025-06-26'
-    | 'computer-use-preview'
-    | 'computer-use-preview-2025-03-11'
-    | 'gpt-5-codex'
-    | 'gpt-5-pro'
-    | 'gpt-5-pro-2025-10-06'
-    | 'gpt-5.1-codex-max'
-    | (string & {})
-    | null;
+  model: 'gpt-5.4' | 'gpt-5.4-mini' | 'gpt-5.4-nano' | 'gpt-5.4-mini-2026-03-17' | 'gpt-5.4-nano-2026-03-17' | 'gpt-5.3-chat-latest' | 'gpt-5.2' | 'gpt-5.2-2025-12-11' | 'gpt-5.2-chat-latest' | 'gpt-5.2-pro' | 'gpt-5.2-pro-2025-12-11' | 'gpt-5.1' | 'gpt-5.1-2025-11-13' | 'gpt-5.1-codex' | 'gpt-5.1-mini' | 'gpt-5.1-chat-latest' | 'gpt-5' | 'gpt-5-mini' | 'gpt-5-nano' | 'gpt-5-2025-08-07' | 'gpt-5-mini-2025-08-07' | 'gpt-5-nano-2025-08-07' | 'gpt-5-chat-latest' | 'gpt-4.1' | 'gpt-4.1-mini' | 'gpt-4.1-nano' | 'gpt-4.1-2025-04-14' | 'gpt-4.1-mini-2025-04-14' | 'gpt-4.1-nano-2025-04-14' | 'o4-mini' | 'o4-mini-2025-04-16' | 'o3' | 'o3-2025-04-16' | 'o3-mini' | 'o3-mini-2025-01-31' | 'o1' | 'o1-2024-12-17' | 'o1-preview' | 'o1-preview-2024-09-12' | 'o1-mini' | 'o1-mini-2024-09-12' | 'gpt-4o' | 'gpt-4o-2024-11-20' | 'gpt-4o-2024-08-06' | 'gpt-4o-2024-05-13' | 'gpt-4o-audio-preview' | 'gpt-4o-audio-preview-2024-10-01' | 'gpt-4o-audio-preview-2024-12-17' | 'gpt-4o-audio-preview-2025-06-03' | 'gpt-4o-mini-audio-preview' | 'gpt-4o-mini-audio-preview-2024-12-17' | 'gpt-4o-search-preview' | 'gpt-4o-mini-search-preview' | 'gpt-4o-search-preview-2025-03-11' | 'gpt-4o-mini-search-preview-2025-03-11' | 'chatgpt-4o-latest' | 'codex-mini-latest' | 'gpt-4o-mini' | 'gpt-4o-mini-2024-07-18' | 'gpt-4-turbo' | 'gpt-4-turbo-2024-04-09' | 'gpt-4-0125-preview' | 'gpt-4-turbo-preview' | 'gpt-4-1106-preview' | 'gpt-4-vision-preview' | 'gpt-4' | 'gpt-4-0314' | 'gpt-4-0613' | 'gpt-4-32k' | 'gpt-4-32k-0314' | 'gpt-4-32k-0613' | 'gpt-3.5-turbo' | 'gpt-3.5-turbo-16k' | 'gpt-3.5-turbo-0301' | 'gpt-3.5-turbo-0613' | 'gpt-3.5-turbo-1106' | 'gpt-3.5-turbo-0125' | 'gpt-3.5-turbo-16k-0613' | 'o1-pro' | 'o1-pro-2025-03-19' | 'o3-pro' | 'o3-pro-2025-06-10' | 'o3-deep-research' | 'o3-deep-research-2025-06-26' | 'o4-mini-deep-research' | 'o4-mini-deep-research-2025-06-26' | 'computer-use-preview' | 'computer-use-preview-2025-03-11' | 'gpt-5-codex' | 'gpt-5-pro' | 'gpt-5-pro-2025-10-06' | 'gpt-5.1-codex-max' | (string & {}) | null;
 
   /**
    * Text, image, or file inputs to the model, used to generate a response
@@ -8144,18 +7707,18 @@ export declare namespace Responses {
     type ResponseRetrieveParams as ResponseRetrieveParams,
     type ResponseRetrieveParamsNonStreaming as ResponseRetrieveParamsNonStreaming,
     type ResponseRetrieveParamsStreaming as ResponseRetrieveParamsStreaming,
-    type ResponseCompactParams as ResponseCompactParams,
+    type ResponseCompactParams as ResponseCompactParams
   };
 
   export {
     InputItems as InputItems,
     type ResponseItemList as ResponseItemList,
-    type InputItemListParams as InputItemListParams,
+    type InputItemListParams as InputItemListParams
   };
 
   export {
     InputTokens as InputTokens,
     type InputTokenCountResponse as InputTokenCountResponse,
-    type InputTokenCountParams as InputTokenCountParams,
+    type InputTokenCountParams as InputTokenCountParams
   };
 }

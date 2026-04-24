@@ -794,22 +794,7 @@ export namespace ResponseIncompleteWebhookEvent {
 /**
  * Sent when a batch API request has been cancelled.
  */
-export type UnwrapWebhookEvent =
-  | BatchCancelledWebhookEvent
-  | BatchCompletedWebhookEvent
-  | BatchExpiredWebhookEvent
-  | BatchFailedWebhookEvent
-  | EvalRunCanceledWebhookEvent
-  | EvalRunFailedWebhookEvent
-  | EvalRunSucceededWebhookEvent
-  | FineTuningJobCancelledWebhookEvent
-  | FineTuningJobFailedWebhookEvent
-  | FineTuningJobSucceededWebhookEvent
-  | RealtimeCallIncomingWebhookEvent
-  | ResponseCancelledWebhookEvent
-  | ResponseCompletedWebhookEvent
-  | ResponseFailedWebhookEvent
-  | ResponseIncompleteWebhookEvent;
+export type UnwrapWebhookEvent = BatchCancelledWebhookEvent | BatchCompletedWebhookEvent | BatchExpiredWebhookEvent | BatchFailedWebhookEvent | EvalRunCanceledWebhookEvent | EvalRunFailedWebhookEvent | EvalRunSucceededWebhookEvent | FineTuningJobCancelledWebhookEvent | FineTuningJobFailedWebhookEvent | FineTuningJobSucceededWebhookEvent | RealtimeCallIncomingWebhookEvent | ResponseCancelledWebhookEvent | ResponseCompletedWebhookEvent | ResponseFailedWebhookEvent | ResponseIncompleteWebhookEvent
 
 export declare namespace Webhooks {
   export {
@@ -828,6 +813,6 @@ export declare namespace Webhooks {
     type ResponseCompletedWebhookEvent as ResponseCompletedWebhookEvent,
     type ResponseFailedWebhookEvent as ResponseFailedWebhookEvent,
     type ResponseIncompleteWebhookEvent as ResponseIncompleteWebhookEvent,
-    type UnwrapWebhookEvent as UnwrapWebhookEvent,
+    type UnwrapWebhookEvent as UnwrapWebhookEvent
   };
 }

@@ -116,24 +116,14 @@ export interface GraderValidateResponse {
   /**
    * The grader used for the fine-tuning job.
    */
-  grader?:
-    | GraderModelsAPI.StringCheckGrader
-    | GraderModelsAPI.TextSimilarityGrader
-    | GraderModelsAPI.PythonGrader
-    | GraderModelsAPI.ScoreModelGrader
-    | GraderModelsAPI.MultiGrader;
+  grader?: GraderModelsAPI.StringCheckGrader | GraderModelsAPI.TextSimilarityGrader | GraderModelsAPI.PythonGrader | GraderModelsAPI.ScoreModelGrader | GraderModelsAPI.MultiGrader;
 }
 
 export interface GraderRunParams {
   /**
    * The grader used for the fine-tuning job.
    */
-  grader:
-    | GraderModelsAPI.StringCheckGrader
-    | GraderModelsAPI.TextSimilarityGrader
-    | GraderModelsAPI.PythonGrader
-    | GraderModelsAPI.ScoreModelGrader
-    | GraderModelsAPI.MultiGrader;
+  grader: GraderModelsAPI.StringCheckGrader | GraderModelsAPI.TextSimilarityGrader | GraderModelsAPI.PythonGrader | GraderModelsAPI.ScoreModelGrader | GraderModelsAPI.MultiGrader;
 
   /**
    * The model sample to be evaluated. This value will be used to populate the
@@ -156,12 +146,7 @@ export interface GraderValidateParams {
   /**
    * The grader used for the fine-tuning job.
    */
-  grader:
-    | GraderModelsAPI.StringCheckGrader
-    | GraderModelsAPI.TextSimilarityGrader
-    | GraderModelsAPI.PythonGrader
-    | GraderModelsAPI.ScoreModelGrader
-    | GraderModelsAPI.MultiGrader;
+  grader: GraderModelsAPI.StringCheckGrader | GraderModelsAPI.TextSimilarityGrader | GraderModelsAPI.PythonGrader | GraderModelsAPI.ScoreModelGrader | GraderModelsAPI.MultiGrader;
 }
 
 export declare namespace Graders {
@@ -169,6 +154,6 @@ export declare namespace Graders {
     type GraderRunResponse as GraderRunResponse,
     type GraderValidateResponse as GraderValidateResponse,
     type GraderRunParams as GraderRunParams,
-    type GraderValidateParams as GraderValidateParams,
+    type GraderValidateParams as GraderValidateParams
   };
 }

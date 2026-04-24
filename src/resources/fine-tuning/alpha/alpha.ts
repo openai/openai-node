@@ -2,13 +2,7 @@
 
 import { APIResource } from '../../../core/resource';
 import * as GradersAPI from './graders';
-import {
-  GraderRunParams,
-  GraderRunResponse,
-  GraderValidateParams,
-  GraderValidateResponse,
-  Graders,
-} from './graders';
+import { GraderRunParams, GraderRunResponse, GraderValidateParams, GraderValidateResponse, Graders } from './graders';
 
 export class Alpha extends APIResource {
   graders: GradersAPI.Graders = new GradersAPI.Graders(this._client);
@@ -22,6 +16,6 @@ export declare namespace Alpha {
     type GraderRunResponse as GraderRunResponse,
     type GraderValidateResponse as GraderValidateResponse,
     type GraderRunParams as GraderRunParams,
-    type GraderValidateParams as GraderValidateParams,
+    type GraderValidateParams as GraderValidateParams
   };
 }

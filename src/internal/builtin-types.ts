@@ -1,20 +1,23 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-export type Fetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
+export type Fetch = (
+  input: string | URL | Request,
+  init?: RequestInit,
+) => Promise<Response>
 
 /**
  * An alias to the builtin `RequestInit` type so we can
  * easily alias it in import statements if there are name clashes.
- *
- * https://developer.mozilla.org/docs/Web/API/RequestInit
+     *
+     * https://developer.mozilla.org/docs/Web/API/RequestInit
  */
 type _RequestInit = RequestInit;
 
 /**
  * An alias to the builtin `Response` type so we can
  * easily alias it in import statements if there are name clashes.
- *
- * https://developer.mozilla.org/docs/Web/API/Response
+     *
+     * https://developer.mozilla.org/docs/Web/API/Response
  */
 type _Response = Response;
 
@@ -51,15 +54,7 @@ type _Array<T> = Array<T>;
  */
 type _Record<K extends keyof any, T> = Record<K, T>;
 
-export type {
-  _Array as Array,
-  _BodyInit as BodyInit,
-  _HeadersInit as HeadersInit,
-  _Record as Record,
-  _RequestInfo as RequestInfo,
-  _RequestInit as RequestInit,
-  _Response as Response,
-};
+export type { _Array as Array, _BodyInit as BodyInit, _HeadersInit as HeadersInit, _Record as Record, _RequestInfo as RequestInfo, _RequestInit as RequestInit, _Response as Response };
 
 /**
  * A copy of the builtin `EndingType` type as it isn't fully supported in certain

@@ -19,8 +19,8 @@ type _ConditionalNodeReadableStream<R = any> =
   typeof globalThis extends { ReadableStream: any } ? never : _NodeReadableStream<R>;
 
 type _ReadableStream<R = any> = NeverToAny<
-  | ([0] extends [1 & _DOMReadableStream<R>] ? never : _DOMReadableStream<R>)
-  | ([0] extends [1 & _ConditionalNodeReadableStream<R>] ? never : _ConditionalNodeReadableStream<R>)
+  ([0] extends [1 & _DOMReadableStream<R>] ? never : _DOMReadableStream<R>) |
+  ([0] extends [1 & _ConditionalNodeReadableStream<R>] ? never : _ConditionalNodeReadableStream<R>)
 >;
 
 export type { _ReadableStream as ReadableStream };

@@ -27,10 +27,7 @@ export class Videos extends APIResource {
   /**
    * List recently generated videos for the current project.
    */
-  list(
-    query: VideoListParams | null | undefined = {},
-    options?: RequestOptions,
-  ): PagePromise<VideosPage, Video> {
+  list(query: VideoListParams | null | undefined = {}, options?: RequestOptions): PagePromise<VideosPage, Video> {
     return this._client.getAPIList('/videos', ConversationCursorPage<Video>, { query, ...options });
   }
 
@@ -44,14 +41,8 @@ export class Videos extends APIResource {
   /**
    * Create a character from an uploaded video.
    */
-  createCharacter(
-    body: VideoCreateCharacterParams,
-    options?: RequestOptions,
-  ): APIPromise<VideoCreateCharacterResponse> {
-    return this._client.post(
-      '/videos/characters',
-      multipartFormRequestOptions({ body, ...options }, this._client),
-    );
+  createCharacter(body: VideoCreateCharacterParams, options?: RequestOptions): APIPromise<VideoCreateCharacterResponse> {
+    return this._client.post('/videos/characters', multipartFormRequestOptions({ body, ...options }, this._client));
   }
 
   /**
@@ -59,17 +50,8 @@ export class Videos extends APIResource {
    *
    * Streams the rendered video content for the specified video job.
    */
-  downloadContent(
-    videoID: string,
-    query: VideoDownloadContentParams | null | undefined = {},
-    options?: RequestOptions,
-  ): APIPromise<Response> {
-    return this._client.get(path`/videos/${videoID}/content`, {
-      query,
-      ...options,
-      headers: buildHeaders([{ Accept: 'application/binary' }, options?.headers]),
-      __binaryResponse: true,
-    });
+  downloadContent(videoID: string, query: VideoDownloadContentParams | null | undefined = {}, options?: RequestOptions): APIPromise<Response> {
+    return this._client.get(path`/videos/${videoID}/content`, { query, ...options, headers: buildHeaders([{Accept: 'application/binary'}, options?.headers]), __binaryResponse: true });
   }
 
   /**
@@ -77,20 +59,14 @@ export class Videos extends APIResource {
    * generated video.
    */
   edit(body: VideoEditParams, options?: RequestOptions): APIPromise<Video> {
-    return this._client.post(
-      '/videos/edits',
-      multipartFormRequestOptions({ body, ...options }, this._client),
-    );
+    return this._client.post('/videos/edits', multipartFormRequestOptions({ body, ...options }, this._client));
   }
 
   /**
    * Create an extension of a completed video.
    */
   extend(body: VideoExtendParams, options?: RequestOptions): APIPromise<Video> {
-    return this._client.post(
-      '/videos/extensions',
-      multipartFormRequestOptions({ body, ...options }, this._client),
-    );
+    return this._client.post('/videos/extensions', multipartFormRequestOptions({ body, ...options }, this._client));
   }
 
   /**
@@ -104,14 +80,11 @@ export class Videos extends APIResource {
    * Create a remix of a completed video using a refreshed prompt.
    */
   remix(videoID: string, body: VideoRemixParams, options?: RequestOptions): APIPromise<Video> {
-    return this._client.post(
-      path`/videos/${videoID}/remix`,
-      maybeMultipartFormRequestOptions({ body, ...options }, this._client),
-    );
+    return this._client.post(path`/videos/${videoID}/remix`, maybeMultipartFormRequestOptions({ body, ...options }, this._client));
   }
 }
 
-export type VideosPage = ConversationCursorPage<Video>;
+export type VideosPage = ConversationCursorPage<Video>
 
 export interface ImageInputReferenceParam {
   file_id?: string;
@@ -208,17 +181,11 @@ export interface VideoCreateError {
   message: string;
 }
 
-export type VideoModel =
-  | (string & {})
-  | 'sora-2'
-  | 'sora-2-pro'
-  | 'sora-2-2025-10-06'
-  | 'sora-2-pro-2025-10-06'
-  | 'sora-2-2025-12-08';
+export type VideoModel = (string & {}) | 'sora-2' | 'sora-2-pro' | 'sora-2-2025-10-06' | 'sora-2-pro-2025-10-06' | 'sora-2-2025-12-08'
 
-export type VideoSeconds = '4' | '8' | '12';
+export type VideoSeconds = '4' | '8' | '12'
 
-export type VideoSize = '720x1280' | '1280x720' | '1024x1792' | '1792x1024';
+export type VideoSize = '720x1280' | '1280x720' | '1024x1792' | '1792x1024'
 
 /**
  * Confirmation payload returned after deleting a video.
@@ -409,6 +376,6 @@ export declare namespace Videos {
     type VideoDownloadContentParams as VideoDownloadContentParams,
     type VideoEditParams as VideoEditParams,
     type VideoExtendParams as VideoExtendParams,
-    type VideoRemixParams as VideoRemixParams,
+    type VideoRemixParams as VideoRemixParams
   };
 }

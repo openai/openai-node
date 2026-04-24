@@ -4,11 +4,7 @@ import { APIResource } from '../../core/resource';
 import * as ConversationsAPI from './conversations';
 import * as ResponsesAPI from '../responses/responses';
 import { APIPromise } from '../../core/api-promise';
-import {
-  ConversationCursorPage,
-  type ConversationCursorPageParams,
-  PagePromise,
-} from '../../core/pagination';
+import { ConversationCursorPage, type ConversationCursorPageParams, PagePromise } from '../../core/pagination';
 import { RequestOptions } from '../../internal/request-options';
 import { path } from '../../internal/utils/path';
 
@@ -19,92 +15,43 @@ export class Items extends APIResource {
   /**
    * Create items in a conversation with the given ID.
    */
-  create(
-    conversationID: string,
-    params: ItemCreateParams,
-    options?: RequestOptions,
-  ): APIPromise<ConversationItemList> {
-    const { include, ...body } = params;
-    return this._client.post(path`/conversations/${conversationID}/items`, {
-      query: { include },
-      body,
-      ...options,
-    });
+  create(conversationID: string, params: ItemCreateParams, options?: RequestOptions): APIPromise<ConversationItemList> {
+    const { include, ...body } = params
+    return this._client.post(path`/conversations/${conversationID}/items`, { query: { include }, body, ...options });
   }
 
   /**
    * Get a single item from a conversation with the given IDs.
    */
-  retrieve(
-    itemID: string,
-    params: ItemRetrieveParams,
-    options?: RequestOptions,
-  ): APIPromise<ConversationItem> {
-    const { conversation_id, ...query } = params;
+  retrieve(itemID: string, params: ItemRetrieveParams, options?: RequestOptions): APIPromise<ConversationItem> {
+    const { conversation_id, ...query } = params
     return this._client.get(path`/conversations/${conversation_id}/items/${itemID}`, { query, ...options });
   }
 
   /**
    * List all items for a conversation with the given ID.
    */
-  list(
-    conversationID: string,
-    query: ItemListParams | null | undefined = {},
-    options?: RequestOptions,
-  ): PagePromise<ConversationItemsPage, ConversationItem> {
-    return this._client.getAPIList(
-      path`/conversations/${conversationID}/items`,
-      ConversationCursorPage<ConversationItem>,
-      { query, ...options },
-    );
+  list(conversationID: string, query: ItemListParams | null | undefined = {}, options?: RequestOptions): PagePromise<ConversationItemsPage, ConversationItem> {
+    return this._client.getAPIList(path`/conversations/${conversationID}/items`, ConversationCursorPage<ConversationItem>, { query, ...options });
   }
 
   /**
    * Delete an item from a conversation with the given IDs.
    */
-  delete(
-    itemID: string,
-    params: ItemDeleteParams,
-    options?: RequestOptions,
-  ): APIPromise<ConversationsAPI.Conversation> {
-    const { conversation_id } = params;
+  delete(itemID: string, params: ItemDeleteParams, options?: RequestOptions): APIPromise<ConversationsAPI.Conversation> {
+    const { conversation_id } = params
     return this._client.delete(path`/conversations/${conversation_id}/items/${itemID}`, options);
   }
 }
 
-export type ConversationItemsPage = ConversationCursorPage<ConversationItem>;
+export type ConversationItemsPage = ConversationCursorPage<ConversationItem>
 
 /**
  * A single item within a conversation. The set of possible types are the same as
  * the `output` type of a
  * [Response object](https://platform.openai.com/docs/api-reference/responses/object#responses/object-output).
  */
-export type ConversationItem =
-  | ConversationsAPI.Message
-  | ResponsesAPI.ResponseFunctionToolCallItem
-  | ResponsesAPI.ResponseFunctionToolCallOutputItem
-  | ResponsesAPI.ResponseFileSearchToolCall
-  | ResponsesAPI.ResponseFunctionWebSearch
-  | ConversationItem.ImageGenerationCall
-  | ResponsesAPI.ResponseComputerToolCall
-  | ResponsesAPI.ResponseComputerToolCallOutputItem
-  | ResponsesAPI.ResponseToolSearchCall
-  | ResponsesAPI.ResponseToolSearchOutputItem
-  | ResponsesAPI.ResponseReasoningItem
-  | ResponsesAPI.ResponseCompactionItem
-  | ResponsesAPI.ResponseCodeInterpreterToolCall
-  | ConversationItem.LocalShellCall
-  | ConversationItem.LocalShellCallOutput
-  | ResponsesAPI.ResponseFunctionShellToolCall
-  | ResponsesAPI.ResponseFunctionShellToolCallOutput
-  | ResponsesAPI.ResponseApplyPatchToolCall
-  | ResponsesAPI.ResponseApplyPatchToolCallOutput
-  | ConversationItem.McpListTools
-  | ConversationItem.McpApprovalRequest
-  | ConversationItem.McpApprovalResponse
-  | ConversationItem.McpCall
-  | ResponsesAPI.ResponseCustomToolCall
-  | ResponsesAPI.ResponseCustomToolCallOutput;
+export type ConversationItem = ConversationsAPI.Message | ResponsesAPI.ResponseFunctionToolCallItem | ResponsesAPI.ResponseFunctionToolCallOutputItem | ResponsesAPI.ResponseFileSearchToolCall | ResponsesAPI.ResponseFunctionWebSearch | ConversationItem.ImageGenerationCall | ResponsesAPI.ResponseComputerToolCall | ResponsesAPI.ResponseComputerToolCallOutputItem | ResponsesAPI.ResponseToolSearchCall | ResponsesAPI.ResponseToolSearchOutputItem | ResponsesAPI.ResponseReasoningItem | ResponsesAPI.ResponseCompactionItem | ResponsesAPI.ResponseCodeInterpreterToolCall | ConversationItem.LocalShellCall | ConversationItem.LocalShellCallOutput | ResponsesAPI.ResponseFunctionShellToolCall | ResponsesAPI.ResponseFunctionShellToolCallOutput | ResponsesAPI.ResponseApplyPatchToolCall | ResponsesAPI.ResponseApplyPatchToolCallOutput | ConversationItem.McpListTools | ConversationItem.McpApprovalRequest | ConversationItem.McpApprovalResponse | ConversationItem.McpCall | ResponsesAPI.ResponseCustomToolCall | ResponsesAPI.ResponseCustomToolCallOutput
 
 export namespace ConversationItem {
   /**
@@ -503,6 +450,6 @@ export declare namespace Items {
     type ItemCreateParams as ItemCreateParams,
     type ItemRetrieveParams as ItemRetrieveParams,
     type ItemListParams as ItemListParams,
-    type ItemDeleteParams as ItemDeleteParams,
+    type ItemDeleteParams as ItemDeleteParams
   };
 }

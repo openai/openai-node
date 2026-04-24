@@ -125,7 +125,7 @@ export interface Embedding {
   object: 'embedding';
 }
 
-export type EmbeddingModel = 'text-embedding-ada-002' | 'text-embedding-3-small' | 'text-embedding-3-large';
+export type EmbeddingModel = 'text-embedding-ada-002' | 'text-embedding-3-small' | 'text-embedding-3-large'
 
 export interface EmbeddingCreateParams {
   /**
@@ -175,6 +175,6 @@ export declare namespace Embeddings {
     type CreateEmbeddingResponse as CreateEmbeddingResponse,
     type Embedding as Embedding,
     type EmbeddingModel as EmbeddingModel,
-    type EmbeddingCreateParams as EmbeddingCreateParams,
+    type EmbeddingCreateParams as EmbeddingCreateParams
   };
 }

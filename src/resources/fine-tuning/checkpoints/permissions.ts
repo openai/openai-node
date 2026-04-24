@@ -2,12 +2,7 @@
 
 import { APIResource } from '../../../core/resource';
 import { APIPromise } from '../../../core/api-promise';
-import {
-  ConversationCursorPage,
-  type ConversationCursorPageParams,
-  Page,
-  PagePromise,
-} from '../../../core/pagination';
+import { ConversationCursorPage, type ConversationCursorPageParams, Page, PagePromise } from '../../../core/pagination';
 import { RequestOptions } from '../../../internal/request-options';
 import { path } from '../../../internal/utils/path';
 
@@ -32,16 +27,8 @@ export class Permissions extends APIResource {
    * }
    * ```
    */
-  create(
-    fineTunedModelCheckpoint: string,
-    body: PermissionCreateParams,
-    options?: RequestOptions,
-  ): PagePromise<PermissionCreateResponsesPage, PermissionCreateResponse> {
-    return this._client.getAPIList(
-      path`/fine_tuning/checkpoints/${fineTunedModelCheckpoint}/permissions`,
-      Page<PermissionCreateResponse>,
-      { body, method: 'post', ...options },
-    );
+  create(fineTunedModelCheckpoint: string, body: PermissionCreateParams, options?: RequestOptions): PagePromise<PermissionCreateResponsesPage, PermissionCreateResponse> {
+    return this._client.getAPIList(path`/fine_tuning/checkpoints/${fineTunedModelCheckpoint}/permissions`, Page<PermissionCreateResponse>, { body, method: 'post', ...options });
   }
 
   /**
@@ -52,15 +39,8 @@ export class Permissions extends APIResource {
    *
    * @deprecated Retrieve is deprecated. Please swap to the paginated list method instead.
    */
-  retrieve(
-    fineTunedModelCheckpoint: string,
-    query: PermissionRetrieveParams | null | undefined = {},
-    options?: RequestOptions,
-  ): APIPromise<PermissionRetrieveResponse> {
-    return this._client.get(path`/fine_tuning/checkpoints/${fineTunedModelCheckpoint}/permissions`, {
-      query,
-      ...options,
-    });
+  retrieve(fineTunedModelCheckpoint: string, query: PermissionRetrieveParams | null | undefined = {}, options?: RequestOptions): APIPromise<PermissionRetrieveResponse> {
+    return this._client.get(path`/fine_tuning/checkpoints/${fineTunedModelCheckpoint}/permissions`, { query, ...options });
   }
 
   /**
@@ -79,16 +59,8 @@ export class Permissions extends APIResource {
    * }
    * ```
    */
-  list(
-    fineTunedModelCheckpoint: string,
-    query: PermissionListParams | null | undefined = {},
-    options?: RequestOptions,
-  ): PagePromise<PermissionListResponsesPage, PermissionListResponse> {
-    return this._client.getAPIList(
-      path`/fine_tuning/checkpoints/${fineTunedModelCheckpoint}/permissions`,
-      ConversationCursorPage<PermissionListResponse>,
-      { query, ...options },
-    );
+  list(fineTunedModelCheckpoint: string, query: PermissionListParams | null | undefined = {}, options?: RequestOptions): PagePromise<PermissionListResponsesPage, PermissionListResponse> {
+    return this._client.getAPIList(path`/fine_tuning/checkpoints/${fineTunedModelCheckpoint}/permissions`, ConversationCursorPage<PermissionListResponse>, { query, ...options });
   }
 
   /**
@@ -109,23 +81,16 @@ export class Permissions extends APIResource {
    *   );
    * ```
    */
-  delete(
-    permissionID: string,
-    params: PermissionDeleteParams,
-    options?: RequestOptions,
-  ): APIPromise<PermissionDeleteResponse> {
-    const { fine_tuned_model_checkpoint } = params;
-    return this._client.delete(
-      path`/fine_tuning/checkpoints/${fine_tuned_model_checkpoint}/permissions/${permissionID}`,
-      options,
-    );
+  delete(permissionID: string, params: PermissionDeleteParams, options?: RequestOptions): APIPromise<PermissionDeleteResponse> {
+    const { fine_tuned_model_checkpoint } = params
+    return this._client.delete(path`/fine_tuning/checkpoints/${fine_tuned_model_checkpoint}/permissions/${permissionID}`, options);
   }
 }
 
 // Note: no pagination actually occurs yet, this is for forwards-compatibility.
-export type PermissionCreateResponsesPage = Page<PermissionCreateResponse>;
+export type PermissionCreateResponsesPage = Page<PermissionCreateResponse>
 
-export type PermissionListResponsesPage = ConversationCursorPage<PermissionListResponse>;
+export type PermissionListResponsesPage = ConversationCursorPage<PermissionListResponse>
 
 /**
  * The `checkpoint.permission` object represents a permission for a fine-tuned
@@ -295,6 +260,6 @@ export declare namespace Permissions {
     type PermissionCreateParams as PermissionCreateParams,
     type PermissionRetrieveParams as PermissionRetrieveParams,
     type PermissionListParams as PermissionListParams,
-    type PermissionDeleteParams as PermissionDeleteParams,
+    type PermissionDeleteParams as PermissionDeleteParams
   };
 }

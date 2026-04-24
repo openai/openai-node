@@ -25,11 +25,7 @@ function getDetectedPlatform(): DetectedPlatform {
   if (typeof EdgeRuntime !== 'undefined') {
     return 'edge';
   }
-  if (
-    Object.prototype.toString.call(
-      typeof (globalThis as any).process !== 'undefined' ? (globalThis as any).process : 0,
-    ) === '[object process]'
-  ) {
+  if (Object.prototype.toString.call(typeof (globalThis as any).process !== 'undefined' ? (globalThis as any).process : 0) === '[object process]') {
     return 'node';
   }
   return 'unknown';

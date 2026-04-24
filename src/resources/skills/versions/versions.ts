@@ -16,57 +16,35 @@ export class Versions extends APIResource {
   /**
    * Create a new immutable skill version.
    */
-  create(
-    skillID: string,
-    body: VersionCreateParams | null | undefined = {},
-    options?: RequestOptions,
-  ): APIPromise<SkillVersion> {
-    return this._client.post(
-      path`/skills/${skillID}/versions`,
-      maybeMultipartFormRequestOptions({ body, ...options }, this._client),
-    );
+  create(skillID: string, body: VersionCreateParams | null | undefined = {}, options?: RequestOptions): APIPromise<SkillVersion> {
+    return this._client.post(path`/skills/${skillID}/versions`, maybeMultipartFormRequestOptions({ body, ...options }, this._client));
   }
 
   /**
    * Get a specific skill version.
    */
-  retrieve(
-    version: string,
-    params: VersionRetrieveParams,
-    options?: RequestOptions,
-  ): APIPromise<SkillVersion> {
-    const { skill_id } = params;
+  retrieve(version: string, params: VersionRetrieveParams, options?: RequestOptions): APIPromise<SkillVersion> {
+    const { skill_id } = params
     return this._client.get(path`/skills/${skill_id}/versions/${version}`, options);
   }
 
   /**
    * List skill versions for a skill.
    */
-  list(
-    skillID: string,
-    query: VersionListParams | null | undefined = {},
-    options?: RequestOptions,
-  ): PagePromise<SkillVersionsPage, SkillVersion> {
-    return this._client.getAPIList(path`/skills/${skillID}/versions`, CursorPage<SkillVersion>, {
-      query,
-      ...options,
-    });
+  list(skillID: string, query: VersionListParams | null | undefined = {}, options?: RequestOptions): PagePromise<SkillVersionsPage, SkillVersion> {
+    return this._client.getAPIList(path`/skills/${skillID}/versions`, CursorPage<SkillVersion>, { query, ...options });
   }
 
   /**
    * Delete a skill version.
    */
-  delete(
-    version: string,
-    params: VersionDeleteParams,
-    options?: RequestOptions,
-  ): APIPromise<DeletedSkillVersion> {
-    const { skill_id } = params;
+  delete(version: string, params: VersionDeleteParams, options?: RequestOptions): APIPromise<DeletedSkillVersion> {
+    const { skill_id } = params
     return this._client.delete(path`/skills/${skill_id}/versions/${version}`, options);
   }
 }
 
-export type SkillVersionsPage = CursorPage<SkillVersion>;
+export type SkillVersionsPage = CursorPage<SkillVersion>
 
 export interface DeletedSkillVersion {
   id: string;
@@ -189,8 +167,11 @@ export declare namespace Versions {
     type VersionCreateParams as VersionCreateParams,
     type VersionRetrieveParams as VersionRetrieveParams,
     type VersionListParams as VersionListParams,
-    type VersionDeleteParams as VersionDeleteParams,
+    type VersionDeleteParams as VersionDeleteParams
   };
 
-  export { Content as Content, type ContentRetrieveParams as ContentRetrieveParams };
+  export {
+    Content as Content,
+    type ContentRetrieveParams as ContentRetrieveParams
+  };
 }

@@ -6,14 +6,7 @@ import * as GraderModelsAPI from '../../graders/grader-models';
 import * as ResponsesAPI from '../../responses/responses';
 import * as CompletionsAPI from '../../chat/completions/completions';
 import * as OutputItemsAPI from './output-items';
-import {
-  OutputItemListParams,
-  OutputItemListResponse,
-  OutputItemListResponsesPage,
-  OutputItemRetrieveParams,
-  OutputItemRetrieveResponse,
-  OutputItems,
-} from './output-items';
+import { OutputItemListParams, OutputItemListResponse, OutputItemListResponsesPage, OutputItemRetrieveParams, OutputItemRetrieveResponse, OutputItems } from './output-items';
 import { APIPromise } from '../../../core/api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pagination';
 import { RequestOptions } from '../../../internal/request-options';
@@ -37,34 +30,23 @@ export class Runs extends APIResource {
   /**
    * Get an evaluation run by ID.
    */
-  retrieve(
-    runID: string,
-    params: RunRetrieveParams,
-    options?: RequestOptions,
-  ): APIPromise<RunRetrieveResponse> {
-    const { eval_id } = params;
+  retrieve(runID: string, params: RunRetrieveParams, options?: RequestOptions): APIPromise<RunRetrieveResponse> {
+    const { eval_id } = params
     return this._client.get(path`/evals/${eval_id}/runs/${runID}`, options);
   }
 
   /**
    * Get a list of runs for an evaluation.
    */
-  list(
-    evalID: string,
-    query: RunListParams | null | undefined = {},
-    options?: RequestOptions,
-  ): PagePromise<RunListResponsesPage, RunListResponse> {
-    return this._client.getAPIList(path`/evals/${evalID}/runs`, CursorPage<RunListResponse>, {
-      query,
-      ...options,
-    });
+  list(evalID: string, query: RunListParams | null | undefined = {}, options?: RequestOptions): PagePromise<RunListResponsesPage, RunListResponse> {
+    return this._client.getAPIList(path`/evals/${evalID}/runs`, CursorPage<RunListResponse>, { query, ...options });
   }
 
   /**
    * Delete an eval run.
    */
   delete(runID: string, params: RunDeleteParams, options?: RequestOptions): APIPromise<RunDeleteResponse> {
-    const { eval_id } = params;
+    const { eval_id } = params
     return this._client.delete(path`/evals/${eval_id}/runs/${runID}`, options);
   }
 
@@ -72,12 +54,12 @@ export class Runs extends APIResource {
    * Cancel an ongoing evaluation run.
    */
   cancel(runID: string, params: RunCancelParams, options?: RequestOptions): APIPromise<RunCancelResponse> {
-    const { eval_id } = params;
+    const { eval_id } = params
     return this._client.post(path`/evals/${eval_id}/runs/${runID}`, options);
   }
 }
 
-export type RunListResponsesPage = CursorPage<RunListResponse>;
+export type RunListResponsesPage = CursorPage<RunListResponse>
 
 /**
  * A CompletionsRunDataSource object describing a model sampling configuration.
@@ -86,10 +68,7 @@ export interface CreateEvalCompletionsRunDataSource {
   /**
    * Determines what populates the `item` namespace in this run's data source.
    */
-  source:
-    | CreateEvalCompletionsRunDataSource.FileContent
-    | CreateEvalCompletionsRunDataSource.FileID
-    | CreateEvalCompletionsRunDataSource.StoredCompletions;
+  source: CreateEvalCompletionsRunDataSource.FileContent | CreateEvalCompletionsRunDataSource.FileID | CreateEvalCompletionsRunDataSource.StoredCompletions;
 
   /**
    * The type of run data source. Always `completions`.
@@ -102,9 +81,7 @@ export interface CreateEvalCompletionsRunDataSource {
    * `item.input_trajectory`), or a template with variable references to the `item`
    * namespace.
    */
-  input_messages?:
-    | CreateEvalCompletionsRunDataSource.Template
-    | CreateEvalCompletionsRunDataSource.ItemReference;
+  input_messages?: CreateEvalCompletionsRunDataSource.Template | CreateEvalCompletionsRunDataSource.ItemReference;
 
   /**
    * The name of the model to use for generating completions (e.g. "o3-mini").
@@ -213,13 +190,7 @@ export namespace CreateEvalCompletionsRunDataSource {
        * Inputs to the model - can contain template strings. Supports text, output text,
        * input images, and input audio, either as a single item or an array of items.
        */
-      content:
-        | string
-        | ResponsesAPI.ResponseInputText
-        | EvalItem.OutputText
-        | EvalItem.InputImage
-        | ResponsesAPI.ResponseInputAudio
-        | GraderModelsAPI.GraderInputs;
+      content: string | ResponsesAPI.ResponseInputText | EvalItem.OutputText | EvalItem.InputImage | ResponsesAPI.ResponseInputAudio | GraderModelsAPI.GraderInputs;
 
       /**
        * The role of the message input. One of `user`, `assistant`, `system`, or
@@ -319,10 +290,7 @@ export namespace CreateEvalCompletionsRunDataSource {
      * ensures the message the model generates is valid JSON. Using `json_schema` is
      * preferred for models that support it.
      */
-    response_format?:
-      | Shared.ResponseFormatText
-      | Shared.ResponseFormatJSONSchema
-      | Shared.ResponseFormatJSONObject;
+    response_format?: Shared.ResponseFormatText | Shared.ResponseFormatJSONSchema | Shared.ResponseFormatJSONObject;
 
     /**
      * A seed value to initialize the randomness, during sampling.
@@ -430,10 +398,7 @@ export interface RunCreateResponse {
   /**
    * Information about the run's data source.
    */
-  data_source:
-    | CreateEvalJSONLRunDataSource
-    | CreateEvalCompletionsRunDataSource
-    | RunCreateResponse.Responses;
+  data_source: CreateEvalJSONLRunDataSource | CreateEvalCompletionsRunDataSource | RunCreateResponse.Responses;
 
   /**
    * An object representing an error response from the Eval API.
@@ -675,13 +640,7 @@ export namespace RunCreateResponse {
          * Inputs to the model - can contain template strings. Supports text, output text,
          * input images, and input audio, either as a single item or an array of items.
          */
-        content:
-          | string
-          | ResponsesAPI.ResponseInputText
-          | EvalItem.OutputText
-          | EvalItem.InputImage
-          | ResponsesAPI.ResponseInputAudio
-          | GraderModelsAPI.GraderInputs;
+        content: string | ResponsesAPI.ResponseInputText | EvalItem.OutputText | EvalItem.InputImage | ResponsesAPI.ResponseInputAudio | GraderModelsAPI.GraderInputs;
 
         /**
          * The role of the message input. One of `user`, `assistant`, `system`, or
@@ -933,10 +892,7 @@ export interface RunRetrieveResponse {
   /**
    * Information about the run's data source.
    */
-  data_source:
-    | CreateEvalJSONLRunDataSource
-    | CreateEvalCompletionsRunDataSource
-    | RunRetrieveResponse.Responses;
+  data_source: CreateEvalJSONLRunDataSource | CreateEvalCompletionsRunDataSource | RunRetrieveResponse.Responses;
 
   /**
    * An object representing an error response from the Eval API.
@@ -1178,13 +1134,7 @@ export namespace RunRetrieveResponse {
          * Inputs to the model - can contain template strings. Supports text, output text,
          * input images, and input audio, either as a single item or an array of items.
          */
-        content:
-          | string
-          | ResponsesAPI.ResponseInputText
-          | EvalItem.OutputText
-          | EvalItem.InputImage
-          | ResponsesAPI.ResponseInputAudio
-          | GraderModelsAPI.GraderInputs;
+        content: string | ResponsesAPI.ResponseInputText | EvalItem.OutputText | EvalItem.InputImage | ResponsesAPI.ResponseInputAudio | GraderModelsAPI.GraderInputs;
 
         /**
          * The role of the message input. One of `user`, `assistant`, `system`, or
@@ -1678,13 +1628,7 @@ export namespace RunListResponse {
          * Inputs to the model - can contain template strings. Supports text, output text,
          * input images, and input audio, either as a single item or an array of items.
          */
-        content:
-          | string
-          | ResponsesAPI.ResponseInputText
-          | EvalItem.OutputText
-          | EvalItem.InputImage
-          | ResponsesAPI.ResponseInputAudio
-          | GraderModelsAPI.GraderInputs;
+        content: string | ResponsesAPI.ResponseInputText | EvalItem.OutputText | EvalItem.InputImage | ResponsesAPI.ResponseInputAudio | GraderModelsAPI.GraderInputs;
 
         /**
          * The role of the message input. One of `user`, `assistant`, `system`, or
@@ -1944,10 +1888,7 @@ export interface RunCancelResponse {
   /**
    * Information about the run's data source.
    */
-  data_source:
-    | CreateEvalJSONLRunDataSource
-    | CreateEvalCompletionsRunDataSource
-    | RunCancelResponse.Responses;
+  data_source: CreateEvalJSONLRunDataSource | CreateEvalCompletionsRunDataSource | RunCancelResponse.Responses;
 
   /**
    * An object representing an error response from the Eval API.
@@ -2189,13 +2130,7 @@ export namespace RunCancelResponse {
          * Inputs to the model - can contain template strings. Supports text, output text,
          * input images, and input audio, either as a single item or an array of items.
          */
-        content:
-          | string
-          | ResponsesAPI.ResponseInputText
-          | EvalItem.OutputText
-          | EvalItem.InputImage
-          | ResponsesAPI.ResponseInputAudio
-          | GraderModelsAPI.GraderInputs;
+        content: string | ResponsesAPI.ResponseInputText | EvalItem.OutputText | EvalItem.InputImage | ResponsesAPI.ResponseInputAudio | GraderModelsAPI.GraderInputs;
 
         /**
          * The role of the message input. One of `user`, `assistant`, `system`, or
@@ -2434,10 +2369,7 @@ export interface RunCreateParams {
   /**
    * Details about the run's data source.
    */
-  data_source:
-    | CreateEvalJSONLRunDataSource
-    | CreateEvalCompletionsRunDataSource
-    | RunCreateParams.CreateEvalResponsesRunDataSource;
+  data_source: CreateEvalJSONLRunDataSource | CreateEvalCompletionsRunDataSource | RunCreateParams.CreateEvalResponsesRunDataSource;
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
@@ -2463,10 +2395,7 @@ export namespace RunCreateParams {
     /**
      * Determines what populates the `item` namespace in this run's data source.
      */
-    source:
-      | CreateEvalResponsesRunDataSource.FileContent
-      | CreateEvalResponsesRunDataSource.FileID
-      | CreateEvalResponsesRunDataSource.Responses;
+    source: CreateEvalResponsesRunDataSource.FileContent | CreateEvalResponsesRunDataSource.FileID | CreateEvalResponsesRunDataSource.Responses;
 
     /**
      * The type of run data source. Always `responses`.
@@ -2479,9 +2408,7 @@ export namespace RunCreateParams {
      * `item.input_trajectory`), or a template with variable references to the `item`
      * namespace.
      */
-    input_messages?:
-      | CreateEvalResponsesRunDataSource.Template
-      | CreateEvalResponsesRunDataSource.ItemReference;
+    input_messages?: CreateEvalResponsesRunDataSource.Template | CreateEvalResponsesRunDataSource.ItemReference;
 
     /**
      * The name of the model to use for generating completions (e.g. "o3-mini").
@@ -2639,13 +2566,7 @@ export namespace RunCreateParams {
          * Inputs to the model - can contain template strings. Supports text, output text,
          * input images, and input audio, either as a single item or an array of items.
          */
-        content:
-          | string
-          | ResponsesAPI.ResponseInputText
-          | EvalItem.OutputText
-          | EvalItem.InputImage
-          | ResponsesAPI.ResponseInputAudio
-          | GraderModelsAPI.GraderInputs;
+        content: string | ResponsesAPI.ResponseInputText | EvalItem.OutputText | EvalItem.InputImage | ResponsesAPI.ResponseInputAudio | GraderModelsAPI.GraderInputs;
 
         /**
          * The role of the message input. One of `user`, `assistant`, `system`, or
@@ -2858,7 +2779,7 @@ export declare namespace Runs {
     type RunRetrieveParams as RunRetrieveParams,
     type RunListParams as RunListParams,
     type RunDeleteParams as RunDeleteParams,
-    type RunCancelParams as RunCancelParams,
+    type RunCancelParams as RunCancelParams
   };
 
   export {
@@ -2867,6 +2788,6 @@ export declare namespace Runs {
     type OutputItemListResponse as OutputItemListResponse,
     type OutputItemListResponsesPage as OutputItemListResponsesPage,
     type OutputItemRetrieveParams as OutputItemRetrieveParams,
-    type OutputItemListParams as OutputItemListParams,
+    type OutputItemListParams as OutputItemListParams
   };
 }

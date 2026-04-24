@@ -3,17 +3,7 @@
 import { APIResource } from '../../core/resource';
 import * as ResponsesAPI from '../responses/responses';
 import * as FilesAPI from './files/files';
-import {
-  FileCreateParams,
-  FileCreateResponse,
-  FileDeleteParams,
-  FileListParams,
-  FileListResponse,
-  FileListResponsesPage,
-  FileRetrieveParams,
-  FileRetrieveResponse,
-  Files,
-} from './files/files';
+import { FileCreateParams, FileCreateResponse, FileDeleteParams, FileListParams, FileListResponse, FileListResponsesPage, FileRetrieveParams, FileRetrieveResponse, Files } from './files/files';
 import { APIPromise } from '../../core/api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../core/pagination';
 import { buildHeaders } from '../../internal/headers';
@@ -40,10 +30,7 @@ export class Containers extends APIResource {
   /**
    * List Containers
    */
-  list(
-    query: ContainerListParams | null | undefined = {},
-    options?: RequestOptions,
-  ): PagePromise<ContainerListResponsesPage, ContainerListResponse> {
+  list(query: ContainerListParams | null | undefined = {}, options?: RequestOptions): PagePromise<ContainerListResponsesPage, ContainerListResponse> {
     return this._client.getAPIList('/containers', CursorPage<ContainerListResponse>, { query, ...options });
   }
 
@@ -51,14 +38,11 @@ export class Containers extends APIResource {
    * Delete Container
    */
   delete(containerID: string, options?: RequestOptions): APIPromise<void> {
-    return this._client.delete(path`/containers/${containerID}`, {
-      ...options,
-      headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
-    });
+    return this._client.delete(path`/containers/${containerID}`, { ...options, headers: buildHeaders([{Accept: '*/*'}, options?.headers]) });
   }
 }
 
-export type ContainerListResponsesPage = CursorPage<ContainerListResponse>;
+export type ContainerListResponsesPage = CursorPage<ContainerListResponse>
 
 export interface ContainerCreateResponse {
   /**
@@ -378,7 +362,7 @@ export declare namespace Containers {
     type ContainerListResponse as ContainerListResponse,
     type ContainerListResponsesPage as ContainerListResponsesPage,
     type ContainerCreateParams as ContainerCreateParams,
-    type ContainerListParams as ContainerListParams,
+    type ContainerListParams as ContainerListParams
   };
 
   export {
@@ -390,6 +374,6 @@ export declare namespace Containers {
     type FileCreateParams as FileCreateParams,
     type FileRetrieveParams as FileRetrieveParams,
     type FileListParams as FileListParams,
-    type FileDeleteParams as FileDeleteParams,
+    type FileDeleteParams as FileDeleteParams
   };
 }

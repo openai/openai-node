@@ -25,16 +25,8 @@ export class Messages extends APIResource {
    * }
    * ```
    */
-  list(
-    completionID: string,
-    query: MessageListParams | null | undefined = {},
-    options?: RequestOptions,
-  ): PagePromise<ChatCompletionStoreMessagesPage, CompletionsAPI.ChatCompletionStoreMessage> {
-    return this._client.getAPIList(
-      path`/chat/completions/${completionID}/messages`,
-      CursorPage<CompletionsAPI.ChatCompletionStoreMessage>,
-      { query, ...options },
-    );
+  list(completionID: string, query: MessageListParams | null | undefined = {}, options?: RequestOptions): PagePromise<ChatCompletionStoreMessagesPage, CompletionsAPI.ChatCompletionStoreMessage> {
+    return this._client.getAPIList(path`/chat/completions/${completionID}/messages`, CursorPage<CompletionsAPI.ChatCompletionStoreMessage>, { query, ...options });
   }
 }
 
@@ -47,7 +39,9 @@ export interface MessageListParams extends CursorPageParams {
 }
 
 export declare namespace Messages {
-  export { type MessageListParams as MessageListParams };
+  export {
+    type MessageListParams as MessageListParams
+  };
 }
 
-export { type ChatCompletionStoreMessagesPage };
+export { type ChatCompletionStoreMessagesPage }

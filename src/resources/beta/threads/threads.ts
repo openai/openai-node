@@ -5,66 +5,14 @@ import * as ThreadsAPI from './threads';
 import * as Shared from '../../shared';
 import * as AssistantsAPI from '../assistants';
 import * as MessagesAPI from './messages';
-import {
-  Annotation,
-  AnnotationDelta,
-  FileCitationAnnotation,
-  FileCitationDeltaAnnotation,
-  FilePathAnnotation,
-  FilePathDeltaAnnotation,
-  ImageFile,
-  ImageFileContentBlock,
-  ImageFileDelta,
-  ImageFileDeltaBlock,
-  ImageURL,
-  ImageURLContentBlock,
-  ImageURLDelta,
-  ImageURLDeltaBlock,
-  Message as MessagesAPIMessage,
-  MessageContent,
-  MessageContentDelta,
-  MessageContentPartParam,
-  MessageCreateParams,
-  MessageDeleteParams,
-  MessageDeleted,
-  MessageDelta,
-  MessageDeltaEvent,
-  MessageListParams,
-  MessageRetrieveParams,
-  MessageUpdateParams,
-  Messages,
-  MessagesPage,
-  RefusalContentBlock,
-  RefusalDeltaBlock,
-  Text,
-  TextContentBlock,
-  TextContentBlockParam,
-  TextDelta,
-  TextDeltaBlock,
-} from './messages';
+import { Annotation, AnnotationDelta, FileCitationAnnotation, FileCitationDeltaAnnotation, FilePathAnnotation, FilePathDeltaAnnotation, ImageFile, ImageFileContentBlock, ImageFileDelta, ImageFileDeltaBlock, ImageURL, ImageURLContentBlock, ImageURLDelta, ImageURLDeltaBlock, Message as MessagesAPIMessage, MessageContent, MessageContentDelta, MessageContentPartParam, MessageCreateParams, MessageDeleteParams, MessageDeleted, MessageDelta, MessageDeltaEvent, MessageListParams, MessageRetrieveParams, MessageUpdateParams, Messages, MessagesPage, RefusalContentBlock, RefusalDeltaBlock, Text, TextContentBlock, TextContentBlockParam, TextDelta, TextDeltaBlock } from './messages';
 import * as RunsAPI from './runs/runs';
-import {
-  RequiredActionFunctionToolCall,
-  Run,
+import { RequiredActionFunctionToolCall, Run,
   RunCreateAndPollParams,
-  RunCreateAndStreamParams,
-  RunCancelParams,
-  RunCreateParams,
-  RunCreateParamsNonStreaming,
-  RunCreateParamsStreaming,
-  RunListParams,
-  RunRetrieveParams,
-  RunStatus,
+  RunCreateAndStreamParams, RunCancelParams, RunCreateParams, RunCreateParamsNonStreaming, RunCreateParamsStreaming, RunListParams, RunRetrieveParams, RunStatus,
   RunStreamParams,
-  RunSubmitToolOutputsAndPollParams,
-  RunSubmitToolOutputsParams,
-  RunSubmitToolOutputsParamsNonStreaming,
-  RunSubmitToolOutputsParamsStreaming,
-  RunSubmitToolOutputsStreamParams,
-  RunUpdateParams,
-  Runs,
-  RunsPage,
-} from './runs/runs';
+  RunSubmitToolOutputsAndPollParams, RunSubmitToolOutputsParams, RunSubmitToolOutputsParamsNonStreaming, RunSubmitToolOutputsParamsStreaming,
+  RunSubmitToolOutputsStreamParams, RunUpdateParams, Runs, RunsPage } from './runs/runs';
 import { APIPromise } from '../../../core/api-promise';
 import { Stream } from '../../../core/streaming';
 import { buildHeaders } from '../../../internal/headers';
@@ -87,11 +35,7 @@ export class Threads extends APIResource {
    * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
   create(body: ThreadCreateParams | null | undefined = {}, options?: RequestOptions): APIPromise<Thread> {
-    return this._client.post('/threads', {
-      body,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-    });
+    return this._client.post('/threads', { body, ...options, headers: buildHeaders([{'OpenAI-Beta': 'assistants=v2'}, options?.headers]) });
   }
 
   /**
@@ -100,10 +44,7 @@ export class Threads extends APIResource {
    * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
   retrieve(threadID: string, options?: RequestOptions): APIPromise<Thread> {
-    return this._client.get(path`/threads/${threadID}`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-    });
+    return this._client.get(path`/threads/${threadID}`, { ...options, headers: buildHeaders([{'OpenAI-Beta': 'assistants=v2'}, options?.headers]) });
   }
 
   /**
@@ -112,11 +53,7 @@ export class Threads extends APIResource {
    * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
   update(threadID: string, body: ThreadUpdateParams, options?: RequestOptions): APIPromise<Thread> {
-    return this._client.post(path`/threads/${threadID}`, {
-      body,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-    });
+    return this._client.post(path`/threads/${threadID}`, { body, ...options, headers: buildHeaders([{'OpenAI-Beta': 'assistants=v2'}, options?.headers]) });
   }
 
   /**
@@ -125,10 +62,7 @@ export class Threads extends APIResource {
    * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
   delete(threadID: string, options?: RequestOptions): APIPromise<ThreadDeleted> {
-    return this._client.delete(path`/threads/${threadID}`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-    });
+    return this._client.delete(path`/threads/${threadID}`, { ...options, headers: buildHeaders([{'OpenAI-Beta': 'assistants=v2'}, options?.headers]) });
   }
 
   /**
@@ -136,26 +70,11 @@ export class Threads extends APIResource {
    *
    * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
-  createAndRun(body: ThreadCreateAndRunParamsNonStreaming, options?: RequestOptions): APIPromise<RunsAPI.Run>;
-  createAndRun(
-    body: ThreadCreateAndRunParamsStreaming,
-    options?: RequestOptions,
-  ): APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
-  createAndRun(
-    body: ThreadCreateAndRunParamsBase,
-    options?: RequestOptions,
-  ): APIPromise<Stream<AssistantsAPI.AssistantStreamEvent> | RunsAPI.Run>;
-  createAndRun(
-    body: ThreadCreateAndRunParams,
-    options?: RequestOptions,
-  ): APIPromise<RunsAPI.Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>> {
-    return this._client.post('/threads/runs', {
-      body,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      stream: body.stream ?? false,
-      __synthesizeEventData: true,
-    }) as APIPromise<RunsAPI.Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
+  createAndRun(body: ThreadCreateAndRunParamsNonStreaming, options?: RequestOptions): APIPromise<RunsAPI.Run>
+  createAndRun(body: ThreadCreateAndRunParamsStreaming, options?: RequestOptions): APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>
+  createAndRun(body: ThreadCreateAndRunParamsBase, options?: RequestOptions): APIPromise<Stream<AssistantsAPI.AssistantStreamEvent> | RunsAPI.Run>
+  createAndRun(body: ThreadCreateAndRunParams, options?: RequestOptions): APIPromise<RunsAPI.Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>> {
+    return this._client.post('/threads/runs', { body, ...options, headers: buildHeaders([{'OpenAI-Beta': 'assistants=v2'}, options?.headers]), stream: body.stream ?? false, __synthesizeEventData: true }) as APIPromise<RunsAPI.Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
   }
 
   /**
@@ -201,11 +120,7 @@ export class Threads extends APIResource {
  * indicates the generation exceeded `max_tokens` or the conversation exceeded the
  * max context length.
  */
-export type AssistantResponseFormatOption =
-  | 'auto'
-  | Shared.ResponseFormatText
-  | Shared.ResponseFormatJSONObject
-  | Shared.ResponseFormatJSONSchema;
+export type AssistantResponseFormatOption = 'auto' | Shared.ResponseFormatText | Shared.ResponseFormatJSONObject | Shared.ResponseFormatJSONSchema
 
 /**
  * Specifies a tool the model should use. Use to force the model to call a specific
@@ -236,7 +151,7 @@ export interface AssistantToolChoiceFunction {
  * `{"type": "function", "function": {"name": "my_function"}}` forces the model to
  * call that tool.
  */
-export type AssistantToolChoiceOption = 'none' | 'auto' | 'required' | AssistantToolChoice;
+export type AssistantToolChoiceOption = 'none' | 'auto' | 'required' | AssistantToolChoice
 
 /**
  * Represents a thread that contains
@@ -566,9 +481,7 @@ export namespace ThreadUpdateParams {
   }
 }
 
-export type ThreadCreateAndRunParams =
-  | ThreadCreateAndRunParamsNonStreaming
-  | ThreadCreateAndRunParamsStreaming;
+export type ThreadCreateAndRunParams = ThreadCreateAndRunParamsNonStreaming | ThreadCreateAndRunParamsStreaming
 
 export interface ThreadCreateAndRunParamsBase {
   /**
@@ -961,8 +874,8 @@ export namespace ThreadCreateAndRunParams {
     last_messages?: number | null;
   }
 
-  export type ThreadCreateAndRunParamsNonStreaming = ThreadsAPI.ThreadCreateAndRunParamsNonStreaming;
-  export type ThreadCreateAndRunParamsStreaming = ThreadsAPI.ThreadCreateAndRunParamsStreaming;
+  export type ThreadCreateAndRunParamsNonStreaming = ThreadsAPI.ThreadCreateAndRunParamsNonStreaming
+  export type ThreadCreateAndRunParamsStreaming = ThreadsAPI.ThreadCreateAndRunParamsStreaming
 }
 
 export interface ThreadCreateAndRunParamsNonStreaming extends ThreadCreateAndRunParamsBase {
@@ -1395,7 +1308,7 @@ export declare namespace Threads {
     type MessageRetrieveParams as MessageRetrieveParams,
     type MessageUpdateParams as MessageUpdateParams,
     type MessageListParams as MessageListParams,
-    type MessageDeleteParams as MessageDeleteParams,
+    type MessageDeleteParams as MessageDeleteParams
   };
 
   export { AssistantStream };

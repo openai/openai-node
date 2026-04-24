@@ -1,2 +1,2 @@
 /** @deprecated Import from ./core/streaming instead */
-export * from './core/streaming';
+export * from "./core/streaming"

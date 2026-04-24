@@ -93,7 +93,7 @@ export class PagePromise<
           props.response,
           await defaultParseResponse(client, props),
           props.options,
-        ) as WithRequestID<PageClass>,
+        ) as WithRequestID<PageClass>
     );
   }
 
@@ -154,20 +154,12 @@ export interface CursorPageParams {
   limit?: number;
 }
 
-export class CursorPage<Item extends { id: string }>
-  extends AbstractPage<Item>
-  implements CursorPageResponse<Item>
-{
+export class CursorPage<Item extends { id: string }> extends AbstractPage<Item> implements CursorPageResponse<Item> {
   data: Array<Item>;
 
   has_more: boolean;
 
-  constructor(
-    client: OpenAI,
-    response: Response,
-    body: CursorPageResponse<Item>,
-    options: FinalRequestOptions,
-  ) {
+  constructor(client: OpenAI, response: Response, body: CursorPageResponse<Item>, options: FinalRequestOptions) {
     super(client, response, body, options);
 
     this.data = body.data || [];
@@ -188,9 +180,9 @@ export class CursorPage<Item extends { id: string }>
 
   nextPageRequestOptions(): PageRequestOptions | null {
     const data = this.getPaginatedItems();
-    const id = data[data.length - 1]?.id;
+    const id = data[data.length - 1]?.id
     if (!id) {
-      return null;
+      return null
     }
 
     return {
@@ -217,22 +209,14 @@ export interface ConversationCursorPageParams {
   limit?: number;
 }
 
-export class ConversationCursorPage<Item>
-  extends AbstractPage<Item>
-  implements ConversationCursorPageResponse<Item>
-{
+export class ConversationCursorPage<Item> extends AbstractPage<Item> implements ConversationCursorPageResponse<Item> {
   data: Array<Item>;
 
   has_more: boolean;
 
   last_id: string;
 
-  constructor(
-    client: OpenAI,
-    response: Response,
-    body: ConversationCursorPageResponse<Item>,
-    options: FinalRequestOptions,
-  ) {
+  constructor(client: OpenAI, response: Response, body: ConversationCursorPageResponse<Item>, options: FinalRequestOptions) {
     super(client, response, body, options);
 
     this.data = body.data || [];
@@ -253,7 +237,7 @@ export class ConversationCursorPage<Item>
   }
 
   nextPageRequestOptions(): PageRequestOptions | null {
-    const cursor = this.last_id;
+    const cursor = this.last_id
     if (!cursor) {
       return null;
     }

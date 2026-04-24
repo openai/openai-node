@@ -3,63 +3,20 @@
 import { APIResource } from '../../core/resource';
 import * as Shared from '../shared';
 import * as CompletionsAPI from './completions/completions';
-import {
-  ChatCompletion,
-  ChatCompletionAllowedToolChoice,
-  ChatCompletionAllowedTools,
-  ChatCompletionAssistantMessageParam,
-  ChatCompletionAudio,
-  ChatCompletionAudioParam,
-  ChatCompletionChunk,
-  ChatCompletionContentPart,
-  ChatCompletionContentPartImage,
-  ChatCompletionContentPartInputAudio,
-  ChatCompletionContentPartRefusal,
-  ChatCompletionContentPartText,
-  ChatCompletionCreateParams,
-  ChatCompletionCreateParamsNonStreaming,
-  ChatCompletionCreateParamsStreaming,
-  ChatCompletionCustomTool,
-  ChatCompletionDeleted,
-  ChatCompletionDeveloperMessageParam,
-  ChatCompletionFunctionCallOption,
-  ChatCompletionFunctionMessageParam,
-  ChatCompletionFunctionTool,
-  ChatCompletionListParams,
-  ChatCompletionMessage,
-  ChatCompletionMessageCustomToolCall,
-  ChatCompletionMessageFunctionToolCall,
-  ChatCompletionMessageParam,
-  ChatCompletionMessageToolCall,
-  ChatCompletionModality,
-  ChatCompletionNamedToolChoice,
-  ChatCompletionNamedToolChoiceCustom,
-  ChatCompletionPredictionContent,
-  ChatCompletionReasoningEffort,
-  ChatCompletionRole,
-  ChatCompletionStoreMessage,
-  ChatCompletionStreamOptions,
-  ChatCompletionSystemMessageParam,
-  ChatCompletionTokenLogprob,
-  ChatCompletionTool,
-  ChatCompletionToolChoiceOption,
-  ChatCompletionToolMessageParam,
-  ChatCompletionUpdateParams,
-  ChatCompletionUserMessageParam,
-  ChatCompletionsPage,
-  Completions,
-} from './completions/completions';
+import { ChatCompletion, ChatCompletionAllowedToolChoice, ChatCompletionAllowedTools, ChatCompletionAssistantMessageParam, ChatCompletionAudio, ChatCompletionAudioParam, ChatCompletionChunk, ChatCompletionContentPart, ChatCompletionContentPartImage, ChatCompletionContentPartInputAudio, ChatCompletionContentPartRefusal, ChatCompletionContentPartText, ChatCompletionCreateParams, ChatCompletionCreateParamsNonStreaming, ChatCompletionCreateParamsStreaming, ChatCompletionCustomTool, ChatCompletionDeleted, ChatCompletionDeveloperMessageParam, ChatCompletionFunctionCallOption, ChatCompletionFunctionMessageParam, ChatCompletionFunctionTool, ChatCompletionListParams, ChatCompletionMessage, ChatCompletionMessageCustomToolCall, ChatCompletionMessageFunctionToolCall, ChatCompletionMessageParam, ChatCompletionMessageToolCall, ChatCompletionModality, ChatCompletionNamedToolChoice, ChatCompletionNamedToolChoiceCustom, ChatCompletionPredictionContent, ChatCompletionReasoningEffort, ChatCompletionRole, ChatCompletionStoreMessage, ChatCompletionStreamOptions, ChatCompletionSystemMessageParam, ChatCompletionTokenLogprob, ChatCompletionTool, ChatCompletionToolChoiceOption, ChatCompletionToolMessageParam, ChatCompletionUpdateParams, ChatCompletionUserMessageParam, ChatCompletionsPage, Completions } from './completions/completions';
 
 export class Chat extends APIResource {
   completions: CompletionsAPI.Completions = new CompletionsAPI.Completions(this._client);
 }
 
-export type ChatModel = Shared.ChatModel;
+export type ChatModel = Shared.ChatModel
 
 Chat.Completions = Completions;
 
 export declare namespace Chat {
-  export { type ChatModel as ChatModel };
+  export {
+    type ChatModel as ChatModel
+  };
 
   export {
     Completions as Completions,
@@ -105,6 +62,6 @@ export declare namespace Chat {
     type ChatCompletionCreateParamsNonStreaming as ChatCompletionCreateParamsNonStreaming,
     type ChatCompletionCreateParamsStreaming as ChatCompletionCreateParamsStreaming,
     type ChatCompletionUpdateParams as ChatCompletionUpdateParams,
-    type ChatCompletionListParams as ChatCompletionListParams,
+    type ChatCompletionListParams as ChatCompletionListParams
   };
 }

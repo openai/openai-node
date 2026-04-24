@@ -2,24 +2,7 @@
 
 import { APIResource } from '../../core/resource';
 import * as AssistantsAPI from './assistants';
-import {
-  Assistant,
-  AssistantCreateParams,
-  AssistantDeleted,
-  AssistantListParams,
-  AssistantStreamEvent,
-  AssistantTool,
-  AssistantUpdateParams,
-  Assistants,
-  AssistantsPage,
-  CodeInterpreterTool,
-  FileSearchTool,
-  FunctionTool,
-  MessageStreamEvent,
-  RunStepStreamEvent,
-  RunStreamEvent,
-  ThreadStreamEvent,
-} from './assistants';
+import { Assistant, AssistantCreateParams, AssistantDeleted, AssistantListParams, AssistantStreamEvent, AssistantTool, AssistantUpdateParams, Assistants, AssistantsPage, CodeInterpreterTool, FileSearchTool, FunctionTool, MessageStreamEvent, RunStepStreamEvent, RunStreamEvent, ThreadStreamEvent } from './assistants';
 import * as RealtimeAPI from './realtime/realtime';
 import {
   ConversationCreatedEvent,
@@ -76,22 +59,9 @@ import {
 import * as ChatKitAPI from './chatkit/chatkit';
 import { ChatKit, ChatKitWorkflow } from './chatkit/chatkit';
 import * as ThreadsAPI from './threads/threads';
-import {
-  AssistantResponseFormatOption,
-  AssistantToolChoice,
-  AssistantToolChoiceFunction,
-  AssistantToolChoiceOption,
-  Thread,
-  ThreadCreateAndRunParams,
-  ThreadCreateAndRunParamsNonStreaming,
-  ThreadCreateAndRunParamsStreaming,
+import { AssistantResponseFormatOption, AssistantToolChoice, AssistantToolChoiceFunction, AssistantToolChoiceOption, Thread, ThreadCreateAndRunParams, ThreadCreateAndRunParamsNonStreaming, ThreadCreateAndRunParamsStreaming,
   ThreadCreateAndRunPollParams,
-  ThreadCreateAndRunStreamParams,
-  ThreadCreateParams,
-  ThreadDeleted,
-  ThreadUpdateParams,
-  Threads,
-} from './threads/threads';
+  ThreadCreateAndRunStreamParams, ThreadCreateParams, ThreadDeleted, ThreadUpdateParams, Threads } from './threads/threads';
 
 export class Beta extends APIResource {
   realtime: RealtimeAPI.Realtime = new RealtimeAPI.Realtime(this._client);
@@ -177,7 +147,7 @@ export declare namespace Beta {
     type AssistantsPage as AssistantsPage,
     type AssistantCreateParams as AssistantCreateParams,
     type AssistantUpdateParams as AssistantUpdateParams,
-    type AssistantListParams as AssistantListParams,
+    type AssistantListParams as AssistantListParams
   };
 
   export {

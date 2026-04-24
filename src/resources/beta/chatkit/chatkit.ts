@@ -4,32 +4,7 @@ import { APIResource } from '../../../core/resource';
 import * as SessionsAPI from './sessions';
 import { SessionCreateParams, Sessions } from './sessions';
 import * as ThreadsAPI from './threads';
-import {
-  ChatKitAttachment,
-  ChatKitResponseOutputText,
-  ChatKitThread,
-  ChatKitThreadAssistantMessageItem,
-  ChatKitThreadItemList,
-  ChatKitThreadItemListDataPage,
-  ChatKitThreadUserMessageItem,
-  ChatKitThreadsPage,
-  ChatKitWidgetItem,
-  ChatSession,
-  ChatSessionAutomaticThreadTitling,
-  ChatSessionChatKitConfiguration,
-  ChatSessionChatKitConfigurationParam,
-  ChatSessionExpiresAfterParam,
-  ChatSessionFileUpload,
-  ChatSessionHistory,
-  ChatSessionRateLimits,
-  ChatSessionRateLimitsParam,
-  ChatSessionStatus,
-  ChatSessionWorkflowParam,
-  ThreadDeleteResponse,
-  ThreadListItemsParams,
-  ThreadListParams,
-  Threads,
-} from './threads';
+import { ChatKitAttachment, ChatKitResponseOutputText, ChatKitThread, ChatKitThreadAssistantMessageItem, ChatKitThreadItemList, ChatKitThreadItemListDataPage, ChatKitThreadUserMessageItem, ChatKitThreadsPage, ChatKitWidgetItem, ChatSession, ChatSessionAutomaticThreadTitling, ChatSessionChatKitConfiguration, ChatSessionChatKitConfigurationParam, ChatSessionExpiresAfterParam, ChatSessionFileUpload, ChatSessionHistory, ChatSessionRateLimits, ChatSessionRateLimitsParam, ChatSessionStatus, ChatSessionWorkflowParam, ThreadDeleteResponse, ThreadListItemsParams, ThreadListParams, Threads } from './threads';
 
 export class ChatKit extends APIResource {
   sessions: SessionsAPI.Sessions = new SessionsAPI.Sessions(this._client);
@@ -79,9 +54,14 @@ ChatKit.Sessions = Sessions;
 ChatKit.Threads = Threads;
 
 export declare namespace ChatKit {
-  export { type ChatKitWorkflow as ChatKitWorkflow };
+  export {
+    type ChatKitWorkflow as ChatKitWorkflow
+  };
 
-  export { Sessions as Sessions, type SessionCreateParams as SessionCreateParams };
+  export {
+    Sessions as Sessions,
+    type SessionCreateParams as SessionCreateParams
+  };
 
   export {
     Threads as Threads,
@@ -107,6 +87,6 @@ export declare namespace ChatKit {
     type ChatKitThreadsPage as ChatKitThreadsPage,
     type ChatKitThreadItemListDataPage as ChatKitThreadItemListDataPage,
     type ThreadListParams as ThreadListParams,
-    type ThreadListItemsParams as ThreadListItemsParams,
+    type ThreadListItemsParams as ThreadListItemsParams
   };
 }

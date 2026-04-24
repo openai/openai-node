@@ -217,3 +217,5 @@ describe('streaming decoding', () => {
     expect(event.done).toBeTruthy();
   });
 });
+
+;
