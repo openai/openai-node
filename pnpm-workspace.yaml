@@ -1,0 +1,10 @@
+packages:
+  - .
+  - examples
+
+minimumReleaseAge: 10080
+minimumReleaseAgeExclude: []
+blockExoticSubdeps: true
+strictDepBuilds: true
+allowBuilds:
+  '@swc/core': true

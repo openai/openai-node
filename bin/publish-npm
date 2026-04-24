@@ -2,14 +2,20 @@
 
 set -eux
 
+NPM_BIN="$PWD/node_modules/.bin/npm"
+if [[ ! -x "$NPM_BIN" ]]; then
+  echo "ERROR: local npm CLI not found. Run corepack pnpm install first."
+  exit 1
+fi
+
 if [[ ${NPM_TOKEN:-} ]]; then
-  npm config set '//registry.npmjs.org/:_authToken' "$NPM_TOKEN"
+  "$NPM_BIN" config set '//registry.npmjs.org/:_authToken' "$NPM_TOKEN"
 elif [[ ! ${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-} ]]; then
   echo "ERROR: NPM_TOKEN must be set if not running in a Github Action with id-token permission"
   exit 1
 fi
 
-yarn build
+corepack pnpm build
 cd dist
 
 # Get package name and version from package.json
@@ -26,7 +32,7 @@ VERSION="$(jq -r -e '.version' ./package.json)"
 #     "detail": "'the_package' is not in this registry..."
 #   }
 # }
-NPM_INFO="$(npm view "$PACKAGE_NAME" version --json 2>/dev/null || true)"
+NPM_INFO="$("$NPM_BIN" view "$PACKAGE_NAME" version --json 2>/dev/null || true)"
 
 # Check if we got an E404 error
 if echo "$NPM_INFO" | jq -e '.error.code == "E404"' > /dev/null 2>&1; then
@@ -62,9 +68,6 @@ else
   TAG="latest"
 fi
 
-# Install OIDC compatible npm version
-npm install --prefix ../oidc/ npm@11.6.2
-
 # Publish with the appropriate tag
 export npm_config_registry='https://registry.npmjs.org'
-../oidc/node_modules/.bin/npm publish --tag "$TAG"
+"$NPM_BIN" publish --tag "$TAG"

@@ -3,9 +3,9 @@
 set -eux
 
 # Build the project
-yarn build
+corepack pnpm build
 
 # Navigate to the dist directory
 cd dist-deno
 
-npx jsr publish ${JSR_TOKEN:+"--token=$JSR_TOKEN"}
+../node_modules/.bin/jsr publish ${JSR_TOKEN:+"--token=$JSR_TOKEN"}

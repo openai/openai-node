@@ -26,7 +26,7 @@ jobs:
           node-version: '20'
       - name: Install dependencies
         run: |
-          yarn install
+          ./scripts/bootstrap
 
       - name: Detect breaking changes
         run: |
@@ -43,12 +43,6 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '20'
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
-        with:
-          version: 10.25.0
-          run_install: false
 
       # Setup this sdk
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -71,20 +65,20 @@ jobs:
 
       - name: Link agents packages to local SDKs
         working-directory: openai-agents-js
-        run: pnpm --filter @openai/agents-core --filter @openai/agents-openai --filter @openai/agents add file:../../../openai-node/dist
+        run: corepack pnpm --filter @openai/agents-core --filter @openai/agents-openai --filter @openai/agents add file:../../../openai-node/dist
 
       - name: Install dependencies
         working-directory: openai-agents-js
-        run: pnpm install
+        run: corepack pnpm install --frozen-lockfile
 
       - name: Build all packages
         working-directory: openai-agents-js
-        run: pnpm build
+        run: corepack pnpm build
 
       - name: Run linter
         working-directory: openai-agents-js
-        run: pnpm lint
+        run: corepack pnpm lint
 
       - name: Type-check docs scripts
         working-directory: openai-agents-js
-        run: pnpm docs:scripts:check
+        run: corepack pnpm docs:scripts:check

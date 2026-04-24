@@ -1,4 +1,4 @@
-#!/usr/bin/env -S yarn tsn -T
+#!/usr/bin/env -S corepack pnpm tsn -T
 
 import OpenAI from 'openai';
 

@@ -1,16 +1,18 @@
 ## Setting up the environment
 
-This repository uses [`yarn@v1`](https://classic.yarnpkg.com/lang/en/docs/install).
+This repository uses [`pnpm`](https://pnpm.io/) via Corepack.
 Other package managers may work but are not officially supported for development.
 
 To set up the repository, run:
 
 ```sh
-$ yarn
-$ yarn build
+$ ./scripts/bootstrap
+$ corepack pnpm build
 ```
 
 This will install all the required dependencies and build output files to `dist/`.
+`./scripts/bootstrap` uses the committed `pnpm-lock.yaml` and will fail if it is out of sync with `package.json`.
+When intentionally changing dependencies, update them explicitly with `corepack pnpm add`, `corepack pnpm up`, or `corepack pnpm install`, then commit the resulting lockfile changes.
 
 ## Modifying/Adding code
 
@@ -25,14 +27,14 @@ All files in the `examples/` directory are not modified by the generator and can
 ```ts
 // add an example to examples/<your-example>.ts
 
-#!/usr/bin/env -S npm run tsn -T
+#!/usr/bin/env -S corepack pnpm tsn -T
 …
 ```
 
 ```sh
 $ chmod +x examples/<your-example>.ts
 # run the example against your api
-$ yarn tsn -T examples/<your-example>.ts
+$ corepack pnpm tsn -T examples/<your-example>.ts
 ```
 
 ## Using the repository from source
@@ -52,15 +54,10 @@ Alternatively, to link a local copy of the repo:
 $ git clone https://www.github.com/openai/openai-node
 $ cd openai-node
 
-# With yarn
-$ yarn link
-$ cd ../my-package
-$ yarn link openai
-
 # With pnpm
-$ pnpm link --global
+$ corepack pnpm link --global
 $ cd ../my-package
-$ pnpm link --global openai
+$ corepack pnpm link --global openai
 ```
 
 ## Running tests
@@ -72,7 +69,7 @@ $ ./scripts/mock
 ```
 
 ```sh
-$ yarn run test
+$ corepack pnpm run test
 ```
 
 ## Linting and formatting
@@ -83,13 +80,13 @@ This repository uses [prettier](https://www.npmjs.com/package/prettier) and
 To lint:
 
 ```sh
-$ yarn lint
+$ corepack pnpm lint
 ```
 
 To format and fix all lint issues automatically:
 
 ```sh
-$ yarn fix
+$ corepack pnpm fix
 ```
 
 ## Publishing and releases

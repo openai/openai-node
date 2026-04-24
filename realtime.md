@@ -9,7 +9,7 @@ This SDK supports accessing the Realtime API through the [WebSocket API](https:/
 Basic text based example with `ws`:
 
 ```ts
-// requires `yarn add ws @types/ws`
+// requires `npm install ws @types/ws`
 import { OpenAIRealtimeWS } from 'openai/realtime/ws';
 
 const rt = new OpenAIRealtimeWS({ model: 'gpt-realtime' });

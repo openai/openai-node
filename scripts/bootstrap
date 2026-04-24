@@ -21,9 +21,20 @@ fi
 
 echo "==> Installing Node dependencies…"
 
-PACKAGE_MANAGER=$(command -v yarn >/dev/null 2>&1 && echo "yarn" || echo "npm")
+require_pnpm_config() {
+  key="$1"
+  expected="$2"
+  actual="$(corepack pnpm config get "$key")"
 
-$PACKAGE_MANAGER install
+  if [ "$actual" != "$expected" ]; then
+    echo "ERROR: expected pnpm config '$key' to be '$expected', got '$actual'"
+    exit 1
+  fi
+}
 
-cd "$(dirname "$0")/../examples"
-$PACKAGE_MANAGER install
+echo "==> Verifying pnpm supply-chain policy…"
+require_pnpm_config minimum-release-age 10080
+require_pnpm_config block-exotic-subdeps true
+require_pnpm_config strict-dep-builds true
+
+corepack pnpm install --frozen-lockfile

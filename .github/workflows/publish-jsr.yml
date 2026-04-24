@@ -23,7 +23,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          yarn install
+          ./scripts/bootstrap
 
       - name: Publish to JSR
         run: |
