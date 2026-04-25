@@ -764,6 +764,49 @@ describe('retries', () => {
     expect(count).toEqual(3);
   });
 
+  test('caps Retry-After at 60s when server returns a large value', async () => {
+    // Capture delays passed to setTimeout (which sleep() wraps) and fire callbacks
+    // immediately so the test doesn't actually wait. We set a small client timeout
+    // (30s) so the per-request abort watchdog can't be confused with the retry sleep.
+    const realSetTimeout = globalThis.setTimeout;
+    const sleepDelays: number[] = [];
+    const setTimeoutSpy = jest
+      .spyOn(globalThis, 'setTimeout')
+      .mockImplementation(((cb: (...args: any[]) => void, ms?: number, ...args: any[]) => {
+        if (typeof ms === 'number') sleepDelays.push(ms);
+        return realSetTimeout(cb, 0, ...args);
+      }) as any);
+
+    try {
+      let count = 0;
+      const testFetch = async (
+        url: string | URL | Request,
+        { signal }: RequestInit = {},
+      ): Promise<Response> => {
+        if (count++ === 0) {
+          return new Response(undefined, {
+            status: 429,
+            // 600 seconds == 10 minutes; without a cap the SDK would sleep for the full duration.
+            headers: { 'Retry-After': '600' },
+          });
+        }
+        return new Response(JSON.stringify({ a: 1 }), { headers: { 'Content-Type': 'application/json' } });
+      };
+
+      const client = new OpenAI({ apiKey: 'My API Key', fetch: testFetch, timeout: 30_000 });
+
+      expect(await client.request({ path: '/foo', method: 'get' })).toEqual({ a: 1 });
+      expect(count).toEqual(2);
+
+      // With the cap in place the retry should fall back to calculated backoff
+      // (<= 8s with jitter); without the cap the largest delay would be 600_000ms.
+      const longestDelay = Math.max(0, ...sleepDelays);
+      expect(longestDelay).toBeLessThan(60 * 1000);
+    } finally {
+      setTimeoutSpy.mockRestore();
+    }
+  });
+
   describe('auth', () => {
     test('apiKey', async () => {
       const client = new OpenAI({
