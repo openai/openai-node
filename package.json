@@ -58,14 +58,6 @@
     "zod": "^3.25 || ^4.0",
     "typescript-eslint": "8.31.1"
   },
-  "peerDependencies": {
-    "ws": "^8.18.0"
-  },
-  "peerDependenciesMeta": {
-    "ws": {
-      "optional": true
-    }
-  },
   "bin": {
     "openai": "bin/cli"
   },
