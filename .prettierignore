@@ -1,4 +1,5 @@
 CHANGELOG.md
+jsr.json
 /ecosystem-tests/*/**
 /node_modules
 /deno
