@@ -2,7 +2,16 @@
 
 import { APIResource } from '../../core/resource';
 import * as GraderModelsAPI from './grader-models';
-import { GraderInputs, GraderModels, LabelModelGrader, MultiGrader, PythonGrader, ScoreModelGrader, StringCheckGrader, TextSimilarityGrader } from './grader-models';
+import {
+  GraderInputs,
+  GraderModels,
+  LabelModelGrader,
+  MultiGrader,
+  PythonGrader,
+  ScoreModelGrader,
+  StringCheckGrader,
+  TextSimilarityGrader,
+} from './grader-models';
 
 export class Graders extends APIResource {
   graderModels: GraderModelsAPI.GraderModels = new GraderModelsAPI.GraderModels(this._client);
@@ -19,6 +28,6 @@ export declare namespace Graders {
     type PythonGrader as PythonGrader,
     type ScoreModelGrader as ScoreModelGrader,
     type StringCheckGrader as StringCheckGrader,
-    type TextSimilarityGrader as TextSimilarityGrader
+    type TextSimilarityGrader as TextSimilarityGrader,
   };
 }

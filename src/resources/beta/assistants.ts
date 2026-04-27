@@ -23,7 +23,11 @@ export class Assistants extends APIResource {
    * @deprecated
    */
   create(body: AssistantCreateParams, options?: RequestOptions): APIPromise<Assistant> {
-    return this._client.post('/assistants', { body, ...options, headers: buildHeaders([{'OpenAI-Beta': 'assistants=v2'}, options?.headers]) });
+    return this._client.post('/assistants', {
+      body,
+      ...options,
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+    });
   }
 
   /**
@@ -32,7 +36,10 @@ export class Assistants extends APIResource {
    * @deprecated
    */
   retrieve(assistantID: string, options?: RequestOptions): APIPromise<Assistant> {
-    return this._client.get(path`/assistants/${assistantID}`, { ...options, headers: buildHeaders([{'OpenAI-Beta': 'assistants=v2'}, options?.headers]) });
+    return this._client.get(path`/assistants/${assistantID}`, {
+      ...options,
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+    });
   }
 
   /**
@@ -41,7 +48,11 @@ export class Assistants extends APIResource {
    * @deprecated
    */
   update(assistantID: string, body: AssistantUpdateParams, options?: RequestOptions): APIPromise<Assistant> {
-    return this._client.post(path`/assistants/${assistantID}`, { body, ...options, headers: buildHeaders([{'OpenAI-Beta': 'assistants=v2'}, options?.headers]) });
+    return this._client.post(path`/assistants/${assistantID}`, {
+      body,
+      ...options,
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+    });
   }
 
   /**
@@ -49,8 +60,15 @@ export class Assistants extends APIResource {
    *
    * @deprecated
    */
-  list(query: AssistantListParams | null | undefined = {}, options?: RequestOptions): PagePromise<AssistantsPage, Assistant> {
-    return this._client.getAPIList('/assistants', CursorPage<Assistant>, { query, ...options, headers: buildHeaders([{'OpenAI-Beta': 'assistants=v2'}, options?.headers]) });
+  list(
+    query: AssistantListParams | null | undefined = {},
+    options?: RequestOptions,
+  ): PagePromise<AssistantsPage, Assistant> {
+    return this._client.getAPIList('/assistants', CursorPage<Assistant>, {
+      query,
+      ...options,
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+    });
   }
 
   /**
@@ -59,11 +77,14 @@ export class Assistants extends APIResource {
    * @deprecated
    */
   delete(assistantID: string, options?: RequestOptions): APIPromise<AssistantDeleted> {
-    return this._client.delete(path`/assistants/${assistantID}`, { ...options, headers: buildHeaders([{'OpenAI-Beta': 'assistants=v2'}, options?.headers]) });
+    return this._client.delete(path`/assistants/${assistantID}`, {
+      ...options,
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+    });
   }
 }
 
-export type AssistantsPage = CursorPage<Assistant>
+export type AssistantsPage = CursorPage<Assistant>;
 
 /**
  * @deprecated Represents an `assistant` that can call the model and use tools.
@@ -240,7 +261,31 @@ export interface AssistantDeleted {
  * [Assistants API quickstart](https://platform.openai.com/docs/assistants/overview)
  * to learn how to integrate the Assistants API with streaming.
  */
-export type AssistantStreamEvent = AssistantStreamEvent.ThreadCreated | AssistantStreamEvent.ThreadRunCreated | AssistantStreamEvent.ThreadRunQueued | AssistantStreamEvent.ThreadRunInProgress | AssistantStreamEvent.ThreadRunRequiresAction | AssistantStreamEvent.ThreadRunCompleted | AssistantStreamEvent.ThreadRunIncomplete | AssistantStreamEvent.ThreadRunFailed | AssistantStreamEvent.ThreadRunCancelling | AssistantStreamEvent.ThreadRunCancelled | AssistantStreamEvent.ThreadRunExpired | AssistantStreamEvent.ThreadRunStepCreated | AssistantStreamEvent.ThreadRunStepInProgress | AssistantStreamEvent.ThreadRunStepDelta | AssistantStreamEvent.ThreadRunStepCompleted | AssistantStreamEvent.ThreadRunStepFailed | AssistantStreamEvent.ThreadRunStepCancelled | AssistantStreamEvent.ThreadRunStepExpired | AssistantStreamEvent.ThreadMessageCreated | AssistantStreamEvent.ThreadMessageInProgress | AssistantStreamEvent.ThreadMessageDelta | AssistantStreamEvent.ThreadMessageCompleted | AssistantStreamEvent.ThreadMessageIncomplete | AssistantStreamEvent.ErrorEvent
+export type AssistantStreamEvent =
+  | AssistantStreamEvent.ThreadCreated
+  | AssistantStreamEvent.ThreadRunCreated
+  | AssistantStreamEvent.ThreadRunQueued
+  | AssistantStreamEvent.ThreadRunInProgress
+  | AssistantStreamEvent.ThreadRunRequiresAction
+  | AssistantStreamEvent.ThreadRunCompleted
+  | AssistantStreamEvent.ThreadRunIncomplete
+  | AssistantStreamEvent.ThreadRunFailed
+  | AssistantStreamEvent.ThreadRunCancelling
+  | AssistantStreamEvent.ThreadRunCancelled
+  | AssistantStreamEvent.ThreadRunExpired
+  | AssistantStreamEvent.ThreadRunStepCreated
+  | AssistantStreamEvent.ThreadRunStepInProgress
+  | AssistantStreamEvent.ThreadRunStepDelta
+  | AssistantStreamEvent.ThreadRunStepCompleted
+  | AssistantStreamEvent.ThreadRunStepFailed
+  | AssistantStreamEvent.ThreadRunStepCancelled
+  | AssistantStreamEvent.ThreadRunStepExpired
+  | AssistantStreamEvent.ThreadMessageCreated
+  | AssistantStreamEvent.ThreadMessageInProgress
+  | AssistantStreamEvent.ThreadMessageDelta
+  | AssistantStreamEvent.ThreadMessageCompleted
+  | AssistantStreamEvent.ThreadMessageIncomplete
+  | AssistantStreamEvent.ErrorEvent;
 
 export namespace AssistantStreamEvent {
   /**
@@ -589,7 +634,7 @@ export namespace AssistantStreamEvent {
   }
 }
 
-export type AssistantTool = CodeInterpreterTool | FileSearchTool | FunctionTool
+export type AssistantTool = CodeInterpreterTool | FileSearchTool | FunctionTool;
 
 export interface CodeInterpreterTool {
   /**
@@ -677,7 +722,12 @@ export interface FunctionTool {
  * [message](https://platform.openai.com/docs/api-reference/messages/object) is
  * created.
  */
-export type MessageStreamEvent = MessageStreamEvent.ThreadMessageCreated | MessageStreamEvent.ThreadMessageInProgress | MessageStreamEvent.ThreadMessageDelta | MessageStreamEvent.ThreadMessageCompleted | MessageStreamEvent.ThreadMessageIncomplete
+export type MessageStreamEvent =
+  | MessageStreamEvent.ThreadMessageCreated
+  | MessageStreamEvent.ThreadMessageInProgress
+  | MessageStreamEvent.ThreadMessageDelta
+  | MessageStreamEvent.ThreadMessageCompleted
+  | MessageStreamEvent.ThreadMessageIncomplete;
 
 export namespace MessageStreamEvent {
   /**
@@ -761,7 +811,14 @@ export namespace MessageStreamEvent {
  * [run step](https://platform.openai.com/docs/api-reference/run-steps/step-object)
  * is created.
  */
-export type RunStepStreamEvent = RunStepStreamEvent.ThreadRunStepCreated | RunStepStreamEvent.ThreadRunStepInProgress | RunStepStreamEvent.ThreadRunStepDelta | RunStepStreamEvent.ThreadRunStepCompleted | RunStepStreamEvent.ThreadRunStepFailed | RunStepStreamEvent.ThreadRunStepCancelled | RunStepStreamEvent.ThreadRunStepExpired
+export type RunStepStreamEvent =
+  | RunStepStreamEvent.ThreadRunStepCreated
+  | RunStepStreamEvent.ThreadRunStepInProgress
+  | RunStepStreamEvent.ThreadRunStepDelta
+  | RunStepStreamEvent.ThreadRunStepCompleted
+  | RunStepStreamEvent.ThreadRunStepFailed
+  | RunStepStreamEvent.ThreadRunStepCancelled
+  | RunStepStreamEvent.ThreadRunStepExpired;
 
 export namespace RunStepStreamEvent {
   /**
@@ -868,7 +925,17 @@ export namespace RunStepStreamEvent {
  * Occurs when a new
  * [run](https://platform.openai.com/docs/api-reference/runs/object) is created.
  */
-export type RunStreamEvent = RunStreamEvent.ThreadRunCreated | RunStreamEvent.ThreadRunQueued | RunStreamEvent.ThreadRunInProgress | RunStreamEvent.ThreadRunRequiresAction | RunStreamEvent.ThreadRunCompleted | RunStreamEvent.ThreadRunIncomplete | RunStreamEvent.ThreadRunFailed | RunStreamEvent.ThreadRunCancelling | RunStreamEvent.ThreadRunCancelled | RunStreamEvent.ThreadRunExpired
+export type RunStreamEvent =
+  | RunStreamEvent.ThreadRunCreated
+  | RunStreamEvent.ThreadRunQueued
+  | RunStreamEvent.ThreadRunInProgress
+  | RunStreamEvent.ThreadRunRequiresAction
+  | RunStreamEvent.ThreadRunCompleted
+  | RunStreamEvent.ThreadRunIncomplete
+  | RunStreamEvent.ThreadRunFailed
+  | RunStreamEvent.ThreadRunCancelling
+  | RunStreamEvent.ThreadRunCancelled
+  | RunStreamEvent.ThreadRunExpired;
 
 export namespace RunStreamEvent {
   /**
@@ -1280,7 +1347,50 @@ export interface AssistantUpdateParams {
    * [Model overview](https://platform.openai.com/docs/models) for descriptions of
    * them.
    */
-  model?: (string & {}) | 'gpt-5' | 'gpt-5-mini' | 'gpt-5-nano' | 'gpt-5-2025-08-07' | 'gpt-5-mini-2025-08-07' | 'gpt-5-nano-2025-08-07' | 'gpt-4.1' | 'gpt-4.1-mini' | 'gpt-4.1-nano' | 'gpt-4.1-2025-04-14' | 'gpt-4.1-mini-2025-04-14' | 'gpt-4.1-nano-2025-04-14' | 'o3-mini' | 'o3-mini-2025-01-31' | 'o1' | 'o1-2024-12-17' | 'gpt-4o' | 'gpt-4o-2024-11-20' | 'gpt-4o-2024-08-06' | 'gpt-4o-2024-05-13' | 'gpt-4o-mini' | 'gpt-4o-mini-2024-07-18' | 'gpt-4.5-preview' | 'gpt-4.5-preview-2025-02-27' | 'gpt-4-turbo' | 'gpt-4-turbo-2024-04-09' | 'gpt-4-0125-preview' | 'gpt-4-turbo-preview' | 'gpt-4-1106-preview' | 'gpt-4-vision-preview' | 'gpt-4' | 'gpt-4-0314' | 'gpt-4-0613' | 'gpt-4-32k' | 'gpt-4-32k-0314' | 'gpt-4-32k-0613' | 'gpt-3.5-turbo' | 'gpt-3.5-turbo-16k' | 'gpt-3.5-turbo-0613' | 'gpt-3.5-turbo-1106' | 'gpt-3.5-turbo-0125' | 'gpt-3.5-turbo-16k-0613';
+  model?:
+    | (string & {})
+    | 'gpt-5'
+    | 'gpt-5-mini'
+    | 'gpt-5-nano'
+    | 'gpt-5-2025-08-07'
+    | 'gpt-5-mini-2025-08-07'
+    | 'gpt-5-nano-2025-08-07'
+    | 'gpt-4.1'
+    | 'gpt-4.1-mini'
+    | 'gpt-4.1-nano'
+    | 'gpt-4.1-2025-04-14'
+    | 'gpt-4.1-mini-2025-04-14'
+    | 'gpt-4.1-nano-2025-04-14'
+    | 'o3-mini'
+    | 'o3-mini-2025-01-31'
+    | 'o1'
+    | 'o1-2024-12-17'
+    | 'gpt-4o'
+    | 'gpt-4o-2024-11-20'
+    | 'gpt-4o-2024-08-06'
+    | 'gpt-4o-2024-05-13'
+    | 'gpt-4o-mini'
+    | 'gpt-4o-mini-2024-07-18'
+    | 'gpt-4.5-preview'
+    | 'gpt-4.5-preview-2025-02-27'
+    | 'gpt-4-turbo'
+    | 'gpt-4-turbo-2024-04-09'
+    | 'gpt-4-0125-preview'
+    | 'gpt-4-turbo-preview'
+    | 'gpt-4-1106-preview'
+    | 'gpt-4-vision-preview'
+    | 'gpt-4'
+    | 'gpt-4-0314'
+    | 'gpt-4-0613'
+    | 'gpt-4-32k'
+    | 'gpt-4-32k-0314'
+    | 'gpt-4-32k-0613'
+    | 'gpt-3.5-turbo'
+    | 'gpt-3.5-turbo-16k'
+    | 'gpt-3.5-turbo-0613'
+    | 'gpt-3.5-turbo-1106'
+    | 'gpt-3.5-turbo-0125'
+    | 'gpt-3.5-turbo-16k-0613';
 
   /**
    * The name of the assistant. The maximum length is 256 characters.
@@ -1428,7 +1538,7 @@ export declare namespace Assistants {
     type AssistantsPage as AssistantsPage,
     type AssistantCreateParams as AssistantCreateParams,
     type AssistantUpdateParams as AssistantUpdateParams,
-    type AssistantListParams as AssistantListParams
+    type AssistantListParams as AssistantListParams,
   };
 
   export { AssistantStream };

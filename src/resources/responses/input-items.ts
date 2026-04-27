@@ -21,8 +21,16 @@ export class InputItems extends APIResource {
    * }
    * ```
    */
-  list(responseID: string, query: InputItemListParams | null | undefined = {}, options?: RequestOptions): PagePromise<ResponseItemsPage, ResponsesAPI.ResponseItem> {
-    return this._client.getAPIList(path`/responses/${responseID}/input_items`, CursorPage<ResponsesAPI.ResponseItem>, { query, ...options });
+  list(
+    responseID: string,
+    query: InputItemListParams | null | undefined = {},
+    options?: RequestOptions,
+  ): PagePromise<ResponseItemsPage, ResponsesAPI.ResponseItem> {
+    return this._client.getAPIList(
+      path`/responses/${responseID}/input_items`,
+      CursorPage<ResponsesAPI.ResponseItem>,
+      { query, ...options },
+    );
   }
 }
 
@@ -73,10 +81,7 @@ export interface InputItemListParams extends CursorPageParams {
 }
 
 export declare namespace InputItems {
-  export {
-    type ResponseItemList as ResponseItemList,
-    type InputItemListParams as InputItemListParams
-  };
+  export { type ResponseItemList as ResponseItemList, type InputItemListParams as InputItemListParams };
 }
 
-export { type ResponseItemsPage }
+export { type ResponseItemsPage };

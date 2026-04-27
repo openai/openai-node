@@ -5,15 +5,19 @@ import * as GraderModelsAPI from './grader-models';
 import * as Shared from '../shared';
 import * as ResponsesAPI from '../responses/responses';
 
-export class GraderModels extends APIResource {
-
-}
+export class GraderModels extends APIResource {}
 
 /**
  * A list of inputs, each of which may be either an input text, output text, input
  * image, or input audio object.
  */
-export type GraderInputs = Array<string | ResponsesAPI.ResponseInputText | GraderInputs.OutputText | GraderInputs.InputImage | ResponsesAPI.ResponseInputAudio>
+export type GraderInputs = Array<
+  | string
+  | ResponsesAPI.ResponseInputText
+  | GraderInputs.OutputText
+  | GraderInputs.InputImage
+  | ResponsesAPI.ResponseInputAudio
+>;
 
 export namespace GraderInputs {
   /**
@@ -99,7 +103,13 @@ export namespace LabelModelGrader {
      * Inputs to the model - can contain template strings. Supports text, output text,
      * input images, and input audio, either as a single item or an array of items.
      */
-    content: string | ResponsesAPI.ResponseInputText | Input.OutputText | Input.InputImage | ResponsesAPI.ResponseInputAudio | GraderModelsAPI.GraderInputs;
+    content:
+      | string
+      | ResponsesAPI.ResponseInputText
+      | Input.OutputText
+      | Input.InputImage
+      | ResponsesAPI.ResponseInputAudio
+      | GraderModelsAPI.GraderInputs;
 
     /**
      * The role of the message input. One of `user`, `assistant`, `system`, or
@@ -253,7 +263,13 @@ export namespace ScoreModelGrader {
      * Inputs to the model - can contain template strings. Supports text, output text,
      * input images, and input audio, either as a single item or an array of items.
      */
-    content: string | ResponsesAPI.ResponseInputText | Input.OutputText | Input.InputImage | ResponsesAPI.ResponseInputAudio | GraderModelsAPI.GraderInputs;
+    content:
+      | string
+      | ResponsesAPI.ResponseInputText
+      | Input.OutputText
+      | Input.InputImage
+      | ResponsesAPI.ResponseInputAudio
+      | GraderModelsAPI.GraderInputs;
 
     /**
      * The role of the message input. One of `user`, `assistant`, `system`, or
@@ -387,7 +403,18 @@ export interface TextSimilarityGrader {
    * The evaluation metric to use. One of `cosine`, `fuzzy_match`, `bleu`, `gleu`,
    * `meteor`, `rouge_1`, `rouge_2`, `rouge_3`, `rouge_4`, `rouge_5`, or `rouge_l`.
    */
-  evaluation_metric: 'cosine' | 'fuzzy_match' | 'bleu' | 'gleu' | 'meteor' | 'rouge_1' | 'rouge_2' | 'rouge_3' | 'rouge_4' | 'rouge_5' | 'rouge_l';
+  evaluation_metric:
+    | 'cosine'
+    | 'fuzzy_match'
+    | 'bleu'
+    | 'gleu'
+    | 'meteor'
+    | 'rouge_1'
+    | 'rouge_2'
+    | 'rouge_3'
+    | 'rouge_4'
+    | 'rouge_5'
+    | 'rouge_l';
 
   /**
    * The text being graded.
@@ -418,6 +445,6 @@ export declare namespace GraderModels {
     type PythonGrader as PythonGrader,
     type ScoreModelGrader as ScoreModelGrader,
     type StringCheckGrader as StringCheckGrader,
-    type TextSimilarityGrader as TextSimilarityGrader
+    type TextSimilarityGrader as TextSimilarityGrader,
   };
 }

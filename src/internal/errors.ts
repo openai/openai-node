@@ -2,12 +2,12 @@
 
 export function isAbortError(err: unknown) {
   return (
-    typeof err === 'object' && err !== null && (
-      // Spec-compliant fetch implementations
-      ('name' in err && (err as any).name === 'AbortError') ||
+    typeof err === 'object' &&
+    err !== null &&
+    // Spec-compliant fetch implementations
+    (('name' in err && (err as any).name === 'AbortError') ||
       // Expo fetch
-      ('message' in err && String((err as any).message).includes('FetchRequestCanceledException'))
-    )
+      ('message' in err && String((err as any).message).includes('FetchRequestCanceledException')))
   );
 }
 
@@ -24,10 +24,10 @@ export const castToError = (err: any): Error => {
         if (err.name) error.name = err.name;
         return error;
       }
-    } catch { }
+    } catch {}
     try {
       return new Error(JSON.stringify(err));
-    } catch { }
+    } catch {}
   }
   return new Error(err);
 };

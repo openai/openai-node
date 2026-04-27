@@ -3,7 +3,11 @@
 import { APIResource } from '../../../core/resource';
 import * as ChatKitAPI from './chatkit';
 import { APIPromise } from '../../../core/api-promise';
-import { ConversationCursorPage, type ConversationCursorPageParams, PagePromise } from '../../../core/pagination';
+import {
+  ConversationCursorPage,
+  type ConversationCursorPageParams,
+  PagePromise,
+} from '../../../core/pagination';
 import { buildHeaders } from '../../../internal/headers';
 import { RequestOptions } from '../../../internal/request-options';
 import { path } from '../../../internal/utils/path';
@@ -19,7 +23,10 @@ export class Threads extends APIResource {
    * ```
    */
   retrieve(threadID: string, options?: RequestOptions): APIPromise<ChatKitThread> {
-    return this._client.get(path`/chatkit/threads/${threadID}`, { ...options, headers: buildHeaders([{'OpenAI-Beta': 'chatkit_beta=v1'}, options?.headers]) });
+    return this._client.get(path`/chatkit/threads/${threadID}`, {
+      ...options,
+      headers: buildHeaders([{ 'OpenAI-Beta': 'chatkit_beta=v1' }, options?.headers]),
+    });
   }
 
   /**
@@ -33,8 +40,15 @@ export class Threads extends APIResource {
    * }
    * ```
    */
-  list(query: ThreadListParams | null | undefined = {}, options?: RequestOptions): PagePromise<ChatKitThreadsPage, ChatKitThread> {
-    return this._client.getAPIList('/chatkit/threads', ConversationCursorPage<ChatKitThread>, { query, ...options, headers: buildHeaders([{'OpenAI-Beta': 'chatkit_beta=v1'}, options?.headers]) });
+  list(
+    query: ThreadListParams | null | undefined = {},
+    options?: RequestOptions,
+  ): PagePromise<ChatKitThreadsPage, ChatKitThread> {
+    return this._client.getAPIList('/chatkit/threads', ConversationCursorPage<ChatKitThread>, {
+      query,
+      ...options,
+      headers: buildHeaders([{ 'OpenAI-Beta': 'chatkit_beta=v1' }, options?.headers]),
+    });
   }
 
   /**
@@ -48,7 +62,10 @@ export class Threads extends APIResource {
    * ```
    */
   delete(threadID: string, options?: RequestOptions): APIPromise<ThreadDeleteResponse> {
-    return this._client.delete(path`/chatkit/threads/${threadID}`, { ...options, headers: buildHeaders([{'OpenAI-Beta': 'chatkit_beta=v1'}, options?.headers]) });
+    return this._client.delete(path`/chatkit/threads/${threadID}`, {
+      ...options,
+      headers: buildHeaders([{ 'OpenAI-Beta': 'chatkit_beta=v1' }, options?.headers]),
+    });
   }
 
   /**
@@ -64,14 +81,44 @@ export class Threads extends APIResource {
    * }
    * ```
    */
-  listItems(threadID: string, query: ThreadListItemsParams | null | undefined = {}, options?: RequestOptions): PagePromise<ChatKitThreadItemListDataPage, ChatKitThreadUserMessageItem | ChatKitThreadAssistantMessageItem | ChatKitWidgetItem | ChatKitThreadItemList.ChatKitClientToolCall | ChatKitThreadItemList.ChatKitTask | ChatKitThreadItemList.ChatKitTaskGroup> {
-    return this._client.getAPIList(path`/chatkit/threads/${threadID}/items`, ConversationCursorPage<ChatKitThreadUserMessageItem | ChatKitThreadAssistantMessageItem | ChatKitWidgetItem | ChatKitThreadItemList.ChatKitClientToolCall | ChatKitThreadItemList.ChatKitTask | ChatKitThreadItemList.ChatKitTaskGroup>, { query, ...options, headers: buildHeaders([{'OpenAI-Beta': 'chatkit_beta=v1'}, options?.headers]) });
+  listItems(
+    threadID: string,
+    query: ThreadListItemsParams | null | undefined = {},
+    options?: RequestOptions,
+  ): PagePromise<
+    ChatKitThreadItemListDataPage,
+    | ChatKitThreadUserMessageItem
+    | ChatKitThreadAssistantMessageItem
+    | ChatKitWidgetItem
+    | ChatKitThreadItemList.ChatKitClientToolCall
+    | ChatKitThreadItemList.ChatKitTask
+    | ChatKitThreadItemList.ChatKitTaskGroup
+  > {
+    return this._client.getAPIList(
+      path`/chatkit/threads/${threadID}/items`,
+      ConversationCursorPage<
+        | ChatKitThreadUserMessageItem
+        | ChatKitThreadAssistantMessageItem
+        | ChatKitWidgetItem
+        | ChatKitThreadItemList.ChatKitClientToolCall
+        | ChatKitThreadItemList.ChatKitTask
+        | ChatKitThreadItemList.ChatKitTaskGroup
+      >,
+      { query, ...options, headers: buildHeaders([{ 'OpenAI-Beta': 'chatkit_beta=v1' }, options?.headers]) },
+    );
   }
 }
 
-export type ChatKitThreadsPage = ConversationCursorPage<ChatKitThread>
+export type ChatKitThreadsPage = ConversationCursorPage<ChatKitThread>;
 
-export type ChatKitThreadItemListDataPage = ConversationCursorPage<ChatKitThreadUserMessageItem | ChatKitThreadAssistantMessageItem | ChatKitWidgetItem | ChatKitThreadItemList.ChatKitClientToolCall | ChatKitThreadItemList.ChatKitTask | ChatKitThreadItemList.ChatKitTaskGroup>
+export type ChatKitThreadItemListDataPage = ConversationCursorPage<
+  | ChatKitThreadUserMessageItem
+  | ChatKitThreadAssistantMessageItem
+  | ChatKitWidgetItem
+  | ChatKitThreadItemList.ChatKitClientToolCall
+  | ChatKitThreadItemList.ChatKitTask
+  | ChatKitThreadItemList.ChatKitTaskGroup
+>;
 
 /**
  * Represents a ChatKit session and its resolved configuration.
@@ -304,7 +351,7 @@ export interface ChatSessionRateLimitsParam {
   max_requests_per_1_minute?: number;
 }
 
-export type ChatSessionStatus = 'active' | 'expired' | 'cancelled'
+export type ChatSessionStatus = 'active' | 'expired' | 'cancelled';
 
 /**
  * Workflow reference and overrides applied to the chat session.
@@ -582,7 +629,14 @@ export interface ChatKitThreadItemList {
   /**
    * A list of items
    */
-  data: Array<ChatKitThreadUserMessageItem | ChatKitThreadAssistantMessageItem | ChatKitWidgetItem | ChatKitThreadItemList.ChatKitClientToolCall | ChatKitThreadItemList.ChatKitTask | ChatKitThreadItemList.ChatKitTaskGroup>;
+  data: Array<
+    | ChatKitThreadUserMessageItem
+    | ChatKitThreadAssistantMessageItem
+    | ChatKitWidgetItem
+    | ChatKitThreadItemList.ChatKitClientToolCall
+    | ChatKitThreadItemList.ChatKitTask
+    | ChatKitThreadItemList.ChatKitTaskGroup
+  >;
 
   /**
    * The ID of the first item in the list.
@@ -978,6 +1032,6 @@ export declare namespace Threads {
     type ChatKitThreadsPage as ChatKitThreadsPage,
     type ChatKitThreadItemListDataPage as ChatKitThreadItemListDataPage,
     type ThreadListParams as ThreadListParams,
-    type ThreadListItemsParams as ThreadListItemsParams
+    type ThreadListItemsParams as ThreadListItemsParams,
   };
 }

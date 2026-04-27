@@ -304,7 +304,7 @@ export interface TranscriptionDiarizedSegment {
   type: 'transcript.text.segment';
 }
 
-export type TranscriptionInclude = 'logprobs'
+export type TranscriptionInclude = 'logprobs';
 
 export interface TranscriptionSegment {
   /**
@@ -367,7 +367,10 @@ export interface TranscriptionSegment {
  * [create a transcription](https://platform.openai.com/docs/api-reference/audio/create-transcription)
  * with `stream` set to `true` and `response_format` set to `diarized_json`.
  */
-export type TranscriptionStreamEvent = TranscriptionTextSegmentEvent | TranscriptionTextDeltaEvent | TranscriptionTextDoneEvent
+export type TranscriptionStreamEvent =
+  | TranscriptionTextSegmentEvent
+  | TranscriptionTextDeltaEvent
+  | TranscriptionTextDoneEvent;
 
 /**
  * Emitted when there is an additional text delta. This is also the first event
@@ -628,11 +631,11 @@ export interface TranscriptionWord {
  * Represents a transcription response returned by model, based on the provided
  * input.
  */
-export type TranscriptionCreateResponse = Transcription | TranscriptionDiarized | TranscriptionVerbose
+export type TranscriptionCreateResponse = Transcription | TranscriptionDiarized | TranscriptionVerbose;
 
 export type TranscriptionCreateParams<
   ResponseFormat extends AudioAPI.AudioResponseFormat | undefined = AudioAPI.AudioResponseFormat | undefined,
-> = | TranscriptionCreateParamsNonStreaming<ResponseFormat> | TranscriptionCreateParamsStreaming
+> = TranscriptionCreateParamsNonStreaming<ResponseFormat> | TranscriptionCreateParamsStreaming;
 
 export interface TranscriptionCreateParamsBase<
   ResponseFormat extends AudioAPI.AudioResponseFormat | undefined = AudioAPI.AudioResponseFormat | undefined,
@@ -771,8 +774,8 @@ export namespace TranscriptionCreateParams {
     threshold?: number;
   }
 
-  export type TranscriptionCreateParamsNonStreaming = TranscriptionsAPI.TranscriptionCreateParamsNonStreaming
-  export type TranscriptionCreateParamsStreaming = TranscriptionsAPI.TranscriptionCreateParamsStreaming
+  export type TranscriptionCreateParamsNonStreaming = TranscriptionsAPI.TranscriptionCreateParamsNonStreaming;
+  export type TranscriptionCreateParamsStreaming = TranscriptionsAPI.TranscriptionCreateParamsStreaming;
 }
 
 export interface TranscriptionCreateParamsNonStreaming<
@@ -821,6 +824,6 @@ export declare namespace Transcriptions {
     type TranscriptionCreateResponse as TranscriptionCreateResponse,
     type TranscriptionCreateParams as TranscriptionCreateParams,
     type TranscriptionCreateParamsNonStreaming as TranscriptionCreateParamsNonStreaming,
-    type TranscriptionCreateParamsStreaming as TranscriptionCreateParamsStreaming
+    type TranscriptionCreateParamsStreaming as TranscriptionCreateParamsStreaming,
   };
 }

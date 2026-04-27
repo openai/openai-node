@@ -51,7 +51,10 @@ export class Files extends APIResource {
   /**
    * Returns a list of files.
    */
-  list(query: FileListParams | null | undefined = {}, options?: RequestOptions): PagePromise<FileObjectsPage, FileObject> {
+  list(
+    query: FileListParams | null | undefined = {},
+    options?: RequestOptions,
+  ): PagePromise<FileObjectsPage, FileObject> {
     return this._client.getAPIList('/files', CursorPage<FileObject>, { query, ...options });
   }
 
@@ -66,7 +69,11 @@ export class Files extends APIResource {
    * Returns the contents of the specified file.
    */
   content(fileID: string, options?: RequestOptions): APIPromise<Response> {
-    return this._client.get(path`/files/${fileID}/content`, { ...options, headers: buildHeaders([{Accept: 'application/binary'}, options?.headers]), __binaryResponse: true });
+    return this._client.get(path`/files/${fileID}/content`, {
+      ...options,
+      headers: buildHeaders([{ Accept: 'application/binary' }, options?.headers]),
+      __binaryResponse: true,
+    });
   }
 
   /**
@@ -96,9 +103,9 @@ export class Files extends APIResource {
   }
 }
 
-export type FileObjectsPage = CursorPage<FileObject>
+export type FileObjectsPage = CursorPage<FileObject>;
 
-export type FileContent = string
+export type FileContent = string;
 
 export interface FileDeleted {
   id: string;
@@ -142,7 +149,15 @@ export interface FileObject {
    * `assistants_output`, `batch`, `batch_output`, `fine-tune`, `fine-tune-results`,
    * `vision`, and `user_data`.
    */
-  purpose: 'assistants' | 'assistants_output' | 'batch' | 'batch_output' | 'fine-tune' | 'fine-tune-results' | 'vision' | 'user_data';
+  purpose:
+    | 'assistants'
+    | 'assistants_output'
+    | 'batch'
+    | 'batch_output'
+    | 'fine-tune'
+    | 'fine-tune-results'
+    | 'vision'
+    | 'user_data';
 
   /**
    * @deprecated Deprecated. The current status of the file, which can be either
@@ -172,7 +187,7 @@ export interface FileObject {
  * - `user_data`: Flexible file type for any purpose
  * - `evals`: Used for eval data sets
  */
-export type FilePurpose = 'assistants' | 'batch' | 'fine-tune' | 'vision' | 'user_data' | 'evals'
+export type FilePurpose = 'assistants' | 'batch' | 'fine-tune' | 'vision' | 'user_data' | 'evals';
 
 export interface FileCreateParams {
   /**
@@ -240,6 +255,6 @@ export declare namespace Files {
     type FilePurpose as FilePurpose,
     type FileObjectsPage as FileObjectsPage,
     type FileCreateParams as FileCreateParams,
-    type FileListParams as FileListParams
+    type FileListParams as FileListParams,
   };
 }

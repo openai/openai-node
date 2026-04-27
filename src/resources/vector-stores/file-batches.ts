@@ -17,25 +17,47 @@ export class FileBatches extends APIResource {
   /**
    * Create a vector store file batch.
    */
-  create(vectorStoreID: string, body: FileBatchCreateParams, options?: RequestOptions): APIPromise<VectorStoreFileBatch> {
-    return this._client.post(path`/vector_stores/${vectorStoreID}/file_batches`, { body, ...options, headers: buildHeaders([{'OpenAI-Beta': 'assistants=v2'}, options?.headers]) });
+  create(
+    vectorStoreID: string,
+    body: FileBatchCreateParams,
+    options?: RequestOptions,
+  ): APIPromise<VectorStoreFileBatch> {
+    return this._client.post(path`/vector_stores/${vectorStoreID}/file_batches`, {
+      body,
+      ...options,
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+    });
   }
 
   /**
    * Retrieves a vector store file batch.
    */
-  retrieve(batchID: string, params: FileBatchRetrieveParams, options?: RequestOptions): APIPromise<VectorStoreFileBatch> {
-    const { vector_store_id } = params
-    return this._client.get(path`/vector_stores/${vector_store_id}/file_batches/${batchID}`, { ...options, headers: buildHeaders([{'OpenAI-Beta': 'assistants=v2'}, options?.headers]) });
+  retrieve(
+    batchID: string,
+    params: FileBatchRetrieveParams,
+    options?: RequestOptions,
+  ): APIPromise<VectorStoreFileBatch> {
+    const { vector_store_id } = params;
+    return this._client.get(path`/vector_stores/${vector_store_id}/file_batches/${batchID}`, {
+      ...options,
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+    });
   }
 
   /**
    * Cancel a vector store file batch. This attempts to cancel the processing of
    * files in this batch as soon as possible.
    */
-  cancel(batchID: string, params: FileBatchCancelParams, options?: RequestOptions): APIPromise<VectorStoreFileBatch> {
-    const { vector_store_id } = params
-    return this._client.post(path`/vector_stores/${vector_store_id}/file_batches/${batchID}/cancel`, { ...options, headers: buildHeaders([{'OpenAI-Beta': 'assistants=v2'}, options?.headers]) });
+  cancel(
+    batchID: string,
+    params: FileBatchCancelParams,
+    options?: RequestOptions,
+  ): APIPromise<VectorStoreFileBatch> {
+    const { vector_store_id } = params;
+    return this._client.post(path`/vector_stores/${vector_store_id}/file_batches/${batchID}/cancel`, {
+      ...options,
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+    });
   }
 
   /**
@@ -53,9 +75,17 @@ export class FileBatches extends APIResource {
   /**
    * Returns a list of vector store files in a batch.
    */
-  listFiles(batchID: string, params: FileBatchListFilesParams, options?: RequestOptions): PagePromise<VectorStoreFilesPage, FilesAPI.VectorStoreFile> {
-    const { vector_store_id, ...query } = params
-    return this._client.getAPIList(path`/vector_stores/${vector_store_id}/file_batches/${batchID}/files`, CursorPage<FilesAPI.VectorStoreFile>, { query, ...options, headers: buildHeaders([{'OpenAI-Beta': 'assistants=v2'}, options?.headers]) });
+  listFiles(
+    batchID: string,
+    params: FileBatchListFilesParams,
+    options?: RequestOptions,
+  ): PagePromise<VectorStoreFilesPage, FilesAPI.VectorStoreFile> {
+    const { vector_store_id, ...query } = params;
+    return this._client.getAPIList(
+      path`/vector_stores/${vector_store_id}/file_batches/${batchID}/files`,
+      CursorPage<FilesAPI.VectorStoreFile>,
+      { query, ...options, headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]) },
+    );
   }
 
   /**
@@ -336,8 +366,8 @@ export declare namespace FileBatches {
     type FileBatchCreateParams as FileBatchCreateParams,
     type FileBatchRetrieveParams as FileBatchRetrieveParams,
     type FileBatchCancelParams as FileBatchCancelParams,
-    type FileBatchListFilesParams as FileBatchListFilesParams
+    type FileBatchListFilesParams as FileBatchListFilesParams,
   };
 }
 
-export { type VectorStoreFilesPage }
+export { type VectorStoreFilesPage };

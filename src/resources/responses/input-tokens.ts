@@ -18,7 +18,10 @@ export class InputTokens extends APIResource {
    * const response = await client.responses.inputTokens.count();
    * ```
    */
-  count(body: InputTokenCountParams | null | undefined = {}, options?: RequestOptions): APIPromise<InputTokenCountResponse> {
+  count(
+    body: InputTokenCountParams | null | undefined = {},
+    options?: RequestOptions,
+  ): APIPromise<InputTokenCountResponse> {
     return this._client.post('/responses/input_tokens', { body, ...options });
   }
 }
@@ -91,7 +94,16 @@ export interface InputTokenCountParams {
   /**
    * Controls which tool the model should use, if any.
    */
-  tool_choice?: ResponsesAPI.ToolChoiceOptions | ResponsesAPI.ToolChoiceAllowed | ResponsesAPI.ToolChoiceTypes | ResponsesAPI.ToolChoiceFunction | ResponsesAPI.ToolChoiceMcp | ResponsesAPI.ToolChoiceCustom | ResponsesAPI.ToolChoiceApplyPatch | ResponsesAPI.ToolChoiceShell | null;
+  tool_choice?:
+    | ResponsesAPI.ToolChoiceOptions
+    | ResponsesAPI.ToolChoiceAllowed
+    | ResponsesAPI.ToolChoiceTypes
+    | ResponsesAPI.ToolChoiceFunction
+    | ResponsesAPI.ToolChoiceMcp
+    | ResponsesAPI.ToolChoiceCustom
+    | ResponsesAPI.ToolChoiceApplyPatch
+    | ResponsesAPI.ToolChoiceShell
+    | null;
 
   /**
    * An array of tools the model may call while generating a response. You can
@@ -147,6 +159,6 @@ export namespace InputTokenCountParams {
 export declare namespace InputTokens {
   export {
     type InputTokenCountResponse as InputTokenCountResponse,
-    type InputTokenCountParams as InputTokenCountParams
+    type InputTokenCountParams as InputTokenCountParams,
   };
 }

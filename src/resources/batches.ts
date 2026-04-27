@@ -29,7 +29,10 @@ export class Batches extends APIResource {
   /**
    * List your organization's batches.
    */
-  list(query: BatchListParams | null | undefined = {}, options?: RequestOptions): PagePromise<BatchesPage, Batch> {
+  list(
+    query: BatchListParams | null | undefined = {},
+    options?: RequestOptions,
+  ): PagePromise<BatchesPage, Batch> {
     return this._client.getAPIList('/batches', CursorPage<Batch>, { query, ...options });
   }
 
@@ -43,7 +46,7 @@ export class Batches extends APIResource {
   }
 }
 
-export type BatchesPage = CursorPage<Batch>
+export type BatchesPage = CursorPage<Batch>;
 
 export interface Batch {
   id: string;
@@ -76,7 +79,15 @@ export interface Batch {
   /**
    * The current status of the batch.
    */
-  status: 'validating' | 'failed' | 'in_progress' | 'finalizing' | 'completed' | 'expired' | 'cancelling' | 'cancelled';
+  status:
+    | 'validating'
+    | 'failed'
+    | 'in_progress'
+    | 'finalizing'
+    | 'completed'
+    | 'expired'
+    | 'cancelling'
+    | 'cancelled';
 
   /**
    * The Unix timestamp (in seconds) for when the batch was cancelled.
@@ -285,7 +296,15 @@ export interface BatchCreateParams {
    * restricted to a maximum of 50,000 embedding inputs across all requests in the
    * batch.
    */
-  endpoint: '/v1/responses' | '/v1/chat/completions' | '/v1/embeddings' | '/v1/completions' | '/v1/moderations' | '/v1/images/generations' | '/v1/images/edits' | '/v1/videos';
+  endpoint:
+    | '/v1/responses'
+    | '/v1/chat/completions'
+    | '/v1/embeddings'
+    | '/v1/completions'
+    | '/v1/moderations'
+    | '/v1/images/generations'
+    | '/v1/images/edits'
+    | '/v1/videos';
 
   /**
    * The ID of an uploaded file that contains requests for the new batch.
@@ -338,8 +357,7 @@ export namespace BatchCreateParams {
   }
 }
 
-export interface BatchListParams extends CursorPageParams {
-}
+export interface BatchListParams extends CursorPageParams {}
 
 export declare namespace Batches {
   export {
@@ -349,6 +367,6 @@ export declare namespace Batches {
     type BatchUsage as BatchUsage,
     type BatchesPage as BatchesPage,
     type BatchCreateParams as BatchCreateParams,
-    type BatchListParams as BatchListParams
+    type BatchListParams as BatchListParams,
   };
 }

@@ -6,7 +6,15 @@ import * as Shared from '../shared';
 import * as CallsAPI from './calls';
 import { CallAcceptParams, CallReferParams, CallRejectParams, Calls } from './calls';
 import * as ClientSecretsAPI from './client-secrets';
-import { ClientSecretCreateParams, ClientSecretCreateResponse, ClientSecrets, RealtimeSessionClientSecret, RealtimeSessionCreateResponse, RealtimeTranscriptionSessionCreateResponse, RealtimeTranscriptionSessionTurnDetection } from './client-secrets';
+import {
+  ClientSecretCreateParams,
+  ClientSecretCreateResponse,
+  ClientSecrets,
+  RealtimeSessionClientSecret,
+  RealtimeSessionCreateResponse,
+  RealtimeTranscriptionSessionCreateResponse,
+  RealtimeTranscriptionSessionTurnDetection,
+} from './client-secrets';
 import * as ResponsesAPI from '../responses/responses';
 
 export class Realtime extends APIResource {
@@ -28,7 +36,13 @@ export interface AudioTranscription {
    * `gpt-4o-transcribe`, and `gpt-4o-transcribe-diarize`. Use
    * `gpt-4o-transcribe-diarize` when you need diarization with speaker labels.
    */
-  model?: (string & {}) | 'whisper-1' | 'gpt-4o-mini-transcribe' | 'gpt-4o-mini-transcribe-2025-12-15' | 'gpt-4o-transcribe' | 'gpt-4o-transcribe-diarize';
+  model?:
+    | (string & {})
+    | 'whisper-1'
+    | 'gpt-4o-mini-transcribe'
+    | 'gpt-4o-mini-transcribe-2025-12-15'
+    | 'gpt-4o-transcribe'
+    | 'gpt-4o-transcribe-diarize';
 
   /**
    * An optional text to guide the model's style or continue a previous audio
@@ -80,7 +94,16 @@ export namespace ConversationCreatedEvent {
 /**
  * A single item within a Realtime conversation.
  */
-export type ConversationItem = RealtimeConversationItemSystemMessage | RealtimeConversationItemUserMessage | RealtimeConversationItemAssistantMessage | RealtimeConversationItemFunctionCall | RealtimeConversationItemFunctionCallOutput | RealtimeMcpApprovalResponse | RealtimeMcpListTools | RealtimeMcpToolCall | RealtimeMcpApprovalRequest
+export type ConversationItem =
+  | RealtimeConversationItemSystemMessage
+  | RealtimeConversationItemUserMessage
+  | RealtimeConversationItemAssistantMessage
+  | RealtimeConversationItemFunctionCall
+  | RealtimeConversationItemFunctionCallOutput
+  | RealtimeMcpApprovalResponse
+  | RealtimeMcpListTools
+  | RealtimeMcpToolCall
+  | RealtimeMcpApprovalRequest;
 
 /**
  * Sent by the server when an Item is added to the default Conversation. This can
@@ -313,7 +336,9 @@ export interface ConversationItemInputAudioTranscriptionCompletedEvent {
    * Usage statistics for the transcription, this is billed according to the ASR
    * model's pricing rather than the realtime model's pricing.
    */
-  usage: ConversationItemInputAudioTranscriptionCompletedEvent.TranscriptTextUsageTokens | ConversationItemInputAudioTranscriptionCompletedEvent.TranscriptTextUsageDuration;
+  usage:
+    | ConversationItemInputAudioTranscriptionCompletedEvent.TranscriptTextUsageTokens
+    | ConversationItemInputAudioTranscriptionCompletedEvent.TranscriptTextUsageDuration;
 
   /**
    * The log probabilities of the transcription.
@@ -1077,7 +1102,7 @@ export interface McpListToolsInProgress {
  * headphones, `far_field` is for far-field microphones such as laptop or
  * conference room microphones.
  */
-export type NoiseReductionType = 'near_field' | 'far_field'
+export type NoiseReductionType = 'near_field' | 'far_field';
 
 /**
  * **WebRTC/SIP Only:** Emit to cut off the current audio response. This will
@@ -1242,7 +1267,19 @@ export interface RealtimeAudioConfigOutput {
    * model has responded with audio at least once. We recommend `marin` and `cedar`
    * for best quality.
    */
-  voice?: string | 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse' | 'marin' | 'cedar' | RealtimeAudioConfigOutput.ID;
+  voice?:
+    | string
+    | 'alloy'
+    | 'ash'
+    | 'ballad'
+    | 'coral'
+    | 'echo'
+    | 'sage'
+    | 'shimmer'
+    | 'verse'
+    | 'marin'
+    | 'cedar'
+    | RealtimeAudioConfigOutput.ID;
 }
 
 export namespace RealtimeAudioConfigOutput {
@@ -1260,7 +1297,10 @@ export namespace RealtimeAudioConfigOutput {
 /**
  * The PCM audio format. Only a 24kHz sample rate is supported.
  */
-export type RealtimeAudioFormats = RealtimeAudioFormats.AudioPCM | RealtimeAudioFormats.AudioPCMU | RealtimeAudioFormats.AudioPCMA
+export type RealtimeAudioFormats =
+  | RealtimeAudioFormats.AudioPCM
+  | RealtimeAudioFormats.AudioPCMU
+  | RealtimeAudioFormats.AudioPCMA;
 
 export namespace RealtimeAudioFormats {
   /**
@@ -1314,7 +1354,9 @@ export namespace RealtimeAudioFormats {
  * wait longer for the user to continue speaking. This can be useful for more
  * natural conversations, but may have a higher latency.
  */
-export type RealtimeAudioInputTurnDetection = RealtimeAudioInputTurnDetection.ServerVad | RealtimeAudioInputTurnDetection.SemanticVad
+export type RealtimeAudioInputTurnDetection =
+  | RealtimeAudioInputTurnDetection.ServerVad
+  | RealtimeAudioInputTurnDetection.SemanticVad;
 
 export namespace RealtimeAudioInputTurnDetection {
   /**
@@ -1421,7 +1463,18 @@ export namespace RealtimeAudioInputTurnDetection {
 /**
  * A realtime client event.
  */
-export type RealtimeClientEvent = ConversationItemCreateEvent | ConversationItemDeleteEvent | ConversationItemRetrieveEvent | ConversationItemTruncateEvent | InputAudioBufferAppendEvent | InputAudioBufferClearEvent | OutputAudioBufferClearEvent | InputAudioBufferCommitEvent | ResponseCancelEvent | ResponseCreateEvent | SessionUpdateEvent
+export type RealtimeClientEvent =
+  | ConversationItemCreateEvent
+  | ConversationItemDeleteEvent
+  | ConversationItemRetrieveEvent
+  | ConversationItemTruncateEvent
+  | InputAudioBufferAppendEvent
+  | InputAudioBufferClearEvent
+  | OutputAudioBufferClearEvent
+  | InputAudioBufferCommitEvent
+  | ResponseCancelEvent
+  | ResponseCreateEvent
+  | SessionUpdateEvent;
 
 /**
  * An assistant message item in a Realtime conversation.
@@ -2056,7 +2109,18 @@ export namespace RealtimeResponse {
        * `alloy`, `ash`, `ballad`, `coral`, `echo`, `sage`, `shimmer`, `verse`, `marin`,
        * and `cedar`. We recommend `marin` and `cedar` for best quality.
        */
-      voice?: (string & {}) | 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse' | 'marin' | 'cedar';
+      voice?:
+        | (string & {})
+        | 'alloy'
+        | 'ash'
+        | 'ballad'
+        | 'coral'
+        | 'echo'
+        | 'sage'
+        | 'shimmer'
+        | 'verse'
+        | 'marin'
+        | 'cedar';
     }
   }
 }
@@ -2083,7 +2147,19 @@ export namespace RealtimeResponseCreateAudioOutput {
      * model has responded with audio at least once. We recommend `marin` and `cedar`
      * for best quality.
      */
-    voice?: string | 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse' | 'marin' | 'cedar' | Output.ID;
+    voice?:
+      | string
+      | 'alloy'
+      | 'ash'
+      | 'ballad'
+      | 'coral'
+      | 'echo'
+      | 'sage'
+      | 'shimmer'
+      | 'verse'
+      | 'marin'
+      | 'cedar'
+      | Output.ID;
   }
 
   export namespace Output {
@@ -2144,7 +2220,15 @@ export interface RealtimeResponseCreateMcpTool {
    * - Outlook Email: `connector_outlookemail`
    * - SharePoint: `connector_sharepoint`
    */
-  connector_id?: 'connector_dropbox' | 'connector_gmail' | 'connector_googlecalendar' | 'connector_googledrive' | 'connector_microsoftteams' | 'connector_outlookcalendar' | 'connector_outlookemail' | 'connector_sharepoint';
+  connector_id?:
+    | 'connector_dropbox'
+    | 'connector_gmail'
+    | 'connector_googlecalendar'
+    | 'connector_googledrive'
+    | 'connector_microsoftteams'
+    | 'connector_outlookcalendar'
+    | 'connector_outlookemail'
+    | 'connector_sharepoint';
 
   /**
    * Whether this MCP tool is deferred and discovered via tool search.
@@ -2487,7 +2571,53 @@ export interface RealtimeResponseUsageOutputTokenDetails {
 /**
  * A realtime server event.
  */
-export type RealtimeServerEvent = ConversationCreatedEvent | ConversationItemCreatedEvent | ConversationItemDeletedEvent | ConversationItemInputAudioTranscriptionCompletedEvent | ConversationItemInputAudioTranscriptionDeltaEvent | ConversationItemInputAudioTranscriptionFailedEvent | RealtimeServerEvent.ConversationItemRetrieved | ConversationItemTruncatedEvent | RealtimeErrorEvent | InputAudioBufferClearedEvent | InputAudioBufferCommittedEvent | InputAudioBufferDtmfEventReceivedEvent | InputAudioBufferSpeechStartedEvent | InputAudioBufferSpeechStoppedEvent | RateLimitsUpdatedEvent | ResponseAudioDeltaEvent | ResponseAudioDoneEvent | ResponseAudioTranscriptDeltaEvent | ResponseAudioTranscriptDoneEvent | ResponseContentPartAddedEvent | ResponseContentPartDoneEvent | ResponseCreatedEvent | ResponseDoneEvent | ResponseFunctionCallArgumentsDeltaEvent | ResponseFunctionCallArgumentsDoneEvent | ResponseOutputItemAddedEvent | ResponseOutputItemDoneEvent | ResponseTextDeltaEvent | ResponseTextDoneEvent | SessionCreatedEvent | SessionUpdatedEvent | RealtimeServerEvent.OutputAudioBufferStarted | RealtimeServerEvent.OutputAudioBufferStopped | RealtimeServerEvent.OutputAudioBufferCleared | ConversationItemAdded | ConversationItemDone | InputAudioBufferTimeoutTriggered | ConversationItemInputAudioTranscriptionSegment | McpListToolsInProgress | McpListToolsCompleted | McpListToolsFailed | ResponseMcpCallArgumentsDelta | ResponseMcpCallArgumentsDone | ResponseMcpCallInProgress | ResponseMcpCallCompleted | ResponseMcpCallFailed
+export type RealtimeServerEvent =
+  | ConversationCreatedEvent
+  | ConversationItemCreatedEvent
+  | ConversationItemDeletedEvent
+  | ConversationItemInputAudioTranscriptionCompletedEvent
+  | ConversationItemInputAudioTranscriptionDeltaEvent
+  | ConversationItemInputAudioTranscriptionFailedEvent
+  | RealtimeServerEvent.ConversationItemRetrieved
+  | ConversationItemTruncatedEvent
+  | RealtimeErrorEvent
+  | InputAudioBufferClearedEvent
+  | InputAudioBufferCommittedEvent
+  | InputAudioBufferDtmfEventReceivedEvent
+  | InputAudioBufferSpeechStartedEvent
+  | InputAudioBufferSpeechStoppedEvent
+  | RateLimitsUpdatedEvent
+  | ResponseAudioDeltaEvent
+  | ResponseAudioDoneEvent
+  | ResponseAudioTranscriptDeltaEvent
+  | ResponseAudioTranscriptDoneEvent
+  | ResponseContentPartAddedEvent
+  | ResponseContentPartDoneEvent
+  | ResponseCreatedEvent
+  | ResponseDoneEvent
+  | ResponseFunctionCallArgumentsDeltaEvent
+  | ResponseFunctionCallArgumentsDoneEvent
+  | ResponseOutputItemAddedEvent
+  | ResponseOutputItemDoneEvent
+  | ResponseTextDeltaEvent
+  | ResponseTextDoneEvent
+  | SessionCreatedEvent
+  | SessionUpdatedEvent
+  | RealtimeServerEvent.OutputAudioBufferStarted
+  | RealtimeServerEvent.OutputAudioBufferStopped
+  | RealtimeServerEvent.OutputAudioBufferCleared
+  | ConversationItemAdded
+  | ConversationItemDone
+  | InputAudioBufferTimeoutTriggered
+  | ConversationItemInputAudioTranscriptionSegment
+  | McpListToolsInProgress
+  | McpListToolsCompleted
+  | McpListToolsFailed
+  | ResponseMcpCallArgumentsDelta
+  | ResponseMcpCallArgumentsDone
+  | ResponseMcpCallInProgress
+  | ResponseMcpCallCompleted
+  | ResponseMcpCallFailed;
 
 export namespace RealtimeServerEvent {
   /**
@@ -2667,7 +2797,24 @@ export interface RealtimeSession {
   /**
    * The Realtime model used for this session.
    */
-  model?: (string & {}) | 'gpt-realtime' | 'gpt-realtime-1.5' | 'gpt-realtime-2025-08-28' | 'gpt-4o-realtime-preview' | 'gpt-4o-realtime-preview-2024-10-01' | 'gpt-4o-realtime-preview-2024-12-17' | 'gpt-4o-realtime-preview-2025-06-03' | 'gpt-4o-mini-realtime-preview' | 'gpt-4o-mini-realtime-preview-2024-12-17' | 'gpt-realtime-mini' | 'gpt-realtime-mini-2025-10-06' | 'gpt-realtime-mini-2025-12-15' | 'gpt-audio-1.5' | 'gpt-audio-mini' | 'gpt-audio-mini-2025-10-06' | 'gpt-audio-mini-2025-12-15';
+  model?:
+    | (string & {})
+    | 'gpt-realtime'
+    | 'gpt-realtime-1.5'
+    | 'gpt-realtime-2025-08-28'
+    | 'gpt-4o-realtime-preview'
+    | 'gpt-4o-realtime-preview-2024-10-01'
+    | 'gpt-4o-realtime-preview-2024-12-17'
+    | 'gpt-4o-realtime-preview-2025-06-03'
+    | 'gpt-4o-mini-realtime-preview'
+    | 'gpt-4o-mini-realtime-preview-2024-12-17'
+    | 'gpt-realtime-mini'
+    | 'gpt-realtime-mini-2025-10-06'
+    | 'gpt-realtime-mini-2025-12-15'
+    | 'gpt-audio-1.5'
+    | 'gpt-audio-mini'
+    | 'gpt-audio-mini-2025-10-06'
+    | 'gpt-audio-mini-2025-12-15';
 
   /**
    * The object type. Always `realtime.session`.
@@ -2741,7 +2888,18 @@ export interface RealtimeSession {
    * once the model has responded with audio at least once. Current voice options are
    * `alloy`, `ash`, `ballad`, `coral`, `echo`, `sage`, `shimmer`, and `verse`.
    */
-  voice?: (string & {}) | 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse' | 'marin' | 'cedar';
+  voice?:
+    | (string & {})
+    | 'alloy'
+    | 'ash'
+    | 'ballad'
+    | 'coral'
+    | 'echo'
+    | 'sage'
+    | 'shimmer'
+    | 'verse'
+    | 'marin'
+    | 'cedar';
 }
 
 export namespace RealtimeSession {
@@ -2932,7 +3090,24 @@ export interface RealtimeSessionCreateRequest {
   /**
    * The Realtime model used for this session.
    */
-  model?: (string & {}) | 'gpt-realtime' | 'gpt-realtime-1.5' | 'gpt-realtime-2025-08-28' | 'gpt-4o-realtime-preview' | 'gpt-4o-realtime-preview-2024-10-01' | 'gpt-4o-realtime-preview-2024-12-17' | 'gpt-4o-realtime-preview-2025-06-03' | 'gpt-4o-mini-realtime-preview' | 'gpt-4o-mini-realtime-preview-2024-12-17' | 'gpt-realtime-mini' | 'gpt-realtime-mini-2025-10-06' | 'gpt-realtime-mini-2025-12-15' | 'gpt-audio-1.5' | 'gpt-audio-mini' | 'gpt-audio-mini-2025-10-06' | 'gpt-audio-mini-2025-12-15';
+  model?:
+    | (string & {})
+    | 'gpt-realtime'
+    | 'gpt-realtime-1.5'
+    | 'gpt-realtime-2025-08-28'
+    | 'gpt-4o-realtime-preview'
+    | 'gpt-4o-realtime-preview-2024-10-01'
+    | 'gpt-4o-realtime-preview-2024-12-17'
+    | 'gpt-4o-realtime-preview-2025-06-03'
+    | 'gpt-4o-mini-realtime-preview'
+    | 'gpt-4o-mini-realtime-preview-2024-12-17'
+    | 'gpt-realtime-mini'
+    | 'gpt-realtime-mini-2025-10-06'
+    | 'gpt-realtime-mini-2025-12-15'
+    | 'gpt-audio-1.5'
+    | 'gpt-audio-mini'
+    | 'gpt-audio-mini-2025-10-06'
+    | 'gpt-audio-mini-2025-12-15';
 
   /**
    * The set of modalities the model can respond with. It defaults to `["audio"]`,
@@ -2997,19 +3172,22 @@ export interface RealtimeSessionCreateRequest {
  * How the model chooses tools. Provide one of the string modes or force a specific
  * function/MCP tool.
  */
-export type RealtimeToolChoiceConfig = ResponsesAPI.ToolChoiceOptions | ResponsesAPI.ToolChoiceFunction | ResponsesAPI.ToolChoiceMcp
+export type RealtimeToolChoiceConfig =
+  | ResponsesAPI.ToolChoiceOptions
+  | ResponsesAPI.ToolChoiceFunction
+  | ResponsesAPI.ToolChoiceMcp;
 
 /**
  * Tools available to the model.
  */
-export type RealtimeToolsConfig = Array<RealtimeToolsConfigUnion>
+export type RealtimeToolsConfig = Array<RealtimeToolsConfigUnion>;
 
 /**
  * Give the model access to additional tools via remote Model Context Protocol
  * (MCP) servers.
  * [Learn more about MCP](https://platform.openai.com/docs/guides/tools-remote-mcp).
  */
-export type RealtimeToolsConfigUnion = RealtimeFunctionTool | RealtimeToolsConfigUnion.Mcp
+export type RealtimeToolsConfigUnion = RealtimeFunctionTool | RealtimeToolsConfigUnion.Mcp;
 
 export namespace RealtimeToolsConfigUnion {
   /**
@@ -3057,7 +3235,15 @@ export namespace RealtimeToolsConfigUnion {
      * - Outlook Email: `connector_outlookemail`
      * - SharePoint: `connector_sharepoint`
      */
-    connector_id?: 'connector_dropbox' | 'connector_gmail' | 'connector_googlecalendar' | 'connector_googledrive' | 'connector_microsoftteams' | 'connector_outlookcalendar' | 'connector_outlookemail' | 'connector_sharepoint';
+    connector_id?:
+      | 'connector_dropbox'
+      | 'connector_gmail'
+      | 'connector_googlecalendar'
+      | 'connector_googledrive'
+      | 'connector_microsoftteams'
+      | 'connector_outlookcalendar'
+      | 'connector_outlookemail'
+      | 'connector_sharepoint';
 
     /**
      * Whether this MCP tool is deferred and discovered via tool search.
@@ -3171,7 +3357,7 @@ export namespace RealtimeToolsConfigUnion {
  * `auto` will create a trace for the session with default values for the workflow
  * name, group id, and metadata.
  */
-export type RealtimeTracingConfig = 'auto' | RealtimeTracingConfig.TracingConfiguration
+export type RealtimeTracingConfig = 'auto' | RealtimeTracingConfig.TracingConfiguration;
 
 export namespace RealtimeTracingConfig {
   /**
@@ -3283,7 +3469,9 @@ export namespace RealtimeTranscriptionSessionAudioInput {
  * wait longer for the user to continue speaking. This can be useful for more
  * natural conversations, but may have a higher latency.
  */
-export type RealtimeTranscriptionSessionAudioInputTurnDetection = RealtimeTranscriptionSessionAudioInputTurnDetection.ServerVad | RealtimeTranscriptionSessionAudioInputTurnDetection.SemanticVad
+export type RealtimeTranscriptionSessionAudioInputTurnDetection =
+  | RealtimeTranscriptionSessionAudioInputTurnDetection.ServerVad
+  | RealtimeTranscriptionSessionAudioInputTurnDetection.SemanticVad;
 
 export namespace RealtimeTranscriptionSessionAudioInputTurnDetection {
   /**
@@ -3431,7 +3619,7 @@ export interface RealtimeTranscriptionSessionCreateRequest {
  * but would instead return an error if the conversation exceeds the model's input
  * token limit.
  */
-export type RealtimeTruncation = 'auto' | 'disabled' | RealtimeTruncationRetentionRatio
+export type RealtimeTruncation = 'auto' | 'disabled' | RealtimeTruncationRetentionRatio;
 
 /**
  * Retain a fraction of the conversation tokens when the conversation exceeds the
@@ -4680,7 +4868,7 @@ export declare namespace Realtime {
     type SessionUpdateEvent as SessionUpdateEvent,
     type SessionUpdatedEvent as SessionUpdatedEvent,
     type TranscriptionSessionUpdate as TranscriptionSessionUpdate,
-    type TranscriptionSessionUpdatedEvent as TranscriptionSessionUpdatedEvent
+    type TranscriptionSessionUpdatedEvent as TranscriptionSessionUpdatedEvent,
   };
 
   export {
@@ -4690,13 +4878,13 @@ export declare namespace Realtime {
     type RealtimeTranscriptionSessionCreateResponse as RealtimeTranscriptionSessionCreateResponse,
     type RealtimeTranscriptionSessionTurnDetection as RealtimeTranscriptionSessionTurnDetection,
     type ClientSecretCreateResponse as ClientSecretCreateResponse,
-    type ClientSecretCreateParams as ClientSecretCreateParams
+    type ClientSecretCreateParams as ClientSecretCreateParams,
   };
 
   export {
     Calls as Calls,
     type CallAcceptParams as CallAcceptParams,
     type CallReferParams as CallReferParams,
-    type CallRejectParams as CallRejectParams
+    type CallRejectParams as CallRejectParams,
   };
 }

@@ -7,34 +7,39 @@ export type KeysEnum<T> = { [P in keyof Required<T>]: true };
 
 export type FinalizedRequestInit = RequestInit & { headers: Headers };
 
-type NotAny<T> = [0] extends [(1 & T)] ? never : T;
+type NotAny<T> = [0] extends [1 & T] ? never : T;
 
 /**
  * Some environments overload the global fetch function, and Parameters<T> only gets the last signature.
  */
-type OverloadedParameters<T> = T extends {
-  (...args: infer A): unknown;
-  (...args: infer B): unknown;
-  (...args: infer C): unknown;
-  (...args: infer D): unknown;
-}
-  ? A | B | C | D
-  : T extends {
+type OverloadedParameters<T> =
+  T extends (
+    {
+      (...args: infer A): unknown;
+      (...args: infer B): unknown;
+      (...args: infer C): unknown;
+      (...args: infer D): unknown;
+    }
+  ) ?
+    A | B | C | D
+  : T extends (
+    {
       (...args: infer A): unknown;
       (...args: infer B): unknown;
       (...args: infer C): unknown;
     }
-  ? A | B | C
-  : T extends {
+  ) ?
+    A | B | C
+  : T extends (
+    {
       (...args: infer A): unknown;
       (...args: infer B): unknown;
     }
-  ? A | B
-  : T extends (...args: infer A) => unknown
-  ? A
+  ) ?
+    A | B
+  : T extends (...args: infer A) => unknown ? A
   : never;
 
- 
 /**
  * These imports attempt to get types from a parent package's dependencies.
  * Unresolved bare specifiers can trigger [automatic type acquisition][1] in some projects, which
@@ -69,7 +74,6 @@ type NodeFetch2RequestInit = NotAny<import('../node_modules/@types/node-fetch/in
 type NodeFetch3RequestInit =  NotAny<import('../node_modules/node-fetch').RequestInit> | NotAny<import('../../node_modules/node-fetch').RequestInit> | NotAny<import('../../../node_modules/node-fetch').RequestInit> | NotAny<import('../../../../node_modules/node-fetch').RequestInit> | NotAny<import('../../../../../node_modules/node-fetch').RequestInit> | NotAny<import('../../../../../../node_modules/node-fetch').RequestInit> | NotAny<import('../../../../../../../node_modules/node-fetch').RequestInit> | NotAny<import('../../../../../../../../node_modules/node-fetch').RequestInit> | NotAny<import('../../../../../../../../../node_modules/node-fetch').RequestInit> | NotAny<import('../../../../../../../../../../node_modules/node-fetch').RequestInit>;
 /** @ts-ignore For users who use Deno */ /* prettier-ignore */
 type FetchRequestInit = NonNullable<OverloadedParameters<typeof fetch>[1]>;
- 
 
 type RequestInits =
   | NotAny<UndiciTypesRequestInit>

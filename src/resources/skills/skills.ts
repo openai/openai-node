@@ -4,7 +4,17 @@ import { APIResource } from '../../core/resource';
 import * as ContentAPI from './content';
 import { Content } from './content';
 import * as VersionsAPI from './versions/versions';
-import { DeletedSkillVersion, SkillVersion, SkillVersionList, SkillVersionsPage, VersionCreateParams, VersionDeleteParams, VersionListParams, VersionRetrieveParams, Versions } from './versions/versions';
+import {
+  DeletedSkillVersion,
+  SkillVersion,
+  SkillVersionList,
+  SkillVersionsPage,
+  VersionCreateParams,
+  VersionDeleteParams,
+  VersionListParams,
+  VersionRetrieveParams,
+  Versions,
+} from './versions/versions';
 import { APIPromise } from '../../core/api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../core/pagination';
 import { type Uploadable } from '../../core/uploads';
@@ -40,7 +50,10 @@ export class Skills extends APIResource {
   /**
    * List all skills for the current project.
    */
-  list(query: SkillListParams | null | undefined = {}, options?: RequestOptions): PagePromise<SkillsPage, Skill> {
+  list(
+    query: SkillListParams | null | undefined = {},
+    options?: RequestOptions,
+  ): PagePromise<SkillsPage, Skill> {
     return this._client.getAPIList('/skills', CursorPage<Skill>, { query, ...options });
   }
 
@@ -52,7 +65,7 @@ export class Skills extends APIResource {
   }
 }
 
-export type SkillsPage = CursorPage<Skill>
+export type SkillsPage = CursorPage<Skill>;
 
 export interface DeletedSkill {
   id: string;
@@ -159,12 +172,10 @@ export declare namespace Skills {
     type SkillsPage as SkillsPage,
     type SkillCreateParams as SkillCreateParams,
     type SkillUpdateParams as SkillUpdateParams,
-    type SkillListParams as SkillListParams
+    type SkillListParams as SkillListParams,
   };
 
-  export {
-    Content as Content
-  };
+  export { Content as Content };
 
   export {
     Versions as Versions,
@@ -175,6 +186,6 @@ export declare namespace Skills {
     type VersionCreateParams as VersionCreateParams,
     type VersionRetrieveParams as VersionRetrieveParams,
     type VersionListParams as VersionListParams,
-    type VersionDeleteParams as VersionDeleteParams
+    type VersionDeleteParams as VersionDeleteParams,
   };
 }

@@ -5,7 +5,23 @@ import * as Shared from '../shared';
 import * as GraderModelsAPI from '../graders/grader-models';
 import * as ResponsesAPI from '../responses/responses';
 import * as RunsAPI from './runs/runs';
-import { CreateEvalCompletionsRunDataSource, CreateEvalJSONLRunDataSource, EvalAPIError, RunCancelParams, RunCancelResponse, RunCreateParams, RunCreateResponse, RunDeleteParams, RunDeleteResponse, RunListParams, RunListResponse, RunListResponsesPage, RunRetrieveParams, RunRetrieveResponse, Runs } from './runs/runs';
+import {
+  CreateEvalCompletionsRunDataSource,
+  CreateEvalJSONLRunDataSource,
+  EvalAPIError,
+  RunCancelParams,
+  RunCancelResponse,
+  RunCreateParams,
+  RunCreateResponse,
+  RunDeleteParams,
+  RunDeleteResponse,
+  RunListParams,
+  RunListResponse,
+  RunListResponsesPage,
+  RunRetrieveParams,
+  RunRetrieveResponse,
+  Runs,
+} from './runs/runs';
 import { APIPromise } from '../../core/api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../core/pagination';
 import { RequestOptions } from '../../internal/request-options';
@@ -46,7 +62,10 @@ export class Evals extends APIResource {
   /**
    * List evaluations for a project.
    */
-  list(query: EvalListParams | null | undefined = {}, options?: RequestOptions): PagePromise<EvalListResponsesPage, EvalListResponse> {
+  list(
+    query: EvalListParams | null | undefined = {},
+    options?: RequestOptions,
+  ): PagePromise<EvalListResponsesPage, EvalListResponse> {
     return this._client.getAPIList('/evals', CursorPage<EvalListResponse>, { query, ...options });
   }
 
@@ -58,7 +77,7 @@ export class Evals extends APIResource {
   }
 }
 
-export type EvalListResponsesPage = CursorPage<EvalListResponse>
+export type EvalListResponsesPage = CursorPage<EvalListResponse>;
 
 /**
  * A CustomDataSourceConfig which specifies the schema of your `item` and
@@ -129,7 +148,10 @@ export interface EvalCreateResponse {
   /**
    * Configuration of data sources used in runs of the evaluation.
    */
-  data_source_config: EvalCustomDataSourceConfig | EvalCreateResponse.Logs | EvalStoredCompletionsDataSourceConfig;
+  data_source_config:
+    | EvalCustomDataSourceConfig
+    | EvalCreateResponse.Logs
+    | EvalStoredCompletionsDataSourceConfig;
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
@@ -154,7 +176,13 @@ export interface EvalCreateResponse {
   /**
    * A list of testing criteria.
    */
-  testing_criteria: Array<GraderModelsAPI.LabelModelGrader | GraderModelsAPI.StringCheckGrader | EvalCreateResponse.EvalGraderTextSimilarity | EvalCreateResponse.EvalGraderPython | EvalCreateResponse.EvalGraderScoreModel>;
+  testing_criteria: Array<
+    | GraderModelsAPI.LabelModelGrader
+    | GraderModelsAPI.StringCheckGrader
+    | EvalCreateResponse.EvalGraderTextSimilarity
+    | EvalCreateResponse.EvalGraderPython
+    | EvalCreateResponse.EvalGraderScoreModel
+  >;
 }
 
 export namespace EvalCreateResponse {
@@ -241,7 +269,10 @@ export interface EvalRetrieveResponse {
   /**
    * Configuration of data sources used in runs of the evaluation.
    */
-  data_source_config: EvalCustomDataSourceConfig | EvalRetrieveResponse.Logs | EvalStoredCompletionsDataSourceConfig;
+  data_source_config:
+    | EvalCustomDataSourceConfig
+    | EvalRetrieveResponse.Logs
+    | EvalStoredCompletionsDataSourceConfig;
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
@@ -266,7 +297,13 @@ export interface EvalRetrieveResponse {
   /**
    * A list of testing criteria.
    */
-  testing_criteria: Array<GraderModelsAPI.LabelModelGrader | GraderModelsAPI.StringCheckGrader | EvalRetrieveResponse.EvalGraderTextSimilarity | EvalRetrieveResponse.EvalGraderPython | EvalRetrieveResponse.EvalGraderScoreModel>;
+  testing_criteria: Array<
+    | GraderModelsAPI.LabelModelGrader
+    | GraderModelsAPI.StringCheckGrader
+    | EvalRetrieveResponse.EvalGraderTextSimilarity
+    | EvalRetrieveResponse.EvalGraderPython
+    | EvalRetrieveResponse.EvalGraderScoreModel
+  >;
 }
 
 export namespace EvalRetrieveResponse {
@@ -353,7 +390,10 @@ export interface EvalUpdateResponse {
   /**
    * Configuration of data sources used in runs of the evaluation.
    */
-  data_source_config: EvalCustomDataSourceConfig | EvalUpdateResponse.Logs | EvalStoredCompletionsDataSourceConfig;
+  data_source_config:
+    | EvalCustomDataSourceConfig
+    | EvalUpdateResponse.Logs
+    | EvalStoredCompletionsDataSourceConfig;
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
@@ -378,7 +418,13 @@ export interface EvalUpdateResponse {
   /**
    * A list of testing criteria.
    */
-  testing_criteria: Array<GraderModelsAPI.LabelModelGrader | GraderModelsAPI.StringCheckGrader | EvalUpdateResponse.EvalGraderTextSimilarity | EvalUpdateResponse.EvalGraderPython | EvalUpdateResponse.EvalGraderScoreModel>;
+  testing_criteria: Array<
+    | GraderModelsAPI.LabelModelGrader
+    | GraderModelsAPI.StringCheckGrader
+    | EvalUpdateResponse.EvalGraderTextSimilarity
+    | EvalUpdateResponse.EvalGraderPython
+    | EvalUpdateResponse.EvalGraderScoreModel
+  >;
 }
 
 export namespace EvalUpdateResponse {
@@ -465,7 +511,10 @@ export interface EvalListResponse {
   /**
    * Configuration of data sources used in runs of the evaluation.
    */
-  data_source_config: EvalCustomDataSourceConfig | EvalListResponse.Logs | EvalStoredCompletionsDataSourceConfig;
+  data_source_config:
+    | EvalCustomDataSourceConfig
+    | EvalListResponse.Logs
+    | EvalStoredCompletionsDataSourceConfig;
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
@@ -490,7 +539,13 @@ export interface EvalListResponse {
   /**
    * A list of testing criteria.
    */
-  testing_criteria: Array<GraderModelsAPI.LabelModelGrader | GraderModelsAPI.StringCheckGrader | EvalListResponse.EvalGraderTextSimilarity | EvalListResponse.EvalGraderPython | EvalListResponse.EvalGraderScoreModel>;
+  testing_criteria: Array<
+    | GraderModelsAPI.LabelModelGrader
+    | GraderModelsAPI.StringCheckGrader
+    | EvalListResponse.EvalGraderTextSimilarity
+    | EvalListResponse.EvalGraderPython
+    | EvalListResponse.EvalGraderScoreModel
+  >;
 }
 
 export namespace EvalListResponse {
@@ -576,7 +631,13 @@ export interface EvalCreateParams {
    * `{{item.variable_name}}`. To reference the model's output, use the `sample`
    * namespace (ie, `{{sample.output_text}}`).
    */
-  testing_criteria: Array<EvalCreateParams.LabelModel | GraderModelsAPI.StringCheckGrader | EvalCreateParams.TextSimilarity | EvalCreateParams.Python | EvalCreateParams.ScoreModel>;
+  testing_criteria: Array<
+    | EvalCreateParams.LabelModel
+    | GraderModelsAPI.StringCheckGrader
+    | EvalCreateParams.TextSimilarity
+    | EvalCreateParams.Python
+    | EvalCreateParams.ScoreModel
+  >;
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
@@ -714,7 +775,13 @@ export namespace EvalCreateParams {
        * Inputs to the model - can contain template strings. Supports text, output text,
        * input images, and input audio, either as a single item or an array of items.
        */
-      content: string | ResponsesAPI.ResponseInputText | EvalItem.OutputText | EvalItem.InputImage | ResponsesAPI.ResponseInputAudio | GraderModelsAPI.GraderInputs;
+      content:
+        | string
+        | ResponsesAPI.ResponseInputText
+        | EvalItem.OutputText
+        | EvalItem.InputImage
+        | ResponsesAPI.ResponseInputAudio
+        | GraderModelsAPI.GraderInputs;
 
       /**
        * The role of the message input. One of `user`, `assistant`, `system`, or
@@ -843,7 +910,7 @@ export declare namespace Evals {
     type EvalListResponsesPage as EvalListResponsesPage,
     type EvalCreateParams as EvalCreateParams,
     type EvalUpdateParams as EvalUpdateParams,
-    type EvalListParams as EvalListParams
+    type EvalListParams as EvalListParams,
   };
 
   export {
@@ -861,6 +928,6 @@ export declare namespace Evals {
     type RunRetrieveParams as RunRetrieveParams,
     type RunListParams as RunListParams,
     type RunDeleteParams as RunDeleteParams,
-    type RunCancelParams as RunCancelParams
+    type RunCancelParams as RunCancelParams,
   };
 }

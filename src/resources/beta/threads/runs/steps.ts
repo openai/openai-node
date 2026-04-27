@@ -21,8 +21,12 @@ export class Steps extends APIResource {
    * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
   retrieve(stepID: string, params: StepRetrieveParams, options?: RequestOptions): APIPromise<RunStep> {
-    const { thread_id, run_id, ...query } = params
-    return this._client.get(path`/threads/${thread_id}/runs/${run_id}/steps/${stepID}`, { query, ...options, headers: buildHeaders([{'OpenAI-Beta': 'assistants=v2'}, options?.headers]) });
+    const { thread_id, run_id, ...query } = params;
+    return this._client.get(path`/threads/${thread_id}/runs/${run_id}/steps/${stepID}`, {
+      query,
+      ...options,
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+    });
   }
 
   /**
@@ -31,12 +35,16 @@ export class Steps extends APIResource {
    * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
   list(runID: string, params: StepListParams, options?: RequestOptions): PagePromise<RunStepsPage, RunStep> {
-    const { thread_id, ...query } = params
-    return this._client.getAPIList(path`/threads/${thread_id}/runs/${runID}/steps`, CursorPage<RunStep>, { query, ...options, headers: buildHeaders([{'OpenAI-Beta': 'assistants=v2'}, options?.headers]) });
+    const { thread_id, ...query } = params;
+    return this._client.getAPIList(path`/threads/${thread_id}/runs/${runID}/steps`, CursorPage<RunStep>, {
+      query,
+      ...options,
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+    });
   }
 }
 
-export type RunStepsPage = CursorPage<RunStep>
+export type RunStepsPage = CursorPage<RunStep>;
 
 /**
  * Text output from the Code Interpreter tool call as part of a run step.
@@ -620,17 +628,17 @@ export namespace RunStepDeltaMessageDelta {
   }
 }
 
-export type RunStepInclude = 'step_details.tool_calls[*].file_search.results[*].content'
+export type RunStepInclude = 'step_details.tool_calls[*].file_search.results[*].content';
 
 /**
  * Details of the Code Interpreter tool call the run step was involved in.
  */
-export type ToolCall = CodeInterpreterToolCall | FileSearchToolCall | FunctionToolCall
+export type ToolCall = CodeInterpreterToolCall | FileSearchToolCall | FunctionToolCall;
 
 /**
  * Details of the Code Interpreter tool call the run step was involved in.
  */
-export type ToolCallDelta = CodeInterpreterToolCallDelta | FileSearchToolCallDelta | FunctionToolCallDelta
+export type ToolCallDelta = CodeInterpreterToolCallDelta | FileSearchToolCallDelta | FunctionToolCallDelta;
 
 /**
  * Details of the tool call.
@@ -745,6 +753,6 @@ export declare namespace Steps {
     type ToolCallsStepDetails as ToolCallsStepDetails,
     type RunStepsPage as RunStepsPage,
     type StepRetrieveParams as StepRetrieveParams,
-    type StepListParams as StepListParams
+    type StepListParams as StepListParams,
   };
 }

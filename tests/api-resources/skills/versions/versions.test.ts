@@ -2,7 +2,10 @@
 
 import OpenAI, { toFile } from 'openai';
 
-const client = new OpenAI({ apiKey: 'My API Key', baseURL: process.env["TEST_API_BASE_URL"] ?? 'http://127.0.0.1:4010' });
+const client = new OpenAI({
+  apiKey: 'My API Key',
+  baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
+});
 
 describe('resource versions', () => {
   test('create', async () => {
@@ -18,9 +21,13 @@ describe('resource versions', () => {
 
   test('create: request options and params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(client.skills.versions.create('skill_123', { default: true, files: [await toFile(Buffer.from('Example data'), 'README.md')] }, { path: '/_stainless_unknown_path' }))
-      .rejects
-      .toThrow(OpenAI.NotFoundError);
+    await expect(
+      client.skills.versions.create(
+        'skill_123',
+        { default: true, files: [await toFile(Buffer.from('Example data'), 'README.md')] },
+        { path: '/_stainless_unknown_path' },
+      ),
+    ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
   test('retrieve: only required params', async () => {
@@ -51,13 +58,17 @@ describe('resource versions', () => {
 
   test('list: request options and params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(client.skills.versions.list('skill_123', {
-    after: 'skillver_123',
-    limit: 0,
-    order: 'asc',
-  }, { path: '/_stainless_unknown_path' }))
-      .rejects
-      .toThrow(OpenAI.NotFoundError);
+    await expect(
+      client.skills.versions.list(
+        'skill_123',
+        {
+          after: 'skillver_123',
+          limit: 0,
+          order: 'asc',
+        },
+        { path: '/_stainless_unknown_path' },
+      ),
+    ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
   test('delete: only required params', async () => {

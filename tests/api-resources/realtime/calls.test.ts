@@ -2,7 +2,10 @@
 
 import OpenAI from 'openai';
 
-const client = new OpenAI({ apiKey: 'My API Key', baseURL: process.env["TEST_API_BASE_URL"] ?? 'http://127.0.0.1:4010' });
+const client = new OpenAI({
+  apiKey: 'My API Key',
+  baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
+});
 
 describe('resource calls', () => {
   test('accept: only required params', async () => {
@@ -18,52 +21,54 @@ describe('resource calls', () => {
 
   test('accept: required and optional params', async () => {
     const response = await client.realtime.calls.accept('call_id', {
-    type: 'realtime',
-    audio: {
-    input: {
-    format: { rate: 24000, type: 'audio/pcm' },
-    noise_reduction: { type: 'near_field' },
-    transcription: {
-    language: 'language',
-    model: 'whisper-1',
-    prompt: 'prompt',
-  },
-    turn_detection: {
-    type: 'server_vad',
-    create_response: true,
-    idle_timeout_ms: 5000,
-    interrupt_response: true,
-    prefix_padding_ms: 0,
-    silence_duration_ms: 0,
-    threshold: 0,
-  },
-  },
-    output: {
-    format: { rate: 24000, type: 'audio/pcm' },
-    speed: 0.25,
-    voice: 'alloy',
-  },
-  },
-    include: ['item.input_audio_transcription.logprobs'],
-    instructions: 'instructions',
-    max_output_tokens: 'inf',
-    model: 'gpt-realtime',
-    output_modalities: ['text'],
-    prompt: {
-    id: 'id',
-    variables: { foo: 'string' },
-    version: 'version',
-  },
-    tool_choice: 'none',
-    tools: [{
-    description: 'description',
-    name: 'name',
-    parameters: {},
-    type: 'function',
-  }],
-    tracing: 'auto',
-    truncation: 'auto',
-  });
+      type: 'realtime',
+      audio: {
+        input: {
+          format: { rate: 24000, type: 'audio/pcm' },
+          noise_reduction: { type: 'near_field' },
+          transcription: {
+            language: 'language',
+            model: 'whisper-1',
+            prompt: 'prompt',
+          },
+          turn_detection: {
+            type: 'server_vad',
+            create_response: true,
+            idle_timeout_ms: 5000,
+            interrupt_response: true,
+            prefix_padding_ms: 0,
+            silence_duration_ms: 0,
+            threshold: 0,
+          },
+        },
+        output: {
+          format: { rate: 24000, type: 'audio/pcm' },
+          speed: 0.25,
+          voice: 'alloy',
+        },
+      },
+      include: ['item.input_audio_transcription.logprobs'],
+      instructions: 'instructions',
+      max_output_tokens: 'inf',
+      model: 'gpt-realtime',
+      output_modalities: ['text'],
+      prompt: {
+        id: 'id',
+        variables: { foo: 'string' },
+        version: 'version',
+      },
+      tool_choice: 'none',
+      tools: [
+        {
+          description: 'description',
+          name: 'name',
+          parameters: {},
+          type: 'function',
+        },
+      ],
+      tracing: 'auto',
+      truncation: 'auto',
+    });
   });
 
   test('hangup', async () => {
@@ -105,8 +110,8 @@ describe('resource calls', () => {
 
   test('reject: request options and params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(client.realtime.calls.reject('call_id', { status_code: 486 }, { path: '/_stainless_unknown_path' }))
-      .rejects
-      .toThrow(OpenAI.NotFoundError);
+    await expect(
+      client.realtime.calls.reject('call_id', { status_code: 486 }, { path: '/_stainless_unknown_path' }),
+    ).rejects.toThrow(OpenAI.NotFoundError);
   });
 });

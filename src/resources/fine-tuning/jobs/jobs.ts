@@ -4,7 +4,12 @@ import { APIResource } from '../../../core/resource';
 import * as Shared from '../../shared';
 import * as MethodsAPI from '../methods';
 import * as CheckpointsAPI from './checkpoints';
-import { CheckpointListParams, Checkpoints, FineTuningJobCheckpoint, FineTuningJobCheckpointsPage } from './checkpoints';
+import {
+  CheckpointListParams,
+  Checkpoints,
+  FineTuningJobCheckpoint,
+  FineTuningJobCheckpointsPage,
+} from './checkpoints';
 import { APIPromise } from '../../../core/api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pagination';
 import { RequestOptions } from '../../../internal/request-options';
@@ -64,7 +69,10 @@ export class Jobs extends APIResource {
    * }
    * ```
    */
-  list(query: JobListParams | null | undefined = {}, options?: RequestOptions): PagePromise<FineTuningJobsPage, FineTuningJob> {
+  list(
+    query: JobListParams | null | undefined = {},
+    options?: RequestOptions,
+  ): PagePromise<FineTuningJobsPage, FineTuningJob> {
     return this._client.getAPIList('/fine_tuning/jobs', CursorPage<FineTuningJob>, { query, ...options });
   }
 
@@ -95,8 +103,16 @@ export class Jobs extends APIResource {
    * }
    * ```
    */
-  listEvents(fineTuningJobID: string, query: JobListEventsParams | null | undefined = {}, options?: RequestOptions): PagePromise<FineTuningJobEventsPage, FineTuningJobEvent> {
-    return this._client.getAPIList(path`/fine_tuning/jobs/${fineTuningJobID}/events`, CursorPage<FineTuningJobEvent>, { query, ...options });
+  listEvents(
+    fineTuningJobID: string,
+    query: JobListEventsParams | null | undefined = {},
+    options?: RequestOptions,
+  ): PagePromise<FineTuningJobEventsPage, FineTuningJobEvent> {
+    return this._client.getAPIList(
+      path`/fine_tuning/jobs/${fineTuningJobID}/events`,
+      CursorPage<FineTuningJobEvent>,
+      { query, ...options },
+    );
   }
 
   /**
@@ -128,9 +144,9 @@ export class Jobs extends APIResource {
   }
 }
 
-export type FineTuningJobsPage = CursorPage<FineTuningJob>
+export type FineTuningJobsPage = CursorPage<FineTuningJob>;
 
-export type FineTuningJobEventsPage = CursorPage<FineTuningJobEvent>
+export type FineTuningJobEventsPage = CursorPage<FineTuningJobEvent>;
 
 /**
  * The `fine_tuning.job` object represents a fine-tuning job that has been created
@@ -411,7 +427,7 @@ export interface FineTuningJobWandbIntegrationObject {
   wandb: FineTuningJobWandbIntegration;
 }
 
-export type FineTuningJobIntegration = FineTuningJobWandbIntegrationObject
+export type FineTuningJobIntegration = FineTuningJobWandbIntegrationObject;
 
 export interface JobCreateParams {
   /**
@@ -614,8 +630,7 @@ export interface JobListParams extends CursorPageParams {
   metadata?: { [key: string]: string } | null;
 }
 
-export interface JobListEventsParams extends CursorPageParams {
-}
+export interface JobListEventsParams extends CursorPageParams {}
 
 Jobs.Checkpoints = Checkpoints;
 
@@ -630,13 +645,13 @@ export declare namespace Jobs {
     type FineTuningJobEventsPage as FineTuningJobEventsPage,
     type JobCreateParams as JobCreateParams,
     type JobListParams as JobListParams,
-    type JobListEventsParams as JobListEventsParams
+    type JobListEventsParams as JobListEventsParams,
   };
 
   export {
     Checkpoints as Checkpoints,
     type FineTuningJobCheckpoint as FineTuningJobCheckpoint,
     type FineTuningJobCheckpointsPage as FineTuningJobCheckpointsPage,
-    type CheckpointListParams as CheckpointListParams
+    type CheckpointListParams as CheckpointListParams,
   };
 }

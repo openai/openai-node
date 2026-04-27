@@ -27,11 +27,16 @@ export class Speech extends APIResource {
    * ```
    */
   create(body: SpeechCreateParams, options?: RequestOptions): APIPromise<Response> {
-    return this._client.post('/audio/speech', { body, ...options, headers: buildHeaders([{Accept: 'application/octet-stream'}, options?.headers]), __binaryResponse: true });
+    return this._client.post('/audio/speech', {
+      body,
+      ...options,
+      headers: buildHeaders([{ Accept: 'application/octet-stream' }, options?.headers]),
+      __binaryResponse: true,
+    });
   }
 }
 
-export type SpeechModel = 'tts-1' | 'tts-1-hd' | 'gpt-4o-mini-tts' | 'gpt-4o-mini-tts-2025-12-15'
+export type SpeechModel = 'tts-1' | 'tts-1-hd' | 'gpt-4o-mini-tts' | 'gpt-4o-mini-tts-2025-12-15';
 
 export interface SpeechCreateParams {
   /**
@@ -53,7 +58,19 @@ export interface SpeechCreateParams {
    * voices are available in the
    * [Text to speech guide](https://platform.openai.com/docs/guides/text-to-speech#voice-options).
    */
-  voice: string | 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse' | 'marin' | 'cedar' | SpeechCreateParams.ID;
+  voice:
+    | string
+    | 'alloy'
+    | 'ash'
+    | 'ballad'
+    | 'coral'
+    | 'echo'
+    | 'sage'
+    | 'shimmer'
+    | 'verse'
+    | 'marin'
+    | 'cedar'
+    | SpeechCreateParams.ID;
 
   /**
    * Control the voice of your generated audio with additional instructions. Does not
@@ -93,8 +110,5 @@ export namespace SpeechCreateParams {
 }
 
 export declare namespace Speech {
-  export {
-    type SpeechModel as SpeechModel,
-    type SpeechCreateParams as SpeechCreateParams
-  };
+  export { type SpeechModel as SpeechModel, type SpeechCreateParams as SpeechCreateParams };
 }

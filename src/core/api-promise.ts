@@ -21,7 +21,10 @@ export class APIPromise<T> extends Promise<WithRequestID<T>> {
   constructor(
     client: OpenAI,
     private responsePromise: Promise<APIResponseProps>,
-    private parseResponse: (client: OpenAI, props: APIResponseProps) => PromiseOrValue<WithRequestID<T>> = defaultParseResponse,
+    private parseResponse: (
+      client: OpenAI,
+      props: APIResponseProps,
+    ) => PromiseOrValue<WithRequestID<T>> = defaultParseResponse,
   ) {
     super((resolve) => {
       // this is maybe a bit weird but this has to be a no-op to not implicitly
@@ -34,7 +37,8 @@ export class APIPromise<T> extends Promise<WithRequestID<T>> {
 
   _thenUnwrap<U>(transform: (data: T, props: APIResponseProps) => U): APIPromise<U> {
     return new APIPromise(this.#client, this.responsePromise, async (client, props) =>
-      addRequestID(transform(await this.parseResponse(client, props), props), props.response));
+      addRequestID(transform(await this.parseResponse(client, props), props), props.response),
+    );
   }
 
   /**

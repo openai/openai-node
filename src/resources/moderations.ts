@@ -295,12 +295,16 @@ export namespace ModerationImageURLInput {
   }
 }
 
-export type ModerationModel = 'omni-moderation-latest' | 'omni-moderation-2024-09-26' | 'text-moderation-latest' | 'text-moderation-stable'
+export type ModerationModel =
+  | 'omni-moderation-latest'
+  | 'omni-moderation-2024-09-26'
+  | 'text-moderation-latest'
+  | 'text-moderation-stable';
 
 /**
  * An object describing an image to classify.
  */
-export type ModerationMultiModalInput = ModerationImageURLInput | ModerationTextInput
+export type ModerationMultiModalInput = ModerationImageURLInput | ModerationTextInput;
 
 /**
  * An object describing text to classify.
@@ -361,6 +365,6 @@ export declare namespace Moderations {
     type ModerationMultiModalInput as ModerationMultiModalInput,
     type ModerationTextInput as ModerationTextInput,
     type ModerationCreateResponse as ModerationCreateResponse,
-    type ModerationCreateParams as ModerationCreateParams
+    type ModerationCreateParams as ModerationCreateParams,
   };
 }

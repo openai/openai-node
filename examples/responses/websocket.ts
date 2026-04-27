@@ -9,7 +9,6 @@ import type {
   ResponsesServerEvent,
 } from 'openai/resources/responses/responses';
 import { ResponsesWS } from 'openai/resources/responses/ws';
-import type { WebSocket } from 'ws';
 
 type ToolName = 'get_sku_inventory' | 'get_supplier_eta' | 'get_quality_alerts';
 type ToolChoice = NonNullable<ResponsesClientEvent['tool_choice']>;
@@ -73,6 +72,16 @@ type RunResponseResult = {
 type RunTurnResult = {
   assistantText: string;
   responseID: string;
+};
+
+type OpenableSocket = {
+  readyState: number;
+  on(event: 'open', listener: () => void): void;
+  on(event: 'error', listener: (err: Error) => void): void;
+  on(event: 'close', listener: () => void): void;
+  off(event: 'open', listener: () => void): void;
+  off(event: 'error', listener: (err: Error) => void): void;
+  off(event: 'close', listener: () => void): void;
 };
 
 type CLIArgs = {
@@ -287,8 +296,8 @@ const callTool = (name: ToolName, args: SKUArguments): ToolOutput => {
   };
 };
 
-const ensureSocketOpen = async (socket: WebSocket): Promise<void> => {
-  if (socket.readyState === socket.OPEN) {
+const ensureSocketOpen = async (socket: OpenableSocket): Promise<void> => {
+  if (socket.readyState === 1) {
     return;
   }
 

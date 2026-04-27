@@ -37,7 +37,10 @@ export class Translations extends APIResource {
     body: TranslationCreateParams,
     options?: RequestOptions,
   ): APIPromise<TranslationCreateResponse | string> {
-    return this._client.post('/audio/translations', multipartFormRequestOptions({ body, ...options, __metadata: { model: body.model } }, this._client));
+    return this._client.post(
+      '/audio/translations',
+      multipartFormRequestOptions({ body, ...options, __metadata: { model: body.model } }, this._client),
+    );
   }
 }
 
@@ -67,7 +70,7 @@ export interface TranslationVerbose {
   segments?: Array<TranscriptionsAPI.TranscriptionSegment>;
 }
 
-export type TranslationCreateResponse = Translation | TranslationVerbose
+export type TranslationCreateResponse = Translation | TranslationVerbose;
 
 export interface TranslationCreateParams<
   ResponseFormat extends AudioAPI.AudioResponseFormat | undefined = AudioAPI.AudioResponseFormat | undefined,
@@ -113,6 +116,6 @@ export declare namespace Translations {
     type Translation as Translation,
     type TranslationVerbose as TranslationVerbose,
     type TranslationCreateResponse as TranslationCreateResponse,
-    type TranslationCreateParams as TranslationCreateParams
+    type TranslationCreateParams as TranslationCreateParams,
   };
 }

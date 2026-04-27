@@ -1,6 +1,42 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-export { Messages, type Annotation, type AnnotationDelta, type FileCitationAnnotation, type FileCitationDeltaAnnotation, type FilePathAnnotation, type FilePathDeltaAnnotation, type ImageFile, type ImageFileContentBlock, type ImageFileDelta, type ImageFileDeltaBlock, type ImageURL, type ImageURLContentBlock, type ImageURLDelta, type ImageURLDeltaBlock, type Message, type MessageContent, type MessageContentDelta, type MessageContentPartParam, type MessageDeleted, type MessageDelta, type MessageDeltaEvent, type RefusalContentBlock, type RefusalDeltaBlock, type Text, type TextContentBlock, type TextContentBlockParam, type TextDelta, type TextDeltaBlock, type MessageCreateParams, type MessageRetrieveParams, type MessageUpdateParams, type MessageListParams, type MessageDeleteParams, type MessagesPage } from './messages';;
+export {
+  Messages,
+  type Annotation,
+  type AnnotationDelta,
+  type FileCitationAnnotation,
+  type FileCitationDeltaAnnotation,
+  type FilePathAnnotation,
+  type FilePathDeltaAnnotation,
+  type ImageFile,
+  type ImageFileContentBlock,
+  type ImageFileDelta,
+  type ImageFileDeltaBlock,
+  type ImageURL,
+  type ImageURLContentBlock,
+  type ImageURLDelta,
+  type ImageURLDeltaBlock,
+  type Message,
+  type MessageContent,
+  type MessageContentDelta,
+  type MessageContentPartParam,
+  type MessageDeleted,
+  type MessageDelta,
+  type MessageDeltaEvent,
+  type RefusalContentBlock,
+  type RefusalDeltaBlock,
+  type Text,
+  type TextContentBlock,
+  type TextContentBlockParam,
+  type TextDelta,
+  type TextDeltaBlock,
+  type MessageCreateParams,
+  type MessageRetrieveParams,
+  type MessageUpdateParams,
+  type MessageListParams,
+  type MessageDeleteParams,
+  type MessagesPage,
+} from './messages';
 export {
   Runs,
   type RequiredActionFunctionToolCall,
@@ -22,7 +58,7 @@ export {
   type RunStreamParams,
   type RunSubmitToolOutputsAndPollParams,
   type RunSubmitToolOutputsStreamParams,
-} from './runs/index';;
+} from './runs/index';
 export {
   Threads,
   type AssistantResponseFormatOption,
@@ -38,4 +74,4 @@ export {
   type ThreadCreateAndRunParamsStreaming,
   type ThreadCreateAndRunPollParams,
   type ThreadCreateAndRunStreamParams,
-} from './threads';;
+} from './threads';

@@ -2,16 +2,19 @@
 
 import OpenAI from 'openai';
 
-const client = new OpenAI({ apiKey: 'My API Key', baseURL: process.env["TEST_API_BASE_URL"] ?? 'http://127.0.0.1:4010' });
+const client = new OpenAI({
+  apiKey: 'My API Key',
+  baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
+});
 
 describe('resource uploads', () => {
   test('create: only required params', async () => {
     const responsePromise = client.uploads.create({
-    bytes: 0,
-    filename: 'filename',
-    mime_type: 'mime_type',
-    purpose: 'assistants',
-  });
+      bytes: 0,
+      filename: 'filename',
+      mime_type: 'mime_type',
+      purpose: 'assistants',
+    });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -23,12 +26,12 @@ describe('resource uploads', () => {
 
   test('create: required and optional params', async () => {
     const response = await client.uploads.create({
-    bytes: 0,
-    filename: 'filename',
-    mime_type: 'mime_type',
-    purpose: 'assistants',
-    expires_after: { anchor: 'created_at', seconds: 3600 },
-  });
+      bytes: 0,
+      filename: 'filename',
+      mime_type: 'mime_type',
+      purpose: 'assistants',
+      expires_after: { anchor: 'created_at', seconds: 3600 },
+    });
   });
 
   test('cancel', async () => {

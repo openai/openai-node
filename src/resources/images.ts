@@ -23,7 +23,10 @@ export class Images extends APIResource {
    * ```
    */
   createVariation(body: ImageCreateVariationParams, options?: RequestOptions): APIPromise<ImagesResponse> {
-    return this._client.post('/images/variations', multipartFormRequestOptions({ body, ...options }, this._client));
+    return this._client.post(
+      '/images/variations',
+      multipartFormRequestOptions({ body, ...options }, this._client),
+    );
   }
 
   /**
@@ -39,11 +42,20 @@ export class Images extends APIResource {
    * });
    * ```
    */
-  edit(body: ImageEditParamsNonStreaming, options?: RequestOptions): APIPromise<ImagesResponse>
-  edit(body: ImageEditParamsStreaming, options?: RequestOptions): APIPromise<Stream<ImageEditStreamEvent>>
-  edit(body: ImageEditParamsBase, options?: RequestOptions): APIPromise<Stream<ImageEditStreamEvent> | ImagesResponse>
-  edit(body: ImageEditParams, options?: RequestOptions): APIPromise<ImagesResponse> | APIPromise<Stream<ImageEditStreamEvent>> {
-    return this._client.post('/images/edits', multipartFormRequestOptions({ body, ...options, stream: body.stream ?? false }, this._client)) as APIPromise<ImagesResponse> | APIPromise<Stream<ImageEditStreamEvent>>;
+  edit(body: ImageEditParamsNonStreaming, options?: RequestOptions): APIPromise<ImagesResponse>;
+  edit(body: ImageEditParamsStreaming, options?: RequestOptions): APIPromise<Stream<ImageEditStreamEvent>>;
+  edit(
+    body: ImageEditParamsBase,
+    options?: RequestOptions,
+  ): APIPromise<Stream<ImageEditStreamEvent> | ImagesResponse>;
+  edit(
+    body: ImageEditParams,
+    options?: RequestOptions,
+  ): APIPromise<ImagesResponse> | APIPromise<Stream<ImageEditStreamEvent>> {
+    return this._client.post(
+      '/images/edits',
+      multipartFormRequestOptions({ body, ...options, stream: body.stream ?? false }, this._client),
+    ) as APIPromise<ImagesResponse> | APIPromise<Stream<ImageEditStreamEvent>>;
   }
 
   /**
@@ -57,11 +69,22 @@ export class Images extends APIResource {
    * });
    * ```
    */
-  generate(body: ImageGenerateParamsNonStreaming, options?: RequestOptions): APIPromise<ImagesResponse>
-  generate(body: ImageGenerateParamsStreaming, options?: RequestOptions): APIPromise<Stream<ImageGenStreamEvent>>
-  generate(body: ImageGenerateParamsBase, options?: RequestOptions): APIPromise<Stream<ImageGenStreamEvent> | ImagesResponse>
-  generate(body: ImageGenerateParams, options?: RequestOptions): APIPromise<ImagesResponse> | APIPromise<Stream<ImageGenStreamEvent>> {
-    return this._client.post('/images/generations', { body, ...options, stream: body.stream ?? false }) as APIPromise<ImagesResponse> | APIPromise<Stream<ImageGenStreamEvent>>;
+  generate(body: ImageGenerateParamsNonStreaming, options?: RequestOptions): APIPromise<ImagesResponse>;
+  generate(
+    body: ImageGenerateParamsStreaming,
+    options?: RequestOptions,
+  ): APIPromise<Stream<ImageGenStreamEvent>>;
+  generate(
+    body: ImageGenerateParamsBase,
+    options?: RequestOptions,
+  ): APIPromise<Stream<ImageGenStreamEvent> | ImagesResponse>;
+  generate(
+    body: ImageGenerateParams,
+    options?: RequestOptions,
+  ): APIPromise<ImagesResponse> | APIPromise<Stream<ImageGenStreamEvent>> {
+    return this._client.post('/images/generations', { body, ...options, stream: body.stream ?? false }) as
+      | APIPromise<ImagesResponse>
+      | APIPromise<Stream<ImageGenStreamEvent>>;
   }
 }
 
@@ -228,7 +251,7 @@ export interface ImageEditPartialImageEvent {
 /**
  * Emitted when a partial image is available during image editing streaming.
  */
-export type ImageEditStreamEvent = ImageEditPartialImageEvent | ImageEditCompletedEvent
+export type ImageEditStreamEvent = ImageEditPartialImageEvent | ImageEditCompletedEvent;
 
 /**
  * Emitted when image generation has completed and the final image is available.
@@ -369,9 +392,9 @@ export interface ImageGenPartialImageEvent {
 /**
  * Emitted when a partial image is available during image generation streaming.
  */
-export type ImageGenStreamEvent = ImageGenPartialImageEvent | ImageGenCompletedEvent
+export type ImageGenStreamEvent = ImageGenPartialImageEvent | ImageGenCompletedEvent;
 
-export type ImageModel = 'gpt-image-1.5' | 'dall-e-2' | 'dall-e-3' | 'gpt-image-1' | 'gpt-image-1-mini'
+export type ImageModel = 'gpt-image-1.5' | 'dall-e-2' | 'dall-e-3' | 'gpt-image-1' | 'gpt-image-1-mini';
 
 /**
  * The response from the image generation endpoint.
@@ -518,7 +541,7 @@ export interface ImageCreateVariationParams {
   user?: string;
 }
 
-export type ImageEditParams = ImageEditParamsNonStreaming | ImageEditParamsStreaming
+export type ImageEditParams = ImageEditParamsNonStreaming | ImageEditParamsStreaming;
 
 export interface ImageEditParamsBase {
   /**
@@ -638,8 +661,8 @@ export interface ImageEditParamsBase {
 }
 
 export namespace ImageEditParams {
-  export type ImageEditParamsNonStreaming = ImagesAPI.ImageEditParamsNonStreaming
-  export type ImageEditParamsStreaming = ImagesAPI.ImageEditParamsStreaming
+  export type ImageEditParamsNonStreaming = ImagesAPI.ImageEditParamsNonStreaming;
+  export type ImageEditParamsStreaming = ImagesAPI.ImageEditParamsStreaming;
 }
 
 export interface ImageEditParamsNonStreaming extends ImageEditParamsBase {
@@ -660,7 +683,7 @@ export interface ImageEditParamsStreaming extends ImageEditParamsBase {
   stream: true;
 }
 
-export type ImageGenerateParams = ImageGenerateParamsNonStreaming | ImageGenerateParamsStreaming
+export type ImageGenerateParams = ImageGenerateParamsNonStreaming | ImageGenerateParamsStreaming;
 
 export interface ImageGenerateParamsBase {
   /**
@@ -749,7 +772,16 @@ export interface ImageGenerateParamsBase {
    * models, one of `256x256`, `512x512`, or `1024x1024` for `dall-e-2`, and one of
    * `1024x1024`, `1792x1024`, or `1024x1792` for `dall-e-3`.
    */
-  size?: 'auto' | '1024x1024' | '1536x1024' | '1024x1536' | '256x256' | '512x512' | '1792x1024' | '1024x1792' | null;
+  size?:
+    | 'auto'
+    | '1024x1024'
+    | '1536x1024'
+    | '1024x1536'
+    | '256x256'
+    | '512x512'
+    | '1792x1024'
+    | '1024x1792'
+    | null;
 
   /**
    * Generate the image in streaming mode. Defaults to `false`. See the
@@ -775,8 +807,8 @@ export interface ImageGenerateParamsBase {
 }
 
 export namespace ImageGenerateParams {
-  export type ImageGenerateParamsNonStreaming = ImagesAPI.ImageGenerateParamsNonStreaming
-  export type ImageGenerateParamsStreaming = ImagesAPI.ImageGenerateParamsStreaming
+  export type ImageGenerateParamsNonStreaming = ImagesAPI.ImageGenerateParamsNonStreaming;
+  export type ImageGenerateParamsStreaming = ImagesAPI.ImageGenerateParamsStreaming;
 }
 
 export interface ImageGenerateParamsNonStreaming extends ImageGenerateParamsBase {
@@ -814,6 +846,6 @@ export declare namespace Images {
     type ImageEditParamsStreaming as ImageEditParamsStreaming,
     type ImageGenerateParams as ImageGenerateParams,
     type ImageGenerateParamsNonStreaming as ImageGenerateParamsNonStreaming,
-    type ImageGenerateParamsStreaming as ImageGenerateParamsStreaming
+    type ImageGenerateParamsStreaming as ImageGenerateParamsStreaming,
   };
 }

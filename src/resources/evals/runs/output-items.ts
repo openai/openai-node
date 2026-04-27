@@ -14,21 +14,33 @@ export class OutputItems extends APIResource {
   /**
    * Get an evaluation run output item by ID.
    */
-  retrieve(outputItemID: string, params: OutputItemRetrieveParams, options?: RequestOptions): APIPromise<OutputItemRetrieveResponse> {
-    const { eval_id, run_id } = params
+  retrieve(
+    outputItemID: string,
+    params: OutputItemRetrieveParams,
+    options?: RequestOptions,
+  ): APIPromise<OutputItemRetrieveResponse> {
+    const { eval_id, run_id } = params;
     return this._client.get(path`/evals/${eval_id}/runs/${run_id}/output_items/${outputItemID}`, options);
   }
 
   /**
    * Get a list of output items for an evaluation run.
    */
-  list(runID: string, params: OutputItemListParams, options?: RequestOptions): PagePromise<OutputItemListResponsesPage, OutputItemListResponse> {
-    const { eval_id, ...query } = params
-    return this._client.getAPIList(path`/evals/${eval_id}/runs/${runID}/output_items`, CursorPage<OutputItemListResponse>, { query, ...options });
+  list(
+    runID: string,
+    params: OutputItemListParams,
+    options?: RequestOptions,
+  ): PagePromise<OutputItemListResponsesPage, OutputItemListResponse> {
+    const { eval_id, ...query } = params;
+    return this._client.getAPIList(
+      path`/evals/${eval_id}/runs/${runID}/output_items`,
+      CursorPage<OutputItemListResponse>,
+      { query, ...options },
+    );
   }
 }
 
-export type OutputItemListResponsesPage = CursorPage<OutputItemListResponse>
+export type OutputItemListResponsesPage = CursorPage<OutputItemListResponse>;
 
 /**
  * A schema representing an evaluation run output item.
@@ -115,7 +127,7 @@ export namespace OutputItemRetrieveResponse {
      */
     type?: string;
 
-  [k: string]: unknown
+    [k: string]: unknown;
   }
 
   /**
@@ -313,7 +325,7 @@ export namespace OutputItemListResponse {
      */
     type?: string;
 
-  [k: string]: unknown
+    [k: string]: unknown;
   }
 
   /**
@@ -463,6 +475,6 @@ export declare namespace OutputItems {
     type OutputItemListResponse as OutputItemListResponse,
     type OutputItemListResponsesPage as OutputItemListResponsesPage,
     type OutputItemRetrieveParams as OutputItemRetrieveParams,
-    type OutputItemListParams as OutputItemListParams
+    type OutputItemListParams as OutputItemListParams,
   };
 }

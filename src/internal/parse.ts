@@ -28,10 +28,20 @@ export async function defaultParseResponse<T>(
       // that if you set `stream: true` the response type must also be `Stream<T>`
 
       if (props.options.__streamClass) {
-        return props.options.__streamClass.fromSSEResponse(response, props.controller, client, props.options.__synthesizeEventData) as any;
+        return props.options.__streamClass.fromSSEResponse(
+          response,
+          props.controller,
+          client,
+          props.options.__synthesizeEventData,
+        ) as any;
       }
 
-      return Stream.fromSSEResponse(response, props.controller, client, props.options.__synthesizeEventData) as any;
+      return Stream.fromSSEResponse(
+        response,
+        props.controller,
+        client,
+        props.options.__synthesizeEventData,
+      ) as any;
     }
 
     // fetch refuses to read the body when the status code is 204.
@@ -60,7 +70,16 @@ export async function defaultParseResponse<T>(
     const text = await response.text();
     return text as unknown as T;
   })();
-  loggerFor(client).debug(`[${requestLogID}] response parsed`, formatRequestDetails({ retryOfRequestLogID, url: response.url, status: response.status, body, durationMs: Date.now() - startTime }));
+  loggerFor(client).debug(
+    `[${requestLogID}] response parsed`,
+    formatRequestDetails({
+      retryOfRequestLogID,
+      url: response.url,
+      status: response.status,
+      body,
+      durationMs: Date.now() - startTime,
+    }),
+  );
   return body;
 }
 

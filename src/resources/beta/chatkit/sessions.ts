@@ -21,7 +21,11 @@ export class Sessions extends APIResource {
    * ```
    */
   create(body: SessionCreateParams, options?: RequestOptions): APIPromise<ThreadsAPI.ChatSession> {
-    return this._client.post('/chatkit/sessions', { body, ...options, headers: buildHeaders([{'OpenAI-Beta': 'chatkit_beta=v1'}, options?.headers]) });
+    return this._client.post('/chatkit/sessions', {
+      body,
+      ...options,
+      headers: buildHeaders([{ 'OpenAI-Beta': 'chatkit_beta=v1' }, options?.headers]),
+    });
   }
 
   /**
@@ -36,7 +40,10 @@ export class Sessions extends APIResource {
    * ```
    */
   cancel(sessionID: string, options?: RequestOptions): APIPromise<ThreadsAPI.ChatSession> {
-    return this._client.post(path`/chatkit/sessions/${sessionID}/cancel`, { ...options, headers: buildHeaders([{'OpenAI-Beta': 'chatkit_beta=v1'}, options?.headers]) });
+    return this._client.post(path`/chatkit/sessions/${sessionID}/cancel`, {
+      ...options,
+      headers: buildHeaders([{ 'OpenAI-Beta': 'chatkit_beta=v1' }, options?.headers]),
+    });
   }
 }
 
@@ -70,7 +77,5 @@ export interface SessionCreateParams {
 }
 
 export declare namespace Sessions {
-  export {
-    type SessionCreateParams as SessionCreateParams
-  };
+  export { type SessionCreateParams as SessionCreateParams };
 }

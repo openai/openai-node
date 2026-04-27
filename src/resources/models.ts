@@ -36,7 +36,7 @@ export class Models extends APIResource {
 }
 
 // Note: no pagination actually occurs yet, this is for forwards-compatibility.
-export type ModelsPage = Page<Model>
+export type ModelsPage = Page<Model>;
 
 /**
  * Describes an OpenAI model offering that can be used with the API.
@@ -72,9 +72,5 @@ export interface ModelDeleted {
 }
 
 export declare namespace Models {
-  export {
-    type Model as Model,
-    type ModelDeleted as ModelDeleted,
-    type ModelsPage as ModelsPage
-  };
+  export { type Model as Model, type ModelDeleted as ModelDeleted, type ModelsPage as ModelsPage };
 }

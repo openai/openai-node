@@ -21,7 +21,11 @@ export class Calls extends APIResource {
    * ```
    */
   accept(callID: string, body: CallAcceptParams, options?: RequestOptions): APIPromise<void> {
-    return this._client.post(path`/realtime/calls/${callID}/accept`, { body, ...options, headers: buildHeaders([{Accept: '*/*'}, options?.headers]) });
+    return this._client.post(path`/realtime/calls/${callID}/accept`, {
+      body,
+      ...options,
+      headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
+    });
   }
 
   /**
@@ -33,7 +37,10 @@ export class Calls extends APIResource {
    * ```
    */
   hangup(callID: string, options?: RequestOptions): APIPromise<void> {
-    return this._client.post(path`/realtime/calls/${callID}/hangup`, { ...options, headers: buildHeaders([{Accept: '*/*'}, options?.headers]) });
+    return this._client.post(path`/realtime/calls/${callID}/hangup`, {
+      ...options,
+      headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
+    });
   }
 
   /**
@@ -47,7 +54,11 @@ export class Calls extends APIResource {
    * ```
    */
   refer(callID: string, body: CallReferParams, options?: RequestOptions): APIPromise<void> {
-    return this._client.post(path`/realtime/calls/${callID}/refer`, { body, ...options, headers: buildHeaders([{Accept: '*/*'}, options?.headers]) });
+    return this._client.post(path`/realtime/calls/${callID}/refer`, {
+      body,
+      ...options,
+      headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
+    });
   }
 
   /**
@@ -58,8 +69,16 @@ export class Calls extends APIResource {
    * await client.realtime.calls.reject('call_id');
    * ```
    */
-  reject(callID: string, body: CallRejectParams | null | undefined = {}, options?: RequestOptions): APIPromise<void> {
-    return this._client.post(path`/realtime/calls/${callID}/reject`, { body, ...options, headers: buildHeaders([{Accept: '*/*'}, options?.headers]) });
+  reject(
+    callID: string,
+    body: CallRejectParams | null | undefined = {},
+    options?: RequestOptions,
+  ): APIPromise<void> {
+    return this._client.post(path`/realtime/calls/${callID}/reject`, {
+      body,
+      ...options,
+      headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
+    });
   }
 }
 
@@ -107,7 +126,24 @@ export interface CallAcceptParams {
   /**
    * The Realtime model used for this session.
    */
-  model?: (string & {}) | 'gpt-realtime' | 'gpt-realtime-1.5' | 'gpt-realtime-2025-08-28' | 'gpt-4o-realtime-preview' | 'gpt-4o-realtime-preview-2024-10-01' | 'gpt-4o-realtime-preview-2024-12-17' | 'gpt-4o-realtime-preview-2025-06-03' | 'gpt-4o-mini-realtime-preview' | 'gpt-4o-mini-realtime-preview-2024-12-17' | 'gpt-realtime-mini' | 'gpt-realtime-mini-2025-10-06' | 'gpt-realtime-mini-2025-12-15' | 'gpt-audio-1.5' | 'gpt-audio-mini' | 'gpt-audio-mini-2025-10-06' | 'gpt-audio-mini-2025-12-15';
+  model?:
+    | (string & {})
+    | 'gpt-realtime'
+    | 'gpt-realtime-1.5'
+    | 'gpt-realtime-2025-08-28'
+    | 'gpt-4o-realtime-preview'
+    | 'gpt-4o-realtime-preview-2024-10-01'
+    | 'gpt-4o-realtime-preview-2024-12-17'
+    | 'gpt-4o-realtime-preview-2025-06-03'
+    | 'gpt-4o-mini-realtime-preview'
+    | 'gpt-4o-mini-realtime-preview-2024-12-17'
+    | 'gpt-realtime-mini'
+    | 'gpt-realtime-mini-2025-10-06'
+    | 'gpt-realtime-mini-2025-12-15'
+    | 'gpt-audio-1.5'
+    | 'gpt-audio-mini'
+    | 'gpt-audio-mini-2025-10-06'
+    | 'gpt-audio-mini-2025-12-15';
 
   /**
    * The set of modalities the model can respond with. It defaults to `["audio"]`,
@@ -188,6 +224,6 @@ export declare namespace Calls {
   export {
     type CallAcceptParams as CallAcceptParams,
     type CallReferParams as CallReferParams,
-    type CallRejectParams as CallRejectParams
+    type CallRejectParams as CallRejectParams,
   };
 }

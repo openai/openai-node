@@ -2,7 +2,10 @@
 
 import OpenAI from 'openai';
 
-const client = new OpenAI({ apiKey: 'My API Key', baseURL: process.env["TEST_API_BASE_URL"] ?? 'http://127.0.0.1:4010' });
+const client = new OpenAI({
+  apiKey: 'My API Key',
+  baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
+});
 
 describe('resource threads', () => {
   test('retrieve', async () => {
@@ -29,15 +32,18 @@ describe('resource threads', () => {
 
   test('list: request options and params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(client.beta.chatkit.threads.list({
-    after: 'after',
-    before: 'before',
-    limit: 0,
-    order: 'asc',
-    user: 'x',
-  }, { path: '/_stainless_unknown_path' }))
-      .rejects
-      .toThrow(OpenAI.NotFoundError);
+    await expect(
+      client.beta.chatkit.threads.list(
+        {
+          after: 'after',
+          before: 'before',
+          limit: 0,
+          order: 'asc',
+          user: 'x',
+        },
+        { path: '/_stainless_unknown_path' },
+      ),
+    ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
   test('delete', async () => {
@@ -64,13 +70,17 @@ describe('resource threads', () => {
 
   test('listItems: request options and params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(client.beta.chatkit.threads.listItems('cthr_123', {
-    after: 'after',
-    before: 'before',
-    limit: 0,
-    order: 'asc',
-  }, { path: '/_stainless_unknown_path' }))
-      .rejects
-      .toThrow(OpenAI.NotFoundError);
+    await expect(
+      client.beta.chatkit.threads.listItems(
+        'cthr_123',
+        {
+          after: 'after',
+          before: 'before',
+          limit: 0,
+          order: 'asc',
+        },
+        { path: '/_stainless_unknown_path' },
+      ),
+    ).rejects.toThrow(OpenAI.NotFoundError);
   });
 });

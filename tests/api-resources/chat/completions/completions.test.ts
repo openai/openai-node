@@ -2,11 +2,17 @@
 
 import OpenAI from 'openai';
 
-const client = new OpenAI({ apiKey: 'My API Key', baseURL: process.env["TEST_API_BASE_URL"] ?? 'http://127.0.0.1:4010' });
+const client = new OpenAI({
+  apiKey: 'My API Key',
+  baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
+});
 
 describe('resource completions', () => {
   test('create: only required params', async () => {
-    const responsePromise = client.chat.completions.create({ messages: [{ content: 'string', role: 'developer' }], model: 'gpt-5.4' });
+    const responsePromise = client.chat.completions.create({
+      messages: [{ content: 'string', role: 'developer' }],
+      model: 'gpt-5.4',
+    });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -18,69 +24,75 @@ describe('resource completions', () => {
 
   test('create: required and optional params', async () => {
     const response = await client.chat.completions.create({
-    messages: [{
-    content: 'string',
-    role: 'developer',
-    name: 'name',
-  }],
-    model: 'gpt-5.4',
-    audio: { format: 'wav', voice: 'alloy' },
-    frequency_penalty: -2,
-    function_call: 'none',
-    functions: [{
-    name: 'name',
-    description: 'description',
-    parameters: { foo: 'bar' },
-  }],
-    logit_bias: { foo: 0 },
-    logprobs: true,
-    max_completion_tokens: 0,
-    max_tokens: 0,
-    metadata: { foo: 'string' },
-    modalities: ['text'],
-    n: 1,
-    parallel_tool_calls: true,
-    prediction: { content: 'string', type: 'content' },
-    presence_penalty: -2,
-    prompt_cache_key: 'prompt-cache-key-1234',
-    prompt_cache_retention: 'in_memory',
-    reasoning_effort: 'none',
-    response_format: { type: 'text' },
-    safety_identifier: 'safety-identifier-1234',
-    seed: -9007199254740991,
-    service_tier: 'auto',
-    stop: '\n',
-    store: true,
-    stream: false,
-    stream_options: { include_obfuscation: true, include_usage: true },
-    temperature: 1,
-    tool_choice: 'none',
-    tools: [{
-    function: {
-    name: 'name',
-    description: 'description',
-    parameters: { foo: 'bar' },
-    strict: true,
-  },
-    type: 'function',
-  }],
-    top_logprobs: 0,
-    top_p: 1,
-    user: 'user-1234',
-    verbosity: 'low',
-    web_search_options: {
-    search_context_size: 'low',
-    user_location: {
-    approximate: {
-    city: 'city',
-    country: 'country',
-    region: 'region',
-    timezone: 'timezone',
-  },
-    type: 'approximate',
-  },
-  },
-  });
+      messages: [
+        {
+          content: 'string',
+          role: 'developer',
+          name: 'name',
+        },
+      ],
+      model: 'gpt-5.4',
+      audio: { format: 'wav', voice: 'alloy' },
+      frequency_penalty: -2,
+      function_call: 'none',
+      functions: [
+        {
+          name: 'name',
+          description: 'description',
+          parameters: { foo: 'bar' },
+        },
+      ],
+      logit_bias: { foo: 0 },
+      logprobs: true,
+      max_completion_tokens: 0,
+      max_tokens: 0,
+      metadata: { foo: 'string' },
+      modalities: ['text'],
+      n: 1,
+      parallel_tool_calls: true,
+      prediction: { content: 'string', type: 'content' },
+      presence_penalty: -2,
+      prompt_cache_key: 'prompt-cache-key-1234',
+      prompt_cache_retention: 'in_memory',
+      reasoning_effort: 'none',
+      response_format: { type: 'text' },
+      safety_identifier: 'safety-identifier-1234',
+      seed: -9007199254740991,
+      service_tier: 'auto',
+      stop: '\n',
+      store: true,
+      stream: false,
+      stream_options: { include_obfuscation: true, include_usage: true },
+      temperature: 1,
+      tool_choice: 'none',
+      tools: [
+        {
+          function: {
+            name: 'name',
+            description: 'description',
+            parameters: { foo: 'bar' },
+            strict: true,
+          },
+          type: 'function',
+        },
+      ],
+      top_logprobs: 0,
+      top_p: 1,
+      user: 'user-1234',
+      verbosity: 'low',
+      web_search_options: {
+        search_context_size: 'low',
+        user_location: {
+          approximate: {
+            city: 'city',
+            country: 'country',
+            region: 'region',
+            timezone: 'timezone',
+          },
+          type: 'approximate',
+        },
+      },
+    });
   });
 
   test('retrieve', async () => {
@@ -122,15 +134,18 @@ describe('resource completions', () => {
 
   test('list: request options and params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(client.chat.completions.list({
-    after: 'after',
-    limit: 0,
-    metadata: { foo: 'string' },
-    model: 'model',
-    order: 'asc',
-  }, { path: '/_stainless_unknown_path' }))
-      .rejects
-      .toThrow(OpenAI.NotFoundError);
+    await expect(
+      client.chat.completions.list(
+        {
+          after: 'after',
+          limit: 0,
+          metadata: { foo: 'string' },
+          model: 'model',
+          order: 'asc',
+        },
+        { path: '/_stainless_unknown_path' },
+      ),
+    ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
   test('delete', async () => {

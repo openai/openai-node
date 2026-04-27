@@ -78,15 +78,12 @@ export type RequestOptions = {
 
   __metadata?: Record<string, unknown>;
   __binaryResponse?: boolean | undefined;
-  __streamClass?: typeof Stream
-  __synthesizeEventData?: boolean
+  __streamClass?: typeof Stream;
+  __synthesizeEventData?: boolean;
 };
 
 export type EncodedContent = { bodyHeaders: HeadersLike; body: BodyInit };
-export type RequestEncoder = (request: {
-  headers: NullableHeaders;
-  body: unknown;
-}) => EncodedContent;
+export type RequestEncoder = (request: { headers: NullableHeaders; body: unknown }) => EncodedContent;
 
 export const FallbackEncoder: RequestEncoder = ({ headers, body }) => {
   return {
