@@ -1,6 +1,6 @@
 {
   "name": "@openai/openai",
-  "version": "6.34.0",
+  "version": "6.35.0",
   "exports": {
     ".": "./index.ts",
     "./helpers/zod": "./helpers/zod.ts",
@@ -10,6 +10,8 @@
     "zod": "npm:zod@3"
   },
   "publish": {
-    "exclude": ["!."]
+    "exclude": [
+      "!."
+    ]
   }
 }

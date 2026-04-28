@@ -1,5 +1,49 @@
 # Changelog
 
+## 6.35.0 (2026-04-28)
+
+Full Changelog: [v6.34.0...v6.35.0](https://github.com/openai/openai-node/compare/v6.34.0...v6.35.0)
+
+### Features
+
+* **api:** Add detail to InputFileContent ([910ec5d](https://github.com/openai/openai-node/commit/910ec5d3b7c551eee367f0b10e84856b9eb171eb))
+* **api:** add OAuthErrorCode type ([f84bd1f](https://github.com/openai/openai-node/commit/f84bd1ff47b61e7a5c9b7130f1b6dfd062178501))
+* **api:** add prompt_cache_retention parameter to responses compact ([c486d1f](https://github.com/openai/openai-node/commit/c486d1f05558e4b082e18dd0ddc7b0685def8c84))
+* **api:** add web_search_call.results to ResponseIncludable ([72449a1](https://github.com/openai/openai-node/commit/72449a193fb32dcfd32993f4a01024eed946dc09))
+* **api:** manual updates ([b742f1f](https://github.com/openai/openai-node/commit/b742f1fbd5c03dda8ba20d1ecca35dbc95bf53d8))
+* **client:** add support for binary messages ([c498cc3](https://github.com/openai/openai-node/commit/c498cc344f49a6ae0382197a6bcc3c22a2af61ff))
+* **client:** add support for path parameters in websockets clients ([e0aba70](https://github.com/openai/openai-node/commit/e0aba7070fa35065aa0093bda02198bd87e7ef9e))
+* **client:** add support for queuing messages when waiting for a connection ([fd8868c](https://github.com/openai/openai-node/commit/fd8868ce76cbc601bd6198f43f5ff47ff0118e67))
+* **client:** add support for WebSockets in the browser when using simple auth ([27bda6a](https://github.com/openai/openai-node/commit/27bda6a4f3fc63469d0b9acd2ef08aa0bf6b8fa8))
+* **client:** support automatic reconnection for websockets ([189410b](https://github.com/openai/openai-node/commit/189410b4765111d8174e815142057ac0e48e8f7e))
+* **typescript:** expose underlying WebSocket type ([7e96939](https://github.com/openai/openai-node/commit/7e96939f5732f658751792038aae1b13a9f21d72))
+
+
+### Bug Fixes
+
+* **client:** allow single messages greater than the size of the websockets queue ([ad19ab2](https://github.com/openai/openai-node/commit/ad19ab2495194eb3a9d81d4390ec3a0e6c0c4395))
+* **internal:** gitignore generated `oidc` dir ([cf860f6](https://github.com/openai/openai-node/commit/cf860f62c0fcc3c1fcbcb95505fec4301b6481ea))
+* **types:** correct prompt_cache_retention enum value in chat/completions and responses ([5a81e1a](https://github.com/openai/openai-node/commit/5a81e1a66eb5450de50da4a49d977bd1daab4552))
+* **types:** preserve emitted ts-ignore comments ([1cde375](https://github.com/openai/openai-node/commit/1cde375c4faecc6e1cde7be782919fa243b1a141))
+
+
+### Chores
+
+* **ci:** remove release-doctor workflow ([e5ab4d1](https://github.com/openai/openai-node/commit/e5ab4d1a056f2223c0756b332f9635476c644c3f))
+* **format:** apply prettier output ([80fa23d](https://github.com/openai/openai-node/commit/80fa23d5ccfd39e51e090e0044d91866a418d212))
+* **format:** ignore release-updated jsr config ([f606e8b](https://github.com/openai/openai-node/commit/f606e8b43d0e3d5a3ad31cf7dab1bded0bac4d37))
+* **formatter:** run prettier and eslint separately ([68a988e](https://github.com/openai/openai-node/commit/68a988e3919c2e8da7949fe75ae143790025964d))
+* **internal:** codegen related update ([7673137](https://github.com/openai/openai-node/commit/7673137d3004226dc0e8daa96f85e8a5c459b7e3))
+* **internal:** fix package.json duplicate keys ([5f075a8](https://github.com/openai/openai-node/commit/5f075a80dc0a4c7ed4550cf718a576e638a7bc9f))
+* **internal:** more robust bootstrap script ([252e70a](https://github.com/openai/openai-node/commit/252e70a2f5e78f9162a99f9ac5adfc581e47e290))
+* **internal:** version bump ([34c84ee](https://github.com/openai/openai-node/commit/34c84eec2f9110746008628b90429c8fd5111157))
+* **tests:** bump steady to v0.22.1 ([316bdba](https://github.com/openai/openai-node/commit/316bdbaeb77a8d2a56c5b13a7b576163e2515951))
+
+
+### Documentation
+
+* improve examples ([6400d19](https://github.com/openai/openai-node/commit/6400d19ee8f44abb862f0c3d2d15d91e51f0741b))
+
 ## 6.34.0 (2026-04-08)
 
 Full Changelog: [v6.33.0...v6.34.0](https://github.com/openai/openai-node/compare/v6.33.0...v6.34.0)
