@@ -1120,7 +1120,7 @@ export interface Response {
    * of 24 hours.
    * [Learn more](https://platform.openai.com/docs/guides/prompt-caching#prompt-cache-retention).
    */
-  prompt_cache_retention?: 'in-memory' | '24h' | null;
+  prompt_cache_retention?: 'in_memory' | '24h' | null;
 
   /**
    * **gpt-5 and o-series models only**
@@ -6551,7 +6551,7 @@ export interface ResponsesClientEvent {
    * of 24 hours.
    * [Learn more](https://platform.openai.com/docs/guides/prompt-caching#prompt-cache-retention).
    */
-  prompt_cache_retention?: 'in-memory' | '24h' | null;
+  prompt_cache_retention?: 'in_memory' | '24h' | null;
 
   /**
    * **gpt-5 and o-series models only**
@@ -7571,7 +7571,7 @@ export interface ResponseCreateParamsBase {
    * of 24 hours.
    * [Learn more](https://platform.openai.com/docs/guides/prompt-caching#prompt-cache-retention).
    */
-  prompt_cache_retention?: 'in-memory' | '24h' | null;
+  prompt_cache_retention?: 'in_memory' | '24h' | null;
 
   /**
    * **gpt-5 and o-series models only**
