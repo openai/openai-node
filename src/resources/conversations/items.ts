@@ -29,6 +29,7 @@ export class Items extends APIResource {
       query: { include },
       body,
       ...options,
+      __security: { bearerAuth: true },
     });
   }
 
@@ -41,7 +42,11 @@ export class Items extends APIResource {
     options?: RequestOptions,
   ): APIPromise<ConversationItem> {
     const { conversation_id, ...query } = params;
-    return this._client.get(path`/conversations/${conversation_id}/items/${itemID}`, { query, ...options });
+    return this._client.get(path`/conversations/${conversation_id}/items/${itemID}`, {
+      query,
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
@@ -55,7 +60,7 @@ export class Items extends APIResource {
     return this._client.getAPIList(
       path`/conversations/${conversationID}/items`,
       ConversationCursorPage<ConversationItem>,
-      { query, ...options },
+      { query, ...options, __security: { bearerAuth: true } },
     );
   }
 
@@ -68,7 +73,10 @@ export class Items extends APIResource {
     options?: RequestOptions,
   ): APIPromise<ConversationsAPI.Conversation> {
     const { conversation_id } = params;
-    return this._client.delete(path`/conversations/${conversation_id}/items/${itemID}`, options);
+    return this._client.delete(path`/conversations/${conversation_id}/items/${itemID}`, {
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 }
 

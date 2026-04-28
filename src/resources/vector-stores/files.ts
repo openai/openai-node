@@ -23,6 +23,7 @@ export class Files extends APIResource {
       body,
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -38,6 +39,7 @@ export class Files extends APIResource {
     return this._client.get(path`/vector_stores/${vector_store_id}/files/${fileID}`, {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -50,6 +52,7 @@ export class Files extends APIResource {
       body,
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -65,6 +68,7 @@ export class Files extends APIResource {
       query,
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -83,6 +87,7 @@ export class Files extends APIResource {
     return this._client.delete(path`/vector_stores/${vector_store_id}/files/${fileID}`, {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -98,7 +103,11 @@ export class Files extends APIResource {
     return this._client.getAPIList(
       path`/vector_stores/${vector_store_id}/files/${fileID}/content`,
       Page<FileContentResponse>,
-      { ...options, headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]) },
+      {
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      },
     );
   }
 }

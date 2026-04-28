@@ -33,7 +33,7 @@ export class Messages extends APIResource {
     return this._client.getAPIList(
       path`/chat/completions/${completionID}/messages`,
       CursorPage<CompletionsAPI.ChatCompletionStoreMessage>,
-      { query, ...options },
+      { query, ...options, __security: { bearerAuth: true } },
     );
   }
 }

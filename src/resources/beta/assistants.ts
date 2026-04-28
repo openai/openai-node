@@ -26,6 +26,7 @@ export class Assistants extends APIResource {
       body,
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -38,6 +39,7 @@ export class Assistants extends APIResource {
     return this._client.get(path`/assistants/${assistantID}`, {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -51,6 +53,7 @@ export class Assistants extends APIResource {
       body,
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -67,6 +70,7 @@ export class Assistants extends APIResource {
       query,
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -79,6 +83,7 @@ export class Assistants extends APIResource {
     return this._client.delete(path`/assistants/${assistantID}`, {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 }

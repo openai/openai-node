@@ -49,9 +49,12 @@ export class Responses extends APIResource {
     body: ResponseCreateParams,
     options?: RequestOptions,
   ): APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>> {
-    return this._client.post('/responses', { body, ...options, stream: body.stream ?? false }) as
-      | APIPromise<Response>
-      | APIPromise<Stream<ResponseStreamEvent>>;
+    return this._client.post('/responses', {
+      body,
+      ...options,
+      stream: body.stream ?? false,
+      __security: { bearerAuth: true },
+    }) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>;
   }
 
   /**
@@ -88,6 +91,7 @@ export class Responses extends APIResource {
       query,
       ...options,
       stream: query?.stream ?? false,
+      __security: { bearerAuth: true },
     }) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>;
   }
 
@@ -105,6 +109,7 @@ export class Responses extends APIResource {
     return this._client.delete(path`/responses/${responseID}`, {
       ...options,
       headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -121,7 +126,10 @@ export class Responses extends APIResource {
    * ```
    */
   cancel(responseID: string, options?: RequestOptions): APIPromise<Response> {
-    return this._client.post(path`/responses/${responseID}/cancel`, options);
+    return this._client.post(path`/responses/${responseID}/cancel`, {
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
@@ -140,7 +148,7 @@ export class Responses extends APIResource {
    * ```
    */
   compact(body: ResponseCompactParams, options?: RequestOptions): APIPromise<CompactedResponse> {
-    return this._client.post('/responses/compact', { body, ...options });
+    return this._client.post('/responses/compact', { body, ...options, __security: { bearerAuth: true } });
   }
 }
 

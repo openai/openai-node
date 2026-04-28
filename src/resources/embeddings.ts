@@ -21,7 +21,7 @@ export class Embeddings extends APIResource {
    * ```
    */
   create(body: EmbeddingCreateParams, options?: RequestOptions): APIPromise<CreateEmbeddingResponse> {
-    return this._client.post('/embeddings', { body, ...options });
+    return this._client.post('/embeddings', { body, ...options, __security: { bearerAuth: true } });
   }
 }
 

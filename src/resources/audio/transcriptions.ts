@@ -46,7 +46,10 @@ export class Transcriptions extends APIResource {
   ): APIPromise<TranscriptionCreateResponse> | APIPromise<Stream<TranscriptionStreamEvent>> {
     return this._client.post(
       '/audio/transcriptions',
-      multipartFormRequestOptions({ body, ...options, stream: body.stream ?? false }, this._client),
+      multipartFormRequestOptions(
+        { body, ...options, stream: body.stream ?? false, __security: { bearerAuth: true } },
+        this._client,
+      ),
     ) as APIPromise<TranscriptionCreateResponse> | APIPromise<Stream<TranscriptionStreamEvent>>;
   }
 }

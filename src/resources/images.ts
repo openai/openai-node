@@ -25,7 +25,7 @@ export class Images extends APIResource {
   createVariation(body: ImageCreateVariationParams, options?: RequestOptions): APIPromise<ImagesResponse> {
     return this._client.post(
       '/images/variations',
-      multipartFormRequestOptions({ body, ...options }, this._client),
+      multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
     );
   }
 
@@ -54,7 +54,10 @@ export class Images extends APIResource {
   ): APIPromise<ImagesResponse> | APIPromise<Stream<ImageEditStreamEvent>> {
     return this._client.post(
       '/images/edits',
-      multipartFormRequestOptions({ body, ...options, stream: body.stream ?? false }, this._client),
+      multipartFormRequestOptions(
+        { body, ...options, stream: body.stream ?? false, __security: { bearerAuth: true } },
+        this._client,
+      ),
     ) as APIPromise<ImagesResponse> | APIPromise<Stream<ImageEditStreamEvent>>;
   }
 
@@ -82,9 +85,12 @@ export class Images extends APIResource {
     body: ImageGenerateParams,
     options?: RequestOptions,
   ): APIPromise<ImagesResponse> | APIPromise<Stream<ImageGenStreamEvent>> {
-    return this._client.post('/images/generations', { body, ...options, stream: body.stream ?? false }) as
-      | APIPromise<ImagesResponse>
-      | APIPromise<Stream<ImageGenStreamEvent>>;
+    return this._client.post('/images/generations', {
+      body,
+      ...options,
+      stream: body.stream ?? false,
+      __security: { bearerAuth: true },
+    }) as APIPromise<ImagesResponse> | APIPromise<Stream<ImageGenStreamEvent>>;
   }
 }
 

@@ -112,6 +112,7 @@ import {
   Videos,
   VideosPage,
 } from './resources/videos';
+import { Admin } from './resources/admin/admin';
 import { Audio, AudioModel, AudioResponseFormat } from './resources/audio/audio';
 import { Beta } from './resources/beta/beta';
 import { Chat } from './resources/chat/chat';
@@ -242,7 +243,12 @@ export interface ClientOptions {
   /**
    * Defaults to process.env['OPENAI_API_KEY'].
    */
-  apiKey?: string | undefined;
+  apiKey?: string | null | undefined;
+
+  /**
+   * Defaults to process.env['OPENAI_ADMIN_KEY'].
+   */
+  adminAPIKey?: string | null | undefined;
 
   /**
    * Defaults to process.env['OPENAI_ORG_ID'].
@@ -338,7 +344,8 @@ export interface ClientOptions {
  * API Client for interfacing with the OpenAI API.
  */
 export class OpenAI {
-  apiKey: string;
+  apiKey: string | null;
+  adminAPIKey: string | null;
   organization: string | null;
   project: string | null;
   webhookSecret: string | null;
@@ -358,7 +365,8 @@ export class OpenAI {
   /**
    * API Client for interfacing with the OpenAI API.
    *
-   * @param {string | undefined} [opts.apiKey=process.env['OPENAI_API_KEY'] ?? undefined]
+   * @param {string | null | undefined} [opts.apiKey=process.env['OPENAI_API_KEY'] ?? null]
+   * @param {string | null | undefined} [opts.adminAPIKey=process.env['OPENAI_ADMIN_KEY'] ?? null]
    * @param {string | null | undefined} [opts.organization=process.env['OPENAI_ORG_ID'] ?? null]
    * @param {string | null | undefined} [opts.project=process.env['OPENAI_PROJECT_ID'] ?? null]
    * @param {string | null | undefined} [opts.webhookSecret=process.env['OPENAI_WEBHOOK_SECRET'] ?? null]
@@ -373,20 +381,16 @@ export class OpenAI {
    */
   constructor({
     baseURL = readEnv('OPENAI_BASE_URL'),
-    apiKey = readEnv('OPENAI_API_KEY'),
+    apiKey = readEnv('OPENAI_API_KEY') ?? null,
+    adminAPIKey = readEnv('OPENAI_ADMIN_KEY') ?? null,
     organization = readEnv('OPENAI_ORG_ID') ?? null,
     project = readEnv('OPENAI_PROJECT_ID') ?? null,
     webhookSecret = readEnv('OPENAI_WEBHOOK_SECRET') ?? null,
     ...opts
   }: ClientOptions = {}) {
-    if (apiKey === undefined) {
-      throw new Errors.OpenAIError(
-        "The OPENAI_API_KEY environment variable is missing or empty; either provide it, or instantiate the OpenAI client with an apiKey option, like new OpenAI({ apiKey: 'My API Key' }).",
-      );
-    }
-
     const options: ClientOptions = {
       apiKey,
+      adminAPIKey,
       organization,
       project,
       webhookSecret,
@@ -430,6 +434,7 @@ export class OpenAI {
     this._options = options;
 
     this.apiKey = apiKey;
+    this.adminAPIKey = adminAPIKey;
     this.organization = organization;
     this.project = project;
     this.webhookSecret = webhookSecret;
@@ -449,6 +454,7 @@ export class OpenAI {
       fetch: this.fetch,
       fetchOptions: this.fetchOptions,
       apiKey: this.apiKey,
+      adminAPIKey: this.adminAPIKey,
       organization: this.organization,
       project: this.project,
       webhookSecret: this.webhookSecret,
@@ -469,11 +475,47 @@ export class OpenAI {
   }
 
   protected validateHeaders({ values, nulls }: NullableHeaders) {
-    return;
+    if (this.apiKey && values.get('authorization')) {
+      return;
+    }
+    if (nulls.has('authorization')) {
+      return;
+    }
+
+    if (this.adminAPIKey && values.get('authorization')) {
+      return;
+    }
+    if (nulls.has('authorization')) {
+      return;
+    }
+
+    throw new Error(
+      'Could not resolve authentication method. Expected either apiKey or adminAPIKey to be set. Or for one of the "Authorization" or "Authorization" headers to be explicitly omitted',
+    );
   }
 
-  protected async authHeaders(opts: FinalRequestOptions): Promise<NullableHeaders | undefined> {
+  protected async authHeaders(
+    opts: FinalRequestOptions,
+    schemes: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+  ): Promise<NullableHeaders | undefined> {
+    return buildHeaders([
+      schemes.bearerAuth ? await this.bearerAuth(opts) : null,
+      schemes.adminAPIKeyAuth ? await this.adminAPIKeyAuth(opts) : null,
+    ]);
+  }
+
+  protected async bearerAuth(opts: FinalRequestOptions): Promise<NullableHeaders | undefined> {
+    if (this.apiKey == null) {
+      return undefined;
+    }
     return buildHeaders([{ Authorization: `Bearer ${this.apiKey}` }]);
+  }
+
+  protected async adminAPIKeyAuth(opts: FinalRequestOptions): Promise<NullableHeaders | undefined> {
+    if (this.adminAPIKey == null) {
+      return undefined;
+    }
+    return buildHeaders([{ Authorization: `Bearer ${this.adminAPIKey}` }]);
   }
 
   protected stringifyQuery(query: object | Record<string, unknown>): string {
@@ -929,7 +971,7 @@ export class OpenAI {
         'OpenAI-Organization': this.organization,
         'OpenAI-Project': this.project,
       },
-      await this.authHeaders(options),
+      await this.authHeaders(options, options.__security ?? { bearerAuth: true, adminAPIKeyAuth: true }),
       this._options.defaultHeaders,
       bodyHeaders,
       options.headers,
@@ -1049,6 +1091,7 @@ export class OpenAI {
    * Use Uploads to upload large files in multiple parts.
    */
   uploads: API.Uploads = new API.Uploads(this);
+  admin: API.Admin = new API.Admin(this);
   responses: API.Responses = new API.Responses(this);
   realtime: API.Realtime = new API.Realtime(this);
   /**
@@ -1079,6 +1122,7 @@ OpenAI.Webhooks = Webhooks;
 OpenAI.Beta = Beta;
 OpenAI.Batches = Batches;
 OpenAI.Uploads = UploadsAPIUploads;
+OpenAI.Admin = Admin;
 OpenAI.Responses = Responses;
 OpenAI.Realtime = Realtime;
 OpenAI.Conversations = Conversations;
@@ -1263,6 +1307,8 @@ export declare namespace OpenAI {
     type UploadCreateParams as UploadCreateParams,
     type UploadCompleteParams as UploadCompleteParams,
   };
+
+  export { Admin as Admin };
 
   export { Responses as Responses };
 

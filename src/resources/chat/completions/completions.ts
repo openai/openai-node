@@ -63,9 +63,12 @@ export class Completions extends APIResource {
     body: ChatCompletionCreateParams,
     options?: RequestOptions,
   ): APIPromise<ChatCompletion> | APIPromise<Stream<ChatCompletionChunk>> {
-    return this._client.post('/chat/completions', { body, ...options, stream: body.stream ?? false }) as
-      | APIPromise<ChatCompletion>
-      | APIPromise<Stream<ChatCompletionChunk>>;
+    return this._client.post('/chat/completions', {
+      body,
+      ...options,
+      stream: body.stream ?? false,
+      __security: { bearerAuth: true },
+    }) as APIPromise<ChatCompletion> | APIPromise<Stream<ChatCompletionChunk>>;
   }
 
   /**
@@ -79,7 +82,10 @@ export class Completions extends APIResource {
    * ```
    */
   retrieve(completionID: string, options?: RequestOptions): APIPromise<ChatCompletion> {
-    return this._client.get(path`/chat/completions/${completionID}`, options);
+    return this._client.get(path`/chat/completions/${completionID}`, {
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
@@ -100,7 +106,11 @@ export class Completions extends APIResource {
     body: ChatCompletionUpdateParams,
     options?: RequestOptions,
   ): APIPromise<ChatCompletion> {
-    return this._client.post(path`/chat/completions/${completionID}`, { body, ...options });
+    return this._client.post(path`/chat/completions/${completionID}`, {
+      body,
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
@@ -119,7 +129,11 @@ export class Completions extends APIResource {
     query: ChatCompletionListParams | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<ChatCompletionsPage, ChatCompletion> {
-    return this._client.getAPIList('/chat/completions', CursorPage<ChatCompletion>, { query, ...options });
+    return this._client.getAPIList('/chat/completions', CursorPage<ChatCompletion>, {
+      query,
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
@@ -133,7 +147,10 @@ export class Completions extends APIResource {
    * ```
    */
   delete(completionID: string, options?: RequestOptions): APIPromise<ChatCompletionDeleted> {
-    return this._client.delete(path`/chat/completions/${completionID}`, options);
+    return this._client.delete(path`/chat/completions/${completionID}`, {
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 }
 

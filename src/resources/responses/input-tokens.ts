@@ -22,7 +22,11 @@ export class InputTokens extends APIResource {
     body: InputTokenCountParams | null | undefined = {},
     options?: RequestOptions,
   ): APIPromise<InputTokenCountResponse> {
-    return this._client.post('/responses/input_tokens', { body, ...options });
+    return this._client.post('/responses/input_tokens', {
+      body,
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 }
 
