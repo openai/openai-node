@@ -14,14 +14,17 @@ export class Videos extends APIResource {
    * Create a new video generation job from a prompt and optional reference assets.
    */
   create(body: VideoCreateParams, options?: RequestOptions): APIPromise<Video> {
-    return this._client.post('/videos', multipartFormRequestOptions({ body, ...options }, this._client));
+    return this._client.post(
+      '/videos',
+      multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
+    );
   }
 
   /**
    * Fetch the latest metadata for a generated video.
    */
   retrieve(videoID: string, options?: RequestOptions): APIPromise<Video> {
-    return this._client.get(path`/videos/${videoID}`, options);
+    return this._client.get(path`/videos/${videoID}`, { ...options, __security: { bearerAuth: true } });
   }
 
   /**
@@ -31,14 +34,18 @@ export class Videos extends APIResource {
     query: VideoListParams | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<VideosPage, Video> {
-    return this._client.getAPIList('/videos', ConversationCursorPage<Video>, { query, ...options });
+    return this._client.getAPIList('/videos', ConversationCursorPage<Video>, {
+      query,
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
    * Permanently delete a completed or failed video and its stored assets.
    */
   delete(videoID: string, options?: RequestOptions): APIPromise<VideoDeleteResponse> {
-    return this._client.delete(path`/videos/${videoID}`, options);
+    return this._client.delete(path`/videos/${videoID}`, { ...options, __security: { bearerAuth: true } });
   }
 
   /**
@@ -50,7 +57,7 @@ export class Videos extends APIResource {
   ): APIPromise<VideoCreateCharacterResponse> {
     return this._client.post(
       '/videos/characters',
-      multipartFormRequestOptions({ body, ...options }, this._client),
+      multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
     );
   }
 
@@ -68,6 +75,7 @@ export class Videos extends APIResource {
       query,
       ...options,
       headers: buildHeaders([{ Accept: 'application/binary' }, options?.headers]),
+      __security: { bearerAuth: true },
       __binaryResponse: true,
     });
   }
@@ -79,7 +87,7 @@ export class Videos extends APIResource {
   edit(body: VideoEditParams, options?: RequestOptions): APIPromise<Video> {
     return this._client.post(
       '/videos/edits',
-      multipartFormRequestOptions({ body, ...options }, this._client),
+      multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
     );
   }
 
@@ -89,7 +97,7 @@ export class Videos extends APIResource {
   extend(body: VideoExtendParams, options?: RequestOptions): APIPromise<Video> {
     return this._client.post(
       '/videos/extensions',
-      multipartFormRequestOptions({ body, ...options }, this._client),
+      multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
     );
   }
 
@@ -97,7 +105,10 @@ export class Videos extends APIResource {
    * Fetch a character.
    */
   getCharacter(characterID: string, options?: RequestOptions): APIPromise<VideoGetCharacterResponse> {
-    return this._client.get(path`/videos/characters/${characterID}`, options);
+    return this._client.get(path`/videos/characters/${characterID}`, {
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
@@ -106,7 +117,7 @@ export class Videos extends APIResource {
   remix(videoID: string, body: VideoRemixParams, options?: RequestOptions): APIPromise<Video> {
     return this._client.post(
       path`/videos/${videoID}/remix`,
-      maybeMultipartFormRequestOptions({ body, ...options }, this._client),
+      maybeMultipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
     );
   }
 }

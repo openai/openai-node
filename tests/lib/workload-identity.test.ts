@@ -23,10 +23,14 @@ const createTestClientOptions = () => ({
 describe('OpenAI with Workload Identity', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    delete process.env['OPENAI_API_KEY'];
+    delete process.env['OPENAI_ADMIN_KEY'];
   });
 
   afterEach(() => {
     global.fetch = originalFetch;
+    delete process.env['OPENAI_API_KEY'];
+    delete process.env['OPENAI_ADMIN_KEY'];
   });
 
   test('initializes with workloadIdentity', () => {
@@ -47,8 +51,12 @@ describe('OpenAI with Workload Identity', () => {
     ).toThrow(/mutually exclusive/);
   });
 
-  test('requires either apiKey or workloadIdentity', () => {
+  test('requires at least one credential source', () => {
     expect(() => new OpenAI({})).toThrow(/Missing credentials/);
+  });
+
+  test('allows client initialization with adminAPIKey only', () => {
+    expect(() => new OpenAI({ apiKey: null, adminAPIKey: 'my-admin-api-key' })).not.toThrow();
   });
 
   test('injects Authorization header with workload identity token', async () => {

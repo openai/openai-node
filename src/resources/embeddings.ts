@@ -38,6 +38,7 @@ export class Embeddings extends APIResource {
         encoding_format: encoding_format as EmbeddingCreateParams['encoding_format'],
       },
       ...options,
+      __security: { bearerAuth: true },
     });
 
     // if the user specified an encoding_format, return the response as-is

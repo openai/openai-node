@@ -45,14 +45,17 @@ export class Files extends APIResource {
    * storage limits.
    */
   create(body: FileCreateParams, options?: RequestOptions): APIPromise<FileObject> {
-    return this._client.post('/files', multipartFormRequestOptions({ body, ...options }, this._client));
+    return this._client.post(
+      '/files',
+      multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
+    );
   }
 
   /**
    * Returns information about a specific file.
    */
   retrieve(fileID: string, options?: RequestOptions): APIPromise<FileObject> {
-    return this._client.get(path`/files/${fileID}`, options);
+    return this._client.get(path`/files/${fileID}`, { ...options, __security: { bearerAuth: true } });
   }
 
   /**
@@ -62,14 +65,18 @@ export class Files extends APIResource {
     query: FileListParams | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<FileObjectsPage, FileObject> {
-    return this._client.getAPIList('/files', CursorPage<FileObject>, { query, ...options });
+    return this._client.getAPIList('/files', CursorPage<FileObject>, {
+      query,
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
    * Delete a file and remove it from all vector stores.
    */
   delete(fileID: string, options?: RequestOptions): APIPromise<FileDeleted> {
-    return this._client.delete(path`/files/${fileID}`, options);
+    return this._client.delete(path`/files/${fileID}`, { ...options, __security: { bearerAuth: true } });
   }
 
   /**
@@ -79,6 +86,7 @@ export class Files extends APIResource {
     return this._client.get(path`/files/${fileID}/content`, {
       ...options,
       headers: buildHeaders([{ Accept: 'application/binary' }, options?.headers]),
+      __security: { bearerAuth: true },
       __binaryResponse: true,
     });
   }

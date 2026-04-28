@@ -75,6 +75,10 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     props: { deploymentName?: string; options?: WS.ClientOptions | undefined } = {},
   ): Promise<OpenAIRealtimeWS> {
     const isApiKeyProvider = await client._callApiKey();
+    const apiKey = client.apiKey;
+    if (!apiKey) {
+      throw new Error('Azure OpenAI Realtime requires an API key');
+    }
     const deploymentName = props.deploymentName ?? client.deploymentName;
     if (!deploymentName) {
       throw new Error('No deployment name provided');
@@ -86,7 +90,7 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
           ...props.options,
           headers: {
             ...props.options?.headers,
-            ...(isApiKeyProvider ? {} : { 'api-key': client.apiKey }),
+            ...(isApiKeyProvider ? {} : { 'api-key': apiKey }),
           },
         },
         __resolvedApiKey: isApiKeyProvider,

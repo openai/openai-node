@@ -23,7 +23,7 @@ export class Versions extends APIResource {
   ): APIPromise<SkillVersion> {
     return this._client.post(
       path`/skills/${skillID}/versions`,
-      maybeMultipartFormRequestOptions({ body, ...options }, this._client),
+      maybeMultipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
     );
   }
 
@@ -36,7 +36,10 @@ export class Versions extends APIResource {
     options?: RequestOptions,
   ): APIPromise<SkillVersion> {
     const { skill_id } = params;
-    return this._client.get(path`/skills/${skill_id}/versions/${version}`, options);
+    return this._client.get(path`/skills/${skill_id}/versions/${version}`, {
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
@@ -50,6 +53,7 @@ export class Versions extends APIResource {
     return this._client.getAPIList(path`/skills/${skillID}/versions`, CursorPage<SkillVersion>, {
       query,
       ...options,
+      __security: { bearerAuth: true },
     });
   }
 
@@ -62,7 +66,10 @@ export class Versions extends APIResource {
     options?: RequestOptions,
   ): APIPromise<DeletedSkillVersion> {
     const { skill_id } = params;
-    return this._client.delete(path`/skills/${skill_id}/versions/${version}`, options);
+    return this._client.delete(path`/skills/${skill_id}/versions/${version}`, {
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 }
 
