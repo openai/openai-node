@@ -18,8 +18,8 @@ export class Speech extends APIResource {
    * ```ts
    * const speech = await client.audio.speech.create({
    *   input: 'input',
-   *   model: 'string',
-   *   voice: 'string',
+   *   model: 'tts-1',
+   *   voice: 'alloy',
    * });
    *
    * const content = await speech.blob();

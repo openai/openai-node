@@ -1120,7 +1120,7 @@ export interface Response {
    * of 24 hours.
    * [Learn more](https://platform.openai.com/docs/guides/prompt-caching#prompt-cache-retention).
    */
-  prompt_cache_retention?: 'in-memory' | '24h' | null;
+  prompt_cache_retention?: 'in_memory' | '24h' | null;
 
   /**
    * **gpt-5 and o-series models only**
@@ -3424,6 +3424,13 @@ export interface ResponseInputFile {
   type: 'input_file';
 
   /**
+   * The detail level of the file to be sent to the model. Use `low` for the default
+   * rendering behavior, or `high` to render the file at higher quality. Defaults to
+   * `low`.
+   */
+  detail?: 'low' | 'high';
+
+  /**
    * The content of the file to be sent to the model.
    */
   file_data?: string;
@@ -3452,6 +3459,13 @@ export interface ResponseInputFileContent {
    * The type of the input item. Always `input_file`.
    */
   type: 'input_file';
+
+  /**
+   * The detail level of the file to be sent to the model. Use `low` for the default
+   * rendering behavior, or `high` to render the file at higher quality. Defaults to
+   * `low`.
+   */
+  detail?: 'low' | 'high';
 
   /**
    * The base64-encoded data of the file to be sent to the model.
@@ -6551,7 +6565,7 @@ export interface ResponsesClientEvent {
    * of 24 hours.
    * [Learn more](https://platform.openai.com/docs/guides/prompt-caching#prompt-cache-retention).
    */
-  prompt_cache_retention?: 'in-memory' | '24h' | null;
+  prompt_cache_retention?: 'in_memory' | '24h' | null;
 
   /**
    * **gpt-5 and o-series models only**
@@ -7571,7 +7585,7 @@ export interface ResponseCreateParamsBase {
    * of 24 hours.
    * [Learn more](https://platform.openai.com/docs/guides/prompt-caching#prompt-cache-retention).
    */
-  prompt_cache_retention?: 'in-memory' | '24h' | null;
+  prompt_cache_retention?: 'in_memory' | '24h' | null;
 
   /**
    * **gpt-5 and o-series models only**
@@ -7965,6 +7979,11 @@ export interface ResponseCompactParams {
    * A key to use when reading from or writing to the prompt cache.
    */
   prompt_cache_key?: string | null;
+
+  /**
+   * How long to retain a prompt cache entry created by this request.
+   */
+  prompt_cache_retention?: 'in_memory' | '24h' | null;
 }
 
 Responses.InputItems = InputItems;
