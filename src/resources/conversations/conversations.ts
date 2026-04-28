@@ -31,14 +31,17 @@ export class Conversations extends APIResource {
     body: ConversationCreateParams | null | undefined = {},
     options?: RequestOptions,
   ): APIPromise<Conversation> {
-    return this._client.post('/conversations', { body, ...options });
+    return this._client.post('/conversations', { body, ...options, __security: { bearerAuth: true } });
   }
 
   /**
    * Get a conversation
    */
   retrieve(conversationID: string, options?: RequestOptions): APIPromise<Conversation> {
-    return this._client.get(path`/conversations/${conversationID}`, options);
+    return this._client.get(path`/conversations/${conversationID}`, {
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
@@ -49,14 +52,21 @@ export class Conversations extends APIResource {
     body: ConversationUpdateParams,
     options?: RequestOptions,
   ): APIPromise<Conversation> {
-    return this._client.post(path`/conversations/${conversationID}`, { body, ...options });
+    return this._client.post(path`/conversations/${conversationID}`, {
+      body,
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
    * Delete a conversation. Items in the conversation will not be deleted.
    */
   delete(conversationID: string, options?: RequestOptions): APIPromise<ConversationDeletedResource> {
-    return this._client.delete(path`/conversations/${conversationID}`, options);
+    return this._client.delete(path`/conversations/${conversationID}`, {
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 }
 

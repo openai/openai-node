@@ -596,6 +596,10 @@ Methods:
 
 - <code title="post /uploads/{upload_id}/parts">client.uploads.parts.<a href="./src/resources/uploads/parts.ts">create</a>(uploadID, { ...params }) -> UploadPart</code>
 
+# Admin
+
+## Organization
+
 # [Responses](src/resources/responses/api.md)
 
 # [Realtime](src/resources/realtime/api.md)

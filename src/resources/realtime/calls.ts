@@ -25,6 +25,7 @@ export class Calls extends APIResource {
       body,
       ...options,
       headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -40,6 +41,7 @@ export class Calls extends APIResource {
     return this._client.post(path`/realtime/calls/${callID}/hangup`, {
       ...options,
       headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -58,6 +60,7 @@ export class Calls extends APIResource {
       body,
       ...options,
       headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -78,6 +81,7 @@ export class Calls extends APIResource {
       body,
       ...options,
       headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 }
