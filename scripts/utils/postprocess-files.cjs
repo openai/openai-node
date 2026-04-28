@@ -23,11 +23,18 @@ async function postprocess() {
 
     // strip out lib="dom", types="node", and types="react" references; these
     // are needed at build time, but would pollute the user's TS environment
-    const transformed = code.replace(
+    let transformed = code.replace(
       /^ *\/\/\/ *<reference +(lib="dom"|types="(node|react)").*?\n/gm,
       // replace with same number of characters to avoid breaking source maps
       (match) => ' '.repeat(match.length - 1) + '\n',
     );
+
+    // TypeScript's declaration emitter collapses /** @ts-ignore */ onto the same
+    // line as the type declaration, which doesn't work. So we convert to // @ts-ignore
+    // on its own line to properly suppresses errors.
+    if (file.endsWith('.d.ts') || file.endsWith('.d.mts') || file.endsWith('.d.cts')) {
+      transformed = transformed.replace(/\/\*\* @ts-ignore\b[^*]*\*\/ /gm, '// @ts-ignore\n');
+    }
 
     if (transformed !== code) {
       console.error(`wrote ${path.relative(process.cwd(), file)}`);
