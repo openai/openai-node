@@ -7,6 +7,7 @@ import Path from 'path';
 
 const client = new OpenAI({
   apiKey: 'My API Key',
+  adminAPIKey: 'My Admin API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 

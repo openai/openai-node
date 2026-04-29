@@ -42,21 +42,21 @@ export class Evals extends APIResource {
    * the [Evals guide](https://platform.openai.com/docs/guides/evals).
    */
   create(body: EvalCreateParams, options?: RequestOptions): APIPromise<EvalCreateResponse> {
-    return this._client.post('/evals', { body, ...options });
+    return this._client.post('/evals', { body, ...options, __security: { bearerAuth: true } });
   }
 
   /**
    * Get an evaluation by ID.
    */
   retrieve(evalID: string, options?: RequestOptions): APIPromise<EvalRetrieveResponse> {
-    return this._client.get(path`/evals/${evalID}`, options);
+    return this._client.get(path`/evals/${evalID}`, { ...options, __security: { bearerAuth: true } });
   }
 
   /**
    * Update certain properties of an evaluation.
    */
   update(evalID: string, body: EvalUpdateParams, options?: RequestOptions): APIPromise<EvalUpdateResponse> {
-    return this._client.post(path`/evals/${evalID}`, { body, ...options });
+    return this._client.post(path`/evals/${evalID}`, { body, ...options, __security: { bearerAuth: true } });
   }
 
   /**
@@ -66,14 +66,18 @@ export class Evals extends APIResource {
     query: EvalListParams | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<EvalListResponsesPage, EvalListResponse> {
-    return this._client.getAPIList('/evals', CursorPage<EvalListResponse>, { query, ...options });
+    return this._client.getAPIList('/evals', CursorPage<EvalListResponse>, {
+      query,
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
    * Delete an evaluation.
    */
   delete(evalID: string, options?: RequestOptions): APIPromise<EvalDeleteResponse> {
-    return this._client.delete(path`/evals/${evalID}`, options);
+    return this._client.delete(path`/evals/${evalID}`, { ...options, __security: { bearerAuth: true } });
   }
 }
 

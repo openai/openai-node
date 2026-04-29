@@ -24,6 +24,7 @@ describe('instantiate client', () => {
       baseURL: 'http://localhost:5000/',
       defaultHeaders: { 'X-My-Default-Header': '2' },
       apiKey: 'My API Key',
+      adminAPIKey: 'My Admin API Key',
     });
 
     test('they are used in the request', async () => {
@@ -91,6 +92,7 @@ describe('instantiate client', () => {
         logger: logger,
         logLevel: 'debug',
         apiKey: 'My API Key',
+        adminAPIKey: 'My Admin API Key',
       });
 
       await forceAPIResponseForClient(client);
@@ -98,7 +100,7 @@ describe('instantiate client', () => {
     });
 
     test('default logLevel is warn', async () => {
-      const client = new OpenAI({ apiKey: 'My API Key' });
+      const client = new OpenAI({ apiKey: 'My API Key', adminAPIKey: 'My Admin API Key' });
       expect(client.logLevel).toBe('warn');
     });
 
@@ -115,6 +117,7 @@ describe('instantiate client', () => {
         logger: logger,
         logLevel: 'info',
         apiKey: 'My API Key',
+        adminAPIKey: 'My Admin API Key',
       });
 
       await forceAPIResponseForClient(client);
@@ -131,7 +134,11 @@ describe('instantiate client', () => {
       };
 
       process.env['OPENAI_LOG'] = 'debug';
-      const client = new OpenAI({ logger: logger, apiKey: 'My API Key' });
+      const client = new OpenAI({
+        logger: logger,
+        apiKey: 'My API Key',
+        adminAPIKey: 'My Admin API Key',
+      });
       expect(client.logLevel).toBe('debug');
 
       await forceAPIResponseForClient(client);
@@ -148,7 +155,11 @@ describe('instantiate client', () => {
       };
 
       process.env['OPENAI_LOG'] = 'not a log level';
-      const client = new OpenAI({ logger: logger, apiKey: 'My API Key' });
+      const client = new OpenAI({
+        logger: logger,
+        apiKey: 'My API Key',
+        adminAPIKey: 'My Admin API Key',
+      });
       expect(client.logLevel).toBe('warn');
       expect(warnMock).toHaveBeenCalledWith(
         'process.env[\'OPENAI_LOG\'] was set to "not a log level", expected one of ["off","error","warn","info","debug"]',
@@ -169,6 +180,7 @@ describe('instantiate client', () => {
         logger: logger,
         logLevel: 'off',
         apiKey: 'My API Key',
+        adminAPIKey: 'My Admin API Key',
       });
 
       await forceAPIResponseForClient(client);
@@ -189,6 +201,7 @@ describe('instantiate client', () => {
         logger: logger,
         logLevel: 'debug',
         apiKey: 'My API Key',
+        adminAPIKey: 'My Admin API Key',
       });
       expect(client.logLevel).toBe('debug');
       expect(warnMock).not.toHaveBeenCalled();
@@ -201,6 +214,7 @@ describe('instantiate client', () => {
         baseURL: 'http://localhost:5000/',
         defaultQuery: { apiVersion: 'foo' },
         apiKey: 'My API Key',
+        adminAPIKey: 'My Admin API Key',
       });
       expect(client.buildURL('/foo', null)).toEqual('http://localhost:5000/foo?apiVersion=foo');
     });
@@ -210,6 +224,7 @@ describe('instantiate client', () => {
         baseURL: 'http://localhost:5000/',
         defaultQuery: { apiVersion: 'foo', hello: 'world' },
         apiKey: 'My API Key',
+        adminAPIKey: 'My Admin API Key',
       });
       expect(client.buildURL('/foo', null)).toEqual('http://localhost:5000/foo?apiVersion=foo&hello=world');
     });
@@ -219,6 +234,7 @@ describe('instantiate client', () => {
         baseURL: 'http://localhost:5000/',
         defaultQuery: { hello: 'world' },
         apiKey: 'My API Key',
+        adminAPIKey: 'My Admin API Key',
       });
       expect(client.buildURL('/foo', { hello: undefined })).toEqual('http://localhost:5000/foo');
     });
@@ -228,6 +244,7 @@ describe('instantiate client', () => {
     const client = new OpenAI({
       baseURL: 'http://localhost:5000/',
       apiKey: 'My API Key',
+      adminAPIKey: 'My Admin API Key',
       fetch: (url) => {
         return Promise.resolve(
           new Response(JSON.stringify({ url, custom: true }), {
@@ -246,6 +263,7 @@ describe('instantiate client', () => {
     const client = new OpenAI({
       baseURL: 'http://localhost:5000/',
       apiKey: 'My API Key',
+      adminAPIKey: 'My Admin API Key',
       fetch: defaultFetch,
     });
   });
@@ -254,6 +272,7 @@ describe('instantiate client', () => {
     const client = new OpenAI({
       baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
       apiKey: 'My API Key',
+      adminAPIKey: 'My Admin API Key',
       fetch: (...args) => {
         return new Promise((resolve, reject) =>
           setTimeout(
@@ -286,6 +305,7 @@ describe('instantiate client', () => {
     const client = new OpenAI({
       baseURL: 'http://localhost:5000/',
       apiKey: 'My API Key',
+      adminAPIKey: 'My Admin API Key',
       fetch: testFetch,
     });
 
@@ -295,12 +315,20 @@ describe('instantiate client', () => {
 
   describe('baseUrl', () => {
     test('trailing slash', () => {
-      const client = new OpenAI({ baseURL: 'http://localhost:5000/custom/path/', apiKey: 'My API Key' });
+      const client = new OpenAI({
+        baseURL: 'http://localhost:5000/custom/path/',
+        apiKey: 'My API Key',
+        adminAPIKey: 'My Admin API Key',
+      });
       expect(client.buildURL('/foo', null)).toEqual('http://localhost:5000/custom/path/foo');
     });
 
     test('no trailing slash', () => {
-      const client = new OpenAI({ baseURL: 'http://localhost:5000/custom/path', apiKey: 'My API Key' });
+      const client = new OpenAI({
+        baseURL: 'http://localhost:5000/custom/path',
+        apiKey: 'My API Key',
+        adminAPIKey: 'My Admin API Key',
+      });
       expect(client.buildURL('/foo', null)).toEqual('http://localhost:5000/custom/path/foo');
     });
 
@@ -309,37 +337,45 @@ describe('instantiate client', () => {
     });
 
     test('explicit option', () => {
-      const client = new OpenAI({ baseURL: 'https://example.com', apiKey: 'My API Key' });
+      const client = new OpenAI({
+        baseURL: 'https://example.com',
+        apiKey: 'My API Key',
+        adminAPIKey: 'My Admin API Key',
+      });
       expect(client.baseURL).toEqual('https://example.com');
     });
 
     test('env variable', () => {
       process.env['OPENAI_BASE_URL'] = 'https://example.com/from_env';
-      const client = new OpenAI({ apiKey: 'My API Key' });
+      const client = new OpenAI({ apiKey: 'My API Key', adminAPIKey: 'My Admin API Key' });
       expect(client.baseURL).toEqual('https://example.com/from_env');
     });
 
     test('empty env variable', () => {
       process.env['OPENAI_BASE_URL'] = ''; // empty
-      const client = new OpenAI({ apiKey: 'My API Key' });
+      const client = new OpenAI({ apiKey: 'My API Key', adminAPIKey: 'My Admin API Key' });
       expect(client.baseURL).toEqual('https://api.openai.com/v1');
     });
 
     test('blank env variable', () => {
       process.env['OPENAI_BASE_URL'] = '  '; // blank
-      const client = new OpenAI({ apiKey: 'My API Key' });
+      const client = new OpenAI({ apiKey: 'My API Key', adminAPIKey: 'My Admin API Key' });
       expect(client.baseURL).toEqual('https://api.openai.com/v1');
     });
 
     test('in request options', () => {
-      const client = new OpenAI({ apiKey: 'My API Key' });
+      const client = new OpenAI({ apiKey: 'My API Key', adminAPIKey: 'My Admin API Key' });
       expect(client.buildURL('/foo', null, 'http://localhost:5000/option')).toEqual(
         'http://localhost:5000/option/foo',
       );
     });
 
     test('in request options overridden by client options', () => {
-      const client = new OpenAI({ apiKey: 'My API Key', baseURL: 'http://localhost:5000/client' });
+      const client = new OpenAI({
+        apiKey: 'My API Key',
+        adminAPIKey: 'My Admin API Key',
+        baseURL: 'http://localhost:5000/client',
+      });
       expect(client.buildURL('/foo', null, 'http://localhost:5000/option')).toEqual(
         'http://localhost:5000/client/foo',
       );
@@ -347,7 +383,7 @@ describe('instantiate client', () => {
 
     test('in request options overridden by env variable', () => {
       process.env['OPENAI_BASE_URL'] = 'http://localhost:5000/env';
-      const client = new OpenAI({ apiKey: 'My API Key' });
+      const client = new OpenAI({ apiKey: 'My API Key', adminAPIKey: 'My Admin API Key' });
       expect(client.buildURL('/foo', null, 'http://localhost:5000/option')).toEqual(
         'http://localhost:5000/env/foo',
       );
@@ -355,11 +391,15 @@ describe('instantiate client', () => {
   });
 
   test('maxRetries option is correctly set', () => {
-    const client = new OpenAI({ maxRetries: 4, apiKey: 'My API Key' });
+    const client = new OpenAI({
+      maxRetries: 4,
+      apiKey: 'My API Key',
+      adminAPIKey: 'My Admin API Key',
+    });
     expect(client.maxRetries).toEqual(4);
 
     // default
-    const client2 = new OpenAI({ apiKey: 'My API Key' });
+    const client2 = new OpenAI({ apiKey: 'My API Key', adminAPIKey: 'My Admin API Key' });
     expect(client2.maxRetries).toEqual(2);
   });
 
@@ -369,6 +409,7 @@ describe('instantiate client', () => {
         baseURL: 'http://localhost:5000/',
         maxRetries: 3,
         apiKey: 'My API Key',
+        adminAPIKey: 'My Admin API Key',
       });
 
       const newClient = client.withOptions({
@@ -395,6 +436,7 @@ describe('instantiate client', () => {
         defaultHeaders: { 'X-Test-Header': 'test-value' },
         defaultQuery: { 'test-param': 'test-value' },
         apiKey: 'My API Key',
+        adminAPIKey: 'My Admin API Key',
       });
 
       const newClient = client.withOptions({
@@ -413,6 +455,7 @@ describe('instantiate client', () => {
         baseURL: 'http://localhost:5000/',
         timeout: 1000,
         apiKey: 'My API Key',
+        adminAPIKey: 'My Admin API Key',
       });
 
       // Modify the client properties directly after creation
@@ -442,20 +485,24 @@ describe('instantiate client', () => {
   test('with environment variable arguments', () => {
     // set options via env var
     process.env['OPENAI_API_KEY'] = 'My API Key';
+    process.env['OPENAI_ADMIN_KEY'] = 'My Admin API Key';
     const client = new OpenAI();
     expect(client.apiKey).toBe('My API Key');
+    expect(client.adminAPIKey).toBe('My Admin API Key');
   });
 
   test('with overridden environment variable arguments', () => {
     // set options via env var
     process.env['OPENAI_API_KEY'] = 'another My API Key';
-    const client = new OpenAI({ apiKey: 'My API Key' });
+    process.env['OPENAI_ADMIN_KEY'] = 'another My Admin API Key';
+    const client = new OpenAI({ apiKey: 'My API Key', adminAPIKey: 'My Admin API Key' });
     expect(client.apiKey).toBe('My API Key');
+    expect(client.adminAPIKey).toBe('My Admin API Key');
   });
 });
 
 describe('request building', () => {
-  const client = new OpenAI({ apiKey: 'My API Key' });
+  const client = new OpenAI({ apiKey: 'My API Key', adminAPIKey: 'My Admin API Key' });
 
   describe('custom headers', () => {
     test('handles undefined', async () => {
@@ -474,7 +521,7 @@ describe('request building', () => {
 });
 
 describe('default encoder', () => {
-  const client = new OpenAI({ apiKey: 'My API Key' });
+  const client = new OpenAI({ apiKey: 'My API Key', adminAPIKey: 'My Admin API Key' });
 
   class Serializable {
     toJSON() {
@@ -561,6 +608,7 @@ describe('retries', () => {
 
     const client = new OpenAI({
       apiKey: 'My API Key',
+      adminAPIKey: 'My Admin API Key',
       timeout: 10,
       fetch: testFetch,
     });
@@ -595,6 +643,7 @@ describe('retries', () => {
 
     const client = new OpenAI({
       apiKey: 'My API Key',
+      adminAPIKey: 'My Admin API Key',
       fetch: testFetch,
       maxRetries: 4,
     });
@@ -623,6 +672,7 @@ describe('retries', () => {
     };
     const client = new OpenAI({
       apiKey: 'My API Key',
+      adminAPIKey: 'My Admin API Key',
       fetch: testFetch,
       maxRetries: 4,
     });
@@ -656,6 +706,7 @@ describe('retries', () => {
     };
     const client = new OpenAI({
       apiKey: 'My API Key',
+      adminAPIKey: 'My Admin API Key',
       fetch: testFetch,
       maxRetries: 4,
       defaultHeaders: { 'X-Stainless-Retry-Count': null },
@@ -689,6 +740,7 @@ describe('retries', () => {
     };
     const client = new OpenAI({
       apiKey: 'My API Key',
+      adminAPIKey: 'My Admin API Key',
       fetch: testFetch,
       maxRetries: 4,
     });
@@ -721,7 +773,11 @@ describe('retries', () => {
       return new Response(JSON.stringify({ a: 1 }), { headers: { 'Content-Type': 'application/json' } });
     };
 
-    const client = new OpenAI({ apiKey: 'My API Key', fetch: testFetch });
+    const client = new OpenAI({
+      apiKey: 'My API Key',
+      adminAPIKey: 'My Admin API Key',
+      fetch: testFetch,
+    });
 
     expect(await client.request({ path: '/foo', method: 'get' })).toEqual({ a: 1 });
     expect(count).toEqual(2);
@@ -751,7 +807,11 @@ describe('retries', () => {
       return new Response(JSON.stringify({ a: 1 }), { headers: { 'Content-Type': 'application/json' } });
     };
 
-    const client = new OpenAI({ apiKey: 'My API Key', fetch: testFetch });
+    const client = new OpenAI({
+      apiKey: 'My API Key',
+      adminAPIKey: 'My Admin API Key',
+      fetch: testFetch,
+    });
 
     expect(await client.request({ path: '/foo', method: 'get' })).toEqual({ a: 1 });
     expect(count).toEqual(2);
@@ -772,6 +832,53 @@ describe('retries', () => {
       });
       const { req } = await client.buildRequest({ path: '/foo', method: 'get' });
       expect(req.headers.get('authorization')).toEqual('Bearer My API Key');
+    });
+
+    test('apiKey and adminAPIKey use route-specific auth', async () => {
+      const client = new OpenAI({
+        baseURL: 'http://localhost:5000/',
+        apiKey: 'My API Key',
+        adminAPIKey: 'My Admin API Key',
+      });
+
+      const bearer = await client.buildRequest({
+        path: '/responses',
+        method: 'post',
+        __security: { bearerAuth: true },
+      });
+      expect(bearer.req.headers.get('authorization')).toEqual('Bearer My API Key');
+
+      const admin = await client.buildRequest({
+        path: '/organization/projects',
+        method: 'get',
+        __security: { adminAPIKeyAuth: true },
+      });
+      expect(admin.req.headers.get('authorization')).toEqual('Bearer My Admin API Key');
+    });
+
+    test('adminAPIKey only', async () => {
+      delete process.env['OPENAI_API_KEY'];
+
+      const client = new OpenAI({
+        baseURL: 'http://localhost:5000/',
+        apiKey: null,
+        adminAPIKey: 'My Admin API Key',
+      });
+
+      const admin = await client.buildRequest({
+        path: '/organization/projects',
+        method: 'get',
+        __security: { adminAPIKeyAuth: true },
+      });
+      expect(admin.req.headers.get('authorization')).toEqual('Bearer My Admin API Key');
+
+      await expect(
+        client.buildRequest({
+          path: '/responses',
+          method: 'post',
+          __security: { bearerAuth: true },
+        }),
+      ).rejects.toThrow(/Could not resolve authentication method/);
     });
 
     test('token', async () => {
@@ -828,16 +935,19 @@ describe('retries', () => {
     });
 
     test('at least one', () => {
-      try {
-        new OpenAI({
-          baseURL: 'http://localhost:5000/',
-        });
-      } catch (error: any) {
-        expect(error).toBeInstanceOf(Error);
-        expect(error.message).toEqual(
-          'Missing credentials. Please pass an `apiKey`, `workloadIdentity`, or set the `OPENAI_API_KEY` environment variable.',
-        );
-      }
+      delete process.env['OPENAI_API_KEY'];
+      delete process.env['OPENAI_ADMIN_KEY'];
+
+      expect(
+        () =>
+          new OpenAI({
+            baseURL: 'http://localhost:5000/',
+          }),
+      ).toThrow(
+        new Error(
+          'Missing credentials. Please pass an `apiKey`, `workloadIdentity`, `adminAPIKey`, or set the `OPENAI_API_KEY` or `OPENAI_ADMIN_KEY` environment variable.',
+        ),
+      );
     });
   });
 });
