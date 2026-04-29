@@ -137,6 +137,7 @@ client.example.list(undefined, { headers: { ... } });
 - `client.beta.threads.runs.list()`
 - `client.beta.threads.messages.list()`
 - `client.batches.list()`
+- `client.admin.organization.auditLogs.list()`
 - `client.responses.retrieve()`
 - `client.responses.inputItems.list()`
 - `client.responses.inputTokens.count()`
