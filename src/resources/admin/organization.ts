@@ -1,5 +1,3 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../core/resource';
-
-export class Organization extends APIResource {}
+export * from './organization/index';

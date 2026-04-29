@@ -42,6 +42,9 @@ TEST_PATHS=(
 	tests/api-resources/batches.test.ts
 	tests/api-resources/uploads/uploads.test.ts
 	tests/api-resources/uploads/parts.test.ts
+	tests/api-resources/admin/admin.test.ts
+	tests/api-resources/admin/organization/organization.test.ts
+	tests/api-resources/admin/organization/audit-logs.test.ts
 	tests/api-resources/responses/responses.test.ts
 	tests/api-resources/responses/input-items.test.ts
 	tests/api-resources/responses/input-tokens.test.ts

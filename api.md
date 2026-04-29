@@ -584,6 +584,16 @@ Methods:
 
 ## Organization
 
+### AuditLogs
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/audit-logs.ts">AuditLogListResponse</a></code>
+
+Methods:
+
+- <code title="get /organization/audit_logs">client.admin.organization.auditLogs.<a href="./src/resources/admin/organization/audit-logs.ts">list</a>({ ...params }) -> AuditLogListResponsesPage</code>
+
 # [Responses](src/resources/responses/api.md)
 
 # [Realtime](src/resources/realtime/api.md)
