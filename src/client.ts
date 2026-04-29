@@ -424,6 +424,16 @@ export class OpenAI {
       baseURL: baseURL || `https://api.openai.com/v1`,
     };
 
+    if (apiKey && workloadIdentity) {
+      throw new Errors.OpenAIError('The `apiKey` and `workloadIdentity` options are mutually exclusive');
+    }
+
+    if (!apiKey && !adminAPIKey && !workloadIdentity) {
+      throw new Errors.OpenAIError(
+        'Missing credentials. Please pass an `apiKey`, `workloadIdentity`, `adminAPIKey`, or set the `OPENAI_API_KEY` or `OPENAI_ADMIN_KEY` environment variable.',
+      );
+    }
+
     if (!options.dangerouslyAllowBrowser && isRunningInBrowser()) {
       throw new Errors.OpenAIError(
         "It looks like you're running in a browser-like environment.\n\nThis is disabled by default, as it risks exposing your secret API credentials to attackers.\nIf you understand the risks and have appropriate mitigations in place,\nyou can set the `dangerouslyAllowBrowser` option to `true`, e.g.,\n\nnew OpenAI({ apiKey, dangerouslyAllowBrowser: true });\n\nhttps://help.openai.com/en/articles/5112595-best-practices-for-api-key-safety\n",
@@ -463,7 +473,7 @@ export class OpenAI {
       this._workloadIdentityAuth = new WorkloadIdentityAuth(workloadIdentity, this.fetch);
     }
 
-    this.apiKey = typeof apiKey === 'string' ? apiKey : 'Missing Key';
+    this.apiKey = typeof apiKey === 'string' ? apiKey : null;
     this.adminAPIKey = adminAPIKey;
     this.organization = organization;
     this.project = project;
@@ -483,8 +493,9 @@ export class OpenAI {
       logLevel: this.logLevel,
       fetch: this.fetch,
       fetchOptions: this.fetchOptions,
-      apiKey: this.apiKey,
+      apiKey: this._options.apiKey,
       adminAPIKey: this.adminAPIKey,
+      workloadIdentity: this._options.workloadIdentity,
       organization: this.organization,
       project: this.project,
       webhookSecret: this.webhookSecret,
@@ -505,17 +516,14 @@ export class OpenAI {
   }
 
   protected validateHeaders({ values, nulls }: NullableHeaders) {
-    if (this.apiKey && values.get('authorization')) {
+    if (values.get('authorization') || values.get('api-key')) {
       return;
     }
     if (nulls.has('authorization')) {
       return;
     }
 
-    if (this.adminAPIKey && values.get('authorization')) {
-      return;
-    }
-    if (nulls.has('authorization')) {
+    if (this._workloadIdentityAuth) {
       return;
     }
 
@@ -538,6 +546,9 @@ export class OpenAI {
   }
 
   protected async bearerAuth(opts: FinalRequestOptions): Promise<NullableHeaders | undefined> {
+    if (this._workloadIdentityAuth) {
+      return buildHeaders([{ Authorization: `Bearer ${await this._workloadIdentityAuth.getToken()}` }]);
+    }
     if (this.apiKey == null) {
       return undefined;
     }
