@@ -1,5 +1,25 @@
 # Changelog
 
+## 6.36.0 (2026-04-29)
+
+Full Changelog: [v6.35.0...v6.36.0](https://github.com/openai/openai-node/compare/v6.35.0...v6.36.0)
+
+### Features
+
+* **api:** add support for Admin API Keys per endpoint ([770d187](https://github.com/openai/openai-node/commit/770d187be1d6c0419002a9b01e7dec6a99761f94))
+
+
+### Bug Fixes
+
+* **api:** support admin api key auth ([e3862a3](https://github.com/openai/openai-node/commit/e3862a3d415ba3cedb178718e2c9bc0c2d09e01e))
+
+
+### Chores
+
+* **format:** run eslint and prettier separately ([104543a](https://github.com/openai/openai-node/commit/104543a4daa138698006b1785ef7845d5ae0be27))
+* **internal:** codegen related update ([05d86da](https://github.com/openai/openai-node/commit/05d86dac705c75f8b8c6e6d5630973451f798e75))
+* **internal:** codegen related update ([f184586](https://github.com/openai/openai-node/commit/f184586fbcb8c7c07bf439455d6317aba62719ec))
+
 ## 6.35.0 (2026-04-28)
 
 Full Changelog: [v6.34.0...v6.35.0](https://github.com/openai/openai-node/compare/v6.34.0...v6.35.0)
