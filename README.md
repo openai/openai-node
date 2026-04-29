@@ -128,6 +128,31 @@ const client = new OpenAI({
 });
 ```
 
+### AWS Bedrock
+
+Requires the AWS SDK peer dependencies (`npm install @aws-sdk/credential-providers @smithy/signature-v4 @aws-crypto/sha256-js`). Credentials are resolved from the [standard AWS credential chain](https://docs.aws.amazon.com/sdkref/latest/guide/standardized-credentials.html).
+
+```ts
+import OpenAI from 'openai';
+import { awsBedrockTokenProvider } from 'openai/auth';
+
+const client = new OpenAI({
+  baseURL: 'https://bedrock-mantle.us-east-1.api.aws/v1', // region must match the token provider
+  apiKey: awsBedrockTokenProvider({
+    region: 'us-east-1',
+    profile: 'my-profile', // optional — defaults to the standard AWS credential chain
+  }),
+});
+
+// List models supported by the OpenAI-compatible endpoint
+const models = await client.models.list();
+for (const model of models.data) {
+  console.log(model.id);
+}
+```
+
+> **Note:** The OpenAI SDK works only with Bedrock models that have the [OpenAI-compatible API](https://docs.aws.amazon.com/bedrock/latest/userguide/bedrock-mantle.html) enabled. Use `client.models.list()` to see which models are available on your endpoint.
+
 ### Custom subject token provider
 
 ```ts

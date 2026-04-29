@@ -99,13 +99,25 @@
   },
   "peerDependencies": {
     "ws": "^8.18.0",
-    "zod": "^3.25 || ^4.0"
+    "zod": "^3.25 || ^4.0",
+    "@aws-sdk/credential-providers": "^3.0.0",
+    "@smithy/signature-v4": "^3.0.0 || ^4.0.0 || ^5.0.0",
+    "@aws-crypto/sha256-js": "^3.0.0 || ^4.0.0 || ^5.0.0"
   },
   "peerDependenciesMeta": {
     "ws": {
       "optional": true
     },
     "zod": {
+      "optional": true
+    },
+    "@aws-sdk/credential-providers": {
+      "optional": true
+    },
+    "@smithy/signature-v4": {
+      "optional": true
+    },
+    "@aws-crypto/sha256-js": {
       "optional": true
     }
   }

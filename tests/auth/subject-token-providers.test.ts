@@ -2,6 +2,7 @@ import {
   k8sServiceAccountTokenProvider,
   azureManagedIdentityTokenProvider,
   gcpIDTokenProvider,
+  awsBedrockTokenProvider,
 } from 'openai/auth/subject-token-providers';
 import { SubjectTokenProviderError } from 'openai';
 
@@ -199,5 +200,194 @@ describe('GCP Metadata Server Token Provider', () => {
     const provider = gcpIDTokenProvider();
     await expect(provider.getToken()).rejects.toThrow(SubjectTokenProviderError);
     await expect(provider.getToken()).rejects.toThrow('Failed to fetch token from GCP Metadata Server');
+  });
+});
+
+function makeMockAwsSdk(opts?: {
+  accessKeyId?: string;
+  secretAccessKey?: string;
+  sessionToken?: string;
+  noCredentials?: boolean;
+}) {
+  const credentials =
+    opts?.noCredentials ? null : (
+      {
+        accessKeyId: opts?.accessKeyId ?? 'AKIAIOSFODNN7EXAMPLE',
+        secretAccessKey: opts?.secretAccessKey ?? 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
+        sessionToken: opts?.sessionToken,
+      }
+    );
+
+  const mockPresign = jest.fn(async (request: any, options: any) => {
+    return {
+      ...request,
+      query: {
+        ...request.query,
+        'X-Amz-Algorithm': 'AWS4-HMAC-SHA256',
+        'X-Amz-Credential': `${credentials?.accessKeyId}/20260428/us-east-1/bedrock/aws4_request`,
+        'X-Amz-Date': '20260428T000000Z',
+        'X-Amz-Expires': String(options?.expiresIn ?? 43200),
+        'X-Amz-SignedHeaders': 'host',
+        'X-Amz-Signature': 'fakesignature1234567890',
+      },
+    };
+  });
+
+  const mockCredentialProvider = jest.fn(async () => {
+    if (!credentials) {
+      throw new Error('No AWS credentials found');
+    }
+    return credentials;
+  });
+
+  const mockFromNodeProviderChain = jest.fn(() => mockCredentialProvider);
+  const mockFromIni = jest.fn((_opts: any) => mockCredentialProvider);
+
+  const mockSignatureV4 = jest.fn().mockImplementation(() => ({
+    presign: mockPresign,
+  }));
+
+  const mockSha256 = jest.fn();
+
+  return {
+    credProviders: {
+      fromNodeProviderChain: mockFromNodeProviderChain,
+      fromIni: mockFromIni,
+    },
+    sigV4: {
+      SignatureV4: mockSignatureV4,
+    },
+    sha256: {
+      Sha256: mockSha256,
+    },
+    mocks: {
+      presign: mockPresign,
+      credentialProvider: mockCredentialProvider,
+      fromNodeProviderChain: mockFromNodeProviderChain,
+      fromIni: mockFromIni,
+      SignatureV4: mockSignatureV4,
+    },
+  };
+}
+
+describe('AWS Bedrock Token Provider', () => {
+  const originalEnv = process.env;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.resetModules();
+    process.env = { ...originalEnv };
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  test('generates a valid bedrock token', async () => {
+    const aws = makeMockAwsSdk();
+
+    jest.mock('@aws-sdk/credential-providers', () => aws.credProviders, { virtual: true });
+    jest.mock('@smithy/signature-v4', () => aws.sigV4, { virtual: true });
+    jest.mock('@aws-crypto/sha256-js', () => aws.sha256, { virtual: true });
+
+    const getToken = awsBedrockTokenProvider({ region: 'us-east-1' });
+    const token = await getToken();
+
+    expect(token.startsWith('bedrock-api-key-')).toBe(true);
+
+    const encodedPart = token.slice('bedrock-api-key-'.length);
+    const decodedUrl = Buffer.from(encodedPart, 'base64').toString('utf-8');
+
+    expect(decodedUrl).toContain('bedrock.amazonaws.com');
+    expect(decodedUrl).toContain('X-Amz-Signature=');
+    expect(decodedUrl).toContain('X-Amz-Credential=');
+    expect(decodedUrl).toContain('Action=CallWithBearerToken');
+    expect(decodedUrl).toContain('&Version=1');
+  });
+
+  test('uses custom region in the signed request', async () => {
+    const aws = makeMockAwsSdk();
+
+    jest.mock('@aws-sdk/credential-providers', () => aws.credProviders, { virtual: true });
+    jest.mock('@smithy/signature-v4', () => aws.sigV4, { virtual: true });
+    jest.mock('@aws-crypto/sha256-js', () => aws.sha256, { virtual: true });
+
+    const getToken = awsBedrockTokenProvider({ region: 'eu-west-1' });
+    await getToken();
+
+    expect(aws.mocks.SignatureV4).toHaveBeenCalledWith(
+      expect.objectContaining({ region: 'eu-west-1', service: 'bedrock' }),
+    );
+  });
+
+  test('uses profile when provided', async () => {
+    const aws = makeMockAwsSdk();
+
+    jest.mock('@aws-sdk/credential-providers', () => aws.credProviders, { virtual: true });
+    jest.mock('@smithy/signature-v4', () => aws.sigV4, { virtual: true });
+    jest.mock('@aws-crypto/sha256-js', () => aws.sha256, { virtual: true });
+
+    const getToken = awsBedrockTokenProvider({ region: 'us-east-1', profile: 'my-profile' });
+    await getToken();
+
+    expect(aws.mocks.fromIni).toHaveBeenCalledWith({ profile: 'my-profile' });
+    expect(aws.mocks.fromNodeProviderChain).not.toHaveBeenCalled();
+  });
+
+  test('throws SubjectTokenProviderError when no credentials found', async () => {
+    const aws = makeMockAwsSdk({ noCredentials: true });
+
+    jest.mock('@aws-sdk/credential-providers', () => aws.credProviders, { virtual: true });
+    jest.mock('@smithy/signature-v4', () => aws.sigV4, { virtual: true });
+    jest.mock('@aws-crypto/sha256-js', () => aws.sha256, { virtual: true });
+
+    const getToken = awsBedrockTokenProvider({ region: 'us-east-1' });
+    await expect(getToken()).rejects.toThrow(SubjectTokenProviderError);
+    await expect(getToken()).rejects.toThrow('Failed to generate AWS Bedrock token');
+  });
+
+  test('throws SubjectTokenProviderError when region is not set', async () => {
+    const aws = makeMockAwsSdk();
+
+    jest.mock('@aws-sdk/credential-providers', () => aws.credProviders, { virtual: true });
+    jest.mock('@smithy/signature-v4', () => aws.sigV4, { virtual: true });
+    jest.mock('@aws-crypto/sha256-js', () => aws.sha256, { virtual: true });
+
+    delete process.env['AWS_REGION'];
+    delete process.env['AWS_DEFAULT_REGION'];
+
+    const getToken = awsBedrockTokenProvider();
+    await expect(getToken()).rejects.toThrow(SubjectTokenProviderError);
+    await expect(getToken()).rejects.toThrow('AWS region must be provided');
+  });
+
+  test('resolves region from AWS_REGION env var', async () => {
+    const aws = makeMockAwsSdk();
+
+    jest.mock('@aws-sdk/credential-providers', () => aws.credProviders, { virtual: true });
+    jest.mock('@smithy/signature-v4', () => aws.sigV4, { virtual: true });
+    jest.mock('@aws-crypto/sha256-js', () => aws.sha256, { virtual: true });
+
+    process.env['AWS_REGION'] = 'ap-southeast-1';
+
+    const getToken = awsBedrockTokenProvider();
+    await getToken();
+
+    expect(aws.mocks.SignatureV4).toHaveBeenCalledWith(expect.objectContaining({ region: 'ap-southeast-1' }));
+  });
+
+  test('regenerates token on each call (no caching)', async () => {
+    const aws = makeMockAwsSdk();
+
+    jest.mock('@aws-sdk/credential-providers', () => aws.credProviders, { virtual: true });
+    jest.mock('@smithy/signature-v4', () => aws.sigV4, { virtual: true });
+    jest.mock('@aws-crypto/sha256-js', () => aws.sha256, { virtual: true });
+
+    const getToken = awsBedrockTokenProvider({ region: 'us-east-1' });
+    await getToken();
+    await getToken();
+
+    // presign should be called each time — no token caching
+    expect(aws.mocks.presign).toHaveBeenCalledTimes(2);
   });
 });
