@@ -82,4 +82,27 @@ describe('form data validation', () => {
     );
     expect(Array.from(form2.entries())).toEqual([['bar[]', 'foo']]);
   });
+
+  test('file names strip path separators by default', async () => {
+    const form = await createForm(
+      {
+        file: new File(['Some content'], 'my-skill/SKILL.md'),
+      },
+      fetch,
+    );
+
+    expect((form.get('file') as File).name).toBe('SKILL.md');
+  });
+
+  test('file names can preserve path separators for APIs that require directories', async () => {
+    const form = await createForm(
+      {
+        files: [new File(['Some content'], 'my-skill/SKILL.md')],
+      },
+      fetch,
+      { stripFilenames: false },
+    );
+
+    expect((form.get('files[]') as File).name).toBe('my-skill/SKILL.md');
+  });
 });
