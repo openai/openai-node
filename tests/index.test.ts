@@ -276,6 +276,24 @@ describe('instantiate client', () => {
     expect(spy).toHaveBeenCalledTimes(1);
   });
 
+  test('removes abort listener from caller signal after successful request', async () => {
+    const testFetch = async (_url: string | URL | Request, _init: RequestInit = {}): Promise<Response> => {
+      return new Response(JSON.stringify({ ok: true }), { headers: { 'Content-Type': 'application/json' } });
+    };
+
+    const client = new OpenAI({ apiKey: 'My API Key', fetch: testFetch });
+
+    const controller = new AbortController();
+    const addSpy = jest.spyOn(controller.signal, 'addEventListener');
+    const removeSpy = jest.spyOn(controller.signal, 'removeEventListener');
+
+    await client.get('/foo', { signal: controller.signal });
+
+    expect(addSpy).toHaveBeenCalledWith('abort', expect.any(Function), { once: true });
+    expect(removeSpy).toHaveBeenCalledWith('abort', expect.any(Function));
+    expect(addSpy.mock.calls[0]![1]).toBe(removeSpy.mock.calls[0]![1]);
+  });
+
   test('normalized method', async () => {
     let capturedRequest: RequestInit | undefined;
     const testFetch = async (url: string | URL | Request, init: RequestInit = {}): Promise<Response> => {
