@@ -200,15 +200,11 @@ export function gcpIDTokenProvider(
  *
  * @param config.region - AWS region. Defaults to `AWS_REGION` or `AWS_DEFAULT_REGION` environment variable.
  * @param config.profile - AWS profile name. If not set, credentials are resolved from the standard chain.
- * @param config.tokenDuration - Presigned URL expiry in seconds. Defaults to 3600 (1 hour).
  */
 export function awsBedrockTokenProvider(config?: {
   region?: string;
   profile?: string;
-  tokenDuration?: number;
 }): () => Promise<string> {
-  const tokenDuration = config?.tokenDuration ?? 3600;
-
   let cachedModules: { credProviders: any; SignatureV4Cls: any; Sha256Cls: any } | null = null;
 
   async function getAwsModules() {
@@ -273,9 +269,7 @@ export function awsBedrockTokenProvider(config?: {
         protocol: 'https:',
       };
 
-      const presigned = await signer.presign(request, {
-        expiresIn: tokenDuration,
-      });
+      const presigned = await signer.presign(request);
 
       // Reconstruct the signed URL from the presigned request
       const queryParams = presigned.query as Record<string, string>;
