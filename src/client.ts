@@ -464,7 +464,7 @@ export class OpenAI {
           parsed[line.substring(0, colon).trim()] = line.substring(colon + 1).trim();
         }
       }
-      options.defaultHeaders = { ...parsed, ...options.defaultHeaders };
+      options.defaultHeaders = buildHeaders([parsed, options.defaultHeaders]);
     }
 
     this._options = options;
@@ -515,20 +515,26 @@ export class OpenAI {
     return this._options.defaultQuery;
   }
 
-  protected validateHeaders({ values, nulls }: NullableHeaders) {
+  protected validateHeaders(
+    { values, nulls }: NullableHeaders,
+    schemes: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean } = {
+      bearerAuth: true,
+      adminAPIKeyAuth: true,
+    },
+  ) {
     if (values.get('authorization') || values.get('api-key')) {
       return;
     }
-    if (nulls.has('authorization')) {
+    if (nulls.has('authorization') || nulls.has('api-key')) {
       return;
     }
 
-    if (this._workloadIdentityAuth) {
+    if (this._workloadIdentityAuth && schemes.bearerAuth) {
       return;
     }
 
     throw new Error(
-      'Could not resolve authentication method. Expected either apiKey or adminAPIKey to be set. Or for one of the "Authorization" or "Authorization" headers to be explicitly omitted',
+      'Could not resolve authentication method. Expected either apiKey or adminAPIKey to be set. Or for one of the "Authorization" or "api-key" headers to be explicitly omitted',
     );
   }
 
@@ -636,7 +642,10 @@ export class OpenAI {
    * Used as a callback for mutating the given `FinalRequestOptions` object.
    */
   protected async prepareOptions(options: FinalRequestOptions): Promise<void> {
-    await this._callApiKey();
+    const security = options.__security ?? { bearerAuth: true };
+    if (security.bearerAuth) {
+      await this._callApiKey();
+    }
   }
 
   /**
@@ -728,8 +737,9 @@ export class OpenAI {
       throw new Errors.APIUserAbortError();
     }
 
+    const security = options.__security ?? { bearerAuth: true };
     const controller = new AbortController();
-    const response = await this.fetchWithAuth(url, req, timeout, controller).catch(castToError);
+    const response = await this.fetchWithAuth(url, req, timeout, controller, security).catch(castToError);
     const headersTime = Date.now();
 
     if (response instanceof globalThis.Error) {
@@ -792,6 +802,7 @@ export class OpenAI {
       if (
         response.status === 401 &&
         this._workloadIdentityAuth &&
+        security.bearerAuth &&
         !options.__metadata?.['hasStreamingBody'] &&
         !options.__metadata?.['workloadIdentityTokenRefreshed']
       ) {
@@ -904,8 +915,12 @@ export class OpenAI {
     init: RequestInit,
     timeout: number,
     controller: AbortController,
+    schemes: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean } = {
+      bearerAuth: true,
+      adminAPIKeyAuth: true,
+    },
   ): Promise<Response> {
-    if (this._workloadIdentityAuth) {
+    if (this._workloadIdentityAuth && schemes.bearerAuth) {
       const headers = init.headers as Headers;
       const authHeader = headers.get('Authorization');
       if (!authHeader || authHeader === `Bearer ${WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}`) {
@@ -1095,13 +1110,13 @@ export class OpenAI {
         'OpenAI-Organization': this.organization,
         'OpenAI-Project': this.project,
       },
-      await this.authHeaders(options, options.__security ?? { bearerAuth: true, adminAPIKeyAuth: true }),
+      await this.authHeaders(options, options.__security ?? { bearerAuth: true }),
       this._options.defaultHeaders,
       bodyHeaders,
       options.headers,
     ]);
 
-    this.validateHeaders(headers);
+    this.validateHeaders(headers, options.__security ?? { bearerAuth: true });
 
     return headers.values;
   }

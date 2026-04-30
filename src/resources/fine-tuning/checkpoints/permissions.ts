@@ -40,7 +40,7 @@ export class Permissions extends APIResource {
     return this._client.getAPIList(
       path`/fine_tuning/checkpoints/${fineTunedModelCheckpoint}/permissions`,
       Page<PermissionCreateResponse>,
-      { body, method: 'post', ...options, __security: { bearerAuth: true } },
+      { body, method: 'post', ...options, __security: { adminAPIKeyAuth: true } },
     );
   }
 
@@ -60,7 +60,7 @@ export class Permissions extends APIResource {
     return this._client.get(path`/fine_tuning/checkpoints/${fineTunedModelCheckpoint}/permissions`, {
       query,
       ...options,
-      __security: { bearerAuth: true },
+      __security: { adminAPIKeyAuth: true },
     });
   }
 
@@ -88,7 +88,7 @@ export class Permissions extends APIResource {
     return this._client.getAPIList(
       path`/fine_tuning/checkpoints/${fineTunedModelCheckpoint}/permissions`,
       ConversationCursorPage<PermissionListResponse>,
-      { query, ...options, __security: { bearerAuth: true } },
+      { query, ...options, __security: { adminAPIKeyAuth: true } },
     );
   }
 
@@ -118,7 +118,7 @@ export class Permissions extends APIResource {
     const { fine_tuned_model_checkpoint } = params;
     return this._client.delete(
       path`/fine_tuning/checkpoints/${fine_tuned_model_checkpoint}/permissions/${permissionID}`,
-      { ...options, __security: { bearerAuth: true } },
+      { ...options, __security: { adminAPIKeyAuth: true } },
     );
   }
 }
