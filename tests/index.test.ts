@@ -49,6 +49,34 @@ describe('instantiate client', () => {
       });
       expect(req.headers.has('x-my-default-header')).toBe(false);
     });
+
+    test('preserves Headers defaultHeaders when OPENAI_CUSTOM_HEADERS is set', async () => {
+      process.env['OPENAI_CUSTOM_HEADERS'] = 'X-Env-Header: env\nX-My-Default-Header: env-default';
+
+      const client = new OpenAI({
+        baseURL: 'http://localhost:5000/',
+        defaultHeaders: new Headers({ 'X-My-Default-Header': '2' }),
+        apiKey: 'My API Key',
+      });
+
+      const { req } = await client.buildRequest({ path: '/foo', method: 'post' });
+      expect(req.headers.get('x-env-header')).toEqual('env');
+      expect(req.headers.get('x-my-default-header')).toEqual('2');
+    });
+
+    test('preserves tuple defaultHeaders when OPENAI_CUSTOM_HEADERS is set', async () => {
+      process.env['OPENAI_CUSTOM_HEADERS'] = 'X-Env-Header: env';
+
+      const client = new OpenAI({
+        baseURL: 'http://localhost:5000/',
+        defaultHeaders: [['X-Tuple-Header', 'tuple']],
+        apiKey: 'My API Key',
+      });
+
+      const { req } = await client.buildRequest({ path: '/foo', method: 'post' });
+      expect(req.headers.get('x-env-header')).toEqual('env');
+      expect(req.headers.get('x-tuple-header')).toEqual('tuple');
+    });
   });
   describe('logging', () => {
     const env = process.env;
@@ -854,6 +882,61 @@ describe('retries', () => {
         __security: { adminAPIKeyAuth: true },
       });
       expect(admin.req.headers.get('authorization')).toEqual('Bearer My Admin API Key');
+    });
+
+    test('defaults to bearer auth when both apiKey and adminAPIKey are configured', async () => {
+      const client = new OpenAI({
+        baseURL: 'http://localhost:5000/',
+        apiKey: 'My API Key',
+        adminAPIKey: 'My Admin API Key',
+      });
+
+      const { req } = await client.buildRequest({ path: '/foo', method: 'get' });
+      expect(req.headers.get('authorization')).toEqual('Bearer My API Key');
+    });
+
+    test('does not resolve apiKey provider for admin-only requests', async () => {
+      const testFetch = async (url: any, { headers }: RequestInit = {}): Promise<Response> => {
+        return new Response(JSON.stringify({}), { headers: headers ?? [] });
+      };
+      const apiKey = jest.fn(async () => {
+        throw new Error('should not be called');
+      });
+      const client = new OpenAI({
+        baseURL: 'http://localhost:5000/',
+        apiKey,
+        adminAPIKey: 'My Admin API Key',
+        fetch: testFetch,
+      });
+
+      const response = await client
+        .request({
+          path: '/organization/projects',
+          method: 'get',
+          __security: { adminAPIKeyAuth: true },
+        })
+        .asResponse();
+
+      expect(apiKey).not.toHaveBeenCalled();
+      expect(response.headers.get('authorization')).toEqual('Bearer My Admin API Key');
+    });
+
+    test('checkpoint permission routes use admin auth', async () => {
+      const testFetch = async (url: any, { headers }: RequestInit = {}): Promise<Response> => {
+        return new Response(JSON.stringify({}), { headers: headers ?? [] });
+      };
+      const client = new OpenAI({
+        baseURL: 'http://localhost:5000/',
+        apiKey: null,
+        adminAPIKey: 'My Admin API Key',
+        fetch: testFetch,
+      });
+
+      const response = await client.fineTuning.checkpoints.permissions
+        .retrieve('ft:gpt-4o-mini-2024-07-18:org:weather:B7R9VjQd')
+        .asResponse();
+
+      expect(response.headers.get('authorization')).toEqual('Bearer My Admin API Key');
     });
 
     test('adminAPIKey only', async () => {

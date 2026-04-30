@@ -93,6 +93,26 @@ describe('OpenAI with Workload Identity', () => {
     expect(apiRequestHeaders!.get('Authorization')).toBe('Bearer exchanged-access-token');
   });
 
+  test('does not satisfy admin-only auth with workload identity', async () => {
+    global.fetch = jest.fn(async () => {
+      return new Response('Unexpected request', { status: 500 });
+    }) as typeof fetch;
+
+    const client = new OpenAI(createTestClientOptions());
+
+    await expect(
+      client
+        .request({
+          path: '/organization/projects',
+          method: 'get',
+          __security: { adminAPIKeyAuth: true },
+        })
+        .asResponse(),
+    ).rejects.toThrow(/Could not resolve authentication method/);
+
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
   test('reuses cached token across multiple requests', async () => {
     let tokenExchangeCallCount = 0;
 
