@@ -946,9 +946,10 @@ export class OpenAI {
       }
     }
 
-    // If the API asks us to wait a certain amount of time, just do what it
-    // says, but otherwise calculate a default
-    if (timeoutMillis === undefined) {
+    // If the API asks us to wait a reasonable amount of time, just do what it
+    // says, but otherwise calculate a default.
+    const maxRetryAfterMillis = 60 * 1000;
+    if (!(timeoutMillis && 0 <= timeoutMillis && timeoutMillis < maxRetryAfterMillis)) {
       const maxRetries = options.maxRetries ?? this.maxRetries;
       timeoutMillis = this.calculateDefaultRetryTimeoutMillis(retriesRemaining, maxRetries);
     }
