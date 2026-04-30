@@ -49,19 +49,35 @@ export function makeFile(
   return new File(fileBits as any, fileName ?? 'unknown_file', options);
 }
 
-export function getName(value: any, opts?: { stripFilename?: boolean }): string | undefined {
-  const name =
-    (typeof value === 'object' &&
-      value !== null &&
-      (('name' in value && value.name && String(value.name)) ||
-        ('url' in value && value.url && String(value.url)) ||
-        ('filename' in value && value.filename && String(value.filename)) ||
-        ('path' in value && value.path && String(value.path)))) ||
-    '';
-
-  if (!name) return undefined;
-  if (opts?.stripFilename === false) return name;
+function basename(name: string, source: 'url' | 'path' | 'explicit'): string | undefined {
+  if (source === 'url') {
+    try {
+      name = new URL(name).pathname;
+    } catch {
+      // Fall back to separator splitting for non-URL values.
+    }
+  }
   return name.split(/[\\/]/).pop() || undefined;
+}
+
+export function getName(value: any, opts?: { stripFilename?: boolean | undefined }): string | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+
+  const explicitName =
+    ('name' in value && value.name && String(value.name)) ||
+    ('filename' in value && value.filename && String(value.filename));
+  if (explicitName) {
+    if (opts?.stripFilename === false) return explicitName;
+    return basename(explicitName, 'explicit');
+  }
+
+  const urlName = 'url' in value && value.url && String(value.url);
+  if (urlName) return basename(urlName, 'url');
+
+  const pathName = 'path' in value && value.path && String(value.path);
+  if (pathName) return basename(pathName, 'path');
+
+  return undefined;
 }
 
 export const isAsyncIterable = (value: any): value is AsyncIterable<any> =>
