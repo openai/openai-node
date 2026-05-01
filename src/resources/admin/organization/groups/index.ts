@@ -22,9 +22,11 @@ export {
 } from './roles';
 export {
   Users,
+  type OrganizationGroupUser,
   type UserCreateResponse,
   type UserDeleteResponse,
   type UserCreateParams,
   type UserListParams,
   type UserDeleteParams,
+  type OrganizationGroupUsersPage,
 } from './users';

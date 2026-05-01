@@ -1,8 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../../../core/resource';
-import * as CertificatesAPI from '../certificates';
-import { CertificatesPage } from '../certificates';
 import {
   ConversationCursorPage,
   type ConversationCursorPageParams,
@@ -19,7 +17,7 @@ export class Certificates extends APIResource {
    * @example
    * ```ts
    * // Automatically fetches more pages as needed.
-   * for await (const certificate of client.admin.organization.projects.certificates.list(
+   * for await (const certificateListResponse of client.admin.organization.projects.certificates.list(
    *   'project_id',
    * )) {
    *   // ...
@@ -30,10 +28,10 @@ export class Certificates extends APIResource {
     projectID: string,
     query: CertificateListParams | null | undefined = {},
     options?: RequestOptions,
-  ): PagePromise<CertificatesPage, CertificatesAPI.Certificate> {
+  ): PagePromise<CertificateListResponsesPage, CertificateListResponse> {
     return this._client.getAPIList(
       path`/organization/projects/${projectID}/certificates`,
-      ConversationCursorPage<CertificatesAPI.Certificate>,
+      ConversationCursorPage<CertificateListResponse>,
       { query, ...options, __security: { adminAPIKeyAuth: true } },
     );
   }
@@ -46,7 +44,7 @@ export class Certificates extends APIResource {
    * @example
    * ```ts
    * // Automatically fetches more pages as needed.
-   * for await (const certificate of client.admin.organization.projects.certificates.activate(
+   * for await (const certificateActivateResponse of client.admin.organization.projects.certificates.activate(
    *   'project_id',
    *   { certificate_ids: ['cert_abc'] },
    * )) {
@@ -58,10 +56,10 @@ export class Certificates extends APIResource {
     projectID: string,
     body: CertificateActivateParams,
     options?: RequestOptions,
-  ): PagePromise<CertificatesPage, CertificatesAPI.Certificate> {
+  ): PagePromise<CertificateActivateResponsesPage, CertificateActivateResponse> {
     return this._client.getAPIList(
       path`/organization/projects/${projectID}/certificates/activate`,
-      Page<CertificatesAPI.Certificate>,
+      Page<CertificateActivateResponse>,
       { body, method: 'post', ...options, __security: { adminAPIKeyAuth: true } },
     );
   }
@@ -73,7 +71,7 @@ export class Certificates extends APIResource {
    * @example
    * ```ts
    * // Automatically fetches more pages as needed.
-   * for await (const certificate of client.admin.organization.projects.certificates.deactivate(
+   * for await (const certificateDeactivateResponse of client.admin.organization.projects.certificates.deactivate(
    *   'project_id',
    *   { certificate_ids: ['cert_abc'] },
    * )) {
@@ -85,12 +83,158 @@ export class Certificates extends APIResource {
     projectID: string,
     body: CertificateDeactivateParams,
     options?: RequestOptions,
-  ): PagePromise<CertificatesPage, CertificatesAPI.Certificate> {
+  ): PagePromise<CertificateDeactivateResponsesPage, CertificateDeactivateResponse> {
     return this._client.getAPIList(
       path`/organization/projects/${projectID}/certificates/deactivate`,
-      Page<CertificatesAPI.Certificate>,
+      Page<CertificateDeactivateResponse>,
       { body, method: 'post', ...options, __security: { adminAPIKeyAuth: true } },
     );
+  }
+}
+
+export type CertificateListResponsesPage = ConversationCursorPage<CertificateListResponse>;
+
+// Note: no pagination actually occurs yet, this is for forwards-compatibility.
+export type CertificateActivateResponsesPage = Page<CertificateActivateResponse>;
+
+// Note: no pagination actually occurs yet, this is for forwards-compatibility.
+export type CertificateDeactivateResponsesPage = Page<CertificateDeactivateResponse>;
+
+/**
+ * Represents an individual certificate configured at the project level.
+ */
+export interface CertificateListResponse {
+  /**
+   * The identifier, which can be referenced in API endpoints
+   */
+  id: string;
+
+  /**
+   * Whether the certificate is currently active at the project level.
+   */
+  active: boolean;
+
+  certificate_details: CertificateListResponse.CertificateDetails;
+
+  /**
+   * The Unix timestamp (in seconds) of when the certificate was uploaded.
+   */
+  created_at: number;
+
+  /**
+   * The name of the certificate.
+   */
+  name: string | null;
+
+  /**
+   * The object type, which is always `organization.project.certificate`.
+   */
+  object: 'organization.project.certificate';
+}
+
+export namespace CertificateListResponse {
+  export interface CertificateDetails {
+    /**
+     * The Unix timestamp (in seconds) of when the certificate expires.
+     */
+    expires_at?: number;
+
+    /**
+     * The Unix timestamp (in seconds) of when the certificate becomes valid.
+     */
+    valid_at?: number;
+  }
+}
+
+/**
+ * Represents an individual certificate configured at the project level.
+ */
+export interface CertificateActivateResponse {
+  /**
+   * The identifier, which can be referenced in API endpoints
+   */
+  id: string;
+
+  /**
+   * Whether the certificate is currently active at the project level.
+   */
+  active: boolean;
+
+  certificate_details: CertificateActivateResponse.CertificateDetails;
+
+  /**
+   * The Unix timestamp (in seconds) of when the certificate was uploaded.
+   */
+  created_at: number;
+
+  /**
+   * The name of the certificate.
+   */
+  name: string | null;
+
+  /**
+   * The object type, which is always `organization.project.certificate`.
+   */
+  object: 'organization.project.certificate';
+}
+
+export namespace CertificateActivateResponse {
+  export interface CertificateDetails {
+    /**
+     * The Unix timestamp (in seconds) of when the certificate expires.
+     */
+    expires_at?: number;
+
+    /**
+     * The Unix timestamp (in seconds) of when the certificate becomes valid.
+     */
+    valid_at?: number;
+  }
+}
+
+/**
+ * Represents an individual certificate configured at the project level.
+ */
+export interface CertificateDeactivateResponse {
+  /**
+   * The identifier, which can be referenced in API endpoints
+   */
+  id: string;
+
+  /**
+   * Whether the certificate is currently active at the project level.
+   */
+  active: boolean;
+
+  certificate_details: CertificateDeactivateResponse.CertificateDetails;
+
+  /**
+   * The Unix timestamp (in seconds) of when the certificate was uploaded.
+   */
+  created_at: number;
+
+  /**
+   * The name of the certificate.
+   */
+  name: string | null;
+
+  /**
+   * The object type, which is always `organization.project.certificate`.
+   */
+  object: 'organization.project.certificate';
+}
+
+export namespace CertificateDeactivateResponse {
+  export interface CertificateDetails {
+    /**
+     * The Unix timestamp (in seconds) of when the certificate expires.
+     */
+    expires_at?: number;
+
+    /**
+     * The Unix timestamp (in seconds) of when the certificate becomes valid.
+     */
+    valid_at?: number;
   }
 }
 
@@ -112,10 +256,14 @@ export interface CertificateDeactivateParams {
 
 export declare namespace Certificates {
   export {
+    type CertificateListResponse as CertificateListResponse,
+    type CertificateActivateResponse as CertificateActivateResponse,
+    type CertificateDeactivateResponse as CertificateDeactivateResponse,
+    type CertificateListResponsesPage as CertificateListResponsesPage,
+    type CertificateActivateResponsesPage as CertificateActivateResponsesPage,
+    type CertificateDeactivateResponsesPage as CertificateDeactivateResponsesPage,
     type CertificateListParams as CertificateListParams,
     type CertificateActivateParams as CertificateActivateParams,
     type CertificateDeactivateParams as CertificateDeactivateParams,
   };
 }
-
-export { type CertificatesPage };

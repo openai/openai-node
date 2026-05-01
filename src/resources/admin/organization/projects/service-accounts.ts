@@ -148,7 +148,7 @@ export interface ProjectServiceAccount {
 export interface ServiceAccountCreateResponse {
   id: string;
 
-  api_key: ServiceAccountCreateResponse.APIKey;
+  api_key: ServiceAccountCreateResponse.APIKey | null;
 
   created_at: number;
 

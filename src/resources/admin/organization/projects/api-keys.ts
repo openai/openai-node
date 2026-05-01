@@ -1,8 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../../../core/resource';
-import * as ServiceAccountsAPI from './service-accounts';
-import * as UsersAPI from './users/users';
 import { APIPromise } from '../../../../core/api-promise';
 import {
   ConversationCursorPage,
@@ -20,14 +18,18 @@ export class APIKeys extends APIResource {
    * ```ts
    * const projectAPIKey =
    *   await client.admin.organization.projects.apiKeys.retrieve(
-   *     'key_id',
+   *     'api_key_id',
    *     { project_id: 'project_id' },
    *   );
    * ```
    */
-  retrieve(keyID: string, params: APIKeyRetrieveParams, options?: RequestOptions): APIPromise<ProjectAPIKey> {
+  retrieve(
+    apiKeyID: string,
+    params: APIKeyRetrieveParams,
+    options?: RequestOptions,
+  ): APIPromise<ProjectAPIKey> {
     const { project_id } = params;
-    return this._client.get(path`/organization/projects/${project_id}/api_keys/${keyID}`, {
+    return this._client.get(path`/organization/projects/${project_id}/api_keys/${apiKeyID}`, {
       ...options,
       __security: { adminAPIKeyAuth: true },
     });
@@ -68,18 +70,18 @@ export class APIKeys extends APIResource {
    * ```ts
    * const apiKey =
    *   await client.admin.organization.projects.apiKeys.delete(
-   *     'key_id',
+   *     'api_key_id',
    *     { project_id: 'project_id' },
    *   );
    * ```
    */
   delete(
-    keyID: string,
+    apiKeyID: string,
     params: APIKeyDeleteParams,
     options?: RequestOptions,
   ): APIPromise<APIKeyDeleteResponse> {
     const { project_id } = params;
-    return this._client.delete(path`/organization/projects/${project_id}/api_keys/${keyID}`, {
+    return this._client.delete(path`/organization/projects/${project_id}/api_keys/${apiKeyID}`, {
       ...options,
       __security: { adminAPIKeyAuth: true },
     });
@@ -105,7 +107,7 @@ export interface ProjectAPIKey {
   /**
    * The Unix timestamp (in seconds) of when the API key was last used.
    */
-  last_used_at: number;
+  last_used_at: number | null;
 
   /**
    * The name of the API key
@@ -128,9 +130,9 @@ export interface ProjectAPIKey {
 export namespace ProjectAPIKey {
   export interface Owner {
     /**
-     * Represents an individual service account in a project.
+     * The service account that owns a project API key.
      */
-    service_account?: ServiceAccountsAPI.ProjectServiceAccount;
+    service_account?: Owner.ServiceAccount;
 
     /**
      * `user` or `service_account`
@@ -138,9 +140,66 @@ export namespace ProjectAPIKey {
     type?: 'user' | 'service_account';
 
     /**
-     * Represents an individual user in a project.
+     * The user that owns a project API key.
      */
-    user?: UsersAPI.ProjectUser;
+    user?: Owner.User;
+  }
+
+  export namespace Owner {
+    /**
+     * The service account that owns a project API key.
+     */
+    export interface ServiceAccount {
+      /**
+       * The identifier, which can be referenced in API endpoints
+       */
+      id: string;
+
+      /**
+       * The Unix timestamp (in seconds) of when the service account was created.
+       */
+      created_at: number;
+
+      /**
+       * The name of the service account.
+       */
+      name: string;
+
+      /**
+       * The service account's project role.
+       */
+      role: string;
+    }
+
+    /**
+     * The user that owns a project API key.
+     */
+    export interface User {
+      /**
+       * The identifier, which can be referenced in API endpoints
+       */
+      id: string;
+
+      /**
+       * The Unix timestamp (in seconds) of when the user was created.
+       */
+      created_at: number;
+
+      /**
+       * The email address of the user.
+       */
+      email: string;
+
+      /**
+       * The name of the user.
+       */
+      name: string;
+
+      /**
+       * The user's project role.
+       */
+      role: string;
+    }
   }
 }
 

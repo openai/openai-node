@@ -10,7 +10,7 @@ const client = new OpenAI({
 
 describe('resource apiKeys', () => {
   test('retrieve: only required params', async () => {
-    const responsePromise = client.admin.organization.projects.apiKeys.retrieve('key_id', {
+    const responsePromise = client.admin.organization.projects.apiKeys.retrieve('api_key_id', {
       project_id: 'project_id',
     });
     const rawResponse = await responsePromise.asResponse();
@@ -23,7 +23,7 @@ describe('resource apiKeys', () => {
   });
 
   test('retrieve: required and optional params', async () => {
-    const response = await client.admin.organization.projects.apiKeys.retrieve('key_id', {
+    const response = await client.admin.organization.projects.apiKeys.retrieve('api_key_id', {
       project_id: 'project_id',
     });
   });
@@ -51,7 +51,7 @@ describe('resource apiKeys', () => {
   });
 
   test('delete: only required params', async () => {
-    const responsePromise = client.admin.organization.projects.apiKeys.delete('key_id', {
+    const responsePromise = client.admin.organization.projects.apiKeys.delete('api_key_id', {
       project_id: 'project_id',
     });
     const rawResponse = await responsePromise.asResponse();
@@ -64,7 +64,7 @@ describe('resource apiKeys', () => {
   });
 
   test('delete: required and optional params', async () => {
-    const response = await client.admin.organization.projects.apiKeys.delete('key_id', {
+    const response = await client.admin.organization.projects.apiKeys.delete('api_key_id', {
       project_id: 'project_id',
     });
   });

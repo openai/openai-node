@@ -20,8 +20,8 @@ describe('resource users', () => {
     expect(dataAndResponse.response).toBe(rawResponse);
   });
 
-  test('update: only required params', async () => {
-    const responsePromise = client.admin.organization.users.update('user_id', { role: 'owner' });
+  test('update', async () => {
+    const responsePromise = client.admin.organization.users.update('user_id', {});
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -29,10 +29,6 @@ describe('resource users', () => {
     const dataAndResponse = await responsePromise.withResponse();
     expect(dataAndResponse.data).toBe(response);
     expect(dataAndResponse.response).toBe(rawResponse);
-  });
-
-  test('update: required and optional params', async () => {
-    const response = await client.admin.organization.users.update('user_id', { role: 'owner' });
   });
 
   test('list', async () => {
