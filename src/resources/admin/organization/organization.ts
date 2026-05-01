@@ -5,6 +5,7 @@ import * as AdminAPIKeysAPI from './admin-api-keys';
 import {
   AdminAPIKey,
   AdminAPIKeyCreateParams,
+  AdminAPIKeyCreateResponse,
   AdminAPIKeyDeleteResponse,
   AdminAPIKeyListParams,
   AdminAPIKeys,
@@ -16,14 +17,19 @@ import * as CertificatesAPI from './certificates';
 import {
   Certificate,
   CertificateActivateParams,
+  CertificateActivateResponse,
+  CertificateActivateResponsesPage,
   CertificateCreateParams,
   CertificateDeactivateParams,
+  CertificateDeactivateResponse,
+  CertificateDeactivateResponsesPage,
   CertificateDeleteResponse,
   CertificateListParams,
+  CertificateListResponse,
+  CertificateListResponsesPage,
   CertificateRetrieveParams,
   CertificateUpdateParams,
   Certificates,
-  CertificatesPage,
 } from './certificates';
 import * as InvitesAPI from './invites';
 import {
@@ -129,6 +135,7 @@ export declare namespace Organization {
   export {
     AdminAPIKeys as AdminAPIKeys,
     type AdminAPIKey as AdminAPIKey,
+    type AdminAPIKeyCreateResponse as AdminAPIKeyCreateResponse,
     type AdminAPIKeyDeleteResponse as AdminAPIKeyDeleteResponse,
     type AdminAPIKeysPage as AdminAPIKeysPage,
     type AdminAPIKeyCreateParams as AdminAPIKeyCreateParams,
@@ -199,8 +206,13 @@ export declare namespace Organization {
   export {
     Certificates as Certificates,
     type Certificate as Certificate,
+    type CertificateListResponse as CertificateListResponse,
     type CertificateDeleteResponse as CertificateDeleteResponse,
-    type CertificatesPage as CertificatesPage,
+    type CertificateActivateResponse as CertificateActivateResponse,
+    type CertificateDeactivateResponse as CertificateDeactivateResponse,
+    type CertificateListResponsesPage as CertificateListResponsesPage,
+    type CertificateActivateResponsesPage as CertificateActivateResponsesPage,
+    type CertificateDeactivateResponsesPage as CertificateDeactivateResponsesPage,
     type CertificateCreateParams as CertificateCreateParams,
     type CertificateRetrieveParams as CertificateRetrieveParams,
     type CertificateUpdateParams as CertificateUpdateParams,

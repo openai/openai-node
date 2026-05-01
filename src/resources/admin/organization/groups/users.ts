@@ -1,10 +1,8 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../../../core/resource';
-import * as OrganizationUsersAPI from '../users/users';
-import { OrganizationUsersPage } from '../users/users';
 import { APIPromise } from '../../../../core/api-promise';
-import { CursorPage, type CursorPageParams, PagePromise } from '../../../../core/pagination';
+import { NextCursorPage, type NextCursorPageParams, PagePromise } from '../../../../core/pagination';
 import { RequestOptions } from '../../../../internal/request-options';
 import { path } from '../../../../internal/utils/path';
 
@@ -35,7 +33,7 @@ export class Users extends APIResource {
    * @example
    * ```ts
    * // Automatically fetches more pages as needed.
-   * for await (const organizationUser of client.admin.organization.groups.users.list(
+   * for await (const organizationGroupUser of client.admin.organization.groups.users.list(
    *   'group_id',
    * )) {
    *   // ...
@@ -46,10 +44,10 @@ export class Users extends APIResource {
     groupID: string,
     query: UserListParams | null | undefined = {},
     options?: RequestOptions,
-  ): PagePromise<OrganizationUsersPage, OrganizationUsersAPI.OrganizationUser> {
+  ): PagePromise<OrganizationGroupUsersPage, OrganizationGroupUser> {
     return this._client.getAPIList(
       path`/organization/groups/${groupID}/users`,
-      CursorPage<OrganizationUsersAPI.OrganizationUser>,
+      NextCursorPage<OrganizationGroupUser>,
       { query, ...options, __security: { adminAPIKeyAuth: true } },
     );
   }
@@ -73,6 +71,28 @@ export class Users extends APIResource {
       __security: { adminAPIKeyAuth: true },
     });
   }
+}
+
+export type OrganizationGroupUsersPage = NextCursorPage<OrganizationGroupUser>;
+
+/**
+ * Represents an individual user returned when inspecting group membership.
+ */
+export interface OrganizationGroupUser {
+  /**
+   * The identifier, which can be referenced in API endpoints
+   */
+  id: string;
+
+  /**
+   * The email address of the user.
+   */
+  email: string | null;
+
+  /**
+   * The name of the user.
+   */
+  name: string;
 }
 
 /**
@@ -117,7 +137,7 @@ export interface UserCreateParams {
   user_id: string;
 }
 
-export interface UserListParams extends CursorPageParams {
+export interface UserListParams extends NextCursorPageParams {
   /**
    * Specifies the sort order of users in the list.
    */
@@ -133,12 +153,12 @@ export interface UserDeleteParams {
 
 export declare namespace Users {
   export {
+    type OrganizationGroupUser as OrganizationGroupUser,
     type UserCreateResponse as UserCreateResponse,
     type UserDeleteResponse as UserDeleteResponse,
+    type OrganizationGroupUsersPage as OrganizationGroupUsersPage,
     type UserCreateParams as UserCreateParams,
     type UserListParams as UserListParams,
     type UserDeleteParams as UserDeleteParams,
   };
 }
-
-export { type OrganizationUsersPage };

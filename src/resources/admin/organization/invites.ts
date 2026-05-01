@@ -103,6 +103,11 @@ export interface Invite {
   id: string;
 
   /**
+   * The Unix timestamp (in seconds) of when the invite was sent.
+   */
+  created_at: number;
+
+  /**
    * The email address of the individual to whom the invite was sent
    */
   email: string;
@@ -110,12 +115,7 @@ export interface Invite {
   /**
    * The Unix timestamp (in seconds) of when the invite expires.
    */
-  expires_at: number;
-
-  /**
-   * The Unix timestamp (in seconds) of when the invite was sent.
-   */
-  invited_at: number;
+  expires_at: number | null;
 
   /**
    * The object type, which is always `organization.invite`
@@ -135,7 +135,7 @@ export interface Invite {
   /**
    * The Unix timestamp (in seconds) of when the invite was accepted.
    */
-  accepted_at?: number;
+  accepted_at?: number | null;
 
   /**
    * The projects that were granted membership upon acceptance of the invite.

@@ -46,9 +46,7 @@ export class Users extends APIResource {
    * @example
    * ```ts
    * const organizationUser =
-   *   await client.admin.organization.users.update('user_id', {
-   *     role: 'owner',
-   *   });
+   *   await client.admin.organization.users.update('user_id');
    * ```
    */
   update(userID: string, body: UserUpdateParams, options?: RequestOptions): APIPromise<OrganizationUser> {
@@ -148,7 +146,7 @@ export interface UserUpdateParams {
   /**
    * `owner` or `reader`
    */
-  role: 'owner' | 'reader';
+  role?: 'owner' | 'reader';
 }
 
 export interface UserListParams extends ConversationCursorPageParams {

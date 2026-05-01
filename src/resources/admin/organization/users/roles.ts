@@ -4,7 +4,7 @@ import { APIResource } from '../../../../core/resource';
 import * as RolesAPI from '../roles';
 import * as UsersAPI from './users';
 import { APIPromise } from '../../../../core/api-promise';
-import { CursorPage, type CursorPageParams, PagePromise } from '../../../../core/pagination';
+import { NextCursorPage, type NextCursorPageParams, PagePromise } from '../../../../core/pagination';
 import { RequestOptions } from '../../../../internal/request-options';
 import { path } from '../../../../internal/utils/path';
 
@@ -47,11 +47,11 @@ export class Roles extends APIResource {
     query: RoleListParams | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<RoleListResponsesPage, RoleListResponse> {
-    return this._client.getAPIList(path`/organization/users/${userID}/roles`, CursorPage<RoleListResponse>, {
-      query,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.getAPIList(
+      path`/organization/users/${userID}/roles`,
+      NextCursorPage<RoleListResponse>,
+      { query, ...options, __security: { adminAPIKeyAuth: true } },
+    );
   }
 
   /**
@@ -75,7 +75,7 @@ export class Roles extends APIResource {
   }
 }
 
-export type RoleListResponsesPage = CursorPage<RoleListResponse>;
+export type RoleListResponsesPage = NextCursorPage<RoleListResponse>;
 
 /**
  * Role assignment linking a user to a role.
@@ -181,7 +181,7 @@ export interface RoleCreateParams {
   role_id: string;
 }
 
-export interface RoleListParams extends CursorPageParams {
+export interface RoleListParams extends NextCursorPageParams {
   /**
    * Sort order for the returned organization roles.
    */

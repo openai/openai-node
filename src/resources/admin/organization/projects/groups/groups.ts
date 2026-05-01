@@ -13,7 +13,7 @@ import {
   Roles,
 } from './roles';
 import { APIPromise } from '../../../../../core/api-promise';
-import { CursorPage, type CursorPageParams, PagePromise } from '../../../../../core/pagination';
+import { NextCursorPage, type NextCursorPageParams, PagePromise } from '../../../../../core/pagination';
 import { RequestOptions } from '../../../../../internal/request-options';
 import { path } from '../../../../../internal/utils/path';
 
@@ -60,7 +60,7 @@ export class Groups extends APIResource {
   ): PagePromise<ProjectGroupsPage, ProjectGroup> {
     return this._client.getAPIList(
       path`/organization/projects/${projectID}/groups`,
-      CursorPage<ProjectGroup>,
+      NextCursorPage<ProjectGroup>,
       { query, ...options, __security: { adminAPIKeyAuth: true } },
     );
   }
@@ -90,7 +90,7 @@ export class Groups extends APIResource {
   }
 }
 
-export type ProjectGroupsPage = CursorPage<ProjectGroup>;
+export type ProjectGroupsPage = NextCursorPage<ProjectGroup>;
 
 /**
  * Details about a group's membership in a project.
@@ -149,7 +149,7 @@ export interface GroupCreateParams {
   role: string;
 }
 
-export interface GroupListParams extends CursorPageParams {
+export interface GroupListParams extends NextCursorPageParams {
   /**
    * Sort order for the returned groups.
    */
