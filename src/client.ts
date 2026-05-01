@@ -669,7 +669,9 @@ export class OpenAI {
     }
 
     const controller = new AbortController();
-    const response = await this.fetchWithAuth(url, req, timeout, controller).catch(castToError);
+    const response = await this.fetchWithAuth(url, req, timeout, controller, !options.stream).catch(
+      castToError,
+    );
     const headersTime = Date.now();
 
     if (response instanceof globalThis.Error) {
@@ -844,6 +846,7 @@ export class OpenAI {
     init: RequestInit,
     timeout: number,
     controller: AbortController,
+    timeoutIncludesBody: boolean = true,
   ): Promise<Response> {
     if (this._workloadIdentityAuth) {
       const headers = init.headers as Headers;
@@ -854,7 +857,7 @@ export class OpenAI {
       }
     }
 
-    const response = await this.fetchWithTimeout(url, init, timeout, controller);
+    const response = await this.fetchWithTimeout(url, init, timeout, controller, timeoutIncludesBody);
 
     return response;
   }
@@ -864,12 +867,25 @@ export class OpenAI {
     init: RequestInit | undefined,
     ms: number,
     controller: AbortController,
+    timeoutIncludesBody: boolean = true,
   ): Promise<Response> {
     const { signal, method, ...options } = init || {};
     const abort = this._makeAbort(controller);
     if (signal) signal.addEventListener('abort', abort, { once: true });
 
-    const timeout = setTimeout(abort, ms);
+    let timedOut = false;
+    let cleanedUp = false;
+    const cleanup = () => {
+      if (!cleanedUp) {
+        cleanedUp = true;
+        clearTimeout(timeout);
+        if (signal) signal.removeEventListener('abort', abort);
+      }
+    };
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      abort();
+    }, ms);
 
     const isReadableBody =
       ((globalThis as any).ReadableStream && options.body instanceof (globalThis as any).ReadableStream) ||
@@ -889,10 +905,55 @@ export class OpenAI {
 
     try {
       // use undefined this binding; fetch errors if bound to something else in browser/cloudflare
-      return await this.fetch.call(undefined, url, fetchOptions);
-    } finally {
-      clearTimeout(timeout);
+      const response = await this.fetch.call(undefined, url, fetchOptions);
+      if (!timeoutIncludesBody || !response.body) {
+        cleanup();
+        return response;
+      }
+      return this.wrapResponseBodyWithTimeout(response, cleanup, () => timedOut);
+    } catch (err) {
+      cleanup();
+      throw err;
     }
+  }
+
+  private wrapResponseBodyWithTimeout(
+    response: Response,
+    cleanup: () => void,
+    isTimeout: () => boolean,
+  ): Response {
+    const reader = response.body!.getReader();
+    const body = new ReadableStream({
+      async pull(controller) {
+        try {
+          const { done, value } = await reader.read();
+          if (done) {
+            cleanup();
+            controller.close();
+            return;
+          }
+          controller.enqueue(value);
+        } catch (err) {
+          cleanup();
+          controller.error(isTimeout() ? new Errors.APIConnectionTimeoutError() : err);
+        }
+      },
+      async cancel(reason) {
+        cleanup();
+        await reader.cancel(reason);
+      },
+    });
+    const wrapped = new Response(body, response);
+    try {
+      Object.defineProperties(wrapped, {
+        redirected: { value: response.redirected },
+        type: { value: response.type },
+        url: { value: response.url },
+      });
+    } catch {
+      // Some fetch implementations may expose non-configurable Response fields.
+    }
+    return wrapped;
   }
 
   private async shouldRetry(response: Response): Promise<boolean> {

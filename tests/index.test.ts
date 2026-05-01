@@ -4,7 +4,7 @@ import { APIPromise } from 'openai/core/api-promise';
 
 import util from 'node:util';
 import OpenAI from 'openai';
-import { APIUserAbortError } from 'openai';
+import { APIConnectionTimeoutError, APIUserAbortError } from 'openai';
 const defaultFetch = fetch;
 
 describe('instantiate client', () => {
@@ -574,6 +574,100 @@ describe('retries', () => {
         .then((r) => r.text()),
     ).toEqual(JSON.stringify({ a: 1 }));
     expect(count).toEqual(3);
+  });
+
+  test('timeout covers response body reads', async () => {
+    const encoder = new TextEncoder();
+    const testFetch = async (
+      url: string | URL | Request,
+      { signal }: RequestInit = {},
+    ): Promise<Response> => {
+      return new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(encoder.encode('{"a":'));
+            signal?.addEventListener('abort', () => controller.error(new Error('body read aborted')), {
+              once: true,
+            });
+          },
+        }),
+        { headers: { 'Content-Type': 'application/json' } },
+      );
+    };
+
+    const client = new OpenAI({
+      apiKey: 'My API Key',
+      timeout: 10,
+      fetch: testFetch,
+      maxRetries: 0,
+    });
+
+    await expect(client.request({ path: '/foo', method: 'get' })).rejects.toBeInstanceOf(
+      APIConnectionTimeoutError,
+    );
+    await expect(
+      client
+        .request({ path: '/foo', method: 'get' })
+        .asResponse()
+        .then((r) => r.text()),
+    ).rejects.toBeInstanceOf(APIConnectionTimeoutError);
+  });
+
+  test('removes caller abort listener after response body is read', async () => {
+    const controller = new AbortController();
+    const addEventListener = jest.spyOn(controller.signal, 'addEventListener');
+    const removeEventListener = jest.spyOn(controller.signal, 'removeEventListener');
+
+    const testFetch = async (): Promise<Response> => {
+      return new Response(JSON.stringify({ a: 1 }), {
+        headers: { 'Content-Type': 'application/json' },
+      });
+    };
+
+    const client = new OpenAI({
+      apiKey: 'My API Key',
+      timeout: 10_000,
+      fetch: testFetch,
+      maxRetries: 0,
+    });
+
+    expect(await client.request({ path: '/foo', method: 'get', signal: controller.signal })).toEqual({
+      a: 1,
+    });
+
+    expect(addEventListener).toHaveBeenCalledWith('abort', expect.any(Function), { once: true });
+    expect(removeEventListener).toHaveBeenCalledTimes(1);
+    expect(removeEventListener.mock.calls[0]?.[0]).toEqual('abort');
+    expect(removeEventListener.mock.calls[0]?.[1]).toBe(addEventListener.mock.calls[0]?.[1]);
+  });
+
+  test('streaming response timeouts still stop after headers', async () => {
+    let aborted = false;
+    const testFetch = async (
+      url: string | URL | Request,
+      { signal }: RequestInit = {},
+    ): Promise<Response> => {
+      signal?.addEventListener('abort', () => {
+        aborted = true;
+      });
+      return new Response(new ReadableStream(), {
+        headers: { 'Content-Type': 'text/event-stream' },
+      });
+    };
+
+    const client = new OpenAI({
+      apiKey: 'My API Key',
+      timeout: 10,
+      fetch: testFetch,
+      maxRetries: 0,
+    });
+
+    const response = await client.request({ path: '/foo', method: 'get', stream: true }).asResponse();
+    await new Promise((resolve) => setTimeout(resolve, 30));
+
+    expect(response.body).toBeInstanceOf(ReadableStream);
+    expect(aborted).toEqual(false);
+    await response.body?.cancel();
   });
 
   test('retry count header', async () => {
