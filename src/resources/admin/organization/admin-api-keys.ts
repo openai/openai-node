@@ -102,16 +102,6 @@ export interface AdminAPIKey {
   created_at: number;
 
   /**
-   * The Unix timestamp (in seconds) of when the API key was last used
-   */
-  last_used_at: number | null;
-
-  /**
-   * The name of the API key
-   */
-  name: string;
-
-  /**
    * The object type, which is always `organization.admin_api_key`
    */
   object: 'organization.admin_api_key';
@@ -124,9 +114,14 @@ export interface AdminAPIKey {
   redacted_value: string;
 
   /**
-   * The value of the API key. Only shown on create.
+   * The Unix timestamp (in seconds) of when the API key was last used
    */
-  value?: string;
+  last_used_at?: number | null;
+
+  /**
+   * The name of the API key
+   */
+  name?: string | null;
 }
 
 export namespace AdminAPIKey {

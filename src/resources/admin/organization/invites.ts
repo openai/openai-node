@@ -113,14 +113,14 @@ export interface Invite {
   email: string;
 
   /**
-   * The Unix timestamp (in seconds) of when the invite expires.
-   */
-  expires_at: number | null;
-
-  /**
    * The object type, which is always `organization.invite`
    */
   object: 'organization.invite';
+
+  /**
+   * The projects that were granted membership upon acceptance of the invite.
+   */
+  projects: Array<Invite.Project>;
 
   /**
    * `owner` or `reader`
@@ -138,9 +138,9 @@ export interface Invite {
   accepted_at?: number | null;
 
   /**
-   * The projects that were granted membership upon acceptance of the invite.
+   * The Unix timestamp (in seconds) of when the invite expires.
    */
-  projects?: Array<Invite.Project>;
+  expires_at?: number | null;
 }
 
 export namespace Invite {
@@ -148,12 +148,12 @@ export namespace Invite {
     /**
      * Project's public ID
      */
-    id?: string;
+    id: string;
 
     /**
      * Project membership role
      */
-    role?: 'member' | 'owner';
+    role: 'member' | 'owner';
   }
 }
 

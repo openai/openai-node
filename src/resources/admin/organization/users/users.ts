@@ -114,24 +114,116 @@ export interface OrganizationUser {
   added_at: number;
 
   /**
-   * The email address of the user
-   */
-  email: string;
-
-  /**
-   * The name of the user
-   */
-  name: string;
-
-  /**
    * The object type, which is always `organization.user`
    */
   object: 'organization.user';
 
   /**
+   * The Unix timestamp (in seconds) of the user's last API key usage.
+   */
+  api_key_last_used_at?: number | null;
+
+  /**
+   * The Unix timestamp (in seconds) of when the user was created.
+   */
+  created?: number;
+
+  /**
+   * The developer persona metadata for the user.
+   */
+  developer_persona?: string | null;
+
+  /**
+   * The email address of the user
+   */
+  email?: string | null;
+
+  /**
+   * Whether this is the organization's default user.
+   */
+  is_default?: boolean;
+
+  /**
+   * Whether the user is an authorized purchaser for Scale Tier.
+   */
+  is_scale_tier_authorized_purchaser?: boolean | null;
+
+  /**
+   * Whether the user is managed through SCIM.
+   */
+  is_scim_managed?: boolean;
+
+  /**
+   * Whether the user is a service account.
+   */
+  is_service_account?: boolean;
+
+  /**
+   * The name of the user
+   */
+  name?: string | null;
+
+  /**
+   * Projects associated with the user, if included.
+   */
+  projects?: OrganizationUser.Projects | null;
+
+  /**
    * `owner` or `reader`
    */
-  role: 'owner' | 'reader';
+  role?: string | null;
+
+  /**
+   * The technical level metadata for the user.
+   */
+  technical_level?: string | null;
+
+  /**
+   * Nested user details.
+   */
+  user?: OrganizationUser.User;
+}
+
+export namespace OrganizationUser {
+  /**
+   * Projects associated with the user, if included.
+   */
+  export interface Projects {
+    data: Array<Projects.Data>;
+
+    object: 'list';
+  }
+
+  export namespace Projects {
+    export interface Data {
+      id?: string | null;
+
+      name?: string | null;
+
+      role?: string | null;
+    }
+  }
+
+  /**
+   * Nested user details.
+   */
+  export interface User {
+    id: string;
+
+    object: 'user';
+
+    banned?: boolean | null;
+
+    banned_at?: number | null;
+
+    email?: string | null;
+
+    enabled?: boolean | null;
+
+    name?: string | null;
+
+    picture?: string | null;
+  }
 }
 
 export interface UserDeleteResponse {
@@ -144,9 +236,24 @@ export interface UserDeleteResponse {
 
 export interface UserUpdateParams {
   /**
+   * Developer persona metadata.
+   */
+  developer_persona?: string | null;
+
+  /**
    * `owner` or `reader`
    */
-  role?: 'owner' | 'reader';
+  role?: string | null;
+
+  /**
+   * Role ID to assign to the user.
+   */
+  role_id?: string | null;
+
+  /**
+   * Technical level metadata.
+   */
+  technical_level?: string | null;
 }
 
 export interface UserListParams extends ConversationCursorPageParams {
