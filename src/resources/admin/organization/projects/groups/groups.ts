@@ -112,6 +112,11 @@ export interface ProjectGroup {
   group_name: string;
 
   /**
+   * The type of the group.
+   */
+  group_type: string;
+
+  /**
    * Always `project.group`.
    */
   object: 'project.group';

@@ -33,7 +33,7 @@ export class Users extends APIResource {
    * const projectUser =
    *   await client.admin.organization.projects.users.create(
    *     'project_id',
-   *     { role: 'owner', user_id: 'user_id' },
+   *     { role: 'role' },
    *   );
    * ```
    */
@@ -73,7 +73,7 @@ export class Users extends APIResource {
    * const projectUser =
    *   await client.admin.organization.projects.users.update(
    *     'user_id',
-   *     { project_id: 'project_id', role: 'owner' },
+   *     { project_id: 'project_id' },
    *   );
    * ```
    */
@@ -152,16 +152,6 @@ export interface ProjectUser {
   added_at: number;
 
   /**
-   * The email address of the user
-   */
-  email: string;
-
-  /**
-   * The name of the user
-   */
-  name: string;
-
-  /**
    * The object type, which is always `organization.project.user`
    */
   object: 'organization.project.user';
@@ -169,7 +159,17 @@ export interface ProjectUser {
   /**
    * `owner` or `member`
    */
-  role: 'owner' | 'member';
+  role: string;
+
+  /**
+   * The email address of the user
+   */
+  email?: string | null;
+
+  /**
+   * The name of the user
+   */
+  name?: string | null;
 }
 
 export interface UserDeleteResponse {
@@ -184,12 +184,17 @@ export interface UserCreateParams {
   /**
    * `owner` or `member`
    */
-  role: 'owner' | 'member';
+  role: string;
+
+  /**
+   * Email of the user to add.
+   */
+  email?: string | null;
 
   /**
    * The ID of the user.
    */
-  user_id: string;
+  user_id?: string | null;
 }
 
 export interface UserRetrieveParams {
@@ -208,7 +213,7 @@ export interface UserUpdateParams {
   /**
    * Body param: `owner` or `member`
    */
-  role: 'owner' | 'member';
+  role?: string | null;
 }
 
 export interface UserListParams extends ConversationCursorPageParams {}

@@ -130,6 +130,11 @@ export interface Group {
   created_at: number;
 
   /**
+   * The type of the group.
+   */
+  group_type: string;
+
+  /**
    * Whether the group is managed through SCIM and controlled by your identity
    * provider.
    */
