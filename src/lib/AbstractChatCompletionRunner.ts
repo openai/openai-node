@@ -334,8 +334,9 @@ export class AbstractChatCompletionRunner<
         return;
       }
 
-      for (const tool_call of message.tool_calls) {
-        if (tool_call.type !== 'function') continue;
+      const runFunctionToolCall = async (
+        tool_call: ChatCompletionMessageFunctionToolCall,
+      ): Promise<{ tool_call_id: string; content: string; didExecute: boolean }> => {
         const tool_call_id = tool_call.id;
         const { name, arguments: args } = tool_call.function;
         const fn = functionsByName[name];
@@ -347,15 +348,13 @@ export class AbstractChatCompletionRunner<
             .map((name) => JSON.stringify(name))
             .join(', ')}. Please try again`;
 
-          this._addMessage({ role, tool_call_id, content });
-          continue;
+          return { tool_call_id, content, didExecute: false };
         } else if (singleFunctionToCall && singleFunctionToCall !== name) {
           const content = `Invalid tool_call: ${JSON.stringify(name)}. ${JSON.stringify(
             singleFunctionToCall,
           )} requested. Please try again`;
 
-          this._addMessage({ role, tool_call_id, content });
-          continue;
+          return { tool_call_id, content, didExecute: false };
         }
 
         let parsed;
@@ -363,17 +362,40 @@ export class AbstractChatCompletionRunner<
           parsed = isRunnableFunctionWithParse(fn) ? await fn.parse(args) : args;
         } catch (error) {
           const content = error instanceof Error ? error.message : String(error);
-          this._addMessage({ role, tool_call_id, content });
-          continue;
+          return { tool_call_id, content, didExecute: false };
         }
 
         // @ts-expect-error it can't rule out `never` type.
         const rawContent = await fn.function(parsed, this);
         const content = this.#stringifyFunctionCallResult(rawContent);
-        this._addMessage({ role, tool_call_id, content });
+        return { tool_call_id, content, didExecute: true };
+      };
 
-        if (singleFunctionToCall) {
-          return;
+      const addToolCallResult = (result: { tool_call_id: string; content: string }) => {
+        this._addMessage({ role, tool_call_id: result.tool_call_id, content: result.content });
+      };
+
+      const functionToolCalls = message.tool_calls.filter(
+        (tool_call): tool_call is ChatCompletionMessageFunctionToolCall => tool_call.type === 'function',
+      );
+
+      if (singleFunctionToCall) {
+        for (const tool_call of functionToolCalls) {
+          const result = await runFunctionToolCall(tool_call);
+          addToolCallResult(result);
+
+          if (result.didExecute) {
+            return;
+          }
+        }
+      } else {
+        const results = await Promise.allSettled(functionToolCalls.map(runFunctionToolCall));
+        for (const result of results) {
+          if (result.status === 'rejected') {
+            throw result.reason;
+          }
+
+          addToolCallResult(result.value);
         }
       }
     }
