@@ -199,6 +199,17 @@ In many cases it will be more convenient to subscribe to a more specific set of 
 
 More information on the types of events can be found here: [Events](https://platform.openai.com/docs/api-reference/assistants-streaming/events)
 
+Raw API event names, such as `thread.run.completed`, are exposed through the `event` listener. The
+SDK-specific convenience listeners below use names such as `messageDone`, `runStepDone`, and `end`.
+
+```ts
+run.on('event', (event) => {
+  if (event.event === 'thread.run.completed') {
+    console.log('run completed', event.data);
+  }
+});
+```
+
 ```ts
 .on('runStepCreated', (runStep: RunStep) => ...)
 .on('runStepDelta', (delta: RunStepDelta, snapshot: RunStep) => ...)
@@ -251,7 +262,7 @@ More information on tools can be found here [Tools](https://platform.openai.com/
 .on('end', () => ...)
 ```
 
-The last event send when a stream ends.
+The last event sent when a stream ends.
 
 ### Assistant Methods
 
