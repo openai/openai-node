@@ -3,7 +3,7 @@
 import { APIResource } from '../../../../../core/resource';
 import * as RolesAPI from '../../roles';
 import { APIPromise } from '../../../../../core/api-promise';
-import { CursorPage, type CursorPageParams, PagePromise } from '../../../../../core/pagination';
+import { NextCursorPage, type NextCursorPageParams, PagePromise } from '../../../../../core/pagination';
 import { RequestOptions } from '../../../../../internal/request-options';
 import { path } from '../../../../../internal/utils/path';
 
@@ -55,7 +55,7 @@ export class Roles extends APIResource {
     const { project_id, ...query } = params;
     return this._client.getAPIList(
       path`/projects/${project_id}/groups/${groupID}/roles`,
-      CursorPage<RoleListResponse>,
+      NextCursorPage<RoleListResponse>,
       { query, ...options, __security: { adminAPIKeyAuth: true } },
     );
   }
@@ -81,7 +81,7 @@ export class Roles extends APIResource {
   }
 }
 
-export type RoleListResponsesPage = CursorPage<RoleListResponse>;
+export type RoleListResponsesPage = NextCursorPage<RoleListResponse>;
 
 /**
  * Role assignment linking a group to a role.
@@ -224,7 +224,7 @@ export interface RoleCreateParams {
   role_id: string;
 }
 
-export interface RoleListParams extends CursorPageParams {
+export interface RoleListParams extends NextCursorPageParams {
   /**
    * Path param: The ID of the project to inspect.
    */

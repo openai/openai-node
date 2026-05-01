@@ -3,6 +3,7 @@
 export {
   AdminAPIKeys,
   type AdminAPIKey,
+  type AdminAPIKeyCreateResponse,
   type AdminAPIKeyDeleteResponse,
   type AdminAPIKeyCreateParams,
   type AdminAPIKeyListParams,
@@ -17,14 +18,19 @@ export {
 export {
   Certificates,
   type Certificate,
+  type CertificateListResponse,
   type CertificateDeleteResponse,
+  type CertificateActivateResponse,
+  type CertificateDeactivateResponse,
   type CertificateCreateParams,
   type CertificateRetrieveParams,
   type CertificateUpdateParams,
   type CertificateListParams,
   type CertificateActivateParams,
   type CertificateDeactivateParams,
-  type CertificatesPage,
+  type CertificateListResponsesPage,
+  type CertificateActivateResponsesPage,
+  type CertificateDeactivateResponsesPage,
 } from './certificates';
 export {
   Groups,

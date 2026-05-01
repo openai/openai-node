@@ -983,7 +983,7 @@
       "params": [
         {
           "type": "param",
-          "key": "key_id",
+          "key": "api_key_id",
           "location": "path"
         },
         {
@@ -1002,7 +1002,7 @@
         },
         {
           "type": "param",
-          "key": "key_id",
+          "key": "api_key_id",
           "location": "path"
         },
         {
@@ -1016,7 +1016,7 @@
       "params": [
         {
           "type": "param",
-          "key": "key_id",
+          "key": "api_key_id",
           "location": "path"
         },
         {
@@ -1035,7 +1035,7 @@
         },
         {
           "type": "param",
-          "key": "key_id",
+          "key": "api_key_id",
           "location": "path"
         },
         {

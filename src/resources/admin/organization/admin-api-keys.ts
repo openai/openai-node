@@ -18,7 +18,7 @@ export class AdminAPIKeys extends APIResource {
    *   });
    * ```
    */
-  create(body: AdminAPIKeyCreateParams, options?: RequestOptions): APIPromise<AdminAPIKey> {
+  create(body: AdminAPIKeyCreateParams, options?: RequestOptions): APIPromise<AdminAPIKeyCreateResponse> {
     return this._client.post('/organization/admin_api_keys', {
       body,
       ...options,
@@ -114,7 +114,7 @@ export interface AdminAPIKey {
   /**
    * The object type, which is always `organization.admin_api_key`
    */
-  object: string;
+  object: 'organization.admin_api_key';
 
   owner: AdminAPIKey.Owner;
 
@@ -163,12 +163,22 @@ export namespace AdminAPIKey {
   }
 }
 
+/**
+ * Represents an individual Admin API key in an org.
+ */
+export interface AdminAPIKeyCreateResponse extends AdminAPIKey {
+  /**
+   * The value of the API key. Only shown on create.
+   */
+  value: string;
+}
+
 export interface AdminAPIKeyDeleteResponse {
-  id?: string;
+  id: string;
 
-  deleted?: boolean;
+  deleted: boolean;
 
-  object?: string;
+  object: 'organization.admin_api_key.deleted';
 }
 
 export interface AdminAPIKeyCreateParams {
@@ -185,6 +195,7 @@ export interface AdminAPIKeyListParams extends CursorPageParams {
 export declare namespace AdminAPIKeys {
   export {
     type AdminAPIKey as AdminAPIKey,
+    type AdminAPIKeyCreateResponse as AdminAPIKeyCreateResponse,
     type AdminAPIKeyDeleteResponse as AdminAPIKeyDeleteResponse,
     type AdminAPIKeysPage as AdminAPIKeysPage,
     type AdminAPIKeyCreateParams as AdminAPIKeyCreateParams,

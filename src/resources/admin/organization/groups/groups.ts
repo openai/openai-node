@@ -14,6 +14,8 @@ import {
 } from './roles';
 import * as UsersAPI from './users';
 import {
+  OrganizationGroupUser,
+  OrganizationGroupUsersPage,
   UserCreateParams,
   UserCreateResponse,
   UserDeleteParams,
@@ -22,7 +24,7 @@ import {
   Users,
 } from './users';
 import { APIPromise } from '../../../../core/api-promise';
-import { CursorPage, type CursorPageParams, PagePromise } from '../../../../core/pagination';
+import { NextCursorPage, type NextCursorPageParams, PagePromise } from '../../../../core/pagination';
 import { RequestOptions } from '../../../../internal/request-options';
 import { path } from '../../../../internal/utils/path';
 
@@ -86,7 +88,7 @@ export class Groups extends APIResource {
     query: GroupListParams | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<GroupsPage, Group> {
-    return this._client.getAPIList('/organization/groups', CursorPage<Group>, {
+    return this._client.getAPIList('/organization/groups', NextCursorPage<Group>, {
       query,
       ...options,
       __security: { adminAPIKeyAuth: true },
@@ -111,7 +113,7 @@ export class Groups extends APIResource {
   }
 }
 
-export type GroupsPage = CursorPage<Group>;
+export type GroupsPage = NextCursorPage<Group>;
 
 /**
  * Details about an organization group.
@@ -199,7 +201,7 @@ export interface GroupUpdateParams {
   name: string;
 }
 
-export interface GroupListParams extends CursorPageParams {
+export interface GroupListParams extends NextCursorPageParams {
   /**
    * Specifies the sort order of the returned groups.
    */
@@ -222,8 +224,10 @@ export declare namespace Groups {
 
   export {
     Users as Users,
+    type OrganizationGroupUser as OrganizationGroupUser,
     type UserCreateResponse as UserCreateResponse,
     type UserDeleteResponse as UserDeleteResponse,
+    type OrganizationGroupUsersPage as OrganizationGroupUsersPage,
     type UserCreateParams as UserCreateParams,
     type UserListParams as UserListParams,
     type UserDeleteParams as UserDeleteParams,

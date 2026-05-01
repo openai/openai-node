@@ -11,9 +11,15 @@ export {
 } from './api-keys';
 export {
   Certificates,
+  type CertificateListResponse,
+  type CertificateActivateResponse,
+  type CertificateDeactivateResponse,
   type CertificateListParams,
   type CertificateActivateParams,
   type CertificateDeactivateParams,
+  type CertificateListResponsesPage,
+  type CertificateActivateResponsesPage,
+  type CertificateDeactivateResponsesPage,
 } from './certificates';
 export {
   Groups,

@@ -21,6 +21,8 @@ import {
   ConversationCursorPageResponse,
   type CursorPageParams,
   CursorPageResponse,
+  type NextCursorPageParams,
+  NextCursorPageResponse,
   PageResponse,
 } from './core/pagination';
 import * as Uploads from './core/uploads';
@@ -1144,6 +1146,12 @@ export declare namespace OpenAI {
   export {
     type ConversationCursorPageParams as ConversationCursorPageParams,
     type ConversationCursorPageResponse as ConversationCursorPageResponse,
+  };
+
+  export import NextCursorPage = Pagination.NextCursorPage;
+  export {
+    type NextCursorPageParams as NextCursorPageParams,
+    type NextCursorPageResponse as NextCursorPageResponse,
   };
 
   export {

@@ -14,8 +14,14 @@ import {
 import * as CertificatesAPI from './certificates';
 import {
   CertificateActivateParams,
+  CertificateActivateResponse,
+  CertificateActivateResponsesPage,
   CertificateDeactivateParams,
+  CertificateDeactivateResponse,
+  CertificateDeactivateResponsesPage,
   CertificateListParams,
+  CertificateListResponse,
+  CertificateListResponsesPage,
   Certificates,
 } from './certificates';
 import * as RateLimitsAPI from './rate-limits';
@@ -334,6 +340,12 @@ export declare namespace Projects {
 
   export {
     Certificates as Certificates,
+    type CertificateListResponse as CertificateListResponse,
+    type CertificateActivateResponse as CertificateActivateResponse,
+    type CertificateDeactivateResponse as CertificateDeactivateResponse,
+    type CertificateListResponsesPage as CertificateListResponsesPage,
+    type CertificateActivateResponsesPage as CertificateActivateResponsesPage,
+    type CertificateDeactivateResponsesPage as CertificateDeactivateResponsesPage,
     type CertificateListParams as CertificateListParams,
     type CertificateActivateParams as CertificateActivateParams,
     type CertificateDeactivateParams as CertificateDeactivateParams,

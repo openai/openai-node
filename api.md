@@ -599,11 +599,12 @@ Methods:
 Types:
 
 - <code><a href="./src/resources/admin/organization/admin-api-keys.ts">AdminAPIKey</a></code>
+- <code><a href="./src/resources/admin/organization/admin-api-keys.ts">AdminAPIKeyCreateResponse</a></code>
 - <code><a href="./src/resources/admin/organization/admin-api-keys.ts">AdminAPIKeyDeleteResponse</a></code>
 
 Methods:
 
-- <code title="post /organization/admin_api_keys">client.admin.organization.adminAPIKeys.<a href="./src/resources/admin/organization/admin-api-keys.ts">create</a>({ ...params }) -> AdminAPIKey</code>
+- <code title="post /organization/admin_api_keys">client.admin.organization.adminAPIKeys.<a href="./src/resources/admin/organization/admin-api-keys.ts">create</a>({ ...params }) -> AdminAPIKeyCreateResponse</code>
 - <code title="get /organization/admin_api_keys/{key_id}">client.admin.organization.adminAPIKeys.<a href="./src/resources/admin/organization/admin-api-keys.ts">retrieve</a>(keyID) -> AdminAPIKey</code>
 - <code title="get /organization/admin_api_keys">client.admin.organization.adminAPIKeys.<a href="./src/resources/admin/organization/admin-api-keys.ts">list</a>({ ...params }) -> AdminAPIKeysPage</code>
 - <code title="delete /organization/admin_api_keys/{key_id}">client.admin.organization.adminAPIKeys.<a href="./src/resources/admin/organization/admin-api-keys.ts">delete</a>(keyID) -> AdminAPIKeyDeleteResponse</code>
@@ -695,13 +696,14 @@ Methods:
 
 Types:
 
+- <code><a href="./src/resources/admin/organization/groups/users.ts">OrganizationGroupUser</a></code>
 - <code><a href="./src/resources/admin/organization/groups/users.ts">UserCreateResponse</a></code>
 - <code><a href="./src/resources/admin/organization/groups/users.ts">UserDeleteResponse</a></code>
 
 Methods:
 
 - <code title="post /organization/groups/{group_id}/users">client.admin.organization.groups.users.<a href="./src/resources/admin/organization/groups/users.ts">create</a>(groupID, { ...params }) -> UserCreateResponse</code>
-- <code title="get /organization/groups/{group_id}/users">client.admin.organization.groups.users.<a href="./src/resources/admin/organization/groups/users.ts">list</a>(groupID, { ...params }) -> OrganizationUsersPage</code>
+- <code title="get /organization/groups/{group_id}/users">client.admin.organization.groups.users.<a href="./src/resources/admin/organization/groups/users.ts">list</a>(groupID, { ...params }) -> OrganizationGroupUsersPage</code>
 - <code title="delete /organization/groups/{group_id}/users/{user_id}">client.admin.organization.groups.users.<a href="./src/resources/admin/organization/groups/users.ts">delete</a>(userID, { ...params }) -> UserDeleteResponse</code>
 
 #### Roles
@@ -737,17 +739,20 @@ Methods:
 Types:
 
 - <code><a href="./src/resources/admin/organization/certificates.ts">Certificate</a></code>
+- <code><a href="./src/resources/admin/organization/certificates.ts">CertificateListResponse</a></code>
 - <code><a href="./src/resources/admin/organization/certificates.ts">CertificateDeleteResponse</a></code>
+- <code><a href="./src/resources/admin/organization/certificates.ts">CertificateActivateResponse</a></code>
+- <code><a href="./src/resources/admin/organization/certificates.ts">CertificateDeactivateResponse</a></code>
 
 Methods:
 
 - <code title="post /organization/certificates">client.admin.organization.certificates.<a href="./src/resources/admin/organization/certificates.ts">create</a>({ ...params }) -> Certificate</code>
 - <code title="get /organization/certificates/{certificate_id}">client.admin.organization.certificates.<a href="./src/resources/admin/organization/certificates.ts">retrieve</a>(certificateID, { ...params }) -> Certificate</code>
 - <code title="post /organization/certificates/{certificate_id}">client.admin.organization.certificates.<a href="./src/resources/admin/organization/certificates.ts">update</a>(certificateID, { ...params }) -> Certificate</code>
-- <code title="get /organization/certificates">client.admin.organization.certificates.<a href="./src/resources/admin/organization/certificates.ts">list</a>({ ...params }) -> CertificatesPage</code>
+- <code title="get /organization/certificates">client.admin.organization.certificates.<a href="./src/resources/admin/organization/certificates.ts">list</a>({ ...params }) -> CertificateListResponsesPage</code>
 - <code title="delete /organization/certificates/{certificate_id}">client.admin.organization.certificates.<a href="./src/resources/admin/organization/certificates.ts">delete</a>(certificateID) -> CertificateDeleteResponse</code>
-- <code title="post /organization/certificates/activate">client.admin.organization.certificates.<a href="./src/resources/admin/organization/certificates.ts">activate</a>({ ...params }) -> CertificatesPage</code>
-- <code title="post /organization/certificates/deactivate">client.admin.organization.certificates.<a href="./src/resources/admin/organization/certificates.ts">deactivate</a>({ ...params }) -> CertificatesPage</code>
+- <code title="post /organization/certificates/activate">client.admin.organization.certificates.<a href="./src/resources/admin/organization/certificates.ts">activate</a>({ ...params }) -> CertificateActivateResponsesPage</code>
+- <code title="post /organization/certificates/deactivate">client.admin.organization.certificates.<a href="./src/resources/admin/organization/certificates.ts">deactivate</a>({ ...params }) -> CertificateDeactivateResponsesPage</code>
 
 ### Projects
 
@@ -816,9 +821,9 @@ Types:
 
 Methods:
 
-- <code title="get /organization/projects/{project_id}/api_keys/{key_id}">client.admin.organization.projects.apiKeys.<a href="./src/resources/admin/organization/projects/api-keys.ts">retrieve</a>(keyID, { ...params }) -> ProjectAPIKey</code>
+- <code title="get /organization/projects/{project_id}/api_keys/{api_key_id}">client.admin.organization.projects.apiKeys.<a href="./src/resources/admin/organization/projects/api-keys.ts">retrieve</a>(apiKeyID, { ...params }) -> ProjectAPIKey</code>
 - <code title="get /organization/projects/{project_id}/api_keys">client.admin.organization.projects.apiKeys.<a href="./src/resources/admin/organization/projects/api-keys.ts">list</a>(projectID, { ...params }) -> ProjectAPIKeysPage</code>
-- <code title="delete /organization/projects/{project_id}/api_keys/{key_id}">client.admin.organization.projects.apiKeys.<a href="./src/resources/admin/organization/projects/api-keys.ts">delete</a>(keyID, { ...params }) -> APIKeyDeleteResponse</code>
+- <code title="delete /organization/projects/{project_id}/api_keys/{api_key_id}">client.admin.organization.projects.apiKeys.<a href="./src/resources/admin/organization/projects/api-keys.ts">delete</a>(apiKeyID, { ...params }) -> APIKeyDeleteResponse</code>
 
 #### RateLimits
 
@@ -873,11 +878,17 @@ Methods:
 
 #### Certificates
 
+Types:
+
+- <code><a href="./src/resources/admin/organization/projects/certificates.ts">CertificateListResponse</a></code>
+- <code><a href="./src/resources/admin/organization/projects/certificates.ts">CertificateActivateResponse</a></code>
+- <code><a href="./src/resources/admin/organization/projects/certificates.ts">CertificateDeactivateResponse</a></code>
+
 Methods:
 
-- <code title="get /organization/projects/{project_id}/certificates">client.admin.organization.projects.certificates.<a href="./src/resources/admin/organization/projects/certificates.ts">list</a>(projectID, { ...params }) -> CertificatesPage</code>
-- <code title="post /organization/projects/{project_id}/certificates/activate">client.admin.organization.projects.certificates.<a href="./src/resources/admin/organization/projects/certificates.ts">activate</a>(projectID, { ...params }) -> CertificatesPage</code>
-- <code title="post /organization/projects/{project_id}/certificates/deactivate">client.admin.organization.projects.certificates.<a href="./src/resources/admin/organization/projects/certificates.ts">deactivate</a>(projectID, { ...params }) -> CertificatesPage</code>
+- <code title="get /organization/projects/{project_id}/certificates">client.admin.organization.projects.certificates.<a href="./src/resources/admin/organization/projects/certificates.ts">list</a>(projectID, { ...params }) -> CertificateListResponsesPage</code>
+- <code title="post /organization/projects/{project_id}/certificates/activate">client.admin.organization.projects.certificates.<a href="./src/resources/admin/organization/projects/certificates.ts">activate</a>(projectID, { ...params }) -> CertificateActivateResponsesPage</code>
+- <code title="post /organization/projects/{project_id}/certificates/deactivate">client.admin.organization.projects.certificates.<a href="./src/resources/admin/organization/projects/certificates.ts">deactivate</a>(projectID, { ...params }) -> CertificateDeactivateResponsesPage</code>
 
 # [Responses](src/resources/responses/api.md)
 

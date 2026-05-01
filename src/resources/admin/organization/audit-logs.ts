@@ -47,11 +47,6 @@ export interface AuditLogListResponse {
   id: string;
 
   /**
-   * The actor who performed the audit logged action.
-   */
-  actor: AuditLogListResponse.Actor;
-
-  /**
    * The Unix timestamp (in seconds) of the event.
    */
   effective_at: number;
@@ -111,6 +106,11 @@ export interface AuditLogListResponse {
     | 'user.added'
     | 'user.updated'
     | 'user.deleted';
+
+  /**
+   * The actor who performed the audit logged action.
+   */
+  actor?: AuditLogListResponse.Actor | null;
 
   /**
    * The details for events with this `type`.

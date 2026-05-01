@@ -2,7 +2,7 @@
 
 import { APIResource } from '../../../core/resource';
 import { APIPromise } from '../../../core/api-promise';
-import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pagination';
+import { NextCursorPage, type NextCursorPageParams, PagePromise } from '../../../core/pagination';
 import { RequestOptions } from '../../../internal/request-options';
 import { path } from '../../../internal/utils/path';
 
@@ -59,7 +59,7 @@ export class Roles extends APIResource {
     query: RoleListParams | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<RolesPage, Role> {
-    return this._client.getAPIList('/organization/roles', CursorPage<Role>, {
+    return this._client.getAPIList('/organization/roles', NextCursorPage<Role>, {
       query,
       ...options,
       __security: { adminAPIKeyAuth: true },
@@ -84,7 +84,7 @@ export class Roles extends APIResource {
   }
 }
 
-export type RolesPage = CursorPage<Role>;
+export type RolesPage = NextCursorPage<Role>;
 
 /**
  * Details about a role that can be assigned through the public Roles API.
@@ -181,7 +181,7 @@ export interface RoleUpdateParams {
   role_name?: string | null;
 }
 
-export interface RoleListParams extends CursorPageParams {
+export interface RoleListParams extends NextCursorPageParams {
   /**
    * Sort order for the returned roles.
    */

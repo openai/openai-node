@@ -194,7 +194,7 @@ export interface UsageAudioSpeechesResponse {
 
   has_more: boolean;
 
-  next_page: string;
+  next_page: string | null;
 
   object: 'page';
 }
@@ -205,7 +205,7 @@ export namespace UsageAudioSpeechesResponse {
 
     object: 'bucket';
 
-    result: Array<
+    results: Array<
       | Data.OrganizationUsageCompletionsResult
       | Data.OrganizationUsageEmbeddingsResult
       | Data.OrganizationUsageModerationsResult
@@ -538,12 +538,12 @@ export namespace UsageAudioSpeechesResponse {
      * bucket.
      */
     export interface OrganizationUsageCodeInterpreterSessionsResult {
-      object: 'organization.usage.code_interpreter_sessions.result';
-
       /**
        * The number of code interpreter sessions.
        */
-      num_sessions?: number;
+      num_sessions: number;
+
+      object: 'organization.usage.code_interpreter_sessions.result';
 
       /**
        * When `group_by=project_id`, this field provides the project ID of the grouped
@@ -606,7 +606,7 @@ export interface UsageAudioTranscriptionsResponse {
 
   has_more: boolean;
 
-  next_page: string;
+  next_page: string | null;
 
   object: 'page';
 }
@@ -617,7 +617,7 @@ export namespace UsageAudioTranscriptionsResponse {
 
     object: 'bucket';
 
-    result: Array<
+    results: Array<
       | Data.OrganizationUsageCompletionsResult
       | Data.OrganizationUsageEmbeddingsResult
       | Data.OrganizationUsageModerationsResult
@@ -950,12 +950,12 @@ export namespace UsageAudioTranscriptionsResponse {
      * bucket.
      */
     export interface OrganizationUsageCodeInterpreterSessionsResult {
-      object: 'organization.usage.code_interpreter_sessions.result';
-
       /**
        * The number of code interpreter sessions.
        */
-      num_sessions?: number;
+      num_sessions: number;
+
+      object: 'organization.usage.code_interpreter_sessions.result';
 
       /**
        * When `group_by=project_id`, this field provides the project ID of the grouped
@@ -1018,7 +1018,7 @@ export interface UsageCodeInterpreterSessionsResponse {
 
   has_more: boolean;
 
-  next_page: string;
+  next_page: string | null;
 
   object: 'page';
 }
@@ -1029,7 +1029,7 @@ export namespace UsageCodeInterpreterSessionsResponse {
 
     object: 'bucket';
 
-    result: Array<
+    results: Array<
       | Data.OrganizationUsageCompletionsResult
       | Data.OrganizationUsageEmbeddingsResult
       | Data.OrganizationUsageModerationsResult
@@ -1362,12 +1362,12 @@ export namespace UsageCodeInterpreterSessionsResponse {
      * bucket.
      */
     export interface OrganizationUsageCodeInterpreterSessionsResult {
-      object: 'organization.usage.code_interpreter_sessions.result';
-
       /**
        * The number of code interpreter sessions.
        */
-      num_sessions?: number;
+      num_sessions: number;
+
+      object: 'organization.usage.code_interpreter_sessions.result';
 
       /**
        * When `group_by=project_id`, this field provides the project ID of the grouped
@@ -1430,7 +1430,7 @@ export interface UsageCompletionsResponse {
 
   has_more: boolean;
 
-  next_page: string;
+  next_page: string | null;
 
   object: 'page';
 }
@@ -1441,7 +1441,7 @@ export namespace UsageCompletionsResponse {
 
     object: 'bucket';
 
-    result: Array<
+    results: Array<
       | Data.OrganizationUsageCompletionsResult
       | Data.OrganizationUsageEmbeddingsResult
       | Data.OrganizationUsageModerationsResult
@@ -1774,12 +1774,12 @@ export namespace UsageCompletionsResponse {
      * bucket.
      */
     export interface OrganizationUsageCodeInterpreterSessionsResult {
-      object: 'organization.usage.code_interpreter_sessions.result';
-
       /**
        * The number of code interpreter sessions.
        */
-      num_sessions?: number;
+      num_sessions: number;
+
+      object: 'organization.usage.code_interpreter_sessions.result';
 
       /**
        * When `group_by=project_id`, this field provides the project ID of the grouped
@@ -1842,7 +1842,7 @@ export interface UsageCostsResponse {
 
   has_more: boolean;
 
-  next_page: string;
+  next_page: string | null;
 
   object: 'page';
 }
@@ -1853,7 +1853,7 @@ export namespace UsageCostsResponse {
 
     object: 'bucket';
 
-    result: Array<
+    results: Array<
       | Data.OrganizationUsageCompletionsResult
       | Data.OrganizationUsageEmbeddingsResult
       | Data.OrganizationUsageModerationsResult
@@ -2186,12 +2186,12 @@ export namespace UsageCostsResponse {
      * bucket.
      */
     export interface OrganizationUsageCodeInterpreterSessionsResult {
-      object: 'organization.usage.code_interpreter_sessions.result';
-
       /**
        * The number of code interpreter sessions.
        */
-      num_sessions?: number;
+      num_sessions: number;
+
+      object: 'organization.usage.code_interpreter_sessions.result';
 
       /**
        * When `group_by=project_id`, this field provides the project ID of the grouped
@@ -2254,7 +2254,7 @@ export interface UsageEmbeddingsResponse {
 
   has_more: boolean;
 
-  next_page: string;
+  next_page: string | null;
 
   object: 'page';
 }
@@ -2265,7 +2265,7 @@ export namespace UsageEmbeddingsResponse {
 
     object: 'bucket';
 
-    result: Array<
+    results: Array<
       | Data.OrganizationUsageCompletionsResult
       | Data.OrganizationUsageEmbeddingsResult
       | Data.OrganizationUsageModerationsResult
@@ -2598,12 +2598,12 @@ export namespace UsageEmbeddingsResponse {
      * bucket.
      */
     export interface OrganizationUsageCodeInterpreterSessionsResult {
-      object: 'organization.usage.code_interpreter_sessions.result';
-
       /**
        * The number of code interpreter sessions.
        */
-      num_sessions?: number;
+      num_sessions: number;
+
+      object: 'organization.usage.code_interpreter_sessions.result';
 
       /**
        * When `group_by=project_id`, this field provides the project ID of the grouped
@@ -2666,7 +2666,7 @@ export interface UsageImagesResponse {
 
   has_more: boolean;
 
-  next_page: string;
+  next_page: string | null;
 
   object: 'page';
 }
@@ -2677,7 +2677,7 @@ export namespace UsageImagesResponse {
 
     object: 'bucket';
 
-    result: Array<
+    results: Array<
       | Data.OrganizationUsageCompletionsResult
       | Data.OrganizationUsageEmbeddingsResult
       | Data.OrganizationUsageModerationsResult
@@ -3010,12 +3010,12 @@ export namespace UsageImagesResponse {
      * bucket.
      */
     export interface OrganizationUsageCodeInterpreterSessionsResult {
-      object: 'organization.usage.code_interpreter_sessions.result';
-
       /**
        * The number of code interpreter sessions.
        */
-      num_sessions?: number;
+      num_sessions: number;
+
+      object: 'organization.usage.code_interpreter_sessions.result';
 
       /**
        * When `group_by=project_id`, this field provides the project ID of the grouped
@@ -3078,7 +3078,7 @@ export interface UsageModerationsResponse {
 
   has_more: boolean;
 
-  next_page: string;
+  next_page: string | null;
 
   object: 'page';
 }
@@ -3089,7 +3089,7 @@ export namespace UsageModerationsResponse {
 
     object: 'bucket';
 
-    result: Array<
+    results: Array<
       | Data.OrganizationUsageCompletionsResult
       | Data.OrganizationUsageEmbeddingsResult
       | Data.OrganizationUsageModerationsResult
@@ -3422,12 +3422,12 @@ export namespace UsageModerationsResponse {
      * bucket.
      */
     export interface OrganizationUsageCodeInterpreterSessionsResult {
-      object: 'organization.usage.code_interpreter_sessions.result';
-
       /**
        * The number of code interpreter sessions.
        */
-      num_sessions?: number;
+      num_sessions: number;
+
+      object: 'organization.usage.code_interpreter_sessions.result';
 
       /**
        * When `group_by=project_id`, this field provides the project ID of the grouped
@@ -3490,7 +3490,7 @@ export interface UsageVectorStoresResponse {
 
   has_more: boolean;
 
-  next_page: string;
+  next_page: string | null;
 
   object: 'page';
 }
@@ -3501,7 +3501,7 @@ export namespace UsageVectorStoresResponse {
 
     object: 'bucket';
 
-    result: Array<
+    results: Array<
       | Data.OrganizationUsageCompletionsResult
       | Data.OrganizationUsageEmbeddingsResult
       | Data.OrganizationUsageModerationsResult
@@ -3834,12 +3834,12 @@ export namespace UsageVectorStoresResponse {
      * bucket.
      */
     export interface OrganizationUsageCodeInterpreterSessionsResult {
-      object: 'organization.usage.code_interpreter_sessions.result';
-
       /**
        * The number of code interpreter sessions.
        */
-      num_sessions?: number;
+      num_sessions: number;
+
+      object: 'organization.usage.code_interpreter_sessions.result';
 
       /**
        * When `group_by=project_id`, this field provides the project ID of the grouped
