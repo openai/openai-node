@@ -21,7 +21,11 @@ describe('resource projects', () => {
   });
 
   test('create: required and optional params', async () => {
-    const response = await client.admin.organization.projects.create({ name: 'name', geography: 'US' });
+    const response = await client.admin.organization.projects.create({
+      name: 'name',
+      external_key_id: 'external_key_id',
+      geography: 'geography',
+    });
   });
 
   test('retrieve', async () => {
@@ -35,8 +39,8 @@ describe('resource projects', () => {
     expect(dataAndResponse.response).toBe(rawResponse);
   });
 
-  test('update: only required params', async () => {
-    const responsePromise = client.admin.organization.projects.update('project_id', { name: 'name' });
+  test('update', async () => {
+    const responsePromise = client.admin.organization.projects.update('project_id', {});
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -44,10 +48,6 @@ describe('resource projects', () => {
     const dataAndResponse = await responsePromise.withResponse();
     expect(dataAndResponse.data).toBe(response);
     expect(dataAndResponse.response).toBe(rawResponse);
-  });
-
-  test('update: required and optional params', async () => {
-    const response = await client.admin.organization.projects.update('project_id', { name: 'name' });
   });
 
   test('list', async () => {

@@ -10,10 +10,7 @@ const client = new OpenAI({
 
 describe('resource users', () => {
   test('create: only required params', async () => {
-    const responsePromise = client.admin.organization.projects.users.create('project_id', {
-      role: 'owner',
-      user_id: 'user_id',
-    });
+    const responsePromise = client.admin.organization.projects.users.create('project_id', { role: 'role' });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -25,7 +22,8 @@ describe('resource users', () => {
 
   test('create: required and optional params', async () => {
     const response = await client.admin.organization.projects.users.create('project_id', {
-      role: 'owner',
+      role: 'role',
+      email: 'email',
       user_id: 'user_id',
     });
   });
@@ -52,7 +50,6 @@ describe('resource users', () => {
   test('update: only required params', async () => {
     const responsePromise = client.admin.organization.projects.users.update('user_id', {
       project_id: 'project_id',
-      role: 'owner',
     });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
@@ -66,7 +63,7 @@ describe('resource users', () => {
   test('update: required and optional params', async () => {
     const response = await client.admin.organization.projects.users.update('user_id', {
       project_id: 'project_id',
-      role: 'owner',
+      role: 'role',
     });
   });
 

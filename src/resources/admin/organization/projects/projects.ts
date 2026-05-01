@@ -139,7 +139,6 @@ export class Projects extends APIResource {
    * const project =
    *   await client.admin.organization.projects.update(
    *     'project_id',
-   *     { name: 'name' },
    *   );
    * ```
    */
@@ -210,24 +209,29 @@ export interface Project {
   created_at: number;
 
   /**
-   * The name of the project. This appears in reporting.
-   */
-  name: string;
-
-  /**
    * The object type, which is always `organization.project`
    */
   object: 'organization.project';
 
   /**
-   * `active` or `archived`
-   */
-  status: 'active' | 'archived';
-
-  /**
    * The Unix timestamp (in seconds) of when the project was archived or `null`.
    */
   archived_at?: number | null;
+
+  /**
+   * The external key associated with the project.
+   */
+  external_key_id?: string | null;
+
+  /**
+   * The name of the project. This appears in reporting.
+   */
+  name?: string | null;
+
+  /**
+   * `active` or `archived`
+   */
+  status?: string | null;
 }
 
 export interface ProjectCreateParams {
@@ -237,19 +241,34 @@ export interface ProjectCreateParams {
   name: string;
 
   /**
+   * External key ID to associate with the project.
+   */
+  external_key_id?: string | null;
+
+  /**
    * Create the project with the specified data residency region. Your organization
    * must have access to Data residency functionality in order to use. See
    * [data residency controls](https://platform.openai.com/docs/guides/your-data#data-residency-controls)
    * to review the functionality and limitations of setting this field.
    */
-  geography?: 'US' | 'EU' | 'JP' | 'IN' | 'KR' | 'CA' | 'AU' | 'SG';
+  geography?: string | null;
 }
 
 export interface ProjectUpdateParams {
   /**
+   * External key ID to associate with the project.
+   */
+  external_key_id?: string | null;
+
+  /**
+   * Geography for the project.
+   */
+  geography?: string | null;
+
+  /**
    * The updated name of the project, this name appears in reports.
    */
-  name: string;
+  name?: string | null;
 }
 
 export interface ProjectListParams extends ConversationCursorPageParams {
