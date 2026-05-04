@@ -11,6 +11,20 @@ export class ClientSecrets extends APIResource {
   /**
    * Create a Realtime client secret with an associated session configuration.
    *
+   * Client secrets are short-lived tokens that can be passed to a client app, such
+   * as a web frontend or mobile client, which grants access to the Realtime API
+   * without leaking your main API key. You can configure a custom TTL for each
+   * client secret.
+   *
+   * You can also attach session configuration options to the client secret, which
+   * will be applied to any sessions created using that client secret, but these can
+   * also be overridden by the client connection.
+   *
+   * [Learn more about authentication with client secrets over WebRTC](https://platform.openai.com/docs/guides/realtime-webrtc).
+   *
+   * Returns the created client secret and the effective session object. The client
+   * secret is a string that looks like `ek_1234`.
+   *
    * @example
    * ```ts
    * const clientSecret =
@@ -96,6 +110,7 @@ export interface RealtimeSessionCreateResponse {
   model?:
     | (string & {})
     | 'gpt-realtime'
+    | 'gpt-realtime-1.5'
     | 'gpt-realtime-2025-08-28'
     | 'gpt-4o-realtime-preview'
     | 'gpt-4o-realtime-preview-2024-10-01'
@@ -105,8 +120,11 @@ export interface RealtimeSessionCreateResponse {
     | 'gpt-4o-mini-realtime-preview-2024-12-17'
     | 'gpt-realtime-mini'
     | 'gpt-realtime-mini-2025-10-06'
+    | 'gpt-realtime-mini-2025-12-15'
+    | 'gpt-audio-1.5'
     | 'gpt-audio-mini'
-    | 'gpt-audio-mini-2025-10-06';
+    | 'gpt-audio-mini-2025-10-06'
+    | 'gpt-audio-mini-2025-12-15';
 
   /**
    * The set of modalities the model can respond with. It defaults to `["audio"]`,
@@ -135,8 +153,9 @@ export interface RealtimeSessionCreateResponse {
 
   /**
    * Realtime API can write session traces to the
-   * [Traces Dashboard](/logs?api=traces). Set to null to disable tracing. Once
-   * tracing is enabled for a session, the configuration cannot be modified.
+   * [Traces Dashboard](https://platform.openai.com/logs?api=traces). Set to null to
+   * disable tracing. Once tracing is enabled for a session, the configuration cannot
+   * be modified.
    *
    * `auto` will create a trace for the session with default values for the workflow
    * name, group id, and metadata.
@@ -432,6 +451,11 @@ export namespace RealtimeSessionCreateResponse {
       | 'connector_outlookcalendar'
       | 'connector_outlookemail'
       | 'connector_sharepoint';
+
+    /**
+     * Whether this MCP tool is deferred and discovered via tool search.
+     */
+    defer_loading?: boolean;
 
     /**
      * Optional HTTP headers to send to the MCP server. Use for authentication or other

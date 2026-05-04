@@ -32,10 +32,17 @@ export interface AudioTranscription {
 
   /**
    * The model to use for transcription. Current options are `whisper-1`,
-   * `gpt-4o-mini-transcribe`, `gpt-4o-transcribe`, and `gpt-4o-transcribe-diarize`.
-   * Use `gpt-4o-transcribe-diarize` when you need diarization with speaker labels.
+   * `gpt-4o-mini-transcribe`, `gpt-4o-mini-transcribe-2025-12-15`,
+   * `gpt-4o-transcribe`, and `gpt-4o-transcribe-diarize`. Use
+   * `gpt-4o-transcribe-diarize` when you need diarization with speaker labels.
    */
-  model?: 'whisper-1' | 'gpt-4o-mini-transcribe' | 'gpt-4o-transcribe' | 'gpt-4o-transcribe-diarize';
+  model?:
+    | (string & {})
+    | 'whisper-1'
+    | 'gpt-4o-mini-transcribe'
+    | 'gpt-4o-mini-transcribe-2025-12-15'
+    | 'gpt-4o-transcribe'
+    | 'gpt-4o-transcribe-diarize';
 
   /**
    * An optional text to guide the model's style or continue a previous audio
@@ -164,10 +171,14 @@ export interface ConversationItemCreateEvent {
 
   /**
    * The ID of the preceding item after which the new item will be inserted. If not
-   * set, the new item will be appended to the end of the conversation. If set to
-   * `root`, the new item will be added to the beginning of the conversation. If set
-   * to an existing ID, it allows an item to be inserted mid-conversation. If the ID
-   * cannot be found, an error will be returned and the item will not be added.
+   * set, the new item will be appended to the end of the conversation.
+   *
+   * If set to `root`, the new item will be added to the beginning of the
+   * conversation.
+   *
+   * If set to an existing ID, it allows an item to be inserted mid-conversation. If
+   * the ID cannot be found, an error will be returned and the item will not be
+   * added.
    */
   previous_item_id?: string;
 }
@@ -1249,13 +1260,15 @@ export interface RealtimeAudioConfigOutput {
   speed?: number;
 
   /**
-   * The voice the model uses to respond. Voice cannot be changed during the session
-   * once the model has responded with audio at least once. Current voice options are
-   * `alloy`, `ash`, `ballad`, `coral`, `echo`, `sage`, `shimmer`, `verse`, `marin`,
-   * and `cedar`. We recommend `marin` and `cedar` for best quality.
+   * The voice the model uses to respond. Supported built-in voices are `alloy`,
+   * `ash`, `ballad`, `coral`, `echo`, `sage`, `shimmer`, `verse`, `marin`, and
+   * `cedar`. You may also provide a custom voice object with an `id`, for example
+   * `{ "id": "voice_1234" }`. Voice cannot be changed during the session once the
+   * model has responded with audio at least once. We recommend `marin` and `cedar`
+   * for best quality.
    */
   voice?:
-    | (string & {})
+    | string
     | 'alloy'
     | 'ash'
     | 'ballad'
@@ -1265,7 +1278,20 @@ export interface RealtimeAudioConfigOutput {
     | 'shimmer'
     | 'verse'
     | 'marin'
-    | 'cedar';
+    | 'cedar'
+    | RealtimeAudioConfigOutput.ID;
+}
+
+export namespace RealtimeAudioConfigOutput {
+  /**
+   * Custom voice reference.
+   */
+  export interface ID {
+    /**
+     * The custom voice ID, e.g. `voice_1234`.
+     */
+    id: string;
+  }
 }
 
 /**
@@ -2114,13 +2140,15 @@ export namespace RealtimeResponseCreateAudioOutput {
     format?: RealtimeAPI.RealtimeAudioFormats;
 
     /**
-     * The voice the model uses to respond. Voice cannot be changed during the session
-     * once the model has responded with audio at least once. Current voice options are
-     * `alloy`, `ash`, `ballad`, `coral`, `echo`, `sage`, `shimmer`, `verse`, `marin`,
-     * and `cedar`. We recommend `marin` and `cedar` for best quality.
+     * The voice the model uses to respond. Supported built-in voices are `alloy`,
+     * `ash`, `ballad`, `coral`, `echo`, `sage`, `shimmer`, `verse`, `marin`, and
+     * `cedar`. You may also provide a custom voice object with an `id`, for example
+     * `{ "id": "voice_1234" }`. Voice cannot be changed during the session once the
+     * model has responded with audio at least once. We recommend `marin` and `cedar`
+     * for best quality.
      */
     voice?:
-      | (string & {})
+      | string
       | 'alloy'
       | 'ash'
       | 'ballad'
@@ -2130,7 +2158,20 @@ export namespace RealtimeResponseCreateAudioOutput {
       | 'shimmer'
       | 'verse'
       | 'marin'
-      | 'cedar';
+      | 'cedar'
+      | Output.ID;
+  }
+
+  export namespace Output {
+    /**
+     * Custom voice reference.
+     */
+    export interface ID {
+      /**
+       * The custom voice ID, e.g. `voice_1234`.
+       */
+      id: string;
+    }
   }
 }
 
@@ -2188,6 +2229,11 @@ export interface RealtimeResponseCreateMcpTool {
     | 'connector_outlookcalendar'
     | 'connector_outlookemail'
     | 'connector_sharepoint';
+
+  /**
+   * Whether this MCP tool is deferred and discovered via tool search.
+   */
+  defer_loading?: boolean;
 
   /**
    * Optional HTTP headers to send to the MCP server. Use for authentication or other
@@ -2752,7 +2798,9 @@ export interface RealtimeSession {
    * The Realtime model used for this session.
    */
   model?:
+    | (string & {})
     | 'gpt-realtime'
+    | 'gpt-realtime-1.5'
     | 'gpt-realtime-2025-08-28'
     | 'gpt-4o-realtime-preview'
     | 'gpt-4o-realtime-preview-2024-10-01'
@@ -2762,8 +2810,11 @@ export interface RealtimeSession {
     | 'gpt-4o-mini-realtime-preview-2024-12-17'
     | 'gpt-realtime-mini'
     | 'gpt-realtime-mini-2025-10-06'
+    | 'gpt-realtime-mini-2025-12-15'
+    | 'gpt-audio-1.5'
     | 'gpt-audio-mini'
-    | 'gpt-audio-mini-2025-10-06';
+    | 'gpt-audio-mini-2025-10-06'
+    | 'gpt-audio-mini-2025-12-15';
 
   /**
    * The object type. Always `realtime.session`.
@@ -3042,6 +3093,7 @@ export interface RealtimeSessionCreateRequest {
   model?:
     | (string & {})
     | 'gpt-realtime'
+    | 'gpt-realtime-1.5'
     | 'gpt-realtime-2025-08-28'
     | 'gpt-4o-realtime-preview'
     | 'gpt-4o-realtime-preview-2024-10-01'
@@ -3051,8 +3103,11 @@ export interface RealtimeSessionCreateRequest {
     | 'gpt-4o-mini-realtime-preview-2024-12-17'
     | 'gpt-realtime-mini'
     | 'gpt-realtime-mini-2025-10-06'
+    | 'gpt-realtime-mini-2025-12-15'
+    | 'gpt-audio-1.5'
     | 'gpt-audio-mini'
-    | 'gpt-audio-mini-2025-10-06';
+    | 'gpt-audio-mini-2025-10-06'
+    | 'gpt-audio-mini-2025-12-15';
 
   /**
    * The set of modalities the model can respond with. It defaults to `["audio"]`,
@@ -3081,8 +3136,9 @@ export interface RealtimeSessionCreateRequest {
 
   /**
    * Realtime API can write session traces to the
-   * [Traces Dashboard](/logs?api=traces). Set to null to disable tracing. Once
-   * tracing is enabled for a session, the configuration cannot be modified.
+   * [Traces Dashboard](https://platform.openai.com/logs?api=traces). Set to null to
+   * disable tracing. Once tracing is enabled for a session, the configuration cannot
+   * be modified.
    *
    * `auto` will create a trace for the session with default values for the workflow
    * name, group id, and metadata.
@@ -3190,6 +3246,11 @@ export namespace RealtimeToolsConfigUnion {
       | 'connector_sharepoint';
 
     /**
+     * Whether this MCP tool is deferred and discovered via tool search.
+     */
+    defer_loading?: boolean;
+
+    /**
      * Optional HTTP headers to send to the MCP server. Use for authentication or other
      * purposes.
      */
@@ -3289,8 +3350,9 @@ export namespace RealtimeToolsConfigUnion {
 
 /**
  * Realtime API can write session traces to the
- * [Traces Dashboard](/logs?api=traces). Set to null to disable tracing. Once
- * tracing is enabled for a session, the configuration cannot be modified.
+ * [Traces Dashboard](https://platform.openai.com/logs?api=traces). Set to null to
+ * disable tracing. Once tracing is enabled for a session, the configuration cannot
+ * be modified.
  *
  * `auto` will create a trace for the session with default values for the workflow
  * name, group id, and metadata.
@@ -4080,6 +4142,11 @@ export interface ResponseFunctionCallArgumentsDoneEvent {
    * The ID of the function call item.
    */
   item_id: string;
+
+  /**
+   * The name of the function that was called.
+   */
+  name: string;
 
   /**
    * The index of the output item in the response.

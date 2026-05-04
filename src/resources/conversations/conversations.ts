@@ -18,6 +18,9 @@ import { APIPromise } from '../../core/api-promise';
 import { RequestOptions } from '../../internal/request-options';
 import { path } from '../../internal/utils/path';
 
+/**
+ * Manage conversations and conversation items.
+ */
 export class Conversations extends APIResource {
   items: ItemsAPI.Items = new ItemsAPI.Items(this._client);
 
@@ -61,6 +64,12 @@ export class Conversations extends APIResource {
  * A screenshot of a computer.
  */
 export interface ComputerScreenshotContent {
+  /**
+   * The detail level of the screenshot image to be sent to the model. One of `high`,
+   * `low`, `auto`, or `original`. Defaults to `auto`.
+   */
+  detail: 'low' | 'high' | 'auto' | 'original';
+
   /**
    * The identifier of an uploaded file that contains the screenshot.
    */
@@ -161,6 +170,14 @@ export interface Message {
    * The type of the message. Always set to `message`.
    */
   type: 'message';
+
+  /**
+   * Labels an `assistant` message as intermediate commentary (`commentary`) or the
+   * final answer (`final_answer`). For models like `gpt-5.3-codex` and beyond, when
+   * sending follow-up requests, preserve and resend phase on all assistant messages
+   * — dropping it can degrade performance. Not used for user messages.
+   */
+  phase?: 'commentary' | 'final_answer' | null;
 }
 
 export namespace Message {

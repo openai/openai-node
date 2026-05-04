@@ -36,7 +36,7 @@ describe('resource runs', () => {
       max_completion_tokens: 256,
       max_prompt_tokens: 256,
       metadata: { foo: 'string' },
-      model: 'string',
+      model: 'gpt-5.4',
       parallel_tool_calls: true,
       reasoning_effort: 'none',
       response_format: 'auto',
@@ -98,7 +98,12 @@ describe('resource runs', () => {
     await expect(
       client.beta.threads.runs.list(
         'thread_id',
-        { after: 'after', before: 'before', limit: 0, order: 'asc' },
+        {
+          after: 'after',
+          before: 'before',
+          limit: 0,
+          order: 'asc',
+        },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);

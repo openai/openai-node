@@ -79,6 +79,7 @@ export type RequestOptions = {
   __metadata?: Record<string, unknown>;
   __binaryResponse?: boolean | undefined;
   __streamClass?: typeof Stream;
+  __synthesizeEventData?: boolean;
 };
 
 export type EncodedContent = { bodyHeaders: HeadersLike; body: BodyInit };

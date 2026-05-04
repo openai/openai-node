@@ -21,6 +21,8 @@ export {
   PermissionDeniedError,
   UnprocessableEntityError,
   InvalidWebhookSignatureError,
+  OAuthError,
+  SubjectTokenProviderError,
 } from './core/error';
 
 export { AzureOpenAI } from './azure';

@@ -75,7 +75,7 @@ describe('resource responses', () => {
   });
 
   test('compact: only required params', async () => {
-    const responsePromise = client.responses.compact({ model: 'gpt-5.1' });
+    const responsePromise = client.responses.compact({ model: 'gpt-5.4' });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -87,10 +87,12 @@ describe('resource responses', () => {
 
   test('compact: required and optional params', async () => {
     const response = await client.responses.compact({
-      model: 'gpt-5.1',
+      model: 'gpt-5.4',
       input: 'string',
       instructions: 'instructions',
       previous_response_id: 'resp_123',
+      prompt_cache_key: 'prompt_cache_key',
+      prompt_cache_retention: 'in_memory',
     });
   });
 });

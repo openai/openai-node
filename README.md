@@ -41,7 +41,7 @@ const client = new OpenAI({
 });
 
 const response = await client.responses.create({
-  model: 'gpt-4o',
+  model: 'gpt-5.2',
   instructions: 'You are a coding assistant that talks like a pirate',
   input: 'Are semicolons optional in JavaScript?',
 });
@@ -59,7 +59,7 @@ const client = new OpenAI({
 });
 
 const completion = await client.chat.completions.create({
-  model: 'gpt-4o',
+  model: 'gpt-5.2',
   messages: [
     { role: 'developer', content: 'Talk like a pirate.' },
     { role: 'user', content: 'Are semicolons optional in JavaScript?' },
@@ -67,6 +67,102 @@ const completion = await client.chat.completions.create({
 });
 
 console.log(completion.choices[0].message.content);
+```
+
+## Workload Identity Authentication
+
+For secure, automated environments like cloud-managed Kubernetes, Azure, and GCP, you can use workload identity authentication with short-lived tokens from cloud identity providers instead of long-lived API keys.
+
+The `workloadIdentity` parameter is mutually exclusive with `apiKey`.
+
+### Kubernetes (service account tokens)
+
+```ts
+import OpenAI from 'openai';
+import { k8sServiceAccountTokenProvider } from 'openai/auth';
+
+const client = new OpenAI({
+  workloadIdentity: {
+    clientId: 'your-client-id',
+    identityProviderId: 'idp-123',
+    serviceAccountId: 'sa-456',
+    provider: k8sServiceAccountTokenProvider('/var/run/secrets/kubernetes.io/serviceaccount/token'),
+  },
+});
+
+const response = await client.chat.completions.create({
+  model: 'gpt-4',
+  messages: [{ role: 'user', content: 'Hello!' }],
+});
+```
+
+### Azure (managed identity)
+
+```ts
+import OpenAI from 'openai';
+import { azureManagedIdentityTokenProvider } from 'openai/auth';
+
+const client = new OpenAI({
+  workloadIdentity: {
+    clientId: 'your-client-id',
+    identityProviderId: 'idp-123',
+    serviceAccountId: 'sa-456',
+    provider: azureManagedIdentityTokenProvider(),
+  },
+});
+```
+
+### GCP (compute engine metadata)
+
+```ts
+import OpenAI from 'openai';
+import { gcpIDTokenProvider } from 'openai/auth';
+
+const client = new OpenAI({
+  workloadIdentity: {
+    clientId: 'your-client-id',
+    identityProviderId: 'idp-123',
+    serviceAccountId: 'sa-456',
+    provider: gcpIDTokenProvider(),
+  },
+});
+```
+
+### Custom subject token provider
+
+```ts
+import OpenAI from 'openai';
+
+const client = new OpenAI({
+  workloadIdentity: {
+    clientId: 'your-client-id',
+    identityProviderId: 'idp-123',
+    serviceAccountId: 'sa-456',
+    provider: {
+      tokenType: 'jwt',
+      getToken: async () => {
+        return 'your-jwt-token';
+      },
+    },
+  },
+});
+```
+
+You can also customize the token refresh buffer (default is 1200 seconds (20 minutes) before expiration):
+
+```ts
+import OpenAI from 'openai';
+import { k8sServiceAccountTokenProvider } from 'openai/auth';
+
+const client = new OpenAI({
+  workloadIdentity: {
+    clientId: 'your-client-id',
+    identityProviderId: 'idp-123',
+    serviceAccountId: 'sa-456',
+    provider: k8sServiceAccountTokenProvider('/var/token'),
+    refreshBufferSeconds: 120.0,
+  },
+});
 ```
 
 ## Streaming responses
@@ -79,7 +175,7 @@ import OpenAI from 'openai';
 const client = new OpenAI();
 
 const stream = await client.responses.create({
-  model: 'gpt-4o',
+  model: 'gpt-5.2',
   input: 'Say "Sheep sleep deep" ten times fast!',
   stream: true,
 });
@@ -111,7 +207,10 @@ await client.files.create({ file: fs.createReadStream('input.jsonl'), purpose: '
 await client.files.create({ file: new File(['my bytes'], 'input.jsonl'), purpose: 'fine-tune' });
 
 // You can also pass a `fetch` `Response`:
-await client.files.create({ file: await fetch('https://somesite/input.jsonl'), purpose: 'fine-tune' });
+await client.files.create({
+  file: await fetch('https://somesite/input.jsonl'),
+  purpose: 'fine-tune',
+});
 
 // Finally, if none of the above are convenient, you can use our `toFile` helper:
 await client.files.create({
@@ -247,7 +346,7 @@ All object responses in the SDK provide a `_request_id` property which is added 
 ```ts
 const completion = await client.chat.completions.create({
   messages: [{ role: 'user', content: 'Say this is a test' }],
-  model: 'gpt-4o',
+  model: 'gpt-5.2',
 });
 console.log(completion._request_id); // req_123
 ```
@@ -257,7 +356,7 @@ You can also access the Request ID using the `.withResponse()` method:
 ```ts
 const { data: stream, request_id } = await openai.chat.completions
   .create({
-    model: 'gpt-4',
+    model: 'gpt-5.2',
     messages: [{ role: 'user', content: 'Say this is a test' }],
     stream: true,
   })
@@ -298,7 +397,7 @@ const azureADTokenProvider = getBearerTokenProvider(credential, scope);
 const openai = new AzureOpenAI({ azureADTokenProvider });
 
 const result = await openai.chat.completions.create({
-  model: 'gpt-4o',
+  model: 'gpt-5.2',
   messages: [{ role: 'user', content: 'Say hello!' }],
 });
 
@@ -321,7 +420,7 @@ const client = new OpenAI({
 });
 
 // Or, configure per-request:
-await client.chat.completions.create({ messages: [{ role: 'user', content: 'How can I get the name of the current day in JavaScript?' }], model: 'gpt-4o' }, {
+await client.chat.completions.create({ messages: [{ role: 'user', content: 'How can I get the name of the current day in JavaScript?' }], model: 'gpt-5.2' }, {
   maxRetries: 5,
 });
 ```
@@ -338,7 +437,7 @@ const client = new OpenAI({
 });
 
 // Override per-request:
-await client.chat.completions.create({ messages: [{ role: 'user', content: 'How can I list all files in a directory using Python?' }], model: 'gpt-4o' }, {
+await client.chat.completions.create({ messages: [{ role: 'user', content: 'How can I list all files in a directory using Python?' }], model: 'gpt-5.2' }, {
   timeout: 5 * 1000,
 });
 ```
@@ -354,7 +453,7 @@ Note that requests which time out will be [retried twice by default](#retries).
 All object responses in the SDK provide a `_request_id` property which is added from the `x-request-id` response header so that you can quickly log failing requests and report them back to OpenAI.
 
 ```ts
-const response = await client.responses.create({ model: 'gpt-4o', input: 'testing 123' });
+const response = await client.responses.create({ model: 'gpt-5.2', input: 'testing 123' });
 console.log(response._request_id); // req_123
 ```
 
@@ -363,7 +462,7 @@ You can also access the Request ID using the `.withResponse()` method:
 ```ts
 const { data: stream, request_id } = await openai.responses
   .create({
-    model: 'gpt-4o',
+    model: 'gpt-5.2',
     input: 'Say this is a test',
     stream: true,
   })
@@ -438,7 +537,7 @@ const openai = new AzureOpenAI({
 });
 
 const result = await openai.chat.completions.create({
-  model: 'gpt-4o',
+  model: 'gpt-5.2',
   messages: [{ role: 'user', content: 'Say hello!' }],
 });
 
@@ -462,7 +561,7 @@ Unlike `.asResponse()` this method consumes the body, returning once it is parse
 const client = new OpenAI();
 
 const httpResponse = await client.responses
-  .create({ model: 'gpt-4o', input: 'say this is a test.' })
+  .create({ model: 'gpt-5.2', input: 'say this is a test.' })
   .asResponse();
 
 // access the underlying web standard Response object
@@ -470,7 +569,7 @@ console.log(httpResponse.headers.get('X-My-Header'));
 console.log(httpResponse.statusText);
 
 const { data: modelResponse, response: raw } = await client.responses
-  .create({ model: 'gpt-4o', input: 'say this is a test.' })
+  .create({ model: 'gpt-5.2', input: 'say this is a test.' })
   .withResponse();
 console.log(raw.headers.get('X-My-Header'));
 console.log(modelResponse);

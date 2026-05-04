@@ -42,6 +42,8 @@ import { RunSubmitToolOutputsParamsStream } from '../../../../lib/AssistantStrea
 import { path } from '../../../../internal/utils/path';
 
 /**
+ * Build Assistants that can call models and use tools.
+ *
  * @deprecated The Assistants API is deprecated in favor of the Responses API
  */
 export class Runs extends APIResource {
@@ -75,6 +77,7 @@ export class Runs extends APIResource {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
       stream: params.stream ?? false,
+      __synthesizeEventData: true,
     }) as APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
   }
 
@@ -259,6 +262,7 @@ export class Runs extends APIResource {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
       stream: params.stream ?? false,
+      __synthesizeEventData: true,
     }) as APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
   }
 
@@ -735,7 +739,7 @@ export interface RunCreateParamsBase {
    * - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
    *   support `none`.
    * - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
-   * - `xhigh` is currently only supported for `gpt-5.1-codex-max`.
+   * - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
    */
   reasoning_effort?: Shared.ReasoningEffort | null;
 

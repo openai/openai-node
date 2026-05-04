@@ -7,6 +7,9 @@ import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pa
 import { RequestOptions } from '../../../internal/request-options';
 import { path } from '../../../internal/utils/path';
 
+/**
+ * Manage and run evals in the OpenAI platform.
+ */
 export class OutputItems extends APIResource {
   /**
    * Get an evaluation run output item by ID.

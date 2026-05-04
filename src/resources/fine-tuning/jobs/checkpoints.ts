@@ -5,6 +5,9 @@ import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pa
 import { RequestOptions } from '../../../internal/request-options';
 import { path } from '../../../internal/utils/path';
 
+/**
+ * Manage fine-tuning jobs to tailor a model to your specific training data.
+ */
 export class Checkpoints extends APIResource {
   /**
    * List checkpoints for a fine-tuning job.

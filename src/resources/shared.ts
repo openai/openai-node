@@ -19,6 +19,17 @@ export type AllModels =
   | 'gpt-5.1-codex-max';
 
 export type ChatModel =
+  | 'gpt-5.4'
+  | 'gpt-5.4-mini'
+  | 'gpt-5.4-nano'
+  | 'gpt-5.4-mini-2026-03-17'
+  | 'gpt-5.4-nano-2026-03-17'
+  | 'gpt-5.3-chat-latest'
+  | 'gpt-5.2'
+  | 'gpt-5.2-2025-12-11'
+  | 'gpt-5.2-chat-latest'
+  | 'gpt-5.2-pro'
+  | 'gpt-5.2-pro-2025-12-11'
   | 'gpt-5.1'
   | 'gpt-5.1-2025-11-13'
   | 'gpt-5.1-codex'
@@ -110,7 +121,7 @@ export interface ComparisonFilter {
    * - `in`: in
    * - `nin`: not in
    */
-  type: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte';
+  type: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'nin';
 
   /**
    * The value to compare against the attribute key; supports string, number, or
@@ -237,6 +248,8 @@ export type FunctionParameters = { [key: string]: unknown };
  */
 export type Metadata = { [key: string]: string };
 
+export type OAuthErrorCode = 'invalid_grant' | 'invalid_subject_token' | (string & {});
+
 /**
  * **gpt-5 and o-series models only**
  *
@@ -257,7 +270,7 @@ export interface Reasoning {
    * - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
    *   support `none`.
    * - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
-   * - `xhigh` is currently only supported for `gpt-5.1-codex-max`.
+   * - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
    */
   effort?: ReasoningEffort | null;
 
@@ -275,7 +288,8 @@ export interface Reasoning {
    * debugging and understanding the model's reasoning process. One of `auto`,
    * `concise`, or `detailed`.
    *
-   * `concise` is only supported for `computer-use-preview` models.
+   * `concise` is supported for `computer-use-preview` models and all reasoning
+   * models after `gpt-5`.
    */
   summary?: 'auto' | 'concise' | 'detailed' | null;
 }
@@ -293,7 +307,7 @@ export interface Reasoning {
  * - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
  *   support `none`.
  * - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
- * - `xhigh` is currently only supported for `gpt-5.1-codex-max`.
+ * - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
  */
 export type ReasoningEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | null;
 

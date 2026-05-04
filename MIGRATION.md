@@ -83,6 +83,9 @@ client.parents.children.retrieve('c_456', { parent_id: 'p_123' });
 - `client.containers.files.retrieve()`
 - `client.containers.files.delete()`
 - `client.containers.files.content.retrieve()`
+- `client.skills.versions.retrieve()`
+- `client.skills.versions.delete()`
+- `client.skills.versions.content.retrieve()`
 
 </details>
 
@@ -124,6 +127,7 @@ client.example.list(undefined, { headers: { ... } });
 - `client.fineTuning.jobs.listEvents()`
 - `client.fineTuning.jobs.checkpoints.list()`
 - `client.fineTuning.checkpoints.permissions.retrieve()`
+- `client.fineTuning.checkpoints.permissions.list()`
 - `client.vectorStores.list()`
 - `client.vectorStores.files.list()`
 - `client.beta.chatkit.threads.list()`
@@ -143,6 +147,10 @@ client.example.list(undefined, { headers: { ... } });
 - `client.evals.runs.list()`
 - `client.containers.list()`
 - `client.containers.files.list()`
+- `client.skills.create()`
+- `client.skills.list()`
+- `client.skills.versions.create()`
+- `client.skills.versions.list()`
 - `client.videos.list()`
 - `client.videos.downloadContent()`
 
@@ -395,14 +403,14 @@ The `beta.chat` namespace has been removed. All chat completion methods that wer
 
 ```ts
 // Before
-client.beta.chat.completions.parse()
-client.beta.chat.completions.stream()
-client.beta.chat.completions.runTools()
+client.beta.chat.completions.parse();
+client.beta.chat.completions.stream();
+client.beta.chat.completions.runTools();
 
 // After
-client.chat.completions.parse()
-client.chat.completions.stream()
-client.chat.completions.runTools()
+client.chat.completions.parse();
+client.chat.completions.stream();
+client.chat.completions.runTools();
 ```
 
 Additionally, related types have been moved:
@@ -447,12 +455,14 @@ openai.chat.completions
 ```
 
 The following event names have been changed:
+
 - `functionCall` → `functionToolCall`
 - `functionCallResult` → `functionToolCallResult`
 - `finalFunctionCall` → `finalFunctionToolCall`
 - `finalFunctionCallResult` → `finalFunctionToolCallResult`
 
 Additionally, the following methods have been renamed:
+
 - `runner.finalFunctionCall()` → `runner.finalFunctionToolCall()`
 - `runner.finalFunctionCallResult()` → `runner.finalFunctionToolCallResult()`
 

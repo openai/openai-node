@@ -8,7 +8,10 @@ import { RequestOptions } from '../../internal/request-options';
 
 export class InputTokens extends APIResource {
   /**
-   * Get input token counts
+   * Returns input token counts of the request.
+   *
+   * Returns an object with `object` set to `response.input_tokens` and an
+   * `input_tokens` count.
    *
    * @example
    * ```ts
@@ -89,9 +92,7 @@ export interface InputTokenCountParams {
   text?: InputTokenCountParams.Text | null;
 
   /**
-   * How the model should select which tool (or tools) to use when generating a
-   * response. See the `tools` parameter to see how to specify which tools the model
-   * can call.
+   * Controls which tool the model should use, if any.
    */
   tool_choice?:
     | ResponsesAPI.ToolChoiceOptions

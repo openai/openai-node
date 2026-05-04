@@ -2,6 +2,7 @@
 
 export {
   GraderModels,
+  type GraderInputs,
   type LabelModelGrader,
   type MultiGrader,
   type PythonGrader,

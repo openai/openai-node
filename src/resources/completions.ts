@@ -2,19 +2,25 @@
 
 import { APIResource } from '../core/resource';
 import * as CompletionsAPI from './completions';
-import * as CompletionsCompletionsAPI from './chat/completions/completions';
+import * as ChatCompletionsAPI from './chat/completions/completions';
 import { APIPromise } from '../core/api-promise';
 import { Stream } from '../core/streaming';
 import { RequestOptions } from '../internal/request-options';
 
+/**
+ * Given a prompt, the model will return one or more predicted completions, and can also return the probabilities of alternative tokens at each position.
+ */
 export class Completions extends APIResource {
   /**
    * Creates a completion for the provided prompt and parameters.
    *
+   * Returns a completion object, or a sequence of completion objects if the request
+   * is streamed.
+   *
    * @example
    * ```ts
    * const completion = await client.completions.create({
-   *   model: 'string',
+   *   model: 'gpt-3.5-turbo-instruct',
    *   prompt: 'This is a test.',
    * });
    * ```
@@ -318,7 +324,7 @@ export interface CompletionCreateParamsBase {
   /**
    * Options for streaming response. Only set this when you set `stream: true`.
    */
-  stream_options?: CompletionsCompletionsAPI.ChatCompletionStreamOptions | null;
+  stream_options?: ChatCompletionsAPI.ChatCompletionStreamOptions | null;
 
   /**
    * The suffix that comes after a completion of inserted text.
