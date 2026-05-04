@@ -18,7 +18,8 @@ export class Files extends APIResource {
   /**
    * Upload a file that can be used across various endpoints. Individual files can be
    * up to 512 MB, and each project can store up to 2.5 TB of files in total. There
-   * is no organization-wide storage limit.
+   * is no organization-wide storage limit. Uploads to this endpoint are rate-limited
+   * to 1,000 requests per minute per authenticated user.
    *
    * - The Assistants API supports files up to 2 million tokens and of specific file
    *   types. See the
@@ -33,19 +34,28 @@ export class Files extends APIResource {
    * - The Batch API only supports `.jsonl` files up to 200 MB in size. The input
    *   also has a specific required
    *   [format](https://platform.openai.com/docs/api-reference/batch/request-input).
+   * - For Retrieval or `file_search` ingestion, upload files here first. If you need
+   *   to attach multiple uploaded files to the same vector store, use
+   *   [`/vector_stores/{vector_store_id}/file_batches`](https://platform.openai.com/docs/api-reference/vector-stores-file-batches/createBatch)
+   *   instead of attaching them one by one. Vector store attachment has separate
+   *   limits from file upload, including 2,000 attached files per minute per
+   *   organization.
    *
    * Please [contact us](https://help.openai.com/) if you need to increase these
    * storage limits.
    */
   create(body: FileCreateParams, options?: RequestOptions): APIPromise<FileObject> {
-    return this._client.post('/files', multipartFormRequestOptions({ body, ...options }, this._client));
+    return this._client.post(
+      '/files',
+      multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
+    );
   }
 
   /**
    * Returns information about a specific file.
    */
   retrieve(fileID: string, options?: RequestOptions): APIPromise<FileObject> {
-    return this._client.get(path`/files/${fileID}`, options);
+    return this._client.get(path`/files/${fileID}`, { ...options, __security: { bearerAuth: true } });
   }
 
   /**
@@ -55,14 +65,18 @@ export class Files extends APIResource {
     query: FileListParams | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<FileObjectsPage, FileObject> {
-    return this._client.getAPIList('/files', CursorPage<FileObject>, { query, ...options });
+    return this._client.getAPIList('/files', CursorPage<FileObject>, {
+      query,
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
    * Delete a file and remove it from all vector stores.
    */
   delete(fileID: string, options?: RequestOptions): APIPromise<FileDeleted> {
-    return this._client.delete(path`/files/${fileID}`, options);
+    return this._client.delete(path`/files/${fileID}`, { ...options, __security: { bearerAuth: true } });
   }
 
   /**
@@ -72,6 +86,7 @@ export class Files extends APIResource {
     return this._client.get(path`/files/${fileID}/content`, {
       ...options,
       headers: buildHeaders([{ Accept: 'application/binary' }, options?.headers]),
+      __security: { bearerAuth: true },
       __binaryResponse: true,
     });
   }

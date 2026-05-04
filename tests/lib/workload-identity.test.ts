@@ -23,10 +23,14 @@ const createTestClientOptions = () => ({
 describe('OpenAI with Workload Identity', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    delete process.env['OPENAI_API_KEY'];
+    delete process.env['OPENAI_ADMIN_KEY'];
   });
 
   afterEach(() => {
     global.fetch = originalFetch;
+    delete process.env['OPENAI_API_KEY'];
+    delete process.env['OPENAI_ADMIN_KEY'];
   });
 
   test('initializes with workloadIdentity', () => {
@@ -47,8 +51,12 @@ describe('OpenAI with Workload Identity', () => {
     ).toThrow(/mutually exclusive/);
   });
 
-  test('requires either apiKey or workloadIdentity', () => {
+  test('requires at least one credential source', () => {
     expect(() => new OpenAI({})).toThrow(/Missing credentials/);
+  });
+
+  test('allows client initialization with adminAPIKey only', () => {
+    expect(() => new OpenAI({ apiKey: null, adminAPIKey: 'my-admin-api-key' })).not.toThrow();
   });
 
   test('injects Authorization header with workload identity token', async () => {
@@ -83,6 +91,26 @@ describe('OpenAI with Workload Identity', () => {
 
     expect(apiRequestHeaders).toBeDefined();
     expect(apiRequestHeaders!.get('Authorization')).toBe('Bearer exchanged-access-token');
+  });
+
+  test('does not satisfy admin-only auth with workload identity', async () => {
+    global.fetch = jest.fn(async () => {
+      return new Response('Unexpected request', { status: 500 });
+    }) as typeof fetch;
+
+    const client = new OpenAI(createTestClientOptions());
+
+    await expect(
+      client
+        .request({
+          path: '/organization/projects',
+          method: 'get',
+          __security: { adminAPIKeyAuth: true },
+        })
+        .asResponse(),
+    ).rejects.toThrow(/Could not resolve authentication method/);
+
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 
   test('reuses cached token across multiple requests', async () => {

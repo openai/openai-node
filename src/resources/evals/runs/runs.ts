@@ -31,7 +31,11 @@ export class Runs extends APIResource {
    * schema specified in the config of the evaluation.
    */
   create(evalID: string, body: RunCreateParams, options?: RequestOptions): APIPromise<RunCreateResponse> {
-    return this._client.post(path`/evals/${evalID}/runs`, { body, ...options });
+    return this._client.post(path`/evals/${evalID}/runs`, {
+      body,
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
@@ -43,7 +47,10 @@ export class Runs extends APIResource {
     options?: RequestOptions,
   ): APIPromise<RunRetrieveResponse> {
     const { eval_id } = params;
-    return this._client.get(path`/evals/${eval_id}/runs/${runID}`, options);
+    return this._client.get(path`/evals/${eval_id}/runs/${runID}`, {
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
@@ -57,6 +64,7 @@ export class Runs extends APIResource {
     return this._client.getAPIList(path`/evals/${evalID}/runs`, CursorPage<RunListResponse>, {
       query,
       ...options,
+      __security: { bearerAuth: true },
     });
   }
 
@@ -65,7 +73,10 @@ export class Runs extends APIResource {
    */
   delete(runID: string, params: RunDeleteParams, options?: RequestOptions): APIPromise<RunDeleteResponse> {
     const { eval_id } = params;
-    return this._client.delete(path`/evals/${eval_id}/runs/${runID}`, options);
+    return this._client.delete(path`/evals/${eval_id}/runs/${runID}`, {
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
@@ -73,7 +84,10 @@ export class Runs extends APIResource {
    */
   cancel(runID: string, params: RunCancelParams, options?: RequestOptions): APIPromise<RunCancelResponse> {
     const { eval_id } = params;
-    return this._client.post(path`/evals/${eval_id}/runs/${runID}`, options);
+    return this._client.post(path`/evals/${eval_id}/runs/${runID}`, {
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 }
 

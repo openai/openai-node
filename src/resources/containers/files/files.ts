@@ -27,7 +27,7 @@ export class Files extends APIResource {
   ): APIPromise<FileCreateResponse> {
     return this._client.post(
       path`/containers/${containerID}/files`,
-      maybeMultipartFormRequestOptions({ body, ...options }, this._client),
+      maybeMultipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
     );
   }
 
@@ -40,7 +40,10 @@ export class Files extends APIResource {
     options?: RequestOptions,
   ): APIPromise<FileRetrieveResponse> {
     const { container_id } = params;
-    return this._client.get(path`/containers/${container_id}/files/${fileID}`, options);
+    return this._client.get(path`/containers/${container_id}/files/${fileID}`, {
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
@@ -54,6 +57,7 @@ export class Files extends APIResource {
     return this._client.getAPIList(path`/containers/${containerID}/files`, CursorPage<FileListResponse>, {
       query,
       ...options,
+      __security: { bearerAuth: true },
     });
   }
 
@@ -65,6 +69,7 @@ export class Files extends APIResource {
     return this._client.delete(path`/containers/${container_id}/files/${fileID}`, {
       ...options,
       headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 }

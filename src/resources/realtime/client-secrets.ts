@@ -32,7 +32,11 @@ export class ClientSecrets extends APIResource {
    * ```
    */
   create(body: ClientSecretCreateParams, options?: RequestOptions): APIPromise<ClientSecretCreateResponse> {
-    return this._client.post('/realtime/client_secrets', { body, ...options });
+    return this._client.post('/realtime/client_secrets', {
+      body,
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 }
 
