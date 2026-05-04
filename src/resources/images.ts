@@ -394,7 +394,7 @@ export interface ImageGenPartialImageEvent {
  */
 export type ImageGenStreamEvent = ImageGenPartialImageEvent | ImageGenCompletedEvent;
 
-export type ImageModel = 'gpt-image-1.5' | 'dall-e-2' | 'dall-e-3' | 'gpt-image-1' | 'gpt-image-1-mini';
+export type ImageModel = 'gpt-image-1.5' | 'dall-e-2' | 'dall-e-3' | 'gpt-image-1' | 'gpt-image-1-mini' | 'gpt-image-2';
 
 /**
  * The response from the image generation endpoint.
@@ -735,7 +735,7 @@ export interface ImageGenerateParamsBase {
    * The format in which the generated images are returned. This parameter is only
    * supported for the GPT image models. Must be one of `png`, `jpeg`, or `webp`.
    */
-  output_format?: 'png' | 'jpeg' | 'webp' | null;
+  output_format?: 'png' | 'jpeg' | null;
 
   /**
    * The number of partial images to generate. This parameter is used for streaming
