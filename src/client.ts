@@ -969,6 +969,11 @@ export class OpenAI {
       return await this.fetch.call(undefined, url, fetchOptions);
     } finally {
       clearTimeout(timeout);
+      // Remove the forwarding listener so the caller's signal (and any
+      // underlying timer, e.g. AbortSignal.timeout()) can be GC'd
+      // immediately.  Without this, Deno keeps the timer ref'd for the
+      // full timeout duration, preventing clean process exit.  See #1811.
+      if (signal) signal.removeEventListener('abort', abort);
     }
   }
 
