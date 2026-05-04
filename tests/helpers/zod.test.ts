@@ -1,4 +1,4 @@
-import { zodResponseFormat } from 'openai/helpers/zod';
+import { zodResponseFormat, zodRealtimeFunction } from 'openai/helpers/zod';
 import { z as zv3 } from 'zod/v3';
 import { z as zv4 } from 'zod/v4';
 
@@ -358,5 +358,44 @@ describe.each([
     );
 
     expect(consoleSpy).toHaveBeenCalledTimes(0);
+  });
+});
+
+describe.each([
+  { version: 'v3', z: zv3 },
+  { version: 'v4', z: zv4 as any as typeof zv3 },
+])('zodRealtimeFunction (Zod $version)', ({ z }) => {
+  it('builds a RealtimeFunctionTool without strict', () => {
+    const tool = zodRealtimeFunction({
+      name: 'get_weather',
+      description: 'Get the current weather',
+      parameters: z.object({
+        location: z.string(),
+        unit: z.enum(['c', 'f']),
+      }),
+    });
+
+    expect(tool.type).toBe('function');
+    expect(tool.name).toBe('get_weather');
+    expect(tool.description).toBe('Get the current weather');
+    expect(tool).not.toHaveProperty('strict');
+    expect(tool.parameters).toMatchObject({
+      type: 'object',
+      properties: {
+        location: { type: 'string' },
+        unit: { enum: ['c', 'f'], type: 'string' },
+      },
+      required: ['location', 'unit'],
+    });
+  });
+
+  it('omits description when not provided', () => {
+    const tool = zodRealtimeFunction({
+      name: 'ping',
+      parameters: z.object({ message: z.string() }),
+    });
+
+    expect(tool).not.toHaveProperty('description');
+    expect(tool.name).toBe('ping');
   });
 });
