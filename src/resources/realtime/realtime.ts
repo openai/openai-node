@@ -16,13 +16,10 @@ import {
   RealtimeTranscriptionSessionTurnDetection,
 } from './client-secrets';
 import * as ResponsesAPI from '../responses/responses';
-import * as TranslationsAPI from './translations/translations';
-import { Translations } from './translations/translations';
 
 export class Realtime extends APIResource {
   clientSecrets: ClientSecretsAPI.ClientSecrets = new ClientSecretsAPI.ClientSecrets(this._client);
   calls: CallsAPI.Calls = new CallsAPI.Calls(this._client);
-  translations: TranslationsAPI.Translations = new TranslationsAPI.Translations(this._client);
 }
 
 export interface AudioTranscription {
@@ -4768,7 +4765,6 @@ export namespace TranscriptionSessionUpdatedEvent {
 
 Realtime.ClientSecrets = ClientSecrets;
 Realtime.Calls = Calls;
-Realtime.Translations = Translations;
 
 export declare namespace Realtime {
   export {
@@ -4891,6 +4887,4 @@ export declare namespace Realtime {
     type CallReferParams as CallReferParams,
     type CallRejectParams as CallRejectParams,
   };
-
-  export { Translations as Translations };
 }
