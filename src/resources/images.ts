@@ -400,7 +400,13 @@ export interface ImageGenPartialImageEvent {
  */
 export type ImageGenStreamEvent = ImageGenPartialImageEvent | ImageGenCompletedEvent;
 
-export type ImageModel = 'gpt-image-1.5' | 'dall-e-2' | 'dall-e-3' | 'gpt-image-1' | 'gpt-image-1-mini';
+export type ImageModel =
+  | 'chatgpt-image-latest'
+  | 'dall-e-2'
+  | 'dall-e-3'
+  | 'gpt-image-1'
+  | 'gpt-image-1-mini'
+  | 'gpt-image-1.5';
 
 /**
  * The response from the image generation endpoint.
