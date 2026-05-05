@@ -7093,7 +7093,14 @@ export namespace Tool {
     /**
      * The image generation model to use. Default: `gpt-image-1`.
      */
-    model?: (string & {}) | 'gpt-image-1' | 'gpt-image-1-mini' | 'gpt-image-1.5';
+    model?:
+      | (string & {})
+      | 'gpt-image-1'
+      | 'gpt-image-1-mini'
+      | 'gpt-image-2'
+      | 'gpt-image-2-2026-04-21'
+      | 'gpt-image-1.5'
+      | 'chatgpt-image-latest';
 
     /**
      * Moderation level for the generated image. Default: `auto`.

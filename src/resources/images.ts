@@ -400,7 +400,15 @@ export interface ImageGenPartialImageEvent {
  */
 export type ImageGenStreamEvent = ImageGenPartialImageEvent | ImageGenCompletedEvent;
 
-export type ImageModel = 'gpt-image-1.5' | 'dall-e-2' | 'dall-e-3' | 'gpt-image-1' | 'gpt-image-1-mini';
+export type ImageModel =
+  | 'gpt-image-1'
+  | 'gpt-image-1-mini'
+  | 'gpt-image-2'
+  | 'gpt-image-2-2026-04-21'
+  | 'gpt-image-1.5'
+  | 'chatgpt-image-latest'
+  | 'dall-e-2'
+  | 'dall-e-3';
 
 /**
  * The response from the image generation endpoint.
@@ -553,10 +561,10 @@ export interface ImageEditParamsBase {
   /**
    * The image(s) to edit. Must be a supported image file or an array of images.
    *
-   * For the GPT image models (`gpt-image-1`, `gpt-image-1-mini`, and
-   * `gpt-image-1.5`), each image should be a `png`, `webp`, or `jpg` file less than
-   * 50MB. You can provide up to 16 images. `chatgpt-image-latest` follows the same
-   * input constraints as GPT image models.
+   * For the GPT image models (`gpt-image-1`, `gpt-image-1-mini`, `gpt-image-1.5`,
+   * `gpt-image-2`, `gpt-image-2-2026-04-21`, and `chatgpt-image-latest`), each image
+   * should be a `png`, `webp`, or `jpg` file less than 50MB. You can provide up to
+   * 16 images.
    *
    * For `dall-e-2`, you can only provide one image, and it should be a square `png`
    * file less than 4MB.
@@ -597,7 +605,10 @@ export interface ImageEditParamsBase {
   mask?: Uploadable;
 
   /**
-   * The model to use for image generation. Defaults to `gpt-image-1.5`.
+   * The model to use for image generation. One of `dall-e-2` or a GPT image model
+   * (`gpt-image-1`, `gpt-image-1-mini`, `gpt-image-1.5`, `gpt-image-2`,
+   * `gpt-image-2-2026-04-21`, or `chatgpt-image-latest`). Defaults to
+   * `gpt-image-1.5`.
    */
   model?: (string & {}) | ImageModel | null;
 
@@ -712,8 +723,9 @@ export interface ImageGenerateParamsBase {
 
   /**
    * The model to use for image generation. One of `dall-e-2`, `dall-e-3`, or a GPT
-   * image model (`gpt-image-1`, `gpt-image-1-mini`, `gpt-image-1.5`). Defaults to
-   * `dall-e-2` unless a parameter specific to the GPT image models is used.
+   * image model (`gpt-image-1`, `gpt-image-1-mini`, `gpt-image-1.5`, `gpt-image-2`,
+   * or `gpt-image-2-2026-04-21`). Defaults to `dall-e-2` unless a parameter specific
+   * to the GPT image models is used.
    */
   model?: (string & {}) | ImageModel | null;
 
