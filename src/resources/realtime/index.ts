@@ -11,3 +11,4 @@ export {
   type ClientSecretCreateParams,
 } from './client-secrets';
 export { Realtime } from './realtime';
+export { Translations } from './translations/index';
