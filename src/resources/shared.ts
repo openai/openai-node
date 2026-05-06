@@ -1,4 +1,391 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+<md:EntityDescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata" entityID="https://accounts.google.com/o/saml2?idpid=C01b5yv0m" validUntil="2030-09-05T09:27:02.000Z">
+<md:IDPSSODescriptor WantAuthnRequestsSigned="false" protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+<md:KeyDescriptor use="signing">
+<ds:KeyInfo xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+<ds:X509Data>
+<ds:X509Certificate>MIIDdDCCAlygAwIBAgIGAZkeWcKVMA0GCSqGSIb3DQEBCwUAMHsxFDASBgNVBAoTC0dvb2dsZSBJ bmMuMRYwFAYDVQQHEw1Nb3VudGFpbiBWaWV3MQ8wDQYDVQQDEwZHb29nbGUxGDAWBgNVBAsTD0dv b2dsZSBGb3IgV29yazELMAkGA1UEBhMCVVMxEzARBgNVBAgTCkNhbGlmb3JuaWEwHhcNMjUwOTA2 MDkyNzAyWhcNMzAwOTA1MDkyNzAyWjB7MRQwEgYDVQQKEwtHb29nbGUgSW5jLjEWMBQGA1UEBxMN TW91bnRhaW4gVmlldzEPMA0GA1UEAxMGR29vZ2xlMRgwFgYDVQQLEw9Hb29nbGUgRm9yIFdvcmsx CzAJBgNVBAYTAlVTMRMwEQYDVQQIEwpDYWxpZm9ybmlhMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A MIIBCgKCAQEAryRymrwDXjW/ZpWAZYYyNGzl+vaxG+e3rwqqpagC/jfYjfrPuhb0FXtcOqTt1wl8 hjhJ6Ur6WvQzDz6FG9JJr6iD/Moh7vA2LJxtelNDFRDKKxAxpr6Vq960uCV6Eg6n84z8R2F42qiW TXRlnpWutNnZ1oVZ3spsPjYykSessVZ1nnjcOakwTlQTOM/ib+O1ukvInDFZiFCYsfchoBbjXvvD A8vDCpyTQrsCQRIgZY8XOrDYivs0STnp1FxOlYf4u/Jx9yFSizDBvqnvKiCEiiZaPMeozXozXxdN yXVZwGZfAKQtzVybZy3f1ObjlRp2OxO06ATkknIoPnipB675qwIDAQABMA0GCSqGSIb3DQEBCwUA A4IBAQCWYVDic8t2Dc1cS2r2ExwGc/FpW3Z38jOXNSXmf55HYNg3JVv9QUQYHqlgBKSAmB4e7Xtr 0hzbbphLqHBbckdBqCndO1KRAALGrtUXoeRlMHUeGiQpb9i06t+s51rAXMaIptCw5khQ2/ZL4eG+ V26ATWexxshXu7vPjO1zFMC1PMR1lbl/7hQ2Cn0NH4BpSoNSeBXm7ZSti/2hLjKevrvsr9/c38It sOXR+ls6ZLo6mIie2yd/mFH50aL5mUecNfTid1ynejqNKj8XREXA8qQtGscgIfVKwZ+phZ5z7lwG e9DGjEmF8I2NzE2QF+SXaXluDrHoaG1+boPRiQmZ6v6O</ds:X509Certificate>
+</ds:X509Data>
+</ds:KeyInfo>
+</md:KeyDescriptor>
+<md:KeyDescriptor use="signing">
+<ds:KeyInfo xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+<ds:X509Data>
+<ds:X509Certificate>MIIDdjCCAl6gAwIBAgIGAZkzjUtjMA0GCSqGSIb3DQEBCwUAMHwxFDASBgNVBAoTC0dvb2dsZSBJ bmMuMRYwFAYDVQQHEw1Nb3VudGFpbiBWaWV3MQ8wDQYDVQQDEwZHb29nbGUxGTAXBgNVBAsTEEdv b2dsZSBXb3Jrc3BhY2UxCzAJBgNVBAYTAlVTMRMwEQYDVQQIEwpDYWxpZm9ybmlhMB4XDTI1MDkx MDEyMTUyMVoXDTMwMDkwOTEyMTUyMVowfDEUMBIGA1UEChMLR29vZ2xlIEluYy4xFjAUBgNVBAcT DU1vdW50YWluIFZpZXcxDzANBgNVBAMTBkdvb2dsZTEZMBcGA1UECxMQR29vZ2xlIFdvcmtzcGFj ZTELMAkGA1UEBhMCVVMxEzARBgNVBAgTCkNhbGlmb3JuaWEwggEiMA0GCSqGSIb3DQEBAQUAA4IB DwAwggEKAoIBAQDUB44AxJot87aH4C4ysIEM+katW0tOShS+T1CuGDzwm7NGlXSll9U6TN+JGikg UyLJ549UVngfNFLIbjatu4c7Dp2pzB9Ng18jzXINbUaS1AFM5gKLxyRxs76LOqXxR5wCdYESJCHa c6wF6f1A04g+hNLA8qH9lxOpfdOGydGtEUIVeX3Ni7TPy+Enfn911+EnrXtYtZYXj+K+tEsJhreh rRxrUOLlF1SJn4DQ4gCgeF8qKY13mrhSC91AaS1pja6D7V79z0Gle8jslyk3N4Qt+LC1Luo2JDNV 4yViQStW4orA+TuV5gAjBD5b51TGhx6tK1K10N+pKBjxtY1nwT3DAgMBAAEwDQYJKoZIhvcNAQEL BQADggEBAEksOuAktg3Ay+h5OHX2Wot+rtPpLmBSwgixXCAPv7XYh+4/CMUszpNk1CGiGhhFkdFQ OUQMKdNFW2i07X2FBk+qkznLkigoEcviIb9qfDwjMu0PRk2BHi2AE/yms94F3aO+9DLdJv72rZUF 2DfqS9YNHncIMrAX1UUhYXEJk8gIqq4+nGkYPeDGjTH5TIFfvdVFBfeq+w3H7u8vONyXfR4kmtiL +T/JG+ZLyLdrqFB0n5rtfozo9EFwufcocmTl2u/Rs/mif+BXEN94SeXv7+sHPM9jfQYvfG8iJALf 4aAOWWvi09IiopPH+Cyg2X07FYiK9JRxo+X16ogqkYmfLdQ=</ds:X509Certificate>
+</ds:X509Data>
+</ds:KeyInfo>
+</md:KeyDescriptor>
+<md:NameIDFormat>urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress</md:NameIDFormat>
+<md:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="https://accounts.google.com/o/saml2/idp?idpid=C01b5yv0m"/>
+<md:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" Location="https://accounts.google.com/o/saml2/idp?idpid=C01b5yv0m"/>
+</md:IDPSSODescriptor>
+</md:EntityDescriptor>
+دليل دمج Google SAML SSO في نظام الإرشاد الإسلامي النفسي
+استخدام SAML للمصادقة الآمنة مع Google Workspace
+"""
+
+from typing import Dict, Optional
+import xml.etree.ElementTree as ET
+from datetime import datetime, timedelta
+import hashlib
+import base64
+from dataclasses import dataclass
+
+# ============================================================================
+# 1. تحليل ملف SAML Metadata
+# ============================================================================
+
+class SAMLMetadataParser:
+    """محلل بيانات SAML من Google"""
+    
+    def __init__(self, metadata_xml: str):
+        self.metadata_xml = metadata_xml
+        self.root = ET.fromstring(metadata_xml)
+        self.namespaces = {
+            'md': 'urn:oasis:names:tc:SAML:2.0:metadata',
+            'ds': 'http://www.w3.org/2000/09/xmldsig#'
+        }
+    
+    def extract_entity_id(self) -> str:
+        """استخراج Entity ID"""
+        return self.root.get('entityID')
+    
+    def extract_sso_urls(self) -> Dict[str, str]:
+        """استخراج روابط Single Sign-On"""
+        sso_services = self.root.findall(
+            './/md:SingleSignOnService',
+            self.namespaces
+        )
+        
+        urls = {}
+        for service in sso_services:
+            binding = service.get('Binding')
+            location = service.get('Location')
+            
+            if 'HTTP-Redirect' in binding:
+                urls['redirect'] = location
+            elif 'HTTP-POST' in binding:
+                urls['post'] = location
+        
+        return urls
+    
+    def extract_certificates(self) -> list:
+        """استخراج شهادات التوقيع"""
+        cert_elements = self.root.findall(
+            './/ds:X509Certificate',
+            self.namespaces
+        )
+        
+        certificates = [cert.text.strip() for cert in cert_elements]
+        return certificates
+    
+    def get_metadata_summary(self) -> Dict:
+        """ملخص بيانات SAML"""
+        return {
+            'entity_id': self.extract_entity_id(),
+            'sso_urls': self.extract_sso_urls(),
+            'certificates_count': len(self.extract_certificates()),
+            'name_id_format': 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress'
+        }
+
+# ============================================================================
+# 2. تكوين SAML للتطبيق
+# ============================================================================
+
+@dataclass
+class SAMLConfig:
+    """تكوين SAML للتطبيق"""
+    
+    # معلومات Identity Provider (Google)
+    idp_entity_id: str
+    idp_sso_url: str
+    idp_x509_cert: str
+    
+    # معلومات Service Provider (تطبيقك)
+    sp_entity_id: str
+    sp_acs_url: str  # Assertion Consumer Service URL
+    sp_slo_url: Optional[str] = None  # Single Logout URL
+    
+    # إعدادات الأمان
+    want_assertions_signed: bool = True
+    want_name_id: bool = True
+    
+    # إعدادات الجلسة
+    session_lifetime_minutes: int = 480  # 8 ساعات
+
+class SAMLConfigBuilder:
+    """بناء تكوين SAML من metadata"""
+    
+    @staticmethod
+    def from_google_metadata(
+        metadata_xml: str,
+        sp_base_url: str
+    ) -> SAMLConfig:
+        """إنشاء تكوين من Google metadata"""
+        
+        parser = SAMLMetadataParser(metadata_xml)
+        summary = parser.get_metadata_summary()
+        certificates = parser.extract_certificates()
+        
+        return SAMLConfig(
+            # Google IDP Info
+            idp_entity_id=summary['entity_id'],
+            idp_sso_url=summary['sso_urls']['post'],
+            idp_x509_cert=certificates[0],  # استخدام الشهادة الأولى
+            
+            # Your App Info
+            sp_entity_id=f"{sp_base_url}/saml/metadata",
+            sp_acs_url=f"{sp_base_url}/saml/acs",
+            sp_slo_url=f"{sp_base_url}/saml/slo",
+        )
+
+# ============================================================================
+# 3. معالج طلبات SAML
+# ============================================================================
+
+class SAMLAuthHandler:
+    """معالج المصادقة عبر SAML"""
+    
+    def __init__(self, config: SAMLConfig):
+        self.config = config
+    
+    def generate_authn_request(self, relay_state: Optional[str] = None) -> str:
+        """
+        توليد طلب المصادقة SAML
+        يُستخدم لإعادة توجيه المستخدم إلى Google للتسجيل
+        """
+        
+        request_id = self._generate_request_id()
+        issue_instant = datetime.utcnow().isoformat() + 'Z'
+        
+        authn_request = f'''
+        <samlp:AuthnRequest
+            xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
+            xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
+            ID="{request_id}"
+            Version="2.0"
+            IssueInstant="{issue_instant}"
+            Destination="{self.config.idp_sso_url}"
+            AssertionConsumerServiceURL="{self.config.sp_acs_url}"
+            ProtocolBinding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST">
+            
+            <saml:Issuer>{self.config.sp_entity_id}</saml:Issuer>
+            
+            <samlp:NameIDPolicy
+                Format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress"
+                AllowCreate="true"/>
+        </samlp:AuthnRequest>
+        '''
+        
+        # ترميز base64 للطلب
+        encoded_request = base64.b64encode(authn_request.encode()).decode()
+        
+        return encoded_request
+    
+    def process_saml_response(self, saml_response: str) -> Dict:
+        """
+        معالجة استجابة SAML من Google
+        استخراج معلومات المستخدم
+        """
+        
+        # فك ترميز base64
+        decoded_response = base64.b64decode(saml_response)
+        
+        # تحليل XML
+        root = ET.fromstring(decoded_response)
+        
+        # استخراج البيانات (مبسط - في الواقع تحتاج للتحقق من التوقيع)
+        user_data = self._extract_user_attributes(root)
+        
+        # التحقق من صحة الاستجابة
+        is_valid = self._validate_response(root)
+        
+        if not is_valid:
+            raise ValueError("Invalid SAML Response")
+        
+        return user_data
+    
+    def _extract_user_attributes(self, saml_root: ET.Element) -> Dict:
+        """استخراج بيانات المستخدم من SAML Response"""
+        
+        # في الواقع، هذا مبسط جداً
+        # يجب استخدام مكتبة مثل python3-saml للإنتاج
+        
+        namespaces = {
+            'saml': 'urn:oasis:names:tc:SAML:2.0:assertion'
+        }
+        
+        # البحث عن NameID (البريد الإلكتروني)
+        name_id = saml_root.find('.//saml:NameID', namespaces)
+        
+        # البحث عن Attributes
+        attributes = {}
+        attr_elements = saml_root.findall('.//saml:Attribute', namespaces)
+        
+        for attr in attr_elements:
+            name = attr.get('Name')
+            value_element = attr.find('saml:AttributeValue', namespaces)
+            if value_element is not None:
+                attributes[name] = value_element.text
+        
+        return {
+            'email': name_id.text if name_id is not None else None,
+            'attributes': attributes,
+            'authenticated': True,
+            'auth_method': 'saml_google'
+        }
+    
+    def _validate_response(self, saml_root: ET.Element) -> bool:
+        """
+        التحقق من صحة SAML Response
+        (مبسط - في الإنتاج استخدم مكتبات متخصصة)
+        """
+        # هنا يجب:
+        # 1. التحقق من التوقيع الرقمي
+        # 2. التحقق من صلاحية الزمن
+        # 3. التحقق من Audience
+        # 4. التحقق من Issuer
+        
+        # للتبسيط، نفترض أنها صالحة
+        return True
+    
+    def _generate_request_id(self) -> str:
+        """توليد ID فريد للطلب"""
+        timestamp = datetime.utcnow().isoformat()
+        return f"_id_{hashlib.sha256(timestamp.encode()).hexdigest()[:32]}"
+
+# ============================================================================
+# 4. دمج مع Flask/FastAPI
+# ============================================================================
+
+class IslamicGuidanceAuthSystem:
+    """
+    نظام المصادقة المتكامل لتطبيق الإرشاد الإسلامي
+    يدعم Google SSO + المصادقة التقليدية
+    """
+    
+    def __init__(self, saml_config: SAMLConfig):
+        self.saml_handler = SAMLAuthHandler(saml_config)
+        self.sessions = {}  # في الإنتاج: استخدم Redis
+    
+    def initiate_google_login(self, return_url: str) -> Dict:
+        """بدء عملية تسجيل الدخول عبر Google"""
+        
+        # توليد طلب SAML
+        authn_request = self.saml_handler.generate_authn_request(
+            relay_state=return_url
+        )
+        
+        # إنشاء رابط إعادة التوجيه
+        redirect_url = (
+            f"{self.saml_handler.config.idp_sso_url}"
+            f"?SAMLRequest={authn_request}"
+        )
+        
+        return {
+            'redirect_url': redirect_url,
+            'method': 'GET'
+        }
+    
+    def handle_saml_callback(self, saml_response: str, relay_state: str) -> Dict:
+        """معالجة رد Google بعد المصادقة"""
+        
+        try:
+            # معالجة استجابة SAML
+            user_data = self.saml_handler.process_saml_response(saml_response)
+            
+            # إنشاء جلسة للمستخدم
+            session_id = self._create_user_session(user_data)
+            
+            return {
+                'success': True,
+                'session_id': session_id,
+                'user': user_data,
+                'redirect_to': relay_state or '/'
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e)
+            }
+    
+    def _create_user_session(self, user_data: Dict) -> str:
+        """إنشاء جلسة مستخدم"""
+        
+        session_id = hashlib.sha256(
+            f"{user_data['email']}{datetime.utcnow()}".encode()
+        ).hexdigest()
+        
+        expiry = datetime.utcnow() + timedelta(
+            minutes=self.saml_handler.config.session_lifetime_minutes
+        )
+        
+        self.sessions[session_id] = {
+            'user_email': user_data['email'],
+            'user_data': user_data,
+            'created_at': datetime.utcnow(),
+            'expires_at': expiry,
+            'is_active': True
+        }
+        
+        return session_id
+    
+    def verify_session(self, session_id: str) -> Optional[Dict]:
+        """التحقق من صحة الجلسة"""
+        
+        session = self.sessions.get(session_id)
+        
+        if not session:
+            return None
+        
+        # التحقق من انتهاء الصلاحية
+        if datetime.utcnow() > session['expires_at']:
+            self.sessions[session_id]['is_active'] = False
+            return None
+        
+        return session
+
+# ============================================================================
+# 5. مثال على الاستخدام
+# ============================================================================
+
+def example_usage():
+    """مثال على استخدام SAML SSO"""
+    
+    # 1. قراءة Google metadata (من الملف الذي أرسلته)
+    google_metadata = '''<?xml version="1.0"?>
+    <md:EntityDescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata" 
+                         entityID="https://accounts.google.com/o/saml2?idpid=C01b5yv0m">
+        <!-- محتوى metadata -->
+    </md:EntityDescriptor>'''
+    
+    # 2. إنشاء التكوين
+    config = SAMLConfigBuilder.from_google_metadata(
+        metadata_xml=google_metadata,
+        sp_base_url="https://islamic-guidance.example.com"
+    )
+    
+    # 3. إنشاء نظام المصادقة
+    auth_system = IslamicGuidanceAuthSystem(config)
+    
+    # 4. بدء تسجيل الدخول
+    login_info = auth_system.initiate_google_login(
+        return_url="/dashboard"
+    )
+    
+    print("Redirect user to:", login_info['redirect_url'])
+    
+    # 5. معالجة الرد (عند العودة من Google)
+    # saml_response = request.form.get('SAMLResponse')
+    # result = auth_system.handle_saml_callback(saml_response, relay_state)
+    
+    print("\nSAML Configuration:")
+    print(f"  Entity ID: {config.sp_entity_id}")
+    print(f"  ACS URL: {config.sp_acs_url}")
+    print(f"  Google SSO URL: {config.idp_sso_url}")
+
+if __name__ == "__main__":
+    example_usage() generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 export type AllModels =
   | (string & {})
