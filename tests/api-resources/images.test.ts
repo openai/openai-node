@@ -61,7 +61,7 @@ describe('resource images', () => {
       partial_images: 1,
       quality: 'high',
       response_format: 'url',
-      size: '1024x1024',
+      size: '256x256',
       stream: false,
       user: 'user-1234',
     });
@@ -90,7 +90,7 @@ describe('resource images', () => {
       partial_images: 1,
       quality: 'medium',
       response_format: 'url',
-      size: '1024x1024',
+      size: 'auto',
       stream: false,
       style: 'vivid',
       user: 'user-1234',
