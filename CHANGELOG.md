@@ -1,5 +1,15 @@
 # Changelog
 
+## 6.37.0 (2026-05-05)
+
+Full Changelog: [v6.36.0...v6.37.0](https://github.com/openai/openai-node/compare/v6.36.0...v6.37.0)
+
+### Features
+
+* **api:** add web_search_call.results output option to responses ([91c75e0](https://github.com/openai/openai-node/commit/91c75e064f12946d3774cb182e5cd795000019ce))
+* **api:** launch realtime translate + update image 2 ([a296b66](https://github.com/openai/openai-node/commit/a296b661f0598ed001309d7deb693caa1596875c))
+* **api:** manual updates ([6963729](https://github.com/openai/openai-node/commit/69637293939580a9d20bd9274d86f23a012ffd87))
+
 ## 6.36.0 (2026-05-01)
 
 Full Changelog: [v6.35.0...v6.36.0](https://github.com/openai/openai-node/compare/v6.35.0...v6.36.0)
