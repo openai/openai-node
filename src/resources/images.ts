@@ -673,7 +673,7 @@ export interface ImageEditParamsBase {
    * `1024x1024`. For `dall-e-3`, use one of `1024x1024`, `1792x1024`, or
    * `1024x1792`.
    */
-  size?: string | null;
+  size?: (string & {}) | '256x256' | '512x512' | '1024x1024' | '1536x1024' | '1024x1536' | 'auto' | null;
 
   /**
    * Edit the image in streaming mode. Defaults to `false`. See the
@@ -815,7 +815,17 @@ export interface ImageGenerateParamsBase {
    * `1024x1024`. For `dall-e-3`, use one of `1024x1024`, `1792x1024`, or
    * `1024x1792`.
    */
-  size?: string | null;
+  size?:
+    | (string & {})
+    | 'auto'
+    | '1024x1024'
+    | '1536x1024'
+    | '1024x1536'
+    | '256x256'
+    | '512x512'
+    | '1792x1024'
+    | '1024x1792'
+    | null;
 
   /**
    * Generate the image in streaming mode. Defaults to `false`. See the

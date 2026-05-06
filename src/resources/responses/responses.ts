@@ -7161,7 +7161,7 @@ export namespace Tool {
      * `1024x1024`. For `dall-e-3`, use one of `1024x1024`, `1792x1024`, or
      * `1024x1792`.
      */
-    size?: string;
+    size?: (string & {}) | '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
   }
 
   export namespace ImageGeneration {
