@@ -83,7 +83,7 @@ export class ResponseStream<ParsedT = null>
     runner._run(() =>
       runner._createOrRetrieveResponse(client, params, {
         ...options,
-        headers: { ...options?.headers, 'X-Stainless-Helper-Method': 'stream' },
+        __metadata: { ...options?.__metadata, helperMethod: 'stream' },
       }),
     );
     return runner;

@@ -35,7 +35,7 @@ export class ChatCompletionRunner<ParsedT = null> extends AbstractChatCompletion
     const runner = new ChatCompletionRunner<ParsedT>();
     const opts = {
       ...options,
-      headers: { ...options?.headers, 'X-Stainless-Helper-Method': 'runTools' },
+      __metadata: { ...options?.__metadata, helperMethod: 'runTools' },
     };
     runner._run(() => runner._runTools(client, params, opts));
     return runner;

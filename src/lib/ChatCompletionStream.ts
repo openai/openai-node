@@ -167,7 +167,7 @@ export class ChatCompletionStream<ParsedT = null>
       runner._runChatCompletion(
         client,
         { ...params, stream: true },
-        { ...options, headers: { ...options?.headers, 'X-Stainless-Helper-Method': 'stream' } },
+        { ...options, __metadata: { ...options?.__metadata, helperMethod: 'stream' } },
       ),
     );
     return runner;
