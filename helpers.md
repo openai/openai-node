@@ -600,7 +600,11 @@ The underlying `AbortController` for the runner.
 #### Abort on a function call
 
 If you have a function call flow which you intend to _end_ with a certain function call, then you can use the second
-argument `runner` given to the function to either mutate `runner.messages` or call `runner.abort()`.
+argument `runner` given to the function to inspect the terminating call, mutate `runner.messages`, or call
+`runner.abort()`.
+
+Because `abort()` ends the run immediately, the `final*` helpers will reject afterwards. Capture the terminating call
+inside the function itself (or via event handlers), then await `runner.done()` and handle the abort error.
 
 ```ts
 import OpenAI from 'openai';
@@ -608,6 +612,8 @@ import OpenAI from 'openai';
 const client = new OpenAI();
 
 async function main() {
+  let terminatingCall: unknown;
+
   const runner = client.chat.completions
     .runTools({
       model: 'gpt-3.5-turbo',
@@ -617,17 +623,19 @@ async function main() {
           type: 'function',
           function: {
             function: function updateDatabase(props, runner) {
-              runner.abort()
+              terminatingCall = props;
+              runner.abort();
             },
             …
           }
         },
       ],
     })
-    .on('message', (message) => console.log(message));
+    .on('message', (message) => console.log(message))
+    .on('abort', (error) => console.log('Run aborted:', error.message));
 
-  const finalFunctionCall = await runner.finalFunctionCall();
-  console.log('Final function call:', finalFunctionCall);
+  await runner.done().catch(() => {});
+  console.log('Function call that ended the run:', terminatingCall);
 }
 
 main();
