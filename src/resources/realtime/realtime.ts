@@ -3600,6 +3600,568 @@ export interface RealtimeTranscriptionSessionCreateRequest {
 }
 
 /**
+ * A Realtime translation client event.
+ */
+export type RealtimeTranslationClientEvent =
+  | RealtimeTranslationSessionUpdateEvent
+  | RealtimeTranslationInputAudioBufferAppendEvent
+  | RealtimeTranslationSessionCloseEvent;
+
+/**
+ * Create a translation session and client secret for the Realtime API.
+ */
+export interface RealtimeTranslationClientSecretCreateRequest {
+  /**
+   * Realtime translation session configuration. Translation sessions stream source
+   * audio in and translated audio plus transcript deltas out continuously.
+   */
+  session: RealtimeTranslationSessionCreateRequest;
+
+  /**
+   * Configuration for the client secret expiration. Expiration refers to the time
+   * after which a client secret will no longer be valid for creating sessions. The
+   * session itself may continue after that time once started. A secret can be used
+   * to create multiple sessions until it expires.
+   */
+  expires_after?: RealtimeTranslationClientSecretCreateRequest.ExpiresAfter;
+}
+
+export namespace RealtimeTranslationClientSecretCreateRequest {
+  /**
+   * Configuration for the client secret expiration. Expiration refers to the time
+   * after which a client secret will no longer be valid for creating sessions. The
+   * session itself may continue after that time once started. A secret can be used
+   * to create multiple sessions until it expires.
+   */
+  export interface ExpiresAfter {
+    /**
+     * The anchor point for the client secret expiration, meaning that `seconds` will
+     * be added to the `created_at` time of the client secret to produce an expiration
+     * timestamp. Only `created_at` is currently supported.
+     */
+    anchor?: 'created_at';
+
+    /**
+     * The number of seconds from the anchor point to the expiration. Select a value
+     * between `10` and `7200` (2 hours). This default to 600 seconds (10 minutes) if
+     * not specified.
+     */
+    seconds?: number;
+  }
+}
+
+/**
+ * Response from creating a translation session and client secret for the Realtime
+ * API.
+ */
+export interface RealtimeTranslationClientSecretCreateResponse {
+  /**
+   * Expiration timestamp for the client secret, in seconds since epoch.
+   */
+  expires_at: number;
+
+  /**
+   * A Realtime translation session. Translation sessions continuously translate
+   * input audio into the configured output language.
+   */
+  session: RealtimeTranslationSession;
+
+  /**
+   * The generated client secret value.
+   */
+  value: string;
+}
+
+/**
+ * Send this event to append audio bytes to the translation session input audio
+ * buffer.
+ *
+ * WebSocket translation sessions accept base64-encoded 24 kHz PCM16 mono
+ * little-endian raw audio bytes. Unsupported websocket audio formats return a
+ * validation error because lower-quality audio materially degrades translation
+ * quality.
+ *
+ * Translation consumes 200 ms engine frames. For best realtime behavior, append
+ * audio in 200 ms chunks. If a chunk is shorter, the server buffers it until it
+ * has enough audio for one frame. If a chunk is longer, the server splits it into
+ * 200 ms frames and enqueues them back-to-back.
+ *
+ * Keep appending silence while the session is active. If a client stops sending
+ * audio and later resumes, model time treats the resumed audio as contiguous with
+ * the previous audio rather than as a real-world pause.
+ */
+export interface RealtimeTranslationInputAudioBufferAppendEvent {
+  /**
+   * Base64-encoded 24 kHz PCM16 mono audio bytes.
+   */
+  audio: string;
+
+  /**
+   * The event type, must be `session.input_audio_buffer.append`.
+   */
+  type: 'session.input_audio_buffer.append';
+
+  /**
+   * Optional client-generated ID used to identify this event.
+   */
+  event_id?: string;
+}
+
+/**
+ * Returned when optional source-language transcript text is available. This event
+ * is emitted only when `audio.input.transcription` is configured.
+ *
+ * Transcript deltas are append-only text fragments. Clients should not insert
+ * unconditional spaces between deltas.
+ */
+export interface RealtimeTranslationInputTranscriptDeltaEvent {
+  /**
+   * Append-only source-language transcript text.
+   */
+  delta: string;
+
+  /**
+   * The unique ID of the server event.
+   */
+  event_id: string;
+
+  /**
+   * The event type, must be `session.input_transcript.delta`.
+   */
+  type: 'session.input_transcript.delta';
+
+  /**
+   * Timing metadata for stream alignment, derived from the translation frame when
+   * available. It advances in 200 ms increments, but multiple transcript deltas may
+   * share the same `elapsed_ms`. Treat it as alignment metadata, not a unique
+   * transcript-delta identifier.
+   */
+  elapsed_ms?: number | null;
+}
+
+/**
+ * Returned when translated output audio is available. Output audio deltas are 200
+ * ms frames of PCM16 audio.
+ */
+export interface RealtimeTranslationOutputAudioDeltaEvent {
+  /**
+   * Base64-encoded translated audio data.
+   */
+  delta: string;
+
+  /**
+   * The unique ID of the server event.
+   */
+  event_id: string;
+
+  /**
+   * The event type, must be `session.output_audio.delta`.
+   */
+  type: 'session.output_audio.delta';
+
+  /**
+   * Number of audio channels.
+   */
+  channels?: number;
+
+  /**
+   * Timing metadata for stream alignment, derived from the translation frame when
+   * available. Treat `elapsed_ms` as alignment metadata, not a unique event
+   * identifier.
+   */
+  elapsed_ms?: number | null;
+
+  /**
+   * Audio encoding for `delta`.
+   */
+  format?: 'pcm16';
+
+  /**
+   * Sample rate of the audio delta.
+   */
+  sample_rate?: number;
+}
+
+/**
+ * Returned when translated transcript text is available.
+ *
+ * Transcript deltas are append-only text fragments. Clients should not insert
+ * unconditional spaces between deltas.
+ */
+export interface RealtimeTranslationOutputTranscriptDeltaEvent {
+  /**
+   * Append-only transcript text for the translated output audio.
+   */
+  delta: string;
+
+  /**
+   * The unique ID of the server event.
+   */
+  event_id: string;
+
+  /**
+   * The event type, must be `session.output_transcript.delta`.
+   */
+  type: 'session.output_transcript.delta';
+
+  /**
+   * Timing metadata for stream alignment, derived from the translation frame when
+   * available. It advances in 200 ms increments, but multiple transcript deltas may
+   * share the same `elapsed_ms`. Treat it as alignment metadata, not a unique
+   * transcript-delta identifier.
+   */
+  elapsed_ms?: number | null;
+}
+
+/**
+ * A Realtime translation server event.
+ */
+export type RealtimeTranslationServerEvent =
+  | RealtimeErrorEvent
+  | RealtimeTranslationSessionCreatedEvent
+  | RealtimeTranslationSessionUpdatedEvent
+  | RealtimeTranslationSessionClosedEvent
+  | RealtimeTranslationInputTranscriptDeltaEvent
+  | RealtimeTranslationOutputTranscriptDeltaEvent
+  | RealtimeTranslationOutputAudioDeltaEvent;
+
+/**
+ * A Realtime translation session. Translation sessions continuously translate
+ * input audio into the configured output language.
+ */
+export interface RealtimeTranslationSession {
+  /**
+   * Unique identifier for the session that looks like `sess_1234567890abcdef`.
+   */
+  id: string;
+
+  /**
+   * Configuration for translation input and output audio.
+   */
+  audio: RealtimeTranslationSession.Audio;
+
+  /**
+   * Expiration timestamp for the session, in seconds since epoch.
+   */
+  expires_at: number;
+
+  /**
+   * The Realtime translation model used for this session. This field is set at
+   * session creation and cannot be changed with `session.update`.
+   */
+  model: string;
+
+  /**
+   * The session type. Always `translation` for Realtime translation sessions.
+   */
+  type: 'translation';
+}
+
+export namespace RealtimeTranslationSession {
+  /**
+   * Configuration for translation input and output audio.
+   */
+  export interface Audio {
+    input?: Audio.Input;
+
+    output?: Audio.Output;
+  }
+
+  export namespace Audio {
+    export interface Input {
+      /**
+       * Optional input noise reduction.
+       */
+      noise_reduction?: Input.NoiseReduction | null;
+
+      /**
+       * Optional source-language transcription. When configured, the server emits
+       * `session.input_transcript.delta` events. Translation itself still runs from the
+       * input audio stream.
+       */
+      transcription?: Input.Transcription | null;
+    }
+
+    export namespace Input {
+      /**
+       * Optional input noise reduction.
+       */
+      export interface NoiseReduction {
+        /**
+         * Type of noise reduction. `near_field` is for close-talking microphones such as
+         * headphones, `far_field` is for far-field microphones such as laptop or
+         * conference room microphones.
+         */
+        type: RealtimeAPI.NoiseReductionType;
+      }
+
+      /**
+       * Optional source-language transcription. When configured, the server emits
+       * `session.input_transcript.delta` events. Translation itself still runs from the
+       * input audio stream.
+       */
+      export interface Transcription {
+        /**
+         * The transcription model used for source transcript deltas.
+         */
+        model: string;
+      }
+    }
+
+    export interface Output {
+      /**
+       * Target language for translated output audio and transcript deltas.
+       */
+      language?: string;
+    }
+  }
+}
+
+/**
+ * Gracefully close the realtime translation session. The server flushes pending
+ * input audio and emits any remaining translated output before closing the
+ * session.
+ */
+export interface RealtimeTranslationSessionCloseEvent {
+  /**
+   * The event type, must be `session.close`.
+   */
+  type: 'session.close';
+
+  /**
+   * Optional client-generated ID used to identify this event.
+   */
+  event_id?: string;
+}
+
+/**
+ * Returned when a realtime translation session is closed.
+ */
+export interface RealtimeTranslationSessionClosedEvent {
+  /**
+   * The unique ID of the server event.
+   */
+  event_id: string;
+
+  /**
+   * The event type, must be `session.closed`.
+   */
+  type: 'session.closed';
+}
+
+/**
+ * Realtime translation session configuration. Translation sessions stream source
+ * audio in and translated audio plus transcript deltas out continuously.
+ */
+export interface RealtimeTranslationSessionCreateRequest {
+  /**
+   * The Realtime translation model used for this session.
+   */
+  model: string;
+
+  /**
+   * Configuration for translation input and output audio.
+   */
+  audio?: RealtimeTranslationSessionCreateRequest.Audio;
+}
+
+export namespace RealtimeTranslationSessionCreateRequest {
+  /**
+   * Configuration for translation input and output audio.
+   */
+  export interface Audio {
+    input?: Audio.Input;
+
+    output?: Audio.Output;
+  }
+
+  export namespace Audio {
+    export interface Input {
+      /**
+       * Optional input noise reduction. Set to `null` to disable it.
+       */
+      noise_reduction?: Input.NoiseReduction | null;
+
+      /**
+       * Optional source-language transcription. When configured, the server emits
+       * `session.input_transcript.delta` events. Translation itself still runs from the
+       * input audio stream.
+       */
+      transcription?: Input.Transcription | null;
+    }
+
+    export namespace Input {
+      /**
+       * Optional input noise reduction. Set to `null` to disable it.
+       */
+      export interface NoiseReduction {
+        /**
+         * Type of noise reduction. `near_field` is for close-talking microphones such as
+         * headphones, `far_field` is for far-field microphones such as laptop or
+         * conference room microphones.
+         */
+        type: RealtimeAPI.NoiseReductionType;
+      }
+
+      /**
+       * Optional source-language transcription. When configured, the server emits
+       * `session.input_transcript.delta` events. Translation itself still runs from the
+       * input audio stream.
+       */
+      export interface Transcription {
+        /**
+         * The transcription model to use for source transcript deltas.
+         */
+        model: string;
+      }
+    }
+
+    export interface Output {
+      /**
+       * Target language for translated output audio and transcript deltas.
+       */
+      language?: string;
+    }
+  }
+}
+
+/**
+ * Returned when a translation session is created. Emitted automatically when a new
+ * connection is established as the first server event. This event contains the
+ * default translation session configuration.
+ */
+export interface RealtimeTranslationSessionCreatedEvent {
+  /**
+   * The unique ID of the server event.
+   */
+  event_id: string;
+
+  /**
+   * The translation session configuration.
+   */
+  session: RealtimeTranslationSession;
+
+  /**
+   * The event type, must be `session.created`.
+   */
+  type: 'session.created';
+}
+
+/**
+ * Send this event to update the translation session configuration. Translation
+ * sessions support updates to `audio.output.language`,
+ * `audio.input.transcription`, and `audio.input.noise_reduction`.
+ */
+export interface RealtimeTranslationSessionUpdateEvent {
+  /**
+   * Translation session fields to update. The session `type` and `model` are set at
+   * creation and cannot be changed with `session.update`.
+   */
+  session: RealtimeTranslationSessionUpdateRequest;
+
+  /**
+   * The event type, must be `session.update`.
+   */
+  type: 'session.update';
+
+  /**
+   * Optional client-generated ID used to identify this event.
+   */
+  event_id?: string;
+}
+
+/**
+ * Realtime translation session fields that can be updated with `session.update`.
+ */
+export interface RealtimeTranslationSessionUpdateRequest {
+  /**
+   * Configuration for translation input and output audio.
+   */
+  audio?: RealtimeTranslationSessionUpdateRequest.Audio;
+}
+
+export namespace RealtimeTranslationSessionUpdateRequest {
+  /**
+   * Configuration for translation input and output audio.
+   */
+  export interface Audio {
+    input?: Audio.Input;
+
+    output?: Audio.Output;
+  }
+
+  export namespace Audio {
+    export interface Input {
+      /**
+       * Optional input noise reduction. Set to `null` to disable it.
+       */
+      noise_reduction?: Input.NoiseReduction | null;
+
+      /**
+       * Optional source-language transcription. When configured, the server emits
+       * `session.input_transcript.delta` events. Translation itself still runs from the
+       * input audio stream.
+       */
+      transcription?: Input.Transcription | null;
+    }
+
+    export namespace Input {
+      /**
+       * Optional input noise reduction. Set to `null` to disable it.
+       */
+      export interface NoiseReduction {
+        /**
+         * Type of noise reduction. `near_field` is for close-talking microphones such as
+         * headphones, `far_field` is for far-field microphones such as laptop or
+         * conference room microphones.
+         */
+        type: RealtimeAPI.NoiseReductionType;
+      }
+
+      /**
+       * Optional source-language transcription. When configured, the server emits
+       * `session.input_transcript.delta` events. Translation itself still runs from the
+       * input audio stream.
+       */
+      export interface Transcription {
+        /**
+         * The transcription model to use for source transcript deltas.
+         */
+        model: string;
+      }
+    }
+
+    export interface Output {
+      /**
+       * Target language for translated output audio and transcript deltas.
+       */
+      language?: string;
+    }
+  }
+}
+
+/**
+ * Returned when a translation session is updated with a `session.update` event,
+ * unless there is an error.
+ */
+export interface RealtimeTranslationSessionUpdatedEvent {
+  /**
+   * The unique ID of the server event.
+   */
+  event_id: string;
+
+  /**
+   * The translation session configuration.
+   */
+  session: RealtimeTranslationSession;
+
+  /**
+   * The event type, must be `session.updated`.
+   */
+  type: 'session.updated';
+}
+
+/**
  * When the number of tokens in a conversation exceeds the model's input token
  * limit, the conversation be truncated, meaning messages (starting from the
  * oldest) will not be included in the model's context. A 32k context model with
@@ -4841,6 +5403,22 @@ export declare namespace Realtime {
     type RealtimeTranscriptionSessionAudioInput as RealtimeTranscriptionSessionAudioInput,
     type RealtimeTranscriptionSessionAudioInputTurnDetection as RealtimeTranscriptionSessionAudioInputTurnDetection,
     type RealtimeTranscriptionSessionCreateRequest as RealtimeTranscriptionSessionCreateRequest,
+    type RealtimeTranslationClientEvent as RealtimeTranslationClientEvent,
+    type RealtimeTranslationClientSecretCreateRequest as RealtimeTranslationClientSecretCreateRequest,
+    type RealtimeTranslationClientSecretCreateResponse as RealtimeTranslationClientSecretCreateResponse,
+    type RealtimeTranslationInputAudioBufferAppendEvent as RealtimeTranslationInputAudioBufferAppendEvent,
+    type RealtimeTranslationInputTranscriptDeltaEvent as RealtimeTranslationInputTranscriptDeltaEvent,
+    type RealtimeTranslationOutputAudioDeltaEvent as RealtimeTranslationOutputAudioDeltaEvent,
+    type RealtimeTranslationOutputTranscriptDeltaEvent as RealtimeTranslationOutputTranscriptDeltaEvent,
+    type RealtimeTranslationServerEvent as RealtimeTranslationServerEvent,
+    type RealtimeTranslationSession as RealtimeTranslationSession,
+    type RealtimeTranslationSessionCloseEvent as RealtimeTranslationSessionCloseEvent,
+    type RealtimeTranslationSessionClosedEvent as RealtimeTranslationSessionClosedEvent,
+    type RealtimeTranslationSessionCreateRequest as RealtimeTranslationSessionCreateRequest,
+    type RealtimeTranslationSessionCreatedEvent as RealtimeTranslationSessionCreatedEvent,
+    type RealtimeTranslationSessionUpdateEvent as RealtimeTranslationSessionUpdateEvent,
+    type RealtimeTranslationSessionUpdateRequest as RealtimeTranslationSessionUpdateRequest,
+    type RealtimeTranslationSessionUpdatedEvent as RealtimeTranslationSessionUpdatedEvent,
     type RealtimeTruncation as RealtimeTruncation,
     type RealtimeTruncationRetentionRatio as RealtimeTruncationRetentionRatio,
     type ResponseAudioDeltaEvent as ResponseAudioDeltaEvent,
