@@ -10,7 +10,6 @@ import {
   ClientSecretCreateParams,
   ClientSecretCreateResponse,
   ClientSecrets,
-  RealtimeSessionClientSecret,
   RealtimeSessionCreateResponse,
   RealtimeTranscriptionSessionCreateResponse,
   RealtimeTranscriptionSessionTurnDetection,
@@ -24,6 +23,13 @@ export class Realtime extends APIResource {
 
 export interface AudioTranscription {
   /**
+   * Controls how long the model waits before emitting transcription text. Higher
+   * values can improve transcription accuracy at the cost of latency. Only supported
+   * with `gpt-realtime-whisper` in GA Realtime sessions.
+   */
+  delay?: 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+
+  /**
    * The language of the input audio. Supplying the input language in
    * [ISO-639-1](https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes) (e.g. `en`)
    * format will improve accuracy and latency.
@@ -33,8 +39,8 @@ export interface AudioTranscription {
   /**
    * The model to use for transcription. Current options are `whisper-1`,
    * `gpt-4o-mini-transcribe`, `gpt-4o-mini-transcribe-2025-12-15`,
-   * `gpt-4o-transcribe`, and `gpt-4o-transcribe-diarize`. Use
-   * `gpt-4o-transcribe-diarize` when you need diarization with speaker labels.
+   * `gpt-4o-transcribe`, `gpt-4o-transcribe-diarize`, and `gpt-realtime-whisper`.
+   * Use `gpt-4o-transcribe-diarize` when you need diarization with speaker labels.
    */
   model?:
     | (string & {})
@@ -42,7 +48,8 @@ export interface AudioTranscription {
     | 'gpt-4o-mini-transcribe'
     | 'gpt-4o-mini-transcribe-2025-12-15'
     | 'gpt-4o-transcribe'
-    | 'gpt-4o-transcribe-diarize';
+    | 'gpt-4o-transcribe-diarize'
+    | 'gpt-realtime-whisper';
 
   /**
    * An optional text to guide the model's style or continue a previous audio
@@ -50,6 +57,7 @@ export interface AudioTranscription {
    * [prompt is a list of keywords](https://platform.openai.com/docs/guides/speech-to-text#prompting).
    * For `gpt-4o-transcribe` models (excluding `gpt-4o-transcribe-diarize`), the
    * prompt is a free text string, for example "expect words related to technology".
+   * Prompt is not supported with `gpt-realtime-whisper` in GA Realtime sessions.
    */
   prompt?: string;
 }
@@ -1220,6 +1228,9 @@ export interface RealtimeAudioConfigInput {
    * trails off with "uhhm", the model will score a low probability of turn end and
    * wait longer for the user to continue speaking. This can be useful for more
    * natural conversations, but may have a higher latency.
+   *
+   * For `gpt-realtime-whisper` transcription sessions, turn detection must be set to
+   * `null`; VAD is not supported.
    */
   turn_detection?: RealtimeAudioInputTurnDetection | null;
 }
@@ -1353,6 +1364,9 @@ export namespace RealtimeAudioFormats {
  * trails off with "uhhm", the model will score a low probability of turn end and
  * wait longer for the user to continue speaking. This can be useful for more
  * natural conversations, but may have a higher latency.
+ *
+ * For `gpt-realtime-whisper` transcription sessions, turn detection must be set to
+ * `null`; VAD is not supported.
  */
 export type RealtimeAudioInputTurnDetection =
   | RealtimeAudioInputTurnDetection.ServerVad
@@ -2011,6 +2025,23 @@ export interface RealtimeMcphttpError {
 }
 
 /**
+ * Configuration for reasoning-capable Realtime models such as `gpt-realtime-2`.
+ */
+export interface RealtimeReasoning {
+  /**
+   * Constrains effort on reasoning for reasoning-capable Realtime models such as
+   * `gpt-realtime-2`.
+   */
+  effort?: RealtimeReasoningEffort;
+}
+
+/**
+ * Constrains effort on reasoning for reasoning-capable Realtime models such as
+ * `gpt-realtime-2`.
+ */
+export type RealtimeReasoningEffort = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+
+/**
  * The response resource.
  */
 export interface RealtimeResponse {
@@ -2398,10 +2429,21 @@ export interface RealtimeResponseCreateParams {
   output_modalities?: Array<'text' | 'audio'>;
 
   /**
+   * Whether the model may call multiple tools in parallel. Only supported by
+   * reasoning Realtime models such as `gpt-realtime-2`.
+   */
+  parallel_tool_calls?: boolean;
+
+  /**
    * Reference to a prompt template and its variables.
    * [Learn more](https://platform.openai.com/docs/guides/text?api-mode=responses#reusable-prompts).
    */
   prompt?: ResponsesAPI.ResponsePrompt | null;
+
+  /**
+   * Configuration for reasoning-capable Realtime models such as `gpt-realtime-2`.
+   */
+  reasoning?: RealtimeReasoning;
 
   /**
    * How the model chooses tools. Provide one of the string modes or force a specific
@@ -2880,6 +2922,9 @@ export interface RealtimeSession {
    * trails off with "uhhm", the model will score a low probability of turn end and
    * wait longer for the user to continue speaking. This can be useful for more
    * natural conversations, but may have a higher latency.
+   *
+   * For `gpt-realtime-whisper` transcription sessions, turn detection must be set to
+   * `null`; VAD is not supported.
    */
   turn_detection?: RealtimeSession.ServerVad | RealtimeSession.SemanticVad | null;
 
@@ -3094,6 +3139,7 @@ export interface RealtimeSessionCreateRequest {
     | (string & {})
     | 'gpt-realtime'
     | 'gpt-realtime-1.5'
+    | 'gpt-realtime-2'
     | 'gpt-realtime-2025-08-28'
     | 'gpt-4o-realtime-preview'
     | 'gpt-4o-realtime-preview-2024-10-01'
@@ -3118,10 +3164,21 @@ export interface RealtimeSessionCreateRequest {
   output_modalities?: Array<'text' | 'audio'>;
 
   /**
+   * Whether the model may call multiple tools in parallel. Only supported by
+   * reasoning Realtime models such as `gpt-realtime-2`.
+   */
+  parallel_tool_calls?: boolean;
+
+  /**
    * Reference to a prompt template and its variables.
    * [Learn more](https://platform.openai.com/docs/guides/text?api-mode=responses#reusable-prompts).
    */
   prompt?: ResponsesAPI.ResponsePrompt | null;
+
+  /**
+   * Configuration for reasoning-capable Realtime models such as `gpt-realtime-2`.
+   */
+  reasoning?: RealtimeReasoning;
 
   /**
    * How the model chooses tools. Provide one of the string modes or force a specific
@@ -3432,6 +3489,9 @@ export interface RealtimeTranscriptionSessionAudioInput {
    * trails off with "uhhm", the model will score a low probability of turn end and
    * wait longer for the user to continue speaking. This can be useful for more
    * natural conversations, but may have a higher latency.
+   *
+   * For `gpt-realtime-whisper` transcription sessions, turn detection must be set to
+   * `null`; VAD is not supported.
    */
   turn_detection?: RealtimeTranscriptionSessionAudioInputTurnDetection | null;
 }
@@ -3468,6 +3528,9 @@ export namespace RealtimeTranscriptionSessionAudioInput {
  * trails off with "uhhm", the model will score a low probability of turn end and
  * wait longer for the user to continue speaking. This can be useful for more
  * natural conversations, but may have a higher latency.
+ *
+ * For `gpt-realtime-whisper` transcription sessions, turn detection must be set to
+ * `null`; VAD is not supported.
  */
 export type RealtimeTranscriptionSessionAudioInputTurnDetection =
   | RealtimeTranscriptionSessionAudioInputTurnDetection.ServerVad
@@ -5252,9 +5315,6 @@ export namespace TranscriptionSessionUpdatedEvent {
      */
     input_audio_format?: string;
 
-    /**
-     * Configuration of the transcription model.
-     */
     input_audio_transcription?: RealtimeAPI.AudioTranscription;
 
     /**
@@ -5384,6 +5444,8 @@ export declare namespace Realtime {
     type RealtimeMcpToolCall as RealtimeMcpToolCall,
     type RealtimeMcpToolExecutionError as RealtimeMcpToolExecutionError,
     type RealtimeMcphttpError as RealtimeMcphttpError,
+    type RealtimeReasoning as RealtimeReasoning,
+    type RealtimeReasoningEffort as RealtimeReasoningEffort,
     type RealtimeResponse as RealtimeResponse,
     type RealtimeResponseCreateAudioOutput as RealtimeResponseCreateAudioOutput,
     type RealtimeResponseCreateMcpTool as RealtimeResponseCreateMcpTool,
@@ -5451,7 +5513,6 @@ export declare namespace Realtime {
 
   export {
     ClientSecrets as ClientSecrets,
-    type RealtimeSessionClientSecret as RealtimeSessionClientSecret,
     type RealtimeSessionCreateResponse as RealtimeSessionCreateResponse,
     type RealtimeTranscriptionSessionCreateResponse as RealtimeTranscriptionSessionCreateResponse,
     type RealtimeTranscriptionSessionTurnDetection as RealtimeTranscriptionSessionTurnDetection,

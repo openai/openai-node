@@ -56,6 +56,8 @@ Types:
 - <code><a href="./src/resources/realtime/realtime.ts">RealtimeMcpToolCall</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">RealtimeMcpToolExecutionError</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">RealtimeMcphttpError</a></code>
+- <code><a href="./src/resources/realtime/realtime.ts">RealtimeReasoning</a></code>
+- <code><a href="./src/resources/realtime/realtime.ts">RealtimeReasoningEffort</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">RealtimeResponse</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">RealtimeResponseCreateAudioOutput</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">RealtimeResponseCreateMcpTool</a></code>
@@ -124,7 +126,6 @@ Types:
 
 Types:
 
-- <code><a href="./src/resources/realtime/client-secrets.ts">RealtimeSessionClientSecret</a></code>
 - <code><a href="./src/resources/realtime/client-secrets.ts">RealtimeSessionCreateResponse</a></code>
 - <code><a href="./src/resources/realtime/client-secrets.ts">RealtimeTranscriptionSessionCreateResponse</a></code>
 - <code><a href="./src/resources/realtime/client-secrets.ts">RealtimeTranscriptionSessionTurnDetection</a></code>
