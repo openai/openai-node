@@ -3,7 +3,6 @@
 export { Calls, type CallAcceptParams, type CallReferParams, type CallRejectParams } from './calls';
 export {
   ClientSecrets,
-  type RealtimeSessionClientSecret,
   type RealtimeSessionCreateResponse,
   type RealtimeTranscriptionSessionCreateResponse,
   type RealtimeTranscriptionSessionTurnDetection,
