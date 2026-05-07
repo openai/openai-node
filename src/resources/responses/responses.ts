@@ -1183,6 +1183,13 @@ export interface Response {
   text?: ResponseTextConfig;
 
   /**
+   * An integer between 0 and 20 specifying the maximum number of most likely tokens
+   * to return at each token position, each with an associated log probability. In
+   * some cases, the number of returned tokens may be fewer than requested.
+   */
+  top_logprobs?: number | null;
+
+  /**
    * The truncation strategy to use for the model response.
    *
    * - `auto`: If the input to this Response exceeds the model's context window size,
@@ -6107,7 +6114,7 @@ export namespace ResponseTextDeltaEvent {
     logprob: number;
 
     /**
-     * The log probability of the top 20 most likely tokens.
+     * The log probabilities of up to 20 of the most likely tokens.
      */
     top_logprobs?: Array<Logprob.TopLogprob>;
   }
@@ -6185,7 +6192,7 @@ export namespace ResponseTextDoneEvent {
     logprob: number;
 
     /**
-     * The log probability of the top 20 most likely tokens.
+     * The log probabilities of up to 20 of the most likely tokens.
      */
     top_logprobs?: Array<Logprob.TopLogprob>;
   }
@@ -6691,8 +6698,9 @@ export interface ResponsesClientEvent {
   tools?: Array<Tool>;
 
   /**
-   * An integer between 0 and 20 specifying the number of most likely tokens to
-   * return at each token position, each with an associated log probability.
+   * An integer between 0 and 20 specifying the maximum number of most likely tokens
+   * to return at each token position, each with an associated log probability. In
+   * some cases, the number of returned tokens may be fewer than requested.
    */
   top_logprobs?: number | null;
 
@@ -7734,6 +7742,13 @@ export interface ResponseCreateParamsBase {
    *   You can also use custom tools to call your own code.
    */
   tools?: Array<Tool>;
+
+  /**
+   * An integer between 0 and 20 specifying the maximum number of most likely tokens
+   * to return at each token position, each with an associated log probability. In
+   * some cases, the number of returned tokens may be fewer than requested.
+   */
+  top_logprobs?: number | null;
 
   /**
    * An alternative to sampling with temperature, called nucleus sampling, where the
