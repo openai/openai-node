@@ -1,5 +1,28 @@
 # Changelog
 
+## 6.37.0 (2026-05-07)
+
+Full Changelog: [v6.36.0...v6.37.0](https://github.com/openai/openai-node/compare/v6.36.0...v6.37.0)
+
+### Features
+
+* **api:** add quantity field to admin organization usage responses ([273a8f7](https://github.com/openai/openai-node/commit/273a8f73e65839fb4d2ebc2a54ccc38383bd7517))
+* **api:** add web_search_call.results output option to responses ([91c75e0](https://github.com/openai/openai-node/commit/91c75e064f12946d3774cb182e5cd795000019ce))
+* **api:** launch realtime translate + update image 2 ([a296b66](https://github.com/openai/openai-node/commit/a296b661f0598ed001309d7deb693caa1596875c))
+* **api:** manual updates ([794b905](https://github.com/openai/openai-node/commit/794b90513f5ca63bd95c6cf774722fa6aeae293d))
+* **api:** manual updates ([6963729](https://github.com/openai/openai-node/commit/69637293939580a9d20bd9274d86f23a012ffd87))
+* **api:** realtime 2 ([f4b7177](https://github.com/openai/openai-node/commit/f4b717702182adfc684270c0e7d5ff11d6c7a408))
+
+
+### Bug Fixes
+
+* **api:** fix imagegen `size` enum regression ([4fe8469](https://github.com/openai/openai-node/commit/4fe8469a7c1f892d586df375a449f6bd0e318b15))
+
+
+### Chores
+
+* redact api-key headers in debug logs ([99c9c80](https://github.com/openai/openai-node/commit/99c9c800e179c13659b96386dedd6c17dd6ffb8d))
+
 ## 6.36.0 (2026-05-01)
 
 Full Changelog: [v6.35.0...v6.36.0](https://github.com/openai/openai-node/compare/v6.35.0...v6.36.0)
