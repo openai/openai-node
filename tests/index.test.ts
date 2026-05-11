@@ -818,6 +818,42 @@ describe('retries', () => {
     expect(count).toEqual(3);
   });
 
+  test('retry on 429 with long retry-after falls back to default backoff', async () => {
+    jest.useFakeTimers();
+    const randomSpy = jest.spyOn(Math, 'random').mockReturnValue(0);
+    let count = 0;
+
+    const testFetch = async (
+      url: string | URL | Request,
+      { signal }: RequestInit = {},
+    ): Promise<Response> => {
+      if (count++ === 0) {
+        return new Response(undefined, {
+          status: 429,
+          headers: {
+            'Retry-After': '600',
+          },
+        });
+      }
+      return new Response(JSON.stringify({ a: 1 }), { headers: { 'Content-Type': 'application/json' } });
+    };
+
+    try {
+      const client = new OpenAI({ apiKey: 'My API Key', fetch: testFetch, maxRetries: 1 });
+      const request = client.request({ path: '/foo', method: 'get' }).then((response) => response);
+
+      await jest.advanceTimersByTimeAsync(0);
+      expect(count).toEqual(1);
+      await jest.advanceTimersByTimeAsync(500);
+      expect(count).toEqual(2);
+      await expect(request).resolves.toEqual({ a: 1 });
+    } finally {
+      await jest.runOnlyPendingTimersAsync();
+      jest.useRealTimers();
+      randomSpy.mockRestore();
+    }
+  });
+
   test('retry on 429 with retry-after-ms', async () => {
     let count = 0;
     const testFetch = async (
