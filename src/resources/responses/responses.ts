@@ -7952,6 +7952,11 @@ export interface ResponseCompactParams {
    * How long to retain a prompt cache entry created by this request.
    */
   prompt_cache_retention?: 'in_memory' | '24h' | null;
+
+  /**
+   * The service tier to use for this request.
+   */
+  service_tier?: 'auto' | 'default' | 'flex' | 'priority' | null;
 }
 
 Responses.InputItems = InputItems;
