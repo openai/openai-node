@@ -633,6 +633,164 @@ describe('resource completions', () => {
       expect(listener.functionCallResults).toEqual([`it's raining`]);
       await listener.sanityCheck();
     });
+
+    test('runs multiple tool calls concurrently and preserves result order', async () => {
+      const { fetch, handleRequest } = mockChatCompletionFetch();
+
+      const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
+
+      let activeToolCalls = 0;
+      let maxActiveToolCalls = 0;
+      const startedToolCalls: string[] = [];
+
+      const createDelayedTool = (name: string) => async () => {
+        startedToolCalls.push(name);
+        activeToolCalls += 1;
+        maxActiveToolCalls = Math.max(maxActiveToolCalls, activeToolCalls);
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        activeToolCalls -= 1;
+        return `${name} result`;
+      };
+
+      const runner = openai.chat.completions.runTools({
+        messages: [{ role: 'user', content: 'look up a discount and a product' }],
+        model: 'gpt-3.5-turbo',
+        tools: [
+          {
+            type: 'function',
+            function: {
+              name: 'lookupDiscount',
+              function: createDelayedTool('discount'),
+              parameters: {},
+              description: 'looks up a discount',
+            },
+          },
+          {
+            type: 'function',
+            function: {
+              name: 'lookupProduct',
+              function: createDelayedTool('product'),
+              parameters: {},
+              description: 'looks up a product',
+            },
+          },
+        ],
+      });
+      const listener = new RunnerListener(runner);
+
+      await handleRequest(async (request) => {
+        expect(request.messages).toEqual([{ role: 'user', content: 'look up a discount and a product' }]);
+        return {
+          id: '1',
+          choices: [
+            {
+              index: 0,
+              finish_reason: 'tool_calls',
+              logprobs: null,
+              message: {
+                role: 'assistant',
+                content: null,
+                refusal: null,
+                parsed: null,
+                tool_calls: [
+                  {
+                    type: 'function',
+                    id: 'discount-call',
+                    function: {
+                      arguments: '',
+                      name: 'lookupDiscount',
+                    },
+                  },
+                  {
+                    type: 'function',
+                    id: 'product-call',
+                    function: {
+                      arguments: '',
+                      name: 'lookupProduct',
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+          created: Math.floor(Date.now() / 1000),
+          model: 'gpt-3.5-turbo',
+          object: 'chat.completion',
+        };
+      });
+
+      await handleRequest(async (request) => {
+        expect(request.messages).toEqual([
+          {
+            role: 'user',
+            content: 'look up a discount and a product',
+          },
+          {
+            role: 'assistant',
+            content: null,
+            refusal: null,
+            parsed: null,
+            tool_calls: [
+              {
+                type: 'function',
+                id: 'discount-call',
+                function: {
+                  arguments: '',
+                  name: 'lookupDiscount',
+                  parsed_arguments: null,
+                },
+              },
+              {
+                type: 'function',
+                id: 'product-call',
+                function: {
+                  arguments: '',
+                  name: 'lookupProduct',
+                  parsed_arguments: null,
+                },
+              },
+            ],
+          },
+          {
+            role: 'tool',
+            content: 'discount result',
+            tool_call_id: 'discount-call',
+          },
+          {
+            role: 'tool',
+            content: 'product result',
+            tool_call_id: 'product-call',
+          },
+        ]);
+
+        return {
+          id: '2',
+          choices: [
+            {
+              index: 0,
+              finish_reason: 'stop',
+              logprobs: null,
+              message: {
+                role: 'assistant',
+                content: 'both lookups are done',
+                refusal: null,
+              },
+            },
+          ],
+          created: Math.floor(Date.now() / 1000),
+          model: 'gpt-3.5-turbo',
+          object: 'chat.completion',
+        };
+      });
+
+      await runner.done();
+
+      expect(startedToolCalls).toEqual(['discount', 'product']);
+      expect(maxActiveToolCalls).toBe(2);
+      expect(listener.functionCallResults).toEqual(['discount result', 'product result']);
+      await listener.sanityCheck();
+    });
+
     test('flow with abort', async () => {
       const { fetch, handleRequest } = mockChatCompletionFetch();
 
