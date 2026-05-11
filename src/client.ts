@@ -1109,6 +1109,9 @@ export class OpenAI {
         'X-Stainless-Retry-Count': String(retryCount),
         ...(options.timeout ? { 'X-Stainless-Timeout': String(Math.trunc(options.timeout / 1000)) } : {}),
         ...getPlatformHeaders(),
+        ...(typeof options.__metadata?.helperMethod === 'string' ?
+          { 'X-Stainless-Helper-Method': options.__metadata.helperMethod }
+        : {}),
         'OpenAI-Organization': this.organization,
         'OpenAI-Project': this.project,
       },

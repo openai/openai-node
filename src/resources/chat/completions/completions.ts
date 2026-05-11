@@ -170,10 +170,7 @@ export class Completions extends APIResource {
     return this._client.chat.completions
       .create(body, {
         ...options,
-        headers: {
-          ...options?.headers,
-          'X-Stainless-Helper-Method': 'chat.completions.parse',
-        },
+        __metadata: { ...options?.__metadata, helperMethod: 'chat.completions.parse' },
       })
       ._thenUnwrap((completion) => parseChatCompletion(completion, body));
   }

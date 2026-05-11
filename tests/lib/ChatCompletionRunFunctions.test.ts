@@ -18,13 +18,16 @@ function mockChatCompletionFetch() {
   const { fetch, handleRequest: handleRawRequest } = mockFetch();
 
   function handleRequest(
-    handler: (body: ChatCompletionToolRunnerParams<any[]>) => Promise<OpenAI.Chat.ChatCompletion>,
+    handler: (
+      body: ChatCompletionToolRunnerParams<any[]>,
+      init: RequestInit | undefined,
+    ) => Promise<OpenAI.Chat.ChatCompletion>,
   ): Promise<void> {
     return handleRawRequest(async (req, init) => {
       const rawBody = init?.body;
       if (typeof rawBody !== 'string') throw new Error(`expected init.body to be a string`);
       const body: ChatCompletionToolRunnerParams<any[]> = JSON.parse(rawBody);
-      return new Response(JSON.stringify(await handler(body)), {
+      return new Response(JSON.stringify(await handler(body, init)), {
         headers: { 'Content-Type': 'application/json' },
       });
     });
@@ -495,6 +498,47 @@ function _typeTests() {
 
 describe('resource completions', () => {
   describe('runTools with stream: false', () => {
+    test('defaultHeaders can suppress helper method header', async () => {
+      const { fetch, handleRequest } = mockChatCompletionFetch();
+
+      const openai = new OpenAI({
+        apiKey: 'something1234',
+        baseURL: 'http://127.0.0.1:4010',
+        defaultHeaders: { 'x-stainless-helper-method': null },
+        fetch,
+      });
+
+      const runner = openai.chat.completions.runTools({
+        messages: [{ role: 'user', content: 'say hi' }],
+        model: 'gpt-3.5-turbo',
+        tools: [],
+      });
+
+      await handleRequest(async (_request, init) => {
+        expect(new Headers(init?.headers).has('x-stainless-helper-method')).toBe(false);
+        return {
+          id: '1',
+          choices: [
+            {
+              index: 0,
+              finish_reason: 'stop',
+              logprobs: null,
+              message: {
+                role: 'assistant',
+                content: 'hi',
+                refusal: null,
+              },
+            },
+          ],
+          created: Math.floor(Date.now() / 1000),
+          model: 'gpt-3.5-turbo',
+          object: 'chat.completion',
+        };
+      });
+
+      await runner.done();
+    });
+
     test('successful flow', async () => {
       const { fetch, handleRequest } = mockChatCompletionFetch();
 
