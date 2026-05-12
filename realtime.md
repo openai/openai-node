@@ -68,6 +68,16 @@ rt.socket.addEventListener('open', () => {
 });
 ```
 
+To attach to an in-progress WebRTC or SIP call over a sideband control connection, pass `callID` instead of `model`:
+
+```ts
+import { OpenAIRealtimeWS } from 'openai/realtime/ws';
+
+const rt = new OpenAIRealtimeWS({ callID: 'rtc_123456' });
+```
+
+`model` and `callID` are mutually exclusive. The web `WebSocket` helper supports the same `callID` option.
+
 A full example can be found [here](https://github.com/openai/openai-node/blob/master/examples/realtime/websocket.ts).
 
 ### Realtime error handling

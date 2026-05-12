@@ -83,16 +83,50 @@ export function isAzure(client: Pick<OpenAI, 'apiKey' | 'baseURL'>): client is A
   return client instanceof AzureOpenAI;
 }
 
-export function buildRealtimeURL(client: Pick<OpenAI, 'apiKey' | 'baseURL'>, model: string): URL {
+export type RealtimeConnectionConfig =
+  | {
+      /**
+       * Start a new Realtime session using the given model.
+       */
+      model: string;
+      callID?: undefined;
+    }
+  | {
+      model?: undefined;
+      /**
+       * Attach to an in-progress Realtime call over a sideband control connection.
+       */
+      callID: string;
+    };
+
+export function buildRealtimeURL(
+  client: Pick<OpenAI, 'apiKey' | 'baseURL'>,
+  connection: RealtimeConnectionConfig,
+): URL {
   const path = '/realtime';
   const baseURL = client.baseURL;
   const url = new URL(baseURL + (baseURL.endsWith('/') ? path.slice(1) : path));
+  const hasModel = !!connection.model;
+  const hasCallID = !!connection.callID;
+
+  if (hasModel === hasCallID) {
+    throw new Error('Pass exactly one of `model` or `callID` when opening a Realtime WebSocket.');
+  }
+
   url.protocol = 'wss';
+  // Sideband control connections attach to an existing call via `call_id`.
   if (isAzure(client)) {
+    if (hasCallID) {
+      throw new Error('`callID` is not supported for Azure Realtime WebSocket connections.');
+    }
     url.searchParams.set('api-version', client.apiVersion);
-    url.searchParams.set('deployment', model);
+    url.searchParams.set('deployment', connection.model!);
   } else {
-    url.searchParams.set('model', model);
+    if (hasCallID) {
+      url.searchParams.set('call_id', connection.callID!);
+    } else {
+      url.searchParams.set('model', connection.model!);
+    }
   }
   return url;
 }
