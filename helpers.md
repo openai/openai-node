@@ -197,6 +197,19 @@ The assistant API provides events you can subscribe to for the following events.
 This allows you to subscribe to all the possible raw events sent by the OpenAI streaming API.
 In many cases it will be more convenient to subscribe to a more specific set of events for your use case.
 
+Raw API event names such as `thread.run.completed` are available through the `event` helper event:
+
+```ts
+openai.beta.threads.runs.stream(thread.id, { assistant_id: assistant.id }).on('event', (event) => {
+  if (event.event === 'thread.run.completed') {
+    console.log('Run completed', event.data);
+  }
+});
+```
+
+The other events in this section, such as `textDelta` and `toolCallDone`, are SDK convenience events built
+from those raw API events.
+
 More information on the types of events can be found here: [Events](https://platform.openai.com/docs/api-reference/assistants-streaming/events)
 
 ```ts
