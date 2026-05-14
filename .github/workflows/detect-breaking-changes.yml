@@ -5,6 +5,9 @@ on:
       - main
       - next
 
+permissions:
+  contents: read
+
 jobs:
   detect_breaking_changes:
     runs-on: 'ubuntu-latest'
