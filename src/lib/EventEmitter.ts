@@ -74,7 +74,7 @@ export class EventEmitter<EventTypes extends Record<string, (...args: any) => an
     : EventParameters<EventTypes, Event>
   > {
     return new Promise((resolve, reject) => {
-      // TODO: handle errors
+      if (event !== 'error') this.once('error', reject as any);
       this.once(event, resolve as any);
     });
   }
