@@ -652,6 +652,29 @@ describe('retries', () => {
     expect(count).toEqual(3);
   });
 
+  test('removes caller abort listener after successful fetch', async () => {
+    const testFetch = async (): Promise<Response> => {
+      return new Response(JSON.stringify({ a: 1 }), { headers: { 'Content-Type': 'application/json' } });
+    };
+
+    const client = new OpenAI({
+      apiKey: 'My API Key',
+      adminAPIKey: 'My Admin API Key',
+      fetch: testFetch,
+    });
+    const controller = new AbortController();
+    const addEventListenerSpy = jest.spyOn(controller.signal, 'addEventListener');
+    const removeEventListenerSpy = jest.spyOn(controller.signal, 'removeEventListener');
+
+    expect(await client.request({ path: '/foo', method: 'get', signal: controller.signal })).toEqual({
+      a: 1,
+    });
+
+    const abortListener = addEventListenerSpy.mock.calls.find(([event]) => event === 'abort')?.[1];
+    expect(abortListener).toEqual(expect.any(Function));
+    expect(removeEventListenerSpy).toHaveBeenCalledWith('abort', abortListener);
+  });
+
   test('retry count header', async () => {
     let count = 0;
     let capturedRequest: RequestInit | undefined;
