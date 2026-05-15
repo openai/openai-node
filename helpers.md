@@ -45,6 +45,27 @@ if (message?.parsed) {
 }
 ```
 
+### Supported Zod features
+
+The Zod helpers convert your schema to the strict JSON Schema subset supported by
+Structured Outputs. Basic schema shapes such as `z.object()`, `z.string()`,
+`z.number()`, `z.boolean()`, `z.array()`, `z.enum()`, `z.literal()`,
+`z.union()`, and nullable fields are supported when they can be represented as
+strict JSON Schema.
+
+Some Zod features do not map cleanly to strict JSON Schema or are not accepted
+by Structured Outputs:
+
+- All object properties must be required. To express a field that can be absent
+  from the model's answer, make it nullable instead of using plain
+  `.optional()`.
+- Zod runtime validation refinements and transforms are not sent to the API.
+  The SDK still uses your Zod schema to parse the returned JSON after the model
+  responds.
+- TypeScript comments and arbitrary Zod metadata are not sent to the API. Use
+  `.describe()` on Zod fields, or the helper's `description` option, when you
+  want descriptions included in the generated JSON Schema.
+
 ## Auto-parsing function tool calls
 
 The `.parse()` method will also automatically parse `function` tool calls if:
