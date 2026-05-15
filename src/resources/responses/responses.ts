@@ -3509,6 +3509,7 @@ export type ResponseInputItem =
   | ResponseInputItem.McpCall
   | ResponseCustomToolCallOutput
   | ResponseCustomToolCall
+  | ResponseInputItem.CompactionTrigger
   | ResponseInputItem.ItemReference;
 
 export namespace ResponseInputItem {
@@ -4169,6 +4170,16 @@ export namespace ResponseInputItem {
      * `calling`, or `failed`.
      */
     status?: 'in_progress' | 'completed' | 'incomplete' | 'calling' | 'failed';
+  }
+
+  /**
+   * Compacts the current context. Must be the final input item.
+   */
+  export interface CompactionTrigger {
+    /**
+     * The type of the item. Always `compaction_trigger`.
+     */
+    type: 'compaction_trigger';
   }
 
   /**
