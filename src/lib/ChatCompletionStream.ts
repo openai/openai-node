@@ -373,11 +373,7 @@ export class ChatCompletionStream<ParsedT = null>
     options?: RequestOptions,
   ): Promise<ParsedChatCompletion<ParsedT>> {
     super._createChatCompletion;
-    const signal = options?.signal;
-    if (signal) {
-      if (signal.aborted) this.controller.abort();
-      signal.addEventListener('abort', () => this.controller.abort());
-    }
+    this._listenForAbort(options?.signal);
     this.#beginRequest();
 
     const stream = await client.chat.completions.create(
@@ -398,11 +394,7 @@ export class ChatCompletionStream<ParsedT = null>
     readableStream: ReadableStream,
     options?: RequestOptions,
   ): Promise<ChatCompletion> {
-    const signal = options?.signal;
-    if (signal) {
-      if (signal.aborted) this.controller.abort();
-      signal.addEventListener('abort', () => this.controller.abort());
-    }
+    this._listenForAbort(options?.signal);
     this.#beginRequest();
     this._connected();
     const stream = Stream.fromReadableStream<ChatCompletionChunk>(readableStream, this.controller);
