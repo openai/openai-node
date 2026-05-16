@@ -65,6 +65,9 @@ const isResponseLike = (value: any): value is ResponseLike =>
   typeof value.url === 'string' &&
   typeof value.blob === 'function';
 
+const hasFilePropertyOverrides = (options: FilePropertyBag | undefined): boolean =>
+  options?.type != null || options?.lastModified != null || options?.endings != null;
+
 export type ToFileInput =
   | FileLike
   | ResponseLike
@@ -90,12 +93,16 @@ export async function toFile(
   // If it's a promise, resolve it.
   value = await value;
 
-  // If we've been given a `File` we don't need to do anything
+  // If we've been given a native `File` and no overrides, we don't need to do anything.
   if (isFileLike(value)) {
-    if (value instanceof File) {
+    if (value instanceof File && name == null && !hasFilePropertyOverrides(options)) {
       return value;
     }
-    return makeFile([await value.arrayBuffer()], value.name);
+    return makeFile([await value.arrayBuffer()], name ?? value.name, {
+      ...options,
+      type: options?.type ?? value.type,
+      lastModified: options?.lastModified ?? value.lastModified,
+    });
   }
 
   if (isResponseLike(value)) {
