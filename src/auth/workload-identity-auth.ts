@@ -1,7 +1,7 @@
 import type { WorkloadIdentity, TokenExchangeResponse } from './types';
 import type { Fetch } from '../internal/builtin-types';
 import * as Shims from '../internal/shims';
-import { APIError, OAuthError } from '../core/error';
+import { APIError, OAuthError, OpenAIError } from '../core/error';
 
 interface CachedToken {
   token: string;
@@ -94,7 +94,11 @@ export class WorkloadIdentityAuth {
     }
 
     const tokenResponse = (await response.json()) as TokenExchangeResponse;
-    const expiresIn = tokenResponse.expires_in || 3600;
+    if (typeof tokenResponse.access_token !== 'string' || tokenResponse.access_token.length === 0) {
+      throw new OpenAIError("Token exchange response missing 'access_token' field");
+    }
+
+    const expiresIn = tokenResponse.expires_in ?? 3600;
     const expiresAt = Date.now() + expiresIn * 1000;
 
     this.cachedToken = {
