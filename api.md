@@ -635,9 +635,11 @@ Types:
 - <code><a href="./src/resources/admin/organization/usage.ts">UsageCompletionsResponse</a></code>
 - <code><a href="./src/resources/admin/organization/usage.ts">UsageCostsResponse</a></code>
 - <code><a href="./src/resources/admin/organization/usage.ts">UsageEmbeddingsResponse</a></code>
+- <code><a href="./src/resources/admin/organization/usage.ts">UsageFileSearchCallsResponse</a></code>
 - <code><a href="./src/resources/admin/organization/usage.ts">UsageImagesResponse</a></code>
 - <code><a href="./src/resources/admin/organization/usage.ts">UsageModerationsResponse</a></code>
 - <code><a href="./src/resources/admin/organization/usage.ts">UsageVectorStoresResponse</a></code>
+- <code><a href="./src/resources/admin/organization/usage.ts">UsageWebSearchCallsResponse</a></code>
 
 Methods:
 
@@ -647,9 +649,11 @@ Methods:
 - <code title="get /organization/usage/completions">client.admin.organization.usage.<a href="./src/resources/admin/organization/usage.ts">completions</a>({ ...params }) -> UsageCompletionsResponse</code>
 - <code title="get /organization/costs">client.admin.organization.usage.<a href="./src/resources/admin/organization/usage.ts">costs</a>({ ...params }) -> UsageCostsResponse</code>
 - <code title="get /organization/usage/embeddings">client.admin.organization.usage.<a href="./src/resources/admin/organization/usage.ts">embeddings</a>({ ...params }) -> UsageEmbeddingsResponse</code>
+- <code title="get /organization/usage/file_search_calls">client.admin.organization.usage.<a href="./src/resources/admin/organization/usage.ts">fileSearchCalls</a>({ ...params }) -> UsageFileSearchCallsResponse</code>
 - <code title="get /organization/usage/images">client.admin.organization.usage.<a href="./src/resources/admin/organization/usage.ts">images</a>({ ...params }) -> UsageImagesResponse</code>
 - <code title="get /organization/usage/moderations">client.admin.organization.usage.<a href="./src/resources/admin/organization/usage.ts">moderations</a>({ ...params }) -> UsageModerationsResponse</code>
 - <code title="get /organization/usage/vector_stores">client.admin.organization.usage.<a href="./src/resources/admin/organization/usage.ts">vectorStores</a>({ ...params }) -> UsageVectorStoresResponse</code>
+- <code title="get /organization/usage/web_search_calls">client.admin.organization.usage.<a href="./src/resources/admin/organization/usage.ts">webSearchCalls</a>({ ...params }) -> UsageWebSearchCallsResponse</code>
 
 ### Invites
 
@@ -851,6 +855,30 @@ Methods:
 
 - <code title="get /organization/projects/{project_id}/rate_limits">client.admin.organization.projects.rateLimits.<a href="./src/resources/admin/organization/projects/rate-limits.ts">listRateLimits</a>(projectID, { ...params }) -> ProjectRateLimitsPage</code>
 - <code title="post /organization/projects/{project_id}/rate_limits/{rate_limit_id}">client.admin.organization.projects.rateLimits.<a href="./src/resources/admin/organization/projects/rate-limits.ts">updateRateLimit</a>(rateLimitID, { ...params }) -> ProjectRateLimit</code>
+
+#### ModelPermissions
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/projects/model-permissions.ts">ProjectModelPermissions</a></code>
+- <code><a href="./src/resources/admin/organization/projects/model-permissions.ts">ProjectModelPermissionsDeleted</a></code>
+
+Methods:
+
+- <code title="get /organization/projects/{project_id}/model_permissions">client.admin.organization.projects.modelPermissions.<a href="./src/resources/admin/organization/projects/model-permissions.ts">retrieve</a>(projectID) -> ProjectModelPermissions</code>
+- <code title="post /organization/projects/{project_id}/model_permissions">client.admin.organization.projects.modelPermissions.<a href="./src/resources/admin/organization/projects/model-permissions.ts">update</a>(projectID, { ...params }) -> ProjectModelPermissions</code>
+- <code title="delete /organization/projects/{project_id}/model_permissions">client.admin.organization.projects.modelPermissions.<a href="./src/resources/admin/organization/projects/model-permissions.ts">delete</a>(projectID) -> ProjectModelPermissionsDeleted</code>
+
+#### HostedToolPermissions
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/projects/hosted-tool-permissions.ts">ProjectHostedToolPermissions</a></code>
+
+Methods:
+
+- <code title="get /organization/projects/{project_id}/hosted_tool_permissions">client.admin.organization.projects.hostedToolPermissions.<a href="./src/resources/admin/organization/projects/hosted-tool-permissions.ts">retrieve</a>(projectID) -> ProjectHostedToolPermissions</code>
+- <code title="post /organization/projects/{project_id}/hosted_tool_permissions">client.admin.organization.projects.hostedToolPermissions.<a href="./src/resources/admin/organization/projects/hosted-tool-permissions.ts">update</a>(projectID, { ...params }) -> ProjectHostedToolPermissions</code>
 
 #### Groups
 

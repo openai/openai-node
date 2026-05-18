@@ -24,6 +24,19 @@ import {
   CertificateListResponsesPage,
   Certificates,
 } from './certificates';
+import * as HostedToolPermissionsAPI from './hosted-tool-permissions';
+import {
+  HostedToolPermissionUpdateParams,
+  HostedToolPermissions,
+  ProjectHostedToolPermissions,
+} from './hosted-tool-permissions';
+import * as ModelPermissionsAPI from './model-permissions';
+import {
+  ModelPermissionUpdateParams,
+  ModelPermissions,
+  ProjectModelPermissions,
+  ProjectModelPermissionsDeleted,
+} from './model-permissions';
 import * as RateLimitsAPI from './rate-limits';
 import {
   ProjectRateLimit,
@@ -89,6 +102,11 @@ export class Projects extends APIResource {
   serviceAccounts: ServiceAccountsAPI.ServiceAccounts = new ServiceAccountsAPI.ServiceAccounts(this._client);
   apiKeys: APIKeysAPI.APIKeys = new APIKeysAPI.APIKeys(this._client);
   rateLimits: RateLimitsAPI.RateLimits = new RateLimitsAPI.RateLimits(this._client);
+  modelPermissions: ModelPermissionsAPI.ModelPermissions = new ModelPermissionsAPI.ModelPermissions(
+    this._client,
+  );
+  hostedToolPermissions: HostedToolPermissionsAPI.HostedToolPermissions =
+    new HostedToolPermissionsAPI.HostedToolPermissions(this._client);
   groups: GroupsAPI.Groups = new GroupsAPI.Groups(this._client);
   roles: RolesAPI.Roles = new RolesAPI.Roles(this._client);
   certificates: CertificatesAPI.Certificates = new CertificatesAPI.Certificates(this._client);
@@ -283,6 +301,8 @@ Projects.Users = Users;
 Projects.ServiceAccounts = ServiceAccounts;
 Projects.APIKeys = APIKeys;
 Projects.RateLimits = RateLimits;
+Projects.ModelPermissions = ModelPermissions;
+Projects.HostedToolPermissions = HostedToolPermissions;
 Projects.Groups = Groups;
 Projects.Roles = Roles;
 Projects.Certificates = Certificates;
@@ -336,6 +356,19 @@ export declare namespace Projects {
     type ProjectRateLimitsPage as ProjectRateLimitsPage,
     type RateLimitListRateLimitsParams as RateLimitListRateLimitsParams,
     type RateLimitUpdateRateLimitParams as RateLimitUpdateRateLimitParams,
+  };
+
+  export {
+    ModelPermissions as ModelPermissions,
+    type ProjectModelPermissions as ProjectModelPermissions,
+    type ProjectModelPermissionsDeleted as ProjectModelPermissionsDeleted,
+    type ModelPermissionUpdateParams as ModelPermissionUpdateParams,
+  };
+
+  export {
+    HostedToolPermissions as HostedToolPermissions,
+    type ProjectHostedToolPermissions as ProjectHostedToolPermissions,
+    type HostedToolPermissionUpdateParams as HostedToolPermissionUpdateParams,
   };
 
   export {
