@@ -65,12 +65,16 @@ import {
   UsageCostsResponse,
   UsageEmbeddingsParams,
   UsageEmbeddingsResponse,
+  UsageFileSearchCallsParams,
+  UsageFileSearchCallsResponse,
   UsageImagesParams,
   UsageImagesResponse,
   UsageModerationsParams,
   UsageModerationsResponse,
   UsageVectorStoresParams,
   UsageVectorStoresResponse,
+  UsageWebSearchCallsParams,
+  UsageWebSearchCallsResponse,
 } from './usage';
 import * as GroupsAPI from './groups/groups';
 import {
@@ -150,18 +154,22 @@ export declare namespace Organization {
     type UsageCompletionsResponse as UsageCompletionsResponse,
     type UsageCostsResponse as UsageCostsResponse,
     type UsageEmbeddingsResponse as UsageEmbeddingsResponse,
+    type UsageFileSearchCallsResponse as UsageFileSearchCallsResponse,
     type UsageImagesResponse as UsageImagesResponse,
     type UsageModerationsResponse as UsageModerationsResponse,
     type UsageVectorStoresResponse as UsageVectorStoresResponse,
+    type UsageWebSearchCallsResponse as UsageWebSearchCallsResponse,
     type UsageAudioSpeechesParams as UsageAudioSpeechesParams,
     type UsageAudioTranscriptionsParams as UsageAudioTranscriptionsParams,
     type UsageCodeInterpreterSessionsParams as UsageCodeInterpreterSessionsParams,
     type UsageCompletionsParams as UsageCompletionsParams,
     type UsageCostsParams as UsageCostsParams,
     type UsageEmbeddingsParams as UsageEmbeddingsParams,
+    type UsageFileSearchCallsParams as UsageFileSearchCallsParams,
     type UsageImagesParams as UsageImagesParams,
     type UsageModerationsParams as UsageModerationsParams,
     type UsageVectorStoresParams as UsageVectorStoresParams,
+    type UsageWebSearchCallsParams as UsageWebSearchCallsParams,
   };
 
   export {
