@@ -79,6 +79,18 @@ export class Webhooks extends APIResource {
         Buffer.from(secret.replace('whsec_', ''), 'base64')
       : Buffer.from(secret, 'utf-8');
 
+    // Reject decoded secrets below the HMAC-SHA256 minimum effective key
+    // length. Buffer.from(str, 'base64') silently ignores invalid characters,
+    // so a misconfigured 'whsec_xyz!' decodes to a near-zero-byte buffer.
+    // OpenAI-issued webhook secrets are 32 bytes; 16 bytes (128 bits) is the
+    // minimum effective HMAC-SHA256 key length per NIST SP 800-107.
+    if (decodedSecret.length < 16) {
+      throw new InvalidWebhookSignatureError(
+        `Decoded webhook secret is ${decodedSecret.length} bytes; minimum 16 bytes required. ` +
+          `If the secret starts with 'whsec_', verify the remaining characters are valid base64.`,
+      );
+    }
+
     // Create the signed payload: {webhook_id}.{timestamp}.{payload}
     const signedPayload = webhookId ? `${webhookId}.${timestamp}.${payload}` : `${timestamp}.${payload}`;
 
