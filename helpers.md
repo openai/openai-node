@@ -601,6 +601,9 @@ The underlying `AbortController` for the runner.
 
 If you have a function call flow which you intend to _end_ with a certain function call, then you can use the second
 argument `runner` given to the function to either mutate `runner.messages` or call `runner.abort()`.
+Calling `runner.abort()` cancels the runner, so promise-returning helpers like `runner.done()`,
+`runner.finalChatCompletion()`, and `runner.finalFunctionToolCall()` will reject with an `APIUserAbortError`.
+Capture any data you need before aborting, or listen for the relevant event.
 
 ```ts
 import OpenAI from 'openai';
@@ -608,6 +611,8 @@ import OpenAI from 'openai';
 const client = new OpenAI();
 
 async function main() {
+  let requestedForecast: { location: string } | undefined;
+
   const runner = client.chat.completions
     .runTools({
       model: 'gpt-3.5-turbo',
@@ -617,7 +622,8 @@ async function main() {
           type: 'function',
           function: {
             function: function updateDatabase(props, runner) {
-              runner.abort()
+              requestedForecast = props;
+              runner.abort();
             },
             …
           }
@@ -626,8 +632,13 @@ async function main() {
     })
     .on('message', (message) => console.log(message));
 
-  const finalFunctionCall = await runner.finalFunctionCall();
-  console.log('Final function call:', finalFunctionCall);
+  await runner.done().catch((error) => {
+    if (error.name !== 'APIUserAbortError') {
+      throw error;
+    }
+  });
+
+  console.log('Requested forecast:', requestedForecast);
 }
 
 main();
