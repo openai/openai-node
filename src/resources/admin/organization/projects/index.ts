@@ -31,6 +31,17 @@ export {
   type ProjectGroupsPage,
 } from './groups/index';
 export {
+  HostedToolPermissions,
+  type ProjectHostedToolPermissions,
+  type HostedToolPermissionUpdateParams,
+} from './hosted-tool-permissions';
+export {
+  ModelPermissions,
+  type ProjectModelPermissions,
+  type ProjectModelPermissionsDeleted,
+  type ModelPermissionUpdateParams,
+} from './model-permissions';
+export {
   Projects,
   type Project,
   type ProjectCreateParams,

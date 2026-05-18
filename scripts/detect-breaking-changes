@@ -61,6 +61,8 @@ TEST_PATHS=(
 	tests/api-resources/admin/organization/projects/service-accounts.test.ts
 	tests/api-resources/admin/organization/projects/api-keys.test.ts
 	tests/api-resources/admin/organization/projects/rate-limits.test.ts
+	tests/api-resources/admin/organization/projects/model-permissions.test.ts
+	tests/api-resources/admin/organization/projects/hosted-tool-permissions.test.ts
 	tests/api-resources/admin/organization/projects/groups/groups.test.ts
 	tests/api-resources/admin/organization/projects/groups/roles.test.ts
 	tests/api-resources/admin/organization/projects/roles.test.ts
