@@ -11,6 +11,35 @@ jobs:
     name: release
     if: github.ref == 'refs/heads/master' && github.repository == 'openai/openai-node'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+
+    steps:
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7
+        id: release
+        with:
+          # Use the default GitHub token for now. If we later provision a
+          # GitHub App installation token for this repo/org, switch this input
+          # to that token so release PRs can trigger follow-on workflows.
+          token: ${{ github.token }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+          target-branch: master
+
+  publish:
+    name: publish
+    if: >-
+      ${{
+        always() &&
+        !cancelled() &&
+        needs.release.outputs.release_created == 'true'
+      }}
+    needs: release
+    runs-on: ubuntu-latest
     environment: publish
     permissions:
       contents: read
@@ -19,29 +48,19 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
-      - uses: stainless-api/trigger-release-please@bb6677c5a04578eec1ccfd9e1913b5b78ed64c61 # v1.4.0
-        id: release
-        with:
-          repo: ${{ github.event.repository.full_name }}
-          stainless-api-key: ${{ secrets.STAINLESS_API_KEY }}
-
       - name: Set up Node
-        if: ${{ steps.release.outputs.releases_created }}
         uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3
         with:
           node-version: '20'
 
       - name: Install dependencies
-        if: ${{ steps.release.outputs.releases_created }}
         run: |
           yarn install
 
       - name: Publish to NPM
-        if: ${{ steps.release.outputs.releases_created }}
         run: |
           bash ./bin/publish-npm
 
       - name: Publish to JSR
-        if: ${{ steps.release.outputs.releases_created }}
         run: |
           bash ./bin/publish-jsr
