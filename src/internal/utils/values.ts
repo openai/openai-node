@@ -3,7 +3,13 @@
 import { OpenAIError } from '../../core/error';
 
 // https://url.spec.whatwg.org/#url-scheme-string
-const startsWithSchemeRegexp = /^[a-z][a-z0-9+.-]*:/i;
+//
+// Restricted to http(s) to avoid bypassing baseURL through dangerous schemes
+// (file:, gopher:, ftp:, data:, javascript:) when an absolute-URL path is
+// passed to client.get / client.post. The SDK's typed resource methods use
+// hardcoded relative paths, so this narrows the regex to the only schemes
+// the SDK is meant to construct outbound requests against.
+const startsWithSchemeRegexp = /^https?:/i;
 
 export const isAbsoluteURL = (url: string): boolean => {
   return startsWithSchemeRegexp.test(url);
