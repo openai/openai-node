@@ -1,6 +1,6 @@
 {
   "name": "openai",
-  "version": "6.38.0",
+  "version": "6.39.0",
   "description": "The official TypeScript library for the OpenAI API",
   "author": "OpenAI <support@openai.com>",
   "types": "dist/index.d.ts",
@@ -50,7 +50,7 @@
     "@types/ws": "^8.5.13",
     "ts-jest": "^29.1.0",
     "ts-node": "^10.5.0",
-    "tsc-multi": "https://github.com/stainless-api/tsc-multi/releases/download/v1.1.9/tsc-multi.tgz",
+    "tsc-multi": "https://github.com/stainless-api/tsc-multi/releases/download/v1.1.11/tsc-multi.tgz",
     "tsconfig-paths": "^4.0.0",
     "tslib": "^2.8.1",
     "typescript": "5.8.3",
