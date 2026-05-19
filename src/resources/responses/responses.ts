@@ -3091,7 +3091,7 @@ export namespace ResponseFunctionWebSearch {
    */
   export interface OpenPage {
     /**
-     * The action type.
+     * The action type. Always `open_page`.
      */
     type: 'open_page';
 
