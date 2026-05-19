@@ -41,7 +41,7 @@ const client = new OpenAI({
 });
 
 const response = await client.responses.create({
-  model: 'gpt-5.2',
+  model: 'gpt-5.5',
   instructions: 'You are a coding assistant that talks like a pirate',
   input: 'Are semicolons optional in JavaScript?',
 });
@@ -59,7 +59,7 @@ const client = new OpenAI({
 });
 
 const completion = await client.chat.completions.create({
-  model: 'gpt-5.2',
+  model: 'gpt-5.5',
   messages: [
     { role: 'developer', content: 'Talk like a pirate.' },
     { role: 'user', content: 'Are semicolons optional in JavaScript?' },
@@ -92,7 +92,7 @@ const client = new OpenAI({
 });
 
 const response = await client.chat.completions.create({
-  model: 'gpt-4',
+  model: 'gpt-5.5',
   messages: [{ role: 'user', content: 'Hello!' }],
 });
 ```
@@ -172,7 +172,7 @@ import OpenAI from 'openai';
 const client = new OpenAI();
 
 const stream = await client.responses.create({
-  model: 'gpt-5.2',
+  model: 'gpt-5.5',
   input: 'Say "Sheep sleep deep" ten times fast!',
   stream: true,
 });
@@ -343,7 +343,7 @@ All object responses in the SDK provide a `_request_id` property which is added 
 ```ts
 const completion = await client.chat.completions.create({
   messages: [{ role: 'user', content: 'Say this is a test' }],
-  model: 'gpt-5.2',
+  model: 'gpt-5.5',
 });
 console.log(completion._request_id); // req_123
 ```
@@ -353,7 +353,7 @@ You can also access the Request ID using the `.withResponse()` method:
 ```ts
 const { data: stream, request_id } = await openai.chat.completions
   .create({
-    model: 'gpt-5.2',
+    model: 'gpt-5.5',
     messages: [{ role: 'user', content: 'Say this is a test' }],
     stream: true,
   })
@@ -367,9 +367,9 @@ The Realtime API enables you to build low-latency, multi-modal conversational ex
 ```ts
 import { OpenAIRealtimeWebSocket } from 'openai/realtime/websocket';
 
-const rt = new OpenAIRealtimeWebSocket({ model: 'gpt-realtime' });
+const rt = new OpenAIRealtimeWebSocket({ model: 'gpt-realtime-2' });
 
-rt.on('response.text.delta', (event) => process.stdout.write(event.delta));
+rt.on('response.output_text.delta', (event) => process.stdout.write(event.delta));
 ```
 
 For more information see [realtime.md](realtime.md).
@@ -394,7 +394,7 @@ const azureADTokenProvider = getBearerTokenProvider(credential, scope);
 const openai = new AzureOpenAI({ azureADTokenProvider });
 
 const result = await openai.chat.completions.create({
-  model: 'gpt-5.2',
+  model: 'gpt-5.5',
   messages: [{ role: 'user', content: 'Say hello!' }],
 });
 
@@ -417,7 +417,7 @@ const client = new OpenAI({
 });
 
 // Or, configure per-request:
-await client.chat.completions.create({ messages: [{ role: 'user', content: 'How can I get the name of the current day in JavaScript?' }], model: 'gpt-5.2' }, {
+await client.chat.completions.create({ messages: [{ role: 'user', content: 'How can I get the name of the current day in JavaScript?' }], model: 'gpt-5.5' }, {
   maxRetries: 5,
 });
 ```
@@ -434,7 +434,7 @@ const client = new OpenAI({
 });
 
 // Override per-request:
-await client.chat.completions.create({ messages: [{ role: 'user', content: 'How can I list all files in a directory using Python?' }], model: 'gpt-5.2' }, {
+await client.chat.completions.create({ messages: [{ role: 'user', content: 'How can I list all files in a directory using Python?' }], model: 'gpt-5.5' }, {
   timeout: 5 * 1000,
 });
 ```
@@ -450,7 +450,7 @@ Note that requests which time out will be [retried twice by default](#retries).
 All object responses in the SDK provide a `_request_id` property which is added from the `x-request-id` response header so that you can quickly log failing requests and report them back to OpenAI.
 
 ```ts
-const response = await client.responses.create({ model: 'gpt-5.2', input: 'testing 123' });
+const response = await client.responses.create({ model: 'gpt-5.5', input: 'testing 123' });
 console.log(response._request_id); // req_123
 ```
 
@@ -459,7 +459,7 @@ You can also access the Request ID using the `.withResponse()` method:
 ```ts
 const { data: stream, request_id } = await openai.responses
   .create({
-    model: 'gpt-5.2',
+    model: 'gpt-5.5',
     input: 'Say this is a test',
     stream: true,
   })
@@ -504,9 +504,9 @@ The Realtime API enables you to build low-latency, multi-modal conversational ex
 ```ts
 import { OpenAIRealtimeWebSocket } from 'openai/realtime/websocket';
 
-const rt = new OpenAIRealtimeWebSocket({ model: 'gpt-realtime' });
+const rt = new OpenAIRealtimeWebSocket({ model: 'gpt-realtime-2' });
 
-rt.on('response.text.delta', (event) => process.stdout.write(event.delta));
+rt.on('response.output_text.delta', (event) => process.stdout.write(event.delta));
 ```
 
 For more information see [realtime.md](realtime.md).
@@ -534,7 +534,7 @@ const openai = new AzureOpenAI({
 });
 
 const result = await openai.chat.completions.create({
-  model: 'gpt-5.2',
+  model: 'gpt-5.5',
   messages: [{ role: 'user', content: 'Say hello!' }],
 });
 
@@ -558,7 +558,7 @@ Unlike `.asResponse()` this method consumes the body, returning once it is parse
 const client = new OpenAI();
 
 const httpResponse = await client.responses
-  .create({ model: 'gpt-5.2', input: 'say this is a test.' })
+  .create({ model: 'gpt-5.5', input: 'say this is a test.' })
   .asResponse();
 
 // access the underlying web standard Response object
@@ -566,7 +566,7 @@ console.log(httpResponse.headers.get('X-My-Header'));
 console.log(httpResponse.statusText);
 
 const { data: modelResponse, response: raw } = await client.responses
-  .create({ model: 'gpt-5.2', input: 'say this is a test.' })
+  .create({ model: 'gpt-5.5', input: 'say this is a test.' })
   .withResponse();
 console.log(raw.headers.get('X-My-Header'));
 console.log(modelResponse);
