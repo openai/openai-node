@@ -1405,4 +1405,43 @@ describe.each([
       `);
     });
   });
+
+  it('allows zod v4 discriminated unions', async () => {
+    const completion = await makeSnapshotRequest(
+      (openai) =>
+        openai.chat.completions.parse({
+          model: 'gpt-4o',
+          messages: [
+            {
+              role: 'user',
+              content: 'can you generate fake data matching the given response format? choose a',
+            },
+          ],
+          response_format: zodResponseFormat(
+            z4.object({
+              data: z4.discriminatedUnion('type', [
+                z4.object({ type: z4.literal('a') }),
+                z4.object({ type: z4.literal('b') }),
+              ]),
+            }),
+            'data',
+          ),
+        }),
+      2,
+    );
+
+    expect(completion.choices[0]?.message).toMatchInlineSnapshot(`
+      {
+        "annotations": [],
+        "content": "{"data":{"type":"a"}}",
+        "parsed": {
+          "data": {
+            "type": "a",
+          },
+        },
+        "refusal": null,
+        "role": "assistant",
+      }
+    `);
+  });
 });
