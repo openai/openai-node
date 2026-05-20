@@ -714,11 +714,15 @@ import * as undici from 'undici';
 
 const proxyAgent = new undici.ProxyAgent('http://localhost:8888');
 const client = new OpenAI({
+  fetch: undici.fetch,
   fetchOptions: {
     dispatcher: proxyAgent,
   },
 });
 ```
+
+When using an `undici` dispatcher, pass `undici.fetch` too so the fetch implementation and dispatcher come
+from the same `undici` package.
 
 <img src="https://raw.githubusercontent.com/stainless-api/sdk-assets/refs/heads/main/bun.svg" align="top" width="18" height="21"> **Bun** <sup>[[docs](https://bun.sh/guides/http/proxy)]</sup>
 
@@ -784,7 +788,6 @@ The following runtimes are supported:
   ### When might this not be dangerous?
 
   In certain scenarios where enabling browser support might not pose significant risks:
-
   - Internal Tools: If the application is used solely within a controlled internal environment where the users are trusted, the risk of credential exposure can be mitigated.
   - Public APIs with Limited Scope: If your API has very limited scope and the exposed credentials do not grant access to sensitive data or critical operations, the potential impact of exposure is reduced.
   - Development or debugging purpose: Enabling this feature temporarily might be acceptable, provided the credentials are short-lived, aren't also used in production environments, or are frequently rotated.
