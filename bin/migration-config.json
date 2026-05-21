@@ -652,6 +652,39 @@
     },
     {
       "base": "admin.organization.users.roles",
+      "name": "retrieve",
+      "params": [
+        {
+          "type": "param",
+          "key": "role_id",
+          "location": "path"
+        },
+        {
+          "type": "params",
+          "maybeOverload": false
+        },
+        {
+          "type": "options"
+        }
+      ],
+      "oldParams": [
+        {
+          "type": "param",
+          "key": "user_id",
+          "location": "path"
+        },
+        {
+          "type": "param",
+          "key": "role_id",
+          "location": "path"
+        },
+        {
+          "type": "options"
+        }
+      ]
+    },
+    {
+      "base": "admin.organization.users.roles",
       "name": "delete",
       "params": [
         {
@@ -685,6 +718,39 @@
     },
     {
       "base": "admin.organization.groups.users",
+      "name": "retrieve",
+      "params": [
+        {
+          "type": "param",
+          "key": "user_id",
+          "location": "path"
+        },
+        {
+          "type": "params",
+          "maybeOverload": false
+        },
+        {
+          "type": "options"
+        }
+      ],
+      "oldParams": [
+        {
+          "type": "param",
+          "key": "group_id",
+          "location": "path"
+        },
+        {
+          "type": "param",
+          "key": "user_id",
+          "location": "path"
+        },
+        {
+          "type": "options"
+        }
+      ]
+    },
+    {
+      "base": "admin.organization.groups.users",
       "name": "delete",
       "params": [
         {
@@ -709,6 +775,39 @@
         {
           "type": "param",
           "key": "user_id",
+          "location": "path"
+        },
+        {
+          "type": "options"
+        }
+      ]
+    },
+    {
+      "base": "admin.organization.groups.roles",
+      "name": "retrieve",
+      "params": [
+        {
+          "type": "param",
+          "key": "role_id",
+          "location": "path"
+        },
+        {
+          "type": "params",
+          "maybeOverload": false
+        },
+        {
+          "type": "options"
+        }
+      ],
+      "oldParams": [
+        {
+          "type": "param",
+          "key": "group_id",
+          "location": "path"
+        },
+        {
+          "type": "param",
+          "key": "role_id",
           "location": "path"
         },
         {
@@ -891,6 +990,44 @@
     },
     {
       "base": "admin.organization.projects.users.roles",
+      "name": "retrieve",
+      "params": [
+        {
+          "type": "param",
+          "key": "role_id",
+          "location": "path"
+        },
+        {
+          "type": "params",
+          "maybeOverload": false
+        },
+        {
+          "type": "options"
+        }
+      ],
+      "oldParams": [
+        {
+          "type": "param",
+          "key": "project_id",
+          "location": "path"
+        },
+        {
+          "type": "param",
+          "key": "user_id",
+          "location": "path"
+        },
+        {
+          "type": "param",
+          "key": "role_id",
+          "location": "path"
+        },
+        {
+          "type": "options"
+        }
+      ]
+    },
+    {
+      "base": "admin.organization.projects.users.roles",
       "name": "list",
       "params": [
         {
@@ -991,6 +1128,43 @@
           "type": "param",
           "key": "service_account_id",
           "location": "path"
+        },
+        {
+          "type": "options"
+        }
+      ]
+    },
+    {
+      "base": "admin.organization.projects.serviceAccounts",
+      "name": "update",
+      "params": [
+        {
+          "type": "param",
+          "key": "service_account_id",
+          "location": "path"
+        },
+        {
+          "type": "params",
+          "maybeOverload": false
+        },
+        {
+          "type": "options"
+        }
+      ],
+      "oldParams": [
+        {
+          "type": "param",
+          "key": "project_id",
+          "location": "path"
+        },
+        {
+          "type": "param",
+          "key": "service_account_id",
+          "location": "path"
+        },
+        {
+          "type": "params",
+          "maybeOverload": false
         },
         {
           "type": "options"
@@ -1135,6 +1309,43 @@
     },
     {
       "base": "admin.organization.projects.groups",
+      "name": "retrieve",
+      "params": [
+        {
+          "type": "param",
+          "key": "group_id",
+          "location": "path"
+        },
+        {
+          "type": "params",
+          "maybeOverload": false
+        },
+        {
+          "type": "options"
+        }
+      ],
+      "oldParams": [
+        {
+          "type": "param",
+          "key": "project_id",
+          "location": "path"
+        },
+        {
+          "type": "param",
+          "key": "group_id",
+          "location": "path"
+        },
+        {
+          "type": "params",
+          "maybeOverload": true
+        },
+        {
+          "type": "options"
+        }
+      ]
+    },
+    {
+      "base": "admin.organization.projects.groups",
       "name": "delete",
       "params": [
         {
@@ -1197,6 +1408,44 @@
         {
           "type": "params",
           "maybeOverload": false
+        },
+        {
+          "type": "options"
+        }
+      ]
+    },
+    {
+      "base": "admin.organization.projects.groups.roles",
+      "name": "retrieve",
+      "params": [
+        {
+          "type": "param",
+          "key": "role_id",
+          "location": "path"
+        },
+        {
+          "type": "params",
+          "maybeOverload": false
+        },
+        {
+          "type": "options"
+        }
+      ],
+      "oldParams": [
+        {
+          "type": "param",
+          "key": "project_id",
+          "location": "path"
+        },
+        {
+          "type": "param",
+          "key": "group_id",
+          "location": "path"
+        },
+        {
+          "type": "param",
+          "key": "role_id",
+          "location": "path"
         },
         {
           "type": "options"
@@ -1280,6 +1529,39 @@
     },
     {
       "base": "admin.organization.projects.roles",
+      "name": "retrieve",
+      "params": [
+        {
+          "type": "param",
+          "key": "role_id",
+          "location": "path"
+        },
+        {
+          "type": "params",
+          "maybeOverload": false
+        },
+        {
+          "type": "options"
+        }
+      ],
+      "oldParams": [
+        {
+          "type": "param",
+          "key": "project_id",
+          "location": "path"
+        },
+        {
+          "type": "param",
+          "key": "role_id",
+          "location": "path"
+        },
+        {
+          "type": "options"
+        }
+      ]
+    },
+    {
+      "base": "admin.organization.projects.roles",
       "name": "update",
       "params": [
         {
@@ -1341,6 +1623,76 @@
         {
           "type": "param",
           "key": "role_id",
+          "location": "path"
+        },
+        {
+          "type": "options"
+        }
+      ]
+    },
+    {
+      "base": "admin.organization.projects.spendAlerts",
+      "name": "update",
+      "params": [
+        {
+          "type": "param",
+          "key": "alert_id",
+          "location": "path"
+        },
+        {
+          "type": "params",
+          "maybeOverload": false
+        },
+        {
+          "type": "options"
+        }
+      ],
+      "oldParams": [
+        {
+          "type": "param",
+          "key": "project_id",
+          "location": "path"
+        },
+        {
+          "type": "param",
+          "key": "alert_id",
+          "location": "path"
+        },
+        {
+          "type": "params",
+          "maybeOverload": false
+        },
+        {
+          "type": "options"
+        }
+      ]
+    },
+    {
+      "base": "admin.organization.projects.spendAlerts",
+      "name": "delete",
+      "params": [
+        {
+          "type": "param",
+          "key": "alert_id",
+          "location": "path"
+        },
+        {
+          "type": "params",
+          "maybeOverload": false
+        },
+        {
+          "type": "options"
+        }
+      ],
+      "oldParams": [
+        {
+          "type": "param",
+          "key": "project_id",
+          "location": "path"
+        },
+        {
+          "type": "param",
+          "key": "alert_id",
           "location": "path"
         },
         {

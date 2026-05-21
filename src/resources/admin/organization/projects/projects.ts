@@ -24,6 +24,8 @@ import {
   CertificateListResponsesPage,
   Certificates,
 } from './certificates';
+import * as DataRetentionAPI from './data-retention';
+import { DataRetention, DataRetentionUpdateParams, ProjectDataRetention } from './data-retention';
 import * as HostedToolPermissionsAPI from './hosted-tool-permissions';
 import {
   HostedToolPermissionUpdateParams,
@@ -51,6 +53,7 @@ import {
   RoleDeleteParams,
   RoleDeleteResponse,
   RoleListParams,
+  RoleRetrieveParams,
   RoleUpdateParams,
   Roles,
 } from './roles';
@@ -64,14 +67,27 @@ import {
   ServiceAccountDeleteResponse,
   ServiceAccountListParams,
   ServiceAccountRetrieveParams,
+  ServiceAccountUpdateParams,
   ServiceAccounts,
 } from './service-accounts';
+import * as SpendAlertsAPI from './spend-alerts';
+import {
+  ProjectSpendAlert,
+  ProjectSpendAlertDeleted,
+  ProjectSpendAlertsPage,
+  SpendAlertCreateParams,
+  SpendAlertDeleteParams,
+  SpendAlertListParams,
+  SpendAlertUpdateParams,
+  SpendAlerts,
+} from './spend-alerts';
 import * as GroupsAPI from './groups/groups';
 import {
   GroupCreateParams,
   GroupDeleteParams,
   GroupDeleteResponse,
   GroupListParams,
+  GroupRetrieveParams,
   Groups,
   ProjectGroup,
   ProjectGroupsPage,
@@ -109,6 +125,8 @@ export class Projects extends APIResource {
     new HostedToolPermissionsAPI.HostedToolPermissions(this._client);
   groups: GroupsAPI.Groups = new GroupsAPI.Groups(this._client);
   roles: RolesAPI.Roles = new RolesAPI.Roles(this._client);
+  dataRetention: DataRetentionAPI.DataRetention = new DataRetentionAPI.DataRetention(this._client);
+  spendAlerts: SpendAlertsAPI.SpendAlerts = new SpendAlertsAPI.SpendAlerts(this._client);
   certificates: CertificatesAPI.Certificates = new CertificatesAPI.Certificates(this._client);
 
   /**
@@ -305,6 +323,8 @@ Projects.ModelPermissions = ModelPermissions;
 Projects.HostedToolPermissions = HostedToolPermissions;
 Projects.Groups = Groups;
 Projects.Roles = Roles;
+Projects.DataRetention = DataRetention;
+Projects.SpendAlerts = SpendAlerts;
 Projects.Certificates = Certificates;
 
 export declare namespace Projects {
@@ -336,6 +356,7 @@ export declare namespace Projects {
     type ProjectServiceAccountsPage as ProjectServiceAccountsPage,
     type ServiceAccountCreateParams as ServiceAccountCreateParams,
     type ServiceAccountRetrieveParams as ServiceAccountRetrieveParams,
+    type ServiceAccountUpdateParams as ServiceAccountUpdateParams,
     type ServiceAccountListParams as ServiceAccountListParams,
     type ServiceAccountDeleteParams as ServiceAccountDeleteParams,
   };
@@ -377,6 +398,7 @@ export declare namespace Projects {
     type GroupDeleteResponse as GroupDeleteResponse,
     type ProjectGroupsPage as ProjectGroupsPage,
     type GroupCreateParams as GroupCreateParams,
+    type GroupRetrieveParams as GroupRetrieveParams,
     type GroupListParams as GroupListParams,
     type GroupDeleteParams as GroupDeleteParams,
   };
@@ -385,9 +407,27 @@ export declare namespace Projects {
     Roles as Roles,
     type RoleDeleteResponse as RoleDeleteResponse,
     type RoleCreateParams as RoleCreateParams,
+    type RoleRetrieveParams as RoleRetrieveParams,
     type RoleUpdateParams as RoleUpdateParams,
     type RoleListParams as RoleListParams,
     type RoleDeleteParams as RoleDeleteParams,
+  };
+
+  export {
+    DataRetention as DataRetention,
+    type ProjectDataRetention as ProjectDataRetention,
+    type DataRetentionUpdateParams as DataRetentionUpdateParams,
+  };
+
+  export {
+    SpendAlerts as SpendAlerts,
+    type ProjectSpendAlert as ProjectSpendAlert,
+    type ProjectSpendAlertDeleted as ProjectSpendAlertDeleted,
+    type ProjectSpendAlertsPage as ProjectSpendAlertsPage,
+    type SpendAlertCreateParams as SpendAlertCreateParams,
+    type SpendAlertUpdateParams as SpendAlertUpdateParams,
+    type SpendAlertListParams as SpendAlertListParams,
+    type SpendAlertDeleteParams as SpendAlertDeleteParams,
   };
 
   export {
