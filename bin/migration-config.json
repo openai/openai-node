@@ -685,6 +685,39 @@
     },
     {
       "base": "admin.organization.users.roles",
+      "name": "retrieve",
+      "params": [
+        {
+          "type": "param",
+          "key": "role_id",
+          "location": "path"
+        },
+        {
+          "type": "params",
+          "maybeOverload": false
+        },
+        {
+          "type": "options"
+        }
+      ],
+      "oldParams": [
+        {
+          "type": "param",
+          "key": "user_id",
+          "location": "path"
+        },
+        {
+          "type": "param",
+          "key": "role_id",
+          "location": "path"
+        },
+        {
+          "type": "options"
+        }
+      ]
+    },
+    {
+      "base": "admin.organization.users.roles",
       "name": "delete",
       "params": [
         {
