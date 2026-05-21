@@ -31,6 +31,17 @@ describe('resource roles', () => {
     });
   });
 
+  test('retrieve', async () => {
+    const responsePromise = client.admin.organization.roles.retrieve('role_id');
+    const rawResponse = await responsePromise.asResponse();
+    expect(rawResponse).toBeInstanceOf(Response);
+    const response = await responsePromise;
+    expect(response).not.toBeInstanceOf(Response);
+    const dataAndResponse = await responsePromise.withResponse();
+    expect(dataAndResponse.data).toBe(response);
+    expect(dataAndResponse.response).toBe(rawResponse);
+  });
+
   test('update', async () => {
     const responsePromise = client.admin.organization.roles.update('role_id', {});
     const rawResponse = await responsePromise.asResponse();

@@ -21,11 +21,13 @@ export {
   type CertificateActivateResponsesPage,
   type CertificateDeactivateResponsesPage,
 } from './certificates';
+export { DataRetention, type ProjectDataRetention, type DataRetentionUpdateParams } from './data-retention';
 export {
   Groups,
   type ProjectGroup,
   type GroupDeleteResponse,
   type GroupCreateParams,
+  type GroupRetrieveParams,
   type GroupListParams,
   type GroupDeleteParams,
   type ProjectGroupsPage,
@@ -60,6 +62,7 @@ export {
   Roles,
   type RoleDeleteResponse,
   type RoleCreateParams,
+  type RoleRetrieveParams,
   type RoleUpdateParams,
   type RoleListParams,
   type RoleDeleteParams,
@@ -71,10 +74,21 @@ export {
   type ServiceAccountDeleteResponse,
   type ServiceAccountCreateParams,
   type ServiceAccountRetrieveParams,
+  type ServiceAccountUpdateParams,
   type ServiceAccountListParams,
   type ServiceAccountDeleteParams,
   type ProjectServiceAccountsPage,
 } from './service-accounts';
+export {
+  SpendAlerts,
+  type ProjectSpendAlert,
+  type ProjectSpendAlertDeleted,
+  type SpendAlertCreateParams,
+  type SpendAlertUpdateParams,
+  type SpendAlertListParams,
+  type SpendAlertDeleteParams,
+  type ProjectSpendAlertsPage,
+} from './spend-alerts';
 export {
   Users,
   type ProjectUser,

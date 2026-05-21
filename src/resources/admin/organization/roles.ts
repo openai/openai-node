@@ -27,6 +27,23 @@ export class Roles extends APIResource {
   }
 
   /**
+   * Retrieves an organization role.
+   *
+   * @example
+   * ```ts
+   * const role = await client.admin.organization.roles.retrieve(
+   *   'role_id',
+   * );
+   * ```
+   */
+  retrieve(roleID: string, options?: RequestOptions): APIPromise<Role> {
+    return this._client.get(path`/organization/roles/${roleID}`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true },
+    });
+  }
+
+  /**
    * Updates an existing organization role.
    *
    * @example

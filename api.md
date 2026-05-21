@@ -672,12 +672,14 @@ Methods:
 Types:
 
 - <code><a href="./src/resources/admin/organization/users/roles.ts">RoleCreateResponse</a></code>
+- <code><a href="./src/resources/admin/organization/users/roles.ts">RoleRetrieveResponse</a></code>
 - <code><a href="./src/resources/admin/organization/users/roles.ts">RoleListResponse</a></code>
 - <code><a href="./src/resources/admin/organization/users/roles.ts">RoleDeleteResponse</a></code>
 
 Methods:
 
 - <code title="post /organization/users/{user_id}/roles">client.admin.organization.users.roles.<a href="./src/resources/admin/organization/users/roles.ts">create</a>(userID, { ...params }) -> RoleCreateResponse</code>
+- <code title="get /organization/users/{user_id}/roles/{role_id}">client.admin.organization.users.roles.<a href="./src/resources/admin/organization/users/roles.ts">retrieve</a>(roleID, { ...params }) -> RoleRetrieveResponse</code>
 - <code title="get /organization/users/{user_id}/roles">client.admin.organization.users.roles.<a href="./src/resources/admin/organization/users/roles.ts">list</a>(userID, { ...params }) -> RoleListResponsesPage</code>
 - <code title="delete /organization/users/{user_id}/roles/{role_id}">client.admin.organization.users.roles.<a href="./src/resources/admin/organization/users/roles.ts">delete</a>(roleID, { ...params }) -> RoleDeleteResponse</code>
 
@@ -692,6 +694,7 @@ Types:
 Methods:
 
 - <code title="post /organization/groups">client.admin.organization.groups.<a href="./src/resources/admin/organization/groups/groups.ts">create</a>({ ...params }) -> Group</code>
+- <code title="get /organization/groups/{group_id}">client.admin.organization.groups.<a href="./src/resources/admin/organization/groups/groups.ts">retrieve</a>(groupID) -> Group</code>
 - <code title="post /organization/groups/{group_id}">client.admin.organization.groups.<a href="./src/resources/admin/organization/groups/groups.ts">update</a>(groupID, { ...params }) -> GroupUpdateResponse</code>
 - <code title="get /organization/groups">client.admin.organization.groups.<a href="./src/resources/admin/organization/groups/groups.ts">list</a>({ ...params }) -> GroupsPage</code>
 - <code title="delete /organization/groups/{group_id}">client.admin.organization.groups.<a href="./src/resources/admin/organization/groups/groups.ts">delete</a>(groupID) -> GroupDeleteResponse</code>
@@ -702,11 +705,13 @@ Types:
 
 - <code><a href="./src/resources/admin/organization/groups/users.ts">OrganizationGroupUser</a></code>
 - <code><a href="./src/resources/admin/organization/groups/users.ts">UserCreateResponse</a></code>
+- <code><a href="./src/resources/admin/organization/groups/users.ts">UserRetrieveResponse</a></code>
 - <code><a href="./src/resources/admin/organization/groups/users.ts">UserDeleteResponse</a></code>
 
 Methods:
 
 - <code title="post /organization/groups/{group_id}/users">client.admin.organization.groups.users.<a href="./src/resources/admin/organization/groups/users.ts">create</a>(groupID, { ...params }) -> UserCreateResponse</code>
+- <code title="get /organization/groups/{group_id}/users/{user_id}">client.admin.organization.groups.users.<a href="./src/resources/admin/organization/groups/users.ts">retrieve</a>(userID, { ...params }) -> UserRetrieveResponse</code>
 - <code title="get /organization/groups/{group_id}/users">client.admin.organization.groups.users.<a href="./src/resources/admin/organization/groups/users.ts">list</a>(groupID, { ...params }) -> OrganizationGroupUsersPage</code>
 - <code title="delete /organization/groups/{group_id}/users/{user_id}">client.admin.organization.groups.users.<a href="./src/resources/admin/organization/groups/users.ts">delete</a>(userID, { ...params }) -> UserDeleteResponse</code>
 
@@ -715,12 +720,14 @@ Methods:
 Types:
 
 - <code><a href="./src/resources/admin/organization/groups/roles.ts">RoleCreateResponse</a></code>
+- <code><a href="./src/resources/admin/organization/groups/roles.ts">RoleRetrieveResponse</a></code>
 - <code><a href="./src/resources/admin/organization/groups/roles.ts">RoleListResponse</a></code>
 - <code><a href="./src/resources/admin/organization/groups/roles.ts">RoleDeleteResponse</a></code>
 
 Methods:
 
 - <code title="post /organization/groups/{group_id}/roles">client.admin.organization.groups.roles.<a href="./src/resources/admin/organization/groups/roles.ts">create</a>(groupID, { ...params }) -> RoleCreateResponse</code>
+- <code title="get /organization/groups/{group_id}/roles/{role_id}">client.admin.organization.groups.roles.<a href="./src/resources/admin/organization/groups/roles.ts">retrieve</a>(roleID, { ...params }) -> RoleRetrieveResponse</code>
 - <code title="get /organization/groups/{group_id}/roles">client.admin.organization.groups.roles.<a href="./src/resources/admin/organization/groups/roles.ts">list</a>(groupID, { ...params }) -> RoleListResponsesPage</code>
 - <code title="delete /organization/groups/{group_id}/roles/{role_id}">client.admin.organization.groups.roles.<a href="./src/resources/admin/organization/groups/roles.ts">delete</a>(roleID, { ...params }) -> RoleDeleteResponse</code>
 
@@ -734,9 +741,35 @@ Types:
 Methods:
 
 - <code title="post /organization/roles">client.admin.organization.roles.<a href="./src/resources/admin/organization/roles.ts">create</a>({ ...params }) -> Role</code>
+- <code title="get /organization/roles/{role_id}">client.admin.organization.roles.<a href="./src/resources/admin/organization/roles.ts">retrieve</a>(roleID) -> Role</code>
 - <code title="post /organization/roles/{role_id}">client.admin.organization.roles.<a href="./src/resources/admin/organization/roles.ts">update</a>(roleID, { ...params }) -> Role</code>
 - <code title="get /organization/roles">client.admin.organization.roles.<a href="./src/resources/admin/organization/roles.ts">list</a>({ ...params }) -> RolesPage</code>
 - <code title="delete /organization/roles/{role_id}">client.admin.organization.roles.<a href="./src/resources/admin/organization/roles.ts">delete</a>(roleID) -> RoleDeleteResponse</code>
+
+### DataRetention
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/data-retention.ts">OrganizationDataRetention</a></code>
+
+Methods:
+
+- <code title="get /organization/data_retention">client.admin.organization.dataRetention.<a href="./src/resources/admin/organization/data-retention.ts">retrieve</a>() -> OrganizationDataRetention</code>
+- <code title="post /organization/data_retention">client.admin.organization.dataRetention.<a href="./src/resources/admin/organization/data-retention.ts">update</a>({ ...params }) -> OrganizationDataRetention</code>
+
+### SpendAlerts
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/spend-alerts.ts">OrganizationSpendAlert</a></code>
+- <code><a href="./src/resources/admin/organization/spend-alerts.ts">OrganizationSpendAlertDeleted</a></code>
+
+Methods:
+
+- <code title="post /organization/spend_alerts">client.admin.organization.spendAlerts.<a href="./src/resources/admin/organization/spend-alerts.ts">create</a>({ ...params }) -> OrganizationSpendAlert</code>
+- <code title="post /organization/spend_alerts/{alert_id}">client.admin.organization.spendAlerts.<a href="./src/resources/admin/organization/spend-alerts.ts">update</a>(alertID, { ...params }) -> OrganizationSpendAlert</code>
+- <code title="get /organization/spend_alerts">client.admin.organization.spendAlerts.<a href="./src/resources/admin/organization/spend-alerts.ts">list</a>({ ...params }) -> OrganizationSpendAlertsPage</code>
+- <code title="delete /organization/spend_alerts/{alert_id}">client.admin.organization.spendAlerts.<a href="./src/resources/admin/organization/spend-alerts.ts">delete</a>(alertID) -> OrganizationSpendAlertDeleted</code>
 
 ### Certificates
 
@@ -792,12 +825,14 @@ Methods:
 Types:
 
 - <code><a href="./src/resources/admin/organization/projects/users/roles.ts">RoleCreateResponse</a></code>
+- <code><a href="./src/resources/admin/organization/projects/users/roles.ts">RoleRetrieveResponse</a></code>
 - <code><a href="./src/resources/admin/organization/projects/users/roles.ts">RoleListResponse</a></code>
 - <code><a href="./src/resources/admin/organization/projects/users/roles.ts">RoleDeleteResponse</a></code>
 
 Methods:
 
 - <code title="post /projects/{project_id}/users/{user_id}/roles">client.admin.organization.projects.users.roles.<a href="./src/resources/admin/organization/projects/users/roles.ts">create</a>(userID, { ...params }) -> RoleCreateResponse</code>
+- <code title="get /projects/{project_id}/users/{user_id}/roles/{role_id}">client.admin.organization.projects.users.roles.<a href="./src/resources/admin/organization/projects/users/roles.ts">retrieve</a>(roleID, { ...params }) -> RoleRetrieveResponse</code>
 - <code title="get /projects/{project_id}/users/{user_id}/roles">client.admin.organization.projects.users.roles.<a href="./src/resources/admin/organization/projects/users/roles.ts">list</a>(userID, { ...params }) -> RoleListResponsesPage</code>
 - <code title="delete /projects/{project_id}/users/{user_id}/roles/{role_id}">client.admin.organization.projects.users.roles.<a href="./src/resources/admin/organization/projects/users/roles.ts">delete</a>(roleID, { ...params }) -> RoleDeleteResponse</code>
 
@@ -813,6 +848,7 @@ Methods:
 
 - <code title="post /organization/projects/{project_id}/service_accounts">client.admin.organization.projects.serviceAccounts.<a href="./src/resources/admin/organization/projects/service-accounts.ts">create</a>(projectID, { ...params }) -> ServiceAccountCreateResponse</code>
 - <code title="get /organization/projects/{project_id}/service_accounts/{service_account_id}">client.admin.organization.projects.serviceAccounts.<a href="./src/resources/admin/organization/projects/service-accounts.ts">retrieve</a>(serviceAccountID, { ...params }) -> ProjectServiceAccount</code>
+- <code title="post /organization/projects/{project_id}/service_accounts/{service_account_id}">client.admin.organization.projects.serviceAccounts.<a href="./src/resources/admin/organization/projects/service-accounts.ts">update</a>(serviceAccountID, { ...params }) -> ProjectServiceAccount</code>
 - <code title="get /organization/projects/{project_id}/service_accounts">client.admin.organization.projects.serviceAccounts.<a href="./src/resources/admin/organization/projects/service-accounts.ts">list</a>(projectID, { ...params }) -> ProjectServiceAccountsPage</code>
 - <code title="delete /organization/projects/{project_id}/service_accounts/{service_account_id}">client.admin.organization.projects.serviceAccounts.<a href="./src/resources/admin/organization/projects/service-accounts.ts">delete</a>(serviceAccountID, { ...params }) -> ServiceAccountDeleteResponse</code>
 
@@ -874,6 +910,7 @@ Types:
 Methods:
 
 - <code title="post /organization/projects/{project_id}/groups">client.admin.organization.projects.groups.<a href="./src/resources/admin/organization/projects/groups/groups.ts">create</a>(projectID, { ...params }) -> ProjectGroup</code>
+- <code title="get /organization/projects/{project_id}/groups/{group_id}">client.admin.organization.projects.groups.<a href="./src/resources/admin/organization/projects/groups/groups.ts">retrieve</a>(groupID, { ...params }) -> ProjectGroup</code>
 - <code title="get /organization/projects/{project_id}/groups">client.admin.organization.projects.groups.<a href="./src/resources/admin/organization/projects/groups/groups.ts">list</a>(projectID, { ...params }) -> ProjectGroupsPage</code>
 - <code title="delete /organization/projects/{project_id}/groups/{group_id}">client.admin.organization.projects.groups.<a href="./src/resources/admin/organization/projects/groups/groups.ts">delete</a>(groupID, { ...params }) -> GroupDeleteResponse</code>
 
@@ -882,12 +919,14 @@ Methods:
 Types:
 
 - <code><a href="./src/resources/admin/organization/projects/groups/roles.ts">RoleCreateResponse</a></code>
+- <code><a href="./src/resources/admin/organization/projects/groups/roles.ts">RoleRetrieveResponse</a></code>
 - <code><a href="./src/resources/admin/organization/projects/groups/roles.ts">RoleListResponse</a></code>
 - <code><a href="./src/resources/admin/organization/projects/groups/roles.ts">RoleDeleteResponse</a></code>
 
 Methods:
 
 - <code title="post /projects/{project_id}/groups/{group_id}/roles">client.admin.organization.projects.groups.roles.<a href="./src/resources/admin/organization/projects/groups/roles.ts">create</a>(groupID, { ...params }) -> RoleCreateResponse</code>
+- <code title="get /projects/{project_id}/groups/{group_id}/roles/{role_id}">client.admin.organization.projects.groups.roles.<a href="./src/resources/admin/organization/projects/groups/roles.ts">retrieve</a>(roleID, { ...params }) -> RoleRetrieveResponse</code>
 - <code title="get /projects/{project_id}/groups/{group_id}/roles">client.admin.organization.projects.groups.roles.<a href="./src/resources/admin/organization/projects/groups/roles.ts">list</a>(groupID, { ...params }) -> RoleListResponsesPage</code>
 - <code title="delete /projects/{project_id}/groups/{group_id}/roles/{role_id}">client.admin.organization.projects.groups.roles.<a href="./src/resources/admin/organization/projects/groups/roles.ts">delete</a>(roleID, { ...params }) -> RoleDeleteResponse</code>
 
@@ -900,9 +939,35 @@ Types:
 Methods:
 
 - <code title="post /projects/{project_id}/roles">client.admin.organization.projects.roles.<a href="./src/resources/admin/organization/projects/roles.ts">create</a>(projectID, { ...params }) -> Role</code>
+- <code title="get /projects/{project_id}/roles/{role_id}">client.admin.organization.projects.roles.<a href="./src/resources/admin/organization/projects/roles.ts">retrieve</a>(roleID, { ...params }) -> Role</code>
 - <code title="post /projects/{project_id}/roles/{role_id}">client.admin.organization.projects.roles.<a href="./src/resources/admin/organization/projects/roles.ts">update</a>(roleID, { ...params }) -> Role</code>
 - <code title="get /projects/{project_id}/roles">client.admin.organization.projects.roles.<a href="./src/resources/admin/organization/projects/roles.ts">list</a>(projectID, { ...params }) -> RolesPage</code>
 - <code title="delete /projects/{project_id}/roles/{role_id}">client.admin.organization.projects.roles.<a href="./src/resources/admin/organization/projects/roles.ts">delete</a>(roleID, { ...params }) -> RoleDeleteResponse</code>
+
+#### DataRetention
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/projects/data-retention.ts">ProjectDataRetention</a></code>
+
+Methods:
+
+- <code title="get /organization/projects/{project_id}/data_retention">client.admin.organization.projects.dataRetention.<a href="./src/resources/admin/organization/projects/data-retention.ts">retrieve</a>(projectID) -> ProjectDataRetention</code>
+- <code title="post /organization/projects/{project_id}/data_retention">client.admin.organization.projects.dataRetention.<a href="./src/resources/admin/organization/projects/data-retention.ts">update</a>(projectID, { ...params }) -> ProjectDataRetention</code>
+
+#### SpendAlerts
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/projects/spend-alerts.ts">ProjectSpendAlert</a></code>
+- <code><a href="./src/resources/admin/organization/projects/spend-alerts.ts">ProjectSpendAlertDeleted</a></code>
+
+Methods:
+
+- <code title="post /organization/projects/{project_id}/spend_alerts">client.admin.organization.projects.spendAlerts.<a href="./src/resources/admin/organization/projects/spend-alerts.ts">create</a>(projectID, { ...params }) -> ProjectSpendAlert</code>
+- <code title="post /organization/projects/{project_id}/spend_alerts/{alert_id}">client.admin.organization.projects.spendAlerts.<a href="./src/resources/admin/organization/projects/spend-alerts.ts">update</a>(alertID, { ...params }) -> ProjectSpendAlert</code>
+- <code title="get /organization/projects/{project_id}/spend_alerts">client.admin.organization.projects.spendAlerts.<a href="./src/resources/admin/organization/projects/spend-alerts.ts">list</a>(projectID, { ...params }) -> ProjectSpendAlertsPage</code>
+- <code title="delete /organization/projects/{project_id}/spend_alerts/{alert_id}">client.admin.organization.projects.spendAlerts.<a href="./src/resources/admin/organization/projects/spend-alerts.ts">delete</a>(alertID, { ...params }) -> ProjectSpendAlertDeleted</code>
 
 #### Certificates
 

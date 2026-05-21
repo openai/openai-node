@@ -8,9 +8,14 @@ const client = new OpenAI({
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
-describe('resource groups', () => {
+describe('resource spendAlerts', () => {
   test('create: only required params', async () => {
-    const responsePromise = client.admin.organization.groups.create({ name: 'x' });
+    const responsePromise = client.admin.organization.projects.spendAlerts.create('project_id', {
+      currency: 'USD',
+      interval: 'month',
+      notification_channel: { recipients: ['string'], type: 'email' },
+      threshold_amount: 0,
+    });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -21,22 +26,26 @@ describe('resource groups', () => {
   });
 
   test('create: required and optional params', async () => {
-    const response = await client.admin.organization.groups.create({ name: 'x' });
-  });
-
-  test('retrieve', async () => {
-    const responsePromise = client.admin.organization.groups.retrieve('group_id');
-    const rawResponse = await responsePromise.asResponse();
-    expect(rawResponse).toBeInstanceOf(Response);
-    const response = await responsePromise;
-    expect(response).not.toBeInstanceOf(Response);
-    const dataAndResponse = await responsePromise.withResponse();
-    expect(dataAndResponse.data).toBe(response);
-    expect(dataAndResponse.response).toBe(rawResponse);
+    const response = await client.admin.organization.projects.spendAlerts.create('project_id', {
+      currency: 'USD',
+      interval: 'month',
+      notification_channel: {
+        recipients: ['string'],
+        type: 'email',
+        subject_prefix: 'subject_prefix',
+      },
+      threshold_amount: 0,
+    });
   });
 
   test('update: only required params', async () => {
-    const responsePromise = client.admin.organization.groups.update('group_id', { name: 'x' });
+    const responsePromise = client.admin.organization.projects.spendAlerts.update('alert_id', {
+      project_id: 'project_id',
+      currency: 'USD',
+      interval: 'month',
+      notification_channel: { recipients: ['string'], type: 'email' },
+      threshold_amount: 0,
+    });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -47,11 +56,21 @@ describe('resource groups', () => {
   });
 
   test('update: required and optional params', async () => {
-    const response = await client.admin.organization.groups.update('group_id', { name: 'x' });
+    const response = await client.admin.organization.projects.spendAlerts.update('alert_id', {
+      project_id: 'project_id',
+      currency: 'USD',
+      interval: 'month',
+      notification_channel: {
+        recipients: ['string'],
+        type: 'email',
+        subject_prefix: 'subject_prefix',
+      },
+      threshold_amount: 0,
+    });
   });
 
   test('list', async () => {
-    const responsePromise = client.admin.organization.groups.list();
+    const responsePromise = client.admin.organization.projects.spendAlerts.list('project_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -64,9 +83,11 @@ describe('resource groups', () => {
   test('list: request options and params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      client.admin.organization.groups.list(
+      client.admin.organization.projects.spendAlerts.list(
+        'project_id',
         {
           after: 'after',
+          before: 'before',
           limit: 0,
           order: 'asc',
         },
@@ -75,8 +96,10 @@ describe('resource groups', () => {
     ).rejects.toThrow(OpenAI.NotFoundError);
   });
 
-  test('delete', async () => {
-    const responsePromise = client.admin.organization.groups.delete('group_id');
+  test('delete: only required params', async () => {
+    const responsePromise = client.admin.organization.projects.spendAlerts.delete('alert_id', {
+      project_id: 'project_id',
+    });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -84,5 +107,11 @@ describe('resource groups', () => {
     const dataAndResponse = await responsePromise.withResponse();
     expect(dataAndResponse.data).toBe(response);
     expect(dataAndResponse.response).toBe(rawResponse);
+  });
+
+  test('delete: required and optional params', async () => {
+    const response = await client.admin.organization.projects.spendAlerts.delete('alert_id', {
+      project_id: 'project_id',
+    });
   });
 });

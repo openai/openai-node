@@ -30,6 +30,27 @@ describe('resource roles', () => {
     });
   });
 
+  test('retrieve: only required params', async () => {
+    const responsePromise = client.admin.organization.projects.groups.roles.retrieve('role_id', {
+      project_id: 'project_id',
+      group_id: 'group_id',
+    });
+    const rawResponse = await responsePromise.asResponse();
+    expect(rawResponse).toBeInstanceOf(Response);
+    const response = await responsePromise;
+    expect(response).not.toBeInstanceOf(Response);
+    const dataAndResponse = await responsePromise.withResponse();
+    expect(dataAndResponse.data).toBe(response);
+    expect(dataAndResponse.response).toBe(rawResponse);
+  });
+
+  test('retrieve: required and optional params', async () => {
+    const response = await client.admin.organization.projects.groups.roles.retrieve('role_id', {
+      project_id: 'project_id',
+      group_id: 'group_id',
+    });
+  });
+
   test('list: only required params', async () => {
     const responsePromise = client.admin.organization.projects.groups.roles.list('group_id', {
       project_id: 'project_id',
