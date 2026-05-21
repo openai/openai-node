@@ -1,5 +1,28 @@
 # Changelog
 
+## 6.39.0 (2026-05-21)
+
+Full Changelog: [v6.38.0...v6.39.0](https://github.com/openai/openai-node/compare/v6.38.0...v6.39.0)
+
+### Features
+
+* **api:** api update ([33ea11f](https://github.com/openai/openai-node/commit/33ea11fc5e7656990005cfb932584e0e646957d4))
+* **api:** manual updates ([c210b09](https://github.com/openai/openai-node/commit/c210b09e71171b5aef844367f698ec4d8de95c2d))
+* **api:** manual updates ([92df9dc](https://github.com/openai/openai-node/commit/92df9dc4a5519d2864ab7c25a3ee370806c9345d))
+* **api:** update OpenAPI spec or Stainless config ([c7c0f52](https://github.com/openai/openai-node/commit/c7c0f52df2278e40c9279d63a08c7a4bc55ea414))
+
+
+### Bug Fixes
+
+* **types:** allow runtime fetch options ([8f5003d](https://github.com/openai/openai-node/commit/8f5003d3c13a0908ef80475a4f1c2e696e882101))
+* **typescript:** upgrade tsc-multi so that it works with Node 26 ([068f9c6](https://github.com/openai/openai-node/commit/068f9c675bc02ffdacbef81103c5af858e03f971))
+
+
+### Chores
+
+* **api:** docs updates ([9d43adb](https://github.com/openai/openai-node/commit/9d43adb15e542ed10bd336078a309bc64bdb64f9))
+* **tests:** remove redundant File import ([5465bbe](https://github.com/openai/openai-node/commit/5465bbe74bdfe922eb0bc961b461656b4d002f5d))
+
 ## 6.38.0 (2026-05-13)
 
 Full Changelog: [v6.37.0...v6.38.0](https://github.com/openai/openai-node/compare/v6.37.0...v6.38.0)
