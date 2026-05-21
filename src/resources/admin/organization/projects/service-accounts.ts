@@ -61,6 +61,30 @@ export class ServiceAccounts extends APIResource {
   }
 
   /**
+   * Updates a service account in the project.
+   *
+   * @example
+   * ```ts
+   * const projectServiceAccount =
+   *   await client.admin.organization.projects.serviceAccounts.update(
+   *     'service_account_id',
+   *     { project_id: 'project_id' },
+   *   );
+   * ```
+   */
+  update(
+    serviceAccountID: string,
+    params: ServiceAccountUpdateParams,
+    options?: RequestOptions,
+  ): APIPromise<ProjectServiceAccount> {
+    const { project_id, ...body } = params;
+    return this._client.post(
+      path`/organization/projects/${project_id}/service_accounts/${serviceAccountID}`,
+      { body, ...options, __security: { adminAPIKeyAuth: true } },
+    );
+  }
+
+  /**
    * Returns a list of service accounts in the project.
    *
    * @example
@@ -201,6 +225,23 @@ export interface ServiceAccountRetrieveParams {
   project_id: string;
 }
 
+export interface ServiceAccountUpdateParams {
+  /**
+   * Path param: The ID of the project.
+   */
+  project_id: string;
+
+  /**
+   * Body param: The updated service account name.
+   */
+  name?: string;
+
+  /**
+   * Body param: The updated service account role.
+   */
+  role?: 'member' | 'owner';
+}
+
 export interface ServiceAccountListParams extends ConversationCursorPageParams {}
 
 export interface ServiceAccountDeleteParams {
@@ -218,6 +259,7 @@ export declare namespace ServiceAccounts {
     type ProjectServiceAccountsPage as ProjectServiceAccountsPage,
     type ServiceAccountCreateParams as ServiceAccountCreateParams,
     type ServiceAccountRetrieveParams as ServiceAccountRetrieveParams,
+    type ServiceAccountUpdateParams as ServiceAccountUpdateParams,
     type ServiceAccountListParams as ServiceAccountListParams,
     type ServiceAccountDeleteParams as ServiceAccountDeleteParams,
   };

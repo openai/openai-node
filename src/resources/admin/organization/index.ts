@@ -33,6 +33,11 @@ export {
   type CertificateDeactivateResponsesPage,
 } from './certificates';
 export {
+  DataRetention,
+  type OrganizationDataRetention,
+  type DataRetentionUpdateParams,
+} from './data-retention';
+export {
   Groups,
   type Group,
   type GroupUpdateResponse,
@@ -68,6 +73,15 @@ export {
   type RoleListParams,
   type RolesPage,
 } from './roles';
+export {
+  SpendAlerts,
+  type OrganizationSpendAlert,
+  type OrganizationSpendAlertDeleted,
+  type SpendAlertCreateParams,
+  type SpendAlertUpdateParams,
+  type SpendAlertListParams,
+  type OrganizationSpendAlertsPage,
+} from './spend-alerts';
 export {
   Usage,
   type UsageAudioSpeechesResponse,
