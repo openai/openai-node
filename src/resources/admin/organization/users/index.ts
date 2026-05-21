@@ -3,9 +3,11 @@
 export {
   Roles,
   type RoleCreateResponse,
+  type RoleRetrieveResponse,
   type RoleListResponse,
   type RoleDeleteResponse,
   type RoleCreateParams,
+  type RoleRetrieveParams,
   type RoleListParams,
   type RoleDeleteParams,
   type RoleListResponsesPage,
