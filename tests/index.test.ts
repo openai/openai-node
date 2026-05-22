@@ -341,6 +341,68 @@ describe('instantiate client', () => {
     expect(capturedRequest?.method).toEqual('PATCH');
   });
 
+  test('fetchOptions dispatcher supports newer undici handlers', async () => {
+    const dispatcher = {
+      dispatch(_options: unknown, handler: any) {
+        expect(typeof handler.onRequestStart).toBe('function');
+        expect(typeof handler.onResponseStart).toBe('function');
+        expect(typeof handler.onResponseData).toBe('function');
+        expect(typeof handler.onResponseEnd).toBe('function');
+
+        const controller = {
+          rawHeaders: ['content-type', 'application/json'],
+          rawTrailers: [],
+          abort: jest.fn(),
+          pause: jest.fn(),
+          resume: jest.fn(),
+        };
+        handler.onRequestStart(controller, undefined);
+        handler.onResponseStart(controller, 200, { 'content-type': 'application/json' });
+        handler.onResponseData(controller, Buffer.from(JSON.stringify({ ok: true })));
+        handler.onResponseEnd(controller, {});
+        return true;
+      },
+    };
+
+    const testFetch = async (_url: string | URL | Request, init: RequestInit = {}): Promise<Response> => {
+      return new Promise((resolve, reject) => {
+        const chunks: Buffer[] = [];
+        (init as any).dispatcher.dispatch(
+          {},
+          {
+            onConnect() {},
+            onHeaders(_statusCode: number, _headers: string[], resume: () => void) {
+              resume();
+            },
+            onData(chunk: Buffer) {
+              chunks.push(chunk);
+            },
+            onComplete() {
+              resolve(
+                new Response(Buffer.concat(chunks).toString(), {
+                  headers: { 'Content-Type': 'application/json' },
+                }),
+              );
+            },
+            onError(error: Error) {
+              reject(error);
+            },
+          },
+        );
+      });
+    };
+
+    const client = new OpenAI({
+      baseURL: 'http://localhost:5000/',
+      apiKey: 'My API Key',
+      adminAPIKey: 'My Admin API Key',
+      fetch: testFetch,
+      fetchOptions: { dispatcher } as any,
+    });
+
+    expect(await client.get('/foo')).toEqual({ ok: true });
+  });
+
   describe('baseUrl', () => {
     test('trailing slash', () => {
       const client = new OpenAI({

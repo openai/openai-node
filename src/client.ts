@@ -963,6 +963,7 @@ export class OpenAI {
       // See https://github.com/nodejs/undici/issues/2294
       fetchOptions.method = method.toUpperCase();
     }
+    maybeWrapDispatcher(fetchOptions);
 
     try {
       // use undefined this binding; fetch errors if bound to something else in browser/cloudflare
@@ -971,7 +972,6 @@ export class OpenAI {
       clearTimeout(timeout);
     }
   }
-
   private async shouldRetry(response: Response): Promise<boolean> {
     // Note this is not a standard header.
     const shouldRetryHeader = response.headers.get('x-should-retry');
@@ -1292,6 +1292,134 @@ OpenAI.Evals = Evals;
 OpenAI.Containers = Containers;
 OpenAI.Skills = Skills;
 OpenAI.Videos = Videos;
+
+function maybeWrapDispatcher(init: RequestInit): void {
+  const dispatcher = (init as any).dispatcher;
+  if (
+    !dispatcher ||
+    typeof dispatcher !== 'object' ||
+    typeof dispatcher.dispatch !== 'function' ||
+    dispatcher.__openai_fetch_compat
+  ) {
+    return;
+  }
+
+  (init as any).dispatcher = new FetchDispatcherCompatibilityWrapper(dispatcher);
+}
+
+class FetchDispatcherCompatibilityWrapper {
+  __openai_fetch_compat = true;
+
+  constructor(private dispatcher: any) {}
+
+  dispatch(options: unknown, handler: unknown): unknown {
+    return this.dispatcher.dispatch(options, wrapFetchDispatchHandler(handler));
+  }
+
+  close(...args: unknown[]): unknown {
+    return this.dispatcher.close?.(...args);
+  }
+
+  destroy(...args: unknown[]): unknown {
+    return this.dispatcher.destroy?.(...args);
+  }
+}
+
+function wrapFetchDispatchHandler(handler: unknown): unknown {
+  if (!handler || typeof handler !== 'object' || typeof (handler as any).onRequestStart === 'function') {
+    return handler;
+  }
+
+  return new FetchDispatchHandlerCompatibilityWrapper(handler);
+}
+
+class FetchDispatchHandlerCompatibilityWrapper {
+  constructor(private handler: any) {}
+
+  onRequestStart(controller: any, context: unknown): void {
+    this.handler.onConnect?.((reason: unknown) => controller.abort(reason), context);
+  }
+
+  onRequestUpgrade(controller: any, statusCode: number, headers: unknown, socket: unknown): void {
+    this.handler.onUpgrade?.(statusCode, getRawHeaders(controller, headers), socket);
+  }
+
+  onResponseStart(controller: any, statusCode: number, headers: unknown, statusMessage?: string): void {
+    if (
+      this.handler.onHeaders?.(
+        statusCode,
+        getRawHeaders(controller, headers),
+        () => controller.resume(),
+        statusMessage,
+      ) === false
+    ) {
+      controller.pause();
+    }
+  }
+
+  onResponseData(controller: any, chunk: unknown): void {
+    if (this.handler.onData?.(chunk) === false) {
+      controller.pause();
+    }
+  }
+
+  onResponseEnd(controller: any, trailers: unknown): void {
+    this.handler.onComplete?.(getRawHeaders(controller, trailers, 'rawTrailers'));
+  }
+
+  onResponseError(_controller: unknown, error: unknown): void {
+    if (!this.handler.onError) {
+      throw error;
+    }
+
+    this.handler.onError?.(error);
+  }
+
+  onBodySent(chunk: unknown): void {
+    this.handler.onBodySent?.(chunk);
+  }
+
+  onRequestSent(): void {
+    this.handler.onRequestSent?.();
+  }
+
+  onResponseStarted(): void {
+    this.handler.onResponseStarted?.();
+  }
+}
+
+function getRawHeaders(
+  controller: any,
+  headers: unknown,
+  controllerKey: 'rawHeaders' | 'rawTrailers' = 'rawHeaders',
+): string[] {
+  if (Array.isArray(controller?.[controllerKey])) {
+    return controller[controllerKey].map(String);
+  }
+
+  if (Array.isArray(headers)) {
+    return headers.map(String);
+  }
+
+  if (!headers || typeof headers !== 'object') {
+    return [];
+  }
+
+  const rawHeaders: string[] = [];
+  for (const [name, value] of Object.entries(
+    headers as Record<string, string | string[] | number | undefined>,
+  )) {
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        rawHeaders.push(name, String(item));
+      }
+    } else if (value !== undefined) {
+      rawHeaders.push(name, String(value));
+    }
+  }
+
+  return rawHeaders;
+}
 
 export declare namespace OpenAI {
   export type RequestOptions = Opts.RequestOptions;
