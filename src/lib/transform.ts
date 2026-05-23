@@ -99,7 +99,13 @@ function ensureStrictJsonSchema(
     jsonSchema.items = ensureStrictJsonSchema(items, [...path, 'items'], root);
   }
 
-  // Handle unions (anyOf)
+  // Handle unions (OpenAI strict mode supports anyOf, but not oneOf)
+  const oneOf = jsonSchema.oneOf;
+  if (Array.isArray(oneOf)) {
+    jsonSchema.anyOf = Array.isArray(jsonSchema.anyOf) ? [...jsonSchema.anyOf, ...oneOf] : oneOf;
+    delete jsonSchema.oneOf;
+  }
+
   const anyOf = jsonSchema.anyOf;
   if (Array.isArray(anyOf)) {
     jsonSchema.anyOf = anyOf.map((variant, i) =>

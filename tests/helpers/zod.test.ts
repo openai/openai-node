@@ -2,6 +2,20 @@ import { zodResponseFormat } from 'openai/helpers/zod';
 import { z as zv3 } from 'zod/v3';
 import { z as zv4 } from 'zod/v4';
 
+it('converts Zod v4 discriminated unions to anyOf for strict schemas', () => {
+  const ResponseSchema = zv4.object({
+    data: zv4.discriminatedUnion('type', [
+      zv4.object({ type: zv4.literal('a') }),
+      zv4.object({ type: zv4.literal('b') }),
+    ]),
+  });
+
+  const schema = zodResponseFormat(ResponseSchema, 'choice').json_schema.schema as any;
+
+  expect(JSON.stringify(schema)).not.toContain('"oneOf"');
+  expect(schema.properties.data.anyOf).toHaveLength(2);
+});
+
 describe.each([
   { version: 'v3', z: zv3 },
   { version: 'v4', z: zv4 as any as typeof zv3 },
