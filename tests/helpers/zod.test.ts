@@ -13,7 +13,9 @@ it('converts Zod v4 discriminated unions to anyOf for strict schemas', () => {
   const schema = zodResponseFormat(ResponseSchema, 'choice').json_schema.schema as any;
 
   expect(JSON.stringify(schema)).not.toContain('"oneOf"');
-  expect(schema.properties.data.anyOf).toHaveLength(2);
+  expect(schema.properties.data).toMatchObject({
+    allOf: [{ anyOf: [{ type: 'object' }, { type: 'object' }] }, { not: { anyOf: expect.any(Array) } }],
+  });
 });
 
 describe.each([
