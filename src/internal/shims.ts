@@ -10,8 +10,32 @@
 import type { Fetch } from './builtin-types';
 import type { ReadableStream } from './shim-types';
 
+type NodeTLSModule = {
+  getCACertificates?: ((type?: 'default' | 'extra') => string[]) | undefined;
+  setDefaultCACertificates?: ((certificates: string[]) => void) | undefined;
+};
+
+function getNodeTLSModule(): NodeTLSModule | undefined {
+  const process = (globalThis as any).process;
+  if (typeof process?.getBuiltinModule !== 'function') return undefined;
+  return process.getBuiltinModule('node:tls') as NodeTLSModule | undefined;
+}
+
+function applyNodeExtraCACertificates(): void {
+  const tls = getNodeTLSModule();
+  if (typeof tls?.getCACertificates !== 'function' || typeof tls?.setDefaultCACertificates !== 'function') {
+    return;
+  }
+
+  const extraCertificates = tls.getCACertificates('extra');
+  if (!extraCertificates.length) return;
+
+  tls.setDefaultCACertificates([...tls.getCACertificates('default'), ...extraCertificates]);
+}
+
 export function getDefaultFetch(): Fetch {
   if (typeof fetch !== 'undefined') {
+    applyNodeExtraCACertificates();
     return fetch as any;
   }
 
