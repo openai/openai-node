@@ -2407,11 +2407,15 @@ describe('resource completions', () => {
         throw new Error('mock request error');
       }).catch(() => {});
 
-      async function runStream() {
-        await stream.done();
-      }
-
-      await expect(runStream).rejects.toThrow(APIConnectionError);
+      await expect(async () => {
+        try {
+          await stream.done();
+        } catch (err) {
+          expect(err).toBeInstanceOf(APIConnectionError);
+          expect((err as Error).message).toBe('mock request error');
+          throw err;
+        }
+      }).rejects.toThrow('mock request error');
     });
     test('handles network errors on async iterator', async () => {
       const { fetch, handleRequest } = mockFetch();
