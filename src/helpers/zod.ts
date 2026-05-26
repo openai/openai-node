@@ -12,6 +12,7 @@ import {
 import { zodToJsonSchema as _zodToJsonSchema } from '../_vendor/zod-to-json-schema';
 import { AutoParseableResponseTool, makeParseableResponseTool } from '../lib/ResponsesParser';
 import { type ResponseFormatTextJSONSchemaConfig } from '../resources/responses/responses';
+import { type RealtimeFunctionTool } from '../resources/realtime/realtime';
 import { toStrictJsonSchema } from '../lib/transform';
 import { JSONSchema } from '../lib/jsonschema';
 
@@ -177,4 +178,48 @@ export function zodResponsesFunction<Parameters extends z3.ZodType | z4.ZodType>
       parser: (args) => options.parameters.parse(JSON.parse(args)),
     },
   );
+}
+
+/**
+ * Creates a Realtime API `function` tool definition from the given Zod schema.
+ *
+ * Unlike {@link zodResponsesFunction}, this helper does **not** set `strict: true`
+ * because the Realtime API's `RealtimeFunctionTool` interface does not include
+ * that field.
+ *
+ * ```ts
+ * const session = await client.beta.realtime.sessions.create({
+ *   model: 'gpt-4o-realtime-preview',
+ *   tools: [
+ *     zodRealtimeFunction({
+ *       name: 'get_weather',
+ *       description: 'Get the current weather for a location',
+ *       parameters: z.object({
+ *         location: z.string().describe('City and state, e.g. "San Francisco, CA"'),
+ *       }),
+ *     }),
+ *   ],
+ * });
+ * ```
+ *
+ * When the model invokes the tool, parse the arguments yourself:
+ *
+ * ```ts
+ * const args = GetWeatherParams.parse(JSON.parse(event.arguments));
+ * ```
+ */
+export function zodRealtimeFunction<Parameters extends z3.ZodType | z4.ZodType>(options: {
+  name: string;
+  parameters: Parameters;
+  description?: string | undefined;
+}): RealtimeFunctionTool {
+  return {
+    type: 'function',
+    name: options.name,
+    parameters:
+      isZodV4(options.parameters) ?
+        zodV4ToJsonSchema(options.parameters)
+      : zodV3ToJsonSchema(options.parameters, { name: options.name }),
+    ...(options.description ? { description: options.description } : undefined),
+  };
 }
