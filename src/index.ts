@@ -25,4 +25,4 @@ export {
   SubjectTokenProviderError,
 } from './core/error';
 
-export { AzureOpenAI } from './azure';
+export { AzureOpenAI, type AzureClientOptions } from './azure';
