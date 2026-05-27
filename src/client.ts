@@ -1298,22 +1298,23 @@ OpenAI.Videos = Videos;
 
 function getConnectionErrorMessage(error: Error): string | undefined {
   if (isUndiciDispatcherVersionMismatchError(error)) {
-    return [
-      'Connection error.',
-      'This may be caused by passing an undici dispatcher, such as ProxyAgent, that is incompatible with the fetch implementation.',
-      "If you are using undici's ProxyAgent, pass the fetch implementation from the same undici package:",
-      "import { fetch, ProxyAgent } from 'undici'; new OpenAI({ fetch, fetchOptions: { dispatcher: new ProxyAgent(...) } });",
-    ].join(' ');
+    return `Connection error. This may be caused by passing an undici dispatcher, such as ProxyAgent, that is incompatible with the fetch implementation. If you are using undici's ProxyAgent, pass the fetch implementation from the same undici package: import { fetch, ProxyAgent } from 'undici'; new OpenAI({ fetch, fetchOptions: { dispatcher: new ProxyAgent(...) } });`;
   }
 
   return undefined;
 }
 
+type ErrorLikeWithCause = {
+  code?: unknown;
+  message?: unknown;
+  cause?: unknown;
+};
+
 function isUndiciDispatcherVersionMismatchError(error: unknown): boolean {
   let current = error;
 
   for (let i = 0; i < 8 && current && typeof current === 'object'; i++) {
-    const err = current as { code?: unknown; message?: unknown; cause?: unknown };
+    const err = current as ErrorLikeWithCause;
     if (
       err.code === 'UND_ERR_INVALID_ARG' &&
       typeof err.message === 'string' &&

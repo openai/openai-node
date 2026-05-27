@@ -722,8 +722,6 @@ const client = new OpenAI({
 ```
 
 Undici-specific options like `dispatcher` must be paired with the matching `fetch` implementation.
-Using Node's built-in `fetch` with a `dispatcher` from another Undici version can cause errors such
-as `UND_ERR_INVALID_ARG: invalid onRequestStart method`.
 
 <img src="https://raw.githubusercontent.com/stainless-api/sdk-assets/refs/heads/main/bun.svg" align="top" width="18" height="21"> **Bun** <sup>[[docs](https://bun.sh/guides/http/proxy)]</sup>
 
