@@ -341,6 +341,39 @@ describe('instantiate client', () => {
     expect(capturedRequest?.method).toEqual('PATCH');
   });
 
+  test('explains undici dispatcher and fetch version mismatch', async () => {
+    const undiciError = Object.assign(new Error('invalid onRequestStart method'), {
+      name: 'InvalidArgumentError',
+      code: 'UND_ERR_INVALID_ARG',
+    });
+    const fetchError = new TypeError('fetch failed');
+    (fetchError as any).cause = undiciError;
+
+    const client = new OpenAI({
+      baseURL: 'http://localhost:5000/',
+      apiKey: 'My API Key',
+      adminAPIKey: 'My Admin API Key',
+      maxRetries: 0,
+      fetch: async () => {
+        throw fetchError;
+      },
+      fetchOptions: {
+        dispatcher: { dispatch() {} },
+      } as any,
+    });
+
+    await expect(client.get('/foo')).rejects.toThrow(
+      "If you are using undici's ProxyAgent, pass the fetch implementation from the same undici package",
+    );
+
+    try {
+      await client.get('/foo');
+      throw new Error('expected request to fail');
+    } catch (error) {
+      expect((error as any).cause).toBe(fetchError);
+    }
+  });
+
   describe('baseUrl', () => {
     test('trailing slash', () => {
       const client = new OpenAI({

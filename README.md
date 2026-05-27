@@ -710,15 +710,18 @@ options to requests:
 
 ```ts
 import OpenAI from 'openai';
-import * as undici from 'undici';
+import { fetch, ProxyAgent } from 'undici';
 
-const proxyAgent = new undici.ProxyAgent('http://localhost:8888');
+const proxyAgent = new ProxyAgent('http://localhost:8888');
 const client = new OpenAI({
+  fetch,
   fetchOptions: {
     dispatcher: proxyAgent,
   },
 });
 ```
+
+Undici-specific options like `dispatcher` must be paired with the matching `fetch` implementation.
 
 <img src="https://raw.githubusercontent.com/stainless-api/sdk-assets/refs/heads/main/bun.svg" align="top" width="18" height="21"> **Bun** <sup>[[docs](https://bun.sh/guides/http/proxy)]</sup>
 
