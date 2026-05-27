@@ -341,6 +341,29 @@ describe('instantiate client', () => {
     expect(capturedRequest?.method).toEqual('PATCH');
   });
 
+  test('preserves JSON error bodies without an error wrapper', async () => {
+    const errorBody = { detail: 'Invalid request body', status: 400 };
+    const testFetch = async (): Promise<Response> => {
+      return new Response(JSON.stringify(errorBody), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    };
+
+    const client = new OpenAI({
+      baseURL: 'http://localhost:5000/',
+      apiKey: 'My API Key',
+      adminAPIKey: 'My Admin API Key',
+      fetch: testFetch,
+      maxRetries: 0,
+    });
+
+    await expect(client.get('/foo')).rejects.toMatchObject({
+      status: 400,
+      error: errorBody,
+    });
+  });
+
   describe('baseUrl', () => {
     test('trailing slash', () => {
       const client = new OpenAI({

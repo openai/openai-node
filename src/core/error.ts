@@ -67,7 +67,10 @@ export class APIError<
       return new APIConnectionError({ message, cause: castToError(errorResponse) });
     }
 
-    const error = (errorResponse as Record<string, any>)?.['error'];
+    const error =
+      errorResponse && typeof errorResponse === 'object' && 'error' in errorResponse ?
+        (errorResponse as Record<string, any>)['error']
+      : errorResponse;
 
     if (status === 400) {
       return new BadRequestError(status, error, message, headers);
