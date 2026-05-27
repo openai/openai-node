@@ -1,5 +1,20 @@
 # Changelog
 
+## 6.39.1 (2026-05-27)
+
+Full Changelog: [v6.39.0...v6.39.1](https://github.com/openai/openai-node/compare/v6.39.0...v6.39.1)
+
+### Bug Fixes
+
+* Improve undici dispatcher mismatch guidance ([#1898](https://github.com/openai/openai-node/issues/1898)) ([b6e5fd6](https://github.com/openai/openai-node/commit/b6e5fd6c30014acfef5994b90816946be5e6c00b))
+* treat text/plan with format: binary as raw upload ([f9a632a](https://github.com/openai/openai-node/commit/f9a632aa26d80d60be84dc55cf700e515377b6ba))
+* treat text/plan with format: binary as raw upload ([323cb78](https://github.com/openai/openai-node/commit/323cb788ce70ad7cf390a4c19997edcb68d854ca))
+
+
+### Chores
+
+* **internal:** codegen related update ([d32deef](https://github.com/openai/openai-node/commit/d32deef4d60f657dd959ef237d57b8cd53ab28b9))
+
 ## 6.39.0 (2026-05-21)
 
 Full Changelog: [v6.38.0...v6.39.0](https://github.com/openai/openai-node/compare/v6.38.0...v6.39.0)
