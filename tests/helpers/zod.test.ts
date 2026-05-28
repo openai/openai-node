@@ -143,6 +143,22 @@ describe.each([
     `);
   });
 
+  it('converts Zod discriminated unions to strict anyOf schemas', () => {
+    const ResponseSchema = z.object({
+      data: z.discriminatedUnion('type', [
+        z.object({ type: z.literal('a') }),
+        z.object({ type: z.literal('b') }),
+      ]),
+    });
+
+    const schema = zodResponseFormat(ResponseSchema, 'choice').json_schema.schema as Record<string, any>;
+    const dataSchema = schema['properties']['data'];
+
+    expect(dataSchema.oneOf).toBeUndefined();
+    expect(dataSchema.anyOf).toHaveLength(2);
+    expect(JSON.stringify(schema)).not.toContain('"oneOf"');
+  });
+
   it('allows description field to be passed in', () => {
     expect(
       zodResponseFormat(
