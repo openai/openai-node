@@ -103,3 +103,10 @@ export const safeJSON = (text: string) => {
     return undefined;
   }
 };
+
+// Gets a value from an object, deletes the key, and returns the value (or undefined if not found)
+export const pop = <T extends Record<string, any>, K extends string>(obj: T, key: K): T[K] => {
+  const value = obj[key];
+  delete obj[key];
+  return value;
+};
