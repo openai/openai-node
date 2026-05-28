@@ -2,6 +2,19 @@ import { zodResponseFormat } from 'openai/helpers/zod';
 import { z as zv3 } from 'zod/v3';
 import { z as zv4 } from 'zod/v4';
 
+function collectRefs(value: unknown, refs: string[] = []): string[] {
+  if (!value || typeof value !== 'object') return refs;
+
+  const maybeRef = (value as { $ref?: unknown }).$ref;
+  if (typeof maybeRef === 'string') refs.push(maybeRef);
+
+  for (const child of Object.values(value)) {
+    collectRefs(child, refs);
+  }
+
+  return refs;
+}
+
 describe.each([
   { version: 'v3', z: zv3 },
   { version: 'v4', z: zv4 as any as typeof zv3 },
@@ -47,6 +60,29 @@ describe.each([
         "strict": true,
       }
     `);
+  });
+
+  it('does not emit whitespace in extracted definition refs', () => {
+    const Thing = z.object({ id: z.string() });
+    const Root = z.object({
+      group: z.object({
+        'Thing With Spaces': Thing,
+        AnotherUsage: Thing,
+      }),
+    });
+
+    const schema = zodResponseFormat(Root, 'example-scope').json_schema.schema as Record<string, unknown>;
+    const definitions = (schema.definitions ?? schema.$defs ?? {}) as Record<string, unknown>;
+    const refs = collectRefs(schema);
+
+    expect(refs).not.toContainEqual(expect.stringMatching(/\s/));
+    expect(Object.keys(definitions)).not.toContainEqual(expect.stringMatching(/\s/));
+
+    for (const ref of refs) {
+      const definitionName = ref.split('/').at(-1);
+      expect(definitionName).toBeDefined();
+      expect(definitions).toHaveProperty(definitionName as string);
+    }
   });
 
   it('automatically adds optional properties to `required`', () => {
