@@ -103,8 +103,15 @@ function ensureStrictJsonSchema(
   // OpenAI strict schemas only support anyOf.
   const oneOf = jsonSchema.oneOf;
   if (Array.isArray(oneOf)) {
-    jsonSchema.anyOf = [...(jsonSchema.anyOf ?? []), ...oneOf];
+    const existingAnyOf = jsonSchema.anyOf;
     delete jsonSchema.oneOf;
+
+    if (Array.isArray(existingAnyOf)) {
+      jsonSchema.allOf = [...(jsonSchema.allOf ?? []), { anyOf: existingAnyOf }, { anyOf: oneOf }];
+      delete jsonSchema.anyOf;
+    } else {
+      jsonSchema.anyOf = oneOf;
+    }
   }
 
   const anyOf = jsonSchema.anyOf;

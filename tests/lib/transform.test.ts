@@ -271,6 +271,73 @@ describe('toStrictJsonSchema', () => {
         }
       `);
     });
+
+    test('keeps existing anyOf separate when converting oneOf', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          value: {
+            anyOf: [
+              {
+                type: 'object',
+                properties: { str: { type: 'string' } },
+                required: ['str'],
+              },
+            ],
+            oneOf: [
+              {
+                type: 'object',
+                properties: { num: { type: 'number' } },
+                required: ['num'],
+              },
+            ],
+          },
+        },
+        required: ['value'],
+      };
+
+      const strict = toStrictJsonSchema(schema);
+      const valueSchema = strict.properties?.['value'] as JSONSchema;
+
+      expect(valueSchema.oneOf).toBeUndefined();
+      expect(valueSchema.anyOf).toBeUndefined();
+      expect(valueSchema.allOf).toMatchInlineSnapshot(`
+        [
+          {
+            "anyOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "str": {
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "str",
+                ],
+                "type": "object",
+              },
+            ],
+          },
+          {
+            "anyOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "num": {
+                    "type": "number",
+                  },
+                },
+                "required": [
+                  "num",
+                ],
+                "type": "object",
+              },
+            ],
+          },
+        ]
+      `);
+    });
   });
 
   describe('allOf Handling', () => {
