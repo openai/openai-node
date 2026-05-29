@@ -63,20 +63,32 @@ describe.each([
   });
 
   it('does not emit whitespace in extracted definition refs', () => {
-    const Thing = z.object({ id: z.string() });
+    const ThingWithSpaces = z.object({ spaced: z.string() });
+    const ThingWithUnderscores = z.object({ underscored: z.string() });
     const Root = z.object({
       group: z.object({
-        'Thing With Spaces': Thing,
-        AnotherUsage: Thing,
+        'Thing With Spaces': ThingWithSpaces,
+        Thing_With_Spaces: ThingWithUnderscores,
+        anotherSpacedUsage: ThingWithSpaces,
+        anotherUnderscoredUsage: ThingWithUnderscores,
       }),
     });
 
     const schema = zodResponseFormat(Root, 'example-scope').json_schema.schema as Record<string, unknown>;
-    const definitions = (schema.definitions ?? schema.$defs ?? {}) as Record<string, unknown>;
+    const definitions = (schema['definitions'] ?? schema['$defs'] ?? {}) as Record<string, unknown>;
     const refs = collectRefs(schema);
+    const definitionNames = Object.keys(definitions);
 
     expect(refs).not.toContainEqual(expect.stringMatching(/\s/));
-    expect(Object.keys(definitions)).not.toContainEqual(expect.stringMatching(/\s/));
+    expect(definitionNames).not.toContainEqual(expect.stringMatching(/\s/));
+    if (version === 'v3') {
+      expect(definitionNames).toContain(
+        'example_x2d_scope_properties_group_properties_Thing_x20_With_x20_Spaces',
+      );
+      expect(definitionNames).toContain(
+        'example_x2d_scope_properties_group_properties_Thing_x5f_With_x5f_Spaces',
+      );
+    }
 
     for (const ref of refs) {
       const definitionName = ref.split('/').at(-1);

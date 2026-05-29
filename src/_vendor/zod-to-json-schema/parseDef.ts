@@ -133,8 +133,8 @@ const get$ref = (
     case 'extract-to-root':
       const name = item.path
         .slice(refs.basePath.length + 1)
-        .join('_')
-        .replace(/\s+/g, '_');
+        .map(encodeDefinitionPathPart)
+        .join('_');
 
       // we don't need to extract the root schema in this case, as it's already
       // been added to the definitions
@@ -160,6 +160,9 @@ const get$ref = (
     }
   }
 };
+
+const encodeDefinitionPathPart = (part: string) =>
+  part.replace(/[^A-Za-z0-9]/g, (char) => `_x${char.charCodeAt(0).toString(16).padStart(2, '0')}_`);
 
 const getRelativePath = (pathA: string[], pathB: string[]) => {
   let i = 0;
