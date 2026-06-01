@@ -1,5 +1,18 @@
 # Changelog
 
+## 6.40.0 (2026-06-01)
+
+Full Changelog: [v6.39.1...v6.40.0](https://github.com/openai/openai-node/compare/v6.39.1...v6.40.0)
+
+### Features
+
+* **api:** workload identity in audit logs, additional_tools item in responses, fix ActionSearch.query to be optional. ([aee09f3](https://github.com/openai/openai-node/commit/aee09f337f92b94428832122a19574d9196c3520))
+
+
+### Chores
+
+* remove migrate CLI ([673c618](https://github.com/openai/openai-node/commit/673c61888933e5909bfcc73102ed0e9f8304930e))
+
 ## 6.39.1 (2026-05-27)
 
 Full Changelog: [v6.39.0...v6.39.1](https://github.com/openai/openai-node/compare/v6.39.0...v6.39.1)
