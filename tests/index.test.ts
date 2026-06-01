@@ -697,7 +697,37 @@ describe('retries', () => {
     );
 
     expect(addEventListener).toHaveBeenCalledWith('abort', expect.any(Function), { once: true });
-    expect(removeEventListener).toHaveBeenCalledWith('abort', addEventListener.mock.calls[0][1]);
+    const abortListener = addEventListener.mock.calls[0]?.[1];
+    expect(abortListener).toEqual(expect.any(Function));
+    expect(removeEventListener).toHaveBeenCalledWith('abort', abortListener);
+  });
+
+  test('keeps abort listener after fetch resolves for streaming responses', async () => {
+    const client = new OpenAI({
+      apiKey: 'My API Key',
+      adminAPIKey: 'My Admin API Key',
+      fetch: async () => new Response('data: {"a":1}\n\n'),
+    });
+
+    const externalController = new AbortController();
+    const requestController = new AbortController();
+    const addEventListener = jest.spyOn(externalController.signal, 'addEventListener');
+    const removeEventListener = jest.spyOn(externalController.signal, 'removeEventListener');
+
+    await client.fetchWithTimeout(
+      'http://localhost/foo',
+      { signal: externalController.signal },
+      1000,
+      requestController,
+      true,
+    );
+
+    expect(addEventListener).toHaveBeenCalledWith('abort', expect.any(Function), { once: true });
+    expect(removeEventListener).not.toHaveBeenCalled();
+
+    externalController.abort();
+
+    expect(requestController.signal.aborted).toBe(true);
   });
 
   test('retry on timeout', async () => {
