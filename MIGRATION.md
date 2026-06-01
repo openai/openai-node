@@ -4,12 +4,6 @@ This guide outlines the changes and steps needed to migrate your codebase to the
 
 The main changes are that the SDK now relies on the [builtin Web fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API) instead of `node-fetch` and has zero dependencies.
 
-## Migration CLI
-
-Most programs will only need minimal changes, but to assist there is a migration tool that will automatically update your code for the new version.
-To use it, upgrade the `openai` package, then run `./node_modules/.bin/openai migrate ./your/src/folders` to update your code.
-To preview the changes without writing them to disk, run the tool with `--dry`.
-
 ## Environment requirements
 
 The minimum supported runtime and tooling versions are now:
