@@ -98,6 +98,7 @@ export type ConversationItem =
   | ResponsesAPI.ResponseComputerToolCallOutputItem
   | ResponsesAPI.ResponseToolSearchCall
   | ResponsesAPI.ResponseToolSearchOutputItem
+  | ConversationItem.AdditionalTools
   | ResponsesAPI.ResponseReasoningItem
   | ResponsesAPI.ResponseCompactionItem
   | ResponsesAPI.ResponseCodeInterpreterToolCall
@@ -138,6 +139,28 @@ export namespace ConversationItem {
      * The type of the image generation call. Always `image_generation_call`.
      */
     type: 'image_generation_call';
+  }
+
+  export interface AdditionalTools {
+    /**
+     * The unique ID of the additional tools item.
+     */
+    id: string;
+
+    /**
+     * The role that provided the additional tools.
+     */
+    role: 'unknown' | 'user' | 'assistant' | 'system' | 'critic' | 'discriminator' | 'developer' | 'tool';
+
+    /**
+     * The additional tool definitions made available at this item.
+     */
+    tools: Array<ResponsesAPI.Tool>;
+
+    /**
+     * The type of the item. Always `additional_tools`.
+     */
+    type: 'additional_tools';
   }
 
   /**

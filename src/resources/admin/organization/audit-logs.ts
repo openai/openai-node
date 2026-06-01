@@ -93,6 +93,12 @@ export interface AuditLogListResponse {
     | 'tunnel.created'
     | 'tunnel.updated'
     | 'tunnel.deleted'
+    | 'workload_identity_provider.created'
+    | 'workload_identity_provider.updated'
+    | 'workload_identity_provider.deleted'
+    | 'workload_identity_provider_mapping.created'
+    | 'workload_identity_provider_mapping.updated'
+    | 'workload_identity_provider_mapping.deleted'
     | 'role.created'
     | 'role.updated'
     | 'role.deleted'
@@ -354,6 +360,36 @@ export interface AuditLogListResponse {
    * The details for events with this `type`.
    */
   'user.updated'?: AuditLogListResponse.UserUpdated;
+
+  /**
+   * The details for events with this `type`.
+   */
+  'workload_identity_provider_mapping.created'?: AuditLogListResponse.WorkloadIdentityProviderMappingCreated;
+
+  /**
+   * The details for events with this `type`.
+   */
+  'workload_identity_provider_mapping.deleted'?: AuditLogListResponse.WorkloadIdentityProviderMappingDeleted;
+
+  /**
+   * The details for events with this `type`.
+   */
+  'workload_identity_provider_mapping.updated'?: AuditLogListResponse.WorkloadIdentityProviderMappingUpdated;
+
+  /**
+   * The details for events with this `type`.
+   */
+  'workload_identity_provider.created'?: AuditLogListResponse.WorkloadIdentityProviderCreated;
+
+  /**
+   * The details for events with this `type`.
+   */
+  'workload_identity_provider.deleted'?: AuditLogListResponse.WorkloadIdentityProviderDeleted;
+
+  /**
+   * The details for events with this `type`.
+   */
+  'workload_identity_provider.updated'?: AuditLogListResponse.WorkloadIdentityProviderUpdated;
 }
 
 export namespace AuditLogListResponse {
@@ -1460,6 +1496,116 @@ export namespace AuditLogListResponse {
       role?: string;
     }
   }
+
+  /**
+   * The details for events with this `type`.
+   */
+  export interface WorkloadIdentityProviderMappingCreated {
+    /**
+     * The workload identity provider mapping ID.
+     */
+    id?: string;
+
+    /**
+     * The payload used to create the workload identity provider mapping.
+     */
+    data?: unknown;
+
+    /**
+     * The workload identity provider ID.
+     */
+    identity_provider_id?: string;
+  }
+
+  /**
+   * The details for events with this `type`.
+   */
+  export interface WorkloadIdentityProviderMappingDeleted {
+    /**
+     * The workload identity provider mapping ID.
+     */
+    id?: string;
+
+    /**
+     * The workload identity provider ID.
+     */
+    identity_provider_id?: string;
+
+    /**
+     * The project ID.
+     */
+    project_id?: string;
+
+    /**
+     * The mapped service account ID.
+     */
+    service_account_id?: string;
+  }
+
+  /**
+   * The details for events with this `type`.
+   */
+  export interface WorkloadIdentityProviderMappingUpdated {
+    /**
+     * The workload identity provider mapping ID.
+     */
+    id?: string;
+
+    /**
+     * The payload used to update the workload identity provider mapping.
+     */
+    changes_requested?: unknown;
+
+    /**
+     * The workload identity provider ID.
+     */
+    identity_provider_id?: string;
+  }
+
+  /**
+   * The details for events with this `type`.
+   */
+  export interface WorkloadIdentityProviderCreated {
+    /**
+     * The workload identity provider ID.
+     */
+    id?: string;
+
+    /**
+     * The payload used to create the workload identity provider.
+     */
+    data?: unknown;
+  }
+
+  /**
+   * The details for events with this `type`.
+   */
+  export interface WorkloadIdentityProviderDeleted {
+    /**
+     * The workload identity provider ID.
+     */
+    id?: string;
+
+    /**
+     * The workload identity provider name.
+     */
+    name?: string;
+  }
+
+  /**
+   * The details for events with this `type`.
+   */
+  export interface WorkloadIdentityProviderUpdated {
+    /**
+     * The workload identity provider ID.
+     */
+    id?: string;
+
+    /**
+     * The payload used to update the workload identity provider.
+     */
+    changes_requested?: unknown;
+  }
 }
 
 export interface AuditLogListParams extends ConversationCursorPageParams {
@@ -1531,6 +1677,12 @@ export interface AuditLogListParams extends ConversationCursorPageParams {
     | 'tunnel.created'
     | 'tunnel.updated'
     | 'tunnel.deleted'
+    | 'workload_identity_provider.created'
+    | 'workload_identity_provider.updated'
+    | 'workload_identity_provider.deleted'
+    | 'workload_identity_provider_mapping.created'
+    | 'workload_identity_provider_mapping.updated'
+    | 'workload_identity_provider_mapping.deleted'
     | 'role.created'
     | 'role.updated'
     | 'role.deleted'
