@@ -30,6 +30,7 @@ describe('resource inputTokens', () => {
           instructions: 'instructions',
           model: 'model',
           parallel_tool_calls: true,
+          personality: 'friendly',
           previous_response_id: 'resp_123',
           reasoning: {
             effort: 'none',
