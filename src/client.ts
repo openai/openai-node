@@ -246,6 +246,8 @@ import { isEmptyObj } from './internal/utils/values';
 
 const WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER = 'workload-identity-auth';
 
+type FetchWithTimeoutResult = { response: Response; cleanup: () => void };
+
 export type ApiKeySetter = () => Promise<string>;
 
 export interface ClientOptions {
@@ -741,10 +743,11 @@ export class OpenAI {
 
     const security = options.__security ?? { bearerAuth: true };
     const controller = new AbortController();
-    const response = await this.fetchWithAuth(url, req, timeout, controller, security).catch(castToError);
+    const fetchResult = await this.fetchWithAuth(url, req, timeout, controller, security).catch(castToError);
     const headersTime = Date.now();
 
-    if (response instanceof globalThis.Error) {
+    if (fetchResult instanceof globalThis.Error) {
+      const response = fetchResult;
       const retryMessage = `retrying, ${retriesRemaining} attempts remaining`;
       if (options.signal?.aborted) {
         throw new Errors.APIUserAbortError();
@@ -795,6 +798,8 @@ export class OpenAI {
       });
     }
 
+    const { response, cleanup } = fetchResult;
+
     const specialHeaders = [...response.headers.entries()]
       .filter(([name]) => name === 'x-request-id')
       .map(([name, value]) => ', ' + name + ': ' + JSON.stringify(value))
@@ -812,6 +817,7 @@ export class OpenAI {
         !options.__metadata?.['workloadIdentityTokenRefreshed']
       ) {
         await Shims.CancelReadableStream(response.body);
+        cleanup();
         this._workloadIdentityAuth.invalidateToken();
 
         return this.makeRequest(
@@ -833,6 +839,7 @@ export class OpenAI {
 
         // We don't need the body of this response.
         await Shims.CancelReadableStream(response.body);
+        cleanup();
         loggerFor(this).info(`${responseInfo} - ${retryMessage}`);
         loggerFor(this).debug(
           `[${requestLogID}] response error (${retryMessage})`,
@@ -856,7 +863,10 @@ export class OpenAI {
 
       loggerFor(this).info(`${responseInfo} - ${retryMessage}`);
 
-      const errText = await response.text().catch((err: any) => castToError(err).message);
+      const errText = await response
+        .text()
+        .catch((err: any) => castToError(err).message)
+        .finally(cleanup);
       const errJSON = safeJSON(errText) as any;
       const errMessage = errJSON ? undefined : errText;
 
@@ -888,7 +898,7 @@ export class OpenAI {
       }),
     );
 
-    return { response, options, controller, requestLogID, retryOfRequestLogID, startTime };
+    return { response, options, controller, requestLogID, retryOfRequestLogID, startTime, cleanup };
   }
 
   getAPIList<Item, PageClass extends Pagination.AbstractPage<Item> = Pagination.AbstractPage<Item>>(
@@ -924,7 +934,7 @@ export class OpenAI {
       bearerAuth: true,
       adminAPIKeyAuth: true,
     },
-  ): Promise<Response> {
+  ): Promise<FetchWithTimeoutResult> {
     if (this._workloadIdentityAuth && schemes.bearerAuth) {
       const headers = init.headers as Headers;
       const authHeader = headers.get('Authorization');
@@ -944,12 +954,19 @@ export class OpenAI {
     init: RequestInit | undefined,
     ms: number,
     controller: AbortController,
-  ): Promise<Response> {
+  ): Promise<FetchWithTimeoutResult> {
     const { signal, method, ...options } = init || {};
     const abort = this._makeAbort(controller);
     if (signal) signal.addEventListener('abort', abort, { once: true });
 
     const timeout = setTimeout(abort, ms);
+    let cleanedUp = false;
+    const cleanup = () => {
+      if (cleanedUp) return;
+      cleanedUp = true;
+      clearTimeout(timeout);
+      if (signal) signal.removeEventListener('abort', abort);
+    };
 
     const isReadableBody =
       ((globalThis as any).ReadableStream && options.body instanceof (globalThis as any).ReadableStream) ||
@@ -969,9 +986,13 @@ export class OpenAI {
 
     try {
       // use undefined this binding; fetch errors if bound to something else in browser/cloudflare
-      return await this.fetch.call(undefined, url, fetchOptions);
-    } finally {
+      const response = await this.fetch.call(undefined, url, fetchOptions);
       clearTimeout(timeout);
+      if (!response.body) cleanup();
+      return { response, cleanup };
+    } catch (err) {
+      cleanup();
+      throw err;
     }
   }
 
