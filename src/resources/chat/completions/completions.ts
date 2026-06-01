@@ -296,6 +296,14 @@ export interface ChatCompletion {
   object: 'chat.completion';
 
   /**
+   * Developer-defined metadata attached to the completion.
+   *
+   * This is commonly present on stored completions (e.g. via `retrieve`/`list`) and
+   * may be omitted in immediate `create` responses.
+   */
+  metadata?: Shared.Metadata | null;
+
+  /**
    * Specifies the processing type used for serving the request.
    *
    * - If set to 'auto', then the request will be processed with the service tier
