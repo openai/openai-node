@@ -73,6 +73,13 @@ export interface InputTokenCountParams {
   parallel_tool_calls?: boolean | null;
 
   /**
+   * A model-owned style preset to apply to this request. Omit this parameter to use
+   * the model's default style. Supported values may expand over time. Values must be
+   * at most 64 characters.
+   */
+  personality?: (string & {}) | 'friendly' | 'pragmatic';
+
+  /**
    * The unique ID of the previous response to the model. Use this to create
    * multi-turn conversations. Learn more about
    * [conversation state](https://platform.openai.com/docs/guides/conversation-state).

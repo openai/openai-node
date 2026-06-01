@@ -1042,6 +1042,14 @@ export interface Response {
    * prompt caching, which keeps cached prefixes active for longer, up to a maximum
    * of 24 hours.
    * [Learn more](https://platform.openai.com/docs/guides/prompt-caching#prompt-cache-retention).
+   * For `gpt-5.5`, `gpt-5.5-pro`, and future models, only `24h` is supported.
+   *
+   * For older models that support both `in_memory` and `24h`, the default depends on
+   * your organization's data retention policy:
+   *
+   * - Organizations without ZDR enabled default to `24h`.
+   * - Organizations with ZDR enabled default to `in_memory` when
+   *   `prompt_cache_retention` is not specified.
    */
   prompt_cache_retention?: 'in_memory' | '24h' | null;
 
@@ -3049,11 +3057,6 @@ export namespace ResponseFunctionWebSearch {
    */
   export interface Search {
     /**
-     * [DEPRECATED] The search query.
-     */
-    query: string;
-
-    /**
      * The action type.
      */
     type: 'search';
@@ -3062,6 +3065,11 @@ export namespace ResponseFunctionWebSearch {
      * The search queries.
      */
     queries?: Array<string>;
+
+    /**
+     * @deprecated The search query.
+     */
+    query?: string;
 
     /**
      * The sources used in the search.
@@ -3493,6 +3501,7 @@ export type ResponseInputItem =
   | ResponseInputItem.FunctionCallOutput
   | ResponseInputItem.ToolSearchCall
   | ResponseToolSearchOutputItemParam
+  | ResponseInputItem.AdditionalTools
   | ResponseReasoningItem
   | ResponseCompactionItemParam
   | ResponseInputItem.ImageGenerationCall
@@ -3663,6 +3672,28 @@ export namespace ResponseInputItem {
      * The status of the tool search call.
      */
     status?: 'in_progress' | 'completed' | 'incomplete' | null;
+  }
+
+  export interface AdditionalTools {
+    /**
+     * The role that provided the additional tools. Only `developer` is supported.
+     */
+    role: 'developer';
+
+    /**
+     * A list of additional tools made available at this item.
+     */
+    tools: Array<ResponsesAPI.Tool>;
+
+    /**
+     * The item type. Always `additional_tools`.
+     */
+    type: 'additional_tools';
+
+    /**
+     * The unique ID of this additional tools item.
+     */
+    id?: string | null;
   }
 
   /**
@@ -4277,6 +4308,7 @@ export type ResponseItem =
   | ResponseFunctionToolCallOutputItem
   | ResponseToolSearchCall
   | ResponseToolSearchOutputItem
+  | ResponseItem.AdditionalTools
   | ResponseReasoningItem
   | ResponseCompactionItem
   | ResponseItem.ImageGenerationCall
@@ -4295,6 +4327,28 @@ export type ResponseItem =
   | ResponseCustomToolCallOutputItem;
 
 export namespace ResponseItem {
+  export interface AdditionalTools {
+    /**
+     * The unique ID of the additional tools item.
+     */
+    id: string;
+
+    /**
+     * The role that provided the additional tools.
+     */
+    role: 'unknown' | 'user' | 'assistant' | 'system' | 'critic' | 'discriminator' | 'developer' | 'tool';
+
+    /**
+     * The additional tool definitions made available at this item.
+     */
+    tools: Array<ResponsesAPI.Tool>;
+
+    /**
+     * The type of the item. Always `additional_tools`.
+     */
+    type: 'additional_tools';
+  }
+
   /**
    * An image generation request made by the model.
    */
@@ -4840,6 +4894,7 @@ export type ResponseOutputItem =
   | ResponseReasoningItem
   | ResponseToolSearchCall
   | ResponseToolSearchOutputItem
+  | ResponseOutputItem.AdditionalTools
   | ResponseCompactionItem
   | ResponseOutputItem.ImageGenerationCall
   | ResponseCodeInterpreterToolCall
@@ -4857,6 +4912,28 @@ export type ResponseOutputItem =
   | ResponseCustomToolCallOutputItem;
 
 export namespace ResponseOutputItem {
+  export interface AdditionalTools {
+    /**
+     * The unique ID of the additional tools item.
+     */
+    id: string;
+
+    /**
+     * The role that provided the additional tools.
+     */
+    role: 'unknown' | 'user' | 'assistant' | 'system' | 'critic' | 'discriminator' | 'developer' | 'tool';
+
+    /**
+     * The additional tool definitions made available at this item.
+     */
+    tools: Array<ResponsesAPI.Tool>;
+
+    /**
+     * The type of the item. Always `additional_tools`.
+     */
+    type: 'additional_tools';
+  }
+
   /**
    * An image generation request made by the model.
    */
@@ -6505,6 +6582,14 @@ export interface ResponsesClientEvent {
    * prompt caching, which keeps cached prefixes active for longer, up to a maximum
    * of 24 hours.
    * [Learn more](https://platform.openai.com/docs/guides/prompt-caching#prompt-cache-retention).
+   * For `gpt-5.5`, `gpt-5.5-pro`, and future models, only `24h` is supported.
+   *
+   * For older models that support both `in_memory` and `24h`, the default depends on
+   * your organization's data retention policy:
+   *
+   * - Organizations without ZDR enabled default to `24h`.
+   * - Organizations with ZDR enabled default to `in_memory` when
+   *   `prompt_cache_retention` is not specified.
    */
   prompt_cache_retention?: 'in_memory' | '24h' | null;
 
@@ -7555,6 +7640,14 @@ export interface ResponseCreateParamsBase {
    * prompt caching, which keeps cached prefixes active for longer, up to a maximum
    * of 24 hours.
    * [Learn more](https://platform.openai.com/docs/guides/prompt-caching#prompt-cache-retention).
+   * For `gpt-5.5`, `gpt-5.5-pro`, and future models, only `24h` is supported.
+   *
+   * For older models that support both `in_memory` and `24h`, the default depends on
+   * your organization's data retention policy:
+   *
+   * - Organizations without ZDR enabled default to `24h`.
+   * - Organizations with ZDR enabled default to `in_memory` when
+   *   `prompt_cache_retention` is not specified.
    */
   prompt_cache_retention?: 'in_memory' | '24h' | null;
 
