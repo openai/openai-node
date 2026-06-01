@@ -58,9 +58,6 @@
     "zod": "^3.25 || ^4.0",
     "typescript-eslint": "8.31.1"
   },
-  "bin": {
-    "openai": "bin/cli"
-  },
   "overrides": {
     "minimatch": "^9.0.5"
   },
