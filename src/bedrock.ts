@@ -10,10 +10,8 @@ import type { ResponseStreamParams } from './lib/responses/ResponseStream';
 import * as API from './resources/index';
 import type * as ResponsesAPI from './resources/responses/responses';
 
-export interface BedrockClientOptions extends Omit<
-  ClientOptions,
-  'apiKey' | 'adminAPIKey' | 'baseURL' | 'workloadIdentity'
-> {
+export interface BedrockClientOptions
+  extends Omit<ClientOptions, 'apiKey' | 'adminAPIKey' | 'baseURL' | 'workloadIdentity'> {
   /**
    * Bedrock bearer token used for authentication.
    *
@@ -183,7 +181,7 @@ export class BedrockOpenAI extends OpenAI {
 
   override withOptions(options: Partial<BedrockClientOptions>): this {
     const bedrockTokenProvider =
-      options.apiKey !== undefined ? undefined : (options.bedrockTokenProvider ?? this.bedrockTokenProvider);
+      options.apiKey !== undefined ? undefined : options.bedrockTokenProvider ?? this.bedrockTokenProvider;
 
     return super.withOptions({
       ...options,
