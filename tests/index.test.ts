@@ -677,6 +677,29 @@ describe('default encoder', () => {
 });
 
 describe('retries', () => {
+  test('removes abort listener after successful fetch', async () => {
+    const client = new OpenAI({
+      apiKey: 'My API Key',
+      adminAPIKey: 'My Admin API Key',
+      fetch: async () =>
+        new Response(JSON.stringify({ a: 1 }), { headers: { 'Content-Type': 'application/json' } }),
+    });
+
+    const externalController = new AbortController();
+    const addEventListener = jest.spyOn(externalController.signal, 'addEventListener');
+    const removeEventListener = jest.spyOn(externalController.signal, 'removeEventListener');
+
+    await client.fetchWithTimeout(
+      'http://localhost/foo',
+      { signal: externalController.signal },
+      1000,
+      new AbortController(),
+    );
+
+    expect(addEventListener).toHaveBeenCalledWith('abort', expect.any(Function), { once: true });
+    expect(removeEventListener).toHaveBeenCalledWith('abort', addEventListener.mock.calls[0][1]);
+  });
+
   test('retry on timeout', async () => {
     let count = 0;
     const testFetch = async (
