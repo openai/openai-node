@@ -1023,7 +1023,7 @@ export interface ThreadCreateAndRunPollParams {
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
    * for storing additional information about the object in a structured format. Keys
-   * can be a maximum of 64 characters long and values can be a maxium of 512
+   * can be a maximum of 64 characters long and values can be a maximum of 512
    * characters long.
    */
   metadata?: unknown | null;
@@ -1127,7 +1127,7 @@ export interface ThreadCreateAndRunPollParams {
 
   /**
    * Controls for how a thread will be truncated prior to the run. Use this to
-   * control the intial context window of the run.
+   * control the initial context window of the run.
    */
   truncation_strategy?: ThreadCreateAndRunPollParams.TruncationStrategy | null;
 }
