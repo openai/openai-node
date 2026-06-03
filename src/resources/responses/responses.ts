@@ -1017,6 +1017,12 @@ export interface Response {
   max_tool_calls?: number | null;
 
   /**
+   * Moderation results for the response input and output, if moderated completions
+   * were requested.
+   */
+  moderation?: Response.Moderation | null;
+
+  /**
    * The unique ID of the previous response to the model. Use this to create
    * multi-turn conversations. Learn more about
    * [conversation state](https://platform.openai.com/docs/guides/conversation-state).
@@ -1161,6 +1167,138 @@ export namespace Response {
      * The unique ID of the conversation that this response was associated with.
      */
     id: string;
+  }
+
+  /**
+   * Moderation results for the response input and output, if moderated completions
+   * were requested.
+   */
+  export interface Moderation {
+    /**
+     * Moderation for the response input.
+     */
+    input: Moderation.ModerationResult | Moderation.Error;
+
+    /**
+     * Moderation for the response output.
+     */
+    output: Moderation.ModerationResult | Moderation.Error;
+  }
+
+  export namespace Moderation {
+    /**
+     * A moderation result produced for the response input or output.
+     */
+    export interface ModerationResult {
+      /**
+       * A dictionary of moderation categories to booleans, True if the input is flagged
+       * under this category.
+       */
+      categories: { [key: string]: boolean };
+
+      /**
+       * Which modalities of input are reflected by the score for each category.
+       */
+      category_applied_input_types: { [key: string]: Array<'text' | 'image'> };
+
+      /**
+       * A dictionary of moderation categories to scores.
+       */
+      category_scores: { [key: string]: number };
+
+      /**
+       * A boolean indicating whether the content was flagged by any category.
+       */
+      flagged: boolean;
+
+      /**
+       * The moderation model that produced this result.
+       */
+      model: string;
+
+      /**
+       * The object type, which was always `moderation_result` for successful moderation
+       * results.
+       */
+      type: 'moderation_result';
+    }
+
+    /**
+     * An error produced while attempting moderation for the response input or output.
+     */
+    export interface Error {
+      /**
+       * The error code.
+       */
+      code: string;
+
+      /**
+       * The error message.
+       */
+      message: string;
+
+      /**
+       * The object type, which was always `error` for moderation failures.
+       */
+      type: 'error';
+    }
+
+    /**
+     * A moderation result produced for the response input or output.
+     */
+    export interface ModerationResult {
+      /**
+       * A dictionary of moderation categories to booleans, True if the input is flagged
+       * under this category.
+       */
+      categories: { [key: string]: boolean };
+
+      /**
+       * Which modalities of input are reflected by the score for each category.
+       */
+      category_applied_input_types: { [key: string]: Array<'text' | 'image'> };
+
+      /**
+       * A dictionary of moderation categories to scores.
+       */
+      category_scores: { [key: string]: number };
+
+      /**
+       * A boolean indicating whether the content was flagged by any category.
+       */
+      flagged: boolean;
+
+      /**
+       * The moderation model that produced this result.
+       */
+      model: string;
+
+      /**
+       * The object type, which was always `moderation_result` for successful moderation
+       * results.
+       */
+      type: 'moderation_result';
+    }
+
+    /**
+     * An error produced while attempting moderation for the response input or output.
+     */
+    export interface Error {
+      /**
+       * The error code.
+       */
+      code: string;
+
+      /**
+       * The error message.
+       */
+      message: string;
+
+      /**
+       * The object type, which was always `error` for moderation failures.
+       */
+      type: 'error';
+    }
   }
 }
 
@@ -6552,6 +6690,11 @@ export interface ResponsesClientEvent {
   model?: Shared.ResponsesModel;
 
   /**
+   * Configuration for running moderation on the input and output of this response.
+   */
+  moderation?: ResponsesClientEvent.Moderation | null;
+
+  /**
    * Whether to allow the model to run tool calls in parallel.
    */
   parallel_tool_calls?: boolean | null;
@@ -6755,6 +6898,17 @@ export namespace ResponsesClientEvent {
      * Token threshold at which compaction should be triggered for this entry.
      */
     compact_threshold?: number | null;
+  }
+
+  /**
+   * Configuration for running moderation on the input and output of this response.
+   */
+  export interface Moderation {
+    /**
+     * The moderation model to use for moderated completions, e.g.
+     * 'omni-moderation-latest'.
+     */
+    model: string;
   }
 
   /**
@@ -7610,6 +7764,11 @@ export interface ResponseCreateParamsBase {
   model?: Shared.ResponsesModel;
 
   /**
+   * Configuration for running moderation on the input and output of this response.
+   */
+  moderation?: ResponseCreateParams.Moderation | null;
+
+  /**
    * Whether to allow the model to run tool calls in parallel.
    */
   parallel_tool_calls?: boolean | null;
@@ -7813,6 +7972,17 @@ export namespace ResponseCreateParams {
      * Token threshold at which compaction should be triggered for this entry.
      */
     compact_threshold?: number | null;
+  }
+
+  /**
+   * Configuration for running moderation on the input and output of this response.
+   */
+  export interface Moderation {
+    /**
+     * The moderation model to use for moderated completions, e.g.
+     * 'omni-moderation-latest'.
+     */
+    model: string;
   }
 
   /**
