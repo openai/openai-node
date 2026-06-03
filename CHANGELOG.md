@@ -1,5 +1,13 @@
 # Changelog
 
+## 6.42.0 (2026-06-03)
+
+Full Changelog: [v6.41.0...v6.42.0](https://github.com/openai/openai-node/compare/v6.41.0...v6.42.0)
+
+### Features
+
+* **api:** responses.moderation and chat_completions.moderation ([6d8f592](https://github.com/openai/openai-node/commit/6d8f592d6aec5487684723b75137629a12225d29))
+
 ## 6.41.0 (2026-06-01)
 
 Full Changelog: [v6.40.0...v6.41.0](https://github.com/openai/openai-node/compare/v6.40.0...v6.41.0)
