@@ -38,6 +38,8 @@ jobs:
     runs-on: 'ubuntu-latest'
     name: Detect Agents SDK regressions
     if: github.repository == 'openai/openai-node'
+    env:
+      PNPM_CONFIG_RESOLUTION_MODE: highest
     steps:
       - name: Set up Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
