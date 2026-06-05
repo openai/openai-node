@@ -63,7 +63,9 @@
     "typescript-eslint": "8.31.1",
     "ws": "^8.18.0",
     "yargs": "^17.7.2",
-    "zod": "^3.25 || ^4.0"
+    "zod": "^3.25 || ^4.0",
+    "@valibot/to-json-schema": "^1.7.0",
+    "valibot": "^1.4.1"
   },
   "overrides": {
     "minimatch": "^9.0.5"
@@ -89,7 +91,9 @@
     "@smithy/hash-node": ">=4.3.0 <5",
     "@smithy/signature-v4": ">=5.4.0 <6",
     "ws": "^8.18.0",
-    "zod": "^3.25 || ^4.0"
+    "zod": "^3.25 || ^4.0",
+    "@valibot/to-json-schema": "^1.0.0",
+    "valibot": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@aws-sdk/credential-provider-node": {
@@ -105,6 +109,12 @@
       "optional": true
     },
     "zod": {
+      "optional": true
+    },
+    "@valibot/to-json-schema": {
+      "optional": true
+    },
+    "valibot": {
       "optional": true
     }
   }
