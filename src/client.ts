@@ -955,11 +955,23 @@ export class OpenAI {
       ((globalThis as any).ReadableStream && options.body instanceof (globalThis as any).ReadableStream) ||
       (typeof options.body === 'object' && options.body !== null && Symbol.asyncIterator in options.body);
 
+    // Strip runtime-specific options that are not part of the standard RequestInit.
+    // These (e.g. undici's dispatcher, agent, client) can cause errors when passed
+    // to the global fetch if the bundled undici version doesn't match the user's
+    // installed undici. Users who need these should pass their own fetch from undici.
+    const {
+      dispatcher: _dispatcher,
+      agent: _agent,
+      client: _client,
+      proxy: _proxy,
+      ...fetchInitOptions
+    } = options as Record<string, unknown>;
+
     const fetchOptions: RequestInit = {
       signal: controller.signal as any,
       ...(isReadableBody ? { duplex: 'half' } : {}),
       method: 'GET',
-      ...options,
+      ...fetchInitOptions,
     };
     if (method) {
       // Custom methods like 'patch' need to be uppercased
