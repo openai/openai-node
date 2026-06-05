@@ -12,6 +12,7 @@ import { Stream } from '../../../core/streaming';
 import { RequestOptions } from '../../../internal/request-options';
 import { path } from '../../../internal/utils/path';
 
+import { estimateTokens, type EstimateTokensParams, type TokenEstimate } from '../../../lib/token-estimation';
 import { ChatCompletionRunner } from '../../../lib/ChatCompletionRunner';
 import { ChatCompletionStreamingRunner } from '../../../lib/ChatCompletionStreamingRunner';
 import { RunnerOptions } from '../../../lib/AbstractChatCompletionRunner';
@@ -223,6 +224,30 @@ export class Completions extends APIResource {
     options?: RequestOptions,
   ): ChatCompletionStream<ParsedT> {
     return ChatCompletionStream.createChatCompletion(this._client, body, options);
+  }
+
+  /**
+   * Estimates the number of tokens that a chat completion request would consume,
+   * without making an API call. Useful for cost estimation and staying within
+   * context window limits.
+   *
+   * The estimation uses a character-counting heuristic (~3.5 characters per
+   * token for English text) plus per-message overhead. For precise token counts
+   * use the `tiktoken` package or check the `usage` field in the API response.
+   *
+   * @example
+   * ```ts
+   * const estimate = client.chat.completions.estimateTokens({
+   *   messages: [{ role: 'user', content: 'Hello!' }],
+   *   model: 'gpt-4o',
+   *   tools: [{ type: 'function', function: { name: 'get_weather', parameters: {} } }],
+   * });
+   * console.log(estimate.inputTokens);
+   * console.log(estimate.maxOutputTokens);
+   * ```
+   */
+  estimateTokens(params: EstimateTokensParams): TokenEstimate {
+    return estimateTokens(params);
   }
 }
 
@@ -2410,6 +2435,8 @@ export interface ChatCompletionListParams extends CursorPageParams {
 Completions.Messages = Messages;
 
 export declare namespace Completions {
+  export { estimateTokens as estimateTokens, type EstimateTokensParams, type TokenEstimate };
+
   export {
     type ChatCompletion as ChatCompletion,
     type ChatCompletionAllowedToolChoice as ChatCompletionAllowedToolChoice,

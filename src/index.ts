@@ -27,3 +27,5 @@ export {
 
 export { AzureOpenAI } from './azure';
 export { BedrockOpenAI, type BedrockClientOptions } from './bedrock';
+
+export { estimateTokens, type EstimateTokensParams, type TokenEstimate } from './lib/token-estimation';
