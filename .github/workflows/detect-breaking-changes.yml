@@ -71,7 +71,9 @@ jobs:
 
       - name: Configure pnpm
         working-directory: openai-agents-js
-        run: echo "resolution-mode=highest" >> .npmrc
+        run: |
+          echo "resolution-mode=highest" >> .npmrc
+          perl -0pi -e 's/minimumReleaseAge: 10080/minimumReleaseAge: 0/' pnpm-workspace.yaml
 
       - name: Link agents packages to local SDKs
         working-directory: openai-agents-js
