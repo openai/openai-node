@@ -74,7 +74,7 @@ export const buildHeaders = (newHeaders: HeadersLike[]): NullableHeaders => {
   for (const headers of newHeaders) {
     const seenHeaders = new Set<string>();
     for (const [name, value] of iterateHeaders(headers)) {
-      const lowerName = name.toLowerCase();
+      const lowerName = name.toLocaleLowerCase('en-US');
       if (!seenHeaders.has(lowerName)) {
         targetHeaders.delete(name);
         seenHeaders.add(lowerName);
