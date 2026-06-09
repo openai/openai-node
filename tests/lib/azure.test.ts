@@ -585,6 +585,18 @@ describe('azure request building', () => {
         });
       });
 
+      test('handles image edits', async () => {
+        expect(
+          await client.images.edit({
+            model: deployment,
+            image: new File([], ''),
+            prompt: 'prompt',
+          }),
+        ).toMatchObject({
+          url: `https://example.com/openai/deployments/${deployment}/images/edits?api-version=${apiVersion}`,
+        });
+      });
+
       test('handles assistants', async () => {
         expect(
           await client.beta.assistants.create({
