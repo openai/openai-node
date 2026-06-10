@@ -1,5 +1,6 @@
 const fs = require('fs');
-const problems = Object.values(JSON.parse(fs.readFileSync('.attw.json', 'utf-8')).problems)
+const reportPath = '.attw-report.json';
+const problems = Object.values(JSON.parse(fs.readFileSync(reportPath, 'utf-8')).problems)
   .flat()
   .filter(
     (problem) =>
@@ -15,7 +16,7 @@ const problems = Object.values(JSON.parse(fs.readFileSync('.attw.json', 'utf-8')
         )
       ),
   );
-fs.unlinkSync('.attw.json');
+fs.unlinkSync(reportPath);
 if (problems.length) {
   process.stdout.write('The types are wrong!\n' + JSON.stringify(problems, null, 2) + '\n');
   process.exitCode = 1;
