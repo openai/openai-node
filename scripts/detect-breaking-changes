@@ -104,7 +104,13 @@ done
 
 # Old test files are checked for compatibility with the current SDK, not
 # formatting drift against the current Prettier version.
-./node_modules/.bin/prettier --write "${TEST_PATHS[@]}"
+EXISTING_TEST_PATHS=()
+for PATHSPEC in "${TEST_PATHS[@]}"; do
+    if [ -e "${PATHSPEC}" ]; then
+        EXISTING_TEST_PATHS+=("${PATHSPEC}")
+    fi
+done
+./node_modules/.bin/prettier --write "${EXISTING_TEST_PATHS[@]}"
 
 # Instead of running the tests, use the linter to check if an
 # older test is no longer compatible with the latest SDK.
