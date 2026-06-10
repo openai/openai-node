@@ -5,6 +5,9 @@ on:
       - main
       - next
 
+env:
+  LATEST_LTS_NODE_VERSION: '24'
+
 jobs:
   detect_breaking_changes:
     runs-on: 'ubuntu-latest'
@@ -23,7 +26,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3
         with:
-          node-version: '20'
+          node-version: ${{ env.LATEST_LTS_NODE_VERSION }}
       - name: Install dependencies
         run: |
           ./scripts/bootstrap
@@ -42,7 +45,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '22'
+          node-version: ${{ env.LATEST_LTS_NODE_VERSION }}
 
       - name: Install pnpm
         uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
