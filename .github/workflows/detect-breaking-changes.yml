@@ -52,16 +52,15 @@ jobs:
         with:
           node-version: ${{ env.LATEST_LTS_NODE_VERSION }}
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
-        with:
-          version: 10.25.0
-          run_install: false
-
       # Setup this sdk
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           path: openai-node
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        with:
+          package_json_file: openai-node/package.json
 
       - name: Bootstrap
         working-directory: openai-node

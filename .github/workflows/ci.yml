@@ -117,6 +117,8 @@ jobs:
     runs-on: ${{ github.repository == 'stainless-sdks/openai-typescript' && 'depot-ubuntu-24.04' || 'ubuntu-latest' }}
     if: github.repository == 'openai/openai-node'
     environment: ci
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -134,8 +136,8 @@ jobs:
         run: |
           pnpm install --frozen-lockfile
 
-      - env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      - name: Run demo
+        if: env.OPENAI_API_KEY != ''
         run: |
           if [ -z "$OPENAI_API_KEY" ]; then
             echo "Skipping examples because OPENAI_API_KEY is not set"
