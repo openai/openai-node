@@ -85,4 +85,24 @@ describe('buildHeaders', () => {
       expect(inspectNullableHeaders(buildHeaders(input))).toEqual(expected);
     });
   }
+
+  // Regression for https://github.com/openai/openai-node/issues/1928
+  test('lowercases header names with ASCII rules even under a Turkish process locale', () => {
+    const originalLowerCase = String.prototype.toLowerCase;
+    // Simulate the Turkish locale's casing rule that maps uppercase `I` to the
+    // dotless `ı`. This is what V8 actually does on Turkish Windows / Linux
+    // installs, but we monkey-patch it here so the test is locale-independent.
+    String.prototype.toLowerCase = function turkishToLowerCase(this: string): string {
+      return this.replace(/I/g, 'ı').replace(/[A-HJ-Z]/g, (c) => c.charCodeAt(0) === 73 ? c : String.fromCharCode(c.charCodeAt(0) | 0x20));
+    };
+    try {
+      const result = buildHeaders([{ 'OpenAI-Organization': 'org_test' }]);
+      // The canonical key must be ASCII-only — no dotless `ı`.
+      const keys = [...result.values.keys()];
+      expect(keys).toContain('openai-organization');
+      expect(keys.every((k) => /^[\x00-\x7F]*$/.test(k))).toBe(true);
+    } finally {
+      String.prototype.toLowerCase = originalLowerCase;
+    }
+  });
 });
