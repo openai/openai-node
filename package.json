@@ -29,6 +29,13 @@
   "dependencies": {},
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.17.0",
+    "@aws-sdk/core": "3.974.15",
+    "@aws-sdk/credential-provider-node": "3.972.47",
+    "@aws-sdk/token-providers": "3.1057.0",
+    "@smithy/core": "3.24.5",
+    "@smithy/hash-node": "4.3.5",
+    "@smithy/protocol-http": "5.4.5",
+    "@smithy/signature-v4": "5.4.5",
     "@swc/core": "^1.3.102",
     "@swc/jest": "^0.2.29",
     "@types/jest": "^29.4.0",
@@ -86,10 +93,38 @@
     }
   },
   "peerDependencies": {
+    "@aws-sdk/core": ">=3.974.0 <4",
+    "@aws-sdk/credential-provider-node": ">=3.972.0 <4",
+    "@aws-sdk/token-providers": ">=3.1057.0 <4",
+    "@smithy/core": ">=3.24.0 <4",
+    "@smithy/hash-node": ">=4.3.0 <5",
+    "@smithy/protocol-http": ">=5.4.0 <6",
+    "@smithy/signature-v4": ">=5.4.0 <6",
     "ws": "^8.18.0",
     "zod": "^3.25 || ^4.0"
   },
   "peerDependenciesMeta": {
+    "@aws-sdk/core": {
+      "optional": true
+    },
+    "@aws-sdk/credential-provider-node": {
+      "optional": true
+    },
+    "@aws-sdk/token-providers": {
+      "optional": true
+    },
+    "@smithy/core": {
+      "optional": true
+    },
+    "@smithy/hash-node": {
+      "optional": true
+    },
+    "@smithy/protocol-http": {
+      "optional": true
+    },
+    "@smithy/signature-v4": {
+      "optional": true
+    },
     "ws": {
       "optional": true
     },

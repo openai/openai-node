@@ -1,5 +1,8 @@
 import { BedrockOpenAI, NotFoundError, type BedrockClientOptions } from 'openai';
 import { type RequestInfo, type RequestInit } from 'openai/internal/builtin-types';
+import { Hash } from '@smithy/hash-node';
+import { HttpRequest } from '@smithy/protocol-http';
+import { SignatureV4 } from '@smithy/signature-v4';
 
 const RESPONSE_BODY = {
   id: 'resp_123',
@@ -142,7 +145,8 @@ describe('instantiate bedrock client', () => {
   test('does not use OPENAI_API_KEY', () => {
     process.env['OPENAI_API_KEY'] = 'openai token';
     process.env['AWS_REGION'] = 'us-west-2';
-    expect(() => new BedrockOpenAI()).toThrow(/AWS_BEARER_TOKEN_BEDROCK/);
+    const client = new BedrockOpenAI();
+    expect(client.apiKey).toBeNull();
   });
 
   test('requires endpoint configuration', () => {
@@ -158,6 +162,39 @@ describe('instantiate bedrock client', () => {
           bedrockTokenProvider: async () => 'provider token',
         }),
     ).toThrow(/mutually exclusive/);
+  });
+
+  test('rejects an empty explicit bearer token', () => {
+    expect(
+      () =>
+        new BedrockOpenAI({
+          baseURL: 'https://example.com/openai/v1',
+          apiKey: '',
+        }),
+    ).toThrow(/must not be empty/);
+  });
+
+  test('rejects bearer and AWS credentials together', () => {
+    expect(
+      () =>
+        new BedrockOpenAI({
+          baseURL: 'https://example.com/openai/v1',
+          apiKey: 'token',
+          awsAccessKeyId: 'access key',
+          awsSecretAccessKey: 'secret key',
+        }),
+    ).toThrow(/mutually exclusive/);
+  });
+
+  test('rejects partial explicit AWS credentials', () => {
+    expect(
+      () =>
+        new BedrockOpenAI({
+          baseURL: 'https://example.com/openai/v1',
+          awsRegion: 'us-east-1',
+          awsAccessKeyId: 'access key',
+        }),
+    ).toThrow(/must be provided together/);
   });
 
   test('requires refreshable tokens to use provider option', () => {
@@ -196,6 +233,182 @@ describe('instantiate bedrock client', () => {
     expect(authorizationHeaders).toEqual(['Bearer first', 'Bearer second']);
   });
 
+  test('uses AWS token discovery and bearer signer for ambient bearer', async () => {
+    process.env['AWS_BEARER_TOKEN_BEDROCK'] = 'ambient token';
+    process.env['AWS_REGION'] = 'us-east-1';
+    const client = new BedrockOpenAI({
+      fetch: async (_url, init) => {
+        expect(new Headers(init?.headers).get('authorization')).toBe('Bearer ambient token');
+        return new globalThis.Response(JSON.stringify(RESPONSE_BODY), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      },
+    });
+    client.apiKey = 'mutated cached token';
+
+    await client.responses.create({ model: 'gpt-4o', input: 'hello' });
+  });
+
+  test('explicit AWS credentials override ambient bearer', async () => {
+    process.env['AWS_BEARER_TOKEN_BEDROCK'] = 'ambient token';
+    const requests: Headers[] = [];
+    const client = new BedrockOpenAI({
+      baseURL: 'https://example.com/openai/v1',
+      awsRegion: 'us-east-1',
+      awsAccessKeyId: 'access key',
+      awsSecretAccessKey: 'secret key',
+      awsSessionToken: 'session token',
+      fetch: async (_url, init) => {
+        requests.push(new Headers(init?.headers));
+        return new globalThis.Response(JSON.stringify(RESPONSE_BODY), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      },
+    });
+
+    await client.responses.create({ model: 'gpt-4o', input: 'hello' });
+
+    expect(requests[0]!.get('authorization')).toContain('AWS4-HMAC-SHA256 Credential=access key/');
+    expect(requests[0]!.get('authorization')).toContain('SignedHeaders=');
+    expect(requests[0]!.get('authorization')).toMatch(/SignedHeaders=[^,]*\bhost\b/);
+    expect(requests[0]!.get('host')).toBe('example.com');
+    expect(requests[0]!.get('x-amz-security-token')).toBe('session token');
+  });
+
+  test('signs the uppercase HTTP method transmitted by fetch', async () => {
+    let signatureMatches = false;
+    const client = new BedrockOpenAI({
+      baseURL: 'https://example.com/openai/v1',
+      awsRegion: 'us-east-1',
+      awsAccessKeyId: 'access key',
+      awsSecretAccessKey: 'secret key',
+      fetch: async (url, init) => {
+        const parsedURL = new URL(String(url));
+        const headers = Object.fromEntries(new Headers(init?.headers).entries());
+        const actualAuthorization = headers['authorization'];
+        delete headers['authorization'];
+        const amzDate = headers['x-amz-date']!;
+        const signingDate = new Date(
+          amzDate.replace(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/, '$1-$2-$3T$4:$5:$6Z'),
+        );
+        const expected = await new SignatureV4({
+          credentials: { accessKeyId: 'access key', secretAccessKey: 'secret key' },
+          region: 'us-east-1',
+          service: 'bedrock-mantle',
+          sha256: Hash.bind(null, 'sha256'),
+        }).sign(
+          new HttpRequest({
+            protocol: parsedURL.protocol,
+            hostname: parsedURL.hostname,
+            method: init?.method?.toUpperCase() ?? 'GET',
+            path: parsedURL.pathname,
+            headers,
+            ...(init?.body ? { body: init.body } : {}),
+          }),
+          { signingDate },
+        );
+        signatureMatches = actualAuthorization === expected.headers['authorization'];
+        return new globalThis.Response(JSON.stringify(RESPONSE_BODY), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      },
+    });
+
+    await client.responses.create({ model: 'gpt-4o', input: 'hello' });
+
+    expect(signatureMatches).toBe(true);
+  });
+
+  test('signs query parameters as a Smithy query bag', async () => {
+    let signatureMatches = false;
+    const client = new BedrockOpenAI({
+      baseURL: 'https://example.com/openai/v1',
+      awsRegion: 'us-east-1',
+      awsAccessKeyId: 'access key',
+      awsSecretAccessKey: 'secret key',
+      fetch: async (url, init) => {
+        const parsedURL = new URL(String(url));
+        const headers = Object.fromEntries(new Headers(init?.headers).entries());
+        const actualAuthorization = headers['authorization'];
+        delete headers['authorization'];
+        const query: Record<string, string | string[]> = {};
+        for (const [name, value] of parsedURL.searchParams) {
+          const existing = query[name];
+          query[name] =
+            existing === undefined ? value
+            : typeof existing === 'string' ? [existing, value]
+            : [...existing, value];
+        }
+        const amzDate = headers['x-amz-date']!;
+        const signingDate = new Date(
+          amzDate.replace(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/, '$1-$2-$3T$4:$5:$6Z'),
+        );
+        const expected = await new SignatureV4({
+          credentials: { accessKeyId: 'access key', secretAccessKey: 'secret key' },
+          region: 'us-east-1',
+          service: 'bedrock-mantle',
+          sha256: Hash.bind(null, 'sha256'),
+        }).sign(
+          new HttpRequest({
+            protocol: parsedURL.protocol,
+            hostname: parsedURL.hostname,
+            method: init?.method?.toUpperCase() ?? 'GET',
+            path: parsedURL.pathname,
+            query,
+            headers,
+          }),
+          { signingDate },
+        );
+        signatureMatches = actualAuthorization === expected.headers['authorization'];
+        return new globalThis.Response(responseStreamSSE(), {
+          status: 200,
+          headers: { 'Content-Type': 'text/event-stream' },
+        });
+      },
+    });
+
+    for await (const _event of await client.responses.retrieve('resp_123', {
+      starting_after: 1,
+      stream: true,
+    })) {
+      // Consume the stream so the request completes.
+    }
+
+    expect(signatureMatches).toBe(true);
+  });
+
+  test('refreshes AWS credentials before retries', async () => {
+    const requests: Headers[] = [];
+    const credentials = [
+      { accessKeyId: 'first access key', secretAccessKey: 'first secret', sessionToken: 'first token' },
+      { accessKeyId: 'second access key', secretAccessKey: 'second secret', sessionToken: 'second token' },
+    ];
+    const client = new BedrockOpenAI({
+      baseURL: 'https://example.com/openai/v1',
+      awsRegion: 'us-east-1',
+      awsCredentialsProvider: async () => credentials.shift()!,
+      fetch: async (_url, init) => {
+        requests.push(new Headers(init?.headers));
+        const status = requests.length === 1 ? 500 : 200;
+        return new globalThis.Response(
+          JSON.stringify(status === 500 ? { error: 'server error' } : RESPONSE_BODY),
+          { status, headers: { 'Content-Type': 'application/json' } },
+        );
+      },
+      maxRetries: 1,
+    });
+
+    await client.responses.create({ model: 'gpt-4o', input: 'hello' });
+
+    expect(requests[0]!.get('authorization')).toContain('Credential=first access key/');
+    expect(requests[0]!.get('x-amz-security-token')).toBe('first token');
+    expect(requests[1]!.get('authorization')).toContain('Credential=second access key/');
+    expect(requests[1]!.get('x-amz-security-token')).toBe('second token');
+  });
+
   test('preserves token provider across withOptions', async () => {
     const authorizationHeaders: string[] = [];
     const fetch = async (_url: RequestInfo, init?: RequestInit): Promise<Response> => {
@@ -214,6 +427,64 @@ describe('instantiate bedrock client', () => {
     await client.withOptions({ timeout: 1 }).responses.create({ model: 'gpt-4o', input: 'hello' });
 
     expect(authorizationHeaders).toEqual(['Bearer provider token']);
+  });
+
+  test('preserves AWS credentials across withOptions', async () => {
+    const requests: Headers[] = [];
+    const client = new BedrockOpenAI({
+      baseURL: 'https://example.com/openai/v1',
+      awsRegion: 'us-east-1',
+      awsAccessKeyId: 'access key',
+      awsSecretAccessKey: 'secret key',
+      fetch: async (_url, init) => {
+        requests.push(new Headers(init?.headers));
+        return new globalThis.Response(JSON.stringify(RESPONSE_BODY), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      },
+    });
+
+    await client.withOptions({ timeout: 1 }).responses.create({ model: 'gpt-4o', input: 'hello' });
+
+    expect(requests[0]!.get('authorization')).toContain('Credential=access key/');
+  });
+
+  test('replaces the AWS credential source in withOptions', () => {
+    const explicitCredentialsClient = new BedrockOpenAI({
+      baseURL: 'https://example.com/openai/v1',
+      awsRegion: 'us-east-1',
+      awsAccessKeyId: 'access key',
+      awsSecretAccessKey: 'secret key',
+    });
+
+    const profileClient = explicitCredentialsClient.withOptions({ awsProfile: 'other-profile' });
+    expect(() =>
+      profileClient.withOptions({
+        awsAccessKeyId: 'replacement access key',
+        awsSecretAccessKey: 'replacement secret key',
+      }),
+    ).not.toThrow();
+  });
+
+  test('recomputes a region-derived base URL in withOptions', () => {
+    const client = new BedrockOpenAI({ awsRegion: 'us-east-1', apiKey: 'token' });
+
+    const copiedClient = client.withOptions({ awsRegion: 'eu-west-1' });
+
+    expect(copiedClient.baseURL).toBe('https://bedrock-mantle.eu-west-1.api.aws/openai/v1');
+  });
+
+  test('keeps an explicit base URL when the region changes in withOptions', () => {
+    const client = new BedrockOpenAI({
+      baseURL: 'https://example.com/openai/v1',
+      awsRegion: 'us-east-1',
+      apiKey: 'token',
+    });
+
+    const copiedClient = client.withOptions({ awsRegion: 'eu-west-1' });
+
+    expect(copiedClient.baseURL).toBe('https://example.com/openai/v1');
   });
 
   test('passes non-Responses resources through', async () => {
