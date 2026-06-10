@@ -22,6 +22,30 @@ data: [DONE]
 "
 `;
 
+exports[`.stream() refusal accumulates correctly 1`] = `
+"data: {\"response\":{\"id\":\"resp_refusal_1\",\"object\":\"response\",\"created_at\":1723031665,\"model\":\"gpt-4o-2024-08-06\",\"output\":[],\"output_text\":\"\",\"error\":null,\"incomplete_details\":null,\"instructions\":null,\"metadata\":null,\"parallel_tool_calls\":false,\"temperature\":null,\"tools\":[],\"top_p\":null,\"status\":\"in_progress\",\"usage\":{\"input_tokens\":0,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":0,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":0}},\"sequence_number\":0,\"type\":\"response.created\"}
+
+data: {\"item\":{\"id\":\"msg_ref_1\",\"type\":\"message\",\"role\":\"assistant\",\"status\":\"in_progress\",\"content\":[]},\"output_index\":0,\"sequence_number\":1,\"type\":\"response.output_item.added\"}
+
+data: {\"content_index\":0,\"item_id\":\"msg_ref_1\",\"output_index\":0,\"part\":{\"type\":\"refusal\",\"refusal\":\"\"},\"sequence_number\":2,\"type\":\"response.content_part.added\"}
+
+data: {\"content_index\":0,\"delta\":\"I cannot \",\"item_id\":\"msg_ref_1\",\"output_index\":0,\"sequence_number\":3,\"type\":\"response.refusal.delta\"}
+
+data: {\"content_index\":0,\"delta\":\"help with \",\"item_id\":\"msg_ref_1\",\"output_index\":0,\"sequence_number\":4,\"type\":\"response.refusal.delta\"}
+
+data: {\"content_index\":0,\"delta\":\"that.\",\"item_id\":\"msg_ref_1\",\"output_index\":0,\"sequence_number\":5,\"type\":\"response.refusal.delta\"}
+
+data: {\"content_index\":0,\"item_id\":\"msg_ref_1\",\"output_index\":0,\"refusal\":\"I cannot help with that.\",\"sequence_number\":6,\"type\":\"response.refusal.done\"}
+
+data: {\"item\":{\"id\":\"msg_ref_1\",\"type\":\"message\",\"role\":\"assistant\",\"status\":\"completed\",\"content\":[{\"type\":\"refusal\",\"refusal\":\"I cannot help with that.\"}]},\"output_index\":0,\"sequence_number\":7,\"type\":\"response.output_item.done\"}
+
+data: {\"response\":{\"id\":\"resp_refusal_1\",\"object\":\"response\",\"created_at\":1723031665,\"model\":\"gpt-4o-2024-08-06\",\"output\":[{\"id\":\"msg_ref_1\",\"type\":\"message\",\"role\":\"assistant\",\"status\":\"completed\",\"content\":[{\"type\":\"refusal\",\"refusal\":\"I cannot help with that.\"}]}],\"output_text\":\"\",\"error\":null,\"incomplete_details\":null,\"instructions\":null,\"metadata\":null,\"parallel_tool_calls\":false,\"temperature\":null,\"tools\":[],\"top_p\":null,\"status\":\"completed\",\"usage\":{\"input_tokens\":10,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":5,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":15}},\"sequence_number\":8,\"type\":\"response.completed\"}
+
+data: [DONE]
+
+"
+`;
+
 exports[`.stream() reasoning works 1`] = `
 "data: {\"response\":{\"id\":\"resp_reason_1\",\"object\":\"response\",\"created_at\":1723031666,\"model\":\"o3\",\"output\":[],\"output_text\":\"\",\"error\":null,\"incomplete_details\":null,\"instructions\":null,\"metadata\":null,\"parallel_tool_calls\":false,\"temperature\":null,\"tools\":[],\"top_p\":null,\"status\":\"in_progress\",\"usage\":{\"input_tokens\":0,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":0,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":0}},\"sequence_number\":0,\"type\":\"response.created\"}
 

@@ -31,6 +31,31 @@ describe('.stream()', () => {
     }
   });
 
+  it('refusal accumulates correctly', async () => {
+    const deltas: string[] = [];
+
+    const stream = (
+      await makeStreamSnapshotRequest((openai) =>
+        openai.responses.stream({
+          model: 'gpt-4o-2024-08-06',
+          input: 'Do something harmful',
+        }),
+      )
+    ).on('response.refusal.delta', (e) => {
+      deltas.push(e.delta);
+    });
+
+    const final = await stream.finalResponse();
+    // The three deltas must be concatenated into the snapshot's refusal content
+    expect(deltas).toEqual(['I cannot ', 'help with ', 'that.']);
+
+    const msg = final.output[0];
+    expect(msg?.type).toBe('message');
+    if (msg?.type === 'message') {
+      expect(msg.content[0]).toMatchObject({ type: 'refusal', refusal: 'I cannot help with that.' });
+    }
+  });
+
   it('reasoning works', async () => {
     const stream = await makeStreamSnapshotRequest((openai) =>
       openai.responses.stream({

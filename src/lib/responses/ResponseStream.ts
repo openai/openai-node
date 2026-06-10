@@ -10,7 +10,11 @@ import { RequestOptions } from '../../internal/request-options';
 import { APIUserAbortError, OpenAIError } from '../../error';
 import OpenAI from '../../index';
 import { type BaseEvents, EventStream } from '../EventStream';
-import { type ResponseFunctionCallArgumentsDeltaEvent, type ResponseTextDeltaEvent } from './EventTypes';
+import {
+  type ResponseFunctionCallArgumentsDeltaEvent,
+  type ResponseRefusalDeltaEvent,
+  type ResponseTextDeltaEvent,
+} from './EventTypes';
 import { maybeParseResponse, ParseableToolsParams } from '../ResponsesParser';
 import { Stream } from '../../streaming';
 
@@ -275,6 +279,23 @@ export class ResponseStream<ParsedT = null>
             throw new OpenAIError(`expected content to be 'reasoning_text', got ${content.type}`);
           }
           content.text += event.delta;
+        }
+        break;
+      }
+      case 'response.refusal.delta': {
+        const output = snapshot.output[event.output_index];
+        if (!output) {
+          throw new OpenAIError(`missing output at index ${event.output_index}`);
+        }
+        if (output.type === 'message') {
+          const content = output.content[event.content_index];
+          if (!content) {
+            throw new OpenAIError(`missing content at index ${event.content_index}`);
+          }
+          if (content.type !== 'refusal') {
+            throw new OpenAIError(`expected content to be 'refusal', got ${content.type}`);
+          }
+          content.refusal += event.delta;
         }
         break;
       }
