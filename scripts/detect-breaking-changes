@@ -102,6 +102,22 @@ for PATHSPEC in "${TEST_PATHS[@]}"; do
     git checkout "$1" -- "${PATHSPEC}" 2>/dev/null || true
 done
 
+# Historical tests are checked against the current SDK and tsconfig. The
+# embeddings tests on main briefly used Array.prototype.at(), but the SDK still
+# targets older JS libs, so normalize that syntax before the compatibility lint.
+if [ -e tests/api-resources/embeddings.test.ts ]; then
+	node <<'EOF'
+const fs = require('fs');
+
+const path = 'tests/api-resources/embeddings.test.ts';
+let contents = fs.readFileSync(path, 'utf8');
+contents = contents
+  .replaceAll('response.data?.at(0)?.embedding.at(0)', 'response.data?.[0]?.embedding[0]')
+  .replaceAll('response.data?.at(0)?.embedding', 'response.data?.[0]?.embedding');
+fs.writeFileSync(path, contents);
+EOF
+fi
+
 # Old test files are checked for compatibility with the current SDK, not
 # formatting drift against the current Prettier version.
 EXISTING_TEST_PATHS=()
