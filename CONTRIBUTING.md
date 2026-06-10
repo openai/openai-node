@@ -2,6 +2,7 @@
 
 This repository uses the [`pnpm`](https://pnpm.io/installation) version pinned by `package.json`.
 Other package managers may work but are not officially supported for development.
+Use a Node.js version supported by that pinned pnpm release.
 Do not rely on Corepack being available; install pnpm explicitly if needed:
 
 ```sh

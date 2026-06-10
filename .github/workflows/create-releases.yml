@@ -35,6 +35,7 @@ jobs:
         uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3
         with:
           node-version: ${{ env.LATEST_LTS_NODE_VERSION }}
+          cache: pnpm
 
       - name: Install dependencies
         if: ${{ steps.release.outputs.releases_created }}
