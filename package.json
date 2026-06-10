@@ -8,7 +8,7 @@
   "type": "commonjs",
   "repository": "github:openai/openai-node",
   "license": "Apache-2.0",
-  "packageManager": "yarn@1.22.22",
+  "packageManager": "pnpm@11.5.1",
   "files": [
     "**/*"
   ],
@@ -19,7 +19,7 @@
   "scripts": {
     "test": "./scripts/test",
     "build": "./scripts/build",
-    "prepublishOnly": "echo 'to publish, run yarn build && (cd dist; yarn publish)' && exit 1",
+    "prepublishOnly": "echo 'to publish, run pnpm build && (cd dist; npm publish)' && exit 1",
     "format": "./scripts/format",
     "prepare": "if ./scripts/utils/check-is-in-git-install.sh; then ./scripts/build && ./scripts/utils/git-swap.sh; fi",
     "tsn": "ts-node -r tsconfig-paths/register",
@@ -33,7 +33,7 @@
     "@swc/jest": "^0.2.29",
     "@types/jest": "^29.4.0",
     "@types/ws": "^8.5.13",
-    "@types/node": "^20.17.6",
+    "@types/node": "^24.0.0",
     "@typescript-eslint/eslint-plugin": "8.31.1",
     "@typescript-eslint/parser": "8.31.1",
     "deep-object-diff": "^1.1.9",
@@ -59,14 +59,6 @@
     "typescript-eslint": "8.31.1"
   },
   "overrides": {
-    "minimatch": "^9.0.5"
-  },
-  "pnpm": {
-    "overrides": {
-      "minimatch": "^9.0.5"
-    }
-  },
-  "resolutions": {
     "minimatch": "^9.0.5"
   },
   "exports": {

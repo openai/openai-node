@@ -32,10 +32,14 @@ jobs:
         with:
           node-version: ${{ env.LATEST_LTS_NODE_VERSION }}
 
+      - name: Set up pnpm
+        if: ${{ steps.release.outputs.releases_created }}
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+
       - name: Install dependencies
         if: ${{ steps.release.outputs.releases_created }}
         run: |
-          yarn install
+          pnpm install --frozen-lockfile
 
       - name: Publish to NPM
         if: ${{ steps.release.outputs.releases_created }}

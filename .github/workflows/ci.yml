@@ -26,10 +26,14 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+
       - name: Set up Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ env.LATEST_LTS_NODE_VERSION }}
+          cache: pnpm
 
       - name: Bootstrap
         run: ./scripts/bootstrap
@@ -48,10 +52,14 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+
       - name: Set up Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ env.LATEST_LTS_NODE_VERSION }}
+          cache: pnpm
 
       - name: Bootstrap
         run: ./scripts/bootstrap
@@ -88,10 +96,14 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+
       - name: Set up Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '${{ matrix.node-version }}'
+          cache: pnpm
 
       - name: Bootstrap
         run: ./scripts/bootstrap
@@ -109,13 +121,18 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+
       - name: Set up Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ env.LATEST_LTS_NODE_VERSION }}
+          cache: pnpm
+
       - name: Install dependencies
         run: |
-          yarn install
+          pnpm install --frozen-lockfile
 
       - env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -124,7 +141,7 @@ jobs:
             echo "Skipping examples because OPENAI_API_KEY is not set"
             exit 0
           fi
-          yarn tsn examples/demo.ts
+          pnpm tsn examples/demo.ts
 
   ecosystem_tests:
     name: ecosystem tests
@@ -135,10 +152,14 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+
       - name: Set up Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ env.LATEST_LTS_NODE_VERSION }}
+          cache: pnpm
 
       - uses: denoland/setup-deno@11b63cf76cfcafb4e43f97b6cad24d8e8438f62d # v1
         with:
@@ -151,7 +172,7 @@ jobs:
 
       - name: Run ecosystem tests
         run: |
-          yarn tsn ecosystem-tests/cli.ts --live --verbose --parallel --jobs=4 --retry=3
+          pnpm tsn ecosystem-tests/cli.ts --live --verbose --parallel --jobs=4 --retry=3
         env:
           DISABLE_V8_COMPILE_CACHE: '1'
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
