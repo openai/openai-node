@@ -79,7 +79,6 @@ jobs:
         run: ./scripts/utils/upload-artifact.sh
   test:
     timeout-minutes: 10
-    name: test (v${{ matrix.node-version }})
     runs-on: ${{ github.repository == 'stainless-sdks/openai-typescript' && 'depot-ubuntu-24.04' || 'ubuntu-latest' }}
     if: github.event_name == 'push' || github.event.pull_request.head.repo.fork
     strategy:
