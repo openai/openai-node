@@ -104,6 +104,7 @@ jobs:
     name: examples
     runs-on: ${{ github.repository == 'stainless-sdks/openai-typescript' && 'depot-ubuntu-24.04' || 'ubuntu-latest' }}
     if: github.repository == 'openai/openai-node'
+    environment: ci
 
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -129,6 +130,7 @@ jobs:
     name: ecosystem tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    environment: ci
 
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
