@@ -554,8 +554,16 @@ async function buildPackage() {
 }
 
 async function installPackage() {
+  const usesPuppeteer = await currentProjectUsesPuppeteer();
+  if (usesPuppeteer) {
+    await resetPuppeteerCache();
+  }
+
   if (state.fromNpm) {
     await run('npm', ['install', '-D', state.fromNpm]);
+    if (usesPuppeteer) {
+      await run('npx', ['puppeteer', 'browsers', 'install', 'chrome']);
+    }
     return;
   }
 
@@ -566,11 +574,31 @@ async function installPackage() {
 
   const packFile = getPackFile();
   await fs.copyFile(packFile, `./${TAR_NAME}`);
-  return await run('npm', ['install', '-D', `./${TAR_NAME}`]);
+  const result = await run('npm', ['install', '-D', `./${TAR_NAME}`]);
+  if (usesPuppeteer) {
+    await run('npx', ['puppeteer', 'browsers', 'install', 'chrome']);
+  }
+  return result;
 }
 
 function getPackFile() {
   return path.relative(process.cwd(), path.join(state.rootDir, PACK_FILE));
+}
+
+async function currentProjectUsesPuppeteer(): Promise<boolean> {
+  try {
+    const packageJson = JSON.parse(await fs.readFile('package.json', 'utf8'));
+    return Boolean(packageJson.dependencies?.puppeteer || packageJson.devDependencies?.puppeteer);
+  } catch {
+    return false;
+  }
+}
+
+async function resetPuppeteerCache(): Promise<void> {
+  const puppeteerCacheDir = process.env['PUPPETEER_CACHE_DIR'];
+  if (puppeteerCacheDir) {
+    await fs.rm(puppeteerCacheDir, { recursive: true, force: true });
+  }
 }
 
 // ------------------ helpers ------------------
