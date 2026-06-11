@@ -562,8 +562,7 @@ async function installPackage() {
   if (state.fromNpm) {
     await installNpmPackage(['install', '-D', state.fromNpm], usesPuppeteer);
     if (usesPuppeteer) {
-      await resetPuppeteerCache();
-      await run('npx', ['puppeteer', 'browsers', 'install', 'chrome']);
+      await installPuppeteerBrowser();
     }
     return;
   }
@@ -577,8 +576,7 @@ async function installPackage() {
   await fs.copyFile(packFile, `./${TAR_NAME}`);
   const result = await installNpmPackage(['install', '-D', `./${TAR_NAME}`], usesPuppeteer);
   if (usesPuppeteer) {
-    await resetPuppeteerCache();
-    await run('npx', ['puppeteer', 'browsers', 'install', 'chrome']);
+    await installPuppeteerBrowser();
   }
   return result;
 }
@@ -601,6 +599,49 @@ async function resetPuppeteerCache(): Promise<void> {
   if (puppeteerCacheDir) {
     await fs.rm(puppeteerCacheDir, { recursive: true, force: true });
   }
+}
+
+async function installPuppeteerBrowser(): Promise<void> {
+  await resetPuppeteerCache();
+  await run('node', [
+    '-e',
+    `
+      const fs = require('fs');
+      const puppeteer = require('puppeteer');
+      const {
+        Browser,
+        detectBrowserPlatform,
+        install,
+      } = require('@puppeteer/browsers');
+      const {
+        PUPPETEER_REVISIONS,
+      } = require('puppeteer-core/internal/revisions.js');
+
+      (async () => {
+        const cacheDir = process.env.PUPPETEER_CACHE_DIR;
+        if (!cacheDir) {
+          throw new Error('PUPPETEER_CACHE_DIR must be set before installing Chrome');
+        }
+
+        const installed = await install({
+          browser: Browser.CHROME,
+          buildId: PUPPETEER_REVISIONS.chrome,
+          cacheDir,
+          platform: detectBrowserPlatform(),
+        });
+        const executablePath = puppeteer.executablePath();
+        if (!fs.existsSync(executablePath)) {
+          throw new Error(
+            \`Installed Chrome at \${installed.executablePath}, but Puppeteer resolved \${executablePath}\`,
+          );
+        }
+        console.error(\`Installed Puppeteer Chrome at \${executablePath}\`);
+      })().catch((error) => {
+        console.error(error);
+        process.exit(1);
+      });
+    `,
+  ]);
 }
 
 async function installNpmPackage(args: string[], skipPuppeteerDownload: boolean) {
