@@ -560,8 +560,9 @@ async function installPackage() {
   }
 
   if (state.fromNpm) {
-    await run('npm', ['install', '-D', state.fromNpm]);
+    await installNpmPackage(['install', '-D', state.fromNpm], usesPuppeteer);
     if (usesPuppeteer) {
+      await resetPuppeteerCache();
       await run('npx', ['puppeteer', 'browsers', 'install', 'chrome']);
     }
     return;
@@ -574,8 +575,9 @@ async function installPackage() {
 
   const packFile = getPackFile();
   await fs.copyFile(packFile, `./${TAR_NAME}`);
-  const result = await run('npm', ['install', '-D', `./${TAR_NAME}`]);
+  const result = await installNpmPackage(['install', '-D', `./${TAR_NAME}`], usesPuppeteer);
   if (usesPuppeteer) {
+    await resetPuppeteerCache();
     await run('npx', ['puppeteer', 'browsers', 'install', 'chrome']);
   }
   return result;
@@ -599,6 +601,14 @@ async function resetPuppeteerCache(): Promise<void> {
   if (puppeteerCacheDir) {
     await fs.rm(puppeteerCacheDir, { recursive: true, force: true });
   }
+}
+
+async function installNpmPackage(args: string[], skipPuppeteerDownload: boolean) {
+  return await run(
+    'npm',
+    args,
+    skipPuppeteerDownload ? { env: { PUPPETEER_SKIP_DOWNLOAD: 'true' } } : undefined,
+  );
 }
 
 // ------------------ helpers ------------------
