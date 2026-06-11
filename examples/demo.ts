@@ -9,14 +9,14 @@ async function main() {
   // Non-streaming:
   const completion = await openai.chat.completions.create({
     model: 'gpt-4o-mini',
-    messages: [{ role: 'user', content: 'Say this is a test' }],
+    messages: [{ role: 'user', content: 'Reply with exactly this text and nothing else: This is a test' }],
   });
   console.log(completion.choices[0]?.message?.content);
 
   // Streaming:
   const stream = await openai.chat.completions.create({
     model: 'gpt-4o-mini',
-    messages: [{ role: 'user', content: 'Say this is a test' }],
+    messages: [{ role: 'user', content: 'Reply with exactly this text and nothing else: This is a test' }],
     stream: true,
   });
   for await (const part of stream) {
