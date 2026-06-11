@@ -92,21 +92,28 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: ['22', '24', '26']
+        node-version: ['20', '22', '24', '26']
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Set up pnpm
         uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
 
+      # pnpm 11 requires Node >=22.13, so install dependencies with the current
+      # LTS before switching to the runtime version under test.
       - name: Set up Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '${{ matrix.node-version }}'
+          node-version: ${{ env.LATEST_LTS_NODE_VERSION }}
           cache: pnpm
 
       - name: Bootstrap
         run: ./scripts/bootstrap
+
+      - name: Set up test Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '${{ matrix.node-version }}'
 
       - name: Run tests
         run: ./scripts/test
