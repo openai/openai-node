@@ -59,7 +59,7 @@ expect.extend({
 it(`raw response`, async function () {
   const response = await client.chat.completions
     .create({
-      model: 'gpt-4',
+      model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: 'Say this is a test' }],
     })
     .asResponse();
@@ -76,7 +76,7 @@ it(`raw response`, async function () {
 
 it(`streaming works`, async function () {
   const stream = await client.chat.completions.create({
-    model: 'gpt-4',
+    model: 'gpt-4o-mini',
     messages: [{ role: 'user', content: 'Say this is a test' }],
     stream: true,
   });
@@ -96,7 +96,7 @@ test.skip(`proxied request`, async function () {
     },
   });
   const completion = await client.chat.completions.create({
-    model: 'gpt-4',
+    model: 'gpt-4o-mini',
     messages: [{ role: 'user', content: 'Say this is a test' }],
   });
   expect(completion.choices[0]?.message?.content).toBeSimilarTo('This is a test', 10);

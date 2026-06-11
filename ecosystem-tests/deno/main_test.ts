@@ -39,7 +39,7 @@ function assertSimilar(received: string, expected: string, maxDistance: number) 
 Deno.test(async function rawResponse() {
   const response = await client.chat.completions
     .create({
-      model: 'gpt-4',
+      model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: 'Say this is a test' }],
     })
     .asResponse();
@@ -71,7 +71,7 @@ Deno.test(async function rawResponse() {
 
 Deno.test(async function streamingWorks() {
   const stream = await client.chat.completions.create({
-    model: 'gpt-4',
+    model: 'gpt-4o-mini',
     messages: [{ role: 'user', content: 'Say this is a test' }],
     stream: true,
   });

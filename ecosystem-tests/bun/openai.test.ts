@@ -37,7 +37,7 @@ function expectSimilar(received: any, comparedTo: string, expectedDistance: numb
 
 test(`basic request works`, async function () {
   const completion = await client.chat.completions.create({
-    model: 'gpt-4',
+    model: 'gpt-4o-mini',
     messages: [{ role: 'user', content: 'Say this is a test' }],
   });
   expectSimilar(completion.choices[0]?.message?.content, 'This is a test', 10);
@@ -51,7 +51,7 @@ test(`proxied request works`, async function () {
   });
   
   const completion = await client.chat.completions.create({
-    model: 'gpt-4',
+    model: 'gpt-4o-mini',
     messages: [{ role: 'user', content: 'Say this is a test' }],
   });
   expectSimilar(completion.choices[0]?.message?.content, 'This is a test', 10);
@@ -60,7 +60,7 @@ test(`proxied request works`, async function () {
 test(`raw response`, async function () {
   const response = await client.chat.completions
     .create({
-      model: 'gpt-4',
+      model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: 'Say this is a test' }],
     })
     .asResponse();
@@ -92,7 +92,7 @@ test(`raw response`, async function () {
 
 test(`streaming works`, async function () {
   const stream = await client.chat.completions.create({
-    model: 'gpt-4',
+    model: 'gpt-4o-mini',
     messages: [{ role: 'user', content: 'Say this is a test' }],
     stream: true,
   });
