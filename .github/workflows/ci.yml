@@ -155,3 +155,5 @@ jobs:
         env:
           DISABLE_V8_COMPILE_CACHE: '1'
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          PUPPETEER_EXECUTABLE_PATH: /usr/bin/google-chrome
+          PUPPETEER_SKIP_DOWNLOAD: 'true'

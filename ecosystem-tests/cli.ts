@@ -553,16 +553,8 @@ async function buildPackage() {
 }
 
 async function installPackage() {
-  const usesPuppeteer = await currentProjectUsesPuppeteer();
-  if (usesPuppeteer) {
-    await resetPuppeteerCache();
-  }
-
   if (state.fromNpm) {
-    await installNpmPackage(['install', '-D', state.fromNpm], usesPuppeteer);
-    if (usesPuppeteer) {
-      await installPuppeteerBrowser();
-    }
+    await run('npm', ['install', '-D', state.fromNpm]);
     return;
   }
 
@@ -573,82 +565,11 @@ async function installPackage() {
 
   const packFile = getPackFile();
   await fs.copyFile(packFile, `./${TAR_NAME}`);
-  const result = await installNpmPackage(['install', '-D', `./${TAR_NAME}`], usesPuppeteer);
-  if (usesPuppeteer) {
-    await installPuppeteerBrowser();
-  }
-  return result;
+  return await run('npm', ['install', '-D', `./${TAR_NAME}`]);
 }
 
 function getPackFile() {
   return path.relative(process.cwd(), path.join(state.rootDir, PACK_FILE));
-}
-
-async function currentProjectUsesPuppeteer(): Promise<boolean> {
-  try {
-    const packageJson = JSON.parse(await fs.readFile('package.json', 'utf8'));
-    return Boolean(packageJson.dependencies?.puppeteer || packageJson.devDependencies?.puppeteer);
-  } catch {
-    return false;
-  }
-}
-
-async function resetPuppeteerCache(): Promise<void> {
-  const puppeteerCacheDir = process.env['PUPPETEER_CACHE_DIR'];
-  if (puppeteerCacheDir) {
-    await fs.rm(puppeteerCacheDir, { recursive: true, force: true });
-  }
-}
-
-async function installPuppeteerBrowser(): Promise<void> {
-  await resetPuppeteerCache();
-  await run('node', [
-    '-e',
-    `
-      const fs = require('fs');
-      const puppeteer = require('puppeteer');
-      const {
-        Browser,
-        detectBrowserPlatform,
-        install,
-      } = require('@puppeteer/browsers');
-      const {
-        PUPPETEER_REVISIONS,
-      } = require('puppeteer-core/internal/revisions.js');
-      const os = require('os');
-      const path = require('path');
-
-      (async () => {
-        const cacheDir =
-          process.env.PUPPETEER_CACHE_DIR || path.join(os.homedir(), '.cache', 'puppeteer');
-
-        const installed = await install({
-          browser: Browser.CHROME,
-          buildId: PUPPETEER_REVISIONS.chrome,
-          cacheDir,
-          platform: detectBrowserPlatform(),
-        });
-        const executablePath = puppeteer.executablePath();
-        if (!fs.existsSync(executablePath)) {
-          throw new Error(
-            \`Installed Chrome at \${installed.executablePath}, but Puppeteer resolved \${executablePath}\`,
-          );
-        }
-        console.error(\`Installed Puppeteer Chrome at \${executablePath}\`);
-      })().catch((error) => {
-        console.error(error);
-        process.exit(1);
-      });
-    `,
-  ]);
-}
-
-async function installNpmPackage(args: string[], skipPuppeteerDownload: boolean) {
-  return await run(
-    'npm',
-    args,
-    skipPuppeteerDownload ? { env: { PUPPETEER_SKIP_DOWNLOAD: 'true' } } : undefined,
-  );
 }
 
 // ------------------ helpers ------------------
