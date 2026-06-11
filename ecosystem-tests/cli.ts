@@ -292,6 +292,8 @@ async function main() {
         console.error('Error: Cleanup of file artifacts failed for project', projectName, err);
       });
     }
+
+    await fs.rm(path.join(tmpFolderPath, 'puppeteer-cache'), { recursive: true, force: true });
   }
 
   async function runCleanupAndExit() {
