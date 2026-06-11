@@ -386,7 +386,6 @@ async function main() {
                       maxBuffer: 100 * 1024 * 1024,
                       env: {
                         DISABLE_V8_COMPILE_CACHE: process.env['DISABLE_V8_COMPILE_CACHE'] ?? '1',
-                        PUPPETEER_CACHE_DIR: path.join(tmpFolderPath, 'puppeteer-cache', project),
                       },
                     },
                   );
@@ -616,12 +615,12 @@ async function installPuppeteerBrowser(): Promise<void> {
       const {
         PUPPETEER_REVISIONS,
       } = require('puppeteer-core/internal/revisions.js');
+      const os = require('os');
+      const path = require('path');
 
       (async () => {
-        const cacheDir = process.env.PUPPETEER_CACHE_DIR;
-        if (!cacheDir) {
-          throw new Error('PUPPETEER_CACHE_DIR must be set before installing Chrome');
-        }
+        const cacheDir =
+          process.env.PUPPETEER_CACHE_DIR || path.join(os.homedir(), '.cache', 'puppeteer');
 
         const installed = await install({
           browser: Browser.CHROME,
