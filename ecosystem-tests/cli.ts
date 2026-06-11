@@ -292,6 +292,8 @@ async function main() {
         console.error('Error: Cleanup of file artifacts failed for project', projectName, err);
       });
     }
+
+    await fs.rm(path.join(tmpFolderPath, 'puppeteer-cache'), { recursive: true, force: true });
   }
 
   async function runCleanupAndExit() {
@@ -384,6 +386,7 @@ async function main() {
                       maxBuffer: 100 * 1024 * 1024,
                       env: {
                         DISABLE_V8_COMPILE_CACHE: process.env['DISABLE_V8_COMPILE_CACHE'] ?? '1',
+                        PUPPETEER_CACHE_DIR: path.join(tmpFolderPath, 'puppeteer-cache', project),
                       },
                     },
                   );
