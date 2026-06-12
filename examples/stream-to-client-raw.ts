@@ -1,4 +1,4 @@
-#!/usr/bin/env -S npm run tsn -T
+#!/usr/bin/env -S npm run tsn -- -T
 
 // This file demonstrates how to stream from the server as a text/plain
 // response with express and the stream async iterator.
