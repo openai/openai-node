@@ -1,10 +1,11 @@
 name: Create releases
 on:
-  schedule:
-    - cron: '0 5 * * *' # every day at 5am UTC
   push:
     branches:
       - main
+
+env:
+  LATEST_LTS_NODE_VERSION: '24'
 
 jobs:
   release:
@@ -29,7 +30,7 @@ jobs:
         if: ${{ steps.release.outputs.releases_created }}
         uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3
         with:
-          node-version: '20'
+          node-version: ${{ env.LATEST_LTS_NODE_VERSION }}
 
       - name: Install dependencies
         if: ${{ steps.release.outputs.releases_created }}
