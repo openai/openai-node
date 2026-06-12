@@ -32,14 +32,14 @@ All files in the `examples/` directory are not modified by the generator and can
 ```ts
 // add an example to examples/<your-example>.ts
 
-#!/usr/bin/env -S npm run tsn -T
+#!/usr/bin/env -S npm run tsn -- -T
 …
 ```
 
 ```sh
 $ chmod +x examples/<your-example>.ts
 # run the example against your api
-$ npm run tsn -T examples/<your-example>.ts
+$ npm run tsn -- -T examples/<your-example>.ts
 ```
 
 ## Using the repository from source
