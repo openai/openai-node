@@ -92,10 +92,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Node 26.3.0 currently surfaces a connection reset for multipart
-        # requests when the mock server returns a 404 before consuming the body.
-        # Pin to 26.2.0 so this job still covers Node 26 without changing
-        # generated API-resource tests.
+        # The GitHub-hosted Node 26 alias currently resolves to 26.3.0, where
+        # this full Steady-backed test job surfaced a multipart connection reset.
+        # Pin to 26.2.0 so this still covers Node 26 without changing generated
+        # API-resource tests for a CI-specific failure.
         node-version: ['20', '22', '24', '26.2.0']
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
