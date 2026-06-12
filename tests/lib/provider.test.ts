@@ -92,7 +92,11 @@ describe('provider', () => {
           provider: provider(),
           apiKey: 'openai-api-key',
           adminAPIKey: 'openai-admin-key',
-          workloadIdentity: {},
+          workloadIdentity: {
+            identityProviderId: 'identity-provider',
+            serviceAccountId: 'service-account',
+            provider: { tokenType: 'jwt', getToken: async () => 'subject-token' },
+          },
           baseURL: 'https://override.example/v1',
         }),
     ).toThrow('`apiKey`, `adminAPIKey`, `workloadIdentity`, `baseURL`');
