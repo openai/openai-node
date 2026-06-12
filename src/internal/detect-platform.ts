@@ -67,7 +67,7 @@ const getPlatformProperties = (): PlatformProperties => {
       'X-Stainless-Arch': normalizeArch(Deno.build.arch),
       'X-Stainless-Runtime': 'deno',
       'X-Stainless-Runtime-Version':
-        typeof Deno.version === 'string' ? Deno.version : (Deno.version?.deno ?? 'unknown'),
+        typeof Deno.version === 'string' ? Deno.version : Deno.version?.deno ?? 'unknown',
     };
   }
   if (typeof EdgeRuntime !== 'undefined') {
