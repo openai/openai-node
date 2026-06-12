@@ -85,6 +85,19 @@ describe('provider', () => {
     ).toThrow(`\`${key}\``);
   });
 
+  test('reports every conflicting top-level option together', () => {
+    expect(
+      () =>
+        new OpenAI({
+          provider: provider(),
+          apiKey: 'openai-api-key',
+          adminAPIKey: 'openai-admin-key',
+          workloadIdentity: {},
+          baseURL: 'https://override.example/v1',
+        }),
+    ).toThrow('`apiKey`, `adminAPIKey`, `workloadIdentity`, `baseURL`');
+  });
+
   test('allows null top-level options', () => {
     expect(
       () =>
@@ -168,6 +181,51 @@ describe('provider', () => {
     expect(() => new OpenAI({ provider: {} as any })).toThrow(
       'Invalid provider. Providers must be created with createProvider().',
     );
+  });
+
+  test('shares provider definitions across duplicate module instances', () => {
+    const configuredProvider = provider({ baseURL: 'https://shared.example/v1' });
+
+    jest.isolateModules(() => {
+      const duplicate = require('openai/internal/provider') as typeof import('openai/internal/provider');
+      expect(duplicate.configureProvider(configuredProvider).baseURL).toBe('https://shared.example/v1');
+    });
+  });
+
+  test('preserves standard OpenAI authentication when no provider is configured', async () => {
+    let requestedHeaders: Headers | undefined;
+    const client = new OpenAI({
+      apiKey: 'openai-api-key',
+      fetch: async (_url, init) => {
+        requestedHeaders = new Headers(init?.headers);
+        return new Response('{}', { headers: { 'Content-Type': 'application/json' } });
+      },
+    });
+
+    await client.request({ method: 'get', path: '/models' });
+
+    expect(requestedHeaders?.get('authorization')).toBe('Bearer openai-api-key');
+  });
+
+  test('can replace standard OpenAI routing with a provider in withOptions', async () => {
+    let requestedURL: string | URL | Request | undefined;
+    let requestedHeaders: Headers | undefined;
+    const client = new OpenAI({
+      apiKey: 'openai-api-key',
+      fetch: async (url, init) => {
+        requestedURL = url;
+        requestedHeaders = new Headers(init?.headers);
+        return new Response('{}', { headers: { 'Content-Type': 'application/json' } });
+      },
+    });
+    const routedClient = client.withOptions({ provider: provider() });
+
+    await routedClient.request({ method: 'get', path: '/models' });
+
+    expect(client.baseURL).toBe('https://api.openai.com/v1');
+    expect(routedClient.baseURL).toBe('https://provider.example/v1');
+    expect(requestedURL).toBe('https://provider.example/v1/models');
+    expect(requestedHeaders?.has('authorization')).toBe(false);
   });
 });
 

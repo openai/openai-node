@@ -197,6 +197,20 @@ describe('instantiate bedrock client', () => {
     ).toThrow(/must be provided together/);
   });
 
+  test.each([
+    ['admin API key', { adminAPIKey: 'admin-key' }],
+    ['workload identity', { workloadIdentity: {} }],
+  ])('rejects an explicit %s', (_name, options) => {
+    expect(
+      () =>
+        new BedrockOpenAI({
+          baseURL: 'https://example.com/openai/v1',
+          apiKey: 'token',
+          ...options,
+        } as any),
+    ).toThrow('only supports Bedrock bearer token or AWS credential authentication');
+  });
+
   test('requires refreshable tokens to use provider option', () => {
     expect(
       () =>
@@ -269,6 +283,21 @@ describe('instantiate bedrock client', () => {
     await copiedClient.responses.create({ model: 'gpt-4o', input: 'hello' });
 
     expect(authorizationHeaders).toEqual(['Bearer refreshed token']);
+  });
+
+  test('reports when ambient bearer auth disappears from a routing clone', async () => {
+    process.env['AWS_BEARER_TOKEN_BEDROCK'] = 'temporary token';
+    process.env['AWS_REGION'] = 'us-east-1';
+    const fetch = jest.fn(async () => new globalThis.Response(JSON.stringify(RESPONSE_BODY)));
+    const client = new BedrockOpenAI({ fetch });
+    const copiedClient = client.withOptions({ baseURL: 'https://example.com/openai/v1' });
+    delete process.env['AWS_BEARER_TOKEN_BEDROCK'];
+
+    await expect(copiedClient.responses.create({ model: 'gpt-4o', input: 'hello' })).rejects.toMatchObject({
+      message: 'Failed to resolve a bearer credential for Bedrock.',
+      cause: expect.objectContaining({ message: expect.stringContaining('Could not find credentials') }),
+    });
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   test('explicit AWS credentials override ambient bearer', async () => {
@@ -486,6 +515,54 @@ describe('instantiate bedrock client', () => {
         awsSecretAccessKey: 'replacement secret key',
       }),
     ).not.toThrow();
+  });
+
+  test('can switch from AWS credentials to bearer authentication in withOptions', async () => {
+    const authorizationHeaders: string[] = [];
+    const client = new BedrockOpenAI({
+      baseURL: 'https://example.com/openai/v1',
+      awsRegion: 'us-east-1',
+      awsAccessKeyId: 'access key',
+      awsSecretAccessKey: 'secret key',
+      fetch: async (_url, init) => {
+        authorizationHeaders.push(new Headers(init?.headers).get('authorization') ?? '');
+        return new globalThis.Response(JSON.stringify(RESPONSE_BODY), {
+          headers: { 'Content-Type': 'application/json' },
+        });
+      },
+    });
+
+    await client
+      .withOptions({ apiKey: 'replacement bearer token' })
+      .responses.create({ model: 'gpt-4o', input: 'hello' });
+
+    expect(authorizationHeaders).toEqual(['Bearer replacement bearer token']);
+  });
+
+  test('can switch from bearer authentication to an AWS credential provider in withOptions', async () => {
+    const authorizationHeaders: string[] = [];
+    const client = new BedrockOpenAI({
+      baseURL: 'https://example.com/openai/v1',
+      awsRegion: 'us-east-1',
+      apiKey: 'bearer token',
+      fetch: async (_url, init) => {
+        authorizationHeaders.push(new Headers(init?.headers).get('authorization') ?? '');
+        return new globalThis.Response(JSON.stringify(RESPONSE_BODY), {
+          headers: { 'Content-Type': 'application/json' },
+        });
+      },
+    });
+
+    await client
+      .withOptions({
+        awsCredentialsProvider: async () => ({
+          accessKeyId: 'replacement access key',
+          secretAccessKey: 'replacement secret key',
+        }),
+      })
+      .responses.create({ model: 'gpt-4o', input: 'hello' });
+
+    expect(authorizationHeaders[0]).toContain('AWS4-HMAC-SHA256 Credential=replacement access key/');
   });
 
   test('recomputes a region-derived base URL in withOptions', () => {
