@@ -250,6 +250,27 @@ describe('instantiate bedrock client', () => {
     await client.responses.create({ model: 'gpt-4o', input: 'hello' });
   });
 
+  test('preserves ambient bearer mode when withOptions changes routing', async () => {
+    process.env['AWS_BEARER_TOKEN_BEDROCK'] = 'first token';
+    process.env['AWS_REGION'] = 'us-east-1';
+    const authorizationHeaders: string[] = [];
+    const fetch = async (_url: RequestInfo, init?: RequestInit): Promise<Response> => {
+      authorizationHeaders.push(new Headers(init?.headers).get('authorization') ?? '');
+      return new globalThis.Response(JSON.stringify(RESPONSE_BODY), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    };
+    const client = new BedrockOpenAI({ fetch });
+
+    delete process.env['AWS_BEARER_TOKEN_BEDROCK'];
+    const copiedClient = client.withOptions({ baseURL: 'https://example.com/openai/v1' });
+    process.env['AWS_BEARER_TOKEN_BEDROCK'] = 'refreshed token';
+    await copiedClient.responses.create({ model: 'gpt-4o', input: 'hello' });
+
+    expect(authorizationHeaders).toEqual(['Bearer refreshed token']);
+  });
+
   test('explicit AWS credentials override ambient bearer', async () => {
     process.env['AWS_BEARER_TOKEN_BEDROCK'] = 'ambient token';
     const requests: Headers[] = [];

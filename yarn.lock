@@ -85,7 +85,7 @@
     "@smithy/util-utf8" "^2.0.0"
     tslib "^2.6.2"
 
-"@aws-sdk/core@3.974.15", "@aws-sdk/core@^3.974.15":
+"@aws-sdk/core@^3.974.15":
   version "3.974.15"
   resolved "https://registry.yarnpkg.com/@aws-sdk/core/-/core-3.974.15.tgz#841395d805ed33b8e4f30b1b86749922a0c6a058"
   integrity sha512-UpA0rTGW/tHGITcCqHisbuuEPraYg9GG+mWmXjY5+RxZBMLGe6aL9oe0ix50LztwAcPIkGZLH0yWdMIkCM10hw==
@@ -237,18 +237,6 @@
   version "3.1056.0"
   resolved "https://registry.yarnpkg.com/@aws-sdk/token-providers/-/token-providers-3.1056.0.tgz#a61372715ebc6527c4849c671539461fee4ca050"
   integrity sha512-81duvlltQlsfn5K+o8zILcystBRdbT1G2JJYVCML5NZHBz4CL/zf+sAemCtBh/uh6RQUMyInGeZLQ7/8igZhbA==
-  dependencies:
-    "@aws-sdk/core" "^3.974.15"
-    "@aws-sdk/nested-clients" "^3.997.13"
-    "@aws-sdk/types" "^3.973.9"
-    "@smithy/core" "^3.24.5"
-    "@smithy/types" "^4.14.2"
-    tslib "^2.6.2"
-
-"@aws-sdk/token-providers@3.1057.0":
-  version "3.1057.0"
-  resolved "https://registry.yarnpkg.com/@aws-sdk/token-providers/-/token-providers-3.1057.0.tgz#066287fdf6152f1156699fc5cf0acf6b346ecec5"
-  integrity sha512-nIypx3Pvn9l7XoCi1a1ruY/FdUyfQW0LXk/2BdazRzs7rOAZeoSdZx9E1A6bmXIDedrG+09hFb8QlxhEk40jfA==
   dependencies:
     "@aws-sdk/core" "^3.974.15"
     "@aws-sdk/nested-clients" "^3.997.13"
@@ -986,7 +974,7 @@
   dependencies:
     "@sinonjs/commons" "^3.0.0"
 
-"@smithy/core@3.24.5", "@smithy/core@^3.24.5":
+"@smithy/core@^3.24.5":
   version "3.24.5"
   resolved "https://registry.yarnpkg.com/@smithy/core/-/core-3.24.5.tgz#396ca5662afc6d83a8f41b7e492e427c48a0924e"
   integrity sha512-Kt8phUg45M15EjhYAbZ+fFikYneijLu9Liugz8ZsYz2i8j0hzGv27LWKpEHYRfvj+LyCOSijpcR/2i8RouV+cA==

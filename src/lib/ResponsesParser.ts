@@ -31,7 +31,7 @@ export function maybeParseResponse<
   ParsedT = Params extends null ? null : ExtractParsedContentFromParams<NonNullable<Params>>,
 >(response: Response, params: Params): ParsedResponse<ParsedT> {
   if (!params || !hasAutoParseableInput(params)) {
-    return {
+    const parsed: ParsedResponse<ParsedT> = {
       ...response,
       output_parsed: null,
       output: response.output.map((item) => {
@@ -55,6 +55,10 @@ export function maybeParseResponse<
         }
       }),
     };
+    if (!Object.getOwnPropertyDescriptor(response, 'output_text')) {
+      addOutputText(parsed);
+    }
+    return parsed;
   }
 
   return parseResponse(response, params);

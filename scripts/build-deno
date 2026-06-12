@@ -7,8 +7,9 @@ cd "$(dirname "$0")/.."
 rm -rf dist-deno; mkdir dist-deno
 cp -rp src/* jsr.json dist-deno
 
-for file in README.md LICENSE CHANGELOG.md; do
+for file in README.md LICENSE CHANGELOG.md bedrock.md; do
   if [ -e "${file}" ]; then cp "${file}" dist-deno; fi
 done
 
 node scripts/utils/convert-jsr-readme.cjs ./dist-deno/README.md
+node scripts/utils/convert-jsr-readme.cjs ./dist-deno/bedrock.md

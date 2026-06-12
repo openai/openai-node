@@ -15,7 +15,7 @@ rm -rf dist; mkdir dist
 # Copy src to dist/src and build from dist/src into dist, so that
 # the source map for index.js.map will refer to ./src/index.ts etc
 cp -rp src README.md dist
-for file in LICENSE CHANGELOG.md; do
+for file in LICENSE CHANGELOG.md bedrock.md; do
   if [ -e "${file}" ]; then cp "${file}" dist; fi
 done
 # this converts the export map paths for the dist directory
@@ -36,6 +36,9 @@ node scripts/utils/postprocess-files.cjs
 # import the output ESM
 (cd dist && node -e 'require("openai")')
 (cd dist && node -e 'import("openai")' --input-type=module)
+(cd dist && node -e 'require("openai/providers/bedrock")')
+(cd dist && node -e 'import("openai/providers/bedrock")' --input-type=module)
+(cd dist && node -e '(async () => { const { OpenAI } = require("openai"); const { bedrock } = await import("openai/providers/bedrock"); process.chdir(require("os").tmpdir()); const client = new OpenAI({ provider: bedrock({ region: "us-east-1", accessKeyId: "test", secretAccessKey: "test" }), fetch: async () => new Response("{}", { headers: { "content-type": "application/json" } }) }); await client.models.list(); })()')
 
 if [ "${OPENAI_DISABLE_DENO_BUILD:-0}" != "1" ] && [ -e ./scripts/build-deno ]
 then

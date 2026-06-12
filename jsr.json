@@ -3,6 +3,7 @@
   "version": "6.42.0",
   "exports": {
     ".": "./index.ts",
+    "./providers/bedrock": "./providers/bedrock.ts",
     "./helpers/zod": "./helpers/zod.ts",
     "./beta/realtime/websocket": "./beta/realtime/websocket.ts"
   },
