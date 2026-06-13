@@ -104,4 +104,4 @@ done
 
 # Instead of running the tests, use the linter to check if an
 # older test is no longer compatible with the latest SDK.
-./scripts/lint
+DETECT_BREAKING_CHANGES_COMPAT=1 ./scripts/lint
