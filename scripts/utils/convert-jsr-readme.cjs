@@ -1,22 +1,40 @@
 const fs = require('fs');
-const { parse } = require('@typescript-eslint/parser');
-const { TSError } = require('@typescript-eslint/typescript-estree');
+const ts = require('typescript');
 
-/**
- * Quick and dirty AST traversal
- */
-function traverse(node, visitor) {
-  if (!node || typeof node.type !== 'string') return;
-  visitor.node?.(node);
-  visitor[node.type]?.(node);
-  for (const key in node) {
-    const value = node[key];
-    if (Array.isArray(value)) {
-      for (const elem of value) traverse(elem, visitor);
-    } else if (value instanceof Object) {
-      traverse(value, visitor);
-    }
+function isStringLiteralLike(node) {
+  return ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node);
+}
+
+function getModuleSpecifier(node) {
+  if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
+    return node.moduleSpecifier;
   }
+
+  if (
+    ts.isCallExpression(node) &&
+    node.expression.kind === ts.SyntaxKind.ImportKeyword &&
+    node.arguments.length > 0
+  ) {
+    return node.arguments[0];
+  }
+
+  if (ts.isImportTypeNode(node) && ts.isLiteralTypeNode(node.argument)) {
+    return node.argument.literal;
+  }
+
+  return null;
+}
+
+function replacePackageSpecifier(value, config) {
+  if (value === config.npm) {
+    return config.jsr;
+  }
+
+  if (value.startsWith(`${config.npm}/`)) {
+    return `${config.jsr}${value.slice(config.npm.length)}`;
+  }
+
+  return null;
 }
 
 /**
@@ -55,7 +73,9 @@ function replaceRanges(code, replacer) {
 
 function replaceProcessEnv(content) {
   // Replace process.env['KEY'] and process.env.KEY with Deno.env.get('KEY')
-  return content.replace(/process\.env(?:\.|\[['"])(.+?)(?:['"]\])/g, "Deno.env.get('$1')");
+  return content
+    .replace(/process\.env\[['"]([^'"]+)['"]\]/g, "Deno.env.get('$1')")
+    .replace(/process\.env\.([A-Za-z_$][\w$]*)/g, "Deno.env.get('$1')");
 }
 
 function replaceProcessStdout(content) {
@@ -71,34 +91,42 @@ function replaceInstallationDirections(content) {
  * Maps over module paths in imports and exports
  */
 function replaceImports(code, config) {
-  try {
-    const ast = parse(code, { sourceType: 'module', range: true });
-    return replaceRanges(code, ({ replace }) =>
-      traverse(ast, {
-        node(node) {
-          switch (node.type) {
-            case 'ImportDeclaration':
-            case 'ExportNamedDeclaration':
-            case 'ExportAllDeclaration':
-            case 'ImportExpression':
-              if (node.source) {
-                const { range, value } = node.source;
-                if (value.startsWith(config.npm)) {
-                  replace(range, JSON.stringify(value.replace(config.npm, config.jsr)));
-                }
-              }
-          }
-        },
-      }),
-    );
-  } catch (e) {
-    if (e instanceof TSError) {
-      // This can error if the code block is not valid TS, in this case give up trying to transform the imports.
-      console.warn(`Original codeblock could not be parsed, replace import skipped: ${e}\n\n${code}`);
-      return code;
-    }
-    throw e;
+  const sourceFile = ts.createSourceFile(
+    'readme-code-block.ts',
+    code,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS,
+  );
+
+  if (sourceFile.parseDiagnostics.length > 0) {
+    const diagnostics = sourceFile.parseDiagnostics
+      .map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'))
+      .join('\n');
+    // This can error if the code block is not valid TS, in this case give up trying to transform the imports.
+    console.warn(`Original codeblock could not be parsed, replace import skipped: ${diagnostics}\n\n${code}`);
+    return code;
   }
+
+  return replaceRanges(code, ({ replace }) => {
+    function visit(node) {
+      const moduleSpecifier = getModuleSpecifier(node);
+
+      if (moduleSpecifier && isStringLiteralLike(moduleSpecifier)) {
+        const replacement = replacePackageSpecifier(moduleSpecifier.text, config);
+        if (replacement) {
+          replace(
+            [moduleSpecifier.getStart(sourceFile), moduleSpecifier.getEnd()],
+            JSON.stringify(replacement),
+          );
+        }
+      }
+
+      ts.forEachChild(node, visit);
+    }
+
+    visit(sourceFile);
+  });
 }
 
 function processReadme(config, file) {

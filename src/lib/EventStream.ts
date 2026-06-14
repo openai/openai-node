@@ -127,9 +127,11 @@ export class EventStream<EventTypes extends BaseEvents> {
   emitted<Event extends keyof EventTypes>(
     event: Event,
   ): Promise<
-    EventParameters<EventTypes, Event> extends [infer Param] ? Param
-    : EventParameters<EventTypes, Event> extends [] ? void
-    : EventParameters<EventTypes, Event>
+    EventParameters<EventTypes, Event> extends [infer Param]
+      ? Param
+      : EventParameters<EventTypes, Event> extends []
+        ? void
+        : EventParameters<EventTypes, Event>
   > {
     return new Promise((resolve, reject) => {
       this.#catchingPromiseCreated = true;

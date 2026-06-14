@@ -74,9 +74,8 @@ export class Webhooks extends APIResource {
       .map((part) => (part.startsWith('v1,') ? part.substring(3) : part));
 
     // Decode the secret if it starts with whsec_
-    const decodedSecret =
-      secret.startsWith('whsec_') ?
-        Buffer.from(secret.replace('whsec_', ''), 'base64')
+    const decodedSecret = secret.startsWith('whsec_')
+      ? Buffer.from(secret.replace('whsec_', ''), 'base64')
       : Buffer.from(secret, 'utf-8');
 
     // Create the signed payload: {webhook_id}.{timestamp}.{payload}

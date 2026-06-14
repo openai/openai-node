@@ -15,8 +15,8 @@ export const parseOptionalDef = (def: ZodOptionalDef, refs: Refs): JsonSchema7Ty
     currentPath: [...refs.currentPath, 'anyOf', '1'],
   });
 
-  return innerSchema ?
-      {
+  return innerSchema
+    ? {
         anyOf: [
           {
             not: {},

@@ -58,15 +58,17 @@ export type RunnableFunctionWithoutParse = {
   strict?: boolean | undefined;
 };
 
-export type RunnableFunction<Args extends object | string> =
-  Args extends string ? RunnableFunctionWithoutParse
-  : Args extends object ? RunnableFunctionWithParse<Args>
-  : never;
+export type RunnableFunction<Args extends object | string> = Args extends string
+  ? RunnableFunctionWithoutParse
+  : Args extends object
+    ? RunnableFunctionWithParse<Args>
+    : never;
 
-export type RunnableToolFunction<Args extends object | string> =
-  Args extends string ? RunnableToolFunctionWithoutParse
-  : Args extends object ? RunnableToolFunctionWithParse<Args>
-  : never;
+export type RunnableToolFunction<Args extends object | string> = Args extends string
+  ? RunnableToolFunctionWithoutParse
+  : Args extends object
+    ? RunnableToolFunctionWithParse<Args>
+    : never;
 
 export type RunnableToolFunctionWithoutParse = {
   type: 'function';
@@ -85,18 +87,20 @@ export function isRunnableFunctionWithParse<Args extends object>(
 
 export type BaseFunctionsArgs = readonly (object | string)[];
 
-export type RunnableFunctions<FunctionsArgs extends BaseFunctionsArgs> =
-  [any[]] extends [FunctionsArgs] ? readonly RunnableFunction<any>[]
+export type RunnableFunctions<FunctionsArgs extends BaseFunctionsArgs> = [any[]] extends [FunctionsArgs]
+  ? readonly RunnableFunction<any>[]
   : {
-      [Index in keyof FunctionsArgs]: Index extends number ? RunnableFunction<FunctionsArgs[Index]>
-      : FunctionsArgs[Index];
+      [Index in keyof FunctionsArgs]: Index extends number
+        ? RunnableFunction<FunctionsArgs[Index]>
+        : FunctionsArgs[Index];
     };
 
-export type RunnableTools<FunctionsArgs extends BaseFunctionsArgs> =
-  [any[]] extends [FunctionsArgs] ? readonly RunnableToolFunction<any>[]
+export type RunnableTools<FunctionsArgs extends BaseFunctionsArgs> = [any[]] extends [FunctionsArgs]
+  ? readonly RunnableToolFunction<any>[]
   : {
-      [Index in keyof FunctionsArgs]: Index extends number ? RunnableToolFunction<FunctionsArgs[Index]>
-      : FunctionsArgs[Index];
+      [Index in keyof FunctionsArgs]: Index extends number
+        ? RunnableToolFunction<FunctionsArgs[Index]>
+        : FunctionsArgs[Index];
     };
 
 /**

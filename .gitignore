@@ -14,5 +14,4 @@ tmp
 ecosystem-tests/deno/package.json
 ecosystem-tests/*/openai.tgz
 .dev.vars
-.eslintcache
 oidc

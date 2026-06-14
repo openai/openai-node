@@ -15,10 +15,7 @@ import { type ResponseFormatTextJSONSchemaConfig } from '../resources/responses/
 import { toStrictJsonSchema } from '../lib/transform';
 import { JSONSchema } from '../lib/jsonschema';
 
-type InferZodType<T> =
-  T extends z4.ZodType ? z4.infer<T>
-  : T extends z3.ZodType ? z3.infer<T>
-  : never;
+type InferZodType<T> = T extends z4.ZodType ? z4.infer<T> : T extends z3.ZodType ? z3.infer<T> : never;
 
 function zodV3ToJsonSchema(schema: z3.ZodType, options: { name: string }): Record<string, unknown> {
   return _zodToJsonSchema(schema, {
@@ -136,9 +133,8 @@ export function zodFunction<Parameters extends z3.ZodType | z4.ZodType>(options:
       type: 'function',
       function: {
         name: options.name,
-        parameters:
-          isZodV4(options.parameters) ?
-            zodV4ToJsonSchema(options.parameters)
+        parameters: isZodV4(options.parameters)
+          ? zodV4ToJsonSchema(options.parameters)
           : zodV3ToJsonSchema(options.parameters, { name: options.name }),
         strict: true,
         ...(options.description ? { description: options.description } : undefined),
@@ -165,9 +161,8 @@ export function zodResponsesFunction<Parameters extends z3.ZodType | z4.ZodType>
     {
       type: 'function',
       name: options.name,
-      parameters:
-        isZodV4(options.parameters) ?
-          zodV4ToJsonSchema(options.parameters)
+      parameters: isZodV4(options.parameters)
+        ? zodV4ToJsonSchema(options.parameters)
         : zodV3ToJsonSchema(options.parameters, { name: options.name }),
       strict: true,
       ...(options.description ? { description: options.description } : undefined),

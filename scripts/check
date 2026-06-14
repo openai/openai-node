@@ -8,7 +8,7 @@ if [ "${DETECT_BREAKING_CHANGES_COMPAT:-}" = "1" ]; then
   echo "==> Preparing historical breaking-change tests"
   # Historical tests are checked against the current SDK and tsconfig. The
   # embeddings tests on main briefly used Array.prototype.at(), but the SDK still
-  # targets older JS libs, so normalize that syntax before the compatibility lint.
+  # targets older JS libs, so normalize that syntax before the compatibility check.
   if [ -e tests/api-resources/embeddings.test.ts ]; then
     node <<'EOF'
 const fs = require('fs');
@@ -23,27 +23,25 @@ EOF
   fi
 
   # Old test files are checked for compatibility with the current SDK, not
-  # formatting drift against the current Prettier version.
-  find tests -name '*.test.ts' -print0 | xargs -0 ./node_modules/.bin/prettier --write
+  # formatting drift against the current Biome version.
+  pnpm exec biome format --write tests --files-ignore-unknown=true
 fi
 
-echo "==> Running prettier --check"
-./node_modules/.bin/prettier --check .
-
-echo "==> Running eslint"
-./node_modules/.bin/eslint .
+echo "==> Running biome check"
+pnpm exec biome check .
 
 echo "==> Building"
-./scripts/build
+pnpm build
 
 echo "==> Checking types"
-./node_modules/typescript/bin/tsc
+pnpm exec tsc
 
 echo "==> Running Are The Types Wrong?"
-./node_modules/.bin/attw --pack dist -f json >.attw.json || true
+pnpm exec attw --pack dist -f json >.attw.json || true
 node scripts/utils/attw-report.cjs
 
 echo "==> Running publint"
-./node_modules/.bin/publint dist
+pnpm exec publint dist
+
 echo "==> Running jsr publish --dry-run"
 (cd dist-deno && npx jsr publish --dry-run --allow-dirty)

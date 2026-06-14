@@ -4,19 +4,19 @@ import { Refs } from '../Refs';
 
 function decideAdditionalProperties(def: ZodObjectDef, refs: Refs) {
   if (refs.removeAdditionalStrategy === 'strict') {
-    return def.catchall._def.typeName === 'ZodNever' ?
-        def.unknownKeys !== 'strict'
-      : parseDef(def.catchall._def, {
+    return def.catchall._def.typeName === 'ZodNever'
+      ? def.unknownKeys !== 'strict'
+      : (parseDef(def.catchall._def, {
           ...refs,
           currentPath: [...refs.currentPath, 'additionalProperties'],
-        }) ?? true;
+        }) ?? true);
   } else {
-    return def.catchall._def.typeName === 'ZodNever' ?
-        def.unknownKeys === 'passthrough'
-      : parseDef(def.catchall._def, {
+    return def.catchall._def.typeName === 'ZodNever'
+      ? def.unknownKeys === 'passthrough'
+      : (parseDef(def.catchall._def, {
           ...refs,
           currentPath: [...refs.currentPath, 'additionalProperties'],
-        }) ?? true;
+        }) ?? true);
   }
 }
 

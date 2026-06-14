@@ -311,10 +311,11 @@ export class ChatCompletionStream<ParsedT = null>
         name: toolCallSnapshot.function.name,
         index: toolCallIndex,
         arguments: toolCallSnapshot.function.arguments,
-        parsed_arguments:
-          isAutoParsableTool(inputTool) ? inputTool.$parseRaw(toolCallSnapshot.function.arguments)
-          : inputTool?.function.strict ? JSON.parse(toolCallSnapshot.function.arguments)
-          : null,
+        parsed_arguments: isAutoParsableTool(inputTool)
+          ? inputTool.$parseRaw(toolCallSnapshot.function.arguments)
+          : inputTool?.function.strict
+            ? JSON.parse(toolCallSnapshot.function.arguments)
+            : null,
       });
     } else {
       assertNever(toolCallSnapshot.type);

@@ -83,10 +83,11 @@ export async function defaultParseResponse<T>(
   return body;
 }
 
-export type WithRequestID<T> =
-  T extends Array<any> | Response | AbstractPage<any> ? T
-  : T extends Record<string, any> ? T & { _request_id?: string | null }
-  : T;
+export type WithRequestID<T> = T extends Array<any> | Response | AbstractPage<any>
+  ? T
+  : T extends Record<string, any>
+    ? T & { _request_id?: string | null }
+    : T;
 
 export function addRequestID<T>(value: T, response: Response): WithRequestID<T> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {

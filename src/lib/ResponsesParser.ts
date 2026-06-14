@@ -212,10 +212,11 @@ function parseToolCall<Params extends ResponseCreateParamsBase>(
   return {
     ...toolCall,
     ...toolCall,
-    parsed_arguments:
-      isAutoParsableTool(inputTool) ? inputTool.$parseRaw(toolCall.arguments)
-      : inputTool?.strict ? JSON.parse(toolCall.arguments)
-      : null,
+    parsed_arguments: isAutoParsableTool(inputTool)
+      ? inputTool.$parseRaw(toolCall.arguments)
+      : inputTool?.strict
+        ? JSON.parse(toolCall.arguments)
+        : null,
   };
 }
 

@@ -12,33 +12,27 @@ type NotAny<T> = [0] extends [1 & T] ? never : T;
 /**
  * Some environments overload the global fetch function, and Parameters<T> only gets the last signature.
  */
-type OverloadedParameters<T> =
-  T extends (
-    {
-      (...args: infer A): unknown;
-      (...args: infer B): unknown;
-      (...args: infer C): unknown;
-      (...args: infer D): unknown;
-    }
-  ) ?
-    A | B | C | D
-  : T extends (
-    {
-      (...args: infer A): unknown;
-      (...args: infer B): unknown;
-      (...args: infer C): unknown;
-    }
-  ) ?
-    A | B | C
-  : T extends (
-    {
-      (...args: infer A): unknown;
-      (...args: infer B): unknown;
-    }
-  ) ?
-    A | B
-  : T extends (...args: infer A) => unknown ? A
-  : never;
+type OverloadedParameters<T> = T extends {
+  (...args: infer A): unknown;
+  (...args: infer B): unknown;
+  (...args: infer C): unknown;
+  (...args: infer D): unknown;
+}
+  ? A | B | C | D
+  : T extends {
+        (...args: infer A): unknown;
+        (...args: infer B): unknown;
+        (...args: infer C): unknown;
+      }
+    ? A | B | C
+    : T extends {
+          (...args: infer A): unknown;
+          (...args: infer B): unknown;
+        }
+      ? A | B
+      : T extends (...args: infer A) => unknown
+        ? A
+        : never;
 
 /**
  * These imports attempt to get types from a parent package's dependencies.
@@ -62,17 +56,23 @@ type OverloadedParameters<T> =
  *
  * [1]: https://www.typescriptlang.org/tsconfig/#typeAcquisition
  */
-/** @ts-ignore For users with \@types/node */ /* prettier-ignore */
+// biome-ignore format: Keep each fallback import declaration on one line so @ts-ignore covers all optional modules.
+/** @ts-ignore For users with \@types/node */
 type UndiciTypesRequestInit = NotAny<import('../node_modules/undici-types/index.d.ts').RequestInit> | NotAny<import('../../node_modules/undici-types/index.d.ts').RequestInit> | NotAny<import('../../../node_modules/undici-types/index.d.ts').RequestInit> | NotAny<import('../../../../node_modules/undici-types/index.d.ts').RequestInit> | NotAny<import('../../../../../node_modules/undici-types/index.d.ts').RequestInit> | NotAny<import('../../../../../../node_modules/undici-types/index.d.ts').RequestInit> | NotAny<import('../../../../../../../node_modules/undici-types/index.d.ts').RequestInit> | NotAny<import('../../../../../../../../node_modules/undici-types/index.d.ts').RequestInit> | NotAny<import('../../../../../../../../../node_modules/undici-types/index.d.ts').RequestInit> | NotAny<import('../../../../../../../../../../node_modules/undici-types/index.d.ts').RequestInit>;
-/** @ts-ignore For users with undici */ /* prettier-ignore */
+// biome-ignore format: Keep each fallback import declaration on one line so @ts-ignore covers all optional modules.
+/** @ts-ignore For users with undici */
 type UndiciRequestInit = NotAny<import('../node_modules/undici/index.d.ts').RequestInit> | NotAny<import('../../node_modules/undici/index.d.ts').RequestInit> | NotAny<import('../../../node_modules/undici/index.d.ts').RequestInit> | NotAny<import('../../../../node_modules/undici/index.d.ts').RequestInit> | NotAny<import('../../../../../node_modules/undici/index.d.ts').RequestInit> | NotAny<import('../../../../../../node_modules/undici/index.d.ts').RequestInit> | NotAny<import('../../../../../../../node_modules/undici/index.d.ts').RequestInit> | NotAny<import('../../../../../../../../node_modules/undici/index.d.ts').RequestInit> | NotAny<import('../../../../../../../../../node_modules/undici/index.d.ts').RequestInit> | NotAny<import('../../../../../../../../../../node_modules/undici/index.d.ts').RequestInit>;
-/** @ts-ignore For users with \@types/bun */ /* prettier-ignore */
+// biome-ignore format: Keep this fallback import declaration on one line so @ts-ignore covers the optional module.
+/** @ts-ignore For users with \@types/bun */
 type BunRequestInit = globalThis.FetchRequestInit;
-/** @ts-ignore For users with node-fetch@2 */ /* prettier-ignore */
+// biome-ignore format: Keep each fallback import declaration on one line so @ts-ignore covers all optional modules.
+/** @ts-ignore For users with node-fetch@2 */
 type NodeFetch2RequestInit = NotAny<import('../node_modules/@types/node-fetch/index.d.ts').RequestInit> | NotAny<import('../../node_modules/@types/node-fetch/index.d.ts').RequestInit> | NotAny<import('../../../node_modules/@types/node-fetch/index.d.ts').RequestInit> | NotAny<import('../../../../node_modules/@types/node-fetch/index.d.ts').RequestInit> | NotAny<import('../../../../../node_modules/@types/node-fetch/index.d.ts').RequestInit> | NotAny<import('../../../../../../node_modules/@types/node-fetch/index.d.ts').RequestInit> | NotAny<import('../../../../../../../node_modules/@types/node-fetch/index.d.ts').RequestInit> | NotAny<import('../../../../../../../../node_modules/@types/node-fetch/index.d.ts').RequestInit> | NotAny<import('../../../../../../../../../node_modules/@types/node-fetch/index.d.ts').RequestInit> | NotAny<import('../../../../../../../../../../node_modules/@types/node-fetch/index.d.ts').RequestInit>;
-/** @ts-ignore For users with node-fetch@3, doesn't need file extension because types are at ./@types/index.d.ts */ /* prettier-ignore */
-type NodeFetch3RequestInit =  NotAny<import('../node_modules/node-fetch').RequestInit> | NotAny<import('../../node_modules/node-fetch').RequestInit> | NotAny<import('../../../node_modules/node-fetch').RequestInit> | NotAny<import('../../../../node_modules/node-fetch').RequestInit> | NotAny<import('../../../../../node_modules/node-fetch').RequestInit> | NotAny<import('../../../../../../node_modules/node-fetch').RequestInit> | NotAny<import('../../../../../../../node_modules/node-fetch').RequestInit> | NotAny<import('../../../../../../../../node_modules/node-fetch').RequestInit> | NotAny<import('../../../../../../../../../node_modules/node-fetch').RequestInit> | NotAny<import('../../../../../../../../../../node_modules/node-fetch').RequestInit>;
-/** @ts-ignore For users who use Deno */ /* prettier-ignore */
+// biome-ignore format: Keep each fallback import declaration on one line so @ts-ignore covers all optional modules.
+/** @ts-ignore For users with node-fetch@3, doesn't need file extension because types are at ./@types/index.d.ts */
+type NodeFetch3RequestInit = NotAny<import('../node_modules/node-fetch').RequestInit> | NotAny<import('../../node_modules/node-fetch').RequestInit> | NotAny<import('../../../node_modules/node-fetch').RequestInit> | NotAny<import('../../../../node_modules/node-fetch').RequestInit> | NotAny<import('../../../../../node_modules/node-fetch').RequestInit> | NotAny<import('../../../../../../node_modules/node-fetch').RequestInit> | NotAny<import('../../../../../../../node_modules/node-fetch').RequestInit> | NotAny<import('../../../../../../../../node_modules/node-fetch').RequestInit> | NotAny<import('../../../../../../../../../node_modules/node-fetch').RequestInit> | NotAny<import('../../../../../../../../../../node_modules/node-fetch').RequestInit>;
+// biome-ignore format: Keep this fallback import declaration on one line so @ts-ignore covers the optional module.
+/** @ts-ignore For users who use Deno */
 type FetchRequestInit = NonNullable<OverloadedParameters<typeof fetch>[1]>;
 
 type RequestInits =

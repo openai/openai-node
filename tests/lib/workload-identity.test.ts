@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import type { Response, RequestInit } from 'openai/internal/builtin-types';
+import type { RequestInit } from 'openai/internal/builtin-types';
 import { OAuthError, SubjectTokenProviderError } from 'openai';
 
 const originalFetch = global.fetch;

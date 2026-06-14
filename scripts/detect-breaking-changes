@@ -102,6 +102,6 @@ for PATHSPEC in "${TEST_PATHS[@]}"; do
     git checkout "$1" -- "${PATHSPEC}" 2>/dev/null || true
 done
 
-# Instead of running the tests, use the linter to check if an
+# Instead of running the tests, use the check script to see if an
 # older test is no longer compatible with the latest SDK.
-DETECT_BREAKING_CHANGES_COMPAT=1 ./scripts/lint
+DETECT_BREAKING_CHANGES_COMPAT=1 pnpm check

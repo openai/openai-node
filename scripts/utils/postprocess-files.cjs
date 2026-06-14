@@ -2,9 +2,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const distDir =
-  process.env['DIST_PATH'] ?
-    path.resolve(process.env['DIST_PATH'])
+const distDir = process.env['DIST_PATH']
+  ? path.resolve(process.env['DIST_PATH'])
   : path.resolve(__dirname, '..', '..', 'dist');
 
 async function* walk(dir) {

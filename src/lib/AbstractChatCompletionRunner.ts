@@ -300,21 +300,21 @@ export class AbstractChatCompletionRunner<
     }
 
     const tools: ChatCompletionTool[] =
-      'tools' in params ?
-        inputTools.map((t) =>
-          t.type === 'function' ?
-            {
-              type: 'function',
-              function: {
-                name: t.function.name || t.function.function.name,
-                parameters: t.function.parameters as Record<string, unknown>,
-                description: t.function.description,
-                strict: t.function.strict,
-              },
-            }
-          : (t as unknown as ChatCompletionTool),
-        )
-      : (undefined as any);
+      'tools' in params
+        ? inputTools.map((t) =>
+            t.type === 'function'
+              ? {
+                  type: 'function',
+                  function: {
+                    name: t.function.name || t.function.function.name,
+                    parameters: t.function.parameters as Record<string, unknown>,
+                    description: t.function.description,
+                    strict: t.function.strict,
+                  },
+                }
+              : (t as unknown as ChatCompletionTool),
+          )
+        : (undefined as any);
 
     for (const message of params.messages) {
       this._addMessage(message, false);
@@ -387,11 +387,11 @@ export class AbstractChatCompletionRunner<
   }
 
   #stringifyFunctionCallResult(rawContent: unknown): string {
-    return (
-      typeof rawContent === 'string' ? rawContent
-      : rawContent === undefined ? 'undefined'
-      : JSON.stringify(rawContent)
-    );
+    return typeof rawContent === 'string'
+      ? rawContent
+      : rawContent === undefined
+        ? 'undefined'
+        : JSON.stringify(rawContent);
   }
 }
 

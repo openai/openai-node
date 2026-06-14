@@ -9,7 +9,6 @@ export type Bytes = string | ArrayBuffer | Uint8Array | null | undefined;
  * https://github.com/encode/httpx/blob/920333ea98118e9cf617f246905d7b202510941c/httpx/_decoders.py#L258
  */
 export class LineDecoder {
-  // prettier-ignore
   static NEWLINE_CHARS = new Set(['\n', '\r']);
   static NEWLINE_REGEXP = /\r\n|[\n\r]/g;
 
@@ -27,9 +26,11 @@ export class LineDecoder {
     }
 
     const binaryChunk =
-      chunk instanceof ArrayBuffer ? new Uint8Array(chunk)
-      : typeof chunk === 'string' ? encodeUTF8(chunk)
-      : chunk;
+      chunk instanceof ArrayBuffer
+        ? new Uint8Array(chunk)
+        : typeof chunk === 'string'
+          ? encodeUTF8(chunk)
+          : chunk;
 
     this.#buffer = concatBytes([this.#buffer, binaryChunk]);
 

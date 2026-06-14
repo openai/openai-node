@@ -263,9 +263,11 @@ async function* iterSSEChunks(iterator: AsyncIterableIterator<Bytes>): AsyncGene
     }
 
     const binaryChunk =
-      chunk instanceof ArrayBuffer ? new Uint8Array(chunk)
-      : typeof chunk === 'string' ? encodeUTF8(chunk)
-      : chunk;
+      chunk instanceof ArrayBuffer
+        ? new Uint8Array(chunk)
+        : typeof chunk === 'string'
+          ? encodeUTF8(chunk)
+          : chunk;
 
     let newData = new Uint8Array(data.length + binaryChunk.length);
     newData.set(data);

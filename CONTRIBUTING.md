@@ -79,13 +79,13 @@ $ pnpm test
 
 ## Linting and formatting
 
-This repository uses [prettier](https://www.npmjs.com/package/prettier) and
-[eslint](https://www.npmjs.com/package/eslint) to format the code in the repository.
+This repository uses [Biome](https://www.npmjs.com/package/@biomejs/biome) to format and lint the code in
+the repository.
 
-To lint:
+To check formatting, linting, types, builds, and package metadata:
 
 ```sh
-$ pnpm lint
+$ pnpm check
 ```
 
 To format and fix all lint issues automatically:

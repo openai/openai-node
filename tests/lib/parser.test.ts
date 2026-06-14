@@ -360,8 +360,9 @@ describe.each([
       });
 
       if (version === 'v3') {
-        expect(zodResponseFormat(contactPersonSchema, 'contactPerson').json_schema.schema)
-          .toMatchInlineSnapshot(`
+        expect(
+          zodResponseFormat(contactPersonSchema, 'contactPerson').json_schema.schema,
+        ).toMatchInlineSnapshot(`
         {
           "$schema": "http://json-schema.org/draft-07/schema#",
           "additionalProperties": false,
@@ -512,8 +513,9 @@ describe.each([
         }
       `);
       } else {
-        expect(zodResponseFormat(contactPersonSchema, 'contactPerson').json_schema.schema)
-          .toMatchInlineSnapshot(`
+        expect(
+          zodResponseFormat(contactPersonSchema, 'contactPerson').json_schema.schema,
+        ).toMatchInlineSnapshot(`
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "additionalProperties": false,
@@ -1251,12 +1253,12 @@ describe.each([
     test('ref schemas with `.transform()`', async () => {
       let Inner = z.object({
         baz:
-          version === 'v3' ?
-            z.boolean().transform((v: any) => v ?? true)
-          : z
-              .boolean()
-              .transform((v: any) => v ?? true)
-              .pipe(z.boolean()),
+          version === 'v3'
+            ? z.boolean().transform((v: any) => v ?? true)
+            : z
+                .boolean()
+                .transform((v: any) => v ?? true)
+                .pipe(z.boolean()),
       });
       const Outer = z.object({
         first: Inner,

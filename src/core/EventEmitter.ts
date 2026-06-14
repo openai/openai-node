@@ -69,9 +69,11 @@ export class EventEmitter<EventTypes extends Record<string, (...args: any) => an
   emitted<Event extends keyof EventTypes>(
     event: Event,
   ): Promise<
-    EventParameters<EventTypes, Event> extends [infer Param] ? Param
-    : EventParameters<EventTypes, Event> extends [] ? void
-    : EventParameters<EventTypes, Event>
+    EventParameters<EventTypes, Event> extends [infer Param]
+      ? Param
+      : EventParameters<EventTypes, Event> extends []
+        ? void
+        : EventParameters<EventTypes, Event>
   > {
     return new Promise((resolve, reject) => {
       // TODO: handle errors

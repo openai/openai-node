@@ -64,17 +64,18 @@ export const getDefaultOptions = <Target extends Targets>(
 ) => {
   // We need to add `definitions` here as we may mutate it
   return (
-    typeof options === 'string' ?
-      {
-        ...defaultOptions,
-        basePath: ['#'],
-        definitions: {},
-        name: options,
-      }
-    : {
-        ...defaultOptions,
-        basePath: ['#'],
-        definitions: {},
-        ...options,
-      }) as Options<Target>;
+    typeof options === 'string'
+      ? {
+          ...defaultOptions,
+          basePath: ['#'],
+          definitions: {},
+          name: options,
+        }
+      : {
+          ...defaultOptions,
+          basePath: ['#'],
+          definitions: {},
+          ...options,
+        }
+  ) as Options<Target>;
 };

@@ -305,7 +305,6 @@ When the library is unable to connect to the API,
 or if the API returns a non-success status code (i.e., 4xx or 5xx response),
 a subclass of `APIError` will be thrown:
 
-<!-- prettier-ignore -->
 ```ts
 const job = await client.fineTuning.jobs
   .create({ model: 'gpt-4o', training_file: 'file-abc123' })
@@ -442,7 +441,6 @@ Connection errors (for example, due to a network connectivity problem), 408 Requ
 
 You can use the `maxRetries` option to configure or disable this:
 
-<!-- prettier-ignore -->
 ```js
 // Configure the default for all requests:
 const client = new OpenAI({
@@ -459,7 +457,6 @@ await client.chat.completions.create({ messages: [{ role: 'user', content: 'How 
 
 Requests time out after 10 minutes by default. You can configure this with a `timeout` option:
 
-<!-- prettier-ignore -->
 ```ts
 // Configure the default for all requests:
 const client = new OpenAI({
@@ -586,7 +583,6 @@ This method returns as soon as the headers for a successful response are receive
 You can also use the `.withResponse()` method to get the raw `Response` along with the parsed data.
 Unlike `.asResponse()` this method consumes the body, returning once it is parsed.
 
-<!-- prettier-ignore -->
 ```ts
 const client = new OpenAI();
 

@@ -1,0 +1,88 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.4.16/schema.json",
+  "files": {
+    "includes": [
+      "**",
+      "!CHANGELOG.md",
+      "!jsr.json",
+      "!node_modules/**",
+      "!deno/**",
+      "!dist/**",
+      "!dist-deno/**"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    // Keep the existing Prettier spacing convention for this migration PR.
+    // Follow-up: consider switching to Biome's default tab indentation.
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 110
+  },
+  "javascript": {
+    "formatter": {
+      "arrowParentheses": "always",
+      "quoteStyle": "single",
+      "trailingCommas": "all"
+    }
+  },
+  "json": {
+    "formatter": {
+      "trailingCommas": "none"
+    }
+  },
+  "assist": {
+    "actions": {
+      "source": {
+        // Disabled to keep this migration focused and reduce import-order churn.
+        // Follow-up: enable organizeImports in a separate PR.
+        "organizeImports": "off"
+      }
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": false,
+      "correctness": {
+        "noUnusedImports": "error"
+      },
+      "style": {
+        "noRestrictedImports": {
+          "level": "error",
+          "options": {
+            "paths": {
+              "openai": "Use a relative import, not a package import."
+            },
+            "patterns": [
+              {
+                "group": ["openai/**"],
+                "message": "Use a relative import, not a package import."
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["tests/**", "examples/**", "ecosystem-tests/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["ecosystem-tests/**"],
+      // Keep vendored ecosystem snapshots untouched for this migration.
+      // Follow-up: re-enable formatting here once the Biome migration has landed.
+      "formatter": {
+        "enabled": false
+      }
+    }
+  ]
+}

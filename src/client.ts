@@ -19,7 +19,6 @@ import type { WorkloadIdentity } from './auth/types';
 import { WorkloadIdentityAuth } from './auth/workload-identity-auth';
 import { OAuthError, SubjectTokenProviderError } from './core/error';
 import {
-  AbstractPage,
   type ConversationCursorPageParams,
   ConversationCursorPageResponse,
   type CursorPageParams,
@@ -622,9 +621,8 @@ export class OpenAI {
     defaultBaseURL?: string | undefined,
   ): string {
     const baseURL = (!this.#baseURLOverridden() && defaultBaseURL) || this.baseURL;
-    const url =
-      isAbsoluteURL(path) ?
-        new URL(path)
+    const url = isAbsoluteURL(path)
+      ? new URL(path)
       : new URL(baseURL + (baseURL.endsWith('/') && path.startsWith('/') ? path.slice(1) : path));
 
     const defaultQuery = this.defaultQuery();
@@ -898,9 +896,9 @@ export class OpenAI {
   ): Pagination.PagePromise<PageClass, Item> {
     return this.requestAPIList(
       Page,
-      opts && 'then' in opts ?
-        opts.then((opts) => ({ method: 'get', path, ...opts }))
-      : { method: 'get', path, ...opts },
+      opts && 'then' in opts
+        ? opts.then((opts) => ({ method: 'get', path, ...opts }))
+        : { method: 'get', path, ...opts },
     );
   }
 
