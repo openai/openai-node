@@ -150,7 +150,7 @@ function resolveBaseURL(baseURL: string | null | undefined, region: string | und
       'Bedrock requires an AWS region. Pass `region` to `bedrock(...)`, or set `AWS_REGION` or `AWS_DEFAULT_REGION`.',
     );
   }
-  return `https://bedrock-mantle.${region}.api.aws/v1`;
+  return `https://bedrock-mantle.${region}.api.aws/openai/v1`;
 }
 
 function validateStaticCredentials(options: BedrockProviderOptions): AwsCredentialIdentity | undefined {

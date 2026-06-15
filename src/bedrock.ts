@@ -21,7 +21,7 @@ export interface BedrockClientOptions
    * Bedrock API root.
    *
    * Defaults to process.env['AWS_BEDROCK_BASE_URL'], or derives the canonical
-   * `https://bedrock-mantle.<region>.api.aws/v1` endpoint.
+   * `https://bedrock-mantle.<region>.api.aws/openai/v1` endpoint.
    */
   baseURL?: string | null | undefined;
 
@@ -102,7 +102,7 @@ function deriveBedrockBaseURL(awsRegion: string | undefined): string {
       'Must provide one of the `baseURL` or `awsRegion` arguments, or set the `AWS_BEDROCK_BASE_URL`, `AWS_REGION`, or `AWS_DEFAULT_REGION` environment variable.',
     );
   }
-  return `https://bedrock-mantle.${region}.api.aws/v1`;
+  return `https://bedrock-mantle.${region}.api.aws/openai/v1`;
 }
 
 /** API Client for interfacing with Amazon Bedrock's OpenAI-compatible endpoint. */

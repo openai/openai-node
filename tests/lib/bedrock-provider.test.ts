@@ -52,8 +52,8 @@ describe('bedrock provider', () => {
 
     await client.request({ method: 'get', path: '/models' });
 
-    expect(client.baseURL).toBe('https://bedrock-mantle.us-east-1.api.aws/v1');
-    expect(String(requestedURL)).toBe('https://bedrock-mantle.us-east-1.api.aws/v1/models');
+    expect(client.baseURL).toBe('https://bedrock-mantle.us-east-1.api.aws/openai/v1');
+    expect(String(requestedURL)).toBe('https://bedrock-mantle.us-east-1.api.aws/openai/v1/models');
     expect(new Headers(requestedInit?.headers).get('authorization')).toBe('Bearer bedrock-token');
   });
 
@@ -98,7 +98,7 @@ describe('bedrock provider', () => {
       provider: bedrock({ region: 'us-east-1', baseURL: null, apiKey: 'bedrock-token' }),
     });
 
-    expect(client.baseURL).toBe('https://bedrock-mantle.us-east-1.api.aws/v1');
+    expect(client.baseURL).toBe('https://bedrock-mantle.us-east-1.api.aws/openai/v1');
   });
 
   test('requires a region only when deriving the default endpoint', () => {
@@ -308,7 +308,7 @@ describe('bedrock provider', () => {
     let thrown: unknown;
     try {
       await runtime.prepareRequest!({ headers: new Headers(), method: 'GET' } as any, {
-        url: 'https://bedrock-mantle.us-east-1.api.aws/v1/models',
+        url: 'https://bedrock-mantle.us-east-1.api.aws/openai/v1/models',
         options: {} as any,
       });
     } catch (error) {
@@ -416,7 +416,7 @@ describe('bedrock provider', () => {
     const client = new OpenAI({
       provider: bedrock({
         region: 'us-east-1',
-        baseURL: 'https://bedrock-mantle.us-west-2.api.aws/v1',
+        baseURL: 'https://bedrock-mantle.us-west-2.api.aws/openai/v1',
         accessKeyId: 'access-key',
         secretAccessKey: 'secret-key',
       }),

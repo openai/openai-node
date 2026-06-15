@@ -421,7 +421,7 @@ const response = await client.responses.create({
 console.log(response.output_text);
 ```
 
-This uses the regional `https://bedrock-mantle.<region>.api.aws/v1` endpoint. The region can also come from `AWS_REGION` or `AWS_DEFAULT_REGION`, and `AWS_BEDROCK_BASE_URL` can override the endpoint.
+This uses the regional `https://bedrock-mantle.<region>.api.aws/openai/v1` endpoint. The region can also come from `AWS_REGION` or `AWS_DEFAULT_REGION`, and `AWS_BEDROCK_BASE_URL` can override the endpoint.
 
 Authentication is selected in this order: an explicit bearer or AWS credential option, `AWS_BEARER_TOKEN_BEDROCK`, then the default AWS credential chain. Pass `apiKey: null` to skip an ambient `AWS_BEARER_TOKEN_BEDROCK` and use the AWS credential chain.
 

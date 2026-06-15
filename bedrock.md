@@ -18,7 +18,7 @@ const response = await client.responses.create({
 console.log(response.output_text);
 ```
 
-The provider uses the regional `https://bedrock-mantle.<region>.api.aws/v1` endpoint and the normal SDK resources. AWS controls which endpoints and features are supported; unsupported calls surface the provider's normal HTTP errors through the SDK.
+The provider uses the regional `https://bedrock-mantle.<region>.api.aws/openai/v1` endpoint and the normal SDK resources. AWS controls which endpoints and features are supported; unsupported calls surface the provider's normal HTTP errors through the SDK.
 
 The region defaults to `AWS_REGION` or `AWS_DEFAULT_REGION`. Pass `baseURL` or set `AWS_BEDROCK_BASE_URL` to override the derived endpoint:
 
@@ -26,7 +26,7 @@ The region defaults to `AWS_REGION` or `AWS_DEFAULT_REGION`. Pass `baseURL` or s
 const client = new OpenAI({
   provider: bedrock({
     region: 'us-west-2',
-    baseURL: 'https://bedrock.example.com/v1',
+    baseURL: 'https://bedrock.example.com/openai/v1',
   }),
 });
 ```
@@ -128,7 +128,7 @@ Bedrock Mantle also supports `UNSIGNED-PAYLOAD` and AWS-chunked request signing,
 
 ## Legacy `BedrockOpenAI` class
 
-The `BedrockOpenAI` class remains available for existing applications. It accepts the `awsRegion`, `awsProfile`, `awsCredentialProvider`, and `bedrockTokenProvider` option names and uses the same `/v1` endpoint as the provider:
+The `BedrockOpenAI` class remains available for existing applications. It accepts the `awsRegion`, `awsProfile`, `awsCredentialProvider`, and `bedrockTokenProvider` option names and uses the same `/openai/v1` endpoint as the provider:
 
 ```ts
 import { BedrockOpenAI } from 'openai';
