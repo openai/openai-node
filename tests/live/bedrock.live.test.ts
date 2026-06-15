@@ -4,7 +4,10 @@ import { bedrock, type BedrockProviderOptions } from 'openai/providers/bedrock';
 /**
  * Example:
  * BEDROCK_LIVE_TEST=1 BEDROCK_LIVE_AUTH=profile AWS_PROFILE=my-profile \
- * AWS_REGION=us-west-2 BEDROCK_MODEL=openai.gpt-5.4 pnpm test:live:bedrock
+ * AWS_REGION=us-west-2 BEDROCK_MODEL=openai.gpt-oss-120b pnpm test:live:bedrock
+ *
+ * BEDROCK_MODEL must support the Responses API. A model returned by the Models
+ * API may support a different Bedrock inference API instead.
  *
  * Set BEDROCK_LIVE_STREAM=1 to include a second, streaming inference request.
  */

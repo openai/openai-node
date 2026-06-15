@@ -11,12 +11,14 @@ const client = new OpenAI({
 });
 
 const response = await client.responses.create({
-  model: 'openai.gpt-5.4',
+  model: 'openai.gpt-oss-120b',
   input: 'Say hello!',
 });
 
 console.log(response.output_text);
 ```
+
+Use a model that [supports the Responses API](https://docs.aws.amazon.com/bedrock/latest/userguide/models-api-compatibility.html). A model returned by the Models API may support a different Bedrock inference API instead.
 
 The provider uses the regional `https://bedrock-mantle.<region>.api.aws/openai/v1` endpoint and the normal SDK resources. AWS controls which endpoints and features are supported; unsupported calls surface the provider's normal HTTP errors through the SDK.
 

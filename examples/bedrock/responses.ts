@@ -14,7 +14,7 @@ const client = new OpenAI({
 
 async function main() {
   const response = await client.responses.create({
-    model: 'openai.gpt-5.4',
+    model: 'openai.gpt-oss-120b',
     input: 'Say hello!',
   });
 
