@@ -21,7 +21,7 @@ export interface BedrockClientOptions
    * Bedrock API root.
    *
    * Defaults to process.env['AWS_BEDROCK_BASE_URL'], or derives the canonical
-   * `https://bedrock-mantle.<region>.api.aws/openai/v1` endpoint.
+   * `https://bedrock-mantle.<region>.api.aws/v1` endpoint.
    */
   baseURL?: string | null | undefined;
 
@@ -47,7 +47,7 @@ export interface BedrockClientOptions
   awsSessionToken?: string | undefined;
 
   /** Provider returning refreshable AWS credentials. */
-  awsCredentialsProvider?: AwsCredentialsProvider | undefined;
+  awsCredentialProvider?: AwsCredentialsProvider | undefined;
 
   /** A function that resolves a Bedrock bearer credential before every request attempt. */
   bedrockTokenProvider?: ApiKeySetter | undefined;
@@ -76,7 +76,7 @@ function hasExplicitAwsAuth(options: Partial<BedrockClientOptions>): boolean {
     hasOwn(options, 'awsAccessKeyId') ||
     hasOwn(options, 'awsSecretAccessKey') ||
     hasOwn(options, 'awsSessionToken') ||
-    hasOwn(options, 'awsCredentialsProvider')
+    hasOwn(options, 'awsCredentialProvider')
   );
 }
 
@@ -102,7 +102,7 @@ function deriveBedrockBaseURL(awsRegion: string | undefined): string {
       'Must provide one of the `baseURL` or `awsRegion` arguments, or set the `AWS_BEDROCK_BASE_URL`, `AWS_REGION`, or `AWS_DEFAULT_REGION` environment variable.',
     );
   }
-  return `https://bedrock-mantle.${region}.api.aws/openai/v1`;
+  return `https://bedrock-mantle.${region}.api.aws/v1`;
 }
 
 /** API Client for interfacing with Amazon Bedrock's OpenAI-compatible endpoint. */
@@ -114,7 +114,7 @@ export class BedrockOpenAI extends OpenAI {
   private readonly awsAccessKeyId: string | undefined;
   private readonly awsSecretAccessKey: string | undefined;
   private readonly awsSessionToken: string | undefined;
-  private readonly awsCredentialsProvider: AwsCredentialsProvider | undefined;
+  private readonly awsCredentialProvider: AwsCredentialsProvider | undefined;
   private readonly usesRegionDerivedBaseURL: boolean;
   private readonly usesEnvironmentBearerAuth: boolean;
 
@@ -130,7 +130,7 @@ export class BedrockOpenAI extends OpenAI {
       awsAccessKeyId,
       awsSecretAccessKey,
       awsSessionToken,
-      awsCredentialsProvider,
+      awsCredentialProvider,
       bedrockTokenProvider,
       adminAPIKey,
       workloadIdentity,
@@ -156,7 +156,7 @@ export class BedrockOpenAI extends OpenAI {
       awsAccessKeyId !== undefined ||
       awsSecretAccessKey !== undefined ||
       awsSessionToken !== undefined ||
-      awsCredentialsProvider !== undefined;
+      awsCredentialProvider !== undefined;
     const usesEnvironmentBearerAuth =
       inheritedState?.usesEnvironmentBearerAuth ??
       (!explicitAwsAuth &&
@@ -176,7 +176,7 @@ export class BedrockOpenAI extends OpenAI {
         accessKeyId: awsAccessKeyId,
         secretAccessKey: awsSecretAccessKey,
         sessionToken: awsSessionToken,
-        credentialProvider: awsCredentialsProvider,
+        credentialProvider: awsCredentialProvider,
       });
 
     super({
@@ -199,7 +199,7 @@ export class BedrockOpenAI extends OpenAI {
     this.awsAccessKeyId = awsAccessKeyId;
     this.awsSecretAccessKey = awsSecretAccessKey;
     this.awsSessionToken = awsSessionToken;
-    this.awsCredentialsProvider = awsCredentialsProvider;
+    this.awsCredentialProvider = awsCredentialProvider;
     this.usesRegionDerivedBaseURL = usesRegionDerivedBaseURL;
     this.usesEnvironmentBearerAuth = usesEnvironmentBearerAuth;
   }
@@ -245,9 +245,9 @@ export class BedrockOpenAI extends OpenAI {
         awsOverride ? options.awsSessionToken
         : preserveAws ? this.awsSessionToken
         : undefined,
-      awsCredentialsProvider:
-        awsOverride ? options.awsCredentialsProvider
-        : preserveAws ? this.awsCredentialsProvider
+      awsCredentialProvider:
+        awsOverride ? options.awsCredentialProvider
+        : preserveAws ? this.awsCredentialProvider
         : undefined,
       ...(!providerChanged || (routingOverride && preserveBearer && this.usesEnvironmentBearerAuth) ?
         {

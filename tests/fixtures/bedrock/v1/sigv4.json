@@ -9,14 +9,14 @@
   },
   "request": {
     "method": "POST",
-    "url": "https://bedrock-mantle.us-east-1.api.aws/openai/v1/responses",
+    "url": "https://bedrock-mantle.us-east-1.api.aws/v1/responses",
     "body": "{\"model\":\"gpt-4o\",\"input\":\"hello\"}",
     "contentType": "application/json"
   },
   "expected": {
     "date": "20250102T030405Z",
     "payloadHash": "50329e51ad520f21b77bad0b01999930ff556cd1bf18434701251ba6c9f877bc",
-    "canonicalRequestHash": "1b69b17ef7548a7bf16a6ee749acfd44b7793e04216345dddd6cfaf4c01bfde5",
-    "authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20250102/us-east-1/bedrock-mantle/aws4_request, SignedHeaders=content-type;host;x-amz-content-sha256;x-amz-date;x-amz-security-token, Signature=dc20c8fbe516daf0ccae7e5b7a78fc2936870413a9f1af6e1b2d44b970ce411f"
+    "canonicalRequestHash": "af8212c327679e6b6a7092b129c24b82a921bf85bcce1fbd0126acded824e489",
+    "authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20250102/us-east-1/bedrock-mantle/aws4_request, SignedHeaders=content-type;host;x-amz-content-sha256;x-amz-date;x-amz-security-token, Signature=b81279dd7a01b9681012a7cf068f8ab7f663b85f0742741b509315ad22e32175"
   }
 }

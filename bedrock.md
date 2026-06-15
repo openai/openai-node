@@ -18,7 +18,7 @@ const response = await client.responses.create({
 console.log(response.output_text);
 ```
 
-The provider uses the regional `https://bedrock-mantle.<region>.api.aws/openai/v1` endpoint and the normal SDK resources. AWS controls which endpoints and features are supported; unsupported calls surface the provider's normal HTTP errors through the SDK.
+The provider uses the regional `https://bedrock-mantle.<region>.api.aws/v1` endpoint and the normal SDK resources. AWS controls which endpoints and features are supported; unsupported calls surface the provider's normal HTTP errors through the SDK.
 
 The region defaults to `AWS_REGION` or `AWS_DEFAULT_REGION`. Pass `baseURL` or set `AWS_BEDROCK_BASE_URL` to override the derived endpoint:
 
@@ -26,7 +26,7 @@ The region defaults to `AWS_REGION` or `AWS_DEFAULT_REGION`. Pass `baseURL` or s
 const client = new OpenAI({
   provider: bedrock({
     region: 'us-west-2',
-    baseURL: 'https://bedrock.example.com/openai/v1',
+    baseURL: 'https://bedrock.example.com/v1',
   }),
 });
 ```
@@ -44,6 +44,17 @@ Explicit bearer and AWS credential modes are mutually exclusive. Similarly, conf
 ### Bearer authentication
 
 Pass a Bedrock API key directly, set `AWS_BEARER_TOKEN_BEDROCK`, or use `tokenProvider` to resolve a fresh token before every request attempt:
+
+```ts
+const client = new OpenAI({
+  provider: bedrock({
+    region: 'us-west-2',
+    apiKey: process.env['BEDROCK_API_KEY'],
+  }),
+});
+```
+
+For a refreshable bearer credential:
 
 ```ts
 const client = new OpenAI({
@@ -81,7 +92,33 @@ const client = new OpenAI({
 });
 ```
 
-You can also pass `accessKeyId` and `secretAccessKey`, with an optional `sessionToken`, or provide refreshable credentials with `credentialProvider`.
+Pass temporary AWS credentials directly, including the session token:
+
+```ts
+const client = new OpenAI({
+  provider: bedrock({
+    region: 'us-west-2',
+    accessKeyId: process.env['AWS_ACCESS_KEY_ID'],
+    secretAccessKey: process.env['AWS_SECRET_ACCESS_KEY'],
+    sessionToken: process.env['AWS_SESSION_TOKEN'],
+  }),
+});
+```
+
+For credentials that can change, pass a provider. It is called before every request attempt, including retries:
+
+```ts
+const client = new OpenAI({
+  provider: bedrock({
+    region: 'us-west-2',
+    credentialProvider: async () => ({
+      accessKeyId: process.env['AWS_ACCESS_KEY_ID']!,
+      secretAccessKey: process.env['AWS_SECRET_ACCESS_KEY']!,
+      sessionToken: process.env['AWS_SESSION_TOKEN'],
+    }),
+  }),
+});
+```
 
 SigV4 authentication is supported in Node.js and compatible server runtimes. Bearer authentication can be used in other runtimes without loading the optional AWS packages.
 
@@ -91,7 +128,7 @@ Bedrock Mantle also supports `UNSIGNED-PAYLOAD` and AWS-chunked request signing,
 
 ## Legacy `BedrockOpenAI` class
 
-The `BedrockOpenAI` class remains available for existing applications. It accepts the legacy `awsRegion`, `awsProfile`, `awsCredentialsProvider`, and `bedrockTokenProvider` option names and uses the same `/openai/v1` endpoint as the provider:
+The `BedrockOpenAI` class remains available for existing applications. It accepts the `awsRegion`, `awsProfile`, `awsCredentialProvider`, and `bedrockTokenProvider` option names and uses the same `/v1` endpoint as the provider:
 
 ```ts
 import { BedrockOpenAI } from 'openai';

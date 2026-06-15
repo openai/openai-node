@@ -95,7 +95,7 @@ describe('instantiate bedrock client', () => {
   test('derives base URL from region', () => {
     const options: BedrockClientOptions = { awsRegion: 'us-east-1', apiKey: 'token' };
     const client = new BedrockOpenAI(options);
-    expect(client.baseURL).toBe('https://bedrock-mantle.us-east-1.api.aws/openai/v1');
+    expect(client.baseURL).toBe('https://bedrock-mantle.us-east-1.api.aws/v1');
   });
 
   test('uses Bedrock config precedence', () => {
@@ -121,9 +121,9 @@ describe('instantiate bedrock client', () => {
     process.env['AWS_REGION'] = undefined;
     const defaultRegionClient = new BedrockOpenAI({ apiKey: 'token' });
 
-    expect(explicitRegionClient.baseURL).toBe('https://bedrock-mantle.eu-west-1.api.aws/openai/v1');
-    expect(awsRegionClient.baseURL).toBe('https://bedrock-mantle.us-east-1.api.aws/openai/v1');
-    expect(defaultRegionClient.baseURL).toBe('https://bedrock-mantle.us-west-2.api.aws/openai/v1');
+    expect(explicitRegionClient.baseURL).toBe('https://bedrock-mantle.eu-west-1.api.aws/v1');
+    expect(awsRegionClient.baseURL).toBe('https://bedrock-mantle.us-east-1.api.aws/v1');
+    expect(defaultRegionClient.baseURL).toBe('https://bedrock-mantle.us-west-2.api.aws/v1');
   });
 
   test('normalizes Responses URL', () => {
@@ -439,7 +439,7 @@ describe('instantiate bedrock client', () => {
     const client = new BedrockOpenAI({
       baseURL: 'https://example.com/openai/v1',
       awsRegion: 'us-east-1',
-      awsCredentialsProvider: async () => credentials.shift()!,
+      awsCredentialProvider: async () => credentials.shift()!,
       fetch: async (_url, init) => {
         requests.push(new Headers(init?.headers));
         const status = requests.length === 1 ? 500 : 200;
@@ -555,7 +555,7 @@ describe('instantiate bedrock client', () => {
 
     await client
       .withOptions({
-        awsCredentialsProvider: async () => ({
+        awsCredentialProvider: async () => ({
           accessKeyId: 'replacement access key',
           secretAccessKey: 'replacement secret key',
         }),
@@ -570,7 +570,7 @@ describe('instantiate bedrock client', () => {
 
     const copiedClient = client.withOptions({ awsRegion: 'eu-west-1' });
 
-    expect(copiedClient.baseURL).toBe('https://bedrock-mantle.eu-west-1.api.aws/openai/v1');
+    expect(copiedClient.baseURL).toBe('https://bedrock-mantle.eu-west-1.api.aws/v1');
   });
 
   test('keeps an explicit base URL when the region changes in withOptions', () => {
