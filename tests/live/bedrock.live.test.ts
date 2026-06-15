@@ -4,7 +4,7 @@ import { bedrock, type BedrockProviderOptions } from 'openai/providers/bedrock';
 /**
  * Example:
  * BEDROCK_LIVE_TEST=1 BEDROCK_LIVE_AUTH=profile AWS_PROFILE=my-profile \
- * AWS_REGION=us-west-2 BEDROCK_MODEL=openai.gpt-5.4 npm run test:live:bedrock
+ * AWS_REGION=us-west-2 BEDROCK_MODEL=openai.gpt-5.4 pnpm test:live:bedrock
  *
  * Set BEDROCK_LIVE_STREAM=1 to include a second, streaming inference request.
  */
@@ -69,7 +69,7 @@ async function authOptions(mode: AuthMode): Promise<BedrockProviderOptions> {
 
 if (process.env[LIVE_TEST_FLAG] !== '1') {
   throw new Error(
-    `Refusing to make live AWS requests. Set ${LIVE_TEST_FLAG}=1 and use \`npm run test:live:bedrock\`.`,
+    `Refusing to make live AWS requests. Set ${LIVE_TEST_FLAG}=1 and use \`pnpm test:live:bedrock\`.`,
   );
 }
 

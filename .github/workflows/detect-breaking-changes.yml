@@ -23,10 +23,15 @@ jobs:
           # Ensure we can check out the pull request base in the script below.
           fetch-depth: ${{ env.FETCH_DEPTH }}
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+
       - name: Set up Node
         uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3
         with:
           node-version: ${{ env.LATEST_LTS_NODE_VERSION }}
+          cache: pnpm
+
       - name: Install dependencies
         run: |
           ./scripts/bootstrap
@@ -36,7 +41,7 @@ jobs:
           # Try to check out previous versions of the breaking change detection script. This ensures that
           # we still detect breaking changes when entire files and their tests are removed.
           git checkout "${{ github.event.pull_request.base.sha }}" -- ./scripts/detect-breaking-changes 2>/dev/null || true
-          ./scripts/detect-breaking-changes ${{ github.event.pull_request.base.sha }}
+          DETECT_BREAKING_CHANGES_COMPAT=1 ./scripts/detect-breaking-changes ${{ github.event.pull_request.base.sha }}
   agents_sdk:
     runs-on: 'ubuntu-latest'
     name: Detect Agents SDK regressions
@@ -47,16 +52,17 @@ jobs:
         with:
           node-version: ${{ env.LATEST_LTS_NODE_VERSION }}
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
-        with:
-          version: 10.25.0
-          run_install: false
-
       # Setup this sdk
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           path: openai-node
+
+      # openai-agents-js is a pnpm workspace, so this downstream check intentionally
+      # uses the pnpm version pinned by this repository while consuming the local SDK.
+      - name: Install pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        with:
+          package_json_file: openai-node/package.json
 
       - name: Bootstrap
         working-directory: openai-node
