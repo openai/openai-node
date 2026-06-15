@@ -16,6 +16,12 @@ beforeEach(() => {
   delete process.env['AWS_ACCESS_KEY_ID'];
   delete process.env['AWS_SECRET_ACCESS_KEY'];
   delete process.env['AWS_SESSION_TOKEN'];
+  delete process.env['AWS_BEDROCK_BASE_URL'];
+  delete process.env['AWS_REGION'];
+  delete process.env['AWS_DEFAULT_REGION'];
+  delete process.env['AWS_PROFILE'];
+  delete process.env['AWS_SHARED_CREDENTIALS_FILE'];
+  delete process.env['AWS_CONFIG_FILE'];
 });
 
 afterEach(() => {
@@ -38,6 +44,31 @@ async function loadBedrockModules(): Promise<{
 }
 
 describe('Bedrock provider optional dependencies', () => {
+  test('resolves temporary environment credentials through the real AWS default chain', async () => {
+    process.env['AWS_ACCESS_KEY_ID'] = 'environment-access-key';
+    process.env['AWS_SECRET_ACCESS_KEY'] = 'environment-secret-key';
+    process.env['AWS_SESSION_TOKEN'] = 'environment-session-token';
+
+    await jest.isolateModulesAsync(async () => {
+      const { OpenAI, bedrock } = await loadBedrockModules();
+      let requestedInit: RequestInit | undefined;
+      const client = new OpenAI({
+        provider: bedrock({ region: 'us-west-2', apiKey: null }),
+        maxRetries: 0,
+        fetch: async (_url: RequestInfo, init?: RequestInit) => {
+          requestedInit = init;
+          return jsonResponse();
+        },
+      });
+
+      await client.request({ method: 'get', path: '/models' });
+
+      const headers = new Headers(requestedInit?.headers);
+      expect(headers.get('authorization')).toContain('Credential=environment-access-key/');
+      expect(headers.get('x-amz-security-token')).toBe('environment-session-token');
+    });
+  });
+
   test('forwards a named profile to the AWS default provider and signs the request', async () => {
     const credentialsProvider = jest.fn(async () => ({
       accessKeyId: 'profile-access-key',

@@ -38,7 +38,7 @@ node scripts/utils/postprocess-files.cjs
 (cd dist && node -e 'import("openai")' --input-type=module)
 (cd dist && node -e 'require("openai/providers/bedrock")')
 (cd dist && node -e 'import("openai/providers/bedrock")' --input-type=module)
-(cd dist && node -e '(async () => { const { OpenAI } = require("openai"); const { bedrock } = await import("openai/providers/bedrock"); process.chdir(require("os").tmpdir()); const client = new OpenAI({ provider: bedrock({ region: "us-east-1", accessKeyId: "test", secretAccessKey: "test" }), fetch: async () => new Response("{}", { headers: { "content-type": "application/json" } }) }); await client.models.list(); })()')
+(cd dist && node -e '(async () => { const { OpenAI } = require("openai"); const { bedrock } = await import("openai/providers/bedrock"); process.chdir(require("os").tmpdir()); const client = new OpenAI({ provider: bedrock({ region: "us-east-1", baseURL: null, accessKeyId: "test", secretAccessKey: "test" }), fetch: async () => new Response("{}", { headers: { "content-type": "application/json" } }) }); await client.models.list(); })()')
 
 if [ "${OPENAI_DISABLE_DENO_BUILD:-0}" != "1" ] && [ -e ./scripts/build-deno ]
 then
