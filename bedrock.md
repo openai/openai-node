@@ -83,6 +83,12 @@ Install the optional AWS dependencies to sign requests with SigV4:
 npm install @aws-sdk/credential-provider-node @smithy/hash-node @smithy/signature-v4
 ```
 
+These dependencies load only when SigV4 authentication is used. If they are missing, the first signed request throws an `OpenAIError` with this message:
+
+```text
+Bedrock AWS authentication requires optional AWS dependencies. Run `npm install @aws-sdk/credential-provider-node @smithy/hash-node @smithy/signature-v4` and try again.
+```
+
 Omit explicit authentication to use the default AWS credential chain, or select a shared-config profile:
 
 ```ts

@@ -16,16 +16,16 @@ importers:
         specifier: ^0.18.3
         version: 0.18.3
       '@aws-sdk/credential-provider-node':
-        specifier: 3.972.47
+        specifier: ^3.972.47
         version: 3.972.47
       '@smithy/hash-node':
-        specifier: 4.3.5
+        specifier: ^4.3.5
         version: 4.3.5
       '@smithy/protocol-http':
-        specifier: 5.4.5
+        specifier: ^5.4.5
         version: 5.4.5
       '@smithy/signature-v4':
-        specifier: 5.4.5
+        specifier: ^5.4.5
         version: 5.4.5
       '@swc/core':
         specifier: ^1.3.102

@@ -433,6 +433,12 @@ Bearer authentication requires no additional packages. For SigV4 authentication,
 npm install @aws-sdk/credential-provider-node @smithy/hash-node @smithy/signature-v4
 ```
 
+These dependencies load only when SigV4 authentication is used. If they are missing, the first signed request throws an `OpenAIError` with this message:
+
+```text
+Bedrock AWS authentication requires optional AWS dependencies. Run `npm install @aws-sdk/credential-provider-node @smithy/hash-node @smithy/signature-v4` and try again.
+```
+
 SigV4 authentication is supported in Node.js and compatible server runtimes. The SDK's current SigV4 mode requires replayable request bodies. Bearer authentication can be used in other runtimes. The legacy `BedrockOpenAI` class remains available for compatibility.
 
 For more information on support for Amazon Bedrock, see [bedrock.md](bedrock.md).

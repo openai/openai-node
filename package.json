@@ -18,7 +18,7 @@
   },
   "scripts": {
     "test": "./scripts/test",
-    "test:live:bedrock": "./node_modules/.bin/jest --config jest.live.config.ts --runInBand tests/live/bedrock.live.test.ts",
+    "test:live:bedrock": "jest --config jest.live.config.ts --runInBand tests/live/bedrock.live.test.ts",
     "build": "./scripts/build",
     "prepublishOnly": "echo 'to publish, run pnpm build && (cd dist; npm publish)' && exit 1",
     "format": "./scripts/format",
@@ -29,10 +29,10 @@
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.3",
-    "@aws-sdk/credential-provider-node": "3.972.47",
-    "@smithy/hash-node": "4.3.5",
-    "@smithy/protocol-http": "5.4.5",
-    "@smithy/signature-v4": "5.4.5",
+    "@aws-sdk/credential-provider-node": "^3.972.47",
+    "@smithy/hash-node": "^4.3.5",
+    "@smithy/protocol-http": "^5.4.5",
+    "@smithy/signature-v4": "^5.4.5",
     "@swc/core": "^1.3.102",
     "@swc/jest": "^0.2.29",
     "@types/jest": "^29.4.0",

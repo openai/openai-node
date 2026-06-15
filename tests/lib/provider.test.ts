@@ -231,6 +231,29 @@ describe('provider', () => {
     expect(requestedURL).toBe('https://provider.example/v1/models');
     expect(requestedHeaders?.has('authorization')).toBe(false);
   });
+
+  test('drops inherited OpenAI headers when switching to a provider in withOptions', async () => {
+    process.env['OPENAI_CUSTOM_HEADERS'] = 'X-OpenAI-Ambient: leaked';
+    process.env['OPENAI_ORG_ID'] = 'openai-org';
+    process.env['OPENAI_PROJECT_ID'] = 'openai-project';
+
+    let requestedHeaders: Headers | undefined;
+    const client = new OpenAI({
+      apiKey: 'openai-api-key',
+      fetch: async (_url, init) => {
+        requestedHeaders = new Headers(init?.headers);
+        return new Response('{}', { headers: { 'Content-Type': 'application/json' } });
+      },
+    });
+    const routedClient = client.withOptions({ provider: provider() });
+
+    await routedClient.request({ method: 'get', path: '/models' });
+
+    expect(requestedHeaders?.has('authorization')).toBe(false);
+    expect(requestedHeaders?.has('openai-organization')).toBe(false);
+    expect(requestedHeaders?.has('openai-project')).toBe(false);
+    expect(requestedHeaders?.has('x-openai-ambient')).toBe(false);
+  });
 });
 
 test('request logging redacts AWS session tokens', () => {

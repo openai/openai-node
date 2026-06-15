@@ -535,6 +535,9 @@ export class OpenAI {
       delete inheritedOptions.adminAPIKey;
       delete inheritedOptions.workloadIdentity;
       delete inheritedOptions.baseURL;
+      delete inheritedOptions.organization;
+      delete inheritedOptions.project;
+      delete inheritedOptions.defaultHeaders;
     }
 
     const client = new (this.constructor as any as new (props: ClientOptions) => typeof this)({
