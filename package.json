@@ -18,6 +18,7 @@
   },
   "scripts": {
     "test": "./scripts/test",
+    "test:live:bedrock": "./node_modules/.bin/jest --config jest.live.config.ts --runInBand tests/live/bedrock.live.test.ts",
     "build": "./scripts/build",
     "prepublishOnly": "echo 'to publish, run yarn build && (cd dist; yarn publish)' && exit 1",
     "format": "./scripts/format",
