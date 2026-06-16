@@ -1,10 +1,11 @@
 name: Create releases
 on:
-  schedule:
-    - cron: '0 5 * * *' # every day at 5am UTC
   push:
     branches:
       - main
+
+env:
+  LATEST_LTS_NODE_VERSION: '24'
 
 jobs:
   release:
@@ -25,16 +26,21 @@ jobs:
           repo: ${{ github.event.repository.full_name }}
           stainless-api-key: ${{ secrets.STAINLESS_API_KEY }}
 
+      - name: Set up pnpm
+        if: ${{ steps.release.outputs.releases_created }}
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+
       - name: Set up Node
         if: ${{ steps.release.outputs.releases_created }}
         uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3
         with:
-          node-version: '20'
+          node-version: ${{ env.LATEST_LTS_NODE_VERSION }}
+          cache: pnpm
 
       - name: Install dependencies
         if: ${{ steps.release.outputs.releases_created }}
         run: |
-          yarn install
+          pnpm install --frozen-lockfile
 
       - name: Publish to NPM
         if: ${{ steps.release.outputs.releases_created }}

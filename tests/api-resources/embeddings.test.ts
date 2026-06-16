@@ -43,8 +43,8 @@ describe('resource embeddings', () => {
       model: 'text-embedding-3-small',
     });
 
-    expect(Array.isArray(response.data?.at(0)?.embedding)).toBe(true);
-    expect(response.data?.at(0)?.embedding.at(0)).toBe(-0.09928705543279648);
+    expect(Array.isArray(response.data?.[0]?.embedding)).toBe(true);
+    expect(response.data?.[0]?.embedding[0]).toBe(-0.09928705543279648);
   });
 
   test('create: encoding_format=float should create float32 embeddings', async () => {
@@ -55,8 +55,8 @@ describe('resource embeddings', () => {
       encoding_format: 'float',
     });
 
-    expect(Array.isArray(response.data?.at(0)?.embedding)).toBe(true);
-    expect(response.data?.at(0)?.embedding.at(0)).toBe(-0.099287055);
+    expect(Array.isArray(response.data?.[0]?.embedding)).toBe(true);
+    expect(response.data?.[0]?.embedding[0]).toBe(-0.099287055);
   });
 
   test('create: encoding_format=base64 should return base64 embeddings', async () => {
@@ -67,7 +67,7 @@ describe('resource embeddings', () => {
       encoding_format: 'base64',
     });
 
-    expect(typeof response.data?.at(0)?.embedding).toBe('string');
+    expect(typeof response.data?.[0]?.embedding).toBe('string');
   });
 });
 
