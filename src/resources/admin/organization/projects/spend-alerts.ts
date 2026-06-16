@@ -44,6 +44,30 @@ export class SpendAlerts extends APIResource {
   }
 
   /**
+   * Retrieves a project spend alert.
+   *
+   * @example
+   * ```ts
+   * const projectSpendAlert =
+   *   await client.admin.organization.projects.spendAlerts.retrieve(
+   *     'alert_id',
+   *     { project_id: 'project_id' },
+   *   );
+   * ```
+   */
+  retrieve(
+    alertID: string,
+    params: SpendAlertRetrieveParams,
+    options?: RequestOptions,
+  ): APIPromise<ProjectSpendAlert> {
+    const { project_id } = params;
+    return this._client.get(path`/organization/projects/${project_id}/spend_alerts/${alertID}`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true },
+    });
+  }
+
+  /**
    * Updates a project spend alert.
    *
    * @example
@@ -250,6 +274,13 @@ export namespace SpendAlertCreateParams {
   }
 }
 
+export interface SpendAlertRetrieveParams {
+  /**
+   * The ID of the project.
+   */
+  project_id: string;
+}
+
 export interface SpendAlertUpdateParams {
   /**
    * Path param: The ID of the project to update.
@@ -325,6 +356,7 @@ export declare namespace SpendAlerts {
     type ProjectSpendAlertDeleted as ProjectSpendAlertDeleted,
     type ProjectSpendAlertsPage as ProjectSpendAlertsPage,
     type SpendAlertCreateParams as SpendAlertCreateParams,
+    type SpendAlertRetrieveParams as SpendAlertRetrieveParams,
     type SpendAlertUpdateParams as SpendAlertUpdateParams,
     type SpendAlertListParams as SpendAlertListParams,
     type SpendAlertDeleteParams as SpendAlertDeleteParams,

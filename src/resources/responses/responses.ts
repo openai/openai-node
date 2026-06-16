@@ -6954,7 +6954,7 @@ export interface ResponsesClientEvent {
   top_p?: number | null;
 
   /**
-   * The truncation strategy to use for the model response.
+   * @deprecated The truncation strategy to use for the model response.
    *
    * - `auto`: If the input to this Response exceeds the model's context window size,
    *   the model will truncate the response to fit the context window by dropping
@@ -8024,7 +8024,7 @@ export interface ResponseCreateParamsBase {
   top_p?: number | null;
 
   /**
-   * The truncation strategy to use for the model response.
+   * @deprecated The truncation strategy to use for the model response.
    *
    * - `auto`: If the input to this Response exceeds the model's context window size,
    *   the model will truncate the response to fit the context window by dropping

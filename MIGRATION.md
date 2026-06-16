@@ -95,6 +95,7 @@ client.parents.children.retrieve('c_456', { parent_id: 'p_123' });
 - `client.admin.organization.projects.roles.retrieve()`
 - `client.admin.organization.projects.roles.update()`
 - `client.admin.organization.projects.roles.delete()`
+- `client.admin.organization.projects.spendAlerts.retrieve()`
 - `client.admin.organization.projects.spendAlerts.update()`
 - `client.admin.organization.projects.spendAlerts.delete()`
 - `client.conversations.items.retrieve()`
