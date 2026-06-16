@@ -4,12 +4,12 @@ on:
     - cron: '0 5 * * *' # every day at 5am UTC
   push:
     branches:
-      - master
+      - main
 
 jobs:
   release:
     name: release
-    if: github.ref == 'refs/heads/master' && github.repository == 'openai/openai-node'
+    if: github.ref == 'refs/heads/main' && github.repository == 'openai/openai-node'
     runs-on: ubuntu-latest
     environment: publish
     permissions:

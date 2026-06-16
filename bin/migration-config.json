@@ -1579,6 +1579,39 @@
     },
     {
       "base": "admin.organization.projects.spendAlerts",
+      "name": "retrieve",
+      "params": [
+        {
+          "type": "param",
+          "key": "alert_id",
+          "location": "path"
+        },
+        {
+          "type": "params",
+          "maybeOverload": false
+        },
+        {
+          "type": "options"
+        }
+      ],
+      "oldParams": [
+        {
+          "type": "param",
+          "key": "project_id",
+          "location": "path"
+        },
+        {
+          "type": "param",
+          "key": "alert_id",
+          "location": "path"
+        },
+        {
+          "type": "options"
+        }
+      ]
+    },
+    {
+      "base": "admin.organization.projects.spendAlerts",
       "name": "update",
       "params": [
         {

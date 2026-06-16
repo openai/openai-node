@@ -84,6 +84,7 @@ export {
   type ProjectSpendAlert,
   type ProjectSpendAlertDeleted,
   type SpendAlertCreateParams,
+  type SpendAlertRetrieveParams,
   type SpendAlertUpdateParams,
   type SpendAlertListParams,
   type SpendAlertDeleteParams,
