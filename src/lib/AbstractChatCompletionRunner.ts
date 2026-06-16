@@ -125,12 +125,7 @@ export class AbstractChatCompletionRunner<
     for (let i = this.messages.length - 1; i >= 0; i--) {
       const message = this.messages[i];
       if (isAssistantMessage(message) && message?.tool_calls?.length) {
-        for (let j = message.tool_calls.length - 1; j >= 0; j--) {
-          const toolCall = message.tool_calls[j];
-          if (toolCall?.type === 'function') {
-            return toolCall.function;
-          }
-        }
+        return message.tool_calls.filter((x) => x.type === 'function').at(-1)?.function;
       }
     }
 

@@ -292,8 +292,6 @@ async function main() {
         console.error('Error: Cleanup of file artifacts failed for project', projectName, err);
       });
     }
-
-    await fs.rm(path.join(tmpFolderPath, 'puppeteer-cache'), { recursive: true, force: true });
   }
 
   async function runCleanupAndExit() {
@@ -367,7 +365,7 @@ async function main() {
               await withRetry(
                 async () => {
                   const child = execa(
-                    'pnpm',
+                    'yarn',
                     [
                       'tsn',
                       __filename,
@@ -534,7 +532,7 @@ async function buildPackage() {
   // Run our build script to ensure all of our build artifacts are up to date.
   // This matters the most for deno as it directly relies on build artifacts
   // instead of the pack file
-  await run('pnpm', ['build']);
+  await run('yarn', ['build']);
 
   const proc = await run('npm', ['pack', '--ignore-scripts', '--json'], {
     cwd: path.join(process.cwd(), 'dist'),
