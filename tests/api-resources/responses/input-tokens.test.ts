@@ -33,6 +33,7 @@ describe('resource inputTokens', () => {
           personality: 'friendly',
           previous_response_id: 'resp_123',
           reasoning: {
+            context: 'auto',
             effort: 'none',
             generate_summary: 'auto',
             summary: 'auto',
