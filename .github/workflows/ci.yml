@@ -14,6 +14,9 @@ on:
       - 'stl-preview-head/**'
       - 'stl-preview-base/**'
 
+env:
+  LATEST_LTS_NODE_VERSION: '24'
+
 jobs:
   lint:
     timeout-minutes: 10
@@ -23,10 +26,14 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+
       - name: Set up Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '20'
+          node-version: ${{ env.LATEST_LTS_NODE_VERSION }}
+          cache: pnpm
 
       - name: Bootstrap
         run: ./scripts/bootstrap
@@ -45,10 +52,14 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+
       - name: Set up Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '20'
+          node-version: ${{ env.LATEST_LTS_NODE_VERSION }}
+          cache: pnpm
 
       - name: Bootstrap
         run: ./scripts/bootstrap
@@ -76,19 +87,37 @@ jobs:
         run: ./scripts/utils/upload-artifact.sh
   test:
     timeout-minutes: 10
-    name: test
     runs-on: ${{ github.repository == 'stainless-sdks/openai-typescript' && 'depot-ubuntu-24.04' || 'ubuntu-latest' }}
     if: github.event_name == 'push' || github.event.pull_request.head.repo.fork
+    strategy:
+      fail-fast: false
+      matrix:
+        # The GitHub-hosted Node 26 alias currently resolves to 26.3.0, where
+        # this full Steady-backed test job surfaced a multipart connection reset.
+        # Pin to 26.2.0 so this still covers Node 26 without changing generated
+        # API-resource tests for a CI-specific failure.
+        node-version: ['20', '22', '24', '26.2.0']
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+
+      # pnpm 11 requires Node >=22.13, so install dependencies with the current
+      # LTS before switching to the runtime version under test.
       - name: Set up Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '20'
+          node-version: ${{ env.LATEST_LTS_NODE_VERSION }}
+          cache: pnpm
 
       - name: Bootstrap
         run: ./scripts/bootstrap
+
+      - name: Set up test Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '${{ matrix.node-version }}'
 
       - name: Run tests
         run: ./scripts/test
@@ -98,39 +127,51 @@ jobs:
     name: examples
     runs-on: ${{ github.repository == 'stainless-sdks/openai-typescript' && 'depot-ubuntu-24.04' || 'ubuntu-latest' }}
     if: github.repository == 'openai/openai-node'
+    environment: ci
 
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+
       - name: Set up Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '20'
+          node-version: ${{ env.LATEST_LTS_NODE_VERSION }}
+          cache: pnpm
+
       - name: Install dependencies
         run: |
-          yarn install
+          pnpm install --frozen-lockfile
 
-      - env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      - name: Run demo
         run: |
-          yarn tsn examples/demo.ts
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "Skipping examples because OPENAI_API_KEY is not set"
+            exit 0
+          fi
+          pnpm tsn examples/demo.ts
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
   ecosystem_tests:
-    name: ecosystem tests (v${{ matrix.node-version }})
+    name: ecosystem tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        node-version: ['20']
+    environment: ci
 
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+
       - name: Set up Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '${{ matrix.node-version }}'
+          node-version: ${{ env.LATEST_LTS_NODE_VERSION }}
+          cache: pnpm
 
       - uses: denoland/setup-deno@11b63cf76cfcafb4e43f97b6cad24d8e8438f62d # v1
         with:
@@ -143,7 +184,9 @@ jobs:
 
       - name: Run ecosystem tests
         run: |
-          yarn tsn ecosystem-tests/cli.ts --live --verbose --parallel --jobs=4 --retry=3
+          pnpm tsn ecosystem-tests/cli.ts --live --verbose --parallel --jobs=4 --retry=3
         env:
           DISABLE_V8_COMPILE_CACHE: '1'
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          PUPPETEER_EXECUTABLE_PATH: /usr/bin/google-chrome
+          PUPPETEER_SKIP_DOWNLOAD: 'true'

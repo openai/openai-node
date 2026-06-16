@@ -4,6 +4,29 @@ set -e
 
 cd "$(dirname "$0")/.."
 
+if [ "${DETECT_BREAKING_CHANGES_COMPAT:-}" = "1" ]; then
+  echo "==> Preparing historical breaking-change tests"
+  # Historical tests are checked against the current SDK and tsconfig. The
+  # embeddings tests on main briefly used Array.prototype.at(), but the SDK still
+  # targets older JS libs, so normalize that syntax before the compatibility lint.
+  if [ -e tests/api-resources/embeddings.test.ts ]; then
+    node <<'EOF'
+const fs = require('fs');
+
+const path = 'tests/api-resources/embeddings.test.ts';
+let contents = fs.readFileSync(path, 'utf8');
+contents = contents
+  .replaceAll('response.data?.at(0)?.embedding.at(0)', 'response.data?.[0]?.embedding[0]')
+  .replaceAll('response.data?.at(0)?.embedding', 'response.data?.[0]?.embedding');
+fs.writeFileSync(path, contents);
+EOF
+  fi
+
+  # Old test files are checked for compatibility with the current SDK, not
+  # formatting drift against the current Prettier version.
+  find tests -name '*.test.ts' -print0 | xargs -0 ./node_modules/.bin/prettier --write
+fi
+
 echo "==> Running prettier --check"
 ./node_modules/.bin/prettier --check .
 
