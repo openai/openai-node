@@ -3,7 +3,7 @@
 set -eux
 
 # Build the project
-yarn build
+pnpm build
 
 # Navigate to the dist directory
 cd dist-deno

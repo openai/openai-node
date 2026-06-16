@@ -1,0 +1,35 @@
+packages:
+  - examples
+  - '!ecosystem-tests/**'
+
+minimumReleaseAge: 1440
+minimumReleaseAgeExclude:
+  # tsc-multi is a direct GitHub release tarball pinned by integrity in pnpm-lock.yaml.
+  # Registry metadata for that tarball lacks publish-time data, so the release-age
+  # check cannot evaluate it.
+  - 'tsc-multi@1.1.11'
+minimumReleaseAgeStrict: true
+trustPolicy: no-downgrade
+trustPolicyExclude:
+  # semver@6.3.1 is an established transitive dependency, but pnpm's trust-policy
+  # check flags it as a trust downgrade because older registry trust signals differ.
+  - 'semver@6.3.1'
+  # tsc-multi is a direct GitHub release tarball pinned by integrity in pnpm-lock.yaml,
+  # so it does not have registry trust metadata comparable to npm-published packages.
+  - 'tsc-multi@1.1.11'
+blockExoticSubdeps: true
+strictDepBuilds: true
+trustLockfile: false
+pmOnFail: error
+verifyDepsBeforeRun: error
+
+overrides:
+  # @typespec/ts-http-runtime@0.3.6 currently has incomplete registry metadata in
+  # our registry mirror, which causes pnpm trust-policy warnings. Azure packages
+  # accept 0.3.5 via their declared ranges, and 0.3.5 has clean metadata.
+  '@typespec/ts-http-runtime': 0.3.5
+  # Keep the existing minimatch security override from the prior Yarn/npm setup.
+  minimatch: ^9.0.5
+
+allowBuilds:
+  '@swc/core': true
