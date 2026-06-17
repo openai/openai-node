@@ -1143,8 +1143,8 @@ export class OpenAI {
       // request body, even if the caller omitted an optional body param. Keep the
       // content-type for those, and only elide it for operations with no body at
       // all (e.g. GET/DELETE).
-      if (body == null && 'body' in options) {
-        return this.#encoder({ body, headers: buildHeaders([rawHeaders]) });
+      if (body === undefined && 'body' in options) {
+        return { ...this.#encoder({ body, headers: buildHeaders([rawHeaders]) }), isStreamingBody: false };
       }
       return { bodyHeaders: undefined, body: undefined, isStreamingBody: false };
     }
