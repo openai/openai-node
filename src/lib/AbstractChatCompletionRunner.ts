@@ -341,8 +341,9 @@ export class AbstractChatCompletionRunner<
 
       for (const tool_call of message.tool_calls) {
         if (tool_call.type !== 'function') continue;
-        const tool_call_id = tool_call.id;
         const { name, arguments: args } = tool_call.function;
+        // Some LLM providers may not populate tool_call.id; use function name as fallback
+        const tool_call_id = tool_call.id || name;
         const fn = functionsByName[name];
 
         if (!fn) {
