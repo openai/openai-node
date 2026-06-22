@@ -1,5 +1,7 @@
 import OpenAI from 'openai';
-import { bedrock, type BedrockProviderOptions } from 'openai/providers/bedrock';
+import type { Provider } from 'openai/internal/provider';
+import { bedrock as bearerBedrock } from 'openai/providers/bedrock';
+import { bedrock as awsBedrock } from 'openai/providers/bedrock/aws';
 
 /**
  * Example:
@@ -39,33 +41,38 @@ function readAuthMode(): AuthMode {
   throw new Error(`${AUTH_MODE_ENV} must be one of: ${authModes.join(', ')}.`);
 }
 
-async function authOptions(mode: AuthMode): Promise<BedrockProviderOptions> {
+async function providerForAuth(
+  mode: AuthMode,
+  endpoint: { region: string; baseURL?: string | undefined },
+): Promise<Provider> {
   switch (mode) {
     case 'bearer':
-      return { apiKey: requiredEnv('AWS_BEARER_TOKEN_BEDROCK') };
+      return bearerBedrock({ ...endpoint, apiKey: requiredEnv('AWS_BEARER_TOKEN_BEDROCK') });
     case 'environment-bearer':
       requiredEnv('AWS_BEARER_TOKEN_BEDROCK');
-      return {};
+      return bearerBedrock(endpoint);
     case 'default-chain':
-      return { apiKey: null };
+      return awsBedrock({ ...endpoint, apiKey: null });
     case 'profile':
-      return { apiKey: null, profile: requiredEnv('AWS_PROFILE') };
+      return awsBedrock({ ...endpoint, apiKey: null, profile: requiredEnv('AWS_PROFILE') });
     case 'static': {
       const sessionToken = process.env['AWS_SESSION_TOKEN']?.trim();
-      return {
+      return awsBedrock({
+        ...endpoint,
         apiKey: null,
         accessKeyId: requiredEnv('AWS_ACCESS_KEY_ID'),
         secretAccessKey: requiredEnv('AWS_SECRET_ACCESS_KEY'),
         ...(sessionToken ? { sessionToken } : {}),
-      };
+      });
     }
     case 'custom-provider': {
       const { defaultProvider } = await import('@aws-sdk/credential-provider-node');
       const profile = process.env['AWS_PROFILE']?.trim();
-      return {
+      return awsBedrock({
+        ...endpoint,
         apiKey: null,
         credentialProvider: defaultProvider(profile ? { profile } : {}),
-      };
+      });
     }
   }
 }
@@ -91,10 +98,9 @@ describe(`Amazon Bedrock live (${authMode})`, () => {
 
   beforeAll(async () => {
     client = new OpenAI({
-      provider: bedrock({
+      provider: await providerForAuth(authMode, {
         region,
         ...(baseURL ? { baseURL } : {}),
-        ...(await authOptions(authMode)),
       }),
       maxRetries: 0,
       timeout: 120_000,

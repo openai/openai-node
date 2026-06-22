@@ -1,9 +1,8 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
-
 import OpenAI from 'openai';
 import type { RequestInfo, RequestInit } from 'openai/internal/builtin-types';
 import { configureProvider } from 'openai/internal/provider';
-import { bedrock, type BedrockProviderOptions } from 'openai/providers/bedrock';
+import { bedrock as bearerBedrock } from 'openai/providers/bedrock';
+import { bedrock, type BedrockProviderOptions } from 'openai/providers/bedrock/aws';
 import { SignatureV4 } from '@smithy/signature-v4';
 
 import sigV4Fixture from '../fixtures/bedrock/v1/sigv4.json';
@@ -42,7 +41,7 @@ describe('bedrock provider', () => {
     let requestedURL: RequestInfo | undefined;
     let requestedInit: RequestInit | undefined;
     const client = new OpenAI({
-      provider: bedrock({ region: 'us-east-1', apiKey: 'bedrock-token' }),
+      provider: bearerBedrock({ region: 'us-east-1', apiKey: 'bedrock-token' }),
       fetch: async (url, init) => {
         requestedURL = url;
         requestedInit = init;
@@ -64,7 +63,7 @@ describe('bedrock provider', () => {
       authorizationHeaders.push(new Headers(init?.headers).get('authorization') ?? '');
       return jsonResponse();
     };
-    const client = new OpenAI({ provider: bedrock({ region: 'us-east-1' }), fetch });
+    const client = new OpenAI({ provider: bearerBedrock({ region: 'us-east-1' }), fetch });
 
     await client.request({ method: 'get', path: '/models' });
     delete process.env['AWS_BEARER_TOKEN_BEDROCK'];
@@ -91,26 +90,32 @@ describe('bedrock provider', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  test('the dependency-free entrypoint points AWS credential users to the AWS entrypoint', () => {
+    expect(() => bearerBedrock({ region: 'us-east-1', apiKey: null })).toThrow(
+      'openai/providers/bedrock/aws',
+    );
+  });
+
   test('baseURL: null skips the environment endpoint fallback', () => {
     process.env['AWS_BEDROCK_BASE_URL'] = 'https://environment.example/v1';
 
     const client = new OpenAI({
-      provider: bedrock({ region: 'us-east-1', baseURL: null, apiKey: 'bedrock-token' }),
+      provider: bearerBedrock({ region: 'us-east-1', baseURL: null, apiKey: 'bedrock-token' }),
     });
 
     expect(client.baseURL).toBe('https://bedrock-mantle.us-east-1.api.aws/openai/v1');
   });
 
   test('requires a region only when deriving the default endpoint', () => {
-    expect(() => bedrock({ apiKey: 'bedrock-token' })).toThrow('Bedrock requires an AWS region');
+    expect(() => bearerBedrock({ apiKey: 'bedrock-token' })).toThrow('Bedrock requires an AWS region');
     expect(() =>
-      bedrock({ baseURL: 'https://bedrock.example.com/openai/v1', apiKey: 'bedrock-token' }),
+      bearerBedrock({ baseURL: 'https://bedrock.example.com/openai/v1', apiKey: 'bedrock-token' }),
     ).not.toThrow();
   });
 
   test('normalizes a Responses URL back to its API root', () => {
     const client = new OpenAI({
-      provider: bedrock({
+      provider: bearerBedrock({
         baseURL: 'https://bedrock.example.com/responses/response-id',
         apiKey: 'bedrock-token',
       }),
@@ -172,7 +177,7 @@ describe('bedrock provider', () => {
   test('rejects a custom Authorization header before fetch', async () => {
     const fetch = jest.fn(async () => jsonResponse());
     const client = new OpenAI({
-      provider: bedrock({ region: 'us-east-1', apiKey: 'bedrock-token' }),
+      provider: bearerBedrock({ region: 'us-east-1', apiKey: 'bedrock-token' }),
       fetch,
     });
 
@@ -230,7 +235,7 @@ describe('bedrock provider', () => {
     async (token) => {
       const fetch = jest.fn(async () => jsonResponse());
       const client = new OpenAI({
-        provider: bedrock({ region: 'us-east-1', tokenProvider: async () => token }),
+        provider: bearerBedrock({ region: 'us-east-1', tokenProvider: async () => token }),
         fetch,
       });
 
@@ -244,7 +249,7 @@ describe('bedrock provider', () => {
   test('fails if an ambient bearer credential disappears before the request', async () => {
     process.env['AWS_BEARER_TOKEN_BEDROCK'] = 'temporary-token';
     const fetch = jest.fn(async () => jsonResponse());
-    const client = new OpenAI({ provider: bedrock({ region: 'us-east-1' }), fetch });
+    const client = new OpenAI({ provider: bearerBedrock({ region: 'us-east-1' }), fetch });
     delete process.env['AWS_BEARER_TOKEN_BEDROCK'];
 
     await expect(client.request({ method: 'get', path: '/models' })).rejects.toMatchObject({

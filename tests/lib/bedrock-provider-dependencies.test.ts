@@ -36,14 +36,37 @@ function jsonResponse(body: unknown = {}): Response {
 
 async function loadBedrockModules(): Promise<{
   OpenAI: typeof import('openai').default;
-  bedrock: typeof import('openai/providers/bedrock').bedrock;
+  bedrock: typeof import('openai/providers/bedrock/aws').bedrock;
 }> {
   const openai = require('openai') as typeof import('openai');
-  const bedrockProvider = require('openai/providers/bedrock') as typeof import('openai/providers/bedrock');
+  const bedrockProvider =
+    require('openai/providers/bedrock/aws') as typeof import('openai/providers/bedrock/aws');
   return { OpenAI: openai.default, bedrock: bedrockProvider.bedrock };
 }
 
 describe('Bedrock provider optional dependencies', () => {
+  test('keeps the root and bearer entrypoints independent from AWS packages', async () => {
+    for (const dependency of optionalDependencies) {
+      jest.doMock(dependency, () => {
+        throw new Error(`unexpected AWS import: ${dependency}`);
+      });
+    }
+
+    await jest.isolateModulesAsync(async () => {
+      const openai = require('openai') as typeof import('openai');
+      const bearerProvider = require('openai/providers/bedrock') as typeof import('openai/providers/bedrock');
+      const fetch = jest.fn(async () => jsonResponse());
+      const client = new openai.default({
+        provider: bearerProvider.bedrock({ region: 'us-east-1', apiKey: 'bearer-token' }),
+        fetch,
+      });
+
+      await client.request({ method: 'get', path: '/models' });
+
+      expect(fetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
   test('resolves temporary environment credentials through the real AWS default chain', async () => {
     process.env['AWS_ACCESS_KEY_ID'] = 'environment-access-key';
     process.env['AWS_SECRET_ACCESS_KEY'] = 'environment-secret-key';
@@ -150,65 +173,14 @@ describe('Bedrock provider optional dependencies', () => {
     });
   });
 
-  test('preserves an actionable message and cause when the default provider dependency is missing', async () => {
+  test('surfaces the runtime module error when an AWS dependency is missing', async () => {
     const missingDependency = new Error('Cannot find module @aws-sdk/credential-provider-node');
     jest.doMock('@aws-sdk/credential-provider-node', () => {
       throw missingDependency;
     });
 
     await jest.isolateModulesAsync(async () => {
-      const { OpenAI, bedrock } = await loadBedrockModules();
-      const client = new OpenAI({
-        provider: bedrock({ region: 'us-east-1', apiKey: null }),
-        maxRetries: 0,
-        fetch: jest.fn(async () => jsonResponse()),
-      });
-
-      let thrown: unknown;
-      try {
-        await client.request({ method: 'get', path: '/models' });
-      } catch (error) {
-        thrown = error;
-      }
-
-      expect(thrown).toBeInstanceOf(Error);
-      expect((thrown as Error).message).toContain(
-        'npm install @aws-sdk/credential-provider-node @smithy/hash-node @smithy/signature-v4',
-      );
-      expect((thrown as Error & { cause?: unknown }).cause).toBe(missingDependency);
-    });
-  });
-
-  test('preserves an actionable message and cause when a signing dependency is missing', async () => {
-    const missingDependency = new Error('Cannot find module @smithy/signature-v4');
-    jest.doMock('@smithy/signature-v4', () => {
-      throw missingDependency;
-    });
-
-    await jest.isolateModulesAsync(async () => {
-      const { OpenAI, bedrock } = await loadBedrockModules();
-      const client = new OpenAI({
-        provider: bedrock({
-          region: 'us-east-1',
-          accessKeyId: 'access-key',
-          secretAccessKey: 'secret-key',
-        }),
-        maxRetries: 0,
-        fetch: jest.fn(async () => jsonResponse()),
-      });
-
-      let thrown: unknown;
-      try {
-        await client.request({ method: 'get', path: '/models' });
-      } catch (error) {
-        thrown = error;
-      }
-
-      expect(thrown).toBeInstanceOf(Error);
-      expect((thrown as Error).message).toContain(
-        'npm install @aws-sdk/credential-provider-node @smithy/hash-node @smithy/signature-v4',
-      );
-      expect((thrown as Error & { cause?: unknown }).cause).toBe(missingDependency);
+      await expect(loadBedrockModules()).rejects.toBe(missingDependency);
     });
   });
 

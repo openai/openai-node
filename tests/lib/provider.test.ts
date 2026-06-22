@@ -1,5 +1,3 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
-
 import OpenAI from 'openai';
 import { createProvider, type ProviderRuntime } from 'openai/internal/provider';
 import { formatRequestDetails } from 'openai/internal/utils/log';
@@ -132,6 +130,22 @@ describe('provider', () => {
     expect(cloned).not.toBe(client);
     expect(cloned.baseURL).toBe('https://provider.example/v1');
     expect(cloned.timeout).toBe(1);
+  });
+
+  test('preserves provider headers when cloning withOptions', async () => {
+    let requestedHeaders: Headers | undefined;
+    const client = new OpenAI({
+      provider: provider(),
+      defaultHeaders: { 'x-provider-custom': 'preserve-me' },
+      fetch: async (_url, init) => {
+        requestedHeaders = new Headers(init?.headers);
+        return new Response('{}', { headers: { 'Content-Type': 'application/json' } });
+      },
+    });
+
+    await client.withOptions({ timeout: 1 }).request({ method: 'get', path: '/models' });
+
+    expect(requestedHeaders?.get('x-provider-custom')).toBe('preserve-me');
   });
 
   test('does not let a request-level default base URL replace the provider base URL', () => {

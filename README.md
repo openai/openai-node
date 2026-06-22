@@ -407,14 +407,14 @@ To use this library with [Amazon Bedrock's OpenAI-compatible API](https://docs.a
 
 ```ts
 import OpenAI from 'openai';
-import { bedrock } from 'openai/providers/bedrock';
+import { bedrock } from 'openai/providers/bedrock/aws';
 
 const client = new OpenAI({
   provider: bedrock({ region: 'us-west-2' }),
 });
 
 const response = await client.responses.create({
-  model: 'openai.gpt-oss-120b',
+  model: 'openai.gpt-5.4',
   input: 'Say hello!',
 });
 
@@ -425,21 +425,19 @@ Use a model that [supports the Responses API](https://docs.aws.amazon.com/bedroc
 
 This uses the regional `https://bedrock-mantle.<region>.api.aws/openai/v1` endpoint. The region can also come from `AWS_REGION` or `AWS_DEFAULT_REGION`, and `AWS_BEDROCK_BASE_URL` can override the endpoint.
 
-Authentication is selected in this order: an explicit bearer or AWS credential option, `AWS_BEARER_TOKEN_BEDROCK`, then the default AWS credential chain. Pass `apiKey: null` to skip an ambient `AWS_BEARER_TOKEN_BEDROCK` and use the AWS credential chain.
-
-Bearer authentication requires no additional packages. For SigV4 authentication, install the optional AWS dependencies:
+The AWS entrypoint uses the standard AWS credential chain by default. It also accepts a named profile, static credentials, or a custom credential provider. Install its peer dependencies before importing it:
 
 ```bash
 npm install @aws-sdk/credential-provider-node @smithy/hash-node @smithy/signature-v4
 ```
 
-These dependencies load only when SigV4 authentication is used. If they are missing, the first signed request throws an `OpenAIError` with this message:
+The AWS entrypoint uses normal static imports so bundlers and serverless packagers can trace these dependencies. If one is missing, importing `openai/providers/bedrock/aws` fails immediately with the runtime's normal module-not-found error, for example:
 
 ```text
-Bedrock AWS authentication requires optional AWS dependencies. Run `npm install @aws-sdk/credential-provider-node @smithy/hash-node @smithy/signature-v4` and try again.
+Cannot find module '@aws-sdk/credential-provider-node'
 ```
 
-SigV4 authentication is supported in Node.js and compatible server runtimes. The SDK's current SigV4 mode requires replayable request bodies. Bearer authentication can be used in other runtimes. The legacy `BedrockOpenAI` class remains available for compatibility.
+For Bedrock API key authentication, import `bedrock` from `openai/providers/bedrock` instead. That entrypoint has no AWS dependencies and works in browser-compatible runtimes when `dangerouslyAllowBrowser` is enabled. SigV4 authentication is supported in Node.js and compatible server runtimes and requires replayable request bodies. The legacy, bearer-only `BedrockOpenAI` class remains available for compatibility.
 
 For more information on support for Amazon Bedrock, see [bedrock.md](bedrock.md).
 

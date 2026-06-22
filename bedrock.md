@@ -4,14 +4,14 @@ To use this library with [Amazon Bedrock's OpenAI-compatible API](https://docs.a
 
 ```ts
 import OpenAI from 'openai';
-import { bedrock } from 'openai/providers/bedrock';
+import { bedrock } from 'openai/providers/bedrock/aws';
 
 const client = new OpenAI({
   provider: bedrock({ region: 'us-west-2' }),
 });
 
 const response = await client.responses.create({
-  model: 'openai.gpt-oss-120b',
+  model: 'openai.gpt-5.4',
   input: 'Say hello!',
 });
 
@@ -35,7 +35,7 @@ const client = new OpenAI({
 
 ## Authentication
 
-The provider selects authentication in this order:
+The AWS entrypoint selects authentication in this order:
 
 1. One explicit mode passed to `bedrock(...)`: `apiKey` or `tokenProvider`, static AWS credentials, `profile`, or `credentialProvider`.
 2. The [Amazon Bedrock API key](https://docs.aws.amazon.com/bedrock/latest/userguide/api-keys.html) in `AWS_BEARER_TOKEN_BEDROCK`.
@@ -67,31 +67,40 @@ const client = new OpenAI({
 });
 ```
 
-Bearer authentication does not require any additional dependencies. Pass `apiKey: null` to skip an ambient `AWS_BEARER_TOKEN_BEDROCK` and explicitly select the default AWS credential chain:
+Bearer authentication does not require any additional dependencies when imported from the dependency-free entrypoint:
 
 ```ts
+import { bedrock } from 'openai/providers/bedrock';
+
 const client = new OpenAI({
-  provider: bedrock({ region: 'us-west-2', apiKey: null }),
+  provider: bedrock({
+    region: 'us-west-2',
+    apiKey: process.env['AWS_BEARER_TOKEN_BEDROCK'],
+  }),
 });
 ```
 
+The dependency-free entrypoint supports only `apiKey`, `tokenProvider`, and `AWS_BEARER_TOKEN_BEDROCK`. Use the AWS entrypoint for SigV4 authentication.
+
 ### AWS credentials and SigV4
 
-Install the optional AWS dependencies to sign requests with SigV4:
+Install the AWS entrypoint's peer dependencies to sign requests with SigV4:
 
 ```sh
 npm install @aws-sdk/credential-provider-node @smithy/hash-node @smithy/signature-v4
 ```
 
-These dependencies load only when SigV4 authentication is used. If they are missing, the first signed request throws an `OpenAIError` with this message:
+The AWS entrypoint uses normal static imports so Vite, Webpack, and serverless packagers can include these dependencies. If one is missing, importing `openai/providers/bedrock/aws` fails immediately with the runtime's normal module-not-found error, for example:
 
 ```text
-Bedrock AWS authentication requires optional AWS dependencies. Run `npm install @aws-sdk/credential-provider-node @smithy/hash-node @smithy/signature-v4` and try again.
+Cannot find module '@aws-sdk/credential-provider-node'
 ```
 
-Omit explicit authentication to use the default AWS credential chain, or select a shared-config profile:
+Import the AWS entrypoint, then omit explicit authentication to use the default AWS credential chain or select a shared-config profile:
 
 ```ts
+import { bedrock } from 'openai/providers/bedrock/aws';
+
 const client = new OpenAI({
   provider: bedrock({
     region: 'us-west-2',
@@ -128,7 +137,7 @@ const client = new OpenAI({
 });
 ```
 
-SigV4 authentication is supported in Node.js and compatible server runtimes. Bearer authentication can be used in other runtimes without loading the optional AWS packages.
+SigV4 authentication is supported in Node.js and compatible server runtimes. Bearer authentication can be used in other runtimes without loading the AWS packages by importing from `openai/providers/bedrock`.
 
 The SDK's current SigV4 mode requires a replayable, buffered body such as a string, `ArrayBuffer`, or typed-array view. The standard JSON API methods already meet this requirement. Custom `FormData`, readable streams, and other non-replayable request bodies are rejected before sending; response streaming is unaffected. Signed requests also do not automatically follow redirects, because the redirect target would require a new signature.
 
@@ -136,15 +145,15 @@ Bedrock Mantle also supports `UNSIGNED-PAYLOAD` and AWS-chunked request signing,
 
 ## Legacy `BedrockOpenAI` class
 
-The `BedrockOpenAI` class remains available for existing applications. It accepts the `awsRegion`, `awsProfile`, `awsCredentialProvider`, and `bedrockTokenProvider` option names and uses the same `/openai/v1` endpoint as the provider:
+The `BedrockOpenAI` class remains available for existing bearer-authenticated applications. It accepts the `awsRegion` and `bedrockTokenProvider` option names and uses the same `/openai/v1` endpoint as the provider:
 
 ```ts
 import { BedrockOpenAI } from 'openai';
 
 const client = new BedrockOpenAI({
   awsRegion: 'us-west-2',
-  awsProfile: 'my-profile',
+  apiKey: process.env['AWS_BEARER_TOKEN_BEDROCK'],
 });
 ```
 
-New applications should prefer `new OpenAI({ provider: bedrock(...) })`.
+New applications using AWS credentials should prefer `new OpenAI({ provider: bedrock(...) })` with the `openai/providers/bedrock/aws` entrypoint.

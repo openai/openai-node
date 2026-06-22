@@ -513,7 +513,8 @@ export class OpenAI {
    * Create a new client instance re-using the same options given to the current client with optional overriding.
    */
   withOptions(options: Partial<ClientOptions>): this {
-    const provider = options.provider ?? this._options.provider;
+    const inheritedProvider = this._options.provider;
+    const provider = options.provider ?? inheritedProvider;
     const inheritedOptions: ClientOptions = {
       ...this._options,
       baseURL: this.baseURL,
@@ -535,9 +536,11 @@ export class OpenAI {
       delete inheritedOptions.adminAPIKey;
       delete inheritedOptions.workloadIdentity;
       delete inheritedOptions.baseURL;
-      delete inheritedOptions.organization;
-      delete inheritedOptions.project;
-      delete inheritedOptions.defaultHeaders;
+      if (provider !== inheritedProvider) {
+        delete inheritedOptions.organization;
+        delete inheritedOptions.project;
+        delete inheritedOptions.defaultHeaders;
+      }
     }
 
     const client = new (this.constructor as any as new (props: ClientOptions) => typeof this)({
