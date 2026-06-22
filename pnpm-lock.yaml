@@ -57,27 +57,36 @@ importers:
       fast-check:
         specifier: ^3.22.0
         version: 3.23.2
+      fast-glob:
+        specifier: ^3.3.2
+        version: 3.3.3
       iconv-lite:
         specifier: ^0.6.3
         version: 0.6.3
       jest:
         specifier: ^29.4.0
         version: 29.7.0(@types/node@24.12.4)(ts-node@10.9.2(@swc/core@1.15.40)(@types/node@24.12.4)(typescript@5.8.3))
+      p-all:
+        specifier: ^3.0.0
+        version: 3.0.0
       prettier:
         specifier: 3.1.1
         version: 3.1.1
       publint:
         specifier: ^0.2.12
         version: 0.2.12
+      signal-exit:
+        specifier: ^3.0.7
+        version: 3.0.7
+      superstruct:
+        specifier: ^1.0.4
+        version: 1.0.4
       ts-jest:
         specifier: ^29.1.0
         version: 29.4.11(@babel/core@7.29.7)(@jest/transform@29.7.0)(@jest/types@30.4.1)(babel-jest@29.7.0(@babel/core@7.29.7))(jest-util@29.7.0)(jest@29.7.0(@types/node@24.12.4)(ts-node@10.9.2(@swc/core@1.15.40)(@types/node@24.12.4)(typescript@5.8.3)))(typescript@5.8.3)
       ts-node:
         specifier: ^10.5.0
         version: 10.9.2(@swc/core@1.15.40)(@types/node@24.12.4)(typescript@5.8.3)
-      tsc-multi:
-        specifier: https://github.com/stainless-api/tsc-multi/releases/download/v1.1.11/tsc-multi.tgz
-        version: https://github.com/stainless-api/tsc-multi/releases/download/v1.1.11/tsc-multi.tgz(typescript@5.8.3)
       tsconfig-paths:
         specifier: ^4.0.0
         version: 4.2.0
@@ -1432,10 +1441,6 @@ packages:
     resolution: {integrity: sha512-sTSfBjoXBp89JvIKIefqw7U2CCebsc74kiY6awiGogKtoSGbgjYE/G/+l9sF3MWFPNc9IcoOC4ODfKHfxFmp0g==}
     engines: {node: '>= 0.4'}
 
-  get-stdin@8.0.0:
-    resolution: {integrity: sha512-sY22aA6xchAzprjyqmSEQv4UbAAzRN0L2dQB0NlN5acTTK9Don6nhoc3eAbUnpZiCANAMfd/+40kVdKfFygohg==}
-    engines: {node: '>=10'}
-
   get-stream@6.0.1:
     resolution: {integrity: sha512-ts6Wi+2j3jQjqi70w5AlN8DFnkSwC+MqmxEzdEALB2qXZYV3X/b1CTfgPLGJNMeAWxdPfU8FO1ms3NUfaHCPYg==}
     engines: {node: '>=10'}
@@ -2202,10 +2207,6 @@ packages:
     resolution: {integrity: sha512-wS+hAgJShR0KhEvPJArfuPVN1+Hz1t0Y6n5jLrGQbkb4urgPE/0Rve+1kMB1v/oWgHgm4WIcV+i7F2pTVj+2iQ==}
     engines: {node: '>=0.10.0'}
 
-  readable-stream@3.6.2:
-    resolution: {integrity: sha512-9u/sniCrY3D5WdsERHzHE4G2YCXqoG5FTHUiCC4SIbr6XcLZBY05ya9EKjYek9O5xOAwjGq+1JdGBAS7Q9ScoA==}
-    engines: {node: '>= 6'}
-
   require-directory@2.1.1:
     resolution: {integrity: sha512-fGxEI7+wsG9xrvdjsrlmL22OMTTiHRwAMroiEeMgq8gzoLC/PQr7RsRDSTLUg/bZAZtF+TVIkHc6/4RIKrui+Q==}
     engines: {node: '>=0.10.0'}
@@ -2343,15 +2344,9 @@ packages:
     resolution: {integrity: sha512-+l6rNN5fYHNhZZy41RXsYptCjA2Igmq4EG7kZAYFQI1E1VTXarr6ZPXBg6eq7Y6eK4FEhY6AJlyuFIb/v/S0VQ==}
     engines: {node: '>=10'}
 
-  string-to-stream@3.0.1:
-    resolution: {integrity: sha512-Hl092MV3USJuUCC6mfl9sPzGloA3K5VwdIeJjYIkXY/8K+mUvaeEabWJgArp+xXrsWxCajeT2pc4axbVhIZJyg==}
-
   string-width@4.2.3:
     resolution: {integrity: sha512-wKyQRQpjJ0sIp62ErSZdGsjMJWsap5oRNihHhu6G7JVO/9jIB6UyevL+tXuOqrng8j/cxKTWyWUwvSTriiZz/g==}
     engines: {node: '>=8'}
-
-  string_decoder@1.3.0:
-    resolution: {integrity: sha512-hkRX8U1WjJFd8LsDJ2yQ/wWWxaopEsABU1XfkM8A+j0+85JAGppt16cr1Whg6KIbb4okU6Mql6BOj+uup/wKeA==}
 
   strip-ansi@6.0.1:
     resolution: {integrity: sha512-Y38VPSHcqkFrCpFnQ9vuSXmquuv5oXOKpGeT6aGrr3o3Gc9AlVa6JBfUSOCnbxGGZF+/0ooI7KrPuUSztUdU5A==}
@@ -2475,14 +2470,6 @@ packages:
       '@swc/wasm':
         optional: true
 
-  tsc-multi@https://github.com/stainless-api/tsc-multi/releases/download/v1.1.11/tsc-multi.tgz:
-    resolution: {integrity: sha512-LrjLRdfDnJ6UcZPSsxxY8QDnZmS3ZpPyvzgjUlNMjjRoTAUVqeL+IWrIzEU3Z+CwVrpVI97PePRLenEfCtR/UQ==, tarball: https://github.com/stainless-api/tsc-multi/releases/download/v1.1.11/tsc-multi.tgz}
-    version: 1.1.11
-    engines: {node: '>=14'}
-    hasBin: true
-    peerDependencies:
-      typescript: '>=4.3.0'
-
   tsconfig-paths@4.2.0:
     resolution: {integrity: sha512-NoZ4roiN7LnbKn9QqE1amc9DJfzvZXxF4xDavcOWt1BPkdx+m+0gJuPM+S0vCe7zTJMYUP0R8pO2XMr+Y8oLIg==}
     engines: {node: '>=6'}
@@ -2551,9 +2538,6 @@ packages:
 
   uri-js@4.4.1:
     resolution: {integrity: sha512-7rKUyy33Q1yc98pQ1DAmLtwX109F7TIfWlW1Ydo8Wl1ii1SeHieeh0HHfPeL2fMXK6z0s8ecKs9frCuLJvndBg==}
-
-  util-deprecate@1.0.2:
-    resolution: {integrity: sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw==}
 
   utils-merge@1.0.1:
     resolution: {integrity: sha512-pMZTvIkT1d+TFGvDOqodOclx0QWkkgi6Tdoa8gC8ffGAAqz9pzPTZWAybbsHHoED/ztMtkv/VoYTYyShUn81hA==}
@@ -4175,8 +4159,6 @@ snapshots:
       dunder-proto: 1.0.1
       es-object-atoms: 1.1.2
 
-  get-stdin@8.0.0: {}
-
   get-stream@6.0.1: {}
 
   glob-parent@5.1.2:
@@ -5076,12 +5058,6 @@ snapshots:
     dependencies:
       loose-envify: 1.4.0
 
-  readable-stream@3.6.2:
-    dependencies:
-      inherits: 2.0.4
-      string_decoder: 1.3.0
-      util-deprecate: 1.0.2
-
   require-directory@2.1.1: {}
 
   resolve-cwd@3.0.0:
@@ -5222,19 +5198,11 @@ snapshots:
       char-regex: 1.0.2
       strip-ansi: 6.0.1
 
-  string-to-stream@3.0.1:
-    dependencies:
-      readable-stream: 3.6.2
-
   string-width@4.2.3:
     dependencies:
       emoji-regex: 8.0.0
       is-fullwidth-code-point: 3.0.0
       strip-ansi: 6.0.1
-
-  string_decoder@1.3.0:
-    dependencies:
-      safe-buffer: 5.2.1
 
   strip-ansi@6.0.1:
     dependencies:
@@ -5338,22 +5306,6 @@ snapshots:
     optionalDependencies:
       '@swc/core': 1.15.40
 
-  tsc-multi@https://github.com/stainless-api/tsc-multi/releases/download/v1.1.11/tsc-multi.tgz(typescript@5.8.3):
-    dependencies:
-      debug: 4.4.3
-      fast-glob: 3.3.3
-      get-stdin: 8.0.0
-      p-all: 3.0.0
-      picocolors: 1.1.1
-      signal-exit: 3.0.7
-      string-to-stream: 3.0.1
-      superstruct: 1.0.4
-      tslib: 2.8.1
-      typescript: 5.8.3
-      yargs: 17.7.2
-    transitivePeerDependencies:
-      - supports-color
-
   tsconfig-paths@4.2.0:
     dependencies:
       json5: 2.2.3
@@ -5409,8 +5361,6 @@ snapshots:
   uri-js@4.4.1:
     dependencies:
       punycode: 2.3.1
-
-  util-deprecate@1.0.2: {}
 
   utils-merge@1.0.1: {}
 
