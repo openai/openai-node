@@ -42,6 +42,29 @@ describe('form data validation', () => {
     expect(form.get('bar')).toBe('baz');
   });
 
+  test('strips file paths by default', async () => {
+    const form = await createForm(
+      {
+        files: [new File(['Example data'], 'my-skill/SKILL.md')],
+      },
+      fetch,
+    );
+
+    expect((form.get('files[]') as File).name).toBe('SKILL.md');
+  });
+
+  test('preserves file paths when requested', async () => {
+    const form = await createForm(
+      {
+        files: [new File(['Example data'], 'my-skill/SKILL.md')],
+      },
+      fetch,
+      { preserveFilePaths: true },
+    );
+
+    expect((form.get('files[]') as File).name).toBe('my-skill/SKILL.md');
+  });
+
   test('nested undefined property is stripped', async () => {
     const form = await createForm(
       {

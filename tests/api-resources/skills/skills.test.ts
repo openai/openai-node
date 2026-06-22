@@ -1,6 +1,7 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import OpenAI, { toFile } from 'openai';
+import { mockFetch } from '../../utils/mock-fetch';
 
 const client = new OpenAI({
   apiKey: 'My API Key',
@@ -28,6 +29,43 @@ describe('resource skills', () => {
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);
+  });
+
+  test('create: preserves directory paths in uploaded filenames', async () => {
+    const { fetch, handleRequest } = mockFetch();
+    const client = new OpenAI({
+      apiKey: 'My API Key',
+      adminAPIKey: 'My Admin API Key',
+      baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
+      fetch,
+    });
+
+    const formDataProbe = handleRequest(async () => new Response('ok'));
+    const request = handleRequest(async (_req, init) => {
+      const form = init!.body as FormData;
+      expect((form.get('files[]') as File).name).toBe('my-skill/SKILL.md');
+
+      return new Response(
+        JSON.stringify({
+          id: 'skill_123',
+          created_at: 0,
+          default_version: 'v1',
+          description: 'Test skill',
+          latest_version: 'v1',
+          name: 'my-skill',
+          object: 'skill',
+        }),
+        { headers: { 'Content-Type': 'application/json' } },
+      );
+    });
+
+    const response = await client.skills.create({
+      files: [new File(['# Skill'], 'my-skill/SKILL.md')],
+    });
+    await formDataProbe;
+    await request;
+
+    expect(response.id).toBe('skill_123');
   });
 
   test('retrieve', async () => {

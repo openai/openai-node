@@ -23,7 +23,9 @@ export class Versions extends APIResource {
   ): APIPromise<SkillVersion> {
     return this._client.post(
       path`/skills/${skillID}/versions`,
-      maybeMultipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
+      maybeMultipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client, {
+        preserveFilePaths: true,
+      }),
     );
   }
 
