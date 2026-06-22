@@ -104,6 +104,8 @@ export interface AuditLogListResponse {
     | 'role.deleted'
     | 'role.assignment.created'
     | 'role.assignment.deleted'
+    | 'role.bound_to_resource'
+    | 'role.unbound_from_resource'
     | 'scim.enabled'
     | 'scim.disabled'
     | 'service_account.created'
@@ -309,12 +311,22 @@ export interface AuditLogListResponse {
   /**
    * The details for events with this `type`.
    */
+  'role.bound_to_resource'?: AuditLogListResponse.RoleBoundToResource;
+
+  /**
+   * The details for events with this `type`.
+   */
   'role.created'?: AuditLogListResponse.RoleCreated;
 
   /**
    * The details for events with this `type`.
    */
   'role.deleted'?: AuditLogListResponse.RoleDeleted;
+
+  /**
+   * The details for events with this `type`.
+   */
+  'role.unbound_from_resource'?: AuditLogListResponse.RoleUnboundFromResource;
 
   /**
    * The details for events with this `type`.
@@ -1255,6 +1267,68 @@ export namespace AuditLogListResponse {
   /**
    * The details for events with this `type`.
    */
+  export interface RoleBoundToResource {
+    /**
+     * The ID of the resource the role was bound to. ChatGPT workspace connector
+     * resources use `<workspace_id>__<connector_id>`.
+     */
+    id?: string;
+
+    /**
+     * The connector ID for a ChatGPT workspace connector resource.
+     */
+    connector_id?: string;
+
+    /**
+     * The connector display name for a ChatGPT workspace connector resource, or the
+     * connector ID when the display name could not be resolved.
+     */
+    connector_name?: string;
+
+    /**
+     * Whether the connector is enabled for the role.
+     */
+    enabled?: boolean;
+
+    /**
+     * The permissions granted to the role for the resource.
+     */
+    permissions?: Array<string>;
+
+    /**
+     * The ID of the resource the role was bound to.
+     */
+    resource_id?: string;
+
+    /**
+     * The type of resource the role was bound to.
+     */
+    resource_type?: string;
+
+    /**
+     * The ID of the role that was bound to the resource.
+     */
+    role_id?: string;
+
+    /**
+     * The connector role mutation path that produced the event.
+     */
+    source?:
+      | 'role_toggle'
+      | 'role_connector_update'
+      | 'role_delete'
+      | 'workspace_permissions'
+      | 'connector_publish';
+
+    /**
+     * The workspace ID for a ChatGPT workspace connector resource.
+     */
+    workspace_id?: string;
+  }
+
+  /**
+   * The details for events with this `type`.
+   */
   export interface RoleCreated {
     /**
      * The role ID.
@@ -1290,6 +1364,68 @@ export namespace AuditLogListResponse {
      * The role ID.
      */
     id?: string;
+  }
+
+  /**
+   * The details for events with this `type`.
+   */
+  export interface RoleUnboundFromResource {
+    /**
+     * The ID of the resource the role was unbound from. ChatGPT workspace connector
+     * resources use `<workspace_id>__<connector_id>`.
+     */
+    id?: string;
+
+    /**
+     * The connector ID for a ChatGPT workspace connector resource.
+     */
+    connector_id?: string;
+
+    /**
+     * The connector display name for a ChatGPT workspace connector resource, or the
+     * connector ID when the display name could not be resolved.
+     */
+    connector_name?: string;
+
+    /**
+     * Whether the connector is enabled for the role.
+     */
+    enabled?: boolean;
+
+    /**
+     * The permissions remaining for the role after the change.
+     */
+    permissions?: Array<string>;
+
+    /**
+     * The ID of the resource the role was unbound from.
+     */
+    resource_id?: string;
+
+    /**
+     * The type of resource the role was unbound from.
+     */
+    resource_type?: string;
+
+    /**
+     * The ID of the role that was unbound from the resource.
+     */
+    role_id?: string;
+
+    /**
+     * The connector role mutation path that produced the event.
+     */
+    source?:
+      | 'role_toggle'
+      | 'role_connector_update'
+      | 'role_delete'
+      | 'workspace_permissions'
+      | 'connector_publish';
+
+    /**
+     * The workspace ID for a ChatGPT workspace connector resource.
+     */
+    workspace_id?: string;
   }
 
   /**
@@ -1688,6 +1824,8 @@ export interface AuditLogListParams extends ConversationCursorPageParams {
     | 'role.deleted'
     | 'role.assignment.created'
     | 'role.assignment.deleted'
+    | 'role.bound_to_resource'
+    | 'role.unbound_from_resource'
     | 'scim.enabled'
     | 'scim.disabled'
     | 'service_account.created'
@@ -1705,9 +1843,18 @@ export interface AuditLogListParams extends ConversationCursorPageParams {
 
   /**
    * Return only events performed on these targets. For example, a project ID
-   * updated.
+   * updated. For ChatGPT connector role events, use the workspace connector resource
+   * ID shown in `details.id`, such as `<workspace_id>__<connector_id>`.
    */
   resource_ids?: Array<string>;
+
+  /**
+   * Return only tenant-scoped events associated with this organization. Required for
+   * tenant-scoped events such as `role.bound_to_resource` and
+   * `role.unbound_from_resource`. When `true`, all supplied event types must be
+   * tenant-scoped.
+   */
+  tenant_only?: boolean;
 }
 
 export namespace AuditLogListParams {

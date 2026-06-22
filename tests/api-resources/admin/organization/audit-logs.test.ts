@@ -39,6 +39,7 @@ describe('resource auditLogs', () => {
           limit: 0,
           project_ids: ['string'],
           resource_ids: ['string'],
+          tenant_only: true,
         },
         { path: '/_stainless_unknown_path' },
       ),

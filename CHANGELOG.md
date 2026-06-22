@@ -1,5 +1,34 @@
 # Changelog
 
+## 6.44.0 (2026-06-17)
+
+Full Changelog: [v6.43.0...v6.44.0](https://github.com/openai/openai-node/compare/v6.43.0...v6.44.0)
+
+### Features
+
+* **api:** update OpenAPI spec or Stainless config ([d05bdbc](https://github.com/openai/openai-node/commit/d05bdbc70b24c2970cf6b583d54529601e5442d8))
+
+## 6.43.0 (2026-06-16)
+
+Full Changelog: [v6.42.0...v6.43.0](https://github.com/openai/openai-node/compare/v6.42.0...v6.43.0)
+
+### Bug Fixes
+
+* fix TS to use `main` ([dc5078b](https://github.com/openai/openai-node/commit/dc5078bcb03c9192c36e5d34a7fc597592220c6a))
+* restore pnpm repo configuration on next ([c2575d6](https://github.com/openai/openai-node/commit/c2575d62cbb73781f2b300c29d30aab5364cf0e0))
+
+
+### Chores
+
+* Convert repository to pnpm ([#1934](https://github.com/openai/openai-node/issues/1934)) ([fbf80f3](https://github.com/openai/openai-node/commit/fbf80f3bf58b1699d686042740076d40832b67c8))
+* sync repo ([34be1be](https://github.com/openai/openai-node/commit/34be1beafc099fb4ae14ed6ee5822cc4617ab18c))
+* Update default branch references to main ([#1920](https://github.com/openai/openai-node/issues/1920)) ([5436f42](https://github.com/openai/openai-node/commit/5436f42de7f8ac2aafed4da23951c61e353da9cc))
+
+
+### Build System
+
+* remove scheduled release ([#1936](https://github.com/openai/openai-node/issues/1936)) ([0c92f62](https://github.com/openai/openai-node/commit/0c92f62a5c7b0dbceebdf1ea474becf0933884e5))
+
 ## 6.42.0 (2026-06-03)
 
 Full Changelog: [v6.41.0...v6.42.0](https://github.com/openai/openai-node/compare/v6.41.0...v6.42.0)
