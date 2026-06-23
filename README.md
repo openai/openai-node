@@ -49,6 +49,18 @@ const response = await client.responses.create({
 console.log(response.output_text);
 ```
 
+### Multi-turn conversations
+
+When you manage Responses API conversation history manually, preserve output items in order. Filtering
+`response.output` to messages can drop required reasoning or tool-call items and cause the next request to
+fail.
+
+Use the SDK's `toResponseInputItems()` helper to normalize all replayable output items before adding them to
+the next request. For simple continuation, you can pass `previous_response_id` instead.
+
+See the [manual conversation state example](examples/responses/manual-conversation-state.ts) and
+[conversation state guide](https://developers.openai.com/api/docs/guides/conversation-state).
+
 The previous standard (supported indefinitely) for generating text is the [Chat Completions API](https://platform.openai.com/docs/api-reference/chat). You can use that API to generate text from the model with the code below.
 
 ```ts
