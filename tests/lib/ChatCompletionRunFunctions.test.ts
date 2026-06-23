@@ -499,23 +499,36 @@ describe('resource completions', () => {
       const { fetch, handleRequest } = mockChatCompletionFetch();
 
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
+      const completionIDs: string[] = [];
+      const injectedMessage: ChatCompletionMessageParam = {
+        role: 'system',
+        content: 'Use this extra context for the next response.',
+      };
 
-      const runner = openai.chat.completions.runTools({
-        messages: [{ role: 'user', content: 'tell me what the weather is like' }],
-        model: 'gpt-3.5-turbo',
-        tools: [
-          {
-            type: 'function',
-            function: {
-              function: function getWeather() {
-                return `it's raining`;
+      const runner = openai.chat.completions.runTools(
+        {
+          messages: [{ role: 'user', content: 'tell me what the weather is like' }],
+          model: 'gpt-3.5-turbo',
+          tools: [
+            {
+              type: 'function',
+              function: {
+                function: function getWeather() {
+                  return `it's raining`;
+                },
+                parameters: {},
+                description: 'gets the weather',
               },
-              parameters: {},
-              description: 'gets the weather',
             },
+          ],
+        },
+        {
+          afterCompletion: (completion, runner) => {
+            completionIDs.push(completion.id);
+            if (completion.id === '1') runner.messages.push(injectedMessage);
           },
-        ],
-      });
+        },
+      );
       const listener = new RunnerListener(runner);
 
       await handleRequest(async (request) => {
@@ -579,6 +592,7 @@ describe('resource completions', () => {
             content: `it's raining`,
             tool_call_id: '123',
           },
+          injectedMessage,
         ]);
 
         return {
@@ -603,6 +617,7 @@ describe('resource completions', () => {
 
       await runner.done();
 
+      expect(completionIDs).toEqual(['1', '2']);
       expect(listener.messages).toEqual([
         {
           role: 'assistant',
@@ -1458,24 +1473,37 @@ describe('resource completions', () => {
       const { fetch, handleRequest } = mockStreamingChatCompletionFetch();
 
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
+      const completionIDs: string[] = [];
+      const injectedMessage: ChatCompletionMessageParam = {
+        role: 'system',
+        content: 'Use this extra context for the next response.',
+      };
 
-      const runner = openai.chat.completions.runTools({
-        stream: true,
-        messages: [{ role: 'user', content: 'tell me what the weather is like' }],
-        model: 'gpt-3.5-turbo',
-        tools: [
-          {
-            type: 'function',
-            function: {
-              function: function getWeather() {
-                return `it's raining`;
+      const runner = openai.chat.completions.runTools(
+        {
+          stream: true,
+          messages: [{ role: 'user', content: 'tell me what the weather is like' }],
+          model: 'gpt-3.5-turbo',
+          tools: [
+            {
+              type: 'function',
+              function: {
+                function: function getWeather() {
+                  return `it's raining`;
+                },
+                parameters: {},
+                description: 'gets the weather',
               },
-              parameters: {},
-              description: 'gets the weather',
             },
+          ],
+        },
+        {
+          afterCompletion: (completion, runner) => {
+            completionIDs.push(completion.id);
+            if (completion.id === '1') runner.messages.push(injectedMessage);
           },
-        ],
-      });
+        },
+      );
       const listener = new StreamingRunnerListener(runner);
 
       await Promise.all([
@@ -1534,6 +1562,7 @@ describe('resource completions', () => {
               content: `it's raining`,
               tool_call_id: '123',
             },
+            injectedMessage,
           ]);
           for (const choice of contentChoiceDeltas(`it's raining`)) {
             yield {
@@ -1548,6 +1577,7 @@ describe('resource completions', () => {
         runner.done(),
       ]);
 
+      expect(completionIDs).toEqual(['1', '2']);
       expect(listener.eventMessages).toEqual([
         {
           role: 'assistant',

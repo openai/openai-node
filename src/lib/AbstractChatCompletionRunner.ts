@@ -24,9 +24,25 @@ import {
 } from './RunnableFunction';
 
 const DEFAULT_MAX_CHAT_COMPLETIONS = 10;
+
+export interface ChatCompletionRunnerContext {
+  messages: ChatCompletionMessageParam[];
+  abort(): void;
+}
+
 export interface RunnerOptions extends RequestOptions {
   /** How many requests to make before canceling. Default 10. */
   maxChatCompletions?: number;
+  /**
+   * A callback that runs after each chat completion and after any tool calls from
+   * that completion have finished. The callback is awaited before the next
+   * request starts or before the runner ends. The runner's mutable `messages`
+   * array can be used to add context for the next request.
+   */
+  afterCompletion?: (
+    completion: ChatCompletion,
+    runner: ChatCompletionRunnerContext,
+  ) => void | Promise<void>;
 }
 
 export class AbstractChatCompletionRunner<
@@ -267,7 +283,7 @@ export class AbstractChatCompletionRunner<
     const { tool_choice = 'auto', stream, ...restParams } = params;
     const singleFunctionToCall =
       typeof tool_choice !== 'string' && tool_choice.type === 'function' && tool_choice?.function?.name;
-    const { maxChatCompletions = DEFAULT_MAX_CHAT_COMPLETIONS } = options || {};
+    const { maxChatCompletions = DEFAULT_MAX_CHAT_COMPLETIONS, afterCompletion } = options || {};
 
     // TODO(someday): clean this logic up
     const inputTools = params.tools.map((tool): RunnableToolFunction<any> => {
@@ -336,6 +352,7 @@ export class AbstractChatCompletionRunner<
         throw new OpenAIError(`missing message in ChatCompletion response`);
       }
       if (!message.tool_calls?.length) {
+        await afterCompletion?.(chatCompletion, this);
         return;
       }
 
@@ -378,9 +395,12 @@ export class AbstractChatCompletionRunner<
         this._addMessage({ role, tool_call_id, content });
 
         if (singleFunctionToCall) {
+          await afterCompletion?.(chatCompletion, this);
           return;
         }
       }
+
+      await afterCompletion?.(chatCompletion, this);
     }
 
     return;

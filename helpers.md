@@ -633,6 +633,35 @@ async function main() {
 main();
 ```
 
+#### Inspect or extend the conversation after each completion
+
+The `afterCompletion` callback runs after a completion's tool calls have finished and is awaited before the
+next request starts. It can inspect the completion and append context to the runner's mutable `messages` array.
+The callback also runs for the final completion, when no further request will be made.
+
+```ts
+const runner = client.chat.completions.runTools(
+  {
+    model: 'gpt-4o',
+    messages,
+    tools,
+  },
+  {
+    afterCompletion: async (completion, runner) => {
+      if (!completion.choices[0]?.message.tool_calls?.length) return;
+
+      const webResearch = await optionallyPerformWebResearch(runner.messages.slice(-10));
+      if (webResearch) {
+        runner.messages.push({
+          role: 'system',
+          content: `Use this up-to-date research to guide your next steps:\n\n${webResearch}`,
+        });
+      }
+    },
+  },
+);
+```
+
 #### Integrate with `zod`
 
 [`zod`](https://www.npmjs.com/package/zod) is a schema validation library which can help with validating the
