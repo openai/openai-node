@@ -1,72 +1,38 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import * as WS from 'ws';
-import { ResponsesEmitter, buildURL } from './internal-base';
-import * as ResponsesAPI from './responses';
+import { NodeWebSocket } from '../../internal/ws-adapter-node';
+import { ResponsesWSBase, type ResponsesWSBaseOptions } from './ws-base';
 import { OpenAI } from '../../client';
 
-export class ResponsesWS extends ResponsesEmitter {
-  url: URL;
-  socket: WS.WebSocket;
-  private client: OpenAI;
+export type { ResponsesWSReconnectOptions } from './ws-base';
 
-  constructor(client: OpenAI, options?: WS.ClientOptions | null | undefined) {
-    super();
-    this.client = client;
-    this.url = buildURL(client, {});
-    this.socket = new WS.WebSocket(this.url, {
-      ...options,
+export interface ResponsesWSClientOptions extends WS.ClientOptions, ResponsesWSBaseOptions {}
+
+export class ResponsesWS extends ResponsesWSBase<NodeWebSocket> {
+  private _wsOptions: WS.ClientOptions | null | undefined;
+
+  constructor(client: OpenAI, options?: ResponsesWSClientOptions | null | undefined) {
+    if (!WS?.WebSocket) {
+      throw new Error(
+        'ResponsesWS from "openai/resources/responses/ws" requires the "ws" package but it could not be loaded.',
+      );
+    }
+
+    const { reconnect, maxQueueSize, ...wsOptions } = options ?? {};
+    super(client, { reconnect, maxQueueSize });
+    this._wsOptions = wsOptions;
+    this._connectInitial();
+  }
+
+  protected _createSocket(url: URL, authHeaders: Record<string, string>): NodeWebSocket {
+    const ws = new WS.WebSocket(url, {
+      ...this._wsOptions,
       headers: {
-        ...this.authHeaders(),
-        ...options?.headers,
+        ...authHeaders,
+        ...this._wsOptions?.headers,
       },
     });
-
-    this.socket.on('message', (wsEvent) => {
-      const event = (() => {
-        try {
-          return JSON.parse(wsEvent.toString()) as ResponsesAPI.ResponsesServerEvent;
-        } catch (err) {
-          this._onError(null, 'could not parse websocket event', err);
-          return null;
-        }
-      })();
-
-      if (event) {
-        this._emit('event', event);
-
-        if (event.type === 'error') {
-          this._onError(event);
-        } else {
-          // @ts-ignore TS isn't smart enough to get the relationship right here
-          this._emit(event.type, event);
-        }
-      }
-    });
-
-    this.socket.on('error', (err) => {
-      this._onError(null, err.message, err);
-    });
-  }
-
-  send(event: ResponsesAPI.ResponsesClientEvent) {
-    try {
-      this.socket.send(JSON.stringify(event));
-    } catch (err) {
-      this._onError(null, 'could not send data', err);
-    }
-  }
-
-  close(props?: { code: number; reason: string }) {
-    try {
-      this.socket.close(props?.code ?? 1000, props?.reason ?? 'OK');
-    } catch (err) {
-      this._onError(null, 'could not close the connection', err);
-    }
-  }
-
-  private authHeaders(): Record<string, string> {
-    return { Authorization: `Bearer ${this.client.apiKey}` };
-    return {};
+    return new NodeWebSocket(ws);
   }
 }

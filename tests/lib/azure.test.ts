@@ -53,6 +53,15 @@ describe('instantiate azure client', () => {
       expect(req.headers.has('x-my-default-header')).toBe(false);
     });
 
+    test('can explicitly omit api-key with `null`', async () => {
+      const { req } = await client.buildRequest({
+        path: '/foo',
+        method: 'post',
+        headers: { 'api-key': null },
+      });
+      expect(req.headers.has('api-key')).toBe(false);
+    });
+
     test('includes retry count', async () => {
       const { req } = await client.buildRequest(
         {
