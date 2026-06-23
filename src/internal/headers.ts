@@ -74,7 +74,14 @@ export const buildHeaders = (newHeaders: HeadersLike[]): NullableHeaders => {
   for (const headers of newHeaders) {
     const seenHeaders = new Set<string>();
     for (const [name, value] of iterateHeaders(headers)) {
-      const lowerName = name.toLowerCase();
+      // HTTP header names are ASCII per RFC 9110, but `String.prototype.toLowerCase()`
+      // applies the host locale to certain Unicode mappings. On Turkish locales the
+      // uppercase `I` in `OpenAI-Organization` becomes the dotless `ı`, producing
+      // `openaı-organization`, which fails Node's HTTP token validation
+      // (`TypeError: Header name must be a valid HTTP token`). Pin the locale to
+      // `en-US` so the casing rule stays ASCII-safe regardless of the runtime locale.
+      // https://github.com/openai/openai-node/issues/1928
+      const lowerName = name.toLocaleLowerCase('en-US');
       if (!seenHeaders.has(lowerName)) {
         targetHeaders.delete(name);
         seenHeaders.add(lowerName);
