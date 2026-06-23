@@ -39,15 +39,19 @@ export type ParsedResponseOutputItem<ParsedT> =
   | ParsedResponseOutputMessage<ParsedT>
   | ParsedResponseFunctionToolCall
   | ResponseFileSearchToolCall
+  | ResponseFunctionToolCallOutputItem
   | ResponseFunctionWebSearch
   | ResponseComputerToolCall
+  | ResponseComputerToolCallOutputItem
   | ResponseToolSearchCall
   | ResponseToolSearchOutputItem
+  | ResponseOutputItem.AdditionalTools
   | ResponseReasoningItem
   | ResponseCompactionItem
   | ResponseOutputItem.ImageGenerationCall
   | ResponseCodeInterpreterToolCall
   | ResponseOutputItem.LocalShellCall
+  | ResponseOutputItem.LocalShellCallOutput
   | ResponseFunctionShellToolCall
   | ResponseFunctionShellToolCallOutput
   | ResponseApplyPatchToolCall
@@ -55,7 +59,9 @@ export type ParsedResponseOutputItem<ParsedT> =
   | ResponseOutputItem.McpCall
   | ResponseOutputItem.McpListTools
   | ResponseOutputItem.McpApprovalRequest
-  | ResponseCustomToolCall;
+  | ResponseOutputItem.McpApprovalResponse
+  | ResponseCustomToolCall
+  | ResponseCustomToolCallOutputItem;
 
 export interface ParsedResponse<ParsedT> extends Response {
   output: Array<ParsedResponseOutputItem<ParsedT>>;
@@ -101,9 +107,12 @@ export class Responses extends APIResource {
     options?: RequestOptions,
   ): APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>> {
     return (
-      this._client.post('/responses', { body, ...options, stream: body.stream ?? false }) as
-        | APIPromise<Response>
-        | APIPromise<Stream<ResponseStreamEvent>>
+      this._client.post('/responses', {
+        body,
+        ...options,
+        stream: body.stream ?? false,
+        __security: { bearerAuth: true },
+      }) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>
     )._thenUnwrap((rsp) => {
       if ('object' in rsp && rsp.object === 'response') {
         addOutputText(rsp as Response);
@@ -148,6 +157,7 @@ export class Responses extends APIResource {
         query,
         ...options,
         stream: query?.stream ?? false,
+        __security: { bearerAuth: true },
       }) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>
     )._thenUnwrap((rsp) => {
       if ('object' in rsp && rsp.object === 'response') {
@@ -172,6 +182,7 @@ export class Responses extends APIResource {
     return this._client.delete(path`/responses/${responseID}`, {
       ...options,
       headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -207,7 +218,10 @@ export class Responses extends APIResource {
    * ```
    */
   cancel(responseID: string, options?: RequestOptions): APIPromise<Response> {
-    return this._client.post(path`/responses/${responseID}/cancel`, options);
+    return this._client.post(path`/responses/${responseID}/cancel`, {
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
@@ -226,7 +240,7 @@ export class Responses extends APIResource {
    * ```
    */
   compact(body: ResponseCompactParams, options?: RequestOptions): APIPromise<CompactedResponse> {
-    return this._client.post('/responses/compact', { body, ...options });
+    return this._client.post('/responses/compact', { body, ...options, __security: { bearerAuth: true } });
   }
 }
 
@@ -310,12 +324,22 @@ export namespace ComputerAction {
      * The y-coordinate where the click occurred.
      */
     y: number;
+
+    /**
+     * The keys being held while clicking.
+     */
+    keys?: Array<string> | null;
   }
 
   /**
    * A double click action.
    */
   export interface DoubleClick {
+    /**
+     * The keys being held while double-clicking.
+     */
+    keys: Array<string> | null;
+
     /**
      * Specifies the event type. For a double click action, this property is always set
      * to `double_click`.
@@ -355,6 +379,11 @@ export namespace ComputerAction {
      * `drag`.
      */
     type: 'drag';
+
+    /**
+     * The keys being held while dragging the mouse.
+     */
+    keys?: Array<string> | null;
   }
 
   export namespace Drag {
@@ -410,6 +439,11 @@ export namespace ComputerAction {
      * The y-coordinate to move to.
      */
     y: number;
+
+    /**
+     * The keys being held while moving the mouse.
+     */
+    keys?: Array<string> | null;
   }
 
   /**
@@ -452,6 +486,11 @@ export namespace ComputerAction {
      * The y-coordinate where the scroll occurred.
      */
     y: number;
+
+    /**
+     * The keys being held while scrolling.
+     */
+    keys?: Array<string> | null;
   }
 
   /**
@@ -898,6 +937,11 @@ export namespace NamespaceTool {
 
     type: 'function';
 
+    /**
+     * Whether this function should be deferred and discovered via tool search.
+     */
+    defer_loading?: boolean;
+
     description?: string | null;
 
     parameters?: unknown | null;
@@ -1059,6 +1103,12 @@ export interface Response {
   max_output_tokens?: number | null;
 
   /**
+   * Moderation results for the response input and output, if moderated completions
+   * were requested.
+   */
+  moderation?: Response.Moderation | null;
+
+  /**
    * The unique ID of the previous response to the model. Use this to create
    * multi-turn conversations. Learn more about
    * [conversation state](https://platform.openai.com/docs/guides/conversation-state).
@@ -1084,8 +1134,16 @@ export interface Response {
    * prompt caching, which keeps cached prefixes active for longer, up to a maximum
    * of 24 hours.
    * [Learn more](https://platform.openai.com/docs/guides/prompt-caching#prompt-cache-retention).
+   * For `gpt-5.5`, `gpt-5.5-pro`, and future models, only `24h` is supported.
+   *
+   * For older models that support both `in_memory` and `24h`, the default depends on
+   * your organization's data retention policy:
+   *
+   * - Organizations without ZDR enabled default to `24h`.
+   * - Organizations with ZDR enabled default to `in_memory` when
+   *   `prompt_cache_retention` is not specified.
    */
-  prompt_cache_retention?: 'in-memory' | '24h' | null;
+  prompt_cache_retention?: 'in_memory' | '24h' | null;
 
   /**
    * **gpt-5 and o-series models only**
@@ -1140,6 +1198,13 @@ export interface Response {
   text?: ResponseTextConfig;
 
   /**
+   * An integer between 0 and 20 specifying the maximum number of most likely tokens
+   * to return at each token position, each with an associated log probability. In
+   * some cases, the number of returned tokens may be fewer than requested.
+   */
+  top_logprobs?: number | null;
+
+  /**
    * The truncation strategy to use for the model response.
    *
    * - `auto`: If the input to this Response exceeds the model's context window size,
@@ -1187,6 +1252,138 @@ export namespace Response {
      * The unique ID of the conversation that this response was associated with.
      */
     id: string;
+  }
+
+  /**
+   * Moderation results for the response input and output, if moderated completions
+   * were requested.
+   */
+  export interface Moderation {
+    /**
+     * Moderation for the response input.
+     */
+    input: Moderation.ModerationResult | Moderation.Error;
+
+    /**
+     * Moderation for the response output.
+     */
+    output: Moderation.ModerationResult | Moderation.Error;
+  }
+
+  export namespace Moderation {
+    /**
+     * A moderation result produced for the response input or output.
+     */
+    export interface ModerationResult {
+      /**
+       * A dictionary of moderation categories to booleans, True if the input is flagged
+       * under this category.
+       */
+      categories: { [key: string]: boolean };
+
+      /**
+       * Which modalities of input are reflected by the score for each category.
+       */
+      category_applied_input_types: { [key: string]: Array<'text' | 'image'> };
+
+      /**
+       * A dictionary of moderation categories to scores.
+       */
+      category_scores: { [key: string]: number };
+
+      /**
+       * A boolean indicating whether the content was flagged by any category.
+       */
+      flagged: boolean;
+
+      /**
+       * The moderation model that produced this result.
+       */
+      model: string;
+
+      /**
+       * The object type, which was always `moderation_result` for successful moderation
+       * results.
+       */
+      type: 'moderation_result';
+    }
+
+    /**
+     * An error produced while attempting moderation for the response input or output.
+     */
+    export interface Error {
+      /**
+       * The error code.
+       */
+      code: string;
+
+      /**
+       * The error message.
+       */
+      message: string;
+
+      /**
+       * The object type, which was always `error` for moderation failures.
+       */
+      type: 'error';
+    }
+
+    /**
+     * A moderation result produced for the response input or output.
+     */
+    export interface ModerationResult {
+      /**
+       * A dictionary of moderation categories to booleans, True if the input is flagged
+       * under this category.
+       */
+      categories: { [key: string]: boolean };
+
+      /**
+       * Which modalities of input are reflected by the score for each category.
+       */
+      category_applied_input_types: { [key: string]: Array<'text' | 'image'> };
+
+      /**
+       * A dictionary of moderation categories to scores.
+       */
+      category_scores: { [key: string]: number };
+
+      /**
+       * A boolean indicating whether the content was flagged by any category.
+       */
+      flagged: boolean;
+
+      /**
+       * The moderation model that produced this result.
+       */
+      model: string;
+
+      /**
+       * The object type, which was always `moderation_result` for successful moderation
+       * results.
+       */
+      type: 'moderation_result';
+    }
+
+    /**
+     * An error produced while attempting moderation for the response input or output.
+     */
+    export interface Error {
+      /**
+       * The error code.
+       */
+      code: string;
+
+      /**
+       * The error message.
+       */
+      message: string;
+
+      /**
+       * The object type, which was always `error` for moderation failures.
+       */
+      type: 'error';
+    }
   }
 }
 
@@ -1766,12 +1963,22 @@ export namespace ResponseComputerToolCall {
      * The y-coordinate where the click occurred.
      */
     y: number;
+
+    /**
+     * The keys being held while clicking.
+     */
+    keys?: Array<string> | null;
   }
 
   /**
    * A double click action.
    */
   export interface DoubleClick {
+    /**
+     * The keys being held while double-clicking.
+     */
+    keys: Array<string> | null;
+
     /**
      * Specifies the event type. For a double click action, this property is always set
      * to `double_click`.
@@ -1811,6 +2018,11 @@ export namespace ResponseComputerToolCall {
      * `drag`.
      */
     type: 'drag';
+
+    /**
+     * The keys being held while dragging the mouse.
+     */
+    keys?: Array<string> | null;
   }
 
   export namespace Drag {
@@ -1866,6 +2078,11 @@ export namespace ResponseComputerToolCall {
      * The y-coordinate to move to.
      */
     y: number;
+
+    /**
+     * The keys being held while moving the mouse.
+     */
+    keys?: Array<string> | null;
   }
 
   /**
@@ -1908,6 +2125,11 @@ export namespace ResponseComputerToolCall {
      * The y-coordinate where the scroll occurred.
      */
     y: number;
+
+    /**
+     * The keys being held while scrolling.
+     */
+    keys?: Array<string> | null;
   }
 
   /**
@@ -1955,6 +2177,12 @@ export interface ResponseComputerToolCallOutputItem {
   output: ResponseComputerToolCallOutputScreenshot;
 
   /**
+   * The status of the message input. One of `in_progress`, `completed`, or
+   * `incomplete`. Populated when input items are returned via API.
+   */
+  status: 'completed' | 'incomplete' | 'failed' | 'in_progress';
+
+  /**
    * The type of the computer tool call output. Always `computer_call_output`.
    */
   type: 'computer_call_output';
@@ -1966,10 +2194,9 @@ export interface ResponseComputerToolCallOutputItem {
   acknowledged_safety_checks?: Array<ResponseComputerToolCallOutputItem.AcknowledgedSafetyCheck>;
 
   /**
-   * The status of the message input. One of `in_progress`, `completed`, or
-   * `incomplete`. Populated when input items are returned via API.
+   * The identifier of the actor that created the item.
    */
-  status?: 'in_progress' | 'completed' | 'incomplete';
+  created_by?: string;
 }
 
 export namespace ResponseComputerToolCallOutputItem {
@@ -2285,6 +2512,27 @@ export interface ResponseCustomToolCallInputDoneEvent {
 }
 
 /**
+ * A call to a custom tool created by the model.
+ */
+export interface ResponseCustomToolCallItem extends ResponseCustomToolCall {
+  /**
+   * The unique ID of the custom tool call item.
+   */
+  id: string;
+
+  /**
+   * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
+   * Populated when items are returned via API.
+   */
+  status: 'in_progress' | 'completed' | 'incomplete';
+
+  /**
+   * The identifier of the actor that created the item.
+   */
+  created_by?: string;
+}
+
+/**
  * The output of a custom tool call from your code, being sent back to the model.
  */
 export interface ResponseCustomToolCallOutput {
@@ -2308,6 +2556,27 @@ export interface ResponseCustomToolCallOutput {
    * The unique ID of the custom tool call output in the OpenAI platform.
    */
   id?: string;
+}
+
+/**
+ * The output of a custom tool call from your code, being sent back to the model.
+ */
+export interface ResponseCustomToolCallOutputItem extends ResponseCustomToolCallOutput {
+  /**
+   * The unique ID of the custom tool call output item.
+   */
+  id: string;
+
+  /**
+   * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
+   * Populated when items are returned via API.
+   */
+  status: 'in_progress' | 'completed' | 'incomplete';
+
+  /**
+   * The identifier of the actor that created the item.
+   */
+  created_by?: string;
 }
 
 /**
@@ -2927,6 +3196,17 @@ export interface ResponseFunctionToolCallItem extends ResponseFunctionToolCall {
    * The unique ID of the function tool call.
    */
   id: string;
+
+  /**
+   * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
+   * Populated when items are returned via API.
+   */
+  status: 'in_progress' | 'completed' | 'incomplete';
+
+  /**
+   * The identifier of the actor that created the item.
+   */
+  created_by?: string;
 }
 
 export interface ResponseFunctionToolCallOutputItem {
@@ -2947,15 +3227,20 @@ export interface ResponseFunctionToolCallOutputItem {
   output: string | Array<ResponseInputText | ResponseInputImage | ResponseInputFile>;
 
   /**
+   * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
+   * Populated when items are returned via API.
+   */
+  status: 'in_progress' | 'completed' | 'incomplete';
+
+  /**
    * The type of the function tool call output. Always `function_call_output`.
    */
   type: 'function_call_output';
 
   /**
-   * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
-   * Populated when items are returned via API.
+   * The identifier of the actor that created the item.
    */
-  status?: 'in_progress' | 'completed' | 'incomplete';
+  created_by?: string;
 }
 
 /**
@@ -2995,11 +3280,6 @@ export namespace ResponseFunctionWebSearch {
    */
   export interface Search {
     /**
-     * [DEPRECATED] The search query.
-     */
-    query: string;
-
-    /**
      * The action type.
      */
     type: 'search';
@@ -3008,6 +3288,11 @@ export namespace ResponseFunctionWebSearch {
      * The search queries.
      */
     queries?: Array<string>;
+
+    /**
+     * @deprecated The search query.
+     */
+    query?: string;
 
     /**
      * The sources used in the search.
@@ -3205,6 +3490,8 @@ export interface ResponseInProgressEvent {
  * Specify additional output data to include in the model response. Currently
  * supported values are:
  *
+ * - `web_search_call.results`: Include the search results of the web search tool
+ *   call.
  * - `web_search_call.action.sources`: Include the sources of the web search tool
  *   call.
  * - `code_interpreter_call.outputs`: Includes the outputs of python code execution
@@ -3301,8 +3588,9 @@ export interface ResponseInputFile {
   type: 'input_file';
 
   /**
-   * The detail level of the file to be sent to the model. One of `high` or `low`.
-   * Defaults to `high`.
+   * The detail level of the file to be sent to the model. Use `low` for the default
+   * rendering behavior, or `high` to render the file at higher quality. Defaults to
+   * `low`.
    */
   detail?: 'low' | 'high';
 
@@ -3337,10 +3625,11 @@ export interface ResponseInputFileContent {
   type: 'input_file';
 
   /**
-   * The detail level of the file to be sent to the model. One of `high` or `low`.
-   * Defaults to `high`.
+   * The detail level of the file to be sent to the model. Use `low` for the default
+   * rendering behavior, or `high` to render the file at higher quality. Defaults to
+   * `low`.
    */
-  detail?: 'high' | 'low';
+  detail?: 'low' | 'high';
 
   /**
    * The base64-encoded data of the file to be sent to the model.
@@ -3438,6 +3727,7 @@ export type ResponseInputItem =
   | ResponseInputItem.FunctionCallOutput
   | ResponseInputItem.ToolSearchCall
   | ResponseToolSearchOutputItemParam
+  | ResponseInputItem.AdditionalTools
   | ResponseReasoningItem
   | ResponseCompactionItemParam
   | ResponseInputItem.ImageGenerationCall
@@ -3454,6 +3744,7 @@ export type ResponseInputItem =
   | ResponseInputItem.McpCall
   | ResponseCustomToolCallOutput
   | ResponseCustomToolCall
+  | ResponseInputItem.CompactionTrigger
   | ResponseInputItem.ItemReference;
 
 export namespace ResponseInputItem {
@@ -3607,6 +3898,28 @@ export namespace ResponseInputItem {
      * The status of the tool search call.
      */
     status?: 'in_progress' | 'completed' | 'incomplete' | null;
+  }
+
+  export interface AdditionalTools {
+    /**
+     * The role that provided the additional tools. Only `developer` is supported.
+     */
+    role: 'developer';
+
+    /**
+     * A list of additional tools made available at this item.
+     */
+    tools: Array<ResponsesAPI.Tool>;
+
+    /**
+     * The item type. Always `additional_tools`.
+     */
+    type: 'additional_tools';
+
+    /**
+     * The unique ID of this additional tools item.
+     */
+    id?: string | null;
   }
 
   /**
@@ -4117,6 +4430,16 @@ export namespace ResponseInputItem {
   }
 
   /**
+   * Compacts the current context. Must be the final input item.
+   */
+  export interface CompactionTrigger {
+    /**
+     * The type of the item. Always `compaction_trigger`.
+     */
+    type: 'compaction_trigger';
+  }
+
+  /**
    * An internal identifier for an item to reference.
    */
   export interface ItemReference {
@@ -4156,15 +4479,15 @@ export interface ResponseInputMessageItem {
   role: 'user' | 'system' | 'developer';
 
   /**
+   * The type of the message input. Always set to `message`.
+   */
+  type: 'message';
+
+  /**
    * The status of item. One of `in_progress`, `completed`, or `incomplete`.
    * Populated when items are returned via API.
    */
   status?: 'in_progress' | 'completed' | 'incomplete';
-
-  /**
-   * The type of the message input. Always set to `message`.
-   */
-  type?: 'message';
 }
 
 /**
@@ -4211,6 +4534,9 @@ export type ResponseItem =
   | ResponseFunctionToolCallOutputItem
   | ResponseToolSearchCall
   | ResponseToolSearchOutputItem
+  | ResponseItem.AdditionalTools
+  | ResponseReasoningItem
+  | ResponseCompactionItem
   | ResponseItem.ImageGenerationCall
   | ResponseCodeInterpreterToolCall
   | ResponseItem.LocalShellCall
@@ -4222,9 +4548,33 @@ export type ResponseItem =
   | ResponseItem.McpListTools
   | ResponseItem.McpApprovalRequest
   | ResponseItem.McpApprovalResponse
-  | ResponseItem.McpCall;
+  | ResponseItem.McpCall
+  | ResponseCustomToolCallItem
+  | ResponseCustomToolCallOutputItem;
 
 export namespace ResponseItem {
+  export interface AdditionalTools {
+    /**
+     * The unique ID of the additional tools item.
+     */
+    id: string;
+
+    /**
+     * The role that provided the additional tools.
+     */
+    role: 'unknown' | 'user' | 'assistant' | 'system' | 'critic' | 'discriminator' | 'developer' | 'tool';
+
+    /**
+     * The additional tool definitions made available at this item.
+     */
+    tools: Array<ResponsesAPI.Tool>;
+
+    /**
+     * The type of the item. Always `additional_tools`.
+     */
+    type: 'additional_tools';
+  }
+
   /**
    * An image generation request made by the model.
    */
@@ -4763,15 +5113,19 @@ export type ResponseOutputItem =
   | ResponseOutputMessage
   | ResponseFileSearchToolCall
   | ResponseFunctionToolCall
+  | ResponseFunctionToolCallOutputItem
   | ResponseFunctionWebSearch
   | ResponseComputerToolCall
+  | ResponseComputerToolCallOutputItem
   | ResponseReasoningItem
   | ResponseToolSearchCall
   | ResponseToolSearchOutputItem
+  | ResponseOutputItem.AdditionalTools
   | ResponseCompactionItem
   | ResponseOutputItem.ImageGenerationCall
   | ResponseCodeInterpreterToolCall
   | ResponseOutputItem.LocalShellCall
+  | ResponseOutputItem.LocalShellCallOutput
   | ResponseFunctionShellToolCall
   | ResponseFunctionShellToolCallOutput
   | ResponseApplyPatchToolCall
@@ -4779,9 +5133,33 @@ export type ResponseOutputItem =
   | ResponseOutputItem.McpCall
   | ResponseOutputItem.McpListTools
   | ResponseOutputItem.McpApprovalRequest
-  | ResponseCustomToolCall;
+  | ResponseOutputItem.McpApprovalResponse
+  | ResponseCustomToolCall
+  | ResponseCustomToolCallOutputItem;
 
 export namespace ResponseOutputItem {
+  export interface AdditionalTools {
+    /**
+     * The unique ID of the additional tools item.
+     */
+    id: string;
+
+    /**
+     * The role that provided the additional tools.
+     */
+    role: 'unknown' | 'user' | 'assistant' | 'system' | 'critic' | 'discriminator' | 'developer' | 'tool';
+
+    /**
+     * The additional tool definitions made available at this item.
+     */
+    tools: Array<ResponsesAPI.Tool>;
+
+    /**
+     * The type of the item. Always `additional_tools`.
+     */
+    type: 'additional_tools';
+  }
+
   /**
    * An image generation request made by the model.
    */
@@ -4872,6 +5250,31 @@ export namespace ResponseOutputItem {
        */
       working_directory?: string | null;
     }
+  }
+
+  /**
+   * The output of a local shell tool call.
+   */
+  export interface LocalShellCallOutput {
+    /**
+     * The unique ID of the local shell tool call generated by the model.
+     */
+    id: string;
+
+    /**
+     * A JSON string of the output of the local shell tool call.
+     */
+    output: string;
+
+    /**
+     * The type of the local shell tool call output. Always `local_shell_call_output`.
+     */
+    type: 'local_shell_call_output';
+
+    /**
+     * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
+     */
+    status?: 'in_progress' | 'completed' | 'incomplete' | null;
   }
 
   /**
@@ -5012,6 +5415,36 @@ export namespace ResponseOutputItem {
      * The type of the item. Always `mcp_approval_request`.
      */
     type: 'mcp_approval_request';
+  }
+
+  /**
+   * A response to an MCP approval request.
+   */
+  export interface McpApprovalResponse {
+    /**
+     * The unique ID of the approval response
+     */
+    id: string;
+
+    /**
+     * The ID of the approval request being answered.
+     */
+    approval_request_id: string;
+
+    /**
+     * Whether the request was approved.
+     */
+    approve: boolean;
+
+    /**
+     * The type of the item. Always `mcp_approval_response`.
+     */
+    type: 'mcp_approval_response';
+
+    /**
+     * Optional reason for the decision.
+     */
+    reason?: string | null;
   }
 }
 
@@ -5908,7 +6341,7 @@ export namespace ResponseTextDeltaEvent {
     logprob: number;
 
     /**
-     * The log probability of the top 20 most likely tokens.
+     * The log probabilities of up to 20 of the most likely tokens.
      */
     top_logprobs?: Array<Logprob.TopLogprob>;
   }
@@ -5986,7 +6419,7 @@ export namespace ResponseTextDoneEvent {
     logprob: number;
 
     /**
-     * The log probability of the top 20 most likely tokens.
+     * The log probabilities of up to 20 of the most likely tokens.
      */
     top_logprobs?: Array<Logprob.TopLogprob>;
   }
@@ -6345,6 +6778,11 @@ export interface ResponsesClientEvent {
   model?: Shared.ResponsesModel;
 
   /**
+   * Configuration for running moderation on the input and output of this response.
+   */
+  moderation?: ResponsesClientEvent.Moderation | null;
+
+  /**
    * Whether to allow the model to run tool calls in parallel.
    */
   parallel_tool_calls?: boolean | null;
@@ -6375,8 +6813,16 @@ export interface ResponsesClientEvent {
    * prompt caching, which keeps cached prefixes active for longer, up to a maximum
    * of 24 hours.
    * [Learn more](https://platform.openai.com/docs/guides/prompt-caching#prompt-cache-retention).
+   * For `gpt-5.5`, `gpt-5.5-pro`, and future models, only `24h` is supported.
+   *
+   * For older models that support both `in_memory` and `24h`, the default depends on
+   * your organization's data retention policy:
+   *
+   * - Organizations without ZDR enabled default to `24h`.
+   * - Organizations with ZDR enabled default to `in_memory` when
+   *   `prompt_cache_retention` is not specified.
    */
-  prompt_cache_retention?: 'in-memory' | '24h' | null;
+  prompt_cache_retention?: 'in_memory' | '24h' | null;
 
   /**
    * **gpt-5 and o-series models only**
@@ -6492,8 +6938,9 @@ export interface ResponsesClientEvent {
   tools?: Array<Tool>;
 
   /**
-   * An integer between 0 and 20 specifying the number of most likely tokens to
-   * return at each token position, each with an associated log probability.
+   * An integer between 0 and 20 specifying the maximum number of most likely tokens
+   * to return at each token position, each with an associated log probability. In
+   * some cases, the number of returned tokens may be fewer than requested.
    */
   top_logprobs?: number | null;
 
@@ -6507,7 +6954,7 @@ export interface ResponsesClientEvent {
   top_p?: number | null;
 
   /**
-   * The truncation strategy to use for the model response.
+   * @deprecated The truncation strategy to use for the model response.
    *
    * - `auto`: If the input to this Response exceeds the model's context window size,
    *   the model will truncate the response to fit the context window by dropping
@@ -6539,6 +6986,17 @@ export namespace ResponsesClientEvent {
      * Token threshold at which compaction should be triggered for this entry.
      */
     compact_threshold?: number | null;
+  }
+
+  /**
+   * Configuration for running moderation on the input and output of this response.
+   */
+  export interface Moderation {
+    /**
+     * The moderation model to use for moderated completions, e.g.
+     * 'omni-moderation-latest'.
+     */
+    model: string;
   }
 
   /**
@@ -6683,8 +7141,8 @@ export namespace Tool {
 
     /**
      * Identifier for service connectors, like those available in ChatGPT. One of
-     * `server_url` or `connector_id` must be provided. Learn more about service
-     * connectors
+     * `server_url`, `connector_id`, or `tunnel_id` must be provided. Learn more about
+     * service connectors
      * [here](https://platform.openai.com/docs/guides/tools-remote-mcp#connectors).
      *
      * Currently supported `connector_id` values are:
@@ -6730,10 +7188,16 @@ export namespace Tool {
     server_description?: string;
 
     /**
-     * The URL for the MCP server. One of `server_url` or `connector_id` must be
-     * provided.
+     * The URL for the MCP server. One of `server_url`, `connector_id`, or `tunnel_id`
+     * must be provided.
      */
     server_url?: string;
+
+    /**
+     * The Secure MCP Tunnel ID to use instead of a direct server URL. One of
+     * `server_url`, `connector_id`, or `tunnel_id` must be provided.
+     */
+    tunnel_id?: string;
   }
 
   export namespace Mcp {
@@ -6872,8 +7336,18 @@ export namespace Tool {
     action?: 'generate' | 'edit' | 'auto';
 
     /**
-     * Background type for the generated image. One of `transparent`, `opaque`, or
-     * `auto`. Default: `auto`.
+     * Allows to set transparency for the background of the generated image(s). This
+     * parameter is only supported for GPT image models that support transparent
+     * backgrounds. Must be one of `transparent`, `opaque`, or `auto` (default value).
+     * When `auto` is used, the model will automatically determine the best background
+     * for the image.
+     *
+     * `gpt-image-2` and `gpt-image-2-2026-04-21` do not support transparent
+     * backgrounds. Requests with `background` set to `transparent` will return an
+     * error for these models; use `opaque` or `auto` instead.
+     *
+     * If `transparent`, the output format needs to support transparency, so it should
+     * be set to either `png` (default value) or `webp`.
      */
     background?: 'transparent' | 'opaque' | 'auto';
 
@@ -6894,7 +7368,14 @@ export namespace Tool {
     /**
      * The image generation model to use. Default: `gpt-image-1`.
      */
-    model?: (string & {}) | 'gpt-image-1' | 'gpt-image-1-mini' | 'gpt-image-1.5';
+    model?:
+      | (string & {})
+      | 'gpt-image-1'
+      | 'gpt-image-1-mini'
+      | 'gpt-image-2'
+      | 'gpt-image-2-2026-04-21'
+      | 'gpt-image-1.5'
+      | 'chatgpt-image-latest';
 
     /**
      * Moderation level for the generated image. Default: `auto`.
@@ -6925,10 +7406,19 @@ export namespace Tool {
     quality?: 'low' | 'medium' | 'high' | 'auto';
 
     /**
-     * The size of the generated image. One of `1024x1024`, `1024x1536`, `1536x1024`,
-     * or `auto`. Default: `auto`.
+     * The size of the generated images. For `gpt-image-2` and
+     * `gpt-image-2-2026-04-21`, arbitrary resolutions are supported as `WIDTHxHEIGHT`
+     * strings, for example `1536x864`. Width and height must both be divisible by 16
+     * and the requested aspect ratio must be between 1:3 and 3:1. Resolutions above
+     * `2560x1440` are experimental, and the maximum supported resolution is
+     * `3840x2160`. The requested size must also satisfy the model's current pixel and
+     * edge limits. The standard sizes `1024x1024`, `1536x1024`, and `1024x1536` are
+     * supported by the GPT image models; `auto` is supported for models that allow
+     * automatic sizing. For `dall-e-2`, use one of `256x256`, `512x512`, or
+     * `1024x1024`. For `dall-e-3`, use one of `1024x1024`, `1792x1024`, or
+     * `1024x1792`.
      */
-    size?: '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
+    size?: (string & {}) | '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
   }
 
   export namespace ImageGeneration {
@@ -7365,6 +7855,11 @@ export interface ResponseCreateParamsBase {
   model?: Shared.ResponsesModel;
 
   /**
+   * Configuration for running moderation on the input and output of this response.
+   */
+  moderation?: ResponseCreateParams.Moderation | null;
+
+  /**
    * Whether to allow the model to run tool calls in parallel.
    */
   parallel_tool_calls?: boolean | null;
@@ -7395,8 +7890,16 @@ export interface ResponseCreateParamsBase {
    * prompt caching, which keeps cached prefixes active for longer, up to a maximum
    * of 24 hours.
    * [Learn more](https://platform.openai.com/docs/guides/prompt-caching#prompt-cache-retention).
+   * For `gpt-5.5`, `gpt-5.5-pro`, and future models, only `24h` is supported.
+   *
+   * For older models that support both `in_memory` and `24h`, the default depends on
+   * your organization's data retention policy:
+   *
+   * - Organizations without ZDR enabled default to `24h`.
+   * - Organizations with ZDR enabled default to `in_memory` when
+   *   `prompt_cache_retention` is not specified.
    */
-  prompt_cache_retention?: 'in-memory' | '24h' | null;
+  prompt_cache_retention?: 'in_memory' | '24h' | null;
 
   /**
    * **gpt-5 and o-series models only**
@@ -7511,6 +8014,13 @@ export interface ResponseCreateParamsBase {
   tools?: Array<Tool>;
 
   /**
+   * An integer between 0 and 20 specifying the maximum number of most likely tokens
+   * to return at each token position, each with an associated log probability. In
+   * some cases, the number of returned tokens may be fewer than requested.
+   */
+  top_logprobs?: number | null;
+
+  /**
    * An alternative to sampling with temperature, called nucleus sampling, where the
    * model considers the results of the tokens with top_p probability mass. So 0.1
    * means only the tokens comprising the top 10% probability mass are considered.
@@ -7520,7 +8030,7 @@ export interface ResponseCreateParamsBase {
   top_p?: number | null;
 
   /**
-   * The truncation strategy to use for the model response.
+   * @deprecated The truncation strategy to use for the model response.
    *
    * - `auto`: If the input to this Response exceeds the model's context window size,
    *   the model will truncate the response to fit the context window by dropping
@@ -7552,6 +8062,17 @@ export namespace ResponseCreateParams {
      * Token threshold at which compaction should be triggered for this entry.
      */
     compact_threshold?: number | null;
+  }
+
+  /**
+   * Configuration for running moderation on the input and output of this response.
+   */
+  export interface Moderation {
+    /**
+     * The moderation model to use for moderated completions, e.g.
+     * 'omni-moderation-latest'.
+     */
+    model: string;
   }
 
   /**
@@ -7671,6 +8192,10 @@ export interface ResponseCompactParams {
    */
   model:
     | 'gpt-5.4'
+    | 'gpt-5.4-mini'
+    | 'gpt-5.4-nano'
+    | 'gpt-5.4-mini-2026-03-17'
+    | 'gpt-5.4-nano-2026-03-17'
     | 'gpt-5.3-chat-latest'
     | 'gpt-5.2'
     | 'gpt-5.2-2025-12-11'
@@ -7786,6 +8311,16 @@ export interface ResponseCompactParams {
    * A key to use when reading from or writing to the prompt cache.
    */
   prompt_cache_key?: string | null;
+
+  /**
+   * How long to retain a prompt cache entry created by this request.
+   */
+  prompt_cache_retention?: 'in_memory' | '24h' | null;
+
+  /**
+   * The service tier to use for this request.
+   */
+  service_tier?: 'auto' | 'default' | 'flex' | 'priority' | null;
 }
 
 Responses.InputItems = InputItems;
@@ -7842,7 +8377,9 @@ export declare namespace Responses {
     type ResponseCustomToolCall as ResponseCustomToolCall,
     type ResponseCustomToolCallInputDeltaEvent as ResponseCustomToolCallInputDeltaEvent,
     type ResponseCustomToolCallInputDoneEvent as ResponseCustomToolCallInputDoneEvent,
+    type ResponseCustomToolCallItem as ResponseCustomToolCallItem,
     type ResponseCustomToolCallOutput as ResponseCustomToolCallOutput,
+    type ResponseCustomToolCallOutputItem as ResponseCustomToolCallOutputItem,
     type ResponseError as ResponseError,
     type ResponseErrorEvent as ResponseErrorEvent,
     type ResponseFailedEvent as ResponseFailedEvent,

@@ -2,6 +2,7 @@
 
 export * from './chat/index';
 export * from './shared';
+export { Admin } from './admin/admin';
 export { Audio, type AudioModel, type AudioResponseFormat } from './audio/audio';
 export {
   Batches,
@@ -130,15 +131,21 @@ export {
 } from './vector-stores/vector-stores';
 export {
   Videos,
+  type ImageInputReferenceParam,
   type Video,
   type VideoCreateError,
   type VideoModel,
   type VideoSeconds,
   type VideoSize,
   type VideoDeleteResponse,
+  type VideoCreateCharacterResponse,
+  type VideoGetCharacterResponse,
   type VideoCreateParams,
   type VideoListParams,
+  type VideoCreateCharacterParams,
   type VideoDownloadContentParams,
+  type VideoEditParams,
+  type VideoExtendParams,
   type VideoRemixParams,
   type VideosPage,
 } from './videos';

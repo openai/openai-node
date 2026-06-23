@@ -4,6 +4,7 @@ import OpenAI, { toFile } from 'openai';
 
 const client = new OpenAI({
   apiKey: 'My API Key',
+  adminAPIKey: 'My Admin API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
@@ -24,7 +25,7 @@ describe('resource versions', () => {
     await expect(
       client.skills.versions.create(
         'skill_123',
-        { default: true, files: [await toFile(Buffer.from('# my file contents'), 'README.md')] },
+        { default: true, files: [await toFile(Buffer.from('Example data'), 'README.md')] },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);

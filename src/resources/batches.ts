@@ -16,14 +16,14 @@ export class Batches extends APIResource {
    * Creates and executes a batch from an uploaded file of requests
    */
   create(body: BatchCreateParams, options?: RequestOptions): APIPromise<Batch> {
-    return this._client.post('/batches', { body, ...options });
+    return this._client.post('/batches', { body, ...options, __security: { bearerAuth: true } });
   }
 
   /**
    * Retrieves a batch.
    */
   retrieve(batchID: string, options?: RequestOptions): APIPromise<Batch> {
-    return this._client.get(path`/batches/${batchID}`, options);
+    return this._client.get(path`/batches/${batchID}`, { ...options, __security: { bearerAuth: true } });
   }
 
   /**
@@ -33,7 +33,11 @@ export class Batches extends APIResource {
     query: BatchListParams | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<BatchesPage, Batch> {
-    return this._client.getAPIList('/batches', CursorPage<Batch>, { query, ...options });
+    return this._client.getAPIList('/batches', CursorPage<Batch>, {
+      query,
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
@@ -42,7 +46,10 @@ export class Batches extends APIResource {
    * (if any) available in the output file.
    */
   cancel(batchID: string, options?: RequestOptions): APIPromise<Batch> {
-    return this._client.post(path`/batches/${batchID}/cancel`, options);
+    return this._client.post(path`/batches/${batchID}/cancel`, {
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 }
 
@@ -291,9 +298,10 @@ export interface BatchCreateParams {
   /**
    * The endpoint to be used for all requests in the batch. Currently
    * `/v1/responses`, `/v1/chat/completions`, `/v1/embeddings`, `/v1/completions`,
-   * `/v1/moderations`, `/v1/images/generations`, and `/v1/images/edits` are
-   * supported. Note that `/v1/embeddings` batches are also restricted to a maximum
-   * of 50,000 embedding inputs across all requests in the batch.
+   * `/v1/moderations`, `/v1/images/generations`, `/v1/images/edits`, and
+   * `/v1/videos` are supported. Note that `/v1/embeddings` batches are also
+   * restricted to a maximum of 50,000 embedding inputs across all requests in the
+   * batch.
    */
   endpoint:
     | '/v1/responses'
@@ -302,7 +310,8 @@ export interface BatchCreateParams {
     | '/v1/completions'
     | '/v1/moderations'
     | '/v1/images/generations'
-    | '/v1/images/edits';
+    | '/v1/images/edits'
+    | '/v1/videos';
 
   /**
    * The ID of an uploaded file that contains requests for the new batch.

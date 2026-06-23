@@ -11,6 +11,7 @@ Types:
 - <code><a href="./src/resources/shared.ts">FunctionDefinition</a></code>
 - <code><a href="./src/resources/shared.ts">FunctionParameters</a></code>
 - <code><a href="./src/resources/shared.ts">Metadata</a></code>
+- <code><a href="./src/resources/shared.ts">OAuthErrorCode</a></code>
 - <code><a href="./src/resources/shared.ts">Reasoning</a></code>
 - <code><a href="./src/resources/shared.ts">ReasoningEffort</a></code>
 - <code><a href="./src/resources/shared.ts">ResponseFormatJSONObject</a></code>
@@ -122,7 +123,7 @@ Methods:
 - <code title="get /files">client.files.<a href="./src/resources/files.ts">list</a>({ ...params }) -> FileObjectsPage</code>
 - <code title="delete /files/{file_id}">client.files.<a href="./src/resources/files.ts">delete</a>(fileID) -> FileDeleted</code>
 - <code title="get /files/{file_id}/content">client.files.<a href="./src/resources/files.ts">content</a>(fileID) -> Response</code>
-- <code>client.files.<a href="./src/resources/files.ts">waitForProcessing</a>(id, { pollInterval = 5000, maxWait = 30 * 60 * 1000 }) -> Promise&lt;FileObject&gt;</code>
+- <code>client.files.<a href="./src/resources/files.ts">waitForProcessing</a>(id, { pollInterval = 5000, maxWait = 30 _ 60 _ 1000 }) -> Promise&lt;FileObject&gt;</code>
 
 # Images
 
@@ -595,6 +596,411 @@ Methods:
 
 - <code title="post /uploads/{upload_id}/parts">client.uploads.parts.<a href="./src/resources/uploads/parts.ts">create</a>(uploadID, { ...params }) -> UploadPart</code>
 
+# Admin
+
+## Organization
+
+### AuditLogs
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/audit-logs.ts">AuditLogListResponse</a></code>
+
+Methods:
+
+- <code title="get /organization/audit_logs">client.admin.organization.auditLogs.<a href="./src/resources/admin/organization/audit-logs.ts">list</a>({ ...params }) -> AuditLogListResponsesPage</code>
+
+### AdminAPIKeys
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/admin-api-keys.ts">AdminAPIKey</a></code>
+- <code><a href="./src/resources/admin/organization/admin-api-keys.ts">AdminAPIKeyCreateResponse</a></code>
+- <code><a href="./src/resources/admin/organization/admin-api-keys.ts">AdminAPIKeyDeleteResponse</a></code>
+
+Methods:
+
+- <code title="post /organization/admin_api_keys">client.admin.organization.adminAPIKeys.<a href="./src/resources/admin/organization/admin-api-keys.ts">create</a>({ ...params }) -> AdminAPIKeyCreateResponse</code>
+- <code title="get /organization/admin_api_keys/{key_id}">client.admin.organization.adminAPIKeys.<a href="./src/resources/admin/organization/admin-api-keys.ts">retrieve</a>(keyID) -> AdminAPIKey</code>
+- <code title="get /organization/admin_api_keys">client.admin.organization.adminAPIKeys.<a href="./src/resources/admin/organization/admin-api-keys.ts">list</a>({ ...params }) -> AdminAPIKeysPage</code>
+- <code title="delete /organization/admin_api_keys/{key_id}">client.admin.organization.adminAPIKeys.<a href="./src/resources/admin/organization/admin-api-keys.ts">delete</a>(keyID) -> AdminAPIKeyDeleteResponse</code>
+
+### Usage
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/usage.ts">UsageAudioSpeechesResponse</a></code>
+- <code><a href="./src/resources/admin/organization/usage.ts">UsageAudioTranscriptionsResponse</a></code>
+- <code><a href="./src/resources/admin/organization/usage.ts">UsageCodeInterpreterSessionsResponse</a></code>
+- <code><a href="./src/resources/admin/organization/usage.ts">UsageCompletionsResponse</a></code>
+- <code><a href="./src/resources/admin/organization/usage.ts">UsageCostsResponse</a></code>
+- <code><a href="./src/resources/admin/organization/usage.ts">UsageEmbeddingsResponse</a></code>
+- <code><a href="./src/resources/admin/organization/usage.ts">UsageFileSearchCallsResponse</a></code>
+- <code><a href="./src/resources/admin/organization/usage.ts">UsageImagesResponse</a></code>
+- <code><a href="./src/resources/admin/organization/usage.ts">UsageModerationsResponse</a></code>
+- <code><a href="./src/resources/admin/organization/usage.ts">UsageVectorStoresResponse</a></code>
+- <code><a href="./src/resources/admin/organization/usage.ts">UsageWebSearchCallsResponse</a></code>
+
+Methods:
+
+- <code title="get /organization/usage/audio_speeches">client.admin.organization.usage.<a href="./src/resources/admin/organization/usage.ts">audioSpeeches</a>({ ...params }) -> UsageAudioSpeechesResponse</code>
+- <code title="get /organization/usage/audio_transcriptions">client.admin.organization.usage.<a href="./src/resources/admin/organization/usage.ts">audioTranscriptions</a>({ ...params }) -> UsageAudioTranscriptionsResponse</code>
+- <code title="get /organization/usage/code_interpreter_sessions">client.admin.organization.usage.<a href="./src/resources/admin/organization/usage.ts">codeInterpreterSessions</a>({ ...params }) -> UsageCodeInterpreterSessionsResponse</code>
+- <code title="get /organization/usage/completions">client.admin.organization.usage.<a href="./src/resources/admin/organization/usage.ts">completions</a>({ ...params }) -> UsageCompletionsResponse</code>
+- <code title="get /organization/costs">client.admin.organization.usage.<a href="./src/resources/admin/organization/usage.ts">costs</a>({ ...params }) -> UsageCostsResponse</code>
+- <code title="get /organization/usage/embeddings">client.admin.organization.usage.<a href="./src/resources/admin/organization/usage.ts">embeddings</a>({ ...params }) -> UsageEmbeddingsResponse</code>
+- <code title="get /organization/usage/file_search_calls">client.admin.organization.usage.<a href="./src/resources/admin/organization/usage.ts">fileSearchCalls</a>({ ...params }) -> UsageFileSearchCallsResponse</code>
+- <code title="get /organization/usage/images">client.admin.organization.usage.<a href="./src/resources/admin/organization/usage.ts">images</a>({ ...params }) -> UsageImagesResponse</code>
+- <code title="get /organization/usage/moderations">client.admin.organization.usage.<a href="./src/resources/admin/organization/usage.ts">moderations</a>({ ...params }) -> UsageModerationsResponse</code>
+- <code title="get /organization/usage/vector_stores">client.admin.organization.usage.<a href="./src/resources/admin/organization/usage.ts">vectorStores</a>({ ...params }) -> UsageVectorStoresResponse</code>
+- <code title="get /organization/usage/web_search_calls">client.admin.organization.usage.<a href="./src/resources/admin/organization/usage.ts">webSearchCalls</a>({ ...params }) -> UsageWebSearchCallsResponse</code>
+
+### Invites
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/invites.ts">Invite</a></code>
+- <code><a href="./src/resources/admin/organization/invites.ts">InviteDeleteResponse</a></code>
+
+Methods:
+
+- <code title="post /organization/invites">client.admin.organization.invites.<a href="./src/resources/admin/organization/invites.ts">create</a>({ ...params }) -> Invite</code>
+- <code title="get /organization/invites/{invite_id}">client.admin.organization.invites.<a href="./src/resources/admin/organization/invites.ts">retrieve</a>(inviteID) -> Invite</code>
+- <code title="get /organization/invites">client.admin.organization.invites.<a href="./src/resources/admin/organization/invites.ts">list</a>({ ...params }) -> InvitesPage</code>
+- <code title="delete /organization/invites/{invite_id}">client.admin.organization.invites.<a href="./src/resources/admin/organization/invites.ts">delete</a>(inviteID) -> InviteDeleteResponse</code>
+
+### Users
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/users/users.ts">OrganizationUser</a></code>
+- <code><a href="./src/resources/admin/organization/users/users.ts">UserDeleteResponse</a></code>
+
+Methods:
+
+- <code title="get /organization/users/{user_id}">client.admin.organization.users.<a href="./src/resources/admin/organization/users/users.ts">retrieve</a>(userID) -> OrganizationUser</code>
+- <code title="post /organization/users/{user_id}">client.admin.organization.users.<a href="./src/resources/admin/organization/users/users.ts">update</a>(userID, { ...params }) -> OrganizationUser</code>
+- <code title="get /organization/users">client.admin.organization.users.<a href="./src/resources/admin/organization/users/users.ts">list</a>({ ...params }) -> OrganizationUsersPage</code>
+- <code title="delete /organization/users/{user_id}">client.admin.organization.users.<a href="./src/resources/admin/organization/users/users.ts">delete</a>(userID) -> UserDeleteResponse</code>
+
+#### Roles
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/users/roles.ts">RoleCreateResponse</a></code>
+- <code><a href="./src/resources/admin/organization/users/roles.ts">RoleRetrieveResponse</a></code>
+- <code><a href="./src/resources/admin/organization/users/roles.ts">RoleListResponse</a></code>
+- <code><a href="./src/resources/admin/organization/users/roles.ts">RoleDeleteResponse</a></code>
+
+Methods:
+
+- <code title="post /organization/users/{user_id}/roles">client.admin.organization.users.roles.<a href="./src/resources/admin/organization/users/roles.ts">create</a>(userID, { ...params }) -> RoleCreateResponse</code>
+- <code title="get /organization/users/{user_id}/roles/{role_id}">client.admin.organization.users.roles.<a href="./src/resources/admin/organization/users/roles.ts">retrieve</a>(roleID, { ...params }) -> RoleRetrieveResponse</code>
+- <code title="get /organization/users/{user_id}/roles">client.admin.organization.users.roles.<a href="./src/resources/admin/organization/users/roles.ts">list</a>(userID, { ...params }) -> RoleListResponsesPage</code>
+- <code title="delete /organization/users/{user_id}/roles/{role_id}">client.admin.organization.users.roles.<a href="./src/resources/admin/organization/users/roles.ts">delete</a>(roleID, { ...params }) -> RoleDeleteResponse</code>
+
+### Groups
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/groups/groups.ts">Group</a></code>
+- <code><a href="./src/resources/admin/organization/groups/groups.ts">GroupUpdateResponse</a></code>
+- <code><a href="./src/resources/admin/organization/groups/groups.ts">GroupDeleteResponse</a></code>
+
+Methods:
+
+- <code title="post /organization/groups">client.admin.organization.groups.<a href="./src/resources/admin/organization/groups/groups.ts">create</a>({ ...params }) -> Group</code>
+- <code title="get /organization/groups/{group_id}">client.admin.organization.groups.<a href="./src/resources/admin/organization/groups/groups.ts">retrieve</a>(groupID) -> Group</code>
+- <code title="post /organization/groups/{group_id}">client.admin.organization.groups.<a href="./src/resources/admin/organization/groups/groups.ts">update</a>(groupID, { ...params }) -> GroupUpdateResponse</code>
+- <code title="get /organization/groups">client.admin.organization.groups.<a href="./src/resources/admin/organization/groups/groups.ts">list</a>({ ...params }) -> GroupsPage</code>
+- <code title="delete /organization/groups/{group_id}">client.admin.organization.groups.<a href="./src/resources/admin/organization/groups/groups.ts">delete</a>(groupID) -> GroupDeleteResponse</code>
+
+#### Users
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/groups/users.ts">OrganizationGroupUser</a></code>
+- <code><a href="./src/resources/admin/organization/groups/users.ts">UserCreateResponse</a></code>
+- <code><a href="./src/resources/admin/organization/groups/users.ts">UserRetrieveResponse</a></code>
+- <code><a href="./src/resources/admin/organization/groups/users.ts">UserDeleteResponse</a></code>
+
+Methods:
+
+- <code title="post /organization/groups/{group_id}/users">client.admin.organization.groups.users.<a href="./src/resources/admin/organization/groups/users.ts">create</a>(groupID, { ...params }) -> UserCreateResponse</code>
+- <code title="get /organization/groups/{group_id}/users/{user_id}">client.admin.organization.groups.users.<a href="./src/resources/admin/organization/groups/users.ts">retrieve</a>(userID, { ...params }) -> UserRetrieveResponse</code>
+- <code title="get /organization/groups/{group_id}/users">client.admin.organization.groups.users.<a href="./src/resources/admin/organization/groups/users.ts">list</a>(groupID, { ...params }) -> OrganizationGroupUsersPage</code>
+- <code title="delete /organization/groups/{group_id}/users/{user_id}">client.admin.organization.groups.users.<a href="./src/resources/admin/organization/groups/users.ts">delete</a>(userID, { ...params }) -> UserDeleteResponse</code>
+
+#### Roles
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/groups/roles.ts">RoleCreateResponse</a></code>
+- <code><a href="./src/resources/admin/organization/groups/roles.ts">RoleRetrieveResponse</a></code>
+- <code><a href="./src/resources/admin/organization/groups/roles.ts">RoleListResponse</a></code>
+- <code><a href="./src/resources/admin/organization/groups/roles.ts">RoleDeleteResponse</a></code>
+
+Methods:
+
+- <code title="post /organization/groups/{group_id}/roles">client.admin.organization.groups.roles.<a href="./src/resources/admin/organization/groups/roles.ts">create</a>(groupID, { ...params }) -> RoleCreateResponse</code>
+- <code title="get /organization/groups/{group_id}/roles/{role_id}">client.admin.organization.groups.roles.<a href="./src/resources/admin/organization/groups/roles.ts">retrieve</a>(roleID, { ...params }) -> RoleRetrieveResponse</code>
+- <code title="get /organization/groups/{group_id}/roles">client.admin.organization.groups.roles.<a href="./src/resources/admin/organization/groups/roles.ts">list</a>(groupID, { ...params }) -> RoleListResponsesPage</code>
+- <code title="delete /organization/groups/{group_id}/roles/{role_id}">client.admin.organization.groups.roles.<a href="./src/resources/admin/organization/groups/roles.ts">delete</a>(roleID, { ...params }) -> RoleDeleteResponse</code>
+
+### Roles
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/roles.ts">Role</a></code>
+- <code><a href="./src/resources/admin/organization/roles.ts">RoleDeleteResponse</a></code>
+
+Methods:
+
+- <code title="post /organization/roles">client.admin.organization.roles.<a href="./src/resources/admin/organization/roles.ts">create</a>({ ...params }) -> Role</code>
+- <code title="get /organization/roles/{role_id}">client.admin.organization.roles.<a href="./src/resources/admin/organization/roles.ts">retrieve</a>(roleID) -> Role</code>
+- <code title="post /organization/roles/{role_id}">client.admin.organization.roles.<a href="./src/resources/admin/organization/roles.ts">update</a>(roleID, { ...params }) -> Role</code>
+- <code title="get /organization/roles">client.admin.organization.roles.<a href="./src/resources/admin/organization/roles.ts">list</a>({ ...params }) -> RolesPage</code>
+- <code title="delete /organization/roles/{role_id}">client.admin.organization.roles.<a href="./src/resources/admin/organization/roles.ts">delete</a>(roleID) -> RoleDeleteResponse</code>
+
+### DataRetention
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/data-retention.ts">OrganizationDataRetention</a></code>
+
+Methods:
+
+- <code title="get /organization/data_retention">client.admin.organization.dataRetention.<a href="./src/resources/admin/organization/data-retention.ts">retrieve</a>() -> OrganizationDataRetention</code>
+- <code title="post /organization/data_retention">client.admin.organization.dataRetention.<a href="./src/resources/admin/organization/data-retention.ts">update</a>({ ...params }) -> OrganizationDataRetention</code>
+
+### SpendAlerts
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/spend-alerts.ts">OrganizationSpendAlert</a></code>
+- <code><a href="./src/resources/admin/organization/spend-alerts.ts">OrganizationSpendAlertDeleted</a></code>
+
+Methods:
+
+- <code title="post /organization/spend_alerts">client.admin.organization.spendAlerts.<a href="./src/resources/admin/organization/spend-alerts.ts">create</a>({ ...params }) -> OrganizationSpendAlert</code>
+- <code title="get /organization/spend_alerts/{alert_id}">client.admin.organization.spendAlerts.<a href="./src/resources/admin/organization/spend-alerts.ts">retrieve</a>(alertID) -> OrganizationSpendAlert</code>
+- <code title="post /organization/spend_alerts/{alert_id}">client.admin.organization.spendAlerts.<a href="./src/resources/admin/organization/spend-alerts.ts">update</a>(alertID, { ...params }) -> OrganizationSpendAlert</code>
+- <code title="get /organization/spend_alerts">client.admin.organization.spendAlerts.<a href="./src/resources/admin/organization/spend-alerts.ts">list</a>({ ...params }) -> OrganizationSpendAlertsPage</code>
+- <code title="delete /organization/spend_alerts/{alert_id}">client.admin.organization.spendAlerts.<a href="./src/resources/admin/organization/spend-alerts.ts">delete</a>(alertID) -> OrganizationSpendAlertDeleted</code>
+
+### Certificates
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/certificates.ts">Certificate</a></code>
+- <code><a href="./src/resources/admin/organization/certificates.ts">CertificateListResponse</a></code>
+- <code><a href="./src/resources/admin/organization/certificates.ts">CertificateDeleteResponse</a></code>
+- <code><a href="./src/resources/admin/organization/certificates.ts">CertificateActivateResponse</a></code>
+- <code><a href="./src/resources/admin/organization/certificates.ts">CertificateDeactivateResponse</a></code>
+
+Methods:
+
+- <code title="post /organization/certificates">client.admin.organization.certificates.<a href="./src/resources/admin/organization/certificates.ts">create</a>({ ...params }) -> Certificate</code>
+- <code title="get /organization/certificates/{certificate_id}">client.admin.organization.certificates.<a href="./src/resources/admin/organization/certificates.ts">retrieve</a>(certificateID, { ...params }) -> Certificate</code>
+- <code title="post /organization/certificates/{certificate_id}">client.admin.organization.certificates.<a href="./src/resources/admin/organization/certificates.ts">update</a>(certificateID, { ...params }) -> Certificate</code>
+- <code title="get /organization/certificates">client.admin.organization.certificates.<a href="./src/resources/admin/organization/certificates.ts">list</a>({ ...params }) -> CertificateListResponsesPage</code>
+- <code title="delete /organization/certificates/{certificate_id}">client.admin.organization.certificates.<a href="./src/resources/admin/organization/certificates.ts">delete</a>(certificateID) -> CertificateDeleteResponse</code>
+- <code title="post /organization/certificates/activate">client.admin.organization.certificates.<a href="./src/resources/admin/organization/certificates.ts">activate</a>({ ...params }) -> CertificateActivateResponsesPage</code>
+- <code title="post /organization/certificates/deactivate">client.admin.organization.certificates.<a href="./src/resources/admin/organization/certificates.ts">deactivate</a>({ ...params }) -> CertificateDeactivateResponsesPage</code>
+
+### Projects
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/projects/projects.ts">Project</a></code>
+
+Methods:
+
+- <code title="post /organization/projects">client.admin.organization.projects.<a href="./src/resources/admin/organization/projects/projects.ts">create</a>({ ...params }) -> Project</code>
+- <code title="get /organization/projects/{project_id}">client.admin.organization.projects.<a href="./src/resources/admin/organization/projects/projects.ts">retrieve</a>(projectID) -> Project</code>
+- <code title="post /organization/projects/{project_id}">client.admin.organization.projects.<a href="./src/resources/admin/organization/projects/projects.ts">update</a>(projectID, { ...params }) -> Project</code>
+- <code title="get /organization/projects">client.admin.organization.projects.<a href="./src/resources/admin/organization/projects/projects.ts">list</a>({ ...params }) -> ProjectsPage</code>
+- <code title="post /organization/projects/{project_id}/archive">client.admin.organization.projects.<a href="./src/resources/admin/organization/projects/projects.ts">archive</a>(projectID) -> Project</code>
+
+#### Users
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/projects/users/users.ts">ProjectUser</a></code>
+- <code><a href="./src/resources/admin/organization/projects/users/users.ts">UserDeleteResponse</a></code>
+
+Methods:
+
+- <code title="post /organization/projects/{project_id}/users">client.admin.organization.projects.users.<a href="./src/resources/admin/organization/projects/users/users.ts">create</a>(projectID, { ...params }) -> ProjectUser</code>
+- <code title="get /organization/projects/{project_id}/users/{user_id}">client.admin.organization.projects.users.<a href="./src/resources/admin/organization/projects/users/users.ts">retrieve</a>(userID, { ...params }) -> ProjectUser</code>
+- <code title="post /organization/projects/{project_id}/users/{user_id}">client.admin.organization.projects.users.<a href="./src/resources/admin/organization/projects/users/users.ts">update</a>(userID, { ...params }) -> ProjectUser</code>
+- <code title="get /organization/projects/{project_id}/users">client.admin.organization.projects.users.<a href="./src/resources/admin/organization/projects/users/users.ts">list</a>(projectID, { ...params }) -> ProjectUsersPage</code>
+- <code title="delete /organization/projects/{project_id}/users/{user_id}">client.admin.organization.projects.users.<a href="./src/resources/admin/organization/projects/users/users.ts">delete</a>(userID, { ...params }) -> UserDeleteResponse</code>
+
+##### Roles
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/projects/users/roles.ts">RoleCreateResponse</a></code>
+- <code><a href="./src/resources/admin/organization/projects/users/roles.ts">RoleRetrieveResponse</a></code>
+- <code><a href="./src/resources/admin/organization/projects/users/roles.ts">RoleListResponse</a></code>
+- <code><a href="./src/resources/admin/organization/projects/users/roles.ts">RoleDeleteResponse</a></code>
+
+Methods:
+
+- <code title="post /projects/{project_id}/users/{user_id}/roles">client.admin.organization.projects.users.roles.<a href="./src/resources/admin/organization/projects/users/roles.ts">create</a>(userID, { ...params }) -> RoleCreateResponse</code>
+- <code title="get /projects/{project_id}/users/{user_id}/roles/{role_id}">client.admin.organization.projects.users.roles.<a href="./src/resources/admin/organization/projects/users/roles.ts">retrieve</a>(roleID, { ...params }) -> RoleRetrieveResponse</code>
+- <code title="get /projects/{project_id}/users/{user_id}/roles">client.admin.organization.projects.users.roles.<a href="./src/resources/admin/organization/projects/users/roles.ts">list</a>(userID, { ...params }) -> RoleListResponsesPage</code>
+- <code title="delete /projects/{project_id}/users/{user_id}/roles/{role_id}">client.admin.organization.projects.users.roles.<a href="./src/resources/admin/organization/projects/users/roles.ts">delete</a>(roleID, { ...params }) -> RoleDeleteResponse</code>
+
+#### ServiceAccounts
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/projects/service-accounts.ts">ProjectServiceAccount</a></code>
+- <code><a href="./src/resources/admin/organization/projects/service-accounts.ts">ServiceAccountCreateResponse</a></code>
+- <code><a href="./src/resources/admin/organization/projects/service-accounts.ts">ServiceAccountDeleteResponse</a></code>
+
+Methods:
+
+- <code title="post /organization/projects/{project_id}/service_accounts">client.admin.organization.projects.serviceAccounts.<a href="./src/resources/admin/organization/projects/service-accounts.ts">create</a>(projectID, { ...params }) -> ServiceAccountCreateResponse</code>
+- <code title="get /organization/projects/{project_id}/service_accounts/{service_account_id}">client.admin.organization.projects.serviceAccounts.<a href="./src/resources/admin/organization/projects/service-accounts.ts">retrieve</a>(serviceAccountID, { ...params }) -> ProjectServiceAccount</code>
+- <code title="post /organization/projects/{project_id}/service_accounts/{service_account_id}">client.admin.organization.projects.serviceAccounts.<a href="./src/resources/admin/organization/projects/service-accounts.ts">update</a>(serviceAccountID, { ...params }) -> ProjectServiceAccount</code>
+- <code title="get /organization/projects/{project_id}/service_accounts">client.admin.organization.projects.serviceAccounts.<a href="./src/resources/admin/organization/projects/service-accounts.ts">list</a>(projectID, { ...params }) -> ProjectServiceAccountsPage</code>
+- <code title="delete /organization/projects/{project_id}/service_accounts/{service_account_id}">client.admin.organization.projects.serviceAccounts.<a href="./src/resources/admin/organization/projects/service-accounts.ts">delete</a>(serviceAccountID, { ...params }) -> ServiceAccountDeleteResponse</code>
+
+#### APIKeys
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/projects/api-keys.ts">ProjectAPIKey</a></code>
+- <code><a href="./src/resources/admin/organization/projects/api-keys.ts">APIKeyDeleteResponse</a></code>
+
+Methods:
+
+- <code title="get /organization/projects/{project_id}/api_keys/{api_key_id}">client.admin.organization.projects.apiKeys.<a href="./src/resources/admin/organization/projects/api-keys.ts">retrieve</a>(apiKeyID, { ...params }) -> ProjectAPIKey</code>
+- <code title="get /organization/projects/{project_id}/api_keys">client.admin.organization.projects.apiKeys.<a href="./src/resources/admin/organization/projects/api-keys.ts">list</a>(projectID, { ...params }) -> ProjectAPIKeysPage</code>
+- <code title="delete /organization/projects/{project_id}/api_keys/{api_key_id}">client.admin.organization.projects.apiKeys.<a href="./src/resources/admin/organization/projects/api-keys.ts">delete</a>(apiKeyID, { ...params }) -> APIKeyDeleteResponse</code>
+
+#### RateLimits
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/projects/rate-limits.ts">ProjectRateLimit</a></code>
+
+Methods:
+
+- <code title="get /organization/projects/{project_id}/rate_limits">client.admin.organization.projects.rateLimits.<a href="./src/resources/admin/organization/projects/rate-limits.ts">listRateLimits</a>(projectID, { ...params }) -> ProjectRateLimitsPage</code>
+- <code title="post /organization/projects/{project_id}/rate_limits/{rate_limit_id}">client.admin.organization.projects.rateLimits.<a href="./src/resources/admin/organization/projects/rate-limits.ts">updateRateLimit</a>(rateLimitID, { ...params }) -> ProjectRateLimit</code>
+
+#### ModelPermissions
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/projects/model-permissions.ts">ProjectModelPermissions</a></code>
+- <code><a href="./src/resources/admin/organization/projects/model-permissions.ts">ProjectModelPermissionsDeleted</a></code>
+
+Methods:
+
+- <code title="get /organization/projects/{project_id}/model_permissions">client.admin.organization.projects.modelPermissions.<a href="./src/resources/admin/organization/projects/model-permissions.ts">retrieve</a>(projectID) -> ProjectModelPermissions</code>
+- <code title="post /organization/projects/{project_id}/model_permissions">client.admin.organization.projects.modelPermissions.<a href="./src/resources/admin/organization/projects/model-permissions.ts">update</a>(projectID, { ...params }) -> ProjectModelPermissions</code>
+- <code title="delete /organization/projects/{project_id}/model_permissions">client.admin.organization.projects.modelPermissions.<a href="./src/resources/admin/organization/projects/model-permissions.ts">delete</a>(projectID) -> ProjectModelPermissionsDeleted</code>
+
+#### HostedToolPermissions
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/projects/hosted-tool-permissions.ts">ProjectHostedToolPermissions</a></code>
+
+Methods:
+
+- <code title="get /organization/projects/{project_id}/hosted_tool_permissions">client.admin.organization.projects.hostedToolPermissions.<a href="./src/resources/admin/organization/projects/hosted-tool-permissions.ts">retrieve</a>(projectID) -> ProjectHostedToolPermissions</code>
+- <code title="post /organization/projects/{project_id}/hosted_tool_permissions">client.admin.organization.projects.hostedToolPermissions.<a href="./src/resources/admin/organization/projects/hosted-tool-permissions.ts">update</a>(projectID, { ...params }) -> ProjectHostedToolPermissions</code>
+
+#### Groups
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/projects/groups/groups.ts">ProjectGroup</a></code>
+- <code><a href="./src/resources/admin/organization/projects/groups/groups.ts">GroupDeleteResponse</a></code>
+
+Methods:
+
+- <code title="post /organization/projects/{project_id}/groups">client.admin.organization.projects.groups.<a href="./src/resources/admin/organization/projects/groups/groups.ts">create</a>(projectID, { ...params }) -> ProjectGroup</code>
+- <code title="get /organization/projects/{project_id}/groups/{group_id}">client.admin.organization.projects.groups.<a href="./src/resources/admin/organization/projects/groups/groups.ts">retrieve</a>(groupID, { ...params }) -> ProjectGroup</code>
+- <code title="get /organization/projects/{project_id}/groups">client.admin.organization.projects.groups.<a href="./src/resources/admin/organization/projects/groups/groups.ts">list</a>(projectID, { ...params }) -> ProjectGroupsPage</code>
+- <code title="delete /organization/projects/{project_id}/groups/{group_id}">client.admin.organization.projects.groups.<a href="./src/resources/admin/organization/projects/groups/groups.ts">delete</a>(groupID, { ...params }) -> GroupDeleteResponse</code>
+
+##### Roles
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/projects/groups/roles.ts">RoleCreateResponse</a></code>
+- <code><a href="./src/resources/admin/organization/projects/groups/roles.ts">RoleRetrieveResponse</a></code>
+- <code><a href="./src/resources/admin/organization/projects/groups/roles.ts">RoleListResponse</a></code>
+- <code><a href="./src/resources/admin/organization/projects/groups/roles.ts">RoleDeleteResponse</a></code>
+
+Methods:
+
+- <code title="post /projects/{project_id}/groups/{group_id}/roles">client.admin.organization.projects.groups.roles.<a href="./src/resources/admin/organization/projects/groups/roles.ts">create</a>(groupID, { ...params }) -> RoleCreateResponse</code>
+- <code title="get /projects/{project_id}/groups/{group_id}/roles/{role_id}">client.admin.organization.projects.groups.roles.<a href="./src/resources/admin/organization/projects/groups/roles.ts">retrieve</a>(roleID, { ...params }) -> RoleRetrieveResponse</code>
+- <code title="get /projects/{project_id}/groups/{group_id}/roles">client.admin.organization.projects.groups.roles.<a href="./src/resources/admin/organization/projects/groups/roles.ts">list</a>(groupID, { ...params }) -> RoleListResponsesPage</code>
+- <code title="delete /projects/{project_id}/groups/{group_id}/roles/{role_id}">client.admin.organization.projects.groups.roles.<a href="./src/resources/admin/organization/projects/groups/roles.ts">delete</a>(roleID, { ...params }) -> RoleDeleteResponse</code>
+
+#### Roles
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/projects/roles.ts">RoleDeleteResponse</a></code>
+
+Methods:
+
+- <code title="post /projects/{project_id}/roles">client.admin.organization.projects.roles.<a href="./src/resources/admin/organization/projects/roles.ts">create</a>(projectID, { ...params }) -> Role</code>
+- <code title="get /projects/{project_id}/roles/{role_id}">client.admin.organization.projects.roles.<a href="./src/resources/admin/organization/projects/roles.ts">retrieve</a>(roleID, { ...params }) -> Role</code>
+- <code title="post /projects/{project_id}/roles/{role_id}">client.admin.organization.projects.roles.<a href="./src/resources/admin/organization/projects/roles.ts">update</a>(roleID, { ...params }) -> Role</code>
+- <code title="get /projects/{project_id}/roles">client.admin.organization.projects.roles.<a href="./src/resources/admin/organization/projects/roles.ts">list</a>(projectID, { ...params }) -> RolesPage</code>
+- <code title="delete /projects/{project_id}/roles/{role_id}">client.admin.organization.projects.roles.<a href="./src/resources/admin/organization/projects/roles.ts">delete</a>(roleID, { ...params }) -> RoleDeleteResponse</code>
+
+#### DataRetention
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/projects/data-retention.ts">ProjectDataRetention</a></code>
+
+Methods:
+
+- <code title="get /organization/projects/{project_id}/data_retention">client.admin.organization.projects.dataRetention.<a href="./src/resources/admin/organization/projects/data-retention.ts">retrieve</a>(projectID) -> ProjectDataRetention</code>
+- <code title="post /organization/projects/{project_id}/data_retention">client.admin.organization.projects.dataRetention.<a href="./src/resources/admin/organization/projects/data-retention.ts">update</a>(projectID, { ...params }) -> ProjectDataRetention</code>
+
+#### SpendAlerts
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/projects/spend-alerts.ts">ProjectSpendAlert</a></code>
+- <code><a href="./src/resources/admin/organization/projects/spend-alerts.ts">ProjectSpendAlertDeleted</a></code>
+
+Methods:
+
+- <code title="post /organization/projects/{project_id}/spend_alerts">client.admin.organization.projects.spendAlerts.<a href="./src/resources/admin/organization/projects/spend-alerts.ts">create</a>(projectID, { ...params }) -> ProjectSpendAlert</code>
+- <code title="get /organization/projects/{project_id}/spend_alerts/{alert_id}">client.admin.organization.projects.spendAlerts.<a href="./src/resources/admin/organization/projects/spend-alerts.ts">retrieve</a>(alertID, { ...params }) -> ProjectSpendAlert</code>
+- <code title="post /organization/projects/{project_id}/spend_alerts/{alert_id}">client.admin.organization.projects.spendAlerts.<a href="./src/resources/admin/organization/projects/spend-alerts.ts">update</a>(alertID, { ...params }) -> ProjectSpendAlert</code>
+- <code title="get /organization/projects/{project_id}/spend_alerts">client.admin.organization.projects.spendAlerts.<a href="./src/resources/admin/organization/projects/spend-alerts.ts">list</a>(projectID, { ...params }) -> ProjectSpendAlertsPage</code>
+- <code title="delete /organization/projects/{project_id}/spend_alerts/{alert_id}">client.admin.organization.projects.spendAlerts.<a href="./src/resources/admin/organization/projects/spend-alerts.ts">delete</a>(alertID, { ...params }) -> ProjectSpendAlertDeleted</code>
+
+#### Certificates
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/projects/certificates.ts">CertificateListResponse</a></code>
+- <code><a href="./src/resources/admin/organization/projects/certificates.ts">CertificateActivateResponse</a></code>
+- <code><a href="./src/resources/admin/organization/projects/certificates.ts">CertificateDeactivateResponse</a></code>
+
+Methods:
+
+- <code title="get /organization/projects/{project_id}/certificates">client.admin.organization.projects.certificates.<a href="./src/resources/admin/organization/projects/certificates.ts">list</a>(projectID, { ...params }) -> CertificateListResponsesPage</code>
+- <code title="post /organization/projects/{project_id}/certificates/activate">client.admin.organization.projects.certificates.<a href="./src/resources/admin/organization/projects/certificates.ts">activate</a>(projectID, { ...params }) -> CertificateActivateResponsesPage</code>
+- <code title="post /organization/projects/{project_id}/certificates/deactivate">client.admin.organization.projects.certificates.<a href="./src/resources/admin/organization/projects/certificates.ts">deactivate</a>(projectID, { ...params }) -> CertificateDeactivateResponsesPage</code>
+
 # [Responses](src/resources/responses/api.md)
 
 # [Realtime](src/resources/realtime/api.md)
@@ -737,12 +1143,15 @@ Methods:
 
 Types:
 
+- <code><a href="./src/resources/videos.ts">ImageInputReferenceParam</a></code>
 - <code><a href="./src/resources/videos.ts">Video</a></code>
 - <code><a href="./src/resources/videos.ts">VideoCreateError</a></code>
 - <code><a href="./src/resources/videos.ts">VideoModel</a></code>
 - <code><a href="./src/resources/videos.ts">VideoSeconds</a></code>
 - <code><a href="./src/resources/videos.ts">VideoSize</a></code>
 - <code><a href="./src/resources/videos.ts">VideoDeleteResponse</a></code>
+- <code><a href="./src/resources/videos.ts">VideoCreateCharacterResponse</a></code>
+- <code><a href="./src/resources/videos.ts">VideoGetCharacterResponse</a></code>
 
 Methods:
 
@@ -750,5 +1159,9 @@ Methods:
 - <code title="get /videos/{video_id}">client.videos.<a href="./src/resources/videos.ts">retrieve</a>(videoID) -> Video</code>
 - <code title="get /videos">client.videos.<a href="./src/resources/videos.ts">list</a>({ ...params }) -> VideosPage</code>
 - <code title="delete /videos/{video_id}">client.videos.<a href="./src/resources/videos.ts">delete</a>(videoID) -> VideoDeleteResponse</code>
+- <code title="post /videos/characters">client.videos.<a href="./src/resources/videos.ts">createCharacter</a>({ ...params }) -> VideoCreateCharacterResponse</code>
 - <code title="get /videos/{video_id}/content">client.videos.<a href="./src/resources/videos.ts">downloadContent</a>(videoID, { ...params }) -> Response</code>
+- <code title="post /videos/edits">client.videos.<a href="./src/resources/videos.ts">edit</a>({ ...params }) -> Video</code>
+- <code title="post /videos/extensions">client.videos.<a href="./src/resources/videos.ts">extend</a>({ ...params }) -> Video</code>
+- <code title="get /videos/characters/{character_id}">client.videos.<a href="./src/resources/videos.ts">getCharacter</a>(characterID) -> VideoGetCharacterResponse</code>
 - <code title="post /videos/{video_id}/remix">client.videos.<a href="./src/resources/videos.ts">remix</a>(videoID, { ...params }) -> Video</code>

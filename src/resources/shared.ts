@@ -20,6 +20,10 @@ export type AllModels =
 
 export type ChatModel =
   | 'gpt-5.4'
+  | 'gpt-5.4-mini'
+  | 'gpt-5.4-nano'
+  | 'gpt-5.4-mini-2026-03-17'
+  | 'gpt-5.4-nano-2026-03-17'
   | 'gpt-5.3-chat-latest'
   | 'gpt-5.2'
   | 'gpt-5.2-2025-12-11'
@@ -117,7 +121,7 @@ export interface ComparisonFilter {
    * - `in`: in
    * - `nin`: not in
    */
-  type: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte';
+  type: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'nin';
 
   /**
    * The value to compare against the attribute key; supports string, number, or
@@ -244,6 +248,8 @@ export type FunctionParameters = { [key: string]: unknown };
  */
 export type Metadata = { [key: string]: string };
 
+export type OAuthErrorCode = 'invalid_grant' | 'invalid_subject_token' | (string & {});
+
 /**
  * **gpt-5 and o-series models only**
  *
@@ -251,6 +257,13 @@ export type Metadata = { [key: string]: string };
  * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
  */
 export interface Reasoning {
+  /**
+   * Controls which reasoning items are rendered back to the model on later turns.
+   * When returned on a response, this is the effective reasoning context mode used
+   * for the response.
+   */
+  context?: 'auto' | 'current_turn' | 'all_turns' | null;
+
   /**
    * Constrains effort on reasoning for
    * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently

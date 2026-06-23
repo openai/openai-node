@@ -2,10 +2,24 @@
 
 import * as ResponsesAPI from './responses';
 import { OpenAI } from '../../client';
-
 import { EventEmitter } from '../../core/EventEmitter';
 import { OpenAIError } from '../../core/error';
-import { stringifyQuery } from '../../internal/utils';
+
+import type { RawWebSocketData, ReconnectingEvent, UnsentMessage } from '../../internal/ws';
+
+export type ResponsesStreamMessage =
+  | { type: 'connecting' | 'open' | 'closing' }
+  | {
+      type: 'close';
+      code: number;
+      reason: string;
+      unsent: UnsentMessage<ResponsesAPI.ResponsesClientEvent>[];
+    }
+  | { type: 'reconnecting'; reconnect: ReconnectingEvent }
+  | { type: 'reconnected' }
+  | { type: 'message'; message: ResponsesAPI.ResponsesServerEvent }
+  | { type: 'raw'; data: RawWebSocketData }
+  | { type: 'error'; error: WebSocketError };
 
 export class WebSocketError extends OpenAIError {
   /**
@@ -22,10 +36,14 @@ export class WebSocketError extends OpenAIError {
 
 type Simplify<T> = { [KeyType in keyof T]: T[KeyType] } & {};
 
-type WebsocketEvents = Simplify<
+type WebSocketEvents = Simplify<
   {
     event: (event: ResponsesAPI.ResponsesServerEvent) => void;
+    raw: (data: RawWebSocketData) => void;
     error: (error: WebSocketError) => void;
+    close: (code: number, reason: string, unsent: UnsentMessage<ResponsesAPI.ResponsesClientEvent>[]) => void;
+    reconnecting: (event: ReconnectingEvent) => void;
+    reconnected: () => void;
   } & {
     [EventType in Exclude<NonNullable<ResponsesAPI.ResponsesServerEvent['type']>, 'error'>]: (
       event: Extract<ResponsesAPI.ResponsesServerEvent, { type?: EventType }>,
@@ -33,14 +51,19 @@ type WebsocketEvents = Simplify<
   }
 >;
 
-export abstract class ResponsesEmitter extends EventEmitter<WebsocketEvents> {
+export abstract class ResponsesEmitter extends EventEmitter<WebSocketEvents> {
   /**
    * Send an event to the API.
    */
   abstract send(event: ResponsesAPI.ResponsesClientEvent): void;
 
   /**
-   * Close the websocket connection.
+   * Send raw data over the WebSocket without JSON serialization.
+   */
+  abstract sendRaw(data: RawWebSocketData): void;
+
+  /**
+   * Close the WebSocket connection.
    */
   abstract close(props?: { code: number; reason: string }): void;
 
@@ -73,14 +96,11 @@ export abstract class ResponsesEmitter extends EventEmitter<WebsocketEvents> {
   }
 }
 
-export function buildURL(client: OpenAI, query?: object | null): URL {
-  const path = '/responses';
-  const baseURL = client.baseURL;
-  const url = new URL(baseURL + (baseURL.endsWith('/') ? path.slice(1) : path));
-  if (query) {
-    url.search = stringifyQuery(query);
-  }
-  url.protocol = 'wss';
+export function buildURL(client: OpenAI, parameters: Record<string, unknown>): URL {
+  const { ...query } = parameters;
+  const endpoint = '/responses';
+  const url = new URL(client.buildURL(endpoint, query, undefined));
+  url.protocol = url.protocol === 'http:' || url.protocol === 'ws:' ? 'ws:' : 'wss:';
   return url;
 }
 

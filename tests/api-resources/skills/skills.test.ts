@@ -4,6 +4,7 @@ import OpenAI, { toFile } from 'openai';
 
 const client = new OpenAI({
   apiKey: 'My API Key',
+  adminAPIKey: 'My Admin API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
@@ -23,7 +24,7 @@ describe('resource skills', () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
       client.skills.create(
-        { files: [await toFile(Buffer.from('# my file contents'), 'README.md')] },
+        { files: [await toFile(Buffer.from('Example data'), 'README.md')] },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);
