@@ -2,7 +2,7 @@ import {
   type ChatCompletionMessageParam,
   type ChatCompletionCreateParamsNonStreaming,
 } from '../resources/chat/completions';
-import { type RunnableFunctions, type BaseFunctionsArgs, RunnableTools } from './RunnableFunction';
+import { type BaseFunctionsArgs, RunnableTools } from './RunnableFunction';
 import {
   AbstractChatCompletionRunner,
   AbstractChatCompletionRunnerEvents,
@@ -16,13 +16,6 @@ export interface ChatCompletionRunnerEvents extends AbstractChatCompletionRunner
   content: (content: string) => void;
 }
 
-export type ChatCompletionFunctionRunnerParams<FunctionsArgs extends BaseFunctionsArgs> = Omit<
-  ChatCompletionCreateParamsNonStreaming,
-  'functions'
-> & {
-  functions: RunnableFunctions<FunctionsArgs>;
-};
-
 export type ChatCompletionToolRunnerParams<FunctionsArgs extends BaseFunctionsArgs> = Omit<
   ChatCompletionCreateParamsNonStreaming,
   'tools'
@@ -34,21 +27,6 @@ export class ChatCompletionRunner<ParsedT = null> extends AbstractChatCompletion
   ChatCompletionRunnerEvents,
   ParsedT
 > {
-  /** @deprecated - please use `runTools` instead. */
-  static runFunctions(
-    client: OpenAI,
-    params: ChatCompletionFunctionRunnerParams<any[]>,
-    options?: RunnerOptions,
-  ): ChatCompletionRunner<null> {
-    const runner = new ChatCompletionRunner();
-    const opts = {
-      ...options,
-      headers: { ...options?.headers, 'X-Stainless-Helper-Method': 'runFunctions' },
-    };
-    runner._run(() => runner._runFunctions(client, params, opts));
-    return runner;
-  }
-
   static runTools<ParsedT>(
     client: OpenAI,
     params: ChatCompletionToolRunnerParams<any[]>,

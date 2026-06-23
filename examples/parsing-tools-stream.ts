@@ -1,6 +1,6 @@
 import { zodFunction } from 'openai/helpers/zod';
 import OpenAI from 'openai/index';
-import { z } from 'zod';
+import { z } from 'zod/v4'; // Also works for 'zod/v3'
 
 const GetWeatherArgs = z.object({
   city: z.string(),
@@ -12,7 +12,7 @@ async function main() {
   const client = new OpenAI();
   const refusal = process.argv.includes('refusal');
 
-  const stream = client.beta.chat.completions
+  const stream = client.chat.completions
     .stream({
       model: 'gpt-4o-2024-08-06',
       messages: [

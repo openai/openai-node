@@ -2,18 +2,18 @@
 
 The OpenAI API supports extracting JSON from the model with the `response_format` request param, for more details on the API, see [this guide](https://platform.openai.com/docs/guides/structured-outputs).
 
-The SDK provides a `client.beta.chat.completions.parse()` method which is a wrapper over the `client.chat.completions.create()` that
+The SDK provides a `client.chat.completions.parse()` method which is a wrapper over the `client.chat.completions.create()` that
 provides richer integrations with TS specific types & returns a `ParsedChatCompletion` object, which is an extension of the standard `ChatCompletion` type.
 
 ## Auto-parsing response content with Zod schemas
 
-You can pass zod schemas wrapped with `zodResponseFormat()` to the `.parse()` method and the SDK will automatically conver the model
+You can pass zod schemas wrapped with `zodResponseFormat()` to the `.parse()` method and the SDK will automatically convert the model
 into a JSON schema, send it to the API and parse the response content back using the given zod schema.
 
 ```ts
 import { zodResponseFormat } from 'openai/helpers/zod';
 import OpenAI from 'openai/index';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 const Step = z.object({
   explanation: z.string(),
@@ -27,7 +27,7 @@ const MathResponse = z.object({
 
 const client = new OpenAI();
 
-const completion = await client.beta.chat.completions.parse({
+const completion = await client.chat.completions.parse({
   model: 'gpt-4o-2024-08-06',
   messages: [
     { role: 'system', content: 'You are a helpful math tutor.' },
@@ -57,7 +57,7 @@ For example:
 ```ts
 import { zodFunction } from 'openai/helpers/zod';
 import OpenAI from 'openai/index';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 const Table = z.enum(['orders', 'customers', 'products']);
 
@@ -93,7 +93,7 @@ const Query = z.object({
 });
 
 const client = new OpenAI();
-const completion = await client.beta.chat.completions.parse({
+const completion = await client.chat.completions.parse({
   model: 'gpt-4o-2024-08-06',
   messages: [
     {
@@ -122,7 +122,7 @@ main();
 
 ### Differences from `.create()`
 
-The `beta.chat.completions.parse()` method imposes some additional restrictions on it's usage that `chat.completions.create()` does not.
+The `chat.completions.parse()` method imposes some additional restrictions on it's usage that `chat.completions.create()` does not.
 
 - If the completion completes with `finish_reason` set to `length` or `content_filter`, the `LengthFinishReasonError` / `ContentFilterFinishReasonError` errors will be raised.
 - Only strict function tools can be passed, e.g. `{type: 'function', function: {..., strict: true}}`
@@ -142,9 +142,7 @@ More information can be found in the documentation: [Assistant Streaming](https:
 
 ```ts
 const run = openai.beta.threads.runs
-  .stream(thread.id, {
-    assistant_id: assistant.id,
-  })
+  .stream(thread.id, { assistant_id: assistant.id })
   .on('textCreated', (text) => process.stdout.write('\nassistant > '))
   .on('textDelta', (textDelta, snapshot) => process.stdout.write(textDelta.value))
   .on('toolCallCreated', (toolCall) => process.stdout.write(`\nassistant > ${toolCall.type}\n\n`))
@@ -304,47 +302,87 @@ If you need to cancel a stream, you can `break` from a `for await` loop or call 
 
 See an example of streaming helpers in action in [`examples/stream.ts`](examples/stream.ts).
 
-### Automated Function Calls
+### Automated function calls
+
+We provide the `openai.chat.completions.runTools({…})`
+convenience helper for using function tool calls with the `/chat/completions` endpoint
+which automatically call the JavaScript functions you provide
+and sends their results back to the `/chat/completions` endpoint,
+looping as long as the model requests tool calls.
+
+If you pass a `parse` function, it will automatically parse the `arguments` for you
+and returns any parsing errors to the model to attempt auto-recovery.
+Otherwise, the args will be passed to the function you provide as a string.
+
+If you pass `tool_choice: {function: {name: …}}` instead of `auto`,
+it returns immediately after calling that function (and only loops to auto-recover parsing errors).
 
 ```ts
-openai.chat.completions.runTools({ stream: false, … }, options?): ChatCompletionRunner
-openai.chat.completions.runTools({ stream: true, … }, options?): ChatCompletionStreamingRunner
-```
+import OpenAI from 'openai';
 
-`openai.chat.completions.runTools()` returns a Runner
-for automating function calls with chat completions.
-The runner automatically calls the JavaScript functions you provide and sends their results back
-to the API, looping as long as the model requests function calls.
+const client = new OpenAI();
 
-If you pass a `parse` function, it will automatically parse the `arguments` for you and returns any parsing
-errors to the model to attempt auto-recovery. Otherwise, the args will be passed to the function you provide
-as a string.
-
-```ts
-client.chat.completions.runTools({
-  model: 'gpt-3.5-turbo',
-  messages: [{ role: 'user', content: 'How is the weather this week?' }],
-  tools: [
-    {
-      type: 'function',
-      function: {
-        function: getWeather as (args: { location: string; time: Date }) => any,
-        parse: parseFunction as (args: strings) => { location: string; time: Date },
-        parameters: {
-          type: 'object',
-          properties: {
-            location: { type: 'string' },
-            time: { type: 'string', format: 'date-time' },
+async function main() {
+  const runner = client.chat.completions
+    .runTools({
+      model: 'gpt-4o',
+      messages: [{ role: 'user', content: 'How is the weather this week?' }],
+      tools: [
+        {
+          type: 'function',
+          function: {
+            function: getCurrentLocation,
+            parameters: { type: 'object', properties: {} },
           },
         },
-      },
-    },
-  ],
-});
+        {
+          type: 'function',
+          function: {
+            function: getWeather,
+            parse: JSON.parse, // or use a validation library like zod for typesafe parsing.
+            parameters: {
+              type: 'object',
+              properties: {
+                location: { type: 'string' },
+              },
+            },
+          },
+        },
+      ],
+    })
+    .on('message', (message) => console.log(message));
+
+  const finalContent = await runner.finalContent();
+  console.log();
+  console.log('Final content:', finalContent);
+}
+
+async function getCurrentLocation() {
+  return 'Boston'; // Simulate lookup
+}
+
+async function getWeather(args: { location: string }) {
+  const { location } = args;
+  // … do lookup …
+  return { temperature, precipitation };
+}
+
+main();
+
+// {role: "user",      content: "How's the weather this week?"}
+// {role: "assistant", tool_calls: [{type: "function", function: {name: "getCurrentLocation", arguments: "{}"}, id: "123"}
+// {role: "tool",      name: "getCurrentLocation", content: "Boston", tool_call_id: "123"}
+// {role: "assistant", tool_calls: [{type: "function", function: {name: "getWeather", arguments: '{"location": "Boston"}'}, id: "1234"}]}
+// {role: "tool",      name: "getWeather", content: '{"temperature": "50degF", "preciptation": "high"}', tool_call_id: "1234"}
+// {role: "assistant", content: "It's looking cold and rainy - you might want to wear a jacket!"}
+//
+// Final content: "It's looking cold and rainy - you might want to wear a jacket!"
 ```
 
-If you pass `function_call: {name: …}` instead of `auto`, it returns immediately after calling that
-function (and only loops to auto-recover parsing errors).
+Like with `.stream()`, we provide a variety of [helpers and events](helpers.md#chat-events).
+
+Read more about various examples such as with integrating with [zod](#integrate-with-zod),
+[next.js](#integrate-with-nextjs), and [proxying a stream to the browser](#proxy-streaming-to-a-browser).
 
 By default, we run the loop up to 10 chat completions from the API. You can change this behavior by
 adjusting `maxChatCompletions` in the request options object. Note that `max_tokens` is the limit per
@@ -397,6 +435,7 @@ response is given as the first argument to the callback.
 #### `.on('content.delta', (props: ContentDeltaEvent) => ...)`
 
 The event fired for every chunk containing new content. The `props` object contains:
+
 - `delta`: The new content string received in this chunk
 - `snapshot`: The accumulated content so far
 - `parsed`: The partially parsed content (if applicable)
@@ -404,23 +443,27 @@ The event fired for every chunk containing new content. The `props` object conta
 #### `.on('content.done', (props: ContentDoneEvent<ParsedT>) => ...)`
 
 The event fired when the content generation is complete. The `props` object contains:
+
 - `content`: The full generated content
 - `parsed`: The fully parsed content (if applicable)
 
 #### `.on('refusal.delta', (props: RefusalDeltaEvent) => ...)`
 
 The event fired when a chunk contains part of a content refusal. The `props` object contains:
+
 - `delta`: The new refusal content string received in this chunk
 - `snapshot`: The accumulated refusal content string so far
 
 #### `.on('refusal.done', (props: RefusalDoneEvent) => ...)`
 
 The event fired when the refusal content is complete. The `props` object contains:
+
 - `refusal`: The full refusal content
 
 #### `.on('tool_calls.function.arguments.delta', (props: FunctionToolCallArgumentsDeltaEvent) => ...)`
 
 The event fired when a chunk contains part of a function tool call's arguments. The `props` object contains:
+
 - `name`: The name of the function being called
 - `index`: The index of the tool call
 - `arguments`: The accumulated raw JSON string of arguments
@@ -430,6 +473,7 @@ The event fired when a chunk contains part of a function tool call's arguments. 
 #### `.on('tool_calls.function.arguments.done', (props: FunctionToolCallArgumentsDoneEvent) => ...)`
 
 The event fired when a function tool call's arguments are complete. The `props` object contains:
+
 - `name`: The name of the function being called
 - `index`: The index of the tool call
 - `arguments`: The full raw JSON string of arguments
@@ -438,23 +482,27 @@ The event fired when a function tool call's arguments are complete. The `props` 
 #### `.on('logprobs.content.delta', (props: LogProbsContentDeltaEvent) => ...)`
 
 The event fired when a chunk contains new content log probabilities. The `props` object contains:
+
 - `content`: A list of the new log probabilities received in this chunk
 - `snapshot`: A list of the accumulated log probabilities so far
 
 #### `.on('logprobs.content.done', (props: LogProbsContentDoneEvent) => ...)`
 
 The event fired when all content log probabilities have been received. The `props` object contains:
+
 - `content`: The full list of token log probabilities for the content
 
 #### `.on('logprobs.refusal.delta', (props: LogProbsRefusalDeltaEvent) => ...)`
 
 The event fired when a chunk contains new refusal log probabilities. The `props` object contains:
+
 - `refusal`: A list of the new log probabilities received in this chunk
 - `snapshot`: A list of the accumulated log probabilities so far
 
 #### `.on('logprobs.refusal.done', (props: LogProbsRefusalDoneEvent) => ...)`
 
 The event fired when all refusal log probabilities have been received. The `props` object contains:
+
 - `refusal`: The full list of token log probabilities for the refusal
 
 #### `.on('finalChatCompletion', (completion: ChatCompletion) => …)`
@@ -585,6 +633,35 @@ async function main() {
 main();
 ```
 
+#### Inspect or extend the conversation after each completion
+
+The `afterCompletion` callback runs after a completion's tool calls have finished and is awaited before the
+next request starts. It can inspect the completion and append context to the runner's mutable `messages` array.
+The callback also runs for the final completion, when no further request will be made.
+
+```ts
+const runner = client.chat.completions.runTools(
+  {
+    model: 'gpt-4o',
+    messages,
+    tools,
+  },
+  {
+    afterCompletion: async (completion, runner) => {
+      if (!completion.choices[0]?.message.tool_calls?.length) return;
+
+      const webResearch = await optionallyPerformWebResearch(runner.messages.slice(-10));
+      if (webResearch) {
+        runner.messages.push({
+          role: 'system',
+          content: `Use this up-to-date research to guide your next steps:\n\n${webResearch}`,
+        });
+      }
+    },
+  },
+);
+```
+
 #### Integrate with `zod`
 
 [`zod`](https://www.npmjs.com/package/zod) is a schema validation library which can help with validating the
@@ -592,7 +669,7 @@ assistant's response to make sure it conforms to a schema. Paired with [`zod-to-
 
 ```ts
 import OpenAI from 'openai';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 
 const client = new OpenAI();
@@ -661,4 +738,18 @@ client.beta.vectorStores.files.uploadAndPoll((...)
 client.beta.vectorStores.files.createAndPoll((...)
 client.beta.vectorStores.fileBatches.createAndPoll((...)
 client.beta.vectorStores.fileBatches.uploadAndPoll((...)
+```
+
+# Bulk Upload Helpers
+
+When creating and interacting with vector stores, you can use the polling helpers to monitor the status of operations.
+For convenience, we also provide a bulk upload helper to allow you to simultaneously upload several files at once.
+
+```ts
+const fileList = [
+  createReadStream('/home/data/example.pdf'),
+  ...
+];
+
+const batch = await openai.vectorStores.fileBatches.uploadAndPoll(vectorStore.id, {files: fileList});
 ```

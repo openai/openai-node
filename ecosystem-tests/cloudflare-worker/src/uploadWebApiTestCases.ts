@@ -49,8 +49,8 @@ export function uploadWebApiTestCases({
 	it(`raw response`, async function () {
 		const response = await client.chat.completions
 			.create({
-				model: 'gpt-4',
-				messages: [{ role: 'user', content: 'Say this is a test' }],
+				model: 'gpt-4o-mini',
+				messages: [{ role: 'user', content: 'Reply with exactly this text and nothing else: This is a test' }],
 			})
 			.asResponse();
 
@@ -81,8 +81,8 @@ export function uploadWebApiTestCases({
 
 	it(`streaming works`, async function () {
 		const stream = await client.chat.completions.create({
-			model: 'gpt-4',
-			messages: [{ role: 'user', content: 'Say this is a test' }],
+			model: 'gpt-4o-mini',
+			messages: [{ role: 'user', content: 'Reply with exactly this text and nothing else: This is a test' }],
 			stream: true,
 		});
 		const chunks = [];
@@ -131,6 +131,7 @@ export function uploadWebApiTestCases({
 	});
 	it('toFile handles ArrayBuffer', async () => {
 		const result = await client.files.create({
+			// @ts-ignore
 			file: await toFile(new TextEncoder().encode(fineTune).buffer, 'finetune.jsonl'),
 			purpose: 'fine-tune',
 		});

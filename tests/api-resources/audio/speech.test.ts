@@ -4,6 +4,7 @@ import OpenAI from 'openai';
 
 const client = new OpenAI({
   apiKey: 'My API Key',
+  adminAPIKey: 'My Admin API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
@@ -12,10 +13,12 @@ describe('resource speech', () => {
   test.skip('create: required and optional params', async () => {
     const response = await client.audio.speech.create({
       input: 'input',
-      model: 'string',
+      model: 'tts-1',
       voice: 'alloy',
+      instructions: 'instructions',
       response_format: 'mp3',
       speed: 0.25,
+      stream_format: 'sse',
     });
   });
 });

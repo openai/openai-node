@@ -1,8 +1,8 @@
-import { OpenAI } from '../../index';
+import { AzureOpenAI, OpenAI } from '../../index';
 import { OpenAIError } from '../../error';
-import * as Core from '../../core';
 import type { RealtimeClientEvent, RealtimeServerEvent } from '../../resources/beta/realtime/realtime';
-import { OpenAIRealtimeEmitter, buildRealtimeURL } from './internal-base';
+import { OpenAIRealtimeEmitter, buildRealtimeURL, isAzure } from './internal-base';
+import { isRunningInBrowser } from '../../internal/detect-platform';
 
 interface MessageEvent {
   data: string;
@@ -11,7 +11,7 @@ interface MessageEvent {
 type _WebSocket =
   typeof globalThis extends (
     {
-      WebSocket: infer ws;
+      WebSocket: infer ws extends abstract new (...args: any) => any;
     }
   ) ?
     // @ts-ignore
@@ -26,17 +26,23 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
     props: {
       model: string;
       dangerouslyAllowBrowser?: boolean;
+      /**
+       * Callback to mutate the URL, needed for Azure.
+       * @internal
+       */
+      onURL?: (url: URL) => void;
+      /** Indicates the token was resolved by the factory just before connecting. @internal */
+      __resolvedApiKey?: boolean;
     },
     client?: Pick<OpenAI, 'apiKey' | 'baseURL'>,
   ) {
     super();
-
+    const hasProvider = typeof (client as any)?._options?.apiKey === 'function';
     const dangerouslyAllowBrowser =
       props.dangerouslyAllowBrowser ??
       (client as any)?._options?.dangerouslyAllowBrowser ??
-      (client?.apiKey.startsWith('ek_') ? true : null);
-
-    if (!dangerouslyAllowBrowser && Core.isRunningInBrowser()) {
+      (client?.apiKey?.startsWith('ek_') ? true : null);
+    if (!dangerouslyAllowBrowser && isRunningInBrowser()) {
       throw new OpenAIError(
         "It looks like you're running in a browser-like environment.\n\nThis is disabled by default, as it risks exposing your secret API credentials to attackers.\n\nYou can avoid this error by creating an ephemeral session token:\nhttps://platform.openai.com/docs/api-reference/realtime-sessions\n",
       );
@@ -44,11 +50,23 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
 
     client ??= new OpenAI({ dangerouslyAllowBrowser });
 
-    this.url = buildRealtimeURL({ baseURL: client.baseURL, model: props.model });
+    if (hasProvider && !props?.__resolvedApiKey) {
+      throw new Error(
+        [
+          'Cannot open Realtime WebSocket with a function-based apiKey.',
+          'Use the .create() method so that the key is resolved before connecting:',
+          'await OpenAIRealtimeWebSocket.create(client, { model })',
+        ].join('\n'),
+      );
+    }
+
+    this.url = buildRealtimeURL(client, props.model);
+    props.onURL?.(this.url);
+
     // @ts-ignore
-    this.socket = new WebSocket(this.url, [
+    this.socket = new WebSocket(this.url.toString(), [
       'realtime',
-      `openai-insecure-api-key.${client.apiKey}`,
+      ...(isAzure(client) ? [] : [`openai-insecure-api-key.${client.apiKey}`]),
       'openai-beta.realtime-v1',
     ]);
 
@@ -77,6 +95,54 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
     this.socket.addEventListener('error', (event: any) => {
       this._onError(null, event.message, null);
     });
+
+    if (isAzure(client)) {
+      if (this.url.searchParams.get('Authorization') !== null) {
+        this.url.searchParams.set('Authorization', '<REDACTED>');
+      } else {
+        this.url.searchParams.set('api-key', '<REDACTED>');
+      }
+    }
+  }
+
+  static async create(
+    client: Pick<OpenAI, 'apiKey' | 'baseURL' | '_callApiKey'>,
+    props: { model: string; dangerouslyAllowBrowser?: boolean },
+  ): Promise<OpenAIRealtimeWebSocket> {
+    return new OpenAIRealtimeWebSocket({ ...props, __resolvedApiKey: await client._callApiKey() }, client);
+  }
+
+  static async azure(
+    client: Pick<AzureOpenAI, '_callApiKey' | 'apiVersion' | 'apiKey' | 'baseURL' | 'deploymentName'>,
+    options: { deploymentName?: string; dangerouslyAllowBrowser?: boolean } = {},
+  ): Promise<OpenAIRealtimeWebSocket> {
+    const isApiKeyProvider = await client._callApiKey();
+    const apiKey = client.apiKey;
+    if (!apiKey) {
+      throw new Error('Azure OpenAI Realtime requires an API key');
+    }
+    const azureApiKey = apiKey;
+    function onURL(url: URL) {
+      if (isApiKeyProvider) {
+        url.searchParams.set('Authorization', `Bearer ${azureApiKey}`);
+      } else {
+        url.searchParams.set('api-key', azureApiKey);
+      }
+    }
+    const deploymentName = options.deploymentName ?? client.deploymentName;
+    if (!deploymentName) {
+      throw new Error('No deployment name provided');
+    }
+    const { dangerouslyAllowBrowser } = options;
+    return new OpenAIRealtimeWebSocket(
+      {
+        model: deploymentName,
+        onURL,
+        ...(dangerouslyAllowBrowser ? { dangerouslyAllowBrowser } : {}),
+        __resolvedApiKey: isApiKeyProvider,
+      },
+      client,
+    );
   }
 
   send(event: RealtimeClientEvent) {

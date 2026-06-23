@@ -1,35 +1,37 @@
-import * as Core from '../core';
+import { partialParse } from '../_vendor/partial-json-parser/parser';
 import {
-  OpenAIError,
   APIUserAbortError,
-  LengthFinishReasonError,
   ContentFilterFinishReasonError,
+  LengthFinishReasonError,
+  OpenAIError,
 } from '../error';
-import {
-  ChatCompletionTokenLogprob,
-  type ChatCompletion,
-  type ChatCompletionChunk,
-  type ChatCompletionCreateParams,
-  type ChatCompletionCreateParamsStreaming,
-  type ChatCompletionCreateParamsBase,
-} from '../resources/chat/completions';
-import {
-  AbstractChatCompletionRunner,
-  type AbstractChatCompletionRunnerEvents,
-} from './AbstractChatCompletionRunner';
-import { type ReadableStream } from '../_shims/index';
-import { Stream } from '../streaming';
 import OpenAI from '../index';
-import { ParsedChatCompletion } from '../resources/beta/chat/completions';
+import { RequestOptions } from '../internal/request-options';
+import { type ReadableStream } from '../internal/shim-types';
 import {
   AutoParseableResponseFormat,
   hasAutoParseableInput,
   isAutoParsableResponseFormat,
   isAutoParsableTool,
+  isChatCompletionFunctionTool,
   maybeParseChatCompletion,
   shouldParseToolCall,
 } from '../lib/parser';
-import { partialParse } from '../_vendor/partial-json-parser/parser';
+import { ChatCompletionFunctionTool, ParsedChatCompletion } from '../resources/chat/completions';
+import {
+  ChatCompletionTokenLogprob,
+  type ChatCompletion,
+  type ChatCompletionChunk,
+  type ChatCompletionCreateParams,
+  type ChatCompletionCreateParamsBase,
+  type ChatCompletionCreateParamsStreaming,
+  type ChatCompletionRole,
+} from '../resources/chat/completions/completions';
+import { Stream } from '../streaming';
+import {
+  AbstractChatCompletionRunner,
+  type AbstractChatCompletionRunnerEvents,
+} from './AbstractChatCompletionRunner';
 
 export interface ContentDeltaEvent {
   delta: string;
@@ -158,7 +160,7 @@ export class ChatCompletionStream<ParsedT = null>
   static createChatCompletion<ParsedT>(
     client: OpenAI,
     params: ChatCompletionStreamParams,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): ChatCompletionStream<ParsedT> {
     const runner = new ChatCompletionStream<ParsedT>(params as ChatCompletionCreateParamsStreaming);
     runner._run(() =>
@@ -302,8 +304,8 @@ export class ChatCompletionStream<ParsedT = null>
 
     if (toolCallSnapshot.type === 'function') {
       const inputTool = this.#params?.tools?.find(
-        (tool) => tool.type === 'function' && tool.function.name === toolCallSnapshot.function.name,
-      );
+        (tool) => isChatCompletionFunctionTool(tool) && tool.function.name === toolCallSnapshot.function.name,
+      ) as ChatCompletionFunctionTool | undefined; // TS doesn't narrow based on isChatCompletionTool
 
       this._emit('tool_calls.function.arguments.done', {
         name: toolCallSnapshot.function.name,
@@ -368,7 +370,7 @@ export class ChatCompletionStream<ParsedT = null>
   protected override async _createChatCompletion(
     client: OpenAI,
     params: ChatCompletionCreateParams,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): Promise<ParsedChatCompletion<ParsedT>> {
     super._createChatCompletion;
     const signal = options?.signal;
@@ -394,7 +396,7 @@ export class ChatCompletionStream<ParsedT = null>
 
   protected async _fromReadableStream(
     readableStream: ReadableStream,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): Promise<ChatCompletion> {
     const signal = options?.signal;
     if (signal) {
@@ -509,9 +511,9 @@ export class ChatCompletionStream<ParsedT = null>
         choice.message.content = (choice.message.content || '') + content;
 
         if (!choice.message.refusal && this.#getAutoParseableResponseFormat()) {
-          // Even a partial parser does not accept empty string
-          const trimmed = choice.message.content.trimStart();
-          choice.message.parsed = trimmed ? partialParse(trimmed) : null;
+          // The partial parser does not accept whitespace-only input.
+          choice.message.parsed =
+            choice.message.content.trim() ? partialParse(choice.message.content) : null;
         }
       }
 
@@ -799,7 +801,7 @@ export namespace ChatCompletionSnapshot {
       /**
        * The role of the author of this message.
        */
-      role?: 'system' | 'user' | 'assistant' | 'function' | 'tool';
+      role?: ChatCompletionRole;
     }
 
     export namespace Message {

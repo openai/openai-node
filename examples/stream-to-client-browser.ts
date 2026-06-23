@@ -1,4 +1,4 @@
-#!/usr/bin/env -S npm run tsn -T
+#!/usr/bin/env -S npm run tsn -- -T
 
 /**
  * This file is intended be run from the command-line with Node
@@ -8,7 +8,6 @@
  * remove the 'node-fetch' import, and replace `process.stdout.write` with
  * a console.log or UI display.
  */
-import fetch from 'node-fetch';
 import { ChatCompletionStream } from 'openai/lib/ChatCompletionStream';
 
 fetch('http://localhost:3000', {

@@ -1,11 +1,16 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../resource';
-import * as Core from '../../core';
+import { APIResource } from '../../core/resource';
 import * as FilesAPI from '../files';
 import * as PartsAPI from './parts';
 import { PartCreateParams, Parts, UploadPart } from './parts';
+import { APIPromise } from '../../core/api-promise';
+import { RequestOptions } from '../../internal/request-options';
+import { path } from '../../internal/utils/path';
 
+/**
+ * Use Uploads to upload large files in multiple parts.
+ */
 export class Uploads extends APIResource {
   parts: PartsAPI.Parts = new PartsAPI.Parts(this._client);
 
@@ -22,24 +27,30 @@ export class Uploads extends APIResource {
    * contains all the parts you uploaded. This File is usable in the rest of our
    * platform as a regular File object.
    *
-   * For certain `purpose`s, the correct `mime_type` must be specified. Please refer
-   * to documentation for the supported MIME types for your use case:
-   *
-   * - [Assistants](https://platform.openai.com/docs/assistants/tools/file-search#supported-files)
+   * For certain `purpose` values, the correct `mime_type` must be specified. Please
+   * refer to documentation for the
+   * [supported MIME types for your use case](https://platform.openai.com/docs/assistants/tools/file-search#supported-files).
    *
    * For guidance on the proper filename extensions for each purpose, please follow
    * the documentation on
    * [creating a File](https://platform.openai.com/docs/api-reference/files/create).
+   *
+   * Returns the Upload object with status `pending`.
    */
-  create(body: UploadCreateParams, options?: Core.RequestOptions): Core.APIPromise<Upload> {
-    return this._client.post('/uploads', { body, ...options });
+  create(body: UploadCreateParams, options?: RequestOptions): APIPromise<Upload> {
+    return this._client.post('/uploads', { body, ...options, __security: { bearerAuth: true } });
   }
 
   /**
    * Cancels the Upload. No Parts may be added after an Upload is cancelled.
+   *
+   * Returns the Upload object with status `cancelled`.
    */
-  cancel(uploadId: string, options?: Core.RequestOptions): Core.APIPromise<Upload> {
-    return this._client.post(`/uploads/${uploadId}/cancel`, options);
+  cancel(uploadID: string, options?: RequestOptions): APIPromise<Upload> {
+    return this._client.post(path`/uploads/${uploadID}/cancel`, {
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
@@ -55,14 +66,16 @@ export class Uploads extends APIResource {
    *
    * The number of bytes uploaded upon completion must match the number of bytes
    * initially specified when creating the Upload object. No Parts may be added after
-   * an Upload is completed.
+   * an Upload is completed. Returns the Upload object with status `completed`,
+   * including an additional `file` property containing the created usable File
+   * object.
    */
-  complete(
-    uploadId: string,
-    body: UploadCompleteParams,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<Upload> {
-    return this._client.post(`/uploads/${uploadId}/complete`, { body, ...options });
+  complete(uploadID: string, body: UploadCompleteParams, options?: RequestOptions): APIPromise<Upload> {
+    return this._client.post(path`/uploads/${uploadID}/complete`, {
+      body,
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 }
 
@@ -86,7 +99,7 @@ export interface Upload {
   created_at: number;
 
   /**
-   * The Unix timestamp (in seconds) for when the Upload was created.
+   * The Unix timestamp (in seconds) for when the Upload will expire.
    */
   expires_at: number;
 
@@ -113,7 +126,7 @@ export interface Upload {
   status: 'pending' | 'completed' | 'cancelled' | 'expired';
 
   /**
-   * The ready File object after the Upload is completed.
+   * The `File` object represents a document that has been uploaded to OpenAI.
    */
   file?: FilesAPI.FileObject | null;
 }
@@ -144,6 +157,32 @@ export interface UploadCreateParams {
    * [documentation on File purposes](https://platform.openai.com/docs/api-reference/files/create#files-create-purpose).
    */
   purpose: FilesAPI.FilePurpose;
+
+  /**
+   * The expiration policy for a file. By default, files with `purpose=batch` expire
+   * after 30 days and all other files are persisted until they are manually deleted.
+   */
+  expires_after?: UploadCreateParams.ExpiresAfter;
+}
+
+export namespace UploadCreateParams {
+  /**
+   * The expiration policy for a file. By default, files with `purpose=batch` expire
+   * after 30 days and all other files are persisted until they are manually deleted.
+   */
+  export interface ExpiresAfter {
+    /**
+     * Anchor timestamp after which the expiration policy applies. Supported anchors:
+     * `created_at`.
+     */
+    anchor: 'created_at';
+
+    /**
+     * The number of seconds after the anchor time that the file will expire. Must be
+     * between 3600 (1 hour) and 2592000 (30 days).
+     */
+    seconds: number;
+  }
 }
 
 export interface UploadCompleteParams {

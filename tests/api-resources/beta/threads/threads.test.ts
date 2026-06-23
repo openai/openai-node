@@ -1,10 +1,10 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import OpenAI from 'openai';
-import { Response } from 'node-fetch';
 
 const client = new OpenAI({
   apiKey: 'My API Key',
+  adminAPIKey: 'My Admin API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
@@ -20,13 +20,6 @@ describe('resource threads', () => {
     expect(dataAndResponse.response).toBe(rawResponse);
   });
 
-  test('create: request options instead of params are passed correctly', async () => {
-    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(client.beta.threads.create({ path: '/_stainless_unknown_path' })).rejects.toThrow(
-      OpenAI.NotFoundError,
-    );
-  });
-
   test('create: request options and params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
@@ -37,15 +30,21 @@ describe('resource threads', () => {
               content: 'string',
               role: 'user',
               attachments: [{ file_id: 'file_id', tools: [{ type: 'code_interpreter' }] }],
-              metadata: {},
+              metadata: { foo: 'string' },
             },
           ],
-          metadata: {},
+          metadata: { foo: 'string' },
           tool_resources: {
             code_interpreter: { file_ids: ['string'] },
             file_search: {
               vector_store_ids: ['string'],
-              vector_stores: [{ chunking_strategy: { type: 'auto' }, file_ids: ['string'], metadata: {} }],
+              vector_stores: [
+                {
+                  chunking_strategy: { type: 'auto' },
+                  file_ids: ['string'],
+                  metadata: { foo: 'string' },
+                },
+              ],
             },
           },
         },
@@ -65,13 +64,6 @@ describe('resource threads', () => {
     expect(dataAndResponse.response).toBe(rawResponse);
   });
 
-  test('retrieve: request options instead of params are passed correctly', async () => {
-    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(
-      client.beta.threads.retrieve('thread_id', { path: '/_stainless_unknown_path' }),
-    ).rejects.toThrow(OpenAI.NotFoundError);
-  });
-
   test('update', async () => {
     const responsePromise = client.beta.threads.update('thread_id', {});
     const rawResponse = await responsePromise.asResponse();
@@ -83,8 +75,8 @@ describe('resource threads', () => {
     expect(dataAndResponse.response).toBe(rawResponse);
   });
 
-  test('del', async () => {
-    const responsePromise = client.beta.threads.del('thread_id');
+  test('delete', async () => {
+    const responsePromise = client.beta.threads.delete('thread_id');
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -92,13 +84,6 @@ describe('resource threads', () => {
     const dataAndResponse = await responsePromise.withResponse();
     expect(dataAndResponse.data).toBe(response);
     expect(dataAndResponse.response).toBe(rawResponse);
-  });
-
-  test('del: request options instead of params are passed correctly', async () => {
-    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(client.beta.threads.del('thread_id', { path: '/_stainless_unknown_path' })).rejects.toThrow(
-      OpenAI.NotFoundError,
-    );
   });
 
   test('createAndRun: only required params', async () => {
@@ -118,8 +103,8 @@ describe('resource threads', () => {
       instructions: 'instructions',
       max_completion_tokens: 256,
       max_prompt_tokens: 256,
-      metadata: {},
-      model: 'gpt-4o',
+      metadata: { foo: 'string' },
+      model: 'gpt-5.4',
       parallel_tool_calls: true,
       response_format: 'auto',
       stream: false,
@@ -130,15 +115,21 @@ describe('resource threads', () => {
             content: 'string',
             role: 'user',
             attachments: [{ file_id: 'file_id', tools: [{ type: 'code_interpreter' }] }],
-            metadata: {},
+            metadata: { foo: 'string' },
           },
         ],
-        metadata: {},
+        metadata: { foo: 'string' },
         tool_resources: {
           code_interpreter: { file_ids: ['string'] },
           file_search: {
             vector_store_ids: ['string'],
-            vector_stores: [{ chunking_strategy: { type: 'auto' }, file_ids: ['string'], metadata: {} }],
+            vector_stores: [
+              {
+                chunking_strategy: { type: 'auto' },
+                file_ids: ['string'],
+                metadata: { foo: 'string' },
+              },
+            ],
           },
         },
       },

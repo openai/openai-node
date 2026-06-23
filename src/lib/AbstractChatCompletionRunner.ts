@@ -1,34 +1,48 @@
-import * as Core from '../core';
-import { type CompletionUsage } from '../resources/completions';
-import {
-  type ChatCompletion,
-  type ChatCompletionMessage,
-  type ChatCompletionMessageParam,
-  type ChatCompletionCreateParams,
-  type ChatCompletionTool,
-} from '../resources/chat/completions';
 import { OpenAIError } from '../error';
+import type OpenAI from '../index';
+import type { RequestOptions } from '../internal/request-options';
+import { isAutoParsableTool, parseChatCompletion } from '../lib/parser';
+import type {
+  ChatCompletion,
+  ChatCompletionCreateParams,
+  ChatCompletionMessage,
+  ChatCompletionMessageFunctionToolCall,
+  ChatCompletionMessageParam,
+  ChatCompletionTool,
+  ParsedChatCompletion,
+} from '../resources/chat/completions';
+import type { CompletionUsage } from '../resources/completions';
+import type { ChatCompletionToolRunnerParams } from './ChatCompletionRunner';
+import type { ChatCompletionStreamingToolRunnerParams } from './ChatCompletionStreamingRunner';
+import { isAssistantMessage, isToolMessage } from './chatCompletionUtils';
+import { BaseEvents, EventStream } from './EventStream';
 import {
-  type RunnableFunction,
   isRunnableFunctionWithParse,
   type BaseFunctionsArgs,
-  RunnableToolFunction,
+  type RunnableFunction,
+  type RunnableToolFunction,
 } from './RunnableFunction';
-import { ChatCompletionFunctionRunnerParams, ChatCompletionToolRunnerParams } from './ChatCompletionRunner';
-import {
-  ChatCompletionStreamingFunctionRunnerParams,
-  ChatCompletionStreamingToolRunnerParams,
-} from './ChatCompletionStreamingRunner';
-import { isAssistantMessage, isFunctionMessage, isToolMessage } from './chatCompletionUtils';
-import { BaseEvents, EventStream } from './EventStream';
-import { ParsedChatCompletion } from '../resources/beta/chat/completions';
-import OpenAI from '../index';
-import { isAutoParsableTool, parseChatCompletion } from '../lib/parser';
 
 const DEFAULT_MAX_CHAT_COMPLETIONS = 10;
-export interface RunnerOptions extends Core.RequestOptions {
+
+export interface ChatCompletionRunnerContext {
+  messages: ChatCompletionMessageParam[];
+  abort(): void;
+}
+
+export interface RunnerOptions extends RequestOptions {
   /** How many requests to make before canceling. Default 10. */
   maxChatCompletions?: number;
+  /**
+   * A callback that runs after each chat completion and after any tool calls from
+   * that completion have finished. The callback is awaited before the next
+   * request starts or before the runner ends. The runner's mutable `messages`
+   * array can be used to add context for the next request.
+   */
+  afterCompletion?: (
+    completion: ChatCompletion,
+    runner: ChatCompletionRunnerContext,
+  ) => void | Promise<void>;
 }
 
 export class AbstractChatCompletionRunner<
@@ -60,15 +74,13 @@ export class AbstractChatCompletionRunner<
 
     if (emit) {
       this._emit('message', message);
-      if ((isFunctionMessage(message) || isToolMessage(message)) && message.content) {
+      if (isToolMessage(message) && message.content) {
         // Note, this assumes that {role: 'tool', content: …} is always the result of a call of tool of type=function.
-        this._emit('functionCallResult', message.content as string);
-      } else if (isAssistantMessage(message) && message.function_call) {
-        this._emit('functionCall', message.function_call);
+        this._emit('functionToolCallResult', message.content as string);
       } else if (isAssistantMessage(message) && message.tool_calls) {
         for (const tool_call of message.tool_calls) {
           if (tool_call.type === 'function') {
-            this._emit('functionCall', tool_call.function);
+            this._emit('functionToolCall', tool_call.function);
           }
         }
       }
@@ -104,17 +116,12 @@ export class AbstractChatCompletionRunner<
     while (i-- > 0) {
       const message = this.messages[i];
       if (isAssistantMessage(message)) {
-        const { function_call, ...rest } = message;
-
         // TODO: support audio here
         const ret: Omit<ChatCompletionMessage, 'audio'> = {
-          ...rest,
+          ...message,
           content: (message as ChatCompletionMessage).content ?? null,
           refusal: (message as ChatCompletionMessage).refusal ?? null,
         };
-        if (function_call) {
-          ret.function_call = function_call;
-        }
         return ret;
       }
     }
@@ -130,14 +137,16 @@ export class AbstractChatCompletionRunner<
     return this.#getFinalMessage();
   }
 
-  #getFinalFunctionCall(): ChatCompletionMessage.FunctionCall | undefined {
+  #getFinalFunctionToolCall(): ChatCompletionMessageFunctionToolCall.Function | undefined {
     for (let i = this.messages.length - 1; i >= 0; i--) {
       const message = this.messages[i];
-      if (isAssistantMessage(message) && message?.function_call) {
-        return message.function_call;
-      }
       if (isAssistantMessage(message) && message?.tool_calls?.length) {
-        return message.tool_calls.at(-1)?.function;
+        for (let j = message.tool_calls.length - 1; j >= 0; j--) {
+          const toolCall = message.tool_calls[j];
+          if (toolCall?.type === 'function') {
+            return toolCall.function;
+          }
+        }
       }
     }
 
@@ -148,17 +157,14 @@ export class AbstractChatCompletionRunner<
    * @returns a promise that resolves with the content of the final FunctionCall, or rejects
    * if an error occurred or the stream ended prematurely without producing a ChatCompletionMessage.
    */
-  async finalFunctionCall(): Promise<ChatCompletionMessage.FunctionCall | undefined> {
+  async finalFunctionToolCall(): Promise<ChatCompletionMessageFunctionToolCall.Function | undefined> {
     await this.done();
-    return this.#getFinalFunctionCall();
+    return this.#getFinalFunctionToolCall();
   }
 
-  #getFinalFunctionCallResult(): string | undefined {
+  #getFinalFunctionToolCallResult(): string | undefined {
     for (let i = this.messages.length - 1; i >= 0; i--) {
       const message = this.messages[i];
-      if (isFunctionMessage(message) && message.content != null) {
-        return message.content;
-      }
       if (
         isToolMessage(message) &&
         message.content != null &&
@@ -176,9 +182,9 @@ export class AbstractChatCompletionRunner<
     return;
   }
 
-  async finalFunctionCallResult(): Promise<string | undefined> {
+  async finalFunctionToolCallResult(): Promise<string | undefined> {
     await this.done();
-    return this.#getFinalFunctionCallResult();
+    return this.#getFinalFunctionToolCallResult();
   }
 
   #calculateTotalUsage(): CompletionUsage {
@@ -216,11 +222,11 @@ export class AbstractChatCompletionRunner<
     const finalContent = this.#getFinalContent();
     if (finalContent) this._emit('finalContent', finalContent);
 
-    const finalFunctionCall = this.#getFinalFunctionCall();
-    if (finalFunctionCall) this._emit('finalFunctionCall', finalFunctionCall);
+    const finalFunctionCall = this.#getFinalFunctionToolCall();
+    if (finalFunctionCall) this._emit('finalFunctionToolCall', finalFunctionCall);
 
-    const finalFunctionCallResult = this.#getFinalFunctionCallResult();
-    if (finalFunctionCallResult != null) this._emit('finalFunctionCallResult', finalFunctionCallResult);
+    const finalFunctionCallResult = this.#getFinalFunctionToolCallResult();
+    if (finalFunctionCallResult != null) this._emit('finalFunctionToolCallResult', finalFunctionCallResult);
 
     if (this._chatCompletions.some((c) => c.usage)) {
       this._emit('totalUsage', this.#calculateTotalUsage());
@@ -238,7 +244,7 @@ export class AbstractChatCompletionRunner<
   protected async _createChatCompletion(
     client: OpenAI,
     params: ChatCompletionCreateParams,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): Promise<ParsedChatCompletion<ParsedT>> {
     const signal = options?.signal;
     if (signal) {
@@ -258,97 +264,12 @@ export class AbstractChatCompletionRunner<
   protected async _runChatCompletion(
     client: OpenAI,
     params: ChatCompletionCreateParams,
-    options?: Core.RequestOptions,
+    options?: RequestOptions,
   ): Promise<ChatCompletion> {
     for (const message of params.messages) {
       this._addMessage(message, false);
     }
     return await this._createChatCompletion(client, params, options);
-  }
-
-  protected async _runFunctions<FunctionsArgs extends BaseFunctionsArgs>(
-    client: OpenAI,
-    params:
-      | ChatCompletionFunctionRunnerParams<FunctionsArgs>
-      | ChatCompletionStreamingFunctionRunnerParams<FunctionsArgs>,
-    options?: RunnerOptions,
-  ) {
-    const role = 'function' as const;
-    const { function_call = 'auto', stream, ...restParams } = params;
-    const singleFunctionToCall = typeof function_call !== 'string' && function_call?.name;
-    const { maxChatCompletions = DEFAULT_MAX_CHAT_COMPLETIONS } = options || {};
-
-    const functionsByName: Record<string, RunnableFunction<any>> = {};
-    for (const f of params.functions) {
-      functionsByName[f.name || f.function.name] = f;
-    }
-
-    const functions: ChatCompletionCreateParams.Function[] = params.functions.map(
-      (f): ChatCompletionCreateParams.Function => ({
-        name: f.name || f.function.name,
-        parameters: f.parameters as Record<string, unknown>,
-        description: f.description,
-      }),
-    );
-
-    for (const message of params.messages) {
-      this._addMessage(message, false);
-    }
-
-    for (let i = 0; i < maxChatCompletions; ++i) {
-      const chatCompletion: ChatCompletion = await this._createChatCompletion(
-        client,
-        {
-          ...restParams,
-          function_call,
-          functions,
-          messages: [...this.messages],
-        },
-        options,
-      );
-      const message = chatCompletion.choices[0]?.message;
-      if (!message) {
-        throw new OpenAIError(`missing message in ChatCompletion response`);
-      }
-      if (!message.function_call) return;
-      const { name, arguments: args } = message.function_call;
-      const fn = functionsByName[name];
-      if (!fn) {
-        const content = `Invalid function_call: ${JSON.stringify(name)}. Available options are: ${functions
-          .map((f) => JSON.stringify(f.name))
-          .join(', ')}. Please try again`;
-
-        this._addMessage({ role, name, content });
-        continue;
-      } else if (singleFunctionToCall && singleFunctionToCall !== name) {
-        const content = `Invalid function_call: ${JSON.stringify(name)}. ${JSON.stringify(
-          singleFunctionToCall,
-        )} requested. Please try again`;
-
-        this._addMessage({ role, name, content });
-        continue;
-      }
-
-      let parsed;
-      try {
-        parsed = isRunnableFunctionWithParse(fn) ? await fn.parse(args) : args;
-      } catch (error) {
-        this._addMessage({
-          role,
-          name,
-          content: error instanceof Error ? error.message : String(error),
-        });
-        continue;
-      }
-
-      // @ts-expect-error it can't rule out `never` type.
-      const rawContent = await fn.function(parsed, this);
-      const content = this.#stringifyFunctionCallResult(rawContent);
-
-      this._addMessage({ role, name, content });
-
-      if (singleFunctionToCall) return;
-    }
   }
 
   protected async _runTools<FunctionsArgs extends BaseFunctionsArgs>(
@@ -360,8 +281,9 @@ export class AbstractChatCompletionRunner<
   ) {
     const role = 'tool' as const;
     const { tool_choice = 'auto', stream, ...restParams } = params;
-    const singleFunctionToCall = typeof tool_choice !== 'string' && tool_choice?.function?.name;
-    const { maxChatCompletions = DEFAULT_MAX_CHAT_COMPLETIONS } = options || {};
+    const singleFunctionToCall =
+      typeof tool_choice !== 'string' && tool_choice.type === 'function' && tool_choice?.function?.name;
+    const { maxChatCompletions = DEFAULT_MAX_CHAT_COMPLETIONS, afterCompletion } = options || {};
 
     // TODO(someday): clean this logic up
     const inputTools = params.tools.map((tool): RunnableToolFunction<any> => {
@@ -430,6 +352,7 @@ export class AbstractChatCompletionRunner<
         throw new OpenAIError(`missing message in ChatCompletion response`);
       }
       if (!message.tool_calls?.length) {
+        await afterCompletion?.(chatCompletion, this);
         return;
       }
 
@@ -472,9 +395,12 @@ export class AbstractChatCompletionRunner<
         this._addMessage({ role, tool_call_id, content });
 
         if (singleFunctionToCall) {
+          await afterCompletion?.(chatCompletion, this);
           return;
         }
       }
+
+      await afterCompletion?.(chatCompletion, this);
     }
 
     return;
@@ -490,14 +416,14 @@ export class AbstractChatCompletionRunner<
 }
 
 export interface AbstractChatCompletionRunnerEvents extends BaseEvents {
-  functionCall: (functionCall: ChatCompletionMessage.FunctionCall) => void;
+  functionToolCall: (functionCall: ChatCompletionMessageFunctionToolCall.Function) => void;
   message: (message: ChatCompletionMessageParam) => void;
   chatCompletion: (completion: ChatCompletion) => void;
   finalContent: (contentSnapshot: string) => void;
   finalMessage: (message: ChatCompletionMessageParam) => void;
   finalChatCompletion: (completion: ChatCompletion) => void;
-  finalFunctionCall: (functionCall: ChatCompletionMessage.FunctionCall) => void;
-  functionCallResult: (content: string) => void;
-  finalFunctionCallResult: (content: string) => void;
+  finalFunctionToolCall: (functionCall: ChatCompletionMessageFunctionToolCall.Function) => void;
+  functionToolCallResult: (content: string) => void;
+  finalFunctionToolCallResult: (content: string) => void;
   totalUsage: (usage: CompletionUsage) => void;
 }

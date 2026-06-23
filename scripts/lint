@@ -4,8 +4,46 @@ set -e
 
 cd "$(dirname "$0")/.."
 
-echo "==> Running eslint"
-ESLINT_USE_FLAT_CONFIG="false" ./node_modules/.bin/eslint --ext ts,js .
+if [ "${DETECT_BREAKING_CHANGES_COMPAT:-}" = "1" ]; then
+  echo "==> Preparing historical breaking-change tests"
+  # Historical tests are checked against the current SDK and tsconfig. The
+  # embeddings tests on main briefly used Array.prototype.at(), but the SDK still
+  # targets older JS libs, so normalize that syntax before the compatibility lint.
+  if [ -e tests/api-resources/embeddings.test.ts ]; then
+    node <<'EOF'
+const fs = require('fs');
 
-echo "==> Running tsc"
-./node_modules/.bin/tsc --noEmit
+const path = 'tests/api-resources/embeddings.test.ts';
+let contents = fs.readFileSync(path, 'utf8');
+contents = contents
+  .replaceAll('response.data?.at(0)?.embedding.at(0)', 'response.data?.[0]?.embedding[0]')
+  .replaceAll('response.data?.at(0)?.embedding', 'response.data?.[0]?.embedding');
+fs.writeFileSync(path, contents);
+EOF
+  fi
+
+  # Old test files are checked for compatibility with the current SDK, not
+  # formatting drift against the current Prettier version.
+  find tests -name '*.test.ts' -print0 | xargs -0 ./node_modules/.bin/prettier --write
+fi
+
+echo "==> Running prettier --check"
+./node_modules/.bin/prettier --check .
+
+echo "==> Running eslint"
+./node_modules/.bin/eslint .
+
+echo "==> Building"
+./scripts/build
+
+echo "==> Checking types"
+./node_modules/typescript/bin/tsc
+
+echo "==> Running Are The Types Wrong?"
+./node_modules/.bin/attw --pack dist -f json >.attw.json || true
+node scripts/utils/attw-report.cjs
+
+echo "==> Running publint"
+./node_modules/.bin/publint dist
+echo "==> Running jsr publish --dry-run"
+(cd dist-deno && npx jsr publish --dry-run --allow-dirty)

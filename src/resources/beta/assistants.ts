@@ -1,91 +1,98 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../resource';
-import { isRequestOptions } from '../../core';
-import * as Core from '../../core';
+import { APIResource } from '../../core/resource';
 import * as Shared from '../shared';
-import * as ChatAPI from '../chat/chat';
 import * as MessagesAPI from './threads/messages';
 import * as ThreadsAPI from './threads/threads';
-import * as VectorStoresAPI from './vector-stores/vector-stores';
 import * as RunsAPI from './threads/runs/runs';
 import * as StepsAPI from './threads/runs/steps';
-import { CursorPage, type CursorPageParams } from '../../pagination';
+import { APIPromise } from '../../core/api-promise';
+import { CursorPage, type CursorPageParams, PagePromise } from '../../core/pagination';
+import { buildHeaders } from '../../internal/headers';
+import { RequestOptions } from '../../internal/request-options';
+import { path } from '../../internal/utils/path';
+import { AssistantStream } from '../../lib/AssistantStream';
 
+/**
+ * Build Assistants that can call models and use tools.
+ */
 export class Assistants extends APIResource {
   /**
    * Create an assistant with a model and instructions.
+   *
+   * @deprecated
    */
-  create(body: AssistantCreateParams, options?: Core.RequestOptions): Core.APIPromise<Assistant> {
+  create(body: AssistantCreateParams, options?: RequestOptions): APIPromise<Assistant> {
     return this._client.post('/assistants', {
       body,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
   /**
    * Retrieves an assistant.
+   *
+   * @deprecated
    */
-  retrieve(assistantId: string, options?: Core.RequestOptions): Core.APIPromise<Assistant> {
-    return this._client.get(`/assistants/${assistantId}`, {
+  retrieve(assistantID: string, options?: RequestOptions): APIPromise<Assistant> {
+    return this._client.get(path`/assistants/${assistantID}`, {
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
   /**
    * Modifies an assistant.
+   *
+   * @deprecated
    */
-  update(
-    assistantId: string,
-    body: AssistantUpdateParams,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<Assistant> {
-    return this._client.post(`/assistants/${assistantId}`, {
+  update(assistantID: string, body: AssistantUpdateParams, options?: RequestOptions): APIPromise<Assistant> {
+    return this._client.post(path`/assistants/${assistantID}`, {
       body,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
   /**
    * Returns a list of assistants.
+   *
+   * @deprecated
    */
   list(
-    query?: AssistantListParams,
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<AssistantsPage, Assistant>;
-  list(options?: Core.RequestOptions): Core.PagePromise<AssistantsPage, Assistant>;
-  list(
-    query: AssistantListParams | Core.RequestOptions = {},
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<AssistantsPage, Assistant> {
-    if (isRequestOptions(query)) {
-      return this.list({}, query);
-    }
-    return this._client.getAPIList('/assistants', AssistantsPage, {
+    query: AssistantListParams | null | undefined = {},
+    options?: RequestOptions,
+  ): PagePromise<AssistantsPage, Assistant> {
+    return this._client.getAPIList('/assistants', CursorPage<Assistant>, {
       query,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
   /**
    * Delete an assistant.
+   *
+   * @deprecated
    */
-  del(assistantId: string, options?: Core.RequestOptions): Core.APIPromise<AssistantDeleted> {
-    return this._client.delete(`/assistants/${assistantId}`, {
+  delete(assistantID: string, options?: RequestOptions): APIPromise<AssistantDeleted> {
+    return this._client.delete(path`/assistants/${assistantID}`, {
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 }
 
-export class AssistantsPage extends CursorPage<Assistant> {}
+export type AssistantsPage = CursorPage<Assistant>;
 
 /**
- * Represents an `assistant` that can call the model and use tools.
+ * @deprecated Represents an `assistant` that can call the model and use tools.
  */
 export interface Assistant {
   /**
@@ -111,11 +118,13 @@ export interface Assistant {
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
-   * for storing additional information about the object in a structured format. Keys
-   * can be a maximum of 64 characters long and values can be a maxium of 512
-   * characters long.
+   * for storing additional information about the object in a structured format, and
+   * querying for objects via API or the dashboard.
+   *
+   * Keys are strings with a maximum length of 64 characters. Values are strings with
+   * a maximum length of 512 characters.
    */
-  metadata: unknown | null;
+  metadata: Shared.Metadata | null;
 
   /**
    * ID of the model to use. You can use the
@@ -1103,7 +1112,7 @@ export interface AssistantCreateParams {
    * [Model overview](https://platform.openai.com/docs/models) for descriptions of
    * them.
    */
-  model: (string & {}) | ChatAPI.ChatModel;
+  model: (string & {}) | Shared.ChatModel;
 
   /**
    * The description of the assistant. The maximum length is 512 characters.
@@ -1118,16 +1127,35 @@ export interface AssistantCreateParams {
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
-   * for storing additional information about the object in a structured format. Keys
-   * can be a maximum of 64 characters long and values can be a maxium of 512
-   * characters long.
+   * for storing additional information about the object in a structured format, and
+   * querying for objects via API or the dashboard.
+   *
+   * Keys are strings with a maximum length of 64 characters. Values are strings with
+   * a maximum length of 512 characters.
    */
-  metadata?: unknown | null;
+  metadata?: Shared.Metadata | null;
 
   /**
    * The name of the assistant. The maximum length is 256 characters.
    */
   name?: string | null;
+
+  /**
+   * Constrains effort on reasoning for
+   * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
+   * supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
+   * Reducing reasoning effort can result in faster responses and fewer tokens used
+   * on reasoning in a response.
+   *
+   * - `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported
+   *   reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool
+   *   calls are supported for all reasoning values in gpt-5.1.
+   * - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
+   *   support `none`.
+   * - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
+   * - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
+   */
+  reasoning_effort?: Shared.ReasoningEffort | null;
 
   /**
    * Specifies the format that the model must output. Compatible with
@@ -1230,24 +1258,66 @@ export namespace AssistantCreateParams {
       export interface VectorStore {
         /**
          * The chunking strategy used to chunk the file(s). If not set, will use the `auto`
-         * strategy. Only applicable if `file_ids` is non-empty.
+         * strategy.
          */
-        chunking_strategy?: VectorStoresAPI.FileChunkingStrategyParam;
+        chunking_strategy?: VectorStore.Auto | VectorStore.Static;
 
         /**
          * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs to
-         * add to the vector store. There can be a maximum of 10000 files in a vector
-         * store.
+         * add to the vector store. For vector stores created before Nov 2025, there can be
+         * a maximum of 10,000 files in a vector store. For vector stores created starting
+         * in Nov 2025, the limit is 100,000,000 files.
          */
         file_ids?: Array<string>;
 
         /**
-         * Set of 16 key-value pairs that can be attached to a vector store. This can be
-         * useful for storing additional information about the vector store in a structured
-         * format. Keys can be a maximum of 64 characters long and values can be a maxium
-         * of 512 characters long.
+         * Set of 16 key-value pairs that can be attached to an object. This can be useful
+         * for storing additional information about the object in a structured format, and
+         * querying for objects via API or the dashboard.
+         *
+         * Keys are strings with a maximum length of 64 characters. Values are strings with
+         * a maximum length of 512 characters.
          */
-        metadata?: unknown;
+        metadata?: Shared.Metadata | null;
+      }
+
+      export namespace VectorStore {
+        /**
+         * The default strategy. This strategy currently uses a `max_chunk_size_tokens` of
+         * `800` and `chunk_overlap_tokens` of `400`.
+         */
+        export interface Auto {
+          /**
+           * Always `auto`.
+           */
+          type: 'auto';
+        }
+
+        export interface Static {
+          static: Static.Static;
+
+          /**
+           * Always `static`.
+           */
+          type: 'static';
+        }
+
+        export namespace Static {
+          export interface Static {
+            /**
+             * The number of tokens that overlap between chunks. The default value is `400`.
+             *
+             * Note that the overlap must not exceed half of `max_chunk_size_tokens`.
+             */
+            chunk_overlap_tokens: number;
+
+            /**
+             * The maximum number of tokens in each chunk. The default value is `800`. The
+             * minimum value is `100` and the maximum value is `4096`.
+             */
+            max_chunk_size_tokens: number;
+          }
+        }
       }
     }
   }
@@ -1267,11 +1337,13 @@ export interface AssistantUpdateParams {
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
-   * for storing additional information about the object in a structured format. Keys
-   * can be a maximum of 64 characters long and values can be a maxium of 512
-   * characters long.
+   * for storing additional information about the object in a structured format, and
+   * querying for objects via API or the dashboard.
+   *
+   * Keys are strings with a maximum length of 64 characters. Values are strings with
+   * a maximum length of 512 characters.
    */
-  metadata?: unknown | null;
+  metadata?: Shared.Metadata | null;
 
   /**
    * ID of the model to use. You can use the
@@ -1280,12 +1352,72 @@ export interface AssistantUpdateParams {
    * [Model overview](https://platform.openai.com/docs/models) for descriptions of
    * them.
    */
-  model?: string;
+  model?:
+    | (string & {})
+    | 'gpt-5'
+    | 'gpt-5-mini'
+    | 'gpt-5-nano'
+    | 'gpt-5-2025-08-07'
+    | 'gpt-5-mini-2025-08-07'
+    | 'gpt-5-nano-2025-08-07'
+    | 'gpt-4.1'
+    | 'gpt-4.1-mini'
+    | 'gpt-4.1-nano'
+    | 'gpt-4.1-2025-04-14'
+    | 'gpt-4.1-mini-2025-04-14'
+    | 'gpt-4.1-nano-2025-04-14'
+    | 'o3-mini'
+    | 'o3-mini-2025-01-31'
+    | 'o1'
+    | 'o1-2024-12-17'
+    | 'gpt-4o'
+    | 'gpt-4o-2024-11-20'
+    | 'gpt-4o-2024-08-06'
+    | 'gpt-4o-2024-05-13'
+    | 'gpt-4o-mini'
+    | 'gpt-4o-mini-2024-07-18'
+    | 'gpt-4.5-preview'
+    | 'gpt-4.5-preview-2025-02-27'
+    | 'gpt-4-turbo'
+    | 'gpt-4-turbo-2024-04-09'
+    | 'gpt-4-0125-preview'
+    | 'gpt-4-turbo-preview'
+    | 'gpt-4-1106-preview'
+    | 'gpt-4-vision-preview'
+    | 'gpt-4'
+    | 'gpt-4-0314'
+    | 'gpt-4-0613'
+    | 'gpt-4-32k'
+    | 'gpt-4-32k-0314'
+    | 'gpt-4-32k-0613'
+    | 'gpt-3.5-turbo'
+    | 'gpt-3.5-turbo-16k'
+    | 'gpt-3.5-turbo-0613'
+    | 'gpt-3.5-turbo-1106'
+    | 'gpt-3.5-turbo-0125'
+    | 'gpt-3.5-turbo-16k-0613';
 
   /**
    * The name of the assistant. The maximum length is 256 characters.
    */
   name?: string | null;
+
+  /**
+   * Constrains effort on reasoning for
+   * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
+   * supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
+   * Reducing reasoning effort can result in faster responses and fewer tokens used
+   * on reasoning in a response.
+   *
+   * - `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported
+   *   reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool
+   *   calls are supported for all reasoning values in gpt-5.1.
+   * - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
+   *   support `none`.
+   * - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
+   * - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
+   */
+  reasoning_effort?: Shared.ReasoningEffort | null;
 
   /**
    * Specifies the format that the model must output. Compatible with
@@ -1395,8 +1527,6 @@ export interface AssistantListParams extends CursorPageParams {
   order?: 'asc' | 'desc';
 }
 
-Assistants.AssistantsPage = AssistantsPage;
-
 export declare namespace Assistants {
   export {
     type Assistant as Assistant,
@@ -1410,9 +1540,11 @@ export declare namespace Assistants {
     type RunStepStreamEvent as RunStepStreamEvent,
     type RunStreamEvent as RunStreamEvent,
     type ThreadStreamEvent as ThreadStreamEvent,
-    AssistantsPage as AssistantsPage,
+    type AssistantsPage as AssistantsPage,
     type AssistantCreateParams as AssistantCreateParams,
     type AssistantUpdateParams as AssistantUpdateParams,
     type AssistantListParams as AssistantListParams,
   };
+
+  export { AssistantStream };
 }

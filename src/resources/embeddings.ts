@@ -1,17 +1,67 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../resource';
-import * as Core from '../core';
+import { APIResource } from '../core/resource';
+import { APIPromise } from '../core/api-promise';
+import { RequestOptions } from '../internal/request-options';
+import { loggerFor, toFloat32Array } from '../internal/utils';
 
+/**
+ * Get a vector representation of a given input that can be easily consumed by machine learning models and algorithms.
+ */
 export class Embeddings extends APIResource {
   /**
    * Creates an embedding vector representing the input text.
+   *
+   * @example
+   * ```ts
+   * const createEmbeddingResponse =
+   *   await client.embeddings.create({
+   *     input: 'The quick brown fox jumped over the lazy dog',
+   *     model: 'text-embedding-3-small',
+   *   });
+   * ```
    */
-  create(
-    body: EmbeddingCreateParams,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<CreateEmbeddingResponse> {
-    return this._client.post('/embeddings', { body, ...options });
+  create(body: EmbeddingCreateParams, options?: RequestOptions): APIPromise<CreateEmbeddingResponse> {
+    const hasUserProvidedEncodingFormat = !!body.encoding_format;
+    // No encoding_format specified, defaulting to base64 for performance reasons
+    // See https://github.com/openai/openai-node/pull/1312
+    let encoding_format: EmbeddingCreateParams['encoding_format'] =
+      hasUserProvidedEncodingFormat ? body.encoding_format : 'base64';
+
+    if (hasUserProvidedEncodingFormat) {
+      loggerFor(this._client).debug('embeddings/user defined encoding_format:', body.encoding_format);
+    }
+
+    const response: APIPromise<CreateEmbeddingResponse> = this._client.post('/embeddings', {
+      body: {
+        ...body,
+        encoding_format: encoding_format as EmbeddingCreateParams['encoding_format'],
+      },
+      ...options,
+      __security: { bearerAuth: true },
+    });
+
+    // if the user specified an encoding_format, return the response as-is
+    if (hasUserProvidedEncodingFormat) {
+      return response;
+    }
+
+    // in this stage, we are sure the user did not specify an encoding_format
+    // and we defaulted to base64 for performance reasons
+    // we are sure then that the response is base64 encoded, let's decode it
+    // the returned result will be a float32 array since this is OpenAI API's default encoding
+    loggerFor(this._client).debug('embeddings/decoding base64 embeddings from base64');
+
+    return (response as APIPromise<CreateEmbeddingResponse>)._thenUnwrap((response) => {
+      if (response && response.data) {
+        response.data.forEach((embeddingBase64Obj) => {
+          const embeddingBase64Str = embeddingBase64Obj.embedding as unknown as string;
+          embeddingBase64Obj.embedding = toFloat32Array(embeddingBase64Str);
+        });
+      }
+
+      return response;
+    });
   }
 }
 
@@ -83,11 +133,12 @@ export interface EmbeddingCreateParams {
    * Input text to embed, encoded as a string or array of tokens. To embed multiple
    * inputs in a single request, pass an array of strings or array of token arrays.
    * The input must not exceed the max input tokens for the model (8192 tokens for
-   * `text-embedding-ada-002`), cannot be an empty string, and any array must be 2048
+   * all embedding models), cannot be an empty string, and any array must be 2048
    * dimensions or less.
    * [Example Python code](https://cookbook.openai.com/examples/how_to_count_tokens_with_tiktoken)
-   * for counting tokens. Some models may also impose a limit on total number of
-   * tokens summed across inputs.
+   * for counting tokens. In addition to the per-input token limit, all embedding
+   * models enforce a maximum of 300,000 tokens summed across all inputs in a single
+   * request.
    */
   input: string | Array<string> | Array<number> | Array<Array<number>>;
 

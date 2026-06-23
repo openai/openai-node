@@ -66,7 +66,7 @@ describe('merge()', function () {
       // st.equal(getCount, 1);
       expect(setCount).toEqual(0);
       expect(getCount).toEqual(1);
-      observed[0] = observed[0]; // eslint-disable-line no-self-assign
+      observed[0] = observed[0];
       // st.equal(setCount, 1);
       // st.equal(getCount, 2);
       expect(setCount).toEqual(1);

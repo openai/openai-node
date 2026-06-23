@@ -1,18 +1,19 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../resource';
-import * as Core from '../core';
+import { APIResource } from '../core/resource';
+import { APIPromise } from '../core/api-promise';
+import { RequestOptions } from '../internal/request-options';
 
+/**
+ * Given text and/or image inputs, classifies if those inputs are potentially harmful.
+ */
 export class Moderations extends APIResource {
   /**
    * Classifies if text and/or image inputs are potentially harmful. Learn more in
    * the [moderation guide](https://platform.openai.com/docs/guides/moderation).
    */
-  create(
-    body: ModerationCreateParams,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<ModerationCreateResponse> {
-    return this._client.post('/moderations', { body, ...options });
+  create(body: ModerationCreateParams, options?: RequestOptions): APIPromise<ModerationCreateResponse> {
+    return this._client.post('/moderations', { body, ...options, __security: { bearerAuth: true } });
   }
 }
 
@@ -75,14 +76,14 @@ export namespace Moderation {
      * execution of wrongdoing, or that gives advice or instruction on how to commit
      * illicit acts. For example, "how to shoplift" would fit this category.
      */
-    illicit: boolean;
+    illicit: boolean | null;
 
     /**
      * Content that includes instructions or advice that facilitate the planning or
      * execution of wrongdoing that also includes violence, or that gives advice or
      * instruction on the procurement of any weapon.
      */
-    'illicit/violent': boolean;
+    'illicit/violent': boolean | null;
 
     /**
      * Content that promotes, encourages, or depicts acts of self-harm, such as

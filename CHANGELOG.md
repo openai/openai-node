@@ -1,5 +1,2028 @@
 # Changelog
 
+## 6.44.0 (2026-06-17)
+
+Full Changelog: [v6.43.0...v6.44.0](https://github.com/openai/openai-node/compare/v6.43.0...v6.44.0)
+
+### Features
+
+* **api:** update OpenAPI spec or Stainless config ([d05bdbc](https://github.com/openai/openai-node/commit/d05bdbc70b24c2970cf6b583d54529601e5442d8))
+
+## 6.43.0 (2026-06-16)
+
+Full Changelog: [v6.42.0...v6.43.0](https://github.com/openai/openai-node/compare/v6.42.0...v6.43.0)
+
+### Bug Fixes
+
+* fix TS to use `main` ([dc5078b](https://github.com/openai/openai-node/commit/dc5078bcb03c9192c36e5d34a7fc597592220c6a))
+* restore pnpm repo configuration on next ([c2575d6](https://github.com/openai/openai-node/commit/c2575d62cbb73781f2b300c29d30aab5364cf0e0))
+
+
+### Chores
+
+* Convert repository to pnpm ([#1934](https://github.com/openai/openai-node/issues/1934)) ([fbf80f3](https://github.com/openai/openai-node/commit/fbf80f3bf58b1699d686042740076d40832b67c8))
+* sync repo ([34be1be](https://github.com/openai/openai-node/commit/34be1beafc099fb4ae14ed6ee5822cc4617ab18c))
+* Update default branch references to main ([#1920](https://github.com/openai/openai-node/issues/1920)) ([5436f42](https://github.com/openai/openai-node/commit/5436f42de7f8ac2aafed4da23951c61e353da9cc))
+
+
+### Build System
+
+* remove scheduled release ([#1936](https://github.com/openai/openai-node/issues/1936)) ([0c92f62](https://github.com/openai/openai-node/commit/0c92f62a5c7b0dbceebdf1ea474becf0933884e5))
+
+## 6.42.0 (2026-06-03)
+
+Full Changelog: [v6.41.0...v6.42.0](https://github.com/openai/openai-node/compare/v6.41.0...v6.42.0)
+
+### Features
+
+* **api:** responses.moderation and chat_completions.moderation ([6d8f592](https://github.com/openai/openai-node/commit/6d8f592d6aec5487684723b75137629a12225d29))
+
+## 6.41.0 (2026-06-01)
+
+Full Changelog: [v6.40.0...v6.41.0](https://github.com/openai/openai-node/compare/v6.40.0...v6.41.0)
+
+### Features
+
+* **api:** Add Amazon Bedrock Responses support ([#1899](https://github.com/openai/openai-node/issues/1899)) ([535b045](https://github.com/openai/openai-node/commit/535b045c9b614eabeb1324c51f401149570a4382))
+
+## 6.40.0 (2026-06-01)
+
+Full Changelog: [v6.39.1...v6.40.0](https://github.com/openai/openai-node/compare/v6.39.1...v6.40.0)
+
+### Features
+
+* **api:** workload identity in audit logs, additional_tools item in responses, fix ActionSearch.query to be optional. ([aee09f3](https://github.com/openai/openai-node/commit/aee09f337f92b94428832122a19574d9196c3520))
+
+
+### Chores
+
+* remove migrate CLI ([673c618](https://github.com/openai/openai-node/commit/673c61888933e5909bfcc73102ed0e9f8304930e))
+
+## 6.39.1 (2026-05-27)
+
+Full Changelog: [v6.39.0...v6.39.1](https://github.com/openai/openai-node/compare/v6.39.0...v6.39.1)
+
+### Bug Fixes
+
+* Improve undici dispatcher mismatch guidance ([#1898](https://github.com/openai/openai-node/issues/1898)) ([b6e5fd6](https://github.com/openai/openai-node/commit/b6e5fd6c30014acfef5994b90816946be5e6c00b))
+* treat text/plan with format: binary as raw upload ([f9a632a](https://github.com/openai/openai-node/commit/f9a632aa26d80d60be84dc55cf700e515377b6ba))
+* treat text/plan with format: binary as raw upload ([323cb78](https://github.com/openai/openai-node/commit/323cb788ce70ad7cf390a4c19997edcb68d854ca))
+
+
+### Chores
+
+* **internal:** codegen related update ([d32deef](https://github.com/openai/openai-node/commit/d32deef4d60f657dd959ef237d57b8cd53ab28b9))
+
+## 6.39.0 (2026-05-21)
+
+Full Changelog: [v6.38.0...v6.39.0](https://github.com/openai/openai-node/compare/v6.38.0...v6.39.0)
+
+### Features
+
+* **api:** api update ([33ea11f](https://github.com/openai/openai-node/commit/33ea11fc5e7656990005cfb932584e0e646957d4))
+* **api:** manual updates ([c210b09](https://github.com/openai/openai-node/commit/c210b09e71171b5aef844367f698ec4d8de95c2d))
+* **api:** manual updates ([92df9dc](https://github.com/openai/openai-node/commit/92df9dc4a5519d2864ab7c25a3ee370806c9345d))
+* **api:** update OpenAPI spec or Stainless config ([c7c0f52](https://github.com/openai/openai-node/commit/c7c0f52df2278e40c9279d63a08c7a4bc55ea414))
+
+
+### Bug Fixes
+
+* **types:** allow runtime fetch options ([8f5003d](https://github.com/openai/openai-node/commit/8f5003d3c13a0908ef80475a4f1c2e696e882101))
+* **typescript:** upgrade tsc-multi so that it works with Node 26 ([068f9c6](https://github.com/openai/openai-node/commit/068f9c675bc02ffdacbef81103c5af858e03f971))
+
+
+### Chores
+
+* **api:** docs updates ([9d43adb](https://github.com/openai/openai-node/commit/9d43adb15e542ed10bd336078a309bc64bdb64f9))
+* **tests:** remove redundant File import ([5465bbe](https://github.com/openai/openai-node/commit/5465bbe74bdfe922eb0bc961b461656b4d002f5d))
+
+## 6.38.0 (2026-05-13)
+
+Full Changelog: [v6.37.0...v6.38.0](https://github.com/openai/openai-node/compare/v6.37.0...v6.38.0)
+
+### Features
+
+* **api:** add service_tier parameter to responses compact method ([423e838](https://github.com/openai/openai-node/commit/423e838c498bd1b77f3b732cfc43c54fc5d261df))
+
+## 6.37.0 (2026-05-07)
+
+Full Changelog: [v6.36.0...v6.37.0](https://github.com/openai/openai-node/compare/v6.36.0...v6.37.0)
+
+### Features
+
+* **api:** add quantity field to admin organization usage responses ([273a8f7](https://github.com/openai/openai-node/commit/273a8f73e65839fb4d2ebc2a54ccc38383bd7517))
+* **api:** add web_search_call.results output option to responses ([91c75e0](https://github.com/openai/openai-node/commit/91c75e064f12946d3774cb182e5cd795000019ce))
+* **api:** launch realtime translate + update image 2 ([a296b66](https://github.com/openai/openai-node/commit/a296b661f0598ed001309d7deb693caa1596875c))
+* **api:** manual updates ([794b905](https://github.com/openai/openai-node/commit/794b90513f5ca63bd95c6cf774722fa6aeae293d))
+* **api:** manual updates ([6963729](https://github.com/openai/openai-node/commit/69637293939580a9d20bd9274d86f23a012ffd87))
+* **api:** realtime 2 ([f4b7177](https://github.com/openai/openai-node/commit/f4b717702182adfc684270c0e7d5ff11d6c7a408))
+
+
+### Bug Fixes
+
+* **api:** fix imagegen `size` enum regression ([4fe8469](https://github.com/openai/openai-node/commit/4fe8469a7c1f892d586df375a449f6bd0e318b15))
+
+
+### Chores
+
+* redact api-key headers in debug logs ([99c9c80](https://github.com/openai/openai-node/commit/99c9c800e179c13659b96386dedd6c17dd6ffb8d))
+
+## 6.36.0 (2026-05-01)
+
+Full Changelog: [v6.35.0...v6.36.0](https://github.com/openai/openai-node/compare/v6.35.0...v6.36.0)
+
+### Features
+
+* **api:** add group_type/user metadata fields, update types across admin resources ([cc52f97](https://github.com/openai/openai-node/commit/cc52f9755e3ce3b29ea2266482521c8d83ab88ad))
+* **api:** add support for Admin API Keys per endpoint ([770d187](https://github.com/openai/openai-node/commit/770d187be1d6c0419002a9b01e7dec6a99761f94))
+* **api:** admin API updates ([ee2bd2d](https://github.com/openai/openai-node/commit/ee2bd2d8e66a5b90f80e6ca8ab4544385d9a5de3))
+* **api:** manual updates ([6af2b6d](https://github.com/openai/openai-node/commit/6af2b6dfd86e4d7e7a2cb5afb1275217fcd5d242))
+* **api:** manual updates ([f2dceda](https://github.com/openai/openai-node/commit/f2dceda58fce6e44e740b56b9337597275d25e5b))
+
+
+### Bug Fixes
+
+* **api:** support admin api key auth ([e3862a3](https://github.com/openai/openai-node/commit/e3862a3d415ba3cedb178718e2c9bc0c2d09e01e))
+* **api:** tighten auth header selection ([f1203bd](https://github.com/openai/openai-node/commit/f1203bd884fb4131c54d9d7b8f89e9db3f4fc57c))
+
+
+### Chores
+
+* **format:** run eslint and prettier separately ([104543a](https://github.com/openai/openai-node/commit/104543a4daa138698006b1785ef7845d5ae0be27))
+* **internal:** codegen related update ([05d86da](https://github.com/openai/openai-node/commit/05d86dac705c75f8b8c6e6d5630973451f798e75))
+* **internal:** codegen related update ([f184586](https://github.com/openai/openai-node/commit/f184586fbcb8c7c07bf439455d6317aba62719ec))
+
+## 6.35.0 (2026-04-28)
+
+Full Changelog: [v6.34.0...v6.35.0](https://github.com/openai/openai-node/compare/v6.34.0...v6.35.0)
+
+### Features
+
+* **api:** Add detail to InputFileContent ([910ec5d](https://github.com/openai/openai-node/commit/910ec5d3b7c551eee367f0b10e84856b9eb171eb))
+* **api:** add OAuthErrorCode type ([f84bd1f](https://github.com/openai/openai-node/commit/f84bd1ff47b61e7a5c9b7130f1b6dfd062178501))
+* **api:** add prompt_cache_retention parameter to responses compact ([c486d1f](https://github.com/openai/openai-node/commit/c486d1f05558e4b082e18dd0ddc7b0685def8c84))
+* **api:** add web_search_call.results to ResponseIncludable ([72449a1](https://github.com/openai/openai-node/commit/72449a193fb32dcfd32993f4a01024eed946dc09))
+* **api:** manual updates ([b742f1f](https://github.com/openai/openai-node/commit/b742f1fbd5c03dda8ba20d1ecca35dbc95bf53d8))
+* **client:** add support for binary messages ([c498cc3](https://github.com/openai/openai-node/commit/c498cc344f49a6ae0382197a6bcc3c22a2af61ff))
+* **client:** add support for path parameters in websockets clients ([e0aba70](https://github.com/openai/openai-node/commit/e0aba7070fa35065aa0093bda02198bd87e7ef9e))
+* **client:** add support for queuing messages when waiting for a connection ([fd8868c](https://github.com/openai/openai-node/commit/fd8868ce76cbc601bd6198f43f5ff47ff0118e67))
+* **client:** add support for WebSockets in the browser when using simple auth ([27bda6a](https://github.com/openai/openai-node/commit/27bda6a4f3fc63469d0b9acd2ef08aa0bf6b8fa8))
+* **client:** support automatic reconnection for websockets ([189410b](https://github.com/openai/openai-node/commit/189410b4765111d8174e815142057ac0e48e8f7e))
+* **typescript:** expose underlying WebSocket type ([7e96939](https://github.com/openai/openai-node/commit/7e96939f5732f658751792038aae1b13a9f21d72))
+
+
+### Bug Fixes
+
+* **client:** allow single messages greater than the size of the websockets queue ([ad19ab2](https://github.com/openai/openai-node/commit/ad19ab2495194eb3a9d81d4390ec3a0e6c0c4395))
+* **internal:** gitignore generated `oidc` dir ([cf860f6](https://github.com/openai/openai-node/commit/cf860f62c0fcc3c1fcbcb95505fec4301b6481ea))
+* **types:** correct prompt_cache_retention enum value in chat/completions and responses ([5a81e1a](https://github.com/openai/openai-node/commit/5a81e1a66eb5450de50da4a49d977bd1daab4552))
+* **types:** preserve emitted ts-ignore comments ([1cde375](https://github.com/openai/openai-node/commit/1cde375c4faecc6e1cde7be782919fa243b1a141))
+
+
+### Chores
+
+* **ci:** remove release-doctor workflow ([e5ab4d1](https://github.com/openai/openai-node/commit/e5ab4d1a056f2223c0756b332f9635476c644c3f))
+* **format:** apply prettier output ([80fa23d](https://github.com/openai/openai-node/commit/80fa23d5ccfd39e51e090e0044d91866a418d212))
+* **format:** ignore release-updated jsr config ([f606e8b](https://github.com/openai/openai-node/commit/f606e8b43d0e3d5a3ad31cf7dab1bded0bac4d37))
+* **formatter:** run prettier and eslint separately ([68a988e](https://github.com/openai/openai-node/commit/68a988e3919c2e8da7949fe75ae143790025964d))
+* **internal:** codegen related update ([7673137](https://github.com/openai/openai-node/commit/7673137d3004226dc0e8daa96f85e8a5c459b7e3))
+* **internal:** fix package.json duplicate keys ([5f075a8](https://github.com/openai/openai-node/commit/5f075a80dc0a4c7ed4550cf718a576e638a7bc9f))
+* **internal:** more robust bootstrap script ([252e70a](https://github.com/openai/openai-node/commit/252e70a2f5e78f9162a99f9ac5adfc581e47e290))
+* **internal:** version bump ([34c84ee](https://github.com/openai/openai-node/commit/34c84eec2f9110746008628b90429c8fd5111157))
+* **tests:** bump steady to v0.22.1 ([316bdba](https://github.com/openai/openai-node/commit/316bdbaeb77a8d2a56c5b13a7b576163e2515951))
+
+
+### Documentation
+
+* improve examples ([6400d19](https://github.com/openai/openai-node/commit/6400d19ee8f44abb862f0c3d2d15d91e51f0741b))
+
+## 6.34.0 (2026-04-08)
+
+Full Changelog: [v6.33.0...v6.34.0](https://github.com/openai/openai-node/compare/v6.33.0...v6.34.0)
+
+### Features
+
+* **api:** add phase field to Message in conversations ([eb7cbc1](https://github.com/openai/openai-node/commit/eb7cbc1cb9d8f3189b4db6b59a6ff2c45376a598))
+* **client:** add support for short-lived tokens ([#839](https://github.com/openai/openai-node/issues/839)) ([a72ebcf](https://github.com/openai/openai-node/commit/a72ebcf06bcbf4100a3f3c8723b66c34f7c261ec))
+
+
+### Bug Fixes
+
+* **api:** remove web_search_call.results from ResponseIncludable in responses ([1f6968e](https://github.com/openai/openai-node/commit/1f6968e1c0add39034d26f4268a75cadad42abf0))
+
+
+### Chores
+
+* **internal:** codegen related update ([1081460](https://github.com/openai/openai-node/commit/1081460b68a90915fb019f81d9c24c0dfa48a3c4))
+* **internal:** update multipart form array serialization ([3faee8d](https://github.com/openai/openai-node/commit/3faee8da8d286871adb3ce1258df57aab67272da))
+* **tests:** bump steady to v0.20.1 ([b73cc6b](https://github.com/openai/openai-node/commit/b73cc6b9db6489b7e8b55cab79789ddb21e6d83f))
+
+
+### Documentation
+
+* **api:** add multi-file ingestion recommendations to vector-stores files/file-batches ([1bc32a3](https://github.com/openai/openai-node/commit/1bc32a3cbc4d453e2835db3a1844e7c99f55df24))
+
+## 6.33.0 (2026-03-25)
+
+Full Changelog: [v6.32.0...v6.33.0](https://github.com/openai/openai-node/compare/v6.32.0...v6.33.0)
+
+### Features
+
+* **api:** add keys field to computer action types ([27a850e](https://github.com/openai/openai-node/commit/27a850e8a698cde5b7e05da70d8babb1205b2830))
+* **client:** add async iterator and stream() to WebSocket classes ([e1c16ee](https://github.com/openai/openai-node/commit/e1c16ee35b8ef9db30e9a99a2b3460368f3044d0))
+
+
+### Bug Fixes
+
+* **api:** align SDK response types with expanded item schemas ([491cd52](https://github.com/openai/openai-node/commit/491cd5290c36e6b1de7ff9787e80c73899d8b642))
+* **types:** make type required in ResponseInputMessageItem ([2012293](https://github.com/openai/openai-node/commit/20122931977c2de8630cb03182766fbf6dc37868))
+
+
+### Chores
+
+* **ci:** skip lint on metadata-only changes ([74a917f](https://github.com/openai/openai-node/commit/74a917fd92dd2a1bd3089f3b5f79781bdc0d4ec3))
+* **internal:** refactor imports ([cfe9c60](https://github.com/openai/openai-node/commit/cfe9c60aa41e9ed53e7d5f9187d31baf4364f8bd))
+* **internal:** update gitignore ([71bd114](https://github.com/openai/openai-node/commit/71bd114f97e24c547660694d03c19b22d62ae961))
+* **tests:** bump steady to v0.19.4 ([f2e9dea](https://github.com/openai/openai-node/commit/f2e9dea844405f189cc63a1d1493de3eabfcb7e7))
+* **tests:** bump steady to v0.19.5 ([37c6cf4](https://github.com/openai/openai-node/commit/37c6cf495b9a05128572f9e955211b67d01410f3))
+* **tests:** bump steady to v0.19.6 ([496b3af](https://github.com/openai/openai-node/commit/496b3af4371cf40f5d14f72d0770e152710b09df))
+* **tests:** bump steady to v0.19.7 ([8491eb6](https://github.com/openai/openai-node/commit/8491eb6d83cf8680bdc9d69e60b8e5d09e2bc8e8))
+
+
+### Refactors
+
+* **tests:** switch from prism to steady ([47c0581](https://github.com/openai/openai-node/commit/47c0581a1923c9e700a619dd6bfa3fb93a188899))
+
+## 6.32.0 (2026-03-17)
+
+Full Changelog: [v6.31.0...v6.32.0](https://github.com/openai/openai-node/compare/v6.31.0...v6.32.0)
+
+### Features
+
+* **api:** 5.4 nano and mini model slugs ([068df6d](https://github.com/openai/openai-node/commit/068df6d625d7faa76dfac160065f1ca550539ba8))
+
+## 6.31.0 (2026-03-16)
+
+Full Changelog: [v6.30.1...v6.31.0](https://github.com/openai/openai-node/compare/v6.30.1...v6.31.0)
+
+### Features
+
+* **api:** add in/nin filter types to ComparisonFilter ([b2eda27](https://github.com/openai/openai-node/commit/b2eda274418ceb9bbdb3778cb6a5ee28090df8ad))
+
+## 6.30.1 (2026-03-16)
+
+Full Changelog: [v6.30.0...v6.30.1](https://github.com/openai/openai-node/compare/v6.30.0...v6.30.1)
+
+### Chores
+
+* **internal:** tweak CI branches ([25f5d74](https://github.com/openai/openai-node/commit/25f5d74c1fc16e3303fcb87022f5f0559b052cbf))
+
+## 6.30.0 (2026-03-16)
+
+Full Changelog: [v6.29.0...v6.30.0](https://github.com/openai/openai-node/compare/v6.29.0...v6.30.0)
+
+### Features
+
+* **api:** add /v1/videos endpoint option to batches ([271d879](https://github.com/openai/openai-node/commit/271d87979f16950900f4253915bdda319b7fe935))
+* **api:** add defer_loading field to NamespaceTool ([7cc8f0a](https://github.com/openai/openai-node/commit/7cc8f0a736ea7ba0aa3e7860b4c30eaaa5795966))
+
+
+### Bug Fixes
+
+* **api:** oidc publishing for npm ([fa50066](https://github.com/openai/openai-node/commit/fa500666e38379f2241ac43d60e2eb7eef7d39cb))
+
+## 6.29.0 (2026-03-13)
+
+Full Changelog: [v6.28.0...v6.29.0](https://github.com/openai/openai-node/compare/v6.28.0...v6.29.0)
+
+### Features
+
+* **api:** custom voices ([a11307a](https://github.com/openai/openai-node/commit/a11307afab49299fdf7e7ed3675d3e277d9b5c60))
+
+## 6.28.0 (2026-03-13)
+
+Full Changelog: [v6.27.0...v6.28.0](https://github.com/openai/openai-node/compare/v6.27.0...v6.28.0)
+
+### Features
+
+* **api:** manual updates ([d543959](https://github.com/openai/openai-node/commit/d54395976aa4c1c1864bb45dbaf81ec1d66b8c6b))
+* **api:** manual updates ([4f87840](https://github.com/openai/openai-node/commit/4f878406e029ae7527201251632e3fa00b800045))
+* **api:** sora api improvements: character api, video extensions/edits, higher resolution exports. ([262dac2](https://github.com/openai/openai-node/commit/262dac25aec6c9caa561f57a0b9e2a086f47a26a))
+
+
+### Bug Fixes
+
+* **types:** remove detail field from ResponseInputFile and ResponseInputFileContent ([8d6c0cd](https://github.com/openai/openai-node/commit/8d6c0cdbbf08829db08745597e1806661534853f))
+
+
+### Chores
+
+* **internal:** update dependencies to address dependabot vulnerabilities ([f5810ee](https://github.com/openai/openai-node/commit/f5810ee5f5bf96e81a77f91939f3d56427c46e00))
+* match http protocol with ws protocol instead of wss ([6f4e936](https://github.com/openai/openai-node/commit/6f4e936bc2211da885bf492615b2bf413887576b))
+* **mcp-server:** improve instructions ([aad9ca1](https://github.com/openai/openai-node/commit/aad9ca15ddbb8dbc27ed6b2aa9b242af9bbf7b8f))
+* use proper capitalization for WebSockets ([cb4cf62](https://github.com/openai/openai-node/commit/cb4cf6297c2a0eb7d3f55f8850e6e8ffc4c7ecc6))
+
+## 6.27.0 (2026-03-05)
+
+Full Changelog: [v6.26.0...v6.27.0](https://github.com/openai/openai-node/compare/v6.26.0...v6.27.0)
+
+### Features
+
+* **api:** The GA ComputerTool now uses the CompuerTool class. The 'computer_use_preview' tool is moved to ComputerUsePreview ([0206188](https://github.com/openai/openai-node/commit/0206188f760be830738136e37dcf7be6ea0fe20c))
+
+
+### Chores
+
+* **internal:** improve import alias names ([9cc2478](https://github.com/openai/openai-node/commit/9cc24789730a309037ef81f5a30af515d700459a))
+
+## 6.26.0 (2026-03-05)
+
+Full Changelog: [v6.25.0...v6.26.0](https://github.com/openai/openai-node/compare/v6.25.0...v6.26.0)
+
+### Features
+
+* **api:** gpt-5.4, tool search tool, and new computer tool ([1d1e5a9](https://github.com/openai/openai-node/commit/1d1e5a9b5aeb11b0e940b4532dcd6a3fcc23898a))
+
+
+### Bug Fixes
+
+* **api:** internal schema fixes ([6b401ad](https://github.com/openai/openai-node/commit/6b401ad7d3ff2ead9cfa577daf8381f62ea85b93))
+* **api:** manual updates ([2b54919](https://github.com/openai/openai-node/commit/2b549195c70581022d9d64c443ab08202c6faeb7))
+* **api:** readd phase ([4a0cf29](https://github.com/openai/openai-node/commit/4a0cf2974865519d3b512fb377bc4ba305dce7b7))
+* **api:** remove phase from message types, prompt_cache_key param in responses ([088fca6](https://github.com/openai/openai-node/commit/088fca6a4d5d1a577500acb5579ee403292d8911))
+
+
+### Chores
+
+* **internal:** codegen related update ([6a0aa9e](https://github.com/openai/openai-node/commit/6a0aa9e2ff10e78f8b9afd777174d16537a29c8e))
+* **internal:** codegen related update ([b2a4299](https://github.com/openai/openai-node/commit/b2a42991cbe83eee45a342f19a5a99ce1d78b36a))
+* **internal:** move stringifyQuery implementation to internal function ([f9f4660](https://github.com/openai/openai-node/commit/f9f46609cf5c1fc51e437c23251c5a7d0519d55d))
+* **internal:** reduce warnings ([7e19492](https://github.com/openai/openai-node/commit/7e194929156052b0efbda9ca48c3ed6de8c18d2f))
+
+## 6.25.0 (2026-02-24)
+
+Full Changelog: [v6.24.0...v6.25.0](https://github.com/openai/openai-node/compare/v6.24.0...v6.25.0)
+
+### Features
+
+* **api:** add phase ([e32b853](https://github.com/openai/openai-node/commit/e32b853c3c57f2d0e4c05b09177b94677aed0e5a))
+
+
+### Bug Fixes
+
+* **api:** fix phase enum ([2ffe1be](https://github.com/openai/openai-node/commit/2ffe1be2600d0154b3355eefa61707470a341a95))
+* **api:** phase docs ([7fdfa38](https://github.com/openai/openai-node/commit/7fdfa38c1fa2bd383e1171510918c6db5f0937d8))
+
+
+### Chores
+
+* **internal:** refactor sse event parsing ([0ea2380](https://github.com/openai/openai-node/commit/0ea238054c0473adc97f4173a0ad5ba8bcfa4e29))
+
+## 6.24.0 (2026-02-24)
+
+Full Changelog: [v6.23.0...v6.24.0](https://github.com/openai/openai-node/compare/v6.23.0...v6.24.0)
+
+### Features
+
+* **api:** add gpt-realtime-1.5 and gpt-audio-1.5 models to realtime ([75875bf](https://github.com/openai/openai-node/commit/75875bfb850c0780878553c566fe8821048ae5e8))
+
+## 6.23.0 (2026-02-23)
+
+Full Changelog: [v6.22.0...v6.23.0](https://github.com/openai/openai-node/compare/v6.22.0...v6.23.0)
+
+### Features
+
+* **api:** websockets for responses api ([c6b96b8](https://github.com/openai/openai-node/commit/c6b96b8b8d5f8132e0a4c5f7399a04185302adcc))
+
+
+### Bug Fixes
+
+* **docs/contributing:** correct pnpm link command ([8a198a5](https://github.com/openai/openai-node/commit/8a198a5aa60209e26509651cdad110aadf164527))
+* **internal:** skip tests that depend on mock server ([3d88cb0](https://github.com/openai/openai-node/commit/3d88cb061a9a4d187931d4c892a87bd5e5f09c4d))
+
+
+### Chores
+
+* **internal/client:** fix form-urlencoded requests ([646cedd](https://github.com/openai/openai-node/commit/646cedd2842716b1768d81705110cc573d6ddc33))
+* update mock server docs ([29f78f3](https://github.com/openai/openai-node/commit/29f78f310b7c336318705c382fd92a324d4b1ea2))
+
+
+### Documentation
+
+* **api:** document 2000 file limit in file-batches create parameters ([ff7bde0](https://github.com/openai/openai-node/commit/ff7bde08d8d02b8bda5f4e50bef65271a8f2a190))
+* **api:** enhance method descriptions across audio/chat/skills/videos/responses ([f5e02a1](https://github.com/openai/openai-node/commit/f5e02a1dcad492fd3dab2d1a289c12af082cdef4))
+* **api:** update safety_identifier description in chat/responses ([a55e0ef](https://github.com/openai/openai-node/commit/a55e0ef720cfb231e09e598ff0e8e60ef91e9088))
+
+## 6.22.0 (2026-02-14)
+
+Full Changelog: [v6.21.0...v6.22.0](https://github.com/openai/openai-node/compare/v6.21.0...v6.22.0)
+
+### Features
+
+* **api:** container network_policy and skills ([65c1482](https://github.com/openai/openai-node/commit/65c1482a41f16d39ff6ba26849a72b417b27403e))
+
+
+### Bug Fixes
+
+* **docs:** restore helper methods in API reference ([3a4c189](https://github.com/openai/openai-node/commit/3a4c189712292f280ca34326fe17e202180951bf))
+* **webhooks:** restore webhook type exports ([49bbf46](https://github.com/openai/openai-node/commit/49bbf46f0ed14ce2a050d10baa4ad7a8481a773d))
+
+
+### Chores
+
+* **internal:** avoid type checking errors with ts-reset ([4b0d1f2](https://github.com/openai/openai-node/commit/4b0d1f27207dea6054291707d7bbdeb86dbcf4b2))
+
+
+### Documentation
+
+* split `api.md` by standalone resources ([48e07d6](https://github.com/openai/openai-node/commit/48e07d65894c22b543e669d62fa42a00cc3d0430))
+* update comment ([e3a1ea0](https://github.com/openai/openai-node/commit/e3a1ea0400b428e0e21666f96e3a9345468678d5))
+
+## 6.21.0 (2026-02-10)
+
+Full Changelog: [v6.20.0...v6.21.0](https://github.com/openai/openai-node/compare/v6.20.0...v6.21.0)
+
+### Features
+
+* **api:** support for images in batch api ([017ba1c](https://github.com/openai/openai-node/commit/017ba1cb5a08428ca59197764cff460c70950e84))
+
+## 6.20.0 (2026-02-10)
+
+Full Changelog: [v6.19.0...v6.20.0](https://github.com/openai/openai-node/compare/v6.19.0...v6.20.0)
+
+### Features
+
+* **api:** skills and hosted shell ([e4bdd62](https://github.com/openai/openai-node/commit/e4bdd6205a0225d662ddeb07367f26094eaadbdd))
+
+## 6.19.0 (2026-02-09)
+
+Full Changelog: [v6.18.0...v6.19.0](https://github.com/openai/openai-node/compare/v6.18.0...v6.19.0)
+
+### Features
+
+* **api:** responses context_management ([40e7671](https://github.com/openai/openai-node/commit/40e7671675159966fe219b3aebfb24b9b03f2c95))
+
+## 6.18.0 (2026-02-05)
+
+Full Changelog: [v6.17.0...v6.18.0](https://github.com/openai/openai-node/compare/v6.17.0...v6.18.0)
+
+### Features
+
+* **api:** image generation actions for responses; ResponseFunctionCallArgumentsDoneEvent.name ([d373c32](https://github.com/openai/openai-node/commit/d373c3210d9299381e20520c217167b387b46105))
+
+
+### Bug Fixes
+
+* **client:** avoid memory leak with abort signals ([b449f36](https://github.com/openai/openai-node/commit/b449f36609b727f3f147fad19e8d064225bc8621))
+* **client:** avoid removing abort listener too early ([1c045f7](https://github.com/openai/openai-node/commit/1c045f701743017ac7b4e2be0dfc8706a3b0213a))
+* **client:** undo change to web search Find action ([8259b45](https://github.com/openai/openai-node/commit/8259b457c6f73c78066af0e1a76be0125caeb1ae))
+* **client:** update type for `find_in_page` action ([9aa8d98](https://github.com/openai/openai-node/commit/9aa8d9822e60afb595c585f7be75087378b724bd))
+
+
+### Chores
+
+* **client:** do not parse responses with empty content-length ([4a118fa](https://github.com/openai/openai-node/commit/4a118fa3e09b0ad2bc4899b2a074fd60103796a0))
+* **client:** restructure abort controller binding ([a4d7151](https://github.com/openai/openai-node/commit/a4d71518787849ec1f530da3c8550ea0f8746668))
+* **internal:** fix pagination internals not accepting option promises ([6677905](https://github.com/openai/openai-node/commit/667790549f9160ba0cac484a8de09d8966cc13f0))
+
+## 6.17.0 (2026-01-28)
+
+Full Changelog: [v6.16.0...v6.17.0](https://github.com/openai/openai-node/compare/v6.16.0...v6.17.0)
+
+### Features
+
+* **api:** add shell_call_output status field ([edf9590](https://github.com/openai/openai-node/commit/edf95904294cce6cdcac521ee75dc8e0a033df4c))
+* **api:** api update ([6a2eb80](https://github.com/openai/openai-node/commit/6a2eb80f53c21f52ff217faef9b783e1cf9846c1))
+* **api:** api updates ([19ca100](https://github.com/openai/openai-node/commit/19ca100e9ebb2d03983da923c4bf944aa23c1f00))
+
+
+### Bug Fixes
+
+* **api:** mark assistants as deprecated ([3ae2a14](https://github.com/openai/openai-node/commit/3ae2a1439bc30d83c81e30ab30ddd06f91fee61f))
+
+
+### Chores
+
+* **ci:** upgrade `actions/github-script` ([4ea73d3](https://github.com/openai/openai-node/commit/4ea73d389b1b96d88c4c37c1a3a08ea143317c08))
+* **internal:** update `actions/checkout` version ([f163b77](https://github.com/openai/openai-node/commit/f163b77bf2bb127f8049a0a7b1a2795c4f2bae50))
+* **internal:** upgrade babel, qs, js-yaml ([2e2f3c6](https://github.com/openai/openai-node/commit/2e2f3c66ed61c0666e19831b123ea13d42978112))
+
+## 6.16.0 (2026-01-09)
+
+Full Changelog: [v6.15.0...v6.16.0](https://github.com/openai/openai-node/compare/v6.15.0...v6.16.0)
+
+### Features
+
+* **api:** add new Response completed_at prop ([ca40534](https://github.com/openai/openai-node/commit/ca40534778311def52bc7dbbab043d925cdaf847))
+* **ci:** add breaking change detection workflow ([a6f3dea](https://github.com/openai/openai-node/commit/a6f3deaf89ea0ef85cc57e1150032bb6b807c3b9))
+
+
+### Chores
+
+* break long lines in snippets into multiline ([80dee2f](https://github.com/openai/openai-node/commit/80dee2fe64d1b13f181bd482b31eb06fd6c5f3f4))
+* **internal:** codegen related update ([b2fac3e](https://github.com/openai/openai-node/commit/b2fac3ecdc3aecc3303c26304c4c94deda061edb))
+
+## 6.15.0 (2025-12-19)
+
+Full Changelog: [v6.14.0...v6.15.0](https://github.com/openai/openai-node/compare/v6.14.0...v6.15.0)
+
+### Bug Fixes
+
+* rebuild ([5627b41](https://github.com/openai/openai-node/commit/5627b4181775981e48991ea246e091afdfdc3caf))
+
+## 6.14.0 (2025-12-16)
+
+Full Changelog: [v6.13.0...v6.14.0](https://github.com/openai/openai-node/compare/v6.13.0...v6.14.0)
+
+### Features
+
+* **api:** gpt-image-1.5 ([6c1ac1d](https://github.com/openai/openai-node/commit/6c1ac1d8a2947c59f38aabaf07795a244c45a688))
+
+## 6.13.0 (2025-12-15)
+
+Full Changelog: [v6.12.0...v6.13.0](https://github.com/openai/openai-node/compare/v6.12.0...v6.13.0)
+
+### Features
+
+* **api:** api update ([bc759dc](https://github.com/openai/openai-node/commit/bc759dc39518412b58b2ebf7e57758776971ce15))
+* **api:** fix grader input list, add dated slugs for sora-2 ([6b2a38f](https://github.com/openai/openai-node/commit/6b2a38fb040eb45535818fb0157ae55949033dc1))
+
+## 6.12.0 (2025-12-11)
+
+Full Changelog: [v6.11.0...v6.12.0](https://github.com/openai/openai-node/compare/v6.11.0...v6.12.0)
+
+### Features
+
+* **api:** gpt 5.2 ([7000ddb](https://github.com/openai/openai-node/commit/7000ddb09ad4e272f43fe0d70cb1f6e5ca9ff725))
+
+## 6.11.0 (2025-12-10)
+
+Full Changelog: [v6.10.0...v6.11.0](https://github.com/openai/openai-node/compare/v6.10.0...v6.11.0)
+
+### Features
+
+* **api:** make model required for the responses/compact endpoint ([0b52b12](https://github.com/openai/openai-node/commit/0b52b12e535b07ef3b1213892ccb50dc4030ecf4))
+
+
+### Bug Fixes
+
+* **mcp:** correct code tool API endpoint ([e3f2a33](https://github.com/openai/openai-node/commit/e3f2a33bc7ae941d0870e7bc0a333951e88925e2))
+* **mcp:** return correct lines on typescript errors ([f485c3c](https://github.com/openai/openai-node/commit/f485c3c36ebb3cb9c2dbff676872a5470d1a9e47))
+
+
+### Chores
+
+* **internal:** codegen related update ([5af1c38](https://github.com/openai/openai-node/commit/5af1c38043118fd8e6f0fd072243bc63660963e4))
+* **internal:** codegen related update ([e43a8d9](https://github.com/openai/openai-node/commit/e43a8d97fd3e9be7c6ae0ebaf6e85d68dbb33432))
+
+## 6.10.0 (2025-12-04)
+
+Full Changelog: [v6.9.1...v6.10.0](https://github.com/openai/openai-node/compare/v6.9.1...v6.10.0)
+
+### Features
+
+* **api:** gpt-5.1-codex-max and responses/compact ([935f79e](https://github.com/openai/openai-node/commit/935f79efbb090d1d6016ac6874456594f5fd4553))
+
+
+### Chores
+
+* **client:** fix logger property type ([fdc671f](https://github.com/openai/openai-node/commit/fdc671f1b21249a8610b38e2535910d956dc3611))
+* **internal:** upgrade eslint ([9de0f90](https://github.com/openai/openai-node/commit/9de0f905bbd965a5d945ddb70c66dc0c6403ed35))
+
+## 6.9.1 (2025-11-17)
+
+Full Changelog: [v6.9.0...v6.9.1](https://github.com/openai/openai-node/compare/v6.9.0...v6.9.1)
+
+### Bug Fixes
+
+* **api:** align types of input items / output items for typescript ([99adaa7](https://github.com/openai/openai-node/commit/99adaa70dc31d07d5c7fa4d67194ac4de375c98f))
+
+## 6.9.0 (2025-11-13)
+
+Full Changelog: [v6.8.1...v6.9.0](https://github.com/openai/openai-node/compare/v6.8.1...v6.9.0)
+
+### Features
+
+* **api:** gpt 5.1 ([58e78a8](https://github.com/openai/openai-node/commit/58e78a86899b43eb9afdb6f0afd60b912eae41f2))
+
+
+### Chores
+
+* add typescript-estree dependency for jsr readme script ([3759514](https://github.com/openai/openai-node/commit/37595149720edd7bf4c11760084cad7753c2f289))
+
+## 6.8.1 (2025-11-05)
+
+Full Changelog: [v6.8.0...v6.8.1](https://github.com/openai/openai-node/compare/v6.8.0...v6.8.1)
+
+### Bug Fixes
+
+* **api:** fix nullability of logprobs ([40a403c](https://github.com/openai/openai-node/commit/40a403cc9a35b11cc665ccde19f9c5ef07247585))
+
+## 6.8.0 (2025-11-03)
+
+Full Changelog: [v6.7.0...v6.8.0](https://github.com/openai/openai-node/compare/v6.7.0...v6.8.0)
+
+### Features
+
+* **api:** Realtime API token_limits, Hybrid searching ranking options ([6a5b48c](https://github.com/openai/openai-node/commit/6a5b48c9c8961bc7409c20546d9d845a4f2674ce))
+* **api:** remove InputAudio from ResponseInputContent ([9909fef](https://github.com/openai/openai-node/commit/9909fef596280fc16174679d97c3e81543c68646))
+
+
+### Chores
+
+* **internal:** codegen related update ([3ad52aa](https://github.com/openai/openai-node/commit/3ad52aaa94cdbe1926fee1e5f8eacebefdfc399d))
+
+## 6.7.0 (2025-10-24)
+
+Full Changelog: [v6.6.0...v6.7.0](https://github.com/openai/openai-node/compare/v6.6.0...v6.7.0)
+
+### Features
+
+* add support for zod@4 schemas ([#1666](https://github.com/openai/openai-node/issues/1666)) ([10ef7ff](https://github.com/openai/openai-node/commit/10ef7ff4cb4aefeaa831b239943118ff52872f5c))
+
+
+### Bug Fixes
+
+* **api:** docs updates ([2591c21](https://github.com/openai/openai-node/commit/2591c211bce29d078579445d9a3b45d8de453ec3))
+
+## 6.6.0 (2025-10-20)
+
+Full Changelog: [v6.5.0...v6.6.0](https://github.com/openai/openai-node/compare/v6.5.0...v6.6.0)
+
+### Features
+
+* **api:** Add responses.input_tokens.count ([520c8a9](https://github.com/openai/openai-node/commit/520c8a95c857307b9329c4725cb40707d4e3eeee))
+
+
+### Bug Fixes
+
+* **api:** internal openapi updates ([d4aaef9](https://github.com/openai/openai-node/commit/d4aaef9c2e3d9f00b33d59e569149a937e5bd3f5))
+
+## 6.5.0 (2025-10-17)
+
+Full Changelog: [v6.4.0...v6.5.0](https://github.com/openai/openai-node/compare/v6.4.0...v6.5.0)
+
+### Features
+
+* **api:** api update ([4d21af3](https://github.com/openai/openai-node/commit/4d21af3e6a04baa0ea42d360cf3601fcc3d39705))
+
+## 6.4.0 (2025-10-16)
+
+Full Changelog: [v6.3.0...v6.4.0](https://github.com/openai/openai-node/compare/v6.3.0...v6.4.0)
+
+### Features
+
+* **api:** Add support for gpt-4o-transcribe-diarize on audio/transcriptions endpoint ([2d27392](https://github.com/openai/openai-node/commit/2d27392ac1cd082f7defb730326d11d8e733353f))
+
+## 6.3.0 (2025-10-10)
+
+Full Changelog: [v6.2.0...v6.3.0](https://github.com/openai/openai-node/compare/v6.2.0...v6.3.0)
+
+### Features
+
+* **api:** comparison filter in/not in ([1a733c6](https://github.com/openai/openai-node/commit/1a733c69ffff094568707b3f615d110c7e2edd6e))
+
+
+### Chores
+
+* **internal:** use npm pack for build uploads ([a532410](https://github.com/openai/openai-node/commit/a53241032e1177a390337986399da57e39be25ec))
+
+## 6.2.0 (2025-10-06)
+
+Full Changelog: [v6.1.0...v6.2.0](https://github.com/openai/openai-node/compare/v6.1.0...v6.2.0)
+
+### Features
+
+* **api:** dev day 2025 launches ([f2816db](https://github.com/openai/openai-node/commit/f2816dbc6ae162d39017e7bafb0d23d0b51dd585))
+
+
+### Chores
+
+* **internal:** codegen related update ([b6f64b7](https://github.com/openai/openai-node/commit/b6f64b70ea681b174695d930f957aa49194553ed))
+* **jsdoc:** fix [@link](https://github.com/link) annotations to refer only to parts of the package‘s public interface ([73e465d](https://github.com/openai/openai-node/commit/73e465d382a45389ab47a0a92575e4415e8d3276))
+
+## 6.1.0 (2025-10-02)
+
+Full Changelog: [v6.0.1...v6.1.0](https://github.com/openai/openai-node/compare/v6.0.1...v6.1.0)
+
+### Features
+
+* **api:** add support for realtime calls ([5de9585](https://github.com/openai/openai-node/commit/5de958556679182dfbdce95b4db6b65ca742aa61))
+
+## 6.0.1 (2025-10-01)
+
+Full Changelog: [v6.0.0...v6.0.1](https://github.com/openai/openai-node/compare/v6.0.0...v6.0.1)
+
+### Bug Fixes
+
+* **api:** add status, approval_request_id to MCP tool call ([498c6a5](https://github.com/openai/openai-node/commit/498c6a5d4cab7ad10e31acd01cb49915a70e576a))
+
+## 6.0.0 (2025-09-30)
+
+Full Changelog: [v5.23.2...v6.0.0](https://github.com/openai/openai-node/compare/v5.23.2...v6.0.0)
+
+### ⚠ BREAKING CHANGES
+
+* **api:** `ResponseFunctionToolCallOutputItem.output` and `ResponseCustomToolCallOutput.output` now return `string | Array<ResponseInputText | ResponseInputImage | ResponseInputFile>` instead of `string` only. This may break existing callsites that assume `output` is always a string.
+
+### Features
+
+* **api:** Support images and files for function call outputs in responses, BatchUsage ([abe56f8](https://github.com/openai/openai-node/commit/abe56f86afdf28fc1a1b410ace1dd422672361a7))
+
+
+### Chores
+
+* compat with zod v4 ([#1658](https://github.com/openai/openai-node/issues/1658)) ([94569a0](https://github.com/openai/openai-node/commit/94569a07ce55317b0166e742b90a463df0f70e56))
+
+## 5.23.2 (2025-09-29)
+
+Full Changelog: [v5.23.1...v5.23.2](https://github.com/openai/openai-node/compare/v5.23.1...v5.23.2)
+
+### Chores
+
+* **env-tests:** upgrade jest-fixed-jsdom 0.0.9 -&gt; 0.0.10 ([6d6d0b0](https://github.com/openai/openai-node/commit/6d6d0b0eaaff86a99141af031f55b7cc6a22772a))
+* **internal:** codegen related update ([1b684af](https://github.com/openai/openai-node/commit/1b684afd387ccd7b16d226dca3adee92db6e4878))
+* **internal:** ignore .eslintcache ([da9e146](https://github.com/openai/openai-node/commit/da9e1468d62aa9044ee9d236b419f744f8792bdb))
+
+## 5.23.1 (2025-09-26)
+
+Full Changelog: [v5.23.0...v5.23.1](https://github.com/openai/openai-node/compare/v5.23.0...v5.23.1)
+
+### Bug Fixes
+
+* **realtime:** remove beta header from GA classes ([a5e9e70](https://github.com/openai/openai-node/commit/a5e9e70af8691f2850ad7ccfec966e5fb0d5b56d))
+
+
+### Performance Improvements
+
+* faster formatting ([d56f309](https://github.com/openai/openai-node/commit/d56f309f359f7f4d87c95bfaaffdc463312850e4))
+
+
+### Chores
+
+* **internal:** fix incremental formatting in some cases ([166d28f](https://github.com/openai/openai-node/commit/166d28ff34edb6b1c3ef310bc825952dcb30ba4b))
+* **internal:** remove deprecated `compilerOptions.baseUrl` from tsconfig.json ([dfab408](https://github.com/openai/openai-node/commit/dfab40857547b272cdad4309baf84e43a07775ed))
+
+## 5.23.0 (2025-09-23)
+
+Full Changelog: [v5.22.1...v5.23.0](https://github.com/openai/openai-node/compare/v5.22.1...v5.23.0)
+
+### Features
+
+* **api:** gpt-5-codex ([2e4ece6](https://github.com/openai/openai-node/commit/2e4ece6a01e1b7c4c69627137900b7f70558a85b))
+
+## 5.22.1 (2025-09-22)
+
+Full Changelog: [v5.22.0...v5.22.1](https://github.com/openai/openai-node/compare/v5.22.0...v5.22.1)
+
+### Bug Fixes
+
+* **api:** fix mcp tool name ([fa9f305](https://github.com/openai/openai-node/commit/fa9f3055c63f83ddc19085ebeb7ac38cb303673a))
+
+
+### Chores
+
+* **api:** openapi updates for conversations ([975c075](https://github.com/openai/openai-node/commit/975c0757da3474439d166a27d61ba6606d439bb0))
+* do not install brew dependencies in ./scripts/bootstrap by default ([6f5e45f](https://github.com/openai/openai-node/commit/6f5e45fc8a0c2dee1f68d00b135034653ed23200))
+* improve example values ([b336a64](https://github.com/openai/openai-node/commit/b336a642fd9507bf28e0ed8976ec102d796f9b9d))
+
+## 5.22.0 (2025-09-19)
+
+Full Changelog: [v5.21.0...v5.22.0](https://github.com/openai/openai-node/compare/v5.21.0...v5.22.0)
+
+### Features
+
+* **api:** add reasoning_text ([7ff6186](https://github.com/openai/openai-node/commit/7ff61860a14ae20d0734b4f592002dfe67330488))
+
+
+### Chores
+
+* **api:** manual fixes for streaming ([3a2ae4c](https://github.com/openai/openai-node/commit/3a2ae4ce2a0796f5201dd9373f103bd94689b733))
+
+## 5.21.0 (2025-09-17)
+
+Full Changelog: [v5.20.3...v5.21.0](https://github.com/openai/openai-node/compare/v5.20.3...v5.21.0)
+
+### Features
+
+* **api:** type updates for conversations, reasoning_effort and results for evals ([f243f54](https://github.com/openai/openai-node/commit/f243f54072d00cb8d83b8c6093accaaabf34d4cf))
+
+## 5.20.3 (2025-09-15)
+
+Full Changelog: [v5.20.2...v5.20.3](https://github.com/openai/openai-node/compare/v5.20.2...v5.20.3)
+
+### Chores
+
+* **api:** docs and spec refactoring ([05b4498](https://github.com/openai/openai-node/commit/05b44987c699f7683b8706c8de363165150e5f31))
+
+## 5.20.2 (2025-09-12)
+
+Full Changelog: [v5.20.1...v5.20.2](https://github.com/openai/openai-node/compare/v5.20.1...v5.20.2)
+
+### Bug Fixes
+
+* coerce nullable values to undefined ([836d1b4](https://github.com/openai/openai-node/commit/836d1b4cdd077c206e1c647c762f4c16e9db444c))
+
+
+### Chores
+
+* **api:** Minor docs and type updates for realtime ([ccb00dc](https://github.com/openai/openai-node/commit/ccb00dcbd1466976045aafee152cbc038bb293b9))
+
+## 5.20.1 (2025-09-10)
+
+Full Changelog: [v5.20.0...v5.20.1](https://github.com/openai/openai-node/compare/v5.20.0...v5.20.1)
+
+### Chores
+
+* **api:** fix realtime GA types ([1c0d314](https://github.com/openai/openai-node/commit/1c0d3145e920a55f3c710323849bcac1fd60b703))
+
+## 5.20.0 (2025-09-08)
+
+Full Changelog: [v5.19.1...v5.20.0](https://github.com/openai/openai-node/compare/v5.19.1...v5.20.0)
+
+### Features
+
+* **api:** ship the RealtimeGA API shape ([4286ddd](https://github.com/openai/openai-node/commit/4286ddd4f990dd26e15e510039457f17d787820d))
+
+
+### Chores
+
+* ci build action ([c8ce143](https://github.com/openai/openai-node/commit/c8ce143196fdbc7ee1c7832bce2417b6e3d25885))
+
+## 5.19.1 (2025-09-03)
+
+Full Changelog: [v5.19.0...v5.19.1](https://github.com/openai/openai-node/compare/v5.19.0...v5.19.1)
+
+### Bug Fixes
+
+* **azure:** correctly send API key ([#1635](https://github.com/openai/openai-node/issues/1635)) ([08f6178](https://github.com/openai/openai-node/commit/08f6178ff0d4ccc6b80462c86a36f11eb3bfd5fe))
+
+## 5.19.0 (2025-09-03)
+
+Full Changelog: [v5.18.1...v5.19.0](https://github.com/openai/openai-node/compare/v5.18.1...v5.19.0)
+
+### Features
+
+* **api:** Add gpt-realtime models ([256d932](https://github.com/openai/openai-node/commit/256d93247da7f31e34f5f80d8added0bc6f52fe9))
+
+## 5.18.1 (2025-09-02)
+
+Full Changelog: [v5.18.0...v5.18.1](https://github.com/openai/openai-node/compare/v5.18.0...v5.18.1)
+
+### Chores
+
+* **api:** manual updates for ResponseInputAudio ([570501b](https://github.com/openai/openai-node/commit/570501b8c66f3f23d0dca05bc948339623732a8e))
+
+## 5.18.0 (2025-09-02)
+
+Full Changelog: [v5.17.0...v5.18.0](https://github.com/openai/openai-node/compare/v5.17.0...v5.18.0)
+
+### Features
+
+* **client:** support api key provider functions ([#1587](https://github.com/openai/openai-node/issues/1587)) ([c3a92c7](https://github.com/openai/openai-node/commit/c3a92c7ee6f5f7c26c9297be04343326c9854bfd))
+
+
+### Bug Fixes
+
+* update non beta realtime websockets helpers ([265a42f](https://github.com/openai/openai-node/commit/265a42f9101b0479b7d8dcbf05d45ce29539a7f3))
+
+## 5.17.0 (2025-09-02)
+
+Full Changelog: [v5.16.0...v5.17.0](https://github.com/openai/openai-node/compare/v5.16.0...v5.17.0)
+
+### Features
+
+* **api:** realtime API updates ([e817255](https://github.com/openai/openai-node/commit/e817255e6ff9e3ad6bd08b001644c335e0459537))
+
+
+### Chores
+
+* **internal:** update global Error reference ([e566ff3](https://github.com/openai/openai-node/commit/e566ff321642a100756224b75a67d44e262e5bea))
+
+## 5.16.0 (2025-08-26)
+
+Full Changelog: [v5.15.0...v5.16.0](https://github.com/openai/openai-node/compare/v5.15.0...v5.16.0)
+
+### Features
+
+* **api:** add web search filters ([975b141](https://github.com/openai/openai-node/commit/975b1417052bdcc0111f546ce3fbbea2e71414af))
+
+
+### Chores
+
+* **client:** qualify global Blob ([7998d3f](https://github.com/openai/openai-node/commit/7998d3fd3715ab2c06ea011155420ac126681649))
+* update CI script ([accb0c1](https://github.com/openai/openai-node/commit/accb0c1188dbaef20c1a40bd3047087960c99a07))
+
+## 5.15.0 (2025-08-21)
+
+Full Changelog: [v5.14.0...v5.15.0](https://github.com/openai/openai-node/compare/v5.14.0...v5.15.0)
+
+### Features
+
+* **api:** Add connectors support for MCP tool ([048bee3](https://github.com/openai/openai-node/commit/048bee3693822c75181012c47b4f54074e1efdd6))
+* **api:** adding support for /v1/conversations to the API ([1380d17](https://github.com/openai/openai-node/commit/1380d1734b1e7eeb5d10fb73fe9cfce6199e5c8e))
+
+
+### Chores
+
+* add package to package.json ([6748b2b](https://github.com/openai/openai-node/commit/6748b2b64f6c06ee324694b95ae7df99493ff08d))
+
+## 5.14.0 (2025-08-20)
+
+Full Changelog: [v5.13.1...v5.14.0](https://github.com/openai/openai-node/compare/v5.13.1...v5.14.0)
+
+### Features
+
+* **mcp:** add code execution tool ([3f8264c](https://github.com/openai/openai-node/commit/3f8264cfaafb8d03aedabe53a0d17a7e3dc326d8))
+
+
+### Chores
+
+* **internal/ci:** setup breaking change detection ([87e8004](https://github.com/openai/openai-node/commit/87e8004d05eb27d14a11d433239af525c9c493b9))
+
+## 5.13.1 (2025-08-19)
+
+Full Changelog: [v5.13.0...v5.13.1](https://github.com/openai/openai-node/compare/v5.13.0...v5.13.1)
+
+### Chores
+
+* **api:** accurately represent shape for verbosity on Chat Completions ([5ddac3c](https://github.com/openai/openai-node/commit/5ddac3c7535e2df4b562fe1237b639e112bf5eef))
+
+## 5.13.0 (2025-08-18)
+
+Full Changelog: [v5.12.3...v5.13.0](https://github.com/openai/openai-node/compare/v5.12.3...v5.13.0)
+
+### Features
+
+* **api:** add new text parameters, expiration options ([499179c](https://github.com/openai/openai-node/commit/499179c095eae77dcccec5e2758ab72c8d829ea7))
+
+
+### Chores
+
+* **deps:** update dependency @types/node to v20.17.58 ([7812d0d](https://github.com/openai/openai-node/commit/7812d0db43309144cb46714a64fe97a3e12f5b04))
+* **internal:** formatting change ([56b2073](https://github.com/openai/openai-node/commit/56b2073ac3553d6b9cca1185fe52a7e697d0b733))
+
+## 5.12.3 (2025-08-12)
+
+Full Changelog: [v5.12.2...v5.12.3](https://github.com/openai/openai-node/compare/v5.12.2...v5.12.3)
+
+### Chores
+
+* **internal:** update comment in script ([2488faf](https://github.com/openai/openai-node/commit/2488faf387da1c9bd7565d4bb5aded7bb53b8799))
+* update @stainless-api/prism-cli to v5.15.0 ([db44a7d](https://github.com/openai/openai-node/commit/db44a7d2afa4e0330f4981c106f9abf2fd4ab432))
+
+## 5.12.2 (2025-08-08)
+
+Full Changelog: [v5.12.1...v5.12.2](https://github.com/openai/openai-node/compare/v5.12.1...v5.12.2)
+
+### Bug Fixes
+
+* **client:** fix verbosity parameter location in Responses ([eaa246f](https://github.com/openai/openai-node/commit/eaa246ffe00ffcdec45c695a96aeed3d87bb3f74))
+
+## 5.12.1 (2025-08-07)
+
+Full Changelog: [v5.12.0...v5.12.1](https://github.com/openai/openai-node/compare/v5.12.0...v5.12.1)
+
+### Features
+
+* **api:** adds GPT-5 and new API features: platform.openai.com/docs/guides/gpt-5 ([59acd85](https://github.com/openai/openai-node/commit/59acd85a3e0d4db7f7eca9a287b23ec00191fa68))
+
+
+### Chores
+
+* **internal:** move publish config ([b3d02f6](https://github.com/openai/openai-node/commit/b3d02f6faab5aa8e62998446485e43ebc802d68e))
+
+## 5.12.0 (2025-08-05)
+
+Full Changelog: [v5.11.0...v5.12.0](https://github.com/openai/openai-node/compare/v5.11.0...v5.12.0)
+
+### Features
+
+* **api:** manual updates ([f0d3056](https://github.com/openai/openai-node/commit/f0d3056932adb8e448fd1141eae4b07ad0c66ddb))
+
+## 5.11.0 (2025-07-30)
+
+Full Changelog: [v5.10.3...v5.11.0](https://github.com/openai/openai-node/compare/v5.10.3...v5.11.0)
+
+### Features
+
+* **api:** manual updates ([442dc25](https://github.com/openai/openai-node/commit/442dc25d7b31a374daf440f32f5694c3b6c20a81))
+
+## 5.10.3 (2025-07-30)
+
+Full Changelog: [v5.10.2...v5.10.3](https://github.com/openai/openai-node/compare/v5.10.2...v5.10.3)
+
+### Bug Fixes
+
+* **zod:** avoid adding redundant not to optional schemas [#1593](https://github.com/openai/openai-node/issues/1593) ([162b697](https://github.com/openai/openai-node/commit/162b697d1b946dc4af213c8efcdb7a7b5317bb6e))
+
+
+### Chores
+
+* **client:** refactor streaming slightly to better future proof it ([292427f](https://github.com/openai/openai-node/commit/292427f7f39f6dd64e46ba4360b0b96c8e49adc9))
+* **internal:** remove redundant imports config ([28dd66d](https://github.com/openai/openai-node/commit/28dd66de15032d6ee620d3cf9f3e33ba61cad4e7))
+* **internal:** version bump ([56e0760](https://github.com/openai/openai-node/commit/56e076090a9ce5c6b7f4ac4d84d33ca3f6522973))
+
+## 5.10.2 (2025-07-22)
+
+Full Changelog: [v5.10.1...v5.10.2](https://github.com/openai/openai-node/compare/v5.10.1...v5.10.2)
+
+### Chores
+
+* **api:** event shapes more accurate ([78f4e1d](https://github.com/openai/openai-node/commit/78f4e1d8e7400001a7bc6a05dc9a6e52a2047523))
+* **internal:** version bump ([ea885ca](https://github.com/openai/openai-node/commit/ea885cac5c4231597141e91bd454e540830deb95))
+
+
+### Documentation
+
+* fix typos in helpers and realtime ([#1592](https://github.com/openai/openai-node/issues/1592)) ([17733b7](https://github.com/openai/openai-node/commit/17733b7e4a19754c9ca2ec815cf7d246b1dc138d))
+
+## 5.10.1 (2025-07-16)
+
+Full Changelog: [v5.10.0...v5.10.1](https://github.com/openai/openai-node/compare/v5.10.0...v5.10.1)
+
+### Chores
+
+* **internal:** version bump ([896b418](https://github.com/openai/openai-node/commit/896b41828ce468fed36ceb50082633e21a0945ca))
+* **ts:** reorder package.json imports ([2f8d2f7](https://github.com/openai/openai-node/commit/2f8d2f7726dbc717c3c6e2a27dbd5b50ff9ef4b4))
+
+## 5.10.0 (2025-07-16)
+
+Full Changelog: [v5.9.2...v5.10.0](https://github.com/openai/openai-node/compare/v5.9.2...v5.10.0)
+
+### Features
+
+* **api:** manual updates ([35338b4](https://github.com/openai/openai-node/commit/35338b44ace44f0f0c0b48ea94aa96d3c81ea385))
+
+
+### Chores
+
+* **internal:** version bump ([3d9de4b](https://github.com/openai/openai-node/commit/3d9de4b2f28c80ea1f92446c092b23d69955ef30))
+
+## 5.9.2 (2025-07-15)
+
+Full Changelog: [v5.9.1...v5.9.2](https://github.com/openai/openai-node/compare/v5.9.1...v5.9.2)
+
+### Chores
+
+* **api:** update realtime specs ([4a20a3d](https://github.com/openai/openai-node/commit/4a20a3da8319667540a7b120f0f94e253420058e))
+* **internal:** version bump ([103e8de](https://github.com/openai/openai-node/commit/103e8def71408724fb37104cfcb9419e01022f24))
+
+## 5.9.1 (2025-07-15)
+
+Full Changelog: [v5.9.0...v5.9.1](https://github.com/openai/openai-node/compare/v5.9.0...v5.9.1)
+
+### Chores
+
+* **api:** update realtime specs, build config ([bb4649f](https://github.com/openai/openai-node/commit/bb4649feb69a6d91e4eea857fd6f5e8c00f2a35d))
+
+## 5.9.0 (2025-07-10)
+
+Full Changelog: [v5.8.4...v5.9.0](https://github.com/openai/openai-node/compare/v5.8.4...v5.9.0)
+
+### Features
+
+* **api:** add file_url, fix event ID ([5f5d39e](https://github.com/openai/openai-node/commit/5f5d39e9e11224bf18a0301041b69548727ed4f3))
+
+## 5.8.4 (2025-07-10)
+
+Full Changelog: [v5.8.3...v5.8.4](https://github.com/openai/openai-node/compare/v5.8.3...v5.8.4)
+
+### Chores
+
+* **internal:** bump undici version in tests ([6f38b80](https://github.com/openai/openai-node/commit/6f38b809a69b6ab3fcbf1235e57bdb8912024ab3))
+* make some internal functions async ([841940d](https://github.com/openai/openai-node/commit/841940d2ae036191b456e8398fbcb1f24c6e4deb))
+
+## 5.8.3 (2025-07-08)
+
+Full Changelog: [v5.8.2...v5.8.3](https://github.com/openai/openai-node/compare/v5.8.2...v5.8.3)
+
+### Bug Fixes
+
+* avoid console usage ([aec57c5](https://github.com/openai/openai-node/commit/aec57c5902b47d2d643f48d98a6014e0e77ba6cc))
+
+
+### Chores
+
+* add docs to RequestOptions type ([3735172](https://github.com/openai/openai-node/commit/37351723bc5a24c06a96c95e11104cda42a1bec3))
+* **ci:** only run for pushes and fork pull requests ([e200bc4](https://github.com/openai/openai-node/commit/e200bc4db18a09d4148fff0056801140411bfa53))
+* **client:** improve path param validation ([b5a043b](https://github.com/openai/openai-node/commit/b5a043bc96b6b6bfe8cca05e103a6e4d6fea962b))
+* **internal/tests:** pin bun types version ([fcffa88](https://github.com/openai/openai-node/commit/fcffa880c1b31aeca70a6fa093f4b1f9d3db1a74))
+
+## 5.8.2 (2025-06-27)
+
+Full Changelog: [v5.8.1...v5.8.2](https://github.com/openai/openai-node/compare/v5.8.1...v5.8.2)
+
+### Bug Fixes
+
+* **client:** get fetchOptions type more reliably ([b3c959d](https://github.com/openai/openai-node/commit/b3c959d22d1002a85772385476f9a5098c8e1514))
+
+## 5.8.1 (2025-06-26)
+
+Full Changelog: [v5.8.0...v5.8.1](https://github.com/openai/openai-node/compare/v5.8.0...v5.8.1)
+
+### Bug Fixes
+
+* **client:** ensure addOutputText is called on responses.retrieve ([d55bb64](https://github.com/openai/openai-node/commit/d55bb64f8022c1e861b4b4d1c23ad4cc0e80e536))
+
+
+### Chores
+
+* **api:** remove unsupported property ([1966954](https://github.com/openai/openai-node/commit/19669545157dc0339f4c88855bd1ae9acaaac53d))
+* **docs:** update README to include links to docs on Webhooks ([586d5da](https://github.com/openai/openai-node/commit/586d5daf5babc9f12793201f1e1e4c79829151f0))
+* **webhooks:** make private methods really private ([0ee396a](https://github.com/openai/openai-node/commit/0ee396a2a0e03c794c7cfa3c9f1beb848fd77f1d))
+
+## 5.8.0 (2025-06-26)
+
+Full Changelog: [v5.7.0...v5.8.0](https://github.com/openai/openai-node/compare/v5.7.0...v5.8.0)
+
+### Features
+
+* **api:** webhook and deep research support ([f2b4f66](https://github.com/openai/openai-node/commit/f2b4f66226ad514d702f8acbb4820ae90b4fd40e))
+
+
+### Bug Fixes
+
+* **ci:** release-doctor — report correct token name ([aed2587](https://github.com/openai/openai-node/commit/aed2587294922415aeaece0b9a6911c3e1577c51))
+
+
+### Refactors
+
+* **types:** replace Record with mapped types ([7865910](https://github.com/openai/openai-node/commit/7865910c7d66a14dac70ea119e109975d9169414))
+
+## 5.7.0 (2025-06-23)
+
+Full Changelog: [v5.6.0...v5.7.0](https://github.com/openai/openai-node/compare/v5.6.0...v5.7.0)
+
+### Features
+
+* **api:** update api shapes for usage and code interpreter ([f2100e8](https://github.com/openai/openai-node/commit/f2100e89334753e7f580f7f20f48b43eb8ba2fe3))
+
+## 5.6.0 (2025-06-20)
+
+Full Changelog: [v5.5.1...v5.6.0](https://github.com/openai/openai-node/compare/v5.5.1...v5.6.0)
+
+### Features
+
+* **api:** make model and inputs not required to create response ([52211c0](https://github.com/openai/openai-node/commit/52211c0e67c2926b27f4adee1f626066d90b6a2e))
+
+
+### Bug Fixes
+
+* **client:** explicitly copy fetch in withOptions ([0efacae](https://github.com/openai/openai-node/commit/0efacaeb8eb0bfbad6bd6bc29fc57f00916411c0))
+
+
+### Chores
+
+* **readme:** update badges ([6898954](https://github.com/openai/openai-node/commit/689895400adf38e85810ba8b63dc16ed56839ddd))
+* **readme:** use better example snippet for undocumented params ([668611f](https://github.com/openai/openai-node/commit/668611f4331ffa375257f3bc138c54d6ee965cd6))
+
+## 5.5.1 (2025-06-17)
+
+Full Changelog: [v5.5.0...v5.5.1](https://github.com/openai/openai-node/compare/v5.5.0...v5.5.1)
+
+### Chores
+
+* **ci:** enable for pull requests ([e1cf00c](https://github.com/openai/openai-node/commit/e1cf00cf2a2ce832d759f3253f10826d3c16338e))
+
+## 5.5.0 (2025-06-16)
+
+Full Changelog: [v5.4.0...v5.5.0](https://github.com/openai/openai-node/compare/v5.4.0...v5.5.0)
+
+### Features
+
+* **api:** manual updates ([ab6b57c](https://github.com/openai/openai-node/commit/ab6b57c241dc7c57e411fae572842da801e9828b))
+
+## 5.4.0 (2025-06-16)
+
+Full Changelog: [v5.3.0...v5.4.0](https://github.com/openai/openai-node/compare/v5.3.0...v5.4.0)
+
+### Features
+
+* **api:** add reusable prompt IDs ([c720bb3](https://github.com/openai/openai-node/commit/c720bb3fb909cdef1cc679df38357f046d3d2756))
+* **client:** add support for endpoint-specific base URLs ([05f558b](https://github.com/openai/openai-node/commit/05f558bcdd362ae56000fe515a24593363d59e83))
+
+
+### Bug Fixes
+
+* publish script — handle NPM errors correctly ([a803cce](https://github.com/openai/openai-node/commit/a803cce6d44116eaba34f2bd7cb0f5d8f5c72be8))
+
+
+### Chores
+
+* **client:** refactor imports ([9eb4470](https://github.com/openai/openai-node/commit/9eb44703432d7e22290564013f8e1798c82918a3))
+* **internal:** add pure annotations, make base APIResource abstract ([418eb02](https://github.com/openai/openai-node/commit/418eb02e3ebe3ef58d851405f9eb5cae275194b4))
+
+## 5.3.0 (2025-06-10)
+
+Full Changelog: [v5.2.0...v5.3.0](https://github.com/openai/openai-node/compare/v5.2.0...v5.3.0)
+
+### Features
+
+* **api:** Add o3-pro model IDs ([9988f8e](https://github.com/openai/openai-node/commit/9988f8ea50a370abfc03bc97882d1ddd83837217))
+
+## 5.2.0 (2025-06-09)
+
+Full Changelog: [v5.1.1...v5.2.0](https://github.com/openai/openai-node/compare/v5.1.1...v5.2.0)
+
+### Features
+
+* **api:** Add tools and structured outputs to evals ([64844f1](https://github.com/openai/openai-node/commit/64844f1be2da9658a603fac304d1387f28a110a4))
+
+
+### Bug Fixes
+
+* **changelog:** remove duplicated entries ([18484cc](https://github.com/openai/openai-node/commit/18484cceea615a01b62590b9b626b9e2140c7dd9))
+
+
+### Chores
+
+* avoid type error in certain environments ([44ac3d9](https://github.com/openai/openai-node/commit/44ac3d96eb258cd777edb02004763ccef253ae7a))
+
+
+### Documentation
+
+* **changelog:** reference MIGRATION.md ([b3d488f](https://github.com/openai/openai-node/commit/b3d488feff5acb020f5db6f27ea94884c56bc767)), closes [#1539](https://github.com/openai/openai-node/issues/1539)
+
+## 5.1.1 (2025-06-05)
+
+Full Changelog: [v5.1.0...v5.1.1](https://github.com/openai/openai-node/compare/v5.1.0...v5.1.1)
+
+### Bug Fixes
+
+* **assistants:** handle thread.run.incomplete while streaming ([8f5e7f3](https://github.com/openai/openai-node/commit/8f5e7f3ffaad7bdd0424743eb68a63f918dbabb8))
+
+
+### Chores
+
+* **docs:** use top-level-await in example snippets ([065d3b0](https://github.com/openai/openai-node/commit/065d3b08b29e10d7af58bb66816245f71f386833))
+* **internal:** fix readablestream types in node 20 ([771ae81](https://github.com/openai/openai-node/commit/771ae818c32d855778c3847d9005efb80b0a8cd5))
+
+## 5.1.0 (2025-06-03)
+
+Full Changelog: [v5.0.2...v5.1.0](https://github.com/openai/openai-node/compare/v5.0.2...v5.1.0)
+
+### Features
+
+* **api:** add new realtime and audio models, realtime session options ([1219f09](https://github.com/openai/openai-node/commit/1219f090b02b8d53f29abf5a0e7564af0f9f68fc))
+
+
+### Chores
+
+* adjust eslint.config.mjs ignore pattern ([9b5c898](https://github.com/openai/openai-node/commit/9b5c898fe5099859252d3c3fd62010d6aa552fef))
+* **api:** update type names ([7c296d6](https://github.com/openai/openai-node/commit/7c296d62bbde52ec84e3af78ed12f1cd196f9d52))
+
+## 5.0.2 (2025-06-02)
+
+Full Changelog: [v5.0.1...v5.0.2](https://github.com/openai/openai-node/compare/v5.0.1...v5.0.2)
+
+### Bug Fixes
+
+* **api:** Fix evals and code interpreter interfaces ([992a9d8](https://github.com/openai/openai-node/commit/992a9d84fe412d96496b11b7a6be5c927f78db6c))
+
+
+### Chores
+
+* **deps:** bump eslint-plugin-prettier ([1428a8b](https://github.com/openai/openai-node/commit/1428a8b4f82e79695c2cbed5e12ca0da4958423b))
+* **internal:** codegen related update ([a65428f](https://github.com/openai/openai-node/commit/a65428fc81e05f681eab806e7efc6ad26062221b))
+
+## 5.0.1 (2025-05-29)
+
+Full Changelog: [v5.0.0...v5.0.1](https://github.com/openai/openai-node/compare/v5.0.0...v5.0.1)
+
+### Chores
+
+* sync changes ([90b100d](https://github.com/openai/openai-node/commit/90b100dcf504ecf0b98620702cb6bd0988695320))
+* **types:** add missing type annotation ([de37b55](https://github.com/openai/openai-node/commit/de37b55e6e95d7089ee845d4144883d93bb18ca0))
+
+## 5.0.0 (2025-05-29)
+
+This release migrates from node-fetch to builtin fetch, for full release notes see [MIGRATION.md](https://github.com/openai/openai-node/blob/main/MIGRATION.md).
+
+Full Changelog: [v5.0.0-alpha.0...v5.0.0](https://github.com/openai/openai-node/compare/v5.0.0-alpha.0...v5.0.0)
+
+### Features
+
+* add audio helpers ([ec5067d](https://github.com/openai/openai-node/commit/ec5067deba1fe4202d90db42e45c3bd774936af1))
+* add migration guide ([cfd2088](https://github.com/openai/openai-node/commit/cfd2088219464381077dec62d38d1830ab0b43f3))
+* add SKIP_BREW env var to ./scripts/bootstrap ([7ea4a24](https://github.com/openai/openai-node/commit/7ea4a244d5b39e0745aea1a89abff940e2c3922f))
+* **api:** add /v1/responses and built-in tools ([91af47c](https://github.com/openai/openai-node/commit/91af47cc4f62b08a451bc39f44c64244a71c1f2c))
+* **api:** add `get /chat/completions` endpoint ([9697139](https://github.com/openai/openai-node/commit/9697139a5f38bcc2dffa3322ff575eb1fc8b4e35))
+* **api:** add `get /responses/{response_id}/input_items` endpoint ([f2c5aba](https://github.com/openai/openai-node/commit/f2c5aba736f99550a9a7837be22b39b36a7495d0))
+* **api:** add container endpoint ([3ffca5c](https://github.com/openai/openai-node/commit/3ffca5c5b2dc6819e955ed343b2bb6e2095e7bdf))
+* **api:** Add evalapi to sdk ([70092d7](https://github.com/openai/openai-node/commit/70092d768426b8e0dd4bca21e7a3dea009e25b9f))
+* **api:** add gpt-4.5-preview ([1d4478d](https://github.com/openai/openai-node/commit/1d4478d7935028e20a9d9d11ff29ff8b991c44f9))
+* **api:** add image sizes, reasoning encryption ([0c25021](https://github.com/openai/openai-node/commit/0c2502187f8895f029277a7be9825862f458e9aa))
+* **api:** add o3 and o4-mini model IDs ([19cda5d](https://github.com/openai/openai-node/commit/19cda5d3b908238ae6c6f5609ac3a118d4d8acc2))
+* **api:** Add reinforcement fine-tuning api support ([e6bbaf5](https://github.com/openai/openai-node/commit/e6bbaf577aa6bdf3bcdaf25a5a7d4e8202831c7a))
+* **api:** add support for storing chat completions ([59da177](https://github.com/openai/openai-node/commit/59da1771b93158d5d89efc9e63e1ef9c09a634f3))
+* **api:** adding gpt-4.1 family of model IDs ([8a2a745](https://github.com/openai/openai-node/commit/8a2a7454bee0fbe9e4729d47f6b894e5f25d68f5))
+* **api:** adding new image model support ([a0010fd](https://github.com/openai/openai-node/commit/a0010fdb60fe723ebc70103cceca552aca51855e))
+* **api:** Config update for pakrym-stream-param ([469ad7b](https://github.com/openai/openai-node/commit/469ad7b9d76b674aa3fd829128a54758ab7adfbd))
+* **api:** further updates for evals API ([3f6f248](https://github.com/openai/openai-node/commit/3f6f248191b45015924be76fd5154d149c4ed8a0))
+* **api:** manual updates ([debe529](https://github.com/openai/openai-node/commit/debe5295d077f79cc4b4eefefb008e5a10b32793))
+* **api:** manual updates ([e83286b](https://github.com/openai/openai-node/commit/e83286b10b20d3e4c02903739b045af5cbf71cde))
+* **api:** manual updates ([959eace](https://github.com/openai/openai-node/commit/959eace6ec132a83f731fa496d5b8b7a11fa6bb2))
+* **api:** manual updates ([179a607](https://github.com/openai/openai-node/commit/179a607a89fabda32ebad62cc7ee86b5332a29f4))
+* **api:** manual updates ([0cb0c86](https://github.com/openai/openai-node/commit/0cb0c863b3bda6e6d72b3b5cdba3c8791db9bb77))
+* **api:** manual updates ([678ae6b](https://github.com/openai/openai-node/commit/678ae6b7112ed9b27d092b3234dd034d572deb9c))
+* **api:** manual updates ([4560dc6](https://github.com/openai/openai-node/commit/4560dc62f8c65e9857085409e382760aa601d60b))
+* **api:** manual updates ([554c3b1](https://github.com/openai/openai-node/commit/554c3b142024bec8010474cd7e42b99a209d4daa))
+* **api:** manual updates ([b893d81](https://github.com/openai/openai-node/commit/b893d81420359c712dab6997c2dbc9f309549712))
+* **api:** manual updates ([c1c2819](https://github.com/openai/openai-node/commit/c1c281983e23dcfdca964720265d3cba28b17795))
+* **api:** manual updates ([efce6d3](https://github.com/openai/openai-node/commit/efce6d3d719ad463b035b22e9a1cf461ab62b5af))
+* **api:** manual updates ([32afb00](https://github.com/openai/openai-node/commit/32afb0022939b19069c37fcd9cabfe666ea86b77))
+* **api:** new API tools ([fb4014f](https://github.com/openai/openai-node/commit/fb4014ffac7b220d37bd03c94fa745386b010bf0))
+* **api:** new models for TTS, STT, + new audio features for Realtime ([#1407](https://github.com/openai/openai-node/issues/1407)) ([d11b13c](https://github.com/openai/openai-node/commit/d11b13cdf5412f03e551365297a27e610a36edda))
+* **api:** new streaming helpers for background responses ([1ddd6ff](https://github.com/openai/openai-node/commit/1ddd6ff182b09d696954fda4bde50fb82f1d6585))
+* **api:** o1-pro now available through the API ([#1398](https://github.com/openai/openai-node/issues/1398)) ([aefd267](https://github.com/openai/openai-node/commit/aefd2675154ff848032a7fec856f0db6ed2ad629))
+* **api:** responses x eval api ([ea1d56c](https://github.com/openai/openai-node/commit/ea1d56c979ad7136aa584a773904b0570ba14783))
+* **api:** Updating Assistants and Evals API schemas ([8cc63d3](https://github.com/openai/openai-node/commit/8cc63d351057678d474fe1a16e3077370c83fddb))
+* **client:** accept RFC6838 JSON content types ([67da9ce](https://github.com/openai/openai-node/commit/67da9ce89ea010813779b98c18fea84d9964c7de))
+* **client:** add Realtime API support ([7737d25](https://github.com/openai/openai-node/commit/7737d2547c5c6c45004fe281b8122c9e2adc0efb))
+* **client:** add withOptions helper ([7e9ea85](https://github.com/openai/openai-node/commit/7e9ea85f63a0989b3446834d9e1a94c0d050cf87))
+* **client:** improve logging ([ead0ba4](https://github.com/openai/openai-node/commit/ead0ba4dc9f51c35007c5fe20f9954855f558652))
+* **client:** promote beta completions methods to GA ([4c622f9](https://github.com/openai/openai-node/commit/4c622f9f55529e3aab30c834349d341038499db1))
+
+
+### Bug Fixes
+
+* **api:** add missing file rank enum + more metadata ([b943a0a](https://github.com/openai/openai-node/commit/b943a0ae4682a410172e1063a9424f5150cd9010))
+* **api:** correct some Responses types ([#1391](https://github.com/openai/openai-node/issues/1391)) ([e983d0c](https://github.com/openai/openai-node/commit/e983d0c61d33b106f149d87eed90378bd0bbc349))
+* **api:** improve type resolution when importing as a package ([#1444](https://github.com/openai/openai-node/issues/1444)) ([4af79dd](https://github.com/openai/openai-node/commit/4af79ddd5b19925fa09d9ae877470aa8304535c2))
+* **assistants:** handle `thread.run.incomplete` event ([a2714bb](https://github.com/openai/openai-node/commit/a2714bb5253ade80cb15455ceb8f6dbea63cb1d0))
+* **audio:** correctly handle transcription streaming ([9c7d352](https://github.com/openai/openai-node/commit/9c7d352181c690156e26c9538c00edff6db5b384))
+* avoid type error in certain environments ([#1413](https://github.com/openai/openai-node/issues/1413)) ([f395e95](https://github.com/openai/openai-node/commit/f395e9584ac63780442bb54c2d292914eaecf3c7))
+* **azure/audio:** use model param for deployments ([0eda70a](https://github.com/openai/openai-node/commit/0eda70adc3c88c12792c1eee9c3279579a86d412))
+* **azure:** add /images/edits to deployments endpoints ([#1509](https://github.com/openai/openai-node/issues/1509)) ([4b18059](https://github.com/openai/openai-node/commit/4b180597633a527c435e049d885103ab06311b90))
+* **azure:** add /images/edits to deployments endpoints ([#1509](https://github.com/openai/openai-node/issues/1509)) ([84fc31a](https://github.com/openai/openai-node/commit/84fc31aa903eceeb80815f6b17562fc463a71cfc))
+* **azure:** use correct internal method ([a9c7821](https://github.com/openai/openai-node/commit/a9c78216d88379bc1d5103b30970f041d22083b8))
+* **client:** always overwrite when merging headers ([c160550](https://github.com/openai/openai-node/commit/c160550761eed22b038ac8a5b477729fe298834c))
+* **client:** fix export map for index exports ([#1328](https://github.com/openai/openai-node/issues/1328)) ([26d5868](https://github.com/openai/openai-node/commit/26d5868dd53045bc820a607100eab1070785f50c))
+* **client:** fix export map for index exports, accept BunFile ([9416c96](https://github.com/openai/openai-node/commit/9416c96fdc12c9ea22da04ac317d93cb2ad94f57))
+* **client:** fix TypeError with undefined File ([0e980d0](https://github.com/openai/openai-node/commit/0e980d05e8e1fb4befae443fb84b8b9fab8dbd50))
+* **client:** remove duplicate types ([bee2ce5](https://github.com/openai/openai-node/commit/bee2ce5841f25b1f56cdc1fd0b36b0758d2c9bdc))
+* **client:** remove duplicate types ([#1410](https://github.com/openai/openai-node/issues/1410)) ([23fd3ff](https://github.com/openai/openai-node/commit/23fd3ffef3b19656b27576b4d0c613d19ea1ae2f))
+* **client:** return binary content from `get /containers/{container_id}/files/{file_id}/content` ([8502966](https://github.com/openai/openai-node/commit/8502966ed2fee9162ad14fdf04c893e1fa130a51))
+* **client:** return binary content from `get /containers/{container_id}/files/{file_id}/content` ([899869b](https://github.com/openai/openai-node/commit/899869b40ab5f64145c48521378f1925f6b5b33a))
+* **client:** return binary content from `get /containers/{container_id}/files/{file_id}/content` ([83129d7](https://github.com/openai/openai-node/commit/83129d7eac3dd784bb1c29fa344c5b808a59db73))
+* **client:** send `X-Stainless-Timeout` in seconds ([5a272a7](https://github.com/openai/openai-node/commit/5a272a76515b09810fcb5d0ca63dd6050d1a8023))
+* **client:** send `X-Stainless-Timeout` in seconds ([#1442](https://github.com/openai/openai-node/issues/1442)) ([5e5e460](https://github.com/openai/openai-node/commit/5e5e4607a103fcb6257c071bb4bf57902ee6415f))
+* **client:** send all configured auth headers ([ee01414](https://github.com/openai/openai-node/commit/ee01414c206f18a537f3616bcf1e208aab311030))
+* compat with more runtimes ([f743730](https://github.com/openai/openai-node/commit/f74373020ab01ace999a72d916e017db0177bf16))
+* correct imports ([21f2107](https://github.com/openai/openai-node/commit/21f210782b1ee3b33231cfed0277ab8e3a764bcb))
+* correctly decode multi-byte characters over multiple chunks ([f3d7083](https://github.com/openai/openai-node/commit/f3d708390a36427206edfc67875a7987eb483e55))
+* **docs:** correct docstring on responses.stream ([1847673](https://github.com/openai/openai-node/commit/1847673de09586c809e1057a6b08c604471e13ff))
+* **ecosystem-tests/bun:** bump dependencies ([1e52734](https://github.com/openai/openai-node/commit/1e52734e28a0e474b11c90977fd3161ea2e50f8c))
+* **ecosystem-tests/cloudflare-worker:** ignore lib errors for now ([157248a](https://github.com/openai/openai-node/commit/157248ae85d2261f9538128703d0ebbc24347c61))
+* **ecosystem-tests:** correct ecosystem tests setup ([6fa0675](https://github.com/openai/openai-node/commit/6fa06756624071fb1486c69a496ba906fef96de2))
+* **embeddings:** correctly decode base64 data ([#1448](https://github.com/openai/openai-node/issues/1448)) ([d6b99c8](https://github.com/openai/openai-node/commit/d6b99c8fcbd35ef6b45d66f487aea759c01febbc))
+* **exports:** add missing type exports ([a816029](https://github.com/openai/openai-node/commit/a81602996a1d9c3ceda79d88fe163a1e6b823e77))
+* **exports:** add missing type exports ([#1417](https://github.com/openai/openai-node/issues/1417)) ([06c03d7](https://github.com/openai/openai-node/commit/06c03d7125d8331679dd206d0e34705d65669046))
+* **exports:** ensure resource imports don't require /index ([d028ad7](https://github.com/openai/openai-node/commit/d028ad7b0debb585534acb73fa5cafe6f8d90f37))
+* **helpers/zod:** error on optional + not nullable fields ([6e424b5](https://github.com/openai/openai-node/commit/6e424b5cac1b2ea7e108ce24154be5bdddf56bdd))
+* **internal:** add mts file + crypto shim types ([a06deb8](https://github.com/openai/openai-node/commit/a06deb8aec21ecf8bfbc369112da10a790039178))
+* **internal:** clean up undefined File test ([da43aa9](https://github.com/openai/openai-node/commit/da43aa91586fe80137c6500e850dca82085936b8))
+* **internal:** fix file uploads in node 18 jest ([abfff03](https://github.com/openai/openai-node/commit/abfff03f49e62e195d112229127be674cc44497d))
+* **internal:** work around https://github.com/vercel/next.js/issues/76881 ([#1427](https://github.com/openai/openai-node/issues/1427)) ([84edc62](https://github.com/openai/openai-node/commit/84edc62d05eddaefee0973f9687fcfdd43b0afa9))
+* **jsr:** correct zod config ([04e30c0](https://github.com/openai/openai-node/commit/04e30c03ce0496a718aebf4cc2daac82ebba1ddb))
+* **jsr:** export realtime helpers ([0ea64eb](https://github.com/openai/openai-node/commit/0ea64eb2bde99e243761ea2e3d9d3c294c9f7fbc))
+* **jsr:** export zod helpers ([77e1180](https://github.com/openai/openai-node/commit/77e118082334710cab361efb95934422e4db6b18))
+* **mcp:** remove unused tools.ts ([#1445](https://github.com/openai/openai-node/issues/1445)) ([4ba9947](https://github.com/openai/openai-node/commit/4ba994773b41a3ed05a3ad908b235fc5f3810dfc))
+* optimize sse chunk reading off-by-one error ([#1339](https://github.com/openai/openai-node/issues/1339)) ([b0b4189](https://github.com/openai/openai-node/commit/b0b4189420e1c5bb5fc4bbb8925f88fe65f9b217))
+* **package:** add chat/completions.ts back in ([#1333](https://github.com/openai/openai-node/issues/1333)) ([1f38cc1](https://github.com/openai/openai-node/commit/1f38cc1976f4091a90a38d49e6ddc1c22e5c39ab))
+* **parsing:** remove tool_calls default empty array ([#1341](https://github.com/openai/openai-node/issues/1341)) ([6d056bf](https://github.com/openai/openai-node/commit/6d056bf95c9be4046decf20ec4c98dfa2bea2723))
+* **realtime:** call .toString() on WebSocket url ([#1324](https://github.com/openai/openai-node/issues/1324)) ([6e9444c](https://github.com/openai/openai-node/commit/6e9444c6c77a93ff4ce06bd5b27a9c236ba6f307))
+* **responses:** correct computer use enum value ([66fb815](https://github.com/openai/openai-node/commit/66fb8157217de604d7f535e917b085fa8b6754d4))
+* **responses:** correct reasoning output type ([9cb9576](https://github.com/openai/openai-node/commit/9cb95763cab5678c5098b37ad0fe1ec83d2c1cb7))
+* **responses:** correctly add output_text ([8ae07cc](https://github.com/openai/openai-node/commit/8ae07cc036895529a028134451fe2ab5c1661871))
+* **responses:** support streaming retrieve calls ([657807c](https://github.com/openai/openai-node/commit/657807c2d7cbf2c6fc9a92ce98bb7295bb156326))
+* **tests/embeddings:** avoid cross-realm issue ([aceaac0](https://github.com/openai/openai-node/commit/aceaac05c05fa318c4bff7ff340b512a6bd904b9))
+* **tests:** don't rely on OPENAI_API_KEY env variable ([087580a](https://github.com/openai/openai-node/commit/087580ae5ebedc88f6f219c7d00c08607722a519))
+* **tests:** manually reset node:buffer File ([1d18ed4](https://github.com/openai/openai-node/commit/1d18ed4f90436e7041835d201c8cb1c373ded418))
+* **tests:** port tests to new setup ([9eb9854](https://github.com/openai/openai-node/commit/9eb98543660c86f0b11766ef95b35fa28fd16e47))
+* **tests:** stop using node:stream ([317a04d](https://github.com/openai/openai-node/commit/317a04d8d189ee33a9dd5308668296a708b391a8))
+* **threads:** remove unused duplicative types ([0b77c7c](https://github.com/openai/openai-node/commit/0b77c7c9da64962fd50854be06661cdce549d326))
+* **types:** export AssistantStream ([#1472](https://github.com/openai/openai-node/issues/1472)) ([bc492ba](https://github.com/openai/openai-node/commit/bc492ba124cddd545eec7a1199712452c573a7a4))
+* **types:** export ParseableToolsParams ([#1486](https://github.com/openai/openai-node/issues/1486)) ([3e7c92c](https://github.com/openai/openai-node/commit/3e7c92c8a76c1f747610d63d9d69a88b796ee9fc))
+* **types:** ignore missing `id` in responses pagination ([d2be74a](https://github.com/openai/openai-node/commit/d2be74a28dec48cd7d88db88af95e8bc608cdede))
+* **types:** improve responses type names ([#1392](https://github.com/openai/openai-node/issues/1392)) ([4548326](https://github.com/openai/openai-node/commit/454832606ebe9d5cf8ffd436eac09375f682c495))
+* **zod:** warn on optional field usage ([#1469](https://github.com/openai/openai-node/issues/1469)) ([aea2d12](https://github.com/openai/openai-node/commit/aea2d123d200e6a7eae11e66583127270a8db8bf))
+
+
+### Performance Improvements
+
+* **embedding:** default embedding creation to base64 ([#1312](https://github.com/openai/openai-node/issues/1312)) ([be00d29](https://github.com/openai/openai-node/commit/be00d29fadb2b78920bcae1e6e72750bc6f973a4)), closes [#1310](https://github.com/openai/openai-node/issues/1310)
+
+
+### Chores
+
+* add hash of OpenAPI spec/config inputs to .stats.yml ([1b0a94d](https://github.com/openai/openai-node/commit/1b0a94d088c2891fcad0ca0de3a1e4e205a7c9cf))
+* add missing type alias exports ([5d75cb9](https://github.com/openai/openai-node/commit/5d75cb95019ae77eafb0c878b355f09a1f87c3bd))
+* **api:** updates to supported Voice IDs ([28130c7](https://github.com/openai/openai-node/commit/28130c7fe172dd90fcf2036dc72750e485e42645))
+* **ci:** add timeout thresholds for CI jobs ([5775451](https://github.com/openai/openai-node/commit/5775451a55212687ba998b332c1394528d98121f))
+* **ci:** bump node version for release workflows ([bbf5d45](https://github.com/openai/openai-node/commit/bbf5d45259a8bfba62e2217955597ec0f6cfead4))
+* **ci:** only use depot for staging repos ([c59c3b5](https://github.com/openai/openai-node/commit/c59c3b5ead95b424b27c8c9f2120ad4283fb280e))
+* **ci:** run on more branches and use depot runners ([e17a4f8](https://github.com/openai/openai-node/commit/e17a4f8e1fc3de02c953421debf39827ea72d52c))
+* **client:** drop support for EOL node versions ([a326944](https://github.com/openai/openai-node/commit/a326944e8a8822bc70f86d7046de3142f9dff530))
+* **client:** expose headers on some streaming errors ([#1423](https://github.com/openai/openai-node/issues/1423)) ([6c93a23](https://github.com/openai/openai-node/commit/6c93a23b79f335a21c65b52d1192890a5325ed6d))
+* **client:** minor internal fixes ([5032c28](https://github.com/openai/openai-node/commit/5032c2802bd51885270badf47e27768f62240d25))
+* **client:** more accurate streaming errors ([0c21914](https://github.com/openai/openai-node/commit/0c21914d90b0ef1073d99c539cf9ef18912b8d0b))
+* **client:** move misc public files to new `core/` directory, deprecate old paths ([38c9d54](https://github.com/openai/openai-node/commit/38c9d548fded9000cde85270b38085c61905b5c1))
+* **client:** only accept standard types for file uploads ([53e35c8](https://github.com/openai/openai-node/commit/53e35c8b10a8e3ef95c0d644d59ab915225b8114))
+* deprecate Assistants API ([0be23b9](https://github.com/openai/openai-node/commit/0be23b98b6be9f8922d035270b1c907307010a29))
+* **docs:** add missing deprecation warnings ([995075b](https://github.com/openai/openai-node/commit/995075b632051b5bb33c0381056107b2fe93931e))
+* **docs:** grammar improvements ([7761cfb](https://github.com/openai/openai-node/commit/7761cfb0a8a56d056a73c046a6a613f66ada4abe))
+* **docs:** improve docs for withResponse/asResponse ([9f4c30b](https://github.com/openai/openai-node/commit/9f4c30b9bcc2f373b3087dba69bd837f96f79d81))
+* **docs:** improve migration doc ([732d870](https://github.com/openai/openai-node/commit/732d87001cbd9aa095e7b58dc843e86547e3f510))
+* **docs:** update zod tool call example, fix azure tests ([f18ced8](https://github.com/openai/openai-node/commit/f18ced883e4b5d689e0569d9b163b1958688b669))
+* **exports:** cleaner resource index imports ([#1396](https://github.com/openai/openai-node/issues/1396)) ([023d106](https://github.com/openai/openai-node/commit/023d106185abf62f892bff66faf617eb45777004))
+* **exports:** stop using path fallbacks ([09af7ff](https://github.com/openai/openai-node/commit/09af7ffd42458c6c26d9325060fcb8925aca7c81))
+* **exports:** stop using path fallbacks ([#1397](https://github.com/openai/openai-node/issues/1397)) ([7c3d212](https://github.com/openai/openai-node/commit/7c3d212b47ee3090f5bbb82dd21026ba532da6e0))
+* fix example types ([20f179d](https://github.com/openai/openai-node/commit/20f179db1bb681db5d1a91adcaab16012d6ffcdf))
+* improve publish-npm script --latest tag logic ([6207a2a](https://github.com/openai/openai-node/commit/6207a2a03d3279423de594eed18c5efb4ce321af))
+* **internal:** add aliases for Record and Array ([#1443](https://github.com/openai/openai-node/issues/1443)) ([1cb66b6](https://github.com/openai/openai-node/commit/1cb66b6ccbcecaa6e48b90d37d8cac4840bb69a4))
+* **internal:** add back release workflow ([ca6266e](https://github.com/openai/openai-node/commit/ca6266eea5229056a3bc2b5e4225b9ea9eaa459e))
+* **internal:** add Bun.File ecosystem test ([cb4194f](https://github.com/openai/openai-node/commit/cb4194f08a2dcb4fc4231bf1b74ed5d6e0aca435))
+* **internal:** add missing return type annotation ([#1334](https://github.com/openai/openai-node/issues/1334)) ([13aab10](https://github.com/openai/openai-node/commit/13aab101588c2eee1250d7c50b2abfeca1c5fa3d))
+* **internal:** add proxy ecosystem tests ([619711a](https://github.com/openai/openai-node/commit/619711ae0da5243c64c266d615703279f7651f58))
+* **internal:** bump migration cli version ([a899c97](https://github.com/openai/openai-node/commit/a899c9748de17ef468a03a97b9ed82124189ff4c))
+* **internal:** codegen related update ([c735a3c](https://github.com/openai/openai-node/commit/c735a3c24ac8255df50f89c519fb7dfc617db045))
+* **internal:** fix devcontainers setup ([#1343](https://github.com/openai/openai-node/issues/1343)) ([9485f5d](https://github.com/openai/openai-node/commit/9485f5d4d6718bff7f579223c9aa528898451533))
+* **internal:** fix eslint ignores ([ad5a9b6](https://github.com/openai/openai-node/commit/ad5a9b6f07002df70764f1b9e5d6cd675eba87ea))
+* **internal:** fix examples ([#1457](https://github.com/openai/openai-node/issues/1457)) ([a100f0a](https://github.com/openai/openai-node/commit/a100f0a0e1d336f8a78c8bbd9e3703cda3f0c5d8))
+* **internal:** fix format script ([3e1ea40](https://github.com/openai/openai-node/commit/3e1ea4063327ac34f4f46536600a8923f96dbbb0))
+* **internal:** fix formatting ([6469d53](https://github.com/openai/openai-node/commit/6469d5323b653f19e90a7470d81c914c640c6f8b))
+* **internal:** fix lint ([45a372c](https://github.com/openai/openai-node/commit/45a372ca0436f2f79c2387665b1c1bc04fd3bfed))
+* **internal:** fix release workflows ([353349d](https://github.com/openai/openai-node/commit/353349de9ee10d32d3243cb5c60a8ae982c49d37))
+* **internal:** fix tests failing on node v18 ([c54270a](https://github.com/openai/openai-node/commit/c54270a58ada1d0d7878ce80c7c2093a56fed158))
+* **internal:** fix tests not always being type checked ([0266b41](https://github.com/openai/openai-node/commit/0266b41efa311205f0fc51b6dc6d29ab003254a6))
+* **internal:** improve node 18 shims ([ee3f483](https://github.com/openai/openai-node/commit/ee3f48333a1d73a096f3417b2701fd722e4fbc68))
+* **internal:** minor client file refactoring ([d1aa00a](https://github.com/openai/openai-node/commit/d1aa00afc760f73624a8a109600c03deba40e72b))
+* **internal:** only run examples workflow in main repo ([#1450](https://github.com/openai/openai-node/issues/1450)) ([93569f3](https://github.com/openai/openai-node/commit/93569f39799512604db439af20f0ef0ad3dae295))
+* **internal:** reduce CI branch coverage ([77fc77f](https://github.com/openai/openai-node/commit/77fc77f7d05d03eafe6c8f002044c60c4bab3c64))
+* **internal:** refactor utils ([e7fbfbc](https://github.com/openai/openai-node/commit/e7fbfbce41c00aaa7d3b75a4bf001c7562b5b722))
+* **internal:** remove CI condition ([#1381](https://github.com/openai/openai-node/issues/1381)) ([e905c95](https://github.com/openai/openai-node/commit/e905c95a27213ee65210b061ead4c982de01648b))
+* **internal:** remove unnecessary todo ([b55321e](https://github.com/openai/openai-node/commit/b55321e2d0713d41b4050e8ccf0ac4eefb45be3a))
+* **internal:** run CI on update-specs branch ([9c45ef3](https://github.com/openai/openai-node/commit/9c45ef37249e7db3ba8aa2e81886ffe306b95da4))
+* **internal:** run example files in CI ([#1357](https://github.com/openai/openai-node/issues/1357)) ([1044c48](https://github.com/openai/openai-node/commit/1044c487566569e773d5f6c1a94ce6b614e62b80))
+* **internal:** share typescript helpers ([2470933](https://github.com/openai/openai-node/commit/247093374538f0e714178134c38813bc4fde9ecf))
+* **internal:** skip broken test ([#1458](https://github.com/openai/openai-node/issues/1458)) ([58f4559](https://github.com/openai/openai-node/commit/58f4559d952f6e56a8f27a6bcaba0acf295623df))
+* **internal:** update @types/bun ([d94b41a](https://github.com/openai/openai-node/commit/d94b41a58e24c82c3f7369bd1360b394e93cf1dd))
+* **internal:** update release workflows ([2cbf49a](https://github.com/openai/openai-node/commit/2cbf49a0b9a8cfbee29cec558c5ccdcebd72396f))
+* **internal:** upload builds and expand CI branch coverage ([#1460](https://github.com/openai/openai-node/issues/1460)) ([2d45287](https://github.com/openai/openai-node/commit/2d452879000c07f3ef4e775e19a527f5f6fa7b4c))
+* **migration:** add beta handling ([3508099](https://github.com/openai/openai-node/commit/3508099991ecfa260d77678037275133130e09dc))
+* move ChatModel type to shared ([236dbf4](https://github.com/openai/openai-node/commit/236dbf4092fccf7697852c6341a8f38f0241770c))
+* **package:** remove engines ([500a82f](https://github.com/openai/openai-node/commit/500a82f45d46697be14987e12d896acb2b109d32))
+* **perf:** faster base64 decoding ([11b9534](https://github.com/openai/openai-node/commit/11b9534d317f87cdcb1934ead013f058865e675e))
+* **tests:** improve enum examples ([#1454](https://github.com/openai/openai-node/issues/1454)) ([15a86c9](https://github.com/openai/openai-node/commit/15a86c958bf300486907f2498e1028fc9bc50b00))
+* **tests:** stop using node-fetch, don't directly upload FormDataFile ([ebd464f](https://github.com/openai/openai-node/commit/ebd464f5ad07f440ad476c0a7ce733947da414e2))
+* **tests:** switch proxy tests to fetchOptions ([da6ed5f](https://github.com/openai/openai-node/commit/da6ed5fc4c9ec203d9add28c34c90532b0334a3e))
+* **types:** improved go to definition on fetchOptions ([f1712cd](https://github.com/openai/openai-node/commit/f1712cdea42e9d95d4b2dc40aae5cebc8e14c76d))
+* update next to 14.2.25 for CVE-2025-29927 ([1ed4288](https://github.com/openai/openai-node/commit/1ed4288c7b9ca8fcb00e524bc6f39c255c6661c5))
+* workaround build errors ([e4a7f67](https://github.com/openai/openai-node/commit/e4a7f674f719a87bb78378a5ce4639d84620e17a))
+* workaround build errors ([d6b396b](https://github.com/openai/openai-node/commit/d6b396b94d9ccf64ddfe945069012b6162225fa9))
+
+
+### Documentation
+
+* add examples to tsdocs ([e8d2092](https://github.com/openai/openai-node/commit/e8d2092e51015b05fe7ef33ef5a9d7652846b137))
+* fix "procesing" -&gt; "processing" in realtime examples ([#1406](https://github.com/openai/openai-node/issues/1406)) ([dfbdc65](https://github.com/openai/openai-node/commit/dfbdc65d3ed17f0063d02906239371b88e04e5fd))
+* **migration:** mention zod helpers error ([43b870d](https://github.com/openai/openai-node/commit/43b870d1651d0c13e4ec10a53de2dfbae276c3e7))
+* **readme:** fix typo ([c44ed98](https://github.com/openai/openai-node/commit/c44ed98a3e7f497a656d612037667dd1f2e6816b))
+* **readme:** fix typo ([0989ddc](https://github.com/openai/openai-node/commit/0989ddcfd5ed0a149bbc67d61f93e0f49c397c72))
+* update URLs from stainlessapi.com to stainless.com ([#1352](https://github.com/openai/openai-node/issues/1352)) ([634a209](https://github.com/openai/openai-node/commit/634a209a6025640e2849133f6997af8faa28d4d8))
+
+
+### Refactors
+
+* **client:** remove deprecated runFunctions method ([e29a009](https://github.com/openai/openai-node/commit/e29a0092e9b077c2a99cd521a316aea4c25ea632))
+* **functions:** rename function helper methods to include tools ([fdd6f66](https://github.com/openai/openai-node/commit/fdd6f6672ec577cbb6876fe3857a2161402513c3))
+
+## 4.104.0 (2025-05-29)
+
+Full Changelog: [v4.103.0...v4.104.0](https://github.com/openai/openai-node/compare/v4.103.0...v4.104.0)
+
+### Features
+
+* **api:** Config update for pakrym-stream-param ([469ad7b](https://github.com/openai/openai-node/commit/469ad7b9d76b674aa3fd829128a54758ab7adfbd))
+
+
+### Bug Fixes
+
+* **azure:** add /images/edits to deployments endpoints ([#1509](https://github.com/openai/openai-node/issues/1509)) ([84fc31a](https://github.com/openai/openai-node/commit/84fc31aa903eceeb80815f6b17562fc463a71cfc))
+* **client:** return binary content from `get /containers/{container_id}/files/{file_id}/content` ([83129d7](https://github.com/openai/openai-node/commit/83129d7eac3dd784bb1c29fa344c5b808a59db73))
+
+
+### Chores
+
+* deprecate Assistants API ([5b34fcd](https://github.com/openai/openai-node/commit/5b34fcdd1454b8cccbaaf05ace6516afb3b09273))
+* improve publish-npm script --latest tag logic ([6207a2a](https://github.com/openai/openai-node/commit/6207a2a03d3279423de594eed18c5efb4ce321af))
+* **internal:** fix release workflows ([353349d](https://github.com/openai/openai-node/commit/353349de9ee10d32d3243cb5c60a8ae982c49d37))
+
+## 4.103.0 (2025-05-22)
+
+Full Changelog: [v4.102.0...v4.103.0](https://github.com/openai/openai-node/compare/v4.102.0...v4.103.0)
+
+### Features
+
+* **api:** new streaming helpers for background responses ([1ddd6ff](https://github.com/openai/openai-node/commit/1ddd6ff182b09d696954fda4bde50fb82f1d6585))
+
+## 4.102.0 (2025-05-21)
+
+Full Changelog: [v4.101.0...v4.102.0](https://github.com/openai/openai-node/compare/v4.101.0...v4.102.0)
+
+### Features
+
+* **api:** add container endpoint ([e973476](https://github.com/openai/openai-node/commit/e9734764625275c50ef612ff934804be8cb2adff))
+
+## 4.101.0 (2025-05-21)
+
+Full Changelog: [v4.100.0...v4.101.0](https://github.com/openai/openai-node/compare/v4.100.0...v4.101.0)
+
+### Features
+
+* **api:** new API tools ([fb4014f](https://github.com/openai/openai-node/commit/fb4014ffac7b220d37bd03c94fa745386b010bf0))
+
+
+### Chores
+
+* **docs:** grammar improvements ([7761cfb](https://github.com/openai/openai-node/commit/7761cfb0a8a56d056a73c046a6a613f66ada4abe))
+* **internal:** version bump ([b40e830](https://github.com/openai/openai-node/commit/b40e8302ec11683b6a360a050236ad1284afc760))
+
+## 4.100.0 (2025-05-16)
+
+Full Changelog: [v4.99.0...v4.100.0](https://github.com/openai/openai-node/compare/v4.99.0...v4.100.0)
+
+### Features
+
+* **api:** further updates for evals API ([3f6f248](https://github.com/openai/openai-node/commit/3f6f248191b45015924be76fd5154d149c4ed8a0))
+
+
+### Chores
+
+* **internal:** version bump ([5123fe0](https://github.com/openai/openai-node/commit/5123fe08a56f3d0040b1cc67129382f3eacc3cca))
+
+## 4.99.0 (2025-05-16)
+
+Full Changelog: [v4.98.0...v4.99.0](https://github.com/openai/openai-node/compare/v4.98.0...v4.99.0)
+
+### Features
+
+* **api:** manual updates ([75eb804](https://github.com/openai/openai-node/commit/75eb804edd6ad653eaa22d47f8c6d09ee845ebf4))
+* **api:** responses x eval api ([5029f1a](https://github.com/openai/openai-node/commit/5029f1a05eb1e8601ada06e0a5ba49f4c2b83c02))
+* **api:** Updating Assistants and Evals API schemas ([27fd517](https://github.com/openai/openai-node/commit/27fd5173b20f75debe96024ae8f1ce58a8254d26))
+
+## 4.98.0 (2025-05-08)
+
+Full Changelog: [v4.97.0...v4.98.0](https://github.com/openai/openai-node/compare/v4.97.0...v4.98.0)
+
+### Features
+
+* **api:** Add reinforcement fine-tuning api support ([4aa7a79](https://github.com/openai/openai-node/commit/4aa7a7954c63caa26cc1640ace56093fe1cafa04))
+
+
+### Chores
+
+* **ci:** bump node version for release workflows ([2961f63](https://github.com/openai/openai-node/commit/2961f63c4d5b8ae8efdf8ea6581aa83c6b0f722e))
+* **internal:** fix formatting ([91a44fe](https://github.com/openai/openai-node/commit/91a44fe11c0847dc50d48a03a8d409ac4bece37a))
+
+
+### Documentation
+
+* add examples to tsdocs ([7d841b7](https://github.com/openai/openai-node/commit/7d841b7f98eb542a398fb9de12056125e8d6cb22))
+
+## 4.97.0 (2025-05-02)
+
+Full Changelog: [v4.96.2...v4.97.0](https://github.com/openai/openai-node/compare/v4.96.2...v4.97.0)
+
+### Features
+
+* **api:** add image sizes, reasoning encryption ([9c2113a](https://github.com/openai/openai-node/commit/9c2113af7c7ea9a797a0e39d07d9ad8627c96acb))
+
+
+### Chores
+
+* **docs:** add missing deprecation warnings ([253392c](https://github.com/openai/openai-node/commit/253392c93adca88e0ee83f784183b2128ff64a16))
+
+
+### Documentation
+
+* fix "procesing" -&gt; "processing" in realtime examples ([#1406](https://github.com/openai/openai-node/issues/1406)) ([8717b9f](https://github.com/openai/openai-node/commit/8717b9fce87d03e51d40ee58f5d6259408405e1f))
+* **readme:** fix typo ([cab3478](https://github.com/openai/openai-node/commit/cab3478f195f9de5c21033a1b3684f52ad347ffc))
+
+## 4.96.2 (2025-04-29)
+
+Full Changelog: [v4.96.1...v4.96.2](https://github.com/openai/openai-node/compare/v4.96.1...v4.96.2)
+
+### Bug Fixes
+
+* **types:** export ParseableToolsParams ([#1486](https://github.com/openai/openai-node/issues/1486)) ([3e7c92c](https://github.com/openai/openai-node/commit/3e7c92c8a76c1f747610d63d9d69a88b796ee9fc))
+
+
+### Chores
+
+* **ci:** only use depot for staging repos ([214da39](https://github.com/openai/openai-node/commit/214da398c76f46d40994665f3ca7e10e203e9579))
+* **ci:** run on more branches and use depot runners ([ead76fc](https://github.com/openai/openai-node/commit/ead76fc6429ac52a1c8b008ac5c0afcefaa0bae5))
+
+## 4.96.1 (2025-04-29)
+
+Full Changelog: [v4.96.0...v4.96.1](https://github.com/openai/openai-node/compare/v4.96.0...v4.96.1)
+
+### Bug Fixes
+
+* **types:** export ParseableToolsParams ([#1486](https://github.com/openai/openai-node/issues/1486)) ([eb055b2](https://github.com/openai/openai-node/commit/eb055b26ce90e5fe1b101a95a4390956d519e168))
+
+
+### Chores
+
+* **ci:** only use depot for staging repos ([e80af47](https://github.com/openai/openai-node/commit/e80af47590056baa8f456e8d60c37f0d00ff08c4))
+* **ci:** run on more branches and use depot runners ([b04a801](https://github.com/openai/openai-node/commit/b04a801d0356105eacddbb4d10f4359719585dd6))
+
+## 4.96.0 (2025-04-23)
+
+Full Changelog: [v4.95.1...v4.96.0](https://github.com/openai/openai-node/compare/v4.95.1...v4.96.0)
+
+### Features
+
+* **api:** adding new image model support ([a00d331](https://github.com/openai/openai-node/commit/a00d33190edd08df7d9c088c00ab7b77673f88ba))
+
+
+### Bug Fixes
+
+* **types:** export AssistantStream ([#1472](https://github.com/openai/openai-node/issues/1472)) ([626c844](https://github.com/openai/openai-node/commit/626c844a758a68ffbff48873d4773be2e3868952))
+
+
+### Chores
+
+* **ci:** add timeout thresholds for CI jobs ([e465063](https://github.com/openai/openai-node/commit/e46506351097f1de39c866c28b6ec20fa724fc36))
+
+## 4.95.1 (2025-04-18)
+
+Full Changelog: [v4.95.0...v4.95.1](https://github.com/openai/openai-node/compare/v4.95.0...v4.95.1)
+
+### Bug Fixes
+
+* **zod:** warn on optional field usage ([#1469](https://github.com/openai/openai-node/issues/1469)) ([aea2d12](https://github.com/openai/openai-node/commit/aea2d123d200e6a7eae11e66583127270a8db8bf))
+
+## 4.95.0 (2025-04-16)
+
+Full Changelog: [v4.94.0...v4.95.0](https://github.com/openai/openai-node/compare/v4.94.0...v4.95.0)
+
+### Features
+
+* **api:** add o3 and o4-mini model IDs ([4845cd9](https://github.com/openai/openai-node/commit/4845cd9ac17450022f1632ae01397e41a97f1662))
+
+## 4.94.0 (2025-04-14)
+
+Full Changelog: [v4.93.0...v4.94.0](https://github.com/openai/openai-node/compare/v4.93.0...v4.94.0)
+
+### Features
+
+* **api:** adding gpt-4.1 family of model IDs ([bddcbcf](https://github.com/openai/openai-node/commit/bddcbcffdc409ffc8a078a65bbd302cd50b35ff0))
+* **api:** manual updates ([7532f48](https://github.com/openai/openai-node/commit/7532f48ad25c5125064a59985587c20c47a2cbfb))
+
+
+### Chores
+
+* **client:** minor internal fixes ([d342f17](https://github.com/openai/openai-node/commit/d342f17e2642da5ee83d080b410dc3c4fe153814))
+* **internal:** reduce CI branch coverage ([a49b94a](https://github.com/openai/openai-node/commit/a49b94a9aebd3e30e1802fff633e1b46cfb81942))
+* **internal:** upload builds and expand CI branch coverage ([#1460](https://github.com/openai/openai-node/issues/1460)) ([7e23bb4](https://github.com/openai/openai-node/commit/7e23bb4f4a09303195b612cc5b393cc41c1d855b))
+* workaround build errors ([913eba8](https://github.com/openai/openai-node/commit/913eba828d116f49fa78b219c62274c1e95c6f17))
+
+## 4.93.0 (2025-04-08)
+
+Full Changelog: [v4.92.1...v4.93.0](https://github.com/openai/openai-node/compare/v4.92.1...v4.93.0)
+
+### Features
+
+* **api:** Add evalapi to sdk ([#1456](https://github.com/openai/openai-node/issues/1456)) ([ee917e3](https://github.com/openai/openai-node/commit/ee917e3335fcf44e87a28e54ce8ddfdcdfab1652))
+
+
+### Chores
+
+* **internal:** fix examples ([#1457](https://github.com/openai/openai-node/issues/1457)) ([a3dd0dd](https://github.com/openai/openai-node/commit/a3dd0dde3e8ad9cc7a02cf203d4550f91d31a2ae))
+* **internal:** skip broken test ([#1458](https://github.com/openai/openai-node/issues/1458)) ([4d2f815](https://github.com/openai/openai-node/commit/4d2f815ba5f6c426f9c21f4c3db443166389bbf8))
+* **tests:** improve enum examples ([#1454](https://github.com/openai/openai-node/issues/1454)) ([ecabce2](https://github.com/openai/openai-node/commit/ecabce282a9fb60122310942f3b647dfefae5403))
+
+## 4.92.1 (2025-04-07)
+
+Full Changelog: [v4.92.0...v4.92.1](https://github.com/openai/openai-node/compare/v4.92.0...v4.92.1)
+
+### Chores
+
+* **internal:** only run examples workflow in main repo ([#1450](https://github.com/openai/openai-node/issues/1450)) ([5e49a7a](https://github.com/openai/openai-node/commit/5e49a7a447bb788fa05898c15ae57c6ea9c8fd49))
+
+## 4.92.0 (2025-04-07)
+
+Full Changelog: [v4.91.1...v4.92.0](https://github.com/openai/openai-node/compare/v4.91.1...v4.92.0)
+
+### Features
+
+* **api:** manual updates ([891754d](https://github.com/openai/openai-node/commit/891754d7fa42d71ce4f93288dd043ef0b97fee23))
+* **api:** manual updates ([01e5546](https://github.com/openai/openai-node/commit/01e5546f3f48a1f4d645e09e7581f16b30f25bdd))
+* **api:** manual updates ([f38dbf3](https://github.com/openai/openai-node/commit/f38dbf3b39b0800b3bbef5c603a4fa2b616f25d8))
+* **api:** manual updates ([1f12253](https://github.com/openai/openai-node/commit/1f12253054a5a7e35dc03b17901b4c1f33bf5b3d))
+
+
+### Bug Fixes
+
+* **api:** improve type resolution when importing as a package ([#1444](https://github.com/openai/openai-node/issues/1444)) ([4aa46d6](https://github.com/openai/openai-node/commit/4aa46d6c0da681bcdde31fcbb09e8ba6fdaf764b))
+* **client:** send `X-Stainless-Timeout` in seconds ([#1442](https://github.com/openai/openai-node/issues/1442)) ([aa4206c](https://github.com/openai/openai-node/commit/aa4206c7d93b4e3114a697f5467ffbbf5a64d1a8))
+* **embeddings:** correctly decode base64 data ([#1448](https://github.com/openai/openai-node/issues/1448)) ([58128f7](https://github.com/openai/openai-node/commit/58128f7efde73726da740c42adde7b02cdf60a6a))
+* **mcp:** remove unused tools.ts ([#1445](https://github.com/openai/openai-node/issues/1445)) ([520a8fa](https://github.com/openai/openai-node/commit/520a8fa77a69ce5855dde3481f9bd39339cb7b83))
+
+
+### Chores
+
+* **internal:** add aliases for Record and Array ([#1443](https://github.com/openai/openai-node/issues/1443)) ([b65391b](https://github.com/openai/openai-node/commit/b65391ba10d5063035c3e5c0bcc5a48ffc80f41d))
+
+## 4.91.1 (2025-04-01)
+
+Full Changelog: [v4.91.0...v4.91.1](https://github.com/openai/openai-node/compare/v4.91.0...v4.91.1)
+
+### Bug Fixes
+
+* **docs:** correct docstring on responses.stream ([1c8cd6a](https://github.com/openai/openai-node/commit/1c8cd6a638128b0ff5fac89d6c7db256f0b63a85))
+
+
+### Chores
+
+* Remove deprecated/unused remote spec feature ([ce3dfa8](https://github.com/openai/openai-node/commit/ce3dfa88bd4d395debccc0e6e1aac6d218b07cb8))
+
+## 4.91.0 (2025-03-31)
+
+Full Changelog: [v4.90.0...v4.91.0](https://github.com/openai/openai-node/compare/v4.90.0...v4.91.0)
+
+### Features
+
+* **api:** add `get /responses/{response_id}/input_items` endpoint ([ef0e0ac](https://github.com/openai/openai-node/commit/ef0e0acd469379ae6f2745c83e6c6813ff7b4edc))
+
+
+### Performance Improvements
+
+* **embedding:** default embedding creation to base64 ([#1312](https://github.com/openai/openai-node/issues/1312)) ([e54530e](https://github.com/openai/openai-node/commit/e54530e4f6f00d7d74fc8636bbdb6f6280548750)), closes [#1310](https://github.com/openai/openai-node/issues/1310)
+
+## 4.90.0 (2025-03-27)
+
+Full Changelog: [v4.89.1...v4.90.0](https://github.com/openai/openai-node/compare/v4.89.1...v4.90.0)
+
+### Features
+
+* **api:** add `get /chat/completions` endpoint ([2d6710a](https://github.com/openai/openai-node/commit/2d6710a1f9dd4f768d9c73e9c9f5f93c737cdc66))
+
+
+### Bug Fixes
+
+* **audio:** correctly handle transcription streaming ([2a9b603](https://github.com/openai/openai-node/commit/2a9b60336cd40a4d4fb9b898ece49170ad648fd0))
+* **internal:** work around https://github.com/vercel/next.js/issues/76881 ([#1427](https://github.com/openai/openai-node/issues/1427)) ([b467e94](https://github.com/openai/openai-node/commit/b467e949476621e8e92587a83c9de6fab35b2b9d))
+
+
+### Chores
+
+* add hash of OpenAPI spec/config inputs to .stats.yml ([45db35e](https://github.com/openai/openai-node/commit/45db35e34be560c75bf36224cc153c6d0e6e2a88))
+* **api:** updates to supported Voice IDs ([#1424](https://github.com/openai/openai-node/issues/1424)) ([404f4db](https://github.com/openai/openai-node/commit/404f4db41a2ee651f5bfdaa7b8881e1bf015f058))
+* **client:** expose headers on some streaming errors ([#1423](https://github.com/openai/openai-node/issues/1423)) ([b0783cc](https://github.com/openai/openai-node/commit/b0783cc6221b68f1738e759b393756a7d0e540a3))
+
+## 4.89.1 (2025-03-26)
+
+Full Changelog: [v4.89.0...v4.89.1](https://github.com/openai/openai-node/compare/v4.89.0...v4.89.1)
+
+### Bug Fixes
+
+* avoid type error in certain environments ([#1413](https://github.com/openai/openai-node/issues/1413)) ([d3f6f8f](https://github.com/openai/openai-node/commit/d3f6f8f9c7511a98cc5795756fee49a30e44d485))
+* **client:** remove duplicate types ([#1410](https://github.com/openai/openai-node/issues/1410)) ([338878b](https://github.com/openai/openai-node/commit/338878bf484dac5a4fadf50592b1f8d1045cd4b6))
+* **exports:** add missing type exports ([#1417](https://github.com/openai/openai-node/issues/1417)) ([2d15ada](https://github.com/openai/openai-node/commit/2d15ada0e0d81a4e0d097dddbe99be2222c4c0ef))
+
+
+### Chores
+
+* **internal:** version bump ([#1408](https://github.com/openai/openai-node/issues/1408)) ([9c0949a](https://github.com/openai/openai-node/commit/9c0949a93c3e181d327f820dbc2a4b0ad77258e9))
+
+## 4.89.0 (2025-03-20)
+
+Full Changelog: [v4.88.0...v4.89.0](https://github.com/openai/openai-node/compare/v4.88.0...v4.89.0)
+
+### Features
+
+* add audio helpers ([ea1b6b4](https://github.com/openai/openai-node/commit/ea1b6b4ef38813af568b3662037519da9404b80e))
+* **api:** new models for TTS, STT, + new audio features for Realtime ([#1407](https://github.com/openai/openai-node/issues/1407)) ([142933a](https://github.com/openai/openai-node/commit/142933ae70d06045dbf4661cd72c7fa35ae7903d))
+
+
+### Chores
+
+* **internal:** version bump ([#1400](https://github.com/openai/openai-node/issues/1400)) ([6838ab4](https://github.com/openai/openai-node/commit/6838ab4268c7c0e083e7be21ef1a51bdea0f0b57))
+
+## 4.88.0 (2025-03-19)
+
+Full Changelog: [v4.87.4...v4.88.0](https://github.com/openai/openai-node/compare/v4.87.4...v4.88.0)
+
+### Features
+
+* **api:** o1-pro now available through the API ([#1398](https://github.com/openai/openai-node/issues/1398)) ([616a7e9](https://github.com/openai/openai-node/commit/616a7e90e764882cd749a65af8cc6ae8734fc80d))
+
+
+### Chores
+
+* **exports:** cleaner resource index imports ([#1396](https://github.com/openai/openai-node/issues/1396)) ([26b0856](https://github.com/openai/openai-node/commit/26b0856cd63846c34b75895a1ea42ceec7908c1a))
+* **exports:** stop using path fallbacks ([#1397](https://github.com/openai/openai-node/issues/1397)) ([d1479c2](https://github.com/openai/openai-node/commit/d1479c23aff68dd46c73fd31896dd2298a6bf140))
+* **internal:** version bump ([#1393](https://github.com/openai/openai-node/issues/1393)) ([7f16c3a](https://github.com/openai/openai-node/commit/7f16c3aa7b1ab36541219c5a0f93fc518733d0e3))
+
+## 4.87.4 (2025-03-18)
+
+Full Changelog: [v4.87.3...v4.87.4](https://github.com/openai/openai-node/compare/v4.87.3...v4.87.4)
+
+### Bug Fixes
+
+* **api:** correct some Responses types ([#1391](https://github.com/openai/openai-node/issues/1391)) ([af45876](https://github.com/openai/openai-node/commit/af458766ac721fb6cf18e7d78c458506c8bfc4e1))
+* **types:** ignore missing `id` in responses pagination ([1b9d20e](https://github.com/openai/openai-node/commit/1b9d20e71f5afbd4999f1999fe4810175476c5d2))
+* **types:** improve responses type names ([#1392](https://github.com/openai/openai-node/issues/1392)) ([164f476](https://github.com/openai/openai-node/commit/164f47606b41fd3e2850f8209eb1c6e2996a81ff))
+
+
+### Chores
+
+* add missing type alias exports ([#1390](https://github.com/openai/openai-node/issues/1390)) ([16c5e22](https://github.com/openai/openai-node/commit/16c5e2261c8c1a0ba96c2d5f475e8b1bc67387d7))
+* **internal:** add back release workflow ([dddf29b](https://github.com/openai/openai-node/commit/dddf29bd914a02d4586b239ec06217389a4409f9))
+* **internal:** remove CI condition ([#1381](https://github.com/openai/openai-node/issues/1381)) ([ef17981](https://github.com/openai/openai-node/commit/ef17981a0bd6b3e971986ece829c5d260d7392d4))
+* **internal:** run CI on update-specs branch ([9fc2130](https://github.com/openai/openai-node/commit/9fc2130b74a5919a3bbd41926903bdb310de4446))
+* **internal:** update release workflows ([90b77d0](https://github.com/openai/openai-node/commit/90b77d09c04d21487aa38fe775c79ae632136813))
+
+## 4.87.3 (2025-03-11)
+
+Full Changelog: [v4.87.2...v4.87.3](https://github.com/openai/openai-node/compare/v4.87.2...v4.87.3)
+
+### Bug Fixes
+
+* **responses:** correct reasoning output type ([2abef57](https://github.com/openai/openai-node/commit/2abef57d7645a96a4b9a6b91483861cd568d2d4d))
+
+## 4.87.2 (2025-03-11)
+
+Full Changelog: [v4.87.1...v4.87.2](https://github.com/openai/openai-node/compare/v4.87.1...v4.87.2)
+
+### Bug Fixes
+
+* **responses:** correctly add output_text ([4ceb5cc](https://github.com/openai/openai-node/commit/4ceb5cc516b8c75d46f0042534d7658796a8cd71))
+
+## 4.87.1 (2025-03-11)
+
+Full Changelog: [v4.87.0...v4.87.1](https://github.com/openai/openai-node/compare/v4.87.0...v4.87.1)
+
+### Bug Fixes
+
+* correct imports ([5cdf17c](https://github.com/openai/openai-node/commit/5cdf17cec33da7cf540b8bdbcfa30c0c52842dd1))
+
+## 4.87.0 (2025-03-11)
+
+Full Changelog: [v4.86.2...v4.87.0](https://github.com/openai/openai-node/compare/v4.86.2...v4.87.0)
+
+### Features
+
+* **api:** add /v1/responses and built-in tools ([119b584](https://github.com/openai/openai-node/commit/119b5843a18b8014167c8d2031d75c08dbf400a3))
+
+## 4.86.2 (2025-03-05)
+
+Full Changelog: [v4.86.1...v4.86.2](https://github.com/openai/openai-node/compare/v4.86.1...v4.86.2)
+
+### Chores
+
+* **internal:** run example files in CI ([#1357](https://github.com/openai/openai-node/issues/1357)) ([88d0050](https://github.com/openai/openai-node/commit/88d0050336749deb3810b4cb43473de1f84e42bd))
+
+## 4.86.1 (2025-02-27)
+
+Full Changelog: [v4.86.0...v4.86.1](https://github.com/openai/openai-node/compare/v4.86.0...v4.86.1)
+
+### Documentation
+
+* update URLs from stainlessapi.com to stainless.com ([#1352](https://github.com/openai/openai-node/issues/1352)) ([8294e9e](https://github.com/openai/openai-node/commit/8294e9ef57ed98722105b56d205ebea9d028f671))
+
+## 4.86.0 (2025-02-27)
+
+Full Changelog: [v4.85.4...v4.86.0](https://github.com/openai/openai-node/compare/v4.85.4...v4.86.0)
+
+### Features
+
+* **api:** add gpt-4.5-preview ([#1349](https://github.com/openai/openai-node/issues/1349)) ([2a1d36b](https://github.com/openai/openai-node/commit/2a1d36b560323fca058f98607775642370e90a47))
+
+## 4.85.4 (2025-02-22)
+
+Full Changelog: [v4.85.3...v4.85.4](https://github.com/openai/openai-node/compare/v4.85.3...v4.85.4)
+
+### Chores
+
+* **internal:** fix devcontainers setup ([#1343](https://github.com/openai/openai-node/issues/1343)) ([cb1ec90](https://github.com/openai/openai-node/commit/cb1ec907832e325bc29abe94ae325e0477cb87d1))
+
+## 4.85.3 (2025-02-20)
+
+Full Changelog: [v4.85.2...v4.85.3](https://github.com/openai/openai-node/compare/v4.85.2...v4.85.3)
+
+### Bug Fixes
+
+* **parsing:** remove tool_calls default empty array ([#1341](https://github.com/openai/openai-node/issues/1341)) ([2672160](https://github.com/openai/openai-node/commit/26721608e61949daa9592483e89b79230bb9198a))
+
+## 4.85.2 (2025-02-18)
+
+Full Changelog: [v4.85.1...v4.85.2](https://github.com/openai/openai-node/compare/v4.85.1...v4.85.2)
+
+### Bug Fixes
+
+* optimize sse chunk reading off-by-one error ([#1339](https://github.com/openai/openai-node/issues/1339)) ([c82795b](https://github.com/openai/openai-node/commit/c82795b189c73d1c0e3bc3a40d0d4a2558b0483a))
+
+## 4.85.1 (2025-02-14)
+
+Full Changelog: [v4.85.0...v4.85.1](https://github.com/openai/openai-node/compare/v4.85.0...v4.85.1)
+
+### Bug Fixes
+
+* **client:** fix export map for index exports ([#1328](https://github.com/openai/openai-node/issues/1328)) ([647ba7a](https://github.com/openai/openai-node/commit/647ba7a52311928f604c72b2cc95698c0837887f))
+* **package:** add chat/completions.ts back in ([#1333](https://github.com/openai/openai-node/issues/1333)) ([e4b5546](https://github.com/openai/openai-node/commit/e4b554632ab1646da831f29413fefb3378c49cc1))
+
+
+### Chores
+
+* **internal:** add missing return type annotation ([#1334](https://github.com/openai/openai-node/issues/1334)) ([53e0856](https://github.com/openai/openai-node/commit/53e0856ec4d36deee4d71b5aaf436df0a59b9402))
+
+## 4.85.0 (2025-02-13)
+
+Full Changelog: [v4.84.1...v4.85.0](https://github.com/openai/openai-node/compare/v4.84.1...v4.85.0)
+
+### Features
+
+* **api:** add support for storing chat completions ([#1327](https://github.com/openai/openai-node/issues/1327)) ([8d77f8e](https://github.com/openai/openai-node/commit/8d77f8e3c4801b7fa1e7c6f50b48c1de1f43f3e6))
+
+
+### Bug Fixes
+
+* **realtime:** call .toString() on WebSocket url ([#1324](https://github.com/openai/openai-node/issues/1324)) ([09bc50d](https://github.com/openai/openai-node/commit/09bc50d439679b6acfd2441e69ee5aa18c00e5d9))
+
+## 4.84.1 (2025-02-13)
+
+Full Changelog: [v4.84.0...v4.84.1](https://github.com/openai/openai-node/compare/v4.84.0...v4.84.1)
+
+### Bug Fixes
+
+* **realtime:** correct websocket type var constraint ([#1321](https://github.com/openai/openai-node/issues/1321)) ([afb17ea](https://github.com/openai/openai-node/commit/afb17ea6497b860ebbe5d8e68e4a97681dd307ff))
+
+## 4.84.0 (2025-02-12)
+
+Full Changelog: [v4.83.0...v4.84.0](https://github.com/openai/openai-node/compare/v4.83.0...v4.84.0)
+
+### Features
+
+* **pagination:** avoid fetching when has_more: false ([#1305](https://github.com/openai/openai-node/issues/1305)) ([b6944c6](https://github.com/openai/openai-node/commit/b6944c634b53c9084f2ccf777c2491e89b2cc7af))
+
+
+### Bug Fixes
+
+* **api:** add missing reasoning effort + model enums ([#1302](https://github.com/openai/openai-node/issues/1302)) ([14c55c3](https://github.com/openai/openai-node/commit/14c55c312e31f1ed46d02f39a99049f785504a53))
+* **assistants:** handle `thread.run.incomplete` event ([7032cc4](https://github.com/openai/openai-node/commit/7032cc40b8aa0a58459cf114bceb8028a8517400))
+* correctly decode multi-byte characters over multiple chunks ([#1316](https://github.com/openai/openai-node/issues/1316)) ([dd776c4](https://github.com/openai/openai-node/commit/dd776c4867401f527f699bd4b9e567890256e849))
+
+
+### Chores
+
+* **internal:** remove segfault-handler dependency ([3521ca3](https://github.com/openai/openai-node/commit/3521ca34e7f5bd51542084e27c084a5d7cc5448b))
+
+
+### Documentation
+
+* **readme:** cleanup into multiple files ([da94424](https://github.com/openai/openai-node/commit/da944242e542e9e5e51cb11853c621fc6825ac02))
+
+## 4.83.0 (2025-02-05)
+
+Full Changelog: [v4.82.0...v4.83.0](https://github.com/openai/openai-node/compare/v4.82.0...v4.83.0)
+
+### Features
+
+* **client:** send `X-Stainless-Timeout` header ([#1299](https://github.com/openai/openai-node/issues/1299)) ([ddfc686](https://github.com/openai/openai-node/commit/ddfc686f43a3420c3adf8dec2e82b4d10a121eb8))
+
+
+### Bug Fixes
+
+* **api/types:** correct audio duration & role types ([#1300](https://github.com/openai/openai-node/issues/1300)) ([a955ac2](https://github.com/openai/openai-node/commit/a955ac2bf5bee663d530d0c82b0005bf3ce6fc47))
+* **azure/audio:** use model param for deployments ([#1297](https://github.com/openai/openai-node/issues/1297)) ([85de382](https://github.com/openai/openai-node/commit/85de382db17cbe5f112650e79d0fc1cc841efbb2))
+
+## 4.82.0 (2025-01-31)
+
+Full Changelog: [v4.81.0...v4.82.0](https://github.com/openai/openai-node/compare/v4.81.0...v4.82.0)
+
+### Features
+
+* **api:** add o3-mini ([#1295](https://github.com/openai/openai-node/issues/1295)) ([378e2f7](https://github.com/openai/openai-node/commit/378e2f7af62c570adb4c7644a4d49576b698de41))
+
+
+### Bug Fixes
+
+* **examples/realtime:** remove duplicate `session.update` call ([#1293](https://github.com/openai/openai-node/issues/1293)) ([ad800b4](https://github.com/openai/openai-node/commit/ad800b4f9410c6838994c24a3386ea708717f72b))
+* **types:** correct metadata type + other fixes ([378e2f7](https://github.com/openai/openai-node/commit/378e2f7af62c570adb4c7644a4d49576b698de41))
+
+## 4.81.0 (2025-01-29)
+
+Full Changelog: [v4.80.1...v4.81.0](https://github.com/openai/openai-node/compare/v4.80.1...v4.81.0)
+
+### Features
+
+* **azure:** Realtime API support ([#1287](https://github.com/openai/openai-node/issues/1287)) ([fe090c0](https://github.com/openai/openai-node/commit/fe090c0a57570217eb0b431e2cce40bf61de2b75))
+
 ## 4.80.1 (2025-01-24)
 
 Full Changelog: [v4.80.0...v4.80.1](https://github.com/openai/openai-node/compare/v4.80.0...v4.80.1)

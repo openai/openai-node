@@ -1,7 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 export {
-  AssistantsPage,
   Assistants,
   type Assistant,
   type AssistantDeleted,
@@ -17,10 +16,11 @@ export {
   type AssistantCreateParams,
   type AssistantUpdateParams,
   type AssistantListParams,
+  type AssistantsPage,
 } from './assistants';
 export { Beta } from './beta';
 export { Realtime } from './realtime/index';
-export { Chat } from './chat/index';
+export { ChatKit, type ChatKitWorkflow } from './chatkit/index';
 export {
   Threads,
   type AssistantResponseFormatOption,
@@ -37,19 +37,3 @@ export {
   type ThreadCreateAndRunPollParams,
   type ThreadCreateAndRunStreamParams,
 } from './threads/index';
-export {
-  VectorStoresPage,
-  VectorStores,
-  type AutoFileChunkingStrategyParam,
-  type FileChunkingStrategy,
-  type FileChunkingStrategyParam,
-  type OtherFileChunkingStrategyObject,
-  type StaticFileChunkingStrategy,
-  type StaticFileChunkingStrategyObject,
-  type StaticFileChunkingStrategyObjectParam,
-  type VectorStore,
-  type VectorStoreDeleted,
-  type VectorStoreCreateParams,
-  type VectorStoreUpdateParams,
-  type VectorStoreListParams,
-} from './vector-stores/index';

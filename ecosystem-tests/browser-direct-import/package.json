@@ -1,0 +1,19 @@
+{
+  "name": "browser-direct-import",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "tsc": "tsc --noEmit",
+    "test": "ts-node src/test.ts",
+    "test:ci": "start-server-and-test serve http://localhost:8081 test",
+    "serve": "sirv -q public --port 8081"
+  },
+  "devDependencies": {
+    "fastest-levenshtein": "^1.0.16",
+    "puppeteer": "^23.4.0",
+    "sirv-cli": "^3.0.0",
+    "start-server-and-test": "^2.0.0",
+    "ts-node": "^10.9.1",
+    "typescript": "^4.7.4"
+  }
+}

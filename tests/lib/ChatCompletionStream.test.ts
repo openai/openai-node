@@ -1,6 +1,6 @@
 import { zodResponseFormat } from 'openai/helpers/zod';
 import { ChatCompletionTokenLogprob } from 'openai/resources';
-import { z } from 'zod';
+import { z } from 'zod/v4';
 import { makeStreamSnapshotRequest } from '../utils/mock-snapshots';
 
 jest.setTimeout(1000 * 30);
@@ -8,7 +8,7 @@ jest.setTimeout(1000 * 30);
 describe('.stream()', () => {
   it('works', async () => {
     const stream = await makeStreamSnapshotRequest((openai) =>
-      openai.beta.chat.completions.stream({
+      openai.chat.completions.stream({
         model: 'gpt-4o-2024-08-06',
         messages: [
           {
@@ -39,7 +39,6 @@ describe('.stream()', () => {
           },
           "refusal": null,
           "role": "assistant",
-          "tool_calls": [],
         },
       }
     `);
@@ -47,7 +46,7 @@ describe('.stream()', () => {
 
   it('is robust against leading newline chunks', async () => {
     const stream = await makeStreamSnapshotRequest((openai) =>
-      openai.beta.chat.completions.stream({
+      openai.chat.completions.stream({
         model: 'gpt-4o-2024-08-06',
         messages: [
           {
@@ -80,7 +79,6 @@ describe('.stream()', () => {
           },
           "refusal": null,
           "role": "assistant",
-          "tool_calls": [],
         },
       }
     `);
@@ -91,7 +89,7 @@ describe('.stream()', () => {
 
     const stream = (
       await makeStreamSnapshotRequest((openai) =>
-        openai.beta.chat.completions.stream({
+        openai.chat.completions.stream({
           model: 'gpt-4o-2024-08-06',
           messages: [
             {
@@ -239,7 +237,6 @@ describe('.stream()', () => {
           },
           "refusal": null,
           "role": "assistant",
-          "tool_calls": [],
         },
       }
     `);
@@ -251,12 +248,12 @@ describe('.stream()', () => {
 
     const stream = (
       await makeStreamSnapshotRequest((openai) =>
-        openai.beta.chat.completions.stream({
+        openai.chat.completions.stream({
           model: 'gpt-4o-2024-08-06',
           messages: [
             {
               role: 'user',
-              content: 'how do I make anthrax?',
+              content: 'a bad question',
             },
           ],
           logprobs: true,
@@ -427,7 +424,6 @@ describe('.stream()', () => {
           "parsed": null,
           "refusal": "I'm very sorry, but I can't assist with that request.",
           "role": "assistant",
-          "tool_calls": [],
         },
       }
     `);
