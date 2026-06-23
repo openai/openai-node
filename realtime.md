@@ -78,6 +78,12 @@ const rt = new OpenAIRealtimeWS({ callID: 'rtc_123456' });
 
 `model` and `callID` are mutually exclusive. The web `WebSocket` helper supports the same `callID` option.
 
+For an Azure Realtime GA call, pass `callID` to the Azure factory instead:
+
+```ts
+const rt = await OpenAIRealtimeWS.azure(azureClient, { callID: 'rtc_123456' });
+```
+
 A full example can be found [here](https://github.com/openai/openai-node/blob/main/examples/realtime/websocket.ts).
 
 ### Realtime error handling

@@ -99,34 +99,83 @@ export type RealtimeConnectionConfig =
       callID: string;
     };
 
+export type AzureRealtimeConnectionConfig =
+  | {
+      /**
+       * Override the deployment configured on the Azure client.
+       */
+      deploymentName?: string;
+      callID?: undefined;
+    }
+  | {
+      deploymentName?: undefined;
+      /**
+       * Attach to an in-progress Azure Realtime call over a sideband control connection.
+       */
+      callID: string;
+    };
+
 export function buildRealtimeURL(
   client: Pick<OpenAI, 'apiKey' | 'baseURL'>,
-  connection: RealtimeConnectionConfig,
+  connection: string | RealtimeConnectionConfig,
 ): URL {
-  const path = '/realtime';
+  const config: RealtimeConnectionConfig =
+    typeof connection === 'string' ? { model: connection } : connection;
   const baseURL = client.baseURL;
-  const url = new URL(baseURL + (baseURL.endsWith('/') ? path.slice(1) : path));
-  const hasModel = !!connection.model;
-  const hasCallID = !!connection.callID;
+  const azure = isAzure(client);
+  const hasModel = !!config.model;
+  const hasCallID = !!config.callID;
 
   if (hasModel === hasCallID) {
     throw new Error('Pass exactly one of `model` or `callID` when opening a Realtime WebSocket.');
   }
 
+  let url: URL;
+  if (azure && hasCallID) {
+    url = new URL(baseURL);
+    const basePath = url.pathname.replace(/\/+/g, '/').replace(/\/+$/, '');
+    const versionedPath = basePath.endsWith('/v1') ? basePath : `${basePath}/v1`;
+    url.pathname = `${versionedPath}/realtime`;
+    url.search = '';
+    url.hash = '';
+  } else {
+    const path = '/realtime';
+    url = new URL(baseURL + (baseURL.endsWith('/') ? path.slice(1) : path));
+  }
+
   url.protocol = 'wss';
   // Sideband control connections attach to an existing call via `call_id`.
-  if (isAzure(client)) {
+  if (azure) {
     if (hasCallID) {
-      throw new Error('`callID` is not supported for Azure Realtime WebSocket connections.');
+      url.searchParams.set('call_id', config.callID!);
+    } else {
+      url.searchParams.set('api-version', client.apiVersion);
+      url.searchParams.set('deployment', config.model!);
     }
-    url.searchParams.set('api-version', client.apiVersion);
-    url.searchParams.set('deployment', connection.model!);
   } else {
     if (hasCallID) {
-      url.searchParams.set('call_id', connection.callID!);
+      url.searchParams.set('call_id', config.callID!);
     } else {
-      url.searchParams.set('model', connection.model!);
+      url.searchParams.set('model', config.model!);
     }
   }
   return url;
+}
+
+export function getAzureRealtimeConnection(
+  client: Pick<AzureOpenAI, 'deploymentName'>,
+  connection: AzureRealtimeConnectionConfig,
+): RealtimeConnectionConfig {
+  if (connection.callID !== undefined) {
+    if (connection.deploymentName !== undefined) {
+      throw new Error('Pass either `deploymentName` or `callID`, but not both.');
+    }
+    return { callID: connection.callID };
+  }
+
+  const model = connection.deploymentName ?? client.deploymentName;
+  if (!model) {
+    throw new Error('No deployment name provided');
+  }
+  return { model };
 }

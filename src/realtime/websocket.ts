@@ -4,7 +4,9 @@ import type { RealtimeClientEvent, RealtimeServerEvent } from '../resources/real
 import {
   OpenAIRealtimeEmitter,
   buildRealtimeURL,
+  getAzureRealtimeConnection,
   isAzure,
+  type AzureRealtimeConnectionConfig,
   type RealtimeConnectionConfig,
 } from './internal-base';
 import { isRunningInBrowser } from '../internal/detect-platform';
@@ -116,8 +118,9 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
 
   static async azure(
     client: Pick<AzureOpenAI, '_callApiKey' | 'apiVersion' | 'apiKey' | 'baseURL' | 'deploymentName'>,
-    options: { deploymentName?: string; dangerouslyAllowBrowser?: boolean } = {},
+    options: AzureRealtimeConnectionConfig & { dangerouslyAllowBrowser?: boolean } = {},
   ): Promise<OpenAIRealtimeWebSocket> {
+    const connection = getAzureRealtimeConnection(client, options);
     const isApiKeyProvider = await client._callApiKey();
     const apiKey = client.apiKey;
     if (!apiKey) {
@@ -131,14 +134,10 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
         url.searchParams.set('api-key', azureApiKey);
       }
     }
-    const deploymentName = options.deploymentName ?? client.deploymentName;
-    if (!deploymentName) {
-      throw new Error('No deployment name provided');
-    }
     const { dangerouslyAllowBrowser } = options;
     return new OpenAIRealtimeWebSocket(
       {
-        model: deploymentName,
+        ...connection,
         onURL,
         ...(dangerouslyAllowBrowser ? { dangerouslyAllowBrowser } : {}),
         __resolvedApiKey: isApiKeyProvider,

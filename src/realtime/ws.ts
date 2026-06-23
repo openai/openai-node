@@ -4,7 +4,9 @@ import type { RealtimeClientEvent, RealtimeServerEvent } from '../resources/real
 import {
   OpenAIRealtimeEmitter,
   buildRealtimeURL,
+  getAzureRealtimeConnection,
   isAzure,
+  type AzureRealtimeConnectionConfig,
   type RealtimeConnectionConfig,
 } from './internal-base';
 
@@ -75,20 +77,17 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
 
   static async azure(
     client: Pick<AzureOpenAI, '_callApiKey' | 'apiVersion' | 'apiKey' | 'baseURL' | 'deploymentName'>,
-    props: { deploymentName?: string; options?: WS.ClientOptions | undefined } = {},
+    props: AzureRealtimeConnectionConfig & { options?: WS.ClientOptions | undefined } = {},
   ): Promise<OpenAIRealtimeWS> {
+    const connection = getAzureRealtimeConnection(client, props);
     const isApiKeyProvider = await client._callApiKey();
     const apiKey = client.apiKey;
     if (!apiKey) {
       throw new Error('Azure OpenAI Realtime requires an API key');
     }
-    const deploymentName = props.deploymentName ?? client.deploymentName;
-    if (!deploymentName) {
-      throw new Error('No deployment name provided');
-    }
     return new OpenAIRealtimeWS(
       {
-        model: deploymentName,
+        ...connection,
         options: {
           ...props.options,
           headers: {
