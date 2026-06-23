@@ -50,3 +50,32 @@ data: [DONE]
 "
 `;
 
+exports[`.stream() hosted shell events work 1`] = `
+"data: {\"response\":{\"id\":\"resp_shell_1\",\"object\":\"response\",\"created_at\":1723031667,\"model\":\"gpt-4.1\",\"output\":[],\"output_text\":\"\",\"error\":null,\"incomplete_details\":null,\"instructions\":null,\"metadata\":null,\"parallel_tool_calls\":false,\"temperature\":null,\"tools\":[{\"type\":\"shell\"}],\"top_p\":null,\"status\":\"in_progress\",\"usage\":{\"input_tokens\":0,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":0,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":0}},\"sequence_number\":0,\"type\":\"response.created\"}
+
+data: {\"item\":{\"id\":\"sh_1\",\"type\":\"shell_call\",\"call_id\":\"call_shell_1\",\"status\":\"in_progress\",\"environment\":null,\"action\":{\"commands\":[\"\"],\"timeout_ms\":null,\"max_output_length\":null}},\"output_index\":0,\"sequence_number\":1,\"type\":\"response.output_item.added\"}
+
+data: {\"command\":\"\",\"command_index\":0,\"output_index\":0,\"sequence_number\":2,\"type\":\"response.shell_call_command.added\"}
+
+data: {\"command_index\":0,\"delta\":\"python \",\"output_index\":0,\"sequence_number\":3,\"type\":\"response.shell_call_command.delta\"}
+
+data: {\"command_index\":0,\"delta\":\"-c \\\"print(55)\\\"\",\"output_index\":0,\"sequence_number\":4,\"type\":\"response.shell_call_command.delta\"}
+
+data: {\"command\":\"python -c \\\"print(55)\\\"\",\"command_index\":0,\"output_index\":0,\"sequence_number\":5,\"type\":\"response.shell_call_command.done\"}
+
+data: {\"item\":{\"id\":\"sh_1\",\"type\":\"shell_call\",\"call_id\":\"call_shell_1\",\"status\":\"completed\",\"environment\":null,\"action\":{\"commands\":[\"python -c \\\"print(55)\\\"\"],\"timeout_ms\":null,\"max_output_length\":null}},\"output_index\":0,\"sequence_number\":6,\"type\":\"response.output_item.done\"}
+
+data: {\"item\":{\"id\":\"sho_1\",\"type\":\"shell_call_output\",\"call_id\":\"call_shell_1\",\"status\":\"in_progress\",\"max_output_length\":null,\"output\":[]},\"output_index\":1,\"sequence_number\":7,\"type\":\"response.output_item.added\"}
+
+data: {\"command_index\":0,\"delta\":{\"stdout\":\"55\\\\n\"},\"item_id\":\"sho_1\",\"output_index\":1,\"sequence_number\":8,\"type\":\"response.shell_call_output_content.delta\"}
+
+data: {\"command_index\":0,\"item_id\":\"sho_1\",\"output\":[{\"stdout\":\"55\\\\n\",\"stderr\":\"\",\"outcome\":{\"type\":\"exit\",\"exit_code\":0}}],\"output_index\":1,\"sequence_number\":9,\"type\":\"response.shell_call_output_content.done\"}
+
+data: {\"item\":{\"id\":\"sho_1\",\"type\":\"shell_call_output\",\"call_id\":\"call_shell_1\",\"status\":\"completed\",\"max_output_length\":null,\"output\":[{\"stdout\":\"55\\\\n\",\"stderr\":\"\",\"outcome\":{\"type\":\"exit\",\"exit_code\":0}}]},\"output_index\":1,\"sequence_number\":10,\"type\":\"response.output_item.done\"}
+
+data: {\"response\":{\"id\":\"resp_shell_1\",\"object\":\"response\",\"created_at\":1723031667,\"model\":\"gpt-4.1\",\"output\":[{\"id\":\"sh_1\",\"type\":\"shell_call\",\"call_id\":\"call_shell_1\",\"status\":\"completed\",\"environment\":null,\"action\":{\"commands\":[\"python -c \\\"print(55)\\\"\"],\"timeout_ms\":null,\"max_output_length\":null}},{\"id\":\"sho_1\",\"type\":\"shell_call_output\",\"call_id\":\"call_shell_1\",\"status\":\"completed\",\"max_output_length\":null,\"output\":[{\"stdout\":\"55\\\\n\",\"stderr\":\"\",\"outcome\":{\"type\":\"exit\",\"exit_code\":0}}]}],\"output_text\":\"\",\"error\":null,\"incomplete_details\":null,\"instructions\":null,\"metadata\":null,\"parallel_tool_calls\":false,\"temperature\":null,\"tools\":[{\"type\":\"shell\"}],\"top_p\":null,\"status\":\"completed\",\"usage\":{\"input_tokens\":10,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":6,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":16}},\"sequence_number\":11,\"type\":\"response.completed\"}
+
+data: [DONE]
+
+"
+`;
