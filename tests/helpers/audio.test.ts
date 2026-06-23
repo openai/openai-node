@@ -1,7 +1,7 @@
 jest.mock('node:child_process', () => ({ spawn: jest.fn() }));
 
 import { spawn } from 'node:child_process';
-import { Writable } from 'node:stream';
+import { Readable, Writable } from 'node:stream';
 import { playAudio } from 'openai/helpers/audio';
 
 const spawnMock = spawn as jest.MockedFunction<typeof spawn>;
@@ -45,6 +45,15 @@ describe('playAudio', () => {
     await playAudio(new Response('hello'));
 
     expect(spawnMock).toHaveBeenCalledWith('ffplay', ['-autoexit', '-nodisp', '-i', 'pipe:0']);
+    expect(Buffer.concat(chunks).toString()).toBe('hello');
+  });
+
+  it('keeps Node Readable response bodies on the Node stream path', async () => {
+    const { chunks } = mockFfplay();
+    const response = { body: Readable.from(['hello']) };
+
+    await playAudio(response as any);
+
     expect(Buffer.concat(chunks).toString()).toBe('hello');
   });
 });

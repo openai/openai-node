@@ -38,7 +38,12 @@ async function nodejsPlayAudio(stream: NodeJS.ReadableStream | Response | File):
       const ffplay = spawn('ffplay', ['-autoexit', '-nodisp', '-i', 'pipe:0']);
 
       if (isResponse(stream)) {
-        Readable.fromWeb(stream.body! as NodeReadableStream).pipe(ffplay.stdin);
+        const body = stream.body! as NodeReadableStream | NodeJS.ReadableStream;
+        if ('pipe' in body && typeof body.pipe === 'function') {
+          body.pipe(ffplay.stdin);
+        } else {
+          Readable.fromWeb(body as NodeReadableStream).pipe(ffplay.stdin);
+        }
       } else if (isFile(stream)) {
         Readable.from(stream.stream()).pipe(ffplay.stdin);
       } else {
