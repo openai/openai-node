@@ -4,13 +4,20 @@ import OpenAI from 'openai';
 
 const client = new OpenAI({
   apiKey: 'My API Key',
+  adminAPIKey: 'My Admin API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
 describe('resource items', () => {
   test('create: only required params', async () => {
     const responsePromise = client.conversations.items.create('conv_123', {
-      items: [{ content: 'string', role: 'user', type: 'message' }],
+      items: [
+        {
+          content: 'string',
+          role: 'user',
+          type: 'message',
+        },
+      ],
     });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
@@ -23,8 +30,15 @@ describe('resource items', () => {
 
   test('create: required and optional params', async () => {
     const response = await client.conversations.items.create('conv_123', {
-      items: [{ content: 'string', role: 'user', type: 'message' }],
-      include: ['code_interpreter_call.outputs'],
+      items: [
+        {
+          content: 'string',
+          role: 'user',
+          phase: 'commentary',
+          type: 'message',
+        },
+      ],
+      include: ['file_search_call.results'],
     });
   });
 
@@ -42,7 +56,7 @@ describe('resource items', () => {
   test('retrieve: required and optional params', async () => {
     const response = await client.conversations.items.retrieve('msg_abc', {
       conversation_id: 'conv_123',
-      include: ['code_interpreter_call.outputs'],
+      include: ['file_search_call.results'],
     });
   });
 
@@ -62,7 +76,12 @@ describe('resource items', () => {
     await expect(
       client.conversations.items.list(
         'conv_123',
-        { after: 'after', include: ['code_interpreter_call.outputs'], limit: 0, order: 'asc' },
+        {
+          after: 'after',
+          include: ['file_search_call.results'],
+          limit: 0,
+          order: 'asc',
+        },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);

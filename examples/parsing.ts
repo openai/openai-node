@@ -1,6 +1,6 @@
 import { zodResponseFormat } from 'openai/helpers/zod';
 import OpenAI from 'openai/index';
-import { z } from 'zod/v3';
+import { z } from 'zod/v4'; // Also works for 'zod/v3'
 
 const Step = z.object({
   explanation: z.string(),

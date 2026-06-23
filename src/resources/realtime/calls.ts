@@ -25,6 +25,7 @@ export class Calls extends APIResource {
       body,
       ...options,
       headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -40,6 +41,7 @@ export class Calls extends APIResource {
     return this._client.post(path`/realtime/calls/${callID}/hangup`, {
       ...options,
       headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -58,6 +60,7 @@ export class Calls extends APIResource {
       body,
       ...options,
       headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -78,6 +81,7 @@ export class Calls extends APIResource {
       body,
       ...options,
       headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 }
@@ -129,6 +133,8 @@ export interface CallAcceptParams {
   model?:
     | (string & {})
     | 'gpt-realtime'
+    | 'gpt-realtime-1.5'
+    | 'gpt-realtime-2'
     | 'gpt-realtime-2025-08-28'
     | 'gpt-4o-realtime-preview'
     | 'gpt-4o-realtime-preview-2024-10-01'
@@ -138,8 +144,11 @@ export interface CallAcceptParams {
     | 'gpt-4o-mini-realtime-preview-2024-12-17'
     | 'gpt-realtime-mini'
     | 'gpt-realtime-mini-2025-10-06'
+    | 'gpt-realtime-mini-2025-12-15'
+    | 'gpt-audio-1.5'
     | 'gpt-audio-mini'
-    | 'gpt-audio-mini-2025-10-06';
+    | 'gpt-audio-mini-2025-10-06'
+    | 'gpt-audio-mini-2025-12-15';
 
   /**
    * The set of modalities the model can respond with. It defaults to `["audio"]`,
@@ -150,10 +159,21 @@ export interface CallAcceptParams {
   output_modalities?: Array<'text' | 'audio'>;
 
   /**
+   * Whether the model may call multiple tools in parallel. Only supported by
+   * reasoning Realtime models such as `gpt-realtime-2`.
+   */
+  parallel_tool_calls?: boolean;
+
+  /**
    * Reference to a prompt template and its variables.
    * [Learn more](https://platform.openai.com/docs/guides/text?api-mode=responses#reusable-prompts).
    */
   prompt?: ResponsesAPI.ResponsePrompt | null;
+
+  /**
+   * Configuration for reasoning-capable Realtime models such as `gpt-realtime-2`.
+   */
+  reasoning?: RealtimeAPI.RealtimeReasoning;
 
   /**
    * How the model chooses tools. Provide one of the string modes or force a specific
@@ -168,8 +188,9 @@ export interface CallAcceptParams {
 
   /**
    * Realtime API can write session traces to the
-   * [Traces Dashboard](/logs?api=traces). Set to null to disable tracing. Once
-   * tracing is enabled for a session, the configuration cannot be modified.
+   * [Traces Dashboard](https://platform.openai.com/logs?api=traces). Set to null to
+   * disable tracing. Once tracing is enabled for a session, the configuration cannot
+   * be modified.
    *
    * `auto` will create a trace for the session with default values for the workflow
    * name, group id, and metadata.
@@ -177,8 +198,24 @@ export interface CallAcceptParams {
   tracing?: RealtimeAPI.RealtimeTracingConfig | null;
 
   /**
-   * Controls how the realtime conversation is truncated prior to model inference.
-   * The default is `auto`.
+   * When the number of tokens in a conversation exceeds the model's input token
+   * limit, the conversation be truncated, meaning messages (starting from the
+   * oldest) will not be included in the model's context. A 32k context model with
+   * 4,096 max output tokens can only include 28,224 tokens in the context before
+   * truncation occurs.
+   *
+   * Clients can configure truncation behavior to truncate with a lower max token
+   * limit, which is an effective way to control token usage and cost.
+   *
+   * Truncation will reduce the number of cached tokens on the next turn (busting the
+   * cache), since messages are dropped from the beginning of the context. However,
+   * clients can also configure truncation to retain messages up to a fraction of the
+   * maximum context size, which will reduce the need for future truncations and thus
+   * improve the cache rate.
+   *
+   * Truncation can be disabled entirely, which means the server will never truncate
+   * but would instead return an error if the conversation exceeds the model's input
+   * token limit.
    */
   truncation?: RealtimeAPI.RealtimeTruncation;
 }

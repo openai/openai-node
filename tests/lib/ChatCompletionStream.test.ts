@@ -1,6 +1,6 @@
 import { zodResponseFormat } from 'openai/helpers/zod';
 import { ChatCompletionTokenLogprob } from 'openai/resources';
-import { z } from 'zod/v3';
+import { z } from 'zod/v4';
 import { makeStreamSnapshotRequest } from '../utils/mock-snapshots';
 
 jest.setTimeout(1000 * 30);
@@ -33,6 +33,46 @@ describe('.stream()', () => {
         "logprobs": null,
         "message": {
           "content": "{"city":"San Francisco","units":"c"}",
+          "parsed": {
+            "city": "San Francisco",
+            "units": "c",
+          },
+          "refusal": null,
+          "role": "assistant",
+        },
+      }
+    `);
+  });
+
+  it('is robust against leading newline chunks', async () => {
+    const stream = await makeStreamSnapshotRequest((openai) =>
+      openai.chat.completions.stream({
+        model: 'gpt-4o-2024-08-06',
+        messages: [
+          {
+            role: 'user',
+            content: "What's the weather like in SF?",
+          },
+        ],
+        response_format: zodResponseFormat(
+          z.object({
+            city: z.string(),
+            units: z.enum(['c', 'f']).default('f'),
+          }),
+          'location',
+        ),
+      }),
+    );
+
+    expect((await stream.finalChatCompletion()).choices[0]).toMatchInlineSnapshot(`
+      {
+        "finish_reason": "stop",
+        "index": 0,
+        "logprobs": null,
+        "message": {
+          "content": "
+
+      {"city":"San Francisco","units":"c"}",
           "parsed": {
             "city": "San Francisco",
             "units": "c",

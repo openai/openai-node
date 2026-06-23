@@ -1,6 +1,6 @@
 import { zodFunction } from 'openai/helpers/zod';
 import OpenAI from 'openai/index';
-import { z } from 'zod/v3';
+import { z } from 'zod/v4'; // Also works for 'zod/v3'
 
 const GetWeatherArgs = z.object({
   city: z.string(),

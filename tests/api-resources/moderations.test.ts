@@ -4,6 +4,7 @@ import OpenAI from 'openai';
 
 const client = new OpenAI({
   apiKey: 'My API Key',
+  adminAPIKey: 'My Admin API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
@@ -20,6 +21,9 @@ describe('resource moderations', () => {
   });
 
   test('create: required and optional params', async () => {
-    const response = await client.moderations.create({ input: 'I want to kill them.', model: 'string' });
+    const response = await client.moderations.create({
+      input: 'I want to kill them.',
+      model: 'omni-moderation-latest',
+    });
   });
 });

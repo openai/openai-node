@@ -4,6 +4,7 @@ import OpenAI from 'openai';
 
 const client = new OpenAI({
   apiKey: 'My API Key',
+  adminAPIKey: 'My Admin API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
@@ -26,7 +27,12 @@ describe('resource calls', () => {
         input: {
           format: { rate: 24000, type: 'audio/pcm' },
           noise_reduction: { type: 'near_field' },
-          transcription: { language: 'language', model: 'whisper-1', prompt: 'prompt' },
+          transcription: {
+            delay: 'minimal',
+            language: 'language',
+            model: 'whisper-1',
+            prompt: 'prompt',
+          },
           turn_detection: {
             type: 'server_vad',
             create_response: true,
@@ -37,16 +43,33 @@ describe('resource calls', () => {
             threshold: 0,
           },
         },
-        output: { format: { rate: 24000, type: 'audio/pcm' }, speed: 0.25, voice: 'ash' },
+        output: {
+          format: { rate: 24000, type: 'audio/pcm' },
+          speed: 0.25,
+          voice: 'alloy',
+        },
       },
       include: ['item.input_audio_transcription.logprobs'],
       instructions: 'instructions',
-      max_output_tokens: 0,
-      model: 'string',
+      max_output_tokens: 'inf',
+      model: 'gpt-realtime',
       output_modalities: ['text'],
-      prompt: { id: 'id', variables: { foo: 'string' }, version: 'version' },
+      parallel_tool_calls: true,
+      prompt: {
+        id: 'id',
+        variables: { foo: 'string' },
+        version: 'version',
+      },
+      reasoning: { effort: 'minimal' },
       tool_choice: 'none',
-      tools: [{ description: 'description', name: 'name', parameters: {}, type: 'function' }],
+      tools: [
+        {
+          description: 'description',
+          name: 'name',
+          parameters: {},
+          type: 'function',
+        },
+      ],
       tracing: 'auto',
       truncation: 'auto',
     });

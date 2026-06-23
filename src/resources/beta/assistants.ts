@@ -13,70 +13,55 @@ import { RequestOptions } from '../../internal/request-options';
 import { path } from '../../internal/utils/path';
 import { AssistantStream } from '../../lib/AssistantStream';
 
+/**
+ * Build Assistants that can call models and use tools.
+ */
 export class Assistants extends APIResource {
   /**
    * Create an assistant with a model and instructions.
    *
-   * @example
-   * ```ts
-   * const assistant = await client.beta.assistants.create({
-   *   model: 'gpt-4o',
-   * });
-   * ```
+   * @deprecated
    */
   create(body: AssistantCreateParams, options?: RequestOptions): APIPromise<Assistant> {
     return this._client.post('/assistants', {
       body,
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
   /**
    * Retrieves an assistant.
    *
-   * @example
-   * ```ts
-   * const assistant = await client.beta.assistants.retrieve(
-   *   'assistant_id',
-   * );
-   * ```
+   * @deprecated
    */
   retrieve(assistantID: string, options?: RequestOptions): APIPromise<Assistant> {
     return this._client.get(path`/assistants/${assistantID}`, {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
   /**
    * Modifies an assistant.
    *
-   * @example
-   * ```ts
-   * const assistant = await client.beta.assistants.update(
-   *   'assistant_id',
-   * );
-   * ```
+   * @deprecated
    */
   update(assistantID: string, body: AssistantUpdateParams, options?: RequestOptions): APIPromise<Assistant> {
     return this._client.post(path`/assistants/${assistantID}`, {
       body,
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
   /**
    * Returns a list of assistants.
    *
-   * @example
-   * ```ts
-   * // Automatically fetches more pages as needed.
-   * for await (const assistant of client.beta.assistants.list()) {
-   *   // ...
-   * }
-   * ```
+   * @deprecated
    */
   list(
     query: AssistantListParams | null | undefined = {},
@@ -86,22 +71,20 @@ export class Assistants extends APIResource {
       query,
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
   /**
    * Delete an assistant.
    *
-   * @example
-   * ```ts
-   * const assistantDeleted =
-   *   await client.beta.assistants.delete('assistant_id');
-   * ```
+   * @deprecated
    */
   delete(assistantID: string, options?: RequestOptions): APIPromise<AssistantDeleted> {
     return this._client.delete(path`/assistants/${assistantID}`, {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 }
@@ -109,7 +92,7 @@ export class Assistants extends APIResource {
 export type AssistantsPage = CursorPage<Assistant>;
 
 /**
- * Represents an `assistant` that can call the model and use tools.
+ * @deprecated Represents an `assistant` that can call the model and use tools.
  */
 export interface Assistant {
   /**
@@ -1160,9 +1143,17 @@ export interface AssistantCreateParams {
   /**
    * Constrains effort on reasoning for
    * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
-   * supported values are `minimal`, `low`, `medium`, and `high`. Reducing reasoning
-   * effort can result in faster responses and fewer tokens used on reasoning in a
-   * response.
+   * supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
+   * Reducing reasoning effort can result in faster responses and fewer tokens used
+   * on reasoning in a response.
+   *
+   * - `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported
+   *   reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool
+   *   calls are supported for all reasoning values in gpt-5.1.
+   * - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
+   *   support `none`.
+   * - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
+   * - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
    */
   reasoning_effort?: Shared.ReasoningEffort | null;
 
@@ -1273,8 +1264,9 @@ export namespace AssistantCreateParams {
 
         /**
          * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs to
-         * add to the vector store. There can be a maximum of 10000 files in a vector
-         * store.
+         * add to the vector store. For vector stores created before Nov 2025, there can be
+         * a maximum of 10,000 files in a vector store. For vector stores created starting
+         * in Nov 2025, the limit is 100,000,000 files.
          */
         file_ids?: Array<string>;
 
@@ -1413,9 +1405,17 @@ export interface AssistantUpdateParams {
   /**
    * Constrains effort on reasoning for
    * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
-   * supported values are `minimal`, `low`, `medium`, and `high`. Reducing reasoning
-   * effort can result in faster responses and fewer tokens used on reasoning in a
-   * response.
+   * supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
+   * Reducing reasoning effort can result in faster responses and fewer tokens used
+   * on reasoning in a response.
+   *
+   * - `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported
+   *   reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool
+   *   calls are supported for all reasoning values in gpt-5.1.
+   * - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
+   *   support `none`.
+   * - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
+   * - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
    */
   reasoning_effort?: Shared.ReasoningEffort | null;
 

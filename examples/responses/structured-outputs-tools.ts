@@ -1,8 +1,8 @@
-#!/usr/bin/env -S npm run tsn -T
+#!/usr/bin/env -S npm run tsn -- -T
 
 import { OpenAI } from 'openai';
 import { zodResponsesFunction } from 'openai/helpers/zod';
-import { z } from 'zod/v3';
+import { z } from 'zod/v4'; // Also works for 'zod/v3'
 
 const Table = z.enum(['orders', 'customers', 'products']);
 const Column = z.enum([

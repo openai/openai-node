@@ -1,7 +1,11 @@
 import { zodResponseFormat } from 'openai/helpers/zod';
-import { z } from 'zod/v3';
+import { z as zv3 } from 'zod/v3';
+import { z as zv4 } from 'zod/v4';
 
-describe('zodResponseFormat', () => {
+describe.each([
+  { version: 'v3', z: zv3 },
+  { version: 'v4', z: zv4 as any as typeof zv3 },
+])('zodResponseFormat (Zod $version)', ({ version, z }) => {
   it('does the thing', () => {
     expect(
       zodResponseFormat(
@@ -287,31 +291,59 @@ describe('zodResponseFormat', () => {
   });
 
   it('throws error on optional fields', () => {
-    expect(() =>
-      zodResponseFormat(
-        z.object({
-          required: z.string(),
-          optional: z.string().optional(),
-          optional_and_nullable: z.string().optional().nullable(),
-        }),
-        'schema',
-      ),
-    ).toThrowErrorMatchingInlineSnapshot(
-      `"Zod field at \`#/definitions/schema/properties/optional\` uses \`.optional()\` without \`.nullable()\` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required"`,
-    );
+    if (version === 'v3') {
+      expect(() =>
+        zodResponseFormat(
+          z.object({
+            required: z.string(),
+            optional: z.string().optional(),
+            optional_and_nullable: z.string().optional().nullable(),
+          }),
+          'schema',
+        ),
+      ).toThrowErrorMatchingInlineSnapshot(
+        `"Zod field at \`#/definitions/schema/properties/optional\` uses \`.optional()\` without \`.nullable()\` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required"`,
+      );
+    } else {
+      expect(() =>
+        zodResponseFormat(
+          z.object({
+            required: z.string(),
+            optional: z.string().optional(),
+            optional_and_nullable: z.string().optional().nullable(),
+          }),
+          'schema',
+        ),
+      ).toThrowErrorMatchingInlineSnapshot(
+        `"Zod field at \`properties/optional\` uses \`.optional()\` without \`.nullable()\` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required"`,
+      );
+    }
   });
 
   it('throws error on nested optional fields', () => {
-    expect(() =>
-      zodResponseFormat(
-        z.object({
-          foo: z.object({ bar: z.array(z.object({ can_be_missing: z.boolean().optional() })) }),
-        }),
-        'schema',
-      ),
-    ).toThrowErrorMatchingInlineSnapshot(
-      `"Zod field at \`#/definitions/schema/properties/foo/properties/bar/items/properties/can_be_missing\` uses \`.optional()\` without \`.nullable()\` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required"`,
-    );
+    if (version === 'v3') {
+      expect(() =>
+        zodResponseFormat(
+          z.object({
+            foo: z.object({ bar: z.array(z.object({ can_be_missing: z.boolean().optional() })) }),
+          }),
+          'schema',
+        ),
+      ).toThrowErrorMatchingInlineSnapshot(
+        `"Zod field at \`#/definitions/schema/properties/foo/properties/bar/items/properties/can_be_missing\` uses \`.optional()\` without \`.nullable()\` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required"`,
+      );
+    } else {
+      expect(() =>
+        zodResponseFormat(
+          z.object({
+            foo: z.object({ bar: z.array(z.object({ can_be_missing: z.boolean().optional() })) }),
+          }),
+          'schema',
+        ),
+      ).toThrowErrorMatchingInlineSnapshot(
+        `"Zod field at \`properties/foo/properties/bar/items/properties/can_be_missing\` uses \`.optional()\` without \`.nullable()\` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required"`,
+      );
+    }
   });
 
   it('does not warn on union nullable fields', () => {

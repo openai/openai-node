@@ -4,6 +4,7 @@ import OpenAI from 'openai';
 
 const client = new OpenAI({
   apiKey: 'My API Key',
+  adminAPIKey: 'My Admin API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
@@ -36,9 +37,9 @@ describe('resource runs', () => {
       max_completion_tokens: 256,
       max_prompt_tokens: 256,
       metadata: { foo: 'string' },
-      model: 'string',
+      model: 'gpt-5.4',
       parallel_tool_calls: true,
-      reasoning_effort: 'minimal',
+      reasoning_effort: 'none',
       response_format: 'auto',
       stream: false,
       temperature: 1,
@@ -98,7 +99,12 @@ describe('resource runs', () => {
     await expect(
       client.beta.threads.runs.list(
         'thread_id',
-        { after: 'after', before: 'before', limit: 0, order: 'asc' },
+        {
+          after: 'after',
+          before: 'before',
+          limit: 0,
+          order: 'asc',
+        },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);

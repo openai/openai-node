@@ -9,7 +9,7 @@ import { path } from '../../../internal/utils/path';
 
 export class Sessions extends APIResource {
   /**
-   * Create a ChatKit session
+   * Create a ChatKit session.
    *
    * @example
    * ```ts
@@ -25,11 +25,14 @@ export class Sessions extends APIResource {
       body,
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'chatkit_beta=v1' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
   /**
-   * Cancel a ChatKit session
+   * Cancel an active ChatKit session and return its most recent metadata.
+   *
+   * Cancelling prevents new requests from using the issued client secret.
    *
    * @example
    * ```ts
@@ -41,6 +44,7 @@ export class Sessions extends APIResource {
     return this._client.post(path`/chatkit/sessions/${sessionID}/cancel`, {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'chatkit_beta=v1' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 }

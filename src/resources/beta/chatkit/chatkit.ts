@@ -30,35 +30,10 @@ import {
   ThreadListParams,
   Threads,
 } from './threads';
-import { APIPromise } from '../../../core/api-promise';
-import { type Uploadable } from '../../../core/uploads';
-import { buildHeaders } from '../../../internal/headers';
-import { RequestOptions } from '../../../internal/request-options';
-import { maybeMultipartFormRequestOptions } from '../../../internal/uploads';
 
 export class ChatKit extends APIResource {
   sessions: SessionsAPI.Sessions = new SessionsAPI.Sessions(this._client);
   threads: ThreadsAPI.Threads = new ThreadsAPI.Threads(this._client);
-
-  /**
-   * Upload a ChatKit file
-   *
-   * @example
-   * ```ts
-   * const response = await client.beta.chatkit.uploadFile({
-   *   file: fs.createReadStream('path/to/file'),
-   * });
-   * ```
-   */
-  uploadFile(body: ChatKitUploadFileParams, options?: RequestOptions): APIPromise<ChatKitUploadFileResponse> {
-    return this._client.post(
-      '/chatkit/files',
-      maybeMultipartFormRequestOptions(
-        { body, ...options, headers: buildHeaders([{ 'OpenAI-Beta': 'chatkit_beta=v1' }, options?.headers]) },
-        this._client,
-      ),
-    );
-  }
 }
 
 /**
@@ -100,97 +75,11 @@ export namespace ChatKitWorkflow {
   }
 }
 
-/**
- * Metadata for a non-image file uploaded through ChatKit.
- */
-export interface FilePart {
-  /**
-   * Unique identifier for the uploaded file.
-   */
-  id: string;
-
-  /**
-   * MIME type reported for the uploaded file. Defaults to null when unknown.
-   */
-  mime_type: string | null;
-
-  /**
-   * Original filename supplied by the uploader. Defaults to null when unnamed.
-   */
-  name: string | null;
-
-  /**
-   * Type discriminator that is always `file`.
-   */
-  type: 'file';
-
-  /**
-   * Signed URL for downloading the uploaded file. Defaults to null when no download
-   * link is available.
-   */
-  upload_url: string | null;
-}
-
-/**
- * Metadata for an image uploaded through ChatKit.
- */
-export interface ImagePart {
-  /**
-   * Unique identifier for the uploaded image.
-   */
-  id: string;
-
-  /**
-   * MIME type of the uploaded image.
-   */
-  mime_type: string;
-
-  /**
-   * Original filename for the uploaded image. Defaults to null when unnamed.
-   */
-  name: string | null;
-
-  /**
-   * Preview URL that can be rendered inline for the image.
-   */
-  preview_url: string;
-
-  /**
-   * Type discriminator that is always `image`.
-   */
-  type: 'image';
-
-  /**
-   * Signed URL for downloading the uploaded image. Defaults to null when no download
-   * link is available.
-   */
-  upload_url: string | null;
-}
-
-/**
- * Represents either a file or image attachment.
- */
-export type ChatKitUploadFileResponse = FilePart | ImagePart;
-
-export interface ChatKitUploadFileParams {
-  /**
-   * Binary file contents to store with the ChatKit session. Supports PDFs and PNG,
-   * JPG, JPEG, GIF, or WEBP images.
-   */
-  file: Uploadable;
-}
-
 ChatKit.Sessions = Sessions;
 ChatKit.Threads = Threads;
 
 export declare namespace ChatKit {
-  export {
-    type ChatKitWorkflow as ChatKitWorkflow,
-    type FilePart as FilePart,
-    type ImagePart as ImagePart,
-    type ChatKitUploadFileResponse as ChatKitUploadFileResponse,
-    type ChatKitUploadFileParams as ChatKitUploadFileParams,
-  };
+  export { type ChatKitWorkflow as ChatKitWorkflow };
 
   export { Sessions as Sessions, type SessionCreateParams as SessionCreateParams };
 

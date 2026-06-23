@@ -1,13 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-export {
-  ChatKit,
-  type ChatKitWorkflow,
-  type FilePart,
-  type ImagePart,
-  type ChatKitUploadFileResponse,
-  type ChatKitUploadFileParams,
-} from './chatkit';
+export { ChatKit, type ChatKitWorkflow } from './chatkit';
 export { Sessions, type SessionCreateParams } from './sessions';
 export {
   Threads,

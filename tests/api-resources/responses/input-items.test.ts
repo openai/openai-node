@@ -4,6 +4,7 @@ import OpenAI from 'openai';
 
 const client = new OpenAI({
   apiKey: 'My API Key',
+  adminAPIKey: 'My Admin API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
@@ -24,7 +25,12 @@ describe('resource inputItems', () => {
     await expect(
       client.responses.inputItems.list(
         'response_id',
-        { after: 'after', include: ['code_interpreter_call.outputs'], limit: 0, order: 'asc' },
+        {
+          after: 'after',
+          include: ['file_search_call.results'],
+          limit: 0,
+          order: 'asc',
+        },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);
