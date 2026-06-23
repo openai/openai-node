@@ -1,7 +1,39 @@
 # Microsoft Azure OpenAI
 
-To use this library with [Azure OpenAI](https://learn.microsoft.com/azure/ai-services/openai/overview), use the `AzureOpenAI`
-class instead of the `OpenAI` class.
+## v1 API
+
+For Azure OpenAI's current [v1 API](https://learn.microsoft.com/azure/foundry/openai/api-version-lifecycle),
+use the standard `OpenAI` client with your Azure endpoint:
+
+```ts
+import OpenAI from 'openai';
+import { getBearerTokenProvider, DefaultAzureCredential } from '@azure/identity';
+
+const endpoint = process.env['AZURE_OPENAI_ENDPOINT'];
+const deployment = process.env['AZURE_OPENAI_DEPLOYMENT'];
+if (!endpoint || !deployment) throw new Error('Missing Azure OpenAI configuration');
+
+const tokenProvider = getBearerTokenProvider(new DefaultAzureCredential(), 'https://ai.azure.com/.default');
+
+const openai = new OpenAI({
+  baseURL: `${endpoint.replace(/\/+$/, '')}/openai/v1/`,
+  apiKey: tokenProvider,
+});
+
+const result = await openai.chat.completions.create({
+  model: deployment,
+  messages: [{ role: 'user', content: 'Say hello!' }],
+});
+
+console.log(result.choices[0]!.message?.content);
+```
+
+With the v1 API, the `model` parameter is your Azure deployment name. See the
+[Azure examples](examples/azure) for complete runnable programs.
+
+## Dated API versions
+
+For dated Azure OpenAI API versions, use the `AzureOpenAI` class instead of the `OpenAI` class.
 
 > [!IMPORTANT]
 > The Azure API shape slightly differs from the core API shape which means that the static types for responses / params

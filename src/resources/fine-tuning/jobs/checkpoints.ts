@@ -30,7 +30,7 @@ export class Checkpoints extends APIResource {
     return this._client.getAPIList(
       path`/fine_tuning/jobs/${fineTuningJobID}/checkpoints`,
       CursorPage<FineTuningJobCheckpoint>,
-      { query, ...options },
+      { query, ...options, __security: { bearerAuth: true } },
     );
   }
 }

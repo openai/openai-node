@@ -96,3 +96,19 @@ export class EventEmitter<EventTypes extends Record<string, (...args: any) => an
     return listeners && listeners.length > 0;
   }
 }
+
+/**
+ * An EventEmitter variant that exposes `_emit()` publicly.
+ *
+ * The base {@link EventEmitter} keeps `_emit` protected so that consumers
+ * can only listen, not dispatch. When you need a separate emitter instance
+ * that your own code can emit on, without exposing emit on the
+ * consumer-facing emitter, use this class.
+ */
+export class InternalEventEmitter<
+  EventTypes extends Record<string, (...args: any) => any>,
+> extends EventEmitter<EventTypes> {
+  override _emit<Event extends keyof EventTypes>(event: Event, ...args: EventParameters<EventTypes, Event>) {
+    super._emit(event, ...args);
+  }
+}

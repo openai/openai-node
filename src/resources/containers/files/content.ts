@@ -15,6 +15,7 @@ export class Content extends APIResource {
     return this._client.get(path`/containers/${container_id}/files/${fileID}/content`, {
       ...options,
       headers: buildHeaders([{ Accept: 'application/binary' }, options?.headers]),
+      __security: { bearerAuth: true },
       __binaryResponse: true,
     });
   }
