@@ -27,6 +27,9 @@ import { CursorPage, type CursorPageParams, PagePromise } from '../../core/pagin
 import { RequestOptions } from '../../internal/request-options';
 import { path } from '../../internal/utils/path';
 
+/**
+ * Manage and run evals in the OpenAI platform.
+ */
 export class Evals extends APIResource {
   runs: RunsAPI.Runs = new RunsAPI.Runs(this._client);
 
@@ -39,21 +42,21 @@ export class Evals extends APIResource {
    * the [Evals guide](https://platform.openai.com/docs/guides/evals).
    */
   create(body: EvalCreateParams, options?: RequestOptions): APIPromise<EvalCreateResponse> {
-    return this._client.post('/evals', { body, ...options });
+    return this._client.post('/evals', { body, ...options, __security: { bearerAuth: true } });
   }
 
   /**
    * Get an evaluation by ID.
    */
   retrieve(evalID: string, options?: RequestOptions): APIPromise<EvalRetrieveResponse> {
-    return this._client.get(path`/evals/${evalID}`, options);
+    return this._client.get(path`/evals/${evalID}`, { ...options, __security: { bearerAuth: true } });
   }
 
   /**
    * Update certain properties of an evaluation.
    */
   update(evalID: string, body: EvalUpdateParams, options?: RequestOptions): APIPromise<EvalUpdateResponse> {
-    return this._client.post(path`/evals/${evalID}`, { body, ...options });
+    return this._client.post(path`/evals/${evalID}`, { body, ...options, __security: { bearerAuth: true } });
   }
 
   /**
@@ -63,14 +66,18 @@ export class Evals extends APIResource {
     query: EvalListParams | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<EvalListResponsesPage, EvalListResponse> {
-    return this._client.getAPIList('/evals', CursorPage<EvalListResponse>, { query, ...options });
+    return this._client.getAPIList('/evals', CursorPage<EvalListResponse>, {
+      query,
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
    * Delete an evaluation.
    */
   delete(evalID: string, options?: RequestOptions): APIPromise<EvalDeleteResponse> {
-    return this._client.delete(path`/evals/${evalID}`, options);
+    return this._client.delete(path`/evals/${evalID}`, { ...options, __security: { bearerAuth: true } });
   }
 }
 
@@ -769,14 +776,16 @@ export namespace EvalCreateParams {
      */
     export interface EvalItem {
       /**
-       * Inputs to the model - can contain template strings.
+       * Inputs to the model - can contain template strings. Supports text, output text,
+       * input images, and input audio, either as a single item or an array of items.
        */
       content:
         | string
         | ResponsesAPI.ResponseInputText
         | EvalItem.OutputText
         | EvalItem.InputImage
-        | Array<unknown>;
+        | ResponsesAPI.ResponseInputAudio
+        | GraderModelsAPI.GraderInputs;
 
       /**
        * The role of the message input. One of `user`, `assistant`, `system`, or
@@ -807,7 +816,7 @@ export namespace EvalCreateParams {
       }
 
       /**
-       * An image input to the model.
+       * An image input block used within EvalItem content arrays.
        */
       export interface InputImage {
         /**

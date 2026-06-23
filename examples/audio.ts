@@ -1,4 +1,4 @@
-#!/usr/bin/env -S npm run tsn -T
+#!/usr/bin/env -S npm run tsn -- -T
 
 import OpenAI, { toFile } from 'openai';
 import fs from 'fs';
@@ -61,7 +61,7 @@ async function blockingDemo() {
  * which is different from a Node ReadableStream.
  */
 async function streamToFile(stream: NodeJS.ReadableStream, path: fs.PathLike) {
-  return new Promise((resolve, reject) => {
+  return new Promise<void>((resolve, reject) => {
     const writeStream = fs.createWriteStream(path).on('error', reject).on('finish', resolve);
 
     // If you don't see a `stream.pipe` method and you're using Node you might need to add `import 'openai/shims/node'` at the top of your entrypoint file.

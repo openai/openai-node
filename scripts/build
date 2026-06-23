@@ -18,20 +18,12 @@ cp -rp src README.md dist
 for file in LICENSE CHANGELOG.md; do
   if [ -e "${file}" ]; then cp "${file}" dist; fi
 done
-if [ -e "bin/cli" ]; then
-  mkdir -p dist/bin
-  cp -p "bin/cli" dist/bin/;
-fi
-if [ -e "bin/migration-config.json" ]; then
-  mkdir -p dist/bin
-  cp -p "bin/migration-config.json" dist/bin/;
-fi
 # this converts the export map paths for the dist directory
 # and does a few other minor things
 node scripts/utils/make-dist-package-json.cjs > dist/package.json
 
 # build to .js/.mjs/.d.ts files
-./node_modules/.bin/tsc-multi
+node -r ts-node/register/transpile-only scripts/_vendor/tsc-multi/src/cli.ts
 # we need to patch index.js so that `new module.exports()` works for cjs backwards
 # compat. No way to get that from index.ts because it would cause compile errors
 # when building .mjs

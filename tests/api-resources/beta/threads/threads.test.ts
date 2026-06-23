@@ -4,6 +4,7 @@ import OpenAI from 'openai';
 
 const client = new OpenAI({
   apiKey: 'My API Key',
+  adminAPIKey: 'My Admin API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
@@ -38,7 +39,11 @@ describe('resource threads', () => {
             file_search: {
               vector_store_ids: ['string'],
               vector_stores: [
-                { chunking_strategy: { type: 'auto' }, file_ids: ['string'], metadata: { foo: 'string' } },
+                {
+                  chunking_strategy: { type: 'auto' },
+                  file_ids: ['string'],
+                  metadata: { foo: 'string' },
+                },
               ],
             },
           },
@@ -99,7 +104,7 @@ describe('resource threads', () => {
       max_completion_tokens: 256,
       max_prompt_tokens: 256,
       metadata: { foo: 'string' },
-      model: 'string',
+      model: 'gpt-5.4',
       parallel_tool_calls: true,
       response_format: 'auto',
       stream: false,
@@ -119,7 +124,11 @@ describe('resource threads', () => {
           file_search: {
             vector_store_ids: ['string'],
             vector_stores: [
-              { chunking_strategy: { type: 'auto' }, file_ids: ['string'], metadata: { foo: 'string' } },
+              {
+                chunking_strategy: { type: 'auto' },
+                file_ids: ['string'],
+                metadata: { foo: 'string' },
+              },
             ],
           },
         },

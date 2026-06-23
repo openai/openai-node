@@ -5,6 +5,9 @@ import { APIPromise } from '../core/api-promise';
 import { RequestOptions } from '../internal/request-options';
 import { loggerFor, toFloat32Array } from '../internal/utils';
 
+/**
+ * Get a vector representation of a given input that can be easily consumed by machine learning models and algorithms.
+ */
 export class Embeddings extends APIResource {
   /**
    * Creates an embedding vector representing the input text.
@@ -35,6 +38,7 @@ export class Embeddings extends APIResource {
         encoding_format: encoding_format as EmbeddingCreateParams['encoding_format'],
       },
       ...options,
+      __security: { bearerAuth: true },
     });
 
     // if the user specified an encoding_format, return the response as-is

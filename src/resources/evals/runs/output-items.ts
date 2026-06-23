@@ -7,6 +7,9 @@ import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pa
 import { RequestOptions } from '../../../internal/request-options';
 import { path } from '../../../internal/utils/path';
 
+/**
+ * Manage and run evals in the OpenAI platform.
+ */
 export class OutputItems extends APIResource {
   /**
    * Get an evaluation run output item by ID.
@@ -17,7 +20,10 @@ export class OutputItems extends APIResource {
     options?: RequestOptions,
   ): APIPromise<OutputItemRetrieveResponse> {
     const { eval_id, run_id } = params;
-    return this._client.get(path`/evals/${eval_id}/runs/${run_id}/output_items/${outputItemID}`, options);
+    return this._client.get(path`/evals/${eval_id}/runs/${run_id}/output_items/${outputItemID}`, {
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
@@ -32,7 +38,7 @@ export class OutputItems extends APIResource {
     return this._client.getAPIList(
       path`/evals/${eval_id}/runs/${runID}/output_items`,
       CursorPage<OutputItemListResponse>,
-      { query, ...options },
+      { query, ...options, __security: { bearerAuth: true } },
     );
   }
 }
@@ -74,9 +80,9 @@ export interface OutputItemRetrieveResponse {
   object: 'eval.run.output_item';
 
   /**
-   * A list of results from the evaluation run.
+   * A list of grader results for this output item.
    */
-  results: Array<{ [key: string]: unknown }>;
+  results: Array<OutputItemRetrieveResponse.Result>;
 
   /**
    * The identifier of the evaluation run associated with this output item.
@@ -95,6 +101,38 @@ export interface OutputItemRetrieveResponse {
 }
 
 export namespace OutputItemRetrieveResponse {
+  /**
+   * A single grader result for an evaluation run output item.
+   */
+  export interface Result {
+    /**
+     * The name of the grader.
+     */
+    name: string;
+
+    /**
+     * Whether the grader considered the output a pass.
+     */
+    passed: boolean;
+
+    /**
+     * The numeric score produced by the grader.
+     */
+    score: number;
+
+    /**
+     * Optional sample or intermediate data produced by the grader.
+     */
+    sample?: { [key: string]: unknown } | null;
+
+    /**
+     * The grader type (for example, "string-check-grader").
+     */
+    type?: string;
+
+    [k: string]: unknown;
+  }
+
   /**
    * A sample containing the input and output of the evaluation run.
    */
@@ -240,9 +278,9 @@ export interface OutputItemListResponse {
   object: 'eval.run.output_item';
 
   /**
-   * A list of results from the evaluation run.
+   * A list of grader results for this output item.
    */
-  results: Array<{ [key: string]: unknown }>;
+  results: Array<OutputItemListResponse.Result>;
 
   /**
    * The identifier of the evaluation run associated with this output item.
@@ -261,6 +299,38 @@ export interface OutputItemListResponse {
 }
 
 export namespace OutputItemListResponse {
+  /**
+   * A single grader result for an evaluation run output item.
+   */
+  export interface Result {
+    /**
+     * The name of the grader.
+     */
+    name: string;
+
+    /**
+     * Whether the grader considered the output a pass.
+     */
+    passed: boolean;
+
+    /**
+     * The numeric score produced by the grader.
+     */
+    score: number;
+
+    /**
+     * Optional sample or intermediate data produced by the grader.
+     */
+    sample?: { [key: string]: unknown } | null;
+
+    /**
+     * The grader type (for example, "string-check-grader").
+     */
+    type?: string;
+
+    [k: string]: unknown;
+  }
+
   /**
    * A sample containing the input and output of the evaluation run.
    */

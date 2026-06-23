@@ -5,6 +5,9 @@ import * as GraderModelsAPI from '../../graders/grader-models';
 import { APIPromise } from '../../../core/api-promise';
 import { RequestOptions } from '../../../internal/request-options';
 
+/**
+ * Manage fine-tuning jobs to tailor a model to your specific training data.
+ */
 export class Graders extends APIResource {
   /**
    * Run a grader.
@@ -24,7 +27,11 @@ export class Graders extends APIResource {
    * ```
    */
   run(body: GraderRunParams, options?: RequestOptions): APIPromise<GraderRunResponse> {
-    return this._client.post('/fine_tuning/alpha/graders/run', { body, ...options });
+    return this._client.post('/fine_tuning/alpha/graders/run', {
+      body,
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
@@ -45,7 +52,11 @@ export class Graders extends APIResource {
    * ```
    */
   validate(body: GraderValidateParams, options?: RequestOptions): APIPromise<GraderValidateResponse> {
-    return this._client.post('/fine_tuning/alpha/graders/validate', { body, ...options });
+    return this._client.post('/fine_tuning/alpha/graders/validate', {
+      body,
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 }
 

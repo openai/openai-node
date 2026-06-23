@@ -25,6 +25,7 @@ export class Files extends APIResource {
       body,
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -40,6 +41,7 @@ export class Files extends APIResource {
     return this._client.get(path`/vector_stores/${vector_store_id}/files/${fileID}`, {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -52,6 +54,7 @@ export class Files extends APIResource {
       body,
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -67,6 +70,7 @@ export class Files extends APIResource {
       query,
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -85,6 +89,7 @@ export class Files extends APIResource {
     return this._client.delete(path`/vector_stores/${vector_store_id}/files/${fileID}`, {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -186,7 +191,11 @@ export class Files extends APIResource {
     return this._client.getAPIList(
       path`/vector_stores/${vector_store_id}/files/${fileID}/content`,
       Page<FileContentResponse>,
-      { ...options, headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]) },
+      {
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      },
     );
   }
 }
@@ -264,7 +273,7 @@ export namespace VectorStoreFile {
    */
   export interface LastError {
     /**
-     * One of `server_error` or `rate_limit_exceeded`.
+     * One of `server_error`, `unsupported_file`, or `invalid_file`.
      */
     code: 'server_error' | 'unsupported_file' | 'invalid_file';
 
@@ -299,7 +308,9 @@ export interface FileCreateParams {
   /**
    * A [File](https://platform.openai.com/docs/api-reference/files) ID that the
    * vector store should use. Useful for tools like `file_search` that can access
-   * files.
+   * files. For multi-file ingestion, we recommend
+   * [`file_batches`](https://platform.openai.com/docs/api-reference/vector-stores-file-batches/createBatch)
+   * to minimize per-vector-store write requests.
    */
   file_id: string;
 

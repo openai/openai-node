@@ -1,4 +1,4 @@
-#!/usr/bin/env -S npm run tsn -T
+#!/usr/bin/env -S npm run tsn -- -T
 
 import { AzureOpenAI } from 'openai';
 import { getBearerTokenProvider, DefaultAzureCredential } from '@azure/identity';

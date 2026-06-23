@@ -28,10 +28,20 @@ export async function defaultParseResponse<T>(
       // that if you set `stream: true` the response type must also be `Stream<T>`
 
       if (props.options.__streamClass) {
-        return props.options.__streamClass.fromSSEResponse(response, props.controller, client) as any;
+        return props.options.__streamClass.fromSSEResponse(
+          response,
+          props.controller,
+          client,
+          props.options.__synthesizeEventData,
+        ) as any;
       }
 
-      return Stream.fromSSEResponse(response, props.controller, client) as any;
+      return Stream.fromSSEResponse(
+        response,
+        props.controller,
+        client,
+        props.options.__synthesizeEventData,
+      ) as any;
     }
 
     // fetch refuses to read the body when the status code is 204.
@@ -47,6 +57,12 @@ export async function defaultParseResponse<T>(
     const mediaType = contentType?.split(';')[0]?.trim();
     const isJSON = mediaType?.includes('application/json') || mediaType?.endsWith('+json');
     if (isJSON) {
+      const contentLength = response.headers.get('content-length');
+      if (contentLength === '0') {
+        // if there is no content we can't do anything
+        return undefined as T;
+      }
+
       const json = await response.json();
       return addRequestID(json as T, response);
     }
