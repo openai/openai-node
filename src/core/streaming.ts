@@ -5,6 +5,8 @@ import { findDoubleNewlineIndex, LineDecoder } from '../internal/decoders/line';
 import { ReadableStreamToAsyncIterable } from '../internal/shims';
 import { isAbortError } from '../internal/errors';
 import { encodeUTF8 } from '../internal/utils/bytes';
+import { loggerFor } from '../internal/utils/log';
+import type { OpenAI } from '../client';
 
 import { APIError } from './error';
 
@@ -18,16 +20,25 @@ export type ServerSentEvent = {
 
 export class Stream<Item> implements AsyncIterable<Item> {
   controller: AbortController;
+  #client: OpenAI | undefined;
 
   constructor(
     private iterator: () => AsyncIterator<Item>,
     controller: AbortController,
+    client?: OpenAI,
   ) {
     this.controller = controller;
+    this.#client = client;
   }
 
-  static fromSSEResponse<Item>(response: Response, controller: AbortController): Stream<Item> {
+  static fromSSEResponse<Item>(
+    response: Response,
+    controller: AbortController,
+    client?: OpenAI,
+    synthesizeEventData?: boolean,
+  ): Stream<Item> {
     let consumed = false;
+    const logger = client ? loggerFor(client) : console;
 
     async function* iterator(): AsyncIterator<Item, any, undefined> {
       if (consumed) {
@@ -44,18 +55,14 @@ export class Stream<Item> implements AsyncIterable<Item> {
             continue;
           }
 
-          if (
-            sse.event === null ||
-            sse.event.startsWith('response.') ||
-            sse.event.startsWith('transcript.')
-          ) {
+          if (sse.event === null || !sse.event.startsWith('thread.')) {
             let data;
 
             try {
-              data = JSON.parse(sse.data);
+              data = JSON.parse(sse.data) as any;
             } catch (e) {
-              console.error(`Could not parse message into JSON:`, sse.data);
-              console.error(`From chunk:`, sse.raw);
+              logger.error(`Could not parse message into JSON:`, sse.data);
+              logger.error(`From chunk:`, sse.raw);
               throw e;
             }
 
@@ -63,7 +70,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
               throw new APIError(undefined, data.error, undefined, response.headers);
             }
 
-            yield data;
+            yield synthesizeEventData ? { event: sse.event, data } : data;
           } else {
             let data;
             try {
@@ -91,14 +98,18 @@ export class Stream<Item> implements AsyncIterable<Item> {
       }
     }
 
-    return new Stream(iterator, controller);
+    return new Stream(iterator, controller, client);
   }
 
   /**
    * Generates a Stream from a newline-separated ReadableStream
    * where each item is a JSON value.
    */
-  static fromReadableStream<Item>(readableStream: ReadableStream, controller: AbortController): Stream<Item> {
+  static fromReadableStream<Item>(
+    readableStream: ReadableStream,
+    controller: AbortController,
+    client?: OpenAI,
+  ): Stream<Item> {
     let consumed = false;
 
     async function* iterLines(): AsyncGenerator<string, void, unknown> {
@@ -125,7 +136,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
       try {
         for await (const line of iterLines()) {
           if (done) continue;
-          if (line) yield JSON.parse(line);
+          if (line) yield JSON.parse(line) as Item;
         }
         done = true;
       } catch (e) {
@@ -138,7 +149,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
       }
     }
 
-    return new Stream(iterator, controller);
+    return new Stream(iterator, controller, client);
   }
 
   [Symbol.asyncIterator](): AsyncIterator<Item> {
@@ -168,8 +179,8 @@ export class Stream<Item> implements AsyncIterable<Item> {
     };
 
     return [
-      new Stream(() => teeIterator(left), this.controller),
-      new Stream(() => teeIterator(right), this.controller),
+      new Stream(() => teeIterator(left), this.controller, this.#client),
+      new Stream(() => teeIterator(right), this.controller, this.#client),
     ];
   }
 

@@ -4,6 +4,7 @@ import OpenAI from 'openai';
 
 const client = new OpenAI({
   apiKey: 'My API Key',
+  adminAPIKey: 'My Admin API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
@@ -56,7 +57,12 @@ describe('resource vectorStores', () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
       client.vectorStores.list(
-        { after: 'after', before: 'before', limit: 0, order: 'asc' },
+        {
+          after: 'after',
+          before: 'before',
+          limit: 0,
+          order: 'asc',
+        },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);
@@ -87,9 +93,13 @@ describe('resource vectorStores', () => {
   test('search: required and optional params', async () => {
     const response = await client.vectorStores.search('vs_abc123', {
       query: 'string',
-      filters: { key: 'key', type: 'eq', value: 'string' },
+      filters: {
+        key: 'key',
+        type: 'eq',
+        value: 'string',
+      },
       max_num_results: 1,
-      ranking_options: { ranker: 'auto', score_threshold: 0 },
+      ranking_options: { ranker: 'none', score_threshold: 0 },
       rewrite_query: true,
     });
   });

@@ -56,8 +56,8 @@ expect.extend({
 
 it(`streaming works`, async function () {
   const stream = await client.chat.completions.create({
-    model: 'gpt-4',
-    messages: [{ role: 'user', content: 'Say this is a test' }],
+    model: 'gpt-4o-mini',
+    messages: [{ role: 'user', content: 'Reply with exactly this text and nothing else: This is a test' }],
     stream: true,
   });
   const chunks = [];
@@ -78,8 +78,8 @@ it(`ChatCompletionStream works`, async function () {
 
   const stream = client.chat.completions
     .stream({
-      model: 'gpt-4',
-      messages: [{ role: 'user', content: 'Say this is a test' }],
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: 'Reply with exactly this text and nothing else: This is a test' }],
     })
     .on('chunk', (chunk) => chunks.push(chunk))
     .on('content', (delta, snapshot) => contents.push([delta, snapshot]))
@@ -123,8 +123,8 @@ it(`aborting ChatCompletionStream works`, async function () {
   const stream = client.chat.completions
     .stream(
       {
-        model: 'gpt-4',
-        messages: [{ role: 'user', content: 'Say this is a test' }],
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: 'Reply with exactly this text and nothing else: This is a test' }],
       },
       { signal: controller.signal },
     )

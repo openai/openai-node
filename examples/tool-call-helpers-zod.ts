@@ -1,8 +1,8 @@
-#!/usr/bin/env -S npm run tsn -T
+#!/usr/bin/env -S npm run tsn -- -T
 
 import OpenAI from 'openai';
 import { zodFunction } from 'openai/helpers/zod';
-import { z } from 'zod';
+import { z } from 'zod/v4'; // Also works for 'zod/v3'
 
 // gets API Key from environment variable OPENAI_API_KEY
 const openai = new OpenAI();

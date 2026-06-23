@@ -15,6 +15,9 @@ import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pa
 import { RequestOptions } from '../../../internal/request-options';
 import { path } from '../../../internal/utils/path';
 
+/**
+ * Manage fine-tuning jobs to tailor a model to your specific training data.
+ */
 export class Jobs extends APIResource {
   checkpoints: CheckpointsAPI.Checkpoints = new CheckpointsAPI.Checkpoints(this._client);
 
@@ -36,7 +39,7 @@ export class Jobs extends APIResource {
    * ```
    */
   create(body: JobCreateParams, options?: RequestOptions): APIPromise<FineTuningJob> {
-    return this._client.post('/fine_tuning/jobs', { body, ...options });
+    return this._client.post('/fine_tuning/jobs', { body, ...options, __security: { bearerAuth: true } });
   }
 
   /**
@@ -52,7 +55,10 @@ export class Jobs extends APIResource {
    * ```
    */
   retrieve(fineTuningJobID: string, options?: RequestOptions): APIPromise<FineTuningJob> {
-    return this._client.get(path`/fine_tuning/jobs/${fineTuningJobID}`, options);
+    return this._client.get(path`/fine_tuning/jobs/${fineTuningJobID}`, {
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
@@ -70,7 +76,11 @@ export class Jobs extends APIResource {
     query: JobListParams | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<FineTuningJobsPage, FineTuningJob> {
-    return this._client.getAPIList('/fine_tuning/jobs', CursorPage<FineTuningJob>, { query, ...options });
+    return this._client.getAPIList('/fine_tuning/jobs', CursorPage<FineTuningJob>, {
+      query,
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
@@ -84,7 +94,10 @@ export class Jobs extends APIResource {
    * ```
    */
   cancel(fineTuningJobID: string, options?: RequestOptions): APIPromise<FineTuningJob> {
-    return this._client.post(path`/fine_tuning/jobs/${fineTuningJobID}/cancel`, options);
+    return this._client.post(path`/fine_tuning/jobs/${fineTuningJobID}/cancel`, {
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
@@ -108,7 +121,7 @@ export class Jobs extends APIResource {
     return this._client.getAPIList(
       path`/fine_tuning/jobs/${fineTuningJobID}/events`,
       CursorPage<FineTuningJobEvent>,
-      { query, ...options },
+      { query, ...options, __security: { bearerAuth: true } },
     );
   }
 
@@ -123,7 +136,10 @@ export class Jobs extends APIResource {
    * ```
    */
   pause(fineTuningJobID: string, options?: RequestOptions): APIPromise<FineTuningJob> {
-    return this._client.post(path`/fine_tuning/jobs/${fineTuningJobID}/pause`, options);
+    return this._client.post(path`/fine_tuning/jobs/${fineTuningJobID}/pause`, {
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
@@ -137,7 +153,10 @@ export class Jobs extends APIResource {
    * ```
    */
   resume(fineTuningJobID: string, options?: RequestOptions): APIPromise<FineTuningJob> {
-    return this._client.post(path`/fine_tuning/jobs/${fineTuningJobID}/resume`, options);
+    return this._client.post(path`/fine_tuning/jobs/${fineTuningJobID}/resume`, {
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 }
 

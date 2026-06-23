@@ -7,6 +7,9 @@ import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pa
 import { RequestOptions } from '../../../internal/request-options';
 import { path } from '../../../internal/utils/path';
 
+/**
+ * Given a list of messages comprising a conversation, the model will return a response.
+ */
 export class Messages extends APIResource {
   /**
    * Get the messages in a stored chat completion. Only Chat Completions that have
@@ -30,7 +33,7 @@ export class Messages extends APIResource {
     return this._client.getAPIList(
       path`/chat/completions/${completionID}/messages`,
       CursorPage<CompletionsAPI.ChatCompletionStoreMessage>,
-      { query, ...options },
+      { query, ...options, __security: { bearerAuth: true } },
     );
   }
 }
