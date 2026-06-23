@@ -4,6 +4,7 @@ import OpenAI from 'openai';
 
 const client = new OpenAI({
   apiKey: 'My API Key',
+  adminAPIKey: 'My Admin API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
@@ -29,8 +30,10 @@ describe('resource inputTokens', () => {
           instructions: 'instructions',
           model: 'model',
           parallel_tool_calls: true,
+          personality: 'friendly',
           previous_response_id: 'resp_123',
           reasoning: {
+            context: 'auto',
             effort: 'none',
             generate_summary: 'auto',
             summary: 'auto',

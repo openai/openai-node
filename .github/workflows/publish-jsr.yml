@@ -4,6 +4,9 @@ name: Publish JSR
 on:
   workflow_dispatch:
 
+env:
+  LATEST_LTS_NODE_VERSION: '24'
+
 jobs:
   publish:
     name: publish
@@ -16,14 +19,18 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+
       - name: Set up Node
         uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3
         with:
-          node-version: '20'
+          node-version: ${{ env.LATEST_LTS_NODE_VERSION }}
+          cache: pnpm
 
       - name: Install dependencies
         run: |
-          yarn install
+          pnpm install --frozen-lockfile
 
       - name: Publish to JSR
         run: |

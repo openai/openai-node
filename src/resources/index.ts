@@ -2,6 +2,7 @@
 
 export * from './chat/index';
 export * from './shared';
+export { Admin } from './admin/admin';
 export { Audio, type AudioModel, type AudioResponseFormat } from './audio/audio';
 export {
   Batches,
