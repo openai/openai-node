@@ -27,14 +27,17 @@ export class Containers extends APIResource {
    * Create Container
    */
   create(body: ContainerCreateParams, options?: RequestOptions): APIPromise<ContainerCreateResponse> {
-    return this._client.post('/containers', { body, ...options });
+    return this._client.post('/containers', { body, ...options, __security: { bearerAuth: true } });
   }
 
   /**
    * Retrieve Container
    */
   retrieve(containerID: string, options?: RequestOptions): APIPromise<ContainerRetrieveResponse> {
-    return this._client.get(path`/containers/${containerID}`, options);
+    return this._client.get(path`/containers/${containerID}`, {
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
@@ -44,7 +47,11 @@ export class Containers extends APIResource {
     query: ContainerListParams | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<ContainerListResponsesPage, ContainerListResponse> {
-    return this._client.getAPIList('/containers', CursorPage<ContainerListResponse>, { query, ...options });
+    return this._client.getAPIList('/containers', CursorPage<ContainerListResponse>, {
+      query,
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
@@ -54,6 +61,7 @@ export class Containers extends APIResource {
     return this._client.delete(path`/containers/${containerID}`, {
       ...options,
       headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 }

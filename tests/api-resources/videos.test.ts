@@ -4,6 +4,7 @@ import OpenAI, { toFile } from 'openai';
 
 const client = new OpenAI({
   apiKey: 'My API Key',
+  adminAPIKey: 'My Admin API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
@@ -23,7 +24,7 @@ describe('resource videos', () => {
     const response = await client.videos.create({
       prompt: 'x',
       input_reference: await toFile(Buffer.from('Example data'), 'README.md'),
-      model: 'string',
+      model: 'sora-2',
       seconds: '4',
       size: '720x1280',
     });
@@ -97,8 +98,7 @@ describe('resource videos', () => {
     });
   });
 
-  // Mock server doesn't support application/binary responses
-  test.skip('downloadContent: request options and params are passed correctly', async () => {
+  test('downloadContent: request options and params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
       client.videos.downloadContent('video_123', { variant: 'video' }, { path: '/_stainless_unknown_path' }),

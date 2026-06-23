@@ -4,12 +4,16 @@ import OpenAI from 'openai';
 
 const client = new OpenAI({
   apiKey: 'My API Key',
+  adminAPIKey: 'My Admin API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
 describe('resource completions', () => {
   test('create: only required params', async () => {
-    const responsePromise = client.completions.create({ model: 'string', prompt: 'This is a test.' });
+    const responsePromise = client.completions.create({
+      model: 'gpt-3.5-turbo-instruct',
+      prompt: 'This is a test.',
+    });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -21,7 +25,7 @@ describe('resource completions', () => {
 
   test('create: required and optional params', async () => {
     const response = await client.completions.create({
-      model: 'string',
+      model: 'gpt-3.5-turbo-instruct',
       prompt: 'This is a test.',
       best_of: 0,
       echo: true,

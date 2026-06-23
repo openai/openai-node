@@ -30,21 +30,28 @@ export class Skills extends APIResource {
    * Create a new skill.
    */
   create(body: SkillCreateParams | null | undefined = {}, options?: RequestOptions): APIPromise<Skill> {
-    return this._client.post('/skills', maybeMultipartFormRequestOptions({ body, ...options }, this._client));
+    return this._client.post(
+      '/skills',
+      maybeMultipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
+    );
   }
 
   /**
    * Get a skill by its ID.
    */
   retrieve(skillID: string, options?: RequestOptions): APIPromise<Skill> {
-    return this._client.get(path`/skills/${skillID}`, options);
+    return this._client.get(path`/skills/${skillID}`, { ...options, __security: { bearerAuth: true } });
   }
 
   /**
    * Update the default version pointer for a skill.
    */
   update(skillID: string, body: SkillUpdateParams, options?: RequestOptions): APIPromise<Skill> {
-    return this._client.post(path`/skills/${skillID}`, { body, ...options });
+    return this._client.post(path`/skills/${skillID}`, {
+      body,
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
@@ -54,14 +61,18 @@ export class Skills extends APIResource {
     query: SkillListParams | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<SkillsPage, Skill> {
-    return this._client.getAPIList('/skills', CursorPage<Skill>, { query, ...options });
+    return this._client.getAPIList('/skills', CursorPage<Skill>, {
+      query,
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
    * Delete a skill by its ID.
    */
   delete(skillID: string, options?: RequestOptions): APIPromise<DeletedSkill> {
-    return this._client.delete(path`/skills/${skillID}`, options);
+    return this._client.delete(path`/skills/${skillID}`, { ...options, __security: { bearerAuth: true } });
   }
 }
 
