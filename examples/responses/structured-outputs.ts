@@ -1,4 +1,4 @@
-#!/usr/bin/env -S npm run tsn -T
+#!/usr/bin/env -S npm run tsn -- -T
 
 import { OpenAI } from 'openai';
 import { zodTextFormat } from 'openai/helpers/zod';

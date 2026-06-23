@@ -29,6 +29,7 @@ export class Items extends APIResource {
       query: { include },
       body,
       ...options,
+      __security: { bearerAuth: true },
     });
   }
 
@@ -41,7 +42,11 @@ export class Items extends APIResource {
     options?: RequestOptions,
   ): APIPromise<ConversationItem> {
     const { conversation_id, ...query } = params;
-    return this._client.get(path`/conversations/${conversation_id}/items/${itemID}`, { query, ...options });
+    return this._client.get(path`/conversations/${conversation_id}/items/${itemID}`, {
+      query,
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
@@ -55,7 +60,7 @@ export class Items extends APIResource {
     return this._client.getAPIList(
       path`/conversations/${conversationID}/items`,
       ConversationCursorPage<ConversationItem>,
-      { query, ...options },
+      { query, ...options, __security: { bearerAuth: true } },
     );
   }
 
@@ -68,7 +73,10 @@ export class Items extends APIResource {
     options?: RequestOptions,
   ): APIPromise<ConversationsAPI.Conversation> {
     const { conversation_id } = params;
-    return this._client.delete(path`/conversations/${conversation_id}/items/${itemID}`, options);
+    return this._client.delete(path`/conversations/${conversation_id}/items/${itemID}`, {
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 }
 
@@ -90,7 +98,9 @@ export type ConversationItem =
   | ResponsesAPI.ResponseComputerToolCallOutputItem
   | ResponsesAPI.ResponseToolSearchCall
   | ResponsesAPI.ResponseToolSearchOutputItem
+  | ConversationItem.AdditionalTools
   | ResponsesAPI.ResponseReasoningItem
+  | ResponsesAPI.ResponseCompactionItem
   | ResponsesAPI.ResponseCodeInterpreterToolCall
   | ConversationItem.LocalShellCall
   | ConversationItem.LocalShellCallOutput
@@ -129,6 +139,28 @@ export namespace ConversationItem {
      * The type of the image generation call. Always `image_generation_call`.
      */
     type: 'image_generation_call';
+  }
+
+  export interface AdditionalTools {
+    /**
+     * The unique ID of the additional tools item.
+     */
+    id: string;
+
+    /**
+     * The role that provided the additional tools.
+     */
+    role: 'unknown' | 'user' | 'assistant' | 'system' | 'critic' | 'discriminator' | 'developer' | 'tool';
+
+    /**
+     * The additional tool definitions made available at this item.
+     */
+    tools: Array<ResponsesAPI.Tool>;
+
+    /**
+     * The type of the item. Always `additional_tools`.
+     */
+    type: 'additional_tools';
   }
 
   /**
