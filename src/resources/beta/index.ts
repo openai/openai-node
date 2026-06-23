@@ -20,6 +20,7 @@ export {
 } from './assistants';
 export { Beta } from './beta';
 export { Realtime } from './realtime/index';
+export { ChatKit, type ChatKitWorkflow } from './chatkit/index';
 export {
   Threads,
   type AssistantResponseFormatOption,

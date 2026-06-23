@@ -58,7 +58,7 @@ const noopLogger = {
   debug: noop,
 };
 
-let cachedLoggers = /** @__PURE__ */ new WeakMap<Logger, [LogLevel, Logger]>();
+let cachedLoggers = /* @__PURE__ */ new WeakMap<Logger, [LogLevel, Logger]>();
 
 export function loggerFor(client: OpenAI): Logger {
   const logger = client.logger;
@@ -107,6 +107,8 @@ export const formatRequestDetails = (details: {
           name,
           (
             name.toLowerCase() === 'authorization' ||
+            name.toLowerCase() === 'api-key' ||
+            name.toLowerCase() === 'x-api-key' ||
             name.toLowerCase() === 'cookie' ||
             name.toLowerCase() === 'set-cookie'
           ) ?

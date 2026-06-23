@@ -1,0 +1,52 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`.stream() standard text works 1`] = `
+"data: {\"response\":{\"id\":\"resp_test_1\",\"object\":\"response\",\"created_at\":1723031665,\"model\":\"gpt-4o-2024-08-06\",\"output\":[],\"output_text\":\"\",\"error\":null,\"incomplete_details\":null,\"instructions\":null,\"metadata\":null,\"parallel_tool_calls\":false,\"temperature\":null,\"tools\":[],\"top_p\":null,\"status\":\"in_progress\",\"usage\":{\"input_tokens\":0,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":0,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":0}},\"sequence_number\":0,\"type\":\"response.created\"}
+
+data: {\"item\":{\"id\":\"msg_1\",\"type\":\"message\",\"role\":\"assistant\",\"status\":\"in_progress\",\"content\":[]},\"output_index\":0,\"sequence_number\":1,\"type\":\"response.output_item.added\"}
+
+data: {\"content_index\":0,\"item_id\":\"msg_1\",\"output_index\":0,\"part\":{\"type\":\"output_text\",\"text\":\"\",\"annotations\":[]},\"sequence_number\":2,\"type\":\"response.content_part.added\"}
+
+data: {\"content_index\":0,\"delta\":\"Hello \",\"item_id\":\"msg_1\",\"logprobs\":[],\"output_index\":0,\"sequence_number\":3,\"type\":\"response.output_text.delta\"}
+
+data: {\"content_index\":0,\"delta\":\"world\",\"item_id\":\"msg_1\",\"logprobs\":[],\"output_index\":0,\"sequence_number\":4,\"type\":\"response.output_text.delta\"}
+
+data: {\"content_index\":0,\"item_id\":\"msg_1\",\"logprobs\":[],\"output_index\":0,\"sequence_number\":5,\"text\":\"Hello world\",\"type\":\"response.output_text.done\"}
+
+data: {\"item\":{\"id\":\"msg_1\",\"type\":\"message\",\"role\":\"assistant\",\"status\":\"completed\",\"content\":[{\"type\":\"output_text\",\"text\":\"Hello world\",\"annotations\":[]}]},\"output_index\":0,\"sequence_number\":6,\"type\":\"response.output_item.done\"}
+
+data: {\"response\":{\"id\":\"resp_test_1\",\"object\":\"response\",\"created_at\":1723031665,\"model\":\"gpt-4o-2024-08-06\",\"output\":[{\"id\":\"msg_1\",\"type\":\"message\",\"role\":\"assistant\",\"status\":\"completed\",\"content\":[{\"type\":\"output_text\",\"text\":\"Hello world\",\"annotations\":[]}]}],\"output_text\":\"Hello world\",\"error\":null,\"incomplete_details\":null,\"instructions\":null,\"metadata\":null,\"parallel_tool_calls\":false,\"temperature\":null,\"tools\":[],\"top_p\":null,\"status\":\"completed\",\"usage\":{\"input_tokens\":10,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":2,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":12}},\"sequence_number\":7,\"type\":\"response.completed\"}
+
+data: [DONE]
+
+"
+`;
+
+exports[`.stream() reasoning works 1`] = `
+"data: {\"response\":{\"id\":\"resp_reason_1\",\"object\":\"response\",\"created_at\":1723031666,\"model\":\"o3\",\"output\":[],\"output_text\":\"\",\"error\":null,\"incomplete_details\":null,\"instructions\":null,\"metadata\":null,\"parallel_tool_calls\":false,\"temperature\":null,\"tools\":[],\"top_p\":null,\"status\":\"in_progress\",\"usage\":{\"input_tokens\":0,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":0,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":0}},\"sequence_number\":0,\"type\":\"response.created\"}
+
+data: {\"item\":{\"id\":\"r1\",\"type\":\"reasoning\",\"summary\":[],\"status\":\"in_progress\"},\"output_index\":0,\"sequence_number\":1,\"type\":\"response.output_item.added\"}
+
+data: {\"content_index\":0,\"item_id\":\"r1\",\"output_index\":0,\"part\":{\"type\":\"reasoning_text\",\"text\":\"\"},\"sequence_number\":2,\"type\":\"response.content_part.added\"}
+
+data: {\"content_index\":0,\"delta\":\"Chain: Step 1. \",\"item_id\":\"r1\",\"output_index\":0,\"sequence_number\":3,\"type\":\"response.reasoning_text.delta\"}
+
+data: {\"content_index\":0,\"delta\":\"Step 2.\",\"item_id\":\"r1\",\"output_index\":0,\"sequence_number\":4,\"type\":\"response.reasoning_text.delta\"}
+
+data: {\"item\":{\"id\":\"msg_2\",\"type\":\"message\",\"role\":\"assistant\",\"status\":\"in_progress\",\"content\":[]},\"output_index\":1,\"sequence_number\":5,\"type\":\"response.output_item.added\"}
+
+data: {\"content_index\":0,\"item_id\":\"msg_2\",\"output_index\":1,\"part\":{\"type\":\"output_text\",\"text\":\"\",\"annotations\":[]},\"sequence_number\":6,\"type\":\"response.content_part.added\"}
+
+data: {\"content_index\":0,\"delta\":\"The answer is \",\"item_id\":\"msg_2\",\"logprobs\":[],\"output_index\":1,\"sequence_number\":7,\"type\":\"response.output_text.delta\"}
+
+data: {\"content_index\":0,\"delta\":\"42\",\"item_id\":\"msg_2\",\"logprobs\":[],\"output_index\":1,\"sequence_number\":8,\"type\":\"response.output_text.delta\"}
+
+data: {\"content_index\":0,\"item_id\":\"msg_2\",\"logprobs\":[],\"output_index\":1,\"sequence_number\":9,\"text\":\"The answer is 42\",\"type\":\"response.output_text.done\"}
+
+data: {\"response\":{\"id\":\"resp_reason_1\",\"object\":\"response\",\"created_at\":1723031666,\"model\":\"o3\",\"output\":[{\"id\":\"r1\",\"type\":\"reasoning\",\"summary\":[],\"status\":\"completed\",\"content\":[{\"type\":\"reasoning_text\",\"text\":\"Chain: Step 1. Step 2.\"}]},{\"id\":\"msg_2\",\"type\":\"message\",\"role\":\"assistant\",\"status\":\"completed\",\"content\":[{\"type\":\"output_text\",\"text\":\"The answer is 42\",\"annotations\":[]}]}],\"output_text\":\"The answer is 42\",\"error\":null,\"incomplete_details\":null,\"instructions\":null,\"metadata\":null,\"parallel_tool_calls\":false,\"temperature\":null,\"tools\":[],\"top_p\":null,\"status\":\"completed\",\"usage\":{\"input_tokens\":0,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":6,\"output_tokens_details\":{\"reasoning_tokens\":2},\"total_tokens\":6}},\"sequence_number\":10,\"type\":\"response.completed\"}
+
+data: [DONE]
+
+"
+`;
+

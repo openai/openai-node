@@ -1,8 +1,8 @@
-#!/usr/bin/env -S npm run tsn -T
+#!/usr/bin/env -S npm run tsn -- -T
 
 import { OpenAI } from 'openai';
 import { zodTextFormat } from 'openai/helpers/zod';
-import { z } from 'zod';
+import { z } from 'zod/v4'; // Also works for 'zod/v3'
 
 const Step = z.object({
   explanation: z.string(),
