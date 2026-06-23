@@ -1,4 +1,4 @@
-#!/usr/bin/env -S npm run tsn -T
+#!/usr/bin/env -S npm run tsn -- -T
 
 // This file demonstrates how to stream from the server the chunks as
 // a new-line separated JSON-encoded stream.
@@ -30,7 +30,7 @@ app.post('/', async (req: Request, res: Response) => {
   try {
     console.log('Received request:', req.body);
 
-    const stream = openai.beta.chat.completions.stream({
+    const stream = openai.chat.completions.stream({
       model: 'gpt-3.5-turbo',
       stream: true,
       messages: [{ role: 'user', content: req.body }],

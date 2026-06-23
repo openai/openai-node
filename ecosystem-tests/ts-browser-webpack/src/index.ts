@@ -1,4 +1,3 @@
-import 'openai/shims/web';
 import OpenAI, { toFile } from 'openai';
 import { distance } from 'fastest-levenshtein';
 import { ChatCompletion } from 'openai/resources/chat/completions';
@@ -109,8 +108,8 @@ async function typeTests() {
 it(`raw response`, async function () {
   const response = await client.chat.completions
     .create({
-      model: 'gpt-4',
-      messages: [{ role: 'user', content: 'Say this is a test' }],
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: 'Reply with exactly this text and nothing else: This is a test' }],
     })
     .asResponse();
 
@@ -141,8 +140,8 @@ it(`raw response`, async function () {
 
 it(`streaming works`, async function () {
   const stream = await client.chat.completions.create({
-    model: 'gpt-4',
-    messages: [{ role: 'user', content: 'Say this is a test' }],
+    model: 'gpt-4o-mini',
+    messages: [{ role: 'user', content: 'Reply with exactly this text and nothing else: This is a test' }],
     stream: true,
   });
   const chunks = [];

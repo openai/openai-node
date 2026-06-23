@@ -1,87 +1,93 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../resource';
-import { isRequestOptions } from '../core';
-import { sleep } from '../core';
+import { APIResource } from '../core/resource';
+import { APIPromise } from '../core/api-promise';
+import { CursorPage, type CursorPageParams, PagePromise } from '../core/pagination';
+import { type Uploadable } from '../core/uploads';
+import { buildHeaders } from '../internal/headers';
+import { RequestOptions } from '../internal/request-options';
+import { sleep } from '../internal/utils/sleep';
 import { APIConnectionTimeoutError } from '../error';
-import * as Core from '../core';
-import * as FilesAPI from './files';
-import { Page } from '../pagination';
-import { type Response } from '../_shims/index';
+import { multipartFormRequestOptions } from '../internal/uploads';
+import { path } from '../internal/utils/path';
 
+/**
+ * Files are used to upload documents that can be used with features like Assistants and Fine-tuning.
+ */
 export class Files extends APIResource {
   /**
    * Upload a file that can be used across various endpoints. Individual files can be
-   * up to 512 MB, and the size of all files uploaded by one organization can be up
-   * to 100 GB.
+   * up to 512 MB, and each project can store up to 2.5 TB of files in total. There
+   * is no organization-wide storage limit. Uploads to this endpoint are rate-limited
+   * to 1,000 requests per minute per authenticated user.
    *
-   * The Assistants API supports files up to 2 million tokens and of specific file
-   * types. See the
-   * [Assistants Tools guide](https://platform.openai.com/docs/assistants/tools) for
-   * details.
-   *
-   * The Fine-tuning API only supports `.jsonl` files. The input also has certain
-   * required formats for fine-tuning
-   * [chat](https://platform.openai.com/docs/api-reference/fine-tuning/chat-input) or
-   * [completions](https://platform.openai.com/docs/api-reference/fine-tuning/completions-input)
-   * models.
-   *
-   * The Batch API only supports `.jsonl` files up to 100 MB in size. The input also
-   * has a specific required
-   * [format](https://platform.openai.com/docs/api-reference/batch/request-input).
+   * - The Assistants API supports files up to 2 million tokens and of specific file
+   *   types. See the
+   *   [Assistants Tools guide](https://platform.openai.com/docs/assistants/tools)
+   *   for details.
+   * - The Fine-tuning API only supports `.jsonl` files. The input also has certain
+   *   required formats for fine-tuning
+   *   [chat](https://platform.openai.com/docs/api-reference/fine-tuning/chat-input)
+   *   or
+   *   [completions](https://platform.openai.com/docs/api-reference/fine-tuning/completions-input)
+   *   models.
+   * - The Batch API only supports `.jsonl` files up to 200 MB in size. The input
+   *   also has a specific required
+   *   [format](https://platform.openai.com/docs/api-reference/batch/request-input).
+   * - For Retrieval or `file_search` ingestion, upload files here first. If you need
+   *   to attach multiple uploaded files to the same vector store, use
+   *   [`/vector_stores/{vector_store_id}/file_batches`](https://platform.openai.com/docs/api-reference/vector-stores-file-batches/createBatch)
+   *   instead of attaching them one by one. Vector store attachment has separate
+   *   limits from file upload, including 2,000 attached files per minute per
+   *   organization.
    *
    * Please [contact us](https://help.openai.com/) if you need to increase these
    * storage limits.
    */
-  create(body: FileCreateParams, options?: Core.RequestOptions): Core.APIPromise<FileObject> {
-    return this._client.post('/files', Core.multipartFormRequestOptions({ body, ...options }));
+  create(body: FileCreateParams, options?: RequestOptions): APIPromise<FileObject> {
+    return this._client.post(
+      '/files',
+      multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
+    );
   }
 
   /**
    * Returns information about a specific file.
    */
-  retrieve(fileId: string, options?: Core.RequestOptions): Core.APIPromise<FileObject> {
-    return this._client.get(`/files/${fileId}`, options);
+  retrieve(fileID: string, options?: RequestOptions): APIPromise<FileObject> {
+    return this._client.get(path`/files/${fileID}`, { ...options, __security: { bearerAuth: true } });
   }
 
   /**
-   * Returns a list of files that belong to the user's organization.
+   * Returns a list of files.
    */
-  list(query?: FileListParams, options?: Core.RequestOptions): Core.PagePromise<FileObjectsPage, FileObject>;
-  list(options?: Core.RequestOptions): Core.PagePromise<FileObjectsPage, FileObject>;
   list(
-    query: FileListParams | Core.RequestOptions = {},
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<FileObjectsPage, FileObject> {
-    if (isRequestOptions(query)) {
-      return this.list({}, query);
-    }
-    return this._client.getAPIList('/files', FileObjectsPage, { query, ...options });
-  }
-
-  /**
-   * Delete a file.
-   */
-  del(fileId: string, options?: Core.RequestOptions): Core.APIPromise<FileDeleted> {
-    return this._client.delete(`/files/${fileId}`, options);
-  }
-
-  /**
-   * Returns the contents of the specified file.
-   */
-  content(fileId: string, options?: Core.RequestOptions): Core.APIPromise<Response> {
-    return this._client.get(`/files/${fileId}/content`, { ...options, __binaryResponse: true });
-  }
-
-  /**
-   * Returns the contents of the specified file.
-   *
-   * @deprecated The `.content()` method should be used instead
-   */
-  retrieveContent(fileId: string, options?: Core.RequestOptions): Core.APIPromise<string> {
-    return this._client.get(`/files/${fileId}/content`, {
+    query: FileListParams | null | undefined = {},
+    options?: RequestOptions,
+  ): PagePromise<FileObjectsPage, FileObject> {
+    return this._client.getAPIList('/files', CursorPage<FileObject>, {
+      query,
       ...options,
-      headers: { Accept: 'application/json', ...options?.headers },
+      __security: { bearerAuth: true },
+    });
+  }
+
+  /**
+   * Delete a file and remove it from all vector stores.
+   */
+  delete(fileID: string, options?: RequestOptions): APIPromise<FileDeleted> {
+    return this._client.delete(path`/files/${fileID}`, { ...options, __security: { bearerAuth: true } });
+  }
+
+  /**
+   * Returns the contents of the specified file.
+   */
+  content(fileID: string, options?: RequestOptions): APIPromise<Response> {
+    return this._client.get(path`/files/${fileID}/content`, {
+      ...options,
+      headers: buildHeaders([{ Accept: 'application/binary' }, options?.headers]),
+      __security: { bearerAuth: true },
+      __binaryResponse: true,
     });
   }
 
@@ -112,10 +118,7 @@ export class Files extends APIResource {
   }
 }
 
-/**
- * Note: no pagination actually occurs yet, this is for forwards-compatibility.
- */
-export class FileObjectsPage extends Page<FileObject> {}
+export type FileObjectsPage = CursorPage<FileObject>;
 
 export type FileContent = string;
 
@@ -158,8 +161,8 @@ export interface FileObject {
 
   /**
    * The intended purpose of the file. Supported values are `assistants`,
-   * `assistants_output`, `batch`, `batch_output`, `fine-tune`, `fine-tune-results`
-   * and `vision`.
+   * `assistants_output`, `batch`, `batch_output`, `fine-tune`, `fine-tune-results`,
+   * `vision`, and `user_data`.
    */
   purpose:
     | 'assistants'
@@ -168,65 +171,105 @@ export interface FileObject {
     | 'batch_output'
     | 'fine-tune'
     | 'fine-tune-results'
-    | 'vision';
+    | 'vision'
+    | 'user_data';
 
   /**
-   * @deprecated: Deprecated. The current status of the file, which can be either
+   * @deprecated Deprecated. The current status of the file, which can be either
    * `uploaded`, `processed`, or `error`.
    */
   status: 'uploaded' | 'processed' | 'error';
 
   /**
-   * @deprecated: Deprecated. For details on why a fine-tuning training file failed
+   * The Unix timestamp (in seconds) for when the file will expire.
+   */
+  expires_at?: number;
+
+  /**
+   * @deprecated Deprecated. For details on why a fine-tuning training file failed
    * validation, see the `error` field on `fine_tuning.job`.
    */
   status_details?: string;
 }
 
 /**
- * The intended purpose of the uploaded file.
+ * The intended purpose of the uploaded file. One of:
  *
- * Use "assistants" for
- * [Assistants](https://platform.openai.com/docs/api-reference/assistants) and
- * [Message](https://platform.openai.com/docs/api-reference/messages) files,
- * "vision" for Assistants image file inputs, "batch" for
- * [Batch API](https://platform.openai.com/docs/guides/batch), and "fine-tune" for
- * [Fine-tuning](https://platform.openai.com/docs/api-reference/fine-tuning).
+ * - `assistants`: Used in the Assistants API
+ * - `batch`: Used in the Batch API
+ * - `fine-tune`: Used for fine-tuning
+ * - `vision`: Images used for vision fine-tuning
+ * - `user_data`: Flexible file type for any purpose
+ * - `evals`: Used for eval data sets
  */
-export type FilePurpose = 'assistants' | 'batch' | 'fine-tune' | 'vision';
+export type FilePurpose = 'assistants' | 'batch' | 'fine-tune' | 'vision' | 'user_data' | 'evals';
 
 export interface FileCreateParams {
   /**
    * The File object (not file name) to be uploaded.
    */
-  file: Core.Uploadable;
+  file: Uploadable;
 
   /**
-   * The intended purpose of the uploaded file.
+   * The intended purpose of the uploaded file. One of:
    *
-   * Use "assistants" for
-   * [Assistants](https://platform.openai.com/docs/api-reference/assistants) and
-   * [Message](https://platform.openai.com/docs/api-reference/messages) files,
-   * "vision" for Assistants image file inputs, "batch" for
-   * [Batch API](https://platform.openai.com/docs/guides/batch), and "fine-tune" for
-   * [Fine-tuning](https://platform.openai.com/docs/api-reference/fine-tuning).
+   * - `assistants`: Used in the Assistants API
+   * - `batch`: Used in the Batch API
+   * - `fine-tune`: Used for fine-tuning
+   * - `vision`: Images used for vision fine-tuning
+   * - `user_data`: Flexible file type for any purpose
+   * - `evals`: Used for eval data sets
    */
   purpose: FilePurpose;
+
+  /**
+   * The expiration policy for a file. By default, files with `purpose=batch` expire
+   * after 30 days and all other files are persisted until they are manually deleted.
+   */
+  expires_after?: FileCreateParams.ExpiresAfter;
 }
 
-export interface FileListParams {
+export namespace FileCreateParams {
+  /**
+   * The expiration policy for a file. By default, files with `purpose=batch` expire
+   * after 30 days and all other files are persisted until they are manually deleted.
+   */
+  export interface ExpiresAfter {
+    /**
+     * Anchor timestamp after which the expiration policy applies. Supported anchors:
+     * `created_at`.
+     */
+    anchor: 'created_at';
+
+    /**
+     * The number of seconds after the anchor time that the file will expire. Must be
+     * between 3600 (1 hour) and 2592000 (30 days).
+     */
+    seconds: number;
+  }
+}
+
+export interface FileListParams extends CursorPageParams {
+  /**
+   * Sort order by the `created_at` timestamp of the objects. `asc` for ascending
+   * order and `desc` for descending order.
+   */
+  order?: 'asc' | 'desc';
+
   /**
    * Only return files with the given purpose.
    */
   purpose?: string;
 }
 
-export namespace Files {
-  export import FileContent = FilesAPI.FileContent;
-  export import FileDeleted = FilesAPI.FileDeleted;
-  export import FileObject = FilesAPI.FileObject;
-  export import FilePurpose = FilesAPI.FilePurpose;
-  export import FileObjectsPage = FilesAPI.FileObjectsPage;
-  export import FileCreateParams = FilesAPI.FileCreateParams;
-  export import FileListParams = FilesAPI.FileListParams;
+export declare namespace Files {
+  export {
+    type FileContent as FileContent,
+    type FileDeleted as FileDeleted,
+    type FileObject as FileObject,
+    type FilePurpose as FilePurpose,
+    type FileObjectsPage as FileObjectsPage,
+    type FileCreateParams as FileCreateParams,
+    type FileListParams as FileListParams,
+  };
 }

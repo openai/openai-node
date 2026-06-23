@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import z from 'zod';
+import z from 'zod/v4'; // Also works for 'zod/v3'
 import { zodFunction } from 'openai/helpers/zod';
 
 const Table = z.enum(['orders', 'customers', 'products']);
@@ -28,7 +28,7 @@ const Condition = z.object({
 const openai = new OpenAI();
 
 async function main() {
-  const runner = openai.beta.chat.completions
+  const runner = openai.chat.completions
     .runTools({
       model: 'gpt-4o-2024-08-06',
       messages: [{ role: 'user', content: `What are the last 10 orders?` }],

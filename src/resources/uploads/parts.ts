@@ -1,9 +1,15 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../resource';
-import * as Core from '../../core';
-import * as PartsAPI from './parts';
+import { APIResource } from '../../core/resource';
+import { APIPromise } from '../../core/api-promise';
+import { type Uploadable } from '../../core/uploads';
+import { RequestOptions } from '../../internal/request-options';
+import { multipartFormRequestOptions } from '../../internal/uploads';
+import { path } from '../../internal/utils/path';
 
+/**
+ * Use Uploads to upload large files in multiple parts.
+ */
 export class Parts extends APIResource {
   /**
    * Adds a
@@ -18,14 +24,10 @@ export class Parts extends APIResource {
    * order of the Parts when you
    * [complete the Upload](https://platform.openai.com/docs/api-reference/uploads/complete).
    */
-  create(
-    uploadId: string,
-    body: PartCreateParams,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<UploadPart> {
+  create(uploadID: string, body: PartCreateParams, options?: RequestOptions): APIPromise<UploadPart> {
     return this._client.post(
-      `/uploads/${uploadId}/parts`,
-      Core.multipartFormRequestOptions({ body, ...options }),
+      path`/uploads/${uploadID}/parts`,
+      multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
     );
   }
 }
@@ -59,10 +61,9 @@ export interface PartCreateParams {
   /**
    * The chunk of bytes for this Part.
    */
-  data: Core.Uploadable;
+  data: Uploadable;
 }
 
-export namespace Parts {
-  export import UploadPart = PartsAPI.UploadPart;
-  export import PartCreateParams = PartsAPI.PartCreateParams;
+export declare namespace Parts {
+  export { type UploadPart as UploadPart, type PartCreateParams as PartCreateParams };
 }

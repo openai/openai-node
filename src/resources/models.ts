@@ -1,40 +1,42 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../resource';
-import * as Core from '../core';
-import * as ModelsAPI from './models';
-import { Page } from '../pagination';
+import { APIResource } from '../core/resource';
+import { APIPromise } from '../core/api-promise';
+import { Page, PagePromise } from '../core/pagination';
+import { RequestOptions } from '../internal/request-options';
+import { path } from '../internal/utils/path';
 
+/**
+ * List and describe the various models available in the API.
+ */
 export class Models extends APIResource {
   /**
    * Retrieves a model instance, providing basic information about the model such as
    * the owner and permissioning.
    */
-  retrieve(model: string, options?: Core.RequestOptions): Core.APIPromise<Model> {
-    return this._client.get(`/models/${model}`, options);
+  retrieve(model: string, options?: RequestOptions): APIPromise<Model> {
+    return this._client.get(path`/models/${model}`, { ...options, __security: { bearerAuth: true } });
   }
 
   /**
    * Lists the currently available models, and provides basic information about each
    * one such as the owner and availability.
    */
-  list(options?: Core.RequestOptions): Core.PagePromise<ModelsPage, Model> {
-    return this._client.getAPIList('/models', ModelsPage, options);
+  list(options?: RequestOptions): PagePromise<ModelsPage, Model> {
+    return this._client.getAPIList('/models', Page<Model>, { ...options, __security: { bearerAuth: true } });
   }
 
   /**
    * Delete a fine-tuned model. You must have the Owner role in your organization to
    * delete a model.
    */
-  del(model: string, options?: Core.RequestOptions): Core.APIPromise<ModelDeleted> {
-    return this._client.delete(`/models/${model}`, options);
+  delete(model: string, options?: RequestOptions): APIPromise<ModelDeleted> {
+    return this._client.delete(path`/models/${model}`, { ...options, __security: { bearerAuth: true } });
   }
 }
 
-/**
- * Note: no pagination actually occurs yet, this is for forwards-compatibility.
- */
-export class ModelsPage extends Page<Model> {}
+// Note: no pagination actually occurs yet, this is for forwards-compatibility.
+export type ModelsPage = Page<Model>;
 
 /**
  * Describes an OpenAI model offering that can be used with the API.
@@ -69,8 +71,6 @@ export interface ModelDeleted {
   object: string;
 }
 
-export namespace Models {
-  export import Model = ModelsAPI.Model;
-  export import ModelDeleted = ModelsAPI.ModelDeleted;
-  export import ModelsPage = ModelsAPI.ModelsPage;
+export declare namespace Models {
+  export { type Model as Model, type ModelDeleted as ModelDeleted, type ModelsPage as ModelsPage };
 }

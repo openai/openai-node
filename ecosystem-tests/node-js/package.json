@@ -7,8 +7,5 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "openai": "^4.40.1"
-  }
+  "license": "ISC"
 }

@@ -112,6 +112,37 @@ exports[`.parse() zod recursive schema extraction 2`] = `
 "
 `;
 
+exports[`.parse() zod ref schemas with \`.transform()\` 2`] = `
+"{
+  "id": "chatcmpl-A6zyLEtubMlUvGplOmr92S0mK0kiG",
+  "object": "chat.completion",
+  "created": 1726231553,
+  "model": "gpt-4o-2024-08-06",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\\"first\\":{\\"baz\\":true},\\"second\\":{\\"baz\\":false}}",
+        "refusal": null
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 167,
+    "completion_tokens": 13,
+    "total_tokens": 180,
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  },
+  "system_fingerprint": "fp_143bb8492c"
+}
+"
+`;
+
 exports[`.parse() zod top-level recursive schemas 1`] = `
 "{
   "id": "chatcmpl-9uLhw79ArBF4KsQQOlsoE68m6vh6v",

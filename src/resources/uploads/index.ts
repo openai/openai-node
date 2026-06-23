@@ -1,4 +1,4 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-export { Upload, UploadCreateParams, UploadCompleteParams, Uploads } from './uploads';
-export { UploadPart, PartCreateParams, Parts } from './parts';
+export { Parts, type UploadPart, type PartCreateParams } from './parts';
+export { Uploads, type Upload, type UploadCreateParams, type UploadCompleteParams } from './uploads';

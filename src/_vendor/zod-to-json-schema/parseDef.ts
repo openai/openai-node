@@ -1,4 +1,4 @@
-import { ZodFirstPartyTypeKind, ZodTypeDef } from 'zod';
+import { ZodFirstPartyTypeKind, ZodTypeDef } from 'zod/v3';
 import { JsonSchema7AnyType, parseAnyDef } from './parsers/any';
 import { JsonSchema7ArrayType, parseArrayDef } from './parsers/array';
 import { JsonSchema7BigintType, parseBigintDef } from './parsers/bigint';
@@ -99,7 +99,7 @@ export function parseDef(
 
   refs.seen.set(def, newItem);
 
-  const jsonSchema = selectParser(def, (def as any).typeName, refs);
+  const jsonSchema = selectParser(def, (def as any).typeName, refs, forceResolution);
 
   if (jsonSchema) {
     addMeta(def, refs, jsonSchema);
@@ -166,7 +166,12 @@ const getRelativePath = (pathA: string[], pathB: string[]) => {
   return [(pathA.length - i).toString(), ...pathB.slice(i)].join('/');
 };
 
-const selectParser = (def: any, typeName: ZodFirstPartyTypeKind, refs: Refs): JsonSchema7Type | undefined => {
+const selectParser = (
+  def: any,
+  typeName: ZodFirstPartyTypeKind,
+  refs: Refs,
+  forceResolution: boolean,
+): JsonSchema7Type | undefined => {
   switch (typeName) {
     case ZodFirstPartyTypeKind.ZodString:
       return parseStringDef(def, refs);
@@ -217,7 +222,7 @@ const selectParser = (def: any, typeName: ZodFirstPartyTypeKind, refs: Refs): Js
     case ZodFirstPartyTypeKind.ZodNever:
       return parseNeverDef();
     case ZodFirstPartyTypeKind.ZodEffects:
-      return parseEffectsDef(def, refs);
+      return parseEffectsDef(def, refs, forceResolution);
     case ZodFirstPartyTypeKind.ZodAny:
       return parseAnyDef();
     case ZodFirstPartyTypeKind.ZodUnknown:

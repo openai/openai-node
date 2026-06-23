@@ -1,4 +1,4 @@
-#!/usr/bin/env -S npm run tsn -T
+#!/usr/bin/env -S npm run tsn -- -T
 
 //
 //
@@ -26,6 +26,9 @@ import {
   ChatCompletionChunk,
   ChatCompletionMessageParam,
 } from 'openai/resources/chat';
+
+// Used so that the each chunk coming in is noticable
+const CHUNK_DELAY_MS = 100;
 
 // gets API Key from environment variable OPENAI_API_KEY
 const openai = new OpenAI();
@@ -73,8 +76,9 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   },
 ];
 
-async function callTool(tool_call: OpenAI.Chat.Completions.ChatCompletionMessageToolCall): Promise<any> {
-  if (tool_call.type !== 'function') throw new Error('Unexpected tool_call type:' + tool_call.type);
+async function callTool(
+  tool_call: OpenAI.Chat.Completions.ChatCompletionMessageFunctionToolCall,
+): Promise<any> {
   const args = JSON.parse(tool_call.function.arguments);
   switch (tool_call.function.name) {
     case 'list':
@@ -126,6 +130,9 @@ async function main() {
     for await (const chunk of stream) {
       message = messageReducer(message, chunk);
       writeLine(message);
+
+      // Add a small delay so that the chunks coming in are noticablej
+      await new Promise((resolve) => setTimeout(resolve, CHUNK_DELAY_MS));
     }
     console.log();
     messages.push(message);
@@ -137,6 +144,9 @@ async function main() {
 
     // If there are tool calls, we generate a new message with the role 'tool' for each tool call.
     for (const toolCall of message.tool_calls) {
+      if (toolCall.type !== 'function') {
+        throw new Error(`Unexpected tool call type: ${toolCall.type}`);
+      }
       const result = await callTool(toolCall);
       const newMessage = {
         tool_call_id: toolCall.id,
@@ -184,7 +194,13 @@ function messageReducer(previous: ChatCompletionMessage, item: ChatCompletionChu
     }
     return acc;
   };
-  return reduce(previous, item.choices[0]!.delta) as ChatCompletionMessage;
+
+  const choice = item.choices[0];
+  if (!choice) {
+    // chunk contains information about usage and token counts
+    return previous;
+  }
+  return reduce(previous, choice.delta) as ChatCompletionMessage;
 }
 
 function lineRewriter() {

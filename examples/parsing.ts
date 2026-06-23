@@ -1,6 +1,6 @@
 import { zodResponseFormat } from 'openai/helpers/zod';
 import OpenAI from 'openai/index';
-import { z } from 'zod';
+import { z } from 'zod/v4'; // Also works for 'zod/v3'
 
 const Step = z.object({
   explanation: z.string(),
@@ -15,7 +15,7 @@ const MathResponse = z.object({
 async function main() {
   const client = new OpenAI();
 
-  const completion = await client.beta.chat.completions.parse({
+  const completion = await client.chat.completions.parse({
     model: 'gpt-4o-2024-08-06',
     messages: [
       { role: 'system', content: 'You are a helpful math tutor.' },

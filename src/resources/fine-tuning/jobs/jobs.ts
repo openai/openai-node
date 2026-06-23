@@ -1,12 +1,23 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../../resource';
-import { isRequestOptions } from '../../../core';
-import * as Core from '../../../core';
-import * as JobsAPI from './jobs';
+import { APIResource } from '../../../core/resource';
+import * as Shared from '../../shared';
+import * as MethodsAPI from '../methods';
 import * as CheckpointsAPI from './checkpoints';
-import { CursorPage, type CursorPageParams } from '../../../pagination';
+import {
+  CheckpointListParams,
+  Checkpoints,
+  FineTuningJobCheckpoint,
+  FineTuningJobCheckpointsPage,
+} from './checkpoints';
+import { APIPromise } from '../../../core/api-promise';
+import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pagination';
+import { RequestOptions } from '../../../internal/request-options';
+import { path } from '../../../internal/utils/path';
 
+/**
+ * Manage fine-tuning jobs to tailor a model to your specific training data.
+ */
 export class Jobs extends APIResource {
   checkpoints: CheckpointsAPI.Checkpoints = new CheckpointsAPI.Checkpoints(this._client);
 
@@ -17,76 +28,141 @@ export class Jobs extends APIResource {
    * Response includes details of the enqueued job including job status and the name
    * of the fine-tuned models once complete.
    *
-   * [Learn more about fine-tuning](https://platform.openai.com/docs/guides/fine-tuning)
+   * [Learn more about fine-tuning](https://platform.openai.com/docs/guides/model-optimization)
+   *
+   * @example
+   * ```ts
+   * const fineTuningJob = await client.fineTuning.jobs.create({
+   *   model: 'gpt-4o-mini',
+   *   training_file: 'file-abc123',
+   * });
+   * ```
    */
-  create(body: JobCreateParams, options?: Core.RequestOptions): Core.APIPromise<FineTuningJob> {
-    return this._client.post('/fine_tuning/jobs', { body, ...options });
+  create(body: JobCreateParams, options?: RequestOptions): APIPromise<FineTuningJob> {
+    return this._client.post('/fine_tuning/jobs', { body, ...options, __security: { bearerAuth: true } });
   }
 
   /**
    * Get info about a fine-tuning job.
    *
-   * [Learn more about fine-tuning](https://platform.openai.com/docs/guides/fine-tuning)
+   * [Learn more about fine-tuning](https://platform.openai.com/docs/guides/model-optimization)
+   *
+   * @example
+   * ```ts
+   * const fineTuningJob = await client.fineTuning.jobs.retrieve(
+   *   'ft-AF1WoRqd3aJAHsqc9NY7iL8F',
+   * );
+   * ```
    */
-  retrieve(fineTuningJobId: string, options?: Core.RequestOptions): Core.APIPromise<FineTuningJob> {
-    return this._client.get(`/fine_tuning/jobs/${fineTuningJobId}`, options);
+  retrieve(fineTuningJobID: string, options?: RequestOptions): APIPromise<FineTuningJob> {
+    return this._client.get(path`/fine_tuning/jobs/${fineTuningJobID}`, {
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
    * List your organization's fine-tuning jobs
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const fineTuningJob of client.fineTuning.jobs.list()) {
+   *   // ...
+   * }
+   * ```
    */
   list(
-    query?: JobListParams,
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<FineTuningJobsPage, FineTuningJob>;
-  list(options?: Core.RequestOptions): Core.PagePromise<FineTuningJobsPage, FineTuningJob>;
-  list(
-    query: JobListParams | Core.RequestOptions = {},
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<FineTuningJobsPage, FineTuningJob> {
-    if (isRequestOptions(query)) {
-      return this.list({}, query);
-    }
-    return this._client.getAPIList('/fine_tuning/jobs', FineTuningJobsPage, { query, ...options });
+    query: JobListParams | null | undefined = {},
+    options?: RequestOptions,
+  ): PagePromise<FineTuningJobsPage, FineTuningJob> {
+    return this._client.getAPIList('/fine_tuning/jobs', CursorPage<FineTuningJob>, {
+      query,
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
    * Immediately cancel a fine-tune job.
+   *
+   * @example
+   * ```ts
+   * const fineTuningJob = await client.fineTuning.jobs.cancel(
+   *   'ft-AF1WoRqd3aJAHsqc9NY7iL8F',
+   * );
+   * ```
    */
-  cancel(fineTuningJobId: string, options?: Core.RequestOptions): Core.APIPromise<FineTuningJob> {
-    return this._client.post(`/fine_tuning/jobs/${fineTuningJobId}/cancel`, options);
+  cancel(fineTuningJobID: string, options?: RequestOptions): APIPromise<FineTuningJob> {
+    return this._client.post(path`/fine_tuning/jobs/${fineTuningJobID}/cancel`, {
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
    * Get status updates for a fine-tuning job.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const fineTuningJobEvent of client.fineTuning.jobs.listEvents(
+   *   'ft-AF1WoRqd3aJAHsqc9NY7iL8F',
+   * )) {
+   *   // ...
+   * }
+   * ```
    */
   listEvents(
-    fineTuningJobId: string,
-    query?: JobListEventsParams,
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<FineTuningJobEventsPage, FineTuningJobEvent>;
-  listEvents(
-    fineTuningJobId: string,
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<FineTuningJobEventsPage, FineTuningJobEvent>;
-  listEvents(
-    fineTuningJobId: string,
-    query: JobListEventsParams | Core.RequestOptions = {},
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<FineTuningJobEventsPage, FineTuningJobEvent> {
-    if (isRequestOptions(query)) {
-      return this.listEvents(fineTuningJobId, {}, query);
-    }
-    return this._client.getAPIList(`/fine_tuning/jobs/${fineTuningJobId}/events`, FineTuningJobEventsPage, {
-      query,
+    fineTuningJobID: string,
+    query: JobListEventsParams | null | undefined = {},
+    options?: RequestOptions,
+  ): PagePromise<FineTuningJobEventsPage, FineTuningJobEvent> {
+    return this._client.getAPIList(
+      path`/fine_tuning/jobs/${fineTuningJobID}/events`,
+      CursorPage<FineTuningJobEvent>,
+      { query, ...options, __security: { bearerAuth: true } },
+    );
+  }
+
+  /**
+   * Pause a fine-tune job.
+   *
+   * @example
+   * ```ts
+   * const fineTuningJob = await client.fineTuning.jobs.pause(
+   *   'ft-AF1WoRqd3aJAHsqc9NY7iL8F',
+   * );
+   * ```
+   */
+  pause(fineTuningJobID: string, options?: RequestOptions): APIPromise<FineTuningJob> {
+    return this._client.post(path`/fine_tuning/jobs/${fineTuningJobID}/pause`, {
       ...options,
+      __security: { bearerAuth: true },
+    });
+  }
+
+  /**
+   * Resume a fine-tune job.
+   *
+   * @example
+   * ```ts
+   * const fineTuningJob = await client.fineTuning.jobs.resume(
+   *   'ft-AF1WoRqd3aJAHsqc9NY7iL8F',
+   * );
+   * ```
+   */
+  resume(fineTuningJobID: string, options?: RequestOptions): APIPromise<FineTuningJob> {
+    return this._client.post(path`/fine_tuning/jobs/${fineTuningJobID}/resume`, {
+      ...options,
+      __security: { bearerAuth: true },
     });
   }
 }
 
-export class FineTuningJobsPage extends CursorPage<FineTuningJob> {}
+export type FineTuningJobsPage = CursorPage<FineTuningJob>;
 
-export class FineTuningJobEventsPage extends CursorPage<FineTuningJobEvent> {}
+export type FineTuningJobEventsPage = CursorPage<FineTuningJobEvent>;
 
 /**
  * The `fine_tuning.job` object represents a fine-tuning job that has been created
@@ -122,9 +198,8 @@ export interface FineTuningJob {
   finished_at: number | null;
 
   /**
-   * The hyperparameters used for the fine-tuning job. See the
-   * [fine-tuning guide](https://platform.openai.com/docs/guides/fine-tuning) for
-   * more details.
+   * The hyperparameters used for the fine-tuning job. This value will only be
+   * returned when running `supervised` jobs.
    */
   hyperparameters: FineTuningJob.Hyperparameters;
 
@@ -190,6 +265,21 @@ export interface FineTuningJob {
    * A list of integrations to enable for this fine-tuning job.
    */
   integrations?: Array<FineTuningJobWandbIntegrationObject> | null;
+
+  /**
+   * Set of 16 key-value pairs that can be attached to an object. This can be useful
+   * for storing additional information about the object in a structured format, and
+   * querying for objects via API or the dashboard.
+   *
+   * Keys are strings with a maximum length of 64 characters. Values are strings with
+   * a maximum length of 512 characters.
+   */
+  metadata?: Shared.Metadata | null;
+
+  /**
+   * The method used for fine-tuning.
+   */
+  method?: FineTuningJob.Method;
 }
 
 export namespace FineTuningJob {
@@ -216,18 +306,52 @@ export namespace FineTuningJob {
   }
 
   /**
-   * The hyperparameters used for the fine-tuning job. See the
-   * [fine-tuning guide](https://platform.openai.com/docs/guides/fine-tuning) for
-   * more details.
+   * The hyperparameters used for the fine-tuning job. This value will only be
+   * returned when running `supervised` jobs.
    */
   export interface Hyperparameters {
     /**
-     * The number of epochs to train the model for. An epoch refers to one full cycle
-     * through the training dataset. "auto" decides the optimal number of epochs based
-     * on the size of the dataset. If setting the number manually, we support any
-     * number between 1 and 50 epochs.
+     * Number of examples in each batch. A larger batch size means that model
+     * parameters are updated less frequently, but with lower variance.
      */
-    n_epochs: 'auto' | number;
+    batch_size?: 'auto' | number | null;
+
+    /**
+     * Scaling factor for the learning rate. A smaller learning rate may be useful to
+     * avoid overfitting.
+     */
+    learning_rate_multiplier?: 'auto' | number;
+
+    /**
+     * The number of epochs to train the model for. An epoch refers to one full cycle
+     * through the training dataset.
+     */
+    n_epochs?: 'auto' | number;
+  }
+
+  /**
+   * The method used for fine-tuning.
+   */
+  export interface Method {
+    /**
+     * The type of method. Is either `supervised`, `dpo`, or `reinforcement`.
+     */
+    type: 'supervised' | 'dpo' | 'reinforcement';
+
+    /**
+     * Configuration for the DPO fine-tuning method.
+     */
+    dpo?: MethodsAPI.DpoMethod;
+
+    /**
+     * Configuration for the reinforcement fine-tuning method.
+     */
+    reinforcement?: MethodsAPI.ReinforcementMethod;
+
+    /**
+     * Configuration for the supervised fine-tuning method.
+     */
+    supervised?: MethodsAPI.SupervisedMethod;
   }
 }
 
@@ -235,18 +359,41 @@ export namespace FineTuningJob {
  * Fine-tuning job event object
  */
 export interface FineTuningJobEvent {
+  /**
+   * The object identifier.
+   */
   id: string;
 
+  /**
+   * The Unix timestamp (in seconds) for when the fine-tuning job was created.
+   */
   created_at: number;
 
+  /**
+   * The log level of the event.
+   */
   level: 'info' | 'warn' | 'error';
 
+  /**
+   * The message of the event.
+   */
   message: string;
 
+  /**
+   * The object type, which is always "fine_tuning.job.event".
+   */
   object: 'fine_tuning.job.event';
-}
 
-export type FineTuningJobIntegration = FineTuningJobWandbIntegrationObject;
+  /**
+   * The data associated with the event.
+   */
+  data?: unknown;
+
+  /**
+   * The type of event.
+   */
+  type?: 'message' | 'metrics';
+}
 
 /**
  * The settings for your integration with Weights and Biases. This payload
@@ -296,10 +443,12 @@ export interface FineTuningJobWandbIntegrationObject {
   wandb: FineTuningJobWandbIntegration;
 }
 
+export type FineTuningJobIntegration = FineTuningJobWandbIntegrationObject;
+
 export interface JobCreateParams {
   /**
    * The name of the model to fine-tune. You can select one of the
-   * [supported models](https://platform.openai.com/docs/guides/fine-tuning/which-models-can-be-fine-tuned).
+   * [supported models](https://platform.openai.com/docs/guides/fine-tuning#which-models-can-be-fine-tuned).
    */
   model: (string & {}) | 'babbage-002' | 'davinci-002' | 'gpt-3.5-turbo' | 'gpt-4o-mini';
 
@@ -313,17 +462,22 @@ export interface JobCreateParams {
    * your file with the purpose `fine-tune`.
    *
    * The contents of the file should differ depending on if the model uses the
-   * [chat](https://platform.openai.com/docs/api-reference/fine-tuning/chat-input) or
+   * [chat](https://platform.openai.com/docs/api-reference/fine-tuning/chat-input),
    * [completions](https://platform.openai.com/docs/api-reference/fine-tuning/completions-input)
+   * format, or if the fine-tuning method uses the
+   * [preference](https://platform.openai.com/docs/api-reference/fine-tuning/preference-input)
    * format.
    *
-   * See the [fine-tuning guide](https://platform.openai.com/docs/guides/fine-tuning)
+   * See the
+   * [fine-tuning guide](https://platform.openai.com/docs/guides/model-optimization)
    * for more details.
    */
   training_file: string;
 
   /**
-   * The hyperparameters used for the fine-tuning job.
+   * @deprecated The hyperparameters used for the fine-tuning job. This value is now
+   * deprecated in favor of `method`, and should be passed in under the `method`
+   * parameter.
    */
   hyperparameters?: JobCreateParams.Hyperparameters;
 
@@ -333,6 +487,21 @@ export interface JobCreateParams {
   integrations?: Array<JobCreateParams.Integration> | null;
 
   /**
+   * Set of 16 key-value pairs that can be attached to an object. This can be useful
+   * for storing additional information about the object in a structured format, and
+   * querying for objects via API or the dashboard.
+   *
+   * Keys are strings with a maximum length of 64 characters. Values are strings with
+   * a maximum length of 512 characters.
+   */
+  metadata?: Shared.Metadata | null;
+
+  /**
+   * The method used for fine-tuning.
+   */
+  method?: JobCreateParams.Method;
+
+  /**
    * The seed controls the reproducibility of the job. Passing in the same seed and
    * job parameters should produce the same results, but may differ in rare cases. If
    * a seed is not specified, one will be generated for you.
@@ -340,7 +509,7 @@ export interface JobCreateParams {
   seed?: number | null;
 
   /**
-   * A string of up to 18 characters that will be added to your fine-tuned model
+   * A string of up to 64 characters that will be added to your fine-tuned model
    * name.
    *
    * For example, a `suffix` of "custom-model-name" would produce a model name like
@@ -359,7 +528,8 @@ export interface JobCreateParams {
    * Your dataset must be formatted as a JSONL file. You must upload your file with
    * the purpose `fine-tune`.
    *
-   * See the [fine-tuning guide](https://platform.openai.com/docs/guides/fine-tuning)
+   * See the
+   * [fine-tuning guide](https://platform.openai.com/docs/guides/model-optimization)
    * for more details.
    */
   validation_file?: string | null;
@@ -367,7 +537,9 @@ export interface JobCreateParams {
 
 export namespace JobCreateParams {
   /**
-   * The hyperparameters used for the fine-tuning job.
+   * @deprecated The hyperparameters used for the fine-tuning job. This value is now
+   * deprecated in favor of `method`, and should be passed in under the `method`
+   * parameter.
    */
   export interface Hyperparameters {
     /**
@@ -439,25 +611,63 @@ export namespace JobCreateParams {
       tags?: Array<string>;
     }
   }
+
+  /**
+   * The method used for fine-tuning.
+   */
+  export interface Method {
+    /**
+     * The type of method. Is either `supervised`, `dpo`, or `reinforcement`.
+     */
+    type: 'supervised' | 'dpo' | 'reinforcement';
+
+    /**
+     * Configuration for the DPO fine-tuning method.
+     */
+    dpo?: MethodsAPI.DpoMethod;
+
+    /**
+     * Configuration for the reinforcement fine-tuning method.
+     */
+    reinforcement?: MethodsAPI.ReinforcementMethod;
+
+    /**
+     * Configuration for the supervised fine-tuning method.
+     */
+    supervised?: MethodsAPI.SupervisedMethod;
+  }
 }
 
-export interface JobListParams extends CursorPageParams {}
+export interface JobListParams extends CursorPageParams {
+  /**
+   * Optional metadata filter. To filter, use the syntax `metadata[k]=v`.
+   * Alternatively, set `metadata=null` to indicate no metadata.
+   */
+  metadata?: { [key: string]: string } | null;
+}
 
 export interface JobListEventsParams extends CursorPageParams {}
 
-export namespace Jobs {
-  export import FineTuningJob = JobsAPI.FineTuningJob;
-  export import FineTuningJobEvent = JobsAPI.FineTuningJobEvent;
-  export import FineTuningJobIntegration = JobsAPI.FineTuningJobIntegration;
-  export import FineTuningJobWandbIntegration = JobsAPI.FineTuningJobWandbIntegration;
-  export import FineTuningJobWandbIntegrationObject = JobsAPI.FineTuningJobWandbIntegrationObject;
-  export import FineTuningJobsPage = JobsAPI.FineTuningJobsPage;
-  export import FineTuningJobEventsPage = JobsAPI.FineTuningJobEventsPage;
-  export import JobCreateParams = JobsAPI.JobCreateParams;
-  export import JobListParams = JobsAPI.JobListParams;
-  export import JobListEventsParams = JobsAPI.JobListEventsParams;
-  export import Checkpoints = CheckpointsAPI.Checkpoints;
-  export import FineTuningJobCheckpoint = CheckpointsAPI.FineTuningJobCheckpoint;
-  export import FineTuningJobCheckpointsPage = CheckpointsAPI.FineTuningJobCheckpointsPage;
-  export import CheckpointListParams = CheckpointsAPI.CheckpointListParams;
+Jobs.Checkpoints = Checkpoints;
+
+export declare namespace Jobs {
+  export {
+    type FineTuningJob as FineTuningJob,
+    type FineTuningJobEvent as FineTuningJobEvent,
+    type FineTuningJobWandbIntegration as FineTuningJobWandbIntegration,
+    type FineTuningJobWandbIntegrationObject as FineTuningJobWandbIntegrationObject,
+    type FineTuningJobIntegration as FineTuningJobIntegration,
+    type FineTuningJobsPage as FineTuningJobsPage,
+    type FineTuningJobEventsPage as FineTuningJobEventsPage,
+    type JobCreateParams as JobCreateParams,
+    type JobListParams as JobListParams,
+    type JobListEventsParams as JobListEventsParams,
+  };
+
+  export {
+    Checkpoints as Checkpoints,
+    type FineTuningJobCheckpoint as FineTuningJobCheckpoint,
+    type FineTuningJobCheckpointsPage as FineTuningJobCheckpointsPage,
+    type CheckpointListParams as CheckpointListParams,
+  };
 }

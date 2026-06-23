@@ -1,16 +1,19 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import OpenAI from 'openai';
-import { Response } from 'node-fetch';
 
 const client = new OpenAI({
   apiKey: 'My API Key',
+  adminAPIKey: 'My Admin API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
 describe('resource steps', () => {
-  test('retrieve', async () => {
-    const responsePromise = client.beta.threads.runs.steps.retrieve('thread_id', 'run_id', 'step_id');
+  test('retrieve: only required params', async () => {
+    const responsePromise = client.beta.threads.runs.steps.retrieve('step_id', {
+      thread_id: 'thread_id',
+      run_id: 'run_id',
+    });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -20,30 +23,16 @@ describe('resource steps', () => {
     expect(dataAndResponse.response).toBe(rawResponse);
   });
 
-  test('retrieve: request options instead of params are passed correctly', async () => {
-    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(
-      client.beta.threads.runs.steps.retrieve('thread_id', 'run_id', 'step_id', {
-        path: '/_stainless_unknown_path',
-      }),
-    ).rejects.toThrow(OpenAI.NotFoundError);
+  test('retrieve: required and optional params', async () => {
+    const response = await client.beta.threads.runs.steps.retrieve('step_id', {
+      thread_id: 'thread_id',
+      run_id: 'run_id',
+      include: ['step_details.tool_calls[*].file_search.results[*].content'],
+    });
   });
 
-  test('retrieve: request options and params are passed correctly', async () => {
-    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(
-      client.beta.threads.runs.steps.retrieve(
-        'thread_id',
-        'run_id',
-        'step_id',
-        { include: ['step_details.tool_calls[*].file_search.results[*].content'] },
-        { path: '/_stainless_unknown_path' },
-      ),
-    ).rejects.toThrow(OpenAI.NotFoundError);
-  });
-
-  test('list', async () => {
-    const responsePromise = client.beta.threads.runs.steps.list('thread_id', 'run_id');
+  test('list: only required params', async () => {
+    const responsePromise = client.beta.threads.runs.steps.list('run_id', { thread_id: 'thread_id' });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -53,28 +42,14 @@ describe('resource steps', () => {
     expect(dataAndResponse.response).toBe(rawResponse);
   });
 
-  test('list: request options instead of params are passed correctly', async () => {
-    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(
-      client.beta.threads.runs.steps.list('thread_id', 'run_id', { path: '/_stainless_unknown_path' }),
-    ).rejects.toThrow(OpenAI.NotFoundError);
-  });
-
-  test('list: request options and params are passed correctly', async () => {
-    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
-    await expect(
-      client.beta.threads.runs.steps.list(
-        'thread_id',
-        'run_id',
-        {
-          after: 'after',
-          before: 'before',
-          include: ['step_details.tool_calls[*].file_search.results[*].content'],
-          limit: 0,
-          order: 'asc',
-        },
-        { path: '/_stainless_unknown_path' },
-      ),
-    ).rejects.toThrow(OpenAI.NotFoundError);
+  test('list: required and optional params', async () => {
+    const response = await client.beta.threads.runs.steps.list('run_id', {
+      thread_id: 'thread_id',
+      after: 'after',
+      before: 'before',
+      include: ['step_details.tool_calls[*].file_search.results[*].content'],
+      limit: 0,
+      order: 'asc',
+    });
   });
 });

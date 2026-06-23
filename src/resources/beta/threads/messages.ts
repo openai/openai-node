@@ -1,90 +1,101 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import { APIResource } from '../../../resource';
-import { isRequestOptions } from '../../../core';
-import * as Core from '../../../core';
-import * as MessagesAPI from './messages';
+import { APIResource } from '../../../core/resource';
+import * as Shared from '../../shared';
 import * as AssistantsAPI from '../assistants';
-import { CursorPage, type CursorPageParams } from '../../../pagination';
+import { APIPromise } from '../../../core/api-promise';
+import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pagination';
+import { buildHeaders } from '../../../internal/headers';
+import { RequestOptions } from '../../../internal/request-options';
+import { path } from '../../../internal/utils/path';
 
+/**
+ * Build Assistants that can call models and use tools.
+ *
+ * @deprecated The Assistants API is deprecated in favor of the Responses API
+ */
 export class Messages extends APIResource {
   /**
    * Create a message.
+   *
+   * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
-  create(
-    threadId: string,
-    body: MessageCreateParams,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<Message> {
-    return this._client.post(`/threads/${threadId}/messages`, {
+  create(threadID: string, body: MessageCreateParams, options?: RequestOptions): APIPromise<Message> {
+    return this._client.post(path`/threads/${threadID}/messages`, {
       body,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
   /**
    * Retrieve a message.
+   *
+   * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
-  retrieve(threadId: string, messageId: string, options?: Core.RequestOptions): Core.APIPromise<Message> {
-    return this._client.get(`/threads/${threadId}/messages/${messageId}`, {
+  retrieve(messageID: string, params: MessageRetrieveParams, options?: RequestOptions): APIPromise<Message> {
+    const { thread_id } = params;
+    return this._client.get(path`/threads/${thread_id}/messages/${messageID}`, {
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
   /**
    * Modifies a message.
+   *
+   * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
-  update(
-    threadId: string,
-    messageId: string,
-    body: MessageUpdateParams,
-    options?: Core.RequestOptions,
-  ): Core.APIPromise<Message> {
-    return this._client.post(`/threads/${threadId}/messages/${messageId}`, {
+  update(messageID: string, params: MessageUpdateParams, options?: RequestOptions): APIPromise<Message> {
+    const { thread_id, ...body } = params;
+    return this._client.post(path`/threads/${thread_id}/messages/${messageID}`, {
       body,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
   /**
    * Returns a list of messages for a given thread.
+   *
+   * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
   list(
-    threadId: string,
-    query?: MessageListParams,
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<MessagesPage, Message>;
-  list(threadId: string, options?: Core.RequestOptions): Core.PagePromise<MessagesPage, Message>;
-  list(
-    threadId: string,
-    query: MessageListParams | Core.RequestOptions = {},
-    options?: Core.RequestOptions,
-  ): Core.PagePromise<MessagesPage, Message> {
-    if (isRequestOptions(query)) {
-      return this.list(threadId, {}, query);
-    }
-    return this._client.getAPIList(`/threads/${threadId}/messages`, MessagesPage, {
+    threadID: string,
+    query: MessageListParams | null | undefined = {},
+    options?: RequestOptions,
+  ): PagePromise<MessagesPage, Message> {
+    return this._client.getAPIList(path`/threads/${threadID}/messages`, CursorPage<Message>, {
       query,
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
   /**
    * Deletes a message.
+   *
+   * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
-  del(threadId: string, messageId: string, options?: Core.RequestOptions): Core.APIPromise<MessageDeleted> {
-    return this._client.delete(`/threads/${threadId}/messages/${messageId}`, {
+  delete(
+    messageID: string,
+    params: MessageDeleteParams,
+    options?: RequestOptions,
+  ): APIPromise<MessageDeleted> {
+    const { thread_id } = params;
+    return this._client.delete(path`/threads/${thread_id}/messages/${messageID}`, {
       ...options,
-      headers: { 'OpenAI-Beta': 'assistants=v2', ...options?.headers },
+      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 }
 
-export class MessagesPage extends CursorPage<Message> {}
+export type MessagesPage = CursorPage<Message>;
 
 /**
  * A citation within the message that points to a specific quote from a specific
@@ -408,11 +419,13 @@ export interface Message {
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
-   * for storing additional information about the object in a structured format. Keys
-   * can be a maximum of 64 characters long and values can be a maxium of 512
-   * characters long.
+   * for storing additional information about the object in a structured format, and
+   * querying for objects via API or the dashboard.
+   *
+   * Keys are strings with a maximum length of 64 characters. Values are strings with
+   * a maximum length of 512 characters.
    */
-  metadata: unknown | null;
+  metadata: Shared.Metadata | null;
 
   /**
    * The object type, which is always `thread.message`.
@@ -661,11 +674,13 @@ export interface MessageCreateParams {
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
-   * for storing additional information about the object in a structured format. Keys
-   * can be a maximum of 64 characters long and values can be a maxium of 512
-   * characters long.
+   * for storing additional information about the object in a structured format, and
+   * querying for objects via API or the dashboard.
+   *
+   * Keys are strings with a maximum length of 64 characters. Values are strings with
+   * a maximum length of 512 characters.
    */
-  metadata?: unknown | null;
+  metadata?: Shared.Metadata | null;
 }
 
 export namespace MessageCreateParams {
@@ -691,22 +706,37 @@ export namespace MessageCreateParams {
   }
 }
 
+export interface MessageRetrieveParams {
+  /**
+   * The ID of the [thread](https://platform.openai.com/docs/api-reference/threads)
+   * to which this message belongs.
+   */
+  thread_id: string;
+}
+
 export interface MessageUpdateParams {
   /**
-   * Set of 16 key-value pairs that can be attached to an object. This can be useful
-   * for storing additional information about the object in a structured format. Keys
-   * can be a maximum of 64 characters long and values can be a maxium of 512
-   * characters long.
+   * Path param: The ID of the thread to which this message belongs.
    */
-  metadata?: unknown | null;
+  thread_id: string;
+
+  /**
+   * Body param: Set of 16 key-value pairs that can be attached to an object. This
+   * can be useful for storing additional information about the object in a
+   * structured format, and querying for objects via API or the dashboard.
+   *
+   * Keys are strings with a maximum length of 64 characters. Values are strings with
+   * a maximum length of 512 characters.
+   */
+  metadata?: Shared.Metadata | null;
 }
 
 export interface MessageListParams extends CursorPageParams {
   /**
    * A cursor for use in pagination. `before` is an object ID that defines your place
    * in the list. For instance, if you make a list request and receive 100 objects,
-   * ending with obj_foo, your subsequent call can include before=obj_foo in order to
-   * fetch the previous page of the list.
+   * starting with obj_foo, your subsequent call can include before=obj_foo in order
+   * to fetch the previous page of the list.
    */
   before?: string;
 
@@ -722,37 +752,48 @@ export interface MessageListParams extends CursorPageParams {
   run_id?: string;
 }
 
-export namespace Messages {
-  export import Annotation = MessagesAPI.Annotation;
-  export import AnnotationDelta = MessagesAPI.AnnotationDelta;
-  export import FileCitationAnnotation = MessagesAPI.FileCitationAnnotation;
-  export import FileCitationDeltaAnnotation = MessagesAPI.FileCitationDeltaAnnotation;
-  export import FilePathAnnotation = MessagesAPI.FilePathAnnotation;
-  export import FilePathDeltaAnnotation = MessagesAPI.FilePathDeltaAnnotation;
-  export import ImageFile = MessagesAPI.ImageFile;
-  export import ImageFileContentBlock = MessagesAPI.ImageFileContentBlock;
-  export import ImageFileDelta = MessagesAPI.ImageFileDelta;
-  export import ImageFileDeltaBlock = MessagesAPI.ImageFileDeltaBlock;
-  export import ImageURL = MessagesAPI.ImageURL;
-  export import ImageURLContentBlock = MessagesAPI.ImageURLContentBlock;
-  export import ImageURLDelta = MessagesAPI.ImageURLDelta;
-  export import ImageURLDeltaBlock = MessagesAPI.ImageURLDeltaBlock;
-  export import Message = MessagesAPI.Message;
-  export import MessageContent = MessagesAPI.MessageContent;
-  export import MessageContentDelta = MessagesAPI.MessageContentDelta;
-  export import MessageContentPartParam = MessagesAPI.MessageContentPartParam;
-  export import MessageDeleted = MessagesAPI.MessageDeleted;
-  export import MessageDelta = MessagesAPI.MessageDelta;
-  export import MessageDeltaEvent = MessagesAPI.MessageDeltaEvent;
-  export import RefusalContentBlock = MessagesAPI.RefusalContentBlock;
-  export import RefusalDeltaBlock = MessagesAPI.RefusalDeltaBlock;
-  export import Text = MessagesAPI.Text;
-  export import TextContentBlock = MessagesAPI.TextContentBlock;
-  export import TextContentBlockParam = MessagesAPI.TextContentBlockParam;
-  export import TextDelta = MessagesAPI.TextDelta;
-  export import TextDeltaBlock = MessagesAPI.TextDeltaBlock;
-  export import MessagesPage = MessagesAPI.MessagesPage;
-  export import MessageCreateParams = MessagesAPI.MessageCreateParams;
-  export import MessageUpdateParams = MessagesAPI.MessageUpdateParams;
-  export import MessageListParams = MessagesAPI.MessageListParams;
+export interface MessageDeleteParams {
+  /**
+   * The ID of the thread to which this message belongs.
+   */
+  thread_id: string;
+}
+
+export declare namespace Messages {
+  export {
+    type Annotation as Annotation,
+    type AnnotationDelta as AnnotationDelta,
+    type FileCitationAnnotation as FileCitationAnnotation,
+    type FileCitationDeltaAnnotation as FileCitationDeltaAnnotation,
+    type FilePathAnnotation as FilePathAnnotation,
+    type FilePathDeltaAnnotation as FilePathDeltaAnnotation,
+    type ImageFile as ImageFile,
+    type ImageFileContentBlock as ImageFileContentBlock,
+    type ImageFileDelta as ImageFileDelta,
+    type ImageFileDeltaBlock as ImageFileDeltaBlock,
+    type ImageURL as ImageURL,
+    type ImageURLContentBlock as ImageURLContentBlock,
+    type ImageURLDelta as ImageURLDelta,
+    type ImageURLDeltaBlock as ImageURLDeltaBlock,
+    type Message as Message,
+    type MessageContent as MessageContent,
+    type MessageContentDelta as MessageContentDelta,
+    type MessageContentPartParam as MessageContentPartParam,
+    type MessageDeleted as MessageDeleted,
+    type MessageDelta as MessageDelta,
+    type MessageDeltaEvent as MessageDeltaEvent,
+    type RefusalContentBlock as RefusalContentBlock,
+    type RefusalDeltaBlock as RefusalDeltaBlock,
+    type Text as Text,
+    type TextContentBlock as TextContentBlock,
+    type TextContentBlockParam as TextContentBlockParam,
+    type TextDelta as TextDelta,
+    type TextDeltaBlock as TextDeltaBlock,
+    type MessagesPage as MessagesPage,
+    type MessageCreateParams as MessageCreateParams,
+    type MessageRetrieveParams as MessageRetrieveParams,
+    type MessageUpdateParams as MessageUpdateParams,
+    type MessageListParams as MessageListParams,
+    type MessageDeleteParams as MessageDeleteParams,
+  };
 }

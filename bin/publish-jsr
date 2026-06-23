@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+
+set -eux
+
+# Build the project
+pnpm build
+
+# Navigate to the dist directory
+cd dist-deno
+
+npx jsr publish ${JSR_TOKEN:+"--token=$JSR_TOKEN"}

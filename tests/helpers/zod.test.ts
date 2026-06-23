@@ -1,7 +1,11 @@
 import { zodResponseFormat } from 'openai/helpers/zod';
-import { z } from 'zod';
+import { z as zv3 } from 'zod/v3';
+import { z as zv4 } from 'zod/v4';
 
-describe('zodResponseFormat', () => {
+describe.each([
+  { version: 'v3', z: zv3 },
+  { version: 'v4', z: zv4 as any as typeof zv3 },
+])('zodResponseFormat (Zod $version)', ({ version, z }) => {
   it('does the thing', () => {
     expect(
       zodResponseFormat(
@@ -51,7 +55,7 @@ describe('zodResponseFormat', () => {
         z.object({
           city: z.string(),
           temperature: z.number(),
-          units: z.enum(['c', 'f']).optional(),
+          units: z.enum(['c', 'f']).optional().nullable(),
         }),
         'location',
       ).json_schema,
@@ -69,11 +73,18 @@ describe('zodResponseFormat', () => {
               "type": "number",
             },
             "units": {
-              "enum": [
-                "c",
-                "f",
+              "anyOf": [
+                {
+                  "enum": [
+                    "c",
+                    "f",
+                  ],
+                  "type": "string",
+                },
+                {
+                  "type": "null",
+                },
               ],
-              "type": "string",
             },
           },
           "required": [
@@ -277,5 +288,75 @@ describe('zodResponseFormat', () => {
         "strict": true,
       }
     `);
+  });
+
+  it('throws error on optional fields', () => {
+    if (version === 'v3') {
+      expect(() =>
+        zodResponseFormat(
+          z.object({
+            required: z.string(),
+            optional: z.string().optional(),
+            optional_and_nullable: z.string().optional().nullable(),
+          }),
+          'schema',
+        ),
+      ).toThrowErrorMatchingInlineSnapshot(
+        `"Zod field at \`#/definitions/schema/properties/optional\` uses \`.optional()\` without \`.nullable()\` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required"`,
+      );
+    } else {
+      expect(() =>
+        zodResponseFormat(
+          z.object({
+            required: z.string(),
+            optional: z.string().optional(),
+            optional_and_nullable: z.string().optional().nullable(),
+          }),
+          'schema',
+        ),
+      ).toThrowErrorMatchingInlineSnapshot(
+        `"Zod field at \`properties/optional\` uses \`.optional()\` without \`.nullable()\` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required"`,
+      );
+    }
+  });
+
+  it('throws error on nested optional fields', () => {
+    if (version === 'v3') {
+      expect(() =>
+        zodResponseFormat(
+          z.object({
+            foo: z.object({ bar: z.array(z.object({ can_be_missing: z.boolean().optional() })) }),
+          }),
+          'schema',
+        ),
+      ).toThrowErrorMatchingInlineSnapshot(
+        `"Zod field at \`#/definitions/schema/properties/foo/properties/bar/items/properties/can_be_missing\` uses \`.optional()\` without \`.nullable()\` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required"`,
+      );
+    } else {
+      expect(() =>
+        zodResponseFormat(
+          z.object({
+            foo: z.object({ bar: z.array(z.object({ can_be_missing: z.boolean().optional() })) }),
+          }),
+          'schema',
+        ),
+      ).toThrowErrorMatchingInlineSnapshot(
+        `"Zod field at \`properties/foo/properties/bar/items/properties/can_be_missing\` uses \`.optional()\` without \`.nullable()\` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required"`,
+      );
+    }
+  });
+
+  it('does not warn on union nullable fields', () => {
+    const consoleSpy = jest.spyOn(console, 'warn');
+    consoleSpy.mockClear();
+
+    zodResponseFormat(
+      z.object({
+        union: z.union([z.string(), z.null()]).optional(),
+      }),
+      'schema',
+    );
+
+    expect(consoleSpy).toHaveBeenCalledTimes(0);
   });
 });

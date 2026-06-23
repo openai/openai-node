@@ -1,6 +1,6 @@
 import { zodFunction } from 'openai/helpers/zod';
 import OpenAI from 'openai/index';
-import { z } from 'zod';
+import { z } from 'zod/v4'; // Also works for 'zod/v3'
 
 const Table = z.enum(['orders', 'customers', 'products']);
 
@@ -38,7 +38,7 @@ const Query = z.object({
 async function main() {
   const client = new OpenAI();
 
-  const completion = await client.beta.chat.completions.parse({
+  const completion = await client.chat.completions.parse({
     model: 'gpt-4o-2024-08-06',
     messages: [
       {

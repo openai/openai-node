@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { z } from 'zod';
+import { z } from 'zod/v4'; // Also works for 'zod/v3'
 import { zodResponseFormat } from 'openai/helpers/zod';
 
 const openai = new OpenAI();
@@ -31,7 +31,7 @@ const UISchema: z.ZodType<UI> = z.lazy(() =>
 );
 
 async function main() {
-  const completion = await openai.beta.chat.completions.parse({
+  const completion = await openai.chat.completions.parse({
     model: 'gpt-4o-2024-08-06',
     messages: [
       {
