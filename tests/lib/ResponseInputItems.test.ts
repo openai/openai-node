@@ -1,5 +1,5 @@
-import { toResponseInputItems } from 'openai/lib/responses/ResponseInputItems';
-import type { ResponseInputItem, ResponseOutputItem } from 'openai/resources/responses';
+import { toResponseInputItem, toResponseInputItems } from 'openai/lib/responses/ResponseInputItems';
+import type { ResponseInputItem, ResponseOutputItem } from 'openai/resources/responses/responses';
 
 describe('toResponseInputItems', () => {
   test('normalizes mixed response history items', () => {
@@ -139,5 +139,107 @@ describe('toResponseInputItems', () => {
         status: 'completed',
       },
     ]);
+  });
+
+  test('normalizes current output-only fields and omits non-replayable items', () => {
+    const history: ResponseOutputItem[] = [
+      {
+        type: 'function_call_output',
+        id: 'function_call_output_123',
+        call_id: 'function_call_123',
+        output: 'done',
+        status: 'completed',
+        created_by: 'assistant',
+      },
+      {
+        type: 'computer_call_output',
+        id: 'computer_call_output_completed_123',
+        call_id: 'computer_call_completed_123',
+        output: {
+          type: 'computer_screenshot',
+          image_url: 'https://example.com/completed.png',
+        },
+        status: 'completed',
+        created_by: 'assistant',
+      },
+      {
+        type: 'computer_call_output',
+        id: 'computer_call_output_failed_123',
+        call_id: 'computer_call_failed_123',
+        output: {
+          type: 'computer_screenshot',
+          image_url: 'https://example.com/failed.png',
+        },
+        status: 'failed',
+        created_by: 'assistant',
+      },
+      {
+        type: 'custom_tool_call_output',
+        id: 'custom_tool_call_output_123',
+        call_id: 'custom_tool_call_123',
+        output: 'done',
+        status: 'completed',
+        created_by: 'assistant',
+      },
+      {
+        type: 'custom_tool_call_output',
+        id: 'custom_tool_call_output_incomplete_123',
+        call_id: 'custom_tool_call_incomplete_123',
+        output: 'partial result',
+        status: 'incomplete',
+        created_by: 'assistant',
+      },
+      {
+        type: 'additional_tools',
+        id: 'additional_tools_assistant_123',
+        role: 'assistant',
+        tools: [],
+      },
+      {
+        type: 'additional_tools',
+        id: 'additional_tools_developer_123',
+        role: 'developer',
+        tools: [],
+      },
+    ];
+
+    expect(toResponseInputItems(history)).toEqual([
+      {
+        type: 'function_call_output',
+        id: 'function_call_output_123',
+        call_id: 'function_call_123',
+        output: 'done',
+        status: 'completed',
+      },
+      {
+        type: 'computer_call_output',
+        id: 'computer_call_output_completed_123',
+        call_id: 'computer_call_completed_123',
+        output: {
+          type: 'computer_screenshot',
+          image_url: 'https://example.com/completed.png',
+        },
+        status: 'completed',
+      },
+      {
+        type: 'custom_tool_call_output',
+        id: 'custom_tool_call_output_123',
+        call_id: 'custom_tool_call_123',
+        output: 'done',
+      },
+      {
+        type: 'additional_tools',
+        id: 'additional_tools_developer_123',
+        role: 'developer',
+        tools: [],
+      },
+    ]);
+
+    expect(toResponseInputItem(history[2]!)).toBeNull();
+    expect(toResponseInputItem(history[4]!)).toBeNull();
+    expect(toResponseInputItem(history[5]!)).toBeNull();
+    expect(() =>
+      toResponseInputItem({ type: 'future_response_item' } as unknown as ResponseOutputItem),
+    ).toThrow('Unsupported response item type: future_response_item');
   });
 });

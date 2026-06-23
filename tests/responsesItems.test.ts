@@ -1,6 +1,6 @@
 import OpenAI from 'openai/index';
 import { toResponseInputItems } from 'openai/lib/responses/ResponseInputItems';
-import type { ResponseInputItem, ResponseOutputItem } from 'openai/resources/responses';
+import type { ResponseInputItem, ResponseOutputItem } from 'openai/resources/responses/responses';
 
 const openai = new OpenAI({ apiKey: 'example-api-key' });
 
