@@ -246,6 +246,11 @@ import { isEmptyObj } from './internal/utils/values';
 
 const WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER = 'workload-identity-auth';
 
+type FetchWithTimeoutResponse = {
+  response: Response;
+  cleanupAbortSignal: () => void;
+};
+
 export type ApiKeySetter = () => Promise<string>;
 
 export interface ClientOptions {
@@ -741,10 +746,10 @@ export class OpenAI {
 
     const security = options.__security ?? { bearerAuth: true };
     const controller = new AbortController();
-    const response = await this.fetchWithAuth(url, req, timeout, controller, security).catch(castToError);
+    const fetchResult = await this.fetchWithAuth(url, req, timeout, controller, security).catch(castToError);
     const headersTime = Date.now();
 
-    if (response instanceof globalThis.Error) {
+    if (fetchResult instanceof globalThis.Error) {
       const retryMessage = `retrying, ${retriesRemaining} attempts remaining`;
       if (options.signal?.aborted) {
         throw new Errors.APIUserAbortError();
@@ -754,8 +759,8 @@ export class OpenAI {
       // undici throws "TypeError: fetch failed" with cause "ConnectTimeoutError: Connect Timeout Error (attempted address: example:443, timeout: 1ms)"
       // others do not provide enough information to distinguish timeouts from other connection errors
       const isTimeout =
-        isAbortError(response) ||
-        /timed? ?out/i.test(String(response) + ('cause' in response ? String(response.cause) : ''));
+        isAbortError(fetchResult) ||
+        /timed? ?out/i.test(String(fetchResult) + ('cause' in fetchResult ? String(fetchResult.cause) : ''));
       if (retriesRemaining) {
         loggerFor(this).info(
           `[${requestLogID}] connection ${isTimeout ? 'timed out' : 'failed'} - ${retryMessage}`,
@@ -766,7 +771,7 @@ export class OpenAI {
             retryOfRequestLogID,
             url,
             durationMs: headersTime - startTime,
-            message: response.message,
+            message: fetchResult.message,
           }),
         );
         return this.retryRequest(options, retriesRemaining, retryOfRequestLogID ?? requestLogID);
@@ -780,21 +785,22 @@ export class OpenAI {
           retryOfRequestLogID,
           url,
           durationMs: headersTime - startTime,
-          message: response.message,
+          message: fetchResult.message,
         }),
       );
-      if (response instanceof OAuthError || response instanceof SubjectTokenProviderError) {
-        throw response;
+      if (fetchResult instanceof OAuthError || fetchResult instanceof SubjectTokenProviderError) {
+        throw fetchResult;
       }
       if (isTimeout) {
         throw new Errors.APIConnectionTimeoutError();
       }
       throw new Errors.APIConnectionError({
-        message: getConnectionErrorMessage(response),
-        cause: response,
+        message: getConnectionErrorMessage(fetchResult),
+        cause: fetchResult,
       });
     }
 
+    const { response, cleanupAbortSignal } = fetchResult;
     const specialHeaders = [...response.headers.entries()]
       .filter(([name]) => name === 'x-request-id')
       .map(([name, value]) => ', ' + name + ': ' + JSON.stringify(value))
@@ -811,7 +817,11 @@ export class OpenAI {
         !options.__metadata?.['hasStreamingBody'] &&
         !options.__metadata?.['workloadIdentityTokenRefreshed']
       ) {
-        await Shims.CancelReadableStream(response.body);
+        try {
+          await Shims.CancelReadableStream(response.body);
+        } finally {
+          cleanupAbortSignal();
+        }
         this._workloadIdentityAuth.invalidateToken();
 
         return this.makeRequest(
@@ -832,7 +842,11 @@ export class OpenAI {
         const retryMessage = `retrying, ${retriesRemaining} attempts remaining`;
 
         // We don't need the body of this response.
-        await Shims.CancelReadableStream(response.body);
+        try {
+          await Shims.CancelReadableStream(response.body);
+        } finally {
+          cleanupAbortSignal();
+        }
         loggerFor(this).info(`${responseInfo} - ${retryMessage}`);
         loggerFor(this).debug(
           `[${requestLogID}] response error (${retryMessage})`,
@@ -856,7 +870,14 @@ export class OpenAI {
 
       loggerFor(this).info(`${responseInfo} - ${retryMessage}`);
 
-      const errText = await response.text().catch((err: any) => castToError(err).message);
+      let errText: string;
+      try {
+        errText = await response.text();
+      } catch (err: any) {
+        errText = castToError(err).message;
+      } finally {
+        cleanupAbortSignal();
+      }
       const errJSON = safeJSON(errText) as any;
       const errMessage = errJSON ? undefined : errText;
 
@@ -888,7 +909,15 @@ export class OpenAI {
       }),
     );
 
-    return { response, options, controller, requestLogID, retryOfRequestLogID, startTime };
+    return {
+      response,
+      options,
+      controller,
+      cleanupAbortSignal,
+      requestLogID,
+      retryOfRequestLogID,
+      startTime,
+    };
   }
 
   getAPIList<Item, PageClass extends Pagination.AbstractPage<Item> = Pagination.AbstractPage<Item>>(
@@ -924,7 +953,7 @@ export class OpenAI {
       bearerAuth: true,
       adminAPIKeyAuth: true,
     },
-  ): Promise<Response> {
+  ): Promise<FetchWithTimeoutResponse> {
     if (this._workloadIdentityAuth && schemes.bearerAuth) {
       const headers = init.headers as Headers;
       const authHeader = headers.get('Authorization');
@@ -944,10 +973,16 @@ export class OpenAI {
     init: RequestInit | undefined,
     ms: number,
     controller: AbortController,
-  ): Promise<Response> {
+  ): Promise<FetchWithTimeoutResponse> {
     const { signal, method, ...options } = init || {};
     const abort = this._makeAbort(controller);
     if (signal) signal.addEventListener('abort', abort, { once: true });
+    let cleanedUp = false;
+    const cleanupAbortSignal = () => {
+      if (!signal || cleanedUp) return;
+      signal.removeEventListener('abort', abort);
+      cleanedUp = true;
+    };
 
     const timeout = setTimeout(abort, ms);
 
@@ -969,7 +1004,11 @@ export class OpenAI {
 
     try {
       // use undefined this binding; fetch errors if bound to something else in browser/cloudflare
-      return await this.fetch.call(undefined, url, fetchOptions);
+      const response = await this.fetch.call(undefined, url, fetchOptions);
+      return { response, cleanupAbortSignal };
+    } catch (error) {
+      cleanupAbortSignal();
+      throw error;
     } finally {
       clearTimeout(timeout);
     }
