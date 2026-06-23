@@ -512,8 +512,7 @@ export class ChatCompletionStream<ParsedT = null>
 
         if (!choice.message.refusal && this.#getAutoParseableResponseFormat()) {
           // The partial parser does not accept whitespace-only input.
-          choice.message.parsed =
-            choice.message.content.trim() ? partialParse(choice.message.content) : null;
+          choice.message.parsed = choice.message.content.trim() ? partialParse(choice.message.content) : null;
         }
       }
 
