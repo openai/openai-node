@@ -2,6 +2,13 @@
 
 import OpenAI from 'openai';
 
+/**
+ * This legacy example uses the deprecated Assistants API.
+ * The API will shut down on August 26, 2026.
+ * For new integrations, use the Responses API:
+ * https://developers.openai.com/api/docs/guides/migrate-to-responses
+ */
+
 const openai = new OpenAI();
 
 async function main() {
