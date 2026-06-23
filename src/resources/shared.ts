@@ -12,9 +12,36 @@ export type AllModels =
   | 'o4-mini-deep-research'
   | 'o4-mini-deep-research-2025-06-26'
   | 'computer-use-preview'
-  | 'computer-use-preview-2025-03-11';
+  | 'computer-use-preview-2025-03-11'
+  | 'gpt-5-codex'
+  | 'gpt-5-pro'
+  | 'gpt-5-pro-2025-10-06'
+  | 'gpt-5.1-codex-max';
 
 export type ChatModel =
+  | 'gpt-5.4'
+  | 'gpt-5.4-mini'
+  | 'gpt-5.4-nano'
+  | 'gpt-5.4-mini-2026-03-17'
+  | 'gpt-5.4-nano-2026-03-17'
+  | 'gpt-5.3-chat-latest'
+  | 'gpt-5.2'
+  | 'gpt-5.2-2025-12-11'
+  | 'gpt-5.2-chat-latest'
+  | 'gpt-5.2-pro'
+  | 'gpt-5.2-pro-2025-12-11'
+  | 'gpt-5.1'
+  | 'gpt-5.1-2025-11-13'
+  | 'gpt-5.1-codex'
+  | 'gpt-5.1-mini'
+  | 'gpt-5.1-chat-latest'
+  | 'gpt-5'
+  | 'gpt-5-mini'
+  | 'gpt-5-nano'
+  | 'gpt-5-2025-08-07'
+  | 'gpt-5-mini-2025-08-07'
+  | 'gpt-5-nano-2025-08-07'
+  | 'gpt-5-chat-latest'
   | 'gpt-4.1'
   | 'gpt-4.1-mini'
   | 'gpt-4.1-nano'
@@ -82,7 +109,8 @@ export interface ComparisonFilter {
   key: string;
 
   /**
-   * Specifies the comparison operator: `eq`, `ne`, `gt`, `gte`, `lt`, `lte`.
+   * Specifies the comparison operator: `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `in`,
+   * `nin`.
    *
    * - `eq`: equals
    * - `ne`: not equal
@@ -90,14 +118,16 @@ export interface ComparisonFilter {
    * - `gte`: greater than or equal
    * - `lt`: less than
    * - `lte`: less than or equal
+   * - `in`: in
+   * - `nin`: not in
    */
-  type: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte';
+  type: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'nin';
 
   /**
    * The value to compare against the attribute key; supports string, number, or
    * boolean types.
    */
-  value: string | number | boolean;
+  value: string | number | boolean | Array<string | number>;
 }
 
 /**
@@ -114,6 +144,43 @@ export interface CompoundFilter {
    * Type of operation: `and` or `or`.
    */
   type: 'and' | 'or';
+}
+
+/**
+ * The input format for the custom tool. Default is unconstrained text.
+ */
+export type CustomToolInputFormat = CustomToolInputFormat.Text | CustomToolInputFormat.Grammar;
+
+export namespace CustomToolInputFormat {
+  /**
+   * Unconstrained free-form text.
+   */
+  export interface Text {
+    /**
+     * Unconstrained text format. Always `text`.
+     */
+    type: 'text';
+  }
+
+  /**
+   * A grammar defined by the user.
+   */
+  export interface Grammar {
+    /**
+     * The grammar definition.
+     */
+    definition: string;
+
+    /**
+     * The syntax of the grammar definition. One of `lark` or `regex`.
+     */
+    syntax: 'lark' | 'regex';
+
+    /**
+     * Grammar format. Always `grammar`.
+     */
+    type: 'grammar';
+  }
 }
 
 export interface ErrorObject {
@@ -181,20 +248,36 @@ export type FunctionParameters = { [key: string]: unknown };
  */
 export type Metadata = { [key: string]: string };
 
+export type OAuthErrorCode = 'invalid_grant' | 'invalid_subject_token' | (string & {});
+
 /**
- * **o-series models only**
+ * **gpt-5 and o-series models only**
  *
  * Configuration options for
  * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
  */
 export interface Reasoning {
   /**
-   * **o-series models only**
-   *
+   * Controls which reasoning items are rendered back to the model on later turns.
+   * When returned on a response, this is the effective reasoning context mode used
+   * for the response.
+   */
+  context?: 'auto' | 'current_turn' | 'all_turns' | null;
+
+  /**
    * Constrains effort on reasoning for
    * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
-   * supported values are `low`, `medium`, and `high`. Reducing reasoning effort can
-   * result in faster responses and fewer tokens used on reasoning in a response.
+   * supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
+   * Reducing reasoning effort can result in faster responses and fewer tokens used
+   * on reasoning in a response.
+   *
+   * - `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported
+   *   reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool
+   *   calls are supported for all reasoning values in gpt-5.1.
+   * - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
+   *   support `none`.
+   * - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
+   * - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
    */
   effort?: ReasoningEffort | null;
 
@@ -211,19 +294,29 @@ export interface Reasoning {
    * A summary of the reasoning performed by the model. This can be useful for
    * debugging and understanding the model's reasoning process. One of `auto`,
    * `concise`, or `detailed`.
+   *
+   * `concise` is supported for `computer-use-preview` models and all reasoning
+   * models after `gpt-5`.
    */
   summary?: 'auto' | 'concise' | 'detailed' | null;
 }
 
 /**
- * **o-series models only**
- *
  * Constrains effort on reasoning for
  * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
- * supported values are `low`, `medium`, and `high`. Reducing reasoning effort can
- * result in faster responses and fewer tokens used on reasoning in a response.
+ * supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
+ * Reducing reasoning effort can result in faster responses and fewer tokens used
+ * on reasoning in a response.
+ *
+ * - `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported
+ *   reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool
+ *   calls are supported for all reasoning values in gpt-5.1.
+ * - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
+ *   support `none`.
+ * - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
+ * - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
  */
-export type ReasoningEffort = 'low' | 'medium' | 'high' | null;
+export type ReasoningEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | null;
 
 /**
  * JSON object response format. An older method of generating JSON responses. Using
@@ -298,6 +391,34 @@ export interface ResponseFormatText {
   type: 'text';
 }
 
+/**
+ * A custom grammar for the model to follow when generating text. Learn more in the
+ * [custom grammars guide](https://platform.openai.com/docs/guides/custom-grammars).
+ */
+export interface ResponseFormatTextGrammar {
+  /**
+   * The custom grammar for the model to follow.
+   */
+  grammar: string;
+
+  /**
+   * The type of response format being defined. Always `grammar`.
+   */
+  type: 'grammar';
+}
+
+/**
+ * Configure the model to generate valid Python code. See the
+ * [custom grammars guide](https://platform.openai.com/docs/guides/custom-grammars)
+ * for more details.
+ */
+export interface ResponseFormatTextPython {
+  /**
+   * The type of response format being defined. Always `python`.
+   */
+  type: 'python';
+}
+
 export type ResponsesModel =
   | (string & {})
   | ChatModel
@@ -310,4 +431,8 @@ export type ResponsesModel =
   | 'o4-mini-deep-research'
   | 'o4-mini-deep-research-2025-06-26'
   | 'computer-use-preview'
-  | 'computer-use-preview-2025-03-11';
+  | 'computer-use-preview-2025-03-11'
+  | 'gpt-5-codex'
+  | 'gpt-5-pro'
+  | 'gpt-5-pro-2025-10-06'
+  | 'gpt-5.1-codex-max';

@@ -4,18 +4,45 @@ set -e
 
 cd "$(dirname "$0")/.."
 
-if [ -f "Brewfile" ] && [ "$(uname -s)" = "Darwin" ] && [ "$SKIP_BREW" != "1" ]; then
+if [ -f "Brewfile" ] && [ "$(uname -s)" = "Darwin" ] && [ "${SKIP_BREW:-}" != "1" ] && [ -t 0 ]; then
   brew bundle check >/dev/null 2>&1 || {
-    echo "==> Installing Homebrew dependencies…"
-    brew bundle
+    echo -n "==> Install Homebrew dependencies? (y/N): "
+    read -r response
+    case "$response" in
+      [yY][eE][sS]|[yY])
+        brew bundle
+        ;;
+      *)
+        ;;
+    esac
+    echo
   }
 fi
 
 echo "==> Installing Node dependencies…"
 
-PACKAGE_MANAGER=$(command -v yarn >/dev/null 2>&1 && echo "yarn" || echo "npm")
+if ! PNPM_VERSION="$(
+  node -e 'const pm = require("./package.json").packageManager || ""; const match = pm.match(/^pnpm@(.+)$/); if (!match) { process.exit(1); } process.stdout.write(match[1]);'
+)"; then
+  echo "package.json must set packageManager to pnpm@<version>."
+  exit 1
+fi
 
-$PACKAGE_MANAGER install
+if ! command -v pnpm >/dev/null 2>&1; then
+  echo "pnpm is required to install dependencies for this repository."
+  echo "Install it with: npm install --global pnpm@${PNPM_VERSION}"
+  exit 1
+fi
 
-cd "$(dirname "$0")/../examples"
-$PACKAGE_MANAGER install
+ACTUAL_PNPM_VERSION="$(pnpm --version)"
+if [ "$ACTUAL_PNPM_VERSION" != "$PNPM_VERSION" ]; then
+  echo "Expected pnpm ${PNPM_VERSION}, but found ${ACTUAL_PNPM_VERSION}."
+  echo "Install the supported version with: npm install --global pnpm@${PNPM_VERSION}"
+  exit 1
+fi
+
+if [ "${CI:-}" = "true" ]; then
+  pnpm install --frozen-lockfile
+else
+  pnpm install
+fi

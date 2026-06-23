@@ -222,8 +222,15 @@ export class ResponseStream<ParsedT = null>
         if (!output) {
           throw new OpenAIError(`missing output at index ${event.output_index}`);
         }
-        if (output.type === 'message') {
-          output.content.push(event.part);
+        const type = output.type;
+        const part = event.part;
+        if (type === 'message' && part.type !== 'reasoning_text') {
+          output.content.push(part);
+        } else if (type === 'reasoning' && part.type === 'reasoning_text') {
+          if (!output.content) {
+            output.content = [];
+          }
+          output.content.push(part);
         }
         break;
       }
@@ -251,6 +258,23 @@ export class ResponseStream<ParsedT = null>
         }
         if (output.type === 'function_call') {
           output.arguments += event.delta;
+        }
+        break;
+      }
+      case 'response.reasoning_text.delta': {
+        const output = snapshot.output[event.output_index];
+        if (!output) {
+          throw new OpenAIError(`missing output at index ${event.output_index}`);
+        }
+        if (output.type === 'reasoning') {
+          const content = output.content?.[event.content_index];
+          if (!content) {
+            throw new OpenAIError(`missing content at index ${event.content_index}`);
+          }
+          if (content.type !== 'reasoning_text') {
+            throw new OpenAIError(`expected content to be 'reasoning_text', got ${content.type}`);
+          }
+          content.text += event.delta;
         }
         break;
       }

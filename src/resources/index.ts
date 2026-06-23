@@ -2,12 +2,14 @@
 
 export * from './chat/index';
 export * from './shared';
+export { Admin } from './admin/admin';
 export { Audio, type AudioModel, type AudioResponseFormat } from './audio/audio';
 export {
   Batches,
   type Batch,
   type BatchError,
   type BatchRequestCounts,
+  type BatchUsage,
   type BatchCreateParams,
   type BatchListParams,
   type BatchesPage,
@@ -31,6 +33,7 @@ export {
   type ContainerListParams,
   type ContainerListResponsesPage,
 } from './containers/containers';
+export { Conversations } from './conversations/conversations';
 export {
   Embeddings,
   type CreateEmbeddingResponse,
@@ -94,7 +97,18 @@ export {
   type ModerationCreateResponse,
   type ModerationCreateParams,
 } from './moderations';
+export { Realtime } from './realtime/realtime';
 export { Responses } from './responses/responses';
+export {
+  Skills,
+  type DeletedSkill,
+  type Skill,
+  type SkillList,
+  type SkillCreateParams,
+  type SkillUpdateParams,
+  type SkillListParams,
+  type SkillsPage,
+} from './skills/skills';
 export { Uploads, type Upload, type UploadCreateParams, type UploadCompleteParams } from './uploads/uploads';
 export {
   VectorStores,
@@ -115,4 +129,24 @@ export {
   type VectorStoresPage,
   type VectorStoreSearchResponsesPage,
 } from './vector-stores/vector-stores';
+export {
+  Videos,
+  type ImageInputReferenceParam,
+  type Video,
+  type VideoCreateError,
+  type VideoModel,
+  type VideoSeconds,
+  type VideoSize,
+  type VideoDeleteResponse,
+  type VideoCreateCharacterResponse,
+  type VideoGetCharacterResponse,
+  type VideoCreateParams,
+  type VideoListParams,
+  type VideoCreateCharacterParams,
+  type VideoDownloadContentParams,
+  type VideoEditParams,
+  type VideoExtendParams,
+  type VideoRemixParams,
+  type VideosPage,
+} from './videos';
 export { Webhooks } from './webhooks';

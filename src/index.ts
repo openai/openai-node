@@ -21,6 +21,9 @@ export {
   PermissionDeniedError,
   UnprocessableEntityError,
   InvalidWebhookSignatureError,
+  OAuthError,
+  SubjectTokenProviderError,
 } from './core/error';
 
 export { AzureOpenAI } from './azure';
+export { BedrockOpenAI, type BedrockClientOptions } from './bedrock';

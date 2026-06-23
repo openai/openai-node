@@ -35,6 +35,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
     response: Response,
     controller: AbortController,
     client?: OpenAI,
+    synthesizeEventData?: boolean,
   ): Stream<Item> {
     let consumed = false;
     const logger = client ? loggerFor(client) : console;
@@ -54,17 +55,11 @@ export class Stream<Item> implements AsyncIterable<Item> {
             continue;
           }
 
-          if (
-            sse.event === null ||
-            sse.event.startsWith('response.') ||
-            sse.event.startsWith('image_edit.') ||
-            sse.event.startsWith('image_generation.') ||
-            sse.event.startsWith('transcript.')
-          ) {
+          if (sse.event === null || !sse.event.startsWith('thread.')) {
             let data;
 
             try {
-              data = JSON.parse(sse.data);
+              data = JSON.parse(sse.data) as any;
             } catch (e) {
               logger.error(`Could not parse message into JSON:`, sse.data);
               logger.error(`From chunk:`, sse.raw);
@@ -75,7 +70,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
               throw new APIError(undefined, data.error, undefined, response.headers);
             }
 
-            yield data;
+            yield synthesizeEventData ? { event: sse.event, data } : data;
           } else {
             let data;
             try {
@@ -141,7 +136,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
       try {
         for await (const line of iterLines()) {
           if (done) continue;
-          if (line) yield JSON.parse(line);
+          if (line) yield JSON.parse(line) as Item;
         }
         done = true;
       } catch (e) {

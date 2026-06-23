@@ -29,7 +29,7 @@ export class InputItems extends APIResource {
     return this._client.getAPIList(
       path`/responses/${responseID}/input_items`,
       CursorPage<ResponsesAPI.ResponseItem>,
-      { query, ...options },
+      { query, ...options, __security: { bearerAuth: true } },
     );
   }
 }
@@ -65,11 +65,6 @@ export interface ResponseItemList {
 }
 
 export interface InputItemListParams extends CursorPageParams {
-  /**
-   * An item ID to list items before, used in pagination.
-   */
-  before?: string;
-
   /**
    * Additional fields to include in the response. See the `include` parameter for
    * Response creation above for more information.
