@@ -220,7 +220,7 @@ class RunnerListener {
     );
     expect(await this.runner.finalFunctionToolCallResult()).toEqual(this.finalFunctionCallResult);
     expect(this.chatCompletions).toEqual(this.runner.allChatCompletions());
-    expect(this.messages).toEqual(this.runner.messages.slice(-this.messages.length));
+    expect(this.messages).toEqual(this.runner.messages.filter((message) => this.messages.includes(message)));
     if (this.chatCompletions.some((c) => c.usage)) {
       const totalUsage: OpenAI.CompletionUsage = {
         completion_tokens: 0,
@@ -324,7 +324,9 @@ class StreamingRunnerListener {
     );
     expect(await this.runner.finalFunctionToolCallResult()).toEqual(this.finalFunctionCallResult);
     expect(this.eventChatCompletions).toEqual(this.runner.allChatCompletions());
-    expect(this.eventMessages).toEqual(this.runner.messages.slice(-this.eventMessages.length));
+    expect(this.eventMessages).toEqual(
+      this.runner.messages.filter((message) => this.eventMessages.includes(message)),
+    );
     if (error) {
       expect(this.error?.message).toEqual(error);
       expect(this.runner.errored).toBe(true);
@@ -647,6 +649,116 @@ describe('resource completions', () => {
       ]);
       expect(listener.functionCallResults).toEqual([`it's raining`]);
       await listener.sanityCheck();
+    });
+    test('runs tool calls concurrently and preserves their result order', async () => {
+      const { fetch, handleRequest } = mockChatCompletionFetch();
+
+      const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
+      const started: string[] = [];
+      let markFirstStarted!: () => void;
+      let resolveFirst!: (value: string) => void;
+      let resolveSecond!: (value: string) => void;
+      const firstStarted = new Promise<void>((resolve) => (markFirstStarted = resolve));
+      const firstResult = new Promise<string>((resolve) => (resolveFirst = resolve));
+      const secondResult = new Promise<string>((resolve) => (resolveSecond = resolve));
+
+      const runner = openai.chat.completions.runTools({
+        messages: [{ role: 'user', content: 'run both tools' }],
+        model: 'gpt-3.5-turbo',
+        tools: [
+          {
+            type: 'function',
+            function: {
+              function: function firstTool() {
+                started.push('firstTool');
+                markFirstStarted();
+                return firstResult;
+              },
+              parameters: {},
+              description: 'returns the first result',
+            },
+          },
+          {
+            type: 'function',
+            function: {
+              function: function secondTool() {
+                started.push('secondTool');
+                return secondResult;
+              },
+              parameters: {},
+              description: 'returns the second result',
+            },
+          },
+        ],
+      });
+
+      await handleRequest(async (request) => {
+        expect(request.messages).toEqual([{ role: 'user', content: 'run both tools' }]);
+        return {
+          id: '1',
+          choices: [
+            {
+              index: 0,
+              finish_reason: 'tool_calls',
+              logprobs: null,
+              message: {
+                role: 'assistant',
+                content: null,
+                refusal: null,
+                parsed: null,
+                tool_calls: [
+                  {
+                    type: 'function',
+                    id: 'first-call',
+                    function: { arguments: '', name: 'firstTool' },
+                  },
+                  {
+                    type: 'function',
+                    id: 'second-call',
+                    function: { arguments: '', name: 'secondTool' },
+                  },
+                ],
+              },
+            },
+          ],
+          created: Math.floor(Date.now() / 1000),
+          model: 'gpt-3.5-turbo',
+          object: 'chat.completion',
+        };
+      });
+
+      await firstStarted;
+      const startedBeforeFirstResolved = [...started];
+
+      const finalRequest = handleRequest(async (request) => {
+        expect(request.messages.slice(-2)).toEqual([
+          { role: 'tool', content: 'first result', tool_call_id: 'first-call' },
+          { role: 'tool', content: 'second result', tool_call_id: 'second-call' },
+        ]);
+        return {
+          id: '2',
+          choices: [
+            {
+              index: 0,
+              finish_reason: 'stop',
+              logprobs: null,
+              message: { role: 'assistant', content: 'done', refusal: null },
+            },
+          ],
+          created: Math.floor(Date.now() / 1000),
+          model: 'gpt-3.5-turbo',
+          object: 'chat.completion',
+        };
+      });
+
+      // Finish the second tool first to ensure completion timing cannot reorder
+      // the tool messages supplied to the next request.
+      resolveSecond('second result');
+      await Promise.resolve();
+      resolveFirst('first result');
+
+      await Promise.all([finalRequest, runner.done()]);
+      expect(startedBeforeFirstResolved).toEqual(['firstTool', 'secondTool']);
     });
     test('flow with abort', async () => {
       const { fetch, handleRequest } = mockChatCompletionFetch();
