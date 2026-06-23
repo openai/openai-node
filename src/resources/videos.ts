@@ -6,43 +6,65 @@ import { ConversationCursorPage, type ConversationCursorPageParams, PagePromise 
 import { type Uploadable } from '../core/uploads';
 import { buildHeaders } from '../internal/headers';
 import { RequestOptions } from '../internal/request-options';
-import { maybeMultipartFormRequestOptions } from '../internal/uploads';
+import { maybeMultipartFormRequestOptions, multipartFormRequestOptions } from '../internal/uploads';
 import { path } from '../internal/utils/path';
 
 export class Videos extends APIResource {
   /**
-   * Create a video
+   * Create a new video generation job from a prompt and optional reference assets.
    */
   create(body: VideoCreateParams, options?: RequestOptions): APIPromise<Video> {
-    return this._client.post('/videos', maybeMultipartFormRequestOptions({ body, ...options }, this._client));
+    return this._client.post(
+      '/videos',
+      multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
+    );
   }
 
   /**
-   * Retrieve a video
+   * Fetch the latest metadata for a generated video.
    */
   retrieve(videoID: string, options?: RequestOptions): APIPromise<Video> {
-    return this._client.get(path`/videos/${videoID}`, options);
+    return this._client.get(path`/videos/${videoID}`, { ...options, __security: { bearerAuth: true } });
   }
 
   /**
-   * List videos
+   * List recently generated videos for the current project.
    */
   list(
     query: VideoListParams | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<VideosPage, Video> {
-    return this._client.getAPIList('/videos', ConversationCursorPage<Video>, { query, ...options });
+    return this._client.getAPIList('/videos', ConversationCursorPage<Video>, {
+      query,
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
-   * Delete a video
+   * Permanently delete a completed or failed video and its stored assets.
    */
   delete(videoID: string, options?: RequestOptions): APIPromise<VideoDeleteResponse> {
-    return this._client.delete(path`/videos/${videoID}`, options);
+    return this._client.delete(path`/videos/${videoID}`, { ...options, __security: { bearerAuth: true } });
   }
 
   /**
-   * Download video content
+   * Create a character from an uploaded video.
+   */
+  createCharacter(
+    body: VideoCreateCharacterParams,
+    options?: RequestOptions,
+  ): APIPromise<VideoCreateCharacterResponse> {
+    return this._client.post(
+      '/videos/characters',
+      multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
+    );
+  }
+
+  /**
+   * Download the generated video bytes or a derived preview asset.
+   *
+   * Streams the rendered video content for the specified video job.
    */
   downloadContent(
     videoID: string,
@@ -53,22 +75,63 @@ export class Videos extends APIResource {
       query,
       ...options,
       headers: buildHeaders([{ Accept: 'application/binary' }, options?.headers]),
+      __security: { bearerAuth: true },
       __binaryResponse: true,
     });
   }
 
   /**
-   * Create a video remix
+   * Create a new video generation job by editing a source video or existing
+   * generated video.
+   */
+  edit(body: VideoEditParams, options?: RequestOptions): APIPromise<Video> {
+    return this._client.post(
+      '/videos/edits',
+      multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
+    );
+  }
+
+  /**
+   * Create an extension of a completed video.
+   */
+  extend(body: VideoExtendParams, options?: RequestOptions): APIPromise<Video> {
+    return this._client.post(
+      '/videos/extensions',
+      multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
+    );
+  }
+
+  /**
+   * Fetch a character.
+   */
+  getCharacter(characterID: string, options?: RequestOptions): APIPromise<VideoGetCharacterResponse> {
+    return this._client.get(path`/videos/characters/${characterID}`, {
+      ...options,
+      __security: { bearerAuth: true },
+    });
+  }
+
+  /**
+   * Create a remix of a completed video using a refreshed prompt.
    */
   remix(videoID: string, body: VideoRemixParams, options?: RequestOptions): APIPromise<Video> {
     return this._client.post(
       path`/videos/${videoID}/remix`,
-      maybeMultipartFormRequestOptions({ body, ...options }, this._client),
+      maybeMultipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
     );
   }
 }
 
 export type VideosPage = ConversationCursorPage<Video>;
+
+export interface ImageInputReferenceParam {
+  file_id?: string;
+
+  /**
+   * A fully qualified URL or base64-encoded data URL.
+   */
+  image_url?: string;
+}
 
 /**
  * Structured information describing a generated video job.
@@ -125,9 +188,10 @@ export interface Video {
   remixed_from_video_id: string | null;
 
   /**
-   * Duration of the generated clip in seconds.
+   * Duration of the generated clip in seconds. For extensions, this is the stitched
+   * total duration.
    */
-  seconds: VideoSeconds;
+  seconds: (string & {}) | VideoSeconds;
 
   /**
    * The resolution of the generated video.
@@ -187,6 +251,40 @@ export interface VideoDeleteResponse {
   object: 'video.deleted';
 }
 
+export interface VideoCreateCharacterResponse {
+  /**
+   * Identifier for the character creation cameo.
+   */
+  id: string | null;
+
+  /**
+   * Unix timestamp (in seconds) when the character was created.
+   */
+  created_at: number;
+
+  /**
+   * Display name for the character.
+   */
+  name: string | null;
+}
+
+export interface VideoGetCharacterResponse {
+  /**
+   * Identifier for the character creation cameo.
+   */
+  id: string | null;
+
+  /**
+   * Unix timestamp (in seconds) when the character was created.
+   */
+  created_at: number;
+
+  /**
+   * Display name for the character.
+   */
+  name: string | null;
+}
+
 export interface VideoCreateParams {
   /**
    * Text prompt that describes the video to generate.
@@ -194,9 +292,9 @@ export interface VideoCreateParams {
   prompt: string;
 
   /**
-   * Optional image reference that guides generation.
+   * Optional reference asset upload or reference object that guides generation.
    */
-  input_reference?: Uploadable;
+  input_reference?: Uploadable | ImageInputReferenceParam;
 
   /**
    * The video generation model to use (allowed values: sora-2, sora-2-pro). Defaults
@@ -224,11 +322,77 @@ export interface VideoListParams extends ConversationCursorPageParams {
   order?: 'asc' | 'desc';
 }
 
+export interface VideoCreateCharacterParams {
+  /**
+   * Display name for this API character.
+   */
+  name: string;
+
+  /**
+   * Video file used to create a character.
+   */
+  video: Uploadable;
+}
+
 export interface VideoDownloadContentParams {
   /**
    * Which downloadable asset to return. Defaults to the MP4 video.
    */
   variant?: 'video' | 'thumbnail' | 'spritesheet';
+}
+
+export interface VideoEditParams {
+  /**
+   * Text prompt that describes how to edit the source video.
+   */
+  prompt: string;
+
+  /**
+   * Reference to the completed video to edit.
+   */
+  video: Uploadable | VideoEditParams.VideoReferenceInputParam;
+}
+
+export namespace VideoEditParams {
+  /**
+   * Reference to the completed video to edit.
+   */
+  export interface VideoReferenceInputParam {
+    /**
+     * The identifier of the completed video.
+     */
+    id: string;
+  }
+}
+
+export interface VideoExtendParams {
+  /**
+   * Updated text prompt that directs the extension generation.
+   */
+  prompt: string;
+
+  /**
+   * Length of the newly generated extension segment in seconds (allowed values: 4,
+   * 8, 12, 16, 20).
+   */
+  seconds: VideoSeconds;
+
+  /**
+   * Reference to the completed video to extend.
+   */
+  video: Uploadable | VideoExtendParams.VideoReferenceInputParam;
+}
+
+export namespace VideoExtendParams {
+  /**
+   * Reference to the completed video.
+   */
+  export interface VideoReferenceInputParam {
+    /**
+     * The identifier of the completed video.
+     */
+    id: string;
+  }
 }
 
 export interface VideoRemixParams {
@@ -240,16 +404,22 @@ export interface VideoRemixParams {
 
 export declare namespace Videos {
   export {
+    type ImageInputReferenceParam as ImageInputReferenceParam,
     type Video as Video,
     type VideoCreateError as VideoCreateError,
     type VideoModel as VideoModel,
     type VideoSeconds as VideoSeconds,
     type VideoSize as VideoSize,
     type VideoDeleteResponse as VideoDeleteResponse,
+    type VideoCreateCharacterResponse as VideoCreateCharacterResponse,
+    type VideoGetCharacterResponse as VideoGetCharacterResponse,
     type VideosPage as VideosPage,
     type VideoCreateParams as VideoCreateParams,
     type VideoListParams as VideoListParams,
+    type VideoCreateCharacterParams as VideoCreateCharacterParams,
     type VideoDownloadContentParams as VideoDownloadContentParams,
+    type VideoEditParams as VideoEditParams,
+    type VideoExtendParams as VideoExtendParams,
     type VideoRemixParams as VideoRemixParams,
   };
 }

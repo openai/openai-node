@@ -1,6 +1,15 @@
 import OpenAI from 'openai/index';
 const openai = new OpenAI({ apiKey: 'example-api-key' });
 
+function isInputCompatibleOutputItem(
+  item: OpenAI.Responses.ResponseOutputItem,
+): item is Exclude<
+  OpenAI.Responses.ResponseOutputItem,
+  OpenAI.Responses.ResponseComputerToolCallOutputItem | OpenAI.Responses.ResponseOutputItem.AdditionalTools
+> {
+  return item.type !== 'computer_call_output' && item.type !== 'additional_tools';
+}
+
 describe('responses item types', () => {
   test('response output items are compatible with input items', async () => {
     expect(true).toBe(true);
@@ -15,7 +24,7 @@ const unused = async () => {
   await openai.responses.create({
     model: 'gpt-5.1',
     // check type compatibility
-    input: response.output,
+    input: response.output.filter(isInputCompatibleOutputItem),
   });
   expect(true).toBe(true);
 };

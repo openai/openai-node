@@ -4,6 +4,7 @@ import OpenAI from 'openai';
 
 const client = new OpenAI({
   apiKey: 'My API Key',
+  adminAPIKey: 'My Admin API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
@@ -75,7 +76,7 @@ describe('resource responses', () => {
   });
 
   test('compact: only required params', async () => {
-    const responsePromise = client.responses.compact({ model: 'gpt-5.2' });
+    const responsePromise = client.responses.compact({ model: 'gpt-5.4' });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -87,10 +88,13 @@ describe('resource responses', () => {
 
   test('compact: required and optional params', async () => {
     const response = await client.responses.compact({
-      model: 'gpt-5.2',
+      model: 'gpt-5.4',
       input: 'string',
       instructions: 'instructions',
       previous_response_id: 'resp_123',
+      prompt_cache_key: 'prompt_cache_key',
+      prompt_cache_retention: 'in_memory',
+      service_tier: 'auto',
     });
   });
 });

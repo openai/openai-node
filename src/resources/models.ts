@@ -6,13 +6,16 @@ import { Page, PagePromise } from '../core/pagination';
 import { RequestOptions } from '../internal/request-options';
 import { path } from '../internal/utils/path';
 
+/**
+ * List and describe the various models available in the API.
+ */
 export class Models extends APIResource {
   /**
    * Retrieves a model instance, providing basic information about the model such as
    * the owner and permissioning.
    */
   retrieve(model: string, options?: RequestOptions): APIPromise<Model> {
-    return this._client.get(path`/models/${model}`, options);
+    return this._client.get(path`/models/${model}`, { ...options, __security: { bearerAuth: true } });
   }
 
   /**
@@ -20,7 +23,7 @@ export class Models extends APIResource {
    * one such as the owner and availability.
    */
   list(options?: RequestOptions): PagePromise<ModelsPage, Model> {
-    return this._client.getAPIList('/models', Page<Model>, options);
+    return this._client.getAPIList('/models', Page<Model>, { ...options, __security: { bearerAuth: true } });
   }
 
   /**
@@ -28,7 +31,7 @@ export class Models extends APIResource {
    * delete a model.
    */
   delete(model: string, options?: RequestOptions): APIPromise<ModelDeleted> {
-    return this._client.delete(path`/models/${model}`, options);
+    return this._client.delete(path`/models/${model}`, { ...options, __security: { bearerAuth: true } });
   }
 }
 

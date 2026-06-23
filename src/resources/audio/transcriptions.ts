@@ -9,9 +9,15 @@ import { type Uploadable } from '../../core/uploads';
 import { RequestOptions } from '../../internal/request-options';
 import { multipartFormRequestOptions } from '../../internal/uploads';
 
+/**
+ * Turn audio into text or text into audio.
+ */
 export class Transcriptions extends APIResource {
   /**
    * Transcribes audio into the input language.
+   *
+   * Returns a transcription object in `json`, `diarized_json`, or `verbose_json`
+   * format, or a stream of transcript events.
    *
    * @example
    * ```ts
@@ -55,6 +61,7 @@ export class Transcriptions extends APIResource {
           ...options,
           stream: body.stream ?? false,
           __metadata: { model: body.model },
+          __security: { bearerAuth: true },
         },
         this._client,
       ),

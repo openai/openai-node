@@ -1,7 +1,7 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../../core/resource';
-import * as CompletionsCompletionsAPI from './completions';
+import * as ChatCompletionsAPI from './completions';
 import * as CompletionsAPI from '../../completions';
 import * as Shared from '../../shared';
 import * as MessagesAPI from './messages';
@@ -20,6 +20,9 @@ import { ChatCompletionStreamingToolRunnerParams } from '../../../lib/ChatComple
 import { ChatCompletionStream, type ChatCompletionStreamParams } from '../../../lib/ChatCompletionStream';
 import { ExtractParsedContentFromParams, parseChatCompletion, validateInputTools } from '../../../lib/parser';
 
+/**
+ * Given a list of messages comprising a conversation, the model will return a response.
+ */
 export class Completions extends APIResource {
   messages: MessagesAPI.Messages = new MessagesAPI.Messages(this._client);
 
@@ -42,12 +45,15 @@ export class Completions extends APIResource {
    * unsupported parameters in reasoning models,
    * [refer to the reasoning guide](https://platform.openai.com/docs/guides/reasoning).
    *
+   * Returns a chat completion object, or a streamed sequence of chat completion
+   * chunk objects if the request is streamed.
+   *
    * @example
    * ```ts
    * const chatCompletion = await client.chat.completions.create(
    *   {
    *     messages: [{ content: 'string', role: 'developer' }],
-   *     model: 'gpt-4o',
+   *     model: 'gpt-5.4',
    *   },
    * );
    * ```
@@ -65,9 +71,12 @@ export class Completions extends APIResource {
     body: ChatCompletionCreateParams,
     options?: RequestOptions,
   ): APIPromise<ChatCompletion> | APIPromise<Stream<ChatCompletionChunk>> {
-    return this._client.post('/chat/completions', { body, ...options, stream: body.stream ?? false }) as
-      | APIPromise<ChatCompletion>
-      | APIPromise<Stream<ChatCompletionChunk>>;
+    return this._client.post('/chat/completions', {
+      body,
+      ...options,
+      stream: body.stream ?? false,
+      __security: { bearerAuth: true },
+    }) as APIPromise<ChatCompletion> | APIPromise<Stream<ChatCompletionChunk>>;
   }
 
   /**
@@ -81,7 +90,10 @@ export class Completions extends APIResource {
    * ```
    */
   retrieve(completionID: string, options?: RequestOptions): APIPromise<ChatCompletion> {
-    return this._client.get(path`/chat/completions/${completionID}`, options);
+    return this._client.get(path`/chat/completions/${completionID}`, {
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
@@ -102,7 +114,11 @@ export class Completions extends APIResource {
     body: ChatCompletionUpdateParams,
     options?: RequestOptions,
   ): APIPromise<ChatCompletion> {
-    return this._client.post(path`/chat/completions/${completionID}`, { body, ...options });
+    return this._client.post(path`/chat/completions/${completionID}`, {
+      body,
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
@@ -121,7 +137,11 @@ export class Completions extends APIResource {
     query: ChatCompletionListParams | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<ChatCompletionsPage, ChatCompletion> {
-    return this._client.getAPIList('/chat/completions', CursorPage<ChatCompletion>, { query, ...options });
+    return this._client.getAPIList('/chat/completions', CursorPage<ChatCompletion>, {
+      query,
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
@@ -135,7 +155,10 @@ export class Completions extends APIResource {
    * ```
    */
   delete(completionID: string, options?: RequestOptions): APIPromise<ChatCompletionDeleted> {
-    return this._client.delete(path`/chat/completions/${completionID}`, options);
+    return this._client.delete(path`/chat/completions/${completionID}`, {
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   parse<Params extends ChatCompletionParseParams, ParsedT = ExtractParsedContentFromParams<Params>>(
@@ -273,6 +296,12 @@ export interface ChatCompletion {
   object: 'chat.completion';
 
   /**
+   * Moderation results for the request input and generated output, if moderated
+   * completions were requested.
+   */
+  moderation?: ChatCompletion.Moderation | null;
+
+  /**
    * Specifies the processing type used for serving the request.
    *
    * - If set to 'auto', then the request will be processed with the service tier
@@ -315,7 +344,8 @@ export namespace ChatCompletion {
      * number of tokens specified in the request was reached, `content_filter` if
      * content was omitted due to a flag from our content filters, `tool_calls` if the
      * model called a tool, or `function_call` (deprecated) if the model called a
-     * function.
+     * function. Read the [Model Spec](https://model-spec.openai.com/2025-12-18.html)
+     * for more.
      */
     finish_reason: 'stop' | 'length' | 'tool_calls' | 'content_filter' | 'function_call';
 
@@ -332,7 +362,7 @@ export namespace ChatCompletion {
     /**
      * A chat completion message generated by the model.
      */
-    message: CompletionsCompletionsAPI.ChatCompletionMessage;
+    message: ChatCompletionsAPI.ChatCompletionMessage;
   }
 
   export namespace Choice {
@@ -343,12 +373,188 @@ export namespace ChatCompletion {
       /**
        * A list of message content tokens with log probability information.
        */
-      content: Array<CompletionsCompletionsAPI.ChatCompletionTokenLogprob> | null;
+      content: Array<ChatCompletionsAPI.ChatCompletionTokenLogprob> | null;
 
       /**
        * A list of message refusal tokens with log probability information.
        */
-      refusal: Array<CompletionsCompletionsAPI.ChatCompletionTokenLogprob> | null;
+      refusal: Array<ChatCompletionsAPI.ChatCompletionTokenLogprob> | null;
+    }
+  }
+
+  /**
+   * Moderation results for the request input and generated output, if moderated
+   * completions were requested.
+   */
+  export interface Moderation {
+    /**
+     * Moderation for the request input.
+     */
+    input: Moderation.ModerationResults | Moderation.Error;
+
+    /**
+     * Moderation for the generated output.
+     */
+    output: Moderation.ModerationResults | Moderation.Error;
+  }
+
+  export namespace Moderation {
+    /**
+     * Successful moderation results for the request input or generated output.
+     */
+    export interface ModerationResults {
+      /**
+       * The moderation model used to generate the results.
+       */
+      model: string;
+
+      /**
+       * A list of moderation results.
+       */
+      results: Array<ModerationResults.Result>;
+
+      /**
+       * The object type, which is always `moderation_results`.
+       */
+      type: 'moderation_results';
+    }
+
+    export namespace ModerationResults {
+      /**
+       * A moderation result produced for the response input or output.
+       */
+      export interface Result {
+        /**
+         * A dictionary of moderation categories to booleans, True if the input is flagged
+         * under this category.
+         */
+        categories: { [key: string]: boolean };
+
+        /**
+         * Which modalities of input are reflected by the score for each category.
+         */
+        category_applied_input_types: { [key: string]: Array<'text' | 'image'> };
+
+        /**
+         * A dictionary of moderation categories to scores.
+         */
+        category_scores: { [key: string]: number };
+
+        /**
+         * A boolean indicating whether the content was flagged by any category.
+         */
+        flagged: boolean;
+
+        /**
+         * The moderation model that produced this result.
+         */
+        model: string;
+
+        /**
+         * The object type, which was always `moderation_result` for successful moderation
+         * results.
+         */
+        type: 'moderation_result';
+      }
+    }
+
+    /**
+     * An error produced while attempting moderation.
+     */
+    export interface Error {
+      /**
+       * The error code.
+       */
+      code: string;
+
+      /**
+       * The error message.
+       */
+      message: string;
+
+      /**
+       * The object type, which is always `error`.
+       */
+      type: 'error';
+    }
+
+    /**
+     * Successful moderation results for the request input or generated output.
+     */
+    export interface ModerationResults {
+      /**
+       * The moderation model used to generate the results.
+       */
+      model: string;
+
+      /**
+       * A list of moderation results.
+       */
+      results: Array<ModerationResults.Result>;
+
+      /**
+       * The object type, which is always `moderation_results`.
+       */
+      type: 'moderation_results';
+    }
+
+    export namespace ModerationResults {
+      /**
+       * A moderation result produced for the response input or output.
+       */
+      export interface Result {
+        /**
+         * A dictionary of moderation categories to booleans, True if the input is flagged
+         * under this category.
+         */
+        categories: { [key: string]: boolean };
+
+        /**
+         * Which modalities of input are reflected by the score for each category.
+         */
+        category_applied_input_types: { [key: string]: Array<'text' | 'image'> };
+
+        /**
+         * A dictionary of moderation categories to scores.
+         */
+        category_scores: { [key: string]: number };
+
+        /**
+         * A boolean indicating whether the content was flagged by any category.
+         */
+        flagged: boolean;
+
+        /**
+         * The moderation model that produced this result.
+         */
+        model: string;
+
+        /**
+         * The object type, which was always `moderation_result` for successful moderation
+         * results.
+         */
+        type: 'moderation_result';
+      }
+    }
+
+    /**
+     * An error produced while attempting moderation.
+     */
+    export interface Error {
+      /**
+       * The error code.
+       */
+      code: string;
+
+      /**
+       * The error message.
+       */
+      message: string;
+
+      /**
+       * The object type, which is always `error`.
+       */
+      type: 'error';
     }
   }
 }
@@ -488,10 +694,11 @@ export interface ChatCompletionAudioParam {
   /**
    * The voice the model uses to respond. Supported built-in voices are `alloy`,
    * `ash`, `ballad`, `coral`, `echo`, `fable`, `nova`, `onyx`, `sage`, `shimmer`,
-   * `marin`, and `cedar`.
+   * `marin`, and `cedar`. You may also provide a custom voice object with an `id`,
+   * for example `{ "id": "voice_1234" }`.
    */
   voice:
-    | (string & {})
+    | string
     | 'alloy'
     | 'ash'
     | 'ballad'
@@ -501,7 +708,20 @@ export interface ChatCompletionAudioParam {
     | 'shimmer'
     | 'verse'
     | 'marin'
-    | 'cedar';
+    | 'cedar'
+    | ChatCompletionAudioParam.ID;
+}
+
+export namespace ChatCompletionAudioParam {
+  /**
+   * Custom voice reference.
+   */
+  export interface ID {
+    /**
+     * The custom voice ID, e.g. `voice_1234`.
+     */
+    id: string;
+  }
 }
 
 /**
@@ -537,6 +757,12 @@ export interface ChatCompletionChunk {
    * The object type, which is always `chat.completion.chunk`.
    */
   object: 'chat.completion.chunk';
+
+  /**
+   * Moderation results for the request input and generated output. Present on the
+   * moderation chunk when moderated completions are requested.
+   */
+  moderation?: ChatCompletionChunk.Moderation | null;
 
   /**
    * Specifies the processing type used for serving the request.
@@ -695,12 +921,188 @@ export namespace ChatCompletionChunk {
       /**
        * A list of message content tokens with log probability information.
        */
-      content: Array<CompletionsCompletionsAPI.ChatCompletionTokenLogprob> | null;
+      content: Array<ChatCompletionsAPI.ChatCompletionTokenLogprob> | null;
 
       /**
        * A list of message refusal tokens with log probability information.
        */
-      refusal: Array<CompletionsCompletionsAPI.ChatCompletionTokenLogprob> | null;
+      refusal: Array<ChatCompletionsAPI.ChatCompletionTokenLogprob> | null;
+    }
+  }
+
+  /**
+   * Moderation results for the request input and generated output. Present on the
+   * moderation chunk when moderated completions are requested.
+   */
+  export interface Moderation {
+    /**
+     * Moderation for the request input.
+     */
+    input: Moderation.ModerationResults | Moderation.Error;
+
+    /**
+     * Moderation for the generated output.
+     */
+    output: Moderation.ModerationResults | Moderation.Error;
+  }
+
+  export namespace Moderation {
+    /**
+     * Successful moderation results for the request input or generated output.
+     */
+    export interface ModerationResults {
+      /**
+       * The moderation model used to generate the results.
+       */
+      model: string;
+
+      /**
+       * A list of moderation results.
+       */
+      results: Array<ModerationResults.Result>;
+
+      /**
+       * The object type, which is always `moderation_results`.
+       */
+      type: 'moderation_results';
+    }
+
+    export namespace ModerationResults {
+      /**
+       * A moderation result produced for the response input or output.
+       */
+      export interface Result {
+        /**
+         * A dictionary of moderation categories to booleans, True if the input is flagged
+         * under this category.
+         */
+        categories: { [key: string]: boolean };
+
+        /**
+         * Which modalities of input are reflected by the score for each category.
+         */
+        category_applied_input_types: { [key: string]: Array<'text' | 'image'> };
+
+        /**
+         * A dictionary of moderation categories to scores.
+         */
+        category_scores: { [key: string]: number };
+
+        /**
+         * A boolean indicating whether the content was flagged by any category.
+         */
+        flagged: boolean;
+
+        /**
+         * The moderation model that produced this result.
+         */
+        model: string;
+
+        /**
+         * The object type, which was always `moderation_result` for successful moderation
+         * results.
+         */
+        type: 'moderation_result';
+      }
+    }
+
+    /**
+     * An error produced while attempting moderation.
+     */
+    export interface Error {
+      /**
+       * The error code.
+       */
+      code: string;
+
+      /**
+       * The error message.
+       */
+      message: string;
+
+      /**
+       * The object type, which is always `error`.
+       */
+      type: 'error';
+    }
+
+    /**
+     * Successful moderation results for the request input or generated output.
+     */
+    export interface ModerationResults {
+      /**
+       * The moderation model used to generate the results.
+       */
+      model: string;
+
+      /**
+       * A list of moderation results.
+       */
+      results: Array<ModerationResults.Result>;
+
+      /**
+       * The object type, which is always `moderation_results`.
+       */
+      type: 'moderation_results';
+    }
+
+    export namespace ModerationResults {
+      /**
+       * A moderation result produced for the response input or output.
+       */
+      export interface Result {
+        /**
+         * A dictionary of moderation categories to booleans, True if the input is flagged
+         * under this category.
+         */
+        categories: { [key: string]: boolean };
+
+        /**
+         * Which modalities of input are reflected by the score for each category.
+         */
+        category_applied_input_types: { [key: string]: Array<'text' | 'image'> };
+
+        /**
+         * A dictionary of moderation categories to scores.
+         */
+        category_scores: { [key: string]: number };
+
+        /**
+         * A boolean indicating whether the content was flagged by any category.
+         */
+        flagged: boolean;
+
+        /**
+         * The moderation model that produced this result.
+         */
+        model: string;
+
+        /**
+         * The object type, which was always `moderation_result` for successful moderation
+         * results.
+         */
+        type: 'moderation_result';
+      }
+    }
+
+    /**
+     * An error produced while attempting moderation.
+     */
+    export interface Error {
+      /**
+       * The error code.
+       */
+      code: string;
+
+      /**
+       * The error message.
+       */
+      message: string;
+
+      /**
+       * The object type, which is always `error`.
+       */
+      type: 'error';
     }
   }
 }
@@ -1357,8 +1759,7 @@ export interface ChatCompletionTokenLogprob {
 
   /**
    * List of the most likely tokens and their log probability, at this token
-   * position. In rare cases, there may be fewer than the number of requested
-   * `top_logprobs` returned.
+   * position. The number of entries may be fewer than the requested `top_logprobs`.
    */
   top_logprobs: Array<ChatCompletionTokenLogprob.TopLogprob>;
 }
@@ -1606,6 +2007,11 @@ export interface ChatCompletionCreateParamsBase {
   modalities?: Array<'text' | 'audio'> | null;
 
   /**
+   * Configuration for running moderation on the request input and generated output.
+   */
+  moderation?: ChatCompletionCreateParams.Moderation | null;
+
+  /**
    * How many chat completion choices to generate for each input message. Note that
    * you will be charged based on the number of generated tokens across all of the
    * choices. Keep `n` as `1` to minimize costs.
@@ -1644,8 +2050,16 @@ export interface ChatCompletionCreateParamsBase {
    * prompt caching, which keeps cached prefixes active for longer, up to a maximum
    * of 24 hours.
    * [Learn more](https://platform.openai.com/docs/guides/prompt-caching#prompt-cache-retention).
+   * For `gpt-5.5`, `gpt-5.5-pro`, and future models, only `24h` is supported.
+   *
+   * For older models that support both `in_memory` and `24h`, the default depends on
+   * your organization's data retention policy:
+   *
+   * - Organizations without ZDR enabled default to `24h`.
+   * - Organizations with ZDR enabled default to `in_memory` when
+   *   `prompt_cache_retention` is not specified.
    */
-  prompt_cache_retention?: 'in-memory' | '24h' | null;
+  prompt_cache_retention?: 'in_memory' | '24h' | null;
 
   /**
    * Constrains effort on reasoning for
@@ -1684,8 +2098,9 @@ export interface ChatCompletionCreateParamsBase {
   /**
    * A stable identifier used to help detect users of your application that may be
    * violating OpenAI's usage policies. The IDs should be a string that uniquely
-   * identifies each user. We recommend hashing their username or email address, in
-   * order to avoid sending us any identifying information.
+   * identifies each user, with a maximum length of 64 characters. We recommend
+   * hashing their username or email address, in order to avoid sending us any
+   * identifying information.
    * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
    */
   safety_identifier?: string;
@@ -1782,8 +2197,9 @@ export interface ChatCompletionCreateParamsBase {
   tools?: Array<ChatCompletionTool>;
 
   /**
-   * An integer between 0 and 20 specifying the number of most likely tokens to
-   * return at each token position, each with an associated log probability.
+   * An integer between 0 and 20 specifying the maximum number of most likely tokens
+   * to return at each token position, each with an associated log probability. In
+   * some cases, the number of returned tokens may be fewer than requested.
    * `logprobs` must be set to `true` if this parameter is used.
    */
   top_logprobs?: number | null;
@@ -1852,6 +2268,17 @@ export namespace ChatCompletionCreateParams {
   }
 
   /**
+   * Configuration for running moderation on the request input and generated output.
+   */
+  export interface Moderation {
+    /**
+     * The moderation model to use for moderated completions, e.g.
+     * 'omni-moderation-latest'.
+     */
+    model: string;
+  }
+
+  /**
    * This tool searches the web for relevant results to use in a response. Learn more
    * about the
    * [web search tool](https://platform.openai.com/docs/guides/tools-web-search?api-mode=chat).
@@ -1916,9 +2343,8 @@ export namespace ChatCompletionCreateParams {
   }
 
   export type ChatCompletionCreateParamsNonStreaming =
-    CompletionsCompletionsAPI.ChatCompletionCreateParamsNonStreaming;
-  export type ChatCompletionCreateParamsStreaming =
-    CompletionsCompletionsAPI.ChatCompletionCreateParamsStreaming;
+    ChatCompletionsAPI.ChatCompletionCreateParamsNonStreaming;
+  export type ChatCompletionCreateParamsStreaming = ChatCompletionsAPI.ChatCompletionCreateParamsStreaming;
 }
 
 export interface ChatCompletionCreateParamsNonStreaming extends ChatCompletionCreateParamsBase {
@@ -1963,12 +2389,9 @@ export interface ChatCompletionUpdateParams {
 
 export interface ChatCompletionListParams extends CursorPageParams {
   /**
-   * Set of 16 key-value pairs that can be attached to an object. This can be useful
-   * for storing additional information about the object in a structured format, and
-   * querying for objects via API or the dashboard.
+   * A list of metadata keys to filter the Chat Completions by. Example:
    *
-   * Keys are strings with a maximum length of 64 characters. Values are strings with
-   * a maximum length of 512 characters.
+   * `metadata[key1]=value1&metadata[key2]=value2`
    */
   metadata?: Shared.Metadata | null;
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env -S npm run tsn -T
+#!/usr/bin/env -S npm run tsn -- -T
 
 // This file demonstrates how to stream from the server the chunks as
 // a new-line separated JSON-encoded stream.

@@ -4,6 +4,7 @@ import OpenAI from 'openai';
 
 const client = new OpenAI({
   apiKey: 'My API Key',
+  adminAPIKey: 'My Admin API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
@@ -11,7 +12,7 @@ describe('resource completions', () => {
   test('create: only required params', async () => {
     const responsePromise = client.chat.completions.create({
       messages: [{ content: 'string', role: 'developer' }],
-      model: 'gpt-4o',
+      model: 'gpt-5.4',
     });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
@@ -31,8 +32,8 @@ describe('resource completions', () => {
           name: 'name',
         },
       ],
-      model: 'gpt-4o',
-      audio: { format: 'wav', voice: 'ash' },
+      model: 'gpt-5.4',
+      audio: { format: 'wav', voice: 'alloy' },
       frequency_penalty: -2,
       function_call: 'none',
       functions: [
@@ -48,12 +49,13 @@ describe('resource completions', () => {
       max_tokens: 0,
       metadata: { foo: 'string' },
       modalities: ['text'],
+      moderation: { model: 'model' },
       n: 1,
       parallel_tool_calls: true,
       prediction: { content: 'string', type: 'content' },
       presence_penalty: -2,
       prompt_cache_key: 'prompt-cache-key-1234',
-      prompt_cache_retention: 'in-memory',
+      prompt_cache_retention: 'in_memory',
       reasoning_effort: 'none',
       response_format: { type: 'text' },
       safety_identifier: 'safety-identifier-1234',

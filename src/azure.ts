@@ -4,7 +4,8 @@ import { buildHeaders } from './internal/headers';
 import * as Errors from './error';
 import { FinalRequestOptions } from './internal/request-options';
 import { isObj, readEnv } from './internal/utils';
-import { ClientOptions, OpenAI } from './client';
+import { OpenAI } from './client';
+import type { ClientOptions } from './client';
 
 /** API Client for interfacing with the Azure OpenAI API. */
 export interface AzureClientOptions extends ClientOptions {
@@ -137,11 +138,15 @@ export class AzureOpenAI extends OpenAI {
     return super.buildRequest(options, props);
   }
 
-  protected override async authHeaders(opts: FinalRequestOptions): Promise<NullableHeaders | undefined> {
-    if (typeof this._options.apiKey === 'string') {
+  protected override async authHeaders(
+    opts: FinalRequestOptions,
+    schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+  ): Promise<NullableHeaders | undefined> {
+    const security = schemes ?? { bearerAuth: true, adminAPIKeyAuth: true };
+    if (security.bearerAuth && typeof this._options.apiKey === 'string') {
       return buildHeaders([{ 'api-key': this.apiKey }]);
     }
-    return super.authHeaders(opts);
+    return super.authHeaders(opts, security);
   }
 }
 

@@ -26,6 +26,7 @@ export class FileBatches extends APIResource {
       body,
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -41,6 +42,7 @@ export class FileBatches extends APIResource {
     return this._client.get(path`/vector_stores/${vector_store_id}/file_batches/${batchID}`, {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -57,6 +59,7 @@ export class FileBatches extends APIResource {
     return this._client.post(path`/vector_stores/${vector_store_id}/file_batches/${batchID}/cancel`, {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -84,7 +87,12 @@ export class FileBatches extends APIResource {
     return this._client.getAPIList(
       path`/vector_stores/${vector_store_id}/file_batches/${batchID}/files`,
       CursorPage<FilesAPI.VectorStoreFile>,
-      { query, ...options, headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]) },
+      {
+        query,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      },
     );
   }
 
@@ -274,7 +282,9 @@ export interface FileBatchCreateParams {
    * A list of [File](https://platform.openai.com/docs/api-reference/files) IDs that
    * the vector store should use. Useful for tools like `file_search` that can access
    * files. If `attributes` or `chunking_strategy` are provided, they will be applied
-   * to all files in the batch. Mutually exclusive with `files`.
+   * to all files in the batch. The maximum batch size is 2000 files. This endpoint
+   * is recommended for multi-file ingestion and helps reduce per-vector-store write
+   * request pressure. Mutually exclusive with `files`.
    */
   file_ids?: Array<string>;
 
@@ -282,7 +292,9 @@ export interface FileBatchCreateParams {
    * A list of objects that each include a `file_id` plus optional `attributes` or
    * `chunking_strategy`. Use this when you need to override metadata for specific
    * files. The global `attributes` or `chunking_strategy` will be ignored and must
-   * be specified for each file. Mutually exclusive with `file_ids`.
+   * be specified for each file. The maximum batch size is 2000 files. This endpoint
+   * is recommended for multi-file ingestion and helps reduce per-vector-store write
+   * request pressure. Mutually exclusive with `file_ids`.
    */
   files?: Array<FileBatchCreateParams.File>;
 }
@@ -292,7 +304,9 @@ export namespace FileBatchCreateParams {
     /**
      * A [File](https://platform.openai.com/docs/api-reference/files) ID that the
      * vector store should use. Useful for tools like `file_search` that can access
-     * files.
+     * files. For multi-file ingestion, we recommend
+     * [`file_batches`](https://platform.openai.com/docs/api-reference/vector-stores-file-batches/createBatch)
+     * to minimize per-vector-store write requests.
      */
     file_id: string;
 

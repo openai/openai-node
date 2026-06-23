@@ -10,7 +10,6 @@ import {
   ClientSecretCreateParams,
   ClientSecretCreateResponse,
   ClientSecrets,
-  RealtimeSessionClientSecret,
   RealtimeSessionCreateResponse,
   RealtimeTranscriptionSessionCreateResponse,
   RealtimeTranscriptionSessionTurnDetection,
@@ -24,6 +23,13 @@ export class Realtime extends APIResource {
 
 export interface AudioTranscription {
   /**
+   * Controls how long the model waits before emitting transcription text. Higher
+   * values can improve transcription accuracy at the cost of latency. Only supported
+   * with `gpt-realtime-whisper` in GA Realtime sessions.
+   */
+  delay?: 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+
+  /**
    * The language of the input audio. Supplying the input language in
    * [ISO-639-1](https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes) (e.g. `en`)
    * format will improve accuracy and latency.
@@ -33,8 +39,8 @@ export interface AudioTranscription {
   /**
    * The model to use for transcription. Current options are `whisper-1`,
    * `gpt-4o-mini-transcribe`, `gpt-4o-mini-transcribe-2025-12-15`,
-   * `gpt-4o-transcribe`, and `gpt-4o-transcribe-diarize`. Use
-   * `gpt-4o-transcribe-diarize` when you need diarization with speaker labels.
+   * `gpt-4o-transcribe`, `gpt-4o-transcribe-diarize`, and `gpt-realtime-whisper`.
+   * Use `gpt-4o-transcribe-diarize` when you need diarization with speaker labels.
    */
   model?:
     | (string & {})
@@ -42,7 +48,8 @@ export interface AudioTranscription {
     | 'gpt-4o-mini-transcribe'
     | 'gpt-4o-mini-transcribe-2025-12-15'
     | 'gpt-4o-transcribe'
-    | 'gpt-4o-transcribe-diarize';
+    | 'gpt-4o-transcribe-diarize'
+    | 'gpt-realtime-whisper';
 
   /**
    * An optional text to guide the model's style or continue a previous audio
@@ -50,6 +57,7 @@ export interface AudioTranscription {
    * [prompt is a list of keywords](https://platform.openai.com/docs/guides/speech-to-text#prompting).
    * For `gpt-4o-transcribe` models (excluding `gpt-4o-transcribe-diarize`), the
    * prompt is a free text string, for example "expect words related to technology".
+   * Prompt is not supported with `gpt-realtime-whisper` in GA Realtime sessions.
    */
   prompt?: string;
 }
@@ -1220,6 +1228,9 @@ export interface RealtimeAudioConfigInput {
    * trails off with "uhhm", the model will score a low probability of turn end and
    * wait longer for the user to continue speaking. This can be useful for more
    * natural conversations, but may have a higher latency.
+   *
+   * For `gpt-realtime-whisper` transcription sessions, turn detection must be set to
+   * `null`; VAD is not supported.
    */
   turn_detection?: RealtimeAudioInputTurnDetection | null;
 }
@@ -1262,11 +1273,13 @@ export interface RealtimeAudioConfigOutput {
   /**
    * The voice the model uses to respond. Supported built-in voices are `alloy`,
    * `ash`, `ballad`, `coral`, `echo`, `sage`, `shimmer`, `verse`, `marin`, and
-   * `cedar`. Voice cannot be changed during the session once the model has responded
-   * with audio at least once. We recommend `marin` and `cedar` for best quality.
+   * `cedar`. You may also provide a custom voice object with an `id`, for example
+   * `{ "id": "voice_1234" }`. Voice cannot be changed during the session once the
+   * model has responded with audio at least once. We recommend `marin` and `cedar`
+   * for best quality.
    */
   voice?:
-    | (string & {})
+    | string
     | 'alloy'
     | 'ash'
     | 'ballad'
@@ -1276,7 +1289,20 @@ export interface RealtimeAudioConfigOutput {
     | 'shimmer'
     | 'verse'
     | 'marin'
-    | 'cedar';
+    | 'cedar'
+    | RealtimeAudioConfigOutput.ID;
+}
+
+export namespace RealtimeAudioConfigOutput {
+  /**
+   * Custom voice reference.
+   */
+  export interface ID {
+    /**
+     * The custom voice ID, e.g. `voice_1234`.
+     */
+    id: string;
+  }
 }
 
 /**
@@ -1338,6 +1364,9 @@ export namespace RealtimeAudioFormats {
  * trails off with "uhhm", the model will score a low probability of turn end and
  * wait longer for the user to continue speaking. This can be useful for more
  * natural conversations, but may have a higher latency.
+ *
+ * For `gpt-realtime-whisper` transcription sessions, turn detection must be set to
+ * `null`; VAD is not supported.
  */
 export type RealtimeAudioInputTurnDetection =
   | RealtimeAudioInputTurnDetection.ServerVad
@@ -1996,6 +2025,23 @@ export interface RealtimeMcphttpError {
 }
 
 /**
+ * Configuration for reasoning-capable Realtime models such as `gpt-realtime-2`.
+ */
+export interface RealtimeReasoning {
+  /**
+   * Constrains effort on reasoning for reasoning-capable Realtime models such as
+   * `gpt-realtime-2`.
+   */
+  effort?: RealtimeReasoningEffort;
+}
+
+/**
+ * Constrains effort on reasoning for reasoning-capable Realtime models such as
+ * `gpt-realtime-2`.
+ */
+export type RealtimeReasoningEffort = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+
+/**
  * The response resource.
  */
 export interface RealtimeResponse {
@@ -2127,11 +2173,13 @@ export namespace RealtimeResponseCreateAudioOutput {
     /**
      * The voice the model uses to respond. Supported built-in voices are `alloy`,
      * `ash`, `ballad`, `coral`, `echo`, `sage`, `shimmer`, `verse`, `marin`, and
-     * `cedar`. Voice cannot be changed during the session once the model has responded
-     * with audio at least once.
+     * `cedar`. You may also provide a custom voice object with an `id`, for example
+     * `{ "id": "voice_1234" }`. Voice cannot be changed during the session once the
+     * model has responded with audio at least once. We recommend `marin` and `cedar`
+     * for best quality.
      */
     voice?:
-      | (string & {})
+      | string
       | 'alloy'
       | 'ash'
       | 'ballad'
@@ -2141,7 +2189,20 @@ export namespace RealtimeResponseCreateAudioOutput {
       | 'shimmer'
       | 'verse'
       | 'marin'
-      | 'cedar';
+      | 'cedar'
+      | Output.ID;
+  }
+
+  export namespace Output {
+    /**
+     * Custom voice reference.
+     */
+    export interface ID {
+      /**
+       * The custom voice ID, e.g. `voice_1234`.
+       */
+      id: string;
+    }
   }
 }
 
@@ -2175,8 +2236,8 @@ export interface RealtimeResponseCreateMcpTool {
 
   /**
    * Identifier for service connectors, like those available in ChatGPT. One of
-   * `server_url` or `connector_id` must be provided. Learn more about service
-   * connectors
+   * `server_url`, `connector_id`, or `tunnel_id` must be provided. Learn more about
+   * service connectors
    * [here](https://platform.openai.com/docs/guides/tools-remote-mcp#connectors).
    *
    * Currently supported `connector_id` values are:
@@ -2201,6 +2262,11 @@ export interface RealtimeResponseCreateMcpTool {
     | 'connector_sharepoint';
 
   /**
+   * Whether this MCP tool is deferred and discovered via tool search.
+   */
+  defer_loading?: boolean;
+
+  /**
    * Optional HTTP headers to send to the MCP server. Use for authentication or other
    * purposes.
    */
@@ -2217,10 +2283,16 @@ export interface RealtimeResponseCreateMcpTool {
   server_description?: string;
 
   /**
-   * The URL for the MCP server. One of `server_url` or `connector_id` must be
-   * provided.
+   * The URL for the MCP server. One of `server_url`, `connector_id`, or `tunnel_id`
+   * must be provided.
    */
   server_url?: string;
+
+  /**
+   * The Secure MCP Tunnel ID to use instead of a direct server URL. One of
+   * `server_url`, `connector_id`, or `tunnel_id` must be provided.
+   */
+  tunnel_id?: string;
 }
 
 export namespace RealtimeResponseCreateMcpTool {
@@ -2363,10 +2435,21 @@ export interface RealtimeResponseCreateParams {
   output_modalities?: Array<'text' | 'audio'>;
 
   /**
+   * Whether the model may call multiple tools in parallel. Only supported by
+   * reasoning Realtime models such as `gpt-realtime-2`.
+   */
+  parallel_tool_calls?: boolean;
+
+  /**
    * Reference to a prompt template and its variables.
    * [Learn more](https://platform.openai.com/docs/guides/text?api-mode=responses#reusable-prompts).
    */
   prompt?: ResponsesAPI.ResponsePrompt | null;
+
+  /**
+   * Configuration for reasoning-capable Realtime models such as `gpt-realtime-2`.
+   */
+  reasoning?: RealtimeReasoning;
 
   /**
    * How the model chooses tools. Provide one of the string modes or force a specific
@@ -2765,6 +2848,7 @@ export interface RealtimeSession {
   model?:
     | (string & {})
     | 'gpt-realtime'
+    | 'gpt-realtime-1.5'
     | 'gpt-realtime-2025-08-28'
     | 'gpt-4o-realtime-preview'
     | 'gpt-4o-realtime-preview-2024-10-01'
@@ -2775,6 +2859,7 @@ export interface RealtimeSession {
     | 'gpt-realtime-mini'
     | 'gpt-realtime-mini-2025-10-06'
     | 'gpt-realtime-mini-2025-12-15'
+    | 'gpt-audio-1.5'
     | 'gpt-audio-mini'
     | 'gpt-audio-mini-2025-10-06'
     | 'gpt-audio-mini-2025-12-15';
@@ -2843,6 +2928,9 @@ export interface RealtimeSession {
    * trails off with "uhhm", the model will score a low probability of turn end and
    * wait longer for the user to continue speaking. This can be useful for more
    * natural conversations, but may have a higher latency.
+   *
+   * For `gpt-realtime-whisper` transcription sessions, turn detection must be set to
+   * `null`; VAD is not supported.
    */
   turn_detection?: RealtimeSession.ServerVad | RealtimeSession.SemanticVad | null;
 
@@ -3056,6 +3144,8 @@ export interface RealtimeSessionCreateRequest {
   model?:
     | (string & {})
     | 'gpt-realtime'
+    | 'gpt-realtime-1.5'
+    | 'gpt-realtime-2'
     | 'gpt-realtime-2025-08-28'
     | 'gpt-4o-realtime-preview'
     | 'gpt-4o-realtime-preview-2024-10-01'
@@ -3066,6 +3156,7 @@ export interface RealtimeSessionCreateRequest {
     | 'gpt-realtime-mini'
     | 'gpt-realtime-mini-2025-10-06'
     | 'gpt-realtime-mini-2025-12-15'
+    | 'gpt-audio-1.5'
     | 'gpt-audio-mini'
     | 'gpt-audio-mini-2025-10-06'
     | 'gpt-audio-mini-2025-12-15';
@@ -3079,10 +3170,21 @@ export interface RealtimeSessionCreateRequest {
   output_modalities?: Array<'text' | 'audio'>;
 
   /**
+   * Whether the model may call multiple tools in parallel. Only supported by
+   * reasoning Realtime models such as `gpt-realtime-2`.
+   */
+  parallel_tool_calls?: boolean;
+
+  /**
    * Reference to a prompt template and its variables.
    * [Learn more](https://platform.openai.com/docs/guides/text?api-mode=responses#reusable-prompts).
    */
   prompt?: ResponsesAPI.ResponsePrompt | null;
+
+  /**
+   * Configuration for reasoning-capable Realtime models such as `gpt-realtime-2`.
+   */
+  reasoning?: RealtimeReasoning;
 
   /**
    * How the model chooses tools. Provide one of the string modes or force a specific
@@ -3097,8 +3199,9 @@ export interface RealtimeSessionCreateRequest {
 
   /**
    * Realtime API can write session traces to the
-   * [Traces Dashboard](/logs?api=traces). Set to null to disable tracing. Once
-   * tracing is enabled for a session, the configuration cannot be modified.
+   * [Traces Dashboard](https://platform.openai.com/logs?api=traces). Set to null to
+   * disable tracing. Once tracing is enabled for a session, the configuration cannot
+   * be modified.
    *
    * `auto` will create a trace for the session with default values for the workflow
    * name, group id, and metadata.
@@ -3180,8 +3283,8 @@ export namespace RealtimeToolsConfigUnion {
 
     /**
      * Identifier for service connectors, like those available in ChatGPT. One of
-     * `server_url` or `connector_id` must be provided. Learn more about service
-     * connectors
+     * `server_url`, `connector_id`, or `tunnel_id` must be provided. Learn more about
+     * service connectors
      * [here](https://platform.openai.com/docs/guides/tools-remote-mcp#connectors).
      *
      * Currently supported `connector_id` values are:
@@ -3206,6 +3309,11 @@ export namespace RealtimeToolsConfigUnion {
       | 'connector_sharepoint';
 
     /**
+     * Whether this MCP tool is deferred and discovered via tool search.
+     */
+    defer_loading?: boolean;
+
+    /**
      * Optional HTTP headers to send to the MCP server. Use for authentication or other
      * purposes.
      */
@@ -3222,10 +3330,16 @@ export namespace RealtimeToolsConfigUnion {
     server_description?: string;
 
     /**
-     * The URL for the MCP server. One of `server_url` or `connector_id` must be
-     * provided.
+     * The URL for the MCP server. One of `server_url`, `connector_id`, or `tunnel_id`
+     * must be provided.
      */
     server_url?: string;
+
+    /**
+     * The Secure MCP Tunnel ID to use instead of a direct server URL. One of
+     * `server_url`, `connector_id`, or `tunnel_id` must be provided.
+     */
+    tunnel_id?: string;
   }
 
   export namespace Mcp {
@@ -3305,8 +3419,9 @@ export namespace RealtimeToolsConfigUnion {
 
 /**
  * Realtime API can write session traces to the
- * [Traces Dashboard](/logs?api=traces). Set to null to disable tracing. Once
- * tracing is enabled for a session, the configuration cannot be modified.
+ * [Traces Dashboard](https://platform.openai.com/logs?api=traces). Set to null to
+ * disable tracing. Once tracing is enabled for a session, the configuration cannot
+ * be modified.
  *
  * `auto` will create a trace for the session with default values for the workflow
  * name, group id, and metadata.
@@ -3386,6 +3501,9 @@ export interface RealtimeTranscriptionSessionAudioInput {
    * trails off with "uhhm", the model will score a low probability of turn end and
    * wait longer for the user to continue speaking. This can be useful for more
    * natural conversations, but may have a higher latency.
+   *
+   * For `gpt-realtime-whisper` transcription sessions, turn detection must be set to
+   * `null`; VAD is not supported.
    */
   turn_detection?: RealtimeTranscriptionSessionAudioInputTurnDetection | null;
 }
@@ -3422,6 +3540,9 @@ export namespace RealtimeTranscriptionSessionAudioInput {
  * trails off with "uhhm", the model will score a low probability of turn end and
  * wait longer for the user to continue speaking. This can be useful for more
  * natural conversations, but may have a higher latency.
+ *
+ * For `gpt-realtime-whisper` transcription sessions, turn detection must be set to
+ * `null`; VAD is not supported.
  */
 export type RealtimeTranscriptionSessionAudioInputTurnDetection =
   | RealtimeTranscriptionSessionAudioInputTurnDetection.ServerVad
@@ -3551,6 +3672,568 @@ export interface RealtimeTranscriptionSessionCreateRequest {
    * transcription.
    */
   include?: Array<'item.input_audio_transcription.logprobs'>;
+}
+
+/**
+ * A Realtime translation client event.
+ */
+export type RealtimeTranslationClientEvent =
+  | RealtimeTranslationSessionUpdateEvent
+  | RealtimeTranslationInputAudioBufferAppendEvent
+  | RealtimeTranslationSessionCloseEvent;
+
+/**
+ * Create a translation session and client secret for the Realtime API.
+ */
+export interface RealtimeTranslationClientSecretCreateRequest {
+  /**
+   * Realtime translation session configuration. Translation sessions stream source
+   * audio in and translated audio plus transcript deltas out continuously.
+   */
+  session: RealtimeTranslationSessionCreateRequest;
+
+  /**
+   * Configuration for the client secret expiration. Expiration refers to the time
+   * after which a client secret will no longer be valid for creating sessions. The
+   * session itself may continue after that time once started. A secret can be used
+   * to create multiple sessions until it expires.
+   */
+  expires_after?: RealtimeTranslationClientSecretCreateRequest.ExpiresAfter;
+}
+
+export namespace RealtimeTranslationClientSecretCreateRequest {
+  /**
+   * Configuration for the client secret expiration. Expiration refers to the time
+   * after which a client secret will no longer be valid for creating sessions. The
+   * session itself may continue after that time once started. A secret can be used
+   * to create multiple sessions until it expires.
+   */
+  export interface ExpiresAfter {
+    /**
+     * The anchor point for the client secret expiration, meaning that `seconds` will
+     * be added to the `created_at` time of the client secret to produce an expiration
+     * timestamp. Only `created_at` is currently supported.
+     */
+    anchor?: 'created_at';
+
+    /**
+     * The number of seconds from the anchor point to the expiration. Select a value
+     * between `10` and `7200` (2 hours). This default to 600 seconds (10 minutes) if
+     * not specified.
+     */
+    seconds?: number;
+  }
+}
+
+/**
+ * Response from creating a translation session and client secret for the Realtime
+ * API.
+ */
+export interface RealtimeTranslationClientSecretCreateResponse {
+  /**
+   * Expiration timestamp for the client secret, in seconds since epoch.
+   */
+  expires_at: number;
+
+  /**
+   * A Realtime translation session. Translation sessions continuously translate
+   * input audio into the configured output language.
+   */
+  session: RealtimeTranslationSession;
+
+  /**
+   * The generated client secret value.
+   */
+  value: string;
+}
+
+/**
+ * Send this event to append audio bytes to the translation session input audio
+ * buffer.
+ *
+ * WebSocket translation sessions accept base64-encoded 24 kHz PCM16 mono
+ * little-endian raw audio bytes. Unsupported websocket audio formats return a
+ * validation error because lower-quality audio materially degrades translation
+ * quality.
+ *
+ * Translation consumes 200 ms engine frames. For best realtime behavior, append
+ * audio in 200 ms chunks. If a chunk is shorter, the server buffers it until it
+ * has enough audio for one frame. If a chunk is longer, the server splits it into
+ * 200 ms frames and enqueues them back-to-back.
+ *
+ * Keep appending silence while the session is active. If a client stops sending
+ * audio and later resumes, model time treats the resumed audio as contiguous with
+ * the previous audio rather than as a real-world pause.
+ */
+export interface RealtimeTranslationInputAudioBufferAppendEvent {
+  /**
+   * Base64-encoded 24 kHz PCM16 mono audio bytes.
+   */
+  audio: string;
+
+  /**
+   * The event type, must be `session.input_audio_buffer.append`.
+   */
+  type: 'session.input_audio_buffer.append';
+
+  /**
+   * Optional client-generated ID used to identify this event.
+   */
+  event_id?: string;
+}
+
+/**
+ * Returned when optional source-language transcript text is available. This event
+ * is emitted only when `audio.input.transcription` is configured.
+ *
+ * Transcript deltas are append-only text fragments. Clients should not insert
+ * unconditional spaces between deltas.
+ */
+export interface RealtimeTranslationInputTranscriptDeltaEvent {
+  /**
+   * Append-only source-language transcript text.
+   */
+  delta: string;
+
+  /**
+   * The unique ID of the server event.
+   */
+  event_id: string;
+
+  /**
+   * The event type, must be `session.input_transcript.delta`.
+   */
+  type: 'session.input_transcript.delta';
+
+  /**
+   * Timing metadata for stream alignment, derived from the translation frame when
+   * available. It advances in 200 ms increments, but multiple transcript deltas may
+   * share the same `elapsed_ms`. Treat it as alignment metadata, not a unique
+   * transcript-delta identifier.
+   */
+  elapsed_ms?: number | null;
+}
+
+/**
+ * Returned when translated output audio is available. Output audio deltas are 200
+ * ms frames of PCM16 audio.
+ */
+export interface RealtimeTranslationOutputAudioDeltaEvent {
+  /**
+   * Base64-encoded translated audio data.
+   */
+  delta: string;
+
+  /**
+   * The unique ID of the server event.
+   */
+  event_id: string;
+
+  /**
+   * The event type, must be `session.output_audio.delta`.
+   */
+  type: 'session.output_audio.delta';
+
+  /**
+   * Number of audio channels.
+   */
+  channels?: number;
+
+  /**
+   * Timing metadata for stream alignment, derived from the translation frame when
+   * available. Treat `elapsed_ms` as alignment metadata, not a unique event
+   * identifier.
+   */
+  elapsed_ms?: number | null;
+
+  /**
+   * Audio encoding for `delta`.
+   */
+  format?: 'pcm16';
+
+  /**
+   * Sample rate of the audio delta.
+   */
+  sample_rate?: number;
+}
+
+/**
+ * Returned when translated transcript text is available.
+ *
+ * Transcript deltas are append-only text fragments. Clients should not insert
+ * unconditional spaces between deltas.
+ */
+export interface RealtimeTranslationOutputTranscriptDeltaEvent {
+  /**
+   * Append-only transcript text for the translated output audio.
+   */
+  delta: string;
+
+  /**
+   * The unique ID of the server event.
+   */
+  event_id: string;
+
+  /**
+   * The event type, must be `session.output_transcript.delta`.
+   */
+  type: 'session.output_transcript.delta';
+
+  /**
+   * Timing metadata for stream alignment, derived from the translation frame when
+   * available. It advances in 200 ms increments, but multiple transcript deltas may
+   * share the same `elapsed_ms`. Treat it as alignment metadata, not a unique
+   * transcript-delta identifier.
+   */
+  elapsed_ms?: number | null;
+}
+
+/**
+ * A Realtime translation server event.
+ */
+export type RealtimeTranslationServerEvent =
+  | RealtimeErrorEvent
+  | RealtimeTranslationSessionCreatedEvent
+  | RealtimeTranslationSessionUpdatedEvent
+  | RealtimeTranslationSessionClosedEvent
+  | RealtimeTranslationInputTranscriptDeltaEvent
+  | RealtimeTranslationOutputTranscriptDeltaEvent
+  | RealtimeTranslationOutputAudioDeltaEvent;
+
+/**
+ * A Realtime translation session. Translation sessions continuously translate
+ * input audio into the configured output language.
+ */
+export interface RealtimeTranslationSession {
+  /**
+   * Unique identifier for the session that looks like `sess_1234567890abcdef`.
+   */
+  id: string;
+
+  /**
+   * Configuration for translation input and output audio.
+   */
+  audio: RealtimeTranslationSession.Audio;
+
+  /**
+   * Expiration timestamp for the session, in seconds since epoch.
+   */
+  expires_at: number;
+
+  /**
+   * The Realtime translation model used for this session. This field is set at
+   * session creation and cannot be changed with `session.update`.
+   */
+  model: string;
+
+  /**
+   * The session type. Always `translation` for Realtime translation sessions.
+   */
+  type: 'translation';
+}
+
+export namespace RealtimeTranslationSession {
+  /**
+   * Configuration for translation input and output audio.
+   */
+  export interface Audio {
+    input?: Audio.Input;
+
+    output?: Audio.Output;
+  }
+
+  export namespace Audio {
+    export interface Input {
+      /**
+       * Optional input noise reduction.
+       */
+      noise_reduction?: Input.NoiseReduction | null;
+
+      /**
+       * Optional source-language transcription. When configured, the server emits
+       * `session.input_transcript.delta` events. Translation itself still runs from the
+       * input audio stream.
+       */
+      transcription?: Input.Transcription | null;
+    }
+
+    export namespace Input {
+      /**
+       * Optional input noise reduction.
+       */
+      export interface NoiseReduction {
+        /**
+         * Type of noise reduction. `near_field` is for close-talking microphones such as
+         * headphones, `far_field` is for far-field microphones such as laptop or
+         * conference room microphones.
+         */
+        type: RealtimeAPI.NoiseReductionType;
+      }
+
+      /**
+       * Optional source-language transcription. When configured, the server emits
+       * `session.input_transcript.delta` events. Translation itself still runs from the
+       * input audio stream.
+       */
+      export interface Transcription {
+        /**
+         * The transcription model used for source transcript deltas.
+         */
+        model: string;
+      }
+    }
+
+    export interface Output {
+      /**
+       * Target language for translated output audio and transcript deltas.
+       */
+      language?: string;
+    }
+  }
+}
+
+/**
+ * Gracefully close the realtime translation session. The server flushes pending
+ * input audio and emits any remaining translated output before closing the
+ * session.
+ */
+export interface RealtimeTranslationSessionCloseEvent {
+  /**
+   * The event type, must be `session.close`.
+   */
+  type: 'session.close';
+
+  /**
+   * Optional client-generated ID used to identify this event.
+   */
+  event_id?: string;
+}
+
+/**
+ * Returned when a realtime translation session is closed.
+ */
+export interface RealtimeTranslationSessionClosedEvent {
+  /**
+   * The unique ID of the server event.
+   */
+  event_id: string;
+
+  /**
+   * The event type, must be `session.closed`.
+   */
+  type: 'session.closed';
+}
+
+/**
+ * Realtime translation session configuration. Translation sessions stream source
+ * audio in and translated audio plus transcript deltas out continuously.
+ */
+export interface RealtimeTranslationSessionCreateRequest {
+  /**
+   * The Realtime translation model used for this session.
+   */
+  model: string;
+
+  /**
+   * Configuration for translation input and output audio.
+   */
+  audio?: RealtimeTranslationSessionCreateRequest.Audio;
+}
+
+export namespace RealtimeTranslationSessionCreateRequest {
+  /**
+   * Configuration for translation input and output audio.
+   */
+  export interface Audio {
+    input?: Audio.Input;
+
+    output?: Audio.Output;
+  }
+
+  export namespace Audio {
+    export interface Input {
+      /**
+       * Optional input noise reduction. Set to `null` to disable it.
+       */
+      noise_reduction?: Input.NoiseReduction | null;
+
+      /**
+       * Optional source-language transcription. When configured, the server emits
+       * `session.input_transcript.delta` events. Translation itself still runs from the
+       * input audio stream.
+       */
+      transcription?: Input.Transcription | null;
+    }
+
+    export namespace Input {
+      /**
+       * Optional input noise reduction. Set to `null` to disable it.
+       */
+      export interface NoiseReduction {
+        /**
+         * Type of noise reduction. `near_field` is for close-talking microphones such as
+         * headphones, `far_field` is for far-field microphones such as laptop or
+         * conference room microphones.
+         */
+        type: RealtimeAPI.NoiseReductionType;
+      }
+
+      /**
+       * Optional source-language transcription. When configured, the server emits
+       * `session.input_transcript.delta` events. Translation itself still runs from the
+       * input audio stream.
+       */
+      export interface Transcription {
+        /**
+         * The transcription model to use for source transcript deltas.
+         */
+        model: string;
+      }
+    }
+
+    export interface Output {
+      /**
+       * Target language for translated output audio and transcript deltas.
+       */
+      language?: string;
+    }
+  }
+}
+
+/**
+ * Returned when a translation session is created. Emitted automatically when a new
+ * connection is established as the first server event. This event contains the
+ * default translation session configuration.
+ */
+export interface RealtimeTranslationSessionCreatedEvent {
+  /**
+   * The unique ID of the server event.
+   */
+  event_id: string;
+
+  /**
+   * The translation session configuration.
+   */
+  session: RealtimeTranslationSession;
+
+  /**
+   * The event type, must be `session.created`.
+   */
+  type: 'session.created';
+}
+
+/**
+ * Send this event to update the translation session configuration. Translation
+ * sessions support updates to `audio.output.language`,
+ * `audio.input.transcription`, and `audio.input.noise_reduction`.
+ */
+export interface RealtimeTranslationSessionUpdateEvent {
+  /**
+   * Translation session fields to update. The session `type` and `model` are set at
+   * creation and cannot be changed with `session.update`.
+   */
+  session: RealtimeTranslationSessionUpdateRequest;
+
+  /**
+   * The event type, must be `session.update`.
+   */
+  type: 'session.update';
+
+  /**
+   * Optional client-generated ID used to identify this event.
+   */
+  event_id?: string;
+}
+
+/**
+ * Realtime translation session fields that can be updated with `session.update`.
+ */
+export interface RealtimeTranslationSessionUpdateRequest {
+  /**
+   * Configuration for translation input and output audio.
+   */
+  audio?: RealtimeTranslationSessionUpdateRequest.Audio;
+}
+
+export namespace RealtimeTranslationSessionUpdateRequest {
+  /**
+   * Configuration for translation input and output audio.
+   */
+  export interface Audio {
+    input?: Audio.Input;
+
+    output?: Audio.Output;
+  }
+
+  export namespace Audio {
+    export interface Input {
+      /**
+       * Optional input noise reduction. Set to `null` to disable it.
+       */
+      noise_reduction?: Input.NoiseReduction | null;
+
+      /**
+       * Optional source-language transcription. When configured, the server emits
+       * `session.input_transcript.delta` events. Translation itself still runs from the
+       * input audio stream.
+       */
+      transcription?: Input.Transcription | null;
+    }
+
+    export namespace Input {
+      /**
+       * Optional input noise reduction. Set to `null` to disable it.
+       */
+      export interface NoiseReduction {
+        /**
+         * Type of noise reduction. `near_field` is for close-talking microphones such as
+         * headphones, `far_field` is for far-field microphones such as laptop or
+         * conference room microphones.
+         */
+        type: RealtimeAPI.NoiseReductionType;
+      }
+
+      /**
+       * Optional source-language transcription. When configured, the server emits
+       * `session.input_transcript.delta` events. Translation itself still runs from the
+       * input audio stream.
+       */
+      export interface Transcription {
+        /**
+         * The transcription model to use for source transcript deltas.
+         */
+        model: string;
+      }
+    }
+
+    export interface Output {
+      /**
+       * Target language for translated output audio and transcript deltas.
+       */
+      language?: string;
+    }
+  }
+}
+
+/**
+ * Returned when a translation session is updated with a `session.update` event,
+ * unless there is an error.
+ */
+export interface RealtimeTranslationSessionUpdatedEvent {
+  /**
+   * The unique ID of the server event.
+   */
+  event_id: string;
+
+  /**
+   * The translation session configuration.
+   */
+  session: RealtimeTranslationSession;
+
+  /**
+   * The event type, must be `session.updated`.
+   */
+  type: 'session.updated';
 }
 
 /**
@@ -4098,6 +4781,11 @@ export interface ResponseFunctionCallArgumentsDoneEvent {
   item_id: string;
 
   /**
+   * The name of the function that was called.
+   */
+  name: string;
+
+  /**
    * The index of the output item in the response.
    */
   output_index: number;
@@ -4639,9 +5327,6 @@ export namespace TranscriptionSessionUpdatedEvent {
      */
     input_audio_format?: string;
 
-    /**
-     * Configuration of the transcription model.
-     */
     input_audio_transcription?: RealtimeAPI.AudioTranscription;
 
     /**
@@ -4771,6 +5456,8 @@ export declare namespace Realtime {
     type RealtimeMcpToolCall as RealtimeMcpToolCall,
     type RealtimeMcpToolExecutionError as RealtimeMcpToolExecutionError,
     type RealtimeMcphttpError as RealtimeMcphttpError,
+    type RealtimeReasoning as RealtimeReasoning,
+    type RealtimeReasoningEffort as RealtimeReasoningEffort,
     type RealtimeResponse as RealtimeResponse,
     type RealtimeResponseCreateAudioOutput as RealtimeResponseCreateAudioOutput,
     type RealtimeResponseCreateMcpTool as RealtimeResponseCreateMcpTool,
@@ -4790,6 +5477,22 @@ export declare namespace Realtime {
     type RealtimeTranscriptionSessionAudioInput as RealtimeTranscriptionSessionAudioInput,
     type RealtimeTranscriptionSessionAudioInputTurnDetection as RealtimeTranscriptionSessionAudioInputTurnDetection,
     type RealtimeTranscriptionSessionCreateRequest as RealtimeTranscriptionSessionCreateRequest,
+    type RealtimeTranslationClientEvent as RealtimeTranslationClientEvent,
+    type RealtimeTranslationClientSecretCreateRequest as RealtimeTranslationClientSecretCreateRequest,
+    type RealtimeTranslationClientSecretCreateResponse as RealtimeTranslationClientSecretCreateResponse,
+    type RealtimeTranslationInputAudioBufferAppendEvent as RealtimeTranslationInputAudioBufferAppendEvent,
+    type RealtimeTranslationInputTranscriptDeltaEvent as RealtimeTranslationInputTranscriptDeltaEvent,
+    type RealtimeTranslationOutputAudioDeltaEvent as RealtimeTranslationOutputAudioDeltaEvent,
+    type RealtimeTranslationOutputTranscriptDeltaEvent as RealtimeTranslationOutputTranscriptDeltaEvent,
+    type RealtimeTranslationServerEvent as RealtimeTranslationServerEvent,
+    type RealtimeTranslationSession as RealtimeTranslationSession,
+    type RealtimeTranslationSessionCloseEvent as RealtimeTranslationSessionCloseEvent,
+    type RealtimeTranslationSessionClosedEvent as RealtimeTranslationSessionClosedEvent,
+    type RealtimeTranslationSessionCreateRequest as RealtimeTranslationSessionCreateRequest,
+    type RealtimeTranslationSessionCreatedEvent as RealtimeTranslationSessionCreatedEvent,
+    type RealtimeTranslationSessionUpdateEvent as RealtimeTranslationSessionUpdateEvent,
+    type RealtimeTranslationSessionUpdateRequest as RealtimeTranslationSessionUpdateRequest,
+    type RealtimeTranslationSessionUpdatedEvent as RealtimeTranslationSessionUpdatedEvent,
     type RealtimeTruncation as RealtimeTruncation,
     type RealtimeTruncationRetentionRatio as RealtimeTruncationRetentionRatio,
     type ResponseAudioDeltaEvent as ResponseAudioDeltaEvent,
@@ -4822,7 +5525,6 @@ export declare namespace Realtime {
 
   export {
     ClientSecrets as ClientSecrets,
-    type RealtimeSessionClientSecret as RealtimeSessionClientSecret,
     type RealtimeSessionCreateResponse as RealtimeSessionCreateResponse,
     type RealtimeTranscriptionSessionCreateResponse as RealtimeTranscriptionSessionCreateResponse,
     type RealtimeTranscriptionSessionTurnDetection as RealtimeTranscriptionSessionTurnDetection,
