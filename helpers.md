@@ -314,6 +314,10 @@ If you pass a `parse` function, it will automatically parse the `arguments` for 
 and returns any parsing errors to the model to attempt auto-recovery.
 Otherwise, the args will be passed to the function you provide as a string.
 
+When a completion requests multiple tool calls, `runTools` executes them concurrently by default and
+sends their results back in the same order as the tool calls. Set `parallel_tool_calls: false` to request
+one tool call at a time and execute any returned group sequentially.
+
 If you pass `tool_choice: {function: {name: …}}` instead of `auto`,
 it returns immediately after calling that function (and only loops to auto-recover parsing errors).
 
