@@ -3,7 +3,12 @@
 import type { RequestInit, RequestInfo, BodyInit } from './internal/builtin-types';
 import type { HTTPMethod, PromiseOrValue, MergedRequestInit, FinalizedRequestInit } from './internal/types';
 import { uuid4 } from './internal/utils/uuid';
-import { validatePositiveInteger, isAbsoluteURL, safeJSON } from './internal/utils/values';
+import {
+  validatePositiveInteger,
+  validateNonNegativeInteger,
+  isAbsoluteURL,
+  safeJSON,
+} from './internal/utils/values';
 import { sleep } from './internal/utils/sleep';
 export type { Logger, LogLevel } from './internal/utils/log';
 import { castToError, isAbortError } from './internal/errors';
@@ -453,7 +458,7 @@ export class OpenAI {
       parseLogLevel(readEnv('OPENAI_LOG'), "process.env['OPENAI_LOG']", this) ??
       defaultLogLevel;
     this.fetchOptions = options.fetchOptions;
-    this.maxRetries = options.maxRetries ?? 2;
+    this.maxRetries = validateNonNegativeInteger('maxRetries', options.maxRetries ?? 2);
     this.fetch = options.fetch ?? Shims.getDefaultFetch();
     this.#encoder = Opts.FallbackEncoder;
 
@@ -706,7 +711,7 @@ export class OpenAI {
     retryOfRequestLogID: string | undefined,
   ): Promise<APIResponseProps> {
     const options = await optionsInput;
-    const maxRetries = options.maxRetries ?? this.maxRetries;
+    const maxRetries = validateNonNegativeInteger('maxRetries', options.maxRetries ?? this.maxRetries);
     if (retriesRemaining == null) {
       retriesRemaining = maxRetries;
     }
@@ -756,7 +761,7 @@ export class OpenAI {
       const isTimeout =
         isAbortError(response) ||
         /timed? ?out/i.test(String(response) + ('cause' in response ? String(response.cause) : ''));
-      if (retriesRemaining) {
+      if (retriesRemaining > 0) {
         loggerFor(this).info(
           `[${requestLogID}] connection ${isTimeout ? 'timed out' : 'failed'} - ${retryMessage}`,
         );
@@ -828,7 +833,7 @@ export class OpenAI {
       }
 
       const shouldRetry = await this.shouldRetry(response);
-      if (retriesRemaining && shouldRetry) {
+      if (retriesRemaining > 0 && shouldRetry) {
         const retryMessage = `retrying, ${retriesRemaining} attempts remaining`;
 
         // We don't need the body of this response.
@@ -1029,7 +1034,7 @@ export class OpenAI {
     // If the API asks us to wait a certain amount of time, just do what it
     // says, but otherwise calculate a default
     if (timeoutMillis === undefined) {
-      const maxRetries = options.maxRetries ?? this.maxRetries;
+      const maxRetries = validateNonNegativeInteger('maxRetries', options.maxRetries ?? this.maxRetries);
       timeoutMillis = this.calculateDefaultRetryTimeoutMillis(retriesRemaining, maxRetries);
     }
     await sleep(timeoutMillis);
