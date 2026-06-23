@@ -69,6 +69,37 @@ const completion = await client.chat.completions.create({
 console.log(completion.choices[0].message.content);
 ```
 
+## Vision
+
+Use the Responses API to analyze images and generate text about visual content.
+
+```ts
+import OpenAI from 'openai';
+
+const client = new OpenAI({
+  apiKey: process.env['OPENAI_API_KEY'], // This is the default and can be omitted
+});
+
+const response = await client.responses.create({
+  model: 'gpt-5.5',
+  input: [
+    {
+      role: 'user',
+      content: [
+        { type: 'input_text', text: 'What is in this image?' },
+        {
+          type: 'input_image',
+          image_url:
+            'https://api.nga.gov/iiif/a2e6da57-3cd1-4235-b20e-95dcaefed6c8/full/!800,800/0/default.jpg',
+        },
+      ],
+    },
+  ],
+});
+
+console.log(response.output_text);
+```
+
 ## Workload Identity Authentication
 
 For secure, automated environments like cloud-managed Kubernetes, Azure, and GCP, you can use workload identity authentication with short-lived tokens from cloud identity providers instead of long-lived API keys.
