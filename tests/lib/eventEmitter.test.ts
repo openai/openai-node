@@ -1,9 +1,9 @@
 import { EventEmitter } from 'openai/lib/EventEmitter';
 
-interface TestEvents {
+type TestEvents = {
   foo: (value: string) => void;
   error: (err: Error) => void;
-}
+};
 
 class TestEmitter extends EventEmitter<TestEvents> {
   emitFoo(value: string) {
@@ -11,6 +11,9 @@ class TestEmitter extends EventEmitter<TestEvents> {
   }
   emitError(err: Error) {
     this._emit('error', err);
+  }
+  hasListener(event: keyof TestEvents) {
+    return this._hasListener(event);
   }
 }
 
@@ -20,6 +23,7 @@ describe('EventEmitter.emitted', () => {
     const promise = emitter.emitted('foo');
     emitter.emitFoo('bar');
     await expect(promise).resolves.toBe('bar');
+    expect(emitter.hasListener('error')).toBe(false);
   });
 
   test('rejects if error emitted before event', async () => {
@@ -27,7 +31,15 @@ describe('EventEmitter.emitted', () => {
     const promise = emitter.emitted('foo');
     const error = new Error('oops');
     emitter.emitError(error);
-    emitter.emitFoo('bar');
     await expect(promise).rejects.toBe(error);
+    expect(emitter.hasListener('foo')).toBe(false);
+  });
+
+  test('resolves when waiting for the error event', async () => {
+    const emitter = new TestEmitter();
+    const promise = emitter.emitted('error');
+    const error = new Error('oops');
+    emitter.emitError(error);
+    await expect(promise).resolves.toBe(error);
   });
 });
