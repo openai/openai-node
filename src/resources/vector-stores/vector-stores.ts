@@ -44,6 +44,7 @@ export class VectorStores extends APIResource {
       body,
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -54,6 +55,7 @@ export class VectorStores extends APIResource {
     return this._client.get(path`/vector_stores/${vectorStoreID}`, {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -69,6 +71,7 @@ export class VectorStores extends APIResource {
       body,
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -83,6 +86,7 @@ export class VectorStores extends APIResource {
       query,
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -93,6 +97,7 @@ export class VectorStores extends APIResource {
     return this._client.delete(path`/vector_stores/${vectorStoreID}`, {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -113,6 +118,7 @@ export class VectorStores extends APIResource {
         method: 'post',
         ...options,
         headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
       },
     );
   }
@@ -362,6 +368,12 @@ export interface VectorStoreCreateParams {
    * strategy. Only applicable if `file_ids` is non-empty.
    */
   chunking_strategy?: FileChunkingStrategyParam;
+
+  /**
+   * A description for the vector store. Can be used to describe the vector store's
+   * purpose.
+   */
+  description?: string;
 
   /**
    * The expiration policy for a vector store.

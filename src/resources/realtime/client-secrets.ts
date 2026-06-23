@@ -11,6 +11,20 @@ export class ClientSecrets extends APIResource {
   /**
    * Create a Realtime client secret with an associated session configuration.
    *
+   * Client secrets are short-lived tokens that can be passed to a client app, such
+   * as a web frontend or mobile client, which grants access to the Realtime API
+   * without leaking your main API key. You can configure a custom TTL for each
+   * client secret.
+   *
+   * You can also attach session configuration options to the client secret, which
+   * will be applied to any sessions created using that client secret, but these can
+   * also be overridden by the client connection.
+   *
+   * [Learn more about authentication with client secrets over WebRTC](https://platform.openai.com/docs/guides/realtime-webrtc).
+   *
+   * Returns the created client secret and the effective session object. The client
+   * secret is a string that looks like `ek_1234`.
+   *
    * @example
    * ```ts
    * const clientSecret =
@@ -18,37 +32,27 @@ export class ClientSecrets extends APIResource {
    * ```
    */
   create(body: ClientSecretCreateParams, options?: RequestOptions): APIPromise<ClientSecretCreateResponse> {
-    return this._client.post('/realtime/client_secrets', { body, ...options });
+    return this._client.post('/realtime/client_secrets', {
+      body,
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 }
 
 /**
- * Ephemeral key returned by the API.
- */
-export interface RealtimeSessionClientSecret {
-  /**
-   * Timestamp for when the token expires. Currently, all tokens expire after one
-   * minute.
-   */
-  expires_at: number;
-
-  /**
-   * Ephemeral key usable in client environments to authenticate connections to the
-   * Realtime API. Use this in client-side environments rather than a standard API
-   * token, which should only be used server-side.
-   */
-  value: string;
-}
-
-/**
- * A new Realtime session configuration, with an ephemeral key. Default TTL for
- * keys is one minute.
+ * A Realtime session configuration object.
  */
 export interface RealtimeSessionCreateResponse {
   /**
-   * Ephemeral key returned by the API.
+   * Unique identifier for the session that looks like `sess_1234567890abcdef`.
    */
-  client_secret: RealtimeSessionClientSecret;
+  id: string;
+
+  /**
+   * The object type. Always `realtime.session`.
+   */
+  object: 'realtime.session';
 
   /**
    * The type of session to create. Always `realtime` for the Realtime API.
@@ -59,6 +63,11 @@ export interface RealtimeSessionCreateResponse {
    * Configuration for input and output audio.
    */
   audio?: RealtimeSessionCreateResponse.Audio;
+
+  /**
+   * Expiration timestamp for the session, in seconds since epoch.
+   */
+  expires_at?: number;
 
   /**
    * Additional fields to include in server outputs.
@@ -96,6 +105,8 @@ export interface RealtimeSessionCreateResponse {
   model?:
     | (string & {})
     | 'gpt-realtime'
+    | 'gpt-realtime-1.5'
+    | 'gpt-realtime-2'
     | 'gpt-realtime-2025-08-28'
     | 'gpt-4o-realtime-preview'
     | 'gpt-4o-realtime-preview-2024-10-01'
@@ -105,8 +116,11 @@ export interface RealtimeSessionCreateResponse {
     | 'gpt-4o-mini-realtime-preview-2024-12-17'
     | 'gpt-realtime-mini'
     | 'gpt-realtime-mini-2025-10-06'
+    | 'gpt-realtime-mini-2025-12-15'
+    | 'gpt-audio-1.5'
     | 'gpt-audio-mini'
-    | 'gpt-audio-mini-2025-10-06';
+    | 'gpt-audio-mini-2025-10-06'
+    | 'gpt-audio-mini-2025-12-15';
 
   /**
    * The set of modalities the model can respond with. It defaults to `["audio"]`,
@@ -123,6 +137,11 @@ export interface RealtimeSessionCreateResponse {
   prompt?: ResponsesAPI.ResponsePrompt | null;
 
   /**
+   * Configuration for reasoning-capable Realtime models such as `gpt-realtime-2`.
+   */
+  reasoning?: RealtimeAPI.RealtimeReasoning;
+
+  /**
    * How the model chooses tools. Provide one of the string modes or force a specific
    * function/MCP tool.
    */
@@ -135,8 +154,9 @@ export interface RealtimeSessionCreateResponse {
 
   /**
    * Realtime API can write session traces to the
-   * [Traces Dashboard](/logs?api=traces). Set to null to disable tracing. Once
-   * tracing is enabled for a session, the configuration cannot be modified.
+   * [Traces Dashboard](https://platform.openai.com/logs?api=traces). Set to null to
+   * disable tracing. Once tracing is enabled for a session, the configuration cannot
+   * be modified.
    *
    * `auto` will create a trace for the session with default values for the workflow
    * name, group id, and metadata.
@@ -144,8 +164,24 @@ export interface RealtimeSessionCreateResponse {
   tracing?: 'auto' | RealtimeSessionCreateResponse.TracingConfiguration | null;
 
   /**
-   * Controls how the realtime conversation is truncated prior to model inference.
-   * The default is `auto`.
+   * When the number of tokens in a conversation exceeds the model's input token
+   * limit, the conversation be truncated, meaning messages (starting from the
+   * oldest) will not be included in the model's context. A 32k context model with
+   * 4,096 max output tokens can only include 28,224 tokens in the context before
+   * truncation occurs.
+   *
+   * Clients can configure truncation behavior to truncate with a lower max token
+   * limit, which is an effective way to control token usage and cost.
+   *
+   * Truncation will reduce the number of cached tokens on the next turn (busting the
+   * cache), since messages are dropped from the beginning of the context. However,
+   * clients can also configure truncation to retain messages up to a fraction of the
+   * maximum context size, which will reduce the need for future truncations and thus
+   * improve the cache rate.
+   *
+   * Truncation can be disabled entirely, which means the server will never truncate
+   * but would instead return an error if the conversation exceeds the model's input
+   * token limit.
    */
   truncation?: RealtimeAPI.RealtimeTruncation;
 }
@@ -176,16 +212,6 @@ export namespace RealtimeSessionCreateResponse {
        */
       noise_reduction?: Input.NoiseReduction;
 
-      /**
-       * Configuration for input audio transcription, defaults to off and can be set to
-       * `null` to turn off once on. Input audio transcription is not native to the
-       * model, since the model consumes audio directly. Transcription runs
-       * asynchronously through
-       * [the /audio/transcriptions endpoint](https://platform.openai.com/docs/api-reference/audio/createTranscription)
-       * and should be treated as guidance of input audio content rather than precisely
-       * what the model heard. The client can optionally set the language and prompt for
-       * transcription, these offer additional guidance to the transcription service.
-       */
       transcription?: RealtimeAPI.AudioTranscription;
 
       /**
@@ -202,6 +228,9 @@ export namespace RealtimeSessionCreateResponse {
        * trails off with "uhhm", the model will score a low probability of turn end and
        * wait longer for the user to continue speaking. This can be useful for more
        * natural conversations, but may have a higher latency.
+       *
+       * For `gpt-realtime-whisper` transcription sessions, turn detection must be set to
+       * `null`; VAD is not supported.
        */
       turn_detection?: Input.ServerVad | Input.SemanticVad | null;
     }
@@ -235,7 +264,11 @@ export namespace RealtimeSessionCreateResponse {
 
         /**
          * Whether or not to automatically generate a response when a VAD stop event
-         * occurs.
+         * occurs. If `interrupt_response` is set to `false` this may fail to create a
+         * response if the model is already responding.
+         *
+         * If both `create_response` and `interrupt_response` are set to `false`, the model
+         * will never respond automatically but VAD events will still be emitted.
          */
         create_response?: boolean;
 
@@ -256,9 +289,13 @@ export namespace RealtimeSessionCreateResponse {
         idle_timeout_ms?: number | null;
 
         /**
-         * Whether or not to automatically interrupt any ongoing response with output to
-         * the default conversation (i.e. `conversation` of `auto`) when a VAD start event
-         * occurs.
+         * Whether or not to automatically interrupt (cancel) any ongoing response with
+         * output to the default conversation (i.e. `conversation` of `auto`) when a VAD
+         * start event occurs. If `true` then the response will be cancelled, otherwise it
+         * will continue until complete.
+         *
+         * If both `create_response` and `interrupt_response` are set to `false`, the model
+         * will never respond automatically but VAD events will still be emitted.
          */
         interrupt_response?: boolean;
 
@@ -384,8 +421,8 @@ export namespace RealtimeSessionCreateResponse {
 
     /**
      * Identifier for service connectors, like those available in ChatGPT. One of
-     * `server_url` or `connector_id` must be provided. Learn more about service
-     * connectors
+     * `server_url`, `connector_id`, or `tunnel_id` must be provided. Learn more about
+     * service connectors
      * [here](https://platform.openai.com/docs/guides/tools-remote-mcp#connectors).
      *
      * Currently supported `connector_id` values are:
@@ -410,6 +447,11 @@ export namespace RealtimeSessionCreateResponse {
       | 'connector_sharepoint';
 
     /**
+     * Whether this MCP tool is deferred and discovered via tool search.
+     */
+    defer_loading?: boolean;
+
+    /**
      * Optional HTTP headers to send to the MCP server. Use for authentication or other
      * purposes.
      */
@@ -426,10 +468,16 @@ export namespace RealtimeSessionCreateResponse {
     server_description?: string;
 
     /**
-     * The URL for the MCP server. One of `server_url` or `connector_id` must be
-     * provided.
+     * The URL for the MCP server. One of `server_url`, `connector_id`, or `tunnel_id`
+     * must be provided.
      */
     server_url?: string;
+
+    /**
+     * The Secure MCP Tunnel ID to use instead of a direct server URL. One of
+     * `server_url`, `connector_id`, or `tunnel_id` must be provided.
+     */
+    tunnel_id?: string;
   }
 
   export namespace McpTool {
@@ -588,17 +636,15 @@ export namespace RealtimeTranscriptionSessionCreateResponse {
        */
       noise_reduction?: Input.NoiseReduction;
 
-      /**
-       * Configuration of the transcription model.
-       */
       transcription?: RealtimeAPI.AudioTranscription;
 
       /**
        * Configuration for turn detection. Can be set to `null` to turn off. Server VAD
        * means that the model will detect the start and end of speech based on audio
-       * volume and respond at the end of user speech.
+       * volume and respond at the end of user speech. For `gpt-realtime-whisper`, this
+       * must be `null`; VAD is not supported.
        */
-      turn_detection?: ClientSecretsAPI.RealtimeTranscriptionSessionTurnDetection;
+      turn_detection?: ClientSecretsAPI.RealtimeTranscriptionSessionTurnDetection | null;
     }
 
     export namespace Input {
@@ -620,7 +666,8 @@ export namespace RealtimeTranscriptionSessionCreateResponse {
 /**
  * Configuration for turn detection. Can be set to `null` to turn off. Server VAD
  * means that the model will detect the start and end of speech based on audio
- * volume and respond at the end of user speech.
+ * volume and respond at the end of user speech. For `gpt-realtime-whisper`, this
+ * must be `null`; VAD is not supported.
  */
 export interface RealtimeTranscriptionSessionTurnDetection {
   /**
@@ -711,7 +758,6 @@ export namespace ClientSecretCreateParams {
 
 export declare namespace ClientSecrets {
   export {
-    type RealtimeSessionClientSecret as RealtimeSessionClientSecret,
     type RealtimeSessionCreateResponse as RealtimeSessionCreateResponse,
     type RealtimeTranscriptionSessionCreateResponse as RealtimeTranscriptionSessionCreateResponse,
     type RealtimeTranscriptionSessionTurnDetection as RealtimeTranscriptionSessionTurnDetection,

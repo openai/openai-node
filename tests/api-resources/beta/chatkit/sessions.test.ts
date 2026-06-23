@@ -4,12 +4,16 @@ import OpenAI from 'openai';
 
 const client = new OpenAI({
   apiKey: 'My API Key',
+  adminAPIKey: 'My Admin API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
 describe('resource sessions', () => {
   test('create: only required params', async () => {
-    const responsePromise = client.beta.chatkit.sessions.create({ user: 'x', workflow: { id: 'id' } });
+    const responsePromise = client.beta.chatkit.sessions.create({
+      user: 'x',
+      workflow: { id: 'id' },
+    });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -30,7 +34,11 @@ describe('resource sessions', () => {
       },
       chatkit_configuration: {
         automatic_thread_titling: { enabled: true },
-        file_upload: { enabled: true, max_file_size: 1, max_files: 1 },
+        file_upload: {
+          enabled: true,
+          max_file_size: 1,
+          max_files: 1,
+        },
         history: { enabled: true, recent_threads: 1 },
       },
       expires_after: { anchor: 'created_at', seconds: 1 },

@@ -1,10 +1,14 @@
-import { z } from 'zod/v3';
+import { z as z4 } from 'zod/v4';
+import { z as z3 } from 'zod/v3';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import { makeSnapshotRequest } from '../utils/mock-snapshots';
 
 jest.setTimeout(1000 * 30);
 
-describe('.parse()', () => {
+describe.each([
+  { version: 'v3', z: z3 },
+  { version: 'v4', z: z4 as any as typeof z3 },
+])('.parse()', ({ z, version }) => {
   describe('zod', () => {
     it('deserialises response_format', async () => {
       const completion = await makeSnapshotRequest((openai) =>
@@ -156,7 +160,8 @@ describe('.parse()', () => {
         }
       `);
 
-      expect(zodResponseFormat(UI, 'ui').json_schema).toMatchInlineSnapshot(`
+      if (version === 'v3') {
+        expect(zodResponseFormat(UI, 'ui').json_schema).toMatchInlineSnapshot(`
         {
           "name": "ui",
           "schema": {
@@ -267,6 +272,66 @@ describe('.parse()', () => {
           "strict": true,
         }
       `);
+      } else {
+        expect(zodResponseFormat(UI, 'ui').json_schema).toMatchInlineSnapshot(`
+{
+  "name": "ui",
+  "schema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "additionalProperties": false,
+    "properties": {
+      "attributes": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+            },
+            "value": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "name",
+            "value",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+      "children": {
+        "items": {
+          "$ref": "#",
+        },
+        "type": "array",
+      },
+      "label": {
+        "type": "string",
+      },
+      "type": {
+        "enum": [
+          "div",
+          "button",
+          "header",
+          "section",
+          "field",
+          "form",
+        ],
+        "type": "string",
+      },
+    },
+    "required": [
+      "type",
+      "label",
+      "children",
+      "attributes",
+    ],
+    "type": "object",
+  },
+  "strict": true,
+}
+`);
+      }
     });
 
     test('merged schemas', async () => {
@@ -294,8 +359,9 @@ describe('.parse()', () => {
         ),
       });
 
-      expect(zodResponseFormat(contactPersonSchema, 'contactPerson').json_schema.schema)
-        .toMatchInlineSnapshot(`
+      if (version === 'v3') {
+        expect(zodResponseFormat(contactPersonSchema, 'contactPerson').json_schema.schema)
+          .toMatchInlineSnapshot(`
         {
           "$schema": "http://json-schema.org/draft-07/schema#",
           "additionalProperties": false,
@@ -445,6 +511,100 @@ describe('.parse()', () => {
           "type": "object",
         }
       `);
+      } else {
+        expect(zodResponseFormat(contactPersonSchema, 'contactPerson').json_schema.schema)
+          .toMatchInlineSnapshot(`
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "person1": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "type": "string",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "description": "Open text for any other relevant information about what the contact does.",
+        },
+        "name": {
+          "type": "string",
+        },
+        "phone_number": {
+          "anyOf": [
+            {
+              "type": "string",
+            },
+            {
+              "type": "null",
+            },
+          ],
+        },
+        "roles": {
+          "description": "Any roles for which the contact is important, use other for custom roles",
+          "items": {
+            "enum": [
+              "parent",
+              "child",
+              "sibling",
+              "spouse",
+              "friend",
+              "other",
+            ],
+            "type": "string",
+          },
+          "type": "array",
+        },
+      },
+      "required": [
+        "name",
+        "phone_number",
+        "roles",
+        "description",
+      ],
+      "type": "object",
+    },
+    "person2": {
+      "additionalProperties": false,
+      "properties": {
+        "differentField": {
+          "type": "string",
+        },
+        "name": {
+          "type": "string",
+        },
+        "phone_number": {
+          "anyOf": [
+            {
+              "type": "string",
+            },
+            {
+              "type": "null",
+            },
+          ],
+        },
+      },
+      "required": [
+        "name",
+        "phone_number",
+        "differentField",
+      ],
+      "type": "object",
+    },
+  },
+  "required": [
+    "person1",
+    "person2",
+  ],
+  "type": "object",
+}
+`);
+      }
 
       const completion = await makeSnapshotRequest(
         (openai) =>
@@ -517,7 +677,8 @@ describe('.parse()', () => {
         fields: z.array(z.union([fieldA, fieldB])),
       });
 
-      expect(zodResponseFormat(model, 'query').json_schema.schema).toMatchInlineSnapshot(`
+      if (version === 'v3') {
+        expect(zodResponseFormat(model, 'query').json_schema.schema).toMatchInlineSnapshot(`
         {
           "$schema": "http://json-schema.org/draft-07/schema#",
           "additionalProperties": false,
@@ -695,6 +856,101 @@ describe('.parse()', () => {
           "type": "object",
         }
       `);
+      } else {
+        expect(zodResponseFormat(model, 'query').json_schema.schema).toMatchInlineSnapshot(`
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "fields": {
+      "items": {
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "metadata": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "foo": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "foo",
+                    ],
+                    "type": "object",
+                  },
+                  {
+                    "type": "null",
+                  },
+                ],
+              },
+              "name": {
+                "type": "string",
+              },
+              "type": {
+                "const": "string",
+                "type": "string",
+              },
+            },
+            "required": [
+              "type",
+              "name",
+              "metadata",
+            ],
+            "type": "object",
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "metadata": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "foo": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "foo",
+                    ],
+                    "type": "object",
+                  },
+                  {
+                    "type": "null",
+                  },
+                ],
+              },
+              "type": {
+                "const": "number",
+                "type": "string",
+              },
+            },
+            "required": [
+              "type",
+              "metadata",
+            ],
+            "type": "object",
+          },
+        ],
+      },
+      "type": "array",
+    },
+    "name": {
+      "type": "string",
+    },
+  },
+  "required": [
+    "name",
+    "fields",
+  ],
+  "type": "object",
+}
+`);
+      }
 
       const completion = await makeSnapshotRequest(
         (openai) =>
@@ -792,10 +1048,12 @@ describe('.parse()', () => {
       const baseLinkedListNodeSchema = z.object({
         value: z.number(),
       });
-      type LinkedListNode = z.infer<typeof baseLinkedListNodeSchema> & {
+
+      type LinkedListNode = z3.infer<typeof baseLinkedListNodeSchema> & {
         next: LinkedListNode | null;
       };
-      const linkedListNodeSchema: z.ZodType<LinkedListNode> = baseLinkedListNodeSchema.extend({
+
+      const linkedListNodeSchema: z3.ZodType<LinkedListNode> = baseLinkedListNodeSchema.extend({
         next: z.lazy(() => z.union([linkedListNodeSchema, z.null()])),
       });
 
@@ -804,7 +1062,8 @@ describe('.parse()', () => {
         linked_list: linkedListNodeSchema,
       });
 
-      expect(zodResponseFormat(mainSchema, 'query').json_schema.schema).toMatchInlineSnapshot(`
+      if (version === 'v3') {
+        expect(zodResponseFormat(mainSchema, 'query').json_schema.schema).toMatchInlineSnapshot(`
         {
           "$schema": "http://json-schema.org/draft-07/schema#",
           "additionalProperties": false,
@@ -902,6 +1161,48 @@ describe('.parse()', () => {
           "type": "object",
         }
       `);
+      } else {
+        expect(zodResponseFormat(mainSchema, 'query').json_schema.schema).toMatchInlineSnapshot(`
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "definitions": {
+    "__schema0": {
+      "additionalProperties": false,
+      "properties": {
+        "next": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/__schema0",
+            },
+            {
+              "type": "null",
+            },
+          ],
+        },
+        "value": {
+          "type": "number",
+        },
+      },
+      "required": [
+        "value",
+        "next",
+      ],
+      "type": "object",
+    },
+  },
+  "properties": {
+    "linked_list": {
+      "$ref": "#/definitions/__schema0",
+    },
+  },
+  "required": [
+    "linked_list",
+  ],
+  "type": "object",
+}
+`);
+      }
 
       const completion = await makeSnapshotRequest(
         (openai) =>
@@ -948,16 +1249,21 @@ describe('.parse()', () => {
     });
 
     test('ref schemas with `.transform()`', async () => {
-      const Inner = z.object({
-        baz: z.boolean().transform((v) => v ?? true),
+      let Inner = z.object({
+        baz:
+          version === 'v3' ?
+            z.boolean().transform((v: any) => v ?? true)
+          : z
+              .boolean()
+              .transform((v: any) => v ?? true)
+              .pipe(z.boolean()),
       });
-
       const Outer = z.object({
         first: Inner,
         second: Inner,
       });
-
-      expect(zodResponseFormat(Outer, 'data').json_schema.schema).toMatchInlineSnapshot(`
+      if (version === 'v3') {
+        expect(zodResponseFormat(Outer, 'data').json_schema.schema).toMatchInlineSnapshot(`
         {
           "$schema": "http://json-schema.org/draft-07/schema#",
           "additionalProperties": false,
@@ -1027,6 +1333,45 @@ describe('.parse()', () => {
           "type": "object",
         }
       `);
+      } else {
+        expect(zodResponseFormat(Outer, 'data').json_schema.schema).toMatchInlineSnapshot(`
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "first": {
+      "additionalProperties": false,
+      "properties": {
+        "baz": {
+          "type": "boolean",
+        },
+      },
+      "required": [
+        "baz",
+      ],
+      "type": "object",
+    },
+    "second": {
+      "additionalProperties": false,
+      "properties": {
+        "baz": {
+          "type": "boolean",
+        },
+      },
+      "required": [
+        "baz",
+      ],
+      "type": "object",
+    },
+  },
+  "required": [
+    "first",
+    "second",
+  ],
+  "type": "object",
+}
+`);
+      }
 
       const completion = await makeSnapshotRequest(
         (openai) =>

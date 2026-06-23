@@ -4,6 +4,7 @@ import OpenAI from 'openai';
 
 const client = new OpenAI({
   apiKey: 'My API Key',
+  adminAPIKey: 'My Admin API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
@@ -23,7 +24,17 @@ describe('resource conversations', () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
       client.conversations.create(
-        { items: [{ content: 'string', role: 'user', type: 'message' }], metadata: { foo: 'string' } },
+        {
+          items: [
+            {
+              content: 'string',
+              role: 'user',
+              phase: 'commentary',
+              type: 'message',
+            },
+          ],
+          metadata: { foo: 'string' },
+        },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);

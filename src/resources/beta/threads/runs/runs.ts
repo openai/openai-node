@@ -42,6 +42,8 @@ import { RunSubmitToolOutputsParamsStream } from '../../../../lib/AssistantStrea
 import { path } from '../../../../internal/utils/path';
 
 /**
+ * Build Assistants that can call models and use tools.
+ *
  * @deprecated The Assistants API is deprecated in favor of the Responses API
  */
 export class Runs extends APIResource {
@@ -75,6 +77,8 @@ export class Runs extends APIResource {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
       stream: params.stream ?? false,
+      __synthesizeEventData: true,
+      __security: { bearerAuth: true },
     }) as APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
   }
 
@@ -88,6 +92,7 @@ export class Runs extends APIResource {
     return this._client.get(path`/threads/${thread_id}/runs/${runID}`, {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -102,6 +107,7 @@ export class Runs extends APIResource {
       body,
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -119,6 +125,7 @@ export class Runs extends APIResource {
       query,
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -132,6 +139,7 @@ export class Runs extends APIResource {
     return this._client.post(path`/threads/${thread_id}/runs/${runID}/cancel`, {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+      __security: { bearerAuth: true },
     });
   }
 
@@ -259,6 +267,8 @@ export class Runs extends APIResource {
       ...options,
       headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
       stream: params.stream ?? false,
+      __synthesizeEventData: true,
+      __security: { bearerAuth: true },
     }) as APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
   }
 
@@ -725,12 +735,17 @@ export interface RunCreateParamsBase {
   /**
    * Body param: Constrains effort on reasoning for
    * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
-   * supported values are `minimal`, `low`, `medium`, and `high`. Reducing reasoning
-   * effort can result in faster responses and fewer tokens used on reasoning in a
-   * response.
+   * supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
+   * Reducing reasoning effort can result in faster responses and fewer tokens used
+   * on reasoning in a response.
    *
-   * Note: The `gpt-5-pro` model defaults to (and only supports) `high` reasoning
-   * effort.
+   * - `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported
+   *   reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool
+   *   calls are supported for all reasoning values in gpt-5.1.
+   * - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
+   *   support `none`.
+   * - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
+   * - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
    */
   reasoning_effort?: Shared.ReasoningEffort | null;
 

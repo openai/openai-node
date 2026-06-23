@@ -4,6 +4,7 @@ import OpenAI from 'openai';
 
 const client = new OpenAI({
   apiKey: 'My API Key',
+  adminAPIKey: 'My Admin API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
@@ -24,6 +25,15 @@ describe('resource containers', () => {
       name: 'name',
       expires_after: { anchor: 'last_active_at', minutes: 0 },
       file_ids: ['string'],
+      memory_limit: '1g',
+      network_policy: { type: 'disabled' },
+      skills: [
+        {
+          skill_id: 'x',
+          type: 'skill_reference',
+          version: 'version',
+        },
+      ],
     });
   });
 
@@ -53,7 +63,12 @@ describe('resource containers', () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
       client.containers.list(
-        { after: 'after', limit: 0, order: 'asc' },
+        {
+          after: 'after',
+          limit: 0,
+          name: 'name',
+          order: 'asc',
+        },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);

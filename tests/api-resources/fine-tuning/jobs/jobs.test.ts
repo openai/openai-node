@@ -4,6 +4,7 @@ import OpenAI from 'openai';
 
 const client = new OpenAI({
   apiKey: 'My API Key',
+  adminAPIKey: 'My Admin API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
@@ -26,11 +27,20 @@ describe('resource jobs', () => {
     const response = await client.fineTuning.jobs.create({
       model: 'gpt-4o-mini',
       training_file: 'file-abc123',
-      hyperparameters: { batch_size: 'auto', learning_rate_multiplier: 'auto', n_epochs: 'auto' },
+      hyperparameters: {
+        batch_size: 'auto',
+        learning_rate_multiplier: 'auto',
+        n_epochs: 'auto',
+      },
       integrations: [
         {
           type: 'wandb',
-          wandb: { project: 'my-wandb-project', entity: 'entity', name: 'name', tags: ['custom-tag'] },
+          wandb: {
+            project: 'my-wandb-project',
+            entity: 'entity',
+            name: 'name',
+            tags: ['custom-tag'],
+          },
         },
       ],
       metadata: { foo: 'string' },
@@ -63,7 +73,11 @@ describe('resource jobs', () => {
           },
         },
         supervised: {
-          hyperparameters: { batch_size: 'auto', learning_rate_multiplier: 'auto', n_epochs: 'auto' },
+          hyperparameters: {
+            batch_size: 'auto',
+            learning_rate_multiplier: 'auto',
+            n_epochs: 'auto',
+          },
         },
       },
       seed: 42,
@@ -98,7 +112,11 @@ describe('resource jobs', () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
       client.fineTuning.jobs.list(
-        { after: 'after', limit: 0, metadata: { foo: 'string' } },
+        {
+          after: 'after',
+          limit: 0,
+          metadata: { foo: 'string' },
+        },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);
