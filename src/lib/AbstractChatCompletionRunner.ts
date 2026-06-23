@@ -14,8 +14,11 @@ import type {
   ParsedChatCompletion,
 } from '../resources/chat/completions';
 import type { CompletionUsage } from '../resources/completions';
-import type { ChatCompletionToolRunnerParams } from './ChatCompletionRunner';
-import type { ChatCompletionStreamingToolRunnerParams } from './ChatCompletionStreamingRunner';
+import type { ChatCompletionRunner, ChatCompletionToolRunnerParams } from './ChatCompletionRunner';
+import type {
+  ChatCompletionStreamingRunner,
+  ChatCompletionStreamingToolRunnerParams,
+} from './ChatCompletionStreamingRunner';
 import { isAssistantMessage, isToolMessage } from './chatCompletionUtils';
 import { BaseEvents, EventStream } from './EventStream';
 import {
@@ -276,6 +279,7 @@ export class AbstractChatCompletionRunner<
     params:
       | ChatCompletionToolRunnerParams<FunctionsArgs>
       | ChatCompletionStreamingToolRunnerParams<FunctionsArgs>,
+    runner: ChatCompletionRunner<any> | ChatCompletionStreamingRunner<any>,
     options?: RunnerOptions,
   ) {
     const role = 'tool' as const;
@@ -365,16 +369,20 @@ export class AbstractChatCompletionRunner<
         return { message: { role, tool_call_id, content }, functionCalled: false };
       }
 
-      let parsed;
-      try {
-        parsed = isRunnableFunctionWithParse(fn) ? await fn.parse(args) : args;
-      } catch (error) {
-        const content = error instanceof Error ? error.message : String(error);
-        return { message: { role, tool_call_id, content }, functionCalled: false };
+      let rawContent: unknown;
+      if (isRunnableFunctionWithParse(fn)) {
+        let parsed;
+        try {
+          parsed = await fn.parse(args);
+        } catch (error) {
+          const content = error instanceof Error ? error.message : String(error);
+          return { message: { role, tool_call_id, content }, functionCalled: false };
+        }
+        rawContent = await fn.function(parsed, runner);
+      } else {
+        rawContent = await fn.function(args, runner);
       }
 
-      // @ts-expect-error it can't rule out `never` type.
-      const rawContent = await fn.function(parsed, this);
       const content = this.#stringifyFunctionCallResult(rawContent);
       return { message: { role, tool_call_id, content }, functionCalled: true };
     };
@@ -395,7 +403,7 @@ export class AbstractChatCompletionRunner<
         throw new OpenAIError(`missing message in ChatCompletion response`);
       }
       if (!message.tool_calls?.length) {
-        await afterCompletion?.(chatCompletion, this);
+        await afterCompletion?.(chatCompletion, runner);
         return;
       }
 
@@ -405,7 +413,7 @@ export class AbstractChatCompletionRunner<
           if (result.message) this._addMessage(result.message);
 
           if (singleFunctionToCall && result.functionCalled) {
-            await afterCompletion?.(chatCompletion, this);
+            await afterCompletion?.(chatCompletion, runner);
             return;
           }
         }
@@ -427,7 +435,7 @@ export class AbstractChatCompletionRunner<
         }
       }
 
-      await afterCompletion?.(chatCompletion, this);
+      await afterCompletion?.(chatCompletion, runner);
     }
 
     return;
