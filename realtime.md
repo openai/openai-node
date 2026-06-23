@@ -78,7 +78,7 @@ const rt = new OpenAIRealtimeWS({ callID: 'rtc_123456' });
 
 `model` and `callID` are mutually exclusive. The web `WebSocket` helper supports the same `callID` option.
 
-A full example can be found [here](https://github.com/openai/openai-node/blob/master/examples/realtime/websocket.ts).
+A full example can be found [here](https://github.com/openai/openai-node/blob/main/examples/realtime/websocket.ts).
 
 ### Realtime error handling
 

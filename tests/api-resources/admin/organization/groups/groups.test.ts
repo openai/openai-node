@@ -24,6 +24,17 @@ describe('resource groups', () => {
     const response = await client.admin.organization.groups.create({ name: 'x' });
   });
 
+  test('retrieve', async () => {
+    const responsePromise = client.admin.organization.groups.retrieve('group_id');
+    const rawResponse = await responsePromise.asResponse();
+    expect(rawResponse).toBeInstanceOf(Response);
+    const response = await responsePromise;
+    expect(response).not.toBeInstanceOf(Response);
+    const dataAndResponse = await responsePromise.withResponse();
+    expect(dataAndResponse.data).toBe(response);
+    expect(dataAndResponse.response).toBe(rawResponse);
+  });
+
   test('update: only required params', async () => {
     const responsePromise = client.admin.organization.groups.update('group_id', { name: 'x' });
     const rawResponse = await responsePromise.asResponse();

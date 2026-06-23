@@ -314,6 +314,10 @@ If you pass a `parse` function, it will automatically parse the `arguments` for 
 and returns any parsing errors to the model to attempt auto-recovery.
 Otherwise, the args will be passed to the function you provide as a string.
 
+When a completion requests multiple tool calls, `runTools` executes them concurrently by default and
+sends their results back in the same order as the tool calls. Set `parallel_tool_calls: false` to request
+one tool call at a time and execute any returned group sequentially.
+
 If you pass `tool_choice: {function: {name: …}}` instead of `auto`,
 it returns immediately after calling that function (and only loops to auto-recover parsing errors).
 
@@ -631,6 +635,35 @@ async function main() {
 }
 
 main();
+```
+
+#### Inspect or extend the conversation after each completion
+
+The `afterCompletion` callback runs after a completion's tool calls have finished and is awaited before the
+next request starts. It can inspect the completion and append context to the runner's mutable `messages` array.
+The callback also runs for the final completion, when no further request will be made.
+
+```ts
+const runner = client.chat.completions.runTools(
+  {
+    model: 'gpt-4o',
+    messages,
+    tools,
+  },
+  {
+    afterCompletion: async (completion, runner) => {
+      if (!completion.choices[0]?.message.tool_calls?.length) return;
+
+      const webResearch = await optionallyPerformWebResearch(runner.messages.slice(-10));
+      if (webResearch) {
+        runner.messages.push({
+          role: 'system',
+          content: `Use this up-to-date research to guide your next steps:\n\n${webResearch}`,
+        });
+      }
+    },
+  },
+);
 ```
 
 #### Integrate with `zod`

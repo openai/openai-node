@@ -9,7 +9,7 @@ elif [[ ! ${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-} ]]; then
   exit 1
 fi
 
-yarn build
+pnpm build
 cd dist
 
 # Get package name and version from package.json

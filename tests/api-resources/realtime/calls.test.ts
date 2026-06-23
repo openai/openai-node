@@ -28,6 +28,7 @@ describe('resource calls', () => {
           format: { rate: 24000, type: 'audio/pcm' },
           noise_reduction: { type: 'near_field' },
           transcription: {
+            delay: 'minimal',
             language: 'language',
             model: 'whisper-1',
             prompt: 'prompt',
@@ -53,11 +54,13 @@ describe('resource calls', () => {
       max_output_tokens: 'inf',
       model: 'gpt-realtime',
       output_modalities: ['text'],
+      parallel_tool_calls: true,
       prompt: {
         id: 'id',
         variables: { foo: 'string' },
         version: 'version',
       },
+      reasoning: { effort: 'minimal' },
       tool_choice: 'none',
       tools: [
         {

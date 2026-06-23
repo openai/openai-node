@@ -161,6 +161,32 @@ describe('resource usage', () => {
     });
   });
 
+  test('fileSearchCalls: only required params', async () => {
+    const responsePromise = client.admin.organization.usage.fileSearchCalls({ start_time: 0 });
+    const rawResponse = await responsePromise.asResponse();
+    expect(rawResponse).toBeInstanceOf(Response);
+    const response = await responsePromise;
+    expect(response).not.toBeInstanceOf(Response);
+    const dataAndResponse = await responsePromise.withResponse();
+    expect(dataAndResponse.data).toBe(response);
+    expect(dataAndResponse.response).toBe(rawResponse);
+  });
+
+  test('fileSearchCalls: required and optional params', async () => {
+    const response = await client.admin.organization.usage.fileSearchCalls({
+      start_time: 0,
+      api_key_ids: ['string'],
+      bucket_width: '1m',
+      end_time: 0,
+      group_by: ['project_id'],
+      limit: 0,
+      page: 'page',
+      project_ids: ['string'],
+      user_ids: ['string'],
+      vector_store_ids: ['string'],
+    });
+  });
+
   test('images: only required params', async () => {
     const responsePromise = client.admin.organization.usage.images({ start_time: 0 });
     const rawResponse = await responsePromise.asResponse();
@@ -235,6 +261,33 @@ describe('resource usage', () => {
       limit: 0,
       page: 'page',
       project_ids: ['string'],
+    });
+  });
+
+  test('webSearchCalls: only required params', async () => {
+    const responsePromise = client.admin.organization.usage.webSearchCalls({ start_time: 0 });
+    const rawResponse = await responsePromise.asResponse();
+    expect(rawResponse).toBeInstanceOf(Response);
+    const response = await responsePromise;
+    expect(response).not.toBeInstanceOf(Response);
+    const dataAndResponse = await responsePromise.withResponse();
+    expect(dataAndResponse.data).toBe(response);
+    expect(dataAndResponse.response).toBe(rawResponse);
+  });
+
+  test('webSearchCalls: required and optional params', async () => {
+    const response = await client.admin.organization.usage.webSearchCalls({
+      start_time: 0,
+      api_key_ids: ['string'],
+      bucket_width: '1m',
+      context_levels: ['low'],
+      end_time: 0,
+      group_by: ['project_id'],
+      limit: 0,
+      models: ['string'],
+      page: 'page',
+      project_ids: ['string'],
+      user_ids: ['string'],
     });
   });
 });

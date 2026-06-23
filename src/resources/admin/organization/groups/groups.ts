@@ -10,6 +10,8 @@ import {
   RoleListParams,
   RoleListResponse,
   RoleListResponsesPage,
+  RoleRetrieveParams,
+  RoleRetrieveResponse,
   Roles,
 } from './roles';
 import * as UsersAPI from './users';
@@ -21,6 +23,8 @@ import {
   UserDeleteParams,
   UserDeleteResponse,
   UserListParams,
+  UserRetrieveParams,
+  UserRetrieveResponse,
   Users,
 } from './users';
 import { APIPromise } from '../../../../core/api-promise';
@@ -45,6 +49,24 @@ export class Groups extends APIResource {
   create(body: GroupCreateParams, options?: RequestOptions): APIPromise<Group> {
     return this._client.post('/organization/groups', {
       body,
+      ...options,
+      __security: { adminAPIKeyAuth: true },
+    });
+  }
+
+  /**
+   * Retrieves a group.
+   *
+   * @example
+   * ```ts
+   * const group =
+   *   await client.admin.organization.groups.retrieve(
+   *     'group_id',
+   *   );
+   * ```
+   */
+  retrieve(groupID: string, options?: RequestOptions): APIPromise<Group> {
+    return this._client.get(path`/organization/groups/${groupID}`, {
       ...options,
       __security: { adminAPIKeyAuth: true },
     });
@@ -132,7 +154,7 @@ export interface Group {
   /**
    * The type of the group.
    */
-  group_type: string;
+  group_type: 'group' | 'tenant_group';
 
   /**
    * Whether the group is managed through SCIM and controlled by your identity
@@ -231,9 +253,11 @@ export declare namespace Groups {
     Users as Users,
     type OrganizationGroupUser as OrganizationGroupUser,
     type UserCreateResponse as UserCreateResponse,
+    type UserRetrieveResponse as UserRetrieveResponse,
     type UserDeleteResponse as UserDeleteResponse,
     type OrganizationGroupUsersPage as OrganizationGroupUsersPage,
     type UserCreateParams as UserCreateParams,
+    type UserRetrieveParams as UserRetrieveParams,
     type UserListParams as UserListParams,
     type UserDeleteParams as UserDeleteParams,
   };
@@ -241,10 +265,12 @@ export declare namespace Groups {
   export {
     Roles as Roles,
     type RoleCreateResponse as RoleCreateResponse,
+    type RoleRetrieveResponse as RoleRetrieveResponse,
     type RoleListResponse as RoleListResponse,
     type RoleDeleteResponse as RoleDeleteResponse,
     type RoleListResponsesPage as RoleListResponsesPage,
     type RoleCreateParams as RoleCreateParams,
+    type RoleRetrieveParams as RoleRetrieveParams,
     type RoleListParams as RoleListParams,
     type RoleDeleteParams as RoleDeleteParams,
   };

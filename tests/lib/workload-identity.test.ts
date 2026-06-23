@@ -5,7 +5,6 @@ import { OAuthError, SubjectTokenProviderError } from 'openai';
 const originalFetch = global.fetch;
 
 const createTestWorkloadIdentity = () => ({
-  clientId: 'test-client-id',
   identityProviderId: 'test-identity-provider-id',
   serviceAccountId: 'test-service-account-id',
   provider: {
@@ -272,7 +271,6 @@ describe('OpenAI with Workload Identity', () => {
   test('propagates SubjectTokenProviderError', async () => {
     const client = new OpenAI({
       workloadIdentity: {
-        clientId: 'test-client-id',
         identityProviderId: 'test-identity-provider-id',
         serviceAccountId: 'test-service-account-id',
         provider: {
@@ -407,7 +405,6 @@ describe('OpenAI with Workload Identity', () => {
 
     const client = new OpenAI({
       workloadIdentity: {
-        clientId: 'test-client-id',
         identityProviderId: 'test-identity-provider-id',
         serviceAccountId: 'test-service-account-id',
         provider: {
