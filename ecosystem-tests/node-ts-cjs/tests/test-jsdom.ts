@@ -59,16 +59,16 @@ expect.extend({
 
 test(`basic request works`, async function () {
   const completion = await client.chat.completions.create({
-    model: 'gpt-4',
-    messages: [{ role: 'user', content: 'Say this is a test' }],
+    model: 'gpt-4o-mini',
+    messages: [{ role: 'user', content: 'Reply with exactly this text and nothing else: This is a test' }],
   });
   expect(completion.choices[0]?.message?.content).toBeSimilarTo('This is a test', 10);
 });
 
 it(`streaming works`, async function () {
   const stream = await client.chat.completions.create({
-    model: 'gpt-4',
-    messages: [{ role: 'user', content: 'Say this is a test' }],
+    model: 'gpt-4o-mini',
+    messages: [{ role: 'user', content: 'Reply with exactly this text and nothing else: This is a test' }],
     stream: true,
   });
   const chunks = [];

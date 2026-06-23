@@ -4,8 +4,8 @@ export interface SubjectTokenProvider {
 }
 
 export interface WorkloadIdentity {
-  /**A unique string that identifies the client.*/
-  clientId: string;
+  /**Optional client identifier for token exchange compatibility.*/
+  clientId?: string;
 
   /**Identity provider resource id in WIFAPI.*/
   identityProviderId: string;

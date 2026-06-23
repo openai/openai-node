@@ -29,7 +29,7 @@ export class InputItems extends APIResource {
     return this._client.getAPIList(
       path`/responses/${responseID}/input_items`,
       CursorPage<ResponsesAPI.ResponseItem>,
-      { query, ...options },
+      { query, ...options, __security: { bearerAuth: true } },
     );
   }
 }

@@ -3,8 +3,11 @@ const openai = new OpenAI({ apiKey: 'example-api-key' });
 
 function isInputCompatibleOutputItem(
   item: OpenAI.Responses.ResponseOutputItem,
-): item is Exclude<OpenAI.Responses.ResponseOutputItem, OpenAI.Responses.ResponseComputerToolCallOutputItem> {
-  return item.type !== 'computer_call_output';
+): item is Exclude<
+  OpenAI.Responses.ResponseOutputItem,
+  OpenAI.Responses.ResponseComputerToolCallOutputItem | OpenAI.Responses.ResponseOutputItem.AdditionalTools
+> {
+  return item.type !== 'computer_call_output' && item.type !== 'additional_tools';
 }
 
 describe('responses item types', () => {

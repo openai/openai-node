@@ -4,6 +4,7 @@ import OpenAI, { toFile } from 'openai';
 
 const client = new OpenAI({
   apiKey: 'My API Key',
+  adminAPIKey: 'My Admin API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
@@ -23,7 +24,7 @@ describe('resource videos', () => {
     const response = await client.videos.create({
       prompt: 'x',
       input_reference: await toFile(Buffer.from('Example data'), 'README.md'),
-      model: 'string',
+      model: 'sora-2',
       seconds: '4',
       size: '720x1280',
     });
