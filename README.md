@@ -69,34 +69,35 @@ const completion = await client.chat.completions.create({
 console.log(completion.choices[0].message.content);
 ```
 
-## vision
-Use the `responses` endpoint to generate text from images and text input. 
-Useful for describing and analyzing visual content.
+## Vision
+
+Use the Responses API to analyze images and generate text about visual content.
 
 ```ts
-const response = await openai.responses.create({
-    model: 'gpt-4o',
-    input: [
-      {
-        role: 'user',
-        content: [
-          {
-            type: 'input_text',
-            text: 'What is in this image?',
-          },
-          {
-            type: 'input_image',
-            detail: 'auto', //can be 'low', 'high', or 'auto'
-            // Replace with a real, accessible image
-            image_url: 'https://example.com/image.jpg',
-          },
-        ],
-      },
-    ],
-  });
+import OpenAI from 'openai';
 
-  console.log(response.output_text);
+const client = new OpenAI({
+  apiKey: process.env['OPENAI_API_KEY'], // This is the default and can be omitted
+});
 
+const response = await client.responses.create({
+  model: 'gpt-5.5',
+  input: [
+    {
+      role: 'user',
+      content: [
+        { type: 'input_text', text: 'What is in this image?' },
+        {
+          type: 'input_image',
+          image_url:
+            'https://api.nga.gov/iiif/a2e6da57-3cd1-4235-b20e-95dcaefed6c8/full/!800,800/0/default.jpg',
+        },
+      ],
+    },
+  ],
+});
+
+console.log(response.output_text);
 ```
 
 ## Streaming responses
