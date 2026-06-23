@@ -1,0 +1,50 @@
+jest.mock('node:child_process', () => ({ spawn: jest.fn() }));
+
+import { spawn } from 'node:child_process';
+import { Writable } from 'node:stream';
+import { playAudio } from 'openai/helpers/audio';
+
+const spawnMock = spawn as jest.MockedFunction<typeof spawn>;
+
+function mockFfplay() {
+  const chunks: Buffer[] = [];
+  const stdin = new Writable({
+    write(chunk, _encoding, callback) {
+      chunks.push(Buffer.from(chunk));
+      callback();
+    },
+  });
+  const ffplay = {
+    stdin,
+    on: jest.fn(),
+  };
+
+  ffplay.on.mockImplementation((event: string, listener: (code: number) => void) => {
+    if (event === 'close') {
+      if (stdin.writableEnded) {
+        queueMicrotask(() => listener(0));
+      } else {
+        stdin.on('finish', () => listener(0));
+      }
+    }
+    return ffplay;
+  });
+  spawnMock.mockReturnValue(ffplay as any);
+
+  return { chunks };
+}
+
+describe('playAudio', () => {
+  afterEach(() => {
+    jest.resetAllMocks();
+  });
+
+  it('pipes a Response Web ReadableStream body to ffplay', async () => {
+    const { chunks } = mockFfplay();
+
+    await playAudio(new Response('hello'));
+
+    expect(spawnMock).toHaveBeenCalledWith('ffplay', ['-autoexit', '-nodisp', '-i', 'pipe:0']);
+    expect(Buffer.concat(chunks).toString()).toBe('hello');
+  });
+});

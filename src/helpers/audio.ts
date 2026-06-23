@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import { Readable } from 'node:stream';
+import type { ReadableStream as NodeReadableStream } from 'node:stream/web';
 import { platform, versions } from 'node:process';
 import { checkFileSupport } from '../internal/uploads';
 
@@ -37,7 +38,7 @@ async function nodejsPlayAudio(stream: NodeJS.ReadableStream | Response | File):
       const ffplay = spawn('ffplay', ['-autoexit', '-nodisp', '-i', 'pipe:0']);
 
       if (isResponse(stream)) {
-        (stream.body! as any).pipe(ffplay.stdin);
+        Readable.fromWeb(stream.body! as NodeReadableStream).pipe(ffplay.stdin);
       } else if (isFile(stream)) {
         Readable.from(stream.stream()).pipe(ffplay.stdin);
       } else {
