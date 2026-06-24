@@ -1022,6 +1022,12 @@ export class OpenAI {
       return await this.fetch.call(undefined, url, fetchOptions);
     } finally {
       clearTimeout(timeout);
+      // Remove the listener on success so we don't keep the caller's signal
+      // (and any underlying timer) ref'd for the full timeout duration.
+      // The `{ once: true }` option only self-removes when the signal actually
+      // fires, which on Deno keeps `AbortSignal.timeout()` timers ref'd and
+      // blocks process exit until the timeout elapses. See #1811.
+      if (signal) signal.removeEventListener('abort', abort);
     }
   }
 
