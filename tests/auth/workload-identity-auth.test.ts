@@ -18,7 +18,6 @@ describe('WorkloadIdentityAuth', () => {
     let fetchCallCount = 0;
 
     const config: WorkloadIdentity = {
-      clientId: 'test-client-id',
       identityProviderId: 'test-identity-provider-id',
       serviceAccountId: 'test-service-account-id',
       provider: {
@@ -59,7 +58,6 @@ describe('WorkloadIdentityAuth', () => {
     let fetchCallCount = 0;
 
     const config: WorkloadIdentity = {
-      clientId: 'test-client-id',
       identityProviderId: 'test-identity-provider-id',
       serviceAccountId: 'test-service-account-id',
       provider: {
@@ -102,7 +100,6 @@ describe('WorkloadIdentityAuth', () => {
     let fetchCallCount = 0;
 
     const config: WorkloadIdentity = {
-      clientId: 'test-client-id',
       identityProviderId: 'test-identity-provider-id',
       serviceAccountId: 'test-service-account-id',
       provider: {
@@ -142,7 +139,6 @@ describe('WorkloadIdentityAuth', () => {
 
   test('sends correct OAuth2 token exchange request', async () => {
     const config: WorkloadIdentity = {
-      clientId: 'test-client-id',
       identityProviderId: 'test-identity-provider-id',
       serviceAccountId: 'test-service-account-id',
       provider: {
@@ -179,7 +175,7 @@ describe('WorkloadIdentityAuth', () => {
 
     const body = JSON.parse(capturedRequest!.body);
     expect(body.grant_type).toBe('urn:ietf:params:oauth:grant-type:token-exchange');
-    expect(body.client_id).toBe('test-client-id');
+    expect(body).not.toHaveProperty('client_id');
     expect(body.subject_token).toBe('subject-token');
     expect(body.subject_token_type).toBe('urn:ietf:params:oauth:token-type:jwt');
     expect(body.identity_provider_id).toBe('test-identity-provider-id');
@@ -188,7 +184,6 @@ describe('WorkloadIdentityAuth', () => {
 
   test('includes all required fields in token exchange', async () => {
     const config: WorkloadIdentity = {
-      clientId: 'test-client-id',
       identityProviderId: 'test-identity-provider-id',
       serviceAccountId: 'test-service-account-id',
       provider: {
@@ -219,14 +214,47 @@ describe('WorkloadIdentityAuth', () => {
     const body = JSON.parse(capturedBody!);
     expect(body.grant_type).toBe('urn:ietf:params:oauth:grant-type:token-exchange');
     expect(body.subject_token_type).toBe('urn:ietf:params:oauth:token-type:jwt');
-    expect(body.client_id).toBe('test-client-id');
+    expect(body).not.toHaveProperty('client_id');
     expect(body.identity_provider_id).toBe('test-identity-provider-id');
     expect(body.service_account_id).toBe('test-service-account-id');
   });
 
-  test('throws OAuthError on failed token exchange', async () => {
+  test('includes client_id when clientId is provided', async () => {
     const config: WorkloadIdentity = {
       clientId: 'test-client-id',
+      identityProviderId: 'test-identity-provider-id',
+      serviceAccountId: 'test-service-account-id',
+      provider: {
+        tokenType: 'jwt',
+        getToken: async () => 'subject-token',
+      },
+    };
+
+    let capturedBody: string | null = null;
+
+    global.fetch = jest.fn(async (url: string, init?: RequestInit) => {
+      capturedBody = init?.body?.toString() || '';
+
+      return new Response(
+        JSON.stringify({
+          access_token: 'access-token',
+          issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
+          token_type: 'Bearer',
+          expires_in: 3600,
+        }),
+        { status: 200 },
+      );
+    }) as typeof fetch;
+
+    const auth = new WorkloadIdentityAuth(config);
+    await auth.getToken();
+
+    const body = JSON.parse(capturedBody!);
+    expect(body.client_id).toBe('test-client-id');
+  });
+
+  test('throws OAuthError on failed token exchange', async () => {
+    const config: WorkloadIdentity = {
       identityProviderId: 'test-identity-provider-id',
       serviceAccountId: 'test-service-account-id',
       provider: {
@@ -253,7 +281,6 @@ describe('WorkloadIdentityAuth', () => {
 
   test('defaults to 3600 seconds when expires_in is missing', async () => {
     const config: WorkloadIdentity = {
-      clientId: 'test-client-id',
       identityProviderId: 'test-identity-provider-id',
       serviceAccountId: 'test-service-account-id',
       provider: {
@@ -283,7 +310,6 @@ describe('WorkloadIdentityAuth', () => {
     let fetchCallCount = 0;
 
     const config: WorkloadIdentity = {
-      clientId: 'test-client-id',
       identityProviderId: 'test-identity-provider-id',
       serviceAccountId: 'test-service-account-id',
       provider: {
@@ -319,7 +345,6 @@ describe('WorkloadIdentityAuth', () => {
 
   test('uses the configured fetch implementation for token exchange', async () => {
     const config: WorkloadIdentity = {
-      clientId: 'test-client-id',
       identityProviderId: 'test-identity-provider-id',
       serviceAccountId: 'test-service-account-id',
       provider: {

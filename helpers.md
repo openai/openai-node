@@ -314,6 +314,10 @@ If you pass a `parse` function, it will automatically parse the `arguments` for 
 and returns any parsing errors to the model to attempt auto-recovery.
 Otherwise, the args will be passed to the function you provide as a string.
 
+When a completion requests multiple tool calls, `runTools` executes them concurrently by default and
+sends their results back in the same order as the tool calls. Set `parallel_tool_calls: false` to request
+one tool call at a time and execute any returned group sequentially.
+
 If you pass `tool_choice: {function: {name: …}}` instead of `auto`,
 it returns immediately after calling that function (and only loops to auto-recover parsing errors).
 
@@ -435,6 +439,7 @@ response is given as the first argument to the callback.
 #### `.on('content.delta', (props: ContentDeltaEvent) => ...)`
 
 The event fired for every chunk containing new content. The `props` object contains:
+
 - `delta`: The new content string received in this chunk
 - `snapshot`: The accumulated content so far
 - `parsed`: The partially parsed content (if applicable)
@@ -442,23 +447,27 @@ The event fired for every chunk containing new content. The `props` object conta
 #### `.on('content.done', (props: ContentDoneEvent<ParsedT>) => ...)`
 
 The event fired when the content generation is complete. The `props` object contains:
+
 - `content`: The full generated content
 - `parsed`: The fully parsed content (if applicable)
 
 #### `.on('refusal.delta', (props: RefusalDeltaEvent) => ...)`
 
 The event fired when a chunk contains part of a content refusal. The `props` object contains:
+
 - `delta`: The new refusal content string received in this chunk
 - `snapshot`: The accumulated refusal content string so far
 
 #### `.on('refusal.done', (props: RefusalDoneEvent) => ...)`
 
 The event fired when the refusal content is complete. The `props` object contains:
+
 - `refusal`: The full refusal content
 
 #### `.on('tool_calls.function.arguments.delta', (props: FunctionToolCallArgumentsDeltaEvent) => ...)`
 
 The event fired when a chunk contains part of a function tool call's arguments. The `props` object contains:
+
 - `name`: The name of the function being called
 - `index`: The index of the tool call
 - `arguments`: The accumulated raw JSON string of arguments
@@ -468,6 +477,7 @@ The event fired when a chunk contains part of a function tool call's arguments. 
 #### `.on('tool_calls.function.arguments.done', (props: FunctionToolCallArgumentsDoneEvent) => ...)`
 
 The event fired when a function tool call's arguments are complete. The `props` object contains:
+
 - `name`: The name of the function being called
 - `index`: The index of the tool call
 - `arguments`: The full raw JSON string of arguments
@@ -476,23 +486,27 @@ The event fired when a function tool call's arguments are complete. The `props` 
 #### `.on('logprobs.content.delta', (props: LogProbsContentDeltaEvent) => ...)`
 
 The event fired when a chunk contains new content log probabilities. The `props` object contains:
+
 - `content`: A list of the new log probabilities received in this chunk
 - `snapshot`: A list of the accumulated log probabilities so far
 
 #### `.on('logprobs.content.done', (props: LogProbsContentDoneEvent) => ...)`
 
 The event fired when all content log probabilities have been received. The `props` object contains:
+
 - `content`: The full list of token log probabilities for the content
 
 #### `.on('logprobs.refusal.delta', (props: LogProbsRefusalDeltaEvent) => ...)`
 
 The event fired when a chunk contains new refusal log probabilities. The `props` object contains:
+
 - `refusal`: A list of the new log probabilities received in this chunk
 - `snapshot`: A list of the accumulated log probabilities so far
 
 #### `.on('logprobs.refusal.done', (props: LogProbsRefusalDoneEvent) => ...)`
 
 The event fired when all refusal log probabilities have been received. The `props` object contains:
+
 - `refusal`: The full list of token log probabilities for the refusal
 
 #### `.on('finalChatCompletion', (completion: ChatCompletion) => …)`
@@ -636,6 +650,35 @@ async function main() {
 }
 
 main();
+```
+
+#### Inspect or extend the conversation after each completion
+
+The `afterCompletion` callback runs after a completion's tool calls have finished and is awaited before the
+next request starts. It can inspect the completion and append context to the runner's mutable `messages` array.
+The callback also runs for the final completion, when no further request will be made.
+
+```ts
+const runner = client.chat.completions.runTools(
+  {
+    model: 'gpt-4o',
+    messages,
+    tools,
+  },
+  {
+    afterCompletion: async (completion, runner) => {
+      if (!completion.choices[0]?.message.tool_calls?.length) return;
+
+      const webResearch = await optionallyPerformWebResearch(runner.messages.slice(-10));
+      if (webResearch) {
+        runner.messages.push({
+          role: 'system',
+          content: `Use this up-to-date research to guide your next steps:\n\n${webResearch}`,
+        });
+      }
+    },
+  },
+);
 ```
 
 #### Integrate with `zod`

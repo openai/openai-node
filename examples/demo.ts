@@ -1,4 +1,4 @@
-#!/usr/bin/env -S npm run tsn -T
+#!/usr/bin/env -S npm run tsn -- -T
 
 import OpenAI from 'openai';
 
@@ -8,15 +8,15 @@ const openai = new OpenAI();
 async function main() {
   // Non-streaming:
   const completion = await openai.chat.completions.create({
-    model: 'gpt-4',
-    messages: [{ role: 'user', content: 'Say this is a test' }],
+    model: 'gpt-4o-mini',
+    messages: [{ role: 'user', content: 'Reply with exactly this text and nothing else: This is a test' }],
   });
   console.log(completion.choices[0]?.message?.content);
 
   // Streaming:
   const stream = await openai.chat.completions.create({
-    model: 'gpt-4',
-    messages: [{ role: 'user', content: 'Say this is a test' }],
+    model: 'gpt-4o-mini',
+    messages: [{ role: 'user', content: 'Reply with exactly this text and nothing else: This is a test' }],
     stream: true,
   });
   for await (const part of stream) {

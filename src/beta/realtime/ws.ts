@@ -1,15 +1,19 @@
 import * as WS from 'ws';
 import { AzureOpenAI, OpenAI } from '../../index';
 import type { RealtimeClientEvent, RealtimeServerEvent } from '../../resources/beta/realtime/realtime';
-import { OpenAIRealtimeEmitter, buildRealtimeURL, isAzure } from './internal-base';
+import {
+  OpenAIRealtimeEmitter,
+  buildRealtimeURL,
+  isAzure,
+  type RealtimeConnectionConfig,
+} from './internal-base';
 
 export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
   url: URL;
   socket: WS.WebSocket;
 
   constructor(
-    props: {
-      model: string;
+    props: RealtimeConnectionConfig & {
       options?: WS.ClientOptions | undefined;
       /** @internal */ __resolvedApiKey?: boolean;
     },
@@ -22,12 +26,11 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
       throw new Error(
         [
           'Cannot open Realtime WebSocket with a function-based apiKey.',
-          'Use the .create() method so that the key is resolved before connecting:',
-          'await OpenAIRealtimeWS.create(client, { model })',
+          'Use the .create() method so that the key is resolved before connecting.',
         ].join('\n'),
       );
     }
-    this.url = buildRealtimeURL(client, props.model);
+    this.url = buildRealtimeURL(client, props);
     this.socket = new WS.WebSocket(this.url, {
       ...props.options,
       headers: {
@@ -66,7 +69,7 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
 
   static async create(
     client: Pick<OpenAI, 'apiKey' | 'baseURL' | '_callApiKey'>,
-    props: { model: string; options?: WS.ClientOptions | undefined },
+    props: RealtimeConnectionConfig & { options?: WS.ClientOptions | undefined },
   ): Promise<OpenAIRealtimeWS> {
     return new OpenAIRealtimeWS({ ...props, __resolvedApiKey: await client._callApiKey() }, client);
   }
@@ -76,6 +79,10 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     props: { deploymentName?: string; options?: WS.ClientOptions | undefined } = {},
   ): Promise<OpenAIRealtimeWS> {
     const isApiKeyProvider = await client._callApiKey();
+    const apiKey = client.apiKey;
+    if (!apiKey) {
+      throw new Error('Azure OpenAI Realtime requires an API key');
+    }
     const deploymentName = props.deploymentName ?? client.deploymentName;
     if (!deploymentName) {
       throw new Error('No deployment name provided');
@@ -87,7 +94,7 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
           ...props.options,
           headers: {
             ...props.options?.headers,
-            ...(isApiKeyProvider ? {} : { 'api-key': client.apiKey }),
+            ...(isApiKeyProvider ? {} : { 'api-key': apiKey }),
           },
         },
         __resolvedApiKey: isApiKeyProvider,

@@ -13,7 +13,7 @@ export class Moderations extends APIResource {
    * the [moderation guide](https://platform.openai.com/docs/guides/moderation).
    */
   create(body: ModerationCreateParams, options?: RequestOptions): APIPromise<ModerationCreateResponse> {
-    return this._client.post('/moderations', { body, ...options });
+    return this._client.post('/moderations', { body, ...options, __security: { bearerAuth: true } });
   }
 }
 

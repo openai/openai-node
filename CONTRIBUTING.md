@@ -1,13 +1,20 @@
 ## Setting up the environment
 
-This repository uses [`yarn@v1`](https://classic.yarnpkg.com/lang/en/docs/install).
+This repository uses the [`pnpm`](https://pnpm.io/installation) version pinned by `package.json`.
 Other package managers may work but are not officially supported for development.
+Use a Node.js version supported by that pinned pnpm release.
+Do not rely on Corepack being available; install pnpm explicitly if needed:
+
+```sh
+$ PNPM_VERSION=$(node -p "require('./package.json').packageManager.replace(/^pnpm@/, '')")
+$ npm install --global "pnpm@$PNPM_VERSION"
+```
 
 To set up the repository, run:
 
 ```sh
-$ yarn
-$ yarn build
+$ pnpm install
+$ pnpm build
 ```
 
 This will install all the required dependencies and build output files to `dist/`.
@@ -25,14 +32,14 @@ All files in the `examples/` directory are not modified by the generator and can
 ```ts
 // add an example to examples/<your-example>.ts
 
-#!/usr/bin/env -S npm run tsn -T
+#!/usr/bin/env -S npm run tsn -- -T
 …
 ```
 
 ```sh
 $ chmod +x examples/<your-example>.ts
 # run the example against your api
-$ yarn tsn -T examples/<your-example>.ts
+$ npm run tsn -- -T examples/<your-example>.ts
 ```
 
 ## Using the repository from source
@@ -52,11 +59,6 @@ Alternatively, to link a local copy of the repo:
 $ git clone https://www.github.com/openai/openai-node
 $ cd openai-node
 
-# With yarn
-$ yarn link
-$ cd ../my-package
-$ yarn link openai
-
 # With pnpm
 $ pnpm link --global
 $ cd ../my-package
@@ -72,7 +74,7 @@ $ ./scripts/mock
 ```
 
 ```sh
-$ yarn run test
+$ pnpm test
 ```
 
 ## Linting and formatting
@@ -83,13 +85,13 @@ This repository uses [prettier](https://www.npmjs.com/package/prettier) and
 To lint:
 
 ```sh
-$ yarn lint
+$ pnpm lint
 ```
 
 To format and fix all lint issues automatically:
 
 ```sh
-$ yarn fix
+$ pnpm fix
 ```
 
 ## Publishing and releases
