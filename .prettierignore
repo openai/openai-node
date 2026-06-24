@@ -1,5 +1,6 @@
 CHANGELOG.md
 jsr.json
+pnpm-lock.yaml
 /ecosystem-tests/*/**
 /node_modules
 /deno

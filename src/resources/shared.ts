@@ -258,6 +258,13 @@ export type OAuthErrorCode = 'invalid_grant' | 'invalid_subject_token' | (string
  */
 export interface Reasoning {
   /**
+   * Controls which reasoning items are rendered back to the model on later turns.
+   * When returned on a response, this is the effective reasoning context mode used
+   * for the response.
+   */
+  context?: 'auto' | 'current_turn' | 'all_turns' | null;
+
+  /**
    * Constrains effort on reasoning for
    * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
    * supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`.

@@ -33,6 +33,11 @@ export {
   type CertificateDeactivateResponsesPage,
 } from './certificates';
 export {
+  DataRetention,
+  type OrganizationDataRetention,
+  type DataRetentionUpdateParams,
+} from './data-retention';
+export {
   Groups,
   type Group,
   type GroupUpdateResponse,
@@ -69,6 +74,15 @@ export {
   type RolesPage,
 } from './roles';
 export {
+  SpendAlerts,
+  type OrganizationSpendAlert,
+  type OrganizationSpendAlertDeleted,
+  type SpendAlertCreateParams,
+  type SpendAlertUpdateParams,
+  type SpendAlertListParams,
+  type OrganizationSpendAlertsPage,
+} from './spend-alerts';
+export {
   Usage,
   type UsageAudioSpeechesResponse,
   type UsageAudioTranscriptionsResponse,
@@ -76,18 +90,22 @@ export {
   type UsageCompletionsResponse,
   type UsageCostsResponse,
   type UsageEmbeddingsResponse,
+  type UsageFileSearchCallsResponse,
   type UsageImagesResponse,
   type UsageModerationsResponse,
   type UsageVectorStoresResponse,
+  type UsageWebSearchCallsResponse,
   type UsageAudioSpeechesParams,
   type UsageAudioTranscriptionsParams,
   type UsageCodeInterpreterSessionsParams,
   type UsageCompletionsParams,
   type UsageCostsParams,
   type UsageEmbeddingsParams,
+  type UsageFileSearchCallsParams,
   type UsageImagesParams,
   type UsageModerationsParams,
   type UsageVectorStoresParams,
+  type UsageWebSearchCallsParams,
 } from './usage';
 export {
   Users,

@@ -24,6 +24,25 @@ describe('resource roles', () => {
     const response = await client.admin.organization.groups.roles.create('group_id', { role_id: 'role_id' });
   });
 
+  test('retrieve: only required params', async () => {
+    const responsePromise = client.admin.organization.groups.roles.retrieve('role_id', {
+      group_id: 'group_id',
+    });
+    const rawResponse = await responsePromise.asResponse();
+    expect(rawResponse).toBeInstanceOf(Response);
+    const response = await responsePromise;
+    expect(response).not.toBeInstanceOf(Response);
+    const dataAndResponse = await responsePromise.withResponse();
+    expect(dataAndResponse.data).toBe(response);
+    expect(dataAndResponse.response).toBe(rawResponse);
+  });
+
+  test('retrieve: required and optional params', async () => {
+    const response = await client.admin.organization.groups.roles.retrieve('role_id', {
+      group_id: 'group_id',
+    });
+  });
+
   test('list', async () => {
     const responsePromise = client.admin.organization.groups.roles.list('group_id');
     const rawResponse = await responsePromise.asResponse();
