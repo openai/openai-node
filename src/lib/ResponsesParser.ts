@@ -31,7 +31,7 @@ export function maybeParseResponse<
   ParsedT = Params extends null ? null : ExtractParsedContentFromParams<NonNullable<Params>>,
 >(response: Response, params: Params): ParsedResponse<ParsedT> {
   if (!params || !hasAutoParseableInput(params)) {
-    const parsed: ParsedResponse<ParsedT> = {
+    const parsed = {
       ...response,
       output_parsed: null,
       output: response.output.map((item) => {
@@ -55,9 +55,11 @@ export function maybeParseResponse<
         }
       }),
     };
-    if (!Object.getOwnPropertyDescriptor(response, 'output_text')) {
-      addOutputText(parsed);
+
+    if (needsOutputText(response, parsed)) {
+      addOutputText(parsed as Response);
     }
+
     return parsed;
   }
 
@@ -68,12 +70,13 @@ export function parseResponse<
   Params extends ResponseCreateParamsBase,
   ParsedT = ExtractParsedContentFromParams<Params>,
 >(response: Response, params: Params): ParsedResponse<ParsedT> {
+  const shouldParse = !response.status || response.status === 'completed';
   const output: Array<ParsedResponseOutputItem<ParsedT>> = response.output.map(
     (item): ParsedResponseOutputItem<ParsedT> => {
       if (item.type === 'function_call') {
         return {
           ...item,
-          parsed_arguments: parseToolCall(params, item),
+          parsed_arguments: shouldParse ? parseToolCall(params, item) : null,
         };
       }
       if (item.type === 'message') {
@@ -81,7 +84,7 @@ export function parseResponse<
           if (content.type === 'output_text') {
             return {
               ...content,
-              parsed: parseTextFormat(params, content.text),
+              parsed: shouldParse ? parseTextFormat(params, content.text) : null,
             };
           }
 
@@ -99,7 +102,7 @@ export function parseResponse<
   );
 
   const parsed: Omit<ParsedResponse<ParsedT>, 'output_parsed'> = Object.assign({}, response, { output });
-  if (!Object.getOwnPropertyDescriptor(response, 'output_text')) {
+  if (needsOutputText(response, parsed)) {
     addOutputText(parsed);
   }
 
@@ -249,6 +252,13 @@ export function validateInputTools(tools: ChatCompletionTool[] | undefined) {
       );
     }
   }
+}
+
+function needsOutputText(
+  response: Response,
+  target: { output_text?: Response['output_text'] | null },
+): boolean {
+  return !Object.getOwnPropertyDescriptor(response, 'output_text') || target.output_text == null;
 }
 
 export function addOutputText(rsp: Response): void {

@@ -1,5 +1,5 @@
 import { WorkloadIdentityAuth } from 'openai/auth/workload-identity-auth';
-import { OAuthError } from 'openai';
+import { OAuthError, OpenAIError } from 'openai';
 import type { WorkloadIdentity } from 'openai/auth/types';
 
 const originalFetch = global.fetch;
@@ -304,6 +304,55 @@ describe('WorkloadIdentityAuth', () => {
 
     const token = await auth.getToken();
     expect(token).toBe('access-token');
+  });
+
+  test.each([
+    [
+      'missing field',
+      {
+        issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
+        token_type: 'Bearer',
+        expires_in: 3600,
+      },
+    ],
+    [
+      'empty field',
+      {
+        access_token: '',
+        issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
+        token_type: 'Bearer',
+        expires_in: 3600,
+      },
+    ],
+    [
+      'blank field',
+      {
+        access_token: '   ',
+        issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
+        token_type: 'Bearer',
+        expires_in: 3600,
+      },
+    ],
+    ['null body', null],
+  ])('throws when successful token exchange response has no access_token: %s', async (_name, body) => {
+    const config: WorkloadIdentity = {
+      identityProviderId: 'test-identity-provider-id',
+      serviceAccountId: 'test-service-account-id',
+      provider: {
+        tokenType: 'jwt',
+        getToken: async () => 'subject-token',
+      },
+    };
+
+    global.fetch = jest.fn(async () => {
+      return new Response(JSON.stringify(body), { status: 200 });
+    }) as typeof fetch;
+
+    const auth = new WorkloadIdentityAuth(config);
+    const tokenPromise = auth.getToken();
+
+    await expect(tokenPromise).rejects.toThrow(OpenAIError);
+    await expect(tokenPromise).rejects.toThrow("missing 'access_token'");
   });
 
   test('invalidateToken clears cache', async () => {
