@@ -4,6 +4,7 @@ import OpenAI from 'openai';
 
 const client = new OpenAI({
   apiKey: 'My API Key',
+  adminAPIKey: 'My Admin API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
@@ -93,6 +94,7 @@ describe('resource responses', () => {
       previous_response_id: 'resp_123',
       prompt_cache_key: 'prompt_cache_key',
       prompt_cache_retention: 'in_memory',
+      service_tier: 'auto',
     });
   });
 });

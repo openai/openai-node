@@ -35,9 +35,12 @@ export class Completions extends APIResource {
     body: CompletionCreateParams,
     options?: RequestOptions,
   ): APIPromise<Completion> | APIPromise<Stream<Completion>> {
-    return this._client.post('/completions', { body, ...options, stream: body.stream ?? false }) as
-      | APIPromise<Completion>
-      | APIPromise<Stream<Completion>>;
+    return this._client.post('/completions', {
+      body,
+      ...options,
+      stream: body.stream ?? false,
+      __security: { bearerAuth: true },
+    }) as APIPromise<Completion> | APIPromise<Stream<Completion>>;
   }
 }
 

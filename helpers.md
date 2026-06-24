@@ -325,6 +325,10 @@ If you pass a `parse` function, it will automatically parse the `arguments` for 
 and returns any parsing errors to the model to attempt auto-recovery.
 Otherwise, the args will be passed to the function you provide as a string.
 
+When a completion requests multiple tool calls, `runTools` executes them concurrently by default and
+sends their results back in the same order as the tool calls. Set `parallel_tool_calls: false` to request
+one tool call at a time and execute any returned group sequentially.
+
 If you pass `tool_choice: {function: {name: …}}` instead of `auto`,
 it returns immediately after calling that function (and only loops to auto-recover parsing errors).
 
@@ -610,8 +614,13 @@ The underlying `AbortController` for the runner.
 
 #### Abort on a function call
 
-If you have a function call flow which you intend to _end_ with a certain function call, then you can use the second
-argument `runner` given to the function to either mutate `runner.messages` or call `runner.abort()`.
+If you have a function call flow which you intend to _end_ with a certain function call, capture that call from the
+`functionToolCall` event and use the second argument `runner` given to the function to mutate `runner.messages` or call
+`runner.abort()`.
+
+Calling `abort()` signals the runner's `AbortController`. If the run observes that signal before it otherwise finishes,
+`done()` and the `final*` helpers reject with `APIUserAbortError`. Other tool callbacks that are already running are not
+cancelled, so capture the terminating call before awaiting the runner and only ignore the expected abort error.
 
 ```ts
 import OpenAI from 'openai';
@@ -619,6 +628,8 @@ import OpenAI from 'openai';
 const client = new OpenAI();
 
 async function main() {
+  let terminatingCall: OpenAI.Chat.ChatCompletionMessageFunctionToolCall.Function | undefined;
+
   const runner = client.chat.completions
     .runTools({
       model: 'gpt-3.5-turbo',
@@ -627,21 +638,58 @@ async function main() {
         {
           type: 'function',
           function: {
-            function: function updateDatabase(props, runner) {
-              runner.abort()
+            function: function updateDatabase(_props, runner) {
+              runner.abort();
             },
             …
           }
         },
       ],
     })
-    .on('message', (message) => console.log(message));
+    .on('message', (message) => console.log(message))
+    .on('functionToolCall', (functionCall) => {
+      if (functionCall.name === 'updateDatabase') terminatingCall = functionCall;
+    })
+    .on('abort', (error) => console.log('Run aborted:', error.message));
 
-  const finalFunctionCall = await runner.finalFunctionCall();
-  console.log('Final function call:', finalFunctionCall);
+  try {
+    await runner.done();
+  } catch (error) {
+    if (!(error instanceof OpenAI.APIUserAbortError)) throw error;
+  }
+  console.log('Function call that ended the run:', terminatingCall);
 }
 
 main();
+```
+
+#### Inspect or extend the conversation after each completion
+
+The `afterCompletion` callback runs after a completion's tool calls have finished and is awaited before the
+next request starts. It can inspect the completion and append context to the runner's mutable `messages` array.
+The callback also runs for the final completion, when no further request will be made.
+
+```ts
+const runner = client.chat.completions.runTools(
+  {
+    model: 'gpt-4o',
+    messages,
+    tools,
+  },
+  {
+    afterCompletion: async (completion, runner) => {
+      if (!completion.choices[0]?.message.tool_calls?.length) return;
+
+      const webResearch = await optionallyPerformWebResearch(runner.messages.slice(-10));
+      if (webResearch) {
+        runner.messages.push({
+          role: 'system',
+          content: `Use this up-to-date research to guide your next steps:\n\n${webResearch}`,
+        });
+      }
+    },
+  },
+);
 ```
 
 #### Integrate with `zod`

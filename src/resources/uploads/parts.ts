@@ -27,7 +27,7 @@ export class Parts extends APIResource {
   create(uploadID: string, body: PartCreateParams, options?: RequestOptions): APIPromise<UploadPart> {
     return this._client.post(
       path`/uploads/${uploadID}/parts`,
-      multipartFormRequestOptions({ body, ...options }, this._client),
+      multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
     );
   }
 }

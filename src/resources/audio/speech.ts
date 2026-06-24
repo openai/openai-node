@@ -31,6 +31,7 @@ export class Speech extends APIResource {
       body,
       ...options,
       headers: buildHeaders([{ Accept: 'application/octet-stream' }, options?.headers]),
+      __security: { bearerAuth: true },
       __binaryResponse: true,
     });
   }
