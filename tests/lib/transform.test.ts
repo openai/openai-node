@@ -271,37 +271,6 @@ describe('toStrictJsonSchema', () => {
         }
       `);
     });
-
-    test('preserves separate anyOf and oneOf semantics', () => {
-      const schema: JSONSchema = {
-        type: 'object',
-        properties: {
-          value: {
-            anyOf: [{ type: 'string' }, { type: 'number' }],
-            oneOf: [{ minimum: 0 }, { maximum: 10 }],
-          },
-        },
-        required: ['value'],
-      };
-
-      const strict = toStrictJsonSchema(schema);
-
-      expect(strict.properties?.value).toEqual({
-        allOf: [
-          { anyOf: [{ type: 'string' }, { type: 'number' }] },
-          {
-            allOf: [
-              { anyOf: [{ minimum: 0 }, { maximum: 10 }] },
-              {
-                not: {
-                  anyOf: [{ allOf: [{ minimum: 0 }, { maximum: 10 }] }],
-                },
-              },
-            ],
-          },
-        ],
-      });
-    });
   });
 
   describe('allOf Handling', () => {

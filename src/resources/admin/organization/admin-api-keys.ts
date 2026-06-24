@@ -102,6 +102,11 @@ export interface AdminAPIKey {
   created_at: number;
 
   /**
+   * The Unix timestamp (in seconds) of when the API key expires
+   */
+  expires_at: number | null;
+
+  /**
    * The object type, which is always `organization.admin_api_key`
    */
   object: 'organization.admin_api_key';
@@ -178,6 +183,12 @@ export interface AdminAPIKeyDeleteResponse {
 
 export interface AdminAPIKeyCreateParams {
   name: string;
+
+  /**
+   * The number of seconds until the API key expires. Omit this field for a key that
+   * does not expire.
+   */
+  expires_in_seconds?: number;
 }
 
 export interface AdminAPIKeyListParams extends CursorPageParams {

@@ -78,6 +78,7 @@ import {
   SpendAlertCreateParams,
   SpendAlertDeleteParams,
   SpendAlertListParams,
+  SpendAlertRetrieveParams,
   SpendAlertUpdateParams,
   SpendAlerts,
 } from './spend-alerts';
@@ -425,6 +426,7 @@ export declare namespace Projects {
     type ProjectSpendAlertDeleted as ProjectSpendAlertDeleted,
     type ProjectSpendAlertsPage as ProjectSpendAlertsPage,
     type SpendAlertCreateParams as SpendAlertCreateParams,
+    type SpendAlertRetrieveParams as SpendAlertRetrieveParams,
     type SpendAlertUpdateParams as SpendAlertUpdateParams,
     type SpendAlertListParams as SpendAlertListParams,
     type SpendAlertDeleteParams as SpendAlertDeleteParams,

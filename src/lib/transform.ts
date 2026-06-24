@@ -31,32 +31,6 @@ function isNullable(schema: JSONSchemaDefinition): boolean {
   return false;
 }
 
-function cloneSchemaDefinition(schema: JSONSchemaDefinition): JSONSchemaDefinition {
-  return structuredClone(schema);
-}
-
-function convertOneOfToStrictSchema(oneOf: JSONSchemaDefinition[]): JSONSchema {
-  if (oneOf.length === 1) {
-    return { allOf: [{ anyOf: [cloneSchemaDefinition(oneOf[0]!)] }] };
-  }
-
-  const overlaps = [];
-  for (let i = 0; i < oneOf.length; i++) {
-    for (let j = i + 1; j < oneOf.length; j++) {
-      overlaps.push({
-        allOf: [cloneSchemaDefinition(oneOf[i]!), cloneSchemaDefinition(oneOf[j]!)],
-      });
-    }
-  }
-
-  return {
-    allOf: [
-      { anyOf: oneOf.map((variant) => cloneSchemaDefinition(variant)) },
-      { not: { anyOf: overlaps } },
-    ],
-  };
-}
-
 /**
  * Mutates the given JSON schema to ensure it conforms to the `strict` standard
  * that the API expects.
@@ -125,23 +99,7 @@ function ensureStrictJsonSchema(
     jsonSchema.items = ensureStrictJsonSchema(items, [...path, 'items'], root);
   }
 
-  // Handle unions (OpenAI strict mode supports anyOf, but not oneOf)
-  const oneOf = jsonSchema.oneOf;
-  if (Array.isArray(oneOf)) {
-    const transformedOneOf = convertOneOfToStrictSchema(oneOf);
-    delete jsonSchema.oneOf;
-
-    if (Array.isArray(jsonSchema.anyOf)) {
-      const existingAnyOf = jsonSchema.anyOf;
-      delete jsonSchema.anyOf;
-      jsonSchema.allOf = [...(jsonSchema.allOf ?? []), { anyOf: existingAnyOf }, transformedOneOf];
-    } else if (Array.isArray(jsonSchema.allOf)) {
-      jsonSchema.allOf = [...jsonSchema.allOf, transformedOneOf];
-    } else {
-      Object.assign(jsonSchema, transformedOneOf);
-    }
-  }
-
+  // Handle unions (anyOf)
   const anyOf = jsonSchema.anyOf;
   if (Array.isArray(anyOf)) {
     jsonSchema.anyOf = anyOf.map((variant, i) =>
@@ -161,11 +119,6 @@ function ensureStrictJsonSchema(
         ensureStrictJsonSchema(entry, [...path, 'allOf', String(i)], root),
       );
     }
-  }
-
-  const not = jsonSchema.not;
-  if (isObject(not)) {
-    jsonSchema.not = ensureStrictJsonSchema(not, [...path, 'not'], root);
   }
 
   // Strip `null` defaults as there's no meaningful distinction
