@@ -1,5 +1,63 @@
 # Changelog
 
+## 6.44.0 (2026-06-17)
+
+Full Changelog: [v6.43.0...v6.44.0](https://github.com/openai/openai-node/compare/v6.43.0...v6.44.0)
+
+### Features
+
+* **api:** update OpenAPI spec or Stainless config ([d05bdbc](https://github.com/openai/openai-node/commit/d05bdbc70b24c2970cf6b583d54529601e5442d8))
+
+## 6.43.0 (2026-06-16)
+
+Full Changelog: [v6.42.0...v6.43.0](https://github.com/openai/openai-node/compare/v6.42.0...v6.43.0)
+
+### Bug Fixes
+
+* fix TS to use `main` ([dc5078b](https://github.com/openai/openai-node/commit/dc5078bcb03c9192c36e5d34a7fc597592220c6a))
+* restore pnpm repo configuration on next ([c2575d6](https://github.com/openai/openai-node/commit/c2575d62cbb73781f2b300c29d30aab5364cf0e0))
+
+
+### Chores
+
+* Convert repository to pnpm ([#1934](https://github.com/openai/openai-node/issues/1934)) ([fbf80f3](https://github.com/openai/openai-node/commit/fbf80f3bf58b1699d686042740076d40832b67c8))
+* sync repo ([34be1be](https://github.com/openai/openai-node/commit/34be1beafc099fb4ae14ed6ee5822cc4617ab18c))
+* Update default branch references to main ([#1920](https://github.com/openai/openai-node/issues/1920)) ([5436f42](https://github.com/openai/openai-node/commit/5436f42de7f8ac2aafed4da23951c61e353da9cc))
+
+
+### Build System
+
+* remove scheduled release ([#1936](https://github.com/openai/openai-node/issues/1936)) ([0c92f62](https://github.com/openai/openai-node/commit/0c92f62a5c7b0dbceebdf1ea474becf0933884e5))
+
+## 6.42.0 (2026-06-03)
+
+Full Changelog: [v6.41.0...v6.42.0](https://github.com/openai/openai-node/compare/v6.41.0...v6.42.0)
+
+### Features
+
+* **api:** responses.moderation and chat_completions.moderation ([6d8f592](https://github.com/openai/openai-node/commit/6d8f592d6aec5487684723b75137629a12225d29))
+
+## 6.41.0 (2026-06-01)
+
+Full Changelog: [v6.40.0...v6.41.0](https://github.com/openai/openai-node/compare/v6.40.0...v6.41.0)
+
+### Features
+
+* **api:** Add Amazon Bedrock Responses support ([#1899](https://github.com/openai/openai-node/issues/1899)) ([535b045](https://github.com/openai/openai-node/commit/535b045c9b614eabeb1324c51f401149570a4382))
+
+## 6.40.0 (2026-06-01)
+
+Full Changelog: [v6.39.1...v6.40.0](https://github.com/openai/openai-node/compare/v6.39.1...v6.40.0)
+
+### Features
+
+* **api:** workload identity in audit logs, additional_tools item in responses, fix ActionSearch.query to be optional. ([aee09f3](https://github.com/openai/openai-node/commit/aee09f337f92b94428832122a19574d9196c3520))
+
+
+### Chores
+
+* remove migrate CLI ([673c618](https://github.com/openai/openai-node/commit/673c61888933e5909bfcc73102ed0e9f8304930e))
+
 ## 6.39.1 (2026-05-27)
 
 Full Changelog: [v6.39.0...v6.39.1](https://github.com/openai/openai-node/compare/v6.39.0...v6.39.1)
@@ -1239,7 +1297,7 @@ Full Changelog: [v5.0.0...v5.0.1](https://github.com/openai/openai-node/compare/
 
 ## 5.0.0 (2025-05-29)
 
-This release migrates from node-fetch to builtin fetch, for full release notes see [MIGRATION.md](https://github.com/openai/openai-node/blob/master/MIGRATION.md).
+This release migrates from node-fetch to builtin fetch, for full release notes see [MIGRATION.md](https://github.com/openai/openai-node/blob/main/MIGRATION.md).
 
 Full Changelog: [v5.0.0-alpha.0...v5.0.0](https://github.com/openai/openai-node/compare/v5.0.0-alpha.0...v5.0.0)
 

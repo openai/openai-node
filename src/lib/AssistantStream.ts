@@ -165,11 +165,7 @@ export class AssistantStream
     readableStream: ReadableStream,
     options?: RequestOptions,
   ): Promise<Run> {
-    const signal = options?.signal;
-    if (signal) {
-      if (signal.aborted) this.controller.abort();
-      signal.addEventListener('abort', () => this.controller.abort());
-    }
+    this._listenForAbort(options?.signal);
     this._connected();
     const stream = Stream.fromReadableStream<AssistantStreamEvent>(readableStream, this.controller);
     for await (const event of stream) {
@@ -208,11 +204,7 @@ export class AssistantStream
     params: RunSubmitToolOutputsParamsStream,
     options?: RequestOptions,
   ): Promise<Run> {
-    const signal = options?.signal;
-    if (signal) {
-      if (signal.aborted) this.controller.abort();
-      signal.addEventListener('abort', () => this.controller.abort());
-    }
+    this._listenForAbort(options?.signal);
 
     const body: RunSubmitToolOutputsParamsStreaming = { ...params, stream: true };
     const stream = await run.submitToolOutputs(runId, body, {
@@ -303,11 +295,7 @@ export class AssistantStream
     params: ThreadCreateAndRunParamsBase,
     options?: RequestOptions,
   ): Promise<Run> {
-    const signal = options?.signal;
-    if (signal) {
-      if (signal.aborted) this.controller.abort();
-      signal.addEventListener('abort', () => this.controller.abort());
-    }
+    this._listenForAbort(options?.signal);
 
     const body: RunCreateParamsStreaming = { ...params, stream: true };
     const stream = await thread.createAndRun(body, { ...options, signal: this.controller.signal });
@@ -330,11 +318,7 @@ export class AssistantStream
     params: RunCreateParamsBase,
     options?: RequestOptions,
   ): Promise<Run> {
-    const signal = options?.signal;
-    if (signal) {
-      if (signal.aborted) this.controller.abort();
-      signal.addEventListener('abort', () => this.controller.abort());
-    }
+    this._listenForAbort(options?.signal);
 
     const body: RunCreateParamsStreaming = { ...params, stream: true };
     const stream = await run.create(threadId, body, { ...options, signal: this.controller.signal });

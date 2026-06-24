@@ -99,15 +99,23 @@ export function parseDef(
 
   refs.seen.set(def, newItem);
 
-  const jsonSchema = selectParser(def, (def as any).typeName, refs, forceResolution);
+  try {
+    const jsonSchema = selectParser(def, (def as any).typeName, refs, forceResolution);
 
-  if (jsonSchema) {
-    addMeta(def, refs, jsonSchema);
+    if (jsonSchema) {
+      addMeta(def, refs, jsonSchema);
+    }
+
+    newItem.jsonSchema = jsonSchema;
+
+    return jsonSchema;
+  } finally {
+    if (forceResolution && seenItem) {
+      // Materializing a definition temporarily moves it to the definition path. Restore the
+      // original path so later references to a shared inner type don't inherit wrapper metadata.
+      refs.seen.set(def, seenItem);
+    }
   }
-
-  newItem.jsonSchema = jsonSchema;
-
-  return jsonSchema;
 }
 
 const get$ref = (
@@ -133,7 +141,10 @@ const get$ref = (
     case 'extract-to-root':
       const name = item.path
         .slice(refs.basePath.length + 1)
-        .map(encodeDefinitionPathPart)
+        // The first part is either the root schema name or an extracted definition
+        // name that is being materialized. Keep it stable so recursive definitions
+        // do not generate a new name each time they are resolved.
+        .map((part, index) => (index === 0 ? part : encodeDefinitionPathPart(part)))
         .join('_');
 
       // we don't need to extract the root schema in this case, as it's already
@@ -213,17 +224,17 @@ const selectParser = (
     case ZodFirstPartyTypeKind.ZodNativeEnum:
       return parseNativeEnumDef(def);
     case ZodFirstPartyTypeKind.ZodNullable:
-      return parseNullableDef(def, refs);
+      return parseNullableDef(def, refs, forceResolution);
     case ZodFirstPartyTypeKind.ZodOptional:
-      return parseOptionalDef(def, refs);
+      return parseOptionalDef(def, refs, forceResolution);
     case ZodFirstPartyTypeKind.ZodMap:
       return parseMapDef(def, refs);
     case ZodFirstPartyTypeKind.ZodSet:
       return parseSetDef(def, refs);
     case ZodFirstPartyTypeKind.ZodLazy:
-      return parseDef(def.getter()._def, refs);
+      return parseDef(def.getter()._def, refs, forceResolution);
     case ZodFirstPartyTypeKind.ZodPromise:
-      return parsePromiseDef(def, refs);
+      return parsePromiseDef(def, refs, forceResolution);
     case ZodFirstPartyTypeKind.ZodNaN:
     case ZodFirstPartyTypeKind.ZodNever:
       return parseNeverDef();
@@ -234,15 +245,15 @@ const selectParser = (
     case ZodFirstPartyTypeKind.ZodUnknown:
       return parseUnknownDef();
     case ZodFirstPartyTypeKind.ZodDefault:
-      return parseDefaultDef(def, refs);
+      return parseDefaultDef(def, refs, forceResolution);
     case ZodFirstPartyTypeKind.ZodBranded:
-      return parseBrandedDef(def, refs);
+      return parseBrandedDef(def, refs, forceResolution);
     case ZodFirstPartyTypeKind.ZodReadonly:
-      return parseReadonlyDef(def, refs);
+      return parseReadonlyDef(def, refs, forceResolution);
     case ZodFirstPartyTypeKind.ZodCatch:
-      return parseCatchDef(def, refs);
+      return parseCatchDef(def, refs, forceResolution);
     case ZodFirstPartyTypeKind.ZodPipeline:
-      return parsePipelineDef(def, refs);
+      return parsePipelineDef(def, refs, forceResolution);
     case ZodFirstPartyTypeKind.ZodFunction:
     case ZodFirstPartyTypeKind.ZodVoid:
     case ZodFirstPartyTypeKind.ZodSymbol:
