@@ -131,7 +131,7 @@ export class AbstractChatCompletionRunner<
   }
 
   /**
-   * @returns a promise that resolves with the the final assistant ChatCompletionMessage response,
+   * @returns a promise that resolves with the final assistant ChatCompletionMessage response,
    * or rejects if an error occurred or the stream ended prematurely without producing a ChatCompletionMessage.
    */
   async finalMessage(): Promise<ChatCompletionMessage> {
