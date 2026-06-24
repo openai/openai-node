@@ -31,6 +31,8 @@ import {
   CertificateUpdateParams,
   Certificates,
 } from './certificates';
+import * as DataRetentionAPI from './data-retention';
+import { DataRetention, DataRetentionUpdateParams, OrganizationDataRetention } from './data-retention';
 import * as InvitesAPI from './invites';
 import {
   Invite,
@@ -50,6 +52,16 @@ import {
   Roles,
   RolesPage,
 } from './roles';
+import * as SpendAlertsAPI from './spend-alerts';
+import {
+  OrganizationSpendAlert,
+  OrganizationSpendAlertDeleted,
+  OrganizationSpendAlertsPage,
+  SpendAlertCreateParams,
+  SpendAlertListParams,
+  SpendAlertUpdateParams,
+  SpendAlerts,
+} from './spend-alerts';
 import * as UsageAPI from './usage';
 import {
   Usage,
@@ -65,12 +77,16 @@ import {
   UsageCostsResponse,
   UsageEmbeddingsParams,
   UsageEmbeddingsResponse,
+  UsageFileSearchCallsParams,
+  UsageFileSearchCallsResponse,
   UsageImagesParams,
   UsageImagesResponse,
   UsageModerationsParams,
   UsageModerationsResponse,
   UsageVectorStoresParams,
   UsageVectorStoresResponse,
+  UsageWebSearchCallsParams,
+  UsageWebSearchCallsResponse,
 } from './usage';
 import * as GroupsAPI from './groups/groups';
 import {
@@ -110,6 +126,8 @@ export class Organization extends APIResource {
   users: UsersAPI.Users = new UsersAPI.Users(this._client);
   groups: GroupsAPI.Groups = new GroupsAPI.Groups(this._client);
   roles: RolesAPI.Roles = new RolesAPI.Roles(this._client);
+  dataRetention: DataRetentionAPI.DataRetention = new DataRetentionAPI.DataRetention(this._client);
+  spendAlerts: SpendAlertsAPI.SpendAlerts = new SpendAlertsAPI.SpendAlerts(this._client);
   certificates: CertificatesAPI.Certificates = new CertificatesAPI.Certificates(this._client);
   projects: ProjectsAPI.Projects = new ProjectsAPI.Projects(this._client);
 }
@@ -121,6 +139,8 @@ Organization.Invites = Invites;
 Organization.Users = Users;
 Organization.Groups = Groups;
 Organization.Roles = Roles;
+Organization.DataRetention = DataRetention;
+Organization.SpendAlerts = SpendAlerts;
 Organization.Certificates = Certificates;
 Organization.Projects = Projects;
 
@@ -150,18 +170,22 @@ export declare namespace Organization {
     type UsageCompletionsResponse as UsageCompletionsResponse,
     type UsageCostsResponse as UsageCostsResponse,
     type UsageEmbeddingsResponse as UsageEmbeddingsResponse,
+    type UsageFileSearchCallsResponse as UsageFileSearchCallsResponse,
     type UsageImagesResponse as UsageImagesResponse,
     type UsageModerationsResponse as UsageModerationsResponse,
     type UsageVectorStoresResponse as UsageVectorStoresResponse,
+    type UsageWebSearchCallsResponse as UsageWebSearchCallsResponse,
     type UsageAudioSpeechesParams as UsageAudioSpeechesParams,
     type UsageAudioTranscriptionsParams as UsageAudioTranscriptionsParams,
     type UsageCodeInterpreterSessionsParams as UsageCodeInterpreterSessionsParams,
     type UsageCompletionsParams as UsageCompletionsParams,
     type UsageCostsParams as UsageCostsParams,
     type UsageEmbeddingsParams as UsageEmbeddingsParams,
+    type UsageFileSearchCallsParams as UsageFileSearchCallsParams,
     type UsageImagesParams as UsageImagesParams,
     type UsageModerationsParams as UsageModerationsParams,
     type UsageVectorStoresParams as UsageVectorStoresParams,
+    type UsageWebSearchCallsParams as UsageWebSearchCallsParams,
   };
 
   export {
@@ -201,6 +225,22 @@ export declare namespace Organization {
     type RoleCreateParams as RoleCreateParams,
     type RoleUpdateParams as RoleUpdateParams,
     type RoleListParams as RoleListParams,
+  };
+
+  export {
+    DataRetention as DataRetention,
+    type OrganizationDataRetention as OrganizationDataRetention,
+    type DataRetentionUpdateParams as DataRetentionUpdateParams,
+  };
+
+  export {
+    SpendAlerts as SpendAlerts,
+    type OrganizationSpendAlert as OrganizationSpendAlert,
+    type OrganizationSpendAlertDeleted as OrganizationSpendAlertDeleted,
+    type OrganizationSpendAlertsPage as OrganizationSpendAlertsPage,
+    type SpendAlertCreateParams as SpendAlertCreateParams,
+    type SpendAlertUpdateParams as SpendAlertUpdateParams,
+    type SpendAlertListParams as SpendAlertListParams,
   };
 
   export {

@@ -84,10 +84,18 @@ type RequestInits =
   | NotAny<RequestInit>
   | NotAny<FetchRequestInit>;
 
+type RuntimeFetchOptions = {
+  dispatcher?: unknown;
+  agent?: unknown;
+  client?: unknown;
+  proxy?: unknown;
+};
+
 /**
  * This type contains `RequestInit` options that may be available on the current runtime,
  * including per-platform extensions like `dispatcher`, `agent`, `client`, etc.
  */
 export type MergedRequestInit = RequestInits &
+  RuntimeFetchOptions &
   /** We don't include these in the types as they'll be overridden for every request. */
   Partial<Record<'body' | 'headers' | 'method' | 'signal', never>>;
