@@ -1,11 +1,16 @@
 #!/usr/bin/env -S npm run tsn -- -T
 
-import { BedrockOpenAI } from 'openai';
+import OpenAI from 'openai';
+import { bedrock } from 'openai/providers/bedrock/aws';
 
-const client = new BedrockOpenAI();
+const client = new OpenAI({
+  provider: bedrock({ region: 'us-west-2' }),
+});
 
-// For refreshed Bedrock bearer tokens:
-// const client = new BedrockOpenAI({ awsRegion: 'us-west-2', bedrockTokenProvider: getBedrockToken });
+// For refreshed Bedrock bearer tokens, import from 'openai/providers/bedrock':
+// const client = new OpenAI({
+//   provider: bedrock({ region: 'us-west-2', tokenProvider: getBedrockToken }),
+// });
 
 async function main() {
   const response = await client.responses.create({

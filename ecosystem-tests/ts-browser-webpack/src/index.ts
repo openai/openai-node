@@ -1,5 +1,6 @@
 import OpenAI, { toFile } from 'openai';
 import { distance } from 'fastest-levenshtein';
+import { bedrock } from 'openai/providers/bedrock';
 import { ChatCompletion } from 'openai/resources/chat/completions';
 
 type TestCase = {
@@ -95,6 +96,22 @@ const model = 'whisper-1';
 const params = new URLSearchParams(location.search);
 
 const client = new OpenAI({ apiKey: params.get('apiKey') ?? undefined, dangerouslyAllowBrowser: true });
+
+it('supports Bedrock bearer authentication without AWS dependencies', async function () {
+  let authorization: string | null = null;
+  const bedrockClient = new OpenAI({
+    provider: bedrock({ region: 'us-east-1', apiKey: 'bedrock-token' }),
+    dangerouslyAllowBrowser: true,
+    fetch: async (_url, init) => {
+      authorization = new Headers(init?.headers).get('authorization');
+      return new Response('{}', { headers: { 'Content-Type': 'application/json' } });
+    },
+  });
+
+  await bedrockClient.request({ method: 'get', path: '/models' });
+
+  expect(authorization).toEqual('Bearer bedrock-token');
+});
 
 async function typeTests() {
   // @ts-expect-error this should error if the `Uploadable` type was resolved correctly

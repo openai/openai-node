@@ -2,11 +2,18 @@
 
 import OpenAI from 'openai';
 
+/**
+ * This legacy example uses the deprecated Assistants API.
+ * The API will shut down on August 26, 2026.
+ * For new integrations, use the Responses API:
+ * https://developers.openai.com/api/docs/guides/migrate-to-responses
+ */
+
 const openai = new OpenAI();
 
 async function main() {
   const assistant = await openai.beta.assistants.create({
-    model: 'gpt-4-1106-preview',
+    model: 'gpt-4o',
     name: 'Math Tutor',
     instructions: 'You are a personal math tutor. Write and run code to answer math questions.',
   });

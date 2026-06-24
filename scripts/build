@@ -23,7 +23,7 @@ done
 node scripts/utils/make-dist-package-json.cjs > dist/package.json
 
 # build to .js/.mjs/.d.ts files
-./node_modules/.bin/tsc-multi
+node -r ts-node/register/transpile-only scripts/_vendor/tsc-multi/src/cli.ts
 # we need to patch index.js so that `new module.exports()` works for cjs backwards
 # compat. No way to get that from index.ts because it would cause compile errors
 # when building .mjs
@@ -36,6 +36,8 @@ node scripts/utils/postprocess-files.cjs
 # import the output ESM
 (cd dist && node -e 'require("openai")')
 (cd dist && node -e 'import("openai")' --input-type=module)
+(cd dist && node -e 'require("openai/providers/bedrock")')
+(cd dist && node -e 'import("openai/providers/bedrock")' --input-type=module)
 
 if [ "${OPENAI_DISABLE_DENO_BUILD:-0}" != "1" ] && [ -e ./scripts/build-deno ]
 then

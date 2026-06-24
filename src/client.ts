@@ -233,6 +233,7 @@ import {
 import { type Fetch } from './internal/builtin-types';
 import { isRunningInBrowser } from './internal/detect-platform';
 import { HeadersLike, NullableHeaders, buildHeaders } from './internal/headers';
+import { configureProvider, type Provider, type ProviderRuntime } from './internal/provider';
 import { FinalRequestOptions, RequestOptions } from './internal/request-options';
 import { readEnv } from './internal/utils/env';
 import {
@@ -363,6 +364,12 @@ export interface ClientOptions {
    * Mutually exclusive with `apiKey`.
    */
   workloadIdentity?: WorkloadIdentity | undefined;
+
+  /**
+   * Configure this client to use a third-party API provider.
+   * Mutually exclusive with top-level authentication and `baseURL` options.
+   */
+  provider?: Provider | undefined;
 }
 
 /**
@@ -386,6 +393,7 @@ export class OpenAI {
   #encoder: Opts.RequestEncoder;
   protected idempotencyHeader?: string;
   protected _options: ClientOptions;
+  private _provider: ProviderRuntime | undefined;
   private _workloadIdentityAuth?: WorkloadIdentityAuth;
 
   /**
@@ -397,6 +405,7 @@ export class OpenAI {
    * @param {string | null | undefined} [opts.project=process.env['OPENAI_PROJECT_ID'] ?? null]
    * @param {string | null | undefined} [opts.webhookSecret=process.env['OPENAI_WEBHOOK_SECRET'] ?? null]
    * @param {string} [opts.baseURL=process.env['OPENAI_BASE_URL'] ?? https://api.openai.com/v1] - Override the default base URL for the API.
+   * @param {Provider} [opts.provider] - Configure a third-party API provider. Mutually exclusive with top-level authentication and base URL options.
    * @param {number} [opts.timeout=10 minutes] - The maximum amount of time (in milliseconds) the client will wait for a response before timing out.
    * @param {MergedRequestInit} [opts.fetchOptions] - Additional `RequestInit` options to be passed to `fetch` calls.
    * @param {Fetch} [opts.fetch] - Specify a custom `fetch` function implementation.
@@ -405,16 +414,32 @@ export class OpenAI {
    * @param {Record<string, string | undefined>} opts.defaultQuery - Default query parameters to include with every request to the API.
    * @param {boolean} [opts.dangerouslyAllowBrowser=false] - By default, client-side use of this library is not allowed, as it risks exposing your secret API credentials to attackers.
    */
-  constructor({
-    baseURL = readEnv('OPENAI_BASE_URL'),
-    apiKey = readEnv('OPENAI_API_KEY') ?? null,
-    adminAPIKey = readEnv('OPENAI_ADMIN_KEY') ?? null,
-    organization = readEnv('OPENAI_ORG_ID') ?? null,
-    project = readEnv('OPENAI_PROJECT_ID') ?? null,
-    webhookSecret = readEnv('OPENAI_WEBHOOK_SECRET') ?? null,
-    workloadIdentity,
-    ...opts
-  }: ClientOptions = {}) {
+  constructor(clientOptions: ClientOptions = {}) {
+    const provider = clientOptions.provider;
+    if (provider) {
+      const conflictingOptions = (['apiKey', 'adminAPIKey', 'workloadIdentity', 'baseURL'] as const).filter(
+        (key) => clientOptions[key] != null,
+      );
+      if (conflictingOptions.length) {
+        throw new Errors.OpenAIError(
+          `The \`provider\` option cannot be used with ${conflictingOptions
+            .map((key) => `\`${key}\``)
+            .join(', ')}. Configure authentication and the base URL through the provider instead.`,
+        );
+      }
+    }
+
+    const {
+      baseURL = provider ? null : readEnv('OPENAI_BASE_URL'),
+      apiKey = provider ? null : readEnv('OPENAI_API_KEY') ?? null,
+      adminAPIKey = provider ? null : readEnv('OPENAI_ADMIN_KEY') ?? null,
+      organization = provider ? null : readEnv('OPENAI_ORG_ID') ?? null,
+      project = provider ? null : readEnv('OPENAI_PROJECT_ID') ?? null,
+      webhookSecret = readEnv('OPENAI_WEBHOOK_SECRET') ?? null,
+      workloadIdentity,
+      ...opts
+    } = clientOptions;
+    const providerRuntime = provider ? configureProvider(provider) : undefined;
     const options: ClientOptions = {
       apiKey,
       adminAPIKey,
@@ -422,15 +447,16 @@ export class OpenAI {
       project,
       webhookSecret,
       workloadIdentity,
+      provider,
       ...opts,
-      baseURL: baseURL || `https://api.openai.com/v1`,
+      baseURL: providerRuntime?.baseURL ?? (baseURL || `https://api.openai.com/v1`),
     };
 
     if (apiKey && workloadIdentity) {
       throw new Errors.OpenAIError('The `apiKey` and `workloadIdentity` options are mutually exclusive');
     }
 
-    if (!apiKey && !adminAPIKey && !workloadIdentity) {
+    if (!providerRuntime && !apiKey && !adminAPIKey && !workloadIdentity) {
       throw new Errors.OpenAIError(
         'Missing credentials. Please pass an `apiKey`, `workloadIdentity`, `adminAPIKey`, or set the `OPENAI_API_KEY` or `OPENAI_ADMIN_KEY` environment variable.',
       );
@@ -457,7 +483,7 @@ export class OpenAI {
     this.fetch = options.fetch ?? Shims.getDefaultFetch();
     this.#encoder = Opts.FallbackEncoder;
 
-    const customHeadersEnv = readEnv('OPENAI_CUSTOM_HEADERS');
+    const customHeadersEnv = provider ? undefined : readEnv('OPENAI_CUSTOM_HEADERS');
     if (customHeadersEnv) {
       const parsed: Record<string, string> = {};
       for (const line of customHeadersEnv.split('\n')) {
@@ -470,6 +496,7 @@ export class OpenAI {
     }
 
     this._options = options;
+    this._provider = providerRuntime;
 
     if (workloadIdentity) {
       this._workloadIdentityAuth = new WorkloadIdentityAuth(workloadIdentity, this.fetch);
@@ -486,7 +513,9 @@ export class OpenAI {
    * Create a new client instance re-using the same options given to the current client with optional overriding.
    */
   withOptions(options: Partial<ClientOptions>): this {
-    const client = new (this.constructor as any as new (props: ClientOptions) => typeof this)({
+    const inheritedProvider = this._options.provider;
+    const provider = options.provider ?? inheritedProvider;
+    const inheritedOptions: ClientOptions = {
       ...this._options,
       baseURL: this.baseURL,
       maxRetries: this.maxRetries,
@@ -501,7 +530,23 @@ export class OpenAI {
       organization: this.organization,
       project: this.project,
       webhookSecret: this.webhookSecret,
+    };
+    if (provider) {
+      delete inheritedOptions.apiKey;
+      delete inheritedOptions.adminAPIKey;
+      delete inheritedOptions.workloadIdentity;
+      delete inheritedOptions.baseURL;
+      if (provider !== inheritedProvider) {
+        delete inheritedOptions.organization;
+        delete inheritedOptions.project;
+        delete inheritedOptions.defaultHeaders;
+      }
+    }
+
+    const client = new (this.constructor as any as new (props: ClientOptions) => typeof this)({
+      ...inheritedOptions,
       ...options,
+      provider,
     });
     return client;
   }
@@ -510,7 +555,7 @@ export class OpenAI {
    * Check whether the base URL is set to its default.
    */
   #baseURLOverridden(): boolean {
-    return this.baseURL !== 'https://api.openai.com/v1';
+    return this._provider !== undefined || this.baseURL !== 'https://api.openai.com/v1';
   }
 
   protected defaultQuery(): Record<string, string | undefined> | undefined {
@@ -592,6 +637,8 @@ export class OpenAI {
   }
 
   async _callApiKey(): Promise<boolean> {
+    if (this._provider) return false;
+
     const apiKey = this._options.apiKey;
     if (typeof apiKey !== 'function') return false;
 
@@ -644,6 +691,8 @@ export class OpenAI {
    * Used as a callback for mutating the given `FinalRequestOptions` object.
    */
   protected async prepareOptions(options: FinalRequestOptions): Promise<void> {
+    if (this._provider) return;
+
     const security = options.__security ?? { bearerAuth: true };
     if (security.bearerAuth) {
       await this._callApiKey();
@@ -718,6 +767,7 @@ export class OpenAI {
     });
 
     await this.prepareRequest(req, { url, options });
+    await this._provider?.prepareRequest?.(req, { url, options });
 
     /** Not an API request ID, just for correlating local log entries. */
     const requestLogID = 'log_' + ((Math.random() * (1 << 24)) | 0).toString(16).padStart(6, '0');
@@ -1115,13 +1165,17 @@ export class OpenAI {
         'OpenAI-Organization': this.organization,
         'OpenAI-Project': this.project,
       },
-      await this.authHeaders(options, options.__security ?? { bearerAuth: true }),
+      this._provider ? undefined : (
+        await this.authHeaders(options, options.__security ?? { bearerAuth: true })
+      ),
       this._options.defaultHeaders,
       bodyHeaders,
       options.headers,
     ]);
 
-    this.validateHeaders(headers, options.__security ?? { bearerAuth: true });
+    if (!this._provider) {
+      this.validateHeaders(headers, options.__security ?? { bearerAuth: true });
+    }
 
     return headers.values;
   }
@@ -1132,12 +1186,20 @@ export class OpenAI {
     return () => controller.abort();
   }
 
-  private buildBody({ options: { body, headers: rawHeaders } }: { options: FinalRequestOptions }): {
+  private buildBody({ options }: { options: FinalRequestOptions }): {
     bodyHeaders: HeadersLike;
     body: BodyInit | undefined;
     isStreamingBody: boolean;
   } {
+    const { body, headers: rawHeaders } = options;
     if (!body) {
+      // A resource method always passes a `body` key when its operation defines a
+      // request body, even if the caller omitted an optional body param. Keep the
+      // content-type for those, and only elide it for operations with no body at
+      // all (e.g. GET/DELETE).
+      if (body === undefined && 'body' in options) {
+        return { ...this.#encoder({ body, headers: buildHeaders([rawHeaders]) }), isStreamingBody: false };
+      }
       return { bodyHeaders: undefined, body: undefined, isStreamingBody: false };
     }
     const headers = buildHeaders([rawHeaders]);
