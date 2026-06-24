@@ -6,6 +6,25 @@ class MyClass {
   name: string = 'foo';
 }
 
+class ForeignFileLike {
+  readonly name = 'foreign.jsonl';
+  readonly type = 'application/jsonl';
+  readonly lastModified = 1234;
+  readonly size = 2;
+
+  async arrayBuffer() {
+    return new Uint8Array([1, 2]).buffer;
+  }
+
+  async text() {
+    return '12';
+  }
+
+  slice() {
+    return new Blob([]);
+  }
+}
+
 function mockResponse({ url, content }: { url: string; content?: Blob }): ResponseLike {
   return {
     url,
@@ -61,6 +80,44 @@ describe('toFile', () => {
     expect(file).toBe(input);
     expect(file.name).toEqual('input.jsonl');
     expect(file.type).toBe('jsonl');
+  });
+
+  it('does not copy File objects for empty options', async () => {
+    const input = new File(['foo'], 'input.jsonl', { type: 'jsonl', lastModified: 1234 });
+
+    await expect(toFile(input, undefined, {})).resolves.toBe(input);
+    await expect(toFile(input, undefined, { type: undefined, lastModified: undefined })).resolves.toBe(input);
+  });
+
+  it('copies File objects when metadata overrides are requested', async () => {
+    const input = new File(['foo'], 'input.jsonl', { type: 'jsonl', lastModified: 1234 });
+    const file = await toFile(input, 'override.jsonl', {
+      type: 'application/x-ndjson',
+      lastModified: 5678,
+    });
+    expect(file).not.toBe(input);
+    expect(file.name).toEqual('override.jsonl');
+    expect(file.type).toEqual('application/x-ndjson');
+    expect(file.lastModified).toEqual(5678);
+    await expect(file.text()).resolves.toEqual('foo');
+  });
+
+  it('preserves metadata from File-like objects', async () => {
+    const file = await toFile(new ForeignFileLike());
+    expect(file.name).toEqual('foreign.jsonl');
+    expect(file.type).toEqual('application/jsonl');
+    expect(file.lastModified).toEqual(1234);
+    await expect(file.arrayBuffer()).resolves.toEqual(new Uint8Array([1, 2]).buffer);
+  });
+
+  it('allows File-like metadata to be overridden', async () => {
+    const file = await toFile(new ForeignFileLike(), 'override.jsonl', {
+      type: 'application/x-ndjson',
+      lastModified: 5678,
+    });
+    expect(file.name).toEqual('override.jsonl');
+    expect(file.type).toEqual('application/x-ndjson');
+    expect(file.lastModified).toEqual(5678);
   });
 
   it('is assignable to File and Blob', async () => {
