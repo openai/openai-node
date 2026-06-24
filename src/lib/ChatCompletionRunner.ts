@@ -37,7 +37,7 @@ export class ChatCompletionRunner<ParsedT = null> extends AbstractChatCompletion
       ...options,
       headers: { ...options?.headers, 'X-Stainless-Helper-Method': 'runTools' },
     };
-    runner._run(() => runner._runTools(client, params, opts));
+    runner._run(() => runner._runTools(client, params, runner, opts));
     return runner;
   }
 

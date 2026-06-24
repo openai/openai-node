@@ -783,6 +783,7 @@ Types:
 Methods:
 
 - <code title="post /organization/spend_alerts">client.admin.organization.spendAlerts.<a href="./src/resources/admin/organization/spend-alerts.ts">create</a>({ ...params }) -> OrganizationSpendAlert</code>
+- <code title="get /organization/spend_alerts/{alert_id}">client.admin.organization.spendAlerts.<a href="./src/resources/admin/organization/spend-alerts.ts">retrieve</a>(alertID) -> OrganizationSpendAlert</code>
 - <code title="post /organization/spend_alerts/{alert_id}">client.admin.organization.spendAlerts.<a href="./src/resources/admin/organization/spend-alerts.ts">update</a>(alertID, { ...params }) -> OrganizationSpendAlert</code>
 - <code title="get /organization/spend_alerts">client.admin.organization.spendAlerts.<a href="./src/resources/admin/organization/spend-alerts.ts">list</a>({ ...params }) -> OrganizationSpendAlertsPage</code>
 - <code title="delete /organization/spend_alerts/{alert_id}">client.admin.organization.spendAlerts.<a href="./src/resources/admin/organization/spend-alerts.ts">delete</a>(alertID) -> OrganizationSpendAlertDeleted</code>
@@ -981,6 +982,7 @@ Types:
 Methods:
 
 - <code title="post /organization/projects/{project_id}/spend_alerts">client.admin.organization.projects.spendAlerts.<a href="./src/resources/admin/organization/projects/spend-alerts.ts">create</a>(projectID, { ...params }) -> ProjectSpendAlert</code>
+- <code title="get /organization/projects/{project_id}/spend_alerts/{alert_id}">client.admin.organization.projects.spendAlerts.<a href="./src/resources/admin/organization/projects/spend-alerts.ts">retrieve</a>(alertID, { ...params }) -> ProjectSpendAlert</code>
 - <code title="post /organization/projects/{project_id}/spend_alerts/{alert_id}">client.admin.organization.projects.spendAlerts.<a href="./src/resources/admin/organization/projects/spend-alerts.ts">update</a>(alertID, { ...params }) -> ProjectSpendAlert</code>
 - <code title="get /organization/projects/{project_id}/spend_alerts">client.admin.organization.projects.spendAlerts.<a href="./src/resources/admin/organization/projects/spend-alerts.ts">list</a>(projectID, { ...params }) -> ProjectSpendAlertsPage</code>
 - <code title="delete /organization/projects/{project_id}/spend_alerts/{alert_id}">client.admin.organization.projects.spendAlerts.<a href="./src/resources/admin/organization/projects/spend-alerts.ts">delete</a>(alertID, { ...params }) -> ProjectSpendAlertDeleted</code>
