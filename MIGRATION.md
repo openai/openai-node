@@ -4,12 +4,6 @@ This guide outlines the changes and steps needed to migrate your codebase to the
 
 The main changes are that the SDK now relies on the [builtin Web fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API) instead of `node-fetch` and has zero dependencies.
 
-## Migration CLI
-
-Most programs will only need minimal changes, but to assist there is a migration tool that will automatically update your code for the new version.
-To use it, upgrade the `openai` package, then run `./node_modules/.bin/openai migrate ./your/src/folders` to update your code.
-To preview the changes without writing them to disk, run the tool with `--dry`.
-
 ## Environment requirements
 
 The minimum supported runtime and tooling versions are now:
@@ -73,26 +67,37 @@ client.parents.children.retrieve('c_456', { parent_id: 'p_123' });
 - `client.beta.threads.messages.retrieve()`
 - `client.beta.threads.messages.update()`
 - `client.beta.threads.messages.delete()`
+- `client.admin.organization.users.roles.retrieve()`
 - `client.admin.organization.users.roles.delete()`
+- `client.admin.organization.groups.users.retrieve()`
 - `client.admin.organization.groups.users.delete()`
+- `client.admin.organization.groups.roles.retrieve()`
 - `client.admin.organization.groups.roles.delete()`
 - `client.admin.organization.projects.users.retrieve()`
 - `client.admin.organization.projects.users.update()`
 - `client.admin.organization.projects.users.delete()`
 - `client.admin.organization.projects.users.roles.create()`
+- `client.admin.organization.projects.users.roles.retrieve()`
 - `client.admin.organization.projects.users.roles.list()`
 - `client.admin.organization.projects.users.roles.delete()`
 - `client.admin.organization.projects.serviceAccounts.retrieve()`
+- `client.admin.organization.projects.serviceAccounts.update()`
 - `client.admin.organization.projects.serviceAccounts.delete()`
 - `client.admin.organization.projects.apiKeys.retrieve()`
 - `client.admin.organization.projects.apiKeys.delete()`
 - `client.admin.organization.projects.rateLimits.updateRateLimit()`
+- `client.admin.organization.projects.groups.retrieve()`
 - `client.admin.organization.projects.groups.delete()`
 - `client.admin.organization.projects.groups.roles.create()`
+- `client.admin.organization.projects.groups.roles.retrieve()`
 - `client.admin.organization.projects.groups.roles.list()`
 - `client.admin.organization.projects.groups.roles.delete()`
+- `client.admin.organization.projects.roles.retrieve()`
 - `client.admin.organization.projects.roles.update()`
 - `client.admin.organization.projects.roles.delete()`
+- `client.admin.organization.projects.spendAlerts.retrieve()`
+- `client.admin.organization.projects.spendAlerts.update()`
+- `client.admin.organization.projects.spendAlerts.delete()`
 - `client.conversations.items.retrieve()`
 - `client.conversations.items.delete()`
 - `client.evals.runs.retrieve()`
@@ -166,6 +171,7 @@ client.example.list(undefined, { headers: { ... } });
 - `client.admin.organization.groups.users.list()`
 - `client.admin.organization.groups.roles.list()`
 - `client.admin.organization.roles.list()`
+- `client.admin.organization.spendAlerts.list()`
 - `client.admin.organization.certificates.retrieve()`
 - `client.admin.organization.certificates.list()`
 - `client.admin.organization.projects.list()`
@@ -175,6 +181,7 @@ client.example.list(undefined, { headers: { ... } });
 - `client.admin.organization.projects.rateLimits.listRateLimits()`
 - `client.admin.organization.projects.groups.list()`
 - `client.admin.organization.projects.roles.list()`
+- `client.admin.organization.projects.spendAlerts.list()`
 - `client.admin.organization.projects.certificates.list()`
 - `client.responses.retrieve()`
 - `client.responses.inputItems.list()`

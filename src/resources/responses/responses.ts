@@ -45,6 +45,7 @@ export type ParsedResponseOutputItem<ParsedT> =
   | ResponseComputerToolCallOutputItem
   | ResponseToolSearchCall
   | ResponseToolSearchOutputItem
+  | ResponseOutputItem.AdditionalTools
   | ResponseReasoningItem
   | ResponseCompactionItem
   | ResponseOutputItem.ImageGenerationCall
@@ -1102,6 +1103,12 @@ export interface Response {
   max_output_tokens?: number | null;
 
   /**
+   * Moderation results for the response input and output, if moderated completions
+   * were requested.
+   */
+  moderation?: Response.Moderation | null;
+
+  /**
    * The unique ID of the previous response to the model. Use this to create
    * multi-turn conversations. Learn more about
    * [conversation state](https://platform.openai.com/docs/guides/conversation-state).
@@ -1127,6 +1134,14 @@ export interface Response {
    * prompt caching, which keeps cached prefixes active for longer, up to a maximum
    * of 24 hours.
    * [Learn more](https://platform.openai.com/docs/guides/prompt-caching#prompt-cache-retention).
+   * For `gpt-5.5`, `gpt-5.5-pro`, and future models, only `24h` is supported.
+   *
+   * For older models that support both `in_memory` and `24h`, the default depends on
+   * your organization's data retention policy:
+   *
+   * - Organizations without ZDR enabled default to `24h`.
+   * - Organizations with ZDR enabled default to `in_memory` when
+   *   `prompt_cache_retention` is not specified.
    */
   prompt_cache_retention?: 'in_memory' | '24h' | null;
 
@@ -1237,6 +1252,138 @@ export namespace Response {
      * The unique ID of the conversation that this response was associated with.
      */
     id: string;
+  }
+
+  /**
+   * Moderation results for the response input and output, if moderated completions
+   * were requested.
+   */
+  export interface Moderation {
+    /**
+     * Moderation for the response input.
+     */
+    input: Moderation.ModerationResult | Moderation.Error;
+
+    /**
+     * Moderation for the response output.
+     */
+    output: Moderation.ModerationResult | Moderation.Error;
+  }
+
+  export namespace Moderation {
+    /**
+     * A moderation result produced for the response input or output.
+     */
+    export interface ModerationResult {
+      /**
+       * A dictionary of moderation categories to booleans, True if the input is flagged
+       * under this category.
+       */
+      categories: { [key: string]: boolean };
+
+      /**
+       * Which modalities of input are reflected by the score for each category.
+       */
+      category_applied_input_types: { [key: string]: Array<'text' | 'image'> };
+
+      /**
+       * A dictionary of moderation categories to scores.
+       */
+      category_scores: { [key: string]: number };
+
+      /**
+       * A boolean indicating whether the content was flagged by any category.
+       */
+      flagged: boolean;
+
+      /**
+       * The moderation model that produced this result.
+       */
+      model: string;
+
+      /**
+       * The object type, which was always `moderation_result` for successful moderation
+       * results.
+       */
+      type: 'moderation_result';
+    }
+
+    /**
+     * An error produced while attempting moderation for the response input or output.
+     */
+    export interface Error {
+      /**
+       * The error code.
+       */
+      code: string;
+
+      /**
+       * The error message.
+       */
+      message: string;
+
+      /**
+       * The object type, which was always `error` for moderation failures.
+       */
+      type: 'error';
+    }
+
+    /**
+     * A moderation result produced for the response input or output.
+     */
+    export interface ModerationResult {
+      /**
+       * A dictionary of moderation categories to booleans, True if the input is flagged
+       * under this category.
+       */
+      categories: { [key: string]: boolean };
+
+      /**
+       * Which modalities of input are reflected by the score for each category.
+       */
+      category_applied_input_types: { [key: string]: Array<'text' | 'image'> };
+
+      /**
+       * A dictionary of moderation categories to scores.
+       */
+      category_scores: { [key: string]: number };
+
+      /**
+       * A boolean indicating whether the content was flagged by any category.
+       */
+      flagged: boolean;
+
+      /**
+       * The moderation model that produced this result.
+       */
+      model: string;
+
+      /**
+       * The object type, which was always `moderation_result` for successful moderation
+       * results.
+       */
+      type: 'moderation_result';
+    }
+
+    /**
+     * An error produced while attempting moderation for the response input or output.
+     */
+    export interface Error {
+      /**
+       * The error code.
+       */
+      code: string;
+
+      /**
+       * The error message.
+       */
+      message: string;
+
+      /**
+       * The object type, which was always `error` for moderation failures.
+       */
+      type: 'error';
+    }
   }
 }
 
@@ -3133,11 +3280,6 @@ export namespace ResponseFunctionWebSearch {
    */
   export interface Search {
     /**
-     * [DEPRECATED] The search query.
-     */
-    query: string;
-
-    /**
      * The action type.
      */
     type: 'search';
@@ -3146,6 +3288,11 @@ export namespace ResponseFunctionWebSearch {
      * The search queries.
      */
     queries?: Array<string>;
+
+    /**
+     * @deprecated The search query.
+     */
+    query?: string;
 
     /**
      * The sources used in the search.
@@ -3580,6 +3727,7 @@ export type ResponseInputItem =
   | ResponseInputItem.FunctionCallOutput
   | ResponseInputItem.ToolSearchCall
   | ResponseToolSearchOutputItemParam
+  | ResponseInputItem.AdditionalTools
   | ResponseReasoningItem
   | ResponseCompactionItemParam
   | ResponseInputItem.ImageGenerationCall
@@ -3596,6 +3744,7 @@ export type ResponseInputItem =
   | ResponseInputItem.McpCall
   | ResponseCustomToolCallOutput
   | ResponseCustomToolCall
+  | ResponseInputItem.CompactionTrigger
   | ResponseInputItem.ItemReference;
 
 export namespace ResponseInputItem {
@@ -3749,6 +3898,28 @@ export namespace ResponseInputItem {
      * The status of the tool search call.
      */
     status?: 'in_progress' | 'completed' | 'incomplete' | null;
+  }
+
+  export interface AdditionalTools {
+    /**
+     * The role that provided the additional tools. Only `developer` is supported.
+     */
+    role: 'developer';
+
+    /**
+     * A list of additional tools made available at this item.
+     */
+    tools: Array<ResponsesAPI.Tool>;
+
+    /**
+     * The item type. Always `additional_tools`.
+     */
+    type: 'additional_tools';
+
+    /**
+     * The unique ID of this additional tools item.
+     */
+    id?: string | null;
   }
 
   /**
@@ -4259,6 +4430,16 @@ export namespace ResponseInputItem {
   }
 
   /**
+   * Compacts the current context. Must be the final input item.
+   */
+  export interface CompactionTrigger {
+    /**
+     * The type of the item. Always `compaction_trigger`.
+     */
+    type: 'compaction_trigger';
+  }
+
+  /**
    * An internal identifier for an item to reference.
    */
   export interface ItemReference {
@@ -4353,6 +4534,7 @@ export type ResponseItem =
   | ResponseFunctionToolCallOutputItem
   | ResponseToolSearchCall
   | ResponseToolSearchOutputItem
+  | ResponseItem.AdditionalTools
   | ResponseReasoningItem
   | ResponseCompactionItem
   | ResponseItem.ImageGenerationCall
@@ -4371,6 +4553,28 @@ export type ResponseItem =
   | ResponseCustomToolCallOutputItem;
 
 export namespace ResponseItem {
+  export interface AdditionalTools {
+    /**
+     * The unique ID of the additional tools item.
+     */
+    id: string;
+
+    /**
+     * The role that provided the additional tools.
+     */
+    role: 'unknown' | 'user' | 'assistant' | 'system' | 'critic' | 'discriminator' | 'developer' | 'tool';
+
+    /**
+     * The additional tool definitions made available at this item.
+     */
+    tools: Array<ResponsesAPI.Tool>;
+
+    /**
+     * The type of the item. Always `additional_tools`.
+     */
+    type: 'additional_tools';
+  }
+
   /**
    * An image generation request made by the model.
    */
@@ -4916,6 +5120,7 @@ export type ResponseOutputItem =
   | ResponseReasoningItem
   | ResponseToolSearchCall
   | ResponseToolSearchOutputItem
+  | ResponseOutputItem.AdditionalTools
   | ResponseCompactionItem
   | ResponseOutputItem.ImageGenerationCall
   | ResponseCodeInterpreterToolCall
@@ -4933,6 +5138,28 @@ export type ResponseOutputItem =
   | ResponseCustomToolCallOutputItem;
 
 export namespace ResponseOutputItem {
+  export interface AdditionalTools {
+    /**
+     * The unique ID of the additional tools item.
+     */
+    id: string;
+
+    /**
+     * The role that provided the additional tools.
+     */
+    role: 'unknown' | 'user' | 'assistant' | 'system' | 'critic' | 'discriminator' | 'developer' | 'tool';
+
+    /**
+     * The additional tool definitions made available at this item.
+     */
+    tools: Array<ResponsesAPI.Tool>;
+
+    /**
+     * The type of the item. Always `additional_tools`.
+     */
+    type: 'additional_tools';
+  }
+
   /**
    * An image generation request made by the model.
    */
@@ -6551,6 +6778,11 @@ export interface ResponsesClientEvent {
   model?: Shared.ResponsesModel;
 
   /**
+   * Configuration for running moderation on the input and output of this response.
+   */
+  moderation?: ResponsesClientEvent.Moderation | null;
+
+  /**
    * Whether to allow the model to run tool calls in parallel.
    */
   parallel_tool_calls?: boolean | null;
@@ -6581,6 +6813,14 @@ export interface ResponsesClientEvent {
    * prompt caching, which keeps cached prefixes active for longer, up to a maximum
    * of 24 hours.
    * [Learn more](https://platform.openai.com/docs/guides/prompt-caching#prompt-cache-retention).
+   * For `gpt-5.5`, `gpt-5.5-pro`, and future models, only `24h` is supported.
+   *
+   * For older models that support both `in_memory` and `24h`, the default depends on
+   * your organization's data retention policy:
+   *
+   * - Organizations without ZDR enabled default to `24h`.
+   * - Organizations with ZDR enabled default to `in_memory` when
+   *   `prompt_cache_retention` is not specified.
    */
   prompt_cache_retention?: 'in_memory' | '24h' | null;
 
@@ -6714,7 +6954,7 @@ export interface ResponsesClientEvent {
   top_p?: number | null;
 
   /**
-   * The truncation strategy to use for the model response.
+   * @deprecated The truncation strategy to use for the model response.
    *
    * - `auto`: If the input to this Response exceeds the model's context window size,
    *   the model will truncate the response to fit the context window by dropping
@@ -6746,6 +6986,17 @@ export namespace ResponsesClientEvent {
      * Token threshold at which compaction should be triggered for this entry.
      */
     compact_threshold?: number | null;
+  }
+
+  /**
+   * Configuration for running moderation on the input and output of this response.
+   */
+  export interface Moderation {
+    /**
+     * The moderation model to use for moderated completions, e.g.
+     * 'omni-moderation-latest'.
+     */
+    model: string;
   }
 
   /**
@@ -6890,8 +7141,8 @@ export namespace Tool {
 
     /**
      * Identifier for service connectors, like those available in ChatGPT. One of
-     * `server_url` or `connector_id` must be provided. Learn more about service
-     * connectors
+     * `server_url`, `connector_id`, or `tunnel_id` must be provided. Learn more about
+     * service connectors
      * [here](https://platform.openai.com/docs/guides/tools-remote-mcp#connectors).
      *
      * Currently supported `connector_id` values are:
@@ -6937,10 +7188,16 @@ export namespace Tool {
     server_description?: string;
 
     /**
-     * The URL for the MCP server. One of `server_url` or `connector_id` must be
-     * provided.
+     * The URL for the MCP server. One of `server_url`, `connector_id`, or `tunnel_id`
+     * must be provided.
      */
     server_url?: string;
+
+    /**
+     * The Secure MCP Tunnel ID to use instead of a direct server URL. One of
+     * `server_url`, `connector_id`, or `tunnel_id` must be provided.
+     */
+    tunnel_id?: string;
   }
 
   export namespace Mcp {
@@ -7598,6 +7855,11 @@ export interface ResponseCreateParamsBase {
   model?: Shared.ResponsesModel;
 
   /**
+   * Configuration for running moderation on the input and output of this response.
+   */
+  moderation?: ResponseCreateParams.Moderation | null;
+
+  /**
    * Whether to allow the model to run tool calls in parallel.
    */
   parallel_tool_calls?: boolean | null;
@@ -7628,6 +7890,14 @@ export interface ResponseCreateParamsBase {
    * prompt caching, which keeps cached prefixes active for longer, up to a maximum
    * of 24 hours.
    * [Learn more](https://platform.openai.com/docs/guides/prompt-caching#prompt-cache-retention).
+   * For `gpt-5.5`, `gpt-5.5-pro`, and future models, only `24h` is supported.
+   *
+   * For older models that support both `in_memory` and `24h`, the default depends on
+   * your organization's data retention policy:
+   *
+   * - Organizations without ZDR enabled default to `24h`.
+   * - Organizations with ZDR enabled default to `in_memory` when
+   *   `prompt_cache_retention` is not specified.
    */
   prompt_cache_retention?: 'in_memory' | '24h' | null;
 
@@ -7760,7 +8030,7 @@ export interface ResponseCreateParamsBase {
   top_p?: number | null;
 
   /**
-   * The truncation strategy to use for the model response.
+   * @deprecated The truncation strategy to use for the model response.
    *
    * - `auto`: If the input to this Response exceeds the model's context window size,
    *   the model will truncate the response to fit the context window by dropping
@@ -7792,6 +8062,17 @@ export namespace ResponseCreateParams {
      * Token threshold at which compaction should be triggered for this entry.
      */
     compact_threshold?: number | null;
+  }
+
+  /**
+   * Configuration for running moderation on the input and output of this response.
+   */
+  export interface Moderation {
+    /**
+     * The moderation model to use for moderated completions, e.g.
+     * 'omni-moderation-latest'.
+     */
+    model: string;
   }
 
   /**
@@ -8035,6 +8316,11 @@ export interface ResponseCompactParams {
    * How long to retain a prompt cache entry created by this request.
    */
   prompt_cache_retention?: 'in_memory' | '24h' | null;
+
+  /**
+   * The service tier to use for this request.
+   */
+  service_tier?: 'auto' | 'default' | 'flex' | 'priority' | null;
 }
 
 Responses.InputItems = InputItems;

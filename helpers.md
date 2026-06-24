@@ -154,10 +154,11 @@ OpenAI supports streaming responses when interacting with the [Chat](#chat-strea
 
 ## Assistant Streaming API
 
-OpenAI supports streaming responses from Assistants. The SDK provides convenience wrappers around the API
-so you can subscribe to the types of events you are interested in as well as receive accumulated responses.
+> **Deprecated:** The Assistants API is deprecated and will shut down on August 26, 2026. For new
+> integrations, use the Responses API. See the [Assistants migration guide](https://developers.openai.com/api/docs/assistants/migration).
 
-More information can be found in the documentation: [Assistant Streaming](https://platform.openai.com/docs/assistants/overview?lang=node.js)
+For existing Assistants integrations, the SDK provides convenience wrappers around the streaming API so you
+can subscribe to the types of events you are interested in as well as receive accumulated responses.
 
 #### An example of creating a run and subscribing to some events
 
@@ -215,10 +216,21 @@ The assistant API provides events you can subscribe to for the following events.
 .on('event', (event: AssistantStreamEvent) => ...)
 ```
 
-This allows you to subscribe to all the possible raw events sent by the OpenAI streaming API.
+This allows you to subscribe to raw Assistants lifecycle events sent by the OpenAI streaming API.
 In many cases it will be more convenient to subscribe to a more specific set of events for your use case.
 
 More information on the types of events can be found here: [Events](https://platform.openai.com/docs/api-reference/assistants-streaming/events)
+
+Raw API event names, such as `thread.run.completed`, are exposed through the `event` listener. The
+SDK-specific convenience listeners below use names such as `messageDone`, `runStepDone`, and `end`.
+
+```ts
+run.on('event', (event) => {
+  if (event.event === 'thread.run.completed') {
+    console.log('run completed', event.data);
+  }
+});
+```
 
 ```ts
 .on('runStepCreated', (runStep: RunStep) => ...)
@@ -269,10 +281,13 @@ These events allow you to subscribe to events for the creation, delta and comple
 More information on tools can be found here [Tools](https://platform.openai.com/docs/assistants/tools)
 
 ```ts
+.on('error', (error: OpenAIError) => ...)
 .on('end', () => ...)
 ```
 
-The last event send when a stream ends.
+The `error` event is emitted when the stream encounters an API or SDK error. The `end` event is the last SDK
+event emitted when the stream finishes, including after an error or abort. The raw `[DONE]` marker is consumed
+by the SDK rather than emitted through the `event` listener.
 
 ### Assistant Methods
 
@@ -334,6 +349,10 @@ looping as long as the model requests tool calls.
 If you pass a `parse` function, it will automatically parse the `arguments` for you
 and returns any parsing errors to the model to attempt auto-recovery.
 Otherwise, the args will be passed to the function you provide as a string.
+
+When a completion requests multiple tool calls, `runTools` executes them concurrently by default and
+sends their results back in the same order as the tool calls. Set `parallel_tool_calls: false` to request
+one tool call at a time and execute any returned group sequentially.
 
 If you pass `tool_choice: {function: {name: …}}` instead of `auto`,
 it returns immediately after calling that function (and only loops to auto-recover parsing errors).
@@ -620,8 +639,13 @@ The underlying `AbortController` for the runner.
 
 #### Abort on a function call
 
-If you have a function call flow which you intend to _end_ with a certain function call, then you can use the second
-argument `runner` given to the function to either mutate `runner.messages` or call `runner.abort()`.
+If you have a function call flow which you intend to _end_ with a certain function call, capture that call from the
+`functionToolCall` event and use the second argument `runner` given to the function to mutate `runner.messages` or call
+`runner.abort()`.
+
+Calling `abort()` signals the runner's `AbortController`. If the run observes that signal before it otherwise finishes,
+`done()` and the `final*` helpers reject with `APIUserAbortError`. Other tool callbacks that are already running are not
+cancelled, so capture the terminating call before awaiting the runner and only ignore the expected abort error.
 
 ```ts
 import OpenAI from 'openai';
@@ -629,6 +653,8 @@ import OpenAI from 'openai';
 const client = new OpenAI();
 
 async function main() {
+  let terminatingCall: OpenAI.Chat.ChatCompletionMessageFunctionToolCall.Function | undefined;
+
   const runner = client.chat.completions
     .runTools({
       model: 'gpt-3.5-turbo',
@@ -637,21 +663,58 @@ async function main() {
         {
           type: 'function',
           function: {
-            function: function updateDatabase(props, runner) {
-              runner.abort()
+            function: function updateDatabase(_props, runner) {
+              runner.abort();
             },
             …
           }
         },
       ],
     })
-    .on('message', (message) => console.log(message));
+    .on('message', (message) => console.log(message))
+    .on('functionToolCall', (functionCall) => {
+      if (functionCall.name === 'updateDatabase') terminatingCall = functionCall;
+    })
+    .on('abort', (error) => console.log('Run aborted:', error.message));
 
-  const finalFunctionCall = await runner.finalFunctionCall();
-  console.log('Final function call:', finalFunctionCall);
+  try {
+    await runner.done();
+  } catch (error) {
+    if (!(error instanceof OpenAI.APIUserAbortError)) throw error;
+  }
+  console.log('Function call that ended the run:', terminatingCall);
 }
 
 main();
+```
+
+#### Inspect or extend the conversation after each completion
+
+The `afterCompletion` callback runs after a completion's tool calls have finished and is awaited before the
+next request starts. It can inspect the completion and append context to the runner's mutable `messages` array.
+The callback also runs for the final completion, when no further request will be made.
+
+```ts
+const runner = client.chat.completions.runTools(
+  {
+    model: 'gpt-4o',
+    messages,
+    tools,
+  },
+  {
+    afterCompletion: async (completion, runner) => {
+      if (!completion.choices[0]?.message.tool_calls?.length) return;
+
+      const webResearch = await optionallyPerformWebResearch(runner.messages.slice(-10));
+      if (webResearch) {
+        runner.messages.push({
+          role: 'system',
+          content: `Use this up-to-date research to guide your next steps:\n\n${webResearch}`,
+        });
+      }
+    },
+  },
+);
 ```
 
 #### Integrate with `zod`

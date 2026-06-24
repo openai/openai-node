@@ -18,6 +18,7 @@ describe('.stream()', () => {
     });
 
     const final = await stream.finalResponse();
+    // The raw stream omits the SDK-only `output_text` convenience field.
     expect(final.output_text).toBe('Hello world');
     expect(deltas).toEqual(['Hello ', 'Hello world']);
 
