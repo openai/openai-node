@@ -43,6 +43,15 @@ describe('toFile', () => {
     expect(file.name).toEqual('audio.mp3');
   });
 
+  it('preserves the MIME type from a Response', async () => {
+    const response = mockResponse({
+      url: 'https://example.com/my/audio.mp3',
+      content: new Blob(['foo'], { type: 'audio/mpeg' }),
+    });
+    const file = await toFile(response);
+    expect(file.type).toEqual('audio/mpeg');
+  });
+
   it('extracts a file name from a File', async () => {
     const input = new File(['foo'], 'input.jsonl');
     const file = await toFile(input);
@@ -53,6 +62,27 @@ describe('toFile', () => {
     const input = fs.createReadStream('tests/uploads.test.ts');
     const file = await toFile(input);
     expect(file.name).toEqual('uploads.test.ts');
+  });
+
+  it('preserves metadata from a File-like object', async () => {
+    const input = {
+      name: 'input.jsonl',
+      type: 'application/jsonl',
+      size: 3,
+      lastModified: 123,
+      text: async () => 'foo',
+      slice: () => new Blob(['foo'], { type: 'application/jsonl' }),
+      arrayBuffer: async () => new Blob(['foo']).arrayBuffer(),
+    };
+    const file = await toFile(input);
+    expect(file.name).toEqual('input.jsonl');
+    expect(file.type).toEqual('application/jsonl');
+    expect(file.lastModified).toEqual(123);
+  });
+
+  it('infers the MIME type from Blob parts', async () => {
+    const file = await toFile(new Blob(['foo'], { type: 'text/plain' }), 'input.txt');
+    expect(file.type).toEqual('text/plain');
   });
 
   it('does not copy File objects', async () => {
