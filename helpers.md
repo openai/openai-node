@@ -433,7 +433,7 @@ adjusting `maxChatCompletions` in the request options object. Note that `max_tok
 chat completion request, not for the entire call run.
 
 See an example of automated function calls in action in
-[`examples/function-call-helpers.ts`](examples/function-call-helpers.ts).
+[`examples/tool-call-helpers.ts`](examples/tool-call-helpers.ts).
 
 Note, `runFunctions` was also previously available, but has been deprecated in favor of `runTools`.
 
@@ -768,7 +768,7 @@ async function getWeather(args: z.infer<typeof GetWeatherParameters>) {
 main();
 ```
 
-See a more fully-fledged example in [`examples/function-call-helpers-zod.ts`](examples/function-call-helpers-zod.ts).
+See a more fully-fledged example in [`examples/tool-call-helpers-zod.ts`](examples/tool-call-helpers-zod.ts).
 
 #### Integrate with Next.JS
 
