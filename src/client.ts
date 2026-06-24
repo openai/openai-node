@@ -510,7 +510,7 @@ export class OpenAI {
   }
 
   /**
-   * Create a new client instance re-using the same options given to the current client with optional overriding.
+   * Create a new client instance reusing the same options given to the current client with optional overriding.
    */
   withOptions(options: Partial<ClientOptions>): this {
     const inheritedProvider = this._options.provider;
