@@ -1,12 +1,17 @@
 {
   "name": "@openai/openai",
-  "version": "6.44.0",
+  "version": "6.45.0",
   "exports": {
     ".": "./index.ts",
+    "./providers/bedrock": "./providers/bedrock.ts",
+    "./providers/bedrock/aws": "./providers/bedrock/aws.ts",
     "./helpers/zod": "./helpers/zod.ts",
     "./beta/realtime/websocket": "./beta/realtime/websocket.ts"
   },
   "imports": {
+    "@aws-sdk/credential-provider-node": "npm:@aws-sdk/credential-provider-node@^3.972.47",
+    "@smithy/hash-node": "npm:@smithy/hash-node@^4.3.5",
+    "@smithy/signature-v4": "npm:@smithy/signature-v4@^5.4.5",
     "zod": "npm:zod@3"
   },
   "publish": {

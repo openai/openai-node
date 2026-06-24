@@ -614,6 +614,30 @@ describe('default encoder', () => {
     });
   }
 
+  test('keeps content-type for omitted optional request bodies', async () => {
+    const { req } = await client.buildRequest({
+      path: '/foo',
+      method: 'post',
+      body: undefined,
+    });
+
+    expect(req.headers).toBeInstanceOf(Headers);
+    expect(req.headers.get('content-type')).toEqual('application/json');
+    expect(req.body).toBe(undefined);
+  });
+
+  test('does not serialize null optional request bodies', async () => {
+    const { req } = await client.buildRequest({
+      path: '/foo',
+      method: 'post',
+      body: null,
+    });
+
+    expect(req.headers).toBeInstanceOf(Headers);
+    expect(req.headers.get('content-type')).toEqual(null);
+    expect(req.body).toBe(undefined);
+  });
+
   const encoder = new TextEncoder();
   const asyncIterable = (async function* () {
     yield encoder.encode('a\n');

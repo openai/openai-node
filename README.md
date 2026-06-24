@@ -521,13 +521,15 @@ For more information on support for the Azure API, see [azure.md](azure.md).
 
 ## Amazon Bedrock
 
-To use this library with [Amazon Bedrock's OpenAI-compatible API](https://docs.aws.amazon.com/bedrock/latest/userguide/models-api-compatibility.html), use the `BedrockOpenAI` class instead of the `OpenAI` class.
+To use this library with [Amazon Bedrock's OpenAI-compatible API](https://docs.aws.amazon.com/bedrock/latest/userguide/models-api-compatibility.html), configure the standard `OpenAI` client with the Bedrock provider:
 
 ```ts
-import { BedrockOpenAI } from 'openai';
+import OpenAI from 'openai';
+import { bedrock } from 'openai/providers/bedrock/aws';
 
-// gets the bearer token from AWS_BEARER_TOKEN_BEDROCK and the region from AWS_REGION/AWS_DEFAULT_REGION
-const client = new BedrockOpenAI();
+const client = new OpenAI({
+  provider: bedrock({ region: 'us-west-2' }),
+});
 
 const response = await client.responses.create({
   model: 'openai.gpt-5.4',
@@ -537,18 +539,23 @@ const response = await client.responses.create({
 console.log(response.output_text);
 ```
 
-`BedrockOpenAI` configures AWS bearer auth and the Bedrock Mantle endpoint, then uses the normal SDK resources. AWS controls which endpoints and features are supported; unsupported calls surface the provider's normal HTTP errors through the SDK.
+Use a model that [supports the Responses API](https://docs.aws.amazon.com/bedrock/latest/userguide/models-api-compatibility.html). A model returned by the Models API may support a different Bedrock inference API instead.
 
-Pass `baseURL` or set `AWS_BEDROCK_BASE_URL` to override the derived `https://bedrock-mantle.<region>.api.aws/openai/v1` endpoint. For long-running apps, pass `bedrockTokenProvider` to refresh the Bedrock bearer token before each request.
+This uses the regional `https://bedrock-mantle.<region>.api.aws/openai/v1` endpoint. The region can also come from `AWS_REGION` or `AWS_DEFAULT_REGION`, and `AWS_BEDROCK_BASE_URL` can override the endpoint.
 
-Set `AWS_BEARER_TOKEN_BEDROCK` to an [Amazon Bedrock API key](https://docs.aws.amazon.com/bedrock/latest/userguide/api-keys.html). To refresh tokens yourself, pass a provider instead of `apiKey`:
+The AWS entrypoint uses the standard AWS credential chain by default. It also accepts a named profile, static credentials, or a custom credential provider. Install its peer dependencies before importing it:
 
-```ts
-const client = new BedrockOpenAI({
-  awsRegion: 'us-west-2',
-  bedrockTokenProvider: async () => refreshBedrockToken(),
-});
+```bash
+npm install @aws-sdk/credential-provider-node @smithy/hash-node @smithy/signature-v4
 ```
+
+The AWS entrypoint uses normal static imports so bundlers and serverless packagers can trace these dependencies. If one is missing, importing `openai/providers/bedrock/aws` fails immediately with the runtime's normal module-not-found error, for example:
+
+```text
+Cannot find module '@aws-sdk/credential-provider-node'
+```
+
+For Bedrock API key authentication, import `bedrock` from `openai/providers/bedrock` instead. That entrypoint has no AWS dependencies and works in browser-compatible runtimes when `dangerouslyAllowBrowser` is enabled. SigV4 authentication is supported in Node.js and compatible server runtimes and requires replayable request bodies. The legacy, bearer-only `BedrockOpenAI` class remains available for compatibility.
 
 For more information on support for Amazon Bedrock, see [bedrock.md](bedrock.md).
 
