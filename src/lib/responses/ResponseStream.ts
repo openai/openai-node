@@ -169,11 +169,7 @@ export class ResponseStream<ParsedT = null>
     params: ResponseStreamParams,
     options?: RequestOptions,
   ): Promise<ParsedResponse<ParsedT>> {
-    const signal = options?.signal;
-    if (signal) {
-      if (signal.aborted) this.controller.abort();
-      signal.addEventListener('abort', () => this.controller.abort());
-    }
+    this._listenForAbort(options?.signal);
     this.#beginRequest();
 
     let stream: Stream<ResponseStreamEvent> | undefined;
