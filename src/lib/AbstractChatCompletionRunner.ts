@@ -1,6 +1,7 @@
 import { OpenAIError } from '../error';
 import type OpenAI from '../index';
 import type { RequestOptions } from '../internal/request-options';
+import { uuid4 } from '../internal/utils/uuid';
 import { isAutoParsableTool, parseChatCompletion } from '../lib/parser';
 import type {
   ChatCompletion,
@@ -30,6 +31,19 @@ import {
 
 const DEFAULT_MAX_CHAT_COMPLETIONS = 10;
 
+function normalizeToolCallIds(chatCompletion: ChatCompletion): void {
+  for (const choice of chatCompletion.choices) {
+    for (const toolCall of choice.message.tool_calls ?? []) {
+      // Some OpenAI-compatible providers omit tool call IDs or return an empty string.
+      // Generate a unique ID before the completion is stored or emitted so the assistant
+      // tool call and its result message always reference the same value.
+      if (!toolCall.id) {
+        toolCall.id = `call_${uuid4()}`;
+      }
+    }
+  }
+}
+
 export interface ChatCompletionRunnerContext {
   messages: ChatCompletionMessageParam[];
   abort(): void;
@@ -58,6 +72,7 @@ export class AbstractChatCompletionRunner<
     this: AbstractChatCompletionRunner<AbstractChatCompletionRunnerEvents, ParsedT>,
     chatCompletion: ParsedChatCompletion<ParsedT>,
   ): ParsedChatCompletion<ParsedT> {
+    normalizeToolCallIds(chatCompletion);
     this._chatCompletions.push(chatCompletion);
     this._emit('chatCompletion', chatCompletion);
     const message = chatCompletion.choices[0]?.message;

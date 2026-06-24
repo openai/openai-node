@@ -8,6 +8,7 @@ import {
 import OpenAI from '../index';
 import { RequestOptions } from '../internal/request-options';
 import { type ReadableStream } from '../internal/shim-types';
+import { uuid4 } from '../internal/utils/uuid';
 import {
   AutoParseableResponseFormat,
   hasAutoParseableInput,
@@ -657,9 +658,6 @@ function finalizeChatCompletion<ParsedT>(
               tool_calls: tool_calls.map((tool_call, i) => {
                 const { function: fn, type, id, ...toolRest } = tool_call;
                 const { arguments: args, name, ...fnRest } = fn || {};
-                if (id == null) {
-                  throw new OpenAIError(`missing choices[${index}].tool_calls[${i}].id\n${str(snapshot)}`);
-                }
                 if (type == null) {
                   throw new OpenAIError(`missing choices[${index}].tool_calls[${i}].type\n${str(snapshot)}`);
                 }
@@ -674,7 +672,12 @@ function finalizeChatCompletion<ParsedT>(
                   );
                 }
 
-                return { ...toolRest, id, type, function: { ...fnRest, name, arguments: args } };
+                return {
+                  ...toolRest,
+                  id: id || `call_${uuid4()}`,
+                  type,
+                  function: { ...fnRest, name, arguments: args },
+                };
               }),
             },
           };
