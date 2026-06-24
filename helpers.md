@@ -603,8 +603,13 @@ The underlying `AbortController` for the runner.
 
 #### Abort on a function call
 
-If you have a function call flow which you intend to _end_ with a certain function call, then you can use the second
-argument `runner` given to the function to either mutate `runner.messages` or call `runner.abort()`.
+If you have a function call flow which you intend to _end_ with a certain function call, capture that call from the
+`functionToolCall` event and use the second argument `runner` given to the function to mutate `runner.messages` or call
+`runner.abort()`.
+
+Calling `abort()` signals the runner's `AbortController`. If the run observes that signal before it otherwise finishes,
+`done()` and the `final*` helpers reject with `APIUserAbortError`. Other tool callbacks that are already running are not
+cancelled, so capture the terminating call before awaiting the runner and only ignore the expected abort error.
 
 ```ts
 import OpenAI from 'openai';
@@ -612,6 +617,8 @@ import OpenAI from 'openai';
 const client = new OpenAI();
 
 async function main() {
+  let terminatingCall: OpenAI.Chat.ChatCompletionMessageFunctionToolCall.Function | undefined;
+
   const runner = client.chat.completions
     .runTools({
       model: 'gpt-3.5-turbo',
@@ -620,18 +627,26 @@ async function main() {
         {
           type: 'function',
           function: {
-            function: function updateDatabase(props, runner) {
-              runner.abort()
+            function: function updateDatabase(_props, runner) {
+              runner.abort();
             },
             …
           }
         },
       ],
     })
-    .on('message', (message) => console.log(message));
+    .on('message', (message) => console.log(message))
+    .on('functionToolCall', (functionCall) => {
+      if (functionCall.name === 'updateDatabase') terminatingCall = functionCall;
+    })
+    .on('abort', (error) => console.log('Run aborted:', error.message));
 
-  const finalFunctionCall = await runner.finalFunctionCall();
-  console.log('Final function call:', finalFunctionCall);
+  try {
+    await runner.done();
+  } catch (error) {
+    if (!(error instanceof OpenAI.APIUserAbortError)) throw error;
+  }
+  console.log('Function call that ended the run:', terminatingCall);
 }
 
 main();
