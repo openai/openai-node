@@ -45,6 +45,31 @@ if (message?.parsed) {
 }
 ```
 
+### Supported Zod features
+
+The Zod helpers convert your schema to JSON Schema and adapt it to the strict subset
+supported by [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs#supported-schemas).
+The root schema must be a `z.object()`. Common property schemas such as `z.string()`,
+`z.number()`, `z.boolean()`, `z.array()`, `z.enum()`, `z.literal()`, `z.union()`, and
+nullable fields are supported when they can be represented by that subset. A
+`z.union()` can be nested inside an object, but a root `z.union()` or
+`z.discriminatedUnion()` is not supported because it produces a root-level `anyOf`.
+
+Some Zod behavior cannot be represented in the schema sent to the API:
+
+- All object properties must be required and will be present in the model's answer.
+  To emulate an optional value, make the field nullable instead of using plain
+  `.optional()`; the model will return either a value or `null` for that field.
+- Only constraints represented in the generated JSON Schema can guide the model.
+  Custom refinements and transforms still run when the SDK parses the response, but
+  some schemas that cannot be converted, including bare transforms in Zod v4, cause
+  the helper to throw before a request is made.
+- TypeScript comments are not available at runtime and are not sent to the API. Use
+  `.describe()` for field descriptions or the helper's `description` option for a
+  top-level response format or function description.
+- Zod v4 copies `.meta()` values into the generated JSON Schema. Only attach metadata
+  that is accepted by Structured Outputs and that you intend to send to the API.
+
 ## Auto-parsing function tool calls
 
 The `.parse()` method will also automatically parse `function` tool calls if:
