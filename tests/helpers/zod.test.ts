@@ -2,6 +2,19 @@ import { zodResponseFormat, zodTextFormat } from 'openai/helpers/zod';
 import { z as zv3 } from 'zod/v3';
 import { z as zv4 } from 'zod/v4';
 
+function collectRefs(value: unknown, refs: string[] = []): string[] {
+  if (!value || typeof value !== 'object') return refs;
+
+  const maybeRef = (value as { $ref?: unknown }).$ref;
+  if (typeof maybeRef === 'string') refs.push(maybeRef);
+
+  for (const child of Object.values(value)) {
+    collectRefs(child, refs);
+  }
+
+  return refs;
+}
+
 function expectDefinitionRefsToResolve(schema: Record<string, unknown>) {
   const definitions = (schema['definitions'] ?? {}) as Record<string, unknown>;
 
@@ -89,6 +102,45 @@ describe.each([
         "strict": true,
       }
     `);
+  });
+
+  it('does not emit whitespace in extracted definition refs', () => {
+    const ThingWithSpaces = z.object({ spaced: z.string() });
+    const ThingWithUnderscores = z.object({ underscored: z.string() });
+    const Root = z.object({
+      group: z.object({
+        'Thing With Spaces': ThingWithSpaces,
+        Thing_With_Spaces: ThingWithUnderscores,
+        anotherSpacedUsage: ThingWithSpaces,
+        anotherUnderscoredUsage: ThingWithUnderscores,
+      }),
+    });
+
+    const schema = zodResponseFormat(Root, 'example-scope').json_schema.schema as Record<string, unknown>;
+    const definitions = (schema['definitions'] ?? schema['$defs'] ?? {}) as Record<string, unknown>;
+    const refs = collectRefs(schema);
+    const definitionNames = Object.keys(definitions);
+
+    expect(refs).not.toContainEqual(expect.stringMatching(/\s/));
+    expect(definitionNames).not.toContainEqual(expect.stringMatching(/\s/));
+    if (version === 'v3') {
+      const rootProperties = schema['properties'] as Record<string, Record<string, unknown>>;
+      const groupProperties = rootProperties['group']?.['properties'] as Record<string, { $ref?: string }>;
+      const spacedRef = groupProperties['anotherSpacedUsage']?.$ref;
+      const underscoredRef = groupProperties['anotherUnderscoredUsage']?.$ref;
+
+      expect(spacedRef).toBeDefined();
+      expect(underscoredRef).toBe(
+        '#/definitions/example-scope_properties_group_properties_Thing_With_Spaces',
+      );
+      expect(spacedRef).not.toBe(underscoredRef);
+    }
+
+    for (const ref of refs) {
+      const definitionName = ref.split('/').pop();
+      expect(definitionName).toBeDefined();
+      expect(definitions).toHaveProperty(definitionName as string);
+    }
   });
 
   it('automatically adds optional properties to `required`', () => {

@@ -139,7 +139,13 @@ const get$ref = (
     // `["#","definitions","contactPerson","properties","person1","properties","name"]`
     // then we'll extract it out to `contactPerson_properties_person1_properties_name`
     case 'extract-to-root':
-      const name = item.path.slice(refs.basePath.length + 1).join('_');
+      const name = item.path
+        .slice(refs.basePath.length + 1)
+        // The first part is either the root schema name or an extracted definition
+        // name that is being materialized. Keep it stable so recursive definitions
+        // do not generate a new name each time they are resolved.
+        .map((part, index) => (index === 0 ? part : encodeDefinitionPathPart(part)))
+        .join('_');
 
       // we don't need to extract the root schema in this case, as it's already
       // been added to the definitions
@@ -164,6 +170,20 @@ const get$ref = (
       return refs.$refStrategy === 'seen' ? {} : undefined;
     }
   }
+};
+
+const encodedDefinitionPathPartPrefix = '_x_';
+
+const encodeDefinitionPathPart = (part: string) => {
+  if (/^[A-Za-z0-9_-]*$/.test(part) && !part.startsWith(encodedDefinitionPathPartPrefix)) {
+    return part;
+  }
+
+  let encoded = encodedDefinitionPathPartPrefix;
+  for (let i = 0; i < part.length; i++) {
+    encoded += part.charCodeAt(i).toString(16).padStart(4, '0');
+  }
+  return encoded;
 };
 
 const getRelativePath = (pathA: string[], pathB: string[]) => {
