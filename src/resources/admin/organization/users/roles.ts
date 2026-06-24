@@ -30,6 +30,30 @@ export class Roles extends APIResource {
   }
 
   /**
+   * Retrieves an organization role assigned to a user.
+   *
+   * @example
+   * ```ts
+   * const role =
+   *   await client.admin.organization.users.roles.retrieve(
+   *     'role_id',
+   *     { user_id: 'user_id' },
+   *   );
+   * ```
+   */
+  retrieve(
+    roleID: string,
+    params: RoleRetrieveParams,
+    options?: RequestOptions,
+  ): APIPromise<RoleRetrieveResponse> {
+    const { user_id } = params;
+    return this._client.get(path`/organization/users/${user_id}/roles/${roleID}`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true },
+    });
+  }
+
+  /**
    * Lists the organization roles assigned to a user within the organization.
    *
    * @example
@@ -101,11 +125,16 @@ export interface RoleCreateResponse {
  * Detailed information about a role assignment entry returned when listing
  * assignments.
  */
-export interface RoleListResponse {
+export interface RoleRetrieveResponse {
   /**
    * Identifier for the role.
    */
   id: string;
+
+  /**
+   * Principals from which the role assignment is inherited, when available.
+   */
+  assignment_sources: Array<RoleRetrieveResponse.AssignmentSource> | null;
 
   /**
    * When the role was created.
@@ -158,6 +187,88 @@ export interface RoleListResponse {
   updated_at: number | null;
 }
 
+export namespace RoleRetrieveResponse {
+  export interface AssignmentSource {
+    principal_id: string;
+
+    principal_type: string;
+  }
+}
+
+/**
+ * Detailed information about a role assignment entry returned when listing
+ * assignments.
+ */
+export interface RoleListResponse {
+  /**
+   * Identifier for the role.
+   */
+  id: string;
+
+  /**
+   * Principals from which the role assignment is inherited, when available.
+   */
+  assignment_sources: Array<RoleListResponse.AssignmentSource> | null;
+
+  /**
+   * When the role was created.
+   */
+  created_at: number | null;
+
+  /**
+   * Identifier of the actor who created the role.
+   */
+  created_by: string | null;
+
+  /**
+   * User details for the actor that created the role, when available.
+   */
+  created_by_user_obj: { [key: string]: unknown } | null;
+
+  /**
+   * Description of the role.
+   */
+  description: string | null;
+
+  /**
+   * Arbitrary metadata stored on the role.
+   */
+  metadata: { [key: string]: unknown } | null;
+
+  /**
+   * Name of the role.
+   */
+  name: string;
+
+  /**
+   * Permissions associated with the role.
+   */
+  permissions: Array<string>;
+
+  /**
+   * Whether the role is predefined by OpenAI.
+   */
+  predefined_role: boolean;
+
+  /**
+   * Resource type the role applies to.
+   */
+  resource_type: string;
+
+  /**
+   * When the role was last updated.
+   */
+  updated_at: number | null;
+}
+
+export namespace RoleListResponse {
+  export interface AssignmentSource {
+    principal_id: string;
+
+    principal_type: string;
+  }
+}
+
 /**
  * Confirmation payload returned after unassigning a role.
  */
@@ -181,6 +292,13 @@ export interface RoleCreateParams {
   role_id: string;
 }
 
+export interface RoleRetrieveParams {
+  /**
+   * The ID of the user to inspect.
+   */
+  user_id: string;
+}
+
 export interface RoleListParams extends NextCursorPageParams {
   /**
    * Sort order for the returned organization roles.
@@ -198,10 +316,12 @@ export interface RoleDeleteParams {
 export declare namespace Roles {
   export {
     type RoleCreateResponse as RoleCreateResponse,
+    type RoleRetrieveResponse as RoleRetrieveResponse,
     type RoleListResponse as RoleListResponse,
     type RoleDeleteResponse as RoleDeleteResponse,
     type RoleListResponsesPage as RoleListResponsesPage,
     type RoleCreateParams as RoleCreateParams,
+    type RoleRetrieveParams as RoleRetrieveParams,
     type RoleListParams as RoleListParams,
     type RoleDeleteParams as RoleDeleteParams,
   };

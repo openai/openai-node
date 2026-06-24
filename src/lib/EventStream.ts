@@ -14,6 +14,7 @@ export class EventStream<EventTypes extends BaseEvents> {
   #listeners: {
     [Event in keyof EventTypes]?: EventListeners<EventTypes, Event>;
   } = {};
+  #abortListeners: Array<{ signal: AbortSignal; listener: () => void }> = [];
 
   #ended = false;
   #errored = false;
@@ -70,6 +71,24 @@ export class EventStream<EventTypes extends BaseEvents> {
 
   abort() {
     this.controller.abort();
+  }
+
+  protected _listenForAbort(signal: AbortSignal | null | undefined) {
+    if (!signal || this.ended) return;
+    if (signal.aborted) {
+      this.controller.abort();
+      return;
+    }
+
+    const listener = () => this.controller.abort();
+    signal.addEventListener('abort', listener, { once: true });
+    this.#abortListeners.push({ signal, listener });
+  }
+
+  #removeAbortListeners() {
+    for (const { signal, listener } of this.#abortListeners.splice(0)) {
+      signal.removeEventListener('abort', listener);
+    }
   }
 
   /**
@@ -177,6 +196,7 @@ export class EventStream<EventTypes extends BaseEvents> {
     }
 
     if (event === 'end') {
+      this.#removeAbortListeners();
       this.#ended = true;
       this.#resolveEndPromise();
     }

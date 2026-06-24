@@ -1,4 +1,6 @@
+import OpenAI from 'openai';
 import { zodResponseFormat } from 'openai/helpers/zod';
+import { ChatCompletionStream } from 'openai/lib/ChatCompletionStream';
 import { ChatCompletionTokenLogprob } from 'openai/resources';
 import { z } from 'zod/v4';
 import { makeStreamSnapshotRequest } from '../utils/mock-snapshots';
@@ -6,6 +8,56 @@ import { makeStreamSnapshotRequest } from '../utils/mock-snapshots';
 jest.setTimeout(1000 * 30);
 
 describe('.stream()', () => {
+  it('removes the caller abort listener after the stream finishes', async () => {
+    const callerController = new AbortController();
+    const addEventListenerSpy = jest.spyOn(callerController.signal, 'addEventListener');
+    const removeEventListenerSpy = jest.spyOn(callerController.signal, 'removeEventListener');
+
+    const chunk: OpenAI.Chat.ChatCompletionChunk = {
+      id: 'chatcmpl-test',
+      object: 'chat.completion.chunk',
+      created: 1,
+      model: 'gpt-test',
+      choices: [
+        {
+          index: 0,
+          delta: { role: 'assistant', content: 'hello' },
+          finish_reason: 'stop',
+          logprobs: null,
+        },
+      ],
+    };
+
+    const client = {
+      chat: {
+        completions: {
+          create: jest.fn(async () => ({
+            controller: new AbortController(),
+            async *[Symbol.asyncIterator]() {
+              yield chunk;
+            },
+          })),
+        },
+      },
+    } as unknown as OpenAI;
+
+    const stream = ChatCompletionStream.createChatCompletion(
+      client,
+      {
+        model: 'gpt-test',
+        messages: [{ role: 'user', content: 'Say hello' }],
+      },
+      { signal: callerController.signal },
+    );
+
+    await expect(stream.finalContent()).resolves.toBe('hello');
+
+    const abortListener = addEventListenerSpy.mock.calls.find(([event]) => event === 'abort')?.[1];
+    expect(abortListener).toEqual(expect.any(Function));
+    expect(addEventListenerSpy).toHaveBeenCalledWith('abort', abortListener, { once: true });
+    expect(removeEventListenerSpy).toHaveBeenCalledWith('abort', abortListener);
+  });
+
   it('works', async () => {
     const stream = await makeStreamSnapshotRequest((openai) =>
       openai.chat.completions.stream({
@@ -33,6 +85,46 @@ describe('.stream()', () => {
         "logprobs": null,
         "message": {
           "content": "{"city":"San Francisco","units":"c"}",
+          "parsed": {
+            "city": "San Francisco",
+            "units": "c",
+          },
+          "refusal": null,
+          "role": "assistant",
+        },
+      }
+    `);
+  });
+
+  it('is robust against leading newline chunks', async () => {
+    const stream = await makeStreamSnapshotRequest((openai) =>
+      openai.chat.completions.stream({
+        model: 'gpt-4o-2024-08-06',
+        messages: [
+          {
+            role: 'user',
+            content: "What's the weather like in SF?",
+          },
+        ],
+        response_format: zodResponseFormat(
+          z.object({
+            city: z.string(),
+            units: z.enum(['c', 'f']).default('f'),
+          }),
+          'location',
+        ),
+      }),
+    );
+
+    expect((await stream.finalChatCompletion()).choices[0]).toMatchInlineSnapshot(`
+      {
+        "finish_reason": "stop",
+        "index": 0,
+        "logprobs": null,
+        "message": {
+          "content": "
+
+      {"city":"San Francisco","units":"c"}",
           "parsed": {
             "city": "San Francisco",
             "units": "c",

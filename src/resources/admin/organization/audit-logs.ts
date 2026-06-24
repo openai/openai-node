@@ -93,11 +93,19 @@ export interface AuditLogListResponse {
     | 'tunnel.created'
     | 'tunnel.updated'
     | 'tunnel.deleted'
+    | 'workload_identity_provider.created'
+    | 'workload_identity_provider.updated'
+    | 'workload_identity_provider.deleted'
+    | 'workload_identity_provider_mapping.created'
+    | 'workload_identity_provider_mapping.updated'
+    | 'workload_identity_provider_mapping.deleted'
     | 'role.created'
     | 'role.updated'
     | 'role.deleted'
     | 'role.assignment.created'
     | 'role.assignment.deleted'
+    | 'role.bound_to_resource'
+    | 'role.unbound_from_resource'
     | 'scim.enabled'
     | 'scim.disabled'
     | 'service_account.created'
@@ -303,12 +311,22 @@ export interface AuditLogListResponse {
   /**
    * The details for events with this `type`.
    */
+  'role.bound_to_resource'?: AuditLogListResponse.RoleBoundToResource;
+
+  /**
+   * The details for events with this `type`.
+   */
   'role.created'?: AuditLogListResponse.RoleCreated;
 
   /**
    * The details for events with this `type`.
    */
   'role.deleted'?: AuditLogListResponse.RoleDeleted;
+
+  /**
+   * The details for events with this `type`.
+   */
+  'role.unbound_from_resource'?: AuditLogListResponse.RoleUnboundFromResource;
 
   /**
    * The details for events with this `type`.
@@ -354,6 +372,36 @@ export interface AuditLogListResponse {
    * The details for events with this `type`.
    */
   'user.updated'?: AuditLogListResponse.UserUpdated;
+
+  /**
+   * The details for events with this `type`.
+   */
+  'workload_identity_provider_mapping.created'?: AuditLogListResponse.WorkloadIdentityProviderMappingCreated;
+
+  /**
+   * The details for events with this `type`.
+   */
+  'workload_identity_provider_mapping.deleted'?: AuditLogListResponse.WorkloadIdentityProviderMappingDeleted;
+
+  /**
+   * The details for events with this `type`.
+   */
+  'workload_identity_provider_mapping.updated'?: AuditLogListResponse.WorkloadIdentityProviderMappingUpdated;
+
+  /**
+   * The details for events with this `type`.
+   */
+  'workload_identity_provider.created'?: AuditLogListResponse.WorkloadIdentityProviderCreated;
+
+  /**
+   * The details for events with this `type`.
+   */
+  'workload_identity_provider.deleted'?: AuditLogListResponse.WorkloadIdentityProviderDeleted;
+
+  /**
+   * The details for events with this `type`.
+   */
+  'workload_identity_provider.updated'?: AuditLogListResponse.WorkloadIdentityProviderUpdated;
 }
 
 export namespace AuditLogListResponse {
@@ -1219,6 +1267,68 @@ export namespace AuditLogListResponse {
   /**
    * The details for events with this `type`.
    */
+  export interface RoleBoundToResource {
+    /**
+     * The ID of the resource the role was bound to. ChatGPT workspace connector
+     * resources use `<workspace_id>__<connector_id>`.
+     */
+    id?: string;
+
+    /**
+     * The connector ID for a ChatGPT workspace connector resource.
+     */
+    connector_id?: string;
+
+    /**
+     * The connector display name for a ChatGPT workspace connector resource, or the
+     * connector ID when the display name could not be resolved.
+     */
+    connector_name?: string;
+
+    /**
+     * Whether the connector is enabled for the role.
+     */
+    enabled?: boolean;
+
+    /**
+     * The permissions granted to the role for the resource.
+     */
+    permissions?: Array<string>;
+
+    /**
+     * The ID of the resource the role was bound to.
+     */
+    resource_id?: string;
+
+    /**
+     * The type of resource the role was bound to.
+     */
+    resource_type?: string;
+
+    /**
+     * The ID of the role that was bound to the resource.
+     */
+    role_id?: string;
+
+    /**
+     * The connector role mutation path that produced the event.
+     */
+    source?:
+      | 'role_toggle'
+      | 'role_connector_update'
+      | 'role_delete'
+      | 'workspace_permissions'
+      | 'connector_publish';
+
+    /**
+     * The workspace ID for a ChatGPT workspace connector resource.
+     */
+    workspace_id?: string;
+  }
+
+  /**
+   * The details for events with this `type`.
+   */
   export interface RoleCreated {
     /**
      * The role ID.
@@ -1254,6 +1364,68 @@ export namespace AuditLogListResponse {
      * The role ID.
      */
     id?: string;
+  }
+
+  /**
+   * The details for events with this `type`.
+   */
+  export interface RoleUnboundFromResource {
+    /**
+     * The ID of the resource the role was unbound from. ChatGPT workspace connector
+     * resources use `<workspace_id>__<connector_id>`.
+     */
+    id?: string;
+
+    /**
+     * The connector ID for a ChatGPT workspace connector resource.
+     */
+    connector_id?: string;
+
+    /**
+     * The connector display name for a ChatGPT workspace connector resource, or the
+     * connector ID when the display name could not be resolved.
+     */
+    connector_name?: string;
+
+    /**
+     * Whether the connector is enabled for the role.
+     */
+    enabled?: boolean;
+
+    /**
+     * The permissions remaining for the role after the change.
+     */
+    permissions?: Array<string>;
+
+    /**
+     * The ID of the resource the role was unbound from.
+     */
+    resource_id?: string;
+
+    /**
+     * The type of resource the role was unbound from.
+     */
+    resource_type?: string;
+
+    /**
+     * The ID of the role that was unbound from the resource.
+     */
+    role_id?: string;
+
+    /**
+     * The connector role mutation path that produced the event.
+     */
+    source?:
+      | 'role_toggle'
+      | 'role_connector_update'
+      | 'role_delete'
+      | 'workspace_permissions'
+      | 'connector_publish';
+
+    /**
+     * The workspace ID for a ChatGPT workspace connector resource.
+     */
+    workspace_id?: string;
   }
 
   /**
@@ -1460,6 +1632,116 @@ export namespace AuditLogListResponse {
       role?: string;
     }
   }
+
+  /**
+   * The details for events with this `type`.
+   */
+  export interface WorkloadIdentityProviderMappingCreated {
+    /**
+     * The workload identity provider mapping ID.
+     */
+    id?: string;
+
+    /**
+     * The payload used to create the workload identity provider mapping.
+     */
+    data?: unknown;
+
+    /**
+     * The workload identity provider ID.
+     */
+    identity_provider_id?: string;
+  }
+
+  /**
+   * The details for events with this `type`.
+   */
+  export interface WorkloadIdentityProviderMappingDeleted {
+    /**
+     * The workload identity provider mapping ID.
+     */
+    id?: string;
+
+    /**
+     * The workload identity provider ID.
+     */
+    identity_provider_id?: string;
+
+    /**
+     * The project ID.
+     */
+    project_id?: string;
+
+    /**
+     * The mapped service account ID.
+     */
+    service_account_id?: string;
+  }
+
+  /**
+   * The details for events with this `type`.
+   */
+  export interface WorkloadIdentityProviderMappingUpdated {
+    /**
+     * The workload identity provider mapping ID.
+     */
+    id?: string;
+
+    /**
+     * The payload used to update the workload identity provider mapping.
+     */
+    changes_requested?: unknown;
+
+    /**
+     * The workload identity provider ID.
+     */
+    identity_provider_id?: string;
+  }
+
+  /**
+   * The details for events with this `type`.
+   */
+  export interface WorkloadIdentityProviderCreated {
+    /**
+     * The workload identity provider ID.
+     */
+    id?: string;
+
+    /**
+     * The payload used to create the workload identity provider.
+     */
+    data?: unknown;
+  }
+
+  /**
+   * The details for events with this `type`.
+   */
+  export interface WorkloadIdentityProviderDeleted {
+    /**
+     * The workload identity provider ID.
+     */
+    id?: string;
+
+    /**
+     * The workload identity provider name.
+     */
+    name?: string;
+  }
+
+  /**
+   * The details for events with this `type`.
+   */
+  export interface WorkloadIdentityProviderUpdated {
+    /**
+     * The workload identity provider ID.
+     */
+    id?: string;
+
+    /**
+     * The payload used to update the workload identity provider.
+     */
+    changes_requested?: unknown;
+  }
 }
 
 export interface AuditLogListParams extends ConversationCursorPageParams {
@@ -1531,11 +1813,19 @@ export interface AuditLogListParams extends ConversationCursorPageParams {
     | 'tunnel.created'
     | 'tunnel.updated'
     | 'tunnel.deleted'
+    | 'workload_identity_provider.created'
+    | 'workload_identity_provider.updated'
+    | 'workload_identity_provider.deleted'
+    | 'workload_identity_provider_mapping.created'
+    | 'workload_identity_provider_mapping.updated'
+    | 'workload_identity_provider_mapping.deleted'
     | 'role.created'
     | 'role.updated'
     | 'role.deleted'
     | 'role.assignment.created'
     | 'role.assignment.deleted'
+    | 'role.bound_to_resource'
+    | 'role.unbound_from_resource'
     | 'scim.enabled'
     | 'scim.disabled'
     | 'service_account.created'
@@ -1553,9 +1843,18 @@ export interface AuditLogListParams extends ConversationCursorPageParams {
 
   /**
    * Return only events performed on these targets. For example, a project ID
-   * updated.
+   * updated. For ChatGPT connector role events, use the workspace connector resource
+   * ID shown in `details.id`, such as `<workspace_id>__<connector_id>`.
    */
   resource_ids?: Array<string>;
+
+  /**
+   * Return only tenant-scoped events associated with this organization. Required for
+   * tenant-scoped events such as `role.bound_to_resource` and
+   * `role.unbound_from_resource`. When `true`, all supplied event types must be
+   * tenant-scoped.
+   */
+  tenant_only?: boolean;
 }
 
 export namespace AuditLogListParams {
