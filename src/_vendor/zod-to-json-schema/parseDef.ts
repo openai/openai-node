@@ -172,8 +172,19 @@ const get$ref = (
   }
 };
 
-const encodeDefinitionPathPart = (part: string) =>
-  part.replace(/[^A-Za-z0-9]/g, (char) => `_x${char.charCodeAt(0).toString(16).padStart(2, '0')}_`);
+const encodedDefinitionPathPartPrefix = '_x_';
+
+const encodeDefinitionPathPart = (part: string) => {
+  if (/^[A-Za-z0-9_-]*$/.test(part) && !part.startsWith(encodedDefinitionPathPartPrefix)) {
+    return part;
+  }
+
+  let encoded = encodedDefinitionPathPartPrefix;
+  for (let i = 0; i < part.length; i++) {
+    encoded += part.charCodeAt(i).toString(16).padStart(4, '0');
+  }
+  return encoded;
+};
 
 const getRelativePath = (pathA: string[], pathB: string[]) => {
   let i = 0;

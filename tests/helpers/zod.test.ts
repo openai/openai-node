@@ -124,16 +124,20 @@ describe.each([
     expect(refs).not.toContainEqual(expect.stringMatching(/\s/));
     expect(definitionNames).not.toContainEqual(expect.stringMatching(/\s/));
     if (version === 'v3') {
-      expect(definitionNames).toContain(
-        'example-scope_properties_group_properties_Thing_x20_With_x20_Spaces',
+      const rootProperties = schema['properties'] as Record<string, Record<string, unknown>>;
+      const groupProperties = rootProperties['group']?.['properties'] as Record<string, { $ref?: string }>;
+      const spacedRef = groupProperties['anotherSpacedUsage']?.$ref;
+      const underscoredRef = groupProperties['anotherUnderscoredUsage']?.$ref;
+
+      expect(spacedRef).toBeDefined();
+      expect(underscoredRef).toBe(
+        '#/definitions/example-scope_properties_group_properties_Thing_With_Spaces',
       );
-      expect(definitionNames).toContain(
-        'example-scope_properties_group_properties_Thing_x5f_With_x5f_Spaces',
-      );
+      expect(spacedRef).not.toBe(underscoredRef);
     }
 
     for (const ref of refs) {
-      const definitionName = ref.split('/').at(-1);
+      const definitionName = ref.split('/').pop();
       expect(definitionName).toBeDefined();
       expect(definitions).toHaveProperty(definitionName as string);
     }
