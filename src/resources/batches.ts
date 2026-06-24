@@ -16,14 +16,14 @@ export class Batches extends APIResource {
    * Creates and executes a batch from an uploaded file of requests
    */
   create(body: BatchCreateParams, options?: RequestOptions): APIPromise<Batch> {
-    return this._client.post('/batches', { body, ...options });
+    return this._client.post('/batches', { body, ...options, __security: { bearerAuth: true } });
   }
 
   /**
    * Retrieves a batch.
    */
   retrieve(batchID: string, options?: RequestOptions): APIPromise<Batch> {
-    return this._client.get(path`/batches/${batchID}`, options);
+    return this._client.get(path`/batches/${batchID}`, { ...options, __security: { bearerAuth: true } });
   }
 
   /**
@@ -33,7 +33,11 @@ export class Batches extends APIResource {
     query: BatchListParams | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<BatchesPage, Batch> {
-    return this._client.getAPIList('/batches', CursorPage<Batch>, { query, ...options });
+    return this._client.getAPIList('/batches', CursorPage<Batch>, {
+      query,
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
@@ -42,7 +46,10 @@ export class Batches extends APIResource {
    * (if any) available in the output file.
    */
   cancel(batchID: string, options?: RequestOptions): APIPromise<Batch> {
-    return this._client.post(path`/batches/${batchID}/cancel`, options);
+    return this._client.post(path`/batches/${batchID}/cancel`, {
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 }
 

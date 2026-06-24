@@ -56,6 +56,8 @@ Types:
 - <code><a href="./src/resources/realtime/realtime.ts">RealtimeMcpToolCall</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">RealtimeMcpToolExecutionError</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">RealtimeMcphttpError</a></code>
+- <code><a href="./src/resources/realtime/realtime.ts">RealtimeReasoning</a></code>
+- <code><a href="./src/resources/realtime/realtime.ts">RealtimeReasoningEffort</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">RealtimeResponse</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">RealtimeResponseCreateAudioOutput</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">RealtimeResponseCreateMcpTool</a></code>
@@ -75,6 +77,22 @@ Types:
 - <code><a href="./src/resources/realtime/realtime.ts">RealtimeTranscriptionSessionAudioInput</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">RealtimeTranscriptionSessionAudioInputTurnDetection</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">RealtimeTranscriptionSessionCreateRequest</a></code>
+- <code><a href="./src/resources/realtime/realtime.ts">RealtimeTranslationClientEvent</a></code>
+- <code><a href="./src/resources/realtime/realtime.ts">RealtimeTranslationClientSecretCreateRequest</a></code>
+- <code><a href="./src/resources/realtime/realtime.ts">RealtimeTranslationClientSecretCreateResponse</a></code>
+- <code><a href="./src/resources/realtime/realtime.ts">RealtimeTranslationInputAudioBufferAppendEvent</a></code>
+- <code><a href="./src/resources/realtime/realtime.ts">RealtimeTranslationInputTranscriptDeltaEvent</a></code>
+- <code><a href="./src/resources/realtime/realtime.ts">RealtimeTranslationOutputAudioDeltaEvent</a></code>
+- <code><a href="./src/resources/realtime/realtime.ts">RealtimeTranslationOutputTranscriptDeltaEvent</a></code>
+- <code><a href="./src/resources/realtime/realtime.ts">RealtimeTranslationServerEvent</a></code>
+- <code><a href="./src/resources/realtime/realtime.ts">RealtimeTranslationSession</a></code>
+- <code><a href="./src/resources/realtime/realtime.ts">RealtimeTranslationSessionCloseEvent</a></code>
+- <code><a href="./src/resources/realtime/realtime.ts">RealtimeTranslationSessionClosedEvent</a></code>
+- <code><a href="./src/resources/realtime/realtime.ts">RealtimeTranslationSessionCreateRequest</a></code>
+- <code><a href="./src/resources/realtime/realtime.ts">RealtimeTranslationSessionCreatedEvent</a></code>
+- <code><a href="./src/resources/realtime/realtime.ts">RealtimeTranslationSessionUpdateEvent</a></code>
+- <code><a href="./src/resources/realtime/realtime.ts">RealtimeTranslationSessionUpdateRequest</a></code>
+- <code><a href="./src/resources/realtime/realtime.ts">RealtimeTranslationSessionUpdatedEvent</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">RealtimeTruncation</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">RealtimeTruncationRetentionRatio</a></code>
 - <code><a href="./src/resources/realtime/realtime.ts">ResponseAudioDeltaEvent</a></code>
@@ -108,7 +126,6 @@ Types:
 
 Types:
 
-- <code><a href="./src/resources/realtime/client-secrets.ts">RealtimeSessionClientSecret</a></code>
 - <code><a href="./src/resources/realtime/client-secrets.ts">RealtimeSessionCreateResponse</a></code>
 - <code><a href="./src/resources/realtime/client-secrets.ts">RealtimeTranscriptionSessionCreateResponse</a></code>
 - <code><a href="./src/resources/realtime/client-secrets.ts">RealtimeTranscriptionSessionTurnDetection</a></code>

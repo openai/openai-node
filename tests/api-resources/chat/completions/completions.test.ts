@@ -4,6 +4,7 @@ import OpenAI from 'openai';
 
 const client = new OpenAI({
   apiKey: 'My API Key',
+  adminAPIKey: 'My Admin API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
@@ -48,6 +49,7 @@ describe('resource completions', () => {
       max_tokens: 0,
       metadata: { foo: 'string' },
       modalities: ['text'],
+      moderation: { model: 'model' },
       n: 1,
       parallel_tool_calls: true,
       prediction: { content: 'string', type: 'content' },
