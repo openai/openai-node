@@ -133,10 +133,11 @@ OpenAI supports streaming responses when interacting with the [Chat](#chat-strea
 
 ## Assistant Streaming API
 
-OpenAI supports streaming responses from Assistants. The SDK provides convenience wrappers around the API
-so you can subscribe to the types of events you are interested in as well as receive accumulated responses.
+> **Deprecated:** The Assistants API is deprecated and will shut down on August 26, 2026. For new
+> integrations, use the Responses API. See the [Assistants migration guide](https://developers.openai.com/api/docs/assistants/migration).
 
-More information can be found in the documentation: [Assistant Streaming](https://platform.openai.com/docs/assistants/overview?lang=node.js)
+For existing Assistants integrations, the SDK provides convenience wrappers around the streaming API so you
+can subscribe to the types of events you are interested in as well as receive accumulated responses.
 
 #### An example of creating a run and subscribing to some events
 
@@ -194,7 +195,7 @@ The assistant API provides events you can subscribe to for the following events.
 .on('event', (event: AssistantStreamEvent) => ...)
 ```
 
-This allows you to subscribe to all the possible raw events sent by the OpenAI streaming API.
+This allows you to subscribe to raw Assistants lifecycle events sent by the OpenAI streaming API.
 In many cases it will be more convenient to subscribe to a more specific set of events for your use case.
 
 More information on the types of events can be found here: [Events](https://platform.openai.com/docs/api-reference/assistants-streaming/events)
@@ -259,10 +260,13 @@ These events allow you to subscribe to events for the creation, delta and comple
 More information on tools can be found here [Tools](https://platform.openai.com/docs/assistants/tools)
 
 ```ts
+.on('error', (error: OpenAIError) => ...)
 .on('end', () => ...)
 ```
 
-The last event sent when a stream ends.
+The `error` event is emitted when the stream encounters an API or SDK error. The `end` event is the last SDK
+event emitted when the stream finishes, including after an error or abort. The raw `[DONE]` marker is consumed
+by the SDK rather than emitted through the `event` listener.
 
 ### Assistant Methods
 
