@@ -93,20 +93,27 @@ export class WorkloadIdentityAuth {
       );
     }
 
-    const tokenResponse = (await response.json()) as TokenExchangeResponse;
-    if (typeof tokenResponse.access_token !== 'string' || tokenResponse.access_token.length === 0) {
+    const tokenResponse: unknown = await response.json();
+    if (
+      typeof tokenResponse !== 'object' ||
+      tokenResponse === null ||
+      !('access_token' in tokenResponse) ||
+      typeof tokenResponse.access_token !== 'string' ||
+      tokenResponse.access_token.trim().length === 0
+    ) {
       throw new OpenAIError("Token exchange response missing 'access_token' field");
     }
 
-    const expiresIn = tokenResponse.expires_in ?? 3600;
+    const accessToken = tokenResponse.access_token;
+    const expiresIn = (tokenResponse as Partial<TokenExchangeResponse>).expires_in ?? 3600;
     const expiresAt = Date.now() + expiresIn * 1000;
 
     this.cachedToken = {
-      token: tokenResponse.access_token,
+      token: accessToken,
       expiresAt,
     };
 
-    return tokenResponse.access_token;
+    return accessToken;
   }
 
   private isTokenExpired(cachedToken: CachedToken): boolean {
