@@ -70,12 +70,13 @@ export function parseResponse<
   Params extends ResponseCreateParamsBase,
   ParsedT = ExtractParsedContentFromParams<Params>,
 >(response: Response, params: Params): ParsedResponse<ParsedT> {
+  const shouldParse = !response.status || response.status === 'completed';
   const output: Array<ParsedResponseOutputItem<ParsedT>> = response.output.map(
     (item): ParsedResponseOutputItem<ParsedT> => {
       if (item.type === 'function_call') {
         return {
           ...item,
-          parsed_arguments: parseToolCall(params, item),
+          parsed_arguments: shouldParse ? parseToolCall(params, item) : null,
         };
       }
       if (item.type === 'message') {
@@ -83,7 +84,7 @@ export function parseResponse<
           if (content.type === 'output_text') {
             return {
               ...content,
-              parsed: parseTextFormat(params, content.text),
+              parsed: shouldParse ? parseTextFormat(params, content.text) : null,
             };
           }
 
