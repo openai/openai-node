@@ -1,5 +1,13 @@
 # Changelog
 
+## 6.45.1 (2026-06-25)
+
+Full Changelog: [v6.45.0...v6.45.1](https://github.com/openai/openai-node/compare/v6.45.0...v6.45.1)
+
+### Bug Fixes
+
+* **runner:** normalize missing tool call IDs ([#1958](https://github.com/openai/openai-node/issues/1958)) ([6371623](https://github.com/openai/openai-node/commit/6371623aadd26ec34a0edecba62a0a10c834b37d))
+
 ## 6.45.0 (2026-06-24)
 
 Full Changelog: [v6.44.0...v6.45.0](https://github.com/openai/openai-node/compare/v6.44.0...v6.45.0)
