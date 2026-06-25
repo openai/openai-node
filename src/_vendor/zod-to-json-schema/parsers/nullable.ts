@@ -12,7 +12,11 @@ export type JsonSchema7NullableType =
       type: [string, 'null'];
     };
 
-export function parseNullableDef(def: ZodNullableDef, refs: Refs): JsonSchema7NullableType | undefined {
+export function parseNullableDef(
+  def: ZodNullableDef,
+  refs: Refs,
+  forceResolution: boolean,
+): JsonSchema7NullableType | undefined {
   if (
     ['ZodString', 'ZodNumber', 'ZodBigInt', 'ZodBoolean', 'ZodNull'].includes(def.innerType._def.typeName) &&
     (!def.innerType._def.checks || !def.innerType._def.checks.length)
@@ -30,10 +34,14 @@ export function parseNullableDef(def: ZodNullableDef, refs: Refs): JsonSchema7Nu
   }
 
   if (refs.target === 'openApi3') {
-    const base = parseDef(def.innerType._def, {
-      ...refs,
-      currentPath: [...refs.currentPath],
-    });
+    const base = parseDef(
+      def.innerType._def,
+      {
+        ...refs,
+        currentPath: [...refs.currentPath],
+      },
+      forceResolution,
+    );
 
     if (base && '$ref' in base) return { allOf: [base], nullable: true } as any;
 

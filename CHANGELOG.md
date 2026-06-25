@@ -1,5 +1,53 @@
 # Changelog
 
+## 6.45.0 (2026-06-24)
+
+Full Changelog: [v6.44.0...v6.45.0](https://github.com/openai/openai-node/compare/v6.44.0...v6.45.0)
+
+### Features
+
+* add afterCompletion hook to runTools ([#1064](https://github.com/openai/openai-node/issues/1064)) ([4976c22](https://github.com/openai/openai-node/commit/4976c22bf608e4d5f70d6386cfe9c428cf8ff2c7))
+* **realtime:** support sideband call_id connections ([#1795](https://github.com/openai/openai-node/issues/1795)) ([4fd59e1](https://github.com/openai/openai-node/commit/4fd59e1be4ad478373cdcb4f185109af29067da8))
+* reject emitted promise on error in EventEmitter ([#1596](https://github.com/openai/openai-node/issues/1596)) ([e0b09da](https://github.com/openai/openai-node/commit/e0b09da782f0d6ce69a383fd3f3d02a0c7608d6d))
+* **responses:** add response input items helper ([#1794](https://github.com/openai/openai-node/issues/1794)) ([7e5a86a](https://github.com/openai/openai-node/commit/7e5a86a6162d76a7248fa983cb16a16c185a097a))
+* **responses:** add response stream accumulator helper ([#1793](https://github.com/openai/openai-node/issues/1793)) ([32e3e39](https://github.com/openai/openai-node/commit/32e3e39e1736659196aadd7d0bb8d6ca90f69168))
+
+
+### Bug Fixes
+
+* avoid serializing null optional bodies ([e4ddff6](https://github.com/openai/openai-node/commit/e4ddff6f2085b1c69eaa790e48d1a22d2dd9d7fb))
+* clean up stream abort listeners ([#1884](https://github.com/openai/openai-node/issues/1884)) ([be55b8f](https://github.com/openai/openai-node/commit/be55b8fb352be80d9d30dd263451615f4342d69f))
+* Leading whitespace chunks break partial parser (structured outputs) ([#1213](https://github.com/openai/openai-node/issues/1213)) ([88d806e](https://github.com/openai/openai-node/commit/88d806eb91f2b41ba4cac3ee69eb73656cab1849))
+* **responses:** avoid parsing incomplete structured output ([#1852](https://github.com/openai/openai-node/issues/1852)) ([4c39681](https://github.com/openai/openai-node/commit/4c396817cbc9586654fa7a376d55a29d8793995d))
+* **responses:** restore output_text on streamed final responses ([#1681](https://github.com/openai/openai-node/issues/1681)) ([bbde4d9](https://github.com/openai/openai-node/commit/bbde4d9e3bbceef5e14bcb71b3a7c36388dbab2b))
+* validate workload identity access tokens ([#1885](https://github.com/openai/openai-node/issues/1885)) ([80febe4](https://github.com/openai/openai-node/commit/80febe441c2dc2d110b412be022fe044bbae2cd9))
+* **zod:** fully resolve extracted wrapper definitions ([#1766](https://github.com/openai/openai-node/issues/1766)) ([5d46ed2](https://github.com/openai/openai-node/commit/5d46ed2012f73b18d6594c62b9fb6351bef76d3d))
+* **zod:** sanitize extracted definition refs ([#1903](https://github.com/openai/openai-node/issues/1903)) ([6ef2111](https://github.com/openai/openai-node/commit/6ef21116801bdaa8e9f25686a8bd365a270401bf))
+
+
+### Chores
+
+* **internal:** codegen related update ([81fcf96](https://github.com/openai/openai-node/commit/81fcf96fccca29dbcbf33bcb7578b98e06d7a6b0))
+
+
+### Documentation
+
+* add vision example using image URL ([#1571](https://github.com/openai/openai-node/issues/1571)) ([70966c9](https://github.com/openai/openai-node/commit/70966c922d0f65eb4711552cf5acb85c7842c2a9))
+* **azure:** add Responses API example ([#1675](https://github.com/openai/openai-node/issues/1675)) ([46453b0](https://github.com/openai/openai-node/commit/46453b06aa8682e5d37be810296bd2f96fe11096))
+* **azure:** use standard client for v1 chat ([#1692](https://github.com/openai/openai-node/issues/1692)) ([fba57e5](https://github.com/openai/openai-node/commit/fba57e577c484c579fbc12741aba6f7df2875eca))
+* clarify abort-on-function-call example ([#1843](https://github.com/openai/openai-node/issues/1843)) ([f21f248](https://github.com/openai/openai-node/commit/f21f24842827f514262bf3c0b5ba4c634585ce31))
+* clarify assistant stream event names ([#1860](https://github.com/openai/openai-node/issues/1860)) ([95fc6cd](https://github.com/openai/openai-node/commit/95fc6cd2d0790797eb62b62a0da45dd13de62c0e))
+* clarify supported zod schema features ([#1880](https://github.com/openai/openai-node/issues/1880)) ([ea93760](https://github.com/openai/openai-node/commit/ea93760643871960ad28cbb8654432f091902241))
+* fix helper example links ([#1890](https://github.com/openai/openai-node/issues/1890)) ([9c58f39](https://github.com/openai/openai-node/commit/9c58f399bd71201d4ff08d5192ca84608aba082b))
+* fix typos in tool calls stream example ([#1817](https://github.com/openai/openai-node/issues/1817)) ([8915ef0](https://github.com/openai/openai-node/commit/8915ef0d46ab47b03c561d87e4271b79bc569793))
+* **readme:** fix two typos and remove duplicate section ([#1733](https://github.com/openai/openai-node/issues/1733)) ([e2f8051](https://github.com/openai/openai-node/commit/e2f80517c01b25432371f7814c20221b3aed67d4))
+* **runner:** remove "the the" duplicate-word typo in JSDoc ([#1892](https://github.com/openai/openai-node/issues/1892)) ([52f075f](https://github.com/openai/openai-node/commit/52f075ff39c14a6114c74b73e9dfbc230445f681))
+
+
+### Build System
+
+* vendor tsc-multi build tool ([#1948](https://github.com/openai/openai-node/issues/1948)) ([7c35bcd](https://github.com/openai/openai-node/commit/7c35bcd186140f47a13f9e60e19e40a1994cbf5e))
+
 ## 6.44.0 (2026-06-17)
 
 Full Changelog: [v6.43.0...v6.44.0](https://github.com/openai/openai-node/compare/v6.43.0...v6.44.0)

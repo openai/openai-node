@@ -8,6 +8,7 @@ import {
 import OpenAI from '../index';
 import { RequestOptions } from '../internal/request-options';
 import { type ReadableStream } from '../internal/shim-types';
+import { uuid4 } from '../internal/utils/uuid';
 import {
   AutoParseableResponseFormat,
   hasAutoParseableInput,
@@ -373,11 +374,7 @@ export class ChatCompletionStream<ParsedT = null>
     options?: RequestOptions,
   ): Promise<ParsedChatCompletion<ParsedT>> {
     super._createChatCompletion;
-    const signal = options?.signal;
-    if (signal) {
-      if (signal.aborted) this.controller.abort();
-      signal.addEventListener('abort', () => this.controller.abort());
-    }
+    this._listenForAbort(options?.signal);
     this.#beginRequest();
 
     const stream = await client.chat.completions.create(
@@ -398,11 +395,7 @@ export class ChatCompletionStream<ParsedT = null>
     readableStream: ReadableStream,
     options?: RequestOptions,
   ): Promise<ChatCompletion> {
-    const signal = options?.signal;
-    if (signal) {
-      if (signal.aborted) this.controller.abort();
-      signal.addEventListener('abort', () => this.controller.abort());
-    }
+    this._listenForAbort(options?.signal);
     this.#beginRequest();
     this._connected();
     const stream = Stream.fromReadableStream<ChatCompletionChunk>(readableStream, this.controller);
@@ -511,7 +504,8 @@ export class ChatCompletionStream<ParsedT = null>
         choice.message.content = (choice.message.content || '') + content;
 
         if (!choice.message.refusal && this.#getAutoParseableResponseFormat()) {
-          choice.message.parsed = partialParse(choice.message.content);
+          // The partial parser does not accept whitespace-only input.
+          choice.message.parsed = choice.message.content.trim() ? partialParse(choice.message.content) : null;
         }
       }
 
@@ -664,9 +658,6 @@ function finalizeChatCompletion<ParsedT>(
               tool_calls: tool_calls.map((tool_call, i) => {
                 const { function: fn, type, id, ...toolRest } = tool_call;
                 const { arguments: args, name, ...fnRest } = fn || {};
-                if (id == null) {
-                  throw new OpenAIError(`missing choices[${index}].tool_calls[${i}].id\n${str(snapshot)}`);
-                }
                 if (type == null) {
                   throw new OpenAIError(`missing choices[${index}].tool_calls[${i}].type\n${str(snapshot)}`);
                 }
@@ -681,7 +672,12 @@ function finalizeChatCompletion<ParsedT>(
                   );
                 }
 
-                return { ...toolRest, id, type, function: { ...fnRest, name, arguments: args } };
+                return {
+                  ...toolRest,
+                  id: id || `call_${uuid4()}`,
+                  type,
+                  function: { ...fnRest, name, arguments: args },
+                };
               }),
             },
           };
