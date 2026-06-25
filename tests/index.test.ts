@@ -909,6 +909,39 @@ describe('retries', () => {
     expect(count).toEqual(3);
   });
 
+  test('caps retry-after above 60 seconds and falls back to backoff', async () => {
+    let count = 0;
+    const testFetch = async (
+      url: string | URL | Request,
+      { signal }: RequestInit = {},
+    ): Promise<Response> => {
+      if (count++ === 0) {
+        return new Response(undefined, {
+          status: 429,
+          headers: {
+            // 600 seconds: must NOT be honored, otherwise the request hangs for 10 minutes.
+            'Retry-After': '600',
+          },
+        });
+      }
+      return new Response(JSON.stringify({ a: 1 }), { headers: { 'Content-Type': 'application/json' } });
+    };
+
+    const client = new OpenAI({
+      apiKey: 'My API Key',
+      adminAPIKey: 'My Admin API Key',
+      fetch: testFetch,
+    });
+
+    const started = Date.now();
+    expect(await client.request({ path: '/foo', method: 'get' })).toEqual({ a: 1 });
+    const elapsed = Date.now() - started;
+    expect(count).toEqual(2);
+    // Default backoff for the first retry is well under a second; assert we did not
+    // sleep anywhere near the 600s the header asked for.
+    expect(elapsed).toBeLessThan(60 * 1000);
+  });
+
   describe('auth', () => {
     test('apiKey', async () => {
       const client = new OpenAI({
