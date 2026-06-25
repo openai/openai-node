@@ -79,6 +79,25 @@ describe('buildHeaders', () => {
     ],
     [[undefined], `NullableHeaders { }`],
     [[null], `NullableHeaders { }`],
+    [
+      [
+        {
+          'OpenAI-Organization': 'org-123',
+        },
+      ],
+      `NullableHeaders { 'OpenAI-Organization': 'org-123' }`,
+    ],
+    [
+      [
+        {
+          'OpenAI-Organization': 'org-123',
+        },
+        {
+          'openai-organization': 'org-456',
+        },
+      ],
+      `NullableHeaders { 'openai-organization': 'org-456' }`,
+    ],
   ];
   for (const [input, expected] of cases) {
     test(expected, () => {
