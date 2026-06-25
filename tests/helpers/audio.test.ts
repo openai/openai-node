@@ -16,6 +16,7 @@ function mockFfplay() {
   });
   const ffplay = {
     stdin,
+    kill: jest.fn(),
     on: jest.fn(),
   };
 
@@ -31,7 +32,7 @@ function mockFfplay() {
   });
   spawnMock.mockReturnValue(ffplay as any);
 
-  return { chunks };
+  return { chunks, ffplay };
 }
 
 describe('playAudio', () => {
@@ -55,5 +56,20 @@ describe('playAudio', () => {
     await playAudio(response as any);
 
     expect(Buffer.concat(chunks).toString()).toBe('hello');
+  });
+
+  it('rejects and stops ffplay when a Response Web ReadableStream errors', async () => {
+    const { ffplay } = mockFfplay();
+    const response = new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.error(new Error('stream failed'));
+        },
+      }),
+    );
+
+    await expect(playAudio(response)).rejects.toThrow('stream failed');
+
+    expect(ffplay.kill).toHaveBeenCalled();
   });
 });
