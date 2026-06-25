@@ -36,6 +36,8 @@ node scripts/utils/postprocess-files.cjs
 # import the output ESM
 (cd dist && node -e 'require("openai")')
 (cd dist && node -e 'import("openai")' --input-type=module)
+(cd dist && node -e 'require("openai/providers/bedrock")')
+(cd dist && node -e 'import("openai/providers/bedrock")' --input-type=module)
 
 if [ "${OPENAI_DISABLE_DENO_BUILD:-0}" != "1" ] && [ -e ./scripts/build-deno ]
 then

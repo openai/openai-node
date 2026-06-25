@@ -1,20 +1,27 @@
 #!/usr/bin/env -S npm run tsn -- -T
 
-import { AzureOpenAI } from 'openai';
+import OpenAI from 'openai';
 import { getBearerTokenProvider, DefaultAzureCredential } from '@azure/identity';
 import 'dotenv/config';
 
-// Corresponds to your Model deployment within your OpenAI resource, e.g. gpt-4-1106-preview
-// Navigate to the Azure OpenAI Studio to deploy a model.
-const deployment = 'gpt-4-1106-preview';
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) throw new Error(`Missing ${name}`);
+  return value;
+}
 
-const credential = new DefaultAzureCredential();
-const scope = 'https://cognitiveservices.azure.com/.default';
-const azureADTokenProvider = getBearerTokenProvider(credential, scope);
+// For example: https://your-resource-name.openai.azure.com
+const endpoint = requireEnv('AZURE_OPENAI_ENDPOINT');
+// This is the name of your Azure model deployment, not the underlying model name.
+const deployment = requireEnv('AZURE_OPENAI_DEPLOYMENT');
 
-// Make sure to set AZURE_OPENAI_ENDPOINT with the endpoint of your Azure resource.
-// You can find it in the Azure Portal.
-const openai = new AzureOpenAI({ azureADTokenProvider, apiVersion: '2024-10-01-preview' });
+// Azure's v1 endpoint uses the standard OpenAI client.
+const tokenProvider = getBearerTokenProvider(new DefaultAzureCredential(), 'https://ai.azure.com/.default');
+
+const openai = new OpenAI({
+  baseURL: `${endpoint.replace(/\/+$/, '')}/openai/v1/`,
+  apiKey: tokenProvider,
+});
 
 async function main() {
   console.log('Non-streaming:');

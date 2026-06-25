@@ -49,6 +49,18 @@ const response = await client.responses.create({
 console.log(response.output_text);
 ```
 
+### Multi-turn conversations
+
+When you manage Responses API conversation history manually, preserve output items in order. Filtering
+`response.output` to messages can drop required reasoning or tool-call items and cause the next request to
+fail.
+
+Use the SDK's `toResponseInputItems()` helper to normalize all replayable output items before adding them to
+the next request. For simple continuation, you can pass `previous_response_id` instead.
+
+See the [manual conversation state example](examples/responses/manual-conversation-state.ts) and
+[conversation state guide](https://developers.openai.com/api/docs/guides/conversation-state).
+
 The previous standard (supported indefinitely) for generating text is the [Chat Completions API](https://platform.openai.com/docs/api-reference/chat). You can use that API to generate text from the model with the code below.
 
 ```ts
@@ -67,6 +79,37 @@ const completion = await client.chat.completions.create({
 });
 
 console.log(completion.choices[0].message.content);
+```
+
+## Vision
+
+Use the Responses API to analyze images and generate text about visual content.
+
+```ts
+import OpenAI from 'openai';
+
+const client = new OpenAI({
+  apiKey: process.env['OPENAI_API_KEY'], // This is the default and can be omitted
+});
+
+const response = await client.responses.create({
+  model: 'gpt-5.5',
+  input: [
+    {
+      role: 'user',
+      content: [
+        { type: 'input_text', text: 'What is in this image?' },
+        {
+          type: 'input_image',
+          image_url:
+            'https://api.nga.gov/iiif/a2e6da57-3cd1-4235-b20e-95dcaefed6c8/full/!800,800/0/default.jpg',
+        },
+      ],
+    },
+  ],
+});
+
+console.log(response.output_text);
 ```
 
 ## Workload Identity Authentication
@@ -164,7 +207,7 @@ const client = new OpenAI({
 
 ## Streaming responses
 
-We provide support for streaming responses using Server Sent Events (SSE).
+We provide support for streaming responses using Server-Sent Events (SSE).
 
 ```ts
 import OpenAI from 'openai';
@@ -334,106 +377,6 @@ Error codes are as follows:
 | >=500       | `InternalServerError`      |
 | N/A         | `APIConnectionError`       |
 
-## Request IDs
-
-> For more information on debugging requests, see [these docs](https://platform.openai.com/docs/api-reference/debugging-requests)
-
-All object responses in the SDK provide a `_request_id` property which is added from the `x-request-id` response header so that you can quickly log failing requests and report them back to OpenAI.
-
-```ts
-const completion = await client.chat.completions.create({
-  messages: [{ role: 'user', content: 'Say this is a test' }],
-  model: 'gpt-5.5',
-});
-console.log(completion._request_id); // req_123
-```
-
-You can also access the Request ID using the `.withResponse()` method:
-
-```ts
-const { data: stream, request_id } = await openai.chat.completions
-  .create({
-    model: 'gpt-5.5',
-    messages: [{ role: 'user', content: 'Say this is a test' }],
-    stream: true,
-  })
-  .withResponse();
-```
-
-## Realtime API
-
-The Realtime API enables you to build low-latency, multi-modal conversational experiences. It currently supports text and audio as both input and output, as well as [function calling](https://platform.openai.com/docs/guides/function-calling) through a `WebSocket` connection.
-
-```ts
-import { OpenAIRealtimeWebSocket } from 'openai/realtime/websocket';
-
-const rt = new OpenAIRealtimeWebSocket({ model: 'gpt-realtime-2' });
-
-rt.on('response.output_text.delta', (event) => process.stdout.write(event.delta));
-```
-
-For more information see [realtime.md](realtime.md).
-
-## Microsoft Azure OpenAI
-
-To use this library with [Azure OpenAI](https://learn.microsoft.com/azure/ai-services/openai/overview), use the `AzureOpenAI`
-class instead of the `OpenAI` class.
-
-> [!IMPORTANT]
-> The Azure API shape slightly differs from the core API shape which means that the static types for responses / params
-> won't always be correct.
-
-```ts
-import { AzureOpenAI } from 'openai';
-import { getBearerTokenProvider, DefaultAzureCredential } from '@azure/identity';
-
-const credential = new DefaultAzureCredential();
-const scope = 'https://cognitiveservices.azure.com/.default';
-const azureADTokenProvider = getBearerTokenProvider(credential, scope);
-
-const openai = new AzureOpenAI({ azureADTokenProvider });
-
-const result = await openai.chat.completions.create({
-  model: 'gpt-5.5',
-  messages: [{ role: 'user', content: 'Say hello!' }],
-});
-
-console.log(result.choices[0]!.message?.content);
-```
-
-## Amazon Bedrock
-
-To use this library with [Amazon Bedrock's OpenAI-compatible API](https://docs.aws.amazon.com/bedrock/latest/userguide/models-api-compatibility.html), use the `BedrockOpenAI` class instead of the `OpenAI` class.
-
-```ts
-import { BedrockOpenAI } from 'openai';
-
-// gets the bearer token from AWS_BEARER_TOKEN_BEDROCK and the region from AWS_REGION/AWS_DEFAULT_REGION
-const client = new BedrockOpenAI();
-
-const response = await client.responses.create({
-  model: 'openai.gpt-5.4',
-  input: 'Say hello!',
-});
-
-console.log(response.output_text);
-```
-
-`BedrockOpenAI` configures AWS bearer auth and the Bedrock Mantle endpoint, then uses the normal SDK resources. AWS controls which endpoints and features are supported; unsupported calls surface the provider's normal HTTP errors through the SDK.
-
-Pass `baseURL` or set `AWS_BEDROCK_BASE_URL` to override the derived `https://bedrock-mantle.<region>.api.aws/openai/v1` endpoint. For long-running apps, pass `bedrockTokenProvider` to refresh the Bedrock bearer token before each request.
-
-Set `AWS_BEARER_TOKEN_BEDROCK` to an [Amazon Bedrock API key](https://docs.aws.amazon.com/bedrock/latest/userguide/api-keys.html). To refresh tokens yourself, pass a provider instead of `apiKey`:
-
-```ts
-const client = new BedrockOpenAI({
-  awsRegion: 'us-west-2',
-  bedrockTokenProvider: async () => refreshBedrockToken(),
-});
-```
-
-For more information on support for Amazon Bedrock, see [bedrock.md](bedrock.md).
-
 ### Retries
 
 Certain errors will be automatically retried 2 times by default, with a short exponential backoff.
@@ -575,6 +518,46 @@ console.log(result.choices[0]!.message?.content);
 ```
 
 For more information on support for the Azure API, see [azure.md](azure.md).
+
+## Amazon Bedrock
+
+To use this library with [Amazon Bedrock's OpenAI-compatible API](https://docs.aws.amazon.com/bedrock/latest/userguide/models-api-compatibility.html), configure the standard `OpenAI` client with the Bedrock provider:
+
+```ts
+import OpenAI from 'openai';
+import { bedrock } from 'openai/providers/bedrock/aws';
+
+const client = new OpenAI({
+  provider: bedrock({ region: 'us-west-2' }),
+});
+
+const response = await client.responses.create({
+  model: 'openai.gpt-5.4',
+  input: 'Say hello!',
+});
+
+console.log(response.output_text);
+```
+
+Use a model that [supports the Responses API](https://docs.aws.amazon.com/bedrock/latest/userguide/models-api-compatibility.html). A model returned by the Models API may support a different Bedrock inference API instead.
+
+This uses the regional `https://bedrock-mantle.<region>.api.aws/openai/v1` endpoint. The region can also come from `AWS_REGION` or `AWS_DEFAULT_REGION`, and `AWS_BEDROCK_BASE_URL` can override the endpoint.
+
+The AWS entrypoint uses the standard AWS credential chain by default. It also accepts a named profile, static credentials, or a custom credential provider. Install its peer dependencies before importing it:
+
+```bash
+npm install @aws-sdk/credential-provider-node @smithy/hash-node @smithy/signature-v4
+```
+
+The AWS entrypoint uses normal static imports so bundlers and serverless packagers can trace these dependencies. If one is missing, importing `openai/providers/bedrock/aws` fails immediately with the runtime's normal module-not-found error, for example:
+
+```text
+Cannot find module '@aws-sdk/credential-provider-node'
+```
+
+For Bedrock API key authentication, import `bedrock` from `openai/providers/bedrock` instead. That entrypoint has no AWS dependencies and works in browser-compatible runtimes when `dangerouslyAllowBrowser` is enabled. SigV4 authentication is supported in Node.js and compatible server runtimes and requires replayable request bodies. The legacy, bearer-only `BedrockOpenAI` class remains available for compatibility.
+
+For more information on support for Amazon Bedrock, see [bedrock.md](bedrock.md).
 
 ## Advanced Usage
 
@@ -808,7 +791,7 @@ The following runtimes are supported:
 - Vercel Edge Runtime.
 - Jest 28 or greater with the `"node"` environment (`"jsdom"` is not supported at this time).
 - Nitro v2.6 or greater.
-- Web browsers: disabled by default to avoid exposing your secret API credentials. Enable browser support by explicitly setting `dangerouslyAllowBrowser` to true'.
+- Web browsers: disabled by default to avoid exposing your secret API credentials. Enable browser support by explicitly setting `dangerouslyAllowBrowser` to `true`.
   <details>
     <summary>More explanation</summary>
 

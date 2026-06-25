@@ -34,6 +34,22 @@ function zodV4ToJsonSchema(schema: z4.ZodType): Record<string, unknown> {
   return toStrictJsonSchema(
     z4.toJSONSchema(schema, {
       target: 'draft-7',
+      override: ({ zodSchema, jsonSchema }) => {
+        const def = zodSchema._zod.def;
+
+        if (def.type === 'union' && 'discriminator' in def && Array.isArray(jsonSchema.oneOf)) {
+          if (jsonSchema.anyOf !== undefined) {
+            throw new Error(
+              'Zod discriminated union generated both `anyOf` and `oneOf`, which cannot be represented in an OpenAI strict schema',
+            );
+          }
+
+          // Discriminator values are mutually exclusive, so anyOf preserves the
+          // union while staying inside the API's supported JSON Schema subset.
+          jsonSchema.anyOf = jsonSchema.oneOf;
+          delete jsonSchema.oneOf;
+        }
+      },
     }) as JSONSchema,
   ) as Record<string, unknown>;
 }
