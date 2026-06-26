@@ -154,7 +154,7 @@ export interface CursorPageParams {
   limit?: number;
 }
 
-export class CursorPage<Item extends { id: string }>
+export class CursorPage<Item extends { id?: string }>
   extends AbstractPage<Item>
   implements CursorPageResponse<Item>
 {
