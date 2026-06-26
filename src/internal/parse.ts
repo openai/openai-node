@@ -10,6 +10,7 @@ export type APIResponseProps = {
   response: Response;
   options: FinalRequestOptions;
   controller: AbortController;
+  cleanupAbortSignal?: () => void;
   requestLogID: string;
   retryOfRequestLogID: string | undefined;
   startTime: number;
@@ -33,6 +34,7 @@ export async function defaultParseResponse<T>(
           props.controller,
           client,
           props.options.__synthesizeEventData,
+          props.cleanupAbortSignal,
         ) as any;
       }
 
@@ -41,34 +43,39 @@ export async function defaultParseResponse<T>(
         props.controller,
         client,
         props.options.__synthesizeEventData,
+        props.cleanupAbortSignal,
       ) as any;
     }
 
-    // fetch refuses to read the body when the status code is 204.
-    if (response.status === 204) {
-      return null as T;
-    }
-
-    if (props.options.__binaryResponse) {
-      return response as unknown as T;
-    }
-
-    const contentType = response.headers.get('content-type');
-    const mediaType = contentType?.split(';')[0]?.trim();
-    const isJSON = mediaType?.includes('application/json') || mediaType?.endsWith('+json');
-    if (isJSON) {
-      const contentLength = response.headers.get('content-length');
-      if (contentLength === '0') {
-        // if there is no content we can't do anything
-        return undefined as T;
+    try {
+      // fetch refuses to read the body when the status code is 204.
+      if (response.status === 204) {
+        return null as T;
       }
 
-      const json = await response.json();
-      return addRequestID(json as T, response);
-    }
+      if (props.options.__binaryResponse) {
+        return response as unknown as T;
+      }
 
-    const text = await response.text();
-    return text as unknown as T;
+      const contentType = response.headers.get('content-type');
+      const mediaType = contentType?.split(';')[0]?.trim();
+      const isJSON = mediaType?.includes('application/json') || mediaType?.endsWith('+json');
+      if (isJSON) {
+        const contentLength = response.headers.get('content-length');
+        if (contentLength === '0') {
+          // if there is no content we can't do anything
+          return undefined as T;
+        }
+
+        const json = await response.json();
+        return addRequestID(json as T, response);
+      }
+
+      const text = await response.text();
+      return text as unknown as T;
+    } finally {
+      if (!props.options.__binaryResponse) props.cleanupAbortSignal?.();
+    }
   })();
   loggerFor(client).debug(
     `[${requestLogID}] response parsed`,

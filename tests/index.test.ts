@@ -323,6 +323,112 @@ describe('instantiate client', () => {
     expect(spy).toHaveBeenCalledTimes(1);
   });
 
+  test('removes custom signal abort listener after request finishes', async () => {
+    const controller = new AbortController();
+    const addEventListenerSpy = jest.spyOn(controller.signal, 'addEventListener');
+    const removeEventListenerSpy = jest.spyOn(controller.signal, 'removeEventListener');
+
+    const client = new OpenAI({
+      baseURL: 'http://localhost:5000/',
+      apiKey: 'My API Key',
+      adminAPIKey: 'My Admin API Key',
+      fetch: () => {
+        return Promise.resolve(
+          new Response(JSON.stringify({}), {
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        );
+      },
+    });
+
+    await client.get('/foo', { signal: controller.signal });
+
+    const abortListener = addEventListenerSpy.mock.calls.find(([event]) => event === 'abort')?.[1];
+    expect(abortListener).toBeDefined();
+    expect(addEventListenerSpy).toHaveBeenCalledWith('abort', abortListener, { once: true });
+    expect(removeEventListenerSpy).toHaveBeenCalledWith('abort', abortListener);
+  });
+
+  test('keeps custom signal abort listener until response body is consumed', async () => {
+    const controller = new AbortController();
+    const removeEventListenerSpy = jest.spyOn(controller.signal, 'removeEventListener');
+    let resolveFetch: (() => void) | undefined;
+    const fetchResolved = new Promise<void>((resolve) => {
+      resolveFetch = resolve;
+    });
+    let fetchSignal: AbortSignal | undefined;
+
+    const client = new OpenAI({
+      baseURL: 'http://localhost:5000/',
+      apiKey: 'My API Key',
+      adminAPIKey: 'My Admin API Key',
+      fetch: (_url, init = {}) => {
+        fetchSignal = init.signal as AbortSignal;
+        const body = new ReadableStream<Uint8Array>({
+          start(bodyController) {
+            fetchSignal?.addEventListener('abort', () => bodyController.error(new Error('aborted')));
+          },
+        });
+        resolveFetch?.();
+        return Promise.resolve(
+          new Response(body, {
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        );
+      },
+    });
+
+    const request = client.get('/foo', { signal: controller.signal });
+    const result = request.then(
+      () => 'resolved',
+      () => 'rejected',
+    );
+    await fetchResolved;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(removeEventListenerSpy).not.toHaveBeenCalled();
+
+    controller.abort();
+
+    expect(fetchSignal?.aborted).toBe(true);
+    await expect(
+      Promise.race([result, new Promise((resolve) => setTimeout(() => resolve('pending'), 100))]),
+    ).resolves.toBe('rejected');
+    expect(removeEventListenerSpy).toHaveBeenCalled();
+  });
+
+  test('removes custom signal abort listener after streamed response finishes', async () => {
+    const controller = new AbortController();
+    const addEventListenerSpy = jest.spyOn(controller.signal, 'addEventListener');
+    const removeEventListenerSpy = jest.spyOn(controller.signal, 'removeEventListener');
+
+    const client = new OpenAI({
+      baseURL: 'http://localhost:5000/',
+      apiKey: 'My API Key',
+      adminAPIKey: 'My Admin API Key',
+      fetch: () => {
+        return Promise.resolve(
+          new Response('data: {"id":"chunk"}\n\ndata: [DONE]\n\n', {
+            headers: { 'Content-Type': 'text/event-stream' },
+          }),
+        );
+      },
+    });
+
+    const stream = await client.get<any>('/foo', { stream: true, signal: controller.signal });
+    const abortListener = addEventListenerSpy.mock.calls.find(([event]) => event === 'abort')?.[1];
+    expect(abortListener).toBeDefined();
+    expect(removeEventListenerSpy).not.toHaveBeenCalled();
+
+    const chunks = [];
+    for await (const chunk of stream) {
+      chunks.push(chunk);
+    }
+
+    expect(chunks).toEqual([{ id: 'chunk' }]);
+    expect(removeEventListenerSpy).toHaveBeenCalledWith('abort', abortListener);
+  });
+
   test('normalized method', async () => {
     let capturedRequest: RequestInit | undefined;
     const testFetch = async (url: string | URL | Request, init: RequestInit = {}): Promise<Response> => {
