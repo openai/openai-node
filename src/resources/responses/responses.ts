@@ -69,6 +69,28 @@ export interface ParsedResponse<ParsedT> extends Response {
   output_parsed: ParsedT | null;
 }
 
+/**
+ * Structured error returned by an MCP tool call.
+ */
+export interface ResponseMcpCallError {
+  /**
+   * The error type returned by the MCP server or transport layer.
+   */
+  type: 'mcp_protocol_error' | 'protocol_error' | 'tool_execution_error' | 'http_error' | (string & {});
+
+  /**
+   * The error message.
+   */
+  message: string;
+
+  /**
+   * Protocol or HTTP status code, when provided.
+   */
+  code?: number;
+
+  [key: string]: unknown;
+}
+
 export type ResponseParseParams = ResponseCreateParamsNonStreaming;
 
 export class Responses extends APIResource {
@@ -4415,7 +4437,7 @@ export namespace ResponseInputItem {
     /**
      * The error from the tool call, if any.
      */
-    error?: string | null;
+    error?: string | ResponseMcpCallError | null;
 
     /**
      * The output from the tool call.
@@ -4848,7 +4870,7 @@ export namespace ResponseItem {
     /**
      * The error from the tool call, if any.
      */
-    error?: string | null;
+    error?: string | ResponseMcpCallError | null;
 
     /**
      * The output from the tool call.
@@ -5316,7 +5338,7 @@ export namespace ResponseOutputItem {
     /**
      * The error from the tool call, if any.
      */
-    error?: string | null;
+    error?: string | ResponseMcpCallError | null;
 
     /**
      * The output from the tool call.
@@ -8421,6 +8443,7 @@ export declare namespace Responses {
     type ResponseInputTextContent as ResponseInputTextContent,
     type ResponseItem as ResponseItem,
     type ResponseLocalEnvironment as ResponseLocalEnvironment,
+    type ResponseMcpCallError as ResponseMcpCallError,
     type ResponseMcpCallArgumentsDeltaEvent as ResponseMcpCallArgumentsDeltaEvent,
     type ResponseMcpCallArgumentsDoneEvent as ResponseMcpCallArgumentsDoneEvent,
     type ResponseMcpCallCompletedEvent as ResponseMcpCallCompletedEvent,
