@@ -1089,5 +1089,13 @@ describe('retries', () => {
         ),
       );
     });
+
+    test('apiKey empty string does not throw', () => {
+      delete process.env['OPENAI_API_KEY'];
+      delete process.env['OPENAI_ADMIN_KEY'];
+
+      const client = new OpenAI({ apiKey: '' });
+      expect(client.apiKey).toBe('');
+    });
   });
 });

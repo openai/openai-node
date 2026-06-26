@@ -456,7 +456,7 @@ export class OpenAI {
       throw new Errors.OpenAIError('The `apiKey` and `workloadIdentity` options are mutually exclusive');
     }
 
-    if (!providerRuntime && !apiKey && !adminAPIKey && !workloadIdentity) {
+    if (!providerRuntime && apiKey == null && !adminAPIKey && !workloadIdentity) {
       throw new Errors.OpenAIError(
         'Missing credentials. Please pass an `apiKey`, `workloadIdentity`, `adminAPIKey`, or set the `OPENAI_API_KEY` or `OPENAI_ADMIN_KEY` environment variable.',
       );
