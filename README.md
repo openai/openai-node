@@ -263,6 +263,16 @@ await client.files.create({
 });
 ```
 
+To retrieve uploaded file contents, use `files.content()` and consume the returned
+web standard `Response`:
+
+```ts
+const response = await client.files.content('file-abc123');
+const fileContents = await response.arrayBuffer();
+```
+
+For text files, you can use `await response.text()` instead.
+
 ## Webhook Verification
 
 Verifying webhook signatures is _optional but encouraged_.
