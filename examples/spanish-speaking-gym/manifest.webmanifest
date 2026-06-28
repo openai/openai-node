@@ -1,0 +1,20 @@
+{
+  "name": "Spanish Speaking Gym",
+  "short_name": "Speaking Gym",
+  "description": "Daily Spanish speaking practice with phrase drills, roleplays, and progress tracking.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f7f8fa",
+  "theme_color": "#111827",
+  "orientation": "portrait",
+  "categories": ["education", "productivity"],
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

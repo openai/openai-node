@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Spanish Speaking Gym icon</title>
+  <desc id="desc">A speech bubble with a dumbbell and Spanish punctuation.</desc>
+  <rect width="512" height="512" rx="112" fill="#111827"/>
+  <path d="M118 147c0-36 29-65 65-65h146c36 0 65 29 65 65v97c0 36-29 65-65 65h-72l-83 72c-12 10-30 2-30-14v-65c-16-11-26-29-26-49V147Z" fill="#f8fafc"/>
+  <path d="M170 214h172" stroke="#2563eb" stroke-width="28" stroke-linecap="round"/>
+  <path d="M202 176v76m108-76v76" stroke="#2563eb" stroke-width="28" stroke-linecap="round"/>
+  <text x="256" y="443" text-anchor="middle" font-family="Arial, sans-serif" font-size="84" font-weight="700" fill="#facc15">¡!</text>
+</svg>

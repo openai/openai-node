@@ -74,7 +74,11 @@ function ensureStateShape(rawState) {
   hydrated.sessionLog ||= {};
   hydrated.roleplayProgress ||= {};
   hydrated.dailyChallenges ||= {};
-  hydrated.settings ||= { voiceEnabled: true, speechRecognitionEnabled: false, enableOptionalRealtime: false };
+  hydrated.settings ||= {
+    voiceEnabled: true,
+    speechRecognitionEnabled: false,
+    enableOptionalRealtime: false,
+  };
   hydrated.stats ||= { xp: 0, streak: 0, lastActiveDate: null };
   return hydrated;
 }
@@ -110,7 +114,9 @@ function renderStatsBar() {
   app.append(
     card(`
       <h2>Practice Stats</h2>
-      <p><span class="badge">Level ${level}</span><span class="badge">🔥 ${state.stats.streak}-day streak</span></p>
+      <p><span class="badge">Level ${level}</span><span class="badge">🔥 ${
+        state.stats.streak
+      }-day streak</span></p>
       <p class="small">${state.stats.xp} XP total · ${xpForNext - progress} XP to next level</p>
       <div class="progress"><span style="width: ${(progress / xpForNext) * 100}%"></span></div>
     `),
@@ -131,6 +137,21 @@ let state = loadState();
 const app = document.getElementById('app');
 const navButtons = [...document.querySelectorAll('.nav button')];
 let route = '/';
+let deferredInstallPrompt = null;
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {
+      // The app still works without offline support when opened from file:// or unsupported browsers.
+    });
+  });
+}
+
+window.addEventListener('beforeinstallprompt', (event) => {
+  event.preventDefault();
+  deferredInstallPrompt = event;
+  if (route === '/settings') render();
+});
 
 function save() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -185,7 +206,9 @@ function renderHome() {
       ${blocks
         .map(
           ([id, label]) => `<li>
-            <label><input type="checkbox" data-block="${id}" ${state.sessionLog[dateKey].completedBlocks.includes(id) ? 'checked' : ''}/> ${label}</label>
+            <label><input type="checkbox" data-block="${id}" ${
+              state.sessionLog[dateKey].completedBlocks.includes(id) ? 'checked' : ''
+            }/> ${label}</label>
           </li>`,
         )
         .join('')}
@@ -202,7 +225,6 @@ function renderHome() {
       awardXP(2);
     });
   });
-
 
   const completedChallenge = Boolean(state.dailyChallenges[dateKey]);
   const promptPhrase = state.phrases[Math.floor(Math.random() * state.phrases.length)];
@@ -232,7 +254,9 @@ function renderPhrases() {
       <input id="phrase-search" placeholder="Search Spanish or English" />
       <select id="phrase-category-filter">
         <option value="all">All categories</option>
-        ${[...new Set(state.phrases.map((p) => p.category))].map((c) => `<option value="${c}">${c}</option>`).join('')}
+        ${[...new Set(state.phrases.map((p) => p.category))]
+          .map((c) => `<option value="${c}">${c}</option>`)
+          .join('')}
       </select>
     </div>
   `);
@@ -243,13 +267,14 @@ function renderPhrases() {
     const query = section.querySelector('#phrase-search').value.trim().toLowerCase();
     const category = section.querySelector('#phrase-category-filter').value;
     const filtered = state.phrases.filter((p) => {
-      const matchesQuery = !query || p.spanish.toLowerCase().includes(query) || p.english.toLowerCase().includes(query);
+      const matchesQuery =
+        !query || p.spanish.toLowerCase().includes(query) || p.english.toLowerCase().includes(query);
       const matchesCategory = category === 'all' || p.category === category;
       return matchesQuery && matchesCategory;
     });
 
     filtered.forEach((p) => {
-    const item = card(`
+      const item = card(`
       <h3>${p.spanish}</h3>
       <p>${p.english}</p>
       <p><span class="badge">${p.category}</span><span class="badge">${p.difficulty}</span></p>
@@ -261,21 +286,21 @@ function renderPhrases() {
       </div>
     `);
 
-    item.querySelector('[data-action="speak"]').addEventListener('click', () => speak(p.spanish));
-    item.querySelector('[data-action="easy"]').addEventListener('click', () => {
-      p.successfulRecalls += 1;
-      p.reviewStatus = 'improving';
-      p.lastPracticedDate = todayISO();
-      awardXP(3);
-      render();
-    });
-    item.querySelector('[data-action="hard"]').addEventListener('click', () => {
-      p.failedRecalls += 1;
-      p.reviewStatus = 'weak';
-      p.lastPracticedDate = todayISO();
-      awardXP(1);
-      render();
-    });
+      item.querySelector('[data-action="speak"]').addEventListener('click', () => speak(p.spanish));
+      item.querySelector('[data-action="easy"]').addEventListener('click', () => {
+        p.successfulRecalls += 1;
+        p.reviewStatus = 'improving';
+        p.lastPracticedDate = todayISO();
+        awardXP(3);
+        render();
+      });
+      item.querySelector('[data-action="hard"]').addEventListener('click', () => {
+        p.failedRecalls += 1;
+        p.reviewStatus = 'weak';
+        p.lastPracticedDate = todayISO();
+        awardXP(1);
+        render();
+      });
 
       list.append(item);
     });
@@ -354,7 +379,11 @@ function renderDrills() {
 }
 
 function renderRoleplays() {
-  app.append(card('<h2>Roleplay Cards</h2><p class="small">Use checklist. Speak out loud before checking each step.</p>'));
+  app.append(
+    card(
+      '<h2>Roleplay Cards</h2><p class="small">Use checklist. Speak out loud before checking each step.</p>',
+    ),
+  );
 
   state.roleplays.forEach((r) => {
     state.roleplayProgress[r.id] ||= [];
@@ -367,7 +396,10 @@ function renderRoleplays() {
       <ul>
         ${r.checklist
           .map(
-            (item, idx) => `<li><label><input type="checkbox" data-step="${idx}" ${done.includes(idx) ? 'checked' : ''}/> ${item}</label></li>`,
+            (item, idx) =>
+              `<li><label><input type="checkbox" data-step="${idx}" ${
+                done.includes(idx) ? 'checked' : ''
+              }/> ${item}</label></li>`,
           )
           .join('')}
       </ul>
@@ -469,7 +501,13 @@ function renderProgress() {
   ];
 
   const isSunday = new Date().getUTCDay() === 0;
-  app.append(card(`<h2>Progress Milestones</h2><p class="small">${isSunday ? 'Sunday benchmark day ✅' : 'Next benchmark prompt appears on Sunday.'}</p>`));
+  app.append(
+    card(
+      `<h2>Progress Milestones</h2><p class="small">${
+        isSunday ? 'Sunday benchmark day ✅' : 'Next benchmark prompt appears on Sunday.'
+      }</p>`,
+    ),
+  );
 
   milestones.forEach(([day, text]) => app.append(card(`<h3>${day}</h3><p>${text}</p>`)));
 
@@ -518,14 +556,35 @@ function renderProgress() {
 
 function renderSettings() {
   const hasSpeechRecognition = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
+  const appUrl = window.location.href;
+  const canInstall = Boolean(deferredInstallPrompt);
   const settings = card(`
     <h2>Voice Settings</h2>
     <p><strong>TTS available:</strong> ${'speechSynthesis' in window ? 'Yes' : 'No'}</p>
-    <p><strong>Speech recognition available:</strong> ${hasSpeechRecognition ? 'Yes' : 'No (manual text fallback active)'}</p>
+    <p><strong>Speech recognition available:</strong> ${
+      hasSpeechRecognition ? 'Yes' : 'No (manual text fallback active)'
+    }</p>
 
-    <label><input id="voice-enabled" type="checkbox" ${state.settings.voiceEnabled ? 'checked' : ''}/> Enable browser text-to-speech</label>
-    <label><input id="stt-enabled" type="checkbox" ${state.settings.speechRecognitionEnabled ? 'checked' : ''} ${!hasSpeechRecognition ? 'disabled' : ''}/> Enable browser speech recognition (optional)</label>
-    <label><input id="realtime-enabled" type="checkbox" ${state.settings.enableOptionalRealtime ? 'checked' : ''}/> Enable optional OpenAI Realtime adapter (future, not required)</label>
+    <label><input id="voice-enabled" type="checkbox" ${
+      state.settings.voiceEnabled ? 'checked' : ''
+    }/> Enable browser text-to-speech</label>
+    <label><input id="stt-enabled" type="checkbox" ${
+      state.settings.speechRecognitionEnabled ? 'checked' : ''
+    } ${!hasSpeechRecognition ? 'disabled' : ''}/> Enable browser speech recognition (optional)</label>
+    <label><input id="realtime-enabled" type="checkbox" ${
+      state.settings.enableOptionalRealtime ? 'checked' : ''
+    }/> Enable optional OpenAI Realtime adapter (future, not required)</label>
+
+    <h3>Connect to your mobile app</h3>
+    <p class="small">Open this URL on your phone, then use Add to Home Screen / Install App. The app shell and practice data are local-first and work offline after the first load.</p>
+    <label>Mobile connection URL<input id="mobile-url" readonly value="${appUrl}" /></label>
+    <div class="row">
+      <button id="copy-mobile-url">Copy mobile URL</button>
+      <button id="install-app" class="primary" ${canInstall ? '' : 'disabled'}>${
+        canInstall ? 'Install mobile app' : 'Use browser Add to Home Screen'
+      }</button>
+    </div>
+    <p id="connection-status" class="small"></p>
 
     <div class="row">
       <button id="test-voice">Test Spanish voice</button>
@@ -546,7 +605,26 @@ function renderSettings() {
     state.settings.enableOptionalRealtime = e.target.checked;
     save();
   });
-  settings.querySelector('#test-voice').addEventListener('click', () => speak('Quiero practicar español todos los días.'));
+  settings.querySelector('#copy-mobile-url').addEventListener('click', async () => {
+    const status = settings.querySelector('#connection-status');
+    try {
+      await navigator.clipboard.writeText(appUrl);
+      status.textContent = 'Copied. Send this link to your phone to finish connecting.';
+    } catch {
+      settings.querySelector('#mobile-url').select();
+      status.textContent = 'Copy unavailable. Select the URL above and send it to your phone.';
+    }
+  });
+  settings.querySelector('#install-app').addEventListener('click', async () => {
+    if (!deferredInstallPrompt) return;
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+    render();
+  });
+  settings
+    .querySelector('#test-voice')
+    .addEventListener('click', () => speak('Quiero practicar español todos los días.'));
   settings.querySelector('#reset').addEventListener('click', () => {
     localStorage.removeItem(STORAGE_KEY);
     state = loadState();
