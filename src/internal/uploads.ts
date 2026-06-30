@@ -54,16 +54,23 @@ type CreateFormOptions = {
 };
 
 export function getName(value: any, options: CreateFormOptions = {}): string | undefined {
-  const name =
-    (typeof value === 'object' &&
-      value !== null &&
-      (('name' in value && value.name && String(value.name)) ||
-        ('url' in value && value.url && String(value.url)) ||
-        ('filename' in value && value.filename && String(value.filename)) ||
-        ('path' in value && value.path && String(value.path)))) ||
-    '';
+  let name = '';
+  let isURL = false;
 
-  if (options.preserveFilePaths) return name || undefined;
+  if (typeof value === 'object' && value !== null) {
+    if ('name' in value && value.name) {
+      name = String(value.name);
+    } else if ('url' in value && value.url) {
+      name = String(value.url);
+      isURL = true;
+    } else if ('filename' in value && value.filename) {
+      name = String(value.filename);
+    } else if ('path' in value && value.path) {
+      name = String(value.path);
+    }
+  }
+
+  if (options.preserveFilePaths && !isURL) return name || undefined;
 
   return name.split(/[\\/]/).pop() || undefined;
 }
