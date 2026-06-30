@@ -709,6 +709,206 @@ describe('retries', () => {
     expect(count).toEqual(3);
   });
 
+  test('removes caller abort listener after successful response parsing', async () => {
+    const callerController = new AbortController();
+    const addEventListenerSpy = jest.spyOn(callerController.signal, 'addEventListener');
+    const removeEventListenerSpy = jest.spyOn(callerController.signal, 'removeEventListener');
+    const testFetch = async (): Promise<Response> =>
+      new Response(JSON.stringify({ a: 1 }), { headers: { 'Content-Type': 'application/json' } });
+
+    const client = new OpenAI({
+      apiKey: 'My API Key',
+      adminAPIKey: 'My Admin API Key',
+      timeout: 1000,
+      fetch: testFetch,
+    });
+
+    expect(
+      await client.request({
+        path: '/foo',
+        method: 'get',
+        signal: callerController.signal,
+      }),
+    ).toEqual({ a: 1 });
+
+    const abortListener = addEventListenerSpy.mock.calls[0]?.[1];
+    expect(addEventListenerSpy).toHaveBeenCalledWith('abort', abortListener, { once: true });
+    expect(removeEventListenerSpy).toHaveBeenCalledWith('abort', abortListener);
+  });
+
+  test('keeps caller abort forwarding until response body parsing settles', async () => {
+    const callerController = new AbortController();
+    const addEventListenerSpy = jest.spyOn(callerController.signal, 'addEventListener');
+    const removeEventListenerSpy = jest.spyOn(callerController.signal, 'removeEventListener');
+    const encoder = new TextEncoder();
+    let fetchSignal: AbortSignal | undefined;
+
+    const testFetch = async (url: string | URL | Request, init: RequestInit = {}): Promise<Response> => {
+      fetchSignal = init.signal as AbortSignal;
+      return new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(encoder.encode('{"a":'));
+            fetchSignal?.addEventListener('abort', () => controller.error(new Error('body aborted')), {
+              once: true,
+            });
+          },
+        }),
+        { headers: { 'Content-Type': 'application/json' } },
+      );
+    };
+
+    const client = new OpenAI({
+      apiKey: 'My API Key',
+      adminAPIKey: 'My Admin API Key',
+      timeout: 1000,
+      maxRetries: 0,
+      fetch: testFetch,
+    });
+
+    const parsePromise = client
+      .request({
+        path: '/foo',
+        method: 'get',
+        signal: callerController.signal,
+      })
+      .then(
+        () => undefined,
+        (err) => err,
+      );
+
+    for (let i = 0; i < 5 && !fetchSignal; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+
+    expect(fetchSignal?.aborted).toBe(false);
+    expect(removeEventListenerSpy).not.toHaveBeenCalled();
+
+    callerController.abort();
+
+    expect(fetchSignal?.aborted).toBe(true);
+    await expect(parsePromise).resolves.toBeInstanceOf(Error);
+
+    const abortListener = addEventListenerSpy.mock.calls[0]?.[1];
+    expect(addEventListenerSpy).toHaveBeenCalledWith('abort', abortListener, { once: true });
+    expect(removeEventListenerSpy).toHaveBeenCalledWith('abort', abortListener);
+  });
+
+  test('removes caller abort listener after streaming response is consumed', async () => {
+    const callerController = new AbortController();
+    const addEventListenerSpy = jest.spyOn(callerController.signal, 'addEventListener');
+    const removeEventListenerSpy = jest.spyOn(callerController.signal, 'removeEventListener');
+    const testFetch = async (): Promise<Response> =>
+      new Response('data: {"a":1}\n\ndata: [DONE]\n\n', {
+        headers: { 'Content-Type': 'text/event-stream' },
+      });
+
+    const client = new OpenAI({
+      apiKey: 'My API Key',
+      adminAPIKey: 'My Admin API Key',
+      timeout: 1000,
+      fetch: testFetch,
+    });
+
+    const stream = await client.request<any>({
+      path: '/foo',
+      method: 'get',
+      stream: true,
+      signal: callerController.signal,
+    });
+    const chunks: unknown[] = [];
+
+    for await (const chunk of stream as AsyncIterable<unknown>) {
+      chunks.push(chunk);
+    }
+
+    expect(chunks).toEqual([{ a: 1 }]);
+    const abortListener = addEventListenerSpy.mock.calls[0]?.[1];
+    expect(addEventListenerSpy).toHaveBeenCalledWith('abort', abortListener, { once: true });
+    expect(removeEventListenerSpy).toHaveBeenCalledWith('abort', abortListener);
+  });
+
+  test('removes caller abort listener after binary response body is consumed', async () => {
+    const callerController = new AbortController();
+    const addEventListenerSpy = jest.spyOn(callerController.signal, 'addEventListener');
+    const removeEventListenerSpy = jest.spyOn(callerController.signal, 'removeEventListener');
+    const testFetch = async (): Promise<Response> => new Response('binary data');
+
+    const client = new OpenAI({
+      apiKey: 'My API Key',
+      adminAPIKey: 'My Admin API Key',
+      timeout: 1000,
+      fetch: testFetch,
+    });
+
+    const response = await client.request<Response>({
+      path: '/foo',
+      method: 'get',
+      signal: callerController.signal,
+      __binaryResponse: true,
+    });
+
+    expect(removeEventListenerSpy).not.toHaveBeenCalled();
+    expect(await response.text()).toBe('binary data');
+
+    const abortListener = addEventListenerSpy.mock.calls[0]?.[1];
+    expect(addEventListenerSpy).toHaveBeenCalledWith('abort', abortListener, { once: true });
+    expect(removeEventListenerSpy).toHaveBeenCalledWith('abort', abortListener);
+  });
+
+  test('keeps caller abort forwarding until binary response body settles', async () => {
+    const callerController = new AbortController();
+    const addEventListenerSpy = jest.spyOn(callerController.signal, 'addEventListener');
+    const removeEventListenerSpy = jest.spyOn(callerController.signal, 'removeEventListener');
+    const encoder = new TextEncoder();
+    let fetchSignal: AbortSignal | undefined;
+
+    const testFetch = async (url: string | URL | Request, init: RequestInit = {}): Promise<Response> => {
+      fetchSignal = init.signal as AbortSignal;
+      return new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(encoder.encode('partial'));
+            fetchSignal?.addEventListener('abort', () => controller.error(new Error('body aborted')), {
+              once: true,
+            });
+          },
+        }),
+      );
+    };
+
+    const client = new OpenAI({
+      apiKey: 'My API Key',
+      adminAPIKey: 'My Admin API Key',
+      timeout: 1000,
+      maxRetries: 0,
+      fetch: testFetch,
+    });
+
+    const response = await client.request<Response>({
+      path: '/foo',
+      method: 'get',
+      signal: callerController.signal,
+      __binaryResponse: true,
+    });
+    const readPromise = response.text().then(
+      () => undefined,
+      (err) => err,
+    );
+
+    expect(fetchSignal?.aborted).toBe(false);
+    expect(removeEventListenerSpy).not.toHaveBeenCalled();
+
+    callerController.abort();
+
+    expect(fetchSignal?.aborted).toBe(true);
+    await expect(readPromise).resolves.toBeInstanceOf(Error);
+
+    const abortListener = addEventListenerSpy.mock.calls[0]?.[1];
+    expect(addEventListenerSpy).toHaveBeenCalledWith('abort', abortListener, { once: true });
+    expect(removeEventListenerSpy).toHaveBeenCalledWith('abort', abortListener);
+  });
+
   test('retry count header', async () => {
     let count = 0;
     let capturedRequest: RequestInit | undefined;
