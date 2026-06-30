@@ -32,7 +32,9 @@ export class Skills extends APIResource {
   create(body: SkillCreateParams | null | undefined = {}, options?: RequestOptions): APIPromise<Skill> {
     return this._client.post(
       '/skills',
-      maybeMultipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
+      maybeMultipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client, {
+        preserveFilePaths: true,
+      }),
     );
   }
 
