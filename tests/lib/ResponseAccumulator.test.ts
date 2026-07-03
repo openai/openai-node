@@ -129,6 +129,19 @@ describe('ResponseAccumulator', () => {
     expect(first.output_text).toBe('Hello world');
   });
 
+  it('ignores keepalive events', () => {
+    const initial = accumulateResponse({
+      type: 'response.created',
+      sequence_number: 0,
+      response: makeResponse(),
+    });
+
+    const snapshot = accumulateResponse({ type: 'keepalive', sequence_number: 1 }, initial);
+
+    expect(snapshot).toBe(initial);
+    expect(snapshot).toEqual(makeResponse());
+  });
+
   it.each([
     ['response.completed', 'completed'],
     ['response.failed', 'failed'],
