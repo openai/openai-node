@@ -14,11 +14,15 @@ export interface ChatCompletionStreamEvents extends AbstractChatCompletionRunner
   chunk: (chunk: ChatCompletionChunk, snapshot: ChatCompletionSnapshot) => void;
 }
 
-export type ChatCompletionStreamingToolRunnerParams<FunctionsArgs extends BaseFunctionsArgs> = Omit<
-  ChatCompletionCreateParamsStreaming,
-  'tools'
-> & {
-  tools: RunnableTools<FunctionsArgs> | AutoParseableTool<any, true>[];
+export type ChatCompletionStreamingToolRunnerParams<
+  FunctionsArgs extends BaseFunctionsArgs,
+  ToolContext = unknown,
+> = Omit<ChatCompletionCreateParamsStreaming, 'tools'> & {
+  tools: RunnableTools<FunctionsArgs, ToolContext> | AutoParseableTool<any, true>[];
+  /**
+   * Context to pass to each tool callback during this run.
+   */
+  toolContext?: ToolContext;
 };
 
 export class ChatCompletionStreamingRunner<ParsedT = null>
@@ -31,9 +35,9 @@ export class ChatCompletionStreamingRunner<ParsedT = null>
     return runner;
   }
 
-  static runTools<T extends (string | object)[], ParsedT = null>(
+  static runTools<T extends (string | object)[], ParsedT = null, ToolContext = unknown>(
     client: OpenAI,
-    params: ChatCompletionStreamingToolRunnerParams<T>,
+    params: ChatCompletionStreamingToolRunnerParams<T, ToolContext>,
     options?: RunnerOptions,
   ): ChatCompletionStreamingRunner<ParsedT> {
     const runner = new ChatCompletionStreamingRunner<ParsedT>(

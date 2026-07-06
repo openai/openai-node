@@ -395,6 +395,26 @@ function _typeTests() {
     ],
   });
   openai.chat.completions.runTools({
+    messages: [{ role: 'user', content: 'update my event' }],
+    model: 'gpt-3.5-turbo',
+    toolContext: { eventId: 'event_123' },
+    tools: [
+      {
+        type: 'function',
+        function: {
+          function: (_args, _runner, context) => {
+            const eventId: string = context.eventId;
+            // @ts-expect-error tool context only includes eventId
+            context.missing;
+            return eventId;
+          },
+          parameters: {},
+          description: 'updates an event',
+        },
+      },
+    ],
+  });
+  openai.chat.completions.runTools({
     messages: [
       { role: 'user', content: 'can you tell me how many properties are in {"a": 1, "b": 2, "c": 3}' },
     ],
@@ -662,6 +682,96 @@ describe('resource completions', () => {
       expect(listener.functionCallResults).toEqual([`it's raining`]);
       await listener.sanityCheck({ ignoredMessages: new Set([injectedMessage]) });
     });
+
+    test('passes tool context to callbacks without sending it to the API', async () => {
+      const { fetch, handleRequest } = mockChatCompletionFetch();
+
+      const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
+      const toolContext = { eventId: 'event_123' };
+      const receivedContexts: (typeof toolContext)[] = [];
+      const runner = openai.chat.completions.runTools({
+        messages: [{ role: 'user', content: 'update my event' }],
+        model: 'gpt-3.5-turbo',
+        toolContext,
+        tools: [
+          {
+            type: 'function',
+            function: {
+              function: function updateEvent(_args, _runner, context) {
+                receivedContexts.push(context);
+                return context.eventId;
+              },
+              parameters: {},
+              description: 'updates an event',
+            },
+          },
+        ],
+      });
+
+      await handleRequest(async (request) => {
+        expect(request).not.toHaveProperty('toolContext');
+        return {
+          id: '1',
+          choices: [
+            {
+              index: 0,
+              finish_reason: 'tool_calls',
+              logprobs: null,
+              message: {
+                role: 'assistant',
+                content: null,
+                refusal: null,
+                tool_calls: [
+                  {
+                    type: 'function',
+                    id: '123',
+                    function: {
+                      arguments: '',
+                      name: 'updateEvent',
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+          created: Math.floor(Date.now() / 1000),
+          model: 'gpt-3.5-turbo',
+          object: 'chat.completion',
+        };
+      });
+
+      await handleRequest(async (request) => {
+        expect(request.messages[2]).toEqual({
+          role: 'tool',
+          content: 'event_123',
+          tool_call_id: '123',
+        });
+        return {
+          id: '2',
+          choices: [
+            {
+              index: 0,
+              finish_reason: 'stop',
+              logprobs: null,
+              message: {
+                role: 'assistant',
+                content: 'updated',
+                refusal: null,
+              },
+            },
+          ],
+          created: Math.floor(Date.now() / 1000),
+          model: 'gpt-3.5-turbo',
+          object: 'chat.completion',
+        };
+      });
+
+      await runner.done();
+
+      expect(receivedContexts).toEqual([toolContext]);
+      expect(receivedContexts[0]).toBe(toolContext);
+    });
+
     test('generates unique IDs for parallel tool calls with empty IDs', async () => {
       const { fetch, handleRequest } = mockChatCompletionFetch();
 

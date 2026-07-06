@@ -285,16 +285,16 @@ export class AbstractChatCompletionRunner<
     return await this._createChatCompletion(client, params, options);
   }
 
-  protected async _runTools<FunctionsArgs extends BaseFunctionsArgs>(
+  protected async _runTools<FunctionsArgs extends BaseFunctionsArgs, ToolContext>(
     client: OpenAI,
     params:
-      | ChatCompletionToolRunnerParams<FunctionsArgs>
-      | ChatCompletionStreamingToolRunnerParams<FunctionsArgs>,
+      | ChatCompletionToolRunnerParams<FunctionsArgs, ToolContext>
+      | ChatCompletionStreamingToolRunnerParams<FunctionsArgs, ToolContext>,
     runner: ChatCompletionRunner<any> | ChatCompletionStreamingRunner<any>,
     options?: RunnerOptions,
   ) {
     const role = 'tool' as const;
-    const { tool_choice = 'auto', stream, ...restParams } = params;
+    const { tool_choice = 'auto', stream, toolContext, ...restParams } = params;
     const singleFunctionToCall =
       typeof tool_choice !== 'string' && tool_choice.type === 'function' && tool_choice?.function?.name;
     const { maxChatCompletions = DEFAULT_MAX_CHAT_COMPLETIONS, afterCompletion } = options || {};
@@ -322,7 +322,7 @@ export class AbstractChatCompletionRunner<
       return tool as any as RunnableToolFunction<any>;
     });
 
-    const functionsByName: Record<string, RunnableFunction<any>> = {};
+    const functionsByName: Record<string, RunnableFunction<any, ToolContext>> = {};
     for (const f of inputTools) {
       if (f.type === 'function') {
         functionsByName[f.function.name || f.function.function.name] = f.function;
@@ -389,9 +389,9 @@ export class AbstractChatCompletionRunner<
           const content = error instanceof Error ? error.message : String(error);
           return { message: { role, tool_call_id, content }, functionCalled: false };
         }
-        rawContent = await fn.function(parsed, runner);
+        rawContent = await fn.function(parsed, runner, toolContext);
       } else {
-        rawContent = await fn.function(args, runner);
+        rawContent = await fn.function(args, runner, toolContext);
       }
 
       const content = this.#stringifyFunctionCallResult(rawContent);
