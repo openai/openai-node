@@ -65,4 +65,22 @@ describe('EventStream.events', () => {
     await expect(iterator.next()).rejects.toBe(error);
     await expect(iterator.next()).resolves.toEqual({ value: undefined, done: true });
   });
+
+  test('does not suppress errors after iterator cleanup', async () => {
+    const stream = new TestStream();
+    const iterator = stream.events('foo');
+    const reject = jest
+      .spyOn(Promise, 'reject')
+      .mockImplementation(() => Promise.resolve() as Promise<never>);
+    const error = new OpenAIError('oops');
+
+    try {
+      await iterator.return?.();
+      stream.emitError(error);
+
+      expect(reject).toHaveBeenCalledWith(error);
+    } finally {
+      reject.mockRestore();
+    }
+  });
 });

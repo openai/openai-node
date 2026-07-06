@@ -225,7 +225,6 @@ export class EventStream<EventTypes extends BaseEvents> {
     };
 
     if (!ended) {
-      this.#catchingPromiseCreated = true;
       this.on(event, onEvent as EventListener<EventTypes, Event>);
       this.on('end', onEnd);
       if (event !== 'error') this.on('error', onFailure);
