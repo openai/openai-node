@@ -8,6 +8,51 @@ import { makeStreamSnapshotRequest } from '../utils/mock-snapshots';
 jest.setTimeout(1000 * 30);
 
 describe('.stream()', () => {
+  it('emits finalization failures as errors', async () => {
+    const chunk: OpenAI.Chat.ChatCompletionChunk = {
+      id: 'chatcmpl-test',
+      object: 'chat.completion.chunk',
+      created: 1,
+      model: 'gpt-test',
+      choices: [
+        {
+          index: 0,
+          delta: { role: 'user', content: 'hello' },
+          finish_reason: 'stop',
+          logprobs: null,
+        },
+      ],
+    };
+
+    const client = {
+      chat: {
+        completions: {
+          create: jest.fn(async () => ({
+            controller: new AbortController(),
+            async *[Symbol.asyncIterator]() {
+              yield chunk;
+            },
+          })),
+        },
+      },
+    } as unknown as OpenAI;
+
+    const stream = ChatCompletionStream.createChatCompletion(client, {
+      model: 'gpt-test',
+      messages: [{ role: 'user', content: 'Say hello' }],
+    });
+    const errors: Error[] = [];
+    stream.on('error', (error) => errors.push(error));
+
+    await expect(stream.done()).rejects.toThrow(
+      'stream ended without producing a ChatCompletionMessage with role=assistant',
+    );
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.message).toBe(
+      'stream ended without producing a ChatCompletionMessage with role=assistant',
+    );
+  });
+
   it('removes the caller abort listener after the stream finishes', async () => {
     const callerController = new AbortController();
     const addEventListenerSpy = jest.spyOn(callerController.signal, 'addEventListener');
