@@ -17,6 +17,7 @@ import { ChatCompletionStreamingRunner } from '../../../lib/ChatCompletionStream
 import { RunnerOptions } from '../../../lib/AbstractChatCompletionRunner';
 import { ChatCompletionToolRunnerParams } from '../../../lib/ChatCompletionRunner';
 import { ChatCompletionStreamingToolRunnerParams } from '../../../lib/ChatCompletionStreamingRunner';
+import { type RunnableToolFunctionWithContext } from '../../../lib/RunnableFunction';
 import { ChatCompletionStream, type ChatCompletionStreamParams } from '../../../lib/ChatCompletionStream';
 import { ExtractParsedContentFromParams, parseChatCompletion, validateInputTools } from '../../../lib/parser';
 
@@ -187,6 +188,38 @@ export class Completions extends APIResource {
    * For more details and examples, see
    * [the docs](https://github.com/openai/openai-node#automated-function-calls)
    */
+  runTools<
+    ToolContext,
+    Params extends Omit<ChatCompletionToolRunnerParams<any, ToolContext>, 'toolContext' | 'tools'> = Omit<
+      ChatCompletionToolRunnerParams<any, ToolContext>,
+      'toolContext' | 'tools'
+    >,
+    ParsedT = ExtractParsedContentFromParams<Params & ChatCompletionToolRunnerParams<any, ToolContext>>,
+  >(
+    body: Params & {
+      toolContext: ToolContext;
+      tools: readonly RunnableToolFunctionWithContext<ToolContext>[];
+    },
+    options?: RunnerOptions,
+  ): ChatCompletionRunner<ParsedT>;
+
+  runTools<
+    ToolContext,
+    Params extends Omit<
+      ChatCompletionStreamingToolRunnerParams<any, ToolContext>,
+      'toolContext' | 'tools'
+    > = Omit<ChatCompletionStreamingToolRunnerParams<any, ToolContext>, 'toolContext' | 'tools'>,
+    ParsedT = ExtractParsedContentFromParams<
+      Params & ChatCompletionStreamingToolRunnerParams<any, ToolContext>
+    >,
+  >(
+    body: Params & {
+      toolContext: ToolContext;
+      tools: readonly RunnableToolFunctionWithContext<ToolContext>[];
+    },
+    options?: RunnerOptions,
+  ): ChatCompletionStreamingRunner<ParsedT>;
+
   runTools<
     Params extends ChatCompletionToolRunnerParams<any>,
     ParsedT = ExtractParsedContentFromParams<Params>,

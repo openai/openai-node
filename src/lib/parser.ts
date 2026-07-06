@@ -18,8 +18,8 @@ import { ResponseFormatJSONSchema } from '../resources/shared';
 
 type AnyChatCompletionCreateParams =
   | ChatCompletionCreateParams
-  | ChatCompletionToolRunnerParams<any>
-  | ChatCompletionStreamingToolRunnerParams<any>
+  | ChatCompletionToolRunnerParams<any, any>
+  | ChatCompletionStreamingToolRunnerParams<any, any>
   | ChatCompletionStreamParams;
 
 type Unpacked<T> = T extends (infer U)[] ? U : T;

@@ -82,6 +82,25 @@ export type RunnableToolFunctionWithParse<Args extends object, ToolContext = unk
   function: RunnableFunctionWithParse<Args, ToolContext>;
 };
 
+/**
+ * A broad tool shape for contextually typing callbacks when the argument type is inferred.
+ */
+export type RunnableToolFunctionWithContext<ToolContext> = {
+  type: 'function';
+  function: {
+    function: (
+      args: any,
+      runner: ChatCompletionRunner<unknown> | ChatCompletionStreamingRunner<unknown>,
+      toolContext: ToolContext,
+    ) => PromiseOrValue<unknown>;
+    parse?: (input: string) => PromiseOrValue<any>;
+    parameters: JSONSchema;
+    description: string;
+    name?: string | undefined;
+    strict?: boolean | undefined;
+  };
+};
+
 export function isRunnableFunctionWithParse<Args extends object, ToolContext = unknown>(
   fn: any,
 ): fn is RunnableFunctionWithParse<Args, ToolContext> {

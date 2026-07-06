@@ -294,7 +294,8 @@ export class AbstractChatCompletionRunner<
     options?: RunnerOptions,
   ) {
     const role = 'tool' as const;
-    const { tool_choice = 'auto', stream, toolContext, ...restParams } = params;
+    const { tool_choice = 'auto', stream, toolContext: inputToolContext, ...restParams } = params;
+    const toolContext = inputToolContext as ToolContext;
     const singleFunctionToCall =
       typeof tool_choice !== 'string' && tool_choice.type === 'function' && tool_choice?.function?.name;
     const { maxChatCompletions = DEFAULT_MAX_CHAT_COMPLETIONS, afterCompletion } = options || {};
