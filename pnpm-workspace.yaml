@@ -25,3 +25,4 @@ overrides:
 
 allowBuilds:
   '@swc/core': true
+  sharp: false
