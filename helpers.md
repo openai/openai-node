@@ -286,12 +286,31 @@ More information on tools can be found here [Tools](https://platform.openai.com/
 
 ```ts
 .on('error', (error: OpenAIError) => ...)
+.on('abort', (error: APIUserAbortError) => ...)
 .on('end', () => ...)
 ```
 
-The `error` event is emitted when the stream encounters an API or SDK error. The `end` event is the last SDK
-event emitted when the stream finishes, including after an error or abort. The raw `[DONE]` marker is consumed
-by the SDK rather than emitted through the `event` listener.
+The `error` event is emitted when the stream encounters an API or SDK error. The `abort` event is emitted
+when the stream is cancelled through an `AbortSignal` or `.abort()`. The `end` event is the last SDK event
+emitted when the stream finishes, including after an error or abort. The raw `[DONE]` marker is consumed by
+the SDK rather than emitted through the `event` listener.
+
+Register `error` and `abort` listeners before handing the stream to another consumer. If you call a
+promise-returning helper such as `.done()` or `.finalRun()`, await or catch that promise as well; event
+listeners do not handle a separate promise rejection.
+
+```ts
+const run = openai.beta.threads.runs
+  .stream(threadId, { assistant_id: assistantId })
+  .on('error', (error) => console.error('Run failed:', error))
+  .on('abort', (error) => console.error('Run aborted:', error));
+
+try {
+  await run.finalRun();
+} catch (error) {
+  // Handle the rejected helper promise here.
+}
+```
 
 ### Assistant Methods
 
