@@ -6,6 +6,11 @@ import {
 import { OpenAIError } from '../../error';
 import { addOutputText } from '../ResponsesParser';
 
+type ResponseKeepAliveEvent = {
+  type: 'keepalive';
+  sequence_number: number;
+};
+
 /**
  * Applies a streaming event to a response snapshot.
  *
@@ -13,7 +18,10 @@ import { addOutputText } from '../ResponsesParser';
  * in place, while response lifecycle events return a detached replacement. Event
  * payloads are cloned, so retaining or replaying the raw events is safe.
  */
-export function accumulateResponse(event: ResponseStreamEvent, snapshot?: Response): Response {
+export function accumulateResponse(
+  event: ResponseStreamEvent | ResponseKeepAliveEvent,
+  snapshot?: Response,
+): Response {
   if (!snapshot) {
     if (event.type !== 'response.created') {
       throw new OpenAIError(
@@ -371,6 +379,7 @@ export function accumulateResponse(event: ResponseStreamEvent, snapshot?: Respon
     case 'response.mcp_list_tools.in_progress':
     case 'response.mcp_list_tools.completed':
     case 'response.mcp_list_tools.failed':
+    case 'keepalive':
     case 'error': {
       // These events do not contain state represented by the Response object.
       break;
