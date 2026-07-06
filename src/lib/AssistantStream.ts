@@ -686,7 +686,7 @@ export class AssistantStream
 
           const accEntry = accValue[index];
           if (accEntry == null) {
-            accValue.push(deltaEntry);
+            accValue[index] = deltaEntry;
           } else {
             accValue[index] = this.accumulateDelta(accEntry, deltaEntry);
           }
