@@ -76,13 +76,37 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
 
   static async azure(
     client: Pick<AzureOpenAI, '_callApiKey' | 'apiVersion' | 'apiKey' | 'baseURL' | 'deploymentName'>,
-    props: { deploymentName?: string; options?: WS.ClientOptions | undefined } = {},
+    props:
+      | { deploymentName?: string; intent?: undefined; options?: WS.ClientOptions | undefined }
+      | { intent: 'transcription'; deploymentName?: undefined; options?: WS.ClientOptions | undefined } = {},
   ): Promise<OpenAIRealtimeWS> {
     const isApiKeyProvider = await client._callApiKey();
     const apiKey = client.apiKey;
     if (!apiKey) {
       throw new Error('Azure OpenAI Realtime requires an API key');
     }
+    if (props.intent && props.deploymentName !== undefined) {
+      throw new Error(
+        'Pass exactly one of `deploymentName`, `callID`, or transcription `intent` when opening an Azure Realtime WebSocket.',
+      );
+    }
+    if (props.intent) {
+      return new OpenAIRealtimeWS(
+        {
+          intent: props.intent,
+          options: {
+            ...props.options,
+            headers: {
+              ...props.options?.headers,
+              ...(isApiKeyProvider ? {} : { 'api-key': apiKey }),
+            },
+          },
+          __resolvedApiKey: isApiKeyProvider,
+        },
+        client,
+      );
+    }
+
     const deploymentName = props.deploymentName ?? client.deploymentName;
     if (!deploymentName) {
       throw new Error('No deployment name provided');
