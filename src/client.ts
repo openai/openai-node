@@ -1278,6 +1278,7 @@ export class OpenAI {
   static InvalidWebhookSignatureError = Errors.InvalidWebhookSignatureError;
 
   static toFile = Uploads.toFile;
+  static toStreamingFile = Uploads.toStreamingFile;
 
   /**
    * Given a prompt, the model will return one or more predicted completions, and can also return the probabilities of alternative tokens at each position.

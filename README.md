@@ -232,11 +232,11 @@ Request parameters that correspond to file uploads can be passed in many differe
 - `File` (or an object with the same structure)
 - a `fetch` `Response` (or an object with the same structure)
 - an `fs.ReadStream`
-- the return value of our `toFile` helper
+- the return value of our `toFile` or `toStreamingFile` helpers
 
 ```ts
 import fs from 'fs';
-import OpenAI, { toFile } from 'openai';
+import OpenAI, { toFile, toStreamingFile } from 'openai';
 
 const client = new OpenAI();
 
@@ -259,6 +259,13 @@ await client.files.create({
 });
 await client.files.create({
   file: await toFile(new Uint8Array([0, 1, 2]), 'input.jsonl'),
+  purpose: 'fine-tune',
+});
+
+// `toFile()` creates a web File, so it must buffer stream inputs before sending them.
+// Use `toStreamingFile()` to stream an arbitrary web, Node, or cloud-storage stream directly:
+await client.files.create({
+  file: toStreamingFile(myReadableStream, 'input.jsonl', { type: 'application/jsonl' }),
   purpose: 'fine-tune',
 });
 ```
