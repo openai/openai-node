@@ -121,4 +121,22 @@ describe('form data validation', () => {
     expect(encoded).toContain('streamed-content-1streamed-content-2streamed-content-3');
     expect(encoded).toContain('name="model"\r\n\r\nwhisper-1');
   });
+
+  test('streams plain Blob chunks', async () => {
+    async function* chunks() {
+      yield new Blob(['blob-content']);
+    }
+
+    const options = await multipartFormRequestOptions(
+      {
+        body: {
+          file: toStreamingFile(chunks(), 'audio.webm'),
+        },
+      },
+      fetch,
+    );
+
+    const encoded = await new Response(options.body as ReadableStream).text();
+    expect(encoded).toContain('blob-content');
+  });
 });

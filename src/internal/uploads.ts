@@ -343,7 +343,7 @@ async function* iterateBytes(value: unknown): AsyncGenerator<Uint8Array> {
     } else {
       yield* iterateBytes(await value.blob());
     }
-  } else if (isNamedBlob(value)) {
+  } else if (value instanceof Blob) {
     if (typeof value.stream === 'function') {
       yield* iterateBytes(value.stream());
     } else {
