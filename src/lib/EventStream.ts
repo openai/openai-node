@@ -47,10 +47,14 @@ export class EventStream<EventTypes extends BaseEvents> {
       Promise.resolve()
         .then(executor)
         .then(() => {
-          this._emitFinal();
+          try {
+            this._emitFinal();
+          } catch (error) {
+            this.#handleError(error);
+            return;
+          }
           this._emit('end');
-        })
-        .catch(this.#handleError.bind(this));
+        }, this.#handleError.bind(this));
     }, 0);
   }
 
