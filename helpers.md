@@ -274,6 +274,17 @@ For convenience, the delta event includes both the incremental update and an acc
 
 Image files are not sent incrementally so an event is provided for when a image file is available.
 
+If you need to await work for each convenience event, use the event's async iterator:
+
+```ts
+for await (const [content, snapshot] of run.events('imageFileDone')) {
+  await moveImageFile(content.file_id, snapshot.id);
+}
+```
+
+The iterator yields every occurrence of the selected event, ends when the stream ends, and rejects if
+the stream errors or is aborted.
+
 ```ts
 .on('toolCallCreated', (toolCall: ToolCall) => ...)
 .on('toolCallDelta', (delta: RunStepDelta, snapshot: ToolCall) => ...)
