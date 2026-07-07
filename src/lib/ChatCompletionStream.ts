@@ -26,6 +26,7 @@ import {
   type ChatCompletionCreateParams,
   type ChatCompletionCreateParamsBase,
   type ChatCompletionCreateParamsStreaming,
+  type ChatCompletionMessageParam,
   type ChatCompletionRole,
 } from '../resources/chat/completions/completions';
 import { Stream } from '../streaming';
@@ -117,6 +118,16 @@ export interface ChatCompletionStreamEvents<ParsedT = null> extends AbstractChat
 export type ChatCompletionStreamParams = Omit<ChatCompletionCreateParamsBase, 'stream'> & {
   stream?: true;
 };
+
+export type ChatCompletionReadableStreamItem =
+  | ChatCompletionChunk
+  | { type: 'message'; message: ChatCompletionMessageParam };
+
+function isChatCompletionReadableStreamMessage(
+  item: ChatCompletionReadableStreamItem,
+): item is { type: 'message'; message: ChatCompletionMessageParam } {
+  return 'type' in item && item.type === 'message';
+}
 
 interface ChoiceEventState {
   content_done: boolean;
@@ -398,9 +409,23 @@ export class ChatCompletionStream<ParsedT = null>
     this._listenForAbort(options?.signal);
     this.#beginRequest();
     this._connected();
-    const stream = Stream.fromReadableStream<ChatCompletionChunk>(readableStream, this.controller);
+    const stream = Stream.fromReadableStream<ChatCompletionReadableStreamItem>(
+      readableStream,
+      this.controller,
+    );
     let chatId;
-    for await (const chunk of stream) {
+    for await (const item of stream) {
+      if (isChatCompletionReadableStreamMessage(item)) {
+        if (this.#currentChatCompletionSnapshot) {
+          this._addChatCompletion(this.#endRequest());
+          chatId = undefined;
+        }
+        this._addMessage(item.message);
+        continue;
+      }
+
+      const chunk = item;
+
       if (chatId && chatId !== chunk.id) {
         // A new request has been made.
         this._addChatCompletion(this.#endRequest());
@@ -412,7 +437,14 @@ export class ChatCompletionStream<ParsedT = null>
     if (stream.controller.signal?.aborted) {
       throw new APIUserAbortError();
     }
-    return this._addChatCompletion(this.#endRequest());
+    if (this.#currentChatCompletionSnapshot) {
+      return this._addChatCompletion(this.#endRequest());
+    }
+    const lastChatCompletion = this._chatCompletions[this._chatCompletions.length - 1];
+    if (lastChatCompletion) {
+      return lastChatCompletion;
+    }
+    throw new OpenAIError(`request ended without sending any chunks`);
   }
 
   #getAutoParseableResponseFormat(): AutoParseableResponseFormat<ParsedT> | null {
