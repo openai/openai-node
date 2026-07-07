@@ -1,8 +1,29 @@
 import { makeStreamSnapshotRequest } from '../utils/mock-snapshots';
+import OpenAI from 'openai';
 
 jest.setTimeout(1000 * 30);
 
 describe('.stream()', () => {
+  it('passes starting_after when resuming a response stream by ID', async () => {
+    const requests: string[] = [];
+    const openai = new OpenAI({
+      apiKey: 'My API Key',
+      fetch: async (url) => {
+        requests.push(String(url));
+        return new Response('data: [DONE]\n\n', {
+          status: 200,
+          headers: { 'content-type': 'text/event-stream' },
+        });
+      },
+    });
+
+    await expect(
+      openai.responses.stream({ response_id: 'resp_123', starting_after: 42 }).finalResponse(),
+    ).rejects.toThrow('request ended without sending any events');
+
+    expect(requests).toEqual(['https://api.openai.com/v1/responses/resp_123?stream=true&starting_after=42']);
+  });
+
   it('standard text works', async () => {
     const deltas: string[] = [];
 
