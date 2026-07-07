@@ -1,6 +1,7 @@
 import { ResponseFormatJSONSchema } from '../resources/index';
 import * as z3 from 'zod/v3';
 import * as z4 from 'zod/v4';
+import * as z4Mini from 'zod/v4-mini';
 import {
   AutoParseableResponseFormat,
   AutoParseableTextFormat,
@@ -15,8 +16,12 @@ import { type ResponseFormatTextJSONSchemaConfig } from '../resources/responses/
 import { toStrictJsonSchema } from '../lib/transform';
 import { JSONSchema } from '../lib/jsonschema';
 
+type ZodV4Schema = z4.ZodType | z4Mini.ZodMiniType;
+type ZodSchema = z3.ZodType | ZodV4Schema;
+
 type InferZodType<T> =
-  T extends z4.ZodType ? z4.infer<T>
+  T extends z4Mini.ZodMiniType ? z4Mini.infer<T>
+  : T extends z4.ZodType ? z4.infer<T>
   : T extends z3.ZodType ? z3.infer<T>
   : never;
 
@@ -30,7 +35,7 @@ function zodV3ToJsonSchema(schema: z3.ZodType, options: { name: string }): Recor
   });
 }
 
-function zodV4ToJsonSchema(schema: z4.ZodType): Record<string, unknown> {
+function zodV4ToJsonSchema(schema: ZodV4Schema): Record<string, unknown> {
   return toStrictJsonSchema(
     z4.toJSONSchema(schema, {
       target: 'draft-7',
@@ -54,8 +59,22 @@ function zodV4ToJsonSchema(schema: z4.ZodType): Record<string, unknown> {
   ) as Record<string, unknown>;
 }
 
-function isZodV4(zodObject: z3.ZodType | z4.ZodType): zodObject is z4.ZodType {
+function isZodV4(zodObject: ZodSchema): zodObject is ZodV4Schema {
   return '_zod' in zodObject;
+}
+
+function parseZodObject<ZodInput extends ZodSchema>(
+  zodObject: ZodInput,
+  content: string,
+): InferZodType<ZodInput> {
+  const parsed = JSON.parse(content);
+  const parser = (zodObject as { parse?: (data: unknown) => unknown }).parse;
+
+  if (typeof parser === 'function') {
+    return parser.call(zodObject, parsed) as InferZodType<ZodInput>;
+  }
+
+  return z4.parse(zodObject as ZodV4Schema, parsed) as InferZodType<ZodInput>;
 }
 
 /**
@@ -95,7 +114,7 @@ function isZodV4(zodObject: z3.ZodType | z4.ZodType): zodObject is z4.ZodType {
  * This can be passed directly to the `.create()` method but will not
  * result in any automatic parsing, you'll have to parse the response yourself.
  */
-export function zodResponseFormat<ZodInput extends z3.ZodType | z4.ZodType>(
+export function zodResponseFormat<ZodInput extends ZodSchema>(
   zodObject: ZodInput,
   name: string,
   props?: Omit<ResponseFormatJSONSchema.JSONSchema, 'schema' | 'strict' | 'name'>,
@@ -110,11 +129,11 @@ export function zodResponseFormat<ZodInput extends z3.ZodType | z4.ZodType>(
         schema: isZodV4(zodObject) ? zodV4ToJsonSchema(zodObject) : zodV3ToJsonSchema(zodObject, { name }),
       },
     },
-    (content) => zodObject.parse(JSON.parse(content)),
+    (content) => parseZodObject(zodObject, content),
   );
 }
 
-export function zodTextFormat<ZodInput extends z3.ZodType | z4.ZodType>(
+export function zodTextFormat<ZodInput extends ZodSchema>(
   zodObject: ZodInput,
   name: string,
   props?: Omit<ResponseFormatTextJSONSchemaConfig, 'schema' | 'type' | 'strict' | 'name'>,
@@ -127,7 +146,7 @@ export function zodTextFormat<ZodInput extends z3.ZodType | z4.ZodType>(
       strict: true,
       schema: isZodV4(zodObject) ? zodV4ToJsonSchema(zodObject) : zodV3ToJsonSchema(zodObject, { name }),
     },
-    (content) => zodObject.parse(JSON.parse(content)),
+    (content) => parseZodObject(zodObject, content),
   );
 }
 
@@ -136,7 +155,7 @@ export function zodTextFormat<ZodInput extends z3.ZodType | z4.ZodType>(
  * automatically by the chat completion `.runTools()` method or automatically
  * parsed by `.parse()` / `.stream()`.
  */
-export function zodFunction<Parameters extends z3.ZodType | z4.ZodType>(options: {
+export function zodFunction<Parameters extends ZodSchema>(options: {
   name: string;
   parameters: Parameters;
   function?: ((args: InferZodType<Parameters>) => unknown | Promise<unknown>) | undefined;
@@ -162,12 +181,12 @@ export function zodFunction<Parameters extends z3.ZodType | z4.ZodType>(options:
     },
     {
       callback: options.function,
-      parser: (args) => options.parameters.parse(JSON.parse(args)),
+      parser: (args) => parseZodObject(options.parameters, args),
     },
   );
 }
 
-export function zodResponsesFunction<Parameters extends z3.ZodType | z4.ZodType>(options: {
+export function zodResponsesFunction<Parameters extends ZodSchema>(options: {
   name: string;
   parameters: Parameters;
   function?: ((args: InferZodType<Parameters>) => unknown | Promise<unknown>) | undefined;
@@ -190,7 +209,7 @@ export function zodResponsesFunction<Parameters extends z3.ZodType | z4.ZodType>
     },
     {
       callback: options.function,
-      parser: (args) => options.parameters.parse(JSON.parse(args)),
+      parser: (args) => parseZodObject(options.parameters, args),
     },
   );
 }
