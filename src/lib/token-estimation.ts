@@ -158,6 +158,17 @@ function estimateMessageContent(content: unknown): number {
         } else if ('input_audio' in part) {
           // Audio is tokenized separately; rough estimate
           tokens += 50;
+        } else if ('file' in part && part.file && typeof part.file === 'object') {
+          const file = part.file as { file_data?: string; file_id?: string; filename?: string };
+          if (typeof file.file_data === 'string') {
+            tokens += estimateStringTokens(file.file_data);
+          }
+          if (typeof file.file_id === 'string') {
+            tokens += estimateStringTokens(file.file_id);
+          }
+          if (typeof file.filename === 'string') {
+            tokens += estimateStringTokens(file.filename);
+          }
         } else if ('refusal' in part && typeof part.refusal === 'string') {
           tokens += estimateStringTokens(part.refusal);
         }
@@ -223,22 +234,14 @@ function estimateToolTokens(tools: ChatCompletionTool[]): number {
 
 /**
  * Find the context window size for a given model name.
- * Supports partial matching (e.g., "gpt-4o-2024-05-13" matches "gpt-4o" prefix).
+ * Only exact matches are used to avoid assigning stale context windows to
+ * unrelated future model IDs that happen to share a prefix.
  */
 function getContextWindow(model?: string): number | undefined {
   if (!model) return undefined;
 
-  // Exact match first
   if (model in MODEL_CONTEXT_WINDOWS) {
     return MODEL_CONTEXT_WINDOWS[model];
-  }
-
-  // Try prefix matching (longest first)
-  const prefixes = Object.keys(MODEL_CONTEXT_WINDOWS).sort((a, b) => b.length - a.length);
-  for (const prefix of prefixes) {
-    if (model.startsWith(prefix)) {
-      return MODEL_CONTEXT_WINDOWS[prefix];
-    }
   }
 
   return undefined;
