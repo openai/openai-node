@@ -1,8 +1,91 @@
+import { ReadableStreamFrom } from 'openai/internal/shims';
+import { ResponseStream } from 'openai/lib/responses/ResponseStream';
+import type { Response, ResponseStreamEvent } from 'openai/resources/responses/responses';
 import { makeStreamSnapshotRequest } from '../utils/mock-snapshots';
 
 jest.setTimeout(1000 * 30);
 
 describe('.stream()', () => {
+  it('creates a response stream from a readable stream', async () => {
+    const events: ResponseStreamEvent[] = [
+      {
+        type: 'response.created',
+        sequence_number: 0,
+        response: makeResponse(),
+      },
+      {
+        type: 'response.output_item.added',
+        sequence_number: 1,
+        output_index: 0,
+        item: {
+          id: 'msg_123',
+          type: 'message',
+          role: 'assistant',
+          status: 'in_progress',
+          content: [],
+        },
+      },
+      {
+        type: 'response.content_part.added',
+        sequence_number: 2,
+        item_id: 'msg_123',
+        output_index: 0,
+        content_index: 0,
+        part: {
+          type: 'output_text',
+          annotations: [],
+          text: '',
+        },
+      },
+      {
+        type: 'response.output_text.delta',
+        sequence_number: 3,
+        item_id: 'msg_123',
+        output_index: 0,
+        content_index: 0,
+        delta: 'Hello world',
+        logprobs: [],
+      },
+      {
+        type: 'response.completed',
+        sequence_number: 4,
+        response: makeResponse({
+          status: 'completed',
+          output_text: 'Hello world',
+          output: [
+            {
+              id: 'msg_123',
+              type: 'message',
+              role: 'assistant',
+              status: 'completed',
+              content: [{ type: 'output_text', annotations: [], text: 'Hello world' }],
+            },
+          ],
+        }),
+      },
+    ];
+    const snapshots: string[] = [];
+    const stream = ResponseStream.fromReadableStream(readableStreamFromEvents(events)).on(
+      'response.output_text.delta',
+      (event) => snapshots.push(event.snapshot),
+    );
+    const emittedEvents: ResponseStreamEvent[] = [];
+
+    for await (const event of stream) {
+      emittedEvents.push(event);
+    }
+
+    const final = await stream.finalResponse();
+
+    expect(emittedEvents).toEqual(events);
+    expect(snapshots).toEqual(['Hello world']);
+    expect(final.output_text).toBe('Hello world');
+    expect(final.output[0]).toMatchObject({
+      type: 'message',
+      content: [{ type: 'output_text', text: 'Hello world' }],
+    });
+  });
+
   it('standard text works', async () => {
     const deltas: string[] = [];
 
@@ -59,3 +142,39 @@ describe('.stream()', () => {
     expect(final.output_text).toBe('The answer is 42');
   });
 });
+
+function readableStreamFromEvents(events: ResponseStreamEvent[]) {
+  const encoder = new TextEncoder();
+  return ReadableStreamFrom(events.map((event) => encoder.encode(JSON.stringify(event) + '\n')));
+}
+
+function makeResponse(overrides: Partial<Response> = {}): Response {
+  return {
+    id: 'resp_123',
+    object: 'response',
+    created_at: 1,
+    error: null,
+    incomplete_details: null,
+    instructions: null,
+    metadata: null,
+    model: 'gpt-5',
+    output: [],
+    output_text: '',
+    parallel_tool_calls: false,
+    status: 'in_progress',
+    temperature: null,
+    tool_choice: 'auto',
+    tools: [],
+    top_p: null,
+    max_output_tokens: null,
+    previous_response_id: null,
+    reasoning: { effort: null, summary: null },
+    service_tier: null,
+    store: true,
+    text: { format: { type: 'text' }, verbosity: null },
+    truncation: 'disabled',
+    usage: null,
+    user: null,
+    ...overrides,
+  } as Response;
+}
