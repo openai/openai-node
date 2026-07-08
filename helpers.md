@@ -212,6 +212,26 @@ openai.beta.threads.runs.submitToolOutputsStream();
 
 This method can be used to submit a tool output to a run waiting on the output and start a stream.
 
+### Configuring file search results
+
+`max_num_results` is a run-level `file_search` tool override. Set it at
+`tools[].file_search.max_num_results` when creating or streaming a run:
+
+```ts
+const run = openai.beta.threads.runs.stream(thread.id, {
+  assistant_id: assistant.id,
+  tools: [
+    {
+      type: 'file_search',
+      file_search: { max_num_results: 10 },
+    },
+  ],
+});
+```
+
+Message attachments only associate a file with the `file_search` tool, so their `tools` entries use
+`{ type: 'file_search' }` without a nested `file_search` configuration object.
+
 ### Assistant Events
 
 The assistant API provides events you can subscribe to for the following events.
