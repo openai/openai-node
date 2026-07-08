@@ -612,11 +612,13 @@ The event fired for the last message with a `role: "function"`.
 
 #### `.on('error', (error: OpenAIError) => …)`
 
-The event fired when an error is encountered outside of a `parse` function or an abort.
+The event fired when an error is encountered outside of a `parse` function or an abort. User-initiated aborts are
+not emitted as `error` events; listen for `abort` instead.
 
 #### `.on('abort', (error: APIUserAbortError) => …)`
 
-The event fired when the stream receives a signal to abort.
+The event fired when the stream receives a signal to abort. After this event, `done()` and the `final*` helpers
+reject with the same `APIUserAbortError`.
 
 #### `.on('totalUsage', (usage: CompletionUsage) => …)` (without `stream`, usage is not currently reported with `stream`)
 
