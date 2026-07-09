@@ -55,6 +55,16 @@ export const validatePositiveInteger = (name: string, n: unknown): number => {
   return n;
 };
 
+export const validateNonNegativeInteger = (name: string, n: unknown): number => {
+  if (typeof n !== 'number' || !Number.isInteger(n)) {
+    throw new OpenAIError(`${name} must be an integer`);
+  }
+  if (n < 0) {
+    throw new OpenAIError(`${name} must be a non-negative integer`);
+  }
+  return n;
+};
+
 export const coerceInteger = (value: unknown): number => {
   if (typeof value === 'number') return Math.round(value);
   if (typeof value === 'string') return parseInt(value, 10);

@@ -464,6 +464,22 @@ describe('instantiate client', () => {
     expect(client2.maxRetries).toEqual(2);
   });
 
+  test.each([
+    { maxRetries: -1, message: 'maxRetries must be a non-negative integer' },
+    { maxRetries: 1.5, message: 'maxRetries must be an integer' },
+    { maxRetries: Infinity, message: 'maxRetries must be an integer' },
+    { maxRetries: NaN, message: 'maxRetries must be an integer' },
+  ])('throws for invalid maxRetries option: $maxRetries', ({ maxRetries, message }) => {
+    expect(
+      () =>
+        new OpenAI({
+          maxRetries,
+          apiKey: 'My API Key',
+          adminAPIKey: 'My Admin API Key',
+        }),
+    ).toThrow(message);
+  });
+
   describe('withOptions', () => {
     test('creates a new client with overridden options', async () => {
       const client = new OpenAI({
@@ -677,6 +693,46 @@ describe('default encoder', () => {
 });
 
 describe('retries', () => {
+  test('does not retry if maxRetries is zero', async () => {
+    let count = 0;
+    const testFetch = async (): Promise<Response> => {
+      count++;
+      return new Response(undefined, { status: 429 });
+    };
+
+    const client = new OpenAI({
+      apiKey: 'My API Key',
+      adminAPIKey: 'My Admin API Key',
+      fetch: testFetch,
+      maxRetries: 0,
+    });
+
+    await expect(client.request({ path: '/foo', method: 'get' })).rejects.toThrow();
+    expect(count).toEqual(1);
+  });
+
+  test.each([
+    { maxRetries: -1, message: 'maxRetries must be a non-negative integer' },
+    { maxRetries: 1.5, message: 'maxRetries must be an integer' },
+    { maxRetries: Infinity, message: 'maxRetries must be an integer' },
+    { maxRetries: NaN, message: 'maxRetries must be an integer' },
+  ])('throws for invalid request maxRetries: $maxRetries', async ({ maxRetries, message }) => {
+    let count = 0;
+    const testFetch = async (): Promise<Response> => {
+      count++;
+      return new Response(JSON.stringify({ a: 1 }), { headers: { 'Content-Type': 'application/json' } });
+    };
+
+    const client = new OpenAI({
+      apiKey: 'My API Key',
+      adminAPIKey: 'My Admin API Key',
+      fetch: testFetch,
+    });
+
+    await expect(client.request({ path: '/foo', method: 'get', maxRetries })).rejects.toThrow(message);
+    expect(count).toEqual(0);
+  });
+
   test('retry on timeout', async () => {
     let count = 0;
     const testFetch = async (
