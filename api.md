@@ -377,6 +377,189 @@ Methods:
 
 # Beta
 
+## Responses
+
+Types:
+
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaApplyPatchTool</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaCompactedResponse</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaComputerAction</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaComputerActionList</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaComputerTool</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaComputerUsePreviewTool</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaContainerAuto</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaContainerNetworkPolicyAllowlist</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaContainerNetworkPolicyDisabled</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaContainerNetworkPolicyDomainSecret</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaContainerReference</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaCustomTool</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaEasyInputMessage</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaFileSearchTool</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaFunctionShellTool</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaFunctionTool</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaInlineSkill</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaInlineSkillSource</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaLocalEnvironment</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaLocalSkill</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaNamespaceTool</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponse</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseApplyPatchToolCall</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseApplyPatchToolCallOutput</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseAudioDeltaEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseAudioDoneEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseAudioTranscriptDeltaEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseAudioTranscriptDoneEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseCodeInterpreterCallCodeDeltaEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseCodeInterpreterCallCodeDoneEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseCodeInterpreterCallCompletedEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseCodeInterpreterCallInProgressEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseCodeInterpreterCallInterpretingEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseCodeInterpreterToolCall</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseCompactionItem</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseCompactionItemParam</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseCompletedEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseComputerToolCall</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseComputerToolCallOutputItem</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseComputerToolCallOutputScreenshot</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseContainerReference</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseContent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseContentPartAddedEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseContentPartDoneEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseConversationParam</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseCreatedEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseCustomToolCall</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseCustomToolCallInputDeltaEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseCustomToolCallInputDoneEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseCustomToolCallItem</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseCustomToolCallOutput</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseCustomToolCallOutputItem</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseError</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseErrorEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseFailedEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseFileSearchCallCompletedEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseFileSearchCallInProgressEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseFileSearchCallSearchingEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseFileSearchToolCall</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseFormatTextConfig</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseFormatTextJSONSchemaConfig</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseFunctionCallArgumentsDeltaEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseFunctionCallArgumentsDoneEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseFunctionCallOutputItem</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseFunctionCallOutputItemList</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseFunctionShellCallOutputContent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseFunctionShellToolCall</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseFunctionShellToolCallOutput</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseFunctionToolCall</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseFunctionToolCallItem</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseFunctionToolCallOutputItem</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseFunctionWebSearch</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseImageGenCallCompletedEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseImageGenCallGeneratingEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseImageGenCallInProgressEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseImageGenCallPartialImageEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseInProgressEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseIncludable</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseIncompleteEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseInjectCreatedEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseInjectEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseInjectFailedEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseInput</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseInputAudio</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseInputContent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseInputFile</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseInputFileContent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseInputImage</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseInputImageContent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseInputItem</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseInputMessageContentList</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseInputMessageItem</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseInputText</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseInputTextContent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseItem</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseLocalEnvironment</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseMcpCallArgumentsDeltaEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseMcpCallArgumentsDoneEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseMcpCallCompletedEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseMcpCallFailedEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseMcpCallInProgressEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseMcpListToolsCompletedEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseMcpListToolsFailedEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseMcpListToolsInProgressEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseOutputAudio</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseOutputItem</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseOutputItemAddedEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseOutputItemDoneEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseOutputMessage</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseOutputRefusal</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseOutputText</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseOutputTextAnnotationAddedEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponsePrompt</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseQueuedEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseReasoningItem</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseReasoningSummaryPartAddedEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseReasoningSummaryPartDoneEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseReasoningSummaryTextDeltaEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseReasoningSummaryTextDoneEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseReasoningTextDeltaEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseReasoningTextDoneEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseRefusalDeltaEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseRefusalDoneEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseStatus</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseStreamEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseTextConfig</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseTextDeltaEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseTextDoneEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseToolSearchCall</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseToolSearchOutputItem</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseToolSearchOutputItemParam</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseUsage</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseWebSearchCallCompletedEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseWebSearchCallInProgressEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseWebSearchCallSearchingEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponsesClientEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponsesServerEvent</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaSkillReference</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaTool</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaToolChoiceAllowed</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaToolChoiceApplyPatch</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaToolChoiceCustom</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaToolChoiceFunction</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaToolChoiceMcp</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaToolChoiceOptions</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaToolChoiceShell</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaToolChoiceTypes</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaToolSearchTool</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaWebSearchPreviewTool</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaWebSearchTool</a></code>
+
+Methods:
+
+- <code title="post /responses?beta=true">client.beta.responses.<a href="./src/resources/beta/responses/responses.ts">create</a>({ ...params }) -> BetaResponse</code>
+- <code title="get /responses/{response_id}?beta=true">client.beta.responses.<a href="./src/resources/beta/responses/responses.ts">retrieve</a>(responseID, { ...params }) -> BetaResponse</code>
+- <code title="delete /responses/{response_id}?beta=true">client.beta.responses.<a href="./src/resources/beta/responses/responses.ts">delete</a>(responseID, { ...params }) -> void</code>
+- <code title="post /responses/{response_id}/cancel?beta=true">client.beta.responses.<a href="./src/resources/beta/responses/responses.ts">cancel</a>(responseID, { ...params }) -> BetaResponse</code>
+- <code title="post /responses/compact?beta=true">client.beta.responses.<a href="./src/resources/beta/responses/responses.ts">compact</a>({ ...params }) -> BetaCompactedResponse</code>
+
+### InputItems
+
+Types:
+
+- <code><a href="./src/resources/beta/responses/input-items.ts">BetaResponseItemList</a></code>
+
+Methods:
+
+- <code title="get /responses/{response_id}/input_items?beta=true">client.beta.responses.inputItems.<a href="./src/resources/beta/responses/input-items.ts">list</a>(responseID, { ...params }) -> BetaResponseItemsPage</code>
+
+### InputTokens
+
+Types:
+
+- <code><a href="./src/resources/beta/responses/input-tokens.ts">InputTokenCountResponse</a></code>
+
+Methods:
+
+- <code title="post /responses/input_tokens?beta=true">client.beta.responses.inputTokens.<a href="./src/resources/beta/responses/input-tokens.ts">count</a>({ ...params }) -> InputTokenCountResponse</code>
+
 ## ChatKit
 
 Types:

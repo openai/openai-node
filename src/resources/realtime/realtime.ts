@@ -2223,6 +2223,11 @@ export interface RealtimeResponseCreateMcpTool {
   type: 'mcp';
 
   /**
+   * The tool invocation context(s).
+   */
+  allowed_callers?: Array<'direct' | 'programmatic'> | null;
+
+  /**
    * List of allowed tool names or a filter object.
    */
   allowed_tools?: Array<string> | RealtimeResponseCreateMcpTool.McpToolFilter | null;
@@ -3146,6 +3151,8 @@ export interface RealtimeSessionCreateRequest {
     | 'gpt-realtime'
     | 'gpt-realtime-1.5'
     | 'gpt-realtime-2'
+    | 'gpt-realtime-2.1'
+    | 'gpt-realtime-2.1-mini'
     | 'gpt-realtime-2025-08-28'
     | 'gpt-4o-realtime-preview'
     | 'gpt-4o-realtime-preview-2024-10-01'
@@ -3268,6 +3275,11 @@ export namespace RealtimeToolsConfigUnion {
      * The type of the MCP tool. Always `mcp`.
      */
     type: 'mcp';
+
+    /**
+     * The tool invocation context(s).
+     */
+    allowed_callers?: Array<'direct' | 'programmatic'> | null;
 
     /**
      * List of allowed tool names or a filter object.

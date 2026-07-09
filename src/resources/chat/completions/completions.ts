@@ -1129,6 +1129,13 @@ export namespace ChatCompletionContentPart {
      * The type of the content part. Always `file`.
      */
     type: 'file';
+
+    /**
+     * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
+     * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
+     * token block.
+     */
+    prompt_cache_breakpoint?: File.PromptCacheBreakpoint;
   }
 
   export namespace File {
@@ -1149,6 +1156,18 @@ export namespace ChatCompletionContentPart {
        */
       filename?: string;
     }
+
+    /**
+     * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
+     * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
+     * token block.
+     */
+    export interface PromptCacheBreakpoint {
+      /**
+       * The breakpoint mode. Always `explicit`.
+       */
+      mode: 'explicit';
+    }
   }
 }
 
@@ -1162,6 +1181,13 @@ export interface ChatCompletionContentPartImage {
    * The type of the content part.
    */
   type: 'image_url';
+
+  /**
+   * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
+   * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
+   * token block.
+   */
+  prompt_cache_breakpoint?: ChatCompletionContentPartImage.PromptCacheBreakpoint;
 }
 
 export namespace ChatCompletionContentPartImage {
@@ -1177,6 +1203,18 @@ export namespace ChatCompletionContentPartImage {
      */
     detail?: 'auto' | 'low' | 'high';
   }
+
+  /**
+   * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
+   * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
+   * token block.
+   */
+  export interface PromptCacheBreakpoint {
+    /**
+     * The breakpoint mode. Always `explicit`.
+     */
+    mode: 'explicit';
+  }
 }
 
 /**
@@ -1189,6 +1227,13 @@ export interface ChatCompletionContentPartInputAudio {
    * The type of the content part. Always `input_audio`.
    */
   type: 'input_audio';
+
+  /**
+   * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
+   * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
+   * token block.
+   */
+  prompt_cache_breakpoint?: ChatCompletionContentPartInputAudio.PromptCacheBreakpoint;
 }
 
 export namespace ChatCompletionContentPartInputAudio {
@@ -1202,6 +1247,18 @@ export namespace ChatCompletionContentPartInputAudio {
      * The format of the encoded audio data. Currently supports "wav" and "mp3".
      */
     format: 'wav' | 'mp3';
+  }
+
+  /**
+   * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
+   * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
+   * token block.
+   */
+  export interface PromptCacheBreakpoint {
+    /**
+     * The breakpoint mode. Always `explicit`.
+     */
+    mode: 'explicit';
   }
 }
 
@@ -1231,6 +1288,27 @@ export interface ChatCompletionContentPartText {
    * The type of the content part.
    */
   type: 'text';
+
+  /**
+   * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
+   * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
+   * token block.
+   */
+  prompt_cache_breakpoint?: ChatCompletionContentPartText.PromptCacheBreakpoint;
+}
+
+export namespace ChatCompletionContentPartText {
+  /**
+   * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
+   * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
+   * token block.
+   */
+  export interface PromptCacheBreakpoint {
+    /**
+     * The breakpoint mode. Always `explicit`.
+     */
+    mode: 'explicit';
+  }
 }
 
 /**
@@ -2046,11 +2124,29 @@ export interface ChatCompletionCreateParamsBase {
   prompt_cache_key?: string;
 
   /**
+   * Options for prompt caching. Supported for `gpt-5.6` and later models. By
+   * default, OpenAI automatically chooses one implicit cache breakpoint. You can add
+   * explicit breakpoints to content blocks with `prompt_cache_breakpoint`. Each
+   * request can write up to four breakpoints. For cache matching, OpenAI considers
+   * up to the latest 80 breakpoints in the conversation, without a content-block
+   * lookback limit. Set `mode` to `explicit` to disable the implicit breakpoint. The
+   * `ttl` defaults to `30m`, which is currently the only supported value. See the
+   * [prompt caching guide](https://platform.openai.com/docs/guides/prompt-caching)
+   * for current details.
+   */
+  prompt_cache_options?: ChatCompletionCreateParams.PromptCacheOptions;
+
+  /**
+   * @deprecated Deprecated. Use `prompt_cache_options.ttl` instead.
+   *
    * The retention policy for the prompt cache. Set to `24h` to enable extended
    * prompt caching, which keeps cached prefixes active for longer, up to a maximum
    * of 24 hours.
    * [Learn more](https://platform.openai.com/docs/guides/prompt-caching#prompt-cache-retention).
-   * For `gpt-5.5`, `gpt-5.5-pro`, and future models, only `24h` is supported.
+   * This field expresses a maximum retention policy, while
+   * `prompt_cache_options.ttl` expresses a minimum cache lifetime. The two fields
+   * are independent and do not interact. For `gpt-5.5`, `gpt-5.5-pro`, and future
+   * models, only `24h` is supported.
    *
    * For older models that support both `in_memory` and `24h`, the default depends on
    * your organization's data retention policy:
@@ -2062,19 +2158,12 @@ export interface ChatCompletionCreateParamsBase {
   prompt_cache_retention?: 'in_memory' | '24h' | null;
 
   /**
-   * Constrains effort on reasoning for
-   * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
-   * supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
-   * Reducing reasoning effort can result in faster responses and fewer tokens used
-   * on reasoning in a response.
-   *
-   * - `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported
-   *   reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool
-   *   calls are supported for all reasoning values in gpt-5.1.
-   * - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
-   *   support `none`.
-   * - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
-   * - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
+   * Constrains effort on reasoning for reasoning models. Currently supported values
+   * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
+   * reasoning effort can result in faster responses and fewer tokens used on
+   * reasoning in a response. Not all reasoning models support every value. See the
+   * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+   * model-specific support.
    */
   reasoning_effort?: Shared.ReasoningEffort | null;
 
@@ -2276,6 +2365,74 @@ export namespace ChatCompletionCreateParams {
      * 'omni-moderation-latest'.
      */
     model: string;
+
+    /**
+     * The policy to apply to moderated response input and output.
+     */
+    policy?: Moderation.Policy | null;
+  }
+
+  export namespace Moderation {
+    /**
+     * The policy to apply to moderated response input and output.
+     */
+    export interface Policy {
+      /**
+       * The moderation policy for the response input.
+       */
+      input?: Policy.Input | null;
+
+      /**
+       * The moderation policy for the response output.
+       */
+      output?: Policy.Output | null;
+    }
+
+    export namespace Policy {
+      /**
+       * The moderation policy for the response input.
+       */
+      export interface Input {
+        mode: 'score' | 'block';
+      }
+
+      /**
+       * The moderation policy for the response output.
+       */
+      export interface Output {
+        mode: 'score' | 'block';
+      }
+    }
+  }
+
+  /**
+   * Options for prompt caching. Supported for `gpt-5.6` and later models. By
+   * default, OpenAI automatically chooses one implicit cache breakpoint. You can add
+   * explicit breakpoints to content blocks with `prompt_cache_breakpoint`. Each
+   * request can write up to four breakpoints. For cache matching, OpenAI considers
+   * up to the latest 80 breakpoints in the conversation, without a content-block
+   * lookback limit. Set `mode` to `explicit` to disable the implicit breakpoint. The
+   * `ttl` defaults to `30m`, which is currently the only supported value. See the
+   * [prompt caching guide](https://platform.openai.com/docs/guides/prompt-caching)
+   * for current details.
+   */
+  export interface PromptCacheOptions {
+    /**
+     * Controls whether OpenAI automatically creates an implicit cache breakpoint.
+     * Defaults to `implicit`. With `implicit`, OpenAI creates one implicit breakpoint
+     * and writes up to the latest three explicit breakpoints in the request. With
+     * `explicit`, OpenAI does not create an implicit breakpoint and writes up to the
+     * latest four explicit breakpoints. If there are no explicit breakpoints, the
+     * request does not use prompt caching.
+     */
+    mode?: 'implicit' | 'explicit';
+
+    /**
+     * The minimum lifetime applied to every implicit and explicit cache breakpoint
+     * written by the request. Defaults to `30m`, which is currently the only supported
+     * value. The backend may retain cache entries for longer.
+     */
+    ttl?: '30m';
   }
 
   /**
