@@ -119,14 +119,67 @@ export type ChatCompletionStreamParams = Omit<ChatCompletionCreateParamsBase, 's
   stream?: true;
 };
 
+type ChatCompletionReadableStreamMessage = {
+  type: 'message';
+  message: ChatCompletionMessageParam;
+  tool_call_ids?: string[];
+};
+
+// Keep message records readable as empty chunks by older SDKs. Their finalizer
+// overwrites `object`, so the encoded payload does not leak into completions.
+const CHAT_COMPLETION_READABLE_STREAM_MESSAGE_PREFIX = 'chat.completion.chunk.message:';
+
+type ChatCompletionReadableStreamMessageChunk = Pick<ChatCompletionChunk, 'id' | 'created' | 'model'> & {
+  choices: [];
+  object: `${typeof CHAT_COMPLETION_READABLE_STREAM_MESSAGE_PREFIX}${string}`;
+};
+
 export type ChatCompletionReadableStreamItem =
   | ChatCompletionChunk
-  | { type: 'message'; message: ChatCompletionMessageParam };
+  | ChatCompletionReadableStreamMessage
+  | ChatCompletionReadableStreamMessageChunk;
+
+export function makeChatCompletionReadableStreamMessageChunk(
+  chunk: ChatCompletionChunk,
+  message: ChatCompletionMessageParam,
+  toolCallIds?: string[],
+): ChatCompletionReadableStreamMessageChunk {
+  const payload: ChatCompletionReadableStreamMessage = {
+    type: 'message',
+    message,
+    ...(toolCallIds ? { tool_call_ids: toolCallIds } : {}),
+  };
+
+  return {
+    id: chunk.id,
+    choices: [],
+    created: chunk.created,
+    model: chunk.model,
+    object: `${CHAT_COMPLETION_READABLE_STREAM_MESSAGE_PREFIX}${JSON.stringify(payload)}`,
+  };
+}
 
 function isChatCompletionReadableStreamMessage(
   item: ChatCompletionReadableStreamItem,
-): item is { type: 'message'; message: ChatCompletionMessageParam } {
-  return 'type' in item && item.type === 'message';
+): item is ChatCompletionReadableStreamMessage | ChatCompletionReadableStreamMessageChunk {
+  return (
+    ('type' in item && item.type === 'message' && 'message' in item) ||
+    ('object' in item &&
+      typeof item.object === 'string' &&
+      item.object.startsWith(CHAT_COMPLETION_READABLE_STREAM_MESSAGE_PREFIX))
+  );
+}
+
+function getChatCompletionReadableStreamMessage(
+  item: ChatCompletionReadableStreamMessage | ChatCompletionReadableStreamMessageChunk,
+): ChatCompletionReadableStreamMessage {
+  if ('type' in item) {
+    return item;
+  }
+
+  return JSON.parse(
+    item.object.slice(CHAT_COMPLETION_READABLE_STREAM_MESSAGE_PREFIX.length),
+  ) as ChatCompletionReadableStreamMessage;
 }
 
 interface ChoiceEventState {
@@ -416,11 +469,20 @@ export class ChatCompletionStream<ParsedT = null>
     let chatId;
     for await (const item of stream) {
       if (isChatCompletionReadableStreamMessage(item)) {
+        const message = getChatCompletionReadableStreamMessage(item);
         if (this.#currentChatCompletionSnapshot) {
+          const toolCalls = this.#currentChatCompletionSnapshot.choices[0]?.message.tool_calls;
+          for (const [index, id] of message.tool_call_ids?.entries() ?? []) {
+            const toolCall = toolCalls?.[index];
+            if (toolCall && id) {
+              toolCall.id = id;
+            }
+          }
+
           this._addChatCompletion(this.#endRequest());
           chatId = undefined;
         }
-        this._addMessage(item.message);
+        this._addMessage(message.message);
         continue;
       }
 

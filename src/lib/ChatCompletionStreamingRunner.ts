@@ -10,11 +10,13 @@ import {
   type ChatCompletionReadableStreamItem,
   ChatCompletionSnapshot,
   ChatCompletionStream,
+  makeChatCompletionReadableStreamMessageChunk,
 } from './ChatCompletionStream';
+import { OpenAIError } from '../error';
 import OpenAI from '../index';
 import { AutoParseableTool } from '../lib/parser';
 import { Stream } from '../streaming';
-import { isToolMessage } from './chatCompletionUtils';
+import { isAssistantMessage, isToolMessage } from './chatCompletionUtils';
 
 export interface ChatCompletionStreamEvents extends AbstractChatCompletionRunnerEvents {
   content: (contentDelta: string, contentSnapshot: string) => void;
@@ -45,6 +47,8 @@ export class ChatCompletionStreamingRunner<ParsedT = null>
       reject: (err: unknown) => void;
     }[] = [];
     let done = false;
+    let lastChunk: ChatCompletionChunk | undefined;
+    let toolCallIds: string[] | undefined;
 
     const pushEvent = (event: ChatCompletionReadableStreamItem) => {
       const reader = readQueue.shift();
@@ -55,10 +59,21 @@ export class ChatCompletionStreamingRunner<ParsedT = null>
       }
     };
 
-    this.on('chunk', (chunk) => pushEvent(chunk));
+    this.on('chunk', (chunk) => {
+      lastChunk = chunk;
+      pushEvent(chunk);
+    });
     this.on('message', (message: ChatCompletionMessageParam) => {
+      if (isAssistantMessage(message)) {
+        toolCallIds = message.tool_calls?.map((toolCall) => toolCall.id);
+        return;
+      }
+
       if (isToolMessage(message)) {
-        pushEvent({ type: 'message', message });
+        if (!lastChunk) {
+          throw new OpenAIError('cannot serialize a tool message before receiving any chunks');
+        }
+        pushEvent(makeChatCompletionReadableStreamMessageChunk(lastChunk, message, toolCallIds));
       }
     });
 
