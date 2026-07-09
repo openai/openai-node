@@ -64,6 +64,10 @@ Some Zod behavior cannot be represented in the schema sent to the API:
   Custom refinements and transforms still run when the SDK parses the response, but
   some schemas that cannot be converted, including bare transforms in Zod v4, cause
   the helper to throw before a request is made.
+- `.default()` emits the unsupported `default` keyword, and string `.min()` or
+  `.max()` emit the unsupported `minLength` or `maxLength` keywords. Because
+  `zodFunction()` always creates a strict function tool, use a regular non-strict
+  tool and parse its arguments with Zod yourself when you need these behaviors.
 - TypeScript comments are not available at runtime and are not sent to the API. Use
   `.describe()` for field descriptions or the helper's `description` option for a
   top-level response format or function description.
