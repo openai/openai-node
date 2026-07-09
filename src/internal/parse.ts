@@ -13,44 +13,58 @@ export type APIResponseProps = {
   requestLogID: string;
   retryOfRequestLogID: string | undefined;
   startTime: number;
+  cleanup?: () => void;
 };
 
 export async function defaultParseResponse<T>(
   client: OpenAI,
   props: APIResponseProps,
 ): Promise<WithRequestID<T>> {
-  const { response, requestLogID, retryOfRequestLogID, startTime } = props;
-  const body = await (async () => {
-    if (props.options.stream) {
-      loggerFor(client).debug('response', response.status, response.url, response.headers, response.body);
+  const { response, requestLogID, retryOfRequestLogID, startTime, cleanup } = props;
+  if (props.options.stream) {
+    loggerFor(client).debug('response', response.status, response.url, response.headers, response.body);
 
-      // Note: there is an invariant here that isn't represented in the type system
-      // that if you set `stream: true` the response type must also be `Stream<T>`
+    // Note: there is an invariant here that isn't represented in the type system
+    // that if you set `stream: true` the response type must also be `Stream<T>`
 
-      if (props.options.__streamClass) {
-        return props.options.__streamClass.fromSSEResponse(
-          response,
-          props.controller,
-          client,
-          props.options.__synthesizeEventData,
-        ) as any;
-      }
-
-      return Stream.fromSSEResponse(
+    if (props.options.__streamClass) {
+      return props.options.__streamClass.fromSSEResponse(
         response,
         props.controller,
         client,
         props.options.__synthesizeEventData,
+        cleanup,
       ) as any;
     }
 
+    return Stream.fromSSEResponse(
+      response,
+      props.controller,
+      client,
+      props.options.__synthesizeEventData,
+      cleanup,
+    ) as any;
+  }
+
+  if (props.options.__binaryResponse) {
+    const body = wrapResponseBodyWithCleanup(response, cleanup);
+    loggerFor(client).debug(
+      `[${requestLogID}] response parsed`,
+      formatRequestDetails({
+        retryOfRequestLogID,
+        url: response.url,
+        status: response.status,
+        body,
+        durationMs: Date.now() - startTime,
+      }),
+    );
+    return body as WithRequestID<T>;
+  }
+
+  const body = await (async () => {
     // fetch refuses to read the body when the status code is 204.
     if (response.status === 204) {
       return null as T;
-    }
-
-    if (props.options.__binaryResponse) {
-      return response as unknown as T;
     }
 
     const contentType = response.headers.get('content-type');
@@ -69,7 +83,7 @@ export async function defaultParseResponse<T>(
 
     const text = await response.text();
     return text as unknown as T;
-  })();
+  })().finally(() => cleanup?.());
   loggerFor(client).debug(
     `[${requestLogID}] response parsed`,
     formatRequestDetails({
@@ -80,13 +94,56 @@ export async function defaultParseResponse<T>(
       durationMs: Date.now() - startTime,
     }),
   );
-  return body;
+  return body as WithRequestID<T>;
 }
 
 export type WithRequestID<T> =
   T extends Array<any> | Response | AbstractPage<any> ? T
   : T extends Record<string, any> ? T & { _request_id?: string | null }
   : T;
+
+function wrapResponseBodyWithCleanup(response: Response, cleanup: (() => void) | undefined): Response {
+  if (!cleanup) return response;
+  if (!response.body) {
+    cleanup();
+    return response;
+  }
+
+  const reader = response.body.getReader();
+  const body = new ReadableStream({
+    async pull(controller) {
+      try {
+        const { done, value } = await reader.read();
+        if (done) {
+          cleanup();
+          controller.close();
+          return;
+        }
+        controller.enqueue(value);
+      } catch (err) {
+        cleanup();
+        controller.error(err);
+      }
+    },
+    async cancel(reason) {
+      cleanup();
+      await reader.cancel(reason);
+    },
+  });
+  const wrapped = new Response(body, response);
+
+  try {
+    Object.defineProperties(wrapped, {
+      redirected: { value: response.redirected },
+      type: { value: response.type },
+      url: { value: response.url },
+    });
+  } catch {
+    // Some fetch implementations may expose non-configurable Response fields.
+  }
+
+  return wrapped;
+}
 
 export function addRequestID<T>(value: T, response: Response): WithRequestID<T> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
