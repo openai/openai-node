@@ -1,3 +1,4 @@
+import { APIUserAbortError } from 'openai';
 import { ReadableStreamFrom } from 'openai/internal/shims';
 import { ResponseStream } from 'openai/lib/responses/ResponseStream';
 import type { Response, ResponseStreamEvent } from 'openai/resources/responses/responses';
@@ -85,6 +86,50 @@ describe('.stream()', () => {
       content: [{ type: 'output_text', text: 'Hello world' }],
     });
   });
+
+  it('cancels a stalled readable stream when aborted', async () => {
+    const encoder = new TextEncoder();
+    const created = {
+      type: 'response.created',
+      sequence_number: 0,
+      response: makeResponse(),
+    } satisfies ResponseStreamEvent;
+
+    let resolvePullStarted!: () => void;
+    const pullStarted = new Promise<void>((resolve) => {
+      resolvePullStarted = resolve;
+    });
+    let resolveCancelled!: () => void;
+    const cancelled = new Promise<void>((resolve) => {
+      resolveCancelled = resolve;
+    });
+    const cancel = jest.fn(() => resolveCancelled());
+    let pulls = 0;
+    const readable = new ReadableStream({
+      pull(controller) {
+        if (pulls++ === 0) {
+          controller.enqueue(encoder.encode(`${JSON.stringify(created)}\n`));
+          return;
+        }
+
+        resolvePullStarted();
+        return new Promise<void>(() => {});
+      },
+      cancel,
+    });
+    const stream = ResponseStream.fromReadableStream(readable);
+
+    await stream.emitted('response.created');
+    await pullStarted;
+
+    const done = expect(stream.done()).rejects.toThrowError(APIUserAbortError);
+    stream.abort();
+
+    await cancelled;
+    await done;
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(stream.aborted).toBe(true);
+  }, 5000);
 
   it('standard text works', async () => {
     const deltas: string[] = [];

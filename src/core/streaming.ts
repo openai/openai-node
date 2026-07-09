@@ -114,16 +114,44 @@ export class Stream<Item> implements AsyncIterable<Item> {
 
     async function* iterLines(): AsyncGenerator<string, void, unknown> {
       const lineDecoder = new LineDecoder();
+      const reader = readableStream.getReader();
+      let closed = false;
+      let cancelPromise: Promise<void> | undefined;
+      const cancel = () => {
+        cancelPromise ??= reader.cancel();
+        cancelPromise.catch(() => {});
+      };
 
-      const iter = ReadableStreamToAsyncIterable<Bytes>(readableStream);
-      for await (const chunk of iter) {
-        for (const line of lineDecoder.decode(chunk)) {
+      controller.signal.addEventListener('abort', cancel, { once: true });
+      try {
+        if (controller.signal.aborted) {
+          cancel();
+          return;
+        }
+
+        while (true) {
+          const { value: chunk, done } = await reader.read();
+          if (done) {
+            closed = true;
+            break;
+          }
+          if (controller.signal.aborted) return;
+
+          for (const line of lineDecoder.decode(chunk)) {
+            if (controller.signal.aborted) return;
+            yield line;
+          }
+        }
+
+        if (controller.signal.aborted) return;
+        for (const line of lineDecoder.flush()) {
+          if (controller.signal.aborted) return;
           yield line;
         }
-      }
-
-      for (const line of lineDecoder.flush()) {
-        yield line;
+      } finally {
+        controller.signal.removeEventListener('abort', cancel);
+        if (!closed) cancel();
+        reader.releaseLock();
       }
     }
 
@@ -141,7 +169,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
         done = true;
       } catch (e) {
         // If the user calls `stream.controller.abort()`, we should exit without throwing.
-        if (isAbortError(e)) return;
+        if (controller.signal.aborted || isAbortError(e)) return;
         throw e;
       } finally {
         // If the user `break`s, abort the ongoing request.
