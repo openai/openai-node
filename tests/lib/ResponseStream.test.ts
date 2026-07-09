@@ -4,24 +4,72 @@ import OpenAI from 'openai';
 jest.setTimeout(1000 * 30);
 
 describe('.stream()', () => {
-  it('passes starting_after when resuming a response stream by ID', async () => {
+  it('replays prior events when resuming by ID so snapshots stay complete', async () => {
     const requests: string[] = [];
+    const response = {
+      id: 'resp_123',
+      object: 'response',
+      created_at: 0,
+      model: 'gpt-4o',
+      output: [],
+      error: null,
+      incomplete_details: null,
+      instructions: null,
+      metadata: null,
+      parallel_tool_calls: false,
+      temperature: null,
+      tools: [],
+      top_p: null,
+      status: 'completed',
+      usage: null,
+    };
+    const events = [
+      {
+        type: 'response.created',
+        sequence_number: 0,
+        response: { ...response, status: 'in_progress' },
+      },
+      {
+        type: 'response.output_item.added',
+        sequence_number: 1,
+        output_index: 0,
+        item: {
+          id: 'msg_1',
+          type: 'message',
+          role: 'assistant',
+          status: 'in_progress',
+          content: [],
+        },
+      },
+      { type: 'response.completed', sequence_number: 2, response },
+    ];
     const openai = new OpenAI({
       apiKey: 'My API Key',
       fetch: async (url) => {
-        requests.push(String(url));
-        return new Response('data: [DONE]\n\n', {
+        const requestURL = String(url);
+        requests.push(requestURL);
+        // Match the API's cursor behavior: forwarding `starting_after` omits the prefix needed
+        // by the accumulator, while omitting it replays the complete event sequence.
+        const streamEvents = requestURL.includes('starting_after=') ? events.slice(1) : events;
+        const body = `${streamEvents
+          .map((event) => `data: ${JSON.stringify(event)}`)
+          .join('\n\n')}\n\ndata: [DONE]\n\n`;
+        return new Response(body, {
           status: 200,
           headers: { 'content-type': 'text/event-stream' },
         });
       },
     });
 
-    await expect(
-      openai.responses.stream({ response_id: 'resp_123', starting_after: 42 }).finalResponse(),
-    ).rejects.toThrow('request ended without sending any events');
+    const emittedEvents: number[] = [];
+    const stream = openai.responses
+      .stream({ response_id: 'resp_123', starting_after: 0 })
+      .on('event', (event) => emittedEvents.push(event.sequence_number));
+    const final = await stream.finalResponse();
 
-    expect(requests).toEqual(['https://api.openai.com/v1/responses/resp_123?stream=true&starting_after=42']);
+    expect(requests).toEqual(['https://api.openai.com/v1/responses/resp_123?stream=true']);
+    expect(emittedEvents).toEqual([1, 2]);
+    expect(final.id).toBe('resp_123');
   });
 
   it('standard text works', async () => {
