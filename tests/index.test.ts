@@ -709,6 +709,37 @@ describe('retries', () => {
     expect(count).toEqual(3);
   });
 
+  test('timeout applies to the response body read phase', async () => {
+    // Server sends headers promptly, then stalls mid-body (never finishes the
+    // body). The timeout must still fire instead of hanging forever.
+    const testFetch = async (
+      _url: string | URL | Request,
+      { signal }: RequestInit = {},
+    ): Promise<Response> => {
+      const body = new ReadableStream({
+        start(controller) {
+          signal?.addEventListener('abort', () => controller.error(new Error('aborted')));
+          // intentionally never enqueue or close: the body read stalls
+        },
+      });
+      return new Response(body, { headers: { 'Content-Type': 'application/json' } });
+    };
+
+    const client = new OpenAI({
+      apiKey: 'My API Key',
+      adminAPIKey: 'My Admin API Key',
+      timeout: 50,
+      maxRetries: 0,
+      fetch: testFetch,
+    });
+
+    const started = Date.now();
+    await expect(client.request({ path: '/foo', method: 'get' })).rejects.toThrow();
+    const elapsed = Date.now() - started;
+    // Should abort shortly after the 50ms timeout, not hang.
+    expect(elapsed).toBeLessThan(2000);
+  });
+
   test('retry count header', async () => {
     let count = 0;
     let capturedRequest: RequestInit | undefined;

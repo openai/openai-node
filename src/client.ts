@@ -999,7 +999,28 @@ export class OpenAI {
     const abort = this._makeAbort(controller);
     if (signal) signal.addEventListener('abort', abort, { once: true });
 
-    const timeout = setTimeout(abort, ms);
+    let timeout: ReturnType<typeof setTimeout> | undefined = setTimeout(abort, ms);
+    let timeoutCleared = false;
+    // Re-arm the timer so that the timeout applies to inactivity during the
+    // body-read phase as well, not just to header arrival. A stalled body read
+    // (headers received, then the server stops sending) is aborted after `ms`
+    // of inactivity instead of hanging forever, while a steadily-streaming
+    // response keeps resetting the timer and is never cut off.
+    // See https://github.com/openai/openai-node/issues/1825
+    const rearmTimeout = () => {
+      if (timeoutCleared) return;
+      if (timeout) clearTimeout(timeout);
+      timeout = setTimeout(abort, ms);
+    };
+    const clearCurrentTimeout = () => {
+      if (timeout) clearTimeout(timeout);
+      timeout = undefined;
+    };
+    const clearTimeoutOnce = () => {
+      if (timeoutCleared) return;
+      timeoutCleared = true;
+      clearCurrentTimeout();
+    };
 
     const isReadableBody =
       ((globalThis as any).ReadableStream && options.body instanceof (globalThis as any).ReadableStream) ||
@@ -1017,12 +1038,65 @@ export class OpenAI {
       fetchOptions.method = method.toUpperCase();
     }
 
+    let response: Response;
     try {
       // use undefined this binding; fetch errors if bound to something else in browser/cloudflare
-      return await this.fetch.call(undefined, url, fetchOptions);
-    } finally {
-      clearTimeout(timeout);
+      response = await this.fetch.call(undefined, url, fetchOptions);
+    } catch (err) {
+      clearTimeoutOnce();
+      throw err;
     }
+
+    const ReadableStreamCtor = (globalThis as any).ReadableStream;
+    if (!response.body || !ReadableStreamCtor) {
+      clearTimeoutOnce();
+      return response;
+    }
+
+    // Headers have arrived; wait until the body is actually read before starting
+    // the body-read timeout, so callers that only inspect the Response don't
+    // leave an active timer behind.
+    clearCurrentTimeout();
+
+    const reader = response.body.getReader();
+    const releaseReader = () => {
+      try {
+        reader.releaseLock();
+      } catch {}
+    };
+    const monitoredBody = new ReadableStreamCtor({
+      async pull(streamController: ReadableStreamDefaultController) {
+        try {
+          rearmTimeout();
+          const { done, value } = await reader.read();
+          if (done) {
+            clearTimeoutOnce();
+            releaseReader();
+            streamController.close();
+            return;
+          }
+          clearCurrentTimeout();
+          streamController.enqueue(value);
+        } catch (err) {
+          clearTimeoutOnce();
+          releaseReader();
+          streamController.error(err);
+        }
+      },
+      cancel(reason: any) {
+        clearTimeoutOnce();
+        return reader.cancel(reason).finally(releaseReader);
+      },
+    });
+
+    const monitoredResponse = new Response(monitoredBody as any, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+    });
+    // `Response` does not let us pass `url` through the constructor, so preserve it.
+    Object.defineProperty(monitoredResponse, 'url', { value: response.url, configurable: true });
+    return monitoredResponse;
   }
 
   private async shouldRetry(response: Response): Promise<boolean> {
