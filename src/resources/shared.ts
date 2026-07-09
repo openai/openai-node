@@ -19,6 +19,9 @@ export type AllModels =
   | 'gpt-5.1-codex-max';
 
 export type ChatModel =
+  | 'gpt-5.6-sol'
+  | 'gpt-5.6-terra'
+  | 'gpt-5.6-luna'
   | 'gpt-5.4'
   | 'gpt-5.4-mini'
   | 'gpt-5.4-nano'
@@ -265,19 +268,12 @@ export interface Reasoning {
   context?: 'auto' | 'current_turn' | 'all_turns' | null;
 
   /**
-   * Constrains effort on reasoning for
-   * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
-   * supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
-   * Reducing reasoning effort can result in faster responses and fewer tokens used
-   * on reasoning in a response.
-   *
-   * - `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported
-   *   reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool
-   *   calls are supported for all reasoning values in gpt-5.1.
-   * - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
-   *   support `none`.
-   * - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
-   * - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
+   * Constrains effort on reasoning for reasoning models. Currently supported values
+   * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
+   * reasoning effort can result in faster responses and fewer tokens used on
+   * reasoning in a response. Not all reasoning models support every value. See the
+   * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+   * model-specific support.
    */
   effort?: ReasoningEffort | null;
 
@@ -291,6 +287,13 @@ export interface Reasoning {
   generate_summary?: 'auto' | 'concise' | 'detailed' | null;
 
   /**
+   * Controls the reasoning execution mode for the request.
+   *
+   * When returned on a response, this is the effective execution mode.
+   */
+  mode?: (string & {}) | 'standard' | 'pro';
+
+  /**
    * A summary of the reasoning performed by the model. This can be useful for
    * debugging and understanding the model's reasoning process. One of `auto`,
    * `concise`, or `detailed`.
@@ -302,21 +305,14 @@ export interface Reasoning {
 }
 
 /**
- * Constrains effort on reasoning for
- * [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
- * supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
- * Reducing reasoning effort can result in faster responses and fewer tokens used
- * on reasoning in a response.
- *
- * - `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported
- *   reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool
- *   calls are supported for all reasoning values in gpt-5.1.
- * - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
- *   support `none`.
- * - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
- * - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
+ * Constrains effort on reasoning for reasoning models. Currently supported values
+ * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
+ * reasoning effort can result in faster responses and fewer tokens used on
+ * reasoning in a response. Not all reasoning models support every value. See the
+ * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+ * model-specific support.
  */
-export type ReasoningEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | null;
+export type ReasoningEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
 
 /**
  * JSON object response format. An older method of generating JSON responses. Using

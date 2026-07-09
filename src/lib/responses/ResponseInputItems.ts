@@ -96,6 +96,8 @@ export function toResponseInputItem(item: ResponseInputItemLike): ResponseInputI
     case 'mcp_call':
     case 'mcp_list_tools':
     case 'message':
+    case 'program':
+    case 'program_output':
     case 'reasoning':
     case 'shell_call':
     case 'tool_search_call':

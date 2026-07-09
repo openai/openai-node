@@ -73,6 +73,20 @@ describe('toResponseInputItems', () => {
         status: 'completed',
         created_by: 'assistant',
       },
+      {
+        type: 'program',
+        id: 'program_123',
+        call_id: 'program_call_123',
+        code: 'return 42',
+        fingerprint: 'program_fingerprint_123',
+      },
+      {
+        type: 'program_output',
+        id: 'program_output_123',
+        call_id: 'program_call_123',
+        result: '42',
+        status: 'completed',
+      },
     ];
 
     expect(toResponseInputItems(history)).toEqual([
@@ -136,6 +150,20 @@ describe('toResponseInputItems', () => {
         id: 'apply_patch_call_output_123',
         call_id: 'apply_patch_call_123',
         output: 'created notes.txt',
+        status: 'completed',
+      },
+      {
+        type: 'program',
+        id: 'program_123',
+        call_id: 'program_call_123',
+        code: 'return 42',
+        fingerprint: 'program_fingerprint_123',
+      },
+      {
+        type: 'program_output',
+        id: 'program_output_123',
+        call_id: 'program_call_123',
+        result: '42',
         status: 'completed',
       },
     ]);
