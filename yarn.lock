@@ -12,12 +12,12 @@
   resolved "https://registry.yarnpkg.com/@andrewbranch/untar.js/-/untar.js-1.0.3.tgz#ba9494f85eb83017c5c855763969caf1d0adea00"
   integrity sha512-Jh15/qVmrLGhkKJBdXlK1+9tY4lZruYjsgkDFj08ZmDiWVBLJcqkok7Z0/R0In+i1rScBpJlSvrTS2Lm41Pbnw==
 
-"@arethetypeswrong/cli@^0.17.0":
-  version "0.17.0"
-  resolved "https://registry.yarnpkg.com/@arethetypeswrong/cli/-/cli-0.17.0.tgz#f97f10926b3f9f9eb5117550242d2e06c25cadac"
-  integrity sha512-xSMW7bfzVWpYw5JFgZqBXqr6PdR0/REmn3DkxCES5N0JTcB0CVgbIynJCvKBFmXaPc3hzmmTrb7+yPDRoOSZdA==
+"@arethetypeswrong/cli@^0.18.0":
+  version "0.18.4"
+  resolved "https://registry.yarnpkg.com/@arethetypeswrong/cli/-/cli-0.18.4.tgz#c31f54f3b0d0e0f3256ab3edb6530beeb5e64b4b"
+  integrity sha512-kNWo6LTzGAuLYPpJ7Sgo63whSUeeSuKMlYx6IBgzs4ONEG807gW4hSSENvpeCHzO2H2wIzG5EFl0OKBbqGBAyA==
   dependencies:
-    "@arethetypeswrong/core" "0.17.0"
+    "@arethetypeswrong/core" "0.18.4"
     chalk "^4.1.2"
     cli-table3 "^0.6.3"
     commander "^10.0.1"
@@ -25,15 +25,16 @@
     marked-terminal "^7.1.0"
     semver "^7.5.4"
 
-"@arethetypeswrong/core@0.17.0":
-  version "0.17.0"
-  resolved "https://registry.yarnpkg.com/@arethetypeswrong/core/-/core-0.17.0.tgz#abb3b5f425056d37193644c2a2de4aecf866b76b"
-  integrity sha512-FHyhFizXNetigTVsIhqXKGYLpazPS5YNojEPpZEUcBPt9wVvoEbNIvG+hybuBR+pjlRcbyuqhukHZm1fr+bDgA==
+"@arethetypeswrong/core@0.18.4":
+  version "0.18.4"
+  resolved "https://registry.yarnpkg.com/@arethetypeswrong/core/-/core-0.18.4.tgz#24edea3d651dea7d32bf6f1cc9ee9a00db39de49"
+  integrity sha512-M5F0ePyN6h2Z6XxRiyIPqjGbltotXLjR0CKA0uKspsDu0QmgTNYvRb4RSQPMUs2ZXZHCCYpbaZbFbYOXLxCjUA==
   dependencies:
     "@andrewbranch/untar.js" "^1.0.3"
+    "@loaderkit/resolve" "^1.0.2"
     cjs-module-lexer "^1.2.3"
-    fflate "^0.8.2"
-    lru-cache "^10.4.3"
+    fflate "^0.8.3"
+    lru-cache "^11.0.1"
     semver "^7.5.4"
     typescript "5.6.1-rc"
     validate-npm-package-name "^5.0.0"
@@ -305,6 +306,11 @@
   version "0.2.3"
   resolved "https://registry.yarnpkg.com/@bcoe/v8-coverage/-/v8-coverage-0.2.3.tgz#75a2e8b51cb758a7553d6804a5932d7aace75c39"
   integrity sha512-0hYQ8SB4Db5zvZB4axdMHGwEaQjkZzFjQiN9LVYvIFB2nSUHW9tYpxWriPrWDASIxiaXax83REcLxuSdnGPZtw==
+
+"@braidai/lang@^1.0.0":
+  version "1.1.2"
+  resolved "https://registry.yarnpkg.com/@braidai/lang/-/lang-1.1.2.tgz#65bc2bc1db6d00e153b95ac7006f4573e289e9be"
+  integrity sha512-qBcknbBufNHlui137Hft8xauQMTZDKdophmLFv05r2eNmdIv/MlPuP4TdUknHG68UdWLgVZwgxVe735HzJNIwA==
 
 "@colors/colors@1.5.0":
   version "1.5.0"
@@ -687,6 +693,13 @@
   dependencies:
     "@jridgewell/resolve-uri" "^3.1.0"
     "@jridgewell/sourcemap-codec" "^1.4.14"
+
+"@loaderkit/resolve@^1.0.2":
+  version "1.0.6"
+  resolved "https://registry.yarnpkg.com/@loaderkit/resolve/-/resolve-1.0.6.tgz#8d45341e688faecc25b3ae919c0f45d94c4e26c9"
+  integrity sha512-G8FdIoF5CypfwmD9rl8BXod5HDn8JqB0CCNBXDTaRZ+yRYhARrrSToX1zg1zy9jX3zLqigsELwhT4gNtkdQAUg==
+  dependencies:
+    "@braidai/lang" "^1.0.0"
 
 "@nodelib/fs.scandir@2.1.5":
   version "2.1.5"
@@ -1703,10 +1716,10 @@ fb-watchman@^2.0.0:
   dependencies:
     bser "2.1.1"
 
-fflate@^0.8.2:
-  version "0.8.2"
-  resolved "https://registry.yarnpkg.com/fflate/-/fflate-0.8.2.tgz#fc8631f5347812ad6028bbe4a2308b2792aa1dea"
-  integrity sha512-cPJU47OaAoCbg0pBvzsgpTPhmhqI5eJjh/JIu8tPj5q+T7iLvW/JAYUqmE7KOB4R1ZyEhzBaIQpQpardBF5z8A==
+fflate@^0.8.3:
+  version "0.8.3"
+  resolved "https://registry.yarnpkg.com/fflate/-/fflate-0.8.3.tgz#bc27d8eb30343d4d512abb03480202ce65d825fc"
+  integrity sha512-tbZNuJrLwGUp3zshBtdy4W+ORxZuIh8a5ilyIEQDC5rY1f3U20JMry0Ll3WBzU58EZKsEuJFXhb5gwv8CsPvgA==
 
 file-entry-cache@^8.0.0:
   version "8.0.0"
@@ -2497,10 +2510,10 @@ lodash.merge@^4.6.2:
   resolved "https://registry.yarnpkg.com/lodash.merge/-/lodash.merge-4.6.2.tgz#558aa53b43b661e1925a0afdfa36a9a1085fe57a"
   integrity sha512-0KpjqXRVvrYyCsX1swR/XTK0va6VQkQM6MNo7PqW77ByjAhoARA8EfrP1N4+KlKj8YS0ZUCtRT/YUuhyYDujIQ==
 
-lru-cache@^10.4.3:
-  version "10.4.3"
-  resolved "https://registry.yarnpkg.com/lru-cache/-/lru-cache-10.4.3.tgz#410fc8a17b70e598013df257c2446b7f3383f119"
-  integrity sha512-JNAzZcXrCt42VGLuYz0zfAzDfAvJWW6AfYlDBQyDV5DClI2m5sAmK+OIO7s59XfsRsWHp02jAJrRadPRGTt6SQ==
+lru-cache@^11.0.1:
+  version "11.5.2"
+  resolved "https://registry.yarnpkg.com/lru-cache/-/lru-cache-11.5.2.tgz#00e16665c90c620fba14a3c368732a976493f760"
+  integrity sha512-4pfM1Ff0x50o0tQwb5ucw/RzNyD0/YJME6IVcStalZuMWxdt3sR3huStTtxz4PUmvZfRguvDejasvQ2kifR11g==
 
 lru-cache@^5.1.1:
   version "5.1.1"

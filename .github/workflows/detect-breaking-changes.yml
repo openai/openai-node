@@ -23,7 +23,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3.9.1
         with:
-          node-version: '20'
+          node-version: '24'
       - name: Install dependencies
         run: |
           yarn install
