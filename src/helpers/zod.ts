@@ -177,7 +177,7 @@ export function zodFunction<Parameters extends ZodTypeLike>(options: {
   function?: ((args: InferZodType<Parameters>) => unknown | Promise<unknown>) | undefined;
   description?: string | undefined;
 }): AutoParseableTool<{
-  arguments: Parameters;
+  arguments: InferZodType<Parameters>;
   name: string;
   function: (args: InferZodType<Parameters>) => unknown;
 }> {
@@ -210,7 +210,7 @@ export function zodResponsesFunction<Parameters extends ZodTypeLike>(options: {
   function?: ((args: InferZodType<Parameters>) => unknown | Promise<unknown>) | undefined;
   description?: string | undefined;
 }): AutoParseableResponseTool<{
-  arguments: Parameters;
+  arguments: InferZodType<Parameters>;
   name: string;
   function: (args: InferZodType<Parameters>) => unknown;
 }> {
