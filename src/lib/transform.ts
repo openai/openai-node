@@ -78,7 +78,7 @@ function ensureStrictJsonSchema(
     for (const [key, value] of Object.entries(properties)) {
       if (!isNullable(value) && !required.includes(key)) {
         throw new Error(
-          `Zod field at \`${[...path, 'properties', key].join(
+          `Schema field at \`${[...path, 'properties', key].join(
             '/',
           )}\` uses \`.optional()\` without \`.nullable()\` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required`,
         );

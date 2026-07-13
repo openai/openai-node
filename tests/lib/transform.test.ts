@@ -139,7 +139,7 @@ describe('toStrictJsonSchema', () => {
       };
 
       expect(() => toStrictJsonSchema(schema)).toThrow(
-        'Zod field at `properties/name` uses `.optional()` without `.nullable()` which is not supported by the API',
+        'Schema field at `properties/name` uses `.optional()` without `.nullable()` which is not supported by the API',
       );
     });
   });

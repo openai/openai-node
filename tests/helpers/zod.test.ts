@@ -463,7 +463,7 @@ describe.each([
           'schema',
         ),
       ).toThrowErrorMatchingInlineSnapshot(
-        `"Zod field at \`properties/optional\` uses \`.optional()\` without \`.nullable()\` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required"`,
+        `"Schema field at \`properties/optional\` uses \`.optional()\` without \`.nullable()\` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required"`,
       );
     }
   });
@@ -489,7 +489,7 @@ describe.each([
           'schema',
         ),
       ).toThrowErrorMatchingInlineSnapshot(
-        `"Zod field at \`properties/foo/properties/bar/items/properties/can_be_missing\` uses \`.optional()\` without \`.nullable()\` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required"`,
+        `"Schema field at \`properties/foo/properties/bar/items/properties/can_be_missing\` uses \`.optional()\` without \`.nullable()\` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required"`,
       );
     }
   });
