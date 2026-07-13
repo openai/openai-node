@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { Stream } from 'openai/core/streaming';
 import { OpenAIError, APIConnectionError } from 'openai/error';
 import { PassThrough } from 'stream';
 import {
@@ -2068,6 +2069,314 @@ describe('resource completions', () => {
       expect(listener.eventFunctionCallResults).toEqual([`it's raining`]);
       await listener.sanityCheck({ ignoredMessages: new Set([injectedMessage]) });
     });
+    test('toReadableStream and fromReadableStream emits tool result messages', async () => {
+      const { fetch, handleRequest } = mockStreamingChatCompletionFetch();
+
+      const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
+
+      const runner = openai.chat.completions.runTools({
+        stream: true,
+        messages: [{ role: 'user', content: 'tell me what the weather is like' }],
+        model: 'gpt-3.5-turbo',
+        tools: [
+          {
+            type: 'function',
+            function: {
+              function: function getWeather() {
+                return `it's raining`;
+              },
+              parameters: {},
+              description: 'gets the weather',
+            },
+          },
+        ],
+      });
+
+      const proxied = ChatCompletionStreamingRunner.fromReadableStream(runner.toReadableStream());
+      const listener = new StreamingRunnerListener(proxied);
+
+      await Promise.all([
+        handleRequest(async function* (request): AsyncIterable<OpenAI.Chat.ChatCompletionChunk> {
+          expect(request.messages).toEqual([{ role: 'user', content: 'tell me what the weather is like' }]);
+          yield {
+            id: '1',
+            choices: [
+              {
+                index: 0,
+                finish_reason: 'function_call',
+                logprobs: null,
+                delta: {
+                  role: 'assistant',
+                  content: null,
+                  tool_calls: [
+                    {
+                      type: 'function',
+                      index: 0,
+                      id: '123',
+                      function: {
+                        arguments: '',
+                        name: 'getWeather',
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+            created: Math.floor(Date.now() / 1000),
+            model: 'gpt-3.5-turbo',
+            object: 'chat.completion.chunk',
+          };
+        }),
+        handleRequest(async function* (request): AsyncIterable<OpenAI.Chat.ChatCompletionChunk> {
+          expect(request.messages).toEqual([
+            { role: 'user', content: 'tell me what the weather is like' },
+            {
+              role: 'assistant',
+              content: null,
+              parsed: null,
+              refusal: null,
+              tool_calls: [
+                {
+                  type: 'function',
+                  id: '123',
+                  function: {
+                    arguments: '',
+                    name: 'getWeather',
+                  },
+                },
+              ],
+            },
+            {
+              role: 'tool',
+              content: `it's raining`,
+              tool_call_id: '123',
+            },
+          ]);
+          for (const choice of contentChoiceDeltas(`it's raining`)) {
+            yield {
+              id: '2',
+              choices: [choice],
+              created: Math.floor(Date.now() / 1000),
+              model: 'gpt-3.5-turbo',
+              object: 'chat.completion.chunk',
+            };
+          }
+        }),
+        proxied.done(),
+      ]);
+
+      expect(listener.eventMessages).toEqual([
+        {
+          role: 'assistant',
+          content: null,
+          parsed: null,
+          refusal: null,
+          tool_calls: [
+            {
+              type: 'function',
+              id: '123',
+              function: {
+                arguments: '',
+                name: 'getWeather',
+              },
+            },
+          ],
+        },
+        { role: 'tool', content: `it's raining`, tool_call_id: '123' },
+        {
+          role: 'assistant',
+          content: "it's raining",
+          parsed: null,
+          refusal: null,
+          tool_calls: undefined,
+        },
+      ]);
+      expect(listener.eventFunctionCallResults).toEqual([`it's raining`]);
+      await listener.sanityCheck();
+    });
+    test('toReadableStream and fromReadableStream handles maxChatCompletions ending on tool results', async () => {
+      const { fetch, handleRequest } = mockStreamingChatCompletionFetch();
+
+      const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
+
+      const runner = openai.chat.completions.runTools(
+        {
+          stream: true,
+          messages: [{ role: 'user', content: 'tell me what the weather is like' }],
+          model: 'gpt-3.5-turbo',
+          tools: [
+            {
+              type: 'function',
+              function: {
+                function: function getWeather() {
+                  return `it's raining`;
+                },
+                parameters: {},
+                description: 'gets the weather',
+              },
+            },
+          ],
+        },
+        { maxChatCompletions: 1 },
+      );
+
+      const proxied = ChatCompletionStreamingRunner.fromReadableStream(runner.toReadableStream());
+      const listener = new StreamingRunnerListener(proxied);
+
+      await Promise.all([
+        handleRequest(async function* (request): AsyncIterable<OpenAI.Chat.ChatCompletionChunk> {
+          expect(request.messages).toEqual([{ role: 'user', content: 'tell me what the weather is like' }]);
+          yield {
+            id: '1',
+            choices: [
+              {
+                index: 0,
+                finish_reason: 'function_call',
+                logprobs: null,
+                delta: {
+                  role: 'assistant',
+                  content: null,
+                  tool_calls: [
+                    {
+                      type: 'function',
+                      index: 0,
+                      id: '123',
+                      function: {
+                        arguments: '',
+                        name: 'getWeather',
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+            created: Math.floor(Date.now() / 1000),
+            model: 'gpt-3.5-turbo',
+            object: 'chat.completion.chunk',
+          };
+        }),
+        runner.done(),
+        proxied.done(),
+      ]);
+
+      const assistantMessage = {
+        role: 'assistant',
+        content: null,
+        parsed: null,
+        refusal: null,
+        tool_calls: [
+          {
+            type: 'function',
+            id: '123',
+            function: {
+              arguments: '',
+              name: 'getWeather',
+            },
+          },
+        ],
+      };
+      const toolMessage = { role: 'tool', content: `it's raining`, tool_call_id: '123' };
+
+      expect(listener.eventMessages).toEqual([assistantMessage, toolMessage]);
+      expect(proxied.messages).toEqual([assistantMessage, toolMessage]);
+      expect(listener.eventFunctionCallResults).toEqual([`it's raining`]);
+      await expect(proxied.finalChatCompletion()).resolves.toMatchObject({ id: '1' });
+      await expect(proxied.finalMessage()).resolves.toEqual(assistantMessage);
+      await listener.sanityCheck();
+    });
+    test('toReadableStream and fromReadableStream handles forced tool choice ending on tool results', async () => {
+      const { fetch, handleRequest } = mockStreamingChatCompletionFetch();
+
+      const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
+
+      const runner = openai.chat.completions.runTools({
+        stream: true,
+        messages: [{ role: 'user', content: 'tell me what the weather is like' }],
+        model: 'gpt-3.5-turbo',
+        tool_choice: {
+          type: 'function',
+          function: {
+            name: 'getWeather',
+          },
+        },
+        tools: [
+          {
+            type: 'function',
+            function: {
+              function: function getWeather() {
+                return `it's raining`;
+              },
+              parameters: {},
+              description: 'gets the weather',
+            },
+          },
+        ],
+      });
+
+      const proxied = ChatCompletionStreamingRunner.fromReadableStream(runner.toReadableStream());
+      const listener = new StreamingRunnerListener(proxied);
+
+      await Promise.all([
+        handleRequest(async function* (request): AsyncIterable<OpenAI.Chat.ChatCompletionChunk> {
+          expect(request.messages).toEqual([{ role: 'user', content: 'tell me what the weather is like' }]);
+          yield {
+            id: '1',
+            choices: [
+              {
+                index: 0,
+                finish_reason: 'function_call',
+                logprobs: null,
+                delta: {
+                  role: 'assistant',
+                  content: null,
+                  tool_calls: [
+                    {
+                      type: 'function',
+                      index: 0,
+                      id: '123',
+                      function: {
+                        arguments: '',
+                        name: 'getWeather',
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+            created: Math.floor(Date.now() / 1000),
+            model: 'gpt-3.5-turbo',
+            object: 'chat.completion.chunk',
+          };
+        }),
+        runner.done(),
+        proxied.done(),
+      ]);
+
+      const assistantMessage = {
+        role: 'assistant',
+        content: null,
+        parsed: null,
+        refusal: null,
+        tool_calls: [
+          {
+            type: 'function',
+            id: '123',
+            function: {
+              arguments: '',
+              name: 'getWeather',
+            },
+          },
+        ],
+      };
+      const toolMessage = { role: 'tool', content: `it's raining`, tool_call_id: '123' };
+
+      expect(listener.eventMessages).toEqual([assistantMessage, toolMessage]);
+      expect(proxied.messages).toEqual([assistantMessage, toolMessage]);
+      expect(listener.eventFunctionCallResults).toEqual([`it's raining`]);
+      await expect(proxied.finalChatCompletion()).resolves.toMatchObject({ id: '1' });
+      await expect(proxied.finalMessage()).resolves.toEqual(assistantMessage);
+      await listener.sanityCheck();
+    });
     test('generates an ID for streamed tool calls with an empty ID', async () => {
       const { fetch, handleRequest } = mockStreamingChatCompletionFetch();
 
@@ -2089,6 +2398,7 @@ describe('resource completions', () => {
           },
         ],
       });
+      const proxied = ChatCompletionStreamingRunner.fromReadableStream(runner.toReadableStream());
 
       await Promise.all([
         handleRequest(async function* (): AsyncIterable<OpenAI.Chat.ChatCompletionChunk> {
@@ -2127,9 +2437,103 @@ describe('resource completions', () => {
           }
         }),
         runner.done(),
+        proxied.done(),
       ]);
 
       await expect(runner.finalFunctionToolCallResult()).resolves.toBe(`it's raining`);
+
+      const assistantMessage = proxied.messages[0];
+      const toolMessage = proxied.messages[1];
+      if (assistantMessage?.role !== 'assistant' || !assistantMessage.tool_calls?.[0]) {
+        throw new Error('expected a proxied assistant message with a tool call');
+      }
+      if (toolMessage?.role !== 'tool') {
+        throw new Error('expected a proxied tool result message');
+      }
+
+      expect(assistantMessage.tool_calls[0].id).toMatch(/^call_/);
+      expect(toolMessage.tool_call_id).toBe(assistantMessage.tool_calls[0].id);
+      await expect(proxied.finalFunctionToolCallResult()).resolves.toBe(`it's raining`);
+    });
+    test('toReadableStream keeps tool messages readable by legacy chunk consumers', async () => {
+      const { fetch, handleRequest } = mockStreamingChatCompletionFetch();
+
+      const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
+      const runner = openai.chat.completions.runTools(
+        {
+          stream: true,
+          messages: [{ role: 'user', content: 'tell me what the weather is like' }],
+          model: 'gpt-3.5-turbo',
+          tools: [
+            {
+              type: 'function',
+              function: {
+                function: function getWeather() {
+                  return `it's raining`;
+                },
+                parameters: {},
+                description: 'gets the weather',
+              },
+            },
+          ],
+        },
+        { maxChatCompletions: 1 },
+      );
+      const stream = Stream.fromReadableStream<OpenAI.Chat.ChatCompletionChunk>(
+        runner.toReadableStream(),
+        new AbortController(),
+      );
+      const chunksPromise = (async () => {
+        const chunks: OpenAI.Chat.ChatCompletionChunk[] = [];
+        for await (const chunk of stream) {
+          // Older consumers read every item as a ChatCompletionChunk and iterate choices.
+          for (const choice of chunk.choices) {
+            void choice.index;
+          }
+          chunks.push(chunk);
+        }
+        return chunks;
+      })();
+
+      const [, chunks] = await Promise.all([
+        handleRequest(async function* (): AsyncIterable<OpenAI.Chat.ChatCompletionChunk> {
+          yield {
+            id: '1',
+            choices: [
+              {
+                index: 0,
+                finish_reason: 'function_call',
+                logprobs: null,
+                delta: {
+                  role: 'assistant',
+                  content: null,
+                  tool_calls: [
+                    {
+                      type: 'function',
+                      index: 0,
+                      id: '123',
+                      function: {
+                        arguments: '',
+                        name: 'getWeather',
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+            created: Math.floor(Date.now() / 1000),
+            model: 'gpt-3.5-turbo',
+            object: 'chat.completion.chunk',
+          };
+        }),
+        chunksPromise,
+        runner.done(),
+      ]);
+
+      expect(chunks.every((chunk) => Array.isArray(chunk.choices))).toBe(true);
+      const messageChunk = chunks.find((chunk) => chunk.choices.length === 0);
+      expect(messageChunk).toMatchObject({ id: '1', model: 'gpt-3.5-turbo' });
+      expect(chunks.map((chunk) => chunk.id)).toEqual(['1', '1']);
     });
     test('flow with abort', async () => {
       const { fetch, handleRequest } = mockStreamingChatCompletionFetch();
