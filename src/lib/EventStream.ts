@@ -44,10 +44,17 @@ export class EventStream<EventTypes extends BaseEvents> {
     // Unfortunately if we call `executor()` immediately we get runtime errors about
     // references to `this` before the `super()` constructor call returns.
     setTimeout(() => {
-      executor().then(() => {
-        this._emitFinal();
-        this._emit('end');
-      }, this.#handleError.bind(this));
+      Promise.resolve()
+        .then(executor)
+        .then(() => {
+          try {
+            this._emitFinal();
+          } catch (error) {
+            this.#handleError(error);
+            return;
+          }
+          this._emit('end');
+        }, this.#handleError.bind(this));
     }, 0);
   }
 
