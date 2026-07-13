@@ -10,7 +10,7 @@ const client = new OpenAI({
 
 describe('resource inputTokens', () => {
   test('count', async () => {
-    const responsePromise = client.responses.inputTokens.count();
+    const responsePromise = client.beta.responses.inputTokens.count();
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -23,7 +23,7 @@ describe('resource inputTokens', () => {
   test('count: request options and params are passed correctly', async () => {
     // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
     await expect(
-      client.responses.inputTokens.count(
+      client.beta.responses.inputTokens.count(
         {
           conversation: 'string',
           input: 'string',
@@ -57,6 +57,7 @@ describe('resource inputTokens', () => {
             },
           ],
           truncation: 'auto',
+          betas: ['responses_multi_agent=v1'],
         },
         { path: '/_stainless_unknown_path' },
       ),

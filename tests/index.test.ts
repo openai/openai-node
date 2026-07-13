@@ -709,6 +709,35 @@ describe('retries', () => {
     expect(count).toEqual(3);
   });
 
+  test('does not retry streaming request bodies', async () => {
+    let count = 0;
+    const testFetch = async (url: string | URL | Request, { body }: RequestInit = {}): Promise<Response> => {
+      count++;
+      expect(body).toBeInstanceOf(ReadableStream);
+      await new Response(body).text();
+      return new Response(undefined, { status: 429 });
+    };
+
+    const client = new OpenAI({
+      apiKey: 'My API Key',
+      adminAPIKey: 'My Admin API Key',
+      fetch: testFetch,
+      maxRetries: 2,
+    });
+
+    const body = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('streamed-content'));
+        controller.close();
+      },
+    });
+
+    await expect(client.request({ path: '/foo', method: 'post', body })).rejects.toMatchObject({
+      status: 429,
+    });
+    expect(count).toEqual(1);
+  });
+
   test('retry count header', async () => {
     let count = 0;
     let capturedRequest: RequestInit | undefined;

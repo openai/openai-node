@@ -205,27 +205,28 @@ export class ChatCompletionStream<ParsedT = null>
 
     for (const choice of chunk.choices) {
       const choiceSnapshot = completion.choices[choice.index]!;
+      const { delta } = choice;
 
       if (
-        choice.delta.content != null &&
+        delta?.content != null &&
         choiceSnapshot.message?.role === 'assistant' &&
         choiceSnapshot.message?.content
       ) {
-        this._emit('content', choice.delta.content, choiceSnapshot.message.content);
+        this._emit('content', delta.content, choiceSnapshot.message.content);
         this._emit('content.delta', {
-          delta: choice.delta.content,
+          delta: delta.content,
           snapshot: choiceSnapshot.message.content,
           parsed: choiceSnapshot.message.parsed,
         });
       }
 
       if (
-        choice.delta.refusal != null &&
+        delta?.refusal != null &&
         choiceSnapshot.message?.role === 'assistant' &&
         choiceSnapshot.message?.refusal
       ) {
         this._emit('refusal.delta', {
-          delta: choice.delta.refusal,
+          delta: delta.refusal,
           snapshot: choiceSnapshot.message.refusal,
         });
       }
@@ -254,7 +255,7 @@ export class ChatCompletionStream<ParsedT = null>
         }
       }
 
-      for (const toolCall of choice.delta.tool_calls ?? []) {
+      for (const toolCall of delta?.tool_calls ?? []) {
         if (state.current_tool_call_index !== toolCall.index) {
           this.#emitContentDoneEvents(choiceSnapshot);
 
@@ -267,7 +268,7 @@ export class ChatCompletionStream<ParsedT = null>
         state.current_tool_call_index = toolCall.index;
       }
 
-      for (const toolCallDelta of choice.delta.tool_calls ?? []) {
+      for (const toolCallDelta of delta?.tool_calls ?? []) {
         const toolCallSnapshot = choiceSnapshot.message.tool_calls?.[toolCallDelta.index];
         if (!toolCallSnapshot?.type) {
           continue;
@@ -401,13 +402,13 @@ export class ChatCompletionStream<ParsedT = null>
     const stream = Stream.fromReadableStream<ChatCompletionChunk>(readableStream, this.controller);
     let chatId;
     for await (const chunk of stream) {
-      if (chatId && chatId !== chunk.id) {
+      if (chatId && chunk.id && chatId !== chunk.id) {
         // A new request has been made.
         this._addChatCompletion(this.#endRequest());
       }
 
       this.#addChunk(chunk);
-      chatId = chunk.id;
+      if (chunk.id) chatId = chunk.id;
     }
     if (stream.controller.signal?.aborted) {
       throw new APIUserAbortError();
@@ -432,7 +433,7 @@ export class ChatCompletionStream<ParsedT = null>
         ...rest,
         choices: [],
       };
-    } else {
+    } else if (chunk.id) {
       Object.assign(snapshot, rest);
     }
 

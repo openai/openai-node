@@ -64,6 +64,10 @@ Some Zod behavior cannot be represented in the schema sent to the API:
   Custom refinements and transforms still run when the SDK parses the response, but
   some schemas that cannot be converted, including bare transforms in Zod v4, cause
   the helper to throw before a request is made.
+- `zodFunction()` always creates a strict function tool. `.default()` emits
+  `default`, but strict conversion still marks the property as required, so it does
+  not make model-generated tool arguments optional. String `.min()` and `.max()`
+  emit `minLength` and `maxLength`, which are not supported by fine-tuned models.
 - TypeScript comments are not available at runtime and are not sent to the API. Use
   `.describe()` for field descriptions or the helper's `description` option for a
   top-level response format or function description.
@@ -293,6 +297,17 @@ For convenience, the delta event includes both the incremental update and an acc
 ```
 
 Image files are not sent incrementally so an event is provided for when a image file is available.
+
+If you need to await work for each convenience event, use the event's async iterator:
+
+```ts
+for await (const [content, snapshot] of run.events('imageFileDone')) {
+  await moveImageFile(content.file_id, snapshot.id);
+}
+```
+
+The iterator yields every occurrence of the selected event, ends when the stream ends, and rejects if
+the stream errors or is aborted.
 
 ```ts
 .on('toolCallCreated', (toolCall: ToolCall) => ...)
