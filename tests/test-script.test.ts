@@ -56,7 +56,7 @@ printf '%s\\0' "$@" > "$JEST_ARGS_FILE"
       env: {
         ...process.env,
         JEST_ARGS_FILE: jestArgsFile,
-        PATH: `${join(fixtureDir, 'bin')}:${process.env.PATH}`,
+        PATH: `${join(fixtureDir, 'bin')}:${process.env['PATH']}`,
       },
     });
 
