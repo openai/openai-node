@@ -17,6 +17,19 @@ function collectRefs(value: unknown, refs: string[] = []): string[] {
   return refs;
 }
 
+function countEnumValues(value: unknown): number {
+  if (!value || typeof value !== 'object') return 0;
+  if (Array.isArray(value)) {
+    return value.reduce((total, child) => total + countEnumValues(child), 0);
+  }
+
+  const record = value as Record<string, unknown>;
+  const enumValues = Array.isArray(record['enum']) ? record['enum'].length : 0;
+  return (
+    enumValues + Object.values(record).reduce<number>((total, child) => total + countEnumValues(child), 0)
+  );
+}
+
 function expectDefinitionRefsToResolve(schema: Record<string, unknown>) {
   const definitions = (schema['definitions'] ?? {}) as Record<string, unknown>;
 
@@ -195,6 +208,27 @@ describe.each([
       expect(definitionName).toBeDefined();
       expect(definitions).toHaveProperty(definitionName as string);
     }
+  });
+
+  it('uses supplied schema definitions', () => {
+    const fooValues = Array.from({ length: 200 }, (_, index) => 'foo_' + index) as [string, ...string[]];
+    const barValues = Array.from({ length: 200 }, (_, index) => 'bar_' + index) as [string, ...string[]];
+    const Foo = z.enum(fooValues);
+    const Bar = z.enum(barValues);
+    const schema = zodResponseFormat(
+      z.object({
+        foo: Foo,
+        foos: z.array(Foo),
+        bar: Bar,
+        bars: z.array(Bar),
+      }),
+      'shared',
+      { schemaDefinitions: { foo: Foo, bar: Bar } },
+    ).json_schema.schema as Record<string, unknown>;
+
+    expect(countEnumValues(schema)).toBe(fooValues.length + barValues.length);
+    expect(collectRefs(schema)).not.toHaveLength(0);
+    expectDefinitionRefsToResolve(schema);
   });
 
   it('automatically adds optional properties to `required`', () => {

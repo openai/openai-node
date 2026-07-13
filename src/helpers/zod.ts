@@ -37,20 +37,45 @@ type InferZodType<T extends ZodTypeLike> =
   : T extends { _zod: { output: infer Output } } ? Output
   : never;
 
-function zodV3ToJsonSchema(schema: z3.ZodType, options: { name: string }): Record<string, unknown> {
+type ZodSchemaDefinitions = Record<string, ZodTypeLike>;
+
+type ZodResponseFormatProps = Omit<ResponseFormatJSONSchema.JSONSchema, 'schema' | 'strict' | 'name'> & {
+  /**
+   * Schemas to extract into the generated JSON Schema definitions.
+   * Use this to reuse large shared schemas instead of inlining them at every occurrence.
+   */
+  schemaDefinitions?: ZodSchemaDefinitions | undefined;
+};
+
+function zodV3ToJsonSchema(
+  schema: z3.ZodType,
+  options: { name: string; schemaDefinitions?: ZodSchemaDefinitions | undefined },
+): Record<string, unknown> {
   return _zodToJsonSchema(schema, {
     openaiStrictMode: true,
     name: options.name,
     nameStrategy: 'duplicate-ref',
     $refStrategy: 'extract-to-root',
     nullableStrategy: 'property',
+    ...(options.schemaDefinitions ?
+      { definitions: options.schemaDefinitions as unknown as Record<string, z3.ZodType> }
+    : undefined),
   });
 }
 
-function zodV4ToJsonSchema(schema: ZodV4Schema): Record<string, unknown> {
+function zodV4ToJsonSchema(
+  schema: ZodV4Schema,
+  options: { schemaDefinitions?: ZodSchemaDefinitions | undefined } = {},
+): Record<string, unknown> {
+  const metadata = options.schemaDefinitions ? z4.registry<Record<string, unknown>>() : undefined;
+  for (const [name, definition] of Object.entries(options.schemaDefinitions ?? {})) {
+    metadata?.add(definition as unknown as z4.ZodType, { id: name });
+  }
+
   return toStrictJsonSchema(
     z4.toJSONSchema(schema, {
       target: 'draft-7',
+      ...(metadata ? { metadata } : undefined),
       override: ({ zodSchema, jsonSchema }) => {
         const def = zodSchema._zod.def;
 
@@ -129,18 +154,22 @@ function parseZodObject<ZodInput extends ZodTypeLike>(
 export function zodResponseFormat<ZodInput extends ZodTypeLike>(
   zodObject: ZodInput,
   name: string,
-  props?: Omit<ResponseFormatJSONSchema.JSONSchema, 'schema' | 'strict' | 'name'>,
+  props?: ZodResponseFormatProps,
 ): AutoParseableResponseFormat<InferZodType<ZodInput>> {
   const zodSchema = zodObject as unknown as ZodSchema;
+  const { schemaDefinitions, ...responseFormatProps } = props ?? {};
 
   return makeParseableResponseFormat<InferZodType<ZodInput>>(
     {
       type: 'json_schema',
       json_schema: {
-        ...props,
+        ...responseFormatProps,
         name,
         strict: true,
-        schema: isZodV4(zodSchema) ? zodV4ToJsonSchema(zodSchema) : zodV3ToJsonSchema(zodSchema, { name }),
+        schema:
+          isZodV4(zodSchema) ?
+            zodV4ToJsonSchema(zodSchema, { schemaDefinitions })
+          : zodV3ToJsonSchema(zodSchema, { name, schemaDefinitions }),
       },
     },
     (content) => parseZodObject(zodObject, content),
