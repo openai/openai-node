@@ -1,7 +1,9 @@
 import OpenAI from 'openai';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import { ChatCompletionStream } from 'openai/lib/ChatCompletionStream';
+import { ChatCompletionStreamingRunner } from 'openai/lib/ChatCompletionStreamingRunner';
 import { ChatCompletionTokenLogprob } from 'openai/resources';
+import { Stream } from 'openai/streaming';
 import { z } from 'zod/v4';
 import { makeStreamSnapshotRequest } from '../utils/mock-snapshots';
 
@@ -56,6 +58,64 @@ describe('.stream()', () => {
     expect(abortListener).toEqual(expect.any(Function));
     expect(addEventListenerSpy).toHaveBeenCalledWith('abort', abortListener, { once: true });
     expect(removeEventListenerSpy).toHaveBeenCalledWith('abort', abortListener);
+  });
+
+  it('handles Azure async filter chunks without deltas', async () => {
+    const chunks: OpenAI.Chat.ChatCompletionChunk[] = [
+      {
+        id: 'chatcmpl-test',
+        object: 'chat.completion.chunk',
+        created: 1,
+        model: 'gpt-test',
+        choices: [
+          {
+            index: 0,
+            delta: { role: 'assistant', content: 'hello' },
+            finish_reason: null,
+            logprobs: null,
+          },
+        ],
+      },
+      {
+        id: 'chatcmpl-test',
+        object: 'chat.completion.chunk',
+        created: 1,
+        model: 'gpt-test',
+        choices: [
+          {
+            index: 0,
+            delta: {},
+            finish_reason: 'stop',
+            logprobs: null,
+          },
+        ],
+      },
+      {
+        id: '',
+        object: '',
+        created: 0,
+        model: '',
+        choices: [
+          {
+            index: 0,
+            finish_reason: null,
+            content_filter_results: {},
+          },
+        ],
+      } as unknown as OpenAI.Chat.ChatCompletionChunk,
+    ];
+    const readable = new Stream(async function* () {
+      for (const chunk of chunks) yield chunk;
+    }, new AbortController()).toReadableStream();
+
+    const stream = ChatCompletionStreamingRunner.fromReadableStream(readable);
+
+    await expect(stream.finalChatCompletion()).resolves.toMatchObject({
+      id: 'chatcmpl-test',
+      created: 1,
+      model: 'gpt-test',
+      choices: [{ message: { content: 'hello' } }],
+    });
   });
 
   it('works', async () => {
