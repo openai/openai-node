@@ -1,4 +1,10 @@
-import { zodFunction, zodResponseFormat, zodResponsesFunction, zodTextFormat } from 'openai/helpers/zod';
+import {
+  zodFunction,
+  zodRealtimeFunction,
+  zodResponseFormat,
+  zodResponsesFunction,
+  zodTextFormat,
+} from 'openai/helpers/zod';
 import { expectType } from '../utils/typing';
 import { z as zv3 } from 'zod/v3';
 import { z as zv4 } from 'zod/v4';
@@ -93,6 +99,7 @@ describe('Zod v4 mini', () => {
   it('supports tool argument parsing', () => {
     const chatTool = zodFunction({ name: 'mini_tool', parameters: MiniSchema });
     const responseTool = zodResponsesFunction({ name: 'mini_tool', parameters: MiniSchema });
+    const realtimeTool = zodRealtimeFunction({ name: 'mini_tool', parameters: MiniSchema });
 
     expect(chatTool.function.parameters).toEqual(expectedSchema);
     expect(chatTool.$parseRaw('{"hello":"world"}')).toEqual({ hello: 'world' });
@@ -101,6 +108,44 @@ describe('Zod v4 mini', () => {
     expect(responseTool.parameters).toEqual(expectedSchema);
     expect(responseTool.$parseRaw('{"hello":"world"}')).toEqual({ hello: 'world' });
     expect(() => responseTool.$parseRaw('{"hello":"there"}')).toThrow();
+
+    expect(realtimeTool).toEqual({
+      type: 'function',
+      name: 'mini_tool',
+      parameters: expectedSchema,
+    });
+  });
+});
+
+describe.each([
+  { version: 'v3', z: zv3 },
+  { version: 'v4', z: zv4 as any as typeof zv3 },
+])('zodRealtimeFunction (Zod $version)', ({ z }) => {
+  it('builds a Realtime function tool without strict', () => {
+    const tool = zodRealtimeFunction({
+      name: 'get_weather',
+      description: 'Get the current weather',
+      parameters: z.object({
+        location: z.string(),
+        unit: z.enum(['c', 'f']),
+      }),
+    });
+
+    expect(tool).toMatchObject({
+      type: 'function',
+      name: 'get_weather',
+      description: 'Get the current weather',
+      parameters: {
+        type: 'object',
+        properties: {
+          location: { type: 'string' },
+          unit: { type: 'string', enum: ['c', 'f'] },
+        },
+        required: ['location', 'unit'],
+        additionalProperties: false,
+      },
+    });
+    expect(tool).not.toHaveProperty('strict');
   });
 });
 

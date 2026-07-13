@@ -13,6 +13,7 @@ import {
 import { zodToJsonSchema as _zodToJsonSchema } from '../_vendor/zod-to-json-schema';
 import { AutoParseableResponseTool, makeParseableResponseTool } from '../lib/ResponsesParser';
 import { type ResponseFormatTextJSONSchemaConfig } from '../resources/responses/responses';
+import { type RealtimeFunctionTool } from '../resources/realtime/realtime';
 import { toStrictJsonSchema } from '../lib/transform';
 import { JSONSchema } from '../lib/jsonschema';
 
@@ -232,4 +233,31 @@ export function zodResponsesFunction<Parameters extends ZodTypeLike>(options: {
       parser: (args) => parseZodObject(options.parameters, args),
     },
   );
+}
+
+/**
+ * Creates a Realtime API `function` tool definition from the given Zod schema.
+ *
+ * Unlike {@link zodResponsesFunction}, this helper does not add `strict`
+ * because Realtime function tools do not support that field.
+ *
+ * This helper only creates the tool definition. Parse function-call arguments
+ * from Realtime events with the original Zod schema.
+ */
+export function zodRealtimeFunction<Parameters extends ZodTypeLike>(options: {
+  name: string;
+  parameters: Parameters;
+  description?: string | undefined;
+}): RealtimeFunctionTool {
+  const zodSchema = options.parameters as unknown as ZodSchema;
+
+  return {
+    type: 'function',
+    name: options.name,
+    parameters:
+      isZodV4(zodSchema) ?
+        zodV4ToJsonSchema(zodSchema)
+      : zodV3ToJsonSchema(zodSchema, { name: options.name }),
+    ...(options.description ? { description: options.description } : undefined),
+  };
 }
