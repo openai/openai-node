@@ -39,6 +39,10 @@ For dated Azure OpenAI API versions, use the `AzureOpenAI` class instead of the 
 > The Azure API shape slightly differs from the core API shape which means that the static types for responses / params
 > won't always be correct.
 
+> [!WARNING]
+> The Azure OpenAI Assistants API is deprecated and will be retired on August 26, 2026. For existing integrations,
+> see the [Azure Assistants example](examples/azure/assistants.ts).
+
 ```ts
 import { AzureOpenAI } from 'openai';
 import { getBearerTokenProvider, DefaultAzureCredential } from '@azure/identity';

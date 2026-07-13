@@ -112,6 +112,7 @@ export interface InputTokenCountParams {
     | ResponsesAPI.ToolChoiceFunction
     | ResponsesAPI.ToolChoiceMcp
     | ResponsesAPI.ToolChoiceCustom
+    | InputTokenCountParams.SpecificProgrammaticToolCallingParam
     | ResponsesAPI.ToolChoiceApplyPatch
     | ResponsesAPI.ToolChoiceShell
     | null;
@@ -165,6 +166,13 @@ export namespace InputTokenCountParams {
      * responses. Currently supported values are `low`, `medium`, and `high`.
      */
     verbosity?: 'low' | 'medium' | 'high' | null;
+  }
+
+  export interface SpecificProgrammaticToolCallingParam {
+    /**
+     * The tool to call. Always `programmatic_tool_calling`.
+     */
+    type: 'programmatic_tool_calling';
   }
 }
 

@@ -76,4 +76,26 @@ describe('ResponsesParser', () => {
       });
     }
   });
+
+  it('passes programmatic tool calling items through unchanged', () => {
+    const raw = makeResponse('completed', '{"size":"large"}');
+    raw.output.push({
+      type: 'program',
+      id: 'program_123',
+      call_id: 'program_call_123',
+      code: 'return 42',
+      fingerprint: 'program_fingerprint_123',
+    });
+    raw.output.push({
+      type: 'program_output',
+      id: 'program_output_123',
+      call_id: 'program_call_123',
+      result: '42',
+      status: 'completed',
+    });
+
+    const response = parseResponse(raw, structuredTextParams);
+
+    expect(response.output.slice(1)).toEqual(raw.output.slice(1));
+  });
 });

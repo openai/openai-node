@@ -44,10 +44,17 @@ export class EventStream<EventTypes extends BaseEvents> {
     // Unfortunately if we call `executor()` immediately we get runtime errors about
     // references to `this` before the `super()` constructor call returns.
     setTimeout(() => {
-      executor().then(() => {
-        this._emitFinal();
-        this._emit('end');
-      }, this.#handleError.bind(this));
+      Promise.resolve()
+        .then(executor)
+        .then(() => {
+          try {
+            this._emitFinal();
+          } catch (error) {
+            this.#handleError(error);
+            return;
+          }
+          this._emit('end');
+        }, this.#handleError.bind(this));
     }, 0);
   }
 
@@ -155,6 +162,109 @@ export class EventStream<EventTypes extends BaseEvents> {
       if (event !== 'error') this.once('error', reject);
       this.once(event, resolve as any);
     });
+  }
+
+  /**
+   * Returns an async iterator that yields every time the event is triggered.
+   * The iterator ends when the stream ends and rejects if the stream errors
+   * or is aborted. If you request the 'error' or 'abort' event, the iterator
+   * yields that event instead of rejecting.
+   *
+   * Example:
+   *
+   *   for await (const [message] of stream.events('message')) {
+   *     await processMessage(message);
+   *   }
+   */
+  events<Event extends keyof EventTypes>(
+    event: Event,
+  ): AsyncIterableIterator<EventParameters<EventTypes, Event>> {
+    type Parameters = EventParameters<EventTypes, Event>;
+    type Result = IteratorResult<Parameters>;
+    type Reader = {
+      resolve: (result: Result) => void;
+      reject: (error: OpenAIError) => void;
+    };
+
+    const pushQueue: Parameters[] = [];
+    const readQueue: Reader[] = [];
+    let ended = this.ended;
+    let failure: OpenAIError | undefined;
+    let failureDelivered = false;
+
+    const doneResult = (): Result => ({ value: undefined as never, done: true });
+    const finishReaders = () => {
+      while (readQueue.length) {
+        readQueue.shift()!.resolve(doneResult());
+      }
+    };
+    const rejectReader = () => {
+      if (!failure || failureDelivered || !readQueue.length) return;
+      failureDelivered = true;
+      readQueue.shift()!.reject(failure);
+    };
+    const cleanup = () => {
+      this.off(event, onEvent as EventListener<EventTypes, Event>);
+      this.off('end', onEnd);
+      if (event !== 'error') this.off('error', onFailure);
+      if (event !== 'abort') this.off('abort', onFailure);
+    };
+    const onEvent = (...args: Parameters) => {
+      if (ended) return;
+      const reader = readQueue.shift();
+      if (reader) {
+        reader.resolve({ value: args, done: false });
+      } else {
+        pushQueue.push(args);
+      }
+    };
+    const onFailure = (error: OpenAIError) => {
+      failure = error;
+      if (!pushQueue.length) rejectReader();
+    };
+    const onEnd = () => {
+      ended = true;
+      cleanup();
+      if (!pushQueue.length) {
+        rejectReader();
+        finishReaders();
+      }
+    };
+
+    if (!ended) {
+      this.on(event, onEvent as EventListener<EventTypes, Event>);
+      this.on('end', onEnd);
+      if (event !== 'error') this.on('error', onFailure);
+      if (event !== 'abort') this.on('abort', onFailure);
+    }
+
+    return {
+      next: () => {
+        const value = pushQueue.shift();
+        if (value) return Promise.resolve({ value, done: false });
+
+        if (failure && !failureDelivered) {
+          failureDelivered = true;
+          return Promise.reject(failure);
+        }
+
+        if (ended) return Promise.resolve(doneResult());
+
+        return new Promise<Result>((resolve, reject) => {
+          readQueue.push({ resolve, reject });
+        });
+      },
+      return: () => {
+        ended = true;
+        pushQueue.length = 0;
+        cleanup();
+        finishReaders();
+        return Promise.resolve(doneResult());
+      },
+      [Symbol.asyncIterator]() {
+        return this;
+      },
+    };
   }
 
   async done(): Promise<void> {

@@ -1,5 +1,27 @@
 # Changelog
 
+## 6.46.0 (2026-07-09)
+
+Full Changelog: [v6.45.0...v6.46.0](https://github.com/openai/openai-node/compare/v6.45.0...v6.46.0)
+
+### Features
+
+* **api:** gpt-5.6-sol updates ([6c397d5](https://github.com/openai/openai-node/commit/6c397d5d281d6061e88b4a0120fab335ec862a89))
+
+
+### Bug Fixes
+
+* **assistants:** place array delta entries by index instead of appending ([#1963](https://github.com/openai/openai-node/issues/1963)) ([0e18d30](https://github.com/openai/openai-node/commit/0e18d30a31595acf0fd5e03b8e6bbf8bf31d15d1))
+* **runner:** normalize missing tool call IDs ([#1958](https://github.com/openai/openai-node/issues/1958)) ([6371623](https://github.com/openai/openai-node/commit/6371623aadd26ec34a0edecba62a0a10c834b37d))
+* upgrade next to 15.5.16 in examples ([#1967](https://github.com/openai/openai-node/issues/1967)) ([95b54e5](https://github.com/openai/openai-node/commit/95b54e5894910e31d01ef418ef0de31e9d653b08))
+
+
+### Documentation
+
+* add Azure Assistants example ([#1975](https://github.com/openai/openai-node/issues/1975)) ([90a72e5](https://github.com/openai/openai-node/commit/90a72e53452fca62e0c1da42c304eba87d8e87e7)), closes [#701](https://github.com/openai/openai-node/issues/701)
+* document assistant stream failures ([#1979](https://github.com/openai/openai-node/issues/1979)) ([d93fbe5](https://github.com/openai/openai-node/commit/d93fbe5bc5a7879ff4a2b81f3840614da6df594e)), closes [#959](https://github.com/openai/openai-node/issues/959)
+* document file search result limits ([#1981](https://github.com/openai/openai-node/issues/1981)) ([e9dc283](https://github.com/openai/openai-node/commit/e9dc283dce5a75c569c1aa418f973da69cf7eaae)), closes [#1004](https://github.com/openai/openai-node/issues/1004)
+
 ## 6.45.0 (2026-06-24)
 
 Full Changelog: [v6.44.0...v6.45.0](https://github.com/openai/openai-node/compare/v6.44.0...v6.45.0)

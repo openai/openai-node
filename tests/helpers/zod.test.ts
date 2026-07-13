@@ -104,6 +104,13 @@ describe('Zod v4 mini', () => {
   });
 });
 
+it('preserves inferred output types', () => {
+  const format = zodResponseFormat(zv4.object({ value: zv4.string() }), 'example');
+  const parsed: { value: string } = format.$parseRaw('{"value":"ok"}');
+
+  expect(parsed.value).toBe('ok');
+});
+
 describe.each([
   { version: 'v3', z: zv3 },
   { version: 'v4', z: zv4 as any as typeof zv3 },
