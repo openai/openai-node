@@ -7,8 +7,10 @@ import {
   ChatCompletionMessage,
   ChatCompletionMessageFunctionToolCall,
   ChatCompletionStreamingToolRunnerParams,
+  ChatCompletionStreamingToolRunnerParamsWithContext,
   ChatCompletionStreamParams,
   ChatCompletionToolRunnerParams,
+  ChatCompletionToolRunnerParamsWithContext,
   ParsedChatCompletion,
   ParsedChoice,
   ParsedFunctionToolCall,
@@ -19,7 +21,9 @@ import { ResponseFormatJSONSchema } from '../resources/shared';
 type AnyChatCompletionCreateParams =
   | ChatCompletionCreateParams
   | ChatCompletionToolRunnerParams<any>
+  | ChatCompletionToolRunnerParamsWithContext<any, any>
   | ChatCompletionStreamingToolRunnerParams<any>
+  | ChatCompletionStreamingToolRunnerParamsWithContext<any, any>
   | ChatCompletionStreamParams;
 
 type Unpacked<T> = T extends (infer U)[] ? U : T;

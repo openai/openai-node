@@ -155,6 +155,11 @@ client.example.list(undefined, { headers: { ... } });
 - `client.fineTuning.checkpoints.permissions.list()`
 - `client.vectorStores.list()`
 - `client.vectorStores.files.list()`
+- `client.beta.responses.retrieve()`
+- `client.beta.responses.delete()`
+- `client.beta.responses.cancel()`
+- `client.beta.responses.inputItems.list()`
+- `client.beta.responses.inputTokens.count()`
 - `client.beta.chatkit.threads.list()`
 - `client.beta.chatkit.threads.listItems()`
 - `client.beta.assistants.list()`

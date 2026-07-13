@@ -25,6 +25,21 @@ function is_overriding_api_base_url() {
   [ -n "$TEST_API_BASE_URL" ]
 }
 
+function has_jest_worker_flag() {
+  for arg in "$@"; do
+    case "$arg" in
+      --runInBand|--runInBand=*|--run-in-band|--run-in-band=*|-i)
+        return 0
+        ;;
+      --maxWorkers|--maxWorkers=*|--max-workers|--max-workers=*|-w|-w?*)
+        return 0
+        ;;
+    esac
+  done
+
+  return 1
+}
+
 if ! is_overriding_api_base_url && ! steady_is_running ; then
   # When we exit this script, make sure to kill the background mock server process
   trap 'kill_server_on_port 4010' EXIT
@@ -53,4 +68,13 @@ else
 fi
 
 echo "==> Running tests"
-./node_modules/.bin/jest "$@"
+jest_args=("$@")
+
+if ! is_overriding_api_base_url && ! has_jest_worker_flag "$@"; then
+  # The local Steady mock server is occasionally flaky under Jest's parallel
+  # workers, especially for multipart requests. Keep the default harness stable
+  # while allowing callers to opt into explicit worker settings.
+  jest_args=(--runInBand "${jest_args[@]}")
+fi
+
+./node_modules/.bin/jest "${jest_args[@]}"
