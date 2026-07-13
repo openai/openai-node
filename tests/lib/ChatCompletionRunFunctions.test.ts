@@ -3,12 +3,13 @@ import { OpenAIError, APIConnectionError } from 'openai/error';
 import { PassThrough } from 'stream';
 import {
   ParsingToolFunction,
-  type ChatCompletionRunner,
+  ChatCompletionRunner,
   type ChatCompletionToolRunnerParams,
   ChatCompletionStreamingRunner,
   type ChatCompletionStreamingToolRunnerParams,
 } from 'openai/resources/chat/completions';
 import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
+import type { RunnableToolFunction } from 'openai/lib/RunnableFunction';
 import { isAssistantMessage } from '../../src/lib/chatCompletionUtils';
 import { mockFetch } from '../utils/mock-fetch';
 
@@ -352,6 +353,49 @@ class StreamingRunnerListener {
 
 function _typeTests() {
   const openai = new OpenAI();
+  const contextTool: RunnableToolFunction<string, { eventId: string }> = {
+    type: 'function',
+    function: {
+      function: (_args, _runner, context) => context.eventId,
+      parameters: {},
+      description: 'updates an event',
+    },
+  };
+  const contextToolParams = {
+    messages: [{ role: 'user' as const, content: 'update my event' }],
+    model: 'gpt-3.5-turbo',
+    tools: [contextTool],
+  };
+  const streamingContextToolParams = {
+    ...contextToolParams,
+    stream: true as const,
+  };
+
+  openai.chat.completions.runTools({
+    ...contextToolParams,
+    toolContext: { eventId: 'event_123' },
+  });
+  ChatCompletionRunner.runTools(openai, {
+    ...contextToolParams,
+    toolContext: { eventId: 'event_123' },
+  });
+  openai.chat.completions.runTools({
+    ...streamingContextToolParams,
+    toolContext: { eventId: 'event_123' },
+  });
+  ChatCompletionStreamingRunner.runTools(openai, {
+    ...streamingContextToolParams,
+    toolContext: { eventId: 'event_123' },
+  });
+
+  // @ts-expect-error context-bearing tools require toolContext
+  openai.chat.completions.runTools(contextToolParams);
+  // @ts-expect-error context-bearing tools require toolContext
+  ChatCompletionRunner.runTools(openai, contextToolParams);
+  // @ts-expect-error context-bearing tools require toolContext
+  openai.chat.completions.runTools(streamingContextToolParams);
+  // @ts-expect-error context-bearing tools require toolContext
+  ChatCompletionStreamingRunner.runTools(openai, streamingContextToolParams);
 
   openai.chat.completions.runTools({
     messages: [

@@ -14,16 +14,40 @@ export interface ChatCompletionStreamEvents extends AbstractChatCompletionRunner
   chunk: (chunk: ChatCompletionChunk, snapshot: ChatCompletionSnapshot) => void;
 }
 
-export type ChatCompletionStreamingToolRunnerParams<
+type ChatCompletionStreamingToolRunnerParamsBase = Omit<ChatCompletionCreateParamsStreaming, 'tools'>;
+
+/**
+ * Parameters for tools that do not require a context value.
+ */
+export type ChatCompletionStreamingToolRunnerParamsWithoutContext<FunctionsArgs extends BaseFunctionsArgs> =
+  ChatCompletionStreamingToolRunnerParamsBase & {
+    tools: RunnableTools<FunctionsArgs> | AutoParseableTool<any, true>[];
+    toolContext?: never;
+  };
+
+/**
+ * Parameters for tools that require a context value.
+ */
+export type ChatCompletionStreamingToolRunnerParamsWithContext<
   FunctionsArgs extends BaseFunctionsArgs,
-  ToolContext = unknown,
-> = Omit<ChatCompletionCreateParamsStreaming, 'tools'> & {
+  ToolContext,
+> = ChatCompletionStreamingToolRunnerParamsBase & {
   tools: RunnableTools<FunctionsArgs, ToolContext> | AutoParseableTool<any, true>[];
   /**
    * Context to pass to each tool callback during this run.
    */
-  toolContext?: ToolContext;
+  toolContext: ToolContext;
 };
+
+/**
+ * Parameters for running streaming tools. Supplying a context type makes
+ * `toolContext` required; omitting it preserves the existing no-context form.
+ */
+export type ChatCompletionStreamingToolRunnerParams<
+  FunctionsArgs extends BaseFunctionsArgs,
+  ToolContext = never,
+> = [ToolContext] extends [never] ? ChatCompletionStreamingToolRunnerParamsWithoutContext<FunctionsArgs>
+: ChatCompletionStreamingToolRunnerParamsWithContext<FunctionsArgs, ToolContext>;
 
 export class ChatCompletionStreamingRunner<ParsedT = null>
   extends ChatCompletionStream<ParsedT>
@@ -37,7 +61,19 @@ export class ChatCompletionStreamingRunner<ParsedT = null>
 
   static runTools<T extends (string | object)[], ParsedT = null, ToolContext = unknown>(
     client: OpenAI,
-    params: ChatCompletionStreamingToolRunnerParams<T, ToolContext>,
+    params: ChatCompletionStreamingToolRunnerParamsWithContext<T, ToolContext>,
+    options?: RunnerOptions,
+  ): ChatCompletionStreamingRunner<ParsedT>;
+  static runTools<T extends (string | object)[], ParsedT = null>(
+    client: OpenAI,
+    params: ChatCompletionStreamingToolRunnerParamsWithoutContext<T>,
+    options?: RunnerOptions,
+  ): ChatCompletionStreamingRunner<ParsedT>;
+  static runTools<T extends (string | object)[], ParsedT = null, ToolContext = unknown>(
+    client: OpenAI,
+    params:
+      | ChatCompletionStreamingToolRunnerParamsWithContext<T, ToolContext>
+      | ChatCompletionStreamingToolRunnerParamsWithoutContext<T>,
     options?: RunnerOptions,
   ): ChatCompletionStreamingRunner<ParsedT> {
     const runner = new ChatCompletionStreamingRunner<ParsedT>(

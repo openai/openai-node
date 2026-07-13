@@ -15,10 +15,15 @@ import type {
   ParsedChatCompletion,
 } from '../resources/chat/completions';
 import type { CompletionUsage } from '../resources/completions';
-import type { ChatCompletionRunner, ChatCompletionToolRunnerParams } from './ChatCompletionRunner';
+import type {
+  ChatCompletionRunner,
+  ChatCompletionToolRunnerParamsWithContext,
+  ChatCompletionToolRunnerParamsWithoutContext,
+} from './ChatCompletionRunner';
 import type {
   ChatCompletionStreamingRunner,
-  ChatCompletionStreamingToolRunnerParams,
+  ChatCompletionStreamingToolRunnerParamsWithContext,
+  ChatCompletionStreamingToolRunnerParamsWithoutContext,
 } from './ChatCompletionStreamingRunner';
 import { isAssistantMessage, isToolMessage } from './chatCompletionUtils';
 import { BaseEvents, EventStream } from './EventStream';
@@ -288,8 +293,10 @@ export class AbstractChatCompletionRunner<
   protected async _runTools<FunctionsArgs extends BaseFunctionsArgs, ToolContext>(
     client: OpenAI,
     params:
-      | ChatCompletionToolRunnerParams<FunctionsArgs, ToolContext>
-      | ChatCompletionStreamingToolRunnerParams<FunctionsArgs, ToolContext>,
+      | ChatCompletionToolRunnerParamsWithContext<FunctionsArgs, ToolContext>
+      | ChatCompletionToolRunnerParamsWithoutContext<FunctionsArgs>
+      | ChatCompletionStreamingToolRunnerParamsWithContext<FunctionsArgs, ToolContext>
+      | ChatCompletionStreamingToolRunnerParamsWithoutContext<FunctionsArgs>,
     runner: ChatCompletionRunner<any> | ChatCompletionStreamingRunner<any>,
     options?: RunnerOptions,
   ) {
