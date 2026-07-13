@@ -337,6 +337,11 @@ describe('instantiate azure client', () => {
     expect(client.baseURL).toEqual('https://example.com/openai');
   });
 
+  test('with endpoint trailing slash', () => {
+    const client = new AzureOpenAI({ endpoint: 'https://example.com/', apiKey: 'My API Key', apiVersion });
+    expect(client.baseURL).toEqual('https://example.com/openai');
+  });
+
   test('baseURL and endpoint are mutually exclusive', () => {
     expect(
       () =>
