@@ -15,8 +15,15 @@ import { path } from '../../../internal/utils/path';
 import { ChatCompletionRunner } from '../../../lib/ChatCompletionRunner';
 import { ChatCompletionStreamingRunner } from '../../../lib/ChatCompletionStreamingRunner';
 import { RunnerOptions } from '../../../lib/AbstractChatCompletionRunner';
-import { ChatCompletionToolRunnerParams } from '../../../lib/ChatCompletionRunner';
-import { ChatCompletionStreamingToolRunnerParams } from '../../../lib/ChatCompletionStreamingRunner';
+import {
+  ChatCompletionToolRunnerParamsWithContext,
+  ChatCompletionToolRunnerParamsWithoutContext,
+} from '../../../lib/ChatCompletionRunner';
+import {
+  ChatCompletionStreamingToolRunnerParamsWithContext,
+  ChatCompletionStreamingToolRunnerParamsWithoutContext,
+} from '../../../lib/ChatCompletionStreamingRunner';
+import { type RunnableToolFunctionWithContext } from '../../../lib/RunnableFunction';
 import { ChatCompletionStream, type ChatCompletionStreamParams } from '../../../lib/ChatCompletionStream';
 import { ExtractParsedContentFromParams, parseChatCompletion, validateInputTools } from '../../../lib/parser';
 
@@ -188,17 +195,55 @@ export class Completions extends APIResource {
    * [the docs](https://github.com/openai/openai-node#automated-function-calls)
    */
   runTools<
-    Params extends ChatCompletionToolRunnerParams<any>,
+    ToolContext,
+    Params extends Omit<
+      ChatCompletionToolRunnerParamsWithContext<any, ToolContext>,
+      'toolContext' | 'tools'
+    > = Omit<ChatCompletionToolRunnerParamsWithContext<any, ToolContext>, 'toolContext' | 'tools'>,
+    ParsedT = ExtractParsedContentFromParams<
+      Params & ChatCompletionToolRunnerParamsWithContext<any, ToolContext>
+    >,
+  >(
+    body: Params & {
+      toolContext: ToolContext;
+      tools: readonly RunnableToolFunctionWithContext<ToolContext>[];
+    },
+    options?: RunnerOptions,
+  ): ChatCompletionRunner<ParsedT>;
+
+  runTools<
+    ToolContext,
+    Params extends Omit<
+      ChatCompletionStreamingToolRunnerParamsWithContext<any, ToolContext>,
+      'toolContext' | 'tools'
+    > = Omit<ChatCompletionStreamingToolRunnerParamsWithContext<any, ToolContext>, 'toolContext' | 'tools'>,
+    ParsedT = ExtractParsedContentFromParams<
+      Params & ChatCompletionStreamingToolRunnerParamsWithContext<any, ToolContext>
+    >,
+  >(
+    body: Params & {
+      toolContext: ToolContext;
+      tools: readonly RunnableToolFunctionWithContext<ToolContext>[];
+    },
+    options?: RunnerOptions,
+  ): ChatCompletionStreamingRunner<ParsedT>;
+
+  runTools<
+    Params extends ChatCompletionToolRunnerParamsWithoutContext<any>,
     ParsedT = ExtractParsedContentFromParams<Params>,
   >(body: Params, options?: RunnerOptions): ChatCompletionRunner<ParsedT>;
 
   runTools<
-    Params extends ChatCompletionStreamingToolRunnerParams<any>,
+    Params extends ChatCompletionStreamingToolRunnerParamsWithoutContext<any>,
     ParsedT = ExtractParsedContentFromParams<Params>,
   >(body: Params, options?: RunnerOptions): ChatCompletionStreamingRunner<ParsedT>;
 
   runTools<
-    Params extends ChatCompletionToolRunnerParams<any> | ChatCompletionStreamingToolRunnerParams<any>,
+    Params extends
+      | ChatCompletionToolRunnerParamsWithoutContext<any>
+      | ChatCompletionToolRunnerParamsWithContext<any, any>
+      | ChatCompletionStreamingToolRunnerParamsWithoutContext<any>
+      | ChatCompletionStreamingToolRunnerParamsWithContext<any, any>,
     ParsedT = ExtractParsedContentFromParams<Params>,
   >(
     body: Params,
@@ -207,12 +252,16 @@ export class Completions extends APIResource {
     if (body.stream) {
       return ChatCompletionStreamingRunner.runTools(
         this._client,
-        body as ChatCompletionStreamingToolRunnerParams<any>,
+        body as ChatCompletionStreamingToolRunnerParamsWithContext<any, any>,
         options,
       );
     }
 
-    return ChatCompletionRunner.runTools(this._client, body as ChatCompletionToolRunnerParams<any>, options);
+    return ChatCompletionRunner.runTools(
+      this._client,
+      body as ChatCompletionToolRunnerParamsWithContext<any, any>,
+      options,
+    );
   }
 
   /**
@@ -255,8 +304,16 @@ export {
   type RunnableFunctionWithoutParse,
   ParsingToolFunction,
 } from '../../../lib/RunnableFunction';
-export { type ChatCompletionToolRunnerParams } from '../../../lib/ChatCompletionRunner';
-export { type ChatCompletionStreamingToolRunnerParams } from '../../../lib/ChatCompletionStreamingRunner';
+export {
+  type ChatCompletionToolRunnerParams,
+  type ChatCompletionToolRunnerParamsWithContext,
+  type ChatCompletionToolRunnerParamsWithoutContext,
+} from '../../../lib/ChatCompletionRunner';
+export {
+  type ChatCompletionStreamingToolRunnerParams,
+  type ChatCompletionStreamingToolRunnerParamsWithContext,
+  type ChatCompletionStreamingToolRunnerParamsWithoutContext,
+} from '../../../lib/ChatCompletionStreamingRunner';
 export { ChatCompletionStream, type ChatCompletionStreamParams } from '../../../lib/ChatCompletionStream';
 export { ChatCompletionRunner } from '../../../lib/ChatCompletionRunner';
 

@@ -3,12 +3,13 @@ import { OpenAIError, APIConnectionError } from 'openai/error';
 import { PassThrough } from 'stream';
 import {
   ParsingToolFunction,
-  type ChatCompletionRunner,
+  ChatCompletionRunner,
   type ChatCompletionToolRunnerParams,
   ChatCompletionStreamingRunner,
   type ChatCompletionStreamingToolRunnerParams,
 } from 'openai/resources/chat/completions';
 import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
+import type { RunnableToolFunction } from 'openai/lib/RunnableFunction';
 import { isAssistantMessage } from '../../src/lib/chatCompletionUtils';
 import { mockFetch } from '../utils/mock-fetch';
 
@@ -352,6 +353,49 @@ class StreamingRunnerListener {
 
 function _typeTests() {
   const openai = new OpenAI();
+  const contextTool: RunnableToolFunction<string, { eventId: string }> = {
+    type: 'function',
+    function: {
+      function: (_args, _runner, context) => context.eventId,
+      parameters: {},
+      description: 'updates an event',
+    },
+  };
+  const contextToolParams = {
+    messages: [{ role: 'user' as const, content: 'update my event' }],
+    model: 'gpt-3.5-turbo',
+    tools: [contextTool],
+  };
+  const streamingContextToolParams = {
+    ...contextToolParams,
+    stream: true as const,
+  };
+
+  openai.chat.completions.runTools({
+    ...contextToolParams,
+    toolContext: { eventId: 'event_123' },
+  });
+  ChatCompletionRunner.runTools(openai, {
+    ...contextToolParams,
+    toolContext: { eventId: 'event_123' },
+  });
+  openai.chat.completions.runTools({
+    ...streamingContextToolParams,
+    toolContext: { eventId: 'event_123' },
+  });
+  ChatCompletionStreamingRunner.runTools(openai, {
+    ...streamingContextToolParams,
+    toolContext: { eventId: 'event_123' },
+  });
+
+  // @ts-expect-error context-bearing tools require toolContext
+  openai.chat.completions.runTools(contextToolParams);
+  // @ts-expect-error context-bearing tools require toolContext
+  ChatCompletionRunner.runTools(openai, contextToolParams);
+  // @ts-expect-error context-bearing tools require toolContext
+  openai.chat.completions.runTools(streamingContextToolParams);
+  // @ts-expect-error context-bearing tools require toolContext
+  ChatCompletionStreamingRunner.runTools(openai, streamingContextToolParams);
 
   openai.chat.completions.runTools({
     messages: [
@@ -390,6 +434,26 @@ function _typeTests() {
           function: (obj: object) => String(Object.keys(obj).length),
           parameters: { type: 'object' },
           description: 'gets the number of properties on an object',
+        },
+      },
+    ],
+  });
+  openai.chat.completions.runTools({
+    messages: [{ role: 'user', content: 'update my event' }],
+    model: 'gpt-3.5-turbo',
+    toolContext: { eventId: 'event_123' },
+    tools: [
+      {
+        type: 'function',
+        function: {
+          function: (_args, _runner, context) => {
+            const eventId: string = context.eventId;
+            // @ts-expect-error tool context only includes eventId
+            context.missing;
+            return eventId;
+          },
+          parameters: {},
+          description: 'updates an event',
         },
       },
     ],
@@ -662,6 +726,96 @@ describe('resource completions', () => {
       expect(listener.functionCallResults).toEqual([`it's raining`]);
       await listener.sanityCheck({ ignoredMessages: new Set([injectedMessage]) });
     });
+
+    test('passes tool context to callbacks without sending it to the API', async () => {
+      const { fetch, handleRequest } = mockChatCompletionFetch();
+
+      const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
+      const toolContext = { eventId: 'event_123' };
+      const receivedContexts: (typeof toolContext)[] = [];
+      const runner = openai.chat.completions.runTools({
+        messages: [{ role: 'user', content: 'update my event' }],
+        model: 'gpt-3.5-turbo',
+        toolContext,
+        tools: [
+          {
+            type: 'function',
+            function: {
+              function: function updateEvent(_args, _runner, context) {
+                receivedContexts.push(context);
+                return context.eventId;
+              },
+              parameters: {},
+              description: 'updates an event',
+            },
+          },
+        ],
+      });
+
+      await handleRequest(async (request) => {
+        expect(request).not.toHaveProperty('toolContext');
+        return {
+          id: '1',
+          choices: [
+            {
+              index: 0,
+              finish_reason: 'tool_calls',
+              logprobs: null,
+              message: {
+                role: 'assistant',
+                content: null,
+                refusal: null,
+                tool_calls: [
+                  {
+                    type: 'function',
+                    id: '123',
+                    function: {
+                      arguments: '',
+                      name: 'updateEvent',
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+          created: Math.floor(Date.now() / 1000),
+          model: 'gpt-3.5-turbo',
+          object: 'chat.completion',
+        };
+      });
+
+      await handleRequest(async (request) => {
+        expect(request.messages[2]).toEqual({
+          role: 'tool',
+          content: 'event_123',
+          tool_call_id: '123',
+        });
+        return {
+          id: '2',
+          choices: [
+            {
+              index: 0,
+              finish_reason: 'stop',
+              logprobs: null,
+              message: {
+                role: 'assistant',
+                content: 'updated',
+                refusal: null,
+              },
+            },
+          ],
+          created: Math.floor(Date.now() / 1000),
+          model: 'gpt-3.5-turbo',
+          object: 'chat.completion',
+        };
+      });
+
+      await runner.done();
+
+      expect(receivedContexts).toEqual([toolContext]);
+      expect(receivedContexts[0]).toBe(toolContext);
+    });
+
     test('generates unique IDs for parallel tool calls with empty IDs', async () => {
       const { fetch, handleRequest } = mockChatCompletionFetch();
 
