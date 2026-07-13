@@ -15,10 +15,14 @@ import { type ResponseFormatTextJSONSchemaConfig } from '../resources/responses/
 import { toStrictJsonSchema } from '../lib/transform';
 import { JSONSchema } from '../lib/jsonschema';
 
-type InferZodType<T> =
-  T extends z4.ZodType ? z4.infer<T>
-  : T extends z3.ZodType ? z3.infer<T>
-  : never;
+// The public helpers only need Zod's output type and parser. Using this small
+// structural type avoids expanding Zod's full v3/v4 type graphs in Deno.
+type ZodTypeLike = {
+  _output: unknown;
+  parse: (data: unknown) => unknown;
+};
+
+type InferZodType<T extends ZodTypeLike> = T['_output'];
 
 function zodV3ToJsonSchema(schema: z3.ZodType, options: { name: string }): Record<string, unknown> {
   return _zodToJsonSchema(schema, {
@@ -95,22 +99,24 @@ function isZodV4(zodObject: z3.ZodType | z4.ZodType): zodObject is z4.ZodType {
  * This can be passed directly to the `.create()` method but will not
  * result in any automatic parsing, you'll have to parse the response yourself.
  */
-export function zodResponseFormat<ZodInput extends z3.ZodType | z4.ZodType>(
+export function zodResponseFormat<ZodInput extends ZodTypeLike>(
   zodObject: ZodInput,
   name: string,
   props?: Omit<ResponseFormatJSONSchema.JSONSchema, 'schema' | 'strict' | 'name'>,
 ): AutoParseableResponseFormat<InferZodType<ZodInput>> {
-  return makeParseableResponseFormat(
+  const zodSchema = zodObject as unknown as z3.ZodType | z4.ZodType;
+
+  return makeParseableResponseFormat<InferZodType<ZodInput>>(
     {
       type: 'json_schema',
       json_schema: {
         ...props,
         name,
         strict: true,
-        schema: isZodV4(zodObject) ? zodV4ToJsonSchema(zodObject) : zodV3ToJsonSchema(zodObject, { name }),
+        schema: isZodV4(zodSchema) ? zodV4ToJsonSchema(zodSchema) : zodV3ToJsonSchema(zodSchema, { name }),
       },
     },
-    (content) => zodObject.parse(JSON.parse(content)),
+    (content) => zodObject.parse(JSON.parse(content)) as InferZodType<ZodInput>,
   );
 }
 

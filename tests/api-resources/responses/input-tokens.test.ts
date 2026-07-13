@@ -36,6 +36,7 @@ describe('resource inputTokens', () => {
             context: 'auto',
             effort: 'none',
             generate_summary: 'auto',
+            mode: 'standard',
             summary: 'auto',
           },
           text: {
@@ -49,8 +50,10 @@ describe('resource inputTokens', () => {
               parameters: { foo: 'bar' },
               strict: true,
               type: 'function',
+              allowed_callers: ['direct'],
               defer_loading: true,
               description: 'description',
+              output_schema: { foo: 'bar' },
             },
           ],
           truncation: 'auto',
