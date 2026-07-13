@@ -28,7 +28,9 @@ export type ResponseStreamByIdParams = {
    */
   response_id: string;
   /**
-   * If provided, the stream will start after the event with the given sequence number.
+   * If provided, events with a sequence number less than or equal to this value
+   * will not be emitted. The helper still replays them internally to build a
+   * complete snapshot for later events and `finalResponse()`.
    */
   starting_after?: number;
   /**
@@ -182,6 +184,8 @@ export class ResponseStream<ParsedT = null>
     let stream: Stream<ResponseStreamEvent> | undefined;
     let starting_after: number | null = null;
     if ('response_id' in params) {
+      // Keep the full replay so that `accumulateResponse()` sees `response.created` and can build
+      // complete snapshots before locally filtering events at `starting_after`.
       stream = await client.responses.retrieve(
         params.response_id,
         { stream: true },
