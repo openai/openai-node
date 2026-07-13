@@ -1,6 +1,8 @@
-import { zodResponseFormat, zodTextFormat } from 'openai/helpers/zod';
+import { zodFunction, zodResponseFormat, zodResponsesFunction, zodTextFormat } from 'openai/helpers/zod';
+import { expectType } from '../utils/typing';
 import { z as zv3 } from 'zod/v3';
 import { z as zv4 } from 'zod/v4';
+import { z as zv4Mini } from 'zod/v4-mini';
 
 function collectRefs(value: unknown, refs: string[] = []): string[] {
   if (!value || typeof value !== 'object') return refs;
@@ -55,6 +57,51 @@ it('converts Zod v4 discriminated unions to anyOf for strict schemas', () => {
 
   expect(JSON.stringify(schema)).not.toContain('"oneOf"');
   expect(schema.properties.data.anyOf).toHaveLength(2);
+});
+
+describe('Zod v4 mini', () => {
+  const MiniSchema = zv4Mini.object({ hello: zv4Mini.literal('world') });
+  const expectedSchema = {
+    $schema: 'http://json-schema.org/draft-07/schema#',
+    type: 'object',
+    properties: {
+      hello: {
+        type: 'string',
+        const: 'world',
+      },
+    },
+    required: ['hello'],
+    additionalProperties: false,
+  };
+
+  it('supports response formats', () => {
+    const format = zodResponseFormat(MiniSchema, 'response');
+
+    expect(format.json_schema.schema).toEqual(expectedSchema);
+    expect(format.$parseRaw('{"hello":"world"}')).toEqual({ hello: 'world' });
+    expect(() => format.$parseRaw('{"hello":"there"}')).toThrow();
+  });
+
+  it('supports text formats', () => {
+    const format = zodTextFormat(MiniSchema, 'response');
+
+    expect(format.schema).toEqual(expectedSchema);
+    expect(format.$parseRaw('{"hello":"world"}')).toEqual({ hello: 'world' });
+    expect(() => format.$parseRaw('{"hello":"there"}')).toThrow();
+  });
+
+  it('supports tool argument parsing', () => {
+    const chatTool = zodFunction({ name: 'mini_tool', parameters: MiniSchema });
+    const responseTool = zodResponsesFunction({ name: 'mini_tool', parameters: MiniSchema });
+
+    expect(chatTool.function.parameters).toEqual(expectedSchema);
+    expect(chatTool.$parseRaw('{"hello":"world"}')).toEqual({ hello: 'world' });
+    expect(() => chatTool.$parseRaw('{"hello":"there"}')).toThrow();
+
+    expect(responseTool.parameters).toEqual(expectedSchema);
+    expect(responseTool.$parseRaw('{"hello":"world"}')).toEqual({ hello: 'world' });
+    expect(() => responseTool.$parseRaw('{"hello":"there"}')).toThrow();
+  });
 });
 
 it('preserves inferred output types', () => {
@@ -567,3 +614,20 @@ describe.each([
     });
   }
 });
+
+function _typeTests() {
+  const MiniSchema = zv4Mini.object({ hello: zv4Mini.literal('world') });
+
+  expectType<{ hello: 'world' }>(zodResponseFormat(MiniSchema, 'response').__output);
+  expectType<{ hello: 'world' }>(zodTextFormat(MiniSchema, 'response').__output);
+  zodFunction({
+    name: 'mini_tool',
+    parameters: MiniSchema,
+    function: (args) => expectType<{ hello: 'world' }>(args),
+  });
+  zodResponsesFunction({
+    name: 'mini_tool',
+    parameters: MiniSchema,
+    function: (args) => expectType<{ hello: 'world' }>(args),
+  });
+}

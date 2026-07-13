@@ -1,6 +1,7 @@
 import { ResponseFormatJSONSchema } from '../resources/index';
 import * as z3 from 'zod/v3';
 import * as z4 from 'zod/v4';
+import type * as z4Mini from 'zod/v4-mini';
 import {
   AutoParseableResponseFormat,
   AutoParseableTextFormat,
@@ -15,14 +16,26 @@ import { type ResponseFormatTextJSONSchemaConfig } from '../resources/responses/
 import { toStrictJsonSchema } from '../lib/transform';
 import { JSONSchema } from '../lib/jsonschema';
 
-// The public helpers only need Zod's output type and parser. Using this small
-// structural type avoids expanding Zod's full v3/v4 type graphs in Deno.
-type ZodTypeLike = {
-  _output: unknown;
-  parse: (data: unknown) => unknown;
+type ZodV4Schema = z4.ZodType | z4Mini.ZodMiniType;
+type ZodSchema = z3.ZodType | ZodV4Schema;
+
+// The public helpers only need Zod's output type and, when available, parser. Using these small
+// structural shapes avoids expanding Zod's full v3/v4 type graphs in Deno.
+type ZodTypeLike = (
+  | { _output: unknown }
+  | {
+      _zod: {
+        output: unknown;
+      };
+    }
+) & {
+  parse?: (data: unknown) => unknown;
 };
 
-type InferZodType<T extends ZodTypeLike> = T['_output'];
+type InferZodType<T extends ZodTypeLike> =
+  T extends { _output: infer Output } ? Output
+  : T extends { _zod: { output: infer Output } } ? Output
+  : never;
 
 function zodV3ToJsonSchema(schema: z3.ZodType, options: { name: string }): Record<string, unknown> {
   return _zodToJsonSchema(schema, {
@@ -34,7 +47,7 @@ function zodV3ToJsonSchema(schema: z3.ZodType, options: { name: string }): Recor
   });
 }
 
-function zodV4ToJsonSchema(schema: z4.ZodType): Record<string, unknown> {
+function zodV4ToJsonSchema(schema: ZodV4Schema): Record<string, unknown> {
   return toStrictJsonSchema(
     z4.toJSONSchema(schema, {
       target: 'draft-7',
@@ -58,8 +71,22 @@ function zodV4ToJsonSchema(schema: z4.ZodType): Record<string, unknown> {
   ) as Record<string, unknown>;
 }
 
-function isZodV4(zodObject: z3.ZodType | z4.ZodType): zodObject is z4.ZodType {
+function isZodV4(zodObject: ZodSchema): zodObject is ZodV4Schema {
   return '_zod' in zodObject;
+}
+
+function parseZodObject<ZodInput extends ZodTypeLike>(
+  zodObject: ZodInput,
+  content: string,
+): InferZodType<ZodInput> {
+  const parsed = JSON.parse(content);
+  const parser = (zodObject as { parse?: (data: unknown) => unknown }).parse;
+
+  if (typeof parser === 'function') {
+    return parser.call(zodObject, parsed) as InferZodType<ZodInput>;
+  }
+
+  return z4.parse(zodObject as unknown as ZodV4Schema, parsed) as InferZodType<ZodInput>;
 }
 
 /**
@@ -104,7 +131,7 @@ export function zodResponseFormat<ZodInput extends ZodTypeLike>(
   name: string,
   props?: Omit<ResponseFormatJSONSchema.JSONSchema, 'schema' | 'strict' | 'name'>,
 ): AutoParseableResponseFormat<InferZodType<ZodInput>> {
-  const zodSchema = zodObject as unknown as z3.ZodType | z4.ZodType;
+  const zodSchema = zodObject as unknown as ZodSchema;
 
   return makeParseableResponseFormat<InferZodType<ZodInput>>(
     {
@@ -116,24 +143,26 @@ export function zodResponseFormat<ZodInput extends ZodTypeLike>(
         schema: isZodV4(zodSchema) ? zodV4ToJsonSchema(zodSchema) : zodV3ToJsonSchema(zodSchema, { name }),
       },
     },
-    (content) => zodObject.parse(JSON.parse(content)) as InferZodType<ZodInput>,
+    (content) => parseZodObject(zodObject, content),
   );
 }
 
-export function zodTextFormat<ZodInput extends z3.ZodType | z4.ZodType>(
+export function zodTextFormat<ZodInput extends ZodTypeLike>(
   zodObject: ZodInput,
   name: string,
   props?: Omit<ResponseFormatTextJSONSchemaConfig, 'schema' | 'type' | 'strict' | 'name'>,
 ): AutoParseableTextFormat<InferZodType<ZodInput>> {
-  return makeParseableTextFormat(
+  const zodSchema = zodObject as unknown as ZodSchema;
+
+  return makeParseableTextFormat<InferZodType<ZodInput>>(
     {
       type: 'json_schema',
       ...props,
       name,
       strict: true,
-      schema: isZodV4(zodObject) ? zodV4ToJsonSchema(zodObject) : zodV3ToJsonSchema(zodObject, { name }),
+      schema: isZodV4(zodSchema) ? zodV4ToJsonSchema(zodSchema) : zodV3ToJsonSchema(zodSchema, { name }),
     },
-    (content) => zodObject.parse(JSON.parse(content)),
+    (content) => parseZodObject(zodObject, content),
   );
 }
 
@@ -142,7 +171,7 @@ export function zodTextFormat<ZodInput extends z3.ZodType | z4.ZodType>(
  * automatically by the chat completion `.runTools()` method or automatically
  * parsed by `.parse()` / `.stream()`.
  */
-export function zodFunction<Parameters extends z3.ZodType | z4.ZodType>(options: {
+export function zodFunction<Parameters extends ZodTypeLike>(options: {
   name: string;
   parameters: Parameters;
   function?: ((args: InferZodType<Parameters>) => unknown | Promise<unknown>) | undefined;
@@ -152,6 +181,8 @@ export function zodFunction<Parameters extends z3.ZodType | z4.ZodType>(options:
   name: string;
   function: (args: InferZodType<Parameters>) => unknown;
 }> {
+  const zodSchema = options.parameters as unknown as ZodSchema;
+
   // @ts-expect-error TODO
   return makeParseableTool<any>(
     {
@@ -159,21 +190,21 @@ export function zodFunction<Parameters extends z3.ZodType | z4.ZodType>(options:
       function: {
         name: options.name,
         parameters:
-          isZodV4(options.parameters) ?
-            zodV4ToJsonSchema(options.parameters)
-          : zodV3ToJsonSchema(options.parameters, { name: options.name }),
+          isZodV4(zodSchema) ?
+            zodV4ToJsonSchema(zodSchema)
+          : zodV3ToJsonSchema(zodSchema, { name: options.name }),
         strict: true,
         ...(options.description ? { description: options.description } : undefined),
       },
     },
     {
       callback: options.function,
-      parser: (args) => options.parameters.parse(JSON.parse(args)),
+      parser: (args) => parseZodObject(options.parameters, args),
     },
   );
 }
 
-export function zodResponsesFunction<Parameters extends z3.ZodType | z4.ZodType>(options: {
+export function zodResponsesFunction<Parameters extends ZodTypeLike>(options: {
   name: string;
   parameters: Parameters;
   function?: ((args: InferZodType<Parameters>) => unknown | Promise<unknown>) | undefined;
@@ -183,20 +214,22 @@ export function zodResponsesFunction<Parameters extends z3.ZodType | z4.ZodType>
   name: string;
   function: (args: InferZodType<Parameters>) => unknown;
 }> {
+  const zodSchema = options.parameters as unknown as ZodSchema;
+
   return makeParseableResponseTool<any>(
     {
       type: 'function',
       name: options.name,
       parameters:
-        isZodV4(options.parameters) ?
-          zodV4ToJsonSchema(options.parameters)
-        : zodV3ToJsonSchema(options.parameters, { name: options.name }),
+        isZodV4(zodSchema) ?
+          zodV4ToJsonSchema(zodSchema)
+        : zodV3ToJsonSchema(zodSchema, { name: options.name }),
       strict: true,
       ...(options.description ? { description: options.description } : undefined),
     },
     {
       callback: options.function,
-      parser: (args) => options.parameters.parse(JSON.parse(args)),
+      parser: (args) => parseZodObject(options.parameters, args),
     },
   );
 }
