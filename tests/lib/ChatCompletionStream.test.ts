@@ -1,13 +1,60 @@
 import OpenAI from 'openai';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import { ChatCompletionStream } from 'openai/lib/ChatCompletionStream';
+import { ChatCompletionStreamingRunner } from 'openai/lib/ChatCompletionStreamingRunner';
 import { ChatCompletionTokenLogprob } from 'openai/resources';
+import { Stream } from 'openai/streaming';
 import { z } from 'zod/v4';
 import { makeStreamSnapshotRequest } from '../utils/mock-snapshots';
 
 jest.setTimeout(1000 * 30);
 
 describe('.stream()', () => {
+  it('emits finalization failures as errors', async () => {
+    const chunk: OpenAI.Chat.ChatCompletionChunk = {
+      id: 'chatcmpl-test',
+      object: 'chat.completion.chunk',
+      created: 1,
+      model: 'gpt-test',
+      choices: [
+        {
+          index: 0,
+          delta: { role: 'user', content: 'hello' },
+          finish_reason: 'stop',
+          logprobs: null,
+        },
+      ],
+    };
+
+    const client = {
+      chat: {
+        completions: {
+          create: jest.fn(async () => ({
+            controller: new AbortController(),
+            async *[Symbol.asyncIterator]() {
+              yield chunk;
+            },
+          })),
+        },
+      },
+    } as unknown as OpenAI;
+
+    const stream = ChatCompletionStream.createChatCompletion(client, {
+      model: 'gpt-test',
+      messages: [{ role: 'user', content: 'Say hello' }],
+    });
+    const errors: Error[] = [];
+    stream.on('error', (error) => errors.push(error));
+
+    await expect(stream.done()).rejects.toThrow(
+      'stream ended without producing a ChatCompletionMessage with role=assistant',
+    );
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.message).toBe(
+      'stream ended without producing a ChatCompletionMessage with role=assistant',
+    );
+  });
+
   it('removes the caller abort listener after the stream finishes', async () => {
     const callerController = new AbortController();
     const addEventListenerSpy = jest.spyOn(callerController.signal, 'addEventListener');
@@ -56,6 +103,64 @@ describe('.stream()', () => {
     expect(abortListener).toEqual(expect.any(Function));
     expect(addEventListenerSpy).toHaveBeenCalledWith('abort', abortListener, { once: true });
     expect(removeEventListenerSpy).toHaveBeenCalledWith('abort', abortListener);
+  });
+
+  it('handles Azure async filter chunks without deltas', async () => {
+    const chunks: OpenAI.Chat.ChatCompletionChunk[] = [
+      {
+        id: 'chatcmpl-test',
+        object: 'chat.completion.chunk',
+        created: 1,
+        model: 'gpt-test',
+        choices: [
+          {
+            index: 0,
+            delta: { role: 'assistant', content: 'hello' },
+            finish_reason: null,
+            logprobs: null,
+          },
+        ],
+      },
+      {
+        id: 'chatcmpl-test',
+        object: 'chat.completion.chunk',
+        created: 1,
+        model: 'gpt-test',
+        choices: [
+          {
+            index: 0,
+            delta: {},
+            finish_reason: 'stop',
+            logprobs: null,
+          },
+        ],
+      },
+      {
+        id: '',
+        object: '',
+        created: 0,
+        model: '',
+        choices: [
+          {
+            index: 0,
+            finish_reason: null,
+            content_filter_results: {},
+          },
+        ],
+      } as unknown as OpenAI.Chat.ChatCompletionChunk,
+    ];
+    const readable = new Stream(async function* () {
+      for (const chunk of chunks) yield chunk;
+    }, new AbortController()).toReadableStream();
+
+    const stream = ChatCompletionStreamingRunner.fromReadableStream(readable);
+
+    await expect(stream.finalChatCompletion()).resolves.toMatchObject({
+      id: 'chatcmpl-test',
+      created: 1,
+      model: 'gpt-test',
+      choices: [{ message: { content: 'hello' } }],
+    });
   });
 
   it('works', async () => {

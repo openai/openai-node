@@ -100,6 +100,8 @@ export type ConversationItem =
   | ResponsesAPI.ResponseToolSearchOutputItem
   | ConversationItem.AdditionalTools
   | ResponsesAPI.ResponseReasoningItem
+  | ConversationItem.Program
+  | ConversationItem.ProgramOutput
   | ResponsesAPI.ResponseCompactionItem
   | ResponsesAPI.ResponseCodeInterpreterToolCall
   | ConversationItem.LocalShellCall
@@ -161,6 +163,60 @@ export namespace ConversationItem {
      * The type of the item. Always `additional_tools`.
      */
     type: 'additional_tools';
+  }
+
+  export interface Program {
+    /**
+     * The unique ID of the program item.
+     */
+    id: string;
+
+    /**
+     * The stable call ID of the program item.
+     */
+    call_id: string;
+
+    /**
+     * The JavaScript source executed by programmatic tool calling.
+     */
+    code: string;
+
+    /**
+     * Opaque program replay fingerprint that must be round-tripped.
+     */
+    fingerprint: string;
+
+    /**
+     * The type of the item. Always `program`.
+     */
+    type: 'program';
+  }
+
+  export interface ProgramOutput {
+    /**
+     * The unique ID of the program output item.
+     */
+    id: string;
+
+    /**
+     * The call ID of the program item.
+     */
+    call_id: string;
+
+    /**
+     * The result produced by the program item.
+     */
+    result: string;
+
+    /**
+     * The terminal status of the program output item.
+     */
+    status: 'completed' | 'incomplete';
+
+    /**
+     * The type of the item. Always `program_output`.
+     */
+    type: 'program_output';
   }
 
   /**
