@@ -30,23 +30,32 @@ function countEnumValues(value: unknown): number {
   );
 }
 
-function expectDefinitionRefsToResolve(schema: Record<string, unknown>) {
-  const definitions = (schema['definitions'] ?? {}) as Record<string, unknown>;
+function resolveJsonPointer(root: Record<string, unknown>, pointer: string): unknown {
+  expect(pointer.startsWith('#/')).toBe(true);
 
+  const tokens = decodeURIComponent(pointer.slice(2))
+    .split('/')
+    .map((token) => token.replace(/~1/g, '/').replace(/~0/g, '~'));
+
+  return tokens.reduce<unknown>((value, token) => {
+    expect(value).not.toBeNull();
+    expect(typeof value).toBe('object');
+    expect(Object.prototype.hasOwnProperty.call(value, token)).toBe(true);
+    return (value as Record<string, unknown>)[token];
+  }, root);
+}
+
+function expectDefinitionRefsToResolve(schema: Record<string, unknown>) {
   const visit = (value: unknown, resolving: Set<string>) => {
     if (!value || typeof value !== 'object') return;
 
     const ref = (value as Record<string, unknown>)['$ref'];
     if (typeof ref === 'string') {
-      const prefix = '#/definitions/';
-      expect(ref.startsWith(prefix)).toBe(true);
-
-      const name = ref.slice(prefix.length);
-      const definition = definitions[name];
+      const definition = resolveJsonPointer(schema, ref);
       expect(definition).toBeDefined();
-      expect(resolving.has(name)).toBe(false);
+      expect(resolving.has(ref)).toBe(false);
 
-      visit(definition, new Set(resolving).add(name));
+      visit(definition, new Set(resolving).add(ref));
       return;
     }
 
@@ -228,6 +237,26 @@ describe.each([
 
     expect(countEnumValues(schema)).toBe(fooValues.length + barValues.length);
     expect(collectRefs(schema)).not.toHaveLength(0);
+    expectDefinitionRefsToResolve(schema);
+  });
+
+  it('keeps the response name separate from supplied schema definitions', () => {
+    const Shared = z.object({ value: z.string() });
+    const schema = zodResponseFormat(z.object({ first: Shared, second: Shared }), 'root', {
+      schemaDefinitions: { root: Shared },
+    }).json_schema.schema as Record<string, unknown>;
+
+    expect(collectRefs(schema)).toContain('#/definitions/root');
+    expectDefinitionRefsToResolve(schema);
+  });
+
+  it('escapes JSON Pointer tokens in supplied schema definition refs', () => {
+    const Shared = z.object({ value: z.string() });
+    const schema = zodResponseFormat(z.object({ first: Shared, second: Shared }), 'response', {
+      schemaDefinitions: { 'foo/bar~baz': Shared },
+    }).json_schema.schema as Record<string, unknown>;
+
+    expect(collectRefs(schema)).toContain('#/definitions/foo~1bar~0baz');
     expectDefinitionRefsToResolve(schema);
   });
 

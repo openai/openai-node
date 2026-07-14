@@ -47,13 +47,58 @@ type ZodResponseFormatProps = Omit<ResponseFormatJSONSchema.JSONSchema, 'schema'
   schemaDefinitions?: ZodSchemaDefinitions | undefined;
 };
 
+function escapeJsonPointerToken(token: string): string {
+  return token.replace(/~/g, '~0').replace(/\//g, '~1');
+}
+
+function escapeSchemaDefinitionRefs(
+  schema: Record<string, unknown>,
+  schemaDefinitions: ZodSchemaDefinitions | undefined,
+): Record<string, unknown> {
+  const refReplacements = new Map(
+    Object.keys(schemaDefinitions ?? {}).map((name) => [
+      `#/definitions/${name}`,
+      `#/definitions/${escapeJsonPointerToken(name)}`,
+    ]),
+  );
+
+  const visit = (value: unknown): void => {
+    if (!value || typeof value !== 'object') return;
+
+    if (Array.isArray(value)) {
+      for (const child of value) visit(child);
+      return;
+    }
+
+    const record = value as Record<string, unknown>;
+    const ref = record['$ref'];
+    if (typeof ref === 'string') {
+      record['$ref'] = refReplacements.get(ref) ?? ref;
+    }
+
+    for (const child of Object.values(record)) visit(child);
+  };
+
+  visit(schema);
+  return schema;
+}
+
+function getZodV3RootName(name: string, schemaDefinitions: ZodSchemaDefinitions | undefined): string {
+  let rootName = name;
+  while (schemaDefinitions && Object.prototype.hasOwnProperty.call(schemaDefinitions, rootName)) {
+    rootName = `${rootName}_root`;
+  }
+  return rootName;
+}
+
 function zodV3ToJsonSchema(
   schema: z3.ZodType,
   options: { name: string; schemaDefinitions?: ZodSchemaDefinitions | undefined },
 ): Record<string, unknown> {
-  return _zodToJsonSchema(schema, {
+  const rootName = getZodV3RootName(options.name, options.schemaDefinitions);
+  const jsonSchema = _zodToJsonSchema(schema, {
     openaiStrictMode: true,
-    name: options.name,
+    name: rootName,
     nameStrategy: 'duplicate-ref',
     $refStrategy: 'extract-to-root',
     nullableStrategy: 'property',
@@ -61,6 +106,8 @@ function zodV3ToJsonSchema(
       { definitions: options.schemaDefinitions as unknown as Record<string, z3.ZodType> }
     : undefined),
   });
+
+  return escapeSchemaDefinitionRefs(jsonSchema, options.schemaDefinitions);
 }
 
 function zodV4ToJsonSchema(
@@ -72,7 +119,7 @@ function zodV4ToJsonSchema(
     metadata?.add(definition as unknown as z4.ZodType, { id: name });
   }
 
-  return toStrictJsonSchema(
+  const jsonSchema = toStrictJsonSchema(
     z4.toJSONSchema(schema, {
       target: 'draft-7',
       ...(metadata ? { metadata } : undefined),
@@ -94,6 +141,8 @@ function zodV4ToJsonSchema(
       },
     }) as JSONSchema,
   ) as Record<string, unknown>;
+
+  return escapeSchemaDefinitionRefs(jsonSchema, options.schemaDefinitions);
 }
 
 function isZodV4(zodObject: ZodSchema): zodObject is ZodV4Schema {
