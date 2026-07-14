@@ -4,6 +4,8 @@
 
 This library provides convenient access to the OpenAI REST API from TypeScript or JavaScript.
 
+
+
 It is generated from our [OpenAPI specification](https://github.com/openai/openai-openapi) with [Stainless](https://stainlessapi.com/).
 
 To learn how to use the OpenAI API, check out our [API Reference](https://platform.openai.com/docs/api-reference) and [Documentation](https://platform.openai.com/docs).
