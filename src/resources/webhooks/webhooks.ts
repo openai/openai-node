@@ -792,68 +792,6 @@ export namespace ResponseIncompleteWebhookEvent {
 }
 
 /**
- * Sent when a request associated with a safety identifier has been blocked.
- */
-export interface SafetyIdentifierBlockedWebhookEvent {
-  /**
-   * The unique ID of the event.
-   */
-  id: string;
-
-  /**
-   * The Unix timestamp (in seconds) of when the request was blocked.
-   */
-  created_at: number;
-
-  /**
-   * Event data payload.
-   */
-  data: SafetyIdentifierBlockedWebhookEvent.Data;
-
-  /**
-   * The type of the event. Always `safety_identifier.blocked`.
-   */
-  type: 'safety_identifier.blocked';
-
-  /**
-   * The object of the event. Always `event`.
-   */
-  object?: 'event';
-}
-
-export namespace SafetyIdentifierBlockedWebhookEvent {
-  /**
-   * Event data payload.
-   */
-  export interface Data {
-    /**
-     * The safety category that triggered the block, such as `bio` or `cyber`.
-     */
-    safety_category: string;
-
-    /**
-     * The stable safety identifier associated with the blocked request.
-     */
-    safety_identifier: string;
-
-    /**
-     * The model used for the blocked request, if available.
-     */
-    model?: string;
-
-    /**
-     * The project associated with the blocked request, if available.
-     */
-    project_id?: string;
-
-    /**
-     * The OpenAI request ID for the blocked request, if available.
-     */
-    request_id?: string;
-  }
-}
-
-/**
  * Sent when a batch API request has been cancelled.
  */
 export type UnwrapWebhookEvent =
@@ -871,8 +809,7 @@ export type UnwrapWebhookEvent =
   | ResponseCancelledWebhookEvent
   | ResponseCompletedWebhookEvent
   | ResponseFailedWebhookEvent
-  | ResponseIncompleteWebhookEvent
-  | SafetyIdentifierBlockedWebhookEvent;
+  | ResponseIncompleteWebhookEvent;
 
 export declare namespace Webhooks {
   export {
@@ -891,7 +828,6 @@ export declare namespace Webhooks {
     type ResponseCompletedWebhookEvent as ResponseCompletedWebhookEvent,
     type ResponseFailedWebhookEvent as ResponseFailedWebhookEvent,
     type ResponseIncompleteWebhookEvent as ResponseIncompleteWebhookEvent,
-    type SafetyIdentifierBlockedWebhookEvent as SafetyIdentifierBlockedWebhookEvent,
     type UnwrapWebhookEvent as UnwrapWebhookEvent,
   };
 }
