@@ -109,10 +109,14 @@ describe('Zod v4 mini', () => {
     expect(responseTool.$parseRaw('{"hello":"world"}')).toEqual({ hello: 'world' });
     expect(() => responseTool.$parseRaw('{"hello":"there"}')).toThrow();
 
-    expect(realtimeTool).toEqual({
+    expect(realtimeTool).toMatchObject({
       type: 'function',
       name: 'mini_tool',
-      parameters: expectedSchema,
+      parameters: {
+        type: 'object',
+        properties: expectedSchema.properties,
+        required: ['hello'],
+      },
     });
   });
 });
@@ -142,10 +146,31 @@ describe.each([
           unit: { type: 'string', enum: ['c', 'f'] },
         },
         required: ['location', 'unit'],
-        additionalProperties: false,
       },
     });
     expect(tool).not.toHaveProperty('strict');
+  });
+
+  it('preserves optional and defaulted parameters in the non-strict schema', () => {
+    const tool = zodRealtimeFunction({
+      name: 'example',
+      parameters: z.object({
+        required: z.string(),
+        optional: z.number().optional(),
+        nullable: z.string().nullable(),
+        defaulted: z.boolean().default(true),
+      }),
+    });
+
+    expect(tool.parameters).toMatchObject({
+      type: 'object',
+      properties: {
+        required: { type: 'string' },
+        optional: { type: 'number' },
+        defaulted: { type: 'boolean', default: true },
+      },
+      required: ['required', 'nullable'],
+    });
   });
 });
 

@@ -72,6 +72,21 @@ function zodV4ToJsonSchema(schema: ZodV4Schema): Record<string, unknown> {
   ) as Record<string, unknown>;
 }
 
+function zodV3ToNonStrictJsonSchema(schema: z3.ZodType, options: { name: string }): Record<string, unknown> {
+  return _zodToJsonSchema(schema, {
+    name: options.name,
+    nameStrategy: 'duplicate-ref',
+    $refStrategy: 'extract-to-root',
+  });
+}
+
+function zodV4ToNonStrictJsonSchema(schema: ZodV4Schema): Record<string, unknown> {
+  return z4.toJSONSchema(schema, {
+    target: 'draft-7',
+    io: 'input',
+  }) as Record<string, unknown>;
+}
+
 function isZodV4(zodObject: ZodSchema): zodObject is ZodV4Schema {
   return '_zod' in zodObject;
 }
@@ -256,8 +271,8 @@ export function zodRealtimeFunction<Parameters extends ZodTypeLike>(options: {
     name: options.name,
     parameters:
       isZodV4(zodSchema) ?
-        zodV4ToJsonSchema(zodSchema)
-      : zodV3ToJsonSchema(zodSchema, { name: options.name }),
+        zodV4ToNonStrictJsonSchema(zodSchema)
+      : zodV3ToNonStrictJsonSchema(zodSchema, { name: options.name }),
     ...(options.description ? { description: options.description } : undefined),
   };
 }
