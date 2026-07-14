@@ -105,6 +105,36 @@ function formatStandardSchemaIssues(issues: ReadonlyArray<StandardSchemaIssue>):
     .join('; ');
 }
 
+function normalizeStructuredOutputSchema(schema: JSONSchema): JSONSchema {
+  const normalizedSchema = structuredClone(schema);
+
+  const visit = (value: unknown): void => {
+    if (!value || typeof value !== 'object') return;
+
+    if (Array.isArray(value)) {
+      for (const child of value) visit(child);
+      return;
+    }
+
+    const record = value as Record<string, unknown>;
+    if (Array.isArray(record['oneOf'])) {
+      if (record['anyOf'] !== undefined) {
+        throw new OpenAIError(
+          'Standard JSON Schema generated both `anyOf` and `oneOf`, which cannot be represented in an OpenAI strict schema',
+        );
+      }
+
+      record['anyOf'] = record['oneOf'];
+      delete record['oneOf'];
+    }
+
+    for (const child of Object.values(record)) visit(child);
+  };
+
+  visit(normalizedSchema);
+  return normalizedSchema;
+}
+
 function parseStandardSchema<Schema extends StandardSchemaLike>(
   standardSchema: Schema,
   content: string,
@@ -138,7 +168,7 @@ function resolveStandardJSONSchema(
     );
   }
 
-  return toStrictJsonSchema(schema) as unknown as Record<string, unknown>;
+  return toStrictJsonSchema(normalizeStructuredOutputSchema(schema)) as unknown as Record<string, unknown>;
 }
 
 /**

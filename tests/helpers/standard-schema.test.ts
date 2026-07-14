@@ -53,8 +53,10 @@ function validateWeather(value: unknown) {
   };
 }
 
-function makeStandardSchema() {
-  const input = jest.fn(() => weatherJSONSchema as Record<string, unknown>);
+function makeStandardSchema(
+  jsonSchema: Record<string, unknown> = weatherJSONSchema as unknown as Record<string, unknown>,
+) {
+  const input = jest.fn(() => jsonSchema);
   const output = jest.fn(() => ({ type: 'string' }));
 
   return {
@@ -160,6 +162,58 @@ describe('Standard Schema helpers', () => {
     });
 
     expect(format.json_schema.schema).toEqual(strictWeatherJSONSchema);
+  });
+
+  it('normalizes oneOf to anyOf before strictifying schemas', () => {
+    const oneOfSchema = {
+      type: 'object',
+      properties: {
+        choice: {
+          oneOf: [
+            {
+              type: 'object',
+              properties: { foo: { type: 'string' } },
+              required: ['foo'],
+            },
+            {
+              type: 'object',
+              properties: { bar: { type: 'number' } },
+              required: ['bar'],
+            },
+          ],
+        },
+      },
+      required: ['choice'],
+    };
+    const { standardSchema } = makeStandardSchema(oneOfSchema);
+
+    const schema = standardResponseFormat(standardSchema, 'choice').json_schema.schema;
+
+    expect(schema).toEqual({
+      type: 'object',
+      properties: {
+        choice: {
+          anyOf: [
+            {
+              type: 'object',
+              properties: { foo: { type: 'string' } },
+              required: ['foo'],
+              additionalProperties: false,
+            },
+            {
+              type: 'object',
+              properties: { bar: { type: 'number' } },
+              required: ['bar'],
+              additionalProperties: false,
+            },
+          ],
+        },
+      },
+      required: ['choice'],
+      additionalProperties: false,
+    });
+    expect(JSON.stringify(schema)).not.toContain('"oneOf"');
+    expect(oneOfSchema.properties.choice).toHaveProperty('oneOf');
   });
 
   it('throws an actionable error when no JSON Schema is available', () => {
