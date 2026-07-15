@@ -1,5 +1,5 @@
-import OpenAI, { ChatCompletionStream, Stream } from '../src';
-import type { ChatCompletionChunk } from '../src/resources/chat/completions';
+import OpenAI, { ChatCompletionStream, Stream } from 'openai';
+import type { ChatCompletionChunk } from 'openai/resources/chat/completions';
 
 const expectType = <T>(_value: T): void => {};
 
