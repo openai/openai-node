@@ -1152,6 +1152,43 @@
       ]
     },
     {
+      "base": "admin.organization.projects.serviceAccounts.apiKeys",
+      "name": "create",
+      "params": [
+        {
+          "type": "param",
+          "key": "service_account_id",
+          "location": "path"
+        },
+        {
+          "type": "params",
+          "maybeOverload": false
+        },
+        {
+          "type": "options"
+        }
+      ],
+      "oldParams": [
+        {
+          "type": "param",
+          "key": "project_id",
+          "location": "path"
+        },
+        {
+          "type": "param",
+          "key": "service_account_id",
+          "location": "path"
+        },
+        {
+          "type": "params",
+          "maybeOverload": true
+        },
+        {
+          "type": "options"
+        }
+      ]
+    },
+    {
       "base": "admin.organization.projects.apiKeys",
       "name": "retrieve",
       "params": [
