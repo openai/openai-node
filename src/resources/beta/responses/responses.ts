@@ -5265,11 +5265,11 @@ export namespace BetaResponseInputItem {
       /**
        * Citations associated with the text content.
        */
-      annotations?: Array<Output.UnionMember0> | Array<Output.UnionMember1> | Array<Output.UnionMember2>;
+      annotations?: Array<Output.FileCitation | Output.URLCitation | Output.ContainerFileCitation>;
     }
 
     export namespace Output {
-      export interface UnionMember0 {
+      export interface FileCitation {
         /**
          * The ID of the file.
          */
@@ -5291,7 +5291,7 @@ export namespace BetaResponseInputItem {
         type: 'file_citation';
       }
 
-      export interface UnionMember1 {
+      export interface URLCitation {
         /**
          * The index of the last character of the citation in the message.
          */
@@ -5318,7 +5318,7 @@ export namespace BetaResponseInputItem {
         url: string;
       }
 
-      export interface UnionMember2 {
+      export interface ContainerFileCitation {
         /**
          * The ID of the container.
          */
