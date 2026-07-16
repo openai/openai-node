@@ -18,5 +18,10 @@
 		"ts-jest": "^29.1.0",
 		"typescript": "5.8.3",
 		"wrangler": "^3.74.0"
+	},
+	"overrides": {
+		"miniflare": {
+			"ws": "8.21.0"
+		}
 	}
 }
