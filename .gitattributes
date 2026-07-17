@@ -1,0 +1,2 @@
+# Homebrew configuration is not application Ruby source.
+Brewfile -linguist-detectable
