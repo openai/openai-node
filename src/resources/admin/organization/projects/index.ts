@@ -72,15 +72,13 @@ export {
   type ProjectServiceAccount,
   type ServiceAccountCreateResponse,
   type ServiceAccountDeleteResponse,
-  type ServiceAccountCreateAPIKeyResponse,
   type ServiceAccountCreateParams,
   type ServiceAccountRetrieveParams,
   type ServiceAccountUpdateParams,
   type ServiceAccountListParams,
   type ServiceAccountDeleteParams,
-  type ServiceAccountCreateAPIKeyParams,
   type ProjectServiceAccountsPage,
-} from './service-accounts';
+} from './service-accounts/index';
 export {
   SpendAlerts,
   type ProjectSpendAlert,

@@ -57,21 +57,6 @@ import {
   RoleUpdateParams,
   Roles,
 } from './roles';
-import * as ServiceAccountsAPI from './service-accounts';
-import {
-  ProjectServiceAccount,
-  ProjectServiceAccountsPage,
-  ServiceAccountCreateAPIKeyParams,
-  ServiceAccountCreateAPIKeyResponse,
-  ServiceAccountCreateParams,
-  ServiceAccountCreateResponse,
-  ServiceAccountDeleteParams,
-  ServiceAccountDeleteResponse,
-  ServiceAccountListParams,
-  ServiceAccountRetrieveParams,
-  ServiceAccountUpdateParams,
-  ServiceAccounts,
-} from './service-accounts';
 import * as SpendAlertsAPI from './spend-alerts';
 import {
   ProjectSpendAlert,
@@ -95,6 +80,19 @@ import {
   ProjectGroup,
   ProjectGroupsPage,
 } from './groups/groups';
+import * as ServiceAccountsAPI from './service-accounts/service-accounts';
+import {
+  ProjectServiceAccount,
+  ProjectServiceAccountsPage,
+  ServiceAccountCreateParams,
+  ServiceAccountCreateResponse,
+  ServiceAccountDeleteParams,
+  ServiceAccountDeleteResponse,
+  ServiceAccountListParams,
+  ServiceAccountRetrieveParams,
+  ServiceAccountUpdateParams,
+  ServiceAccounts,
+} from './service-accounts/service-accounts';
 import * as UsersAPI from './users/users';
 import {
   ProjectUser,
@@ -356,14 +354,12 @@ export declare namespace Projects {
     type ProjectServiceAccount as ProjectServiceAccount,
     type ServiceAccountCreateResponse as ServiceAccountCreateResponse,
     type ServiceAccountDeleteResponse as ServiceAccountDeleteResponse,
-    type ServiceAccountCreateAPIKeyResponse as ServiceAccountCreateAPIKeyResponse,
     type ProjectServiceAccountsPage as ProjectServiceAccountsPage,
     type ServiceAccountCreateParams as ServiceAccountCreateParams,
     type ServiceAccountRetrieveParams as ServiceAccountRetrieveParams,
     type ServiceAccountUpdateParams as ServiceAccountUpdateParams,
     type ServiceAccountListParams as ServiceAccountListParams,
     type ServiceAccountDeleteParams as ServiceAccountDeleteParams,
-    type ServiceAccountCreateAPIKeyParams as ServiceAccountCreateAPIKeyParams,
   };
 
   export {
