@@ -3,8 +3,10 @@ import handler from '../src/pages/api/edge-test';
 
 it('does not expose stack traces from unexpected edge runtime errors', async () => {
   const apiKey = process.env.OPENAI_API_KEY;
+  const adminKey = process.env.OPENAI_ADMIN_KEY;
   const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
   delete process.env.OPENAI_API_KEY;
+  delete process.env.OPENAI_ADMIN_KEY;
 
   try {
     const response = await handler({} as NextRequest);
@@ -16,6 +18,11 @@ it('does not expose stack traces from unexpected edge runtime errors', async () 
       delete process.env.OPENAI_API_KEY;
     } else {
       process.env.OPENAI_API_KEY = apiKey;
+    }
+    if (adminKey === undefined) {
+      delete process.env.OPENAI_ADMIN_KEY;
+    } else {
+      process.env.OPENAI_ADMIN_KEY = adminKey;
     }
     consoleError.mockRestore();
   }

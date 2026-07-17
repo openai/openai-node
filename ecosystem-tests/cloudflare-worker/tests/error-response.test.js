@@ -9,7 +9,11 @@ it('keeps the health check response available', async () => {
 });
 
 it('does not expose stack traces from unexpected errors', async () => {
+	const apiKey = process.env.OPENAI_API_KEY;
+	const adminKey = process.env.OPENAI_ADMIN_KEY;
 	const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+	delete process.env.OPENAI_API_KEY;
+	delete process.env.OPENAI_ADMIN_KEY;
 
 	try {
 		const response = await worker.fetch(
@@ -21,6 +25,16 @@ it('does not expose stack traces from unexpected errors', async () => {
 		expect(response.status).toBe(500);
 		expect(await response.text()).toBe('Internal Server Error');
 	} finally {
+		if (apiKey === undefined) {
+			delete process.env.OPENAI_API_KEY;
+		} else {
+			process.env.OPENAI_API_KEY = apiKey;
+		}
+		if (adminKey === undefined) {
+			delete process.env.OPENAI_ADMIN_KEY;
+		} else {
+			process.env.OPENAI_ADMIN_KEY = adminKey;
+		}
 		consoleError.mockRestore();
 	}
 });
