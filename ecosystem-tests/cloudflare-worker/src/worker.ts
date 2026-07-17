@@ -99,7 +99,7 @@ export default {
 			return new Response(allPassed ? 'Passed!' : results.join('\n\n'));
 		} catch (error) {
 			console.error(error instanceof Error ? error.stack : String(error));
-			return new Response(error instanceof Error ? error.stack : String(error), { status: 500 });
+			return new Response('Internal Server Error', { status: 500 });
 		}
 	},
 };

@@ -74,6 +74,6 @@ export default async (request: NextRequest) => {
     return new NextResponse(allPassed ? 'Passed!' : results.join('\n\n'));
   } catch (error) {
     console.error(error instanceof Error ? error.stack : String(error));
-    return new NextResponse(error instanceof Error ? error.stack : String(error), { status: 500 });
+    return new NextResponse('Internal Server Error', { status: 500 });
   }
 };

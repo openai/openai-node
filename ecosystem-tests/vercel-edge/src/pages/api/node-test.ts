@@ -63,6 +63,6 @@ export default async (request: NextApiRequest, response: NextApiResponse) => {
     response.status(200).end(allPassed ? 'Passed!' : results.join('\n\n'));
   } catch (error) {
     console.error(error instanceof Error ? error.stack : String(error));
-    response.status(500).end(error instanceof Error ? error.stack : String(error));
+    response.status(500).end('Internal Server Error');
   }
 };
