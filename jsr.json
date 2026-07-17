@@ -1,6 +1,6 @@
 {
   "name": "@openai/openai",
-  "version": "6.47.0",
+  "version": "6.48.0",
   "exports": {
     ".": "./index.ts",
     "./providers/bedrock": "./providers/bedrock.ts",

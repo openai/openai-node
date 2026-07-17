@@ -1,5 +1,25 @@
 # Changelog
 
+## 6.48.0 (2026-07-17)
+
+Full Changelog: [v6.47.0...v6.48.0](https://github.com/openai/openai-node/compare/v6.47.0...v6.48.0)
+
+### Features
+
+* **api:** /organization/projects/{project_id}/service_accounts/{service_account_id}/api_keys" endpoint ([9133b54](https://github.com/openai/openai-node/commit/9133b5490b766bf9105588ca13829b10a3726aca))
+* **api:** manual updates ([34acd23](https://github.com/openai/openai-node/commit/34acd239caf745069cca2b13ba62b0fe0b26acd9))
+* **api:** manual updates ([3188968](https://github.com/openai/openai-node/commit/31889688373788b4b1eae7702e222fb6f34a537f))
+
+
+### Bug Fixes
+
+* normalize header names before appending ([#1941](https://github.com/openai/openai-node/issues/1941)) ([18e8c29](https://github.com/openai/openai-node/commit/18e8c290d422ef1dfb09a4940f2a0b7703691cc1))
+
+
+### Chores
+
+* refresh ecosystem test dependencies ([#2002](https://github.com/openai/openai-node/issues/2002)) ([8009491](https://github.com/openai/openai-node/commit/8009491ae3509fc5919eb9353f464a1064996a54))
+
 ## 6.47.0 (2026-07-14)
 
 Full Changelog: [v6.46.0...v6.47.0](https://github.com/openai/openai-node/compare/v6.46.0...v6.47.0)
