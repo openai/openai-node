@@ -38,3 +38,22 @@ it('does not expose stack traces from unexpected errors', async () => {
 		consoleError.mockRestore();
 	}
 });
+
+it('does not expose stack traces from failed test handlers', async () => {
+	const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+	const fetch = jest.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('sensitive stack trace'));
+
+	try {
+		const response = await worker.fetch(
+			new Request('http://localhost:8787/test'),
+			{ OPENAI_API_KEY: 'test-key' },
+			{},
+		);
+
+		expect(response.status).toBe(500);
+		expect(await response.text()).toBe('Internal Server Error');
+	} finally {
+		fetch.mockRestore();
+		consoleError.mockRestore();
+	}
+});
