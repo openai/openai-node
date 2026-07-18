@@ -43,26 +43,21 @@ export default async (request: NextApiRequest, response: NextApiResponse) => {
       expectSimilar,
     });
 
-    let allPassed = true;
-    const results = [];
-
     for (const { description, handler } of tests) {
       console.error('running', description);
-      let result;
       try {
-        result = await handler();
+        await handler();
         console.error('passed ', description);
       } catch (error) {
         console.error('failed ', description, error);
-        allPassed = false;
-        result = error instanceof Error ? error.stack : String(error);
+        response.status(500).end('Internal Server Error');
+        return;
       }
-      results.push(`${description}\n\n${String(result)}`);
     }
 
-    response.status(200).end(allPassed ? 'Passed!' : results.join('\n\n'));
+    response.status(200).end('Passed!');
   } catch (error) {
     console.error(error instanceof Error ? error.stack : String(error));
-    response.status(500).end(error instanceof Error ? error.stack : String(error));
+    response.status(500).end('Internal Server Error');
   }
 };
