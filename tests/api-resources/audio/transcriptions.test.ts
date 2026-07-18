@@ -1,6 +1,9 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import OpenAI, { toFile } from 'openai';
+import type { Transcription, TranscriptionDiarized } from 'openai/resources/audio/transcriptions';
+
+import { expectType } from '../../utils/typing';
 
 const client = new OpenAI({
   apiKey: 'My API Key',
@@ -9,6 +12,18 @@ const client = new OpenAI({
 });
 
 describe('resource transcriptions', () => {
+  test('create response duration usage exposes seconds', () => {
+    const transcriptionUsage: Transcription.Duration = { type: 'duration', seconds: 4 };
+    expectType<number>(transcriptionUsage.seconds);
+    // @ts-expect-error duration usage objects expose seconds, not duration
+    expectType<number>(transcriptionUsage.duration);
+
+    const diarizedUsage: TranscriptionDiarized.Duration = { type: 'duration', seconds: 4 };
+    expectType<number>(diarizedUsage.seconds);
+    // @ts-expect-error duration usage objects expose seconds, not duration
+    expectType<number>(diarizedUsage.duration);
+  });
+
   test('create: only required params', async () => {
     const responsePromise = client.audio.transcriptions.create({
       file: await toFile(Buffer.from('Example data'), 'README.md'),
