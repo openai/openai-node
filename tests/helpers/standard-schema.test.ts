@@ -8,6 +8,8 @@ import type OpenAI from 'openai';
 import type { JSONSchema } from 'openai/lib/jsonschema';
 import { compareType, expectType } from '../utils/typing';
 
+declare const runTools: OpenAI['chat']['completions']['runTools'];
+
 type WeatherInput = {
   city: string;
   unit: 'c' | 'f';
@@ -333,8 +335,7 @@ function _typeTests() {
   compareType<ReturnType<typeof responseTool.$parseRaw>, WeatherOutput>(true);
   expectType<true>(chatTool.__hasFunction);
   expectType<false>(callbacklessChatTool.__hasFunction);
-  const openai = null as unknown as OpenAI;
   // @ts-expect-error callback-less tools cannot be passed to runTools
-  openai.chat.completions.runTools({ model: 'gpt-4o', messages: [], tools: [callbacklessChatTool] });
+  runTools({ model: 'gpt-4o', messages: [], tools: [callbacklessChatTool] });
   standardResponseFormat(standardTargetSchema, 'weather');
 }
