@@ -77,6 +77,7 @@ function zodV3ToNonStrictJsonSchema(schema: z3.ZodType, options: { name: string 
     name: options.name,
     nameStrategy: 'duplicate-ref',
     $refStrategy: 'extract-to-root',
+    pipeStrategy: 'input',
   });
 }
 

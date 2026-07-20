@@ -172,6 +172,24 @@ describe.each([
       required: ['required', 'nullable'],
     });
   });
+
+  it('uses pipeline input schemas', () => {
+    const tool = zodRealtimeFunction({
+      name: 'example',
+      parameters: z.object({
+        value: z.string().transform(Number).pipe(z.number()),
+      }),
+    });
+
+    expect(tool.parameters).toMatchObject({
+      type: 'object',
+      properties: {
+        value: { type: 'string' },
+      },
+      required: ['value'],
+    });
+    expect(tool.parameters).not.toHaveProperty('properties.value.allOf');
+  });
 });
 
 it('preserves inferred output types', () => {
