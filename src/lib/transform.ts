@@ -11,33 +11,81 @@ export function toStrictJsonSchema(schema: JSONSchema): JSONSchema {
   return ensureStrictJsonSchema(schemaCopy, [], schemaCopy);
 }
 
-function isNullable(schema: JSONSchemaDefinition): boolean {
+function isNullable(
+  schema: JSONSchemaDefinition,
+  root: JSONSchema,
+  seenRefs: Set<string> = new Set(),
+): boolean {
   if (typeof schema === 'boolean') {
+    return schema;
+  }
+
+  const ref = schema.$ref;
+  if (ref !== undefined) {
+    // Keep the proof conservative when a ref has sibling constraints. Resolving
+    // those correctly would require combining the referenced schema and siblings.
+    if (typeof ref !== 'string' || hasMoreThanNKeys(schema, 1) || seenRefs.has(ref)) {
+      return false;
+    }
+
+    const resolved = resolveLocalRef(root, ref);
+    if (resolved === undefined) {
+      return false;
+    }
+
+    return isNullable(resolved, root, new Set([...seenRefs, ref]));
+  }
+
+  if (
+    schema.type !== undefined &&
+    schema.type !== 'null' &&
+    !(Array.isArray(schema.type) && schema.type.includes('null'))
+  ) {
     return false;
   }
-  if (schema.type === 'null') {
-    return true;
+
+  if ('const' in schema && schema.const !== null) {
+    return false;
   }
-  if (Array.isArray(schema.type) && schema.type.includes('null')) {
-    return true;
+
+  if (schema.enum !== undefined && (!Array.isArray(schema.enum) || !schema.enum.includes(null))) {
+    return false;
   }
-  if (schema.const === null) {
-    return true;
-  }
-  if (Array.isArray(schema.enum) && schema.enum.includes(null)) {
-    return true;
-  }
-  for (const oneOfVariant of schema.oneOf ?? []) {
-    if (isNullable(oneOfVariant)) {
-      return true;
+
+  if (schema.allOf !== undefined) {
+    if (!Array.isArray(schema.allOf) || !schema.allOf.every((variant) => isNullable(variant, root))) {
+      return false;
     }
   }
-  for (const allOfVariant of schema.anyOf ?? []) {
-    if (isNullable(allOfVariant)) {
-      return true;
+
+  if (schema.anyOf !== undefined) {
+    if (!Array.isArray(schema.anyOf) || !schema.anyOf.some((variant) => isNullable(variant, root))) {
+      return false;
     }
   }
-  return false;
+
+  if (schema.oneOf !== undefined) {
+    if (
+      !Array.isArray(schema.oneOf) ||
+      schema.oneOf.filter((variant) => isNullable(variant, root)).length !== 1
+    ) {
+      return false;
+    }
+  }
+
+  // Conditional and negated schemas need a full JSON Schema evaluator to prove
+  // that null is allowed. Treat them conservatively instead of accepting an
+  // optional field that may not actually accept null.
+  if (
+    schema.not !== undefined ||
+    schema.if !== undefined ||
+    schema.then !== undefined ||
+    schema.else !== undefined
+  ) {
+    return false;
+  }
+
+  return true;
 }
 
 /**
@@ -73,13 +121,19 @@ function ensureStrictJsonSchema(
     }
   }
 
-  // Add additionalProperties: false to object types
+  // Add additionalProperties: false to object types. Explicitly open object
+  // schemas cannot be represented in Structured Outputs strict mode.
   const typ = jsonSchema.type;
-  if (
-    (typ === 'object' || (Array.isArray(typ) && typ.includes('object'))) &&
-    !('additionalProperties' in jsonSchema)
-  ) {
-    jsonSchema.additionalProperties = false;
+  if (typ === 'object' || (Array.isArray(typ) && typ.includes('object'))) {
+    if (!('additionalProperties' in jsonSchema)) {
+      jsonSchema.additionalProperties = false;
+    } else if (jsonSchema.additionalProperties !== false) {
+      throw new Error(
+        `Object schema at \`${
+          path.join('/') || '<root>'
+        }\` must set \`additionalProperties: false\` to be compatible with strict Structured Outputs.`,
+      );
+    }
   }
 
   const required = jsonSchema.required ?? [];
@@ -88,7 +142,7 @@ function ensureStrictJsonSchema(
   const properties = jsonSchema.properties;
   if (isObject(properties)) {
     for (const [key, value] of Object.entries(properties)) {
-      if (!isNullable(value) && !required.includes(key)) {
+      if (!isNullable(value, root) && !required.includes(key)) {
         throw new Error(
           `Schema field at \`${[...path, 'properties', key].join(
             '/',
@@ -187,6 +241,26 @@ function resolveRef(root: JSONSchema, ref: string): JSONSchemaDefinition {
   }
 
   return resolved;
+}
+
+function resolveLocalRef(root: JSONSchema, ref: string): JSONSchemaDefinition | undefined {
+  if (ref === '#') {
+    return root;
+  }
+  if (!ref.startsWith('#/')) {
+    return undefined;
+  }
+
+  let resolved: unknown = root;
+  for (const encodedPart of ref.slice(2).split('/')) {
+    const part = encodedPart.replace(/~1/g, '/').replace(/~0/g, '~');
+    if (!isObject(resolved) || !(part in resolved)) {
+      return undefined;
+    }
+    resolved = resolved[part];
+  }
+
+  return resolved as JSONSchemaDefinition;
 }
 
 function isObject<T>(obj: T | Array<any>): obj is Extract<T, Record<string, any>> {

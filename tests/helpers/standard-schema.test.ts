@@ -353,6 +353,24 @@ describe('Standard Schema helpers', () => {
     });
   });
 
+  it.each([
+    ['true', true],
+    ['schema-valued', { type: 'string' }],
+  ])('rejects %s additionalProperties before returning a strict schema', (_name, additionalProperties) => {
+    const { standardSchema } = makeStandardSchema({
+      type: 'object',
+      properties: {
+        city: { type: 'string' },
+      },
+      required: ['city'],
+      additionalProperties,
+    });
+
+    expect(() => standardResponseFormat(standardSchema, 'weather')).toThrow(
+      'must set `additionalProperties: false` to be compatible with strict Structured Outputs',
+    );
+  });
+
   it('throws an actionable error when no JSON Schema is available', () => {
     const standardSchema = makeValidationOnlySchema();
 

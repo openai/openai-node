@@ -45,7 +45,7 @@ describe('toStrictJsonSchema', () => {
       `);
     });
 
-    test('preserves existing additionalProperties value', () => {
+    test('rejects additionalProperties: true', () => {
       const schema: JSONSchema = {
         type: 'object',
         properties: {
@@ -55,16 +55,24 @@ describe('toStrictJsonSchema', () => {
         additionalProperties: true,
       };
 
-      const strict = toStrictJsonSchema(schema);
-      const diff = detailedDiff(schema, strict);
+      expect(() => toStrictJsonSchema(schema)).toThrow(
+        'must set `additionalProperties: false` to be compatible with strict Structured Outputs',
+      );
+    });
 
-      expect(diff).toMatchInlineSnapshot(`
-        {
-          "added": {},
-          "deleted": {},
-          "updated": {},
-        }
-      `);
+    test('rejects schema-valued additionalProperties', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+        },
+        required: ['name'],
+        additionalProperties: { type: 'string' },
+      };
+
+      expect(() => toStrictJsonSchema(schema)).toThrow(
+        'must set `additionalProperties: false` to be compatible with strict Structured Outputs',
+      );
     });
 
     test('adds additionalProperties: false to nested objects', () => {
@@ -179,6 +187,76 @@ describe('toStrictJsonSchema', () => {
         'nestedConstNull',
         'nestedEnumNull',
       ]);
+    });
+
+    test('only makes literal-constrained properties required when null satisfies the whole schema', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          validConstNull: { type: ['string', 'null'], const: null },
+          validEnumNull: { type: ['string', 'null'], enum: ['ready', null] },
+          invalidConstNull: { type: 'string', const: null },
+          invalidEnumNull: { type: 'string', enum: ['ready', null] },
+        },
+        required: ['invalidConstNull', 'invalidEnumNull'],
+      };
+
+      expect(toStrictJsonSchema(schema).required).toEqual([
+        'validConstNull',
+        'validEnumNull',
+        'invalidConstNull',
+        'invalidEnumNull',
+      ]);
+    });
+
+    test('rejects optional literal-constrained properties when another keyword excludes null', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          status: { type: 'string', enum: ['ready', null] },
+        },
+      };
+
+      expect(() => toStrictJsonSchema(schema)).toThrow(
+        'Schema field at `properties/status` uses `.optional()` without `.nullable()`',
+      );
+    });
+
+    test('resolves pure local refs when checking nullable optional properties', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        $defs: {
+          NullableString: { type: ['string', 'null'] },
+          Alias: { $ref: '#/$defs/NullableString' },
+        },
+        properties: {
+          nickname: { $ref: '#/$defs/Alias' },
+        },
+      };
+
+      expect(toStrictJsonSchema(schema).required).toEqual(['nickname']);
+    });
+
+    test.each([
+      ['missing', { $ref: '#/$defs/Missing' }],
+      ['external', { $ref: 'https://example.com/schema.json#/$defs/NullableString' }],
+      ['cyclic', { $ref: '#/$defs/Cyclic' }],
+      ['sibling-constrained', { $ref: '#/$defs/NullableString', type: 'string' }],
+    ])('conservatively rejects %s refs when checking nullable optional properties', (_name, property) => {
+      const schema: JSONSchema = {
+        type: 'object',
+        $defs: {
+          NullableString: { type: ['string', 'null'] },
+          Cyclic: { $ref: '#/$defs/Cyclic' },
+        },
+        properties: {
+          nickname: property as JSONSchema,
+        },
+      };
+
+      expect(() => toStrictJsonSchema(schema)).toThrow(
+        'Schema field at `properties/nickname` uses `.optional()` without `.nullable()`',
+      );
     });
 
     test('throws error for optional properties without nullable', () => {
