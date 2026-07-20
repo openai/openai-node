@@ -12,6 +12,7 @@ export type HeadersLike =
   | NullableHeaders;
 
 const brand_privateNullableHeaders = /* @__PURE__ */ Symbol('brand.privateNullableHeaders');
+const httpTokenHeaderName = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
 
 /**
  * @internal
@@ -74,16 +75,19 @@ export const buildHeaders = (newHeaders: HeadersLike[]): NullableHeaders => {
   for (const headers of newHeaders) {
     const seenHeaders = new Set<string>();
     for (const [name, value] of iterateHeaders(headers)) {
+      if (!httpTokenHeaderName.test(name)) {
+        throw new TypeError(`Header name must be a valid HTTP token ["${name}"]`);
+      }
       const lowerName = name.toLowerCase();
       if (!seenHeaders.has(lowerName)) {
-        targetHeaders.delete(name);
+        targetHeaders.delete(lowerName);
         seenHeaders.add(lowerName);
       }
       if (value === null) {
-        targetHeaders.delete(name);
+        targetHeaders.delete(lowerName);
         nullHeaders.add(lowerName);
       } else {
-        targetHeaders.append(name, value);
+        targetHeaders.append(lowerName, value);
         nullHeaders.delete(lowerName);
       }
     }

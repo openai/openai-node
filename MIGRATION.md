@@ -83,6 +83,7 @@ client.parents.children.retrieve('c_456', { parent_id: 'p_123' });
 - `client.admin.organization.projects.serviceAccounts.retrieve()`
 - `client.admin.organization.projects.serviceAccounts.update()`
 - `client.admin.organization.projects.serviceAccounts.delete()`
+- `client.admin.organization.projects.serviceAccounts.apiKeys.create()`
 - `client.admin.organization.projects.apiKeys.retrieve()`
 - `client.admin.organization.projects.apiKeys.delete()`
 - `client.admin.organization.projects.rateLimits.updateRateLimit()`
