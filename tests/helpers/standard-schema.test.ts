@@ -4,6 +4,7 @@ import {
   standardResponsesFunction,
   standardTextFormat,
 } from 'openai/helpers/standard-schema';
+import type OpenAI from 'openai';
 import type { JSONSchema } from 'openai/lib/jsonschema';
 import { compareType, expectType } from '../utils/typing';
 
@@ -216,6 +217,53 @@ describe('Standard Schema helpers', () => {
     expect(oneOfSchema.properties.choice).toHaveProperty('oneOf');
   });
 
+  it('does not normalize oneOf keys inside literal schema values', () => {
+    const schemaWithLiterals = {
+      type: 'object',
+      properties: {
+        choice: {
+          type: 'string',
+          enum: [{ oneOf: ['literal enum value'] }],
+          const: { oneOf: ['literal const value'] },
+          default: { oneOf: ['literal default value'] },
+        },
+      },
+      required: ['choice'],
+    };
+    const { standardSchema } = makeStandardSchema(schemaWithLiterals);
+
+    const schema = standardResponseFormat(standardSchema, 'choice').json_schema.schema;
+
+    expect(schema).toMatchObject({
+      properties: {
+        choice: {
+          enum: [{ oneOf: ['literal enum value'] }],
+          const: { oneOf: ['literal const value'] },
+          default: { oneOf: ['literal default value'] },
+        },
+      },
+    });
+  });
+
+  it('accepts nullable type arrays for optional properties', () => {
+    const nullableTypeArraySchema = {
+      type: 'object',
+      properties: {
+        city: { type: ['string', 'null'] },
+      },
+    };
+    const { standardSchema } = makeStandardSchema(nullableTypeArraySchema);
+
+    expect(standardResponseFormat(standardSchema, 'weather').json_schema.schema).toEqual({
+      type: 'object',
+      properties: {
+        city: { type: ['string', 'null'] },
+      },
+      required: ['city'],
+      additionalProperties: false,
+    });
+  });
+
   it('throws an actionable error when no JSON Schema is available', () => {
     const standardSchema = makeValidationOnlySchema();
 
@@ -266,7 +314,27 @@ function _typeTests() {
     parameters: standardSchema,
     function: (args) => expectType<WeatherOutput>(args),
   });
+  const callbacklessChatTool = standardFunction({
+    name: 'get_weather',
+    parameters: standardSchema,
+  });
+  const standardTargetSchema = {
+    ...standardSchema,
+    '~standard': {
+      ...standardSchema['~standard'],
+      jsonSchema: {
+        input: (_options: { readonly target: 'draft-07' | 'draft-2020-12' }) =>
+          weatherJSONSchema as unknown as Record<string, unknown>,
+      },
+    },
+  };
 
   compareType<ReturnType<typeof chatTool.$parseRaw>, WeatherOutput>(true);
   compareType<ReturnType<typeof responseTool.$parseRaw>, WeatherOutput>(true);
+  expectType<true>(chatTool.__hasFunction);
+  expectType<false>(callbacklessChatTool.__hasFunction);
+  const openai = null as unknown as OpenAI;
+  // @ts-expect-error callback-less tools cannot be passed to runTools
+  openai.chat.completions.runTools({ model: 'gpt-4o', messages: [], tools: [callbacklessChatTool] });
+  standardResponseFormat(standardTargetSchema, 'weather');
 }

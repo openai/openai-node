@@ -74,10 +74,7 @@ export function parseResponse<
   const output: Array<ParsedResponseOutputItem<ParsedT>> = response.output.map(
     (item): ParsedResponseOutputItem<ParsedT> => {
       if (item.type === 'function_call') {
-        return {
-          ...item,
-          parsed_arguments: shouldParse ? parseToolCall(params, item) : null,
-        };
+        return shouldParse ? parseToolCall(params, item) : { ...item, parsed_arguments: null };
       }
       if (item.type === 'message') {
         const content: Array<ParsedContent<ParsedT>> = item.content.map((content) => {
@@ -149,7 +146,13 @@ export function hasAutoParseableInput(params: ResponseCreateParamsWithTools): bo
     return true;
   }
 
-  return false;
+  return (
+    (Array.isArray(params.tools) &&
+      params.tools.some(
+        (tool) => isAutoParsableTool(tool) || (tool.type === 'function' && tool.strict === true),
+      )) ||
+    false
+  );
 }
 
 type ToolOptions = {

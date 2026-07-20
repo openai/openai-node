@@ -18,6 +18,9 @@ function isNullable(schema: JSONSchemaDefinition): boolean {
   if (schema.type === 'null') {
     return true;
   }
+  if (Array.isArray(schema.type) && schema.type.includes('null')) {
+    return true;
+  }
   for (const oneOfVariant of schema.oneOf ?? []) {
     if (isNullable(oneOfVariant)) {
       return true;

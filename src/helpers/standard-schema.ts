@@ -28,7 +28,7 @@ type StandardSchemaResult<Output> =
     };
 
 type StandardJSONSchemaOptions = {
-  readonly target: string;
+  readonly target: 'draft-07';
   readonly libraryOptions?: Record<string, unknown> | undefined;
 };
 
@@ -75,6 +75,10 @@ type StandardTextFormatProps = Omit<
 > &
   StandardSchemaJSONSchemaProps;
 
+type StandardToolFunction<Parameters extends StandardSchemaLike> = (
+  args: InferStandardOutput<Parameters>,
+) => unknown | Promise<unknown>;
+
 type StandardToolOptions<Parameters extends StandardSchemaLike> = {
   name: string;
   parameters: Parameters;
@@ -83,8 +87,17 @@ type StandardToolOptions<Parameters extends StandardSchemaLike> = {
    * expose `~standard.jsonSchema.input()`.
    */
   schema?: JSONSchema | Record<string, unknown> | undefined;
-  function?: ((args: InferStandardOutput<Parameters>) => unknown | Promise<unknown>) | undefined;
+  function?: StandardToolFunction<Parameters> | undefined;
   description?: string | undefined;
+};
+
+type StandardToolReturnOptions<
+  Parameters extends StandardSchemaLike,
+  Function extends StandardToolFunction<Parameters> | undefined,
+> = {
+  arguments: InferStandardOutput<Parameters>;
+  name: string;
+  function: Function;
 };
 
 function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
@@ -108,14 +121,8 @@ function formatStandardSchemaIssues(issues: ReadonlyArray<StandardSchemaIssue>):
 function normalizeStructuredOutputSchema(schema: JSONSchema): JSONSchema {
   const normalizedSchema = structuredClone(schema);
 
-  const visit = (value: unknown): void => {
-    if (!value || typeof value !== 'object') return;
-
-    if (Array.isArray(value)) {
-      for (const child of value) visit(child);
-      return;
-    }
-
+  const visitSchema = (value: unknown): void => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return;
     const record = value as Record<string, unknown>;
     if (Array.isArray(record['oneOf'])) {
       if (record['anyOf'] !== undefined) {
@@ -128,10 +135,47 @@ function normalizeStructuredOutputSchema(schema: JSONSchema): JSONSchema {
       delete record['oneOf'];
     }
 
-    for (const child of Object.values(record)) visit(child);
+    for (const keyword of [
+      'additionalItems',
+      'additionalProperties',
+      'contains',
+      'contentSchema',
+      'else',
+      'if',
+      'not',
+      'propertyNames',
+      'then',
+      'unevaluatedItems',
+      'unevaluatedProperties',
+    ]) {
+      visitSchema(record[keyword]);
+    }
+
+    for (const keyword of ['allOf', 'anyOf', 'items', 'prefixItems']) {
+      const children = record[keyword];
+      if (Array.isArray(children)) {
+        for (const child of children) visitSchema(child);
+      } else {
+        visitSchema(children);
+      }
+    }
+
+    for (const keyword of [
+      '$defs',
+      'definitions',
+      'dependentSchemas',
+      'dependencies',
+      'patternProperties',
+      'properties',
+    ]) {
+      const children = record[keyword];
+      if (children && typeof children === 'object' && !Array.isArray(children)) {
+        for (const child of Object.values(children)) visitSchema(child);
+      }
+    }
   };
 
-  visit(normalizedSchema);
+  visitSchema(normalizedSchema);
   return normalizedSchema;
 }
 
@@ -227,14 +271,21 @@ export function standardTextFormat<Schema extends StandardSchemaLike>(
  * Creates a chat completion `function` tool from a Standard Schema
  * validator.
  */
+export function standardFunction<
+  Parameters extends StandardSchemaLike,
+  Function extends StandardToolFunction<Parameters>,
+>(
+  options: StandardToolOptions<Parameters> & { function: Function },
+): AutoParseableTool<StandardToolReturnOptions<Parameters, Function>>;
+export function standardFunction<Parameters extends StandardSchemaLike>(
+  options: StandardToolOptions<Parameters> & { function?: undefined },
+): AutoParseableTool<StandardToolReturnOptions<Parameters, undefined>>;
 export function standardFunction<Parameters extends StandardSchemaLike>(
   options: StandardToolOptions<Parameters>,
-): AutoParseableTool<{
-  arguments: InferStandardOutput<Parameters>;
-  name: string;
-  function: (args: InferStandardOutput<Parameters>) => unknown;
-}> {
-  // @ts-expect-error TODO
+): AutoParseableTool<StandardToolReturnOptions<Parameters, StandardToolFunction<Parameters> | undefined>>;
+export function standardFunction<Parameters extends StandardSchemaLike>(
+  options: StandardToolOptions<Parameters>,
+) {
   return makeParseableTool<any>(
     {
       type: 'function',
@@ -255,13 +306,23 @@ export function standardFunction<Parameters extends StandardSchemaLike>(
 /**
  * Creates a Responses API `function` tool from a Standard Schema validator.
  */
+export function standardResponsesFunction<
+  Parameters extends StandardSchemaLike,
+  Function extends StandardToolFunction<Parameters>,
+>(
+  options: StandardToolOptions<Parameters> & { function: Function },
+): AutoParseableResponseTool<StandardToolReturnOptions<Parameters, Function>>;
+export function standardResponsesFunction<Parameters extends StandardSchemaLike>(
+  options: StandardToolOptions<Parameters> & { function?: undefined },
+): AutoParseableResponseTool<StandardToolReturnOptions<Parameters, undefined>>;
 export function standardResponsesFunction<Parameters extends StandardSchemaLike>(
   options: StandardToolOptions<Parameters>,
-): AutoParseableResponseTool<{
-  arguments: InferStandardOutput<Parameters>;
-  name: string;
-  function: (args: InferStandardOutput<Parameters>) => unknown;
-}> {
+): AutoParseableResponseTool<
+  StandardToolReturnOptions<Parameters, StandardToolFunction<Parameters> | undefined>
+>;
+export function standardResponsesFunction<Parameters extends StandardSchemaLike>(
+  options: StandardToolOptions<Parameters>,
+) {
   return makeParseableResponseTool<any>(
     {
       type: 'function',
