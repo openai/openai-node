@@ -103,11 +103,12 @@ export class AssistantStream
 
     //Catch all for passing along all events
     this.on('event', (event) => {
+      const eventCopy = structuredClone(event);
       const reader = readQueue.shift();
       if (reader) {
-        reader.resolve(event);
+        reader.resolve(eventCopy);
       } else {
-        pushQueue.push(event);
+        pushQueue.push(eventCopy);
       }
     });
 

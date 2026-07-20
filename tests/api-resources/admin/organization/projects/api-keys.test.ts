@@ -44,7 +44,11 @@ describe('resource apiKeys', () => {
     await expect(
       client.admin.organization.projects.apiKeys.list(
         'project_id',
-        { after: 'after', limit: 0 },
+        {
+          after: 'after',
+          limit: 0,
+          owner_project_access: 'active',
+        },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);
