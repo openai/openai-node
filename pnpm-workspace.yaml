@@ -20,8 +20,11 @@ overrides:
   # our registry mirror, which causes pnpm trust-policy warnings. Azure packages
   # accept 0.3.5 via their declared ranges, and 0.3.5 has clean metadata.
   '@typespec/ts-http-runtime': 0.3.5
+  # Keep transitive dependencies outside known vulnerable ranges.
+  'js-yaml@<3.15.0': 3.15.0
   # Keep the existing minimatch security override from the prior Yarn/npm setup.
   minimatch: ^9.0.5
+  'postcss@<8.5.10': 8.5.10
 
 allowBuilds:
   '@swc/core': true

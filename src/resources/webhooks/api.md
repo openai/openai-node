@@ -17,7 +17,6 @@ Types:
 - <code><a href="./src/resources/webhooks.ts">ResponseCompletedWebhookEvent</a></code>
 - <code><a href="./src/resources/webhooks.ts">ResponseFailedWebhookEvent</a></code>
 - <code><a href="./src/resources/webhooks.ts">ResponseIncompleteWebhookEvent</a></code>
-- <code><a href="./src/resources/webhooks.ts">SafetyIdentifierBlockedWebhookEvent</a></code>
 - <code><a href="./src/resources/webhooks.ts">UnwrapWebhookEvent</a></code>
 
 Methods:

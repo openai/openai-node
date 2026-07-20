@@ -1,5 +1,52 @@
 # Changelog
 
+## 6.48.0 (2026-07-17)
+
+Full Changelog: [v6.47.0...v6.48.0](https://github.com/openai/openai-node/compare/v6.47.0...v6.48.0)
+
+### Features
+
+* **api:** /organization/projects/{project_id}/service_accounts/{service_account_id}/api_keys" endpoint ([9133b54](https://github.com/openai/openai-node/commit/9133b5490b766bf9105588ca13829b10a3726aca))
+* **api:** manual updates ([34acd23](https://github.com/openai/openai-node/commit/34acd239caf745069cca2b13ba62b0fe0b26acd9))
+* **api:** manual updates ([3188968](https://github.com/openai/openai-node/commit/31889688373788b4b1eae7702e222fb6f34a537f))
+
+
+### Bug Fixes
+
+* normalize header names before appending ([#1941](https://github.com/openai/openai-node/issues/1941)) ([18e8c29](https://github.com/openai/openai-node/commit/18e8c290d422ef1dfb09a4940f2a0b7703691cc1))
+
+
+### Chores
+
+* refresh ecosystem test dependencies ([#2002](https://github.com/openai/openai-node/issues/2002)) ([8009491](https://github.com/openai/openai-node/commit/8009491ae3509fc5919eb9353f464a1064996a54))
+
+## 6.47.0 (2026-07-14)
+
+Full Changelog: [v6.46.0...v6.47.0](https://github.com/openai/openai-node/compare/v6.46.0...v6.47.0)
+
+### Features
+
+* add async event iterators ([#1977](https://github.com/openai/openai-node/issues/1977)) ([2ece8aa](https://github.com/openai/openai-node/commit/2ece8aa848c6e90d68df636cfff1e3fde2075d8f))
+* add fromReadableStream to ResponseStream ([#1987](https://github.com/openai/openai-node/issues/1987)) ([5984f44](https://github.com/openai/openai-node/commit/5984f442e0cdb5151ccf29562362131c98a3615a))
+* **api:** add owner_project_access to APIKeyListParams ([7bfce97](https://github.com/openai/openai-node/commit/7bfce973a114e04471796e375faf0b62229c71c1))
+* pass context to runTools callbacks ([#1973](https://github.com/openai/openai-node/issues/1973)) ([a6f01e5](https://github.com/openai/openai-node/commit/a6f01e53de019e71a3a21f6097c38c9c674005c9))
+* support streaming file uploads ([#1970](https://github.com/openai/openai-node/issues/1970)) ([a86f1fd](https://github.com/openai/openai-node/commit/a86f1fde303df05ce6c5e4130bb07add3de89b7d))
+
+
+### Bug Fixes
+
+* **assistants:** preserve readable stream deltas ([#1994](https://github.com/openai/openai-node/issues/1994)) ([1cdc019](https://github.com/openai/openai-node/commit/1cdc0196b4341ee641ec6839e08744b2771250e4))
+* avoid deep Deno Zod types ([#1980](https://github.com/openai/openai-node/issues/1980)) ([ae17127](https://github.com/openai/openai-node/commit/ae17127eff0160ce1af7bcb2cc456a4275272a14)), closes [#984](https://github.com/openai/openai-node/issues/984)
+* **ci:** bump @arethetypeswrong/cli to ^0.18.0 and run CI workflows on Node 24 ([baa0b2a](https://github.com/openai/openai-node/commit/baa0b2ad9006e879f28abe45999ef0901eabeea9))
+* emit stream finalization errors ([#1972](https://github.com/openai/openai-node/issues/1972)) ([9555b71](https://github.com/openai/openai-node/commit/9555b71ab8300cad057dd7699b75ae80e3967573))
+* handle Azure filter stream chunks ([#1982](https://github.com/openai/openai-node/issues/1982)) ([c1c5c28](https://github.com/openai/openai-node/commit/c1c5c28267ec36f6afef55e1dfe6eabeda22c2ee)), closes [#1015](https://github.com/openai/openai-node/issues/1015)
+* **zod:** support zod v4 mini schemas ([#1985](https://github.com/openai/openai-node/issues/1985)) ([2df10fc](https://github.com/openai/openai-node/commit/2df10fc19add2cf78aff96c5e4dceac271dab33a))
+
+
+### Documentation
+
+* clarify strict Zod function schemas ([#1988](https://github.com/openai/openai-node/issues/1988)) ([373b08a](https://github.com/openai/openai-node/commit/373b08ac3b7127392f1607fc8e82001e4776b959))
+
 ## 6.46.0 (2026-07-09)
 
 Full Changelog: [v6.45.0...v6.46.0](https://github.com/openai/openai-node/compare/v6.45.0...v6.46.0)
