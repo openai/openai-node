@@ -21,6 +21,12 @@ function isNullable(schema: JSONSchemaDefinition): boolean {
   if (Array.isArray(schema.type) && schema.type.includes('null')) {
     return true;
   }
+  if (schema.const === null) {
+    return true;
+  }
+  if (Array.isArray(schema.enum) && schema.enum.includes(null)) {
+    return true;
+  }
   for (const oneOfVariant of schema.oneOf ?? []) {
     if (isNullable(oneOfVariant)) {
       return true;

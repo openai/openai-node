@@ -239,6 +239,73 @@ describe('Standard Schema helpers', () => {
     );
   });
 
+  it('normalizes provably exclusive oneOf branches behind local refs', () => {
+    const referencedOneOfSchema = {
+      type: 'object',
+      $defs: {
+        foo: {
+          type: 'object',
+          properties: { kind: { type: 'string', const: 'foo' }, foo: { type: 'string' } },
+          required: ['kind', 'foo'],
+        },
+        bar: {
+          type: 'object',
+          properties: { kind: { type: 'string', const: 'bar' }, bar: { type: 'number' } },
+          required: ['kind', 'bar'],
+        },
+      },
+      properties: {
+        choice: {
+          oneOf: [{ $ref: '#/$defs/foo' }, { $ref: '#/$defs/bar' }],
+        },
+      },
+      required: ['choice'],
+    };
+    const { standardSchema } = makeStandardSchema(referencedOneOfSchema);
+
+    expect(standardResponseFormat(standardSchema, 'choice').json_schema.schema).toEqual({
+      type: 'object',
+      $defs: {
+        foo: {
+          type: 'object',
+          properties: { kind: { type: 'string', const: 'foo' }, foo: { type: 'string' } },
+          required: ['kind', 'foo'],
+          additionalProperties: false,
+        },
+        bar: {
+          type: 'object',
+          properties: { kind: { type: 'string', const: 'bar' }, bar: { type: 'number' } },
+          required: ['kind', 'bar'],
+          additionalProperties: false,
+        },
+      },
+      properties: {
+        choice: {
+          anyOf: [{ $ref: '#/$defs/foo' }, { $ref: '#/$defs/bar' }],
+        },
+      },
+      required: ['choice'],
+      additionalProperties: false,
+    });
+  });
+
+  it('rejects oneOf refs that cannot be resolved locally', () => {
+    for (const branches of [
+      [{ $ref: '#/$defs/missing' }, { type: 'string' }],
+      [{ $ref: 'https://example.com/schema.json#/$defs/foo' }, { type: 'string' }],
+    ]) {
+      const { standardSchema } = makeStandardSchema({
+        type: 'object',
+        properties: { choice: { oneOf: branches } },
+        required: ['choice'],
+      });
+
+      expect(() => standardResponseFormat(standardSchema, 'choice')).toThrow(
+        'Standard JSON Schema generated a `oneOf` whose branches are not provably mutually exclusive',
+      );
+    }
+  });
+
   it('does not normalize oneOf keys inside literal schema values', () => {
     const schemaWithLiterals = {
       type: 'object',

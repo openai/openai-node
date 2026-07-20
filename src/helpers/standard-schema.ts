@@ -235,10 +235,42 @@ function areMutuallyExclusive(left: unknown, right: unknown): boolean {
   return haveDisjointLiteralValues(left, right) || haveDisjointObjectDiscriminator(left, right);
 }
 
-function areOneOfBranchesMutuallyExclusive(branches: unknown[]): boolean {
+function resolveLocalRefForExclusivity(
+  schema: unknown,
+  root: JSONSchema,
+  seenRefs: Set<string> = new Set(),
+): unknown | undefined {
+  if (!schema || typeof schema !== 'object' || Array.isArray(schema)) return schema;
+
+  const record = schema as Record<string, unknown>;
+  const ref = record['$ref'];
+  if (ref === undefined) return schema;
+
+  // Keep the proof conservative when a ref has sibling constraints. Resolving
+  // those correctly would require combining the referenced schema and siblings.
+  if (typeof ref !== 'string' || Object.keys(record).length !== 1 || !ref.startsWith('#/')) {
+    return undefined;
+  }
+  if (seenRefs.has(ref)) return undefined;
+
+  let resolved: unknown = root;
+  for (const encodedPart of ref.slice(2).split('/')) {
+    const part = encodedPart.replace(/~1/g, '/').replace(/~0/g, '~');
+    if (!resolved || typeof resolved !== 'object' || Array.isArray(resolved) || !(part in resolved)) {
+      return undefined;
+    }
+    resolved = (resolved as Record<string, unknown>)[part];
+  }
+
+  return resolveLocalRefForExclusivity(resolved, root, new Set([...seenRefs, ref]));
+}
+
+function areOneOfBranchesMutuallyExclusive(branches: unknown[], root: JSONSchema): boolean {
   for (let index = 0; index < branches.length; index++) {
     for (let otherIndex = index + 1; otherIndex < branches.length; otherIndex++) {
-      if (!areMutuallyExclusive(branches[index], branches[otherIndex])) {
+      const left = resolveLocalRefForExclusivity(branches[index], root);
+      const right = resolveLocalRefForExclusivity(branches[otherIndex], root);
+      if (left === undefined || right === undefined || !areMutuallyExclusive(left, right)) {
         return false;
       }
     }
@@ -259,7 +291,7 @@ function normalizeStructuredOutputSchema(schema: JSONSchema): JSONSchema {
           'Standard JSON Schema generated both `anyOf` and `oneOf`, which cannot be represented in an OpenAI strict schema',
         );
       }
-      if (!areOneOfBranchesMutuallyExclusive(record['oneOf'])) {
+      if (!areOneOfBranchesMutuallyExclusive(record['oneOf'], normalizedSchema)) {
         throw new OpenAIError(
           'Standard JSON Schema generated a `oneOf` whose branches are not provably mutually exclusive. OpenAI strict schemas do not support `oneOf`; use `anyOf` or add a discriminator with distinct literal values.',
         );

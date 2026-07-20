@@ -162,6 +162,25 @@ describe('toStrictJsonSchema', () => {
       `);
     });
 
+    test('makes properties with null-valued literals required', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          constNull: { const: null },
+          enumNull: { enum: [null] },
+          nestedConstNull: { anyOf: [{ type: 'string' }, { const: null }] },
+          nestedEnumNull: { anyOf: [{ type: 'string' }, { enum: [null] }] },
+        },
+      };
+
+      expect(toStrictJsonSchema(schema).required).toEqual([
+        'constNull',
+        'enumNull',
+        'nestedConstNull',
+        'nestedEnumNull',
+      ]);
+    });
+
     test('throws error for optional properties without nullable', () => {
       const schema: JSONSchema = {
         type: 'object',
