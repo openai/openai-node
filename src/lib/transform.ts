@@ -69,7 +69,10 @@ function ensureStrictJsonSchema(
 
   // Add additionalProperties: false to object types
   const typ = jsonSchema.type;
-  if (typ === 'object' && !('additionalProperties' in jsonSchema)) {
+  if (
+    (typ === 'object' || (Array.isArray(typ) && typ.includes('object'))) &&
+    !('additionalProperties' in jsonSchema)
+  ) {
     jsonSchema.additionalProperties = false;
   }
 

@@ -167,7 +167,7 @@ describe('Standard Schema helpers', () => {
     expect(format.json_schema.schema).toEqual(strictWeatherJSONSchema);
   });
 
-  it('normalizes oneOf to anyOf before strictifying schemas', () => {
+  it('normalizes provably exclusive oneOf branches before strictifying schemas', () => {
     const oneOfSchema = {
       type: 'object',
       properties: {
@@ -175,13 +175,13 @@ describe('Standard Schema helpers', () => {
           oneOf: [
             {
               type: 'object',
-              properties: { foo: { type: 'string' } },
-              required: ['foo'],
+              properties: { kind: { type: 'string', const: 'foo' }, foo: { type: 'string' } },
+              required: ['kind', 'foo'],
             },
             {
               type: 'object',
-              properties: { bar: { type: 'number' } },
-              required: ['bar'],
+              properties: { kind: { type: 'string', const: 'bar' }, bar: { type: 'number' } },
+              required: ['kind', 'bar'],
             },
           ],
         },
@@ -199,14 +199,14 @@ describe('Standard Schema helpers', () => {
           anyOf: [
             {
               type: 'object',
-              properties: { foo: { type: 'string' } },
-              required: ['foo'],
+              properties: { kind: { type: 'string', const: 'foo' }, foo: { type: 'string' } },
+              required: ['kind', 'foo'],
               additionalProperties: false,
             },
             {
               type: 'object',
-              properties: { bar: { type: 'number' } },
-              required: ['bar'],
+              properties: { kind: { type: 'string', const: 'bar' }, bar: { type: 'number' } },
+              required: ['kind', 'bar'],
               additionalProperties: false,
             },
           ],
@@ -217,6 +217,26 @@ describe('Standard Schema helpers', () => {
     });
     expect(JSON.stringify(schema)).not.toContain('"oneOf"');
     expect(oneOfSchema.properties.choice).toHaveProperty('oneOf');
+  });
+
+  it('rejects oneOf branches that may overlap', () => {
+    const overlappingOneOfSchema = {
+      type: 'object',
+      properties: {
+        choice: {
+          oneOf: [
+            { type: 'string', enum: ['left', 'shared'] },
+            { type: 'string', enum: ['shared', 'right'] },
+          ],
+        },
+      },
+      required: ['choice'],
+    };
+    const { standardSchema } = makeStandardSchema(overlappingOneOfSchema);
+
+    expect(() => standardResponseFormat(standardSchema, 'choice')).toThrow(
+      'Standard JSON Schema generated a `oneOf` whose branches are not provably mutually exclusive',
+    );
   });
 
   it('does not normalize oneOf keys inside literal schema values', () => {
@@ -297,6 +317,30 @@ describe('Standard Schema helpers', () => {
     expect(() => format.$parseRaw('{"city":"Paris","unit":"c"}')).toThrow(
       'Standard Schema helpers only support synchronous validation',
     );
+  });
+
+  it('observes rejected asynchronous validators', async () => {
+    const { standardSchema } = makeStandardSchema();
+    const unhandledRejection = jest.fn();
+    const rejectingAsyncSchema = {
+      ...standardSchema,
+      '~standard': {
+        ...standardSchema['~standard'],
+        validate: () => Promise.reject(new Error('validation rejected')),
+      },
+    };
+    const format = standardResponseFormat(rejectingAsyncSchema, 'weather');
+    process.once('unhandledRejection', unhandledRejection);
+
+    try {
+      expect(() => format.$parseRaw('{"city":"Paris","unit":"c"}')).toThrow(
+        'Standard Schema helpers only support synchronous validation',
+      );
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(unhandledRejection).not.toHaveBeenCalled();
+    } finally {
+      process.removeListener('unhandledRejection', unhandledRejection);
+    }
   });
 });
 

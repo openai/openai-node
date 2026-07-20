@@ -100,6 +100,38 @@ describe('toStrictJsonSchema', () => {
         }
       `);
     });
+
+    test('adds additionalProperties: false to nullable object type arrays', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          user: {
+            type: ['object', 'null'],
+            properties: {
+              name: { type: 'string' },
+            },
+            required: ['name'],
+          },
+        },
+        required: ['user'],
+      };
+
+      expect(toStrictJsonSchema(schema)).toEqual({
+        type: 'object',
+        properties: {
+          user: {
+            type: ['object', 'null'],
+            properties: {
+              name: { type: 'string' },
+            },
+            required: ['name'],
+            additionalProperties: false,
+          },
+        },
+        required: ['user'],
+        additionalProperties: false,
+      });
+    });
   });
 
   describe('Required Properties', () => {

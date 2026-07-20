@@ -118,6 +118,135 @@ function formatStandardSchemaIssues(issues: ReadonlyArray<StandardSchemaIssue>):
     .join('; ');
 }
 
+const JSON_SCHEMA_TYPES = new Set(['string', 'number', 'integer', 'boolean', 'object', 'array', 'null']);
+
+type JSONPrimitive = string | number | boolean | null;
+
+function getSchemaTypes(schema: unknown): Set<string> | undefined {
+  if (!schema || typeof schema !== 'object' || Array.isArray(schema)) return undefined;
+
+  const type = (schema as Record<string, unknown>)['type'];
+  const types = Array.isArray(type) ? type : [type];
+  if (
+    types.length === 0 ||
+    !types.every((value) => typeof value === 'string' && JSON_SCHEMA_TYPES.has(value))
+  ) {
+    return undefined;
+  }
+
+  return new Set(types);
+}
+
+function isJSONPrimitive(value: unknown): value is JSONPrimitive {
+  return (
+    value === null ||
+    typeof value === 'string' ||
+    typeof value === 'boolean' ||
+    (typeof value === 'number' && Number.isFinite(value))
+  );
+}
+
+function getLiteralValues(schema: unknown): JSONPrimitive[] | undefined {
+  if (!schema || typeof schema !== 'object' || Array.isArray(schema)) return undefined;
+
+  const record = schema as Record<string, unknown>;
+  if ('const' in record && isJSONPrimitive(record['const'])) {
+    return [record['const']];
+  }
+
+  const enumValues = record['enum'];
+  if (Array.isArray(enumValues) && enumValues.length > 0 && enumValues.every(isJSONPrimitive)) {
+    return enumValues;
+  }
+
+  return undefined;
+}
+
+function haveDisjointLiteralValues(left: unknown, right: unknown): boolean {
+  const leftValues = getLiteralValues(left);
+  const rightValues = getLiteralValues(right);
+  if (!leftValues || !rightValues) return false;
+
+  return leftValues.every((leftValue) => !rightValues.some((rightValue) => leftValue === rightValue));
+}
+
+function schemaTypesOverlap(left: string, right: string): boolean {
+  return (
+    left === right || (left === 'integer' && right === 'number') || (left === 'number' && right === 'integer')
+  );
+}
+
+function isObjectOnlySchema(schema: unknown): boolean {
+  const types = getSchemaTypes(schema);
+  return types?.size === 1 && types.has('object');
+}
+
+function haveDisjointObjectDiscriminator(left: unknown, right: unknown): boolean {
+  if (!isObjectOnlySchema(left) || !isObjectOnlySchema(right)) return false;
+
+  const leftRecord = left as Record<string, unknown>;
+  const rightRecord = right as Record<string, unknown>;
+  const leftProperties = leftRecord['properties'];
+  const rightProperties = rightRecord['properties'];
+  const leftRequired = leftRecord['required'];
+  const rightRequired = rightRecord['required'];
+  if (
+    !leftProperties ||
+    typeof leftProperties !== 'object' ||
+    Array.isArray(leftProperties) ||
+    !rightProperties ||
+    typeof rightProperties !== 'object' ||
+    Array.isArray(rightProperties) ||
+    !Array.isArray(leftRequired) ||
+    !Array.isArray(rightRequired)
+  ) {
+    return false;
+  }
+
+  for (const property of leftRequired) {
+    if (
+      typeof property === 'string' &&
+      rightRequired.includes(property) &&
+      haveDisjointLiteralValues(
+        (leftProperties as Record<string, unknown>)[property],
+        (rightProperties as Record<string, unknown>)[property],
+      )
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function areMutuallyExclusive(left: unknown, right: unknown): boolean {
+  const leftTypes = getSchemaTypes(left);
+  const rightTypes = getSchemaTypes(right);
+  if (
+    leftTypes &&
+    rightTypes &&
+    [...leftTypes].every((leftType) =>
+      [...rightTypes].every((rightType) => !schemaTypesOverlap(leftType, rightType)),
+    )
+  ) {
+    return true;
+  }
+
+  return haveDisjointLiteralValues(left, right) || haveDisjointObjectDiscriminator(left, right);
+}
+
+function areOneOfBranchesMutuallyExclusive(branches: unknown[]): boolean {
+  for (let index = 0; index < branches.length; index++) {
+    for (let otherIndex = index + 1; otherIndex < branches.length; otherIndex++) {
+      if (!areMutuallyExclusive(branches[index], branches[otherIndex])) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
 function normalizeStructuredOutputSchema(schema: JSONSchema): JSONSchema {
   const normalizedSchema = structuredClone(schema);
 
@@ -128,6 +257,11 @@ function normalizeStructuredOutputSchema(schema: JSONSchema): JSONSchema {
       if (record['anyOf'] !== undefined) {
         throw new OpenAIError(
           'Standard JSON Schema generated both `anyOf` and `oneOf`, which cannot be represented in an OpenAI strict schema',
+        );
+      }
+      if (!areOneOfBranchesMutuallyExclusive(record['oneOf'])) {
+        throw new OpenAIError(
+          'Standard JSON Schema generated a `oneOf` whose branches are not provably mutually exclusive. OpenAI strict schemas do not support `oneOf`; use `anyOf` or add a discriminator with distinct literal values.',
         );
       }
 
@@ -186,6 +320,7 @@ function parseStandardSchema<Schema extends StandardSchemaLike>(
   const result = standardSchema['~standard'].validate(JSON.parse(content));
 
   if (isPromiseLike(result)) {
+    void Promise.resolve(result).catch(() => undefined);
     throw new OpenAIError(
       'Standard Schema helpers only support synchronous validation. Use a schema with a synchronous `~standard.validate()` implementation.',
     );
