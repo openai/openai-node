@@ -1234,9 +1234,31 @@ export namespace RealtimeResponseUsage {
     cached_tokens?: number;
 
     /**
+     * Details about the cached tokens used in the Response.
+     */
+    cached_tokens_details?: InputTokenDetails.CachedTokensDetails;
+
+    /**
      * The number of text tokens used in the Response.
      */
     text_tokens?: number;
+  }
+
+  export namespace InputTokenDetails {
+    /**
+     * Details about the cached tokens used in the Response.
+     */
+    export interface CachedTokensDetails {
+      /**
+       * The number of cached audio tokens used in the Response.
+       */
+      audio_tokens?: number;
+
+      /**
+       * The number of cached text tokens used in the Response.
+       */
+      text_tokens?: number;
+    }
   }
 
   /**
