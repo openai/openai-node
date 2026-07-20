@@ -1040,17 +1040,27 @@ Methods:
 
 Types:
 
-- <code><a href="./src/resources/admin/organization/projects/service-accounts.ts">ProjectServiceAccount</a></code>
-- <code><a href="./src/resources/admin/organization/projects/service-accounts.ts">ServiceAccountCreateResponse</a></code>
-- <code><a href="./src/resources/admin/organization/projects/service-accounts.ts">ServiceAccountDeleteResponse</a></code>
+- <code><a href="./src/resources/admin/organization/projects/service-accounts/service-accounts.ts">ProjectServiceAccount</a></code>
+- <code><a href="./src/resources/admin/organization/projects/service-accounts/service-accounts.ts">ServiceAccountCreateResponse</a></code>
+- <code><a href="./src/resources/admin/organization/projects/service-accounts/service-accounts.ts">ServiceAccountDeleteResponse</a></code>
 
 Methods:
 
-- <code title="post /organization/projects/{project_id}/service_accounts">client.admin.organization.projects.serviceAccounts.<a href="./src/resources/admin/organization/projects/service-accounts.ts">create</a>(projectID, { ...params }) -> ServiceAccountCreateResponse</code>
-- <code title="get /organization/projects/{project_id}/service_accounts/{service_account_id}">client.admin.organization.projects.serviceAccounts.<a href="./src/resources/admin/organization/projects/service-accounts.ts">retrieve</a>(serviceAccountID, { ...params }) -> ProjectServiceAccount</code>
-- <code title="post /organization/projects/{project_id}/service_accounts/{service_account_id}">client.admin.organization.projects.serviceAccounts.<a href="./src/resources/admin/organization/projects/service-accounts.ts">update</a>(serviceAccountID, { ...params }) -> ProjectServiceAccount</code>
-- <code title="get /organization/projects/{project_id}/service_accounts">client.admin.organization.projects.serviceAccounts.<a href="./src/resources/admin/organization/projects/service-accounts.ts">list</a>(projectID, { ...params }) -> ProjectServiceAccountsPage</code>
-- <code title="delete /organization/projects/{project_id}/service_accounts/{service_account_id}">client.admin.organization.projects.serviceAccounts.<a href="./src/resources/admin/organization/projects/service-accounts.ts">delete</a>(serviceAccountID, { ...params }) -> ServiceAccountDeleteResponse</code>
+- <code title="post /organization/projects/{project_id}/service_accounts">client.admin.organization.projects.serviceAccounts.<a href="./src/resources/admin/organization/projects/service-accounts/service-accounts.ts">create</a>(projectID, { ...params }) -> ServiceAccountCreateResponse</code>
+- <code title="get /organization/projects/{project_id}/service_accounts/{service_account_id}">client.admin.organization.projects.serviceAccounts.<a href="./src/resources/admin/organization/projects/service-accounts/service-accounts.ts">retrieve</a>(serviceAccountID, { ...params }) -> ProjectServiceAccount</code>
+- <code title="post /organization/projects/{project_id}/service_accounts/{service_account_id}">client.admin.organization.projects.serviceAccounts.<a href="./src/resources/admin/organization/projects/service-accounts/service-accounts.ts">update</a>(serviceAccountID, { ...params }) -> ProjectServiceAccount</code>
+- <code title="get /organization/projects/{project_id}/service_accounts">client.admin.organization.projects.serviceAccounts.<a href="./src/resources/admin/organization/projects/service-accounts/service-accounts.ts">list</a>(projectID, { ...params }) -> ProjectServiceAccountsPage</code>
+- <code title="delete /organization/projects/{project_id}/service_accounts/{service_account_id}">client.admin.organization.projects.serviceAccounts.<a href="./src/resources/admin/organization/projects/service-accounts/service-accounts.ts">delete</a>(serviceAccountID, { ...params }) -> ServiceAccountDeleteResponse</code>
+
+##### APIKeys
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/projects/service-accounts/api-keys.ts">APIKeyCreateResponse</a></code>
+
+Methods:
+
+- <code title="post /organization/projects/{project_id}/service_accounts/{service_account_id}/api_keys">client.admin.organization.projects.serviceAccounts.apiKeys.<a href="./src/resources/admin/organization/projects/service-accounts/api-keys.ts">create</a>(serviceAccountID, { ...params }) -> APIKeyCreateResponse</code>
 
 #### APIKeys
 

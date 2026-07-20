@@ -1,15 +1,30 @@
-import { useChat } from 'ai/react';
+import { useChat } from '@ai-sdk/react';
+import { DefaultChatTransport } from 'ai';
+import { useState, type FormEvent } from 'react';
+
+const transport = new DefaultChatTransport({ api: '/api/vercel-ai-streaming' });
 
 export default function Chat() {
-  const { messages, input, handleInputChange, handleSubmit } = useChat({ api: '/api/vercel-ai-streaming' });
-  console.log({ messages });
+  const [input, setInput] = useState('');
+  const { messages, sendMessage } = useChat({ transport });
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!input.trim()) return;
+
+    void sendMessage({ text: input });
+    setInput('');
+  };
 
   return (
     <div className="mx-auto w-full max-w-md py-24 flex flex-col stretch">
       {messages.map((m) => (
         <div key={m.id}>
           {m.role === 'user' ? 'User: ' : 'AI: '}
-          {m.content}
+          {m.parts
+            .filter((part) => part.type === 'text')
+            .map((part) => part.text)
+            .join('')}
         </div>
       ))}
 
@@ -19,7 +34,7 @@ export default function Chat() {
           <input
             className="fixed w-full max-w-md bottom-0 border border-gray-300 rounded mb-8 shadow-xl p-2"
             value={input}
-            onChange={handleInputChange}
+            onChange={(event) => setInput(event.target.value)}
           />
         </label>
         <button type="submit">Send</button>
