@@ -1,5 +1,25 @@
 import type { JSONSchema, JSONSchemaDefinition } from './jsonschema';
 
+const JSON_SCHEMA_ANNOTATION_KEYWORDS = new Set([
+  'default',
+  'description',
+  'examples',
+  'readOnly',
+  'title',
+  'writeOnly',
+]);
+
+const JSON_SCHEMA_OBJECT_KEYWORDS = new Set([
+  'additionalProperties',
+  'dependencies',
+  'maxProperties',
+  'minProperties',
+  'patternProperties',
+  'properties',
+  'propertyNames',
+  'required',
+]);
+
 export function toStrictJsonSchema(schema: JSONSchema): JSONSchema {
   if (schema.type !== 'object') {
     throw new Error(
@@ -22,9 +42,11 @@ function isNullable(
 
   const ref = schema.$ref;
   if (ref !== undefined) {
-    // Keep the proof conservative when a ref has sibling constraints. Resolving
-    // those correctly would require combining the referenced schema and siblings.
-    if (typeof ref !== 'string' || hasMoreThanNKeys(schema, 1) || seenRefs.has(ref)) {
+    // Annotation keywords do not constrain validation, so they are safe beside
+    // a local ref. Keep the proof conservative for every other sibling because
+    // resolving those correctly would require intersecting the referenced
+    // schema and its sibling constraints.
+    if (typeof ref !== 'string' || !hasOnlyRefAndAnnotations(schema) || seenRefs.has(ref)) {
       return false;
     }
 
@@ -121,10 +143,16 @@ function ensureStrictJsonSchema(
     }
   }
 
-  // Add additionalProperties: false to object types. Explicitly open object
-  // schemas cannot be represented in Structured Outputs strict mode.
+  // Add additionalProperties: false to object schemas. Draft 7 permits object
+  // keywords without an explicit type, so those implicit object shapes need
+  // the same strict handling as type: 'object'. Explicitly open object schemas
+  // cannot be represented in Structured Outputs strict mode.
   const typ = jsonSchema.type;
-  if (typ === 'object' || (Array.isArray(typ) && typ.includes('object'))) {
+  if (
+    typ === 'object' ||
+    (Array.isArray(typ) && typ.includes('object')) ||
+    (typ === undefined && hasObjectKeywords(jsonSchema))
+  ) {
     if (!('additionalProperties' in jsonSchema)) {
       jsonSchema.additionalProperties = false;
     } else if (jsonSchema.additionalProperties !== false) {
@@ -161,7 +189,11 @@ function ensureStrictJsonSchema(
 
   // Handle arrays
   const items = jsonSchema.items;
-  if (isObject(items)) {
+  if (Array.isArray(items)) {
+    jsonSchema.items = items.map((item, i) =>
+      ensureStrictJsonSchema(item, [...path, 'items', String(i)], root),
+    );
+  } else if (items !== undefined) {
     jsonSchema.items = ensureStrictJsonSchema(items, [...path, 'items'], root);
   }
 
@@ -176,9 +208,11 @@ function ensureStrictJsonSchema(
   // Handle intersections (allOf)
   const allOf = jsonSchema.allOf;
   if (Array.isArray(allOf)) {
-    if (allOf.length === 1) {
+    if (allOf.length === 1 && hasOnlyAnnotationSiblings(jsonSchema, 'allOf')) {
       const resolved = ensureStrictJsonSchema(allOf[0]!, [...path, 'allOf', '0'], root);
-      Object.assign(jsonSchema, resolved);
+      const annotations = { ...jsonSchema };
+      delete annotations.allOf;
+      Object.assign(jsonSchema, resolved, annotations);
       delete jsonSchema.allOf;
     } else {
       jsonSchema.allOf = allOf.map((entry, i) =>
@@ -265,6 +299,22 @@ function resolveLocalRef(root: JSONSchema, ref: string): JSONSchemaDefinition | 
 
 function isObject<T>(obj: T | Array<any>): obj is Extract<T, Record<string, any>> {
   return typeof obj === 'object' && obj !== null && !Array.isArray(obj);
+}
+
+function hasOnlyRefAndAnnotations(schema: JSONSchema): boolean {
+  return Object.keys(schema).every(
+    (keyword) => keyword === '$ref' || JSON_SCHEMA_ANNOTATION_KEYWORDS.has(keyword),
+  );
+}
+
+function hasOnlyAnnotationSiblings(schema: JSONSchema, keyword: string): boolean {
+  return Object.keys(schema).every(
+    (schemaKeyword) => schemaKeyword === keyword || JSON_SCHEMA_ANNOTATION_KEYWORDS.has(schemaKeyword),
+  );
+}
+
+function hasObjectKeywords(schema: JSONSchema): boolean {
+  return Object.keys(schema).some((keyword) => JSON_SCHEMA_OBJECT_KEYWORDS.has(keyword));
 }
 
 function hasMoreThanNKeys(obj: Record<string, any>, n: number): boolean {

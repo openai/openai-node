@@ -140,6 +140,59 @@ describe('toStrictJsonSchema', () => {
         additionalProperties: false,
       });
     });
+
+    test('adds additionalProperties: false to implicit object schemas', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          user: {
+            properties: {
+              name: { type: 'string' },
+            },
+            required: ['name'],
+          },
+        },
+        required: ['user'],
+      };
+
+      expect(toStrictJsonSchema(schema)).toEqual({
+        type: 'object',
+        properties: {
+          user: {
+            properties: {
+              name: { type: 'string' },
+            },
+            required: ['name'],
+            additionalProperties: false,
+          },
+        },
+        required: ['user'],
+        additionalProperties: false,
+      });
+    });
+
+    test.each([
+      ['true', true],
+      ['schema-valued', { type: 'string' }],
+    ])('rejects %s additionalProperties on implicit object schemas', (_name, additionalProperties) => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          user: {
+            properties: {
+              name: { type: 'string' },
+            },
+            required: ['name'],
+            additionalProperties,
+          },
+        },
+        required: ['user'],
+      };
+
+      expect(() => toStrictJsonSchema(schema)).toThrow(
+        'must set `additionalProperties: false` to be compatible with strict Structured Outputs',
+      );
+    });
   });
 
   describe('Required Properties', () => {
@@ -235,6 +288,34 @@ describe('toStrictJsonSchema', () => {
       };
 
       expect(toStrictJsonSchema(schema).required).toEqual(['nickname']);
+    });
+
+    test('resolves local refs with annotation-only siblings when checking nullable optional properties', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        $defs: {
+          NullableString: { type: ['string', 'null'] },
+        },
+        properties: {
+          nickname: {
+            $ref: '#/$defs/NullableString',
+            title: 'Nickname',
+            description: 'A preferred name',
+            default: null,
+            examples: [null],
+          },
+        },
+      };
+
+      const strict = toStrictJsonSchema(schema);
+
+      expect(strict.required).toEqual(['nickname']);
+      expect(strict.properties?.['nickname']).toMatchObject({
+        type: ['string', 'null'],
+        title: 'Nickname',
+        description: 'A preferred name',
+        examples: [null],
+      });
     });
 
     test.each([
@@ -350,6 +431,56 @@ describe('toStrictJsonSchema', () => {
         }
       `);
     });
+
+    test('processes tuple item schemas recursively', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          tuple: {
+            type: 'array',
+            items: [
+              { type: 'string' },
+              {
+                type: 'array',
+                items: [
+                  {
+                    type: 'object',
+                    properties: { name: { type: 'string' } },
+                    required: ['name'],
+                  },
+                ],
+              },
+            ],
+          },
+        },
+        required: ['tuple'],
+      };
+
+      expect(toStrictJsonSchema(schema)).toEqual({
+        type: 'object',
+        properties: {
+          tuple: {
+            type: 'array',
+            items: [
+              { type: 'string' },
+              {
+                type: 'array',
+                items: [
+                  {
+                    type: 'object',
+                    properties: { name: { type: 'string' } },
+                    required: ['name'],
+                    additionalProperties: false,
+                  },
+                ],
+              },
+            ],
+          },
+        },
+        required: ['tuple'],
+        additionalProperties: false,
+      });
+    });
   });
 
   describe('anyOf Handling', () => {
@@ -452,6 +583,56 @@ describe('toStrictJsonSchema', () => {
           "updated": {},
         }
       `);
+    });
+
+    test('inlines a single allOf variant with annotation siblings', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          value: {
+            description: 'A string value',
+            allOf: [{ type: 'string' }],
+          },
+        },
+        required: ['value'],
+      };
+
+      expect(toStrictJsonSchema(schema)).toEqual({
+        type: 'object',
+        properties: {
+          value: {
+            type: 'string',
+            description: 'A string value',
+          },
+        },
+        required: ['value'],
+        additionalProperties: false,
+      });
+    });
+
+    test('does not flatten a single allOf variant across sibling constraints', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          value: {
+            type: 'string',
+            allOf: [{ type: 'number' }],
+          },
+        },
+        required: ['value'],
+      };
+
+      expect(toStrictJsonSchema(schema)).toEqual({
+        type: 'object',
+        properties: {
+          value: {
+            type: 'string',
+            allOf: [{ type: 'number' }],
+          },
+        },
+        required: ['value'],
+        additionalProperties: false,
+      });
     });
 
     test('processes multiple allOf variants', () => {
