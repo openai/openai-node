@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { OpenAIStream, StreamingTextResponse } from 'ai';
+import { createUIMessageStream, createUIMessageStreamResponse, type UIMessage } from 'ai';
 import { NextRequest } from 'next/server';
 
 export const config = {
@@ -13,20 +13,42 @@ export const config = {
 export default async (request: NextRequest) => {
   const openai = new OpenAI();
 
-  // Extract the `messages` from the body of the request
-  const { messages } = await request.json();
+  const { messages }: { messages: UIMessage[] } = await request.json();
+  const openAIMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = messages.map((message) => {
+    const content = message.parts
+      .filter((part) => part.type === 'text')
+      .map((part) => part.text)
+      .join('');
 
-  // Ask OpenAI for a streaming chat completion given the prompt
-  const streamResponse = await openai.chat.completions
-    .create({
-      model: 'gpt-3.5-turbo',
-      stream: true,
-      messages,
-    })
-    .asResponse();
+    switch (message.role) {
+      case 'system':
+        return { role: 'system', content };
+      case 'assistant':
+        return { role: 'assistant', content };
+      case 'user':
+        return { role: 'user', content };
+    }
+  });
 
-  const stream = OpenAIStream(streamResponse);
+  const completion = await openai.chat.completions.create({
+    model: 'gpt-3.5-turbo',
+    stream: true,
+    messages: openAIMessages,
+  });
 
-  // Respond with the stream
-  return new StreamingTextResponse(stream);
+  const stream = createUIMessageStream({
+    execute: async ({ writer }) => {
+      const textPartID = 'text';
+      writer.write({ type: 'text-start', id: textPartID });
+
+      for await (const chunk of completion) {
+        const delta = chunk.choices[0]?.delta.content;
+        if (delta) writer.write({ type: 'text-delta', id: textPartID, delta });
+      }
+
+      writer.write({ type: 'text-end', id: textPartID });
+    },
+  });
+
+  return createUIMessageStreamResponse({ stream });
 };

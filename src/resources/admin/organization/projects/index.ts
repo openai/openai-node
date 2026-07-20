@@ -78,7 +78,7 @@ export {
   type ServiceAccountListParams,
   type ServiceAccountDeleteParams,
   type ProjectServiceAccountsPage,
-} from './service-accounts';
+} from './service-accounts/index';
 export {
   SpendAlerts,
   type ProjectSpendAlert,

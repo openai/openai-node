@@ -57,19 +57,6 @@ import {
   RoleUpdateParams,
   Roles,
 } from './roles';
-import * as ServiceAccountsAPI from './service-accounts';
-import {
-  ProjectServiceAccount,
-  ProjectServiceAccountsPage,
-  ServiceAccountCreateParams,
-  ServiceAccountCreateResponse,
-  ServiceAccountDeleteParams,
-  ServiceAccountDeleteResponse,
-  ServiceAccountListParams,
-  ServiceAccountRetrieveParams,
-  ServiceAccountUpdateParams,
-  ServiceAccounts,
-} from './service-accounts';
 import * as SpendAlertsAPI from './spend-alerts';
 import {
   ProjectSpendAlert,
@@ -93,6 +80,19 @@ import {
   ProjectGroup,
   ProjectGroupsPage,
 } from './groups/groups';
+import * as ServiceAccountsAPI from './service-accounts/service-accounts';
+import {
+  ProjectServiceAccount,
+  ProjectServiceAccountsPage,
+  ServiceAccountCreateParams,
+  ServiceAccountCreateResponse,
+  ServiceAccountDeleteParams,
+  ServiceAccountDeleteResponse,
+  ServiceAccountListParams,
+  ServiceAccountRetrieveParams,
+  ServiceAccountUpdateParams,
+  ServiceAccounts,
+} from './service-accounts/service-accounts';
 import * as UsersAPI from './users/users';
 import {
   ProjectUser,

@@ -272,8 +272,9 @@ export namespace UsageAudioSpeechesResponse {
      */
     export interface OrganizationUsageCompletionsResult {
       /**
-       * The aggregated number of text input tokens used, including cached tokens. For
-       * customers subscribe to scale tier, this includes scale tier tokens.
+       * The aggregated number of input tokens used, including cached and cache-write
+       * tokens. This includes text, audio, and image tokens. For customers subscribed to
+       * Scale Tier, this includes Scale Tier tokens.
        */
       input_tokens: number;
 
@@ -285,8 +286,9 @@ export namespace UsageAudioSpeechesResponse {
       object: 'organization.usage.completions.result';
 
       /**
-       * The aggregated number of text output tokens used. For customers subscribe to
-       * scale tier, this includes scale tier tokens.
+       * The aggregated number of output tokens used across text, audio, and image
+       * outputs. For customers subscribed to Scale Tier, this includes Scale Tier
+       * tokens.
        */
       output_tokens: number;
 
@@ -303,16 +305,52 @@ export namespace UsageAudioSpeechesResponse {
       batch?: boolean | null;
 
       /**
-       * The aggregated number of audio input tokens used, including cached tokens.
+       * The aggregated number of uncached audio input tokens used.
        */
       input_audio_tokens?: number;
 
       /**
-       * The aggregated number of text input tokens that has been cached from previous
-       * requests. For customers subscribe to scale tier, this includes scale tier
-       * tokens.
+       * The aggregated number of input tokens written to the cache.
+       */
+      input_cache_write_tokens?: number;
+
+      /**
+       * The aggregated number of cached audio input tokens used.
+       */
+      input_cached_audio_tokens?: number;
+
+      /**
+       * The aggregated number of cached image input tokens used.
+       */
+      input_cached_image_tokens?: number;
+
+      /**
+       * The aggregated number of cached text input tokens used.
+       */
+      input_cached_text_tokens?: number;
+
+      /**
+       * The aggregated number of cached input tokens used across text, audio, and image
+       * inputs. For customers subscribed to Scale Tier, this includes Scale Tier tokens.
        */
       input_cached_tokens?: number;
+
+      /**
+       * The aggregated number of uncached image input tokens used.
+       */
+      input_image_tokens?: number;
+
+      /**
+       * The aggregated number of uncached text input tokens used, excluding cache-write
+       * tokens.
+       */
+      input_text_tokens?: number;
+
+      /**
+       * The aggregated number of uncached input tokens used across text, audio, and
+       * image inputs, excluding cache-write tokens.
+       */
+      input_uncached_tokens?: number;
 
       /**
        * When `group_by=model`, this field provides the model name of the grouped usage
@@ -324,6 +362,16 @@ export namespace UsageAudioSpeechesResponse {
        * The aggregated number of audio output tokens used.
        */
       output_audio_tokens?: number;
+
+      /**
+       * The aggregated number of image output tokens used.
+       */
+      output_image_tokens?: number;
+
+      /**
+       * The aggregated number of text output tokens used.
+       */
+      output_text_tokens?: number;
 
       /**
        * When `group_by=project_id`, this field provides the project ID of the grouped
@@ -775,8 +823,9 @@ export namespace UsageAudioTranscriptionsResponse {
      */
     export interface OrganizationUsageCompletionsResult {
       /**
-       * The aggregated number of text input tokens used, including cached tokens. For
-       * customers subscribe to scale tier, this includes scale tier tokens.
+       * The aggregated number of input tokens used, including cached and cache-write
+       * tokens. This includes text, audio, and image tokens. For customers subscribed to
+       * Scale Tier, this includes Scale Tier tokens.
        */
       input_tokens: number;
 
@@ -788,8 +837,9 @@ export namespace UsageAudioTranscriptionsResponse {
       object: 'organization.usage.completions.result';
 
       /**
-       * The aggregated number of text output tokens used. For customers subscribe to
-       * scale tier, this includes scale tier tokens.
+       * The aggregated number of output tokens used across text, audio, and image
+       * outputs. For customers subscribed to Scale Tier, this includes Scale Tier
+       * tokens.
        */
       output_tokens: number;
 
@@ -806,16 +856,52 @@ export namespace UsageAudioTranscriptionsResponse {
       batch?: boolean | null;
 
       /**
-       * The aggregated number of audio input tokens used, including cached tokens.
+       * The aggregated number of uncached audio input tokens used.
        */
       input_audio_tokens?: number;
 
       /**
-       * The aggregated number of text input tokens that has been cached from previous
-       * requests. For customers subscribe to scale tier, this includes scale tier
-       * tokens.
+       * The aggregated number of input tokens written to the cache.
+       */
+      input_cache_write_tokens?: number;
+
+      /**
+       * The aggregated number of cached audio input tokens used.
+       */
+      input_cached_audio_tokens?: number;
+
+      /**
+       * The aggregated number of cached image input tokens used.
+       */
+      input_cached_image_tokens?: number;
+
+      /**
+       * The aggregated number of cached text input tokens used.
+       */
+      input_cached_text_tokens?: number;
+
+      /**
+       * The aggregated number of cached input tokens used across text, audio, and image
+       * inputs. For customers subscribed to Scale Tier, this includes Scale Tier tokens.
        */
       input_cached_tokens?: number;
+
+      /**
+       * The aggregated number of uncached image input tokens used.
+       */
+      input_image_tokens?: number;
+
+      /**
+       * The aggregated number of uncached text input tokens used, excluding cache-write
+       * tokens.
+       */
+      input_text_tokens?: number;
+
+      /**
+       * The aggregated number of uncached input tokens used across text, audio, and
+       * image inputs, excluding cache-write tokens.
+       */
+      input_uncached_tokens?: number;
 
       /**
        * When `group_by=model`, this field provides the model name of the grouped usage
@@ -827,6 +913,16 @@ export namespace UsageAudioTranscriptionsResponse {
        * The aggregated number of audio output tokens used.
        */
       output_audio_tokens?: number;
+
+      /**
+       * The aggregated number of image output tokens used.
+       */
+      output_image_tokens?: number;
+
+      /**
+       * The aggregated number of text output tokens used.
+       */
+      output_text_tokens?: number;
 
       /**
        * When `group_by=project_id`, this field provides the project ID of the grouped
@@ -1278,8 +1374,9 @@ export namespace UsageCodeInterpreterSessionsResponse {
      */
     export interface OrganizationUsageCompletionsResult {
       /**
-       * The aggregated number of text input tokens used, including cached tokens. For
-       * customers subscribe to scale tier, this includes scale tier tokens.
+       * The aggregated number of input tokens used, including cached and cache-write
+       * tokens. This includes text, audio, and image tokens. For customers subscribed to
+       * Scale Tier, this includes Scale Tier tokens.
        */
       input_tokens: number;
 
@@ -1291,8 +1388,9 @@ export namespace UsageCodeInterpreterSessionsResponse {
       object: 'organization.usage.completions.result';
 
       /**
-       * The aggregated number of text output tokens used. For customers subscribe to
-       * scale tier, this includes scale tier tokens.
+       * The aggregated number of output tokens used across text, audio, and image
+       * outputs. For customers subscribed to Scale Tier, this includes Scale Tier
+       * tokens.
        */
       output_tokens: number;
 
@@ -1309,16 +1407,52 @@ export namespace UsageCodeInterpreterSessionsResponse {
       batch?: boolean | null;
 
       /**
-       * The aggregated number of audio input tokens used, including cached tokens.
+       * The aggregated number of uncached audio input tokens used.
        */
       input_audio_tokens?: number;
 
       /**
-       * The aggregated number of text input tokens that has been cached from previous
-       * requests. For customers subscribe to scale tier, this includes scale tier
-       * tokens.
+       * The aggregated number of input tokens written to the cache.
+       */
+      input_cache_write_tokens?: number;
+
+      /**
+       * The aggregated number of cached audio input tokens used.
+       */
+      input_cached_audio_tokens?: number;
+
+      /**
+       * The aggregated number of cached image input tokens used.
+       */
+      input_cached_image_tokens?: number;
+
+      /**
+       * The aggregated number of cached text input tokens used.
+       */
+      input_cached_text_tokens?: number;
+
+      /**
+       * The aggregated number of cached input tokens used across text, audio, and image
+       * inputs. For customers subscribed to Scale Tier, this includes Scale Tier tokens.
        */
       input_cached_tokens?: number;
+
+      /**
+       * The aggregated number of uncached image input tokens used.
+       */
+      input_image_tokens?: number;
+
+      /**
+       * The aggregated number of uncached text input tokens used, excluding cache-write
+       * tokens.
+       */
+      input_text_tokens?: number;
+
+      /**
+       * The aggregated number of uncached input tokens used across text, audio, and
+       * image inputs, excluding cache-write tokens.
+       */
+      input_uncached_tokens?: number;
 
       /**
        * When `group_by=model`, this field provides the model name of the grouped usage
@@ -1330,6 +1464,16 @@ export namespace UsageCodeInterpreterSessionsResponse {
        * The aggregated number of audio output tokens used.
        */
       output_audio_tokens?: number;
+
+      /**
+       * The aggregated number of image output tokens used.
+       */
+      output_image_tokens?: number;
+
+      /**
+       * The aggregated number of text output tokens used.
+       */
+      output_text_tokens?: number;
 
       /**
        * When `group_by=project_id`, this field provides the project ID of the grouped
@@ -1781,8 +1925,9 @@ export namespace UsageCompletionsResponse {
      */
     export interface OrganizationUsageCompletionsResult {
       /**
-       * The aggregated number of text input tokens used, including cached tokens. For
-       * customers subscribe to scale tier, this includes scale tier tokens.
+       * The aggregated number of input tokens used, including cached and cache-write
+       * tokens. This includes text, audio, and image tokens. For customers subscribed to
+       * Scale Tier, this includes Scale Tier tokens.
        */
       input_tokens: number;
 
@@ -1794,8 +1939,9 @@ export namespace UsageCompletionsResponse {
       object: 'organization.usage.completions.result';
 
       /**
-       * The aggregated number of text output tokens used. For customers subscribe to
-       * scale tier, this includes scale tier tokens.
+       * The aggregated number of output tokens used across text, audio, and image
+       * outputs. For customers subscribed to Scale Tier, this includes Scale Tier
+       * tokens.
        */
       output_tokens: number;
 
@@ -1812,16 +1958,52 @@ export namespace UsageCompletionsResponse {
       batch?: boolean | null;
 
       /**
-       * The aggregated number of audio input tokens used, including cached tokens.
+       * The aggregated number of uncached audio input tokens used.
        */
       input_audio_tokens?: number;
 
       /**
-       * The aggregated number of text input tokens that has been cached from previous
-       * requests. For customers subscribe to scale tier, this includes scale tier
-       * tokens.
+       * The aggregated number of input tokens written to the cache.
+       */
+      input_cache_write_tokens?: number;
+
+      /**
+       * The aggregated number of cached audio input tokens used.
+       */
+      input_cached_audio_tokens?: number;
+
+      /**
+       * The aggregated number of cached image input tokens used.
+       */
+      input_cached_image_tokens?: number;
+
+      /**
+       * The aggregated number of cached text input tokens used.
+       */
+      input_cached_text_tokens?: number;
+
+      /**
+       * The aggregated number of cached input tokens used across text, audio, and image
+       * inputs. For customers subscribed to Scale Tier, this includes Scale Tier tokens.
        */
       input_cached_tokens?: number;
+
+      /**
+       * The aggregated number of uncached image input tokens used.
+       */
+      input_image_tokens?: number;
+
+      /**
+       * The aggregated number of uncached text input tokens used, excluding cache-write
+       * tokens.
+       */
+      input_text_tokens?: number;
+
+      /**
+       * The aggregated number of uncached input tokens used across text, audio, and
+       * image inputs, excluding cache-write tokens.
+       */
+      input_uncached_tokens?: number;
 
       /**
        * When `group_by=model`, this field provides the model name of the grouped usage
@@ -1833,6 +2015,16 @@ export namespace UsageCompletionsResponse {
        * The aggregated number of audio output tokens used.
        */
       output_audio_tokens?: number;
+
+      /**
+       * The aggregated number of image output tokens used.
+       */
+      output_image_tokens?: number;
+
+      /**
+       * The aggregated number of text output tokens used.
+       */
+      output_text_tokens?: number;
 
       /**
        * When `group_by=project_id`, this field provides the project ID of the grouped
@@ -2284,8 +2476,9 @@ export namespace UsageCostsResponse {
      */
     export interface OrganizationUsageCompletionsResult {
       /**
-       * The aggregated number of text input tokens used, including cached tokens. For
-       * customers subscribe to scale tier, this includes scale tier tokens.
+       * The aggregated number of input tokens used, including cached and cache-write
+       * tokens. This includes text, audio, and image tokens. For customers subscribed to
+       * Scale Tier, this includes Scale Tier tokens.
        */
       input_tokens: number;
 
@@ -2297,8 +2490,9 @@ export namespace UsageCostsResponse {
       object: 'organization.usage.completions.result';
 
       /**
-       * The aggregated number of text output tokens used. For customers subscribe to
-       * scale tier, this includes scale tier tokens.
+       * The aggregated number of output tokens used across text, audio, and image
+       * outputs. For customers subscribed to Scale Tier, this includes Scale Tier
+       * tokens.
        */
       output_tokens: number;
 
@@ -2315,16 +2509,52 @@ export namespace UsageCostsResponse {
       batch?: boolean | null;
 
       /**
-       * The aggregated number of audio input tokens used, including cached tokens.
+       * The aggregated number of uncached audio input tokens used.
        */
       input_audio_tokens?: number;
 
       /**
-       * The aggregated number of text input tokens that has been cached from previous
-       * requests. For customers subscribe to scale tier, this includes scale tier
-       * tokens.
+       * The aggregated number of input tokens written to the cache.
+       */
+      input_cache_write_tokens?: number;
+
+      /**
+       * The aggregated number of cached audio input tokens used.
+       */
+      input_cached_audio_tokens?: number;
+
+      /**
+       * The aggregated number of cached image input tokens used.
+       */
+      input_cached_image_tokens?: number;
+
+      /**
+       * The aggregated number of cached text input tokens used.
+       */
+      input_cached_text_tokens?: number;
+
+      /**
+       * The aggregated number of cached input tokens used across text, audio, and image
+       * inputs. For customers subscribed to Scale Tier, this includes Scale Tier tokens.
        */
       input_cached_tokens?: number;
+
+      /**
+       * The aggregated number of uncached image input tokens used.
+       */
+      input_image_tokens?: number;
+
+      /**
+       * The aggregated number of uncached text input tokens used, excluding cache-write
+       * tokens.
+       */
+      input_text_tokens?: number;
+
+      /**
+       * The aggregated number of uncached input tokens used across text, audio, and
+       * image inputs, excluding cache-write tokens.
+       */
+      input_uncached_tokens?: number;
 
       /**
        * When `group_by=model`, this field provides the model name of the grouped usage
@@ -2336,6 +2566,16 @@ export namespace UsageCostsResponse {
        * The aggregated number of audio output tokens used.
        */
       output_audio_tokens?: number;
+
+      /**
+       * The aggregated number of image output tokens used.
+       */
+      output_image_tokens?: number;
+
+      /**
+       * The aggregated number of text output tokens used.
+       */
+      output_text_tokens?: number;
 
       /**
        * When `group_by=project_id`, this field provides the project ID of the grouped
@@ -2787,8 +3027,9 @@ export namespace UsageEmbeddingsResponse {
      */
     export interface OrganizationUsageCompletionsResult {
       /**
-       * The aggregated number of text input tokens used, including cached tokens. For
-       * customers subscribe to scale tier, this includes scale tier tokens.
+       * The aggregated number of input tokens used, including cached and cache-write
+       * tokens. This includes text, audio, and image tokens. For customers subscribed to
+       * Scale Tier, this includes Scale Tier tokens.
        */
       input_tokens: number;
 
@@ -2800,8 +3041,9 @@ export namespace UsageEmbeddingsResponse {
       object: 'organization.usage.completions.result';
 
       /**
-       * The aggregated number of text output tokens used. For customers subscribe to
-       * scale tier, this includes scale tier tokens.
+       * The aggregated number of output tokens used across text, audio, and image
+       * outputs. For customers subscribed to Scale Tier, this includes Scale Tier
+       * tokens.
        */
       output_tokens: number;
 
@@ -2818,16 +3060,52 @@ export namespace UsageEmbeddingsResponse {
       batch?: boolean | null;
 
       /**
-       * The aggregated number of audio input tokens used, including cached tokens.
+       * The aggregated number of uncached audio input tokens used.
        */
       input_audio_tokens?: number;
 
       /**
-       * The aggregated number of text input tokens that has been cached from previous
-       * requests. For customers subscribe to scale tier, this includes scale tier
-       * tokens.
+       * The aggregated number of input tokens written to the cache.
+       */
+      input_cache_write_tokens?: number;
+
+      /**
+       * The aggregated number of cached audio input tokens used.
+       */
+      input_cached_audio_tokens?: number;
+
+      /**
+       * The aggregated number of cached image input tokens used.
+       */
+      input_cached_image_tokens?: number;
+
+      /**
+       * The aggregated number of cached text input tokens used.
+       */
+      input_cached_text_tokens?: number;
+
+      /**
+       * The aggregated number of cached input tokens used across text, audio, and image
+       * inputs. For customers subscribed to Scale Tier, this includes Scale Tier tokens.
        */
       input_cached_tokens?: number;
+
+      /**
+       * The aggregated number of uncached image input tokens used.
+       */
+      input_image_tokens?: number;
+
+      /**
+       * The aggregated number of uncached text input tokens used, excluding cache-write
+       * tokens.
+       */
+      input_text_tokens?: number;
+
+      /**
+       * The aggregated number of uncached input tokens used across text, audio, and
+       * image inputs, excluding cache-write tokens.
+       */
+      input_uncached_tokens?: number;
 
       /**
        * When `group_by=model`, this field provides the model name of the grouped usage
@@ -2839,6 +3117,16 @@ export namespace UsageEmbeddingsResponse {
        * The aggregated number of audio output tokens used.
        */
       output_audio_tokens?: number;
+
+      /**
+       * The aggregated number of image output tokens used.
+       */
+      output_image_tokens?: number;
+
+      /**
+       * The aggregated number of text output tokens used.
+       */
+      output_text_tokens?: number;
 
       /**
        * When `group_by=project_id`, this field provides the project ID of the grouped
@@ -3290,8 +3578,9 @@ export namespace UsageFileSearchCallsResponse {
      */
     export interface OrganizationUsageCompletionsResult {
       /**
-       * The aggregated number of text input tokens used, including cached tokens. For
-       * customers subscribe to scale tier, this includes scale tier tokens.
+       * The aggregated number of input tokens used, including cached and cache-write
+       * tokens. This includes text, audio, and image tokens. For customers subscribed to
+       * Scale Tier, this includes Scale Tier tokens.
        */
       input_tokens: number;
 
@@ -3303,8 +3592,9 @@ export namespace UsageFileSearchCallsResponse {
       object: 'organization.usage.completions.result';
 
       /**
-       * The aggregated number of text output tokens used. For customers subscribe to
-       * scale tier, this includes scale tier tokens.
+       * The aggregated number of output tokens used across text, audio, and image
+       * outputs. For customers subscribed to Scale Tier, this includes Scale Tier
+       * tokens.
        */
       output_tokens: number;
 
@@ -3321,16 +3611,52 @@ export namespace UsageFileSearchCallsResponse {
       batch?: boolean | null;
 
       /**
-       * The aggregated number of audio input tokens used, including cached tokens.
+       * The aggregated number of uncached audio input tokens used.
        */
       input_audio_tokens?: number;
 
       /**
-       * The aggregated number of text input tokens that has been cached from previous
-       * requests. For customers subscribe to scale tier, this includes scale tier
-       * tokens.
+       * The aggregated number of input tokens written to the cache.
+       */
+      input_cache_write_tokens?: number;
+
+      /**
+       * The aggregated number of cached audio input tokens used.
+       */
+      input_cached_audio_tokens?: number;
+
+      /**
+       * The aggregated number of cached image input tokens used.
+       */
+      input_cached_image_tokens?: number;
+
+      /**
+       * The aggregated number of cached text input tokens used.
+       */
+      input_cached_text_tokens?: number;
+
+      /**
+       * The aggregated number of cached input tokens used across text, audio, and image
+       * inputs. For customers subscribed to Scale Tier, this includes Scale Tier tokens.
        */
       input_cached_tokens?: number;
+
+      /**
+       * The aggregated number of uncached image input tokens used.
+       */
+      input_image_tokens?: number;
+
+      /**
+       * The aggregated number of uncached text input tokens used, excluding cache-write
+       * tokens.
+       */
+      input_text_tokens?: number;
+
+      /**
+       * The aggregated number of uncached input tokens used across text, audio, and
+       * image inputs, excluding cache-write tokens.
+       */
+      input_uncached_tokens?: number;
 
       /**
        * When `group_by=model`, this field provides the model name of the grouped usage
@@ -3342,6 +3668,16 @@ export namespace UsageFileSearchCallsResponse {
        * The aggregated number of audio output tokens used.
        */
       output_audio_tokens?: number;
+
+      /**
+       * The aggregated number of image output tokens used.
+       */
+      output_image_tokens?: number;
+
+      /**
+       * The aggregated number of text output tokens used.
+       */
+      output_text_tokens?: number;
 
       /**
        * When `group_by=project_id`, this field provides the project ID of the grouped
@@ -3793,8 +4129,9 @@ export namespace UsageImagesResponse {
      */
     export interface OrganizationUsageCompletionsResult {
       /**
-       * The aggregated number of text input tokens used, including cached tokens. For
-       * customers subscribe to scale tier, this includes scale tier tokens.
+       * The aggregated number of input tokens used, including cached and cache-write
+       * tokens. This includes text, audio, and image tokens. For customers subscribed to
+       * Scale Tier, this includes Scale Tier tokens.
        */
       input_tokens: number;
 
@@ -3806,8 +4143,9 @@ export namespace UsageImagesResponse {
       object: 'organization.usage.completions.result';
 
       /**
-       * The aggregated number of text output tokens used. For customers subscribe to
-       * scale tier, this includes scale tier tokens.
+       * The aggregated number of output tokens used across text, audio, and image
+       * outputs. For customers subscribed to Scale Tier, this includes Scale Tier
+       * tokens.
        */
       output_tokens: number;
 
@@ -3824,16 +4162,52 @@ export namespace UsageImagesResponse {
       batch?: boolean | null;
 
       /**
-       * The aggregated number of audio input tokens used, including cached tokens.
+       * The aggregated number of uncached audio input tokens used.
        */
       input_audio_tokens?: number;
 
       /**
-       * The aggregated number of text input tokens that has been cached from previous
-       * requests. For customers subscribe to scale tier, this includes scale tier
-       * tokens.
+       * The aggregated number of input tokens written to the cache.
+       */
+      input_cache_write_tokens?: number;
+
+      /**
+       * The aggregated number of cached audio input tokens used.
+       */
+      input_cached_audio_tokens?: number;
+
+      /**
+       * The aggregated number of cached image input tokens used.
+       */
+      input_cached_image_tokens?: number;
+
+      /**
+       * The aggregated number of cached text input tokens used.
+       */
+      input_cached_text_tokens?: number;
+
+      /**
+       * The aggregated number of cached input tokens used across text, audio, and image
+       * inputs. For customers subscribed to Scale Tier, this includes Scale Tier tokens.
        */
       input_cached_tokens?: number;
+
+      /**
+       * The aggregated number of uncached image input tokens used.
+       */
+      input_image_tokens?: number;
+
+      /**
+       * The aggregated number of uncached text input tokens used, excluding cache-write
+       * tokens.
+       */
+      input_text_tokens?: number;
+
+      /**
+       * The aggregated number of uncached input tokens used across text, audio, and
+       * image inputs, excluding cache-write tokens.
+       */
+      input_uncached_tokens?: number;
 
       /**
        * When `group_by=model`, this field provides the model name of the grouped usage
@@ -3845,6 +4219,16 @@ export namespace UsageImagesResponse {
        * The aggregated number of audio output tokens used.
        */
       output_audio_tokens?: number;
+
+      /**
+       * The aggregated number of image output tokens used.
+       */
+      output_image_tokens?: number;
+
+      /**
+       * The aggregated number of text output tokens used.
+       */
+      output_text_tokens?: number;
 
       /**
        * When `group_by=project_id`, this field provides the project ID of the grouped
@@ -4296,8 +4680,9 @@ export namespace UsageModerationsResponse {
      */
     export interface OrganizationUsageCompletionsResult {
       /**
-       * The aggregated number of text input tokens used, including cached tokens. For
-       * customers subscribe to scale tier, this includes scale tier tokens.
+       * The aggregated number of input tokens used, including cached and cache-write
+       * tokens. This includes text, audio, and image tokens. For customers subscribed to
+       * Scale Tier, this includes Scale Tier tokens.
        */
       input_tokens: number;
 
@@ -4309,8 +4694,9 @@ export namespace UsageModerationsResponse {
       object: 'organization.usage.completions.result';
 
       /**
-       * The aggregated number of text output tokens used. For customers subscribe to
-       * scale tier, this includes scale tier tokens.
+       * The aggregated number of output tokens used across text, audio, and image
+       * outputs. For customers subscribed to Scale Tier, this includes Scale Tier
+       * tokens.
        */
       output_tokens: number;
 
@@ -4327,16 +4713,52 @@ export namespace UsageModerationsResponse {
       batch?: boolean | null;
 
       /**
-       * The aggregated number of audio input tokens used, including cached tokens.
+       * The aggregated number of uncached audio input tokens used.
        */
       input_audio_tokens?: number;
 
       /**
-       * The aggregated number of text input tokens that has been cached from previous
-       * requests. For customers subscribe to scale tier, this includes scale tier
-       * tokens.
+       * The aggregated number of input tokens written to the cache.
+       */
+      input_cache_write_tokens?: number;
+
+      /**
+       * The aggregated number of cached audio input tokens used.
+       */
+      input_cached_audio_tokens?: number;
+
+      /**
+       * The aggregated number of cached image input tokens used.
+       */
+      input_cached_image_tokens?: number;
+
+      /**
+       * The aggregated number of cached text input tokens used.
+       */
+      input_cached_text_tokens?: number;
+
+      /**
+       * The aggregated number of cached input tokens used across text, audio, and image
+       * inputs. For customers subscribed to Scale Tier, this includes Scale Tier tokens.
        */
       input_cached_tokens?: number;
+
+      /**
+       * The aggregated number of uncached image input tokens used.
+       */
+      input_image_tokens?: number;
+
+      /**
+       * The aggregated number of uncached text input tokens used, excluding cache-write
+       * tokens.
+       */
+      input_text_tokens?: number;
+
+      /**
+       * The aggregated number of uncached input tokens used across text, audio, and
+       * image inputs, excluding cache-write tokens.
+       */
+      input_uncached_tokens?: number;
 
       /**
        * When `group_by=model`, this field provides the model name of the grouped usage
@@ -4348,6 +4770,16 @@ export namespace UsageModerationsResponse {
        * The aggregated number of audio output tokens used.
        */
       output_audio_tokens?: number;
+
+      /**
+       * The aggregated number of image output tokens used.
+       */
+      output_image_tokens?: number;
+
+      /**
+       * The aggregated number of text output tokens used.
+       */
+      output_text_tokens?: number;
 
       /**
        * When `group_by=project_id`, this field provides the project ID of the grouped
@@ -4799,8 +5231,9 @@ export namespace UsageVectorStoresResponse {
      */
     export interface OrganizationUsageCompletionsResult {
       /**
-       * The aggregated number of text input tokens used, including cached tokens. For
-       * customers subscribe to scale tier, this includes scale tier tokens.
+       * The aggregated number of input tokens used, including cached and cache-write
+       * tokens. This includes text, audio, and image tokens. For customers subscribed to
+       * Scale Tier, this includes Scale Tier tokens.
        */
       input_tokens: number;
 
@@ -4812,8 +5245,9 @@ export namespace UsageVectorStoresResponse {
       object: 'organization.usage.completions.result';
 
       /**
-       * The aggregated number of text output tokens used. For customers subscribe to
-       * scale tier, this includes scale tier tokens.
+       * The aggregated number of output tokens used across text, audio, and image
+       * outputs. For customers subscribed to Scale Tier, this includes Scale Tier
+       * tokens.
        */
       output_tokens: number;
 
@@ -4830,16 +5264,52 @@ export namespace UsageVectorStoresResponse {
       batch?: boolean | null;
 
       /**
-       * The aggregated number of audio input tokens used, including cached tokens.
+       * The aggregated number of uncached audio input tokens used.
        */
       input_audio_tokens?: number;
 
       /**
-       * The aggregated number of text input tokens that has been cached from previous
-       * requests. For customers subscribe to scale tier, this includes scale tier
-       * tokens.
+       * The aggregated number of input tokens written to the cache.
+       */
+      input_cache_write_tokens?: number;
+
+      /**
+       * The aggregated number of cached audio input tokens used.
+       */
+      input_cached_audio_tokens?: number;
+
+      /**
+       * The aggregated number of cached image input tokens used.
+       */
+      input_cached_image_tokens?: number;
+
+      /**
+       * The aggregated number of cached text input tokens used.
+       */
+      input_cached_text_tokens?: number;
+
+      /**
+       * The aggregated number of cached input tokens used across text, audio, and image
+       * inputs. For customers subscribed to Scale Tier, this includes Scale Tier tokens.
        */
       input_cached_tokens?: number;
+
+      /**
+       * The aggregated number of uncached image input tokens used.
+       */
+      input_image_tokens?: number;
+
+      /**
+       * The aggregated number of uncached text input tokens used, excluding cache-write
+       * tokens.
+       */
+      input_text_tokens?: number;
+
+      /**
+       * The aggregated number of uncached input tokens used across text, audio, and
+       * image inputs, excluding cache-write tokens.
+       */
+      input_uncached_tokens?: number;
 
       /**
        * When `group_by=model`, this field provides the model name of the grouped usage
@@ -4851,6 +5321,16 @@ export namespace UsageVectorStoresResponse {
        * The aggregated number of audio output tokens used.
        */
       output_audio_tokens?: number;
+
+      /**
+       * The aggregated number of image output tokens used.
+       */
+      output_image_tokens?: number;
+
+      /**
+       * The aggregated number of text output tokens used.
+       */
+      output_text_tokens?: number;
 
       /**
        * When `group_by=project_id`, this field provides the project ID of the grouped
@@ -5302,8 +5782,9 @@ export namespace UsageWebSearchCallsResponse {
      */
     export interface OrganizationUsageCompletionsResult {
       /**
-       * The aggregated number of text input tokens used, including cached tokens. For
-       * customers subscribe to scale tier, this includes scale tier tokens.
+       * The aggregated number of input tokens used, including cached and cache-write
+       * tokens. This includes text, audio, and image tokens. For customers subscribed to
+       * Scale Tier, this includes Scale Tier tokens.
        */
       input_tokens: number;
 
@@ -5315,8 +5796,9 @@ export namespace UsageWebSearchCallsResponse {
       object: 'organization.usage.completions.result';
 
       /**
-       * The aggregated number of text output tokens used. For customers subscribe to
-       * scale tier, this includes scale tier tokens.
+       * The aggregated number of output tokens used across text, audio, and image
+       * outputs. For customers subscribed to Scale Tier, this includes Scale Tier
+       * tokens.
        */
       output_tokens: number;
 
@@ -5333,16 +5815,52 @@ export namespace UsageWebSearchCallsResponse {
       batch?: boolean | null;
 
       /**
-       * The aggregated number of audio input tokens used, including cached tokens.
+       * The aggregated number of uncached audio input tokens used.
        */
       input_audio_tokens?: number;
 
       /**
-       * The aggregated number of text input tokens that has been cached from previous
-       * requests. For customers subscribe to scale tier, this includes scale tier
-       * tokens.
+       * The aggregated number of input tokens written to the cache.
+       */
+      input_cache_write_tokens?: number;
+
+      /**
+       * The aggregated number of cached audio input tokens used.
+       */
+      input_cached_audio_tokens?: number;
+
+      /**
+       * The aggregated number of cached image input tokens used.
+       */
+      input_cached_image_tokens?: number;
+
+      /**
+       * The aggregated number of cached text input tokens used.
+       */
+      input_cached_text_tokens?: number;
+
+      /**
+       * The aggregated number of cached input tokens used across text, audio, and image
+       * inputs. For customers subscribed to Scale Tier, this includes Scale Tier tokens.
        */
       input_cached_tokens?: number;
+
+      /**
+       * The aggregated number of uncached image input tokens used.
+       */
+      input_image_tokens?: number;
+
+      /**
+       * The aggregated number of uncached text input tokens used, excluding cache-write
+       * tokens.
+       */
+      input_text_tokens?: number;
+
+      /**
+       * The aggregated number of uncached input tokens used across text, audio, and
+       * image inputs, excluding cache-write tokens.
+       */
+      input_uncached_tokens?: number;
 
       /**
        * When `group_by=model`, this field provides the model name of the grouped usage
@@ -5354,6 +5872,16 @@ export namespace UsageWebSearchCallsResponse {
        * The aggregated number of audio output tokens used.
        */
       output_audio_tokens?: number;
+
+      /**
+       * The aggregated number of image output tokens used.
+       */
+      output_image_tokens?: number;
+
+      /**
+       * The aggregated number of text output tokens used.
+       */
+      output_text_tokens?: number;
 
       /**
        * When `group_by=project_id`, this field provides the project ID of the grouped
