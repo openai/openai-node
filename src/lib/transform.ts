@@ -127,6 +127,10 @@ export function forEachJSONSchemaChild(
 
 export function toStrictJsonSchema(schema: JSONSchema): JSONSchema {
   const schemaCopy = structuredClone(schema);
+  // JSON serialization omits undefined object properties. Drop optional
+  // placeholders before any structural checks so they cannot accidentally
+  // look like validation-bearing schema keywords.
+  stripUndefinedSchemaKeywords(schemaCopy);
   normalizeSingletonTypeArrays(schemaCopy);
   // Root ref/allOf normalization can promote a nested branch into the root.
   // Reject separate resource scopes while their original nesting is still
@@ -158,6 +162,27 @@ export function toStrictJsonSchema(schema: JSONSchema): JSONSchema {
   const strictSchema = ensureStrictJsonSchema(schemaCopy, [], schemaCopy);
   validateRefSchemas(strictSchema, [], strictSchema);
   return strictSchema;
+}
+
+function stripUndefinedSchemaKeywords(
+  schema: JSONSchemaDefinition,
+  visited: Set<JSONSchema> = new Set(),
+): void {
+  if (typeof schema === 'boolean' || !isObject(schema) || visited.has(schema)) {
+    return;
+  }
+  visited.add(schema);
+
+  const schemaRecord = schema as Record<string, unknown>;
+  for (const keyword of Object.keys(schemaRecord)) {
+    if (schemaRecord[keyword] === undefined) {
+      delete schemaRecord[keyword];
+    }
+  }
+
+  forEachJSONSchemaChild(schema, [], (child) => {
+    stripUndefinedSchemaKeywords(child as JSONSchemaDefinition, visited);
+  });
 }
 
 /**
@@ -1167,6 +1192,23 @@ function normalizeObjectAllOfBranches(schema: JSONSchemaDefinition, path: string
   });
 }
 
+/**
+ * Standard Schema needs to prove oneOf branches exclusive before it rewrites
+ * them to anyOf. Inspect a cloned branch through the same conservative object
+ * allOf merger without mutating the caller's schema or broadening failures.
+ */
+export function normalizeObjectAllOfForExclusivity(
+  schema: JSONSchema,
+  root: JSONSchema,
+): JSONSchema | undefined {
+  const normalized = structuredClone(schema);
+  try {
+    return mergeObjectAllOf(normalized, [], root) ? normalized : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function mergeObjectAllOf(jsonSchema: JSONSchema, path: string[], root: JSONSchema): boolean {
   const allOf = jsonSchema.allOf;
   if (!Array.isArray(allOf) || allOf.length === 0) {
@@ -1256,6 +1298,7 @@ function mergeObjectAllOf(jsonSchema: JSONSchema, path: string[], root: JSONSche
   let sawProperties = false;
   let sawRequired = false;
   let hasExplicitObjectType = false;
+  let hasExplicitNullableObjectType = false;
 
   const mergeAnnotations = (schema: JSONSchema) => {
     for (const keyword of JSON_SCHEMA_ANNOTATION_KEYWORDS) {
@@ -1278,7 +1321,12 @@ function mergeObjectAllOf(jsonSchema: JSONSchema, path: string[], root: JSONSche
   for (const branch of branches) {
     for (const keyword of Object.keys(branch)) {
       if (keyword === 'allOf' && branch === jsonSchema) continue;
-      if ((keyword === '$defs' || keyword === 'definitions') && branch === jsonSchema) continue;
+      if (
+        (keyword === '$defs' || keyword === 'definitions') &&
+        isObject((branch as Record<string, unknown>)[keyword])
+      ) {
+        continue;
+      }
       if (branch === jsonSchema && path.length === 0 && JSON_SCHEMA_ROOT_METADATA_KEYWORDS.has(keyword)) {
         continue;
       }
@@ -1288,10 +1336,14 @@ function mergeObjectAllOf(jsonSchema: JSONSchema, path: string[], root: JSONSche
     }
 
     if (branch.type !== undefined) {
-      if (branch.type !== 'object') {
+      if (!isMergeableObjectType(branch.type)) {
         fail();
       }
-      hasExplicitObjectType = true;
+      if (branch.type === 'object') {
+        hasExplicitObjectType = true;
+      } else {
+        hasExplicitNullableObjectType = true;
+      }
     }
 
     if (branch.properties !== undefined) {
@@ -1331,7 +1383,9 @@ function mergeObjectAllOf(jsonSchema: JSONSchema, path: string[], root: JSONSche
     fail();
   }
 
-  if (hasExplicitObjectType) merged.type = 'object';
+  if (hasExplicitObjectType || hasExplicitNullableObjectType) {
+    merged.type = hasExplicitObjectType ? 'object' : ['object', 'null'];
+  }
   if (sawProperties) merged.properties = Object.fromEntries(Object.entries(mergedProperties));
   if (sawRequired) merged.required = [...mergedRequired];
   if (closedPropertySets.length > 0) merged.additionalProperties = false;
@@ -1345,9 +1399,16 @@ function mergeObjectAllOf(jsonSchema: JSONSchema, path: string[], root: JSONSche
 
 function hasObjectShapeWithoutAllOf(schema: JSONSchema): boolean {
   if (schema.type !== undefined) {
-    return schema.type === 'object';
+    return isMergeableObjectType(schema.type);
   }
   return Object.keys(schema).some((keyword) => JSON_SCHEMA_OBJECT_KEYWORDS.has(keyword));
+}
+
+function isMergeableObjectType(type: JSONSchema['type']): boolean {
+  return (
+    type === 'object' ||
+    (Array.isArray(type) && type.length === 2 && type.includes('object') && type.includes('null'))
+  );
 }
 
 function schemasEqual(left: unknown, right: unknown): boolean {

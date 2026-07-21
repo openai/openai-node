@@ -1132,6 +1132,23 @@ describe('toStrictJsonSchema', () => {
       });
     });
 
+    test('ignores undefined object-keyword placeholders when normalizing unions', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          value: {
+            properties: undefined,
+            anyOf: [{ type: 'string' }, { type: 'number' }],
+          },
+        },
+        required: ['value'],
+      };
+
+      expect(toStrictJsonSchema(schema).properties?.['value']).toEqual({
+        anyOf: [{ type: 'string' }, { type: 'number' }],
+      });
+    });
+
     test('rejects tuple-form items before returning a strict schema', () => {
       const schema: JSONSchema = {
         type: 'object',
@@ -1885,6 +1902,79 @@ describe('toStrictJsonSchema', () => {
         type: 'object',
         $comment: 'Generated alias',
         description: 'Name fields',
+        properties: { name: { type: 'string' }, age: { type: 'number' } },
+        required: ['name', 'age'],
+        additionalProperties: false,
+      });
+    });
+
+    test.each(['$defs', 'definitions'] as const)(
+      'merges ref-backed object allOf variants with scoped %s maps',
+      (keyword) => {
+        const schema = {
+          type: 'object',
+          [keyword]: {
+            Name: {
+              type: 'object',
+              [keyword]: {
+                Value: { type: 'string' },
+              },
+              properties: {
+                name: { $ref: `#/${keyword}/Name/${keyword}/Value` },
+              },
+              required: ['name'],
+            },
+            Age: {
+              type: 'object',
+              properties: { age: { type: 'number' } },
+              required: ['age'],
+            },
+          },
+          properties: {
+            value: {
+              type: 'object',
+              allOf: [{ $ref: `#/${keyword}/Name` }, { $ref: `#/${keyword}/Age` }],
+            },
+          },
+          required: ['value'],
+        } as JSONSchema;
+
+        expect(toStrictJsonSchema(schema).properties?.['value']).toMatchObject({
+          type: 'object',
+          properties: {
+            name: { $ref: `#/${keyword}/Name/${keyword}/Value` },
+            age: { type: 'number' },
+          },
+          required: ['name', 'age'],
+          additionalProperties: false,
+        });
+      },
+    );
+
+    test('merges compatible nullable object allOf variants', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          value: {
+            allOf: [
+              {
+                type: ['object', 'null'],
+                properties: { name: { type: 'string' } },
+                required: ['name'],
+              },
+              {
+                type: ['object', 'null'],
+                properties: { age: { type: 'number' } },
+                required: ['age'],
+              },
+            ],
+          },
+        },
+        required: ['value'],
+      };
+
+      expect(toStrictJsonSchema(schema).properties?.['value']).toEqual({
+        type: ['object', 'null'],
         properties: { name: { type: 'string' }, age: { type: 'number' } },
         required: ['name', 'age'],
         additionalProperties: false,

@@ -13,6 +13,7 @@ import {
   assertNoNestedSchemaIds,
   forEachJSONSchemaChild,
   hasOnlyRefAndAnnotations,
+  normalizeObjectAllOfForExclusivity,
   resolveLocalRef,
   rewriteLocalRefsIntoMovedOneOfBranches,
   toStrictJsonSchema,
@@ -251,20 +252,27 @@ function resolveLocalRefForExclusivity(
 
   const record = schema as Record<string, unknown>;
   const ref = record['$ref'];
-  if (ref === undefined) return schema;
+  if (ref !== undefined) {
+    // Annotation keywords do not affect Draft 7 validation, so they are safe
+    // to retain while proving the referenced branches are mutually exclusive.
+    // Keep the proof conservative for every other sibling constraint.
+    if (typeof ref !== 'string' || !hasOnlyRefAndAnnotations(record as JSONSchema)) {
+      return undefined;
+    }
+    if (seenRefs.has(ref)) return undefined;
 
-  // Annotation keywords do not affect Draft 7 validation, so they are safe to
-  // retain while proving the referenced branches are mutually exclusive.
-  // Keep the proof conservative for every other sibling constraint.
-  if (typeof ref !== 'string' || !hasOnlyRefAndAnnotations(record as JSONSchema)) {
-    return undefined;
+    const resolved = resolveLocalRef(root, ref);
+    if (resolved === undefined) return undefined;
+
+    return resolveLocalRefForExclusivity(resolved, root, new Set([...seenRefs, ref]));
   }
-  if (seenRefs.has(ref)) return undefined;
 
-  const resolved = resolveLocalRef(root, ref);
-  if (resolved === undefined) return undefined;
+  if (record['allOf'] !== undefined) {
+    if (!Array.isArray(record['allOf'])) return undefined;
+    return normalizeObjectAllOfForExclusivity(record as JSONSchema, root);
+  }
 
-  return resolveLocalRefForExclusivity(resolved, root, new Set([...seenRefs, ref]));
+  return schema;
 }
 
 function areOneOfBranchesMutuallyExclusive(branches: unknown[], root: JSONSchema): boolean {

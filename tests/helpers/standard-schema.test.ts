@@ -460,6 +460,67 @@ describe('Standard Schema helpers', () => {
     expect(JSON.stringify(schema)).not.toContain('"oneOf"');
   });
 
+  it('inspects mergeable allOf branches when proving oneOf exclusivity', () => {
+    const { standardSchema } = makeStandardSchema({
+      type: 'object',
+      properties: {
+        choice: {
+          oneOf: [
+            {
+              allOf: [
+                {
+                  type: 'object',
+                  properties: { foo: { type: 'string' } },
+                  required: ['foo'],
+                },
+                {
+                  type: 'object',
+                  properties: { kind: { type: 'string', const: 'foo' } },
+                  required: ['kind'],
+                },
+              ],
+            },
+            {
+              allOf: [
+                {
+                  type: 'object',
+                  properties: { bar: { type: 'number' } },
+                  required: ['bar'],
+                },
+                {
+                  type: 'object',
+                  properties: { kind: { type: 'string', const: 'bar' } },
+                  required: ['kind'],
+                },
+              ],
+            },
+          ],
+        },
+      },
+      required: ['choice'],
+    });
+
+    const schema = standardResponseFormat(standardSchema, 'choice').json_schema.schema;
+
+    expect(schema).toMatchObject({
+      properties: {
+        choice: {
+          anyOf: [
+            {
+              type: 'object',
+              properties: { kind: { type: 'string', const: 'foo' }, foo: { type: 'string' } },
+            },
+            {
+              type: 'object',
+              properties: { kind: { type: 'string', const: 'bar' }, bar: { type: 'number' } },
+            },
+          ],
+        },
+      },
+    });
+    expect(JSON.stringify(schema)).not.toContain('"oneOf"');
+  });
+
   it('drops validation-neutral empty object keywords when normalizing oneOf wrappers', () => {
     const { standardSchema } = makeStandardSchema({
       type: 'object',
