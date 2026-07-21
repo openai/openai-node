@@ -290,7 +290,7 @@ describe('toStrictJsonSchema', () => {
       expect(toStrictJsonSchema(schema).required).toEqual(['nickname']);
     });
 
-    test('resolves local refs with annotation-only siblings when checking nullable optional properties', () => {
+    test('resolves local refs with $comment and other annotation-only siblings', () => {
       const schema: JSONSchema = {
         type: 'object',
         $defs: {
@@ -299,6 +299,7 @@ describe('toStrictJsonSchema', () => {
         properties: {
           nickname: {
             $ref: '#/$defs/NullableString',
+            $comment: 'Generated alias',
             title: 'Nickname',
             description: 'A preferred name',
             default: null,
@@ -312,6 +313,7 @@ describe('toStrictJsonSchema', () => {
       expect(strict.required).toEqual(['nickname']);
       expect(strict.properties?.['nickname']).toEqual({
         $ref: '#/$defs/NullableString',
+        $comment: 'Generated alias',
         title: 'Nickname',
         description: 'A preferred name',
         examples: [null],

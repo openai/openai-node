@@ -380,7 +380,7 @@ describe('Standard Schema helpers', () => {
       properties: {
         choice: {
           oneOf: [
-            { $ref: '#/$defs/foo', description: 'Foo choice' },
+            { $ref: '#/$defs/foo', $comment: 'Generated foo alias', description: 'Foo choice' },
             { $ref: '#/$defs/bar', title: 'Bar choice' },
           ],
         },
@@ -392,7 +392,7 @@ describe('Standard Schema helpers', () => {
       properties: {
         choice: {
           anyOf: [
-            { $ref: '#/$defs/foo', description: 'Foo choice' },
+            { $ref: '#/$defs/foo', $comment: 'Generated foo alias', description: 'Foo choice' },
             { $ref: '#/$defs/bar', title: 'Bar choice' },
           ],
         },

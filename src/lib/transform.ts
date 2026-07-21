@@ -1,6 +1,7 @@
 import type { JSONSchema, JSONSchemaDefinition } from './jsonschema';
 
 const JSON_SCHEMA_ANNOTATION_KEYWORDS = new Set([
+  '$comment',
   'default',
   'description',
   'examples',
