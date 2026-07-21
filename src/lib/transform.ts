@@ -20,6 +20,39 @@ const JSON_SCHEMA_OBJECT_KEYWORDS = new Set([
   'required',
 ]);
 
+const JSON_SCHEMA_SINGLE_SCHEMA_KEYWORDS = [
+  'additionalItems',
+  'additionalProperties',
+  'contains',
+  'contentSchema',
+  'else',
+  'if',
+  'not',
+  'propertyNames',
+  'then',
+  'unevaluatedItems',
+  'unevaluatedProperties',
+];
+
+const JSON_SCHEMA_ARRAY_SCHEMA_KEYWORDS = ['allOf', 'anyOf', 'items', 'oneOf', 'prefixItems'];
+
+const JSON_SCHEMA_MAP_SCHEMA_KEYWORDS = [
+  '$defs',
+  'definitions',
+  'dependentSchemas',
+  'dependencies',
+  'patternProperties',
+  'properties',
+];
+
+const MERGEABLE_OBJECT_ALL_OF_KEYWORDS = new Set([
+  ...JSON_SCHEMA_ANNOTATION_KEYWORDS,
+  'additionalProperties',
+  'properties',
+  'required',
+  'type',
+]);
+
 export function toStrictJsonSchema(schema: JSONSchema): JSONSchema {
   if (schema.type !== 'object') {
     throw new Error(
@@ -28,6 +61,7 @@ export function toStrictJsonSchema(schema: JSONSchema): JSONSchema {
   }
 
   const schemaCopy = structuredClone(schema);
+  validateRefSchemas(schemaCopy, []);
   return ensureStrictJsonSchema(schemaCopy, [], schemaCopy);
 }
 
@@ -143,16 +177,19 @@ function ensureStrictJsonSchema(
     }
   }
 
+  // Closing each object branch in an allOf independently changes the
+  // intersection: sibling branches' properties become forbidden extras. Merge
+  // the small object-intersection subset that can be represented exactly before
+  // applying strict object closure, and fail closed for the rest.
+  if (mergeObjectAllOf(jsonSchema, path)) {
+    return ensureStrictJsonSchema(jsonSchema, path, root);
+  }
+
   // Add additionalProperties: false to object schemas. Draft 7 permits object
   // keywords without an explicit type, so those implicit object shapes need
   // the same strict handling as type: 'object'. Explicitly open object schemas
   // cannot be represented in Structured Outputs strict mode.
-  const typ = jsonSchema.type;
-  if (
-    typ === 'object' ||
-    (Array.isArray(typ) && typ.includes('object')) ||
-    (typ === undefined && hasObjectKeywords(jsonSchema))
-  ) {
+  if (hasObjectShape(jsonSchema)) {
     if (!('additionalProperties' in jsonSchema)) {
       jsonSchema.additionalProperties = false;
     } else if (jsonSchema.additionalProperties !== false) {
@@ -165,9 +202,25 @@ function ensureStrictJsonSchema(
   }
 
   const required = jsonSchema.required ?? [];
+  if (!Array.isArray(required) || required.some((key) => typeof key !== 'string')) {
+    throw new TypeError(
+      `Expected \`required\` to be an array of strings; path=${path.join('/') || '<root>'}`,
+    );
+  }
 
   // Handle object properties
   const properties = jsonSchema.properties;
+  if (hasObjectShape(jsonSchema)) {
+    for (const key of required) {
+      if (!isObject(properties) || !Object.prototype.hasOwnProperty.call(properties, key)) {
+        throw new Error(
+          `Object schema at \`${
+            path.join('/') || '<root>'
+          }\` requires property \`${key}\` but does not declare it in \`properties\`.`,
+        );
+      }
+    }
+  }
   if (isObject(properties)) {
     for (const [key, value] of Object.entries(properties)) {
       if (!isNullable(value, root) && !required.includes(key)) {
@@ -195,6 +248,28 @@ function ensureStrictJsonSchema(
     );
   } else if (items !== undefined) {
     jsonSchema.items = ensureStrictJsonSchema(items, [...path, 'items'], root);
+  }
+
+  // Draft 7 only applies additionalItems to tuple-style items arrays. Recurse
+  // into schema-valued extras so nested objects are strictified too; reject an
+  // ignored additionalItems rather than sending a keyword whose semantics may
+  // differ under Structured Outputs.
+  const additionalItems = jsonSchema.additionalItems;
+  if (additionalItems !== undefined) {
+    if (!Array.isArray(items)) {
+      throw new Error(
+        `Schema at \`${
+          path.join('/') || '<root>'
+        }\` uses \`additionalItems\` without tuple \`items\`, which cannot be represented in strict Structured Outputs.`,
+      );
+    }
+    if (typeof additionalItems !== 'boolean') {
+      jsonSchema.additionalItems = ensureStrictJsonSchema(
+        additionalItems,
+        [...path, 'additionalItems'],
+        root,
+      );
+    }
   }
 
   // Handle unions (anyOf)
@@ -229,10 +304,6 @@ function ensureStrictJsonSchema(
   // Handle $ref with additional properties
   const ref = (jsonSchema as any).$ref;
   if (ref && hasMoreThanNKeys(jsonSchema, 1)) {
-    if (typeof ref !== 'string') {
-      throw new TypeError(`Received non-string $ref - ${ref}; path=${path.join('/')}`);
-    }
-
     const resolved = resolveRef(root, ref);
     if (typeof resolved === 'boolean') {
       throw new Error(`Expected \`$ref: ${ref}\` to resolve to an object schema but got boolean`);
@@ -256,22 +327,13 @@ function ensureStrictJsonSchema(
 }
 
 function resolveRef(root: JSONSchema, ref: string): JSONSchemaDefinition {
-  if (!ref.startsWith('#/')) {
-    throw new Error(`Unexpected $ref format ${JSON.stringify(ref)}; Does not start with #/`);
+  if (ref === '#') {
+    throw new Error('Cannot inline a root `$ref` with sibling annotations');
   }
 
-  const pathParts = ref.slice(2).split('/');
-  let resolved: any = root;
-
-  for (const key of pathParts) {
-    if (!isObject(resolved)) {
-      throw new Error(`encountered non-object entry while resolving ${ref} - ${JSON.stringify(resolved)}`);
-    }
-    const value = resolved[key];
-    if (value === undefined) {
-      throw new Error(`Key ${key} not found while resolving ${ref}`);
-    }
-    resolved = value;
+  const resolved = resolveLocalRef(root, ref);
+  if (resolved === undefined) {
+    throw new Error(`Key not found while resolving ${ref}`);
   }
 
   return resolved;
@@ -315,6 +377,229 @@ function hasOnlyAnnotationSiblings(schema: JSONSchema, keyword: string): boolean
 
 function hasObjectKeywords(schema: JSONSchema): boolean {
   return Object.keys(schema).some((keyword) => JSON_SCHEMA_OBJECT_KEYWORDS.has(keyword));
+}
+
+function hasObjectShape(schema: JSONSchema): boolean {
+  const typ = schema.type;
+  return (
+    typ === 'object' ||
+    (Array.isArray(typ) && typ.includes('object')) ||
+    (typ === undefined && hasObjectKeywords(schema))
+  );
+}
+
+function validateRefSchemas(schema: JSONSchemaDefinition, path: string[]): void {
+  if (typeof schema === 'boolean' || !isObject(schema)) {
+    return;
+  }
+
+  const ref = schema.$ref;
+  if (ref !== undefined) {
+    if (typeof ref !== 'string') {
+      throw new TypeError(`Received non-string $ref - ${ref}; path=${path.join('/')}`);
+    }
+    if (ref !== '#' && !ref.startsWith('#/')) {
+      throw new Error(
+        `External $ref at \`${
+          path.join('/') || '<root>'
+        }\` is not supported in strict Structured Outputs: ${JSON.stringify(ref)}`,
+      );
+    }
+    if (!hasOnlyRefAndAnnotations(schema)) {
+      throw new Error(
+        `Schema $ref at \`${
+          path.join('/') || '<root>'
+        }\` has non-annotation siblings that Draft 7 ignores and cannot be represented in strict Structured Outputs.`,
+      );
+    }
+  }
+
+  for (const keyword of JSON_SCHEMA_SINGLE_SCHEMA_KEYWORDS) {
+    validateRefSchemas((schema as any)[keyword], [...path, keyword]);
+  }
+
+  for (const keyword of JSON_SCHEMA_ARRAY_SCHEMA_KEYWORDS) {
+    const children = (schema as any)[keyword];
+    if (Array.isArray(children)) {
+      for (const [index, child] of children.entries()) {
+        validateRefSchemas(child, [...path, keyword, String(index)]);
+      }
+    } else {
+      validateRefSchemas(children, [...path, keyword]);
+    }
+  }
+
+  for (const keyword of JSON_SCHEMA_MAP_SCHEMA_KEYWORDS) {
+    const children = (schema as any)[keyword];
+    if (isObject(children)) {
+      for (const [key, child] of Object.entries(children)) {
+        validateRefSchemas(child as JSONSchemaDefinition, [...path, keyword, key]);
+      }
+    }
+  }
+}
+
+function mergeObjectAllOf(jsonSchema: JSONSchema, path: string[]): boolean {
+  const allOf = jsonSchema.allOf;
+  if (!Array.isArray(allOf) || allOf.length === 0) {
+    return false;
+  }
+
+  const parentHasObjectShape = hasObjectShapeWithoutAllOf(jsonSchema);
+  const objectBranches = allOf.filter(
+    (entry): entry is JSONSchema => isObject(entry) && hasObjectShapeWithoutAllOf(entry),
+  );
+  if (!parentHasObjectShape && objectBranches.length === 0) {
+    return false;
+  }
+  // A lone object branch with no object-valued parent is handled by the
+  // existing safe single-allOf flattening path below.
+  if (!parentHasObjectShape && allOf.length === 1) {
+    return false;
+  }
+
+  const fail = (): never => {
+    throw new Error(
+      `Object allOf at \`${
+        path.join('/') || '<root>'
+      }\` cannot be merged without changing Draft 7 validation.`,
+    );
+  };
+
+  if (
+    !parentHasObjectShape &&
+    ['additionalProperties', 'properties', 'required', 'type'].some((keyword) => keyword in jsonSchema)
+  ) {
+    fail();
+  }
+
+  for (const keyword of Object.keys(jsonSchema)) {
+    if (
+      keyword !== 'allOf' &&
+      keyword !== '$defs' &&
+      keyword !== 'definitions' &&
+      !MERGEABLE_OBJECT_ALL_OF_KEYWORDS.has(keyword)
+    ) {
+      fail();
+    }
+  }
+
+  const branches: JSONSchema[] = [];
+  if (parentHasObjectShape) {
+    branches.push(jsonSchema);
+  }
+  for (const entry of allOf) {
+    if (!isObject(entry)) {
+      fail();
+    }
+    const branch = entry as JSONSchema;
+    if (hasObjectShapeWithoutAllOf(branch)) {
+      branches.push(branch);
+    } else if (!Object.keys(branch).every((keyword) => JSON_SCHEMA_ANNOTATION_KEYWORDS.has(keyword))) {
+      fail();
+    }
+  }
+
+  const merged: JSONSchema = {};
+  for (const keyword of ['$defs', 'definitions'] as const) {
+    if (jsonSchema[keyword] !== undefined) {
+      merged[keyword] = jsonSchema[keyword];
+    }
+  }
+
+  const mergedProperties: Record<string, JSONSchemaDefinition> = {};
+  const mergedRequired = new Set<string>();
+  const closedPropertySets: Set<string>[] = [];
+  let sawProperties = false;
+  let sawRequired = false;
+  let hasExplicitObjectType = false;
+
+  const mergeAnnotations = (schema: JSONSchema) => {
+    for (const keyword of JSON_SCHEMA_ANNOTATION_KEYWORDS) {
+      if (!(keyword in schema)) continue;
+      if (keyword in merged && !schemasEqual((merged as any)[keyword], (schema as any)[keyword])) {
+        fail();
+      }
+      (merged as any)[keyword] = (schema as any)[keyword];
+    }
+  };
+
+  mergeAnnotations(jsonSchema);
+  for (const entry of allOf) {
+    if (isObject(entry)) mergeAnnotations(entry);
+  }
+
+  for (const branch of branches) {
+    for (const keyword of Object.keys(branch)) {
+      if (keyword === 'allOf' && branch === jsonSchema) continue;
+      if ((keyword === '$defs' || keyword === 'definitions') && branch === jsonSchema) continue;
+      if (!MERGEABLE_OBJECT_ALL_OF_KEYWORDS.has(keyword)) {
+        fail();
+      }
+    }
+
+    if (branch.type !== undefined) {
+      if (branch.type !== 'object') {
+        fail();
+      }
+      hasExplicitObjectType = true;
+    }
+
+    if (branch.properties !== undefined) {
+      if (!isObject(branch.properties)) {
+        fail();
+      }
+      sawProperties = true;
+      for (const [key, propertySchema] of Object.entries(branch.properties)) {
+        if (key in mergedProperties && !schemasEqual(mergedProperties[key], propertySchema)) {
+          fail();
+        }
+        mergedProperties[key] = propertySchema;
+      }
+    }
+
+    if (branch.required !== undefined) {
+      if (!Array.isArray(branch.required) || branch.required.some((key) => typeof key !== 'string')) {
+        fail();
+      }
+      sawRequired = true;
+      for (const key of branch.required) mergedRequired.add(key);
+    }
+
+    if ('additionalProperties' in branch) {
+      if (branch.additionalProperties !== false) {
+        fail();
+      }
+      closedPropertySets.push(new Set(Object.keys(branch.properties ?? {})));
+    }
+  }
+
+  const mergedPropertyNames = Object.keys(mergedProperties);
+  if (closedPropertySets.some((keys) => mergedPropertyNames.some((key) => !keys.has(key)))) {
+    fail();
+  }
+
+  if (hasExplicitObjectType) merged.type = 'object';
+  if (sawProperties) merged.properties = mergedProperties;
+  if (sawRequired) merged.required = [...mergedRequired];
+  if (closedPropertySets.length > 0) merged.additionalProperties = false;
+
+  for (const keyword of Object.keys(jsonSchema)) {
+    delete (jsonSchema as any)[keyword];
+  }
+  Object.assign(jsonSchema, merged);
+  return true;
+}
+
+function hasObjectShapeWithoutAllOf(schema: JSONSchema): boolean {
+  if (schema.type !== undefined) {
+    return schema.type === 'object';
+  }
+  return Object.keys(schema).some((keyword) => JSON_SCHEMA_OBJECT_KEYWORDS.has(keyword));
+}
+
+function schemasEqual(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
 }
 
 function hasMoreThanNKeys(obj: Record<string, any>, n: number): boolean {

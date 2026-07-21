@@ -320,9 +320,7 @@ describe('toStrictJsonSchema', () => {
 
     test.each([
       ['missing', { $ref: '#/$defs/Missing' }],
-      ['external', { $ref: 'https://example.com/schema.json#/$defs/NullableString' }],
       ['cyclic', { $ref: '#/$defs/Cyclic' }],
-      ['sibling-constrained', { $ref: '#/$defs/NullableString', type: 'string' }],
     ])('conservatively rejects %s refs when checking nullable optional properties', (_name, property) => {
       const schema: JSONSchema = {
         type: 'object',
@@ -337,6 +335,49 @@ describe('toStrictJsonSchema', () => {
 
       expect(() => toStrictJsonSchema(schema)).toThrow(
         'Schema field at `properties/nickname` uses `.optional()` without `.nullable()`',
+      );
+    });
+
+    test('rejects external refs before returning a strict schema', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          nickname: { $ref: 'https://example.com/schema.json#/$defs/NullableString' },
+        },
+        required: ['nickname'],
+      };
+
+      expect(() => toStrictJsonSchema(schema)).toThrow(
+        'External $ref at `properties/nickname` is not supported in strict Structured Outputs',
+      );
+    });
+
+    test.each([false, true])('rejects Draft 7 validation siblings on %s $ref properties', (isRequired) => {
+      const schema: JSONSchema = {
+        type: 'object',
+        $defs: {
+          Text: { type: 'string' },
+        },
+        properties: {
+          value: { $ref: '#/$defs/Text', type: 'number' },
+        },
+        ...(isRequired ? { required: ['value'] } : {}),
+      };
+
+      expect(() => toStrictJsonSchema(schema)).toThrow('has non-annotation siblings that Draft 7 ignores');
+    });
+
+    test('rejects required properties missing from properties', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+        },
+        required: ['name', 'age'],
+      };
+
+      expect(() => toStrictJsonSchema(schema)).toThrow(
+        'requires property `age` but does not declare it in `properties`',
       );
     });
 
@@ -475,6 +516,42 @@ describe('toStrictJsonSchema', () => {
                 ],
               },
             ],
+          },
+        },
+        required: ['tuple'],
+        additionalProperties: false,
+      });
+    });
+
+    test('processes schema-valued additionalItems recursively', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          tuple: {
+            type: 'array',
+            items: [{ type: 'string' }],
+            additionalItems: {
+              type: 'object',
+              properties: { name: { type: 'string' } },
+              required: ['name'],
+            },
+          },
+        },
+        required: ['tuple'],
+      };
+
+      expect(toStrictJsonSchema(schema)).toEqual({
+        type: 'object',
+        properties: {
+          tuple: {
+            type: 'array',
+            items: [{ type: 'string' }],
+            additionalItems: {
+              type: 'object',
+              properties: { name: { type: 'string' } },
+              required: ['name'],
+              additionalProperties: false,
+            },
           },
         },
         required: ['tuple'],
@@ -635,7 +712,7 @@ describe('toStrictJsonSchema', () => {
       });
     });
 
-    test('processes multiple allOf variants', () => {
+    test('merges compatible object allOf variants before closing them', () => {
       const schema: JSONSchema = {
         type: 'object',
         properties: {
@@ -657,30 +734,46 @@ describe('toStrictJsonSchema', () => {
         required: ['value'],
       };
 
-      const strict = toStrictJsonSchema(schema);
-      const diff = detailedDiff(schema, strict);
-
-      expect(diff).toMatchInlineSnapshot(`
-        {
-          "added": {
-            "additionalProperties": false,
-            "properties": {
-              "value": {
-                "allOf": {
-                  "0": {
-                    "additionalProperties": false,
-                  },
-                  "1": {
-                    "additionalProperties": false,
-                  },
-                },
-              },
-            },
+      expect(toStrictJsonSchema(schema)).toEqual({
+        type: 'object',
+        properties: {
+          value: {
+            type: 'object',
+            properties: { name: { type: 'string' }, age: { type: 'number' } },
+            required: ['name', 'age'],
+            additionalProperties: false,
           },
-          "deleted": {},
-          "updated": {},
-        }
-      `);
+        },
+        required: ['value'],
+        additionalProperties: false,
+      });
+    });
+
+    test('rejects object allOf variants that cannot be merged exactly', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          value: {
+            allOf: [
+              {
+                type: 'object',
+                properties: { shared: { type: 'string' } },
+                required: ['shared'],
+              },
+              {
+                type: 'object',
+                properties: { shared: { type: 'number' } },
+                required: ['shared'],
+              },
+            ],
+          },
+        },
+        required: ['value'],
+      };
+
+      expect(() => toStrictJsonSchema(schema)).toThrow(
+        'cannot be merged without changing Draft 7 validation',
+      );
     });
   });
 
