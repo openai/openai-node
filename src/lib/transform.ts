@@ -59,7 +59,9 @@ const JSON_SCHEMA_UNSUPPORTED_SCHEMA_KEYWORDS = new Set([
   'dependencies',
   'else',
   'if',
+  'maxContains',
   'maxProperties',
+  'minContains',
   'minProperties',
   'not',
   'patternProperties',
@@ -223,21 +225,6 @@ function inlineRootRefObject(schema: JSONSchema): void {
 
   const rootDefinitions = schema.$defs;
   const legacyDefinitions = schema.definitions;
-  for (const keyword of ['$defs', 'definitions'] as const) {
-    const rootDefinitionMap = schema[keyword];
-    const targetDefinitionMap = resolved[keyword];
-    if (
-      rootDefinitionMap !== undefined &&
-      targetDefinitionMap !== undefined &&
-      !schemasEqual(rootDefinitionMap, targetDefinitionMap)
-    ) {
-      throw new Error(
-        'Cannot inline a root local $ref with conflicting ' +
-          keyword +
-          ' definition maps without changing local ref resolution.',
-      );
-    }
-  }
   const rootMetadata = Object.fromEntries(
     Object.entries(schema).filter(
       ([keyword]) =>
@@ -245,6 +232,15 @@ function inlineRootRefObject(schema: JSONSchema): void {
     ),
   );
   const inlined = structuredClone(resolved);
+  // A target's definition map lives below the target's original pointer, not
+  // at the document root. Keep the outer document map at the root so existing
+  // absolute refs retain their meaning; the retained outer map also keeps the
+  // target's nested map reachable at its original pointer.
+  for (const keyword of ['$defs', 'definitions'] as const) {
+    if (schema[keyword] !== undefined && inlined[keyword] !== undefined) {
+      delete inlined[keyword];
+    }
+  }
   const schemaRecord = schema as Record<string, unknown>;
 
   for (const keyword of Object.keys(schema)) {
@@ -740,17 +736,26 @@ function hasObjectShape(schema: JSONSchema): boolean {
 }
 
 function normalizeObjectUnionWrapper(jsonSchema: JSONSchema, path: string[], root: JSONSchema): void {
-  if (jsonSchema.anyOf === undefined || !hasObjectShape(jsonSchema)) {
+  if (jsonSchema.anyOf === undefined) {
     return;
   }
 
-  const isValidationNeutralEmptyObjectKeyword = (keyword: string): boolean =>
-    (keyword === 'properties' &&
-      isObject(jsonSchema.properties) &&
-      Object.keys(jsonSchema.properties).length === 0) ||
-    (keyword === 'required' && Array.isArray(jsonSchema.required) && jsonSchema.required.length === 0);
-  const hasOwnObjectConstraints = Object.keys(jsonSchema).some(
-    (keyword) => JSON_SCHEMA_OBJECT_KEYWORDS.has(keyword) && !isValidationNeutralEmptyObjectKeyword(keyword),
+  const hasEmptyProperties =
+    isObject(jsonSchema.properties) && Object.keys(jsonSchema.properties).length === 0;
+  const hasEmptyRequired = Array.isArray(jsonSchema.required) && jsonSchema.required.length === 0;
+  if (hasEmptyProperties) {
+    delete jsonSchema.properties;
+  }
+  if (hasEmptyRequired) {
+    delete jsonSchema.required;
+  }
+
+  if (!hasObjectShape(jsonSchema)) {
+    return;
+  }
+
+  const hasOwnObjectConstraints = Object.keys(jsonSchema).some((keyword) =>
+    JSON_SCHEMA_OBJECT_KEYWORDS.has(keyword),
   );
   if (
     jsonSchema.type === 'object' &&
@@ -758,12 +763,6 @@ function normalizeObjectUnionWrapper(jsonSchema: JSONSchema, path: string[], roo
     Array.isArray(jsonSchema.anyOf) &&
     jsonSchema.anyOf.every((branch) => isObjectOnlySchema(branch, root))
   ) {
-    if (isValidationNeutralEmptyObjectKeyword('properties')) {
-      delete jsonSchema.properties;
-    }
-    if (isValidationNeutralEmptyObjectKeyword('required')) {
-      delete jsonSchema.required;
-    }
     delete jsonSchema.type;
     return;
   }

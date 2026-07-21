@@ -455,6 +455,40 @@ describe('Standard Schema helpers', () => {
     });
   });
 
+  it('drops empty object keywords from untyped oneOf wrappers', () => {
+    const { standardSchema } = makeStandardSchema({
+      type: 'object',
+      properties: {
+        choice: {
+          properties: {},
+          required: [],
+          oneOf: [{ type: 'string' }, { type: 'number' }],
+        },
+      },
+      required: ['choice'],
+    });
+
+    const schema = standardResponseFormat(standardSchema, 'choice').json_schema.schema;
+    expect((schema as JSONSchema).properties?.['choice']).toEqual({
+      anyOf: [{ type: 'string' }, { type: 'number' }],
+    });
+  });
+
+  it('still rejects non-empty object constraints on untyped oneOf wrappers', () => {
+    const { standardSchema } = makeStandardSchema({
+      type: 'object',
+      properties: {
+        choice: {
+          properties: { kind: { type: 'string' } },
+          oneOf: [{ type: 'string' }, { type: 'number' }],
+        },
+      },
+      required: ['choice'],
+    });
+
+    expect(() => standardResponseFormat(standardSchema, 'choice')).toThrow('Object anyOf schema');
+  });
+
   it('still rejects non-empty object constraints on normalized oneOf wrappers', () => {
     const { standardSchema } = makeStandardSchema({
       type: 'object',
@@ -771,6 +805,24 @@ describe('Standard Schema helpers', () => {
       expect(() => standardResponseFormat(standardSchema, 'metadata')).toThrow(
         `uses unsupported keyword \`${keyword}\``,
       );
+    },
+  );
+
+  it.each(['minContains', 'maxContains'] as const)(
+    'rejects unsupported %s without contains before returning a strict schema',
+    (keyword) => {
+      const { standardSchema } = makeStandardSchema({
+        type: 'object',
+        properties: {
+          values: {
+            type: 'array',
+            [keyword]: 1,
+          },
+        },
+        required: ['values'],
+      });
+
+      expect(() => standardResponseFormat(standardSchema, 'values')).toThrow('uses unsupported keyword');
     },
   );
 

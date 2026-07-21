@@ -213,7 +213,7 @@ describe('toStrictJsonSchema', () => {
     });
 
     test.each(['$defs', 'definitions'] as const)(
-      'rejects conflicting %s maps when inlining a root local ref',
+      'preserves nested %s maps at their original pointer scope when inlining a root local ref',
       (keyword) => {
         const schema = {
           $ref: '#/' + keyword + '/Input',
@@ -221,13 +221,38 @@ describe('toStrictJsonSchema', () => {
             Input: {
               type: 'object',
               [keyword]: { Nested: { type: 'string' } },
-              properties: { name: { type: 'string' } },
-              required: ['name'],
+              properties: {
+                nested: { $ref: '#/' + keyword + '/Input/' + keyword + '/Nested' },
+                outer: { $ref: '#/' + keyword + '/Nested' },
+              },
+              required: ['nested', 'outer'],
             },
+            Nested: { type: 'number' },
           },
         } as JSONSchema;
 
-        expect(() => toStrictJsonSchema(schema)).toThrow('conflicting ' + keyword + ' definition maps');
+        expect(toStrictJsonSchema(schema)).toEqual({
+          type: 'object',
+          properties: {
+            nested: { $ref: '#/' + keyword + '/Input/' + keyword + '/Nested' },
+            outer: { $ref: '#/' + keyword + '/Nested' },
+          },
+          required: ['nested', 'outer'],
+          additionalProperties: false,
+          [keyword]: {
+            Input: {
+              type: 'object',
+              [keyword]: { Nested: { type: 'string' } },
+              properties: {
+                nested: { $ref: '#/' + keyword + '/Input/' + keyword + '/Nested' },
+                outer: { $ref: '#/' + keyword + '/Nested' },
+              },
+              required: ['nested', 'outer'],
+              additionalProperties: false,
+            },
+            Nested: { type: 'number' },
+          },
+        });
       },
     );
 
@@ -1087,6 +1112,24 @@ describe('toStrictJsonSchema', () => {
       expect(() => toStrictJsonSchema(schema)).toThrow(`uses unsupported keyword \`${keyword}\``);
     });
 
+    test.each(['minContains', 'maxContains'] as const)(
+      'rejects unsupported %s without contains',
+      (keyword) => {
+        const schema = {
+          type: 'object',
+          properties: {
+            values: {
+              type: 'array',
+              [keyword]: 1,
+            },
+          },
+          required: ['values'],
+        } as JSONSchema;
+
+        expect(() => toStrictJsonSchema(schema)).toThrow('uses unsupported keyword');
+      },
+    );
+
     test.each([
       [
         'contains',
@@ -1265,6 +1308,39 @@ describe('toStrictJsonSchema', () => {
           },
         ],
       });
+    });
+
+    test('removes empty object keywords from an untyped anyOf wrapper', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          value: {
+            properties: {},
+            required: [],
+            anyOf: [{ type: 'string' }, { type: 'number' }],
+          },
+        },
+        required: ['value'],
+      };
+
+      expect(toStrictJsonSchema(schema).properties?.['value']).toEqual({
+        anyOf: [{ type: 'string' }, { type: 'number' }],
+      });
+    });
+
+    test('rejects non-empty object constraints on untyped anyOf wrappers', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          value: {
+            properties: { kind: { type: 'string' } },
+            anyOf: [{ type: 'string' }, { type: 'number' }],
+          },
+        },
+        required: ['value'],
+      };
+
+      expect(() => toStrictJsonSchema(schema)).toThrow('Object anyOf schema');
     });
 
     test('rejects object anyOf wrappers whose own constraints cannot be preserved', () => {
