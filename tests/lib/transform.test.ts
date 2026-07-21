@@ -570,7 +570,7 @@ describe('toStrictJsonSchema', () => {
       });
     });
 
-    test('processes patternProperties schemas recursively', () => {
+    test('rejects patternProperties schemas', () => {
       const schema: JSONSchema = {
         type: 'object',
         properties: {
@@ -589,17 +589,7 @@ describe('toStrictJsonSchema', () => {
         required: ['metadata'],
       };
 
-      expect(toStrictJsonSchema(schema)).toMatchObject({
-        properties: {
-          metadata: {
-            patternProperties: {
-              '^x-': {
-                additionalProperties: false,
-              },
-            },
-          },
-        },
-      });
+      expect(() => toStrictJsonSchema(schema)).toThrow('uses unsupported keyword `patternProperties`');
     });
 
     test.each([
@@ -726,6 +716,78 @@ describe('toStrictJsonSchema', () => {
           "updated": {},
         }
       `);
+    });
+
+    test('removes a redundant object type from an anyOf wrapper before closing branches', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          value: {
+            type: 'object',
+            anyOf: [
+              {
+                type: 'object',
+                properties: { kind: { type: 'string', const: 'foo' }, foo: { type: 'string' } },
+                required: ['kind', 'foo'],
+              },
+              {
+                type: 'object',
+                properties: { kind: { type: 'string', const: 'bar' }, bar: { type: 'number' } },
+                required: ['kind', 'bar'],
+              },
+            ],
+          },
+        },
+        required: ['value'],
+      };
+
+      const strict = toStrictJsonSchema(schema);
+      expect(strict.properties?.['value']).toEqual({
+        anyOf: [
+          {
+            type: 'object',
+            properties: { kind: { type: 'string', const: 'foo' }, foo: { type: 'string' } },
+            required: ['kind', 'foo'],
+            additionalProperties: false,
+          },
+          {
+            type: 'object',
+            properties: { kind: { type: 'string', const: 'bar' }, bar: { type: 'number' } },
+            required: ['kind', 'bar'],
+            additionalProperties: false,
+          },
+        ],
+      });
+    });
+
+    test('rejects object anyOf wrappers whose own constraints cannot be preserved', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          value: {
+            type: 'object',
+            properties: { kind: { type: 'string' } },
+            required: ['kind'],
+            anyOf: [
+              {
+                type: 'object',
+                properties: { kind: { type: 'string', const: 'foo' }, foo: { type: 'string' } },
+                required: ['kind', 'foo'],
+              },
+              {
+                type: 'object',
+                properties: { kind: { type: 'string', const: 'bar' }, bar: { type: 'number' } },
+                required: ['kind', 'bar'],
+              },
+            ],
+          },
+        },
+        required: ['value'],
+      };
+
+      expect(() => toStrictJsonSchema(schema)).toThrow(
+        'Object anyOf schema at `properties/value` cannot be represented',
+      );
     });
   });
 

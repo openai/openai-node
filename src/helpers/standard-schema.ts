@@ -14,6 +14,7 @@ import {
   forEachJSONSchemaChild,
   hasOnlyRefAndAnnotations,
   resolveLocalRef,
+  rewriteLocalRefsIntoMovedOneOfBranches,
   toStrictJsonSchema,
 } from '../lib/transform';
 import { ResponseFormatJSONSchema } from '../resources/index';
@@ -283,11 +284,17 @@ function areOneOfBranchesMutuallyExclusive(branches: unknown[], root: JSONSchema
 function normalizeStructuredOutputSchema(schema: JSONSchema): JSONSchema {
   assertNoNestedSchemaIds(schema);
   const normalizedSchema = structuredClone(schema);
+  const oneOfSchemas: Record<string, unknown>[] = [];
 
   const visitSchema = (value: unknown): void => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return;
     const record = value as Record<string, unknown>;
-    if (Array.isArray(record['oneOf'])) {
+    if (record['oneOf'] !== undefined) {
+      if (!Array.isArray(record['oneOf'])) {
+        throw new OpenAIError(
+          'Standard JSON Schema generated an invalid `oneOf`, which cannot be represented in an OpenAI strict schema',
+        );
+      }
       if (record['anyOf'] !== undefined) {
         throw new OpenAIError(
           'Standard JSON Schema generated both `anyOf` and `oneOf`, which cannot be represented in an OpenAI strict schema',
@@ -298,15 +305,18 @@ function normalizeStructuredOutputSchema(schema: JSONSchema): JSONSchema {
           'Standard JSON Schema generated a `oneOf` whose branches are not provably mutually exclusive. OpenAI strict schemas do not support `oneOf`; use `anyOf` or add a discriminator with distinct literal values.',
         );
       }
-
-      record['anyOf'] = record['oneOf'];
-      delete record['oneOf'];
+      oneOfSchemas.push(record);
     }
 
     forEachJSONSchemaChild(record, [], (child) => visitSchema(child));
   };
 
   visitSchema(normalizedSchema);
+  rewriteLocalRefsIntoMovedOneOfBranches(normalizedSchema);
+  for (const record of oneOfSchemas) {
+    record['anyOf'] = record['oneOf'];
+    delete record['oneOf'];
+  }
   return normalizedSchema;
 }
 

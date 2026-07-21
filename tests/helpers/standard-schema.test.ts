@@ -219,6 +219,78 @@ describe('Standard Schema helpers', () => {
     expect(oneOfSchema.properties.choice).toHaveProperty('oneOf');
   });
 
+  it('does not close redundant object oneOf wrappers as empty objects', () => {
+    const { standardSchema } = makeStandardSchema({
+      type: 'object',
+      properties: {
+        choice: {
+          type: 'object',
+          oneOf: [
+            {
+              type: 'object',
+              properties: { kind: { type: 'string', const: 'foo' }, foo: { type: 'string' } },
+              required: ['kind', 'foo'],
+            },
+            {
+              type: 'object',
+              properties: { kind: { type: 'string', const: 'bar' }, bar: { type: 'number' } },
+              required: ['kind', 'bar'],
+            },
+          ],
+        },
+      },
+      required: ['choice'],
+    });
+
+    const schema = standardResponseFormat(standardSchema, 'choice').json_schema.schema;
+    expect(schema).toMatchObject({
+      properties: {
+        choice: {
+          anyOf: [
+            {
+              type: 'object',
+              properties: { kind: { type: 'string', const: 'foo' }, foo: { type: 'string' } },
+              required: ['kind', 'foo'],
+              additionalProperties: false,
+            },
+            {
+              type: 'object',
+              properties: { kind: { type: 'string', const: 'bar' }, bar: { type: 'number' } },
+              required: ['kind', 'bar'],
+              additionalProperties: false,
+            },
+          ],
+        },
+      },
+    });
+    const properties = (schema as Record<string, unknown>)['properties'] as Record<string, unknown>;
+    const choice = properties['choice'] as Record<string, unknown>;
+    expect(choice).not.toHaveProperty('type');
+    expect(choice).not.toHaveProperty('additionalProperties');
+  });
+
+  it('updates refs into oneOf branches after moving them to anyOf', () => {
+    const { standardSchema } = makeStandardSchema({
+      type: 'object',
+      properties: {
+        choice: {
+          oneOf: [{ type: 'string', const: 'foo' }, { type: 'number' }],
+        },
+        alias: { $ref: '#/properties/choice/oneOf/0' },
+      },
+      required: ['choice', 'alias'],
+    });
+
+    expect(standardResponseFormat(standardSchema, 'choice').json_schema.schema).toMatchObject({
+      properties: {
+        choice: {
+          anyOf: [{ type: 'string', const: 'foo' }, { type: 'number' }],
+        },
+        alias: { $ref: '#/properties/choice/anyOf/0' },
+      },
+    });
+  });
+
   it('rejects oneOf branches that may overlap', () => {
     const overlappingOneOfSchema = {
       type: 'object',
@@ -500,7 +572,7 @@ describe('Standard Schema helpers', () => {
     });
   });
 
-  it('strictifies object schemas nested under patternProperties', () => {
+  it('rejects patternProperties before returning a strict schema', () => {
     const { standardSchema } = makeStandardSchema({
       type: 'object',
       properties: {
@@ -519,17 +591,27 @@ describe('Standard Schema helpers', () => {
       required: ['metadata'],
     });
 
-    expect(standardResponseFormat(standardSchema, 'metadata').json_schema.schema).toMatchObject({
+    expect(() => standardResponseFormat(standardSchema, 'metadata')).toThrow(
+      'uses unsupported keyword `patternProperties`',
+    );
+  });
+
+  it('rejects root anyOf schemas', () => {
+    const { standardSchema } = makeStandardSchema({
+      type: 'object',
       properties: {
-        metadata: {
-          patternProperties: {
-            '^x-': {
-              additionalProperties: false,
-            },
-          },
-        },
+        kind: { type: 'string' },
       },
+      required: ['kind'],
+      anyOf: [
+        { type: 'object', properties: { kind: { type: 'string', const: 'foo' } }, required: ['kind'] },
+        { type: 'object', properties: { kind: { type: 'string', const: 'bar' } }, required: ['kind'] },
+      ],
     });
+
+    expect(() => standardResponseFormat(standardSchema, 'choice')).toThrow(
+      'Root schema must not use `anyOf`',
+    );
   });
 
   it('rejects unsupported nested schema keywords before returning a strict schema', () => {

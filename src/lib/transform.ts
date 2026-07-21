@@ -54,6 +54,7 @@ const JSON_SCHEMA_UNSUPPORTED_SCHEMA_KEYWORDS = new Set([
   'else',
   'if',
   'not',
+  'patternProperties',
   'prefixItems',
   'propertyNames',
   'then',
@@ -117,6 +118,11 @@ export function toStrictJsonSchema(schema: JSONSchema): JSONSchema {
   if (schema.type !== 'object') {
     throw new Error(
       `Root schema must have type: 'object' but got type: ${schema.type ? `'${schema.type}'` : 'undefined'}`,
+    );
+  }
+  if (schema.anyOf !== undefined) {
+    throw new Error(
+      'Root schema must not use `anyOf` because strict Structured Outputs requires a root object without a union.',
     );
   }
 
@@ -233,6 +239,13 @@ function ensureStrictJsonSchema(
   if (mergeObjectAllOf(jsonSchema, path)) {
     return ensureStrictJsonSchema(jsonSchema, path, root);
   }
+
+  // Closing a type: object wrapper around object union branches without any
+  // own properties would turn it into an empty object and forbid every branch
+  // property. A bare object type is redundant when every branch already proves
+  // the value is an object, so remove only that exact constraint; fail closed
+  // for wrappers whose object constraints cannot be preserved mechanically.
+  normalizeObjectUnionWrapper(jsonSchema, path, root);
 
   // Add additionalProperties: false to object schemas. Draft 7 permits object
   // keywords without an explicit type, so those implicit object shapes need
@@ -412,6 +425,34 @@ function isSchemaDefinition(value: unknown): value is JSONSchemaDefinition {
   return typeof value === 'boolean' || isObject(value);
 }
 
+function isObjectOnlySchema(
+  schema: JSONSchemaDefinition,
+  root: JSONSchema,
+  seenRefs: Set<string> = new Set(),
+): boolean {
+  if (typeof schema === 'boolean' || !isObject(schema)) {
+    return false;
+  }
+
+  if (schema.$ref !== undefined) {
+    if (typeof schema.$ref !== 'string' || !hasOnlyRefAndAnnotations(schema) || seenRefs.has(schema.$ref)) {
+      return false;
+    }
+
+    const resolved = resolveLocalRef(root, schema.$ref);
+    if (resolved === undefined) {
+      return false;
+    }
+
+    return isObjectOnlySchema(resolved, root, new Set([...seenRefs, schema.$ref]));
+  }
+
+  return (
+    schema.type === 'object' ||
+    (Array.isArray(schema.type) && schema.type.length === 1 && schema.type[0] === 'object')
+  );
+}
+
 export function hasOnlyRefAndAnnotations(schema: JSONSchema): boolean {
   return Object.keys(schema).every(
     (keyword) => keyword === '$ref' || JSON_SCHEMA_ANNOTATION_KEYWORDS.has(keyword),
@@ -434,6 +475,31 @@ function hasObjectShape(schema: JSONSchema): boolean {
     typ === 'object' ||
     (Array.isArray(typ) && typ.includes('object')) ||
     (typ === undefined && hasObjectKeywords(schema))
+  );
+}
+
+function normalizeObjectUnionWrapper(jsonSchema: JSONSchema, path: string[], root: JSONSchema): void {
+  if (jsonSchema.anyOf === undefined || !hasObjectShape(jsonSchema)) {
+    return;
+  }
+
+  const hasOwnObjectKeywords = Object.keys(jsonSchema).some((keyword) =>
+    JSON_SCHEMA_OBJECT_KEYWORDS.has(keyword),
+  );
+  if (
+    jsonSchema.type === 'object' &&
+    !hasOwnObjectKeywords &&
+    Array.isArray(jsonSchema.anyOf) &&
+    jsonSchema.anyOf.every((branch) => isObjectOnlySchema(branch, root))
+  ) {
+    delete jsonSchema.type;
+    return;
+  }
+
+  throw new Error(
+    'Object anyOf schema at `' +
+      (path.join('/') || '<root>') +
+      '` cannot be represented in strict Structured Outputs without changing Draft 7 validation.',
   );
 }
 
@@ -487,6 +553,59 @@ function refTargetsAllOfBranch(root: JSONSchema, ref: string): boolean {
 
 function escapeJSONPointerToken(token: string): string {
   return token.replace(/~/g, '~0').replace(/\//g, '~1');
+}
+
+/**
+ * Standard Schema normalization moves representable oneOf branches to anyOf.
+ * Rewrite only pointers that traverse an actual oneOf schema array while the
+ * original tree is still intact, preserving escaped tokens for every other
+ * path segment.
+ */
+export function rewriteLocalRefsIntoMovedOneOfBranches(root: JSONSchema): void {
+  const rewriteRef = (ref: string): string => {
+    const parts = parseLocalRef(ref);
+    if (parts === undefined || parts.length === 0) {
+      return ref;
+    }
+
+    const encodedParts = ref.slice(2).split('/');
+    let resolved: unknown = root;
+    let changed = false;
+    for (const [index, part] of parts.entries()) {
+      if (
+        part === 'oneOf' &&
+        index < parts.length - 1 &&
+        isObject(resolved) &&
+        Array.isArray(resolved['oneOf'])
+      ) {
+        encodedParts[index] = 'anyOf';
+        changed = true;
+      }
+
+      resolved = resolvePointerPart(resolved, part);
+      if (resolved === undefined) {
+        return ref;
+      }
+    }
+
+    return changed ? '#/' + encodedParts.join('/') : ref;
+  };
+
+  const rewriteRefs = (value: JSONSchemaDefinition): void => {
+    if (typeof value === 'boolean' || !isObject(value)) {
+      return;
+    }
+
+    if (typeof value.$ref === 'string') {
+      value.$ref = rewriteRef(value.$ref);
+    }
+
+    forEachJSONSchemaChild(value, [], (child) => {
+      rewriteRefs(child as JSONSchemaDefinition);
+    });
+  };
+
+  rewriteRefs(root);
 }
 
 /**
