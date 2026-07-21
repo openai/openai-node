@@ -54,6 +54,43 @@ describe('toStrictJsonSchema', () => {
       });
       expect(schema.type).toEqual(['object']);
     });
+
+    test('inlines a root local object ref while retaining definitions', () => {
+      const schema: JSONSchema = {
+        $ref: '#/$defs/Input',
+        $defs: {
+          Input: {
+            type: 'object',
+            properties: {
+              name: { $ref: '#/$defs/Name' },
+            },
+            required: ['name'],
+          },
+          Name: { type: 'string' },
+        },
+      };
+
+      expect(toStrictJsonSchema(schema)).toEqual({
+        type: 'object',
+        properties: {
+          name: { $ref: '#/$defs/Name' },
+        },
+        required: ['name'],
+        additionalProperties: false,
+        $defs: {
+          Input: {
+            type: 'object',
+            properties: {
+              name: { $ref: '#/$defs/Name' },
+            },
+            required: ['name'],
+            additionalProperties: false,
+          },
+          Name: { type: 'string' },
+        },
+      });
+      expect(schema).not.toHaveProperty('type');
+    });
   });
 
   describe('Additional Properties', () => {
@@ -425,16 +462,15 @@ describe('toStrictJsonSchema', () => {
         type: 'object',
         properties: {
           source: {
-            type: 'array',
-            items: [{ type: 'string' }],
+            anyOf: [{ type: 'string' }, { type: 'number' }],
           },
-          alias: { $ref: '#/properties/source/items/0' },
+          alias: { $ref: '#/properties/source/anyOf/0' },
         },
         required: ['source', 'alias'],
       };
 
       expect(toStrictJsonSchema(schema).properties?.['alias']).toEqual({
-        $ref: '#/properties/source/items/0',
+        $ref: '#/properties/source/anyOf/0',
       });
     });
 
@@ -634,63 +670,28 @@ describe('toStrictJsonSchema', () => {
       `);
     });
 
-    test('processes tuple item schemas recursively', () => {
+    test('rejects tuple-form items before returning a strict schema', () => {
       const schema: JSONSchema = {
         type: 'object',
         properties: {
           tuple: {
             type: 'array',
-            items: [
-              { type: 'string' },
-              {
-                type: 'array',
-                items: [
-                  {
-                    type: 'object',
-                    properties: { name: { type: 'string' } },
-                    required: ['name'],
-                  },
-                ],
-              },
-            ],
+            items: [{ type: 'string' }, { type: 'number' }],
           },
         },
         required: ['tuple'],
       };
 
-      expect(toStrictJsonSchema(schema)).toEqual({
-        type: 'object',
-        properties: {
-          tuple: {
-            type: 'array',
-            items: [
-              { type: 'string' },
-              {
-                type: 'array',
-                items: [
-                  {
-                    type: 'object',
-                    properties: { name: { type: 'string' } },
-                    required: ['name'],
-                    additionalProperties: false,
-                  },
-                ],
-              },
-            ],
-          },
-        },
-        required: ['tuple'],
-        additionalProperties: false,
-      });
+      expect(() => toStrictJsonSchema(schema)).toThrow('uses tuple-form `items`');
     });
 
-    test('processes schema-valued additionalItems recursively', () => {
+    test('rejects additionalItems before returning a strict schema', () => {
       const schema: JSONSchema = {
         type: 'object',
         properties: {
           tuple: {
             type: 'array',
-            items: [{ type: 'string' }],
+            items: { type: 'string' },
             additionalItems: {
               type: 'object',
               properties: { name: { type: 'string' } },
@@ -701,23 +702,7 @@ describe('toStrictJsonSchema', () => {
         required: ['tuple'],
       };
 
-      expect(toStrictJsonSchema(schema)).toEqual({
-        type: 'object',
-        properties: {
-          tuple: {
-            type: 'array',
-            items: [{ type: 'string' }],
-            additionalItems: {
-              type: 'object',
-              properties: { name: { type: 'string' } },
-              required: ['name'],
-              additionalProperties: false,
-            },
-          },
-        },
-        required: ['tuple'],
-        additionalProperties: false,
-      });
+      expect(() => toStrictJsonSchema(schema)).toThrow('uses unsupported keyword `additionalItems`');
     });
 
     test('rejects patternProperties schemas', () => {
@@ -835,6 +820,18 @@ describe('toStrictJsonSchema', () => {
               properties: { dependent: { type: 'string' } },
               required: ['dependent'],
             },
+          },
+          additionalProperties: false,
+        },
+      ],
+      [
+        'dependentRequired',
+        {
+          type: 'object',
+          properties: { value: { type: 'string' } },
+          required: ['value'],
+          dependentRequired: {
+            value: ['dependent'],
           },
           additionalProperties: false,
         },

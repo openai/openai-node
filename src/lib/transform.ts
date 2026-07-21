@@ -50,6 +50,7 @@ const JSON_SCHEMA_UNSUPPORTED_SCHEMA_KEYWORDS = new Set([
   'allOf',
   'contains',
   'contentSchema',
+  'dependentRequired',
   'dependentSchemas',
   'dependencies',
   'else',
@@ -121,6 +122,7 @@ export function forEachJSONSchemaChild(
 export function toStrictJsonSchema(schema: JSONSchema): JSONSchema {
   const schemaCopy = structuredClone(schema);
   normalizeSingletonTypeArrays(schemaCopy);
+  inlineRootRefObject(schemaCopy);
 
   if (schemaCopy.type !== 'object') {
     throw new Error(
@@ -142,6 +144,73 @@ export function toStrictJsonSchema(schema: JSONSchema): JSONSchema {
   const strictSchema = ensureStrictJsonSchema(schemaCopy, [], schemaCopy);
   validateRefSchemas(strictSchema, [], strictSchema);
   return strictSchema;
+}
+
+/**
+ * Some Standard Schema converters emit the root object through a local ref,
+ * with the referenced schema stored in a root definition map. Structured
+ * Outputs requires the root itself to be an object, so inline that safe,
+ * definition-only form while keeping the root maps available for every local
+ * pointer in the schema.
+ */
+function inlineRootRefObject(schema: JSONSchema): void {
+  const ref = schema.$ref;
+  if (ref === undefined) {
+    return;
+  }
+
+  if (typeof ref !== 'string') {
+    throw new TypeError('Received non-string $ref - ' + String(ref) + '; path=');
+  }
+  if (!ref.startsWith('#')) {
+    throw new Error(
+      'External $ref at `<root>` is not supported in strict Structured Outputs: ' + JSON.stringify(ref),
+    );
+  }
+  if (!hasOnlyRootRefAndDefinitions(schema)) {
+    throw new Error(
+      'Schema $ref at `<root>` has non-annotation siblings that Draft 7 ignores and cannot be represented in strict Structured Outputs.',
+    );
+  }
+
+  const resolved = resolveLocalRef(schema, ref);
+  if (resolved === undefined) {
+    throw new Error(
+      'Local $ref at `<root>` does not resolve to an object or boolean schema: ' + JSON.stringify(ref),
+    );
+  }
+  if (typeof resolved === 'boolean') {
+    throw new TypeError('Expected object schema but got boolean; path=');
+  }
+
+  const rootDefinitions = schema.$defs;
+  const legacyDefinitions = schema.definitions;
+  const rootAnnotations = Object.fromEntries(
+    Object.entries(schema).filter(([keyword]) => JSON_SCHEMA_ANNOTATION_KEYWORDS.has(keyword)),
+  );
+  const inlined = structuredClone(resolved);
+  const schemaRecord = schema as Record<string, unknown>;
+
+  for (const keyword of Object.keys(schema)) {
+    delete schemaRecord[keyword];
+  }
+  Object.assign(schema, inlined, rootAnnotations);
+  if (rootDefinitions !== undefined) {
+    schema.$defs = rootDefinitions;
+  }
+  if (legacyDefinitions !== undefined) {
+    schema.definitions = legacyDefinitions;
+  }
+}
+
+function hasOnlyRootRefAndDefinitions(schema: JSONSchema): boolean {
+  return Object.keys(schema).every(
+    (keyword) =>
+      keyword === '$ref' ||
+      keyword === '$defs' ||
+      keyword === 'definitions' ||
+      JSON_SCHEMA_ANNOTATION_KEYWORDS.has(keyword),
+  );
 }
 
 /**
@@ -324,20 +393,24 @@ function ensureStrictJsonSchema(
     jsonSchema.required = Object.keys(properties);
   }
 
-  // Draft 7 only applies additionalItems to tuple-style items arrays. Recurse
-  // into schema-valued extras so nested objects are strictified too; reject an
-  // ignored additionalItems rather than sending a keyword whose semantics may
-  // differ under Structured Outputs.
+  // Structured Outputs accepts one schema for every array item and does not
+  // support Draft 7 tuples or additionalItems. Reject both forms rather than
+  // advertising a schema whose array validation the API cannot preserve.
   const items = jsonSchema.items;
   const additionalItems = jsonSchema.additionalItems;
+  if (Array.isArray(items)) {
+    throw new Error(
+      `Schema at \`${
+        path.join('/') || '<root>'
+      }\` uses tuple-form \`items\`, which cannot be represented in strict Structured Outputs.`,
+    );
+  }
   if (additionalItems !== undefined) {
-    if (!Array.isArray(items)) {
-      throw new Error(
-        `Schema at \`${
-          path.join('/') || '<root>'
-        }\` uses \`additionalItems\` without tuple \`items\`, which cannot be represented in strict Structured Outputs.`,
-      );
-    }
+    throw new Error(
+      `Schema at \`${
+        path.join('/') || '<root>'
+      }\` uses unsupported keyword \`additionalItems\` and cannot be represented in strict Structured Outputs.`,
+    );
   }
 
   // Handle intersections (allOf)
