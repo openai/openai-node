@@ -318,10 +318,7 @@ describe('toStrictJsonSchema', () => {
       });
     });
 
-    test.each([
-      ['missing', { $ref: '#/$defs/Missing' }],
-      ['cyclic', { $ref: '#/$defs/Cyclic' }],
-    ])('conservatively rejects %s refs when checking nullable optional properties', (_name, property) => {
+    test('conservatively rejects cyclic refs when checking nullable optional properties', () => {
       const schema: JSONSchema = {
         type: 'object',
         $defs: {
@@ -329,12 +326,26 @@ describe('toStrictJsonSchema', () => {
           Cyclic: { $ref: '#/$defs/Cyclic' },
         },
         properties: {
-          nickname: property as JSONSchema,
+          nickname: { $ref: '#/$defs/Cyclic' },
         },
       };
 
       expect(() => toStrictJsonSchema(schema)).toThrow(
         'Schema field at `properties/nickname` uses `.optional()` without `.nullable()`',
+      );
+    });
+
+    test('rejects unresolved local refs before returning a strict schema', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          nickname: { $ref: '#/$defs/Missing' },
+        },
+        required: ['nickname'],
+      };
+
+      expect(() => toStrictJsonSchema(schema)).toThrow(
+        'Local $ref at `properties/nickname` does not resolve to an object or boolean schema',
       );
     });
 
@@ -795,7 +806,7 @@ describe('toStrictJsonSchema', () => {
       });
     });
 
-    test('does not flatten a single allOf variant across sibling constraints', () => {
+    test('rejects a single allOf variant with sibling constraints', () => {
       const schema: JSONSchema = {
         type: 'object',
         properties: {
@@ -807,17 +818,7 @@ describe('toStrictJsonSchema', () => {
         required: ['value'],
       };
 
-      expect(toStrictJsonSchema(schema)).toEqual({
-        type: 'object',
-        properties: {
-          value: {
-            type: 'string',
-            allOf: [{ type: 'number' }],
-          },
-        },
-        required: ['value'],
-        additionalProperties: false,
-      });
+      expect(() => toStrictJsonSchema(schema)).toThrow('uses unsupported keyword `allOf`');
     });
 
     test('merges compatible object allOf variants before closing them', () => {
@@ -855,6 +856,47 @@ describe('toStrictJsonSchema', () => {
         required: ['value'],
         additionalProperties: false,
       });
+    });
+
+    test('merges object allOf properties that match Object prototype names', () => {
+      const specialProperties = Object.fromEntries([
+        ['constructor', { type: 'string' }],
+        ['toString', { type: 'string' }],
+        ['__proto__', { type: 'string' }],
+      ]);
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          value: {
+            allOf: [
+              {
+                type: 'object',
+                properties: specialProperties,
+                required: ['constructor', 'toString', '__proto__'],
+              },
+              {
+                type: 'object',
+                properties: { other: { type: 'number' } },
+                required: ['other'],
+              },
+            ],
+          },
+        },
+        required: ['value'],
+      };
+
+      const strict = toStrictJsonSchema(schema);
+      const properties = (strict.properties?.['value'] as JSONSchema).properties;
+
+      expect(properties).toEqual(
+        Object.fromEntries([
+          ['constructor', { type: 'string' }],
+          ['toString', { type: 'string' }],
+          ['__proto__', { type: 'string' }],
+          ['other', { type: 'number' }],
+        ]),
+      );
+      expect(Object.prototype.hasOwnProperty.call(properties, '__proto__')).toBe(true);
     });
 
     test('rejects object allOf variants that cannot be merged exactly', () => {

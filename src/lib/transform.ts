@@ -46,6 +46,7 @@ const JSON_SCHEMA_MAP_SCHEMA_KEYWORDS = [
 ];
 
 const JSON_SCHEMA_UNSUPPORTED_SCHEMA_KEYWORDS = new Set([
+  'allOf',
   'contains',
   'contentSchema',
   'dependentSchemas',
@@ -120,7 +121,7 @@ export function toStrictJsonSchema(schema: JSONSchema): JSONSchema {
   }
 
   const schemaCopy = structuredClone(schema);
-  validateRefSchemas(schemaCopy, []);
+  validateRefSchemas(schemaCopy, [], schemaCopy);
   return ensureStrictJsonSchema(schemaCopy, [], schemaCopy);
 }
 
@@ -387,7 +388,7 @@ function hasObjectShape(schema: JSONSchema): boolean {
   );
 }
 
-function validateRefSchemas(schema: JSONSchemaDefinition, path: string[]): void {
+function validateRefSchemas(schema: JSONSchemaDefinition, path: string[], root: JSONSchema): void {
   if (typeof schema === 'boolean' || !isObject(schema)) {
     return;
   }
@@ -404,6 +405,14 @@ function validateRefSchemas(schema: JSONSchemaDefinition, path: string[]): void 
         }\` is not supported in strict Structured Outputs: ${JSON.stringify(ref)}`,
       );
     }
+    const resolved = resolveLocalRef(root, ref);
+    if (resolved === undefined || !isSchemaDefinition(resolved)) {
+      throw new Error(
+        `Local $ref at \`${
+          path.join('/') || '<root>'
+        }\` does not resolve to an object or boolean schema: ${JSON.stringify(ref)}`,
+      );
+    }
     if (!hasOnlyRefAndAnnotations(schema)) {
       throw new Error(
         `Schema $ref at \`${
@@ -414,7 +423,7 @@ function validateRefSchemas(schema: JSONSchemaDefinition, path: string[]): void 
   }
 
   forEachJSONSchemaChild(schema, path, (child, childPath) => {
-    validateRefSchemas(child as JSONSchemaDefinition, childPath);
+    validateRefSchemas(child as JSONSchemaDefinition, childPath, root);
   });
 }
 
@@ -486,7 +495,7 @@ function mergeObjectAllOf(jsonSchema: JSONSchema, path: string[]): boolean {
     }
   }
 
-  const mergedProperties: Record<string, JSONSchemaDefinition> = {};
+  const mergedProperties = Object.create(null) as Record<string, JSONSchemaDefinition>;
   const mergedRequired = new Set<string>();
   const closedPropertySets: Set<string>[] = [];
   let sawProperties = false;
@@ -530,7 +539,10 @@ function mergeObjectAllOf(jsonSchema: JSONSchema, path: string[]): boolean {
       }
       sawProperties = true;
       for (const [key, propertySchema] of Object.entries(branch.properties)) {
-        if (key in mergedProperties && !schemasEqual(mergedProperties[key], propertySchema)) {
+        if (
+          Object.prototype.hasOwnProperty.call(mergedProperties, key) &&
+          !schemasEqual(mergedProperties[key], propertySchema)
+        ) {
           fail();
         }
         mergedProperties[key] = propertySchema;
@@ -559,7 +571,7 @@ function mergeObjectAllOf(jsonSchema: JSONSchema, path: string[]): boolean {
   }
 
   if (hasExplicitObjectType) merged.type = 'object';
-  if (sawProperties) merged.properties = mergedProperties;
+  if (sawProperties) merged.properties = Object.fromEntries(Object.entries(mergedProperties));
   if (sawRequired) merged.required = [...mergedRequired];
   if (closedPropertySets.length > 0) merged.additionalProperties = false;
 
