@@ -145,6 +145,18 @@ describe('toStrictJsonSchema', () => {
 
       expect(() => toStrictJsonSchema(schema)).toThrow(message);
     });
+
+    test('reports the root path for invalid root ref values and boolean targets', () => {
+      expect(() => toStrictJsonSchema({ $ref: 1 } as unknown as JSONSchema)).toThrow(
+        'Received non-string $ref - 1; path=<root>',
+      );
+      expect(() =>
+        toStrictJsonSchema({
+          $ref: '#/$defs/False',
+          $defs: { False: false },
+        }),
+      ).toThrow('Expected object schema but got boolean; path=<root>');
+    });
   });
 
   describe('Additional Properties', () => {

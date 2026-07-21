@@ -181,7 +181,7 @@ function inlineRootRefObject(schema: JSONSchema): void {
       );
     }
     if (typeof target === 'boolean') {
-      throw new TypeError('Expected object schema but got boolean; path=');
+      throw new TypeError('Expected object schema but got boolean; path=<root>');
     }
 
     const nextRef = target.$ref;
@@ -223,7 +223,7 @@ function inlineRootRefObject(schema: JSONSchema): void {
 
 function assertLocalRootRef(ref: unknown): asserts ref is string {
   if (typeof ref !== 'string') {
-    throw new TypeError('Received non-string $ref - ' + String(ref) + '; path=');
+    throw new TypeError('Received non-string $ref - ' + String(ref) + '; path=<root>');
   }
   if (!ref.startsWith('#')) {
     throw new Error(
