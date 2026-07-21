@@ -316,8 +316,20 @@ function inlineRootRefObject(schema: JSONSchema): void {
  */
 function normalizeRootAllOf(schema: JSONSchema): void {
   while (schema.allOf !== undefined) {
+    // Root normalization runs before recursive strictification so the root
+    // type check can see an inlined object. Normalize nested intersections in
+    // its branches first for the same associative allOf case handled by the
+    // later recursive pass.
+    if (Array.isArray(schema.allOf)) {
+      for (const [index, branch] of schema.allOf.entries()) {
+        normalizeObjectAllOfBranches(branch, ['allOf', String(index)], schema);
+      }
+    }
+
     if (mergeObjectAllOf(schema, [], schema)) {
-      return;
+      // Removing neutral true branches can leave a singleton allOf behind;
+      // keep normalizing until the root reaches its final object form.
+      continue;
     }
 
     const allOf = schema.allOf;
@@ -1182,14 +1194,17 @@ function normalizeObjectAllOfBranches(schema: JSONSchemaDefinition, path: string
     return;
   }
 
-  if (mergeObjectAllOf(schema, path, root)) {
-    normalizeObjectAllOfBranches(schema, path, root);
-    return;
-  }
-
   forEachJSONSchemaChild(schema, path, (child, childPath) => {
     normalizeObjectAllOfBranches(child as JSONSchemaDefinition, childPath, root);
   });
+
+  // Intersections are associative, so normalize nested object intersections
+  // before classifying their parents. Otherwise an inner allOf wrapper has no
+  // directly visible object shape and makes an exactly mergeable outer allOf
+  // fail closed.
+  if (mergeObjectAllOf(schema, path, root)) {
+    normalizeObjectAllOfBranches(schema, path, root);
+  }
 }
 
 /**
@@ -1213,6 +1228,19 @@ function mergeObjectAllOf(jsonSchema: JSONSchema, path: string[], root: JSONSche
   const allOf = jsonSchema.allOf;
   if (!Array.isArray(allOf) || allOf.length === 0) {
     return false;
+  }
+
+  // `true` is the identity element for Draft 7 intersections. Remove it
+  // before deciding whether the remaining branches are object-mergeable so a
+  // neutral branch cannot make an otherwise exact merge fail closed.
+  const nonNeutralBranches = allOf.filter((entry) => entry !== true);
+  if (nonNeutralBranches.length !== allOf.length) {
+    if (nonNeutralBranches.length === 0) {
+      delete jsonSchema.allOf;
+    } else {
+      jsonSchema.allOf = nonNeutralBranches;
+    }
+    return true;
   }
 
   const parentHasObjectShape = hasObjectShapeWithoutAllOf(jsonSchema);

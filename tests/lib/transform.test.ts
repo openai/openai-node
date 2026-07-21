@@ -435,6 +435,63 @@ describe('toStrictJsonSchema', () => {
       });
     });
 
+    test('removes neutral root allOf branches before inlining an object branch', () => {
+      const schema: JSONSchema = {
+        allOf: [
+          true,
+          {
+            type: 'object',
+            properties: { name: { type: 'string' } },
+            required: ['name'],
+          },
+        ],
+      };
+
+      expect(toStrictJsonSchema(schema)).toEqual({
+        type: 'object',
+        properties: { name: { type: 'string' } },
+        required: ['name'],
+        additionalProperties: false,
+      });
+    });
+
+    test('normalizes nested root allOf variants before validating the type', () => {
+      const schema: JSONSchema = {
+        allOf: [
+          {
+            allOf: [
+              {
+                type: 'object',
+                properties: { name: { type: 'string' } },
+                required: ['name'],
+              },
+              {
+                type: 'object',
+                properties: { age: { type: 'number' } },
+                required: ['age'],
+              },
+            ],
+          },
+          {
+            type: 'object',
+            properties: { active: { type: 'boolean' } },
+            required: ['active'],
+          },
+        ],
+      };
+
+      expect(toStrictJsonSchema(schema)).toEqual({
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          age: { type: 'number' },
+          active: { type: 'boolean' },
+        },
+        required: ['name', 'age', 'active'],
+        additionalProperties: false,
+      });
+    });
+
     test('preserves root dialect and base metadata while merging root allOf branches', () => {
       const schema: JSONSchema = {
         $schema: 'http://json-schema.org/draft-07/schema#',
@@ -1866,6 +1923,78 @@ describe('toStrictJsonSchema', () => {
           },
         },
         required: ['value'],
+        additionalProperties: false,
+      });
+    });
+
+    test('removes neutral true branches before merging object allOf variants', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          value: {
+            type: 'object',
+            properties: { name: { type: 'string' } },
+            required: ['name'],
+            allOf: [
+              true,
+              {
+                type: 'object',
+                properties: { age: { type: 'number' } },
+                required: ['age'],
+              },
+            ],
+          },
+        },
+        required: ['value'],
+      };
+
+      expect(toStrictJsonSchema(schema).properties?.['value']).toEqual({
+        type: 'object',
+        properties: { name: { type: 'string' }, age: { type: 'number' } },
+        required: ['name', 'age'],
+        additionalProperties: false,
+      });
+    });
+
+    test('normalizes nested object allOf variants before merging their parent', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          value: {
+            allOf: [
+              {
+                allOf: [
+                  {
+                    type: 'object',
+                    properties: { name: { type: 'string' } },
+                    required: ['name'],
+                  },
+                  {
+                    type: 'object',
+                    properties: { age: { type: 'number' } },
+                    required: ['age'],
+                  },
+                ],
+              },
+              {
+                type: 'object',
+                properties: { active: { type: 'boolean' } },
+                required: ['active'],
+              },
+            ],
+          },
+        },
+        required: ['value'],
+      };
+
+      expect(toStrictJsonSchema(schema).properties?.['value']).toEqual({
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          age: { type: 'number' },
+          active: { type: 'boolean' },
+        },
+        required: ['name', 'age', 'active'],
         additionalProperties: false,
       });
     });
