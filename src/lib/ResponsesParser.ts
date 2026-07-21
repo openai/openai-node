@@ -147,11 +147,10 @@ export function hasAutoParseableInput(params: ResponseCreateParamsWithTools): bo
   }
 
   return (
-    (Array.isArray(params.tools) &&
-      params.tools.some(
-        (tool) => isAutoParsableTool(tool) || (tool.type === 'function' && tool.strict === true),
-      )) ||
-    false
+    Array.isArray(params.tools) &&
+    params.tools.some(
+      (tool) => isAutoParsableTool(tool) || (tool.type === 'function' && tool.strict === true),
+    )
   );
 }
 

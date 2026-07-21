@@ -92,6 +92,38 @@ describe('toStrictJsonSchema', () => {
       expect(schema).not.toHaveProperty('type');
     });
 
+    test('preserves root dialect and base metadata when inlining a local ref', () => {
+      const schema: JSONSchema = {
+        $schema: 'http://json-schema.org/draft-07/schema#',
+        $id: 'https://example.com/input.json',
+        $ref: '#/$defs/Input',
+        $defs: {
+          Input: {
+            type: 'object',
+            properties: { name: { type: 'string' } },
+            required: ['name'],
+          },
+        },
+      };
+
+      expect(toStrictJsonSchema(schema)).toEqual({
+        $schema: 'http://json-schema.org/draft-07/schema#',
+        $id: 'https://example.com/input.json',
+        type: 'object',
+        properties: { name: { type: 'string' } },
+        required: ['name'],
+        additionalProperties: false,
+        $defs: {
+          Input: {
+            type: 'object',
+            properties: { name: { type: 'string' } },
+            required: ['name'],
+            additionalProperties: false,
+          },
+        },
+      });
+    });
+
     test('follows a root local ref chain before validating the object type', () => {
       const schema: JSONSchema = {
         $ref: '#/$defs/A',
@@ -156,6 +188,70 @@ describe('toStrictJsonSchema', () => {
           $defs: { False: false },
         }),
       ).toThrow('Expected object schema but got boolean; path=<root>');
+    });
+
+    test('normalizes a single root allOf object branch before validating the type', () => {
+      const schema: JSONSchema = {
+        allOf: [
+          {
+            type: 'object',
+            properties: { name: { type: 'string' } },
+            required: ['name'],
+          },
+        ],
+      };
+
+      expect(toStrictJsonSchema(schema)).toEqual({
+        type: 'object',
+        properties: { name: { type: 'string' } },
+        required: ['name'],
+        additionalProperties: false,
+      });
+    });
+
+    test('merges compatible root allOf object branches before validating the type', () => {
+      const schema: JSONSchema = {
+        allOf: [
+          {
+            type: 'object',
+            properties: { name: { type: 'string' } },
+            required: ['name'],
+          },
+          {
+            type: 'object',
+            properties: { age: { type: 'number' } },
+            required: ['age'],
+          },
+        ],
+      };
+
+      expect(toStrictJsonSchema(schema)).toEqual({
+        type: 'object',
+        properties: { name: { type: 'string' }, age: { type: 'number' } },
+        required: ['name', 'age'],
+        additionalProperties: false,
+      });
+    });
+
+    test('still rejects root allOf object branches that cannot be merged exactly', () => {
+      const schema: JSONSchema = {
+        allOf: [
+          {
+            type: 'object',
+            properties: { shared: { type: 'string' } },
+            required: ['shared'],
+          },
+          {
+            type: 'object',
+            properties: { shared: { type: 'number' } },
+            required: ['shared'],
+          },
+        ],
+      };
+
+      expect(() => toStrictJsonSchema(schema)).toThrow(
+        'cannot be merged without changing Draft 7 validation',
+      );
     });
   });
 
@@ -807,6 +903,24 @@ describe('toStrictJsonSchema', () => {
       };
 
       expect(() => toStrictJsonSchema(schema)).toThrow('uses unsupported keyword `uniqueItems`');
+    });
+
+    test.each([
+      ['contentEncoding', 'base64'],
+      ['contentMediaType', 'application/json'],
+    ] as const)('rejects unsupported %s schemas', (keyword, value) => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          payload: {
+            type: 'string',
+            [keyword]: value,
+          },
+        },
+        required: ['payload'],
+      };
+
+      expect(() => toStrictJsonSchema(schema)).toThrow(`uses unsupported keyword \`${keyword}\``);
     });
 
     test.each(['minProperties', 'maxProperties'] as const)('rejects %s schemas', (keyword) => {

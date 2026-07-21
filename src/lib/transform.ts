@@ -10,6 +10,8 @@ const JSON_SCHEMA_ANNOTATION_KEYWORDS = new Set([
   'writeOnly',
 ]);
 
+const JSON_SCHEMA_ROOT_METADATA_KEYWORDS = new Set(['$id', '$schema']);
+
 const JSON_SCHEMA_OBJECT_KEYWORDS = new Set([
   'additionalProperties',
   'dependencies',
@@ -49,6 +51,8 @@ const JSON_SCHEMA_MAP_SCHEMA_KEYWORDS = [
 const JSON_SCHEMA_UNSUPPORTED_SCHEMA_KEYWORDS = new Set([
   'allOf',
   'contains',
+  'contentEncoding',
+  'contentMediaType',
   'contentSchema',
   'dependentRequired',
   'dependentSchemas',
@@ -123,6 +127,8 @@ export function toStrictJsonSchema(schema: JSONSchema): JSONSchema {
   const schemaCopy = structuredClone(schema);
   normalizeSingletonTypeArrays(schemaCopy);
   inlineRootRefObject(schemaCopy);
+  preserveAllOfRefTargets(schemaCopy, true);
+  normalizeRootAllOf(schemaCopy);
 
   if (schemaCopy.type !== 'object') {
     throw new Error(
@@ -162,7 +168,7 @@ function inlineRootRefObject(schema: JSONSchema): void {
   assertLocalRootRef(ref);
   if (!hasOnlyRootRefAndDefinitions(schema)) {
     throw new Error(
-      'Schema $ref at `<root>` has non-annotation siblings that Draft 7 ignores and cannot be represented in strict Structured Outputs.',
+      'Schema $ref at `<root>` has non-metadata siblings that Draft 7 ignores and cannot be represented in strict Structured Outputs.',
     );
   }
 
@@ -203,8 +209,11 @@ function inlineRootRefObject(schema: JSONSchema): void {
 
   const rootDefinitions = schema.$defs;
   const legacyDefinitions = schema.definitions;
-  const rootAnnotations = Object.fromEntries(
-    Object.entries(schema).filter(([keyword]) => JSON_SCHEMA_ANNOTATION_KEYWORDS.has(keyword)),
+  const rootMetadata = Object.fromEntries(
+    Object.entries(schema).filter(
+      ([keyword]) =>
+        JSON_SCHEMA_ANNOTATION_KEYWORDS.has(keyword) || JSON_SCHEMA_ROOT_METADATA_KEYWORDS.has(keyword),
+    ),
   );
   const inlined = structuredClone(resolved);
   const schemaRecord = schema as Record<string, unknown>;
@@ -212,12 +221,45 @@ function inlineRootRefObject(schema: JSONSchema): void {
   for (const keyword of Object.keys(schema)) {
     delete schemaRecord[keyword];
   }
-  Object.assign(schema, inlined, rootAnnotations);
+  Object.assign(schema, inlined, rootMetadata);
   if (rootDefinitions !== undefined) {
     schema.$defs = rootDefinitions;
   }
   if (legacyDefinitions !== undefined) {
     schema.definitions = legacyDefinitions;
+  }
+}
+
+/**
+ * Root object validation runs before recursive strictification, so normalize
+ * the same exactly representable allOf forms here that the recursive pass
+ * handles for nested schemas.
+ */
+function normalizeRootAllOf(schema: JSONSchema): void {
+  while (schema.allOf !== undefined) {
+    if (mergeObjectAllOf(schema, [])) {
+      return;
+    }
+
+    const allOf = schema.allOf;
+    if (!Array.isArray(allOf) || allOf.length !== 1 || !hasOnlyRootAllOfMetadataSiblings(schema)) {
+      return;
+    }
+
+    const branch = allOf[0];
+    if (typeof branch === 'boolean' || !isObject(branch)) {
+      return;
+    }
+
+    const rootMetadata = { ...schema };
+    delete rootMetadata.allOf;
+    const normalized = structuredClone(branch);
+    const schemaRecord = schema as Record<string, unknown>;
+
+    for (const keyword of Object.keys(schema)) {
+      delete schemaRecord[keyword];
+    }
+    Object.assign(schema, normalized, rootMetadata);
   }
 }
 
@@ -238,6 +280,7 @@ function hasOnlyRootRefAndDefinitions(schema: JSONSchema): boolean {
       keyword === '$ref' ||
       keyword === '$defs' ||
       keyword === 'definitions' ||
+      JSON_SCHEMA_ROOT_METADATA_KEYWORDS.has(keyword) ||
       JSON_SCHEMA_ANNOTATION_KEYWORDS.has(keyword),
   );
 }
@@ -643,6 +686,17 @@ function hasOnlyAnnotationSiblings(schema: JSONSchema, keyword: string): boolean
   );
 }
 
+function hasOnlyRootAllOfMetadataSiblings(schema: JSONSchema): boolean {
+  return Object.keys(schema).every(
+    (keyword) =>
+      keyword === 'allOf' ||
+      keyword === '$defs' ||
+      keyword === 'definitions' ||
+      JSON_SCHEMA_ROOT_METADATA_KEYWORDS.has(keyword) ||
+      JSON_SCHEMA_ANNOTATION_KEYWORDS.has(keyword),
+  );
+}
+
 function hasObjectKeywords(schema: JSONSchema): boolean {
   return Object.keys(schema).some((keyword) => JSON_SCHEMA_OBJECT_KEYWORDS.has(keyword));
 }
@@ -798,7 +852,7 @@ export function rewriteLocalRefsIntoMovedOneOfBranches(root: JSONSchema): void {
  * referenced through an allOf branch under a stable root definition first so
  * structural flattening cannot leave a dangling local pointer behind.
  */
-function preserveAllOfRefTargets(root: JSONSchema): void {
+function preserveAllOfRefTargets(root: JSONSchema, rootOnly = false): void {
   const refsToPreserve = new Set<string>();
   const collectRefs = (value: JSONSchemaDefinition): void => {
     if (typeof value === 'boolean' || !isObject(value)) {
@@ -806,7 +860,10 @@ function preserveAllOfRefTargets(root: JSONSchema): void {
     }
 
     if (typeof value.$ref === 'string' && refTargetsAllOfBranch(root, value.$ref)) {
-      refsToPreserve.add(value.$ref);
+      const pointerParts = parseLocalRef(value.$ref);
+      if (!rootOnly || pointerParts?.[0] === 'allOf') {
+        refsToPreserve.add(value.$ref);
+      }
     }
 
     forEachJSONSchemaChild(value, [], (child) => {
@@ -829,6 +886,9 @@ function preserveAllOfRefTargets(root: JSONSchema): void {
   for (const ref of refsToPreserve) {
     const target = resolveLocalRef(root, ref);
     if (!isSchemaDefinition(target)) {
+      if (rootOnly) {
+        continue;
+      }
       throw new Error('Local $ref cannot be preserved before allOf flattening: ' + JSON.stringify(ref));
     }
 
