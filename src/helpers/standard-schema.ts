@@ -269,7 +269,13 @@ function resolveLocalRefForExclusivity(
 
   if (record['allOf'] !== undefined) {
     if (!Array.isArray(record['allOf'])) return undefined;
-    return normalizeObjectAllOfForExclusivity(record as JSONSchema, root);
+    const normalized = normalizeObjectAllOfForExclusivity(record as JSONSchema, root);
+    if (normalized === undefined) return undefined;
+
+    // Flattening a singleton allOf can expose a bare local ref. Feed that
+    // result through this same resolver so URI-fragment decoding and the
+    // existing local-ref cycle guard still apply before exclusivity analysis.
+    return resolveLocalRefForExclusivity(normalized, root, seenRefs);
   }
 
   return schema;

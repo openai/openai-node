@@ -80,6 +80,29 @@ function makeStandardSchema(
   };
 }
 
+function makeStrictSchemaFactories(jsonSchema: Record<string, unknown>) {
+  const { standardSchema } = makeStandardSchema(jsonSchema);
+
+  return [
+    () => standardResponseFormat(standardSchema, 'weather').json_schema.schema,
+    () => standardTextFormat(standardSchema, 'weather').schema,
+    () =>
+      standardFunction({
+        name: 'get_weather',
+        parameters: standardSchema,
+      }).function.parameters,
+    () =>
+      standardResponsesFunction({
+        name: 'get_weather',
+        parameters: standardSchema,
+      }).parameters,
+  ];
+}
+
+function strictSchemasForAllHelpers(jsonSchema: Record<string, unknown>) {
+  return makeStrictSchemaFactories(jsonSchema).map((makeSchema) => makeSchema());
+}
+
 function makeValidationOnlySchema() {
   return {
     '~standard': {
@@ -288,6 +311,75 @@ describe('Standard Schema helpers', () => {
     const choice = properties['choice'] as Record<string, unknown>;
     expect(choice).not.toHaveProperty('type');
     expect(choice).not.toHaveProperty('additionalProperties');
+  });
+
+  it('normalizes redundant nullable object oneOf wrappers across all helper surfaces', () => {
+    const schemas = strictSchemasForAllHelpers({
+      type: 'object',
+      properties: {
+        choice: {
+          type: ['object', 'null'],
+          oneOf: [
+            {
+              type: 'object',
+              properties: { kind: { type: 'string', const: 'foo' }, foo: { type: 'string' } },
+              required: ['kind', 'foo'],
+            },
+            {
+              type: 'object',
+              properties: { kind: { type: 'string', const: 'bar' }, bar: { type: 'number' } },
+              required: ['kind', 'bar'],
+            },
+          ],
+        },
+      },
+      required: ['choice'],
+    });
+
+    for (const schema of schemas) {
+      const choice = (schema as JSONSchema).properties?.['choice'] as JSONSchema;
+      expect(choice).toEqual({
+        anyOf: [
+          {
+            type: 'object',
+            properties: { kind: { type: 'string', const: 'foo' }, foo: { type: 'string' } },
+            required: ['kind', 'foo'],
+            additionalProperties: false,
+          },
+          {
+            type: 'object',
+            properties: { kind: { type: 'string', const: 'bar' }, bar: { type: 'number' } },
+            required: ['kind', 'bar'],
+            additionalProperties: false,
+          },
+        ],
+      });
+    }
+  });
+
+  it('normalizes redundant nullable array anyOf wrappers across all helper surfaces', () => {
+    const schemas = strictSchemasForAllHelpers({
+      type: 'object',
+      properties: {
+        choice: {
+          type: ['array', 'null'],
+          anyOf: [
+            { type: 'array', items: { type: 'string' } },
+            { type: 'array', items: { type: 'number' } },
+          ],
+        },
+      },
+      required: ['choice'],
+    });
+
+    for (const schema of schemas) {
+      expect((schema as JSONSchema).properties?.['choice']).toEqual({
+        anyOf: [
+          { type: 'array', items: { type: 'string' } },
+          { type: 'array', items: { type: 'number' } },
+        ],
+      });
+    }
   });
 
   it('updates refs into oneOf branches after moving them to anyOf', () => {
@@ -575,6 +667,88 @@ describe('Standard Schema helpers', () => {
     expect(JSON.stringify(schema)).not.toContain('"oneOf"');
   });
 
+  it('resolves local refs exposed by oneOf allOf normalization across all helper surfaces', () => {
+    const schemas = strictSchemasForAllHelpers({
+      type: 'object',
+      $defs: {
+        'foo branch': {
+          type: 'object',
+          properties: { kind: { type: 'string', const: 'foo' }, foo: { type: 'string' } },
+          required: ['kind', 'foo'],
+        },
+        'bar branch': {
+          type: 'object',
+          properties: { kind: { type: 'string', const: 'bar' }, bar: { type: 'number' } },
+          required: ['kind', 'bar'],
+        },
+      },
+      properties: {
+        choice: {
+          oneOf: [
+            { allOf: [{ $ref: '#/$defs/foo%20branch' }] },
+            { allOf: [{ $ref: '#/$defs/bar%20branch' }] },
+          ],
+        },
+      },
+      required: ['choice'],
+    });
+
+    for (const schema of schemas) {
+      expect((schema as JSONSchema).properties?.['choice']).toEqual({
+        anyOf: [{ $ref: '#/$defs/foo%20branch' }, { $ref: '#/$defs/bar%20branch' }],
+      });
+      expect(JSON.stringify(schema)).not.toContain('"allOf"');
+      expect(JSON.stringify(schema)).not.toContain('"oneOf"');
+    }
+  });
+
+  it.each(['$defs', 'definitions'] as const)(
+    'discards neutral %s-only allOf branches across all helper surfaces',
+    (keyword) => {
+      const schemas = strictSchemasForAllHelpers({
+        type: 'object',
+        properties: {
+          value: {
+            allOf: [
+              {
+                [keyword]: {
+                  Name: { type: 'string' },
+                },
+              },
+              {
+                type: 'object',
+                properties: {
+                  name: { $ref: `#/properties/value/allOf/0/${keyword}/Name` },
+                },
+                required: ['name'],
+              },
+            ],
+          },
+        },
+        required: ['value'],
+      });
+
+      for (const schema of schemas) {
+        expect(schema).toMatchObject({
+          $defs: {
+            __openai_strict_allOf_ref_0: { type: 'string' },
+          },
+          properties: {
+            value: {
+              type: 'object',
+              properties: {
+                name: { $ref: '#/$defs/__openai_strict_allOf_ref_0' },
+              },
+              required: ['name'],
+              additionalProperties: false,
+            },
+          },
+        });
+        expect(JSON.stringify(schema)).not.toContain('"allOf"');
+      }
+    },
+  );
+
   it('drops validation-neutral empty object keywords when normalizing oneOf wrappers', () => {
     const { standardSchema } = makeStandardSchema({
       type: 'object',
@@ -840,6 +1014,29 @@ describe('Standard Schema helpers', () => {
       });
 
       expect(() => standardResponseFormat(standardSchema, 'choice')).toThrow(
+        'Standard JSON Schema generated a `oneOf` whose branches are not provably mutually exclusive',
+      );
+    }
+  });
+
+  it.each([
+    ['missing', { allOf: [{ $ref: '#/$defs/missing' }] }, {}],
+    ['external', { allOf: [{ $ref: 'https://example.com/schema.json#/$defs/foo' }] }, {}],
+    ['cyclic', { allOf: [{ $ref: '#/$defs/cycle' }] }, { cycle: { allOf: [{ $ref: '#/$defs/cycle' }] } }],
+  ])('keeps %s refs exposed by oneOf allOf normalization fail closed', (_name, branch, defs) => {
+    const factories = makeStrictSchemaFactories({
+      type: 'object',
+      $defs: defs,
+      properties: {
+        choice: {
+          oneOf: [branch, { type: 'string' }],
+        },
+      },
+      required: ['choice'],
+    });
+
+    for (const makeSchema of factories) {
+      expect(makeSchema).toThrow(
         'Standard JSON Schema generated a `oneOf` whose branches are not provably mutually exclusive',
       );
     }

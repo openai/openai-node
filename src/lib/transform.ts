@@ -877,6 +877,13 @@ function hasObjectShape(schema: JSONSchema): boolean {
   );
 }
 
+function isRedundantUnionWrapperType(type: JSONSchema['type'], branchType: 'object' | 'array'): boolean {
+  return (
+    type === branchType ||
+    (Array.isArray(type) && type.length === 2 && type.includes(branchType) && type.includes('null'))
+  );
+}
+
 function normalizeObjectUnionWrapper(jsonSchema: JSONSchema, path: string[], root: JSONSchema): void {
   if (jsonSchema.anyOf === undefined) {
     return;
@@ -900,11 +907,14 @@ function normalizeObjectUnionWrapper(jsonSchema: JSONSchema, path: string[], roo
     JSON_SCHEMA_OBJECT_KEYWORDS.has(keyword),
   );
   if (
-    jsonSchema.type === 'object' &&
+    isRedundantUnionWrapperType(jsonSchema.type, 'object') &&
     !hasOwnObjectConstraints &&
     Array.isArray(jsonSchema.anyOf) &&
     jsonSchema.anyOf.every((branch) => isObjectOnlySchema(branch, root))
   ) {
+    // The union already excludes null and every non-object value, so both a
+    // scalar object wrapper and a nullable object wrapper are redundant under
+    // Draft 7's conjunctive keyword semantics.
     delete jsonSchema.type;
     return;
   }
@@ -918,14 +928,14 @@ function normalizeObjectUnionWrapper(jsonSchema: JSONSchema, path: string[], roo
 
 function normalizeArrayUnionWrapper(jsonSchema: JSONSchema, root: JSONSchema): void {
   if (
-    jsonSchema.type === 'array' &&
+    isRedundantUnionWrapperType(jsonSchema.type, 'array') &&
     jsonSchema.items === undefined &&
     Array.isArray(jsonSchema.anyOf) &&
     jsonSchema.anyOf.every((branch) => isArrayOnlySchema(branch, root))
   ) {
-    // Every union branch already proves the value is an array. Keeping the
-    // redundant wrapper would require an outer items schema that does not
-    // contribute any Draft 7 validation.
+    // Every union branch already proves the value is an array and excludes
+    // null. Keeping either redundant wrapper would require an outer items
+    // schema that does not contribute any Draft 7 validation.
     delete jsonSchema.type;
   }
 }
@@ -1333,9 +1343,13 @@ function mergeObjectAllOf(jsonSchema: JSONSchema, path: string[], root: JSONSche
       return fail();
     }
     const branch = resolvedEntry.schema;
+    // Definition maps do not constrain instances. Any refs into an allOf
+    // branch were preserved under stable root definitions before this merge,
+    // so a valid definitions-only branch can now be discarded like an
+    // annotation-only branch.
     if (hasObjectShapeWithoutAllOf(branch)) {
       branches.push(branch);
-    } else if (!Object.keys(branch).every((keyword) => JSON_SCHEMA_ANNOTATION_KEYWORDS.has(keyword))) {
+    } else if (!hasOnlyNeutralAllOfBranchKeywords(branch)) {
       fail();
     }
   }
@@ -1464,6 +1478,15 @@ function hasObjectShapeWithoutAllOf(schema: JSONSchema): boolean {
     return isMergeableObjectType(schema.type);
   }
   return Object.keys(schema).some((keyword) => JSON_SCHEMA_OBJECT_KEYWORDS.has(keyword));
+}
+
+function hasOnlyNeutralAllOfBranchKeywords(schema: JSONSchema): boolean {
+  const schemaRecord = schema as Record<string, unknown>;
+  return Object.keys(schema).every(
+    (keyword) =>
+      JSON_SCHEMA_ANNOTATION_KEYWORDS.has(keyword) ||
+      ((keyword === '$defs' || keyword === 'definitions') && isObject(schemaRecord[keyword])),
+  );
 }
 
 function isMergeableObjectType(type: JSONSchema['type']): boolean {

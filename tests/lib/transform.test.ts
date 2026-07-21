@@ -1553,6 +1553,46 @@ describe('toStrictJsonSchema', () => {
       });
     });
 
+    test('removes a redundant nullable array type from an anyOf wrapper', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          value: {
+            type: ['array', 'null'],
+            anyOf: [
+              { type: 'array', items: { type: 'string' } },
+              { type: 'array', items: { type: 'number' } },
+            ],
+          },
+        },
+        required: ['value'],
+      };
+
+      expect(toStrictJsonSchema(schema).properties?.['value']).toEqual({
+        anyOf: [
+          { type: 'array', items: { type: 'string' } },
+          { type: 'array', items: { type: 'number' } },
+        ],
+      });
+    });
+
+    test('keeps nullable array union wrappers fail closed when a branch is not array-only', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          value: {
+            type: ['array', 'null'],
+            anyOf: [{ type: 'array', items: { type: 'string' } }, { type: 'null' }],
+          },
+        },
+        required: ['value'],
+      };
+
+      expect(() => toStrictJsonSchema(schema)).toThrow(
+        'declares an array without `items`, which cannot be represented',
+      );
+    });
+
     test('removes a redundant object type from an anyOf wrapper before closing branches', () => {
       const schema: JSONSchema = {
         type: 'object',
@@ -1593,6 +1633,72 @@ describe('toStrictJsonSchema', () => {
           },
         ],
       });
+    });
+
+    test('removes a redundant nullable object type from an anyOf wrapper before closing branches', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          value: {
+            type: ['object', 'null'],
+            anyOf: [
+              {
+                type: 'object',
+                properties: { kind: { type: 'string', const: 'foo' }, foo: { type: 'string' } },
+                required: ['kind', 'foo'],
+              },
+              {
+                type: 'object',
+                properties: { kind: { type: 'string', const: 'bar' }, bar: { type: 'number' } },
+                required: ['kind', 'bar'],
+              },
+            ],
+          },
+        },
+        required: ['value'],
+      };
+
+      const strict = toStrictJsonSchema(schema);
+      expect(strict.properties?.['value']).toEqual({
+        anyOf: [
+          {
+            type: 'object',
+            properties: { kind: { type: 'string', const: 'foo' }, foo: { type: 'string' } },
+            required: ['kind', 'foo'],
+            additionalProperties: false,
+          },
+          {
+            type: 'object',
+            properties: { kind: { type: 'string', const: 'bar' }, bar: { type: 'number' } },
+            required: ['kind', 'bar'],
+            additionalProperties: false,
+          },
+        ],
+      });
+    });
+
+    test('keeps nullable object union wrappers fail closed when a branch is not object-only', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          value: {
+            type: ['object', 'null'],
+            anyOf: [
+              {
+                type: 'object',
+                properties: { value: { type: 'string' } },
+                required: ['value'],
+              },
+              { type: 'null' },
+            ],
+          },
+        },
+        required: ['value'],
+      };
+
+      expect(() => toStrictJsonSchema(schema)).toThrow(
+        'Object anyOf schema at `properties/value` cannot be represented',
+      );
     });
 
     test('removes empty object keywords from an untyped anyOf wrapper', () => {
@@ -1957,6 +2063,78 @@ describe('toStrictJsonSchema', () => {
         additionalProperties: false,
       });
     });
+
+    test.each(['$defs', 'definitions'] as const)(
+      'discards neutral %s-only allOf branches after preserving their refs',
+      (keyword) => {
+        const schema = {
+          type: 'object',
+          properties: {
+            value: {
+              allOf: [
+                {
+                  [keyword]: {
+                    Name: { type: 'string' },
+                  },
+                },
+                {
+                  type: 'object',
+                  properties: {
+                    name: { $ref: `#/properties/value/allOf/0/${keyword}/Name` },
+                  },
+                  required: ['name'],
+                },
+              ],
+            },
+          },
+          required: ['value'],
+        } as JSONSchema;
+
+        const strict = toStrictJsonSchema(schema);
+        expect(strict).toMatchObject({
+          $defs: {
+            __openai_strict_allOf_ref_0: { type: 'string' },
+          },
+          properties: {
+            value: {
+              type: 'object',
+              properties: {
+                name: { $ref: '#/$defs/__openai_strict_allOf_ref_0' },
+              },
+              required: ['name'],
+              additionalProperties: false,
+            },
+          },
+        });
+        expect(JSON.stringify(strict)).not.toContain('"allOf"');
+      },
+    );
+
+    test.each(['$defs', 'definitions'] as const)(
+      'keeps malformed %s-only allOf branches fail closed',
+      (keyword) => {
+        const schema = {
+          type: 'object',
+          properties: {
+            value: {
+              allOf: [
+                { [keyword]: false },
+                {
+                  type: 'object',
+                  properties: { name: { type: 'string' } },
+                  required: ['name'],
+                },
+              ],
+            },
+          },
+          required: ['value'],
+        } as unknown as JSONSchema;
+
+        expect(() => toStrictJsonSchema(schema)).toThrow(
+          'cannot be merged without changing Draft 7 validation',
+        );
+      },
+    );
 
     test('normalizes nested object allOf variants before merging their parent', () => {
       const schema: JSONSchema = {
