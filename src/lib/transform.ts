@@ -129,6 +129,9 @@ export function toStrictJsonSchema(schema: JSONSchema): JSONSchema {
   inlineRootRefObject(schemaCopy);
   preserveAllOfRefTargets(schemaCopy, true);
   normalizeRootAllOf(schemaCopy);
+  // A singleton root allOf can flatten to a local ref. Run the same root
+  // inliner again so its chain and cycle checks apply before root validation.
+  inlineRootRefObject(schemaCopy);
 
   if (schemaCopy.type !== 'object') {
     throw new Error(
@@ -173,6 +176,12 @@ function inlineRootRefObject(schema: JSONSchema): void {
   }
 
   const seenRefs = new Set<string>();
+  // Ref siblings are annotations in Draft 7, so keep them while following
+  // aliases. Add outer annotations first so they win over inner aliases and
+  // the final target when the effective root is assembled.
+  const inheritedAnnotations: Record<string, unknown> = Object.fromEntries(
+    Object.entries(schema).filter(([keyword]) => JSON_SCHEMA_ANNOTATION_KEYWORDS.has(keyword)),
+  );
   let resolved: JSONSchema;
   while (true) {
     if (seenRefs.has(ref)) {
@@ -204,11 +213,31 @@ function inlineRootRefObject(schema: JSONSchema): void {
         'Schema $ref in root chain has non-annotation siblings that Draft 7 ignores and cannot be represented in strict Structured Outputs.',
       );
     }
+    for (const keyword of JSON_SCHEMA_ANNOTATION_KEYWORDS) {
+      if (!(keyword in inheritedAnnotations) && keyword in target) {
+        inheritedAnnotations[keyword] = (target as Record<string, unknown>)[keyword];
+      }
+    }
     ref = nextRef;
   }
 
   const rootDefinitions = schema.$defs;
   const legacyDefinitions = schema.definitions;
+  for (const keyword of ['$defs', 'definitions'] as const) {
+    const rootDefinitionMap = schema[keyword];
+    const targetDefinitionMap = resolved[keyword];
+    if (
+      rootDefinitionMap !== undefined &&
+      targetDefinitionMap !== undefined &&
+      !schemasEqual(rootDefinitionMap, targetDefinitionMap)
+    ) {
+      throw new Error(
+        'Cannot inline a root local $ref with conflicting ' +
+          keyword +
+          ' definition maps without changing local ref resolution.',
+      );
+    }
+  }
   const rootMetadata = Object.fromEntries(
     Object.entries(schema).filter(
       ([keyword]) =>
@@ -221,7 +250,7 @@ function inlineRootRefObject(schema: JSONSchema): void {
   for (const keyword of Object.keys(schema)) {
     delete schemaRecord[keyword];
   }
-  Object.assign(schema, inlined, rootMetadata);
+  Object.assign(schema, inlined, inheritedAnnotations, rootMetadata);
   if (rootDefinitions !== undefined) {
     schema.$defs = rootDefinitions;
   }
@@ -715,15 +744,26 @@ function normalizeObjectUnionWrapper(jsonSchema: JSONSchema, path: string[], roo
     return;
   }
 
-  const hasOwnObjectKeywords = Object.keys(jsonSchema).some((keyword) =>
-    JSON_SCHEMA_OBJECT_KEYWORDS.has(keyword),
+  const isValidationNeutralEmptyObjectKeyword = (keyword: string): boolean =>
+    (keyword === 'properties' &&
+      isObject(jsonSchema.properties) &&
+      Object.keys(jsonSchema.properties).length === 0) ||
+    (keyword === 'required' && Array.isArray(jsonSchema.required) && jsonSchema.required.length === 0);
+  const hasOwnObjectConstraints = Object.keys(jsonSchema).some(
+    (keyword) => JSON_SCHEMA_OBJECT_KEYWORDS.has(keyword) && !isValidationNeutralEmptyObjectKeyword(keyword),
   );
   if (
     jsonSchema.type === 'object' &&
-    !hasOwnObjectKeywords &&
+    !hasOwnObjectConstraints &&
     Array.isArray(jsonSchema.anyOf) &&
     jsonSchema.anyOf.every((branch) => isObjectOnlySchema(branch, root))
   ) {
+    if (isValidationNeutralEmptyObjectKeyword('properties')) {
+      delete jsonSchema.properties;
+    }
+    if (isValidationNeutralEmptyObjectKeyword('required')) {
+      delete jsonSchema.required;
+    }
     delete jsonSchema.type;
     return;
   }
@@ -997,6 +1037,7 @@ function mergeObjectAllOf(jsonSchema: JSONSchema, path: string[]): boolean {
       keyword !== 'allOf' &&
       keyword !== '$defs' &&
       keyword !== 'definitions' &&
+      !(path.length === 0 && JSON_SCHEMA_ROOT_METADATA_KEYWORDS.has(keyword)) &&
       !MERGEABLE_OBJECT_ALL_OF_KEYWORDS.has(keyword)
     ) {
       fail();
@@ -1023,6 +1064,13 @@ function mergeObjectAllOf(jsonSchema: JSONSchema, path: string[]): boolean {
   for (const keyword of ['$defs', 'definitions'] as const) {
     if (jsonSchema[keyword] !== undefined) {
       merged[keyword] = jsonSchema[keyword];
+    }
+  }
+  if (path.length === 0) {
+    for (const keyword of JSON_SCHEMA_ROOT_METADATA_KEYWORDS) {
+      if (keyword in jsonSchema) {
+        (merged as Record<string, unknown>)[keyword] = (jsonSchema as Record<string, unknown>)[keyword];
+      }
     }
   }
 
@@ -1052,6 +1100,9 @@ function mergeObjectAllOf(jsonSchema: JSONSchema, path: string[]): boolean {
     for (const keyword of Object.keys(branch)) {
       if (keyword === 'allOf' && branch === jsonSchema) continue;
       if ((keyword === '$defs' || keyword === 'definitions') && branch === jsonSchema) continue;
+      if (branch === jsonSchema && path.length === 0 && JSON_SCHEMA_ROOT_METADATA_KEYWORDS.has(keyword)) {
+        continue;
+      }
       if (!MERGEABLE_OBJECT_ALL_OF_KEYWORDS.has(keyword)) {
         fail();
       }

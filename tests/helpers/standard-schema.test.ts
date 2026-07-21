@@ -411,6 +411,78 @@ describe('Standard Schema helpers', () => {
     });
   });
 
+  it('drops validation-neutral empty object keywords when normalizing oneOf wrappers', () => {
+    const { standardSchema } = makeStandardSchema({
+      type: 'object',
+      properties: {
+        choice: {
+          type: 'object',
+          properties: {},
+          required: [],
+          oneOf: [
+            {
+              type: 'object',
+              properties: { kind: { type: 'string', const: 'foo' }, foo: { type: 'string' } },
+              required: ['kind', 'foo'],
+            },
+            {
+              type: 'object',
+              properties: { kind: { type: 'string', const: 'bar' }, bar: { type: 'number' } },
+              required: ['kind', 'bar'],
+            },
+          ],
+        },
+      },
+      required: ['choice'],
+    });
+
+    const schema = standardResponseFormat(standardSchema, 'choice').json_schema.schema;
+    expect((schema as JSONSchema).properties?.['choice']).toEqual({
+      anyOf: [
+        {
+          type: 'object',
+          properties: { kind: { type: 'string', const: 'foo' }, foo: { type: 'string' } },
+          required: ['kind', 'foo'],
+          additionalProperties: false,
+        },
+        {
+          type: 'object',
+          properties: { kind: { type: 'string', const: 'bar' }, bar: { type: 'number' } },
+          required: ['kind', 'bar'],
+          additionalProperties: false,
+        },
+      ],
+    });
+  });
+
+  it('still rejects non-empty object constraints on normalized oneOf wrappers', () => {
+    const { standardSchema } = makeStandardSchema({
+      type: 'object',
+      properties: {
+        choice: {
+          type: 'object',
+          properties: { kind: { type: 'string' } },
+          required: ['kind'],
+          oneOf: [
+            {
+              type: 'object',
+              properties: { kind: { type: 'string', const: 'foo' }, foo: { type: 'string' } },
+              required: ['kind', 'foo'],
+            },
+            {
+              type: 'object',
+              properties: { kind: { type: 'string', const: 'bar' }, bar: { type: 'number' } },
+              required: ['kind', 'bar'],
+            },
+          ],
+        },
+      },
+      required: ['choice'],
+    });
+
+    expect(() => standardResponseFormat(standardSchema, 'choice')).toThrow('Object anyOf schema');
+  });
+
   it('normalizes annotated oneOf ref branches but rejects validation siblings', () => {
     const definitions = {
       foo: {

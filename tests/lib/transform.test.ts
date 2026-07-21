@@ -154,6 +154,83 @@ describe('toStrictJsonSchema', () => {
       });
     });
 
+    test('preserves root ref-chain annotations with outer precedence', () => {
+      const schema: JSONSchema = {
+        $ref: '#/$defs/A',
+        description: 'root description',
+        $defs: {
+          A: {
+            $ref: '#/$defs/B',
+            title: 'alias title',
+            description: 'alias description',
+          },
+          B: {
+            $ref: '#/$defs/Input',
+            title: 'inner alias title',
+            $comment: 'inner alias comment',
+          },
+          Input: {
+            type: 'object',
+            title: 'target title',
+            description: 'target description',
+            $comment: 'target comment',
+            properties: { name: { type: 'string' } },
+            required: ['name'],
+          },
+        },
+      };
+
+      expect(toStrictJsonSchema(schema)).toEqual({
+        type: 'object',
+        title: 'alias title',
+        description: 'root description',
+        $comment: 'inner alias comment',
+        properties: { name: { type: 'string' } },
+        required: ['name'],
+        additionalProperties: false,
+        $defs: {
+          A: {
+            $ref: '#/$defs/B',
+            title: 'alias title',
+            description: 'alias description',
+          },
+          B: {
+            $ref: '#/$defs/Input',
+            title: 'inner alias title',
+            $comment: 'inner alias comment',
+          },
+          Input: {
+            type: 'object',
+            title: 'target title',
+            description: 'target description',
+            $comment: 'target comment',
+            properties: { name: { type: 'string' } },
+            required: ['name'],
+            additionalProperties: false,
+          },
+        },
+      });
+    });
+
+    test.each(['$defs', 'definitions'] as const)(
+      'rejects conflicting %s maps when inlining a root local ref',
+      (keyword) => {
+        const schema = {
+          $ref: '#/' + keyword + '/Input',
+          [keyword]: {
+            Input: {
+              type: 'object',
+              [keyword]: { Nested: { type: 'string' } },
+              properties: { name: { type: 'string' } },
+              required: ['name'],
+            },
+          },
+        } as JSONSchema;
+
+        expect(() => toStrictJsonSchema(schema)).toThrow('conflicting ' + keyword + ' definition maps');
+      },
+    );
+
     test('rejects cyclic root local ref chains', () => {
       const schema: JSONSchema = {
         $ref: '#/$defs/A',
@@ -164,6 +241,48 @@ describe('toStrictJsonSchema', () => {
       };
 
       expect(() => toStrictJsonSchema(schema)).toThrow('Cyclic local $ref at `<root>`');
+    });
+
+    test('inlines root local ref chains exposed by singleton root allOf', () => {
+      const schema: JSONSchema = {
+        allOf: [{ $ref: '#/$defs/A' }],
+        $defs: {
+          A: { $ref: '#/$defs/Input' },
+          Input: {
+            type: 'object',
+            properties: { name: { type: 'string' } },
+            required: ['name'],
+          },
+        },
+      };
+
+      expect(toStrictJsonSchema(schema)).toEqual({
+        type: 'object',
+        properties: { name: { type: 'string' } },
+        required: ['name'],
+        additionalProperties: false,
+        $defs: {
+          A: { $ref: '#/$defs/Input' },
+          Input: {
+            type: 'object',
+            properties: { name: { type: 'string' } },
+            required: ['name'],
+            additionalProperties: false,
+          },
+        },
+      });
+    });
+
+    test('rejects root local ref cycles exposed by singleton root allOf', () => {
+      const schema: JSONSchema = {
+        allOf: [{ $ref: '#/$defs/A' }],
+        $defs: {
+          A: { $ref: '#/$defs/B' },
+          B: { $ref: '#/$defs/A' },
+        },
+      };
+
+      expect(() => toStrictJsonSchema(schema)).toThrow('Cyclic local $ref');
     });
 
     test.each([
@@ -226,6 +345,34 @@ describe('toStrictJsonSchema', () => {
       };
 
       expect(toStrictJsonSchema(schema)).toEqual({
+        type: 'object',
+        properties: { name: { type: 'string' }, age: { type: 'number' } },
+        required: ['name', 'age'],
+        additionalProperties: false,
+      });
+    });
+
+    test('preserves root dialect and base metadata while merging root allOf branches', () => {
+      const schema: JSONSchema = {
+        $schema: 'http://json-schema.org/draft-07/schema#',
+        $id: 'https://example.com/input.json',
+        allOf: [
+          {
+            type: 'object',
+            properties: { name: { type: 'string' } },
+            required: ['name'],
+          },
+          {
+            type: 'object',
+            properties: { age: { type: 'number' } },
+            required: ['age'],
+          },
+        ],
+      };
+
+      expect(toStrictJsonSchema(schema)).toEqual({
+        $schema: 'http://json-schema.org/draft-07/schema#',
+        $id: 'https://example.com/input.json',
         type: 'object',
         properties: { name: { type: 'string' }, age: { type: 'number' } },
         required: ['name', 'age'],
