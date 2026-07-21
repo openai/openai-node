@@ -1182,6 +1182,92 @@ describe('toStrictJsonSchema', () => {
       expect(Object.prototype.hasOwnProperty.call(properties, '__proto__')).toBe(true);
     });
 
+    test('merges matching object allOf properties with reordered schema keys', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          value: {
+            allOf: [
+              {
+                type: 'object',
+                properties: {
+                  shared: {
+                    type: 'object',
+                    description: 'shared object',
+                    properties: { name: { type: 'string', description: 'display name' } },
+                    required: ['name'],
+                  },
+                },
+                required: ['shared'],
+              },
+              {
+                required: ['shared'],
+                properties: {
+                  shared: {
+                    required: ['name'],
+                    properties: { name: { description: 'display name', type: 'string' } },
+                    description: 'shared object',
+                    type: 'object',
+                  },
+                },
+                type: 'object',
+              },
+            ],
+          },
+        },
+        required: ['value'],
+      };
+
+      expect(toStrictJsonSchema(schema)).toEqual({
+        type: 'object',
+        properties: {
+          value: {
+            type: 'object',
+            properties: {
+              shared: {
+                type: 'object',
+                description: 'shared object',
+                properties: { name: { type: 'string', description: 'display name' } },
+                required: ['name'],
+                additionalProperties: false,
+              },
+            },
+            required: ['shared'],
+            additionalProperties: false,
+          },
+        },
+        required: ['value'],
+        additionalProperties: false,
+      });
+    });
+
+    test('rejects matching object allOf properties with reordered array values', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          value: {
+            allOf: [
+              {
+                type: 'object',
+                properties: { shared: { type: 'string', enum: ['first', 'second'] } },
+                required: ['shared'],
+              },
+              {
+                type: 'object',
+                properties: { shared: { enum: ['second', 'first'], type: 'string' } },
+                required: ['shared'],
+              },
+            ],
+          },
+        },
+        required: ['value'],
+      };
+
+      expect(() => toStrictJsonSchema(schema)).toThrow(
+        'cannot be merged without changing Draft 7 validation',
+      );
+    });
+
     test('rejects object allOf variants that cannot be merged exactly', () => {
       const schema: JSONSchema = {
         type: 'object',
