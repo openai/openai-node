@@ -61,6 +61,7 @@ const JSON_SCHEMA_UNSUPPORTED_SCHEMA_KEYWORDS = new Set([
   'then',
   'unevaluatedItems',
   'unevaluatedProperties',
+  'uniqueItems',
 ]);
 
 const MERGEABLE_OBJECT_ALL_OF_KEYWORDS = new Set([
@@ -355,28 +356,35 @@ function ensureStrictJsonSchema(
 }
 
 function parseLocalRef(ref: string): string[] | undefined {
-  if (ref === '#') {
+  if (!ref.startsWith('#')) {
+    return undefined;
+  }
+
+  let pointer: string;
+  try {
+    // A local $ref is a URI fragment containing a JSON Pointer. RFC 6901
+    // decodes the complete fragment before tokenizing the pointer, so an
+    // encoded slash is a separator rather than part of a literal key.
+    pointer = decodeURIComponent(ref.slice(1));
+  } catch {
+    return undefined;
+  }
+
+  if (pointer === '') {
     return [];
   }
-  if (!ref.startsWith('#/')) {
+  if (!pointer.startsWith('/')) {
     return undefined;
   }
 
   const parts: string[] = [];
-  for (const encodedPart of ref.slice(2).split('/')) {
-    let decodedPart: string;
-    try {
-      decodedPart = decodeURIComponent(encodedPart);
-    } catch {
-      return undefined;
-    }
-
+  for (const encodedPart of pointer.slice(1).split('/')) {
     // JSON Pointer only defines ~0 and ~1 escapes. Reject malformed escape
     // sequences instead of looking up a different literal key.
-    if (/~(?:[^01]|$)/.test(decodedPart)) {
+    if (/~(?:[^01]|$)/.test(encodedPart)) {
       return undefined;
     }
-    parts.push(decodedPart.replace(/~1/g, '/').replace(/~0/g, '~'));
+    parts.push(encodedPart.replace(/~1/g, '/').replace(/~0/g, '~'));
   }
 
   return parts;
@@ -407,15 +415,56 @@ export function resolveLocalRef(root: JSONSchema, ref: string): JSONSchemaDefini
     return undefined;
   }
 
+  // Literal payloads such as `default`, `enum`, and `const` can contain
+  // object-shaped values, but they are not schemas and are never traversed by
+  // strictification. Resolve only the schema-bearing locations visited by
+  // forEachJSONSchemaChild so every accepted target is normalized before we
+  // advertise the result as strict.
   let resolved: unknown = root;
-  for (const part of parts) {
-    resolved = resolvePointerPart(resolved, part);
-    if (resolved === undefined) {
+  for (let index = 0; index < parts.length; ) {
+    if (!isObject(resolved)) {
       return undefined;
     }
+
+    const keyword = parts[index]!;
+    if (JSON_SCHEMA_SINGLE_SCHEMA_KEYWORDS.includes(keyword)) {
+      resolved = resolvePointerPart(resolved, keyword);
+      index += 1;
+      continue;
+    }
+
+    if (JSON_SCHEMA_ARRAY_SCHEMA_KEYWORDS.includes(keyword)) {
+      resolved = resolvePointerPart(resolved, keyword);
+      index += 1;
+      if (Array.isArray(resolved)) {
+        if (index >= parts.length) {
+          return undefined;
+        }
+        resolved = resolvePointerPart(resolved, parts[index]!);
+        index += 1;
+      }
+      continue;
+    }
+
+    if (JSON_SCHEMA_MAP_SCHEMA_KEYWORDS.includes(keyword)) {
+      const children = resolvePointerPart(resolved, keyword);
+      index += 1;
+      if (!isObject(children) || index >= parts.length) {
+        return undefined;
+      }
+
+      resolved = resolvePointerPart(children, parts[index]!);
+      if (keyword === 'dependencies' && !isSchemaDefinition(resolved)) {
+        return undefined;
+      }
+      index += 1;
+      continue;
+    }
+
+    return undefined;
   }
 
-  return resolved as JSONSchemaDefinition;
+  return isSchemaDefinition(resolved) ? resolved : undefined;
 }
 
 function isObject<T>(obj: T | Array<any>): obj is Extract<T, Record<string, any>> {
@@ -569,7 +618,6 @@ export function rewriteLocalRefsIntoMovedOneOfBranches(root: JSONSchema): void {
       return ref;
     }
 
-    const encodedParts = ref.slice(2).split('/');
     let resolved: unknown = root;
     let changed = false;
     for (const [index, part] of parts.entries()) {
@@ -579,7 +627,7 @@ export function rewriteLocalRefsIntoMovedOneOfBranches(root: JSONSchema): void {
         isObject(resolved) &&
         Array.isArray(resolved['oneOf'])
       ) {
-        encodedParts[index] = 'anyOf';
+        parts[index] = 'anyOf';
         changed = true;
       }
 
@@ -589,7 +637,7 @@ export function rewriteLocalRefsIntoMovedOneOfBranches(root: JSONSchema): void {
       }
     }
 
-    return changed ? '#/' + encodedParts.join('/') : ref;
+    return changed ? '#/' + parts.map(escapeJSONPointerToken).join('/') : ref;
   };
 
   const rewriteRefs = (value: JSONSchemaDefinition): void => {
@@ -682,7 +730,7 @@ function validateRefSchemas(schema: JSONSchemaDefinition, path: string[], root: 
     if (typeof ref !== 'string') {
       throw new TypeError(`Received non-string $ref - ${ref}; path=${path.join('/')}`);
     }
-    if (ref !== '#' && !ref.startsWith('#/')) {
+    if (!ref.startsWith('#')) {
       throw new Error(
         `External $ref at \`${
           path.join('/') || '<root>'

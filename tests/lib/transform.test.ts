@@ -290,6 +290,104 @@ describe('toStrictJsonSchema', () => {
       expect(toStrictJsonSchema(schema).required).toEqual(['nickname']);
     });
 
+    test('decodes complete URI fragments before splitting pointer tokens', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        $defs: {
+          'A/properties/B': { type: 'number' },
+          A: {
+            type: 'object',
+            properties: {
+              B: { type: ['string', 'null'] },
+            },
+            required: ['B'],
+          },
+        },
+        properties: {
+          value: { $ref: '#/$defs/A%2Fproperties%2FB' },
+        },
+      };
+
+      const strict = toStrictJsonSchema(schema);
+
+      expect(strict.required).toEqual(['value']);
+      expect(strict.properties?.['value']).toEqual({ $ref: '#/$defs/A%2Fproperties%2FB' });
+    });
+
+    test('resolves literal slash keys only through JSON Pointer escaping', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        $defs: {
+          'A/properties/B': { type: 'string' },
+          A: {
+            type: 'object',
+            properties: {
+              B: { type: 'number' },
+            },
+            required: ['B'],
+          },
+        },
+        properties: {
+          value: { $ref: '#/$defs/A~1properties~1B' },
+        },
+        required: ['value'],
+      };
+
+      expect(toStrictJsonSchema(schema).properties?.['value']).toEqual({
+        $ref: '#/$defs/A~1properties~1B',
+      });
+    });
+
+    test('rejects malformed URI encodings in local refs', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        $defs: {
+          Text: { type: 'string' },
+        },
+        properties: {
+          value: { $ref: '#/$defs/Text%2' },
+        },
+        required: ['value'],
+      };
+
+      expect(() => toStrictJsonSchema(schema)).toThrow(
+        'Local $ref at `properties/value` does not resolve to an object or boolean schema',
+      );
+    });
+
+    test('rejects local refs into non-schema literal payloads', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        default: { type: 'string' },
+        properties: {
+          value: { $ref: '#/default' },
+        },
+        required: ['value'],
+      };
+
+      expect(() => toStrictJsonSchema(schema)).toThrow(
+        'Local $ref at `properties/value` does not resolve to an object or boolean schema',
+      );
+    });
+
+    test('allows local refs into traversed schema array locations', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          source: {
+            type: 'array',
+            items: [{ type: 'string' }],
+          },
+          alias: { $ref: '#/properties/source/items/0' },
+        },
+        required: ['source', 'alias'],
+      };
+
+      expect(toStrictJsonSchema(schema).properties?.['alias']).toEqual({
+        $ref: '#/properties/source/items/0',
+      });
+    });
+
     test('resolves local refs with $comment and other annotation-only siblings', () => {
       const schema: JSONSchema = {
         type: 'object',
@@ -592,6 +690,22 @@ describe('toStrictJsonSchema', () => {
       };
 
       expect(() => toStrictJsonSchema(schema)).toThrow('uses unsupported keyword `patternProperties`');
+    });
+
+    test('rejects uniqueItems schemas', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          tags: {
+            type: 'array',
+            items: { type: 'string' },
+            uniqueItems: true,
+          },
+        },
+        required: ['tags'],
+      };
+
+      expect(() => toStrictJsonSchema(schema)).toThrow('uses unsupported keyword `uniqueItems`');
     });
 
     test.each([
