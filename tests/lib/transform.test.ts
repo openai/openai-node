@@ -1290,6 +1290,8 @@ describe('toStrictJsonSchema', () => {
       'dependencies',
       '$dynamicAnchor',
       '$dynamicRef',
+      '$recursiveAnchor',
+      '$recursiveRef',
       'else',
       'if',
       'maxContains',
@@ -1553,6 +1555,29 @@ describe('toStrictJsonSchema', () => {
       });
     });
 
+    test('removes a redundant array type through singleton allOf union branches', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          value: {
+            type: 'array',
+            anyOf: [
+              { allOf: [{ type: 'array', items: { type: 'string' } }] },
+              { type: 'array', items: { type: 'number' } },
+            ],
+          },
+        },
+        required: ['value'],
+      };
+
+      expect(toStrictJsonSchema(schema).properties?.['value']).toEqual({
+        anyOf: [
+          { type: 'array', items: { type: 'string' } },
+          { type: 'array', items: { type: 'number' } },
+        ],
+      });
+    });
+
     test('removes a redundant nullable array type from an anyOf wrapper', () => {
       const schema: JSONSchema = {
         type: 'object',
@@ -1635,6 +1660,51 @@ describe('toStrictJsonSchema', () => {
       });
     });
 
+    test('removes a redundant object type through singleton allOf union branches', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          value: {
+            type: 'object',
+            anyOf: [
+              {
+                allOf: [
+                  {
+                    type: 'object',
+                    properties: { name: { type: 'string' } },
+                    required: ['name'],
+                  },
+                ],
+              },
+              {
+                type: 'object',
+                properties: { age: { type: 'number' } },
+                required: ['age'],
+              },
+            ],
+          },
+        },
+        required: ['value'],
+      };
+
+      expect(toStrictJsonSchema(schema).properties?.['value']).toEqual({
+        anyOf: [
+          {
+            type: 'object',
+            properties: { name: { type: 'string' } },
+            required: ['name'],
+            additionalProperties: false,
+          },
+          {
+            type: 'object',
+            properties: { age: { type: 'number' } },
+            required: ['age'],
+            additionalProperties: false,
+          },
+        ],
+      });
+    });
+
     test('removes a redundant nullable object type from an anyOf wrapper before closing branches', () => {
       const schema: JSONSchema = {
         type: 'object',
@@ -1699,6 +1769,33 @@ describe('toStrictJsonSchema', () => {
       expect(() => toStrictJsonSchema(schema)).toThrow(
         'Object anyOf schema at `properties/value` cannot be represented',
       );
+    });
+
+    test('removes false anyOf branches while retaining all-false failures', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          value: {
+            anyOf: [false, { type: 'string' }],
+          },
+        },
+        required: ['value'],
+      };
+
+      expect(toStrictJsonSchema(schema).properties?.['value']).toEqual({
+        anyOf: [{ type: 'string' }],
+      });
+
+      const allFalseSchema: JSONSchema = {
+        type: 'object',
+        properties: {
+          value: {
+            anyOf: [false, false],
+          },
+        },
+        required: ['value'],
+      };
+      expect(() => toStrictJsonSchema(allFalseSchema)).toThrow('Expected object schema but got boolean');
     });
 
     test('removes empty object keywords from an untyped anyOf wrapper', () => {
@@ -2179,6 +2276,56 @@ describe('toStrictJsonSchema', () => {
       });
     });
 
+    test('normalizes ref-resolved allOf targets before earlier consumers', () => {
+      const makeSchema = (consumerFirst: boolean): JSONSchema => {
+        const consumer = {
+          type: 'object',
+          allOf: [
+            { $ref: '#/properties/target' },
+            {
+              type: 'object',
+              properties: { active: { type: 'boolean' } },
+              required: ['active'],
+            },
+          ],
+        };
+        const target = {
+          allOf: [
+            {
+              type: 'object',
+              properties: { name: { type: 'string' } },
+              required: ['name'],
+            },
+            {
+              type: 'object',
+              properties: { age: { type: 'number' } },
+              required: ['age'],
+            },
+          ],
+        };
+        return {
+          type: 'object',
+          properties: consumerFirst ? { consumer, target } : { target, consumer },
+          required: ['consumer', 'target'],
+        };
+      };
+
+      for (const consumerFirst of [true, false]) {
+        const strict = toStrictJsonSchema(makeSchema(consumerFirst));
+        expect(strict.properties?.['consumer']).toEqual({
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            age: { type: 'number' },
+            active: { type: 'boolean' },
+          },
+          required: ['name', 'age', 'active'],
+          additionalProperties: false,
+        });
+        expect(JSON.stringify(strict)).not.toContain('"allOf"');
+      }
+    });
+
     test('merges compatible object allOf variants through local ref chains', () => {
       const schema: JSONSchema = {
         type: 'object',
@@ -2288,6 +2435,67 @@ describe('toStrictJsonSchema', () => {
         required: ['name', 'age'],
         additionalProperties: false,
       });
+    });
+
+    test('intersects closed object allOf property sets and drops excluded optionals', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          value: {
+            allOf: [
+              {
+                type: 'object',
+                properties: { x: { type: 'string' } },
+                required: ['x'],
+                additionalProperties: false,
+              },
+              {
+                type: 'object',
+                properties: { x: { type: 'string' }, y: { type: 'number' } },
+                required: ['x'],
+                additionalProperties: false,
+              },
+            ],
+          },
+        },
+        required: ['value'],
+      };
+
+      expect(toStrictJsonSchema(schema).properties?.['value']).toEqual({
+        type: 'object',
+        properties: { x: { type: 'string' } },
+        required: ['x'],
+        additionalProperties: false,
+      });
+    });
+
+    test('rejects closed object allOf intersections that exclude required properties', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          value: {
+            allOf: [
+              {
+                type: 'object',
+                properties: { x: { type: 'string' } },
+                required: ['x'],
+                additionalProperties: false,
+              },
+              {
+                type: 'object',
+                properties: { x: { type: 'string' }, y: { type: 'number' } },
+                required: ['x', 'y'],
+                additionalProperties: false,
+              },
+            ],
+          },
+        },
+        required: ['value'],
+      };
+
+      expect(() => toStrictJsonSchema(schema)).toThrow(
+        'cannot be merged without changing Draft 7 validation',
+      );
     });
 
     test('fails closed on cyclic local ref chains in object allOf variants', () => {

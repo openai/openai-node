@@ -227,6 +227,52 @@ function haveDisjointObjectDiscriminator(left: unknown, right: unknown, root: JS
   return false;
 }
 
+function getClosedObjectPropertySet(
+  schema: unknown,
+): { properties: Set<string>; required: string[] } | undefined {
+  if (!isObjectOnlySchema(schema)) return undefined;
+
+  const record = schema as Record<string, unknown>;
+  const properties = record['properties'];
+  const required = record['required'];
+  if (
+    record['additionalProperties'] !== false ||
+    !properties ||
+    typeof properties !== 'object' ||
+    Array.isArray(properties) ||
+    !Array.isArray(required) ||
+    required.some((property) => typeof property !== 'string')
+  ) {
+    return undefined;
+  }
+
+  const propertySet = new Set(Object.keys(properties));
+  const requiredProperties = required as string[];
+  // A required undeclared property makes a closed branch unsatisfiable, but
+  // the strictifier rejects that shape rather than representing it. Keep this
+  // exclusivity proof conservative and let the normal validation path fail.
+  if (requiredProperties.some((property) => !propertySet.has(property))) {
+    return undefined;
+  }
+
+  return { properties: propertySet, required: requiredProperties };
+}
+
+function haveDisjointClosedObjectPropertySets(left: unknown, right: unknown): boolean {
+  const leftShape = getClosedObjectPropertySet(left);
+  const rightShape = getClosedObjectPropertySet(right);
+  if (!leftShape || !rightShape) return false;
+
+  // If either closed branch requires a property the other branch does not
+  // declare, every instance satisfying the first is rejected by the second as
+  // an additional property. This proves oneOf exclusivity without widening
+  // overlapping closed shapes.
+  return (
+    leftShape.required.some((property) => !rightShape.properties.has(property)) ||
+    rightShape.required.some((property) => !leftShape.properties.has(property))
+  );
+}
+
 function areMutuallyExclusive(left: unknown, right: unknown, root: JSONSchema): boolean {
   const leftTypes = getSchemaTypes(left);
   const rightTypes = getSchemaTypes(right);
@@ -240,7 +286,11 @@ function areMutuallyExclusive(left: unknown, right: unknown, root: JSONSchema): 
     return true;
   }
 
-  return haveDisjointLiteralValues(left, right) || haveDisjointObjectDiscriminator(left, right, root);
+  return (
+    haveDisjointLiteralValues(left, right) ||
+    haveDisjointObjectDiscriminator(left, right, root) ||
+    haveDisjointClosedObjectPropertySets(left, right)
+  );
 }
 
 function resolveLocalRefForExclusivity(

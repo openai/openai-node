@@ -51,6 +51,8 @@ const JSON_SCHEMA_MAP_SCHEMA_KEYWORDS = [
 const JSON_SCHEMA_UNSUPPORTED_SCHEMA_KEYWORDS = new Set([
   '$dynamicAnchor',
   '$dynamicRef',
+  '$recursiveAnchor',
+  '$recursiveRef',
   'allOf',
   'contains',
   'contentEncoding',
@@ -502,6 +504,13 @@ function ensureStrictJsonSchema(
     return ensureStrictJsonSchema(jsonSchema, path, root);
   }
 
+  // false is the identity element for a union. Remove it before proving
+  // whether an outer object/array wrapper is redundant so an impossible
+  // alternative cannot hide the shape of every real branch. Keep all-false
+  // and boolean-only unions intact so the existing boolean-schema rejection
+  // remains fail closed.
+  normalizeAnyOfFalseBranches(jsonSchema);
+
   // Closing a type: object wrapper around object union branches without any
   // own properties would turn it into an empty object and forbid every branch
   // property. A bare object type is redundant when every branch already proves
@@ -793,6 +802,21 @@ function isObjectOnlySchema(
     return isObjectOnlySchema(resolved, root, new Set([...seenRefs, schema.$ref]));
   }
 
+  if (schema.allOf !== undefined) {
+    if (
+      !Array.isArray(schema.allOf) ||
+      schema.allOf.length !== 1 ||
+      !hasOnlyAnnotationSiblings(schema, 'allOf')
+    ) {
+      return false;
+    }
+
+    const branch = schema.allOf[0];
+    return branch !== undefined && branch !== true && branch !== false ?
+        isObjectOnlySchema(branch, root, seenRefs)
+      : false;
+  }
+
   return (
     schema.type === 'object' ||
     (Array.isArray(schema.type) && schema.type.length === 1 && schema.type[0] === 'object')
@@ -819,6 +843,21 @@ function isArrayOnlySchema(
     }
 
     return isArrayOnlySchema(resolved, root, new Set([...seenRefs, schema.$ref]));
+  }
+
+  if (schema.allOf !== undefined) {
+    if (
+      !Array.isArray(schema.allOf) ||
+      schema.allOf.length !== 1 ||
+      !hasOnlyAnnotationSiblings(schema, 'allOf')
+    ) {
+      return false;
+    }
+
+    const branch = schema.allOf[0];
+    return branch !== undefined && branch !== true && branch !== false ?
+        isArrayOnlySchema(branch, root, seenRefs)
+      : false;
   }
 
   return (
@@ -937,6 +976,17 @@ function normalizeArrayUnionWrapper(jsonSchema: JSONSchema, root: JSONSchema): v
     // null. Keeping either redundant wrapper would require an outer items
     // schema that does not contribute any Draft 7 validation.
     delete jsonSchema.type;
+  }
+}
+
+function normalizeAnyOfFalseBranches(jsonSchema: JSONSchema): void {
+  if (!Array.isArray(jsonSchema.anyOf)) {
+    return;
+  }
+
+  const realBranches = jsonSchema.anyOf.filter((branch) => branch !== false);
+  if (realBranches.length > 0 && realBranches.length !== jsonSchema.anyOf.length) {
+    jsonSchema.anyOf = realBranches;
   }
 }
 
@@ -1177,45 +1227,83 @@ type ResolvedObjectAllOfBranch = {
 function resolveObjectAllOfBranch(
   schema: JSONSchema,
   root: JSONSchema,
+  normalizing: Set<JSONSchema>,
 ): ResolvedObjectAllOfBranch | undefined {
   const refChain = [schema];
   const seenRefs = new Set<string>();
   let resolved = schema;
+  let resolvedPath: string[] = [];
 
-  while (resolved.$ref !== undefined) {
-    const ref = resolved.$ref;
-    if (typeof ref !== 'string' || !hasOnlyRefAndAnnotations(resolved) || seenRefs.has(ref)) {
-      return undefined;
+  while (true) {
+    while (resolved.$ref !== undefined) {
+      const ref = resolved.$ref;
+      if (typeof ref !== 'string' || !hasOnlyRefAndAnnotations(resolved) || seenRefs.has(ref)) {
+        return undefined;
+      }
+      seenRefs.add(ref);
+
+      const target = resolveLocalRef(root, ref);
+      if (typeof target === 'boolean' || !isObject(target)) {
+        return undefined;
+      }
+      const targetPath = parseLocalRef(ref);
+      if (targetPath === undefined) {
+        return undefined;
+      }
+
+      resolved = target;
+      resolvedPath = targetPath;
+      refChain.push(resolved);
     }
-    seenRefs.add(ref);
 
-    const target = resolveLocalRef(root, ref);
-    if (typeof target === 'boolean' || !isObject(target)) {
-      return undefined;
+    // A ref can point forward to a target whose own mergeable allOf has not
+    // been visited yet. Normalize that target before its consumer classifies
+    // the resolved shape, making property order irrelevant. An active target
+    // is a ref/allOf cycle; leave it wrapped so the caller still fails closed.
+    if (resolved.allOf !== undefined && !normalizing.has(resolved)) {
+      const previousAllOf = resolved.allOf;
+      normalizeObjectAllOfBranches(resolved, resolvedPath, root, normalizing);
+      // Singleton flattening can expose another local ref. Follow it through
+      // the same guarded loop before returning the effective branch.
+      if (resolved.$ref !== undefined || resolved.allOf !== previousAllOf) {
+        continue;
+      }
     }
 
-    resolved = target;
-    refChain.push(resolved);
+    return { schema: resolved, refChain };
   }
-
-  return { schema: resolved, refChain };
 }
 
-function normalizeObjectAllOfBranches(schema: JSONSchemaDefinition, path: string[], root: JSONSchema): void {
+function normalizeObjectAllOfBranches(
+  schema: JSONSchemaDefinition,
+  path: string[],
+  root: JSONSchema,
+  normalizing: Set<JSONSchema> = new Set(),
+): void {
   if (typeof schema === 'boolean' || !isObject(schema)) {
     return;
   }
+  if (normalizing.has(schema)) {
+    return;
+  }
 
-  forEachJSONSchemaChild(schema, path, (child, childPath) => {
-    normalizeObjectAllOfBranches(child as JSONSchemaDefinition, childPath, root);
-  });
+  normalizing.add(schema);
+  try {
+    while (true) {
+      forEachJSONSchemaChild(schema, path, (child, childPath) => {
+        normalizeObjectAllOfBranches(child as JSONSchemaDefinition, childPath, root, normalizing);
+      });
 
-  // Intersections are associative, so normalize nested object intersections
-  // before classifying their parents. Otherwise an inner allOf wrapper has no
-  // directly visible object shape and makes an exactly mergeable outer allOf
-  // fail closed.
-  if (mergeObjectAllOf(schema, path, root)) {
-    normalizeObjectAllOfBranches(schema, path, root);
+      // Intersections are associative, so normalize nested object
+      // intersections before classifying their parents. Otherwise an inner
+      // allOf wrapper has no directly visible object shape and makes an
+      // exactly mergeable outer allOf fail closed.
+      if (!mergeObjectAllOf(schema, path, root, normalizing)) {
+        return;
+      }
+    }
+  } finally {
+    normalizing.delete(schema);
   }
 }
 
@@ -1268,7 +1356,12 @@ export function normalizeObjectAllOfForExclusivity(
   }
 }
 
-function mergeObjectAllOf(jsonSchema: JSONSchema, path: string[], root: JSONSchema): boolean {
+function mergeObjectAllOf(
+  jsonSchema: JSONSchema,
+  path: string[],
+  root: JSONSchema,
+  normalizing: Set<JSONSchema> = new Set(),
+): boolean {
   const allOf = jsonSchema.allOf;
   if (!Array.isArray(allOf) || allOf.length === 0) {
     return false;
@@ -1289,7 +1382,7 @@ function mergeObjectAllOf(jsonSchema: JSONSchema, path: string[], root: JSONSche
 
   const parentHasObjectShape = hasObjectShapeWithoutAllOf(jsonSchema);
   const resolvedEntries = allOf.map((entry) =>
-    isObject(entry) ? resolveObjectAllOfBranch(entry, root) : undefined,
+    isObject(entry) ? resolveObjectAllOfBranch(entry, root, normalizing) : undefined,
   );
   const objectBranches = resolvedEntries
     .map((entry) => entry?.schema)
@@ -1371,6 +1464,7 @@ function mergeObjectAllOf(jsonSchema: JSONSchema, path: string[], root: JSONSche
   const mergedProperties = Object.create(null) as Record<string, JSONSchemaDefinition>;
   const mergedRequired = new Set<string>();
   const closedPropertySets: Set<string>[] = [];
+  const propertyEntries: Array<[string, JSONSchemaDefinition]> = [];
   let sawProperties = false;
   let sawRequired = false;
   let hasExplicitObjectType = false;
@@ -1428,13 +1522,7 @@ function mergeObjectAllOf(jsonSchema: JSONSchema, path: string[], root: JSONSche
       }
       sawProperties = true;
       for (const [key, propertySchema] of Object.entries(branch.properties)) {
-        if (
-          Object.prototype.hasOwnProperty.call(mergedProperties, key) &&
-          !schemasEqual(mergedProperties[key], propertySchema)
-        ) {
-          fail();
-        }
-        mergedProperties[key] = propertySchema;
+        propertyEntries.push([key, propertySchema]);
       }
     }
 
@@ -1454,9 +1542,37 @@ function mergeObjectAllOf(jsonSchema: JSONSchema, path: string[], root: JSONSche
     }
   }
 
-  const mergedPropertyNames = Object.keys(mergedProperties);
-  if (closedPropertySets.some((keys) => mergedPropertyNames.some((key) => !keys.has(key)))) {
+  // A closed branch forbids every property it does not declare. Intersect all
+  // closed property sets before merging schemas so optional declarations
+  // excluded by another closed branch are discarded, while required excluded
+  // properties remain unrepresentable and fail closed.
+  const allowedClosedProperties =
+    closedPropertySets.length === 0 ?
+      undefined
+    : closedPropertySets
+        .slice(1)
+        .reduce(
+          (allowed, keys) => new Set([...allowed].filter((key) => keys.has(key))),
+          new Set(closedPropertySets[0]),
+        );
+  if (
+    allowedClosedProperties !== undefined &&
+    [...mergedRequired].some((key) => !allowedClosedProperties.has(key))
+  ) {
     fail();
+  }
+
+  for (const [key, propertySchema] of propertyEntries) {
+    if (allowedClosedProperties !== undefined && !allowedClosedProperties.has(key)) {
+      continue;
+    }
+    if (
+      Object.prototype.hasOwnProperty.call(mergedProperties, key) &&
+      !schemasEqual(mergedProperties[key], propertySchema)
+    ) {
+      fail();
+    }
+    mergedProperties[key] = propertySchema;
   }
 
   if (hasExplicitObjectType || hasExplicitNullableObjectType) {

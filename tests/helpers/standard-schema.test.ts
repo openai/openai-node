@@ -382,6 +382,108 @@ describe('Standard Schema helpers', () => {
     }
   });
 
+  it('normalizes singleton allOf wrappers inside object unions across all helper surfaces', () => {
+    const schemas = strictSchemasForAllHelpers({
+      type: 'object',
+      properties: {
+        choice: {
+          type: 'object',
+          anyOf: [
+            {
+              allOf: [
+                {
+                  type: 'object',
+                  properties: { name: { type: 'string' } },
+                  required: ['name'],
+                },
+              ],
+            },
+            {
+              type: 'object',
+              properties: { age: { type: 'number' } },
+              required: ['age'],
+            },
+          ],
+        },
+      },
+      required: ['choice'],
+    });
+
+    for (const schema of schemas) {
+      expect((schema as JSONSchema).properties?.['choice']).toEqual({
+        anyOf: [
+          {
+            type: 'object',
+            properties: { name: { type: 'string' } },
+            required: ['name'],
+            additionalProperties: false,
+          },
+          {
+            type: 'object',
+            properties: { age: { type: 'number' } },
+            required: ['age'],
+            additionalProperties: false,
+          },
+        ],
+      });
+    }
+  });
+
+  it('normalizes singleton allOf wrappers inside array unions across all helper surfaces', () => {
+    const schemas = strictSchemasForAllHelpers({
+      type: 'object',
+      properties: {
+        choice: {
+          type: 'array',
+          anyOf: [
+            { allOf: [{ type: 'array', items: { type: 'string' } }] },
+            { type: 'array', items: { type: 'number' } },
+          ],
+        },
+      },
+      required: ['choice'],
+    });
+
+    for (const schema of schemas) {
+      expect((schema as JSONSchema).properties?.['choice']).toEqual({
+        anyOf: [
+          { type: 'array', items: { type: 'string' } },
+          { type: 'array', items: { type: 'number' } },
+        ],
+      });
+    }
+  });
+
+  it('removes false anyOf alternatives across all helper surfaces but keeps boolean unions fail closed', () => {
+    const schemas = strictSchemasForAllHelpers({
+      type: 'object',
+      properties: {
+        choice: {
+          anyOf: [false, { type: 'string' }],
+        },
+      },
+      required: ['choice'],
+    });
+
+    for (const schema of schemas) {
+      expect((schema as JSONSchema).properties?.['choice']).toEqual({
+        anyOf: [{ type: 'string' }],
+      });
+    }
+
+    for (const makeSchema of makeStrictSchemaFactories({
+      type: 'object',
+      properties: {
+        choice: {
+          anyOf: [false, false],
+        },
+      },
+      required: ['choice'],
+    })) {
+      expect(makeSchema).toThrow('Expected object schema but got boolean');
+    }
+  });
+
   it('updates refs into oneOf branches after moving them to anyOf', () => {
     const { standardSchema } = makeStandardSchema({
       type: 'object',
@@ -451,6 +553,77 @@ describe('Standard Schema helpers', () => {
     expect(() => standardResponseFormat(standardSchema, 'choice')).toThrow(
       'Standard JSON Schema generated a `oneOf` whose branches are not provably mutually exclusive',
     );
+  });
+
+  it('proves disjoint closed object property sets across all helper surfaces', () => {
+    const schemas = strictSchemasForAllHelpers({
+      type: 'object',
+      properties: {
+        choice: {
+          oneOf: [
+            {
+              type: 'object',
+              properties: { a: { type: 'string' } },
+              required: ['a'],
+              additionalProperties: false,
+            },
+            {
+              type: 'object',
+              properties: { b: { type: 'number' } },
+              required: ['b'],
+              additionalProperties: false,
+            },
+          ],
+        },
+      },
+      required: ['choice'],
+    });
+
+    for (const schema of schemas) {
+      expect((schema as JSONSchema).properties?.['choice']).toEqual({
+        anyOf: [
+          {
+            type: 'object',
+            properties: { a: { type: 'string' } },
+            required: ['a'],
+            additionalProperties: false,
+          },
+          {
+            type: 'object',
+            properties: { b: { type: 'number' } },
+            required: ['b'],
+            additionalProperties: false,
+          },
+        ],
+      });
+    }
+  });
+
+  it('keeps overlapping closed object property sets fail closed across all helper surfaces', () => {
+    for (const makeSchema of makeStrictSchemaFactories({
+      type: 'object',
+      properties: {
+        choice: {
+          oneOf: [
+            {
+              type: 'object',
+              properties: { shared: { type: 'string' } },
+              required: ['shared'],
+              additionalProperties: false,
+            },
+            {
+              type: 'object',
+              properties: { shared: { type: 'string' }, optional: { type: 'number' } },
+              required: ['shared'],
+              additionalProperties: false,
+            },
+          ],
+        },
+      },
+      required: ['choice'],
+    })) {
+      expect(makeSchema).toThrow('whose branches are not provably mutually exclusive');
+    }
   });
 
   it('normalizes provably exclusive oneOf branches behind local refs', () => {
@@ -699,6 +872,118 @@ describe('Standard Schema helpers', () => {
       });
       expect(JSON.stringify(schema)).not.toContain('"allOf"');
       expect(JSON.stringify(schema)).not.toContain('"oneOf"');
+    }
+  });
+
+  it('normalizes ref-resolved allOf targets before earlier consumers across all helper surfaces', () => {
+    const makeSchema = (consumerFirst: boolean) => {
+      const consumer = {
+        type: 'object',
+        allOf: [
+          { $ref: '#/properties/target' },
+          {
+            type: 'object',
+            properties: { active: { type: 'boolean' } },
+            required: ['active'],
+          },
+        ],
+      };
+      const target = {
+        allOf: [
+          {
+            type: 'object',
+            properties: { name: { type: 'string' } },
+            required: ['name'],
+          },
+          {
+            type: 'object',
+            properties: { age: { type: 'number' } },
+            required: ['age'],
+          },
+        ],
+      };
+      return {
+        type: 'object',
+        properties: consumerFirst ? { consumer, target } : { target, consumer },
+        required: ['consumer', 'target'],
+      };
+    };
+
+    for (const consumerFirst of [true, false]) {
+      for (const schema of strictSchemasForAllHelpers(makeSchema(consumerFirst))) {
+        expect((schema as JSONSchema).properties?.['consumer']).toEqual({
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            age: { type: 'number' },
+            active: { type: 'boolean' },
+          },
+          required: ['name', 'age', 'active'],
+          additionalProperties: false,
+        });
+        expect(JSON.stringify(schema)).not.toContain('"allOf"');
+      }
+    }
+  });
+
+  it('intersects closed allOf property sets across all helper surfaces', () => {
+    const schemas = strictSchemasForAllHelpers({
+      type: 'object',
+      properties: {
+        value: {
+          allOf: [
+            {
+              type: 'object',
+              properties: { x: { type: 'string' } },
+              required: ['x'],
+              additionalProperties: false,
+            },
+            {
+              type: 'object',
+              properties: { x: { type: 'string' }, y: { type: 'number' } },
+              required: ['x'],
+              additionalProperties: false,
+            },
+          ],
+        },
+      },
+      required: ['value'],
+    });
+
+    for (const schema of schemas) {
+      expect((schema as JSONSchema).properties?.['value']).toEqual({
+        type: 'object',
+        properties: { x: { type: 'string' } },
+        required: ['x'],
+        additionalProperties: false,
+      });
+    }
+  });
+
+  it('rejects closed allOf property sets that exclude required properties across all helper surfaces', () => {
+    for (const makeSchema of makeStrictSchemaFactories({
+      type: 'object',
+      properties: {
+        value: {
+          allOf: [
+            {
+              type: 'object',
+              properties: { x: { type: 'string' } },
+              required: ['x'],
+              additionalProperties: false,
+            },
+            {
+              type: 'object',
+              properties: { x: { type: 'string' }, y: { type: 'number' } },
+              required: ['x', 'y'],
+              additionalProperties: false,
+            },
+          ],
+        },
+      },
+      required: ['value'],
+    })) {
+      expect(makeSchema).toThrow('cannot be merged without changing Draft 7 validation');
     }
   });
 
@@ -1165,6 +1450,24 @@ describe('Standard Schema helpers', () => {
     expect(() => standardResponseFormat(standardSchema, 'value')).toThrow(
       `uses unsupported keyword \`${keyword}\``,
     );
+  });
+
+  it.each([
+    ['$recursiveRef', '#'],
+    ['$recursiveAnchor', true],
+  ] as const)('rejects unsupported %s across all helper surfaces', (keyword, value) => {
+    for (const makeSchema of makeStrictSchemaFactories({
+      type: 'object',
+      properties: {
+        value: {
+          type: 'string',
+          [keyword]: value,
+        },
+      },
+      required: ['value'],
+    })) {
+      expect(makeSchema).toThrow('uses unsupported keyword');
+    }
   });
 
   it.each(['minProperties', 'maxProperties'] as const)(
