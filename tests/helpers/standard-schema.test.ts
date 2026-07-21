@@ -484,6 +484,73 @@ describe('Standard Schema helpers', () => {
     }
   });
 
+  it('rewrites nested refs into shifted false anyOf alternatives across all helper surfaces', () => {
+    const definitionName = 'union/name~% value';
+    const definitionRef = '#/$defs/union~1name~0%25%20value';
+    const schemas = strictSchemasForAllHelpers({
+      type: 'object',
+      $defs: {
+        [definitionName]: {
+          anyOf: [
+            false,
+            {
+              type: 'object',
+              properties: {
+                nested: {
+                  anyOf: [false, { type: 'string' }],
+                },
+              },
+              required: ['nested'],
+            },
+          ],
+        },
+      },
+      properties: {
+        value: { $ref: `${definitionRef}/anyOf/1` },
+        nested: { $ref: `${definitionRef}/anyOf/1/properties/nested/anyOf/1` },
+      },
+      required: ['value', 'nested'],
+    });
+
+    for (const schema of schemas) {
+      expect(schema).toMatchObject({
+        $defs: {
+          [definitionName]: {
+            anyOf: [
+              {
+                type: 'object',
+                properties: {
+                  nested: {
+                    anyOf: [{ type: 'string' }],
+                  },
+                },
+              },
+            ],
+          },
+        },
+        properties: {
+          value: { $ref: `${definitionRef}/anyOf/0` },
+          nested: { $ref: `${definitionRef}/anyOf/0/properties/nested/anyOf/0` },
+        },
+      });
+    }
+  });
+
+  it('keeps refs into removed false anyOf alternatives fail closed across all helper surfaces', () => {
+    for (const makeSchema of makeStrictSchemaFactories({
+      type: 'object',
+      properties: {
+        choice: {
+          anyOf: [false, { type: 'string' }],
+        },
+        alias: { $ref: '#/properties/choice/anyOf/0' },
+      },
+      required: ['choice', 'alias'],
+    })) {
+      expect(makeSchema).toThrow('Expected object schema but got boolean');
+    }
+  });
+
   it('updates refs into oneOf branches after moving them to anyOf', () => {
     const { standardSchema } = makeStandardSchema({
       type: 'object',
@@ -1643,8 +1710,12 @@ describe('Standard Schema helpers', () => {
 function _typeTests() {
   const { standardSchema } = makeStandardSchema();
 
-  expectType<WeatherOutput>(standardResponseFormat(standardSchema, 'weather').__output);
-  expectType<WeatherOutput>(standardTextFormat(standardSchema, 'weather').__output);
+  const responseFormat = standardResponseFormat(standardSchema, 'weather');
+  const textFormat = standardTextFormat(standardSchema, 'weather');
+  expectType<WeatherOutput>(responseFormat.__output);
+  expectType<WeatherOutput>(textFormat.__output);
+  compareType<typeof responseFormat.__output, WeatherOutput>(true);
+  compareType<typeof textFormat.__output, WeatherOutput>(true);
 
   const chatTool = standardFunction({
     name: 'get_weather',
@@ -1670,9 +1741,35 @@ function _typeTests() {
       },
     },
   };
+  const typelessStandardSchema = {
+    '~standard': {
+      version: 1 as const,
+      vendor: 'test',
+      validate: validateWeather,
+      jsonSchema: {
+        input: () => weatherJSONSchema as unknown as Record<string, unknown>,
+      },
+    },
+  };
+  const typelessResponseFormat = standardResponseFormat(typelessStandardSchema, 'weather');
+  const typelessTextFormat = standardTextFormat(typelessStandardSchema, 'weather');
+  const typelessChatTool = standardFunction({
+    name: 'get_weather',
+    parameters: typelessStandardSchema,
+    function: (args) => compareType<typeof args, unknown>(true),
+  });
+  const typelessResponseTool = standardResponsesFunction({
+    name: 'get_weather',
+    parameters: typelessStandardSchema,
+    function: (args) => compareType<typeof args, unknown>(true),
+  });
 
   compareType<ReturnType<typeof chatTool.$parseRaw>, WeatherOutput>(true);
   compareType<ReturnType<typeof responseTool.$parseRaw>, WeatherOutput>(true);
+  compareType<typeof typelessResponseFormat.__output, unknown>(true);
+  compareType<typeof typelessTextFormat.__output, unknown>(true);
+  compareType<ReturnType<typeof typelessChatTool.$parseRaw>, unknown>(true);
+  compareType<ReturnType<typeof typelessResponseTool.$parseRaw>, unknown>(true);
   expectType<true>(chatTool.__hasFunction);
   expectType<false>(callbacklessChatTool.__hasFunction);
   // @ts-expect-error callback-less tools cannot be passed to runTools

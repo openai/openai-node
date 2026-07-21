@@ -158,6 +158,7 @@ export function toStrictJsonSchema(schema: JSONSchema): JSONSchema {
   validateRefSchemas(schemaCopy, [], schemaCopy);
   preserveAllOfRefTargets(schemaCopy);
   validateRefSchemas(schemaCopy, [], schemaCopy);
+  rewriteLocalRefsIntoFilteredAnyOfBranches(schemaCopy);
   // Resolve representable object intersections before recursive
   // strictification closes referenced definitions. Otherwise a definition
   // reached through an allOf ref would be closed in isolation before its
@@ -1083,6 +1084,88 @@ export function rewriteLocalRefsIntoMovedOneOfBranches(root: JSONSchema): void {
     }
 
     return changed ? '#/' + parts.map(encodeJSONPointerTokenForURIFragment).join('/') : ref;
+  };
+
+  const rewriteRefs = (value: JSONSchemaDefinition): void => {
+    if (typeof value === 'boolean' || !isObject(value)) {
+      return;
+    }
+
+    if (typeof value.$ref === 'string') {
+      value.$ref = rewriteRef(value.$ref);
+    }
+
+    forEachJSONSchemaChild(value, [], (child) => {
+      rewriteRefs(child as JSONSchemaDefinition);
+    });
+  };
+
+  rewriteRefs(root);
+}
+
+/**
+ * Strictification removes false anyOf alternatives. Rewrite pointers into
+ * surviving alternatives before that filtering happens so each local ref
+ * still names the same schema after earlier indices disappear.
+ */
+function rewriteLocalRefsIntoFilteredAnyOfBranches(root: JSONSchema): void {
+  const rewriteRef = (ref: string): string => {
+    const originalParts = parseLocalRef(ref);
+    if (originalParts === undefined || originalParts.length === 0) {
+      return ref;
+    }
+
+    const rewrittenParts = [...originalParts];
+    let resolved: unknown = root;
+    let changed = false;
+
+    for (const [index, part] of originalParts.entries()) {
+      const resolvedRecord =
+        typeof resolved === 'object' && resolved !== null && !Array.isArray(resolved) ?
+          (resolved as Record<string, unknown>)
+        : undefined;
+      if (
+        part === 'anyOf' &&
+        index < originalParts.length - 1 &&
+        resolvedRecord !== undefined &&
+        Array.isArray(resolvedRecord['anyOf'])
+      ) {
+        const branches = resolvedRecord['anyOf'];
+        const branchIndexPart = originalParts[index + 1]!;
+        if (!/^(?:0|[1-9]\d*)$/.test(branchIndexPart)) {
+          return ref;
+        }
+
+        const branchIndex = Number(branchIndexPart);
+        if (!Object.prototype.hasOwnProperty.call(branches, branchIndex)) {
+          return ref;
+        }
+
+        const realBranches = branches.filter((branch) => branch !== false);
+        if (realBranches.length > 0 && realBranches.length !== branches.length) {
+          // A ref to a removed false schema is already rejected by the first
+          // ref-validation pass. Leave it untouched so it remains fail closed.
+          if (branches[branchIndex] === false) {
+            return ref;
+          }
+
+          const rewrittenIndex = branches.slice(0, branchIndex).filter((branch) => branch !== false).length;
+          if (rewrittenIndex !== branchIndex) {
+            rewrittenParts[index + 1] = String(rewrittenIndex);
+            changed = true;
+          }
+        }
+      }
+
+      // Resolve through the original pointer, not the rewritten one, so a
+      // nested anyOf can also be remapped after its parent index shifts.
+      resolved = resolvePointerPart(resolved, part);
+      if (resolved === undefined) {
+        return ref;
+      }
+    }
+
+    return changed ? '#/' + rewrittenParts.map(encodeJSONPointerTokenForURIFragment).join('/') : ref;
   };
 
   const rewriteRefs = (value: JSONSchemaDefinition): void => {
