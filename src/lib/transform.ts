@@ -121,8 +121,13 @@ export function toStrictJsonSchema(schema: JSONSchema): JSONSchema {
   }
 
   const schemaCopy = structuredClone(schema);
+  assertNoNestedSchemaIds(schemaCopy);
   validateRefSchemas(schemaCopy, [], schemaCopy);
-  return ensureStrictJsonSchema(schemaCopy, [], schemaCopy);
+  preserveAllOfRefTargets(schemaCopy);
+  validateRefSchemas(schemaCopy, [], schemaCopy);
+  const strictSchema = ensureStrictJsonSchema(schemaCopy, [], schemaCopy);
+  validateRefSchemas(strictSchema, [], strictSchema);
+  return strictSchema;
 }
 
 function isNullable(
@@ -335,21 +340,65 @@ function ensureStrictJsonSchema(
   return jsonSchema;
 }
 
-function resolveLocalRef(root: JSONSchema, ref: string): JSONSchemaDefinition | undefined {
+function parseLocalRef(ref: string): string[] | undefined {
   if (ref === '#') {
-    return root;
+    return [];
   }
   if (!ref.startsWith('#/')) {
     return undefined;
   }
 
-  let resolved: unknown = root;
+  const parts: string[] = [];
   for (const encodedPart of ref.slice(2).split('/')) {
-    const part = encodedPart.replace(/~1/g, '/').replace(/~0/g, '~');
-    if (!isObject(resolved) || !(part in resolved)) {
+    let decodedPart: string;
+    try {
+      decodedPart = decodeURIComponent(encodedPart);
+    } catch {
       return undefined;
     }
-    resolved = resolved[part];
+
+    // JSON Pointer only defines ~0 and ~1 escapes. Reject malformed escape
+    // sequences instead of looking up a different literal key.
+    if (/~(?:[^01]|$)/.test(decodedPart)) {
+      return undefined;
+    }
+    parts.push(decodedPart.replace(/~1/g, '/').replace(/~0/g, '~'));
+  }
+
+  return parts;
+}
+
+function resolvePointerPart(resolved: unknown, part: string): unknown | undefined {
+  if (Array.isArray(resolved)) {
+    if (!/^(?:0|[1-9]\d*)$/.test(part)) {
+      return undefined;
+    }
+
+    const index = Number(part);
+    if (!Object.prototype.hasOwnProperty.call(resolved, index)) {
+      return undefined;
+    }
+    return resolved[index];
+  }
+
+  if (!isObject(resolved) || !Object.prototype.hasOwnProperty.call(resolved, part)) {
+    return undefined;
+  }
+  return resolved[part];
+}
+
+export function resolveLocalRef(root: JSONSchema, ref: string): JSONSchemaDefinition | undefined {
+  const parts = parseLocalRef(ref);
+  if (parts === undefined) {
+    return undefined;
+  }
+
+  let resolved: unknown = root;
+  for (const part of parts) {
+    resolved = resolvePointerPart(resolved, part);
+    if (resolved === undefined) {
+      return undefined;
+    }
   }
 
   return resolved as JSONSchemaDefinition;
@@ -363,7 +412,7 @@ function isSchemaDefinition(value: unknown): value is JSONSchemaDefinition {
   return typeof value === 'boolean' || isObject(value);
 }
 
-function hasOnlyRefAndAnnotations(schema: JSONSchema): boolean {
+export function hasOnlyRefAndAnnotations(schema: JSONSchema): boolean {
   return Object.keys(schema).every(
     (keyword) => keyword === '$ref' || JSON_SCHEMA_ANNOTATION_KEYWORDS.has(keyword),
   );
@@ -386,6 +435,121 @@ function hasObjectShape(schema: JSONSchema): boolean {
     (Array.isArray(typ) && typ.includes('object')) ||
     (typ === undefined && hasObjectKeywords(schema))
   );
+}
+
+export function assertNoNestedSchemaIds(schema: JSONSchema): void {
+  const visit = (value: JSONSchemaDefinition, path: string[]): void => {
+    if (typeof value === 'boolean' || !isObject(value)) {
+      return;
+    }
+
+    if (path.length > 0 && '$id' in value) {
+      throw new Error(
+        'Nested $id at ' +
+          JSON.stringify(path.join('/')) +
+          ' establishes a separate JSON Schema resource scope and cannot be represented in strict Structured Outputs.',
+      );
+    }
+
+    forEachJSONSchemaChild(value, path, (child, childPath) => {
+      visit(child as JSONSchemaDefinition, childPath);
+    });
+  };
+
+  visit(schema, []);
+}
+
+function refTargetsAllOfBranch(root: JSONSchema, ref: string): boolean {
+  const parts = parseLocalRef(ref);
+  if (parts === undefined) {
+    return false;
+  }
+
+  let resolved: unknown = root;
+  for (const [index, part] of parts.entries()) {
+    if (
+      part === 'allOf' &&
+      isObject(resolved) &&
+      Array.isArray(resolved['allOf']) &&
+      index < parts.length - 1
+    ) {
+      return true;
+    }
+
+    resolved = resolvePointerPart(resolved, part);
+    if (resolved === undefined) {
+      return false;
+    }
+  }
+
+  return false;
+}
+
+function escapeJSONPointerToken(token: string): string {
+  return token.replace(/~/g, '~0').replace(/\//g, '~1');
+}
+
+/**
+ * Strictification removes every representable allOf. Preserve any schema
+ * referenced through an allOf branch under a stable root definition first so
+ * structural flattening cannot leave a dangling local pointer behind.
+ */
+function preserveAllOfRefTargets(root: JSONSchema): void {
+  const refsToPreserve = new Set<string>();
+  const collectRefs = (value: JSONSchemaDefinition): void => {
+    if (typeof value === 'boolean' || !isObject(value)) {
+      return;
+    }
+
+    if (typeof value.$ref === 'string' && refTargetsAllOfBranch(root, value.$ref)) {
+      refsToPreserve.add(value.$ref);
+    }
+
+    forEachJSONSchemaChild(value, [], (child) => {
+      collectRefs(child as JSONSchemaDefinition);
+    });
+  };
+  collectRefs(root);
+
+  if (refsToPreserve.size === 0) {
+    return;
+  }
+
+  if (root.$defs !== undefined && !isObject(root.$defs)) {
+    throw new Error('Root schema has invalid $defs and cannot preserve local allOf references.');
+  }
+  const definitions = (root.$defs ??= {});
+  const rewrittenRefs = new Map<string, string>();
+  let aliasIndex = 0;
+
+  for (const ref of refsToPreserve) {
+    const target = resolveLocalRef(root, ref);
+    if (!isSchemaDefinition(target)) {
+      throw new Error('Local $ref cannot be preserved before allOf flattening: ' + JSON.stringify(ref));
+    }
+
+    let alias = '__openai_strict_allOf_ref_' + aliasIndex++;
+    while (Object.prototype.hasOwnProperty.call(definitions, alias)) {
+      alias = '__openai_strict_allOf_ref_' + aliasIndex++;
+    }
+    definitions[alias] = structuredClone(target);
+    rewrittenRefs.set(ref, '#/$defs/' + escapeJSONPointerToken(alias));
+  }
+
+  const rewriteRefs = (value: JSONSchemaDefinition): void => {
+    if (typeof value === 'boolean' || !isObject(value)) {
+      return;
+    }
+
+    if (typeof value.$ref === 'string') {
+      value.$ref = rewrittenRefs.get(value.$ref) ?? value.$ref;
+    }
+
+    forEachJSONSchemaChild(value, [], (child) => {
+      rewriteRefs(child as JSONSchemaDefinition);
+    });
+  };
+  rewriteRefs(root);
 }
 
 function validateRefSchemas(schema: JSONSchemaDefinition, path: string[], root: JSONSchema): void {

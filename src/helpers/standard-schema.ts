@@ -9,7 +9,13 @@ import {
 } from '../lib/parser';
 import { AutoParseableResponseTool, makeParseableResponseTool } from '../lib/ResponsesParser';
 import { type JSONSchema } from '../lib/jsonschema';
-import { forEachJSONSchemaChild, toStrictJsonSchema } from '../lib/transform';
+import {
+  assertNoNestedSchemaIds,
+  forEachJSONSchemaChild,
+  hasOnlyRefAndAnnotations,
+  resolveLocalRef,
+  toStrictJsonSchema,
+} from '../lib/transform';
 import { ResponseFormatJSONSchema } from '../resources/index';
 import { type ResponseFormatTextJSONSchemaConfig } from '../resources/responses/responses';
 
@@ -246,21 +252,16 @@ function resolveLocalRefForExclusivity(
   const ref = record['$ref'];
   if (ref === undefined) return schema;
 
-  // Keep the proof conservative when a ref has sibling constraints. Resolving
-  // those correctly would require combining the referenced schema and siblings.
-  if (typeof ref !== 'string' || Object.keys(record).length !== 1 || !ref.startsWith('#/')) {
+  // Annotation keywords do not affect Draft 7 validation, so they are safe to
+  // retain while proving the referenced branches are mutually exclusive.
+  // Keep the proof conservative for every other sibling constraint.
+  if (typeof ref !== 'string' || !hasOnlyRefAndAnnotations(record as JSONSchema)) {
     return undefined;
   }
   if (seenRefs.has(ref)) return undefined;
 
-  let resolved: unknown = root;
-  for (const encodedPart of ref.slice(2).split('/')) {
-    const part = encodedPart.replace(/~1/g, '/').replace(/~0/g, '~');
-    if (!resolved || typeof resolved !== 'object' || Array.isArray(resolved) || !(part in resolved)) {
-      return undefined;
-    }
-    resolved = (resolved as Record<string, unknown>)[part];
-  }
+  const resolved = resolveLocalRef(root, ref);
+  if (resolved === undefined) return undefined;
 
   return resolveLocalRefForExclusivity(resolved, root, new Set([...seenRefs, ref]));
 }
@@ -280,6 +281,7 @@ function areOneOfBranchesMutuallyExclusive(branches: unknown[], root: JSONSchema
 }
 
 function normalizeStructuredOutputSchema(schema: JSONSchema): JSONSchema {
+  assertNoNestedSchemaIds(schema);
   const normalizedSchema = structuredClone(schema);
 
   const visitSchema = (value: unknown): void => {

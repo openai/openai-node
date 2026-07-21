@@ -806,6 +806,47 @@ describe('toStrictJsonSchema', () => {
       });
     });
 
+    test('preserves refs into allOf branches before flattening', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          value: {
+            allOf: [{ type: 'string' }],
+          },
+          alias: { $ref: '#/properties/value/allOf/0' },
+        },
+        required: ['value', 'alias'],
+      };
+
+      const strict = toStrictJsonSchema(schema);
+
+      expect(strict).toMatchObject({
+        $defs: {
+          __openai_strict_allOf_ref_0: { type: 'string' },
+        },
+        properties: {
+          value: { type: 'string' },
+          alias: { $ref: '#/$defs/__openai_strict_allOf_ref_0' },
+        },
+      });
+      expect(JSON.stringify(strict)).not.toContain('"allOf"');
+    });
+
+    test('rejects refs to missing allOf branches', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          value: {
+            allOf: [{ type: 'string' }],
+          },
+          alias: { $ref: '#/properties/value/allOf/1' },
+        },
+        required: ['value', 'alias'],
+      };
+
+      expect(() => toStrictJsonSchema(schema)).toThrow('does not resolve to an object or boolean schema');
+    });
+
     test('rejects a single allOf variant with sibling constraints', () => {
       const schema: JSONSchema = {
         type: 'object',
@@ -928,6 +969,67 @@ describe('toStrictJsonSchema', () => {
   });
 
   describe('$ref Resolution', () => {
+    test('resolves percent-encoded JSON Pointer tokens before pointer unescaping', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        $defs: {
+          'A B': { type: 'string' },
+          'A/B': { type: 'number' },
+        },
+        properties: {
+          spaced: { $ref: '#/$defs/A%20B' },
+          slash: { $ref: '#/$defs/A%7E1B' },
+        },
+        required: ['spaced', 'slash'],
+      };
+
+      expect(toStrictJsonSchema(schema)).toMatchObject({
+        properties: {
+          spaced: { $ref: '#/$defs/A%20B' },
+          slash: { $ref: '#/$defs/A%7E1B' },
+        },
+      });
+    });
+
+    test('rejects malformed URI and JSON Pointer escapes in local refs', () => {
+      for (const ref of ['#/$defs/A%2', '#/$defs/A%ZZ', '#/$defs/A~2B']) {
+        const schema: JSONSchema = {
+          type: 'object',
+          $defs: { 'A B': { type: 'string' } },
+          properties: { value: { $ref: ref } },
+          required: ['value'],
+        };
+
+        expect(() => toStrictJsonSchema(schema)).toThrow('does not resolve to an object or boolean schema');
+      }
+    });
+
+    test('allows a root $id but rejects nested resource scopes', () => {
+      const rootIdSchema: JSONSchema = {
+        $id: 'https://example.com/root.json',
+        type: 'object',
+        properties: { value: { type: 'string' } },
+        required: ['value'],
+      };
+      expect(toStrictJsonSchema(rootIdSchema)).toMatchObject({
+        $id: 'https://example.com/root.json',
+      });
+
+      const nestedIdSchema: JSONSchema = {
+        type: 'object',
+        properties: {
+          value: {
+            $id: 'nested.json',
+            type: 'string',
+          },
+        },
+        required: ['value'],
+      };
+      expect(() => toStrictJsonSchema(nestedIdSchema)).toThrow(
+        'establishes a separate JSON Schema resource scope',
+      );
+    });
+
     test('retains annotation-only recursive refs without expanding them', () => {
       const schema: JSONSchema = {
         type: 'object',

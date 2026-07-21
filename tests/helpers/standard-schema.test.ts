@@ -289,6 +289,153 @@ describe('Standard Schema helpers', () => {
     });
   });
 
+  it('normalizes annotated oneOf ref branches but rejects validation siblings', () => {
+    const definitions = {
+      foo: {
+        type: 'object',
+        properties: { kind: { type: 'string', const: 'foo' }, foo: { type: 'string' } },
+        required: ['kind', 'foo'],
+      },
+      bar: {
+        type: 'object',
+        properties: { kind: { type: 'string', const: 'bar' }, bar: { type: 'number' } },
+        required: ['kind', 'bar'],
+      },
+    };
+    const { standardSchema } = makeStandardSchema({
+      type: 'object',
+      $defs: definitions,
+      properties: {
+        choice: {
+          oneOf: [
+            { $ref: '#/$defs/foo', description: 'Foo choice' },
+            { $ref: '#/$defs/bar', title: 'Bar choice' },
+          ],
+        },
+      },
+      required: ['choice'],
+    });
+
+    expect(standardResponseFormat(standardSchema, 'choice').json_schema.schema).toMatchObject({
+      properties: {
+        choice: {
+          anyOf: [
+            { $ref: '#/$defs/foo', description: 'Foo choice' },
+            { $ref: '#/$defs/bar', title: 'Bar choice' },
+          ],
+        },
+      },
+    });
+
+    const { standardSchema: constrainedRefSchema } = makeStandardSchema({
+      type: 'object',
+      $defs: definitions,
+      properties: {
+        choice: {
+          oneOf: [{ $ref: '#/$defs/foo', minProperties: 1 }, { $ref: '#/$defs/bar' }],
+        },
+      },
+      required: ['choice'],
+    });
+    expect(() => standardResponseFormat(constrainedRefSchema, 'choice')).toThrow(
+      'whose branches are not provably mutually exclusive',
+    );
+  });
+
+  it('resolves URI-escaped oneOf refs and rejects malformed encodings', () => {
+    const definitions = {
+      'foo branch': {
+        type: 'object',
+        properties: { kind: { type: 'string', const: 'foo' }, foo: { type: 'string' } },
+        required: ['kind', 'foo'],
+      },
+      'bar branch': {
+        type: 'object',
+        properties: { kind: { type: 'string', const: 'bar' }, bar: { type: 'number' } },
+        required: ['kind', 'bar'],
+      },
+    };
+    const { standardSchema } = makeStandardSchema({
+      type: 'object',
+      $defs: definitions,
+      properties: {
+        choice: {
+          oneOf: [{ $ref: '#/$defs/foo%20branch' }, { $ref: '#/$defs/bar%20branch' }],
+        },
+      },
+      required: ['choice'],
+    });
+
+    expect(standardResponseFormat(standardSchema, 'choice').json_schema.schema).toMatchObject({
+      properties: {
+        choice: {
+          anyOf: [{ $ref: '#/$defs/foo%20branch' }, { $ref: '#/$defs/bar%20branch' }],
+        },
+      },
+    });
+
+    const { standardSchema: malformedRefSchema } = makeStandardSchema({
+      type: 'object',
+      $defs: definitions,
+      properties: {
+        choice: {
+          oneOf: [{ $ref: '#/$defs/foo%2' }, { $ref: '#/$defs/bar%20branch' }],
+        },
+      },
+      required: ['choice'],
+    });
+    expect(() => standardResponseFormat(malformedRefSchema, 'choice')).toThrow(
+      'whose branches are not provably mutually exclusive',
+    );
+  });
+
+  it('allows root $id scopes but rejects nested $id before oneOf normalization', () => {
+    const rootScopedSchema = {
+      $id: 'https://example.com/root.json',
+      type: 'object',
+      properties: { value: { type: 'string' } },
+      required: ['value'],
+    };
+    const { standardSchema: rootScopedStandardSchema } = makeStandardSchema(rootScopedSchema);
+    expect(standardResponseFormat(rootScopedStandardSchema, 'value').json_schema.schema).toMatchObject({
+      $id: 'https://example.com/root.json',
+    });
+
+    const { standardSchema: nestedScopedStandardSchema } = makeStandardSchema({
+      type: 'object',
+      $defs: {
+        outer: {
+          type: 'object',
+          properties: { kind: { type: 'string', const: 'outer' } },
+          required: ['kind'],
+        },
+      },
+      properties: {
+        nested: {
+          $id: 'nested.json',
+          type: 'object',
+          $defs: {
+            outer: {
+              type: 'object',
+              properties: { kind: { type: 'string', const: 'nested' } },
+              required: ['kind'],
+            },
+          },
+          properties: {
+            choice: {
+              oneOf: [{ $ref: '#/$defs/outer' }, { type: 'string' }],
+            },
+          },
+          required: ['choice'],
+        },
+      },
+      required: ['nested'],
+    });
+    expect(() => standardResponseFormat(nestedScopedStandardSchema, 'nested')).toThrow(
+      'establishes a separate JSON Schema resource scope',
+    );
+  });
+
   it('rejects oneOf refs that cannot be resolved locally', () => {
     for (const branches of [
       [{ $ref: '#/$defs/missing' }, { type: 'string' }],
