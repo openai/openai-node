@@ -1288,6 +1288,8 @@ describe('toStrictJsonSchema', () => {
       'dependentRequired',
       'dependentSchemas',
       'dependencies',
+      '$dynamicAnchor',
+      '$dynamicRef',
       'else',
       'if',
       'maxContains',

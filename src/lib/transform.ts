@@ -49,6 +49,8 @@ const JSON_SCHEMA_MAP_SCHEMA_KEYWORDS = [
 ];
 
 const JSON_SCHEMA_UNSUPPORTED_SCHEMA_KEYWORDS = new Set([
+  '$dynamicAnchor',
+  '$dynamicRef',
   'allOf',
   'contains',
   'contentEncoding',
@@ -1216,9 +1218,41 @@ export function normalizeObjectAllOfForExclusivity(
   schema: JSONSchema,
   root: JSONSchema,
 ): JSONSchema | undefined {
+  if (schema.allOf === undefined) {
+    return undefined;
+  }
+
   const normalized = structuredClone(schema);
   try {
-    return mergeObjectAllOf(normalized, [], root) ? normalized : undefined;
+    // Removing neutral branches or flattening a singleton can expose another
+    // mergeable allOf wrapper. Keep applying the recursive merger and safe
+    // singleton flattening until the proof sees the branch's final shape.
+    while (normalized.allOf !== undefined) {
+      normalizeObjectAllOfBranches(normalized, [], root);
+      if (normalized.allOf === undefined) {
+        break;
+      }
+
+      const allOf = normalized.allOf;
+      if (!Array.isArray(allOf) || allOf.length !== 1 || !hasOnlyAnnotationSiblings(normalized, 'allOf')) {
+        return undefined;
+      }
+
+      const branch = allOf[0];
+      if (typeof branch === 'boolean' || !isObject(branch)) {
+        return undefined;
+      }
+
+      const siblings = { ...normalized };
+      delete siblings.allOf;
+      const flattened = structuredClone(branch);
+      for (const keyword of Object.keys(normalized)) {
+        delete (normalized as Record<string, unknown>)[keyword];
+      }
+      Object.assign(normalized, flattened, siblings);
+    }
+
+    return normalized;
   } catch {
     return undefined;
   }

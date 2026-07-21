@@ -521,6 +521,60 @@ describe('Standard Schema helpers', () => {
     expect(JSON.stringify(schema)).not.toContain('"oneOf"');
   });
 
+  it('normalizes oneOf allOf branches to a fixed point before proving exclusivity', () => {
+    const { standardSchema } = makeStandardSchema({
+      type: 'object',
+      properties: {
+        choice: {
+          oneOf: [
+            {
+              allOf: [
+                true,
+                {
+                  type: 'object',
+                  properties: { kind: { type: 'string', const: 'foo' }, foo: { type: 'string' } },
+                  required: ['kind', 'foo'],
+                },
+              ],
+            },
+            {
+              allOf: [
+                true,
+                {
+                  type: 'object',
+                  properties: { kind: { type: 'string', const: 'bar' }, bar: { type: 'number' } },
+                  required: ['kind', 'bar'],
+                },
+              ],
+            },
+          ],
+        },
+      },
+      required: ['choice'],
+    });
+
+    const schema = standardResponseFormat(standardSchema, 'choice').json_schema.schema;
+
+    expect(schema).toMatchObject({
+      properties: {
+        choice: {
+          anyOf: [
+            {
+              type: 'object',
+              properties: { kind: { type: 'string', const: 'foo' }, foo: { type: 'string' } },
+            },
+            {
+              type: 'object',
+              properties: { kind: { type: 'string', const: 'bar' }, bar: { type: 'number' } },
+            },
+          ],
+        },
+      },
+    });
+    expect(JSON.stringify(schema)).not.toContain('"allOf"');
+    expect(JSON.stringify(schema)).not.toContain('"oneOf"');
+  });
+
   it('drops validation-neutral empty object keywords when normalizing oneOf wrappers', () => {
     const { standardSchema } = makeStandardSchema({
       type: 'object',
@@ -893,6 +947,26 @@ describe('Standard Schema helpers', () => {
 
     expect(() => standardResponseFormat(standardSchema, 'metadata')).toThrow(
       'uses unsupported keyword `patternProperties`',
+    );
+  });
+
+  it.each([
+    ['$dynamicRef', '#node'],
+    ['$dynamicAnchor', 'node'],
+  ] as const)('rejects unsupported %s before returning a strict schema', (keyword, value) => {
+    const { standardSchema } = makeStandardSchema({
+      type: 'object',
+      properties: {
+        value: {
+          type: 'string',
+          [keyword]: value,
+        },
+      },
+      required: ['value'],
+    });
+
+    expect(() => standardResponseFormat(standardSchema, 'value')).toThrow(
+      `uses unsupported keyword \`${keyword}\``,
     );
   });
 
