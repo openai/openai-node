@@ -91,6 +91,60 @@ describe('toStrictJsonSchema', () => {
       });
       expect(schema).not.toHaveProperty('type');
     });
+
+    test('follows a root local ref chain before validating the object type', () => {
+      const schema: JSONSchema = {
+        $ref: '#/$defs/A',
+        $defs: {
+          A: { $ref: '#/$defs/B' },
+          B: {
+            type: 'object',
+            properties: { name: { type: 'string' } },
+            required: ['name'],
+          },
+        },
+      };
+
+      expect(toStrictJsonSchema(schema)).toEqual({
+        type: 'object',
+        properties: { name: { type: 'string' } },
+        required: ['name'],
+        additionalProperties: false,
+        $defs: {
+          A: { $ref: '#/$defs/B' },
+          B: {
+            type: 'object',
+            properties: { name: { type: 'string' } },
+            required: ['name'],
+            additionalProperties: false,
+          },
+        },
+      });
+    });
+
+    test('rejects cyclic root local ref chains', () => {
+      const schema: JSONSchema = {
+        $ref: '#/$defs/A',
+        $defs: {
+          A: { $ref: '#/$defs/B' },
+          B: { $ref: '#/$defs/A' },
+        },
+      };
+
+      expect(() => toStrictJsonSchema(schema)).toThrow('Cyclic local $ref at `<root>`');
+    });
+
+    test.each([
+      ['missing', '#/$defs/Missing', 'does not resolve to an object or boolean schema'],
+      ['external', 'https://example.com/schema.json#/$defs/Input', 'External $ref at `<root>`'],
+    ])('rejects %s targets in root local ref chains', (_name, ref, message) => {
+      const schema: JSONSchema = {
+        $ref: '#/$defs/A',
+        $defs: { A: { $ref: ref } },
+      };
+
+      expect(() => toStrictJsonSchema(schema)).toThrow(message);
+    });
   });
 
   describe('Additional Properties', () => {

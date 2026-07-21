@@ -219,6 +219,27 @@ describe('Standard Schema helpers', () => {
     expect(oneOfSchema.properties.choice).toHaveProperty('oneOf');
   });
 
+  it('rewrites a shared oneOf schema only once', () => {
+    const sharedChoice = {
+      oneOf: [{ type: 'string', const: 'foo' }, { type: 'number' }],
+    };
+    const { standardSchema } = makeStandardSchema({
+      type: 'object',
+      properties: { first: sharedChoice, second: sharedChoice },
+      required: ['first', 'second'],
+    });
+
+    const schema = standardResponseFormat(standardSchema, 'choice').json_schema.schema;
+
+    expect(schema).toMatchObject({
+      properties: {
+        first: { anyOf: [{ type: 'string', const: 'foo' }, { type: 'number' }] },
+        second: { anyOf: [{ type: 'string', const: 'foo' }, { type: 'number' }] },
+      },
+    });
+    expect(JSON.stringify(schema)).not.toContain('"oneOf"');
+  });
+
   it('does not close redundant object oneOf wrappers as empty objects', () => {
     const { standardSchema } = makeStandardSchema({
       type: 'object',

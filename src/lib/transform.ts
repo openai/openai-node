@@ -154,33 +154,51 @@ export function toStrictJsonSchema(schema: JSONSchema): JSONSchema {
  * pointer in the schema.
  */
 function inlineRootRefObject(schema: JSONSchema): void {
-  const ref = schema.$ref;
+  let ref = schema.$ref;
   if (ref === undefined) {
     return;
   }
 
-  if (typeof ref !== 'string') {
-    throw new TypeError('Received non-string $ref - ' + String(ref) + '; path=');
-  }
-  if (!ref.startsWith('#')) {
-    throw new Error(
-      'External $ref at `<root>` is not supported in strict Structured Outputs: ' + JSON.stringify(ref),
-    );
-  }
+  assertLocalRootRef(ref);
   if (!hasOnlyRootRefAndDefinitions(schema)) {
     throw new Error(
       'Schema $ref at `<root>` has non-annotation siblings that Draft 7 ignores and cannot be represented in strict Structured Outputs.',
     );
   }
 
-  const resolved = resolveLocalRef(schema, ref);
-  if (resolved === undefined) {
-    throw new Error(
-      'Local $ref at `<root>` does not resolve to an object or boolean schema: ' + JSON.stringify(ref),
-    );
-  }
-  if (typeof resolved === 'boolean') {
-    throw new TypeError('Expected object schema but got boolean; path=');
+  const seenRefs = new Set<string>();
+  let resolved: JSONSchema;
+  while (true) {
+    if (seenRefs.has(ref)) {
+      throw new Error('Cyclic local $ref at `<root>` is not supported: ' + JSON.stringify(ref));
+    }
+    seenRefs.add(ref);
+
+    const target = resolveLocalRef(schema, ref);
+    if (target === undefined) {
+      throw new Error(
+        'Local $ref at `<root>` does not resolve to an object or boolean schema: ' + JSON.stringify(ref),
+      );
+    }
+    if (typeof target === 'boolean') {
+      throw new TypeError('Expected object schema but got boolean; path=');
+    }
+
+    const nextRef = target.$ref;
+    if (nextRef === undefined) {
+      resolved = target;
+      break;
+    }
+    assertLocalRootRef(nextRef);
+    if (seenRefs.has(nextRef)) {
+      throw new Error('Cyclic local $ref at `<root>` is not supported: ' + JSON.stringify(nextRef));
+    }
+    if (!hasOnlyRefAndAnnotations(target)) {
+      throw new Error(
+        'Schema $ref in root chain has non-annotation siblings that Draft 7 ignores and cannot be represented in strict Structured Outputs.',
+      );
+    }
+    ref = nextRef;
   }
 
   const rootDefinitions = schema.$defs;
@@ -200,6 +218,17 @@ function inlineRootRefObject(schema: JSONSchema): void {
   }
   if (legacyDefinitions !== undefined) {
     schema.definitions = legacyDefinitions;
+  }
+}
+
+function assertLocalRootRef(ref: unknown): asserts ref is string {
+  if (typeof ref !== 'string') {
+    throw new TypeError('Received non-string $ref - ' + String(ref) + '; path=');
+  }
+  if (!ref.startsWith('#')) {
+    throw new Error(
+      'External $ref at `<root>` is not supported in strict Structured Outputs: ' + JSON.stringify(ref),
+    );
   }
 }
 

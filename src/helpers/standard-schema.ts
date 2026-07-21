@@ -285,10 +285,14 @@ function normalizeStructuredOutputSchema(schema: JSONSchema): JSONSchema {
   assertNoNestedSchemaIds(schema);
   const normalizedSchema = structuredClone(schema);
   const oneOfSchemas: Record<string, unknown>[] = [];
+  const visitedSchemas = new Set<Record<string, unknown>>();
 
   const visitSchema = (value: unknown): void => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return;
     const record = value as Record<string, unknown>;
+    if (visitedSchemas.has(record)) return;
+    visitedSchemas.add(record);
+
     if (record['oneOf'] !== undefined) {
       if (!Array.isArray(record['oneOf'])) {
         throw new OpenAIError(
