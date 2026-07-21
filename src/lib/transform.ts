@@ -152,6 +152,11 @@ export function toStrictJsonSchema(schema: JSONSchema): JSONSchema {
   validateRefSchemas(schemaCopy, [], schemaCopy);
   preserveAllOfRefTargets(schemaCopy);
   validateRefSchemas(schemaCopy, [], schemaCopy);
+  // Resolve representable object intersections before recursive
+  // strictification closes referenced definitions. Otherwise a definition
+  // reached through an allOf ref would be closed in isolation before its
+  // sibling object properties can be merged.
+  normalizeObjectAllOfBranches(schemaCopy, [], schemaCopy);
   const strictSchema = ensureStrictJsonSchema(schemaCopy, [], schemaCopy);
   validateRefSchemas(strictSchema, [], strictSchema);
   return strictSchema;
@@ -262,7 +267,7 @@ function inlineRootRefObject(schema: JSONSchema): void {
  */
 function normalizeRootAllOf(schema: JSONSchema): void {
   while (schema.allOf !== undefined) {
-    if (mergeObjectAllOf(schema, [])) {
+    if (mergeObjectAllOf(schema, [], schema)) {
       return;
     }
 
@@ -430,7 +435,7 @@ function ensureStrictJsonSchema(
   // intersection: sibling branches' properties become forbidden extras. Merge
   // the small object-intersection subset that can be represented exactly before
   // applying strict object closure, and fail closed for the rest.
-  if (mergeObjectAllOf(jsonSchema, path)) {
+  if (mergeObjectAllOf(jsonSchema, path, root)) {
     return ensureStrictJsonSchema(jsonSchema, path, root);
   }
 
@@ -530,6 +535,15 @@ function ensureStrictJsonSchema(
         }\` uses unsupported keyword \`${keyword}\` and cannot be represented in strict Structured Outputs.`,
       );
     }
+  }
+
+  const type = jsonSchema.type;
+  if ((type === 'array' || (Array.isArray(type) && type.includes('array'))) && items === undefined) {
+    throw new Error(
+      `Schema at \`${
+        path.join('/') || '<root>'
+      }\` declares an array without \`items\`, which cannot be represented in strict Structured Outputs.`,
+    );
   }
 
   forEachJSONSchemaChild(jsonSchema, path, (child, childPath, keyword) => {
@@ -701,7 +715,13 @@ function isObjectOnlySchema(
 
 export function hasOnlyRefAndAnnotations(schema: JSONSchema): boolean {
   return Object.keys(schema).every(
-    (keyword) => keyword === '$ref' || JSON_SCHEMA_ANNOTATION_KEYWORDS.has(keyword),
+    // Definition maps do not add sibling validation constraints, and keeping
+    // them in place preserves local pointers into a nested alias's scope.
+    (keyword) =>
+      keyword === '$ref' ||
+      keyword === '$defs' ||
+      keyword === 'definitions' ||
+      JSON_SCHEMA_ANNOTATION_KEYWORDS.has(keyword),
   );
 }
 
@@ -997,16 +1017,72 @@ function validateRefSchemas(schema: JSONSchemaDefinition, path: string[], root: 
   });
 }
 
-function mergeObjectAllOf(jsonSchema: JSONSchema, path: string[]): boolean {
+type ResolvedObjectAllOfBranch = {
+  schema: JSONSchema;
+  refChain: JSONSchema[];
+};
+
+/**
+ * Resolve only local aliases whose siblings carry no validation semantics.
+ * Keeping this separate from general ref validation lets allOf merging inspect
+ * the effective object shape without broadening which refs or sibling
+ * constraints are accepted.
+ */
+function resolveObjectAllOfBranch(
+  schema: JSONSchema,
+  root: JSONSchema,
+): ResolvedObjectAllOfBranch | undefined {
+  const refChain = [schema];
+  const seenRefs = new Set<string>();
+  let resolved = schema;
+
+  while (resolved.$ref !== undefined) {
+    const ref = resolved.$ref;
+    if (typeof ref !== 'string' || !hasOnlyRefAndAnnotations(resolved) || seenRefs.has(ref)) {
+      return undefined;
+    }
+    seenRefs.add(ref);
+
+    const target = resolveLocalRef(root, ref);
+    if (typeof target === 'boolean' || !isObject(target)) {
+      return undefined;
+    }
+
+    resolved = target;
+    refChain.push(resolved);
+  }
+
+  return { schema: resolved, refChain };
+}
+
+function normalizeObjectAllOfBranches(schema: JSONSchemaDefinition, path: string[], root: JSONSchema): void {
+  if (typeof schema === 'boolean' || !isObject(schema)) {
+    return;
+  }
+
+  if (mergeObjectAllOf(schema, path, root)) {
+    normalizeObjectAllOfBranches(schema, path, root);
+    return;
+  }
+
+  forEachJSONSchemaChild(schema, path, (child, childPath) => {
+    normalizeObjectAllOfBranches(child as JSONSchemaDefinition, childPath, root);
+  });
+}
+
+function mergeObjectAllOf(jsonSchema: JSONSchema, path: string[], root: JSONSchema): boolean {
   const allOf = jsonSchema.allOf;
   if (!Array.isArray(allOf) || allOf.length === 0) {
     return false;
   }
 
   const parentHasObjectShape = hasObjectShapeWithoutAllOf(jsonSchema);
-  const objectBranches = allOf.filter(
-    (entry): entry is JSONSchema => isObject(entry) && hasObjectShapeWithoutAllOf(entry),
+  const resolvedEntries = allOf.map((entry) =>
+    isObject(entry) ? resolveObjectAllOfBranch(entry, root) : undefined,
   );
+  const objectBranches = resolvedEntries
+    .map((entry) => entry?.schema)
+    .filter((entry): entry is JSONSchema => entry !== undefined && hasObjectShapeWithoutAllOf(entry));
   if (!parentHasObjectShape && objectBranches.length === 0) {
     return false;
   }
@@ -1047,11 +1123,15 @@ function mergeObjectAllOf(jsonSchema: JSONSchema, path: string[]): boolean {
   if (parentHasObjectShape) {
     branches.push(jsonSchema);
   }
-  for (const entry of allOf) {
+  for (const [index, entry] of allOf.entries()) {
     if (!isObject(entry)) {
       fail();
     }
-    const branch = entry as JSONSchema;
+    const resolvedEntry = resolvedEntries[index];
+    if (resolvedEntry === undefined) {
+      return fail();
+    }
+    const branch = resolvedEntry.schema;
     if (hasObjectShapeWithoutAllOf(branch)) {
       branches.push(branch);
     } else if (!Object.keys(branch).every((keyword) => JSON_SCHEMA_ANNOTATION_KEYWORDS.has(keyword))) {
@@ -1091,8 +1171,11 @@ function mergeObjectAllOf(jsonSchema: JSONSchema, path: string[]): boolean {
   };
 
   mergeAnnotations(jsonSchema);
-  for (const entry of allOf) {
-    if (isObject(entry)) mergeAnnotations(entry);
+  for (const resolvedEntry of resolvedEntries) {
+    if (resolvedEntry === undefined) continue;
+    for (const entry of resolvedEntry.refChain) {
+      mergeAnnotations(entry);
+    }
   }
 
   for (const branch of branches) {

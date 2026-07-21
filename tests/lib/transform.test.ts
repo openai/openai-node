@@ -838,6 +838,32 @@ describe('toStrictJsonSchema', () => {
       });
     });
 
+    test.each(['$defs', 'definitions'] as const)(
+      'retains nested %s maps beside local refs at their original pointer scope',
+      (keyword) => {
+        const ref = '#/properties/value/' + keyword + '/Value';
+        const schema: JSONSchema = {
+          type: 'object',
+          properties: {
+            value: {
+              $ref: ref,
+              [keyword]: {
+                Value: { type: 'string' },
+              },
+            },
+          },
+          required: ['value'],
+        };
+
+        const strictValue = toStrictJsonSchema(schema).properties?.['value'] as JSONSchema;
+
+        expect(strictValue.$ref).toBe(ref);
+        expect(strictValue[keyword]).toEqual({
+          Value: { type: 'string' },
+        });
+      },
+    );
+
     test('conservatively rejects cyclic refs when checking nullable optional properties', () => {
       const schema: JSONSchema = {
         type: 'object',
@@ -1002,6 +1028,50 @@ describe('toStrictJsonSchema', () => {
           "updated": {},
         }
       `);
+    });
+
+    test('rejects array schemas without items before returning a strict schema', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          tags: {
+            type: 'array',
+          },
+        },
+        required: ['tags'],
+      };
+
+      expect(() => toStrictJsonSchema(schema)).toThrow('declares an array without `items`');
+    });
+
+    test('rejects union-typed array schemas without items before returning a strict schema', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          tags: {
+            type: ['array', 'null'],
+          },
+        },
+        required: ['tags'],
+      };
+
+      expect(() => toStrictJsonSchema(schema)).toThrow('declares an array without `items`');
+    });
+
+    test('does not require items for schemas that do not declare arrays', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          label: {
+            type: ['string', 'null'],
+          },
+        },
+        required: ['label'],
+      };
+
+      expect(toStrictJsonSchema(schema).properties?.['label']).toEqual({
+        type: ['string', 'null'],
+      });
     });
 
     test('rejects tuple-form items before returning a strict schema', () => {
@@ -1542,6 +1612,70 @@ describe('toStrictJsonSchema', () => {
         required: ['value'],
         additionalProperties: false,
       });
+    });
+
+    test('merges compatible object allOf variants through local ref chains', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        $defs: {
+          Name: {
+            type: 'object',
+            properties: { name: { type: 'string' } },
+            required: ['name'],
+          },
+          NameAlias: {
+            $ref: '#/$defs/Name',
+            description: 'Name fields',
+          },
+          Age: {
+            type: 'object',
+            properties: { age: { type: 'number' } },
+            required: ['age'],
+          },
+        },
+        properties: {
+          value: {
+            type: 'object',
+            allOf: [{ $ref: '#/$defs/NameAlias', $comment: 'Generated alias' }, { $ref: '#/$defs/Age' }],
+          },
+        },
+        required: ['value'],
+      };
+
+      expect(toStrictJsonSchema(schema).properties?.['value']).toEqual({
+        type: 'object',
+        $comment: 'Generated alias',
+        description: 'Name fields',
+        properties: { name: { type: 'string' }, age: { type: 'number' } },
+        required: ['name', 'age'],
+        additionalProperties: false,
+      });
+    });
+
+    test('fails closed on cyclic local ref chains in object allOf variants', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        $defs: {
+          A: { $ref: '#/$defs/B' },
+          B: { $ref: '#/$defs/A' },
+          Age: {
+            type: 'object',
+            properties: { age: { type: 'number' } },
+            required: ['age'],
+          },
+        },
+        properties: {
+          value: {
+            type: 'object',
+            allOf: [{ $ref: '#/$defs/A' }, { $ref: '#/$defs/Age' }],
+          },
+        },
+        required: ['value'],
+      };
+
+      expect(() => toStrictJsonSchema(schema)).toThrow(
+        'cannot be merged without changing Draft 7 validation',
+      );
     });
 
     test('merges object allOf properties that match Object prototype names', () => {
