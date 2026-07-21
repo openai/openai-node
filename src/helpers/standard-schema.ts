@@ -188,7 +188,7 @@ function isObjectOnlySchema(schema: unknown): boolean {
   return types?.size === 1 && types.has('object');
 }
 
-function haveDisjointObjectDiscriminator(left: unknown, right: unknown): boolean {
+function haveDisjointObjectDiscriminator(left: unknown, right: unknown, root: JSONSchema): boolean {
   if (!isObjectOnlySchema(left) || !isObjectOnlySchema(right)) return false;
 
   const leftRecord = left as Record<string, unknown>;
@@ -215,8 +215,8 @@ function haveDisjointObjectDiscriminator(left: unknown, right: unknown): boolean
       typeof property === 'string' &&
       rightRequired.includes(property) &&
       haveDisjointLiteralValues(
-        (leftProperties as Record<string, unknown>)[property],
-        (rightProperties as Record<string, unknown>)[property],
+        resolveLocalRefForExclusivity((leftProperties as Record<string, unknown>)[property], root),
+        resolveLocalRefForExclusivity((rightProperties as Record<string, unknown>)[property], root),
       )
     ) {
       return true;
@@ -226,7 +226,7 @@ function haveDisjointObjectDiscriminator(left: unknown, right: unknown): boolean
   return false;
 }
 
-function areMutuallyExclusive(left: unknown, right: unknown): boolean {
+function areMutuallyExclusive(left: unknown, right: unknown, root: JSONSchema): boolean {
   const leftTypes = getSchemaTypes(left);
   const rightTypes = getSchemaTypes(right);
   if (
@@ -239,7 +239,7 @@ function areMutuallyExclusive(left: unknown, right: unknown): boolean {
     return true;
   }
 
-  return haveDisjointLiteralValues(left, right) || haveDisjointObjectDiscriminator(left, right);
+  return haveDisjointLiteralValues(left, right) || haveDisjointObjectDiscriminator(left, right, root);
 }
 
 function resolveLocalRefForExclusivity(
@@ -272,7 +272,7 @@ function areOneOfBranchesMutuallyExclusive(branches: unknown[], root: JSONSchema
     for (let otherIndex = index + 1; otherIndex < branches.length; otherIndex++) {
       const left = resolveLocalRefForExclusivity(branches[index], root);
       const right = resolveLocalRefForExclusivity(branches[otherIndex], root);
-      if (left === undefined || right === undefined || !areMutuallyExclusive(left, right)) {
+      if (left === undefined || right === undefined || !areMutuallyExclusive(left, right, root)) {
         return false;
       }
     }

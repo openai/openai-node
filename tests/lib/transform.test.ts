@@ -298,6 +298,41 @@ describe('toStrictJsonSchema', () => {
       });
     });
 
+    test('normalizes root allOf branches exposed by local ref inlining', () => {
+      const schema: JSONSchema = {
+        allOf: [{ $ref: '#/$defs/A' }],
+        $defs: {
+          A: {
+            allOf: [
+              {
+                type: 'object',
+                properties: { name: { type: 'string' } },
+                required: ['name'],
+              },
+            ],
+          },
+        },
+      };
+
+      expect(toStrictJsonSchema(schema)).toMatchObject({
+        type: 'object',
+        properties: { name: { type: 'string' } },
+        required: ['name'],
+        additionalProperties: false,
+      });
+    });
+
+    test('rejects alternating root ref and allOf cycles', () => {
+      const schema: JSONSchema = {
+        allOf: [{ $ref: '#/$defs/A' }],
+        $defs: {
+          A: { allOf: [{ $ref: '#/$defs/A' }] },
+        },
+      };
+
+      expect(() => toStrictJsonSchema(schema)).toThrow('Cyclic local $ref');
+    });
+
     test('rejects root local ref cycles exposed by singleton root allOf', () => {
       const schema: JSONSchema = {
         allOf: [{ $ref: '#/$defs/A' }],
@@ -1338,6 +1373,29 @@ describe('toStrictJsonSchema', () => {
       `);
     });
 
+    test('removes a redundant array type from an anyOf wrapper', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          value: {
+            type: 'array',
+            anyOf: [
+              { type: 'array', items: { type: 'string' } },
+              { type: 'array', items: { type: 'number' } },
+            ],
+          },
+        },
+        required: ['value'],
+      };
+
+      expect(toStrictJsonSchema(schema).properties?.['value']).toEqual({
+        anyOf: [
+          { type: 'array', items: { type: 'string' } },
+          { type: 'array', items: { type: 'number' } },
+        ],
+      });
+    });
+
     test('removes a redundant object type from an anyOf wrapper before closing branches', () => {
       const schema: JSONSchema = {
         type: 'object',
@@ -1518,6 +1576,63 @@ describe('toStrictJsonSchema', () => {
         },
         required: ['value'],
         additionalProperties: false,
+      });
+    });
+
+    test('removes a true singleton allOf branch without dropping annotations', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          value: {
+            description: 'Any value',
+            allOf: [true],
+          },
+        },
+        required: ['value'],
+      };
+
+      expect(toStrictJsonSchema(schema)).toEqual({
+        type: 'object',
+        properties: {
+          value: {
+            description: 'Any value',
+          },
+        },
+        required: ['value'],
+        additionalProperties: false,
+      });
+    });
+
+    test('rejects a false singleton allOf branch', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          value: {
+            allOf: [false],
+          },
+        },
+        required: ['value'],
+      };
+
+      expect(() => toStrictJsonSchema(schema)).toThrow(
+        'uses `allOf: [false]`, which cannot be represented in strict Structured Outputs',
+      );
+    });
+
+    test('uses array items introduced by a singleton allOf branch', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          values: {
+            allOf: [{ type: 'array', items: { type: 'string' } }],
+          },
+        },
+        required: ['values'],
+      };
+
+      expect(toStrictJsonSchema(schema).properties?.['values']).toEqual({
+        type: 'array',
+        items: { type: 'string' },
       });
     });
 
@@ -1869,7 +1984,7 @@ describe('toStrictJsonSchema', () => {
       }
     });
 
-    test('allows a root $id but rejects nested resource scopes', () => {
+    test('allows a root $id and undefined nested $id values but rejects defined nested resource scopes', () => {
       const rootIdSchema: JSONSchema = {
         $id: 'https://example.com/root.json',
         type: 'object',
@@ -1879,6 +1994,18 @@ describe('toStrictJsonSchema', () => {
       expect(toStrictJsonSchema(rootIdSchema)).toMatchObject({
         $id: 'https://example.com/root.json',
       });
+
+      const undefinedNestedIdSchema: JSONSchema = {
+        type: 'object',
+        properties: {
+          value: {
+            $id: undefined,
+            type: 'string',
+          },
+        },
+        required: ['value'],
+      };
+      expect(() => toStrictJsonSchema(undefinedNestedIdSchema)).not.toThrow();
 
       const nestedIdSchema: JSONSchema = {
         type: 'object',

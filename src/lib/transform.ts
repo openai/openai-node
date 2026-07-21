@@ -128,12 +128,7 @@ export function forEachJSONSchemaChild(
 export function toStrictJsonSchema(schema: JSONSchema): JSONSchema {
   const schemaCopy = structuredClone(schema);
   normalizeSingletonTypeArrays(schemaCopy);
-  inlineRootRefObject(schemaCopy);
-  preserveAllOfRefTargets(schemaCopy, true);
-  normalizeRootAllOf(schemaCopy);
-  // A singleton root allOf can flatten to a local ref. Run the same root
-  // inliner again so its chain and cycle checks apply before root validation.
-  inlineRootRefObject(schemaCopy);
+  normalizeRootRefAndAllOf(schemaCopy);
 
   if (schemaCopy.type !== 'object') {
     throw new Error(
@@ -160,6 +155,32 @@ export function toStrictJsonSchema(schema: JSONSchema): JSONSchema {
   const strictSchema = ensureStrictJsonSchema(schemaCopy, [], schemaCopy);
   validateRefSchemas(strictSchema, [], strictSchema);
   return strictSchema;
+}
+
+/**
+ * Root ref inlining and singleton allOf flattening can expose each other.
+ * Iterate until flattening no longer produces another root ref so every
+ * exactly representable chain reaches its final object form before the root
+ * type check runs.
+ */
+function normalizeRootRefAndAllOf(schema: JSONSchema): void {
+  const seenRefs = new Set<string>();
+  while (true) {
+    if (typeof schema.$ref === 'string') {
+      if (seenRefs.has(schema.$ref)) {
+        throw new Error('Cyclic local $ref at `<root>` is not supported: ' + JSON.stringify(schema.$ref));
+      }
+      seenRefs.add(schema.$ref);
+    }
+
+    inlineRootRefObject(schema);
+    preserveAllOfRefTargets(schema, true);
+    normalizeRootAllOf(schema);
+
+    if (schema.$ref === undefined) {
+      return;
+    }
+  }
 }
 
 /**
@@ -519,13 +540,29 @@ function ensureStrictJsonSchema(
   const allOf = jsonSchema.allOf;
   if (Array.isArray(allOf)) {
     if (allOf.length === 1 && hasOnlyAnnotationSiblings(jsonSchema, 'allOf')) {
-      const resolved = ensureStrictJsonSchema(allOf[0]!, [...path, 'allOf', '0'], root);
-      const annotations = { ...jsonSchema };
-      delete annotations.allOf;
-      Object.assign(jsonSchema, resolved, annotations);
-      delete jsonSchema.allOf;
+      const branch = allOf[0]!;
+      if (branch === false) {
+        throw new Error(
+          `Schema at \`${
+            path.join('/') || '<root>'
+          }\` uses \`allOf: [false]\`, which cannot be represented in strict Structured Outputs.`,
+        );
+      }
+      if (branch === true) {
+        // true is the neutral schema for an intersection, so removing this
+        // branch preserves validation while retaining the parent annotations.
+        delete jsonSchema.allOf;
+      } else {
+        const resolved = ensureStrictJsonSchema(branch, [...path, 'allOf', '0'], root);
+        const annotations = { ...jsonSchema };
+        delete annotations.allOf;
+        Object.assign(jsonSchema, resolved, annotations);
+        delete jsonSchema.allOf;
+      }
     }
   }
+
+  normalizeArrayUnionWrapper(jsonSchema, root);
 
   for (const keyword of JSON_SCHEMA_UNSUPPORTED_SCHEMA_KEYWORDS) {
     if (keyword in jsonSchema) {
@@ -538,7 +575,8 @@ function ensureStrictJsonSchema(
   }
 
   const type = jsonSchema.type;
-  if ((type === 'array' || (Array.isArray(type) && type.includes('array'))) && items === undefined) {
+  const currentItems = jsonSchema.items;
+  if ((type === 'array' || (Array.isArray(type) && type.includes('array'))) && currentItems === undefined) {
     throw new Error(
       `Schema at \`${
         path.join('/') || '<root>'
@@ -713,6 +751,34 @@ function isObjectOnlySchema(
   );
 }
 
+function isArrayOnlySchema(
+  schema: JSONSchemaDefinition,
+  root: JSONSchema,
+  seenRefs: Set<string> = new Set(),
+): boolean {
+  if (typeof schema === 'boolean' || !isObject(schema)) {
+    return false;
+  }
+
+  if (schema.$ref !== undefined) {
+    if (typeof schema.$ref !== 'string' || !hasOnlyRefAndAnnotations(schema) || seenRefs.has(schema.$ref)) {
+      return false;
+    }
+
+    const resolved = resolveLocalRef(root, schema.$ref);
+    if (resolved === undefined) {
+      return false;
+    }
+
+    return isArrayOnlySchema(resolved, root, new Set([...seenRefs, schema.$ref]));
+  }
+
+  return (
+    schema.type === 'array' ||
+    (Array.isArray(schema.type) && schema.type.length === 1 && schema.type[0] === 'array')
+  );
+}
+
 export function hasOnlyRefAndAnnotations(schema: JSONSchema): boolean {
   return Object.keys(schema).every(
     // Definition maps do not add sibling validation constraints, and keeping
@@ -794,13 +860,27 @@ function normalizeObjectUnionWrapper(jsonSchema: JSONSchema, path: string[], roo
   );
 }
 
+function normalizeArrayUnionWrapper(jsonSchema: JSONSchema, root: JSONSchema): void {
+  if (
+    jsonSchema.type === 'array' &&
+    jsonSchema.items === undefined &&
+    Array.isArray(jsonSchema.anyOf) &&
+    jsonSchema.anyOf.every((branch) => isArrayOnlySchema(branch, root))
+  ) {
+    // Every union branch already proves the value is an array. Keeping the
+    // redundant wrapper would require an outer items schema that does not
+    // contribute any Draft 7 validation.
+    delete jsonSchema.type;
+  }
+}
+
 export function assertNoNestedSchemaIds(schema: JSONSchema): void {
   const visit = (value: JSONSchemaDefinition, path: string[]): void => {
     if (typeof value === 'boolean' || !isObject(value)) {
       return;
     }
 
-    if (path.length > 0 && '$id' in value) {
+    if (path.length > 0 && value.$id !== undefined) {
       throw new Error(
         'Nested $id at ' +
           JSON.stringify(path.join('/')) +

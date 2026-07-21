@@ -411,6 +411,55 @@ describe('Standard Schema helpers', () => {
     });
   });
 
+  it('resolves discriminator property ref chains when proving oneOf exclusivity', () => {
+    const { standardSchema } = makeStandardSchema({
+      type: 'object',
+      $defs: {
+        fooKind: { $ref: '#/$defs/fooLiteral', description: 'Foo discriminator' },
+        fooLiteral: { type: 'string', const: 'foo' },
+        barKind: { $ref: '#/$defs/barLiteral', description: 'Bar discriminator' },
+        barLiteral: { type: 'string', const: 'bar' },
+      },
+      properties: {
+        choice: {
+          oneOf: [
+            {
+              type: 'object',
+              properties: {
+                kind: { $ref: '#/$defs/fooKind', $comment: 'Generated foo discriminator' },
+                foo: { type: 'string' },
+              },
+              required: ['kind', 'foo'],
+            },
+            {
+              type: 'object',
+              properties: {
+                kind: { $ref: '#/$defs/barKind', title: 'Bar discriminator' },
+                bar: { type: 'number' },
+              },
+              required: ['kind', 'bar'],
+            },
+          ],
+        },
+      },
+      required: ['choice'],
+    });
+
+    const schema = standardResponseFormat(standardSchema, 'choice').json_schema.schema;
+
+    expect(schema).toMatchObject({
+      properties: {
+        choice: {
+          anyOf: [
+            { properties: { kind: { $ref: '#/$defs/fooKind' } } },
+            { properties: { kind: { $ref: '#/$defs/barKind' } } },
+          ],
+        },
+      },
+    });
+    expect(JSON.stringify(schema)).not.toContain('"oneOf"');
+  });
+
   it('drops validation-neutral empty object keywords when normalizing oneOf wrappers', () => {
     const { standardSchema } = makeStandardSchema({
       type: 'object',
