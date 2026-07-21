@@ -9,7 +9,7 @@ import {
 } from '../lib/parser';
 import { AutoParseableResponseTool, makeParseableResponseTool } from '../lib/ResponsesParser';
 import { type JSONSchema } from '../lib/jsonschema';
-import { toStrictJsonSchema } from '../lib/transform';
+import { forEachJSONSchemaChild, toStrictJsonSchema } from '../lib/transform';
 import { ResponseFormatJSONSchema } from '../resources/index';
 import { type ResponseFormatTextJSONSchemaConfig } from '../resources/responses/responses';
 
@@ -301,44 +301,7 @@ function normalizeStructuredOutputSchema(schema: JSONSchema): JSONSchema {
       delete record['oneOf'];
     }
 
-    for (const keyword of [
-      'additionalItems',
-      'additionalProperties',
-      'contains',
-      'contentSchema',
-      'else',
-      'if',
-      'not',
-      'propertyNames',
-      'then',
-      'unevaluatedItems',
-      'unevaluatedProperties',
-    ]) {
-      visitSchema(record[keyword]);
-    }
-
-    for (const keyword of ['allOf', 'anyOf', 'items', 'prefixItems']) {
-      const children = record[keyword];
-      if (Array.isArray(children)) {
-        for (const child of children) visitSchema(child);
-      } else {
-        visitSchema(children);
-      }
-    }
-
-    for (const keyword of [
-      '$defs',
-      'definitions',
-      'dependentSchemas',
-      'dependencies',
-      'patternProperties',
-      'properties',
-    ]) {
-      const children = record[keyword];
-      if (children && typeof children === 'object' && !Array.isArray(children)) {
-        for (const child of Object.values(children)) visitSchema(child);
-      }
-    }
+    forEachJSONSchemaChild(record, [], (child) => visitSchema(child));
   };
 
   visitSchema(normalizedSchema);

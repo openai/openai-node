@@ -45,6 +45,21 @@ const JSON_SCHEMA_MAP_SCHEMA_KEYWORDS = [
   'properties',
 ];
 
+const JSON_SCHEMA_UNSUPPORTED_SCHEMA_KEYWORDS = new Set([
+  'contains',
+  'contentSchema',
+  'dependentSchemas',
+  'dependencies',
+  'else',
+  'if',
+  'not',
+  'prefixItems',
+  'propertyNames',
+  'then',
+  'unevaluatedItems',
+  'unevaluatedProperties',
+]);
+
 const MERGEABLE_OBJECT_ALL_OF_KEYWORDS = new Set([
   ...JSON_SCHEMA_ANNOTATION_KEYWORDS,
   'additionalProperties',
@@ -52,6 +67,50 @@ const MERGEABLE_OBJECT_ALL_OF_KEYWORDS = new Set([
   'required',
   'type',
 ]);
+
+type JSONSchemaChildVisitor = (schema: unknown, path: string[], keyword: string) => void;
+
+/**
+ * Visits only values carried by JSON Schema keywords that contain schemas.
+ * Literal payloads such as enum, const, and default deliberately do not
+ * participate.
+ */
+export function forEachJSONSchemaChild(
+  schema: JSONSchema | Record<string, unknown>,
+  path: string[],
+  visit: JSONSchemaChildVisitor,
+): void {
+  const record = schema as Record<string, unknown>;
+
+  for (const keyword of JSON_SCHEMA_SINGLE_SCHEMA_KEYWORDS) {
+    if (keyword in record) {
+      visit(record[keyword], [...path, keyword], keyword);
+    }
+  }
+
+  for (const keyword of JSON_SCHEMA_ARRAY_SCHEMA_KEYWORDS) {
+    const children = record[keyword];
+    if (Array.isArray(children)) {
+      for (const [index, child] of children.entries()) {
+        visit(child, [...path, keyword, String(index)], keyword);
+      }
+    } else if (children !== undefined) {
+      visit(children, [...path, keyword], keyword);
+    }
+  }
+
+  for (const keyword of JSON_SCHEMA_MAP_SCHEMA_KEYWORDS) {
+    const children = record[keyword];
+    if (!isObject(children)) continue;
+
+    for (const [key, child] of Object.entries(children)) {
+      // Draft 7 dependencies also permits property dependency arrays. They
+      // are not schemas and must not be traversed as literal JSON payloads.
+      if (keyword === 'dependencies' && !isSchemaDefinition(child)) continue;
+      visit(child, [...path, keyword, key], keyword);
+    }
+  }
+}
 
 export function toStrictJsonSchema(schema: JSONSchema): JSONSchema {
   if (schema.type !== 'object') {
@@ -161,22 +220,6 @@ function ensureStrictJsonSchema(
     throw new TypeError(`Expected ${JSON.stringify(jsonSchema)} to be an object; path=${path.join('/')}`);
   }
 
-  // Handle $defs (non-standard but sometimes used)
-  const defs = (jsonSchema as any).$defs;
-  if (isObject(defs)) {
-    for (const [defName, defSchema] of Object.entries(defs)) {
-      ensureStrictJsonSchema(defSchema as JSONSchema, [...path, '$defs', defName], root);
-    }
-  }
-
-  // Handle definitions (draft-04 style, deprecated in draft-07 but still used)
-  const definitions = (jsonSchema as any).definitions;
-  if (isObject(definitions)) {
-    for (const [definitionName, definitionSchema] of Object.entries(definitions)) {
-      ensureStrictJsonSchema(definitionSchema as JSONSchema, [...path, 'definitions', definitionName], root);
-    }
-  }
-
   // Closing each object branch in an allOf independently changes the
   // intersection: sibling branches' properties become forbidden extras. Merge
   // the small object-intersection subset that can be represented exactly before
@@ -232,28 +275,13 @@ function ensureStrictJsonSchema(
       }
     }
     jsonSchema.required = Object.keys(properties);
-    jsonSchema.properties = Object.fromEntries(
-      Object.entries(properties).map(([key, propSchema]) => [
-        key,
-        ensureStrictJsonSchema(propSchema, [...path, 'properties', key], root),
-      ]),
-    );
-  }
-
-  // Handle arrays
-  const items = jsonSchema.items;
-  if (Array.isArray(items)) {
-    jsonSchema.items = items.map((item, i) =>
-      ensureStrictJsonSchema(item, [...path, 'items', String(i)], root),
-    );
-  } else if (items !== undefined) {
-    jsonSchema.items = ensureStrictJsonSchema(items, [...path, 'items'], root);
   }
 
   // Draft 7 only applies additionalItems to tuple-style items arrays. Recurse
   // into schema-valued extras so nested objects are strictified too; reject an
   // ignored additionalItems rather than sending a keyword whose semantics may
   // differ under Structured Outputs.
+  const items = jsonSchema.items;
   const additionalItems = jsonSchema.additionalItems;
   if (additionalItems !== undefined) {
     if (!Array.isArray(items)) {
@@ -263,21 +291,6 @@ function ensureStrictJsonSchema(
         }\` uses \`additionalItems\` without tuple \`items\`, which cannot be represented in strict Structured Outputs.`,
       );
     }
-    if (typeof additionalItems !== 'boolean') {
-      jsonSchema.additionalItems = ensureStrictJsonSchema(
-        additionalItems,
-        [...path, 'additionalItems'],
-        root,
-      );
-    }
-  }
-
-  // Handle unions (anyOf)
-  const anyOf = jsonSchema.anyOf;
-  if (Array.isArray(anyOf)) {
-    jsonSchema.anyOf = anyOf.map((variant, i) =>
-      ensureStrictJsonSchema(variant, [...path, 'anyOf', String(i)], root),
-    );
   }
 
   // Handle intersections (allOf)
@@ -289,54 +302,36 @@ function ensureStrictJsonSchema(
       delete annotations.allOf;
       Object.assign(jsonSchema, resolved, annotations);
       delete jsonSchema.allOf;
-    } else {
-      jsonSchema.allOf = allOf.map((entry, i) =>
-        ensureStrictJsonSchema(entry, [...path, 'allOf', String(i)], root),
+    }
+  }
+
+  for (const keyword of JSON_SCHEMA_UNSUPPORTED_SCHEMA_KEYWORDS) {
+    if (keyword in jsonSchema) {
+      throw new Error(
+        `Schema at \`${
+          path.join('/') || '<root>'
+        }\` uses unsupported keyword \`${keyword}\` and cannot be represented in strict Structured Outputs.`,
       );
     }
   }
+
+  forEachJSONSchemaChild(jsonSchema, path, (child, childPath, keyword) => {
+    // These boolean forms are already handled as parent-keyword semantics:
+    // additionalProperties: false closes objects, while boolean
+    // additionalItems does not contain a nested schema to strictify.
+    if (typeof child === 'boolean' && (keyword === 'additionalProperties' || keyword === 'additionalItems')) {
+      return;
+    }
+
+    ensureStrictJsonSchema(child as JSONSchemaDefinition, childPath, root);
+  });
 
   // Strip `null` defaults as there's no meaningful distinction
   if (jsonSchema.default === null) {
     delete jsonSchema.default;
   }
 
-  // Handle $ref with additional properties
-  const ref = (jsonSchema as any).$ref;
-  if (ref && hasMoreThanNKeys(jsonSchema, 1)) {
-    const resolved = resolveRef(root, ref);
-    if (typeof resolved === 'boolean') {
-      throw new Error(`Expected \`$ref: ${ref}\` to resolve to an object schema but got boolean`);
-    }
-    if (!isObject(resolved)) {
-      throw new Error(
-        `Expected \`$ref: ${ref}\` to resolve to an object but got ${JSON.stringify(resolved)}`,
-      );
-    }
-
-    // Properties from the json schema take priority over the ones on the `$ref`
-    Object.assign(jsonSchema, { ...resolved, ...jsonSchema });
-    delete (jsonSchema as any).$ref;
-
-    // Since the schema expanded from `$ref` might not have `additionalProperties: false` applied,
-    // we call `ensureStrictJsonSchema` again to fix the inlined schema and ensure it's valid.
-    return ensureStrictJsonSchema(jsonSchema, path, root);
-  }
-
   return jsonSchema;
-}
-
-function resolveRef(root: JSONSchema, ref: string): JSONSchemaDefinition {
-  if (ref === '#') {
-    throw new Error('Cannot inline a root `$ref` with sibling annotations');
-  }
-
-  const resolved = resolveLocalRef(root, ref);
-  if (resolved === undefined) {
-    throw new Error(`Key not found while resolving ${ref}`);
-  }
-
-  return resolved;
 }
 
 function resolveLocalRef(root: JSONSchema, ref: string): JSONSchemaDefinition | undefined {
@@ -361,6 +356,10 @@ function resolveLocalRef(root: JSONSchema, ref: string): JSONSchemaDefinition | 
 
 function isObject<T>(obj: T | Array<any>): obj is Extract<T, Record<string, any>> {
   return typeof obj === 'object' && obj !== null && !Array.isArray(obj);
+}
+
+function isSchemaDefinition(value: unknown): value is JSONSchemaDefinition {
+  return typeof value === 'boolean' || isObject(value);
 }
 
 function hasOnlyRefAndAnnotations(schema: JSONSchema): boolean {
@@ -414,29 +413,9 @@ function validateRefSchemas(schema: JSONSchemaDefinition, path: string[]): void 
     }
   }
 
-  for (const keyword of JSON_SCHEMA_SINGLE_SCHEMA_KEYWORDS) {
-    validateRefSchemas((schema as any)[keyword], [...path, keyword]);
-  }
-
-  for (const keyword of JSON_SCHEMA_ARRAY_SCHEMA_KEYWORDS) {
-    const children = (schema as any)[keyword];
-    if (Array.isArray(children)) {
-      for (const [index, child] of children.entries()) {
-        validateRefSchemas(child, [...path, keyword, String(index)]);
-      }
-    } else {
-      validateRefSchemas(children, [...path, keyword]);
-    }
-  }
-
-  for (const keyword of JSON_SCHEMA_MAP_SCHEMA_KEYWORDS) {
-    const children = (schema as any)[keyword];
-    if (isObject(children)) {
-      for (const [key, child] of Object.entries(children)) {
-        validateRefSchemas(child as JSONSchemaDefinition, [...path, keyword, key]);
-      }
-    }
-  }
+  forEachJSONSchemaChild(schema, path, (child, childPath) => {
+    validateRefSchemas(child as JSONSchemaDefinition, childPath);
+  });
 }
 
 function mergeObjectAllOf(jsonSchema: JSONSchema, path: string[]): boolean {
@@ -600,15 +579,4 @@ function hasObjectShapeWithoutAllOf(schema: JSONSchema): boolean {
 
 function schemasEqual(left: unknown, right: unknown): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
-}
-
-function hasMoreThanNKeys(obj: Record<string, any>, n: number): boolean {
-  let i = 0;
-  for (const _ in obj) {
-    i++;
-    if (i > n) {
-      return true;
-    }
-  }
-  return false;
 }

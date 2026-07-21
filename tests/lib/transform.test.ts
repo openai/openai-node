@@ -310,8 +310,8 @@ describe('toStrictJsonSchema', () => {
       const strict = toStrictJsonSchema(schema);
 
       expect(strict.required).toEqual(['nickname']);
-      expect(strict.properties?.['nickname']).toMatchObject({
-        type: ['string', 'null'],
+      expect(strict.properties?.['nickname']).toEqual({
+        $ref: '#/$defs/NullableString',
         title: 'Nickname',
         description: 'A preferred name',
         examples: [null],
@@ -558,6 +558,114 @@ describe('toStrictJsonSchema', () => {
         additionalProperties: false,
       });
     });
+
+    test('processes patternProperties schemas recursively', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          metadata: {
+            type: 'object',
+            patternProperties: {
+              '^x-': {
+                type: 'object',
+                properties: { value: { type: 'string' } },
+                required: ['value'],
+              },
+            },
+            additionalProperties: false,
+          },
+        },
+        required: ['metadata'],
+      };
+
+      expect(toStrictJsonSchema(schema)).toMatchObject({
+        properties: {
+          metadata: {
+            patternProperties: {
+              '^x-': {
+                additionalProperties: false,
+              },
+            },
+          },
+        },
+      });
+    });
+
+    test.each([
+      [
+        'contains',
+        {
+          type: 'array',
+          contains: {
+            type: 'object',
+            properties: { value: { type: 'string' } },
+            required: ['value'],
+          },
+        },
+      ],
+      [
+        'propertyNames',
+        {
+          type: 'object',
+          properties: {},
+          propertyNames: { type: 'string' },
+          additionalProperties: false,
+        },
+      ],
+      [
+        'if/then/else',
+        {
+          type: 'object',
+          properties: {},
+          if: { type: 'object' },
+          then: { type: 'object' },
+          else: { type: 'object' },
+          additionalProperties: false,
+        },
+      ],
+      [
+        'schema-valued dependencies',
+        {
+          type: 'object',
+          properties: { value: { type: 'string' } },
+          required: ['value'],
+          dependencies: {
+            value: {
+              type: 'object',
+              properties: { dependent: { type: 'string' } },
+              required: ['dependent'],
+            },
+          },
+          additionalProperties: false,
+        },
+      ],
+      [
+        'dependentSchemas',
+        {
+          type: 'object',
+          properties: { value: { type: 'string' } },
+          required: ['value'],
+          dependentSchemas: {
+            value: {
+              type: 'object',
+              properties: { dependent: { type: 'string' } },
+              required: ['dependent'],
+            },
+          },
+          additionalProperties: false,
+        },
+      ],
+    ])('rejects unsupported nested %s schemas', (_name, propertySchema) => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          value: propertySchema as JSONSchema,
+        },
+        required: ['value'],
+      };
+
+      expect(() => toStrictJsonSchema(schema)).toThrow('uses unsupported keyword');
+    });
   });
 
   describe('anyOf Handling', () => {
@@ -778,6 +886,66 @@ describe('toStrictJsonSchema', () => {
   });
 
   describe('$ref Resolution', () => {
+    test('retains annotation-only recursive refs without expanding them', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        $defs: {
+          Node: {
+            type: 'object',
+            properties: {
+              value: { type: 'string' },
+              next: {
+                anyOf: [{ $ref: '#/$defs/Node', description: 'The next node' }, { type: 'null' }],
+              },
+            },
+            required: ['value', 'next'],
+          },
+        },
+        properties: {
+          root: { $ref: '#/$defs/Node', description: 'The root node' },
+        },
+        required: ['root'],
+      };
+
+      expect(toStrictJsonSchema(schema)).toMatchObject({
+        $defs: {
+          Node: {
+            additionalProperties: false,
+            properties: {
+              next: {
+                anyOf: [{ $ref: '#/$defs/Node', description: 'The next node' }, { type: 'null' }],
+              },
+            },
+          },
+        },
+        properties: {
+          root: { $ref: '#/$defs/Node', description: 'The root node' },
+        },
+      });
+    });
+
+    test('retains validation through annotated local reference chains', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        $defs: {
+          Text: { type: 'string' },
+          Alias: { $ref: '#/$defs/Text' },
+        },
+        properties: {
+          value: { $ref: '#/$defs/Alias', description: 'A text value' },
+        },
+        required: ['value'],
+      };
+
+      const strict = toStrictJsonSchema(schema);
+
+      expect(strict.$defs?.['Alias']).toEqual({ $ref: '#/$defs/Text' });
+      expect(strict.properties?.['value']).toEqual({
+        $ref: '#/$defs/Alias',
+        description: 'A text value',
+      });
+    });
+
     test('processes definitions', () => {
       const schema: JSONSchema = {
         type: 'object',

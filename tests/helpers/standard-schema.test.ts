@@ -353,6 +353,59 @@ describe('Standard Schema helpers', () => {
     });
   });
 
+  it('strictifies object schemas nested under patternProperties', () => {
+    const { standardSchema } = makeStandardSchema({
+      type: 'object',
+      properties: {
+        metadata: {
+          type: 'object',
+          patternProperties: {
+            '^x-': {
+              type: 'object',
+              properties: { value: { type: 'string' } },
+              required: ['value'],
+            },
+          },
+          additionalProperties: false,
+        },
+      },
+      required: ['metadata'],
+    });
+
+    expect(standardResponseFormat(standardSchema, 'metadata').json_schema.schema).toMatchObject({
+      properties: {
+        metadata: {
+          patternProperties: {
+            '^x-': {
+              additionalProperties: false,
+            },
+          },
+        },
+      },
+    });
+  });
+
+  it('rejects unsupported nested schema keywords before returning a strict schema', () => {
+    const { standardSchema } = makeStandardSchema({
+      type: 'object',
+      properties: {
+        values: {
+          type: 'array',
+          contains: {
+            type: 'object',
+            properties: { value: { type: 'string' } },
+            required: ['value'],
+          },
+        },
+      },
+      required: ['values'],
+    });
+
+    expect(() => standardResponseFormat(standardSchema, 'values')).toThrow(
+      'uses unsupported keyword `contains`',
+    );
+  });
+
   it.each([
     ['true', true],
     ['schema-valued', { type: 'string' }],
