@@ -388,6 +388,29 @@ describe('toStrictJsonSchema', () => {
       });
     });
 
+    test('rejects nested IDs before root allOf normalization can rebind branch definitions', () => {
+      const schema: JSONSchema = {
+        $defs: {
+          Value: { type: 'string' },
+        },
+        allOf: [
+          {
+            $id: 'branch.json',
+            type: 'object',
+            $defs: {
+              Value: { type: 'number' },
+            },
+            properties: {
+              value: { $ref: '#/$defs/Value' },
+            },
+            required: ['value'],
+          },
+        ],
+      };
+
+      expect(() => toStrictJsonSchema(schema)).toThrow('establishes a separate JSON Schema resource scope');
+    });
+
     test('merges compatible root allOf object branches before validating the type', () => {
       const schema: JSONSchema = {
         allOf: [
@@ -1182,6 +1205,64 @@ describe('toStrictJsonSchema', () => {
       expect(() => toStrictJsonSchema(schema)).toThrow('uses unsupported keyword `uniqueItems`');
     });
 
+    const unsupportedKeywords = [
+      'allOf',
+      'contains',
+      'contentEncoding',
+      'contentMediaType',
+      'contentSchema',
+      'dependentRequired',
+      'dependentSchemas',
+      'dependencies',
+      'else',
+      'if',
+      'maxContains',
+      'maxProperties',
+      'minContains',
+      'minProperties',
+      'not',
+      'patternProperties',
+      'prefixItems',
+      'propertyNames',
+      'then',
+      'unevaluatedItems',
+      'unevaluatedProperties',
+      'uniqueItems',
+    ] as const;
+
+    test.each(unsupportedKeywords)('omits undefined unsupported %s placeholders', (keyword) => {
+      const schema = {
+        type: 'object',
+        properties: {
+          value: {
+            type: 'string',
+            [keyword]: undefined,
+          },
+        },
+        required: ['value'],
+      } as JSONSchema;
+
+      const strict = toStrictJsonSchema(schema);
+
+      expect(strict.properties?.['value']).toEqual({ type: 'string' });
+      expect(JSON.stringify(strict)).not.toContain(`"${keyword}"`);
+    });
+
+    test.each(unsupportedKeywords)('still rejects defined unsupported %s placeholders', (keyword) => {
+      const schema = {
+        type: 'object',
+        properties: {
+          value: {
+            type: 'string',
+            [keyword]: false,
+          },
+        },
+        required: ['value'],
+      } as JSONSchema;
+
+      expect(() => toStrictJsonSchema(schema)).toThrow(`uses unsupported keyword \`${keyword}\``);
+    });
+
     test.each([
       ['contentEncoding', 'base64'],
       ['contentMediaType', 'application/json'],
@@ -1578,6 +1659,49 @@ describe('toStrictJsonSchema', () => {
         additionalProperties: false,
       });
     });
+
+    test.each(['$defs', 'definitions'] as const)(
+      'inlines a singleton allOf while preserving scoped %s maps',
+      (keyword) => {
+        const schema = {
+          type: 'object',
+          properties: {
+            value: {
+              [keyword]: {
+                Value: { type: 'string' },
+              },
+              allOf: [{ $ref: `#/properties/value/${keyword}/Value` }],
+            },
+          },
+          required: ['value'],
+        } as JSONSchema;
+
+        expect(toStrictJsonSchema(schema).properties?.['value']).toEqual({
+          $ref: `#/properties/value/${keyword}/Value`,
+          [keyword]: {
+            Value: { type: 'string' },
+          },
+        });
+      },
+    );
+
+    test.each(['$defs', 'definitions'] as const)(
+      'does not flatten a singleton allOf with malformed %s siblings',
+      (keyword) => {
+        const schema = {
+          type: 'object',
+          properties: {
+            value: {
+              [keyword]: false,
+              allOf: [{ type: 'string' }],
+            },
+          },
+          required: ['value'],
+        } as unknown as JSONSchema;
+
+        expect(() => toStrictJsonSchema(schema)).toThrow('uses unsupported keyword `allOf`');
+      },
+    );
 
     test('removes a true singleton allOf branch without dropping annotations', () => {
       const schema: JSONSchema = {

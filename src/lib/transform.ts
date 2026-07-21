@@ -128,6 +128,10 @@ export function forEachJSONSchemaChild(
 export function toStrictJsonSchema(schema: JSONSchema): JSONSchema {
   const schemaCopy = structuredClone(schema);
   normalizeSingletonTypeArrays(schemaCopy);
+  // Root ref/allOf normalization can promote a nested branch into the root.
+  // Reject separate resource scopes while their original nesting is still
+  // visible so branch-local definitions cannot be rebound at the root.
+  assertNoNestedSchemaIds(schemaCopy);
   normalizeRootRefAndAllOf(schemaCopy);
 
   if (schemaCopy.type !== 'object') {
@@ -143,7 +147,6 @@ export function toStrictJsonSchema(schema: JSONSchema): JSONSchema {
     );
   }
 
-  assertNoNestedSchemaIds(schemaCopy);
   validateRefSchemas(schemaCopy, [], schemaCopy);
   preserveAllOfRefTargets(schemaCopy);
   validateRefSchemas(schemaCopy, [], schemaCopy);
@@ -564,14 +567,20 @@ function ensureStrictJsonSchema(
 
   normalizeArrayUnionWrapper(jsonSchema, root);
 
+  const schemaRecord = jsonSchema as Record<string, unknown>;
   for (const keyword of JSON_SCHEMA_UNSUPPORTED_SCHEMA_KEYWORDS) {
-    if (keyword in jsonSchema) {
+    // Optional converter output often keeps undefined placeholders on the
+    // JavaScript object even though JSON serialization omits them. They carry
+    // no validation semantics, so treat only undefined as absent; every
+    // defined value remains unsupported.
+    if (schemaRecord[keyword] !== undefined) {
       throw new Error(
         `Schema at \`${
           path.join('/') || '<root>'
         }\` uses unsupported keyword \`${keyword}\` and cannot be represented in strict Structured Outputs.`,
       );
     }
+    delete schemaRecord[keyword];
   }
 
   const type = jsonSchema.type;
@@ -792,8 +801,16 @@ export function hasOnlyRefAndAnnotations(schema: JSONSchema): boolean {
 }
 
 function hasOnlyAnnotationSiblings(schema: JSONSchema, keyword: string): boolean {
+  const schemaRecord = schema as Record<string, unknown>;
   return Object.keys(schema).every(
-    (schemaKeyword) => schemaKeyword === keyword || JSON_SCHEMA_ANNOTATION_KEYWORDS.has(schemaKeyword),
+    // Definition maps do not add sibling validation constraints. Keep them
+    // beside a flattened singleton allOf so refs into this nested scope stay
+    // reachable at their original pointers.
+    (schemaKeyword) =>
+      schemaKeyword === keyword ||
+      ((schemaKeyword === '$defs' || schemaKeyword === 'definitions') &&
+        isObject(schemaRecord[schemaKeyword])) ||
+      JSON_SCHEMA_ANNOTATION_KEYWORDS.has(schemaKeyword),
   );
 }
 
