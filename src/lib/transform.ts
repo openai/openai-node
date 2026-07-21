@@ -54,6 +54,8 @@ const JSON_SCHEMA_UNSUPPORTED_SCHEMA_KEYWORDS = new Set([
   'dependencies',
   'else',
   'if',
+  'maxProperties',
+  'minProperties',
   'not',
   'patternProperties',
   'prefixItems',
@@ -117,18 +119,22 @@ export function forEachJSONSchemaChild(
 }
 
 export function toStrictJsonSchema(schema: JSONSchema): JSONSchema {
-  if (schema.type !== 'object') {
+  const schemaCopy = structuredClone(schema);
+  normalizeSingletonTypeArrays(schemaCopy);
+
+  if (schemaCopy.type !== 'object') {
     throw new Error(
-      `Root schema must have type: 'object' but got type: ${schema.type ? `'${schema.type}'` : 'undefined'}`,
+      `Root schema must have type: 'object' but got type: ${
+        schemaCopy.type ? `'${schemaCopy.type}'` : 'undefined'
+      }`,
     );
   }
-  if (schema.anyOf !== undefined) {
+  if (schemaCopy.anyOf !== undefined) {
     throw new Error(
       'Root schema must not use `anyOf` because strict Structured Outputs requires a root object without a union.',
     );
   }
 
-  const schemaCopy = structuredClone(schema);
   assertNoNestedSchemaIds(schemaCopy);
   validateRefSchemas(schemaCopy, [], schemaCopy);
   preserveAllOfRefTargets(schemaCopy);
@@ -136,6 +142,26 @@ export function toStrictJsonSchema(schema: JSONSchema): JSONSchema {
   const strictSchema = ensureStrictJsonSchema(schemaCopy, [], schemaCopy);
   validateRefSchemas(strictSchema, [], strictSchema);
   return strictSchema;
+}
+
+/**
+ * Draft 7 permits `type` to be either a string or an array of strings. A
+ * singleton array has exactly the same validation semantics as its scalar
+ * form, so canonicalize it before root validation and recursive strictifying.
+ * Multi-type arrays carry real union semantics and must remain unchanged.
+ */
+function normalizeSingletonTypeArrays(schema: JSONSchemaDefinition): void {
+  if (typeof schema === 'boolean' || !isObject(schema)) {
+    return;
+  }
+
+  if (Array.isArray(schema.type) && schema.type.length === 1) {
+    schema.type = schema.type[0]!;
+  }
+
+  forEachJSONSchemaChild(schema, [], (child) => {
+    normalizeSingletonTypeArrays(child as JSONSchemaDefinition);
+  });
 }
 
 function isNullable(
@@ -605,6 +631,14 @@ function escapeJSONPointerToken(token: string): string {
   return token.replace(/~/g, '~0').replace(/\//g, '~1');
 }
 
+function encodeJSONPointerTokenForURIFragment(token: string): string {
+  // `$` is a valid URI fragment sub-delimiter and keeping it readable retains
+  // the conventional `#/$defs/...` spelling. Everything else that could
+  // invalidate or retokenize the fragment (notably `%` and spaces) is encoded
+  // after JSON Pointer escaping.
+  return encodeURIComponent(escapeJSONPointerToken(token)).replace(/%24/g, '$');
+}
+
 /**
  * Standard Schema normalization moves representable oneOf branches to anyOf.
  * Rewrite only pointers that traverse an actual oneOf schema array while the
@@ -637,7 +671,7 @@ export function rewriteLocalRefsIntoMovedOneOfBranches(root: JSONSchema): void {
       }
     }
 
-    return changed ? '#/' + parts.map(escapeJSONPointerToken).join('/') : ref;
+    return changed ? '#/' + parts.map(encodeJSONPointerTokenForURIFragment).join('/') : ref;
   };
 
   const rewriteRefs = (value: JSONSchemaDefinition): void => {
@@ -744,6 +778,9 @@ function validateRefSchemas(schema: JSONSchemaDefinition, path: string[], root: 
           path.join('/') || '<root>'
         }\` does not resolve to an object or boolean schema: ${JSON.stringify(ref)}`,
       );
+    }
+    if (typeof resolved === 'boolean') {
+      throw new TypeError(`Expected object schema but got boolean; path=${path.join('/')}`);
     }
     if (!hasOnlyRefAndAnnotations(schema)) {
       throw new Error(

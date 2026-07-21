@@ -19,6 +19,41 @@ describe('toStrictJsonSchema', () => {
         "Root schema must have type: 'object' but got type: undefined",
       );
     });
+
+    test('normalizes singleton type arrays at root and nested positions', () => {
+      const schema: JSONSchema = {
+        type: ['object'],
+        properties: {
+          user: {
+            type: ['object'],
+            properties: {
+              name: { type: ['string'] },
+              nickname: { type: ['string', 'null'] },
+            },
+            required: ['name', 'nickname'],
+          },
+        },
+        required: ['user'],
+      };
+
+      expect(toStrictJsonSchema(schema)).toEqual({
+        type: 'object',
+        properties: {
+          user: {
+            type: 'object',
+            properties: {
+              name: { type: 'string' },
+              nickname: { type: ['string', 'null'] },
+            },
+            required: ['name', 'nickname'],
+            additionalProperties: false,
+          },
+        },
+        required: ['user'],
+        additionalProperties: false,
+      });
+      expect(schema.type).toEqual(['object']);
+    });
   });
 
   describe('Additional Properties', () => {
@@ -370,6 +405,21 @@ describe('toStrictJsonSchema', () => {
       );
     });
 
+    test('rejects boolean schemas reached through local refs', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          value: { $ref: '#/additionalProperties' },
+        },
+        required: ['value'],
+      };
+
+      expect(() => toStrictJsonSchema(schema)).toThrow(
+        'Expected object schema but got boolean; path=properties/value',
+      );
+    });
+
     test('allows local refs into traversed schema array locations', () => {
       const schema: JSONSchema = {
         type: 'object',
@@ -706,6 +756,23 @@ describe('toStrictJsonSchema', () => {
       };
 
       expect(() => toStrictJsonSchema(schema)).toThrow('uses unsupported keyword `uniqueItems`');
+    });
+
+    test.each(['minProperties', 'maxProperties'] as const)('rejects %s schemas', (keyword) => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          metadata: {
+            type: 'object',
+            properties: { value: { type: 'string' } },
+            required: ['value'],
+            [keyword]: 1,
+          },
+        },
+        required: ['metadata'],
+      };
+
+      expect(() => toStrictJsonSchema(schema)).toThrow(`uses unsupported keyword \`${keyword}\``);
     });
 
     test.each([

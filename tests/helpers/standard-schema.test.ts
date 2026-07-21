@@ -291,6 +291,35 @@ describe('Standard Schema helpers', () => {
     });
   });
 
+  it('re-encodes rewritten local refs after moving oneOf branches', () => {
+    const definitionName = 'folder/name~% value';
+    const { standardSchema } = makeStandardSchema({
+      type: 'object',
+      $defs: {
+        [definitionName]: {
+          oneOf: [{ type: 'string', const: 'foo' }, { type: 'number' }],
+        },
+      },
+      properties: {
+        // The encoded slashes are URI-fragment separators. The definition
+        // token itself exercises JSON Pointer escapes plus URI encoding.
+        alias: { $ref: '#/%24defs%2Ffolder~1name~0%25%20value%2FoneOf%2F0' },
+      },
+      required: ['alias'],
+    });
+
+    expect(standardResponseFormat(standardSchema, 'choice').json_schema.schema).toMatchObject({
+      $defs: {
+        [definitionName]: {
+          anyOf: [{ type: 'string', const: 'foo' }, { type: 'number' }],
+        },
+      },
+      properties: {
+        alias: { $ref: '#/$defs/folder~1name~0%25%20value/anyOf/0' },
+      },
+    });
+  });
+
   it('rejects oneOf branches that may overlap', () => {
     const overlappingOneOfSchema = {
       type: 'object',
@@ -572,6 +601,40 @@ describe('Standard Schema helpers', () => {
     });
   });
 
+  it('normalizes singleton type arrays while preserving multi-type arrays', () => {
+    const { standardSchema } = makeStandardSchema({
+      type: ['object'],
+      properties: {
+        weather: {
+          type: ['object'],
+          properties: {
+            city: { type: ['string'] },
+            unit: { type: ['string', 'null'] },
+          },
+          required: ['city', 'unit'],
+        },
+      },
+      required: ['weather'],
+    });
+
+    expect(standardResponseFormat(standardSchema, 'weather').json_schema.schema).toEqual({
+      type: 'object',
+      properties: {
+        weather: {
+          type: 'object',
+          properties: {
+            city: { type: 'string' },
+            unit: { type: ['string', 'null'] },
+          },
+          required: ['city', 'unit'],
+          additionalProperties: false,
+        },
+      },
+      required: ['weather'],
+      additionalProperties: false,
+    });
+  });
+
   it('rejects patternProperties before returning a strict schema', () => {
     const { standardSchema } = makeStandardSchema({
       type: 'object',
@@ -595,6 +658,28 @@ describe('Standard Schema helpers', () => {
       'uses unsupported keyword `patternProperties`',
     );
   });
+
+  it.each(['minProperties', 'maxProperties'] as const)(
+    'rejects %s before returning a strict schema',
+    (keyword) => {
+      const { standardSchema } = makeStandardSchema({
+        type: 'object',
+        properties: {
+          metadata: {
+            type: 'object',
+            properties: { value: { type: 'string' } },
+            required: ['value'],
+            [keyword]: 1,
+          },
+        },
+        required: ['metadata'],
+      });
+
+      expect(() => standardResponseFormat(standardSchema, 'metadata')).toThrow(
+        `uses unsupported keyword \`${keyword}\``,
+      );
+    },
+  );
 
   it('rejects root anyOf schemas', () => {
     const { standardSchema } = makeStandardSchema({
@@ -650,6 +735,21 @@ describe('Standard Schema helpers', () => {
 
     expect(() => standardResponseFormat(standardSchema, 'weather')).toThrow(
       'must set `additionalProperties: false` to be compatible with strict Structured Outputs',
+    );
+  });
+
+  it('rejects boolean schemas reached through local refs before returning a strict schema', () => {
+    const { standardSchema } = makeStandardSchema({
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        value: { $ref: '#/additionalProperties' },
+      },
+      required: ['value'],
+    });
+
+    expect(() => standardResponseFormat(standardSchema, 'value')).toThrow(
+      'Expected object schema but got boolean; path=properties/value',
     );
   });
 
