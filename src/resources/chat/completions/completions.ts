@@ -2015,7 +2015,7 @@ export interface ChatCompletionCreateParamsBase {
    * hit rates. Replaces the `user` field.
    * [Learn more](https://platform.openai.com/docs/guides/prompt-caching).
    */
-  prompt_cache_key?: string;
+  prompt_cache_key?: string | null;
 
   /**
    * Options for prompt caching. Supported for `gpt-5.6` and later models. By
@@ -2086,7 +2086,7 @@ export interface ChatCompletionCreateParamsBase {
    * identifying information.
    * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
    */
-  safety_identifier?: string;
+  safety_identifier?: string | null;
 
   /**
    * @deprecated This feature is in Beta. If specified, our system will make a best
@@ -2209,7 +2209,8 @@ export interface ChatCompletionCreateParamsBase {
   /**
    * Constrains the verbosity of the model's response. Lower values will result in
    * more concise responses, while higher values will result in more verbose
-   * responses. Currently supported values are `low`, `medium`, and `high`.
+   * responses. Currently supported values are `low`, `medium`, and `high`. The
+   * default is `medium`.
    */
   verbosity?: 'low' | 'medium' | 'high' | null;
 

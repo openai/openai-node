@@ -1330,7 +1330,7 @@ export interface BetaResponse {
    * hit rates. Replaces the `user` field.
    * [Learn more](https://platform.openai.com/docs/guides/prompt-caching).
    */
-  prompt_cache_key?: string;
+  prompt_cache_key?: string | null;
 
   /**
    * The prompt-caching options that were applied to the response. Supported for
@@ -1375,7 +1375,7 @@ export interface BetaResponse {
    * identifying information.
    * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
    */
-  safety_identifier?: string;
+  safety_identifier?: string | null;
 
   /**
    * Specifies the processing type used for serving the request.
@@ -1632,7 +1632,10 @@ export namespace BetaResponse {
    */
   export interface Reasoning {
     /**
-     * Controls which reasoning items are rendered back to the model on later turns.
+     * Controls which reasoning items are rendered back to the model on later turns. If
+     * omitted or set to `auto`, the model determines the context mode. The `gpt-5.6`
+     * model family defaults to `all_turns`; earlier models default to `current_turn`.
+     *
      * When returned on a response, this is the effective reasoning context mode used
      * for the response.
      */
@@ -3124,6 +3127,7 @@ export interface BetaResponseError {
     | 'server_error'
     | 'rate_limit_exceeded'
     | 'invalid_prompt'
+    | 'data_residency_mismatch'
     | 'bio_policy'
     | 'vector_store_timeout'
     | 'invalid_image'
@@ -9611,7 +9615,8 @@ export interface BetaResponseTextConfig {
   /**
    * Constrains the verbosity of the model's response. Lower values will result in
    * more concise responses, while higher values will result in more verbose
-   * responses. Currently supported values are `low`, `medium`, and `high`.
+   * responses. Currently supported values are `low`, `medium`, and `high`. The
+   * default is `medium`.
    */
   verbosity?: 'low' | 'medium' | 'high' | null;
 }
@@ -10392,7 +10397,7 @@ export namespace BetaResponsesClientEvent {
      * hit rates. Replaces the `user` field.
      * [Learn more](https://platform.openai.com/docs/guides/prompt-caching).
      */
-    prompt_cache_key?: string;
+    prompt_cache_key?: string | null;
 
     /**
      * Options for prompt caching. Supported for `gpt-5.6` and later models. By
@@ -10444,7 +10449,7 @@ export namespace BetaResponsesClientEvent {
      * identifying information.
      * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
      */
-    safety_identifier?: string;
+    safety_identifier?: string | null;
 
     /**
      * Specifies the processing type used for serving the request.
@@ -10700,7 +10705,10 @@ export namespace BetaResponsesClientEvent {
      */
     export interface Reasoning {
       /**
-       * Controls which reasoning items are rendered back to the model on later turns.
+       * Controls which reasoning items are rendered back to the model on later turns. If
+       * omitted or set to `auto`, the model determines the context mode. The `gpt-5.6`
+       * model family defaults to `all_turns`; earlier models default to `current_turn`.
+       *
        * When returned on a response, this is the effective reasoning context mode used
        * for the response.
        */
@@ -11761,7 +11769,7 @@ export interface ResponseCreateParamsBase {
    * your cache hit rates. Replaces the `user` field.
    * [Learn more](https://platform.openai.com/docs/guides/prompt-caching).
    */
-  prompt_cache_key?: string;
+  prompt_cache_key?: string | null;
 
   /**
    * Body param: Options for prompt caching. Supported for `gpt-5.6` and later
@@ -11814,7 +11822,7 @@ export interface ResponseCreateParamsBase {
    * any identifying information.
    * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
    */
-  safety_identifier?: string;
+  safety_identifier?: string | null;
 
   /**
    * Body param: Specifies the processing type used for serving the request.
@@ -12079,7 +12087,10 @@ export namespace ResponseCreateParams {
    */
   export interface Reasoning {
     /**
-     * Controls which reasoning items are rendered back to the model on later turns.
+     * Controls which reasoning items are rendered back to the model on later turns. If
+     * omitted or set to `auto`, the model determines the context mode. The `gpt-5.6`
+     * model family defaults to `all_turns`; earlier models default to `current_turn`.
+     *
      * When returned on a response, this is the effective reasoning context mode used
      * for the response.
      */
