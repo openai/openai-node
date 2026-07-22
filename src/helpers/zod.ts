@@ -47,8 +47,14 @@ type ZodResponseFormatProps = Omit<ResponseFormatJSONSchema.JSONSchema, 'schema'
   schemaDefinitions?: ZodSchemaDefinitions | undefined;
 };
 
-function escapeJsonPointerToken(token: string): string {
-  return token.replace(/~/g, '~0').replace(/\//g, '~1');
+function encodeSchemaDefinitionRefToken(token: string): string {
+  return encodeURIComponent(token.replace(/~/g, '~0').replace(/\//g, '~1'));
+}
+
+function validateSchemaDefinitions(schemaDefinitions: ZodSchemaDefinitions | undefined): void {
+  if (schemaDefinitions && Object.prototype.hasOwnProperty.call(schemaDefinitions, '__proto__')) {
+    throw new Error('schemaDefinitions cannot include "__proto__" as a definition name');
+  }
 }
 
 function escapeSchemaDefinitionRefs(
@@ -58,7 +64,7 @@ function escapeSchemaDefinitionRefs(
   const refReplacements = new Map(
     Object.keys(schemaDefinitions ?? {}).map((name) => [
       `#/definitions/${name}`,
-      `#/definitions/${escapeJsonPointerToken(name)}`,
+      `#/definitions/${encodeSchemaDefinitionRefToken(name)}`,
     ]),
   );
 
@@ -207,6 +213,7 @@ export function zodResponseFormat<ZodInput extends ZodTypeLike>(
 ): AutoParseableResponseFormat<InferZodType<ZodInput>> {
   const zodSchema = zodObject as unknown as ZodSchema;
   const { schemaDefinitions, ...responseFormatProps } = props ?? {};
+  validateSchemaDefinitions(schemaDefinitions);
 
   return makeParseableResponseFormat<InferZodType<ZodInput>>(
     {

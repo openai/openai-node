@@ -260,6 +260,26 @@ describe.each([
     expectDefinitionRefsToResolve(schema);
   });
 
+  it('URI-encodes supplied schema definition refs', () => {
+    const Shared = z.object({ value: z.string() });
+    const schema = zodResponseFormat(z.object({ first: Shared, second: Shared }), 'response', {
+      schemaDefinitions: { 'foo%2Fbar': Shared },
+    }).json_schema.schema as Record<string, unknown>;
+
+    expect(collectRefs(schema)).toContain('#/definitions/foo%252Fbar');
+    expectDefinitionRefsToResolve(schema);
+  });
+
+  it('rejects __proto__ as a supplied schema definition name', () => {
+    const Shared = z.object({ value: z.string() });
+
+    expect(() =>
+      zodResponseFormat(z.object({ first: Shared, second: Shared }), 'response', {
+        schemaDefinitions: { ['__proto__']: Shared },
+      }),
+    ).toThrow('schemaDefinitions cannot include "__proto__" as a definition name');
+  });
+
   it('automatically adds optional properties to `required`', () => {
     expect(
       zodResponseFormat(
