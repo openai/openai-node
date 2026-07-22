@@ -368,19 +368,48 @@ function normalizeRootAllOf(schema: JSONSchema): void {
  */
 function normalizeRootAnyOf(schema: JSONSchema): boolean {
   const anyOf = schema.anyOf;
-  if (!Array.isArray(anyOf) || anyOf.length !== 1 || !hasOnlyRootAnyOfMetadataSiblings(schema)) {
+  if (!Array.isArray(anyOf) || !hasOnlyRootAnyOfMetadataSiblings(schema)) {
     return false;
   }
 
-  const branch = anyOf[0];
+  // `false` contributes no instances to a union. Keep the original array in
+  // place until promotion so refs into the surviving branch can be rewritten
+  // from their original index, while refs into removed false branches become
+  // dangling and remain fail closed after the wrapper disappears.
+  const realBranches = anyOf
+    .map((branch, index) => ({ branch, index }))
+    .filter(({ branch }) => branch !== false);
+  if (realBranches.length !== 1) {
+    return false;
+  }
+
+  const { branch, index: branchIndex } = realBranches[0]!;
   if (typeof branch === 'boolean' || !isObject(branch) || !isObjectOnlySchema(branch, schema)) {
     return false;
   }
 
-  rewriteLocalRefsIntoPromotedRootAnyOfBranch(schema);
+  const definitionRenames = planPromotedRootAnyOfDefinitionRenames(schema, branch);
+  rewriteLocalRefsIntoPromotedRootAnyOfBranch(schema, branchIndex, definitionRenames);
   const rootMetadata = { ...schema };
   delete rootMetadata.anyOf;
   const normalized = structuredClone(branch);
+
+  for (const keyword of ['$defs', 'definitions'] as const) {
+    const rootDefinitions = schema[keyword];
+    const branchDefinitions = normalized[keyword];
+    if (!isObject(rootDefinitions) || !isObject(branchDefinitions)) {
+      continue;
+    }
+
+    const renames = definitionRenames.get(keyword);
+    const mergedDefinitions: Record<string, JSONSchemaDefinition> = { ...rootDefinitions };
+    for (const [name, definition] of Object.entries(branchDefinitions)) {
+      mergedDefinitions[renames?.get(name) ?? name] = definition as JSONSchemaDefinition;
+    }
+    normalized[keyword] = mergedDefinitions;
+    delete rootMetadata[keyword];
+  }
+
   const schemaRecord = schema as Record<string, unknown>;
 
   for (const keyword of Object.keys(schema)) {
@@ -390,19 +419,80 @@ function normalizeRootAnyOf(schema: JSONSchema): boolean {
   return true;
 }
 
+type RootDefinitionKeyword = '$defs' | 'definitions';
+type PromotedRootAnyOfDefinitionRenames = Map<RootDefinitionKeyword, Map<string, string>>;
+
 /**
- * Promoting a singleton root anyOf branch removes the original anyOf/0
+ * Root and promoted branch definition maps occupy the same pointer after
+ * promotion. Give conflicting branch definitions stable aliases before refs
+ * are rewritten so neither original target is rebound.
+ */
+function planPromotedRootAnyOfDefinitionRenames(
+  root: JSONSchema,
+  branch: JSONSchema,
+): PromotedRootAnyOfDefinitionRenames {
+  const renames: PromotedRootAnyOfDefinitionRenames = new Map();
+
+  for (const keyword of ['$defs', 'definitions'] as const) {
+    const rootDefinitions = root[keyword];
+    const branchDefinitions = branch[keyword];
+    if (!isObject(rootDefinitions) || !isObject(branchDefinitions)) {
+      continue;
+    }
+
+    const usedNames = new Set([...Object.keys(rootDefinitions), ...Object.keys(branchDefinitions)]);
+    const keywordRenames = new Map<string, string>();
+    let aliasIndex = 0;
+
+    for (const [name, definition] of Object.entries(branchDefinitions)) {
+      if (
+        !Object.prototype.hasOwnProperty.call(rootDefinitions, name) ||
+        schemasEqual(rootDefinitions[name], definition)
+      ) {
+        continue;
+      }
+
+      let alias = '__openai_strict_anyOf_definition_' + aliasIndex++;
+      while (usedNames.has(alias)) {
+        alias = '__openai_strict_anyOf_definition_' + aliasIndex++;
+      }
+      usedNames.add(alias);
+      keywordRenames.set(name, alias);
+    }
+
+    if (keywordRenames.size > 0) {
+      renames.set(keyword, keywordRenames);
+    }
+  }
+
+  return renames;
+}
+
+/**
+ * Promoting a singleton root anyOf branch removes the original anyOf/index
  * pointer prefix. Rewrite refs through that prefix while the old tree still
  * exists so the promoted schema keeps naming the same targets.
  */
-function rewriteLocalRefsIntoPromotedRootAnyOfBranch(root: JSONSchema): void {
+function rewriteLocalRefsIntoPromotedRootAnyOfBranch(
+  root: JSONSchema,
+  branchIndex: number,
+  definitionRenames: PromotedRootAnyOfDefinitionRenames,
+): void {
   const rewriteRef = (ref: string): string => {
     const parts = parseLocalRef(ref);
-    if (parts === undefined || parts[0] !== 'anyOf' || parts[1] !== '0') {
+    if (parts === undefined || parts[0] !== 'anyOf' || parts[1] !== String(branchIndex)) {
       return ref;
     }
 
     const promotedParts = parts.slice(2);
+    const definitionKeyword = promotedParts[0];
+    if (promotedParts.length > 1 && (definitionKeyword === '$defs' || definitionKeyword === 'definitions')) {
+      const renamed = definitionRenames.get(definitionKeyword)?.get(promotedParts[1]!);
+      if (renamed !== undefined) {
+        promotedParts[1] = renamed;
+      }
+    }
+
     return promotedParts.length === 0 ?
         '#'
       : '#/' + promotedParts.map(encodeJSONPointerTokenForURIFragment).join('/');
@@ -1603,6 +1693,17 @@ function mergeObjectAllOf(
   const allOf = jsonSchema.allOf;
   if (!Array.isArray(allOf) || allOf.length === 0) {
     return false;
+  }
+
+  // Intersections are idempotent. Collapse structurally identical branches
+  // before object-shape classification so duplicate scalar and array schemas
+  // can reach the existing safe singleton-flattening path.
+  const uniqueBranches = allOf.filter(
+    (branch, index) => !allOf.slice(0, index).some((candidate) => schemasEqual(candidate, branch)),
+  );
+  if (uniqueBranches.length !== allOf.length) {
+    jsonSchema.allOf = uniqueBranches;
+    return true;
   }
 
   // `true` is the identity element for Draft 7 intersections. Remove it

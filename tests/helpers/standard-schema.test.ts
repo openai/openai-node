@@ -455,6 +455,31 @@ describe('Standard Schema helpers', () => {
     }
   });
 
+  it('deduplicates identical non-object allOf branches across all helper surfaces', () => {
+    const schemas = strictSchemasForAllHelpers({
+      type: 'object',
+      properties: {
+        scalar: {
+          allOf: [{ type: 'string' }, { type: 'string' }],
+        },
+        array: {
+          allOf: [
+            { type: 'array', items: { type: 'string' } },
+            { items: { type: 'string' }, type: 'array' },
+          ],
+        },
+      },
+      required: ['scalar', 'array'],
+    });
+
+    for (const schema of schemas) {
+      expect((schema as JSONSchema).properties).toEqual({
+        scalar: { type: 'string' },
+        array: { type: 'array', items: { type: 'string' } },
+      });
+    }
+  });
+
   it('removes false anyOf alternatives across all helper surfaces but keeps boolean unions fail closed', () => {
     const schemas = strictSchemasForAllHelpers({
       type: 'object',
@@ -1798,6 +1823,109 @@ describe('Standard Schema helpers', () => {
       });
     }
   });
+
+  it.each(['anyOf', 'oneOf'] as const)(
+    'filters false root %s alternatives before singleton promotion across all helper surfaces',
+    (keyword) => {
+      const schemas = strictSchemasForAllHelpers({
+        type: 'object',
+        [keyword]: [
+          false,
+          {
+            type: 'object',
+            $defs: {
+              Value: { type: 'string' },
+            },
+            properties: {
+              value: { $ref: `#/${keyword}/1/$defs/Value` },
+            },
+            required: ['value'],
+          },
+        ],
+      });
+
+      for (const schema of schemas) {
+        expect(schema).toEqual({
+          type: 'object',
+          $defs: {
+            Value: { type: 'string' },
+          },
+          properties: {
+            value: { $ref: '#/$defs/Value' },
+          },
+          required: ['value'],
+          additionalProperties: false,
+        });
+      }
+    },
+  );
+
+  it.each(['anyOf', 'oneOf'] as const)(
+    'keeps refs into removed false root %s alternatives fail closed across all helper surfaces',
+    (keyword) => {
+      for (const makeSchema of makeStrictSchemaFactories({
+        type: 'object',
+        [keyword]: [
+          false,
+          {
+            type: 'object',
+            properties: {
+              value: { $ref: `#/${keyword}/0` },
+            },
+            required: ['value'],
+          },
+        ],
+      })) {
+        expect(makeSchema).toThrow('does not resolve to an object or boolean schema');
+      }
+    },
+  );
+
+  it.each(['$defs', 'definitions'] as const)(
+    'preserves colliding root and promoted branch %s maps across all helper surfaces',
+    (keyword) => {
+      const schemas = strictSchemasForAllHelpers({
+        type: 'object',
+        [keyword]: {
+          Value: { type: 'number' },
+          RootOnly: { type: 'boolean' },
+        },
+        anyOf: [
+          {
+            type: 'object',
+            [keyword]: {
+              Value: { type: 'string' },
+              BranchOnly: { type: 'integer' },
+            },
+            properties: {
+              branchValue: { $ref: `#/anyOf/0/${keyword}/Value` },
+              branchOnly: { $ref: `#/anyOf/0/${keyword}/BranchOnly` },
+              rootValue: { $ref: `#/${keyword}/Value` },
+              rootOnly: { $ref: `#/${keyword}/RootOnly` },
+            },
+            required: ['branchValue', 'branchOnly', 'rootValue', 'rootOnly'],
+          },
+        ],
+      });
+
+      for (const schema of schemas) {
+        expect(schema).toMatchObject({
+          [keyword]: {
+            Value: { type: 'number' },
+            RootOnly: { type: 'boolean' },
+            __openai_strict_anyOf_definition_0: { type: 'string' },
+            BranchOnly: { type: 'integer' },
+          },
+          properties: {
+            branchValue: { $ref: `#/${keyword}/__openai_strict_anyOf_definition_0` },
+            branchOnly: { $ref: `#/${keyword}/BranchOnly` },
+            rootValue: { $ref: `#/${keyword}/Value` },
+            rootOnly: { $ref: `#/${keyword}/RootOnly` },
+          },
+        });
+      }
+    },
+  );
 
   it('rejects unsupported nested schema keywords before returning a strict schema', () => {
     const { standardSchema } = makeStandardSchema({
