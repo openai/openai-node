@@ -153,7 +153,10 @@ export namespace InputTokenCountParams {
    */
   export interface Reasoning {
     /**
-     * Controls which reasoning items are rendered back to the model on later turns.
+     * Controls which reasoning items are rendered back to the model on later turns. If
+     * omitted or set to `auto`, the model determines the context mode. The `gpt-5.6`
+     * model family defaults to `all_turns`; earlier models default to `current_turn`.
+     *
      * When returned on a response, this is the effective reasoning context mode used
      * for the response.
      */
@@ -224,7 +227,8 @@ export namespace InputTokenCountParams {
     /**
      * Constrains the verbosity of the model's response. Lower values will result in
      * more concise responses, while higher values will result in more verbose
-     * responses. Currently supported values are `low`, `medium`, and `high`.
+     * responses. Currently supported values are `low`, `medium`, and `high`. The
+     * default is `medium`.
      */
     verbosity?: 'low' | 'medium' | 'high' | null;
   }

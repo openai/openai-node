@@ -1172,7 +1172,7 @@ export interface Response {
    * hit rates. Replaces the `user` field.
    * [Learn more](https://platform.openai.com/docs/guides/prompt-caching).
    */
-  prompt_cache_key?: string;
+  prompt_cache_key?: string | null;
 
   /**
    * The prompt-caching options that were applied to the response. Supported for
@@ -1217,7 +1217,7 @@ export interface Response {
    * identifying information.
    * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
    */
-  safety_identifier?: string;
+  safety_identifier?: string | null;
 
   /**
    * Specifies the latency tier to use for processing the request. This parameter is
@@ -2753,6 +2753,7 @@ export interface ResponseError {
     | 'server_error'
     | 'rate_limit_exceeded'
     | 'invalid_prompt'
+    | 'data_residency_mismatch'
     | 'bio_policy'
     | 'vector_store_timeout'
     | 'invalid_image'
@@ -6955,7 +6956,8 @@ export interface ResponseTextConfig {
   /**
    * Constrains the verbosity of the model's response. Lower values will result in
    * more concise responses, while higher values will result in more verbose
-   * responses. Currently supported values are `low`, `medium`, and `high`.
+   * responses. Currently supported values are `low`, `medium`, and `high`. The
+   * default is `medium`.
    */
   verbosity?: 'low' | 'medium' | 'high' | null;
 }
@@ -7488,7 +7490,7 @@ export interface ResponsesClientEvent {
    * hit rates. Replaces the `user` field.
    * [Learn more](https://platform.openai.com/docs/guides/prompt-caching).
    */
-  prompt_cache_key?: string;
+  prompt_cache_key?: string | null;
 
   /**
    * Options for prompt caching. Supported for `gpt-5.6` and later models. By
@@ -7540,7 +7542,7 @@ export interface ResponsesClientEvent {
    * identifying information.
    * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
    */
-  safety_identifier?: string;
+  safety_identifier?: string | null;
 
   /**
    * Specifies the processing type used for serving the request.
@@ -8677,7 +8679,7 @@ export interface ResponseCreateParamsBase {
    * hit rates. Replaces the `user` field.
    * [Learn more](https://platform.openai.com/docs/guides/prompt-caching).
    */
-  prompt_cache_key?: string;
+  prompt_cache_key?: string | null;
 
   /**
    * Options for prompt caching. Supported for `gpt-5.6` and later models. By
@@ -8729,7 +8731,7 @@ export interface ResponseCreateParamsBase {
    * identifying information.
    * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
    */
-  safety_identifier?: string;
+  safety_identifier?: string | null;
 
   /**
    * Specifies the latency tier to use for processing the request. This parameter is

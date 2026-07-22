@@ -163,7 +163,8 @@ export namespace InputTokenCountParams {
     /**
      * Constrains the verbosity of the model's response. Lower values will result in
      * more concise responses, while higher values will result in more verbose
-     * responses. Currently supported values are `low`, `medium`, and `high`.
+     * responses. Currently supported values are `low`, `medium`, and `high`. The
+     * default is `medium`.
      */
     verbosity?: 'low' | 'medium' | 'high' | null;
   }
