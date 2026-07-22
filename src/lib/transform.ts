@@ -377,6 +377,7 @@ function normalizeRootAnyOf(schema: JSONSchema): boolean {
     return false;
   }
 
+  rewriteLocalRefsIntoPromotedRootAnyOfBranch(schema);
   const rootMetadata = { ...schema };
   delete rootMetadata.anyOf;
   const normalized = structuredClone(branch);
@@ -387,6 +388,41 @@ function normalizeRootAnyOf(schema: JSONSchema): boolean {
   }
   Object.assign(schema, normalized, rootMetadata);
   return true;
+}
+
+/**
+ * Promoting a singleton root anyOf branch removes the original anyOf/0
+ * pointer prefix. Rewrite refs through that prefix while the old tree still
+ * exists so the promoted schema keeps naming the same targets.
+ */
+function rewriteLocalRefsIntoPromotedRootAnyOfBranch(root: JSONSchema): void {
+  const rewriteRef = (ref: string): string => {
+    const parts = parseLocalRef(ref);
+    if (parts === undefined || parts[0] !== 'anyOf' || parts[1] !== '0') {
+      return ref;
+    }
+
+    const promotedParts = parts.slice(2);
+    return promotedParts.length === 0 ?
+        '#'
+      : '#/' + promotedParts.map(encodeJSONPointerTokenForURIFragment).join('/');
+  };
+
+  const rewriteRefs = (value: JSONSchemaDefinition): void => {
+    if (typeof value === 'boolean' || !isObject(value)) {
+      return;
+    }
+
+    if (typeof value.$ref === 'string') {
+      value.$ref = rewriteRef(value.$ref);
+    }
+
+    forEachJSONSchemaChild(value, [], (child) => {
+      rewriteRefs(child as JSONSchemaDefinition);
+    });
+  };
+
+  rewriteRefs(root);
 }
 
 function assertLocalRootRef(ref: unknown): asserts ref is string {
@@ -1296,6 +1332,83 @@ function preserveAllOfRefTargets(root: JSONSchema, rootOnly = false): void {
   rewriteRefs(root);
 }
 
+/**
+ * Closed allOf merges can discard optional property declarations. Preserve
+ * only local refs into declarations that are about to disappear, then rewrite
+ * those refs to stable root definitions before the merge removes their paths.
+ */
+function preserveDiscardedAllOfPropertyRefTargets(root: JSONSchema, discardedPaths: string[][]): void {
+  if (discardedPaths.length === 0) {
+    return;
+  }
+
+  const refsToPreserve = new Set<string>();
+  const collectRefs = (value: JSONSchemaDefinition): void => {
+    if (typeof value === 'boolean' || !isObject(value)) {
+      return;
+    }
+
+    if (typeof value.$ref === 'string') {
+      const parts = parseLocalRef(value.$ref);
+      if (
+        parts !== undefined &&
+        discardedPaths.some(
+          (discardedPath) =>
+            parts.length >= discardedPath.length &&
+            discardedPath.every((part, index) => parts[index] === part),
+        )
+      ) {
+        refsToPreserve.add(value.$ref);
+      }
+    }
+
+    forEachJSONSchemaChild(value, [], (child) => {
+      collectRefs(child as JSONSchemaDefinition);
+    });
+  };
+  collectRefs(root);
+
+  if (refsToPreserve.size === 0) {
+    return;
+  }
+
+  if (root.$defs !== undefined && !isObject(root.$defs)) {
+    throw new Error('Root schema has invalid $defs and cannot preserve discarded allOf properties.');
+  }
+  const definitions = (root.$defs ??= {});
+  const rewrittenRefs = new Map<string, string>();
+  let aliasIndex = 0;
+
+  for (const ref of refsToPreserve) {
+    const target = resolveLocalRef(root, ref);
+    if (!isSchemaDefinition(target)) {
+      throw new Error('Local $ref cannot be preserved before allOf property removal: ' + JSON.stringify(ref));
+    }
+
+    let alias = '__openai_strict_allOf_property_ref_' + aliasIndex++;
+    while (Object.prototype.hasOwnProperty.call(definitions, alias)) {
+      alias = '__openai_strict_allOf_property_ref_' + aliasIndex++;
+    }
+    definitions[alias] = structuredClone(target);
+    rewrittenRefs.set(ref, '#/$defs/' + escapeJSONPointerToken(alias));
+  }
+
+  const rewriteRefs = (value: JSONSchemaDefinition): void => {
+    if (typeof value === 'boolean' || !isObject(value)) {
+      return;
+    }
+
+    if (typeof value.$ref === 'string') {
+      value.$ref = rewrittenRefs.get(value.$ref) ?? value.$ref;
+    }
+
+    forEachJSONSchemaChild(value, [], (child) => {
+      rewriteRefs(child as JSONSchemaDefinition);
+    });
+  };
+  rewriteRefs(root);
+}
+
 function validateRefSchemas(schema: JSONSchemaDefinition, path: string[], root: JSONSchema): void {
   if (typeof schema === 'boolean' || !isObject(schema)) {
     return;
@@ -1548,9 +1661,9 @@ function mergeObjectAllOf(
     }
   }
 
-  const branches: JSONSchema[] = [];
+  const branches: Array<{ schema: JSONSchema; sourcePath: string[] | undefined }> = [];
   if (parentHasObjectShape) {
-    branches.push(jsonSchema);
+    branches.push({ schema: jsonSchema, sourcePath: path });
   }
   for (const [index, entry] of allOf.entries()) {
     if (!isObject(entry)) {
@@ -1566,7 +1679,10 @@ function mergeObjectAllOf(
     // so a valid definitions-only branch can now be discarded like an
     // annotation-only branch.
     if (hasObjectShapeWithoutAllOf(branch)) {
-      branches.push(branch);
+      branches.push({
+        schema: branch,
+        sourcePath: branch === entry ? [...path, 'allOf', String(index)] : undefined,
+      });
     } else if (!hasOnlyNeutralAllOfBranchKeywords(branch)) {
       fail();
     }
@@ -1589,7 +1705,11 @@ function mergeObjectAllOf(
   const mergedProperties = Object.create(null) as Record<string, JSONSchemaDefinition>;
   const mergedRequired = new Set<string>();
   const closedPropertySets: Set<string>[] = [];
-  const propertyEntries: Array<[string, JSONSchemaDefinition]> = [];
+  const propertyEntries: Array<{
+    key: string;
+    propertySchema: JSONSchemaDefinition;
+    sourcePath: string[] | undefined;
+  }> = [];
   let sawProperties = false;
   let sawRequired = false;
   let hasExplicitObjectType = false;
@@ -1615,7 +1735,7 @@ function mergeObjectAllOf(
     }
   }
 
-  for (const branch of branches) {
+  for (const { schema: branch, sourcePath } of branches) {
     for (const keyword of Object.keys(branch)) {
       if (keyword === 'allOf' && branch === jsonSchema) continue;
       if (
@@ -1649,7 +1769,11 @@ function mergeObjectAllOf(
       }
       sawProperties = true;
       for (const [key, propertySchema] of Object.entries(branch.properties)) {
-        propertyEntries.push([key, propertySchema]);
+        propertyEntries.push({
+          key,
+          propertySchema,
+          sourcePath: sourcePath === undefined ? undefined : [...sourcePath, 'properties', key],
+        });
       }
     }
 
@@ -1682,14 +1806,27 @@ function mergeObjectAllOf(
           (allowed, keys) => new Set([...allowed].filter((key) => keys.has(key))),
           new Set(closedPropertySets[0]),
         );
-  if (
+  const excludesRequiredProperty =
     allowedClosedProperties !== undefined &&
-    [...mergedRequired].some((key) => !allowedClosedProperties.has(key))
-  ) {
+    [...mergedRequired].some((key) => !allowedClosedProperties.has(key));
+  const collapsesToNull = excludesRequiredProperty && !hasExplicitObjectType && hasExplicitNullableObjectType;
+  const discardedPropertyPaths = propertyEntries
+    .filter(
+      ({ key, sourcePath }) =>
+        sourcePath !== undefined &&
+        (collapsesToNull || (allowedClosedProperties !== undefined && !allowedClosedProperties.has(key))),
+    )
+    .map(({ sourcePath }) => sourcePath!);
+  preserveDiscardedAllOfPropertyRefTargets(root, discardedPropertyPaths);
+  if (jsonSchema === root && root.$defs !== undefined) {
+    merged.$defs = root.$defs;
+  }
+
+  if (excludesRequiredProperty) {
     // Object keywords do not constrain null. If every explicit object type
     // also admits null, the object portion is contradictory but null remains
     // an exact representation of the intersection.
-    if (!hasExplicitObjectType && hasExplicitNullableObjectType) {
+    if (collapsesToNull) {
       merged.type = 'null';
       for (const keyword of Object.keys(jsonSchema)) {
         delete (jsonSchema as any)[keyword];
@@ -1700,7 +1837,7 @@ function mergeObjectAllOf(
     fail();
   }
 
-  for (const [key, propertySchema] of propertyEntries) {
+  for (const { key, propertySchema } of propertyEntries) {
     if (allowedClosedProperties !== undefined && !allowedClosedProperties.has(key)) {
       continue;
     }

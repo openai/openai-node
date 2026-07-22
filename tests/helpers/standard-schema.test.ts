@@ -1076,6 +1076,43 @@ describe('Standard Schema helpers', () => {
     }
   });
 
+  it('preserves refs to optional allOf properties discarded by closed branches', () => {
+    const schemas = strictSchemasForAllHelpers({
+      type: 'object',
+      properties: {
+        wrapper: {
+          type: 'object',
+          properties: { x: { type: 'string' } },
+          allOf: [
+            {
+              type: 'object',
+              properties: {},
+              additionalProperties: false,
+            },
+          ],
+        },
+        alias: { $ref: '#/properties/wrapper/properties/x' },
+      },
+      required: ['wrapper', 'alias'],
+    });
+
+    for (const schema of schemas) {
+      expect(schema).toMatchObject({
+        $defs: {
+          __openai_strict_allOf_property_ref_0: { type: 'string' },
+        },
+        properties: {
+          wrapper: {
+            type: 'object',
+            properties: {},
+            additionalProperties: false,
+          },
+          alias: { $ref: '#/$defs/__openai_strict_allOf_property_ref_0' },
+        },
+      });
+    }
+  });
+
   it('rejects closed allOf property sets that exclude required properties across all helper surfaces', () => {
     for (const makeSchema of makeStrictSchemaFactories({
       type: 'object',
@@ -1729,6 +1766,35 @@ describe('Standard Schema helpers', () => {
         properties: { value: { type: 'string' } },
         required: ['value'],
         additionalProperties: false,
+      });
+    }
+  });
+
+  it('rewrites refs into flattened singleton root anyOf branches across all helper surfaces', () => {
+    const schemas = strictSchemasForAllHelpers({
+      type: 'object',
+      anyOf: [
+        {
+          type: 'object',
+          $defs: {
+            Value: { type: 'string' },
+          },
+          properties: {
+            value: { $ref: '#/anyOf/0/$defs/Value' },
+          },
+          required: ['value'],
+        },
+      ],
+    });
+
+    for (const schema of schemas) {
+      expect(schema).toMatchObject({
+        $defs: {
+          Value: { type: 'string' },
+        },
+        properties: {
+          value: { $ref: '#/$defs/Value' },
+        },
       });
     }
   });
