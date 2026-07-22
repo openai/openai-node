@@ -1,4 +1,10 @@
-import { zodFunction, zodResponseFormat, zodResponsesFunction, zodTextFormat } from 'openai/helpers/zod';
+import {
+  zodFunction,
+  zodRealtimeFunction,
+  zodResponseFormat,
+  zodResponsesFunction,
+  zodTextFormat,
+} from 'openai/helpers/zod';
 import { expectType } from '../utils/typing';
 import { z as zv3 } from 'zod/v3';
 import { z as zv4 } from 'zod/v4';
@@ -93,6 +99,7 @@ describe('Zod v4 mini', () => {
   it('supports tool argument parsing', () => {
     const chatTool = zodFunction({ name: 'mini_tool', parameters: MiniSchema });
     const responseTool = zodResponsesFunction({ name: 'mini_tool', parameters: MiniSchema });
+    const realtimeTool = zodRealtimeFunction({ name: 'mini_tool', parameters: MiniSchema });
 
     expect(chatTool.function.parameters).toEqual(expectedSchema);
     expect(chatTool.$parseRaw('{"hello":"world"}')).toEqual({ hello: 'world' });
@@ -101,6 +108,87 @@ describe('Zod v4 mini', () => {
     expect(responseTool.parameters).toEqual(expectedSchema);
     expect(responseTool.$parseRaw('{"hello":"world"}')).toEqual({ hello: 'world' });
     expect(() => responseTool.$parseRaw('{"hello":"there"}')).toThrow();
+
+    expect(realtimeTool).toMatchObject({
+      type: 'function',
+      name: 'mini_tool',
+      parameters: {
+        type: 'object',
+        properties: expectedSchema.properties,
+        required: ['hello'],
+      },
+    });
+  });
+});
+
+describe.each([
+  { version: 'v3', z: zv3 },
+  { version: 'v4', z: zv4 as any as typeof zv3 },
+])('zodRealtimeFunction (Zod $version)', ({ z }) => {
+  it('builds a Realtime function tool without strict', () => {
+    const tool = zodRealtimeFunction({
+      name: 'get_weather',
+      description: 'Get the current weather',
+      parameters: z.object({
+        location: z.string(),
+        unit: z.enum(['c', 'f']),
+      }),
+    });
+
+    expect(tool).toMatchObject({
+      type: 'function',
+      name: 'get_weather',
+      description: 'Get the current weather',
+      parameters: {
+        type: 'object',
+        properties: {
+          location: { type: 'string' },
+          unit: { type: 'string', enum: ['c', 'f'] },
+        },
+        required: ['location', 'unit'],
+      },
+    });
+    expect(tool).not.toHaveProperty('strict');
+  });
+
+  it('preserves optional and defaulted parameters in the non-strict schema', () => {
+    const tool = zodRealtimeFunction({
+      name: 'example',
+      parameters: z.object({
+        required: z.string(),
+        optional: z.number().optional(),
+        nullable: z.string().nullable(),
+        defaulted: z.boolean().default(true),
+      }),
+    });
+
+    expect(tool.parameters).toMatchObject({
+      type: 'object',
+      properties: {
+        required: { type: 'string' },
+        optional: { type: 'number' },
+        defaulted: { type: 'boolean', default: true },
+      },
+      required: ['required', 'nullable'],
+    });
+  });
+
+  it('uses pipeline input schemas', () => {
+    const tool = zodRealtimeFunction({
+      name: 'example',
+      parameters: z.object({
+        value: z.string().transform(Number).pipe(z.number()),
+      }),
+    });
+
+    expect(tool.parameters).toMatchObject({
+      type: 'object',
+      properties: {
+        value: { type: 'string' },
+      },
+      required: ['value'],
+    });
+    expect(tool.parameters).not.toHaveProperty('properties.value.allOf');
   });
 });
 
