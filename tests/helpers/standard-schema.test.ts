@@ -7,6 +7,7 @@ import {
 import type OpenAI from 'openai';
 import type { JSONSchema } from 'openai/lib/jsonschema';
 import { compareType, expectType } from '../utils/typing';
+import { z as zv4 } from 'zod/v4';
 
 declare const runTools: OpenAI['chat']['completions']['runTools'];
 
@@ -484,6 +485,36 @@ describe('Standard Schema helpers', () => {
     }
   });
 
+  it('removes false oneOf alternatives across all helper surfaces but keeps boolean unions fail closed', () => {
+    const schemas = strictSchemasForAllHelpers({
+      type: 'object',
+      properties: {
+        choice: {
+          oneOf: [false, { type: 'string' }],
+        },
+      },
+      required: ['choice'],
+    });
+
+    for (const schema of schemas) {
+      expect((schema as JSONSchema).properties?.['choice']).toEqual({
+        anyOf: [{ type: 'string' }],
+      });
+    }
+
+    for (const makeSchema of makeStrictSchemaFactories({
+      type: 'object',
+      properties: {
+        choice: {
+          oneOf: [false, false],
+        },
+      },
+      required: ['choice'],
+    })) {
+      expect(makeSchema).toThrow('Expected object schema but got boolean');
+    }
+  });
+
   it('rewrites nested refs into shifted false anyOf alternatives across all helper surfaces', () => {
     const definitionName = 'union/name~% value';
     const definitionRef = '#/$defs/union~1name~0%25%20value';
@@ -571,6 +602,24 @@ describe('Standard Schema helpers', () => {
         alias: { $ref: '#/properties/choice/anyOf/0' },
       },
     });
+  });
+
+  it('infers literal types when proving oneOf exclusivity across all helper surfaces', () => {
+    const schemas = strictSchemasForAllHelpers({
+      type: 'object',
+      properties: {
+        choice: {
+          oneOf: [{ const: 'foo' }, { type: 'number' }],
+        },
+      },
+      required: ['choice'],
+    });
+
+    for (const schema of schemas) {
+      expect((schema as JSONSchema).properties?.['choice']).toEqual({
+        anyOf: [{ const: 'foo' }, { type: 'number' }],
+      });
+    }
   });
 
   it('re-encodes rewritten local refs after moving oneOf branches', () => {
@@ -1475,6 +1524,70 @@ describe('Standard Schema helpers', () => {
     });
   });
 
+  it('preserves the first conflicting allOf annotation across all helper surfaces', () => {
+    const schemas = strictSchemasForAllHelpers({
+      type: 'object',
+      properties: {
+        choice: {
+          allOf: [
+            {
+              type: 'object',
+              description: 'first description',
+              properties: { value: { type: 'string' } },
+              required: ['value'],
+            },
+            {
+              type: 'object',
+              description: 'second description',
+              title: 'second title',
+              properties: { value: { type: 'string' } },
+              required: ['value'],
+            },
+          ],
+        },
+      },
+      required: ['choice'],
+    });
+
+    for (const schema of schemas) {
+      expect((schema as JSONSchema).properties?.['choice']).toEqual({
+        type: 'object',
+        description: 'first description',
+        title: 'second title',
+        properties: { value: { type: 'string' } },
+        required: ['value'],
+        additionalProperties: false,
+      });
+    }
+  });
+
+  it('collapses contradictory nullable object allOf branches to null across all helper surfaces', () => {
+    const schemas = strictSchemasForAllHelpers({
+      type: 'object',
+      properties: {
+        choice: {
+          allOf: [
+            {
+              type: ['object', 'null'],
+              properties: {},
+              additionalProperties: false,
+            },
+            {
+              type: ['object', 'null'],
+              properties: { value: { type: 'string' } },
+              required: ['value'],
+            },
+          ],
+        },
+      },
+      required: ['choice'],
+    });
+
+    for (const schema of schemas) {
+      expect((schema as JSONSchema).properties?.['choice']).toEqual({ type: 'null' });
+    }
+  });
+
   it('rejects patternProperties before returning a strict schema', () => {
     const { standardSchema } = makeStandardSchema({
       type: 'object',
@@ -1520,6 +1633,7 @@ describe('Standard Schema helpers', () => {
   });
 
   it.each([
+    ['$anchor', 'node'],
     ['$recursiveRef', '#'],
     ['$recursiveAnchor', true],
   ] as const)('rejects unsupported %s across all helper surfaces', (keyword, value) => {
@@ -1593,6 +1707,30 @@ describe('Standard Schema helpers', () => {
     expect(() => standardResponseFormat(standardSchema, 'choice')).toThrow(
       'Root schema must not use `anyOf`',
     );
+  });
+
+  it('flattens singleton root anyOf object wrappers across all helper surfaces', () => {
+    const schemas = strictSchemasForAllHelpers({
+      type: 'object',
+      description: 'root description',
+      anyOf: [
+        {
+          type: 'object',
+          properties: { value: { type: 'string' } },
+          required: ['value'],
+        },
+      ],
+    });
+
+    for (const schema of schemas) {
+      expect(schema).toEqual({
+        type: 'object',
+        description: 'root description',
+        properties: { value: { type: 'string' } },
+        required: ['value'],
+        additionalProperties: false,
+      });
+    }
   });
 
   it('rejects unsupported nested schema keywords before returning a strict schema', () => {
@@ -1709,6 +1847,7 @@ describe('Standard Schema helpers', () => {
 
 function _typeTests() {
   const { standardSchema } = makeStandardSchema();
+  const vendorStandardSchema = zv4.object({ city: zv4.string() });
 
   const responseFormat = standardResponseFormat(standardSchema, 'weather');
   const textFormat = standardTextFormat(standardSchema, 'weather');
@@ -1763,6 +1902,12 @@ function _typeTests() {
     parameters: typelessStandardSchema,
     function: (args) => compareType<typeof args, unknown>(true),
   });
+  const vendorResponseFormat = standardResponseFormat(vendorStandardSchema, 'weather');
+  const vendorChatTool = standardFunction({
+    name: 'get_weather',
+    parameters: vendorStandardSchema,
+    function: (args) => expectType<{ city: string }>(args),
+  });
 
   compareType<ReturnType<typeof chatTool.$parseRaw>, WeatherOutput>(true);
   compareType<ReturnType<typeof responseTool.$parseRaw>, WeatherOutput>(true);
@@ -1770,6 +1915,8 @@ function _typeTests() {
   compareType<typeof typelessTextFormat.__output, unknown>(true);
   compareType<ReturnType<typeof typelessChatTool.$parseRaw>, unknown>(true);
   compareType<ReturnType<typeof typelessResponseTool.$parseRaw>, unknown>(true);
+  compareType<typeof vendorResponseFormat.__output, { city: string }>(true);
+  compareType<ReturnType<typeof vendorChatTool.$parseRaw>, { city: string }>(true);
   expectType<true>(chatTool.__hasFunction);
   expectType<false>(callbacklessChatTool.__hasFunction);
   // @ts-expect-error callback-less tools cannot be passed to runTools

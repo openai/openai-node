@@ -63,7 +63,9 @@ type StandardSchemaLike<Input = unknown, Output = Input> = {
 };
 
 type InferStandardOutput<Schema extends StandardSchemaLike> =
-  Schema['~standard'] extends { readonly types: { readonly output: infer Output } } ? Output : unknown;
+  [NonNullable<Schema['~standard']['types']>] extends [never] ? unknown
+  : NonNullable<Schema['~standard']['types']> extends { readonly output: infer Output } ? Output
+  : unknown;
 
 type StandardSchemaJSONSchemaProps = {
   /**
@@ -133,6 +135,9 @@ function getSchemaTypes(schema: unknown): Set<string> | undefined {
   if (!schema || typeof schema !== 'object' || Array.isArray(schema)) return undefined;
 
   const type = (schema as Record<string, unknown>)['type'];
+  if (type === undefined) {
+    return getLiteralSchemaTypes(schema);
+  }
   const types = Array.isArray(type) ? type : [type];
   if (
     types.length === 0 ||
@@ -167,6 +172,18 @@ function getLiteralValues(schema: unknown): JSONPrimitive[] | undefined {
   }
 
   return undefined;
+}
+
+function getLiteralSchemaTypes(schema: unknown): Set<string> | undefined {
+  const literalValues = getLiteralValues(schema);
+  if (!literalValues) return undefined;
+
+  return new Set(
+    literalValues.map((value) => {
+      if (value === null) return 'null';
+      return typeof value;
+    }),
+  );
 }
 
 function haveDisjointLiteralValues(left: unknown, right: unknown): boolean {
@@ -367,7 +384,12 @@ function normalizeStructuredOutputSchema(schema: JSONSchema): JSONSchema {
           'Standard JSON Schema generated both `anyOf` and `oneOf`, which cannot be represented in an OpenAI strict schema',
         );
       }
-      if (!areOneOfBranchesMutuallyExclusive(record['oneOf'], normalizedSchema)) {
+      // `false` can never validate, so it cannot overlap another oneOf
+      // branch. Keep it in place until the existing anyOf normalization runs
+      // so local refs into surviving branch indices can be rewritten before
+      // the impossible alternatives are removed.
+      const possibleBranches = record['oneOf'].filter((branch) => branch !== false);
+      if (!areOneOfBranchesMutuallyExclusive(possibleBranches, normalizedSchema)) {
         throw new OpenAIError(
           'Standard JSON Schema generated a `oneOf` whose branches are not provably mutually exclusive. OpenAI strict schemas do not support `oneOf`; use `anyOf` or add a discriminator with distinct literal values.',
         );

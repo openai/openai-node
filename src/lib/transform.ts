@@ -49,6 +49,7 @@ const JSON_SCHEMA_MAP_SCHEMA_KEYWORDS = [
 ];
 
 const JSON_SCHEMA_UNSUPPORTED_SCHEMA_KEYWORDS = new Set([
+  '$anchor',
   '$dynamicAnchor',
   '$dynamicRef',
   '$recursiveAnchor',
@@ -209,8 +210,9 @@ function normalizeRootRefAndAllOf(schema: JSONSchema): void {
     inlineRootRefObject(schema);
     preserveAllOfRefTargets(schema, true);
     normalizeRootAllOf(schema);
+    const normalizedAnyOf = normalizeRootAnyOf(schema);
 
-    if (schema.$ref === undefined) {
+    if (schema.$ref === undefined && !normalizedAnyOf) {
       return;
     }
   }
@@ -357,6 +359,34 @@ function normalizeRootAllOf(schema: JSONSchema): void {
     }
     Object.assign(schema, normalized, rootMetadata);
   }
+}
+
+/**
+ * A singleton root anyOf with no validating siblings is equivalent to its
+ * only branch. Flatten it before the root-union check so converters that
+ * retain a redundant object wrapper can still produce a strict root object.
+ */
+function normalizeRootAnyOf(schema: JSONSchema): boolean {
+  const anyOf = schema.anyOf;
+  if (!Array.isArray(anyOf) || anyOf.length !== 1 || !hasOnlyRootAnyOfMetadataSiblings(schema)) {
+    return false;
+  }
+
+  const branch = anyOf[0];
+  if (typeof branch === 'boolean' || !isObject(branch) || !isObjectOnlySchema(branch, schema)) {
+    return false;
+  }
+
+  const rootMetadata = { ...schema };
+  delete rootMetadata.anyOf;
+  const normalized = structuredClone(branch);
+  const schemaRecord = schema as Record<string, unknown>;
+
+  for (const keyword of Object.keys(schema)) {
+    delete schemaRecord[keyword];
+  }
+  Object.assign(schema, normalized, rootMetadata);
+  return true;
 }
 
 function assertLocalRootRef(ref: unknown): asserts ref is string {
@@ -899,6 +929,18 @@ function hasOnlyRootAllOfMetadataSiblings(schema: JSONSchema): boolean {
       keyword === 'allOf' ||
       keyword === '$defs' ||
       keyword === 'definitions' ||
+      JSON_SCHEMA_ROOT_METADATA_KEYWORDS.has(keyword) ||
+      JSON_SCHEMA_ANNOTATION_KEYWORDS.has(keyword),
+  );
+}
+
+function hasOnlyRootAnyOfMetadataSiblings(schema: JSONSchema): boolean {
+  return Object.keys(schema).every(
+    (keyword) =>
+      keyword === 'anyOf' ||
+      keyword === '$defs' ||
+      keyword === 'definitions' ||
+      (keyword === 'type' && schema.type === 'object') ||
       JSON_SCHEMA_ROOT_METADATA_KEYWORDS.has(keyword) ||
       JSON_SCHEMA_ANNOTATION_KEYWORDS.has(keyword),
   );
@@ -1556,10 +1598,12 @@ function mergeObjectAllOf(
   const mergeAnnotations = (schema: JSONSchema) => {
     for (const keyword of JSON_SCHEMA_ANNOTATION_KEYWORDS) {
       if (!(keyword in schema)) continue;
-      if (keyword in merged && !schemasEqual((merged as any)[keyword], (schema as any)[keyword])) {
-        fail();
+      // Annotation keywords do not affect Draft 7 validation. Preserve the
+      // first value (the outer schema, then earlier branches) instead of
+      // rejecting an otherwise exactly mergeable intersection.
+      if (!(keyword in merged)) {
+        (merged as any)[keyword] = (schema as any)[keyword];
       }
-      (merged as any)[keyword] = (schema as any)[keyword];
     }
   };
 
@@ -1642,6 +1686,17 @@ function mergeObjectAllOf(
     allowedClosedProperties !== undefined &&
     [...mergedRequired].some((key) => !allowedClosedProperties.has(key))
   ) {
+    // Object keywords do not constrain null. If every explicit object type
+    // also admits null, the object portion is contradictory but null remains
+    // an exact representation of the intersection.
+    if (!hasExplicitObjectType && hasExplicitNullableObjectType) {
+      merged.type = 'null';
+      for (const keyword of Object.keys(jsonSchema)) {
+        delete (jsonSchema as any)[keyword];
+      }
+      Object.assign(jsonSchema, merged);
+      return true;
+    }
     fail();
   }
 
