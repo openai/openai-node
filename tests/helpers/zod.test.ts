@@ -5,7 +5,7 @@ import {
   zodResponsesFunction,
   zodTextFormat,
 } from 'openai/helpers/zod';
-import { expectType } from '../utils/typing';
+import { compareType, expectType } from '../utils/typing';
 import { z as zv3 } from 'zod/v3';
 import { z as zv4 } from 'zod/v4';
 import { z as zv4Mini } from 'zod/v4-mini';
@@ -705,17 +705,25 @@ describe.each([
 
 function _typeTests() {
   const MiniSchema = zv4Mini.object({ hello: zv4Mini.literal('world') });
+  type ParsedArguments = { hello: 'world' };
 
-  expectType<{ hello: 'world' }>(zodResponseFormat(MiniSchema, 'response').__output);
-  expectType<{ hello: 'world' }>(zodTextFormat(MiniSchema, 'response').__output);
-  zodFunction({
+  expectType<ParsedArguments>(zodResponseFormat(MiniSchema, 'response').__output);
+  expectType<ParsedArguments>(zodTextFormat(MiniSchema, 'response').__output);
+  const chatTool = zodFunction({
     name: 'mini_tool',
     parameters: MiniSchema,
-    function: (args) => expectType<{ hello: 'world' }>(args),
+    function: (args) => expectType<ParsedArguments>(args),
   });
-  zodResponsesFunction({
+  const responseTool = zodResponsesFunction({
     name: 'mini_tool',
     parameters: MiniSchema,
-    function: (args) => expectType<{ hello: 'world' }>(args),
+    function: (args) => expectType<ParsedArguments>(args),
   });
+
+  compareType<Parameters<NonNullable<typeof chatTool.$callback>>[0], ParsedArguments>(true);
+  compareType<ReturnType<typeof chatTool.$parseRaw>, ParsedArguments>(true);
+  compareType<typeof chatTool.__arguments, ParsedArguments>(true);
+  compareType<Parameters<NonNullable<typeof responseTool.$callback>>[0], ParsedArguments>(true);
+  compareType<ReturnType<typeof responseTool.$parseRaw>, ParsedArguments>(true);
+  compareType<typeof responseTool.__arguments, ParsedArguments>(true);
 }
