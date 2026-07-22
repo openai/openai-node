@@ -163,6 +163,173 @@ describe('.stream()', () => {
     });
   });
 
+  it('finalizes audio streams that end with an expires_at-only chunk', async () => {
+    const chunks = [
+      {
+        id: 'chatcmpl-test',
+        object: 'chat.completion.chunk',
+        created: 1,
+        model: 'gpt-4o-audio-preview',
+        choices: [
+          {
+            index: 0,
+            delta: { audio: { transcript: 'hel' } },
+            finish_reason: null,
+          },
+        ],
+      },
+      {
+        id: 'chatcmpl-test',
+        object: 'chat.completion.chunk',
+        created: 1,
+        model: 'gpt-4o-audio-preview',
+        choices: [
+          {
+            index: 0,
+            delta: {
+              role: 'assistant',
+              content: null,
+              refusal: null,
+              audio: { id: 'audio-test', data: 'abc' },
+            },
+            finish_reason: null,
+          },
+        ],
+      },
+      {
+        id: 'chatcmpl-test',
+        object: 'chat.completion.chunk',
+        created: 1,
+        model: 'gpt-4o-audio-preview',
+        choices: [
+          {
+            index: 0,
+            delta: { audio: { transcript: 'lo', data: 'def' } },
+            finish_reason: null,
+          },
+        ],
+      },
+      {
+        id: 'chatcmpl-test',
+        object: 'chat.completion.chunk',
+        created: 1,
+        model: 'gpt-4o-audio-preview',
+        choices: [
+          {
+            index: 0,
+            delta: { audio: { expires_at: 2 } },
+          },
+        ],
+      },
+    ] as unknown as OpenAI.Chat.ChatCompletionChunk[];
+    const readable = new Stream(async function* () {
+      for (const chunk of chunks) yield chunk;
+    }, new AbortController()).toReadableStream();
+
+    const stream = ChatCompletionStreamingRunner.fromReadableStream(readable);
+
+    await expect(stream.finalChatCompletion()).resolves.toMatchObject({
+      id: 'chatcmpl-test',
+      choices: [
+        {
+          finish_reason: 'stop',
+          message: {
+            role: 'assistant',
+            content: null,
+            refusal: null,
+            audio: {
+              id: 'audio-test',
+              data: 'abcdef',
+              transcript: 'hello',
+              expires_at: 2,
+            },
+          },
+        },
+      ],
+    });
+  });
+
+  it('does not infer a finish_reason if audio continues after expires_at', async () => {
+    const chunks = [
+      {
+        id: 'chatcmpl-test',
+        object: 'chat.completion.chunk',
+        created: 1,
+        model: 'gpt-4o-audio-preview',
+        choices: [
+          {
+            index: 0,
+            delta: {
+              role: 'assistant',
+              audio: {
+                id: 'audio-test',
+                data: 'abc',
+                transcript: 'hello',
+              },
+            },
+            finish_reason: null,
+          },
+        ],
+      },
+      {
+        id: 'chatcmpl-test',
+        object: 'chat.completion.chunk',
+        created: 1,
+        model: 'gpt-4o-audio-preview',
+        choices: [
+          {
+            index: 0,
+            delta: { audio: { expires_at: 2 } },
+          },
+        ],
+      },
+      {
+        id: 'chatcmpl-test',
+        object: 'chat.completion.chunk',
+        created: 1,
+        model: 'gpt-4o-audio-preview',
+        choices: [
+          {
+            index: 0,
+            delta: { audio: { data: 'def' } },
+            finish_reason: null,
+          },
+        ],
+      },
+    ] as unknown as OpenAI.Chat.ChatCompletionChunk[];
+    const readable = new Stream(async function* () {
+      for (const chunk of chunks) yield chunk;
+    }, new AbortController()).toReadableStream();
+
+    const stream = ChatCompletionStreamingRunner.fromReadableStream(readable);
+
+    await expect(stream.finalChatCompletion()).rejects.toThrow('missing finish_reason for choice 0');
+  });
+
+  it('still rejects non-audio streams without a finish_reason', async () => {
+    const chunk: OpenAI.Chat.ChatCompletionChunk = {
+      id: 'chatcmpl-test',
+      object: 'chat.completion.chunk',
+      created: 1,
+      model: 'gpt-test',
+      choices: [
+        {
+          index: 0,
+          delta: { role: 'assistant', content: 'hello' },
+          finish_reason: null,
+          logprobs: null,
+        },
+      ],
+    };
+    const readable = new Stream(async function* () {
+      yield chunk;
+    }, new AbortController()).toReadableStream();
+
+    const stream = ChatCompletionStreamingRunner.fromReadableStream(readable);
+
+    await expect(stream.finalChatCompletion()).rejects.toThrow('missing finish_reason for choice 0');
+  });
+
   it('works', async () => {
     const stream = await makeStreamSnapshotRequest((openai) =>
       openai.chat.completions.stream({

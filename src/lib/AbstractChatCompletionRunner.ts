@@ -5,6 +5,7 @@ import { uuid4 } from '../internal/utils/uuid';
 import { isAutoParsableTool, parseChatCompletion } from '../lib/parser';
 import type {
   ChatCompletion,
+  ChatCompletionAssistantMessageParam,
   ChatCompletionCreateParams,
   ChatCompletionMessage,
   ChatCompletionMessageFunctionToolCall,
@@ -47,6 +48,47 @@ function normalizeToolCallIds(chatCompletion: ChatCompletion): void {
       }
     }
   }
+}
+
+/**
+ * Parsed completions contain response-only and helper-only fields. Keep those
+ * on runner.messages for callers, but only replay valid request fields.
+ */
+function toRequestMessage(message: ChatCompletionMessageParam): ChatCompletionMessageParam {
+  if (!isAssistantMessage(message)) return message;
+
+  const requestMessage: ChatCompletionAssistantMessageParam = { role: 'assistant' };
+
+  if (message.audio != null) requestMessage.audio = { id: message.audio.id };
+  if (message.content !== undefined) requestMessage.content = message.content;
+  if (message.function_call != null) requestMessage.function_call = message.function_call;
+  if (message.name !== undefined) requestMessage.name = message.name;
+  if (message.refusal != null) requestMessage.refusal = message.refusal;
+  if (message.tool_calls !== undefined) {
+    requestMessage.tool_calls = message.tool_calls.map((toolCall) => {
+      if (toolCall.type === 'custom') {
+        return {
+          id: toolCall.id,
+          type: toolCall.type,
+          custom: {
+            input: toolCall.custom.input,
+            name: toolCall.custom.name,
+          },
+        };
+      }
+
+      return {
+        id: toolCall.id,
+        type: toolCall.type,
+        function: {
+          arguments: toolCall.function.arguments,
+          name: toolCall.function.name,
+        },
+      };
+    });
+  }
+
+  return requestMessage;
 }
 
 export interface ChatCompletionRunnerContext {
@@ -413,7 +455,7 @@ export class AbstractChatCompletionRunner<
           ...restParams,
           tool_choice,
           tools,
-          messages: [...this.messages],
+          messages: this.messages.map(toRequestMessage),
         },
         options,
       );
