@@ -5,6 +5,7 @@
     ".": "./index.ts",
     "./providers/bedrock": "./providers/bedrock.ts",
     "./providers/bedrock/aws": "./providers/bedrock/aws.ts",
+    "./helpers/standard-schema": "./helpers/standard-schema.ts",
     "./helpers/zod": "./helpers/zod.ts",
     "./beta/realtime/websocket": "./beta/realtime/websocket.ts"
   },
