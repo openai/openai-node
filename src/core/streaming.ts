@@ -278,12 +278,15 @@ export async function* _iterSSEMessages(
   }
 }
 
+const DOUBLE_NEWLINE_DELIMITER_MAX_OVERLAP_BYTES = 3;
+
 /**
  * Given an async iterable iterator, iterates over it and yields full
  * SSE chunks, i.e. yields when a double new-line is encountered.
  */
 async function* iterSSEChunks(iterator: AsyncIterableIterator<Bytes>): AsyncGenerator<Uint8Array> {
   let data = new Uint8Array();
+  let searchStartIndex = 0;
 
   for await (const chunk of iterator) {
     if (chunk == null) {
@@ -301,10 +304,17 @@ async function* iterSSEChunks(iterator: AsyncIterableIterator<Bytes>): AsyncGene
     data = newData;
 
     let patternIndex;
-    while ((patternIndex = findDoubleNewlineIndex(data)) !== -1) {
+    while ((patternIndex = findDoubleNewlineIndex(data.subarray(searchStartIndex))) !== -1) {
+      patternIndex += searchStartIndex;
       yield data.slice(0, patternIndex);
       data = data.slice(patternIndex);
+      searchStartIndex = 0;
     }
+
+    searchStartIndex = Math.max(
+      0,
+      data.length - DOUBLE_NEWLINE_DELIMITER_MAX_OVERLAP_BYTES,
+    );
   }
 
   if (data.length > 0) {
