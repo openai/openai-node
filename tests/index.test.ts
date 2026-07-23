@@ -676,6 +676,56 @@ describe('default encoder', () => {
   });
 });
 
+describe('response parsing', () => {
+  test('handles an empty JSON body without a content-length header', async () => {
+    // Some servers (e.g. over HTTP/2 or with chunked transfer encoding) return an
+    // empty body with a JSON content-type but omit the `content-length` header.
+    // `new Response('')` reproduces this: an empty body with no `content-length`.
+    // This previously threw `SyntaxError: Unexpected end of JSON input`.
+    const testFetch = async (): Promise<Response> => {
+      const response = new Response('', { headers: { 'Content-Type': 'application/json' } });
+      expect(response.headers.get('content-length')).toBeNull();
+      return response;
+    };
+
+    const client = new OpenAI({ apiKey: 'My API Key', adminAPIKey: 'My Admin API Key', fetch: testFetch });
+
+    expect(await client.request({ path: '/foo', method: 'get' })).toBeUndefined();
+  });
+
+  test('handles an empty JSON body with an explicit content-length: 0 header', async () => {
+    const testFetch = async (): Promise<Response> =>
+      new Response('', { headers: { 'Content-Type': 'application/json', 'Content-Length': '0' } });
+
+    const client = new OpenAI({ apiKey: 'My API Key', adminAPIKey: 'My Admin API Key', fetch: testFetch });
+
+    expect(await client.request({ path: '/foo', method: 'get' })).toBeUndefined();
+  });
+
+  test('parses a non-empty JSON body', async () => {
+    const testFetch = async (): Promise<Response> =>
+      new Response(JSON.stringify({ a: 1 }), { headers: { 'Content-Type': 'application/json' } });
+
+    const client = new OpenAI({ apiKey: 'My API Key', adminAPIKey: 'My Admin API Key', fetch: testFetch });
+
+    expect(await client.request({ path: '/foo', method: 'get' })).toEqual({ a: 1 });
+  });
+
+  test('still throws on a malformed non-empty JSON body', async () => {
+    const testFetch = async (): Promise<Response> =>
+      new Response('{ not json', { headers: { 'Content-Type': 'application/json' } });
+
+    const client = new OpenAI({
+      apiKey: 'My API Key',
+      adminAPIKey: 'My Admin API Key',
+      maxRetries: 0,
+      fetch: testFetch,
+    });
+
+    await expect(client.request({ path: '/foo', method: 'get' })).rejects.toThrow();
+  });
+});
+
 describe('retries', () => {
   test('retry on timeout', async () => {
     let count = 0;
