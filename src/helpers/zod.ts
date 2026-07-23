@@ -126,30 +126,30 @@ function zodV4ToJsonSchema(
     metadata?.add(definition as unknown as z4.ZodType, { id: name });
   }
 
-  const jsonSchema = toStrictJsonSchema(
-    z4.toJSONSchema(schema, {
-      target: 'draft-7',
-      ...(metadata ? { metadata } : undefined),
-      override: ({ zodSchema, jsonSchema }) => {
-        const def = zodSchema._zod.def;
+  const jsonSchema = z4.toJSONSchema(schema, {
+    target: 'draft-7',
+    ...(metadata ? { metadata } : undefined),
+    override: ({ zodSchema, jsonSchema }) => {
+      const def = zodSchema._zod.def;
 
-        if (def.type === 'union' && 'discriminator' in def && Array.isArray(jsonSchema.oneOf)) {
-          if (jsonSchema.anyOf !== undefined) {
-            throw new Error(
-              'Zod discriminated union generated both `anyOf` and `oneOf`, which cannot be represented in an OpenAI strict schema',
-            );
-          }
-
-          // Discriminator values are mutually exclusive, so anyOf preserves the
-          // union while staying inside the API's supported JSON Schema subset.
-          jsonSchema.anyOf = jsonSchema.oneOf;
-          delete jsonSchema.oneOf;
+      if (def.type === 'union' && 'discriminator' in def && Array.isArray(jsonSchema.oneOf)) {
+        if (jsonSchema.anyOf !== undefined) {
+          throw new Error(
+            'Zod discriminated union generated both `anyOf` and `oneOf`, which cannot be represented in an OpenAI strict schema',
+          );
         }
-      },
-    }) as JSONSchema,
-  ) as Record<string, unknown>;
 
-  return escapeSchemaDefinitionRefs(jsonSchema, options.schemaDefinitions);
+        // Discriminator values are mutually exclusive, so anyOf preserves the
+        // union while staying inside the API's supported JSON Schema subset.
+        jsonSchema.anyOf = jsonSchema.oneOf;
+        delete jsonSchema.oneOf;
+      }
+    },
+  }) as Record<string, unknown>;
+
+  return toStrictJsonSchema(
+    escapeSchemaDefinitionRefs(jsonSchema, options.schemaDefinitions) as JSONSchema,
+  ) as Record<string, unknown>;
 }
 
 function zodV3ToNonStrictJsonSchema(schema: z3.ZodType, options: { name: string }): Record<string, unknown> {
