@@ -4,7 +4,7 @@ import { APIPromise } from 'openai/core/api-promise';
 
 import util from 'node:util';
 import OpenAI from 'openai';
-import { APIUserAbortError } from 'openai';
+import { APIUserAbortError, UnprocessableEntityError } from 'openai';
 const defaultFetch = fetch;
 
 describe('instantiate client', () => {
@@ -284,6 +284,34 @@ describe('instantiate client', () => {
 
     const response = await client.get('/foo');
     expect(response).toEqual({ url: 'http://localhost:5000/foo', custom: true });
+  });
+
+  test('error message falls back to the whole response body when error field is absent', async () => {
+    const errorBody = { detail: '422: The model gpt-5-gibberish does not exist.' };
+    const client = new OpenAI({
+      baseURL: 'http://localhost:5000/',
+      apiKey: 'My API Key',
+      fetch: () => {
+        return Promise.resolve(
+          new Response(JSON.stringify(errorBody), {
+            status: 422,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        );
+      },
+    });
+
+    try {
+      await client.get('/foo');
+      throw new Error('Expected request to fail');
+    } catch (error) {
+      expect(error).toBeInstanceOf(UnprocessableEntityError);
+      expect(error).toMatchObject({
+        status: 422,
+        error: errorBody,
+        message: `422 ${JSON.stringify(errorBody)}`,
+      });
+    }
   });
 
   test('explicit global fetch', async () => {
