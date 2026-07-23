@@ -62,7 +62,11 @@ describe('resource webhooks', () => {
 
     it('should throw for invalid signature', async () => {
       await expect(
-        client.webhooks.verifySignature(payload, headers, Buffer.from('foo').toString('base64')),
+        client.webhooks.verifySignature(
+          payload,
+          headers,
+          Buffer.from('not-the-correct-secret-but-long-enough').toString('base64'),
+        ),
       ).rejects.toThrowErrorMatchingInlineSnapshot(
         `"The given webhook signature does not match the expected signature"`,
       );
