@@ -15,6 +15,8 @@ import { stringifyQuery } from './internal/utils/query';
 import { VERSION } from './version';
 import * as Errors from './core/error';
 import * as Pagination from './core/pagination';
+import * as Streaming from './streaming';
+import * as ChatCompletionStreams from './lib/ChatCompletionStream';
 import type { WorkloadIdentity } from './auth/types';
 import { WorkloadIdentityAuth } from './auth/workload-identity-auth';
 import { OAuthError, SubjectTokenProviderError } from './core/error';
@@ -1401,6 +1403,9 @@ function isUndiciDispatcherVersionMismatchError(error: unknown): boolean {
 
 export declare namespace OpenAI {
   export type RequestOptions = Opts.RequestOptions;
+
+  export import Stream = Streaming.Stream;
+  export import ChatCompletionStream = ChatCompletionStreams.ChatCompletionStream;
 
   export import Page = Pagination.Page;
   export { type PageResponse as PageResponse };
