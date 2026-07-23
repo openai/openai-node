@@ -938,6 +938,47 @@ describe('retries', () => {
     expect(count).toEqual(3);
   });
 
+  test.each([
+    ['Retry-After', '60'],
+    ['Retry-After-Ms', '60000'],
+  ])('retry on 429 honors %s at the 60-second cap', async (headerName, headerValue) => {
+    jest.useFakeTimers();
+    try {
+      let count = 0;
+      const testFetch = async (
+        url: string | URL | Request,
+        { signal }: RequestInit = {},
+      ): Promise<Response> => {
+        if (count++ === 0) {
+          return new Response(undefined, {
+            status: 429,
+            headers: {
+              [headerName]: headerValue,
+            },
+          });
+        }
+        return new Response(JSON.stringify({ a: 1 }), {
+          headers: { 'Content-Type': 'application/json' },
+        });
+      };
+
+      const client = new OpenAI({
+        apiKey: 'My API Key',
+        adminAPIKey: 'My Admin API Key',
+        fetch: testFetch,
+      });
+
+      const request = client.request({ path: '/foo', method: 'get' });
+      await Promise.resolve();
+      await jest.advanceTimersByTimeAsync(60 * 1000);
+
+      await expect(request).resolves.toEqual({ a: 1 });
+      expect(count).toEqual(2);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   describe('auth', () => {
     test('apiKey', async () => {
       const client = new OpenAI({
