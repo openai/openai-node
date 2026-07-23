@@ -83,6 +83,12 @@ export {
   type OrganizationSpendAlertsPage,
 } from './spend-alerts';
 export {
+  SpendLimit,
+  type OrganizationSpendLimit,
+  type OrganizationSpendLimitDeleted,
+  type SpendLimitUpdateParams,
+} from './spend-limit';
+export {
   Usage,
   type UsageAudioSpeechesResponse,
   type UsageAudioTranscriptionsResponse,

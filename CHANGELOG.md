@@ -1,5 +1,37 @@
 # Changelog
 
+## 6.49.0 (2026-07-23)
+
+Full Changelog: [v6.48.0...v6.49.0](https://github.com/openai/openai-node/compare/v6.48.0...v6.49.0)
+
+### Features
+
+* **api:** accept `None` for prompt_cache_key/safety_identifier ([c54a7f3](https://github.com/openai/openai-node/commit/c54a7f3b01760b705ebca1e88738fb649187ffe0))
+* **api:** add support for `spend_limit` admin apis ([e8238b0](https://github.com/openai/openai-node/commit/e8238b085de715dbf0c0cb64e7e6207314b12954))
+* **helpers:** add standard schema support ([#1997](https://github.com/openai/openai-node/issues/1997)) ([4ced1a8](https://github.com/openai/openai-node/commit/4ced1a8eaba3f5e960b94090a75e8048f7642439))
+* **helpers:** add zod realtime function helper ([#1996](https://github.com/openai/openai-node/issues/1996)) ([ee59911](https://github.com/openai/openai-node/commit/ee59911804fa56e1bcac01a127108b63a7cd28e5))
+* **stlc:** configurable CI runner and private-production-repo support in workflow templates ([967a66b](https://github.com/openai/openai-node/commit/967a66b2349c5ce5d45fbe902287f121d6b3cf64))
+* **zod:** support schema definitions ([#1993](https://github.com/openai/openai-node/issues/1993)) ([eb04567](https://github.com/openai/openai-node/commit/eb04567313c6296b80fc3c47306ee96b9c34456f))
+
+
+### Bug Fixes
+
+* address code scanning findings ([#2007](https://github.com/openai/openai-node/issues/2007)) ([2706888](https://github.com/openai/openai-node/commit/2706888499a777b47d851aeb479f846f80932765))
+* address remaining Dependabot alerts ([#2005](https://github.com/openai/openai-node/issues/2005)) ([6ab3428](https://github.com/openai/openai-node/commit/6ab34285f02d6e9fb4eb1779fca13e51d1be3e10))
+* **azure:** normalize endpoint trailing slashes ([#1995](https://github.com/openai/openai-node/issues/1995)) ([39a15b4](https://github.com/openai/openai-node/commit/39a15b412fc129df15339ebd6e3e6547854aa81f))
+* **ci:** restore explicit TypeScript SDK runner selection ([fe79401](https://github.com/openai/openai-node/commit/fe79401763f192a2705204c7235c21b036fdb238))
+* **runTools:** sanitize replayed messages ([#1990](https://github.com/openai/openai-node/issues/1990)) ([a60cc25](https://github.com/openai/openai-node/commit/a60cc250d4c442bae25e05c67c6bd30d18fc87e6))
+* **stream:** handle audio completion markers ([#1991](https://github.com/openai/openai-node/issues/1991)) ([bd86817](https://github.com/openai/openai-node/commit/bd86817ea0c9ebe233f30d80c9b98b80a8b30be1))
+* **zod:** escape schema definition refs before strict validation ([bff2b10](https://github.com/openai/openai-node/commit/bff2b104f53fde6d620327790a8a5cb6dfd5ff0c))
+* **zod:** infer parsed tool callback arguments ([#1992](https://github.com/openai/openai-node/issues/1992)) ([83cdb79](https://github.com/openai/openai-node/commit/83cdb79e62c24dbf0cd27d893c8b792dadf6bcf8))
+* **zod:** preserve schema types while escaping refs ([cb7e195](https://github.com/openai/openai-node/commit/cb7e19539160d71b381a7e2ff6c98fe4981c52eb))
+
+
+### Chores
+
+* exclude Brewfile from language detection ([#2006](https://github.com/openai/openai-node/issues/2006)) ([9bec333](https://github.com/openai/openai-node/commit/9bec3332133c115b0e728010ab614daf5516e35b))
+* refresh more ecosystem test dependencies ([#2003](https://github.com/openai/openai-node/issues/2003)) ([3cafa55](https://github.com/openai/openai-node/commit/3cafa553aeb7f10e9afb432ae5d4aaa1c6d42663))
+
 ## 6.48.0 (2026-07-17)
 
 Full Changelog: [v6.47.0...v6.48.0](https://github.com/openai/openai-node/compare/v6.47.0...v6.48.0)

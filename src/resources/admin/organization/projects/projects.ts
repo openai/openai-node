@@ -69,6 +69,13 @@ import {
   SpendAlertUpdateParams,
   SpendAlerts,
 } from './spend-alerts';
+import * as SpendLimitAPI from './spend-limit';
+import {
+  ProjectSpendLimit,
+  ProjectSpendLimitDeleted,
+  SpendLimit,
+  SpendLimitUpdateParams,
+} from './spend-limit';
 import * as GroupsAPI from './groups/groups';
 import {
   GroupCreateParams,
@@ -127,6 +134,7 @@ export class Projects extends APIResource {
   groups: GroupsAPI.Groups = new GroupsAPI.Groups(this._client);
   roles: RolesAPI.Roles = new RolesAPI.Roles(this._client);
   dataRetention: DataRetentionAPI.DataRetention = new DataRetentionAPI.DataRetention(this._client);
+  spendLimit: SpendLimitAPI.SpendLimit = new SpendLimitAPI.SpendLimit(this._client);
   spendAlerts: SpendAlertsAPI.SpendAlerts = new SpendAlertsAPI.SpendAlerts(this._client);
   certificates: CertificatesAPI.Certificates = new CertificatesAPI.Certificates(this._client);
 
@@ -325,6 +333,7 @@ Projects.HostedToolPermissions = HostedToolPermissions;
 Projects.Groups = Groups;
 Projects.Roles = Roles;
 Projects.DataRetention = DataRetention;
+Projects.SpendLimit = SpendLimit;
 Projects.SpendAlerts = SpendAlerts;
 Projects.Certificates = Certificates;
 
@@ -418,6 +427,13 @@ export declare namespace Projects {
     DataRetention as DataRetention,
     type ProjectDataRetention as ProjectDataRetention,
     type DataRetentionUpdateParams as DataRetentionUpdateParams,
+  };
+
+  export {
+    SpendLimit as SpendLimit,
+    type ProjectSpendLimit as ProjectSpendLimit,
+    type ProjectSpendLimitDeleted as ProjectSpendLimitDeleted,
+    type SpendLimitUpdateParams as SpendLimitUpdateParams,
   };
 
   export {

@@ -91,6 +91,12 @@ export {
   type ProjectSpendAlertsPage,
 } from './spend-alerts';
 export {
+  SpendLimit,
+  type ProjectSpendLimit,
+  type ProjectSpendLimitDeleted,
+  type SpendLimitUpdateParams,
+} from './spend-limit';
+export {
   Users,
   type ProjectUser,
   type UserDeleteResponse,

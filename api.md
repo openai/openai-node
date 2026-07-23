@@ -956,6 +956,19 @@ Methods:
 - <code title="get /organization/data_retention">client.admin.organization.dataRetention.<a href="./src/resources/admin/organization/data-retention.ts">retrieve</a>() -> OrganizationDataRetention</code>
 - <code title="post /organization/data_retention">client.admin.organization.dataRetention.<a href="./src/resources/admin/organization/data-retention.ts">update</a>({ ...params }) -> OrganizationDataRetention</code>
 
+### SpendLimit
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/spend-limit.ts">OrganizationSpendLimit</a></code>
+- <code><a href="./src/resources/admin/organization/spend-limit.ts">OrganizationSpendLimitDeleted</a></code>
+
+Methods:
+
+- <code title="get /organization/spend_limit">client.admin.organization.spendLimit.<a href="./src/resources/admin/organization/spend-limit.ts">retrieve</a>() -> OrganizationSpendLimit</code>
+- <code title="post /organization/spend_limit">client.admin.organization.spendLimit.<a href="./src/resources/admin/organization/spend-limit.ts">update</a>({ ...params }) -> OrganizationSpendLimit</code>
+- <code title="delete /organization/spend_limit">client.admin.organization.spendLimit.<a href="./src/resources/admin/organization/spend-limit.ts">delete</a>() -> OrganizationSpendLimitDeleted</code>
+
 ### SpendAlerts
 
 Types:
@@ -1164,6 +1177,19 @@ Methods:
 
 - <code title="get /organization/projects/{project_id}/data_retention">client.admin.organization.projects.dataRetention.<a href="./src/resources/admin/organization/projects/data-retention.ts">retrieve</a>(projectID) -> ProjectDataRetention</code>
 - <code title="post /organization/projects/{project_id}/data_retention">client.admin.organization.projects.dataRetention.<a href="./src/resources/admin/organization/projects/data-retention.ts">update</a>(projectID, { ...params }) -> ProjectDataRetention</code>
+
+#### SpendLimit
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/projects/spend-limit.ts">ProjectSpendLimit</a></code>
+- <code><a href="./src/resources/admin/organization/projects/spend-limit.ts">ProjectSpendLimitDeleted</a></code>
+
+Methods:
+
+- <code title="get /organization/projects/{project_id}/spend_limit">client.admin.organization.projects.spendLimit.<a href="./src/resources/admin/organization/projects/spend-limit.ts">retrieve</a>(projectID) -> ProjectSpendLimit</code>
+- <code title="post /organization/projects/{project_id}/spend_limit">client.admin.organization.projects.spendLimit.<a href="./src/resources/admin/organization/projects/spend-limit.ts">update</a>(projectID, { ...params }) -> ProjectSpendLimit</code>
+- <code title="delete /organization/projects/{project_id}/spend_limit">client.admin.organization.projects.spendLimit.<a href="./src/resources/admin/organization/projects/spend-limit.ts">delete</a>(projectID) -> ProjectSpendLimitDeleted</code>
 
 #### SpendAlerts
 
