@@ -3,6 +3,8 @@
 import { InvalidWebhookSignatureError } from '../../error';
 import { APIResource } from '../../core/resource';
 import { buildHeaders, HeadersLike } from '../../internal/headers';
+import { fromBase64 } from '../../internal/utils/base64';
+import { encodeUTF8 } from '../../internal/utils/bytes';
 
 export class Webhooks extends APIResource {
   /**
@@ -75,9 +77,7 @@ export class Webhooks extends APIResource {
 
     // Decode the secret if it starts with whsec_
     const decodedSecret =
-      secret.startsWith('whsec_') ?
-        Buffer.from(secret.replace('whsec_', ''), 'base64')
-      : Buffer.from(secret, 'utf-8');
+      secret.startsWith('whsec_') ? fromBase64(secret.replace('whsec_', '')) : encodeUTF8(secret);
 
     // Create the signed payload: {webhook_id}.{timestamp}.{payload}
     const signedPayload = webhookId ? `${webhookId}.${timestamp}.${payload}` : `${timestamp}.${payload}`;
@@ -94,7 +94,7 @@ export class Webhooks extends APIResource {
     // Check if any signature matches using timing-safe WebCrypto verify
     for (const signature of signatures) {
       try {
-        const signatureBytes = Buffer.from(signature, 'base64');
+        const signatureBytes = fromBase64(signature);
         const isValid = await crypto.subtle.verify(
           'HMAC',
           key,
