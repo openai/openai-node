@@ -58,10 +58,10 @@ function validateSchemaDefinitions(schemaDefinitions: ZodSchemaDefinitions | und
   }
 }
 
-function escapeSchemaDefinitionRefs(
-  schema: Record<string, unknown>,
+function escapeSchemaDefinitionRefs<T extends object>(
+  schema: T,
   schemaDefinitions: ZodSchemaDefinitions | undefined,
-): Record<string, unknown> {
+): T {
   const refReplacements = new Map(
     Object.keys(schemaDefinitions ?? {}).map((name) => [
       `#/definitions/${name}`,
@@ -145,11 +145,11 @@ function zodV4ToJsonSchema(
         delete jsonSchema.oneOf;
       }
     },
-  }) as Record<string, unknown>;
+  }) as JSONSchema;
 
-  return toStrictJsonSchema(
-    escapeSchemaDefinitionRefs(jsonSchema, options.schemaDefinitions) as JSONSchema,
-  ) as Record<string, unknown>;
+  const escapedSchema = escapeSchemaDefinitionRefs(jsonSchema, options.schemaDefinitions);
+
+  return toStrictJsonSchema(escapedSchema) as Record<string, unknown>;
 }
 
 function zodV3ToNonStrictJsonSchema(schema: z3.ZodType, options: { name: string }): Record<string, unknown> {
