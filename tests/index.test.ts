@@ -77,6 +77,46 @@ describe('instantiate client', () => {
       expect(req.headers.get('x-env-header')).toEqual('env');
       expect(req.headers.get('x-tuple-header')).toEqual('tuple');
     });
+
+    test('omits forbidden User-Agent header in browser environments', async () => {
+      const windowDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'window');
+      const navigatorDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+
+      Object.defineProperty(globalThis, 'window', {
+        configurable: true,
+        value: { document: {} },
+      });
+      Object.defineProperty(globalThis, 'navigator', {
+        configurable: true,
+        value: {
+          userAgent:
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',
+        },
+      });
+
+      try {
+        const browserClient = new OpenAI({
+          baseURL: 'http://localhost:5000/',
+          apiKey: 'My API Key',
+          dangerouslyAllowBrowser: true,
+        });
+
+        const { req } = await browserClient.buildRequest({ path: '/foo', method: 'post' });
+        expect(req.headers.has('user-agent')).toBe(false);
+      } finally {
+        if (windowDescriptor) {
+          Object.defineProperty(globalThis, 'window', windowDescriptor);
+        } else {
+          delete (globalThis as any).window;
+        }
+
+        if (navigatorDescriptor) {
+          Object.defineProperty(globalThis, 'navigator', navigatorDescriptor);
+        } else {
+          delete (globalThis as any).navigator;
+        }
+      }
+    });
   });
   describe('logging', () => {
     const env = process.env;
