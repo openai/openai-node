@@ -13,6 +13,11 @@ import {
   type ResponseFunctionToolCall,
   type Tool,
 } from '../resources/responses/responses';
+import type {
+  BetaResponse,
+  BetaResponseOutputItem,
+  BetaResponseOutputMessage,
+} from '../resources/beta/responses/responses';
 import { type AutoParseableTextFormat, isAutoParsableResponseFormat } from '../lib/parser';
 
 export type ParseableToolsParams = Array<Tool> | ChatCompletionTool | null;
@@ -263,10 +268,38 @@ function needsOutputText(
   return !Object.getOwnPropertyDescriptor(response, 'output_text') || target.output_text == null;
 }
 
-export function addOutputText(rsp: Response): void {
+function hasAgentMetadata(
+  output: Response['output'][number] | BetaResponseOutputItem,
+): output is BetaResponseOutputMessage {
+  return output.type === 'message' && 'agent' in output && output.agent != null;
+}
+
+export function addOutputText(rsp: Response | BetaResponse): void {
+  let hasMultiAgentOutput = false;
+  let finalRootMessage: BetaResponseOutputMessage | undefined;
+
+  for (const output of rsp.output) {
+    if (!hasAgentMetadata(output)) {
+      continue;
+    }
+
+    hasMultiAgentOutput = true;
+    if (output.agent?.agent_name === '/root' && output.phase === 'final_answer') {
+      finalRootMessage = output;
+    }
+  }
+
+  if (hasMultiAgentOutput && !finalRootMessage) {
+    rsp.output_text = '';
+    return;
+  }
+
   const texts: string[] = [];
   for (const output of rsp.output) {
     if (output.type !== 'message') {
+      continue;
+    }
+    if (hasMultiAgentOutput && output !== finalRootMessage) {
       continue;
     }
 

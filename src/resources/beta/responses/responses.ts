@@ -12,6 +12,7 @@ import { Stream } from '../../../core/streaming';
 import { buildHeaders } from '../../../internal/headers';
 import { RequestOptions } from '../../../internal/request-options';
 import { path } from '../../../internal/utils/path';
+import { addOutputText } from '../../../lib/ResponsesParser';
 
 export class Responses extends APIResource {
   inputItems: InputItemsAPI.InputItems = new InputItemsAPI.InputItems(this._client);
@@ -49,15 +50,23 @@ export class Responses extends APIResource {
     options?: RequestOptions,
   ): APIPromise<BetaResponse> | APIPromise<Stream<BetaResponseStreamEvent>> {
     const { betas, ...body } = params;
-    return this._client.post('/responses?beta=true', {
-      body,
-      ...options,
-      headers: buildHeaders([
-        { ...(betas?.toString() != null ? { 'openai-beta': betas?.toString() } : undefined) },
-        options?.headers,
-      ]),
-      stream: params.stream ?? false,
-      __security: { bearerAuth: true },
+    return (
+      this._client.post('/responses?beta=true', {
+        body,
+        ...options,
+        headers: buildHeaders([
+          { ...(betas?.toString() != null ? { 'openai-beta': betas?.toString() } : undefined) },
+          options?.headers,
+        ]),
+        stream: params.stream ?? false,
+        __security: { bearerAuth: true },
+      }) as APIPromise<BetaResponse> | APIPromise<Stream<BetaResponseStreamEvent>>
+    )._thenUnwrap((rsp) => {
+      if ('object' in rsp && rsp.object === 'response') {
+        addOutputText(rsp as BetaResponse);
+      }
+
+      return rsp;
     }) as APIPromise<BetaResponse> | APIPromise<Stream<BetaResponseStreamEvent>>;
   }
 
@@ -92,15 +101,23 @@ export class Responses extends APIResource {
     options?: RequestOptions,
   ): APIPromise<BetaResponse> | APIPromise<Stream<BetaResponseStreamEvent>> {
     const { betas, ...query } = params ?? {};
-    return this._client.get(path`/responses/${responseID}?beta=true`, {
-      query,
-      ...options,
-      headers: buildHeaders([
-        { ...(betas?.toString() != null ? { 'openai-beta': betas?.toString() } : undefined) },
-        options?.headers,
-      ]),
-      stream: params?.stream ?? false,
-      __security: { bearerAuth: true },
+    return (
+      this._client.get(path`/responses/${responseID}?beta=true`, {
+        query,
+        ...options,
+        headers: buildHeaders([
+          { ...(betas?.toString() != null ? { 'openai-beta': betas?.toString() } : undefined) },
+          options?.headers,
+        ]),
+        stream: params?.stream ?? false,
+        __security: { bearerAuth: true },
+      }) as APIPromise<BetaResponse> | APIPromise<Stream<BetaResponseStreamEvent>>
+    )._thenUnwrap((rsp) => {
+      if ('object' in rsp && rsp.object === 'response') {
+        addOutputText(rsp as BetaResponse);
+      }
+
+      return rsp;
     }) as APIPromise<BetaResponse> | APIPromise<Stream<BetaResponseStreamEvent>>;
   }
 
@@ -148,13 +165,18 @@ export class Responses extends APIResource {
     options?: RequestOptions,
   ): APIPromise<BetaResponse> {
     const { betas } = params ?? {};
-    return this._client.post(path`/responses/${responseID}/cancel?beta=true`, {
-      ...options,
-      headers: buildHeaders([
-        { ...(betas?.toString() != null ? { 'openai-beta': betas?.toString() } : undefined) },
-        options?.headers,
-      ]),
-      __security: { bearerAuth: true },
+    return (
+      this._client.post(path`/responses/${responseID}/cancel?beta=true`, {
+        ...options,
+        headers: buildHeaders([
+          { ...(betas?.toString() != null ? { 'openai-beta': betas?.toString() } : undefined) },
+          options?.headers,
+        ]),
+        __security: { bearerAuth: true },
+      }) as APIPromise<BetaResponse>
+    )._thenUnwrap((rsp) => {
+      addOutputText(rsp);
+      return rsp;
     });
   }
 
@@ -1210,6 +1232,12 @@ export interface BetaResponse {
    *   consider using the `output_text` property where supported in SDKs.
    */
   output: Array<BetaResponseOutputItem>;
+
+  /**
+   * SDK convenience property containing the response's output text. For multi-agent
+   * responses, this contains text from the last root `final_answer` message.
+   */
+  output_text: string;
 
   /**
    * Whether to allow the model to run tool calls in parallel.
