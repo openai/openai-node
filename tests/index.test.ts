@@ -323,6 +323,39 @@ describe('instantiate client', () => {
     expect(spy).toHaveBeenCalledTimes(1);
   });
 
+  test('removes abort listener from custom signal on success', async () => {
+    // Regression for #1811: the listener forwarding aborts from the caller's
+    // signal to our internal controller used to leak until the signal fired,
+    // which on Deno keeps `AbortSignal.timeout()` timers ref'd and blocks
+    // process exit.
+    const client = new OpenAI({
+      baseURL: 'http://localhost:5000/',
+      apiKey: 'My API Key',
+      adminAPIKey: 'My Admin API Key',
+      fetch: () =>
+        Promise.resolve(
+          new Response(JSON.stringify({ ok: true }), {
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        ),
+    });
+
+    const controller = new AbortController();
+    const addSpy = jest.spyOn(controller.signal, 'addEventListener');
+    const removeSpy = jest.spyOn(controller.signal, 'removeEventListener');
+
+    await client.get('/foo', { signal: controller.signal });
+
+    const abortAdds = addSpy.mock.calls.filter((c) => c[0] === 'abort');
+    const abortRemoves = removeSpy.mock.calls.filter((c) => c[0] === 'abort');
+    expect(abortAdds.length).toBeGreaterThan(0);
+    expect(abortRemoves.length).toBe(abortAdds.length);
+    // Same listener reference passed to both add and remove.
+    for (let i = 0; i < abortAdds.length; i++) {
+      expect(abortRemoves[i]![1]).toBe(abortAdds[i]![1]);
+    }
+  });
+
   test('normalized method', async () => {
     let capturedRequest: RequestInit | undefined;
     const testFetch = async (url: string | URL | Request, init: RequestInit = {}): Promise<Response> => {
