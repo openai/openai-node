@@ -792,7 +792,9 @@ export class OpenAI {
 
     const security = options.__security ?? { bearerAuth: true };
     const controller = new AbortController();
-    const response = await this.fetchWithAuth(url, req, timeout, controller, security).catch(castToError);
+    const response = await this.fetchWithAuth(url, req, timeout, controller, security, options.stream).catch(
+      castToError,
+    );
     const headersTime = Date.now();
 
     if (response instanceof globalThis.Error) {
@@ -981,6 +983,7 @@ export class OpenAI {
       bearerAuth: true,
       adminAPIKeyAuth: true,
     },
+    keepAbortListener = false,
   ): Promise<Response> {
     if (this._workloadIdentityAuth && schemes.bearerAuth) {
       const headers = init.headers as Headers;
@@ -991,7 +994,7 @@ export class OpenAI {
       }
     }
 
-    const response = await this.fetchWithTimeout(url, init, timeout, controller);
+    const response = await this.fetchWithTimeout(url, init, timeout, controller, keepAbortListener);
 
     return response;
   }
@@ -1001,6 +1004,7 @@ export class OpenAI {
     init: RequestInit | undefined,
     ms: number,
     controller: AbortController,
+    keepAbortListener = false,
   ): Promise<Response> {
     const { signal, method, ...options } = init || {};
     const abort = this._makeAbort(controller);
@@ -1029,6 +1033,7 @@ export class OpenAI {
       return await this.fetch.call(undefined, url, fetchOptions);
     } finally {
       clearTimeout(timeout);
+      if (signal && !keepAbortListener) signal.removeEventListener('abort', abort);
     }
   }
 
