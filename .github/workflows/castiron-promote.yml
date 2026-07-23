@@ -42,6 +42,22 @@ jobs:
       id-token: write
 
     steps:
+      # The pinned writer revalidates these values, but only after this wrapper
+      # has set up credentials. Reject malformed dispatches before any token mint.
+      - name: Validate dispatch inputs
+        env:
+          candidate_id: ${{ inputs.candidate_id }}
+          preflight_contract_sha256: ${{ inputs.preflight_contract_sha256 }}
+        run: |
+          set -euo pipefail
+          for input_name in candidate_id preflight_contract_sha256; do
+            input_value="${!input_name}"
+            if [[ ! "$input_value" =~ ^[0-9a-f]{64}$ ]]; then
+              echo "::error title=Invalid ${input_name}::${input_name} must be a lowercase SHA-256 hex digest."
+              exit 1
+            fi
+          done
+
       # Temporarily reuse openai-sdks for checkout, but mint a separate token
       # scoped only to read openai/openai. Do not reuse the pair-scoped SDK
       # write token for checkout.
