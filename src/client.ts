@@ -390,6 +390,7 @@ export class OpenAI {
   fetchOptions: MergedRequestInit | undefined;
 
   private fetch: Fetch;
+  #customFetch: boolean;
   #encoder: Opts.RequestEncoder;
   protected idempotencyHeader?: string;
   protected _options: ClientOptions;
@@ -480,6 +481,7 @@ export class OpenAI {
       defaultLogLevel;
     this.fetchOptions = options.fetchOptions;
     this.maxRetries = options.maxRetries ?? 2;
+    this.#customFetch = options.fetch !== undefined;
     this.fetch = options.fetch ?? Shims.getDefaultFetch();
     this.#encoder = Opts.FallbackEncoder;
 
@@ -1012,11 +1014,27 @@ export class OpenAI {
       ((globalThis as any).ReadableStream && options.body instanceof (globalThis as any).ReadableStream) ||
       (typeof options.body === 'object' && options.body !== null && Symbol.asyncIterator in options.body);
 
+    let fetchInitOptions = options;
+    if (!this.#customFetch) {
+      // Strip runtime-specific options that are not part of the standard RequestInit.
+      // These (e.g. undici's dispatcher, agent, client) can cause errors when passed
+      // to the global fetch if the bundled undici version doesn't match the user's
+      // installed undici. Custom fetch implementations receive the options unchanged.
+      const {
+        dispatcher: _dispatcher,
+        agent: _agent,
+        client: _client,
+        proxy: _proxy,
+        ...standardFetchOptions
+      } = options as Record<string, unknown>;
+      fetchInitOptions = standardFetchOptions as typeof options;
+    }
+
     const fetchOptions: RequestInit = {
       signal: controller.signal as any,
       ...(isReadableBody ? { duplex: 'half' } : {}),
       method: 'GET',
-      ...options,
+      ...fetchInitOptions,
     };
     if (method) {
       // Custom methods like 'patch' need to be uppercased

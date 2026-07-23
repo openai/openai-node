@@ -341,6 +341,71 @@ describe('instantiate client', () => {
     expect(capturedRequest?.method).toEqual('PATCH');
   });
 
+  test('preserves runtime fetch options for custom fetch implementations', async () => {
+    let capturedRequest: (RequestInit & Record<string, unknown>) | undefined;
+    const dispatcher = { dispatch() {} };
+    const testFetch = async (
+      url: string | URL | Request,
+      init: (RequestInit & Record<string, unknown>) = {},
+    ): Promise<Response> => {
+      capturedRequest = init;
+      return new Response(JSON.stringify({}), { headers: { 'Content-Type': 'application/json' } });
+    };
+
+    const client = new OpenAI({
+      baseURL: 'http://localhost:5000/',
+      apiKey: 'My API Key',
+      adminAPIKey: 'My Admin API Key',
+      fetch: testFetch,
+      fetchOptions: {
+        dispatcher,
+        agent: 'agent',
+        client: 'client',
+        proxy: 'proxy',
+      } as any,
+    });
+
+    await client.get('/foo');
+    expect(capturedRequest?.dispatcher).toBe(dispatcher);
+    expect(capturedRequest?.agent).toEqual('agent');
+    expect(capturedRequest?.client).toEqual('client');
+    expect(capturedRequest?.proxy).toEqual('proxy');
+  });
+
+  test('strips runtime fetch options from the default global fetch', async () => {
+    const originalFetch = globalThis.fetch;
+    let capturedRequest: (RequestInit & Record<string, unknown>) | undefined;
+    globalThis.fetch = (async (
+      url: string | URL | Request,
+      init: (RequestInit & Record<string, unknown>) = {},
+    ): Promise<Response> => {
+      capturedRequest = init;
+      return new Response(JSON.stringify({}), { headers: { 'Content-Type': 'application/json' } });
+    }) as typeof fetch;
+
+    try {
+      const client = new OpenAI({
+        baseURL: 'http://localhost:5000/',
+        apiKey: 'My API Key',
+        adminAPIKey: 'My Admin API Key',
+        fetchOptions: {
+          dispatcher: { dispatch() {} },
+          agent: 'agent',
+          client: 'client',
+          proxy: 'proxy',
+        } as any,
+      });
+
+      await client.get('/foo');
+      expect(capturedRequest?.dispatcher).toBeUndefined();
+      expect(capturedRequest?.agent).toBeUndefined();
+      expect(capturedRequest?.client).toBeUndefined();
+      expect(capturedRequest?.proxy).toBeUndefined();
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   test('explains undici dispatcher and fetch version mismatch', async () => {
     const undiciError = Object.assign(new Error('invalid onRequestStart method'), {
       name: 'InvalidArgumentError',
