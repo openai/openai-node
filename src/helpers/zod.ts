@@ -13,6 +13,7 @@ import {
 import { zodToJsonSchema as _zodToJsonSchema } from '../_vendor/zod-to-json-schema';
 import { AutoParseableResponseTool, makeParseableResponseTool } from '../lib/ResponsesParser';
 import { type ResponseFormatTextJSONSchemaConfig } from '../resources/responses/responses';
+import { type RealtimeFunctionTool } from '../resources/realtime/realtime';
 import { toStrictJsonSchema } from '../lib/transform';
 import { JSONSchema } from '../lib/jsonschema';
 
@@ -37,20 +38,98 @@ type InferZodType<T extends ZodTypeLike> =
   : T extends { _zod: { output: infer Output } } ? Output
   : never;
 
-function zodV3ToJsonSchema(schema: z3.ZodType, options: { name: string }): Record<string, unknown> {
-  return _zodToJsonSchema(schema, {
+type ZodSchemaDefinitions = Record<string, ZodTypeLike>;
+
+type ZodResponseFormatProps = Omit<ResponseFormatJSONSchema.JSONSchema, 'schema' | 'strict' | 'name'> & {
+  /**
+   * Schemas to extract into the generated JSON Schema definitions.
+   * Use this to reuse large shared schemas instead of inlining them at every occurrence.
+   */
+  schemaDefinitions?: ZodSchemaDefinitions | undefined;
+};
+
+function encodeSchemaDefinitionRefToken(token: string): string {
+  return encodeURIComponent(token.replace(/~/g, '~0').replace(/\//g, '~1'));
+}
+
+function validateSchemaDefinitions(schemaDefinitions: ZodSchemaDefinitions | undefined): void {
+  if (schemaDefinitions && Object.prototype.hasOwnProperty.call(schemaDefinitions, '__proto__')) {
+    throw new Error('schemaDefinitions cannot include "__proto__" as a definition name');
+  }
+}
+
+function escapeSchemaDefinitionRefs(
+  schema: Record<string, unknown>,
+  schemaDefinitions: ZodSchemaDefinitions | undefined,
+): Record<string, unknown> {
+  const refReplacements = new Map(
+    Object.keys(schemaDefinitions ?? {}).map((name) => [
+      `#/definitions/${name}`,
+      `#/definitions/${encodeSchemaDefinitionRefToken(name)}`,
+    ]),
+  );
+
+  const visit = (value: unknown): void => {
+    if (!value || typeof value !== 'object') return;
+
+    if (Array.isArray(value)) {
+      for (const child of value) visit(child);
+      return;
+    }
+
+    const record = value as Record<string, unknown>;
+    const ref = record['$ref'];
+    if (typeof ref === 'string') {
+      record['$ref'] = refReplacements.get(ref) ?? ref;
+    }
+
+    for (const child of Object.values(record)) visit(child);
+  };
+
+  visit(schema);
+  return schema;
+}
+
+function getZodV3RootName(name: string, schemaDefinitions: ZodSchemaDefinitions | undefined): string {
+  let rootName = name;
+  while (schemaDefinitions && Object.prototype.hasOwnProperty.call(schemaDefinitions, rootName)) {
+    rootName = `${rootName}_root`;
+  }
+  return rootName;
+}
+
+function zodV3ToJsonSchema(
+  schema: z3.ZodType,
+  options: { name: string; schemaDefinitions?: ZodSchemaDefinitions | undefined },
+): Record<string, unknown> {
+  const rootName = getZodV3RootName(options.name, options.schemaDefinitions);
+  const jsonSchema = _zodToJsonSchema(schema, {
     openaiStrictMode: true,
-    name: options.name,
+    name: rootName,
     nameStrategy: 'duplicate-ref',
     $refStrategy: 'extract-to-root',
     nullableStrategy: 'property',
+    ...(options.schemaDefinitions ?
+      { definitions: options.schemaDefinitions as unknown as Record<string, z3.ZodType> }
+    : undefined),
   });
+
+  return escapeSchemaDefinitionRefs(jsonSchema, options.schemaDefinitions);
 }
 
-function zodV4ToJsonSchema(schema: ZodV4Schema): Record<string, unknown> {
-  return toStrictJsonSchema(
+function zodV4ToJsonSchema(
+  schema: ZodV4Schema,
+  options: { schemaDefinitions?: ZodSchemaDefinitions | undefined } = {},
+): Record<string, unknown> {
+  const metadata = options.schemaDefinitions ? z4.registry<Record<string, unknown>>() : undefined;
+  for (const [name, definition] of Object.entries(options.schemaDefinitions ?? {})) {
+    metadata?.add(definition as unknown as z4.ZodType, { id: name });
+  }
+
+  const jsonSchema = toStrictJsonSchema(
     z4.toJSONSchema(schema, {
       target: 'draft-7',
+      ...(metadata ? { metadata } : undefined),
       override: ({ zodSchema, jsonSchema }) => {
         const def = zodSchema._zod.def;
 
@@ -69,6 +148,24 @@ function zodV4ToJsonSchema(schema: ZodV4Schema): Record<string, unknown> {
       },
     }) as JSONSchema,
   ) as Record<string, unknown>;
+
+  return escapeSchemaDefinitionRefs(jsonSchema, options.schemaDefinitions);
+}
+
+function zodV3ToNonStrictJsonSchema(schema: z3.ZodType, options: { name: string }): Record<string, unknown> {
+  return _zodToJsonSchema(schema, {
+    name: options.name,
+    nameStrategy: 'duplicate-ref',
+    $refStrategy: 'extract-to-root',
+    pipeStrategy: 'input',
+  });
+}
+
+function zodV4ToNonStrictJsonSchema(schema: ZodV4Schema): Record<string, unknown> {
+  return z4.toJSONSchema(schema, {
+    target: 'draft-7',
+    io: 'input',
+  }) as Record<string, unknown>;
 }
 
 function isZodV4(zodObject: ZodSchema): zodObject is ZodV4Schema {
@@ -129,18 +226,23 @@ function parseZodObject<ZodInput extends ZodTypeLike>(
 export function zodResponseFormat<ZodInput extends ZodTypeLike>(
   zodObject: ZodInput,
   name: string,
-  props?: Omit<ResponseFormatJSONSchema.JSONSchema, 'schema' | 'strict' | 'name'>,
+  props?: ZodResponseFormatProps,
 ): AutoParseableResponseFormat<InferZodType<ZodInput>> {
   const zodSchema = zodObject as unknown as ZodSchema;
+  const { schemaDefinitions, ...responseFormatProps } = props ?? {};
+  validateSchemaDefinitions(schemaDefinitions);
 
   return makeParseableResponseFormat<InferZodType<ZodInput>>(
     {
       type: 'json_schema',
       json_schema: {
-        ...props,
+        ...responseFormatProps,
         name,
         strict: true,
-        schema: isZodV4(zodSchema) ? zodV4ToJsonSchema(zodSchema) : zodV3ToJsonSchema(zodSchema, { name }),
+        schema:
+          isZodV4(zodSchema) ?
+            zodV4ToJsonSchema(zodSchema, { schemaDefinitions })
+          : zodV3ToJsonSchema(zodSchema, { name, schemaDefinitions }),
       },
     },
     (content) => parseZodObject(zodObject, content),
@@ -177,7 +279,7 @@ export function zodFunction<Parameters extends ZodTypeLike>(options: {
   function?: ((args: InferZodType<Parameters>) => unknown | Promise<unknown>) | undefined;
   description?: string | undefined;
 }): AutoParseableTool<{
-  arguments: Parameters;
+  arguments: InferZodType<Parameters>;
   name: string;
   function: (args: InferZodType<Parameters>) => unknown;
 }> {
@@ -210,7 +312,7 @@ export function zodResponsesFunction<Parameters extends ZodTypeLike>(options: {
   function?: ((args: InferZodType<Parameters>) => unknown | Promise<unknown>) | undefined;
   description?: string | undefined;
 }): AutoParseableResponseTool<{
-  arguments: Parameters;
+  arguments: InferZodType<Parameters>;
   name: string;
   function: (args: InferZodType<Parameters>) => unknown;
 }> {
@@ -232,4 +334,31 @@ export function zodResponsesFunction<Parameters extends ZodTypeLike>(options: {
       parser: (args) => parseZodObject(options.parameters, args),
     },
   );
+}
+
+/**
+ * Creates a Realtime API `function` tool definition from the given Zod schema.
+ *
+ * Unlike {@link zodResponsesFunction}, this helper does not add `strict`
+ * because Realtime function tools do not support that field.
+ *
+ * This helper only creates the tool definition. Parse function-call arguments
+ * from Realtime events with the original Zod schema.
+ */
+export function zodRealtimeFunction<Parameters extends ZodTypeLike>(options: {
+  name: string;
+  parameters: Parameters;
+  description?: string | undefined;
+}): RealtimeFunctionTool {
+  const zodSchema = options.parameters as unknown as ZodSchema;
+
+  return {
+    type: 'function',
+    name: options.name,
+    parameters:
+      isZodV4(zodSchema) ?
+        zodV4ToNonStrictJsonSchema(zodSchema)
+      : zodV3ToNonStrictJsonSchema(zodSchema, { name: options.name }),
+    ...(options.description ? { description: options.description } : undefined),
+  };
 }

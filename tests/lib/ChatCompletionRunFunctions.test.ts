@@ -644,6 +644,7 @@ describe('resource completions', () => {
       });
 
       await handleRequest(async (request) => {
+        // Parsed response metadata stays on the runner but must not be sent back to the API.
         expect(request.messages).toEqual([
           {
             role: 'user',
@@ -652,8 +653,6 @@ describe('resource completions', () => {
           {
             role: 'assistant',
             content: null,
-            refusal: null,
-            parsed: null,
             tool_calls: [
               {
                 type: 'function',
@@ -661,7 +660,6 @@ describe('resource completions', () => {
                 function: {
                   arguments: '',
                   name: 'getWeather',
-                  parsed_arguments: null,
                 },
               },
             ],
@@ -1281,8 +1279,6 @@ describe('resource completions', () => {
           {
             role: 'assistant',
             content: null,
-            parsed: null,
-            refusal: null,
             tool_calls: [
               {
                 type: 'function',
@@ -1290,7 +1286,6 @@ describe('resource completions', () => {
                 function: {
                   arguments: '{"a": 1, "b": 2, "c": 3}',
                   name: 'numProperties',
-                  parsed_arguments: null,
                 },
               },
             ],
@@ -1436,8 +1431,6 @@ describe('resource completions', () => {
             {
               role: 'assistant',
               content: null,
-              parsed: null,
-              refusal: null,
               tool_calls: [
                 {
                   type: 'function',
@@ -1445,7 +1438,6 @@ describe('resource completions', () => {
                   function: {
                     arguments: '[{"a": 1, "b": 2, "c": 3}]',
                     name: 'numProperties',
-                    parsed_arguments: null,
                   },
                 },
               ],
@@ -1495,8 +1487,6 @@ describe('resource completions', () => {
             {
               role: 'assistant',
               content: null,
-              parsed: null,
-              refusal: null,
               tool_calls: [
                 {
                   type: 'function',
@@ -1504,7 +1494,6 @@ describe('resource completions', () => {
                   function: {
                     arguments: '[{"a": 1, "b": 2, "c": 3}]',
                     name: 'numProperties',
-                    parsed_arguments: null,
                   },
                 },
               ],
@@ -1517,8 +1506,6 @@ describe('resource completions', () => {
             {
               role: 'assistant',
               content: null,
-              parsed: null,
-              refusal: null,
               tool_calls: [
                 {
                   type: 'function',
@@ -1526,7 +1513,6 @@ describe('resource completions', () => {
                   function: {
                     arguments: '{"a": 1, "b": 2, "c": 3}',
                     name: 'numProperties',
-                    parsed_arguments: null,
                   },
                 },
               ],
@@ -1757,8 +1743,6 @@ describe('resource completions', () => {
             {
               role: 'assistant',
               content: null,
-              parsed: null,
-              refusal: null,
               tool_calls: [
                 {
                   type: 'function',
@@ -1766,7 +1750,6 @@ describe('resource completions', () => {
                   function: {
                     arguments: '',
                     name: 'get_weather',
-                    parsed_arguments: null,
                   },
                 },
               ],
@@ -1813,8 +1796,6 @@ describe('resource completions', () => {
             {
               role: 'assistant',
               content: null,
-              parsed: null,
-              refusal: null,
               tool_calls: [
                 {
                   type: 'function',
@@ -1822,7 +1803,6 @@ describe('resource completions', () => {
                   function: {
                     arguments: '',
                     name: 'get_weather',
-                    parsed_arguments: null,
                   },
                 },
               ],
@@ -1835,8 +1815,6 @@ describe('resource completions', () => {
             {
               role: 'assistant',
               content: null,
-              parsed: null,
-              refusal: null,
               tool_calls: [
                 {
                   type: 'function',
@@ -1844,7 +1822,6 @@ describe('resource completions', () => {
                   function: {
                     arguments: '',
                     name: 'getWeather',
-                    parsed_arguments: null,
                   },
                 },
               ],
@@ -2006,8 +1983,6 @@ describe('resource completions', () => {
             {
               role: 'assistant',
               content: null,
-              parsed: null,
-              refusal: null,
               tool_calls: [
                 {
                   type: 'function',
@@ -2133,8 +2108,6 @@ describe('resource completions', () => {
             {
               role: 'assistant',
               content: null,
-              parsed: null,
-              refusal: null,
               tool_calls: [
                 {
                   type: 'function',
@@ -2697,8 +2670,6 @@ describe('resource completions', () => {
             {
               role: 'assistant',
               content: null,
-              parsed: null,
-              refusal: null,
               tool_calls: [
                 {
                   type: 'function',
@@ -2820,8 +2791,6 @@ describe('resource completions', () => {
             {
               role: 'assistant',
               content: null,
-              parsed: null,
-              refusal: null,
               tool_calls: [
                 {
                   type: 'function',
@@ -2861,8 +2830,6 @@ describe('resource completions', () => {
             {
               role: 'assistant',
               content: null,
-              parsed: null,
-              refusal: null,
               tool_calls: [
                 {
                   type: 'function',
@@ -2882,8 +2849,6 @@ describe('resource completions', () => {
             {
               role: 'assistant',
               content: null,
-              parsed: null,
-              refusal: null,
               tool_calls: [
                 {
                   type: 'function',
@@ -3107,8 +3072,6 @@ describe('resource completions', () => {
             {
               role: 'assistant',
               content: null,
-              parsed: null,
-              refusal: null,
               tool_calls: [
                 {
                   type: 'function',
@@ -3161,8 +3124,6 @@ describe('resource completions', () => {
             {
               role: 'assistant',
               content: null,
-              parsed: null,
-              refusal: null,
               tool_calls: [
                 {
                   type: 'function',
@@ -3182,8 +3143,6 @@ describe('resource completions', () => {
             {
               role: 'assistant',
               content: null,
-              parsed: null,
-              refusal: null,
               tool_calls: [
                 {
                   type: 'function',

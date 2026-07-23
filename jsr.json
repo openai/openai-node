@@ -1,10 +1,11 @@
 {
   "name": "@openai/openai",
-  "version": "6.47.0",
+  "version": "6.48.0",
   "exports": {
     ".": "./index.ts",
     "./providers/bedrock": "./providers/bedrock.ts",
     "./providers/bedrock/aws": "./providers/bedrock/aws.ts",
+    "./helpers/standard-schema": "./helpers/standard-schema.ts",
     "./helpers/zod": "./helpers/zod.ts",
     "./beta/realtime/websocket": "./beta/realtime/websocket.ts"
   },

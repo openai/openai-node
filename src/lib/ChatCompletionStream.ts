@@ -20,6 +20,7 @@ import {
 } from '../lib/parser';
 import { ChatCompletionFunctionTool, ParsedChatCompletion } from '../resources/chat/completions';
 import {
+  type ChatCompletionAudio,
   ChatCompletionTokenLogprob,
   type ChatCompletion,
   type ChatCompletionChunk,
@@ -196,12 +197,14 @@ export class ChatCompletionStream<ParsedT = null>
   implements AsyncIterable<ChatCompletionChunk>
 {
   #params: ChatCompletionCreateParams | null;
+  #audioDoneChoiceIndexes: Set<number>;
   #choiceEventStates: ChoiceEventState[];
   #currentChatCompletionSnapshot: ChatCompletionSnapshot | undefined;
 
   constructor(params: ChatCompletionCreateParams | null) {
     super();
     this.#params = params;
+    this.#audioDoneChoiceIndexes = new Set();
     this.#choiceEventStates = [];
   }
 
@@ -240,6 +243,7 @@ export class ChatCompletionStream<ParsedT = null>
 
   #beginRequest() {
     if (this.ended) return;
+    this.#audioDoneChoiceIndexes = new Set();
     this.#currentChatCompletionSnapshot = undefined;
   }
 
@@ -428,9 +432,11 @@ export class ChatCompletionStream<ParsedT = null>
     if (!snapshot) {
       throw new OpenAIError(`request ended without sending any chunks`);
     }
+    const audioDoneChoiceIndexes = this.#audioDoneChoiceIndexes;
+    this.#audioDoneChoiceIndexes = new Set();
     this.#currentChatCompletionSnapshot = undefined;
     this.#choiceEventStates = [];
-    return finalizeChatCompletion(snapshot, this.#params);
+    return finalizeChatCompletion(snapshot, this.#params, audioDoneChoiceIndexes);
   }
 
   protected override async _createChatCompletion(
@@ -575,15 +581,41 @@ export class ChatCompletionStream<ParsedT = null>
 
       if (!delta) continue; // Shouldn't happen; just in case.
 
-      const { content, refusal, function_call, role, tool_calls, ...rest } = delta;
+      this.#audioDoneChoiceIndexes.delete(index);
+      const { audio, content, refusal, function_call, role, tool_calls, ...rest } = delta as typeof delta & {
+        audio?: Partial<ChatCompletionAudio> | null;
+      };
       assertIsEmpty(rest);
       Object.assign(choice.message, rest);
+      if (
+        audio?.expires_at != null &&
+        audio.id == null &&
+        audio.data == null &&
+        audio.transcript == null &&
+        content == null &&
+        refusal == null &&
+        function_call == null &&
+        role == null &&
+        tool_calls == null &&
+        Object.keys(rest).length === 0
+      ) {
+        this.#audioDoneChoiceIndexes.add(index);
+      }
 
       if (refusal) {
         choice.message.refusal = (choice.message.refusal || '') + refusal;
       }
 
       if (role) choice.message.role = role;
+      if (audio) {
+        const audioSnapshot = (choice.message.audio ??= {});
+        if (audio.id != null) audioSnapshot.id = audio.id;
+        if (audio.data != null) audioSnapshot.data = (audioSnapshot.data ?? '') + audio.data;
+        if (audio.transcript != null) {
+          audioSnapshot.transcript = (audioSnapshot.transcript ?? '') + audio.transcript;
+        }
+        if (audio.expires_at != null) audioSnapshot.expires_at = audio.expires_at;
+      }
       if (function_call) {
         if (!choice.message.function_call) {
           choice.message.function_call = function_call;
@@ -698,6 +730,7 @@ export class ChatCompletionStream<ParsedT = null>
 function finalizeChatCompletion<ParsedT>(
   snapshot: ChatCompletionSnapshot,
   params: ChatCompletionCreateParams | null,
+  audioDoneChoiceIndexes: ReadonlySet<number>,
 ): ParsedChatCompletion<ParsedT> {
   const { id, choices, created, model, system_fingerprint, ...rest } = snapshot;
   const completion: ChatCompletion = {
@@ -705,11 +738,16 @@ function finalizeChatCompletion<ParsedT>(
     id,
     choices: choices.map(
       ({ message, finish_reason, index, logprobs, ...choiceRest }): ChatCompletion.Choice => {
-        if (!finish_reason) {
+        const { content = null, function_call, tool_calls, audio, ...messageRest } = message;
+        // Audio streams can end with an expires_at-only chunk after the
+        // generated audio, without a separate finish_reason.
+        const finishReason =
+          finish_reason ?? (audioDoneChoiceIndexes.has(index) && isCompleteAudio(audio) ? 'stop' : null);
+        if (!finishReason) {
           throw new OpenAIError(`missing finish_reason for choice ${index}`);
         }
 
-        const { content = null, function_call, tool_calls, ...messageRest } = message;
+        const audioResponse = audio ? { audio: audio as ChatCompletionAudio } : {};
         const role = message.role as 'assistant'; // this is what we expect; in theory it could be different which would make our types a slight lie but would be fine.
         if (!role) {
           throw new OpenAIError(`missing role for choice ${index}`);
@@ -728,12 +766,13 @@ function finalizeChatCompletion<ParsedT>(
           return {
             ...choiceRest,
             message: {
+              ...audioResponse,
               content,
               function_call: { arguments: args, name },
               role,
               refusal: message.refusal ?? null,
             },
-            finish_reason,
+            finish_reason: finishReason,
             index,
             logprobs,
           };
@@ -743,10 +782,11 @@ function finalizeChatCompletion<ParsedT>(
           return {
             ...choiceRest,
             index,
-            finish_reason,
+            finish_reason: finishReason,
             logprobs,
             message: {
               ...messageRest,
+              ...audioResponse,
               role,
               content,
               refusal: message.refusal ?? null,
@@ -779,8 +819,8 @@ function finalizeChatCompletion<ParsedT>(
         }
         return {
           ...choiceRest,
-          message: { ...messageRest, content, role, refusal: message.refusal ?? null },
-          finish_reason,
+          message: { ...messageRest, ...audioResponse, content, role, refusal: message.refusal ?? null },
+          finish_reason: finishReason,
           index,
           logprobs,
         };
@@ -793,6 +833,12 @@ function finalizeChatCompletion<ParsedT>(
   };
 
   return maybeParseChatCompletion(completion, params);
+}
+
+function isCompleteAudio(
+  audio: Partial<ChatCompletionAudio> | null | undefined,
+): audio is ChatCompletionAudio {
+  return audio?.id != null && audio.data != null && audio.transcript != null && audio.expires_at != null;
 }
 
 function str(x: unknown) {
@@ -874,6 +920,8 @@ export namespace ChatCompletionSnapshot {
        * The contents of the chunk message.
        */
       content?: string | null;
+
+      audio?: Partial<ChatCompletionAudio> | null;
 
       refusal?: string | null;
 
