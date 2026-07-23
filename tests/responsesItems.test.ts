@@ -17,6 +17,25 @@ describe('responses item types', () => {
   test('response output items are compatible with input items', async () => {
     expect(true).toBe(true);
   });
+
+  test('mcp_call output items accept structured errors', () => {
+    const item: OpenAI.Responses.ResponseOutputItem.McpCall = {
+      id: 'mcp_abc',
+      type: 'mcp_call',
+      approval_request_id: null,
+      arguments: '{"query":"latest tech gadgets"}',
+      error: {
+        type: 'mcp_protocol_error',
+        code: 32600,
+        message: 'Session terminated',
+      },
+      name: 'search',
+      output: null,
+      server_label: 'my-mcp-server',
+    };
+
+    expect(item.error).toMatchObject({ message: 'Session terminated' });
+  });
 });
 
 const unused = async () => {
