@@ -58,6 +58,7 @@ TEST_PATHS=(
 	tests/api-resources/admin/organization/groups/roles.test.ts
 	tests/api-resources/admin/organization/roles.test.ts
 	tests/api-resources/admin/organization/data-retention.test.ts
+	tests/api-resources/admin/organization/spend-limit.test.ts
 	tests/api-resources/admin/organization/spend-alerts.test.ts
 	tests/api-resources/admin/organization/certificates.test.ts
 	tests/api-resources/admin/organization/projects/projects.test.ts
@@ -73,6 +74,7 @@ TEST_PATHS=(
 	tests/api-resources/admin/organization/projects/groups/roles.test.ts
 	tests/api-resources/admin/organization/projects/roles.test.ts
 	tests/api-resources/admin/organization/projects/data-retention.test.ts
+	tests/api-resources/admin/organization/projects/spend-limit.test.ts
 	tests/api-resources/admin/organization/projects/spend-alerts.test.ts
 	tests/api-resources/admin/organization/projects/certificates.test.ts
 	tests/api-resources/responses/responses.test.ts

@@ -62,6 +62,13 @@ import {
   SpendAlertUpdateParams,
   SpendAlerts,
 } from './spend-alerts';
+import * as SpendLimitAPI from './spend-limit';
+import {
+  OrganizationSpendLimit,
+  OrganizationSpendLimitDeleted,
+  SpendLimit,
+  SpendLimitUpdateParams,
+} from './spend-limit';
 import * as UsageAPI from './usage';
 import {
   Usage,
@@ -127,6 +134,7 @@ export class Organization extends APIResource {
   groups: GroupsAPI.Groups = new GroupsAPI.Groups(this._client);
   roles: RolesAPI.Roles = new RolesAPI.Roles(this._client);
   dataRetention: DataRetentionAPI.DataRetention = new DataRetentionAPI.DataRetention(this._client);
+  spendLimit: SpendLimitAPI.SpendLimit = new SpendLimitAPI.SpendLimit(this._client);
   spendAlerts: SpendAlertsAPI.SpendAlerts = new SpendAlertsAPI.SpendAlerts(this._client);
   certificates: CertificatesAPI.Certificates = new CertificatesAPI.Certificates(this._client);
   projects: ProjectsAPI.Projects = new ProjectsAPI.Projects(this._client);
@@ -140,6 +148,7 @@ Organization.Users = Users;
 Organization.Groups = Groups;
 Organization.Roles = Roles;
 Organization.DataRetention = DataRetention;
+Organization.SpendLimit = SpendLimit;
 Organization.SpendAlerts = SpendAlerts;
 Organization.Certificates = Certificates;
 Organization.Projects = Projects;
@@ -231,6 +240,13 @@ export declare namespace Organization {
     DataRetention as DataRetention,
     type OrganizationDataRetention as OrganizationDataRetention,
     type DataRetentionUpdateParams as DataRetentionUpdateParams,
+  };
+
+  export {
+    SpendLimit as SpendLimit,
+    type OrganizationSpendLimit as OrganizationSpendLimit,
+    type OrganizationSpendLimitDeleted as OrganizationSpendLimitDeleted,
+    type SpendLimitUpdateParams as SpendLimitUpdateParams,
   };
 
   export {
