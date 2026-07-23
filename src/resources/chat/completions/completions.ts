@@ -314,6 +314,7 @@ export {
   type ChatCompletionStreamingToolRunnerParamsWithContext,
   type ChatCompletionStreamingToolRunnerParamsWithoutContext,
 } from '../../../lib/ChatCompletionStreamingRunner';
+export { type RunnerOptions } from '../../../lib/AbstractChatCompletionRunner';
 export { ChatCompletionStream, type ChatCompletionStreamParams } from '../../../lib/ChatCompletionStream';
 export { ChatCompletionRunner } from '../../../lib/ChatCompletionRunner';
 
