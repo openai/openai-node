@@ -1164,7 +1164,7 @@ export class OpenAI {
     const headers = buildHeaders([
       idempotencyHeaders,
       {
-        Accept: 'application/json',
+        Accept: options.stream ? 'text/event-stream' : 'application/json',
         'User-Agent': this.getUserAgent(),
         'X-Stainless-Retry-Count': String(retryCount),
         ...(options.timeout ? { 'X-Stainless-Timeout': String(Math.trunc(options.timeout / 1000)) } : {}),

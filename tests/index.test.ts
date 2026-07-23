@@ -27,6 +27,26 @@ describe('instantiate client', () => {
       adminAPIKey: 'My Admin API Key',
     });
 
+    test('uses an event-stream accept header for streaming requests', async () => {
+      const { req } = await client.buildRequest({ path: '/foo', method: 'post', stream: true });
+      expect(req.headers.get('accept')).toEqual('text/event-stream');
+    });
+
+    test('uses a JSON accept header for non-streaming requests', async () => {
+      const { req } = await client.buildRequest({ path: '/foo', method: 'post', stream: false });
+      expect(req.headers.get('accept')).toEqual('application/json');
+    });
+
+    test('preserves an explicit accept header for streaming requests', async () => {
+      const { req } = await client.buildRequest({
+        path: '/foo',
+        method: 'post',
+        stream: true,
+        headers: { Accept: 'application/x-ndjson' },
+      });
+      expect(req.headers.get('accept')).toEqual('application/x-ndjson');
+    });
+
     test('they are used in the request', async () => {
       const { req } = await client.buildRequest({ path: '/foo', method: 'post' });
       expect(req.headers.get('x-my-default-header')).toEqual('2');
