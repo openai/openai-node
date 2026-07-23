@@ -95,12 +95,19 @@ export async function toFile(
     if (value instanceof File) {
       return value;
     }
-    return makeFile([await value.arrayBuffer()], value.name);
+    return makeFile([await value.arrayBuffer()], value.name, {
+      type: value.type,
+      lastModified: value.lastModified,
+      ...options,
+    });
   }
 
   if (isResponseLike(value)) {
     const blob = await value.blob();
     name ||= new URL(value.url).pathname.split(/[\\/]/).pop();
+    if (!options?.type && blob.type) {
+      options = { ...options, type: blob.type };
+    }
 
     return makeFile(await getBytes(blob), name, options);
   }
@@ -110,7 +117,14 @@ export async function toFile(
   name ||= getName(value);
 
   if (!options?.type) {
-    const type = parts.find((part) => typeof part === 'object' && 'type' in part && part.type);
+    const type = parts.find(
+      (part): part is Blob =>
+        typeof part === 'object' &&
+        part !== null &&
+        'type' in part &&
+        typeof part.type === 'string' &&
+        part.type.length > 0,
+    )?.type;
     if (typeof type === 'string') {
       options = { ...options, type };
     }
