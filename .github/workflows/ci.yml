@@ -126,6 +126,31 @@ jobs:
       - name: Run tests
         run: ./scripts/test
 
+  test_matrix:
+    name: >-
+      ${{
+        (github.event_name == 'push' || github.event.pull_request.head.repo.fork)
+        && 'test matrix'
+        || 'test matrix (not run)'
+      }}
+    if: >-
+      ${{
+        always() &&
+        (github.event_name == 'push' || github.event.pull_request.head.repo.fork)
+      }}
+    needs: test
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Verify Node.js test matrix
+        env:
+          TEST_RESULT: ${{ needs.test.result }}
+        run: |
+          if [ "$TEST_RESULT" != "success" ]; then
+            echo "::error::Node.js test matrix result: $TEST_RESULT"
+            exit 1
+          fi
+
   examples:
     timeout-minutes: 10
     name: examples
