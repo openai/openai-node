@@ -133,7 +133,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions: {}
     steps:
-      - name: Verify Node.js test matrix
+      - name: Tests (all)
         env:
           TEST_RESULT: ${{ needs.test.result }}
         run: |
