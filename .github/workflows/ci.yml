@@ -127,17 +127,8 @@ jobs:
         run: ./scripts/test
 
   test_matrix:
-    name: >-
-      ${{
-        (github.event_name == 'push' || github.event.pull_request.head.repo.fork)
-        && 'test matrix'
-        || 'test matrix (not run)'
-      }}
-    if: >-
-      ${{
-        always() &&
-        (github.event_name == 'push' || github.event.pull_request.head.repo.fork)
-      }}
+    name: ${{ (github.event_name == 'push' || github.event.pull_request.head.repo.fork) && 'test matrix' || 'test matrix (not run)' }}
+    if: ${{ always() && (github.event_name == 'push' || github.event.pull_request.head.repo.fork) }}
     needs: test
     runs-on: ubuntu-latest
     permissions: {}
