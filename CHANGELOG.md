@@ -1,5 +1,9 @@
 # Changelog
 
+## 6.49.1 (2026-07-24)
+
+Full Changelog: [v6.49.0...v6.49.1](https://github.com/openai/openai-node/compare/v6.49.0...v6.49.1)
+
 ## 6.49.0 (2026-07-23)
 
 Full Changelog: [v6.48.0...v6.49.0](https://github.com/openai/openai-node/compare/v6.48.0...v6.49.0)
