@@ -294,7 +294,7 @@ export class ResponseStream<ParsedT = null>
   async finalResponse(): Promise<ParsedResponse<ParsedT>> {
     await this.done();
     const response = this.#finalResponse;
-    if (!response) throw new OpenAIError('stream ended without producing a ChatCompletion');
+    if (!response) throw new OpenAIError('stream ended without producing a Response');
     return response;
   }
 }

@@ -254,6 +254,12 @@ describe('.stream()', () => {
     }
     expect(final.output_text).toBe('The answer is 42');
   });
+
+  it('throws an error identifying Response when finalResponse is called before producing a Response', async () => {
+    const stream = ResponseStream.fromReadableStream(readableStreamFromEvents([]));
+
+    await expect(stream.finalResponse()).rejects.toThrow('stream ended without producing a Response');
+  });
 });
 
 function readableStreamFromEvents(events: ResponseStreamEvent[]) {
