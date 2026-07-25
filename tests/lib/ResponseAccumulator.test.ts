@@ -222,6 +222,68 @@ describe('ResponseAccumulator', () => {
       content: [{ type: 'refusal', refusal: 'I cannot help with that.' }],
     });
   });
+
+  it('safely accumulates deltas when initial string fields are uninitialized', () => {
+    const snapshot = accumulateEvents([
+      { type: 'response.created', sequence_number: 0, response: makeResponse() },
+      {
+        type: 'response.output_item.added',
+        sequence_number: 1,
+        output_index: 0,
+        item: {
+          id: 'fc_1',
+          type: 'function_call',
+          call_id: 'call_1',
+          name: 'get_weather',
+          status: 'in_progress',
+        } as any,
+      },
+      {
+        type: 'response.function_call_arguments.delta',
+        sequence_number: 2,
+        item_id: 'fc_1',
+        output_index: 0,
+        delta: '{"city": "Paris"}',
+      },
+      {
+        type: 'response.output_item.added',
+        sequence_number: 3,
+        output_index: 1,
+        item: {
+          id: 'msg_123',
+          type: 'message',
+          role: 'assistant',
+          status: 'in_progress',
+          content: [],
+        },
+      },
+      {
+        type: 'response.content_part.added',
+        sequence_number: 4,
+        item_id: 'msg_123',
+        output_index: 1,
+        content_index: 0,
+        part: { type: 'refusal' } as any,
+      },
+      {
+        type: 'response.refusal.delta',
+        sequence_number: 5,
+        item_id: 'msg_123',
+        output_index: 1,
+        content_index: 0,
+        delta: 'Permission denied',
+      },
+    ]);
+
+    expect(snapshot.output[0]).toMatchObject({
+      type: 'function_call',
+      arguments: '{"city": "Paris"}',
+    });
+    expect(snapshot.output[1]).toMatchObject({
+      type: 'message',
+      content: [{ type: 'refusal', refusal: 'Permission denied' }],
+    });
+  });
 });
 
 function accumulateEvents(events: ResponseStreamEvent[]): Response {
