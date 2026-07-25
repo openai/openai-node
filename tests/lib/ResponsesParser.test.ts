@@ -139,4 +139,13 @@ describe('ResponsesParser', () => {
       parsed_arguments: { city: 'Paris' },
     });
   });
+
+  it('parses raw json_schema text format in maybeParseResponse', () => {
+    const response = maybeParseResponse(
+      makeResponse('completed', '{"size":"large","quality":"good"}'),
+      structuredTextParams,
+    );
+
+    expect(response.output_parsed).toEqual({ size: 'large', quality: 'good' });
+  });
 });

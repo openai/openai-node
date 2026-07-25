@@ -275,7 +275,10 @@ export function shouldParseToolCall(
 }
 
 export function hasAutoParseableInput(params: AnyChatCompletionCreateParams): boolean {
-  if (isAutoParsableResponseFormat(params.response_format)) {
+  if (
+    isAutoParsableResponseFormat(params.response_format) ||
+    params.response_format?.type === 'json_schema'
+  ) {
     return true;
   }
 

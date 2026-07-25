@@ -142,7 +142,7 @@ function parseTextFormat<
 }
 
 export function hasAutoParseableInput(params: ResponseCreateParamsWithTools): boolean {
-  if (isAutoParsableResponseFormat(params.text?.format)) {
+  if (isAutoParsableResponseFormat(params.text?.format) || params.text?.format?.type === 'json_schema') {
     return true;
   }
 
