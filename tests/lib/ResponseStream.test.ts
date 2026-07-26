@@ -1,4 +1,4 @@
-import OpenAI, { APIUserAbortError } from 'openai';
+import OpenAI, { APIError, APIUserAbortError, OpenAIError } from 'openai';
 import { ReadableStreamFrom } from 'openai/internal/shims';
 import { ResponseStream } from 'openai/lib/responses/ResponseStream';
 import type { Response, ResponseStreamEvent } from 'openai/resources/responses/responses';
@@ -153,6 +153,41 @@ describe('.stream()', () => {
       type: 'message',
       content: [{ type: 'output_text', text: 'Hello world' }],
     });
+  });
+
+  it('converts an error event into an APIError', async () => {
+    const events: ResponseStreamEvent[] = [
+      {
+        type: 'response.created',
+        sequence_number: 0,
+        response: makeResponse(),
+      },
+      {
+        type: 'error',
+        sequence_number: 1,
+        code: 'server_error',
+        message: 'The server had an error while processing your request.',
+        param: null,
+      },
+    ];
+    const stream = ResponseStream.fromReadableStream(readableStreamFromEvents(events));
+    const listenerErrors: OpenAIError[] = [];
+    stream.on('error', (error) => listenerErrors.push(error));
+
+    const rejection = await stream.finalResponse().then(
+      () => {
+        throw new Error('expected finalResponse() to reject');
+      },
+      (error: unknown) => error,
+    );
+
+    expect(rejection).toBeInstanceOf(OpenAIError);
+    expect(rejection).toBeInstanceOf(APIError);
+    expect((rejection as APIError).message).toBe('The server had an error while processing your request.');
+    expect((rejection as APIError).code).toBe('server_error');
+    // `.on('error')` must observe the converted error, not the raw stream frame.
+    expect(listenerErrors).toHaveLength(1);
+    expect(listenerErrors[0]).toBe(rejection);
   });
 
   it('cancels a stalled readable stream when aborted', async () => {
