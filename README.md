@@ -791,7 +791,7 @@ TypeScript >= 4.9 is supported.
 
 The following runtimes are supported:
 
-- Node.js 20 LTS or later ([non-EOL](https://endoflife.date/nodejs)) versions.
+- Node.js 22 and 24 LTS. Node.js 22 is the minimum supported version.
 - Deno v1.28.0 or higher.
 - Bun 1.0 or later.
 - Cloudflare Workers.
@@ -820,6 +820,12 @@ The following runtimes are supported:
 Note that React Native is not supported at this time.
 
 If you are interested in other runtime environments, please open or upvote an issue on GitHub.
+
+Node.js 20 reached end of life on April 30, 2026 and is no longer supported.
+Previously published SDK releases remain available, but receive no guaranteed
+fixes or security backports for unsupported Node.js versions. See the
+[Node.js version support policy](https://github.com/openai/openai-node/blob/main/NODE_VERSION_POLICY.md)
+for lifecycle, deprecation, and release rules.
 
 ## Contributing
 

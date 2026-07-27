@@ -1,3 +1,6 @@
+# Compares pull requests with their base revision and tests the Agents SDK
+# against the proposed package. This catches exported API breaks and downstream
+# incompatibilities that ordinary unit tests can miss.
 name: CI
 on:
   pull_request:

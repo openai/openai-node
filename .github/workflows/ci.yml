@@ -1,3 +1,6 @@
+# Runs the repository's normal lint, build, test, example, and ecosystem checks.
+# These checks catch generated-code, packaging, runtime, and integration
+# regressions; policy-document alignment lives in node-version-policy.yml.
 name: CI
 on:
   push:
@@ -10,6 +13,7 @@ on:
       - '!codegen/**'
       - 'codegen/stl/**'
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     branches-ignore:
       - 'stl-preview-head/**'
       - 'stl-preview-base/**'
@@ -22,7 +26,7 @@ jobs:
     timeout-minutes: 10
     name: lint
     runs-on: ${{ github.repository == 'stainless-sdks/openai-typescript' && 'depot-ubuntu-24.04' || 'ubuntu-latest' }}
-    if: (github.event_name == 'push' || github.event.pull_request.head.repo.fork) && (github.event_name != 'push' || github.event.head_commit.message != 'codegen metadata')
+    if: (github.event_name == 'push' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review') && (github.event_name != 'push' || github.event.head_commit.message != 'codegen metadata')
     permissions:
       contents: read
     steps:
@@ -47,7 +51,7 @@ jobs:
     timeout-minutes: 5
     name: build
     runs-on: ${{ github.repository == 'stainless-sdks/openai-typescript' && 'depot-ubuntu-24.04' || 'ubuntu-latest' }}
-    if: (github.event_name == 'push' || github.event.pull_request.head.repo.fork) && (github.event_name != 'push' || github.event.head_commit.message != 'codegen metadata')
+    if: (github.event_name == 'push' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review') && (github.event_name != 'push' || github.event.head_commit.message != 'codegen metadata')
     permissions:
       contents: read
       id-token: write
@@ -87,20 +91,25 @@ jobs:
           AUTH: ${{ steps.github-oidc.outputs.github_token }}
           SHA: ${{ github.sha }}
         run: ./scripts/utils/upload-artifact.sh
+
   test:
+    name: test (${{ matrix.node-version }})
     timeout-minutes: 10
     runs-on: ${{ github.repository == 'stainless-sdks/openai-typescript' && 'depot-ubuntu-24.04' || 'ubuntu-latest' }}
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.fork
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review'
+    continue-on-error: ${{ matrix.experimental }}
     permissions:
       contents: read
     strategy:
       fail-fast: false
       matrix:
-        # The GitHub-hosted Node 26 alias currently resolves to 26.3.0, where
-        # this full Steady-backed test job surfaced a multipart connection reset.
-        # Pin to 26.2.0 so this still covers Node 26 without changing generated
-        # API-resource tests for a CI-specific failure.
-        node-version: ['20', '22', '24', '26.2.0']
+        include:
+          - node-version: '22'
+            experimental: false
+          - node-version: '24'
+            experimental: false
+          - node-version: '26'
+            experimental: true
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
@@ -126,9 +135,15 @@ jobs:
       - name: Run tests
         run: ./scripts/test
 
+      - name: Test packed npm package
+        if: matrix.experimental == false
+        run: |
+          OPENAI_DISABLE_DENO_BUILD=1 ./scripts/build
+          node --experimental-strip-types scripts/test-packed-package.ts
+
   test_matrix:
-    name: ${{ (github.event_name == 'push' || github.event.pull_request.head.repo.fork) && 'test matrix' || 'test matrix (not run)' }}
-    if: ${{ always() && (github.event_name == 'push' || github.event.pull_request.head.repo.fork) }}
+    name: ${{ (github.event_name == 'push' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review') && 'test matrix' || 'test matrix (not run)' }}
+    if: ${{ always() && (github.event_name == 'push' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review') }}
     needs: test
     runs-on: ubuntu-latest
     permissions: {}
