@@ -17,18 +17,19 @@ If the repository already matches policy, make no file changes.
 
 If it has drifted, prepare one focused change:
 
-1. Update only `package.json#engines.node`; do not alter package scripts,
+1. Update the policy's current compatibility data.
+2. Update only `package.json#engines.node`; do not alter package scripts,
    dependencies, peer dependencies, exports, package-manager metadata, or the
    lockfile.
-2. Update the Node.js version matrix and `LATEST_LTS_NODE_VERSION` in
-   `.github/workflows/ci.yml`. Do not alter workflow triggers, permissions,
-   actions, jobs, steps, scripts, or expressions.
-3. Update `README.md` and the policy's current compatibility data.
-   Update `CONTRIBUTING.md` only if its toolchain guidance changed.
-4. Preserve the public SDK API, CommonJS and ESM exports, emitted `es2020`
+3. Update `.nvmrc` when the recommended repository toolchain changes.
+4. Update `README.md`. Update `CONTRIBUTING.md` only if its toolchain guidance
+   changed.
+5. Do not edit GitHub Actions workflows. CI derives its Node.js test matrix
+   from the policy table through `scripts/check-node-version-policy.ts`.
+6. Preserve the public SDK API, CommonJS and ESM exports, emitted `es2020`
    target, TypeScript support, and Deno, Bun, browser, Workers, edge, Jest, and
    Nitro behavior. Do not edit generated SDK source.
-5. Do not make dependency, lockfile, refactoring, formatting, or unrelated
+7. Do not make dependency, lockfile, refactoring, formatting, or unrelated
    documentation changes.
 
 Do not commit, push, open a pull request, call GitHub, or modify repository

@@ -5,9 +5,6 @@ name: Publish NPM
 on:
   workflow_dispatch:
 
-env:
-  LATEST_LTS_NODE_VERSION: '24'
-
 jobs:
   publish:
     name: publish
@@ -26,7 +23,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3
         with:
-          node-version: ${{ env.LATEST_LTS_NODE_VERSION }}
+          node-version-file: '.nvmrc'
           cache: pnpm
 
       - name: Install dependencies

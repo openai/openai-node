@@ -37,7 +37,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '24'
+          node-version-file: '.nvmrc'
           cache: pnpm
 
       - name: Install dependencies
@@ -77,8 +77,8 @@ jobs:
             Before marking this draft ready, choose the release classification
             required by `NODE_VERSION_POLICY.md` and update the title.
           add-paths: |
+            .nvmrc
             package.json
             README.md
             CONTRIBUTING.md
             NODE_VERSION_POLICY.md
-            .github/workflows/ci.yml

@@ -18,9 +18,6 @@ on:
       - 'stl-preview-head/**'
       - 'stl-preview-base/**'
 
-env:
-  LATEST_LTS_NODE_VERSION: '24'
-
 jobs:
   lint:
     timeout-minutes: 10
@@ -38,7 +35,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: ${{ env.LATEST_LTS_NODE_VERSION }}
+          node-version-file: '.nvmrc'
           cache: pnpm
 
       - name: Bootstrap
@@ -64,7 +61,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: ${{ env.LATEST_LTS_NODE_VERSION }}
+          node-version-file: '.nvmrc'
           cache: pnpm
 
       - name: Bootstrap
@@ -92,8 +89,29 @@ jobs:
           SHA: ${{ github.sha }}
         run: ./scripts/utils/upload-artifact.sh
 
+  node_matrix:
+    name: Read Node.js test matrix
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review'
+    permissions:
+      contents: read
+    outputs:
+      matrix: ${{ steps.policy.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Read policy matrix
+        id: policy
+        run: echo "matrix=$(node --experimental-strip-types scripts/check-node-version-policy.ts --matrix)" >> "$GITHUB_OUTPUT"
+
   test:
     name: test (${{ matrix.node-version }})
+    needs: node_matrix
     timeout-minutes: 10
     runs-on: ${{ github.repository == 'stainless-sdks/openai-typescript' && 'depot-ubuntu-24.04' || 'ubuntu-latest' }}
     if: github.event_name == 'push' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review'
@@ -102,14 +120,7 @@ jobs:
       contents: read
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - node-version: '22'
-            experimental: false
-          - node-version: '24'
-            experimental: false
-          - node-version: '26'
-            experimental: true
+      matrix: ${{ fromJSON(needs.node_matrix.outputs.matrix) }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
@@ -121,7 +132,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: ${{ env.LATEST_LTS_NODE_VERSION }}
+          node-version-file: '.nvmrc'
           cache: pnpm
 
       - name: Bootstrap
@@ -175,7 +186,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: ${{ env.LATEST_LTS_NODE_VERSION }}
+          node-version-file: '.nvmrc'
           cache: pnpm
 
       - name: Install dependencies
@@ -209,7 +220,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: ${{ env.LATEST_LTS_NODE_VERSION }}
+          node-version-file: '.nvmrc'
           cache: pnpm
 
       - uses: denoland/setup-deno@11b63cf76cfcafb4e43f97b6cad24d8e8438f62d # v1

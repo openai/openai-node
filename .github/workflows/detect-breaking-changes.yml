@@ -4,12 +4,10 @@
 name: CI
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     branches:
       - main
       - next
-
-env:
-  LATEST_LTS_NODE_VERSION: '24'
 
 jobs:
   detect_breaking_changes:
@@ -34,7 +32,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3
         with:
-          node-version: ${{ env.LATEST_LTS_NODE_VERSION }}
+          node-version-file: '.nvmrc'
           cache: pnpm
 
       - name: Install dependencies
@@ -54,15 +52,15 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Set up Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: ${{ env.LATEST_LTS_NODE_VERSION }}
-
       # Setup this sdk
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           path: openai-node
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: 'openai-node/.nvmrc'
 
       # openai-agents-js is a pnpm workspace, so this downstream check intentionally
       # uses the pnpm version pinned by this repository while consuming the local SDK.

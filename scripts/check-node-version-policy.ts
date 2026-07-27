@@ -24,11 +24,17 @@
   }
 
   interface MatrixEntry {
-    version: string;
+    'node-version': string;
     experimental: boolean;
   }
 
   const readmePolicyURL = 'https://github.com/openai/openai-node/blob/main/NODE_VERSION_POLICY.md';
+  const options = process.argv.slice(2);
+  assert(
+    options.every((option) => option === '--matrix') && options.length <= 1,
+    'Usage: check-node-version-policy.ts [--matrix]',
+  );
+  const emitMatrix = options.includes('--matrix');
 
   const required = <Value>(value: Value | undefined, message: string): Value => {
     if (value === undefined) {
@@ -43,11 +49,10 @@
   const read = (file: string): string => fs.readFileSync(path.join(root, file), 'utf8');
   const readJSON = <Value>(file: string): Value => JSON.parse(read(file)) as Value;
   const unique = <Value>(values: Value[]): Value[] => [...new Set(values)];
-  const major = (version: string): string =>
-    required(/^(\d+)(?:\.\d+\.\d+)?$/.exec(version)?.[1], `Invalid Node.js version in CI: ${version}`);
 
   const packageJSON = readJSON<PackageMetadata>('package.json');
   const ci = read('.github/workflows/ci.yml');
+  const repositoryNodeVersion = read('.nvmrc').trim();
   const readme = read('README.md');
   const contributing = read('CONTRIBUTING.md');
   const policyDocument = read('NODE_VERSION_POLICY.md');
@@ -56,20 +61,6 @@
   const engineMinimum = required(
     engineMatch?.[1],
     'package.json#engines.node must have the form >=<major>.0.0',
-  );
-
-  const matrixEntries: MatrixEntry[] = Array.from(
-    ci.matchAll(/^\s+- node-version: '([^']+)'\r?\n\s+experimental: (true|false)$/gm),
-    (match) => ({
-      version: required(match[1], 'CI contains an empty Node.js matrix entry'),
-      experimental: match[2] === 'true',
-    }),
-  );
-  assert(matrixEntries.length > 0, 'CI is missing its Node.js version matrix');
-  assert.equal(
-    new Set(matrixEntries.map(({ version }) => version)).size,
-    matrixEntries.length,
-    'CI Node.js matrix contains duplicate versions',
   );
 
   const policyRows: PolicyRow[] = Array.from(
@@ -103,16 +94,20 @@
   const policyForward = policyRows
     .filter(({ status }) => status === 'Forward-tested only')
     .map(({ major: version }) => version);
-  const matrixSupported = matrixEntries
-    .filter(({ experimental }) => !experimental)
-    .map(({ version }) => version);
-  const matrixForward = matrixEntries
-    .filter(({ experimental }) => experimental)
-    .map(({ version }) => version);
+  const matrixEntries: MatrixEntry[] = [
+    ...policySupported.map((version) => ({
+      'node-version': version,
+      experimental: false,
+    })),
+    ...policyForward.map((version) => ({
+      'node-version': version,
+      experimental: true,
+    })),
+  ];
 
   assert(
-    matrixSupported.every((version) => /^\d+$/.test(version)),
-    'Supported CI versions must be major lines',
+    [...policySupported, ...policyForward].every((version) => /^\d+$/.test(version)),
+    'Policy matrix versions must be major lines',
   );
   assert.deepEqual(
     policyRows.map(({ major: version }) => version),
@@ -121,21 +116,7 @@
       .map(({ major: version }) => version),
     'NODE_VERSION_POLICY.md compatibility rows must be ordered by major',
   );
-  assert.equal(
-    new Set(matrixForward.map(major)).size,
-    matrixForward.length,
-    'Experimental CI must contain at most one entry per Node.js major',
-  );
-  assert.deepEqual(
-    matrixSupported.map(major),
-    policySupported,
-    'Blocking CI versions must exactly match supported policy lines',
-  );
-  assert.deepEqual(
-    unique(matrixForward.map(major)),
-    policyForward,
-    'Experimental CI versions must exactly match forward-tested policy lines',
-  );
+  assert(matrixEntries.length > 0, 'Policy produces an empty Node.js test matrix');
 
   const policyMinimum = policyRows.filter(({ status }) => status === 'Supported minimum');
   const policyRecommended = policyRows.filter(({ status }) => status === 'Supported and recommended');
@@ -156,16 +137,14 @@
     'The engine minimum must be the oldest supported Node.js line',
   );
 
-  const latestLTSMatch = ci.match(/^\s*LATEST_LTS_NODE_VERSION: '([^']+)'$/m);
-  const recommended = required(latestLTSMatch?.[1], 'CI is missing LATEST_LTS_NODE_VERSION');
   assert.equal(
     required(policyRecommended[0], 'Policy is missing its recommended line').major,
-    recommended,
-    'LATEST_LTS_NODE_VERSION must match the recommended policy line',
+    repositoryNodeVersion,
+    '.nvmrc must match the recommended policy line',
   );
   assert.equal(
     required(policySupported[policySupported.length - 1], 'Policy has no supported Node.js lines'),
-    recommended,
+    repositoryNodeVersion,
     'The recommended Node.js line must be the newest supported line',
   );
 
@@ -189,17 +168,22 @@
     ci.includes('scripts/test-packed-package.ts'),
     'CI does not test the packed npm artifact on supported Node.js lines',
   );
+  assert(
+    ci.includes('scripts/check-node-version-policy.ts --matrix'),
+    'CI does not read its Node.js matrix from the policy checker',
+  );
+  assert(
+    ci.includes('fromJSON(needs.node_matrix.outputs.matrix)'),
+    'CI does not consume the policy-generated Node.js matrix',
+  );
 
-  for (const version of matrixForward.filter((version) => version.includes('.'))) {
-    assert(
-      policyDocument.includes(`\`${version}\``),
-      `NODE_VERSION_POLICY.md must document the temporary Node.js ${version} pin`,
+  if (emitMatrix) {
+    process.stdout.write(JSON.stringify({ include: matrixEntries }));
+  } else {
+    console.log(
+      `Node.js policy is aligned: minimum ${engineMinimum}; supported ${policySupported.join(
+        ', ',
+      )}; forward-tested ${policyForward.join(', ') || 'none'}.`,
     );
   }
-
-  console.log(
-    `Node.js policy is aligned: minimum ${engineMinimum}; supported ${matrixSupported.join(
-      ', ',
-    )}; forward-tested ${matrixForward.join(', ') || 'none'}.`,
-  );
 })();

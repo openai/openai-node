@@ -54,9 +54,10 @@ exact version must be named in its release notes.
 ## Automation
 
 This document is the sole lifecycle and release policy. The README,
-`package.json#engines.node`, and the required CI matrix are projections of it.
-The type-checked `scripts/check-node-version-policy.ts` fails when those
-projections drift.
+`package.json#engines.node`, and `.nvmrc` are projections of it. Required CI
+derives its runtime matrix directly from the compatibility table. The
+type-checked `scripts/check-node-version-policy.ts` fails when those projections
+drift and emits the matrix consumed by CI.
 
 Each month, `.github/workflows/node-version-review.yml` asks Codex to research
 the official Node.js schedule, reconcile the policy artifacts, run repository

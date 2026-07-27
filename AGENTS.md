@@ -11,8 +11,8 @@ explicitly requires it.
 
 `NODE_VERSION_POLICY.md` is the sole authority for lifecycle, deprecation,
 exception, and release rules. Read and apply it rather than copying its rules
-into agent instructions. `package.json#engines.node`, the README, and CI are
-enforcement projections of that policy.
+into agent instructions. `package.json#engines.node`, `.nvmrc`, and the README
+are enforcement projections; CI derives its runtime matrix from the policy.
 
 Keep Node.js policy changes focused and keep the consumer runtime floor
 separate from repository tooling requirements. After changing a policy
