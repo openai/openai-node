@@ -1,5 +1,24 @@
 # Changelog
 
+## 7.0.0 (2026-07-27)
+
+Full Changelog: [v6.49.0...v7.0.0](https://github.com/openai/openai-node/compare/v6.49.0...v7.0.0)
+
+### ⚠ BREAKING CHANGES
+
+* require Node.js 22 and codify version support ([#2026](https://github.com/openai/openai-node/issues/2026))
+
+### Features
+
+* require Node.js 22 and codify version support ([#2026](https://github.com/openai/openai-node/issues/2026)) ([9185cdd](https://github.com/openai/openai-node/commit/9185cdd02fbf4b6cac7cbedce3417e33db3ea790))
+
+
+### Build System
+
+* **deps:** bump fast-uri in /ecosystem-tests/ts-browser-webpack ([#2027](https://github.com/openai/openai-node/issues/2027)) ([c6a46b8](https://github.com/openai/openai-node/commit/c6a46b838d9d8c099b1d903db3327e82ac400b60))
+* **deps:** bump fast-uri in /ecosystem-tests/vercel-edge ([#2024](https://github.com/openai/openai-node/issues/2024)) ([8e775cf](https://github.com/openai/openai-node/commit/8e775cf1b6aeb1011091b92d0fc759a559a02f5d))
+* **deps:** bump next from 15.5.20 to 15.5.21 ([#2025](https://github.com/openai/openai-node/issues/2025)) ([09f0b5e](https://github.com/openai/openai-node/commit/09f0b5eb4829e54f02e2b05c86178b182f40c88f))
+
 ## 6.49.0 (2026-07-23)
 
 Full Changelog: [v6.48.0...v6.49.0](https://github.com/openai/openai-node/compare/v6.48.0...v6.49.0)
