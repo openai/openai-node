@@ -753,4 +753,87 @@ describe('.stream()', () => {
     `);
     expect(capturedLogProbs?.length).toEqual(choice?.logprobs?.refusal?.length);
   });
+
+  it('handles custom tool calls in stream chunks', async () => {
+    const chunk1: OpenAI.Chat.ChatCompletionChunk = {
+      id: 'chatcmpl-stream-custom',
+      object: 'chat.completion.chunk',
+      created: 100,
+      model: 'gpt-4o',
+      choices: [
+        {
+          index: 0,
+          delta: {
+            role: 'assistant',
+            tool_calls: [
+              {
+                index: 0,
+                id: 'call_custom_123',
+                type: 'custom' as any,
+                custom: {
+                  name: 'my_custom_tool',
+                  input: '{"foo":',
+                },
+              } as any,
+            ],
+          },
+          finish_reason: null,
+        },
+      ],
+    };
+
+    const chunk2: OpenAI.Chat.ChatCompletionChunk = {
+      id: 'chatcmpl-stream-custom',
+      object: 'chat.completion.chunk',
+      created: 101,
+      model: 'gpt-4o',
+      choices: [
+        {
+          index: 0,
+          delta: {
+            tool_calls: [
+              {
+                index: 0,
+                custom: {
+                  input: '"bar"}',
+                },
+              } as any,
+            ],
+          },
+          finish_reason: 'stop',
+        },
+      ],
+    };
+
+    const client = {
+      chat: {
+        completions: {
+          create: jest.fn(async () => ({
+            controller: new AbortController(),
+            async *[Symbol.asyncIterator]() {
+              yield chunk1;
+              yield chunk2;
+            },
+          })),
+        },
+      },
+    } as unknown as OpenAI;
+
+    const stream = ChatCompletionStream.createChatCompletion(client, {
+      model: 'gpt-4o',
+      messages: [{ role: 'user', content: 'test' }],
+    });
+
+    const completion = await stream.finalChatCompletion();
+    expect(completion.choices[0]?.message.tool_calls).toEqual([
+      {
+        id: 'call_custom_123',
+        type: 'custom',
+        custom: {
+          name: 'my_custom_tool',
+          input: '{"foo":"bar"}',
+        },
+      },
+    ]);
+  });
 });

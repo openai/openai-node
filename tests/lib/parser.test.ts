@@ -1406,3 +1406,49 @@ describe.each([
     });
   });
 });
+
+describe('custom tool calls', () => {
+  it('parses chat completion with custom tool calls without error', () => {
+    const { maybeParseChatCompletion } = require('openai/lib/parser');
+    const completion = {
+      id: 'chatcmpl-custom-1',
+      object: 'chat.completion',
+      created: 123456789,
+      model: 'gpt-4o',
+      choices: [
+        {
+          index: 0,
+          finish_reason: 'stop',
+          logprobs: null,
+          message: {
+            role: 'assistant',
+            content: null,
+            refusal: null,
+            tool_calls: [
+              {
+                id: 'call_custom_1',
+                type: 'custom',
+                custom: {
+                  name: 'my_custom_tool',
+                  input: '{"key":"value"}',
+                },
+              },
+            ],
+          },
+        },
+      ],
+    };
+
+    const parsed = maybeParseChatCompletion(completion, null);
+    expect(parsed.choices[0].message.tool_calls).toEqual([
+      {
+        id: 'call_custom_1',
+        type: 'custom',
+        custom: {
+          name: 'my_custom_tool',
+          input: '{"key":"value"}',
+        },
+      },
+    ]);
+  });
+});
