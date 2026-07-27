@@ -254,6 +254,52 @@ describe('.stream()', () => {
     }
     expect(final.output_text).toBe('The answer is 42');
   });
+
+  it('rejects with Response error message when finalResponse() is called without producing a response', async () => {
+    const stream = new ResponseStream(null);
+    stream._emit('end');
+    await expect(stream.finalResponse()).rejects.toThrowError('stream ended without producing a Response');
+  });
+
+  it('safely accumulates deltas when properties are uninitialized', async () => {
+    const events: ResponseStreamEvent[] = [
+      {
+        type: 'response.created',
+        sequence_number: 0,
+        response: makeResponse(),
+      },
+      {
+        type: 'response.output_item.added',
+        sequence_number: 1,
+        output_index: 0,
+        item: {
+          id: 'call_123',
+          type: 'function_call',
+          call_id: 'call_123',
+          name: 'get_weather',
+          arguments: '',
+          status: 'in_progress',
+        },
+      },
+      {
+        type: 'response.function_call_arguments.delta',
+        sequence_number: 2,
+        item_id: 'call_123',
+        output_index: 0,
+        delta: '{"loc',
+      },
+    ];
+
+    const stream = ResponseStream.fromReadableStream(readableStreamFromEvents(events));
+    for await (const _ of stream) {
+    }
+
+    const final = await stream.finalResponse();
+    expect(final.output[0]).toMatchObject({
+      type: 'function_call',
+      arguments: '{"loc',
+    });
+  });
 });
 
 function readableStreamFromEvents(events: ResponseStreamEvent[]) {

@@ -289,12 +289,12 @@ export class ResponseStream<ParsedT = null>
 
   /**
    * @returns a promise that resolves with the final Response, or rejects
-   * if an error occurred or the stream ended prematurely without producing a REsponse.
+   * if an error occurred or the stream ended prematurely without producing a Response.
    */
   async finalResponse(): Promise<ParsedResponse<ParsedT>> {
     await this.done();
     const response = this.#finalResponse;
-    if (!response) throw new OpenAIError('stream ended without producing a ChatCompletion');
+    if (!response) throw new OpenAIError('stream ended without producing a Response');
     return response;
   }
 }
