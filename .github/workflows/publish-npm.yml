@@ -1,11 +1,9 @@
-# This workflow publishes the package to NPM.
-# You can run this workflow manually by navigating to https://www.github.com/openai/openai-node/actions/workflows/publish-npm.yml
+# Manually publishes the current reviewed package to npm. This provides an
+# explicit recovery path when npm publication is not completed by the normal
+# release workflow.
 name: Publish NPM
 on:
   workflow_dispatch:
-
-env:
-  LATEST_LTS_NODE_VERSION: '24'
 
 jobs:
   publish:
@@ -25,7 +23,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3
         with:
-          node-version: ${{ env.LATEST_LTS_NODE_VERSION }}
+          node-version-file: '.nvmrc'
           cache: pnpm
 
       - name: Install dependencies

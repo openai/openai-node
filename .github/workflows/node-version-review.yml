@@ -1,0 +1,84 @@
+# Asks Codex once a month to compare this repository with the official Node.js
+# lifecycle, make any needed support-policy edits, validate them, and open a
+# draft pull request. If nothing has drifted, the run makes no pull request.
+# Because GitHub suppresses CI events for its own token, checks start when a
+# maintainer marks the draft ready; human review is always required before merge.
+name: Monthly Node.js version review
+
+on:
+  schedule:
+    - cron: '17 14 1 * *'
+  workflow_dispatch:
+
+concurrency:
+  group: monthly-node-version-review
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  review:
+    if: github.repository == 'openai/openai-node' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: ci
+    steps:
+      - name: Check out main
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Ask Codex to review Node.js support
+        id: codex
+        uses: openai/codex-action@52fe01ec70a42f454c9d2ebd47598f9fd6893d56 # v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt-file: .github/codex/prompts/node-version-review.md
+          codex-version: '0.144.6'
+          codex-args: '["--search","--ephemeral"]'
+          permission-profile: ':workspace'
+          safety-strategy: drop-sudo
+
+      - name: Validate the repository
+        run: |
+          node --experimental-strip-types scripts/check-node-version-policy.ts
+          pnpm lint
+          pnpm test
+
+      - name: Open or update the draft pull request
+        uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7
+        with:
+          token: ${{ github.token }}
+          branch: codex/monthly-node-version-update
+          delete-branch: true
+          draft: always-true
+          commit-message: 'chore(node): review supported Node.js versions'
+          title: 'chore(node): review supported Node.js versions'
+          body: |
+            Automated monthly review of the Node.js support policy.
+
+            ${{ steps.codex.outputs.final-message }}
+
+            Before marking this draft ready, choose the release classification
+            required by `NODE_VERSION_POLICY.md` and update the title.
+          add-paths: |
+            .nvmrc
+            package.json
+            README.md
+            CONTRIBUTING.md
+            NODE_VERSION_POLICY.md

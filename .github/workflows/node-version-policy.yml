@@ -1,0 +1,30 @@
+# Checks `main` after each merge to ensure package metadata, documentation, and
+# the CI runtime matrix still agree. It reports policy drift without adding
+# another pull-request check or changing normal CI behavior.
+name: Node.js support policy
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  policy:
+    timeout-minutes: 5
+    name: Node.js support policy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Check Node.js support policy
+        run: node --experimental-strip-types scripts/check-node-version-policy.ts

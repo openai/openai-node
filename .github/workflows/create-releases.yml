@@ -1,11 +1,11 @@
+# Watches the default branch for release-please output, then publishes newly
+# created SDK releases to npm and JSR. Keeping both registries in one workflow
+# ensures they are released from the same reviewed commit.
 name: Create releases
 on:
   push:
     branches:
       - main
-
-env:
-  LATEST_LTS_NODE_VERSION: '24'
 
 jobs:
   release:
@@ -34,7 +34,7 @@ jobs:
         if: ${{ steps.release.outputs.releases_created }}
         uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3
         with:
-          node-version: ${{ env.LATEST_LTS_NODE_VERSION }}
+          node-version-file: '.nvmrc'
           cache: pnpm
 
       - name: Install dependencies

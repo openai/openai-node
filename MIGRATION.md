@@ -8,7 +8,7 @@ The main changes are that the SDK now relies on the [builtin Web fetch API](http
 
 The minimum supported runtime and tooling versions are now:
 
-- Node.js 20 LTS (Most recent non-EOL Node version)
+- Node.js 22 LTS
 - TypeScript 4.9
 - Jest 28
 
