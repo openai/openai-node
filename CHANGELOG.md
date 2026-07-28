@@ -1,5 +1,18 @@
 # Changelog
 
+## 7.1.0 (2026-07-28)
+
+Full Changelog: [v7.0.0...v7.1.0](https://github.com/openai/openai-node/compare/v7.0.0...v7.1.0)
+
+### Features
+
+* **api:** transcription model updates ([b35ca14](https://github.com/openai/openai-node/commit/b35ca14883ed662c81fa75a058dbd1aab4de1db3))
+
+
+### Chores
+
+* **internal:** codegen related update ([ee871e5](https://github.com/openai/openai-node/commit/ee871e58616be2c9f16bfd26cef23ca024690839))
+
 ## 7.0.0 (2026-07-27)
 
 Full Changelog: [v6.49.0...v7.0.0](https://github.com/openai/openai-node/compare/v6.49.0...v7.0.0)
