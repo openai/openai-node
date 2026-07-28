@@ -29,7 +29,9 @@ describe('resource calls', () => {
           noise_reduction: { type: 'near_field' },
           transcription: {
             delay: 'minimal',
+            keywords: ['string'],
             language: 'language',
+            languages: ['string'],
             model: 'whisper-1',
             prompt: 'prompt',
           },

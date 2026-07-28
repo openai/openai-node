@@ -160,6 +160,7 @@ Types:
 - <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionDiarized</a></code>
 - <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionDiarizedSegment</a></code>
 - <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionInclude</a></code>
+- <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionLanguage</a></code>
 - <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionSegment</a></code>
 - <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionStreamEvent</a></code>
 - <code><a href="./src/resources/audio/transcriptions.ts">TranscriptionTextDeltaEvent</a></code>

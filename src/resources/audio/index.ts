@@ -8,6 +8,7 @@ export {
   type TranscriptionDiarized,
   type TranscriptionDiarizedSegment,
   type TranscriptionInclude,
+  type TranscriptionLanguage,
   type TranscriptionSegment,
   type TranscriptionStreamEvent,
   type TranscriptionTextDeltaEvent,
