@@ -3,6 +3,7 @@
 import { APIResource } from '../../core/resource';
 import * as RealtimeAPI from './realtime';
 import * as Shared from '../shared';
+import * as TranscriptionsAPI from '../audio/transcriptions';
 import * as CallsAPI from './calls';
 import { CallAcceptParams, CallReferParams, CallRejectParams, Calls } from './calls';
 import * as ClientSecretsAPI from './client-secrets';
@@ -30,6 +31,12 @@ export interface AudioTranscription {
   delay?: 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
 
   /**
+   * Words or phrases to guide transcription of the input audio. Supported by
+   * `gpt-transcribe` and `gpt-live-transcribe`.
+   */
+  keywords?: Array<string>;
+
+  /**
    * The language of the input audio. Supplying the input language in
    * [ISO-639-1](https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes) (e.g. `en`)
    * format will improve accuracy and latency.
@@ -37,14 +44,24 @@ export interface AudioTranscription {
   language?: string;
 
   /**
+   * Possible languages of the input audio, in
+   * [ISO-639-1](https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes) format.
+   * Supported by `gpt-transcribe` and `gpt-live-transcribe`.
+   */
+  languages?: Array<string>;
+
+  /**
    * The model to use for transcription. Current options are `whisper-1`,
-   * `gpt-4o-mini-transcribe`, `gpt-4o-mini-transcribe-2025-12-15`,
-   * `gpt-4o-transcribe`, `gpt-4o-transcribe-diarize`, and `gpt-realtime-whisper`.
-   * Use `gpt-4o-transcribe-diarize` when you need diarization with speaker labels.
+   * `gpt-transcribe`, `gpt-live-transcribe`, `gpt-4o-mini-transcribe`,
+   * `gpt-4o-mini-transcribe-2025-12-15`, `gpt-4o-transcribe`,
+   * `gpt-4o-transcribe-diarize`, and `gpt-realtime-whisper`. Use
+   * `gpt-4o-transcribe-diarize` when you need diarization with speaker labels.
    */
   model?:
     | (string & {})
     | 'whisper-1'
+    | 'gpt-transcribe'
+    | 'gpt-live-transcribe'
     | 'gpt-4o-mini-transcribe'
     | 'gpt-4o-mini-transcribe-2025-12-15'
     | 'gpt-4o-transcribe'
@@ -347,6 +364,12 @@ export interface ConversationItemInputAudioTranscriptionCompletedEvent {
   usage:
     | ConversationItemInputAudioTranscriptionCompletedEvent.TranscriptTextUsageTokens
     | ConversationItemInputAudioTranscriptionCompletedEvent.TranscriptTextUsageDuration;
+
+  /**
+   * The languages detected in the audio. Returned by `gpt-transcribe`. An empty
+   * array indicates that no language could be reliably detected.
+   */
+  languages?: Array<TranscriptionsAPI.TranscriptionLanguage>;
 
   /**
    * The log probabilities of the transcription.
