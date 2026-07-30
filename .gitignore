@@ -3,8 +3,8 @@
 node_modules
 yarn-error.log
 codegen.log
-Brewfile.lock.json
 dist
+/coverage
 /oidc
 /*.tgz
 .idea/
@@ -15,3 +15,5 @@ ecosystem-tests/*/openai.tgz
 .dev.vars
 .eslintcache
 oidc
+/benchmark-results.json
+/benchmark-environment.json

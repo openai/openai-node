@@ -14,6 +14,8 @@ for (const key of ['types', 'main', 'module']) {
 }
 
 delete pkgJson.devDependencies;
+delete pkgJson.scripts.bench;
+delete pkgJson.scripts['bench:json'];
 delete pkgJson.scripts.prepack;
 delete pkgJson.scripts.prepublishOnly;
 delete pkgJson.scripts.prepare;
