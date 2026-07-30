@@ -6,6 +6,7 @@ codegen.log
 Brewfile.lock.json
 dist
 dist-deno
+/coverage
 /oidc
 /*.tgz
 .idea/

@@ -21,6 +21,9 @@
   },
   "scripts": {
     "test": "./scripts/test",
+    "test:unit": "OPENAI_TEST_SUITE=unit jest --runInBand",
+    "test:generated": "OPENAI_TEST_SUITE=generated ./scripts/test",
+    "test:coverage": "OPENAI_TEST_SUITE=all ./scripts/test --coverage",
     "test:live:bedrock": "jest --config jest.live.config.ts --runInBand tests/live/bedrock.live.test.ts",
     "build": "./scripts/build",
     "prepublishOnly": "echo 'to publish, run pnpm build && (cd dist; npm publish)' && exit 1",
