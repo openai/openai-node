@@ -54,7 +54,7 @@
   const ci = read('.github/workflows/ci.yml');
   const repositoryNodeVersion = read('.nvmrc').trim();
   const readme = read('README.md');
-  const contributing = read('CONTRIBUTING.md');
+  const contributing = read('.github/CONTRIBUTING.md');
   const policyDocument = read('NODE_VERSION_POLICY.md');
 
   const engineMatch = /^>=(\d+)\.0\.0$/.exec(packageJSON.engines?.node ?? '');
@@ -163,7 +163,10 @@
     'README Node.js versions must exactly match supported policy lines',
   );
   assert(readme.includes(`](${readmePolicyURL})`), 'README does not link to the published Node.js policy');
-  assert(contributing.includes('(NODE_VERSION_POLICY.md)'), 'CONTRIBUTING does not link the Node.js policy');
+  assert(
+    contributing.includes('(../NODE_VERSION_POLICY.md)'),
+    '.github/CONTRIBUTING.md does not link the Node.js policy',
+  );
   assert(
     ci.includes('scripts/test-packed-package.ts'),
     'CI does not test the packed npm artifact on supported Node.js lines',

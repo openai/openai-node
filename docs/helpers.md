@@ -394,7 +394,7 @@ completion object for you).
 
 If you need to cancel a stream, you can `break` from a `for await` loop or call `stream.abort()`.
 
-See an example of streaming helpers in action in [`examples/stream.ts`](examples/stream.ts).
+See an example of streaming helpers in action in [`examples/stream.ts`](../examples/stream.ts).
 
 ### Automated function calls
 
@@ -487,7 +487,7 @@ adjusting `maxChatCompletions` in the request options object. Note that `max_tok
 chat completion request, not for the entire call run.
 
 See an example of automated function calls in action in
-[`examples/tool-call-helpers.ts`](examples/tool-call-helpers.ts).
+[`examples/tool-call-helpers.ts`](../examples/tool-call-helpers.ts).
 
 Note, `runFunctions` was also previously available, but has been deprecated in favor of `runTools`.
 
@@ -521,13 +521,13 @@ The event fired when a message from the `assistant` is received from the API.
 The event fired when a chunk from the `assistant` is received from the API. The `delta` argument contains the
 content of the chunk, while the `snapshot` returns the accumulated content for the current message.
 
-#### `.on('functionCall', (functionCall: ChatCompletionMessage.FunctionCall) => …)`
+#### `.on('functionToolCall', (functionCall: ChatCompletionMessageFunctionToolCall.Function) => …)`
 
 The event fired when a function call is made by the assistant.
 
-#### `.on('functionCallResult', (content: string) => …)`
+#### `.on('functionToolCallResult', (content: string) => …)`
 
-The event fired when the function runner responds to the function call with `role: "function"`. The `content` of the
+The event fired when the function runner responds to the function call with `role: "tool"`. The `content` of the
 response is given as the first argument to the callback.
 
 #### `.on('content.delta', (props: ContentDeltaEvent) => ...)`
@@ -617,13 +617,13 @@ message.
 
 The event fired for the last message.
 
-#### `.on('finalFunctionCall', (functionCall: ChatCompletionMessage.FunctionCall) => …)`
+#### `.on('finalFunctionToolCall', (functionCall: ChatCompletionMessageFunctionToolCall.Function) => …)`
 
-The event fired for the last message with a defined `function_call`.
+The event fired for the last assistant message containing a function tool call.
 
-#### `.on('finalFunctionCallResult', (content: string) => …)`
+#### `.on('finalFunctionToolCallResult', (content: string) => …)`
 
-The event fired for the last message with a `role: "function"`.
+The event fired for the last message with a `role: "tool"`.
 
 #### `.on('error', (error: OpenAIError) => …)`
 
@@ -659,9 +659,10 @@ An empty promise which resolves when the stream is done.
 A promise which resolves with the final chat completion that was received from the API. Throws if the request
 ends before a complete chat completion is returned.
 
-#### `await .allChatCompletions()`
+#### `.allChatCompletions()`
 
-A promise which resolves with The array of all chat completions that were received from the API.
+Returns the array of chat completions received so far. Await `.done()` first when you need the complete
+list.
 
 #### `await .finalContent()`
 
@@ -672,14 +673,14 @@ can be found.
 
 A promise which resolves with the last message.
 
-#### `await .finalFunctionCall()`
+#### `await .finalFunctionToolCall()`
 
-A promise which resolves with the last message with a defined `function_call`. Throws if no such message is
+A promise which resolves with the last function tool call, or `undefined` if no function tool call is found.
+
+#### `await .finalFunctionToolCallResult()`
+
+A promise which resolves with the last function tool result, or `undefined` if no matching tool message is
 found.
-
-#### `await .finalFunctionCallResult()`
-
-A promise which resolves with the last message with a `role: "function"`. Throws if no such message is found.
 
 #### `await .totalUsage()` (without `stream`, usage is not currently reported with `stream`)
 
@@ -824,15 +825,15 @@ async function getWeather(args: z.infer<typeof GetWeatherParameters>) {
 main();
 ```
 
-See a more fully-fledged example in [`examples/tool-call-helpers-zod.ts`](examples/tool-call-helpers-zod.ts).
+See a more fully-fledged example in [`examples/tool-call-helpers-zod.ts`](../examples/tool-call-helpers-zod.ts).
 
 #### Integrate with Next.JS
 
-See an example of a Next.JS integration here [`examples/stream-to-client-next.ts`](examples/stream-to-client-next.ts).
+See an example of a Next.JS integration here [`examples/stream-to-client-next.ts`](../examples/stream-to-client-next.ts).
 
 #### Proxy Streaming to a Browser
 
-See an example of using express to stream to a browser here [`examples/stream-to-client-express.ts`](examples/stream-to-client-express.ts).
+See an example of using express to stream to a browser here [`examples/stream-to-client-express.ts`](../examples/stream-to-client-express.ts).
 
 # Polling Helpers
 
