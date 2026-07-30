@@ -31,18 +31,21 @@ modify the contents of the `src/lib/` and `examples/` directories.
 ## Adding and running examples
 
 All files in the `examples/` directory are not modified by the generator and can be freely edited or added to.
+Use [`examples/README.md`](examples/README.md) to find the closest existing example and keep new examples
+focused on one supported SDK or API behavior. When adding, removing, or renaming an example, update both
+the README and [`examples/manifest.json`](examples/manifest.json), then run `pnpm check:examples`.
 
 ```ts
-// add an example to examples/<your-example>.ts
+// add an example to examples/<category>/<your-example>.ts
 
 #!/usr/bin/env -S npm run tsn -- -T
 …
 ```
 
 ```sh
-$ chmod +x examples/<your-example>.ts
+$ chmod +x examples/<category>/<your-example>.ts
 # run the example against your api
-$ npm run tsn -- -T examples/<your-example>.ts
+$ pnpm tsn examples/<category>/<your-example>.ts
 ```
 
 ## Using the repository from source

@@ -33,6 +33,9 @@ echo "==> Running prettier --check"
 echo "==> Running eslint"
 ./node_modules/.bin/eslint .
 
+echo "==> Checking examples catalog"
+node scripts/check-examples.cjs
+
 echo "==> Building"
 ./scripts/build
 

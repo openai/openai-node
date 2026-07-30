@@ -23,6 +23,7 @@
     "test": "./scripts/test",
     "test:live:bedrock": "jest --config jest.live.config.ts --runInBand tests/live/bedrock.live.test.ts",
     "build": "./scripts/build",
+    "check:examples": "node scripts/check-examples.cjs",
     "prepublishOnly": "echo 'to publish, run pnpm build && (cd dist; npm publish)' && exit 1",
     "format": "./scripts/format",
     "prepare": "if ./scripts/utils/check-is-in-git-install.sh; then ./scripts/build && ./scripts/utils/git-swap.sh; fi",
