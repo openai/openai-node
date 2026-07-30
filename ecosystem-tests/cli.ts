@@ -104,13 +104,25 @@ const projectRunners = {
     };
     await fs.writeFile('package.json', JSON.stringify(packageJson, null, 2) + '\n');
 
-    const packFile = getPackFile();
-    await fs.copyFile(packFile, `./${TAR_NAME}`);
-    await run('deno', ['task', 'install']);
+    if (state.fromNpm) {
+      await run('npm', [
+        'install',
+        '--ignore-scripts',
+        '--no-package-lock',
+        '--no-audit',
+        '--no-fund',
+        '--no-save',
+        state.fromNpm,
+      ]);
+    } else {
+      const packFile = getPackFile();
+      await fs.copyFile(packFile, `./${TAR_NAME}`);
+      await run('deno', ['task', 'install']);
+    }
 
     // Deno's BYONM resolver requires package.json to declare the npm
-    // dependency, but add that declaration only after npm installs the
-    // local tarball so it cannot substitute a registry package.
+    // dependency. For the default path, add that declaration only after npm
+    // installs the local tarball so it cannot substitute a registry package.
     const installedPackage = JSON.parse(await fs.readFile('node_modules/openai/package.json', 'utf8'));
     assert(typeof installedPackage.version === 'string');
     await fs.writeFile(
@@ -659,6 +671,7 @@ export const packageDir = async (): Promise<string> => {
 // terminated
 const fileCache = (() => {
   const filesToCache: Array<string> = ['package.json', 'package-lock.json', 'deno.lock', 'bun.lockb'];
+  const generatedFilesToRemove = new Set(['deno/package.json']);
 
   return {
     // Copy existing files from each ecosystem-tests project folder to the ./tmp folder
@@ -694,9 +707,12 @@ const fileCache = (() => {
         for (let j = 0; j < filesToCache.length; j++) {
           const fileName = filesToCache[j] || '';
 
-          const filePath = path.resolve(tmpProjectPath, fileName);
-          if (await fileExists(filePath)) {
-            await fs.rename(filePath, path.resolve(projectPath, fileName));
+          const cachedFilePath = path.resolve(tmpProjectPath, fileName);
+          const projectFilePath = path.resolve(projectPath, fileName);
+          if (await fileExists(cachedFilePath)) {
+            await fs.rename(cachedFilePath, projectFilePath);
+          } else if (generatedFilesToRemove.has(path.join(projectName, fileName))) {
+            await fs.rm(projectFilePath, { force: true });
           }
         }
         await fs.rmdir(tmpProjectPath);
