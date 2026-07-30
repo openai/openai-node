@@ -1385,9 +1385,13 @@ export interface BetaResponse {
    *   will use 'default'.
    * - If set to 'default', then the request will be processed with the standard
    *   pricing and performance for the selected model.
-   * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)' or
-   *   '[priority](https://openai.com/api-priority-processing/)', then the request
-   *   will be processed with the corresponding service tier.
+   * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)',
+   *   then the request will be processed with the Flex Processing service tier.
+   * - To opt-in to [Fast mode](/api/docs/guides/fast-mode) at the request level,
+   *   include the `service_tier=fast` or `service_tier=priority` parameter for
+   *   Responses or Chat Completions. The response will show `service_tier=priority`
+   *   regardless of if you specify `service_tier=fast` or `priority` in your
+   *   request.
    * - When not set, the default behavior is 'auto'.
    *
    * When the `service_tier` parameter is set, the response body will include the
@@ -1395,7 +1399,7 @@ export interface BetaResponse {
    * request. This response value may be different from the value set in the
    * parameter.
    */
-  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | null;
+  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | 'fast' | null;
 
   /**
    * The status of the response generation. One of `completed`, `failed`,
@@ -10459,9 +10463,13 @@ export namespace BetaResponsesClientEvent {
      *   will use 'default'.
      * - If set to 'default', then the request will be processed with the standard
      *   pricing and performance for the selected model.
-     * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)' or
-     *   '[priority](https://openai.com/api-priority-processing/)', then the request
-     *   will be processed with the corresponding service tier.
+     * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)',
+     *   then the request will be processed with the Flex Processing service tier.
+     * - To opt-in to [Fast mode](/api/docs/guides/fast-mode) at the request level,
+     *   include the `service_tier=fast` or `service_tier=priority` parameter for
+     *   Responses or Chat Completions. The response will show `service_tier=priority`
+     *   regardless of if you specify `service_tier=fast` or `priority` in your
+     *   request.
      * - When not set, the default behavior is 'auto'.
      *
      * When the `service_tier` parameter is set, the response body will include the
@@ -10469,7 +10477,7 @@ export namespace BetaResponsesClientEvent {
      * request. This response value may be different from the value set in the
      * parameter.
      */
-    service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | null;
+    service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | 'fast' | null;
 
     /**
      * Whether to store the generated model response for later retrieval via API.
@@ -11832,9 +11840,13 @@ export interface ResponseCreateParamsBase {
    *   will use 'default'.
    * - If set to 'default', then the request will be processed with the standard
    *   pricing and performance for the selected model.
-   * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)' or
-   *   '[priority](https://openai.com/api-priority-processing/)', then the request
-   *   will be processed with the corresponding service tier.
+   * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)',
+   *   then the request will be processed with the Flex Processing service tier.
+   * - To opt-in to [Fast mode](/api/docs/guides/fast-mode) at the request level,
+   *   include the `service_tier=fast` or `service_tier=priority` parameter for
+   *   Responses or Chat Completions. The response will show `service_tier=priority`
+   *   regardless of if you specify `service_tier=fast` or `priority` in your
+   *   request.
    * - When not set, the default behavior is 'auto'.
    *
    * When the `service_tier` parameter is set, the response body will include the
@@ -11842,7 +11854,7 @@ export interface ResponseCreateParamsBase {
    * request. This response value may be different from the value set in the
    * parameter.
    */
-  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | null;
+  service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | 'fast' | null;
 
   /**
    * Body param: Whether to store the generated model response for later retrieval

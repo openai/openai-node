@@ -1,5 +1,13 @@
 # Changelog
 
+## 7.2.0 (2026-07-30)
+
+Full Changelog: [v7.1.0...v7.2.0](https://github.com/openai/openai-node/compare/v7.1.0...v7.2.0)
+
+### Features
+
+* **api:** fast tier ([84dffed](https://github.com/openai/openai-node/commit/84dffedd7f238abac249671409ad11bdddc80567))
+
 ## 7.1.0 (2026-07-28)
 
 Full Changelog: [v7.0.0...v7.1.0](https://github.com/openai/openai-node/compare/v7.0.0...v7.1.0)
