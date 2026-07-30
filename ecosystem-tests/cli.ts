@@ -97,15 +97,38 @@ const projectRunners = {
       await run('bun', ['test']);
     }
   },
-  // deno: async () => {
-  //   // we don't need to explicitly install the package here
-  //   // because our deno setup relies on `rootDir/deno` to exist
-  //   // which is an artifact produced from our build process
-  //   await run('deno', ['task', 'install']);
-  //   await run('deno', ['task', 'check']);
-  //
-  //   if (state.live) await run('deno', ['task', 'test']);
-  // },
+  deno: async () => {
+    const packageJson = {
+      name: 'openai-deno-ecosystem-test',
+      private: true,
+    };
+    await fs.writeFile('package.json', JSON.stringify(packageJson, null, 2) + '\n');
+
+    const packFile = getPackFile();
+    await fs.copyFile(packFile, `./${TAR_NAME}`);
+    await run('deno', ['task', 'install']);
+
+    // Deno's BYONM resolver requires package.json to declare the npm
+    // dependency, but add that declaration only after npm installs the
+    // local tarball so it cannot substitute a registry package.
+    const installedPackage = JSON.parse(await fs.readFile('node_modules/openai/package.json', 'utf8'));
+    assert(typeof installedPackage.version === 'string');
+    await fs.writeFile(
+      'package.json',
+      JSON.stringify(
+        {
+          ...packageJson,
+          dependencies: { openai: installedPackage.version },
+        },
+        null,
+        2,
+      ) + '\n',
+    );
+
+    await run('deno', ['task', 'check']);
+
+    if (state.live) await run('deno', ['task', 'test']);
+  },
 };
 
 let projectNames = Object.keys(projectRunners) as Array<keyof typeof projectRunners>;
