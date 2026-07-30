@@ -69,7 +69,6 @@ Full Changelog: [v6.48.0...v6.49.0](https://github.com/openai/openai-node/compar
 
 ### Chores
 
-* exclude Brewfile from language detection ([#2006](https://github.com/openai/openai-node/issues/2006)) ([9bec333](https://github.com/openai/openai-node/commit/9bec3332133c115b0e728010ab614daf5516e35b))
 * refresh more ecosystem test dependencies ([#2003](https://github.com/openai/openai-node/issues/2003)) ([3cafa55](https://github.com/openai/openai-node/commit/3cafa553aeb7f10e9afb432ae5d4aaa1c6d42663))
 
 ## 6.48.0 (2026-07-17)

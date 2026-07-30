@@ -2,8 +2,16 @@
 
 This repository uses the [`pnpm`](https://pnpm.io/installation) version pinned by `package.json`.
 Other package managers may work but are not officially supported for development.
-Use the Node.js version in `.nvmrc` for repository tooling. The published
-package supports the Node.js LTS lines documented in
+Use the Node.js version in `.nvmrc` for repository tooling. Install that version
+with the official [Node.js installer](https://nodejs.org/en/download), or use
+[`nvm`](https://github.com/nvm-sh/nvm):
+
+```sh
+$ nvm install
+$ nvm use
+```
+
+The published package supports the Node.js LTS lines documented in
 [`NODE_VERSION_POLICY.md`](NODE_VERSION_POLICY.md); the repository toolchain may
 be newer than the consumer runtime floor.
 Do not rely on Corepack being available; install pnpm explicitly if needed:
