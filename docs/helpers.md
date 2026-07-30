@@ -837,35 +837,17 @@ See an example of using express to stream to a browser here [`examples/stream-to
 
 # Polling Helpers
 
-When interacting with the API some actions such as starting a Run and adding files to vector stores are asynchronous and take time to complete.
-The SDK includes helper functions which will poll the status until it reaches a terminal state and then return the resulting object.
-If an API method results in an action which could benefit from polling there will be a corresponding version of the
-method ending in `_AndPoll`.
+Some API operations, such as starting an Assistants run or adding files to a
+vector store, are asynchronous. The SDK provides polling helpers that wait
+until the operation reaches a terminal state. Assistants run helpers include
+`client.beta.threads.createAndRunPoll`,
+`client.beta.threads.runs.createAndPoll`, and
+`client.beta.threads.runs.submitToolOutputsAndPoll`.
 
-All methods also allow you to set the polling frequency, how often the API is checked for an update, via a function argument (`pollIntervalMs`).
-
-The polling methods are:
-
-```ts
-client.beta.threads.createAndRunPoll(...)
-client.beta.threads.runs.createAndPoll((...)
-client.beta.threads.runs.submitToolOutputsAndPoll((...)
-client.beta.vectorStores.files.uploadAndPoll((...)
-client.beta.vectorStores.files.createAndPoll((...)
-client.beta.vectorStores.fileBatches.createAndPoll((...)
-client.beta.vectorStores.fileBatches.uploadAndPoll((...)
-```
+For vector-store file and batch polling, supported options, terminal states,
+and error handling, see [Vector-store uploads](uploads.md#vector-store-uploads).
 
 # Bulk Upload Helpers
 
-When creating and interacting with vector stores, you can use the polling helpers to monitor the status of operations.
-For convenience, we also provide a bulk upload helper to allow you to simultaneously upload several files at once.
-
-```ts
-const fileList = [
-  createReadStream('/home/data/example.pdf'),
-  ...
-];
-
-const batch = await openai.vectorStores.fileBatches.uploadAndPoll(vectorStore.id, {files: fileList});
-```
+For concurrent vector-store uploads and batch polling, see
+[Upload multiple files](uploads.md#upload-multiple-files).
