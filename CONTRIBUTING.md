@@ -78,15 +78,26 @@ $ pnpm link --global openai
 
 ## Running tests
 
-Most tests require you to [set up a mock server](https://github.com/dgellow/steady) against the OpenAPI spec to run the tests.
+The test suite is split between handwritten unit tests and Stainless-generated
+API-resource tests. Generated tests have a Stainless-generated comment at the
+top of the file and primarily live in `tests/api-resources/`. Handwritten tests
+live in `tests/lib/`, `tests/helpers/`, `tests/auth/`, and the remaining
+unmarked test files.
 
 ```sh
-$ ./scripts/mock
+$ pnpm test:unit       # Handwritten, isolated SDK behavior; no mock server
+$ pnpm test:generated  # Generated API-resource and client tests
+$ pnpm test            # Complete regular test suite
+$ pnpm test:coverage   # Complete suite with enforced coverage thresholds
 ```
 
-```sh
-$ pnpm test
-```
+The full, generated, and coverage suites automatically start a
+[Steady mock server](https://github.com/dgellow/steady) against the OpenAPI
+spec when one is not already running. To manage that server yourself, run
+`./scripts/mock` in a separate terminal. Coverage is collected from SDK source
+files, excluding vendored third-party code and type-only modules. CI requires
+at least 98% statement and line coverage, 90% branch coverage, and 93%
+function coverage.
 
 ## Linting and formatting
 
