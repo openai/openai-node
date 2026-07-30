@@ -78,15 +78,62 @@ $ pnpm link --global openai
 
 ## Running tests
 
-Most tests require you to [set up a mock server](https://github.com/dgellow/steady) against the OpenAPI spec to run the tests.
+The test suite is split between handwritten unit tests and Stainless-generated
+API-resource tests. Generated tests have a Stainless-generated comment at the
+top of the file and primarily live in `tests/api-resources/`. Handwritten tests
+live in `tests/lib/`, `tests/helpers/`, `tests/auth/`, and the remaining
+unmarked test files.
 
 ```sh
-$ ./scripts/mock
+$ pnpm test:unit       # Handwritten, isolated SDK behavior; no mock server
+$ pnpm test:generated  # Generated API-resource and client tests
+$ pnpm test            # Complete regular test suite
+$ pnpm test:coverage   # Complete suite with enforced coverage thresholds
 ```
 
+The full, generated, and coverage suites automatically start a
+[Steady mock server](https://github.com/dgellow/steady) against the OpenAPI
+spec when one is not already running. To manage that server yourself, run
+`./scripts/mock` in a separate terminal. Coverage is collected from SDK source
+files, excluding vendored third-party code and type-only modules. CI requires
+at least 98% statement and line coverage, 90% branch coverage, and 93%
+function coverage.
+
+## Running performance benchmarks
+
+The Vitest benchmark suite measures SDK work locally using deterministic fixtures,
+in-memory fetch responses, and synthetic streams. It does not require an OpenAI
+API key or the mock server used by the regular test suite.
+
+Use the Node.js version from `.nvmrc`, install repository dependencies, and run:
+
 ```sh
-$ pnpm test
+$ pnpm bench
 ```
+
+To save the machine-readable Vitest benchmark report:
+
+```sh
+$ pnpm bench:json
+```
+
+This writes `benchmark-results.json` in the repository root. The report is ignored
+by Git and is uploaded by the separate, manually triggered or scheduled benchmark
+workflow alongside a runtime, runner, revision, and fixture-hash metadata file.
+Pass a benchmark name or file filter directly to run only part of the suite, for
+example:
+
+```sh
+$ pnpm bench streaming
+```
+
+Benchmarks cover SSE chunk decoding and JSON parsing, incremental structured
+output parsing, schema generation and validation, and base64-versus-float
+embedding responses. Each case prepares its fixtures before timing and uses
+explicit warmup and repeated measurements. Compare medians and tail latency only
+between runs with the same Node.js version, CPU or runner class, SDK revision,
+fixture sizes, and background load. Shared CI runners are useful for collecting
+trends but are too variable for blocking performance thresholds.
 
 ## Linting and formatting
 
