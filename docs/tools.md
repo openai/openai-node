@@ -120,6 +120,10 @@ const response = await client.responses.parse({
   ],
 });
 
+if (response.status !== 'completed') {
+  throw new Error(JSON.stringify(response.error ?? response.incomplete_details));
+}
+
 for (const item of response.output) {
   if (item.type === 'function_call') {
     const args: z.infer<typeof WeatherArguments> = item.parsed_arguments;
