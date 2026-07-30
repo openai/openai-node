@@ -60,13 +60,5 @@
     }
   ],
   "release-type": "node",
-  "extra-files": [
-    "src/version.ts",
-    "README.md",
-    {
-      "type": "json",
-      "path": "jsr.json",
-      "jsonpath": "$.version"
-    }
-  ]
+  "extra-files": ["src/version.ts", "README.md"]
 }

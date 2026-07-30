@@ -1,6 +1,6 @@
 # OpenAI TypeScript and JavaScript API Library
 
-[![NPM version](<https://img.shields.io/npm/v/openai.svg?label=npm%20(stable)>)](https://npmjs.org/package/openai) ![npm bundle size](https://img.shields.io/bundlephobia/minzip/openai) [![JSR Version](https://jsr.io/badges/@openai/openai)](https://jsr.io/@openai/openai)
+[![NPM version](<https://img.shields.io/npm/v/openai.svg?label=npm%20(stable)>)](https://npmjs.org/package/openai) ![npm bundle size](https://img.shields.io/bundlephobia/minzip/openai)
 
 This library provides convenient access to the OpenAI REST API from TypeScript or JavaScript.
 
@@ -14,17 +14,12 @@ To learn how to use the OpenAI API, check out our [API Reference](https://platfo
 npm install openai
 ```
 
-### Installation from JSR
+### Installation with Deno
 
-```sh
-deno add jsr:@openai/openai
-npx jsr add @openai/openai
-```
-
-These commands will make the module importable from the `@openai/openai` scope. You can also [import directly from JSR](https://jsr.io/docs/using-packages#importing-with-jsr-specifiers) without an install step if you're using the Deno JavaScript runtime:
+Deno can import the package directly from npm:
 
 ```ts
-import OpenAI from 'jsr:@openai/openai';
+import OpenAI from 'npm:openai';
 ```
 
 ## Usage
@@ -631,7 +626,7 @@ may still be visible.
 #### Custom logger
 
 By default, this library logs to `globalThis.console`. You can also provide a custom logger.
-Most logging libraries are supported, including [pino](https://www.npmjs.com/package/pino), [winston](https://www.npmjs.com/package/winston), [bunyan](https://www.npmjs.com/package/bunyan), [consola](https://www.npmjs.com/package/consola), [signale](https://www.npmjs.com/package/signale), and [@std/log](https://jsr.io/@std/log). If your logger doesn't work, please open an issue.
+Most logging libraries are supported, including [pino](https://www.npmjs.com/package/pino), [winston](https://www.npmjs.com/package/winston), [bunyan](https://www.npmjs.com/package/bunyan), [consola](https://www.npmjs.com/package/consola), and [signale](https://www.npmjs.com/package/signale). If your logger doesn't work, please open an issue.
 
 When providing a custom logger, the `logLevel` option still controls which messages are emitted, messages
 below the configured level will not be sent to your logger.
