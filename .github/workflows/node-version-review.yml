@@ -80,5 +80,5 @@ jobs:
             .nvmrc
             package.json
             README.md
-            CONTRIBUTING.md
+            .github/CONTRIBUTING.md
             NODE_VERSION_POLICY.md

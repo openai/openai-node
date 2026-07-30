@@ -394,7 +394,7 @@ completion object for you).
 
 If you need to cancel a stream, you can `break` from a `for await` loop or call `stream.abort()`.
 
-See an example of streaming helpers in action in [`examples/stream.ts`](examples/stream.ts).
+See an example of streaming helpers in action in [`examples/stream.ts`](../examples/stream.ts).
 
 ### Automated function calls
 
@@ -487,7 +487,7 @@ adjusting `maxChatCompletions` in the request options object. Note that `max_tok
 chat completion request, not for the entire call run.
 
 See an example of automated function calls in action in
-[`examples/tool-call-helpers.ts`](examples/tool-call-helpers.ts).
+[`examples/tool-call-helpers.ts`](../examples/tool-call-helpers.ts).
 
 Note, `runFunctions` was also previously available, but has been deprecated in favor of `runTools`.
 
@@ -521,13 +521,13 @@ The event fired when a message from the `assistant` is received from the API.
 The event fired when a chunk from the `assistant` is received from the API. The `delta` argument contains the
 content of the chunk, while the `snapshot` returns the accumulated content for the current message.
 
-#### `.on('functionCall', (functionCall: ChatCompletionMessage.FunctionCall) => …)`
+#### `.on('functionToolCall', (functionCall: ChatCompletionMessageFunctionToolCall.Function) => …)`
 
 The event fired when a function call is made by the assistant.
 
-#### `.on('functionCallResult', (content: string) => …)`
+#### `.on('functionToolCallResult', (content: string) => …)`
 
-The event fired when the function runner responds to the function call with `role: "function"`. The `content` of the
+The event fired when the function runner responds to the function call with `role: "tool"`. The `content` of the
 response is given as the first argument to the callback.
 
 #### `.on('content.delta', (props: ContentDeltaEvent) => ...)`
@@ -617,13 +617,13 @@ message.
 
 The event fired for the last message.
 
-#### `.on('finalFunctionCall', (functionCall: ChatCompletionMessage.FunctionCall) => …)`
+#### `.on('finalFunctionToolCall', (functionCall: ChatCompletionMessageFunctionToolCall.Function) => …)`
 
-The event fired for the last message with a defined `function_call`.
+The event fired for the last assistant message containing a function tool call.
 
-#### `.on('finalFunctionCallResult', (content: string) => …)`
+#### `.on('finalFunctionToolCallResult', (content: string) => …)`
 
-The event fired for the last message with a `role: "function"`.
+The event fired for the last message with a `role: "tool"`.
 
 #### `.on('error', (error: OpenAIError) => …)`
 
@@ -659,9 +659,10 @@ An empty promise which resolves when the stream is done.
 A promise which resolves with the final chat completion that was received from the API. Throws if the request
 ends before a complete chat completion is returned.
 
-#### `await .allChatCompletions()`
+#### `.allChatCompletions()`
 
-A promise which resolves with The array of all chat completions that were received from the API.
+Returns the array of chat completions received so far. Await `.done()` first when you need the complete
+list.
 
 #### `await .finalContent()`
 
@@ -672,14 +673,14 @@ can be found.
 
 A promise which resolves with the last message.
 
-#### `await .finalFunctionCall()`
+#### `await .finalFunctionToolCall()`
 
-A promise which resolves with the last message with a defined `function_call`. Throws if no such message is
+A promise which resolves with the last function tool call, or `undefined` if no function tool call is found.
+
+#### `await .finalFunctionToolCallResult()`
+
+A promise which resolves with the last function tool result, or `undefined` if no matching tool message is
 found.
-
-#### `await .finalFunctionCallResult()`
-
-A promise which resolves with the last message with a `role: "function"`. Throws if no such message is found.
 
 #### `await .totalUsage()` (without `stream`, usage is not currently reported with `stream`)
 
@@ -824,47 +825,29 @@ async function getWeather(args: z.infer<typeof GetWeatherParameters>) {
 main();
 ```
 
-See a more fully-fledged example in [`examples/tool-call-helpers-zod.ts`](examples/tool-call-helpers-zod.ts).
+See a more fully-fledged example in [`examples/tool-call-helpers-zod.ts`](../examples/tool-call-helpers-zod.ts).
 
 #### Integrate with Next.JS
 
-See an example of a Next.JS integration here [`examples/stream-to-client-next.ts`](examples/stream-to-client-next.ts).
+See an example of a Next.JS integration here [`examples/stream-to-client-next.ts`](../examples/stream-to-client-next.ts).
 
 #### Proxy Streaming to a Browser
 
-See an example of using express to stream to a browser here [`examples/stream-to-client-express.ts`](examples/stream-to-client-express.ts).
+See an example of using express to stream to a browser here [`examples/stream-to-client-express.ts`](../examples/stream-to-client-express.ts).
 
 # Polling Helpers
 
-When interacting with the API some actions such as starting a Run and adding files to vector stores are asynchronous and take time to complete.
-The SDK includes helper functions which will poll the status until it reaches a terminal state and then return the resulting object.
-If an API method results in an action which could benefit from polling there will be a corresponding version of the
-method ending in `_AndPoll`.
+Some API operations, such as starting an Assistants run or adding files to a
+vector store, are asynchronous. The SDK provides polling helpers that wait
+until the operation reaches a terminal state. Assistants run helpers include
+`client.beta.threads.createAndRunPoll`,
+`client.beta.threads.runs.createAndPoll`, and
+`client.beta.threads.runs.submitToolOutputsAndPoll`.
 
-All methods also allow you to set the polling frequency, how often the API is checked for an update, via a function argument (`pollIntervalMs`).
-
-The polling methods are:
-
-```ts
-client.beta.threads.createAndRunPoll(...)
-client.beta.threads.runs.createAndPoll((...)
-client.beta.threads.runs.submitToolOutputsAndPoll((...)
-client.beta.vectorStores.files.uploadAndPoll((...)
-client.beta.vectorStores.files.createAndPoll((...)
-client.beta.vectorStores.fileBatches.createAndPoll((...)
-client.beta.vectorStores.fileBatches.uploadAndPoll((...)
-```
+For vector-store file and batch polling, supported options, terminal states,
+and error handling, see [Vector-store uploads](uploads.md#vector-store-uploads).
 
 # Bulk Upload Helpers
 
-When creating and interacting with vector stores, you can use the polling helpers to monitor the status of operations.
-For convenience, we also provide a bulk upload helper to allow you to simultaneously upload several files at once.
-
-```ts
-const fileList = [
-  createReadStream('/home/data/example.pdf'),
-  ...
-];
-
-const batch = await openai.vectorStores.fileBatches.uploadAndPoll(vectorStore.id, {files: fileList});
-```
+For concurrent vector-store uploads and batch polling, see
+[Upload multiple files](uploads.md#upload-multiple-files).
