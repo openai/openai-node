@@ -1,0 +1,83 @@
+name: Performance benchmarks
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 7 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  benchmarks:
+    if: github.repository == 'openai/openai-node'
+    name: Performance benchmarks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run benchmarks
+        run: pnpm bench:json
+
+      - name: Record benchmark environment
+        run: |
+          node -e '
+            const { execFileSync } = require("node:child_process");
+            const { createHash } = require("node:crypto");
+            const fs = require("node:fs");
+            const os = require("node:os");
+            const fixtures = [
+              "tests/benchmarks/streaming.bench.ts",
+              "tests/benchmarks/structured-output-and-embeddings.bench.ts",
+              "tests/api-resources/embeddings-base64-response.json",
+              "tests/api-resources/embeddings-float-response.json",
+              "vitest.bench.config.mts",
+            ];
+            const environment = {
+              revision: process.env.GITHUB_SHA,
+              node: process.version,
+              v8: process.versions.v8,
+              platform: process.platform,
+              architecture: process.arch,
+              cpu: {
+                model: os.cpus()[0]?.model ?? "unknown",
+                logicalCount: os.cpus().length,
+              },
+              pnpm: execFileSync("pnpm", ["--version"], { encoding: "utf8" }).trim(),
+              vitest: require("vitest/package.json").version,
+              fixtures: Object.fromEntries(fixtures.map((path) => {
+                const contents = fs.readFileSync(path);
+                return [path, {
+                  bytes: contents.byteLength,
+                  sha256: createHash("sha256").update(contents).digest("hex"),
+                }];
+              })),
+            };
+            fs.writeFileSync("benchmark-environment.json", `${JSON.stringify(environment, null, 2)}\n`);
+          '
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: openai-node-benchmarks-${{ github.run_id }}
+          path: |
+            benchmark-results.json
+            benchmark-environment.json
+          if-no-files-found: error
+          retention-days: 30
