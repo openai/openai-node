@@ -40,6 +40,15 @@ let response = await client.responses.create({
 while (true) {
   const calls = response.output.filter((item) => item.type === 'function_call');
 
+  if (response.status !== 'completed') {
+    const details = response.error ?? response.incomplete_details;
+    throw new Error(
+      `Response status ${response.status ?? 'unknown'}: ${
+        details ? JSON.stringify(details) : 'No additional details.'
+      }`,
+    );
+  }
+
   if (calls.length === 0) {
     console.log(response.output_text);
     break;
