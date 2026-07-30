@@ -95,11 +95,14 @@ export class Responses extends APIResource {
    * const response = await client.responses.create();
    * ```
    */
-  create(body: ResponseCreateParamsNonStreaming, options?: RequestOptions): APIPromise<Response>;
   create(
     body: ResponseCreateParamsStreaming,
     options?: RequestOptions,
   ): APIPromise<Stream<ResponseStreamEvent>>;
+  create(
+    body: ResponseCreateParamsNonStreaming,
+    options?: RequestOptions,
+  ): APIPromise<Response>;
   create(
     body: ResponseCreateParamsBase,
     options?: RequestOptions,
