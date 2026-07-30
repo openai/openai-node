@@ -139,9 +139,11 @@ socket.send({
 });
 ```
 
-The connection inherits authentication and endpoint configuration from the `OpenAI` client. Attach an `error` listener;
-unhandled WebSocket errors otherwise become unhandled promise rejections. You can also iterate over `socket` or
-`socket.stream()` to receive connection lifecycle events and server messages.
+The connection inherits endpoint configuration from the `OpenAI` client and automatically adds authentication only
+when the client has a static `apiKey` string. It does not resolve async `apiKey` functions or workload identity; for
+those clients, pass a resolved `Authorization` header in the WebSocket options. Attach an `error` listener; unhandled
+WebSocket errors otherwise become unhandled promise rejections. You can also iterate over `socket` or `socket.stream()`
+to receive connection lifecycle events and server messages.
 
 For additional headers, including feature-specific beta headers when required, pass WebSocket options to the constructor:
 

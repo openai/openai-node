@@ -158,8 +158,8 @@ status before using the file.
 
 ## Vector-store uploads
 
-To upload a file, attach it to a vector store, and wait until processing reaches
-a terminal state, use `vectorStores.files.uploadAndPoll`:
+To upload a file, attach it to a vector store, and wait until processing
+completes or fails, use `vectorStores.files.uploadAndPoll`:
 
 ```ts
 import { createReadStream } from 'node:fs';
@@ -173,10 +173,12 @@ if (file.status !== 'completed') {
 }
 ```
 
-Polling returns files in terminal states, including failures; inspect `status`
-and `last_error` before assuming ingestion succeeded. Vector-store polling uses
-the interval suggested by the API, or five seconds when none is provided;
-`pollIntervalMs` overrides that interval.
+The helper returns files with `completed` or `failed` status; inspect `status`
+and `last_error` before assuming ingestion succeeded. It does not currently
+return for a `cancelled` file, so use an abort signal or retrieve the file
+directly when cancellation is possible. Vector-store polling uses the interval
+suggested by the API, or five seconds when none is provided; `pollIntervalMs`
+overrides that interval.
 
 ### Upload multiple files
 
@@ -194,8 +196,10 @@ const batch = await client.vectorStores.fileBatches.uploadAndPoll(
   { maxConcurrency: 2 },
 );
 
-if (batch.file_counts.failed > 0) {
-  throw new Error(`${batch.file_counts.failed} files failed processing`);
+if (batch.status !== 'completed' || batch.file_counts.failed > 0 || batch.file_counts.cancelled > 0) {
+  throw new Error(
+    `Batch processing ${batch.status}: ${batch.file_counts.failed} failed, ${batch.file_counts.cancelled} cancelled`,
+  );
 }
 ```
 
