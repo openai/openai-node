@@ -147,6 +147,18 @@ describe('buffered multipart forms', () => {
     expect(unsupportedFetch).not.toHaveBeenCalled();
   });
 
+  test('consumes FormData capability probe responses and caches the result', async () => {
+    const response = new Response('');
+    const probingFetch = jest.fn().mockResolvedValue(response);
+
+    await expect(createForm({}, probingFetch)).resolves.toBeInstanceOf(FormData);
+    await expect(createForm({}, probingFetch)).resolves.toBeInstanceOf(FormData);
+
+    expect(probingFetch).toHaveBeenCalledTimes(1);
+    expect(probingFetch).toHaveBeenCalledWith('data:,');
+    expect(response.bodyUsed).toBe(true);
+  });
+
   test('treats failed FormData capability checks as supported and caches the result', async () => {
     const failingFetch = jest.fn().mockRejectedValue(new Error('capability probe failed'));
     const client = { fetch: failingFetch };
