@@ -4,7 +4,6 @@ node_modules
 yarn-error.log
 codegen.log
 dist
-dist-deno
 /coverage
 /oidc
 /*.tgz

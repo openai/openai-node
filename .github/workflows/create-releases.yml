@@ -1,6 +1,5 @@
 # Watches the default branch for release-please output, then publishes newly
-# created SDK releases to npm and JSR. Keeping both registries in one workflow
-# ensures they are released from the same reviewed commit.
+# created SDK releases to npm.
 name: Create releases
 on:
   push:
@@ -46,8 +45,3 @@ jobs:
         if: ${{ steps.release.outputs.releases_created }}
         run: |
           bash ./bin/publish-npm
-
-      - name: Publish to JSR
-        if: ${{ steps.release.outputs.releases_created }}
-        run: |
-          bash ./bin/publish-jsr

@@ -149,7 +149,7 @@ jobs:
       - name: Test packed npm package
         if: matrix.experimental == false
         run: |
-          OPENAI_DISABLE_DENO_BUILD=1 ./scripts/build
+          ./scripts/build
           node --experimental-strip-types scripts/test-packed-package.ts
 
   coverage:

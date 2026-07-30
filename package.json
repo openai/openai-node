@@ -49,7 +49,6 @@
     "@types/yargs": "^17.0.35",
     "@typescript-eslint/eslint-plugin": "8.31.1",
     "@typescript-eslint/parser": "8.31.1",
-    "@typescript-eslint/typescript-estree": "8.31.1",
     "deep-object-diff": "^1.1.9",
     "eslint": "^9.39.1",
     "eslint-plugin-unused-imports": "^4.1.4",
