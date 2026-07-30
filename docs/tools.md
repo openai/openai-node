@@ -165,6 +165,10 @@ stream.on('response.function_call_arguments.delta', (event) => {
 
 const response = await stream.finalResponse();
 
+if (response.status !== 'completed') {
+  throw new Error(JSON.stringify(response.error ?? response.incomplete_details));
+}
+
 for (const item of response.output) {
   if (item.type === 'function_call') {
     console.log(item.parsed_arguments.city);
