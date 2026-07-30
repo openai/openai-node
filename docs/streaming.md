@@ -69,7 +69,9 @@ stream.on('response.function_call_arguments.delta', (event) => {
 ```
 
 Use `.on('event', listener)` to observe every server event, or `for await (const event of stream)` to process events
-sequentially. `finalResponse()` waits for completion and rejects if the request fails or the stream ends prematurely.
+sequentially. `finalResponse()` waits for stream consumption to finish and returns the latest accumulated response
+snapshot. Check the returned response's `status` before treating it as complete: network, request, and abort errors
+reject, but a clean EOF can resolve with a partial response whose status is not `completed`.
 
 See the [Responses streaming example](../examples/responses/stream.ts) and the
 [streamed tools example](../examples/responses/streaming-tools.ts).
