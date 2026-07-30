@@ -109,6 +109,7 @@ The Node.js WebSocket helper requires the optional `ws` peer dependency:
 
 ```sh
 npm install ws
+npm install --save-dev @types/ws
 ```
 
 ```ts
@@ -126,8 +127,22 @@ socket.on('response.output_text.delta', (event) => {
   process.stdout.write(event.delta);
 });
 
-socket.on('response.completed', (event) => {
-  console.log('\nResponse ID:', event.response.id);
+socket.on('event', (event) => {
+  if (
+    event.type !== 'response.completed' &&
+    event.type !== 'response.failed' &&
+    event.type !== 'response.incomplete'
+  ) {
+    return;
+  }
+
+  if (event.type === 'response.completed') {
+    console.log('\nResponse ID:', event.response.id);
+  } else {
+    const details = event.response.error ?? event.response.incomplete_details;
+    console.error(`\n${event.type}:`, details ?? 'No additional details.');
+  }
+
   socket.close();
 });
 

@@ -153,7 +153,7 @@ if (processed.status !== 'processed') {
 ```
 
 The default interval is five seconds and the default maximum wait is 30 minutes.
-The helper returns for terminal `processed` or `error` states; check the returned
+The helper returns for terminal `processed`, `error`, or `deleted` states; check the returned
 status before using the file.
 
 ## Vector-store uploads
