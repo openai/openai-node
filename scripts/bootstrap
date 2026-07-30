@@ -4,6 +4,13 @@ set -e
 
 cd "$(dirname "$0")/.."
 
+if ! command -v node >/dev/null 2>&1; then
+  echo "Node.js is required to install dependencies for this repository."
+  echo "Install the version in .nvmrc with nvm install, then run nvm use."
+  echo "See CONTRIBUTING.md for Node.js setup instructions."
+  exit 1
+fi
+
 echo "==> Installing Node dependencies…"
 
 if ! PNPM_VERSION="$(
