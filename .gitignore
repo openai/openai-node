@@ -16,3 +16,5 @@ ecosystem-tests/*/openai.tgz
 .dev.vars
 .eslintcache
 oidc
+/benchmark-results.json
+/benchmark-environment.json

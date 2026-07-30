@@ -99,6 +99,42 @@ files, excluding vendored third-party code and type-only modules. CI requires
 at least 98% statement and line coverage, 90% branch coverage, and 93%
 function coverage.
 
+## Running performance benchmarks
+
+The Vitest benchmark suite measures SDK work locally using deterministic fixtures,
+in-memory fetch responses, and synthetic streams. It does not require an OpenAI
+API key or the mock server used by the regular test suite.
+
+Use the Node.js version from `.nvmrc`, install repository dependencies, and run:
+
+```sh
+$ pnpm bench
+```
+
+To save the machine-readable Vitest benchmark report:
+
+```sh
+$ pnpm bench:json
+```
+
+This writes `benchmark-results.json` in the repository root. The report is ignored
+by Git and is uploaded by the separate, manually triggered or scheduled benchmark
+workflow alongside a runtime, runner, revision, and fixture-hash metadata file.
+Pass a benchmark name or file filter directly to run only part of the suite, for
+example:
+
+```sh
+$ pnpm bench streaming
+```
+
+Benchmarks cover SSE chunk decoding and JSON parsing, incremental structured
+output parsing, schema generation and validation, and base64-versus-float
+embedding responses. Each case prepares its fixtures before timing and uses
+explicit warmup and repeated measurements. Compare medians and tail latency only
+between runs with the same Node.js version, CPU or runner class, SDK revision,
+fixture sizes, and background load. Shared CI runners are useful for collecting
+trends but are too variable for blocking performance thresholds.
+
 ## Linting and formatting
 
 This repository uses [prettier](https://www.npmjs.com/package/prettier) and

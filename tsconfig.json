@@ -1,5 +1,5 @@
 {
-  "include": ["src", "tests", "examples", "scripts/**/*.ts"],
+  "include": ["src", "tests", "examples", "scripts/**/*.ts", "vitest.bench.config.mts"],
   "exclude": ["scripts/_vendor"],
   "compilerOptions": {
     "target": "es2020",
