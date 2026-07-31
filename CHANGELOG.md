@@ -1,5 +1,13 @@
 # Changelog
 
+## 7.3.1 (2026-07-31)
+
+Full Changelog: [v7.3.0...v7.3.1](https://github.com/openai/openai-node/compare/v7.3.0...v7.3.1)
+
+### Documentation
+
+* add HTTP mTLS transport examples ([#2029](https://github.com/openai/openai-node/issues/2029)) ([2cc5f96](https://github.com/openai/openai-node/commit/2cc5f96d4332bc12210cd751cd367f3908986587))
+
 ## 7.3.0 (2026-07-31)
 
 Full Changelog: [v7.2.0...v7.3.0](https://github.com/openai/openai-node/compare/v7.2.0...v7.3.0)
