@@ -33,6 +33,11 @@ export {
   type ContainerListParams,
   type ContainerListResponsesPage,
 } from './containers/containers';
+export {
+  ContentProvenanceChecks,
+  type ContentProvenanceCheck,
+  type ContentProvenanceCheckCreateParams,
+} from './content-provenance-checks';
 export { Conversations } from './conversations/conversations';
 export {
   Embeddings,

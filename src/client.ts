@@ -51,6 +51,11 @@ import {
   Completions,
 } from './resources/completions';
 import {
+  ContentProvenanceCheck,
+  ContentProvenanceCheckCreateParams,
+  ContentProvenanceChecks,
+} from './resources/content-provenance-checks';
+import {
   CreateEmbeddingResponse,
   Embedding,
   EmbeddingCreateParams,
@@ -1304,6 +1309,7 @@ export class OpenAI {
    * Given a prompt and/or an input image, the model will generate a new image.
    */
   images: API.Images = new API.Images(this);
+  contentProvenanceChecks: API.ContentProvenanceChecks = new API.ContentProvenanceChecks(this);
   audio: API.Audio = new API.Audio(this);
   /**
    * Given text and/or image inputs, classifies if those inputs are potentially harmful.
@@ -1347,6 +1353,7 @@ OpenAI.Chat = Chat;
 OpenAI.Embeddings = Embeddings;
 OpenAI.Files = Files;
 OpenAI.Images = Images;
+OpenAI.ContentProvenanceChecks = ContentProvenanceChecks;
 OpenAI.Audio = Audio;
 OpenAI.Moderations = Moderations;
 OpenAI.Models = Models;
@@ -1514,6 +1521,12 @@ export declare namespace OpenAI {
     type ImageGenerateParams as ImageGenerateParams,
     type ImageGenerateParamsNonStreaming as ImageGenerateParamsNonStreaming,
     type ImageGenerateParamsStreaming as ImageGenerateParamsStreaming,
+  };
+
+  export {
+    ContentProvenanceChecks as ContentProvenanceChecks,
+    type ContentProvenanceCheck as ContentProvenanceCheck,
+    type ContentProvenanceCheckCreateParams as ContentProvenanceCheckCreateParams,
   };
 
   export { Audio as Audio, type AudioModel as AudioModel, type AudioResponseFormat as AudioResponseFormat };

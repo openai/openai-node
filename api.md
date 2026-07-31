@@ -145,6 +145,16 @@ Methods:
 - <code title="post /images/edits">client.images.<a href="./src/resources/images.ts">edit</a>({ ...params }) -> ImagesResponse</code>
 - <code title="post /images/generations">client.images.<a href="./src/resources/images.ts">generate</a>({ ...params }) -> ImagesResponse</code>
 
+# ContentProvenanceChecks
+
+Types:
+
+- <code><a href="./src/resources/content-provenance-checks.ts">ContentProvenanceCheck</a></code>
+
+Methods:
+
+- <code title="post /content_provenance_checks">client.contentProvenanceChecks.<a href="./src/resources/content-provenance-checks.ts">create</a>({ ...params }) -> ContentProvenanceCheck</code>
+
 # Audio
 
 Types:

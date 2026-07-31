@@ -14,6 +14,7 @@ TEST_PATHS=(
 	tests/api-resources/embeddings.test.ts
 	tests/api-resources/files.test.ts
 	tests/api-resources/images.test.ts
+	tests/api-resources/content-provenance-checks.test.ts
 	tests/api-resources/audio/audio.test.ts
 	tests/api-resources/audio/transcriptions.test.ts
 	tests/api-resources/audio/translations.test.ts
