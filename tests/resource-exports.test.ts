@@ -29,8 +29,8 @@ const resourceIndexes = [...findResourceIndexes(resourcesDirectory), ...realtime
 );
 
 describe.each(resourceIndexes)('SDK exports: $path', ({ modulePath }) => {
-  test('exposes every declared runtime export', () => {
-    const exports = require(modulePath) as Record<string, unknown>;
+  test('exposes every declared runtime export', async () => {
+    const exports = (await import(modulePath)) as Record<string, unknown>;
     const names = Object.keys(exports);
 
     expect(names.length).toBeGreaterThan(0);

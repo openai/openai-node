@@ -1,3 +1,5 @@
+import { vi } from 'vitest';
+
 import {
   zodFunction,
   zodRealtimeFunction,
@@ -620,8 +622,8 @@ describe.each([
           }),
           'schema',
         ),
-      ).toThrowErrorMatchingInlineSnapshot(
-        `"Zod field at \`#/definitions/schema/properties/optional\` uses \`.optional()\` without \`.nullable()\` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required"`,
+      ).toThrow(
+        'Zod field at `#/definitions/schema/properties/optional` uses `.optional()` without `.nullable()` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required',
       );
     } else {
       expect(() =>
@@ -633,8 +635,8 @@ describe.each([
           }),
           'schema',
         ),
-      ).toThrowErrorMatchingInlineSnapshot(
-        `"Schema field at \`properties/optional\` uses \`.optional()\` without \`.nullable()\` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required"`,
+      ).toThrow(
+        'Schema field at `properties/optional` uses `.optional()` without `.nullable()` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required',
       );
     }
   });
@@ -648,8 +650,8 @@ describe.each([
           }),
           'schema',
         ),
-      ).toThrowErrorMatchingInlineSnapshot(
-        `"Zod field at \`#/definitions/schema/properties/foo/properties/bar/items/properties/can_be_missing\` uses \`.optional()\` without \`.nullable()\` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required"`,
+      ).toThrow(
+        'Zod field at `#/definitions/schema/properties/foo/properties/bar/items/properties/can_be_missing` uses `.optional()` without `.nullable()` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required',
       );
     } else {
       expect(() =>
@@ -659,14 +661,14 @@ describe.each([
           }),
           'schema',
         ),
-      ).toThrowErrorMatchingInlineSnapshot(
-        `"Schema field at \`properties/foo/properties/bar/items/properties/can_be_missing\` uses \`.optional()\` without \`.nullable()\` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required"`,
+      ).toThrow(
+        'Schema field at `properties/foo/properties/bar/items/properties/can_be_missing` uses `.optional()` without `.nullable()` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required',
       );
     }
   });
 
   it('does not warn on union nullable fields', () => {
-    const consoleSpy = jest.spyOn(console, 'warn');
+    const consoleSpy = vi.spyOn(console, 'warn');
     consoleSpy.mockClear();
 
     zodResponseFormat(

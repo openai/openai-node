@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import { EventEmitter } from 'openai/lib/EventEmitter';
 
 type TestEvents = {
@@ -60,7 +61,7 @@ describe('EventEmitter listeners', () => {
 
   test('removes one matching listener at a time without affecting unknown listeners', () => {
     const emitter = new TestEmitter();
-    const listener = jest.fn();
+    const listener = vi.fn();
 
     expect(emitter.off('foo', listener)).toBe(emitter);
     emitter.on('foo', listener).on('foo', listener);
@@ -77,7 +78,7 @@ describe('EventEmitter listeners', () => {
 
   test('automatically removes one-time listeners after their first invocation', () => {
     const emitter = new TestEmitter();
-    const listener = jest.fn();
+    const listener = vi.fn();
 
     expect(emitter.once('foo', listener)).toBe(emitter);
     expect(emitter.hasListener('foo')).toBe(true);

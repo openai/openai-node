@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import OpenAI from 'openai';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import { ChatCompletionStream } from 'openai/lib/ChatCompletionStream';
@@ -6,8 +7,6 @@ import { ChatCompletionTokenLogprob } from 'openai/resources';
 import { Stream } from 'openai/streaming';
 import { z } from 'zod/v4';
 import { makeStreamSnapshotRequest } from '../utils/mock-snapshots';
-
-jest.setTimeout(1000 * 30);
 
 describe('.stream()', () => {
   it('emits finalization failures as errors', async () => {
@@ -29,7 +28,7 @@ describe('.stream()', () => {
     const client = {
       chat: {
         completions: {
-          create: jest.fn(async () => ({
+          create: vi.fn(async () => ({
             controller: new AbortController(),
             async *[Symbol.asyncIterator]() {
               yield chunk;
@@ -57,8 +56,8 @@ describe('.stream()', () => {
 
   it('removes the caller abort listener after the stream finishes', async () => {
     const callerController = new AbortController();
-    const addEventListenerSpy = jest.spyOn(callerController.signal, 'addEventListener');
-    const removeEventListenerSpy = jest.spyOn(callerController.signal, 'removeEventListener');
+    const addEventListenerSpy = vi.spyOn(callerController.signal, 'addEventListener');
+    const removeEventListenerSpy = vi.spyOn(callerController.signal, 'removeEventListener');
 
     const chunk: OpenAI.Chat.ChatCompletionChunk = {
       id: 'chatcmpl-test',
@@ -78,7 +77,7 @@ describe('.stream()', () => {
     const client = {
       chat: {
         completions: {
-          create: jest.fn(async () => ({
+          create: vi.fn(async () => ({
             controller: new AbortController(),
             async *[Symbol.asyncIterator]() {
               yield chunk;

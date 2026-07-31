@@ -30,7 +30,8 @@ export async function makeSnapshotRequest<T>(
     return result;
   }
 
-  const qualifiedSnapshotName = [expect.getState().currentTestName, snapshotIndex].join(' ');
+  const testName = expect.getState().currentTestName?.replace(/ > /g, ' ');
+  const qualifiedSnapshotName = [testName, snapshotIndex].join(' ');
   const snapshotState = expect.getState()['snapshotState'];
   (snapshotState._uncheckedKeys as Set<string>).delete(qualifiedSnapshotName);
 
@@ -92,7 +93,8 @@ export async function makeStreamSnapshotRequest<T extends AsyncIterable<any>>(
     return iterator;
   }
 
-  const qualifiedSnapshotName = `${expect.getState().currentTestName} 1`;
+  const testName = expect.getState().currentTestName?.replace(/ > /g, ' ');
+  const qualifiedSnapshotName = `${testName} 1`;
   const snapshotState = expect.getState()['snapshotState'];
   (snapshotState._uncheckedKeys as Set<string>).delete(qualifiedSnapshotName);
 

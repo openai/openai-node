@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import { EventEmitter, InternalEventEmitter } from 'openai/core/EventEmitter';
 
 type Events = {
@@ -36,7 +37,7 @@ describe('core EventEmitter', () => {
 
   test('removes only one matching listener and tolerates unknown listeners', () => {
     const emitter = new TestEmitter();
-    const listener = jest.fn();
+    const listener = vi.fn();
 
     expect(emitter.off('message', listener)).toBe(emitter);
     emitter.on('message', listener).on('message', listener);
@@ -53,8 +54,8 @@ describe('core EventEmitter', () => {
 
   test('removes one-time listeners while retaining ordinary listeners', () => {
     const emitter = new TestEmitter();
-    const once = jest.fn();
-    const repeated = jest.fn();
+    const once = vi.fn();
+    const repeated = vi.fn();
 
     expect(emitter.once('message', once)).toBe(emitter);
     emitter.on('message', repeated);
@@ -91,7 +92,7 @@ describe('core EventEmitter', () => {
 describe('InternalEventEmitter', () => {
   test('exposes public event dispatch while preserving EventEmitter behavior', () => {
     const emitter = new InternalEventEmitter<Events>();
-    const listener = jest.fn();
+    const listener = vi.fn();
 
     emitter.once('message', listener);
     emitter._emit('message', 'first');

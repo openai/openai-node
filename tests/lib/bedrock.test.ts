@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import { BedrockOpenAI, NotFoundError, type BedrockClientOptions } from 'openai';
 import { type RequestInfo, type RequestInit } from 'openai/internal/builtin-types';
 
@@ -77,7 +78,7 @@ describe('instantiate bedrock client', () => {
   const env = process.env;
 
   beforeEach(() => {
-    jest.resetModules();
+    vi.resetModules();
     process.env = { ...env };
     process.env['AWS_BEARER_TOKEN_BEDROCK'] = undefined;
     process.env['AWS_BEDROCK_BASE_URL'] = undefined;

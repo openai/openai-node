@@ -21,9 +21,8 @@
   },
   "scripts": {
     "test": "./scripts/test",
-    "test:unit": "OPENAI_TEST_SUITE=unit jest --runInBand",
+    "test:unit": "vitest run --config vitest.config.mts",
     "test:generated": "OPENAI_TEST_SUITE=generated ./scripts/test",
-    "test:coverage": "OPENAI_TEST_SUITE=all ./scripts/test --coverage",
     "test:live:bedrock": "jest --config jest.live.config.ts --runInBand tests/live/bedrock.live.test.ts",
     "bench": "vitest bench --run --config vitest.bench.config.mts",
     "bench:json": "vitest bench --run --config vitest.bench.config.mts --outputJson benchmark-results.json",

@@ -1,3 +1,5 @@
+import { vi, type Mock } from 'vitest';
+
 import {
   k8sServiceAccountTokenProvider,
   azureManagedIdentityTokenProvider,
@@ -5,18 +7,18 @@ import {
 } from 'openai/auth/subject-token-providers';
 import { SubjectTokenProviderError } from 'openai';
 
-jest.mock('fs/promises');
+vi.mock('fs/promises');
 
 const originalFetch = global.fetch;
 
 describe('Kubernetes Service Account Token Provider', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   test('reads token from file', async () => {
     const fsPromises = await import('fs/promises');
-    (fsPromises.readFile as jest.Mock).mockResolvedValue('  my-k8s-token  \n');
+    (fsPromises.readFile as Mock).mockResolvedValue('  my-k8s-token  \n');
 
     const provider = k8sServiceAccountTokenProvider('/custom/path/token');
     expect(provider.tokenType).toBe('jwt');
@@ -33,7 +35,7 @@ describe('Kubernetes Service Account Token Provider', () => {
 
   test('throws SubjectTokenProviderError on file read failure', async () => {
     const fsPromises = await import('fs/promises');
-    (fsPromises.readFile as jest.Mock).mockRejectedValue(new Error('ENOENT: no such file or directory'));
+    (fsPromises.readFile as Mock).mockRejectedValue(new Error('ENOENT: no such file or directory'));
 
     const provider = k8sServiceAccountTokenProvider('/nonexistent/path');
     await expect(provider.getToken()).rejects.toThrow(SubjectTokenProviderError);
@@ -43,7 +45,7 @@ describe('Kubernetes Service Account Token Provider', () => {
 
 describe('Azure IMDS Token Provider', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   afterEach(() => {
@@ -51,7 +53,7 @@ describe('Azure IMDS Token Provider', () => {
   });
 
   test('fetches token from Azure IMDS with default resource', async () => {
-    global.fetch = jest.fn(async (url: string, init?: RequestInit) => {
+    global.fetch = vi.fn(async (url: string, init?: RequestInit) => {
       const urlObj = new URL(url);
       expect(url).toContain('169.254.169.254');
       expect(urlObj.searchParams.get('api-version')).toBe('2018-02-01');
@@ -77,7 +79,7 @@ describe('Azure IMDS Token Provider', () => {
   });
 
   test('fetches token from Azure IMDS with custom resource', async () => {
-    global.fetch = jest.fn(async (url: string) => {
+    global.fetch = vi.fn(async (url: string) => {
       const urlObj = new URL(url);
       expect(urlObj.searchParams.get('resource')).toBe('https://cognitiveservices.azure.com/');
 
@@ -91,7 +93,7 @@ describe('Azure IMDS Token Provider', () => {
   });
 
   test('uses custom api version', async () => {
-    global.fetch = jest.fn(async (url: string) => {
+    global.fetch = vi.fn(async (url: string) => {
       expect(url).toContain('api-version=2019-08-01');
 
       return new Response(
@@ -111,7 +113,7 @@ describe('Azure IMDS Token Provider', () => {
   });
 
   test('uses the configured fetch implementation', async () => {
-    const customFetch = jest.fn(async () => {
+    const customFetch = vi.fn(async () => {
       return new Response(
         JSON.stringify({
           access_token: 'azure-token',
@@ -129,7 +131,7 @@ describe('Azure IMDS Token Provider', () => {
   });
 
   test('throws SubjectTokenProviderError on failed request', async () => {
-    global.fetch = jest.fn(async () => {
+    global.fetch = vi.fn(async () => {
       return new Response('Not found', { status: 404 });
     }) as typeof fetch;
 
@@ -139,7 +141,7 @@ describe('Azure IMDS Token Provider', () => {
   });
 
   test('throws SubjectTokenProviderError when access_token missing', async () => {
-    global.fetch = jest.fn(async () => {
+    global.fetch = vi.fn(async () => {
       return new Response(JSON.stringify({ expires_in: '3600' }), { status: 200 });
     }) as typeof fetch;
 
@@ -151,7 +153,7 @@ describe('Azure IMDS Token Provider', () => {
 
 describe('GCP Metadata Server Token Provider', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   afterEach(() => {
@@ -159,7 +161,7 @@ describe('GCP Metadata Server Token Provider', () => {
   });
 
   test('fetches token from GCP metadata server', async () => {
-    global.fetch = jest.fn(async (url: string, init?: RequestInit) => {
+    global.fetch = vi.fn(async (url: string, init?: RequestInit) => {
       const urlObj = new URL(url);
       expect(url).toContain('metadata.google.internal');
       expect(url).toContain('service-accounts/default/identity');
@@ -179,7 +181,7 @@ describe('GCP Metadata Server Token Provider', () => {
   });
 
   test('uses the configured fetch implementation', async () => {
-    const customFetch = jest.fn(async () => {
+    const customFetch = vi.fn(async () => {
       return new Response('gcp-id-token', { status: 200 });
     }) as typeof fetch;
 
@@ -192,7 +194,7 @@ describe('GCP Metadata Server Token Provider', () => {
   });
 
   test('throws SubjectTokenProviderError on failed request', async () => {
-    global.fetch = jest.fn(async () => {
+    global.fetch = vi.fn(async () => {
       return new Response('Unauthorized', { status: 401 });
     }) as typeof fetch;
 
