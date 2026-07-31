@@ -29,7 +29,7 @@ console.log(result.choices[0]!.message?.content);
 ```
 
 With the v1 API, the `model` parameter is your Azure deployment name. See the
-[Azure examples](examples/azure) for complete runnable programs.
+[Azure examples](../examples/azure) for complete runnable programs.
 
 ## Dated API versions
 
@@ -41,7 +41,7 @@ For dated Azure OpenAI API versions, use the `AzureOpenAI` class instead of the 
 
 > [!WARNING]
 > The Azure OpenAI Assistants API is deprecated and will be retired on August 26, 2026. For existing integrations,
-> see the [Azure Assistants example](examples/azure/assistants.ts).
+> see the [Azure Assistants example](../examples/azure/assistants.ts).
 
 ```ts
 import { AzureOpenAI } from 'openai';
@@ -64,7 +64,7 @@ const result = await openai.chat.completions.create({
 console.log(result.choices[0]!.message?.content);
 ```
 
-For more information on support for the Azure API, see [azure.md](azure.md).
+For OpenAI workload identity on Azure-managed infrastructure, see [Authentication](authentication.md).
 
 ## Realtime API
 

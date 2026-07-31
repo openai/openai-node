@@ -22,7 +22,7 @@ If it has drifted, prepare one focused change:
    dependencies, peer dependencies, exports, package-manager metadata, or the
    lockfile.
 3. Update `.nvmrc` when the recommended repository toolchain changes.
-4. Update `README.md`. Update `CONTRIBUTING.md` only if its toolchain guidance
+4. Update `README.md`. Update `.github/CONTRIBUTING.md` only if its toolchain guidance
    changed.
 5. Do not edit GitHub Actions workflows. CI derives its Node.js test matrix
    from the policy table through `scripts/check-node-version-policy.ts`.

@@ -1,4 +1,4 @@
-## Realtime API
+# Realtime API
 
 The Realtime API enables you to build low-latency, multi-modal conversational experiences. It currently supports text and audio as both input and output, as well as [function calling](https://platform.openai.com/docs/guides/function-calling) through a `WebSocket` connection.
 
@@ -20,8 +20,8 @@ rt.socket.on('open', () => {
   rt.send({
     type: 'session.update',
     session: {
-      modalities: ['text'],
-      model: 'gpt-4o-realtime-preview',
+      output_modalities: ['text'],
+      type: 'realtime',
     },
   });
 
@@ -38,9 +38,7 @@ rt.socket.on('open', () => {
 });
 
 rt.on('error', (err) => {
-  // in a real world scenario this should be logged somewhere as you
-  // likely want to continue processing events regardless of any errors
-  throw err;
+  console.error('Realtime error:', err);
 });
 
 rt.on('session.created', (event) => {
@@ -48,8 +46,8 @@ rt.on('session.created', (event) => {
   console.log();
 });
 
-rt.on('response.text.delta', (event) => process.stdout.write(event.delta));
-rt.on('response.text.done', () => console.log());
+rt.on('response.output_text.delta', (event) => process.stdout.write(event.delta));
+rt.on('response.output_text.done', () => console.log());
 
 rt.on('response.done', () => rt.close());
 
@@ -84,7 +82,7 @@ For an Azure Realtime GA call, pass `callID` to the Azure factory instead:
 const rt = await OpenAIRealtimeWS.azure(azureClient, { callID: 'rtc_123456' });
 ```
 
-A full example can be found [here](https://github.com/openai/openai-node/blob/main/examples/realtime/websocket.ts).
+A full example can be found in [`examples/realtime/websocket.ts`](../examples/realtime/websocket.ts).
 
 ### Realtime error handling
 
@@ -95,8 +93,6 @@ It is **highly recommended** that you register an `error` event listener and han
 ```ts
 const rt = new OpenAIRealtimeWS({ model: 'gpt-realtime' });
 rt.on('error', (err) => {
-  // in a real world scenario this should be logged somewhere as you
-  // likely want to continue processing events regardless of any errors
-  throw err;
+  console.error('Realtime error:', err);
 });
 ```
