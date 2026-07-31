@@ -11,7 +11,9 @@ function mockFfmpeg() {
   const ffmpeg = Object.assign(new EventEmitter(), {
     stdout: new PassThrough(),
     stderr: new PassThrough(),
-    kill: jest.fn(),
+    exitCode: null as number | null,
+    signalCode: null as NodeJS.Signals | null,
+    kill: jest.fn(() => true),
   });
   spawnMock.mockReturnValue(ffmpeg as any);
   return ffmpeg;
@@ -79,7 +81,7 @@ describe('recordAudio', () => {
     controller.abort();
     expect(ffmpeg.kill).toHaveBeenCalledWith('SIGTERM');
 
-    ffmpeg.emit('close', 0);
+    ffmpeg.emit('close', 255);
     await recording;
   });
 
@@ -93,8 +95,34 @@ describe('recordAudio', () => {
     timeoutController.abort();
     expect(ffmpeg.kill).toHaveBeenCalledWith('SIGTERM');
 
-    ffmpeg.emit('close', 0);
+    ffmpeg.emit('close', 255);
     await recording;
+  });
+
+  test('reports an exit failure that happens before an abort signal', async () => {
+    const ffmpeg = mockFfmpeg();
+    const controller = new AbortController();
+    const recording = recordAudio({ signal: controller.signal });
+
+    ffmpeg.exitCode = 3;
+    controller.abort();
+    ffmpeg.emit('close', 3);
+
+    expect(ffmpeg.kill).not.toHaveBeenCalled();
+    await expect(recording).rejects.toThrow('ffmpeg process exited with code 3');
+  });
+
+  test('reports an exit failure if ffmpeg could not be terminated', async () => {
+    const ffmpeg = mockFfmpeg();
+    ffmpeg.kill.mockReturnValue(false);
+    const controller = new AbortController();
+    const recording = recordAudio({ signal: controller.signal });
+
+    controller.abort();
+    ffmpeg.emit('close', 255);
+
+    expect(ffmpeg.kill).toHaveBeenCalledWith('SIGTERM');
+    await expect(recording).rejects.toThrow('ffmpeg process exited with code 255');
   });
 
   test.each([0, -10])('does not install a timeout for %i milliseconds', async (timeout) => {
@@ -118,6 +146,16 @@ describe('recordAudio', () => {
 
     await expect(recording).rejects.toBe(failure);
     expect(consoleError).toHaveBeenCalledWith(failure);
+  });
+
+  test('rejects unsuccessful ffmpeg exit codes', async () => {
+    const ffmpeg = mockFfmpeg();
+    const recording = recordAudio();
+
+    ffmpeg.stdout.write(Buffer.from('partial audio'));
+    ffmpeg.emit('close', 3);
+
+    await expect(recording).rejects.toThrow('ffmpeg process exited with code 3');
   });
 
   test('reports synchronous ffmpeg startup failures', async () => {
