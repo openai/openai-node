@@ -11,7 +11,7 @@ function jsonResponse(body: unknown): Response {
   });
 }
 
-describe('handwritten SDK behavior coverage', () => {
+describe('handwritten SDK behavior', () => {
   test('sends PATCH and DELETE requests through their public helpers', async () => {
     const fetch = vi.fn(async () => jsonResponse({ updated: true }));
     const client = new OpenAI({ apiKey: 'test-key', fetch });

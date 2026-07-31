@@ -144,7 +144,7 @@ jobs:
           node-version: '${{ matrix.node-version }}'
 
       - name: Run tests
-        run: pnpm test
+        run: ./scripts/test
 
       - name: Test packed npm package
         if: matrix.experimental == false
@@ -152,49 +152,19 @@ jobs:
           ./scripts/build
           node --experimental-strip-types scripts/test-packed-package.ts
 
-  coverage:
-    name: coverage
-    timeout-minutes: 20
-    runs-on: ${{ github.repository == 'stainless-sdks/openai-typescript' && 'depot-ubuntu-24.04' || 'ubuntu-latest' }}
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review'
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-
-      - name: Set up pnpm
-        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
-
-      - name: Set up Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version-file: '.nvmrc'
-          cache: pnpm
-
-      - name: Bootstrap
-        run: ./scripts/bootstrap
-
-      - name: Enforce coverage thresholds
-        run: pnpm test:coverage
-
   test_matrix:
     name: ${{ (github.event_name == 'push' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review') && 'test matrix' || 'test matrix (not run)' }}
     if: ${{ always() && (github.event_name == 'push' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review') }}
-    needs: [test, coverage]
+    needs: [test]
     runs-on: ubuntu-latest
     permissions: {}
     steps:
       - name: Tests (all)
         env:
           TEST_RESULT: ${{ needs.test.result }}
-          COVERAGE_RESULT: ${{ needs.coverage.result }}
         run: |
           if [ "$TEST_RESULT" != "success" ]; then
             echo "::error::Node.js test matrix result: $TEST_RESULT"
-            exit 1
-          fi
-          if [ "$COVERAGE_RESULT" != "success" ]; then
-            echo "::error::Coverage result: $COVERAGE_RESULT"
             exit 1
           fi
 

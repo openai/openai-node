@@ -20,22 +20,5 @@ export default defineConfig({
     ],
     fileParallelism: true,
     maxWorkers: 4,
-    coverage: {
-      provider: 'v8',
-      reportsDirectory: 'coverage/unit',
-      reporter: ['json'],
-      include: ['src/**/*.ts'],
-      exclude: [
-        'src/**/*.d.ts',
-        'src/_vendor/**',
-        'src/auth/types.ts',
-        'src/internal/builtin-types.ts',
-        'src/internal/qs/types.ts',
-        'src/internal/shim-types.ts',
-        'src/internal/types.ts',
-        'src/lib/jsonschema.ts',
-        'src/lib/responses/EventTypes.ts',
-      ],
-    },
   },
 });

@@ -13,6 +13,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
+import jestConfig from '../jest.config';
+import generatedTestPatterns from '../scripts/generated-test-patterns.json';
+
 const testScriptPath = join(process.cwd(), 'scripts/test');
 const generatedTestPatternsPath = join(process.cwd(), 'scripts/generated-test-patterns.json');
 const generatedTopLevelTests = readdirSync(join(process.cwd(), 'tests')).filter(
@@ -91,6 +94,15 @@ printf '%s\\0' "$@" > "$VITEST_ARGS_FILE"
 
     return { jestArgs: readArgs(jestArgsFile), vitestArgs: readArgs(vitestArgsFile) };
   }
+
+  test('keeps Jest limited to the canonical generated suites without a Vitest compatibility layer', () => {
+    expect(jestConfig.testMatch).toEqual(
+      generatedTestPatterns.map(
+        (pattern) => `<rootDir>/${pattern}${pattern.endsWith('.test.ts') ? '' : '/**/*.test.ts'}`,
+      ),
+    );
+    expect(jestConfig.moduleNameMapper).not.toHaveProperty('^vitest$');
+  });
 
   test('runs handwritten Vitest tests before generated serial Jest tests by default', () => {
     expect(runTestScript(['--showConfig'])).toEqual({
