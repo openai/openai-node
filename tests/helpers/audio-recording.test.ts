@@ -1,17 +1,19 @@
-jest.mock('node:child_process', () => ({ spawn: jest.fn() }));
+import { vi, type MockedFunction } from 'vitest';
+
+vi.mock('node:child_process', () => ({ spawn: vi.fn() }));
 
 import { spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { PassThrough, Readable, Writable } from 'node:stream';
 import { playAudio, recordAudio } from 'openai/helpers/audio';
 
-const spawnMock = spawn as jest.MockedFunction<typeof spawn>;
+const spawnMock = spawn as MockedFunction<typeof spawn>;
 
 function mockFfmpeg() {
   const ffmpeg = Object.assign(new EventEmitter(), {
     stdout: new PassThrough(),
     stderr: new PassThrough(),
-    kill: jest.fn(),
+    kill: vi.fn(),
   });
   spawnMock.mockReturnValue(ffmpeg as any);
   return ffmpeg;
@@ -25,14 +27,14 @@ function mockFfplay(exitCode = 0) {
       callback();
     },
   });
-  const ffplay = Object.assign(new EventEmitter(), { stdin, kill: jest.fn() });
+  const ffplay = Object.assign(new EventEmitter(), { stdin, kill: vi.fn() });
   stdin.on('finish', () => ffplay.emit('close', exitCode));
   spawnMock.mockReturnValue(ffplay as any);
   return { chunks, ffplay };
 }
 
 afterEach(() => {
-  jest.restoreAllMocks();
+  vi.restoreAllMocks();
   spawnMock.mockReset();
 });
 
@@ -86,7 +88,7 @@ describe('recordAudio', () => {
   test('terminates ffmpeg when the configured timeout expires', async () => {
     const ffmpeg = mockFfmpeg();
     const timeoutController = new AbortController();
-    const timeout = jest.spyOn(AbortSignal, 'timeout').mockReturnValue(timeoutController.signal);
+    const timeout = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(timeoutController.signal);
     const recording = recordAudio({ timeout: 50 });
 
     expect(timeout).toHaveBeenCalledWith(50);
@@ -99,7 +101,7 @@ describe('recordAudio', () => {
 
   test.each([0, -10])('does not install a timeout for %i milliseconds', async (timeout) => {
     const ffmpeg = mockFfmpeg();
-    const timeoutSpy = jest.spyOn(AbortSignal, 'timeout');
+    const timeoutSpy = vi.spyOn(AbortSignal, 'timeout');
     const recording = recordAudio({ timeout });
     ffmpeg.emit('close', 0);
 
@@ -110,7 +112,7 @@ describe('recordAudio', () => {
 
   test('reports ffmpeg process errors', async () => {
     const ffmpeg = mockFfmpeg();
-    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     const failure = new Error('microphone unavailable');
     const recording = recordAudio();
 

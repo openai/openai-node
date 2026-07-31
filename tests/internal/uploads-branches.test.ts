@@ -1,3 +1,5 @@
+import { vi } from 'vitest';
+
 import { buildHeaders } from 'openai/internal/headers';
 import { toFile } from 'openai/internal/to-file';
 import {
@@ -136,7 +138,7 @@ describe('buffered multipart forms', () => {
         return this.body.toString();
       }
     }
-    const unsupportedFetch = Object.assign(jest.fn(), { Response: UnsupportedResponse });
+    const unsupportedFetch = Object.assign(vi.fn(), { Response: UnsupportedResponse });
 
     await expect(createForm({}, unsupportedFetch as any)).rejects.toThrow(
       'fetch function does not support file uploads',
@@ -149,7 +151,7 @@ describe('buffered multipart forms', () => {
 
   test('consumes FormData capability probe responses and caches the result', async () => {
     const response = new Response('');
-    const probingFetch = jest.fn().mockResolvedValue(response);
+    const probingFetch = vi.fn().mockResolvedValue(response);
 
     await expect(createForm({}, probingFetch)).resolves.toBeInstanceOf(FormData);
     await expect(createForm({}, probingFetch)).resolves.toBeInstanceOf(FormData);
@@ -160,7 +162,7 @@ describe('buffered multipart forms', () => {
   });
 
   test('treats failed FormData capability checks as supported and caches the result', async () => {
-    const failingFetch = jest.fn().mockRejectedValue(new Error('capability probe failed'));
+    const failingFetch = vi.fn().mockRejectedValue(new Error('capability probe failed'));
     const client = { fetch: failingFetch };
 
     await expect(createForm({}, client as any)).resolves.toBeInstanceOf(FormData);

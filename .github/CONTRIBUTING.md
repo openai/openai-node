@@ -78,11 +78,13 @@ $ pnpm link --global openai
 
 ## Running tests
 
-The test suite is split between handwritten unit tests and Stainless-generated
-API-resource tests. Generated tests have a Stainless-generated comment at the
-top of the file and primarily live in `tests/api-resources/`. Handwritten tests
-live in `tests/lib/`, `tests/helpers/`, `tests/auth/`, and the remaining
-unmarked test files.
+The test suite is split between handwritten unit tests, which run with Vitest,
+and Stainless-generated API-resource tests, which remain on Jest. Generated
+tests have a Stainless-generated comment at the top of the file and primarily
+live in `tests/api-resources/`; a few generated client tests also live directly
+under `tests/`. Handwritten tests live in `tests/lib/`, `tests/helpers/`,
+`tests/auth/`, and the remaining unmarked test files. The existing Jest-based
+live and ecosystem fixtures also retain their own runners.
 
 ```sh
 $ pnpm test:unit       # Handwritten, isolated SDK behavior; no mock server
@@ -91,13 +93,20 @@ $ pnpm test            # Complete regular test suite
 $ pnpm test:coverage   # Complete suite with enforced coverage thresholds
 ```
 
-The full, generated, and coverage suites automatically start a
-[Steady mock server](https://github.com/dgellow/steady) against the OpenAPI
-spec when one is not already running. To manage that server yourself, run
-`./scripts/mock` in a separate terminal. Coverage is collected from SDK source
-files, excluding vendored third-party code and type-only modules. CI requires
-at least 98% statement and line coverage, 90% branch coverage, and 93%
-function coverage.
+Pass a handwritten or generated test path to the full-suite command to run only
+its corresponding runner, for example `pnpm test -- tests/lib/parser.test.ts`
+or `pnpm test -- tests/api-resources/models.test.ts`.
+
+The generated portion of the full, generated, and coverage suites automatically
+starts a [Steady mock server](https://github.com/dgellow/steady) against the
+OpenAPI spec when one is not already running. To manage that server yourself,
+run `./scripts/mock` in a separate terminal. Coverage combines Vitest and Jest
+results from SDK source files, excluding vendored third-party code and type-only
+modules. Both runners use V8 coverage; a shared Istanbul conversion keeps their
+source maps compatible before merging. The merged report is written to
+`coverage/` in text-summary, JSON-summary, and LCOV formats. CI requires at
+least 98% statement and line coverage, 90% branch coverage, and 93% function
+coverage.
 
 ## Running performance benchmarks
 

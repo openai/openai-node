@@ -1,6 +1,7 @@
 import {
   chmodSync,
   copyFileSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -38,6 +39,12 @@ exit 0
 printf '%s\\0' "$@" > "$JEST_ARGS_FILE"
 `,
     );
+    writeExecutable(
+      join(fixtureDir, 'node_modules/.bin/vitest'),
+      `#!/usr/bin/env bash
+printf '%s\\0' "$@" > "$VITEST_ARGS_FILE"
+`,
+    );
   });
 
   afterEach(() => {
@@ -49,14 +56,17 @@ printf '%s\\0' "$@" > "$JEST_ARGS_FILE"
     chmodSync(path, 0o755);
   }
 
-  function runTestScript(...args: string[]): string[] {
+  function runTestScript(args: string[], suite = 'all'): { jestArgs: string[]; vitestArgs: string[] } {
     const jestArgsFile = join(fixtureDir, 'jest-args');
+    const vitestArgsFile = join(fixtureDir, 'vitest-args');
     const result = spawnSync(join(fixtureDir, 'scripts/test'), args, {
       encoding: 'utf8',
       env: {
         ...process.env,
         JEST_ARGS_FILE: jestArgsFile,
+        OPENAI_TEST_SUITE: suite,
         PATH: `${join(fixtureDir, 'bin')}:${process.env['PATH']}`,
+        VITEST_ARGS_FILE: vitestArgsFile,
       },
     });
 
@@ -66,11 +76,73 @@ printf '%s\\0' "$@" > "$JEST_ARGS_FILE"
       );
     }
 
-    return readFileSync(jestArgsFile, 'utf8').split('\0').slice(0, -1);
+    const readArgs = (path: string) =>
+      existsSync(path) ? readFileSync(path, 'utf8').split('\0').slice(0, -1) : [];
+
+    return { jestArgs: readArgs(jestArgsFile), vitestArgs: readArgs(vitestArgsFile) };
   }
 
-  test('defaults to serial Jest execution with the local Steady server', () => {
-    expect(runTestScript('--showConfig')).toEqual(['--runInBand', '--showConfig']);
+  test('runs handwritten Vitest tests before generated serial Jest tests by default', () => {
+    expect(runTestScript(['--showConfig'])).toEqual({
+      jestArgs: ['--runInBand', '--showConfig'],
+      vitestArgs: ['run', '--config', 'vitest.config.mts'],
+    });
+  });
+
+  test('runs only handwritten Vitest tests for the unit suite', () => {
+    expect(runTestScript(['tests/lib/parser.test.ts'], 'unit')).toEqual({
+      jestArgs: [],
+      vitestArgs: ['run', '--config', 'vitest.config.mts', 'tests/lib/parser.test.ts'],
+    });
+  });
+
+  test('runs only generated Jest tests for the generated suite', () => {
+    expect(runTestScript(['--showConfig'], 'generated')).toEqual({
+      jestArgs: ['--runInBand', '--showConfig'],
+      vitestArgs: [],
+    });
+  });
+
+  test('routes handwritten path filters only to Vitest', () => {
+    expect(runTestScript(['tests/lib/parser.test.ts'])).toEqual({
+      jestArgs: [],
+      vitestArgs: ['run', '--config', 'vitest.config.mts', 'tests/lib/parser.test.ts'],
+    });
+  });
+
+  test('accepts the package-manager argument separator before handwritten filters', () => {
+    expect(runTestScript(['--', 'tests/lib/parser.test.ts'])).toEqual({
+      jestArgs: [],
+      vitestArgs: ['run', '--config', 'vitest.config.mts', 'tests/lib/parser.test.ts'],
+    });
+  });
+
+  test('routes generated path filters only to Jest', () => {
+    expect(runTestScript(['tests/api-resources/models.test.ts'])).toEqual({
+      jestArgs: ['--runInBand', 'tests/api-resources/models.test.ts'],
+      vitestArgs: [],
+    });
+  });
+
+  test('routes generated top-level client tests only to Jest', () => {
+    expect(runTestScript(['tests/index.test.ts'])).toEqual({
+      jestArgs: ['--runInBand', 'tests/index.test.ts'],
+      vitestArgs: [],
+    });
+  });
+
+  test('splits handwritten and generated path filters between their runners', () => {
+    expect(runTestScript(['tests/lib/parser.test.ts', 'tests/api-resources/models.test.ts'])).toEqual({
+      jestArgs: ['--runInBand', 'tests/api-resources/models.test.ts'],
+      vitestArgs: ['run', '--config', 'vitest.config.mts', 'tests/lib/parser.test.ts'],
+    });
+  });
+
+  test('does not forward Jest-only worker options to a filtered Vitest run', () => {
+    expect(runTestScript(['tests/lib/parser.test.ts', '--runInBand'])).toEqual({
+      jestArgs: [],
+      vitestArgs: ['run', '--config', 'vitest.config.mts', 'tests/lib/parser.test.ts'],
+    });
   });
 
   test.each([
@@ -83,6 +155,9 @@ printf '%s\\0' "$@" > "$JEST_ARGS_FILE"
     { label: '-wvalue', args: ['-w2'] },
     { label: '--run-in-band', args: ['--run-in-band'] },
   ])('preserves explicit worker arguments: $label', ({ args }) => {
-    expect(runTestScript('--showConfig', ...args)).toEqual(['--showConfig', ...args]);
+    expect(runTestScript(['--showConfig', ...args])).toEqual({
+      jestArgs: ['--showConfig', ...args],
+      vitestArgs: ['run', '--config', 'vitest.config.mts'],
+    });
   });
 });

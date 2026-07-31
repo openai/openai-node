@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import OpenAI from 'openai';
 import type { Response, RequestInit } from 'openai/internal/builtin-types';
 import { OAuthError, SubjectTokenProviderError } from 'openai';
@@ -21,7 +22,7 @@ const createTestClientOptions = () => ({
 
 describe('OpenAI with Workload Identity', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     delete process.env['OPENAI_API_KEY'];
     delete process.env['OPENAI_ADMIN_KEY'];
   });
@@ -61,7 +62,7 @@ describe('OpenAI with Workload Identity', () => {
   test('injects Authorization header with workload identity token', async () => {
     let apiRequestHeaders: Headers | undefined;
 
-    global.fetch = jest.fn(async (url: string, init?: RequestInit) => {
+    global.fetch = vi.fn(async (url: string, init?: RequestInit) => {
       const urlStr = url.toString();
 
       if (urlStr.includes('/oauth/token')) {
@@ -93,7 +94,7 @@ describe('OpenAI with Workload Identity', () => {
   });
 
   test('does not satisfy admin-only auth with workload identity', async () => {
-    global.fetch = jest.fn(async () => {
+    global.fetch = vi.fn(async () => {
       return new Response('Unexpected request', { status: 500 });
     }) as typeof fetch;
 
@@ -115,7 +116,7 @@ describe('OpenAI with Workload Identity', () => {
   test('reuses cached token across multiple requests', async () => {
     let tokenExchangeCallCount = 0;
 
-    global.fetch = jest.fn(async (url: string, init?: RequestInit) => {
+    global.fetch = vi.fn(async (url: string, init?: RequestInit) => {
       const urlStr = url.toString();
 
       if (urlStr.includes('/oauth/token')) {
@@ -151,7 +152,7 @@ describe('OpenAI with Workload Identity', () => {
     let apiCallCount = 0;
     let tokenExchangeCallCount = 0;
 
-    global.fetch = jest.fn(async (url: string, init?: RequestInit) => {
+    global.fetch = vi.fn(async (url: string, init?: RequestInit) => {
       const urlStr = url.toString();
 
       if (urlStr.includes('/oauth/token')) {
@@ -191,7 +192,7 @@ describe('OpenAI with Workload Identity', () => {
     let apiCallCount = 0;
     let tokenExchangeCallCount = 0;
 
-    global.fetch = jest.fn(async (url: string, init?: RequestInit) => {
+    global.fetch = vi.fn(async (url: string, init?: RequestInit) => {
       const urlStr = url.toString();
 
       if (urlStr.includes('/oauth/token')) {
@@ -227,7 +228,7 @@ describe('OpenAI with Workload Identity', () => {
     let apiCallCount = 0;
     let tokenExchangeCallCount = 0;
 
-    global.fetch = jest.fn(async (url: string, init?: RequestInit) => {
+    global.fetch = vi.fn(async (url: string, init?: RequestInit) => {
       const urlStr = url.toString();
 
       if (urlStr.includes('/oauth/token')) {
@@ -288,7 +289,7 @@ describe('OpenAI with Workload Identity', () => {
   });
 
   test('propagates OAuthError on token exchange failure', async () => {
-    global.fetch = jest.fn(async (url: string) => {
+    global.fetch = vi.fn(async (url: string) => {
       const urlStr = url.toString();
 
       if (urlStr.includes('/oauth/token')) {
@@ -312,7 +313,7 @@ describe('OpenAI with Workload Identity', () => {
   test('refreshes expired tokens automatically', async () => {
     let tokenExchangeCallCount = 0;
 
-    global.fetch = jest.fn(async (url: string, init?: RequestInit) => {
+    global.fetch = vi.fn(async (url: string, init?: RequestInit) => {
       const urlStr = url.toString();
 
       if (urlStr.includes('/oauth/token')) {
@@ -347,7 +348,7 @@ describe('OpenAI with Workload Identity', () => {
   });
 
   test('withOptions preserves workloadIdentity', async () => {
-    global.fetch = jest.fn(async (url: string) => {
+    global.fetch = vi.fn(async (url: string) => {
       const urlStr = url.toString();
 
       if (urlStr.includes('/oauth/token')) {
@@ -381,7 +382,7 @@ describe('OpenAI with Workload Identity', () => {
   test('works with custom subject token provider', async () => {
     let customProviderCallCount = 0;
 
-    global.fetch = jest.fn(async (url: string) => {
+    global.fetch = vi.fn(async (url: string) => {
       const urlStr = url.toString();
 
       if (urlStr.includes('/oauth/token')) {
@@ -425,10 +426,10 @@ describe('OpenAI with Workload Identity', () => {
   });
 
   test('uses client fetch for token exchange', async () => {
-    const globalFetchSpy = jest.fn(originalFetch as any);
+    const globalFetchSpy = vi.fn(originalFetch as any);
     global.fetch = globalFetchSpy as typeof fetch;
 
-    const clientFetch = jest.fn(async (url: string) => {
+    const clientFetch = vi.fn(async (url: string) => {
       const urlStr = url.toString();
 
       if (urlStr.includes('/oauth/token')) {

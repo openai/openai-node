@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import OpenAI from 'openai';
 import { ReadyState, type WebSocketLike } from 'openai/internal/ws-adapter';
@@ -14,8 +15,8 @@ import { WebSocketError as BetaWebSocketError } from 'openai/resources/beta/resp
 
 class FakeResponseSocket extends EventEmitter implements WebSocketLike {
   readyState: number = ReadyState.CONNECTING;
-  readonly send = jest.fn();
-  readonly close = jest.fn((code = 1000, reason = 'OK') => {
+  readonly send = vi.fn();
+  readonly close = vi.fn((code = 1000, reason = 'OK') => {
     this.readyState = ReadyState.CLOSED;
     this.emit('close', code, reason);
   });
@@ -108,7 +109,7 @@ describe.each(variants)('%s Responses WebSocket', (_version, Base, WebSocketErro
 
   test('reports queue overflows and disconnected sends to registered error listeners', () => {
     const websocket = createWebSocket({ maxQueueSize: 1 });
-    const listener = jest.fn();
+    const listener = vi.fn();
     websocket.on('error', listener);
 
     websocket.send({ type: 'first' } as any);
@@ -130,7 +131,7 @@ describe.each(variants)('%s Responses WebSocket', (_version, Base, WebSocketErro
 
   test('reports socket failures while sending, flushing, and closing', () => {
     const websocket = createWebSocket();
-    const listener = jest.fn();
+    const listener = vi.fn();
     websocket.on('error', listener);
     websocket.socket.open();
     websocket.socket.send.mockImplementation(() => {
@@ -155,10 +156,10 @@ describe.each(variants)('%s Responses WebSocket', (_version, Base, WebSocketErro
 
   test('dispatches JSON, typed events, binary data, invalid JSON, and API errors', () => {
     const websocket = createWebSocket();
-    const events = jest.fn();
-    const typed = jest.fn();
-    const raw = jest.fn();
-    const errors = jest.fn();
+    const events = vi.fn();
+    const typed = vi.fn();
+    const raw = vi.fn();
+    const errors = vi.fn();
     websocket.on('event', events);
     websocket.on('response.created', typed as any);
     websocket.on('raw', raw);
@@ -248,7 +249,7 @@ describe.each(variants)('%s Responses WebSocket', (_version, Base, WebSocketErro
   test('intentionally closes sockets using default or explicit close information', () => {
     const defaultClose = createWebSocket();
     const customClose = createWebSocket();
-    const listener = jest.fn();
+    const listener = vi.fn();
     customClose.on('close', listener);
 
     defaultClose.close();
@@ -260,12 +261,12 @@ describe.each(variants)('%s Responses WebSocket', (_version, Base, WebSocketErro
   });
 
   test('reconnects after recoverable closes and flushes queued messages', async () => {
-    const reconnect = jest.fn(() => ({ parameters: { starting_after: 'event_123' } }));
+    const reconnect = vi.fn(() => ({ parameters: { starting_after: 'event_123' } }));
     const websocket = createWebSocket({
       reconnect: { onReconnecting: reconnect, maxRetries: 1, initialDelay: 0, maxDelay: 0 },
     });
-    const reconnected = jest.fn();
-    websocket.on('error', jest.fn());
+    const reconnected = vi.fn();
+    websocket.on('error', vi.fn());
     websocket.on('reconnected', reconnected);
     const original = websocket.socket;
 
@@ -293,7 +294,7 @@ describe.each(variants)('%s Responses WebSocket', (_version, Base, WebSocketErro
         initialDelay: 0,
       },
     });
-    const closed = jest.fn();
+    const closed = vi.fn();
     websocket.on('close', closed);
 
     websocket.socket.readyState = ReadyState.CLOSED;
@@ -313,8 +314,8 @@ describe.each(variants)('%s Responses WebSocket', (_version, Base, WebSocketErro
         maxRetries: 1,
       },
     });
-    const errors = jest.fn();
-    const closed = jest.fn();
+    const errors = vi.fn();
+    const closed = vi.fn();
     websocket.on('error', errors);
     websocket.on('close', closed);
 
@@ -329,9 +330,9 @@ describe.each(variants)('%s Responses WebSocket', (_version, Base, WebSocketErro
   });
 
   test.each([1000, 1002, 1008])('does not reconnect after non-recoverable close %i', (code) => {
-    const reconnect = jest.fn();
+    const reconnect = vi.fn();
     const websocket = createWebSocket({ reconnect: { onReconnecting: reconnect } });
-    const closed = jest.fn();
+    const closed = vi.fn();
     websocket.on('close', closed);
 
     websocket.socket.readyState = ReadyState.CLOSED;

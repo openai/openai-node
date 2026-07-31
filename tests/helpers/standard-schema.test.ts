@@ -1,3 +1,5 @@
+import { vi } from 'vitest';
+
 import {
   standardFunction,
   standardResponseFormat,
@@ -60,8 +62,8 @@ function validateWeather(value: unknown) {
 function makeStandardSchema(
   jsonSchema: Record<string, unknown> = weatherJSONSchema as unknown as Record<string, unknown>,
 ) {
-  const input = jest.fn(() => jsonSchema);
-  const output = jest.fn(() => ({ type: 'string' }));
+  const input = vi.fn(() => jsonSchema);
+  const output = vi.fn(() => ({ type: 'string' }));
 
   return {
     input,
@@ -2016,7 +2018,7 @@ describe('Standard Schema helpers', () => {
 
   it('observes rejected asynchronous validators', async () => {
     const { standardSchema } = makeStandardSchema();
-    const unhandledRejection = jest.fn();
+    const unhandledRejection = vi.fn();
     const rejectingAsyncSchema = {
       ...standardSchema,
       '~standard': {

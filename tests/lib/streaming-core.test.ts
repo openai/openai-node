@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import { APIError, OpenAIError } from 'openai/core/error';
 import { Stream, _iterSSEMessages } from 'openai/core/streaming';
 import { ReadableStreamFrom } from 'openai/internal/shims';
@@ -52,7 +53,7 @@ describe('Stream.fromSSEResponse', () => {
   });
 
   test('reports malformed JSON from normal and thread events', async () => {
-    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     try {
       const ordinary = Stream.fromSSEResponse(responseForSSE('data: {bad-json}\n\n'), new AbortController());
@@ -112,9 +113,9 @@ describe('Stream.fromReadableStream', () => {
     const controller = new AbortController();
     controller.abort();
     const reader = {
-      read: jest.fn(),
-      cancel: jest.fn().mockResolvedValue(undefined),
-      releaseLock: jest.fn(),
+      read: vi.fn(),
+      cancel: vi.fn().mockResolvedValue(undefined),
+      releaseLock: vi.fn(),
     };
     const stream = Stream.fromReadableStream({ getReader: () => reader } as any, controller);
 
@@ -127,12 +128,12 @@ describe('Stream.fromReadableStream', () => {
   test('cancels readers when an abort arrives while a chunk is being read', async () => {
     const controller = new AbortController();
     const reader = {
-      read: jest.fn().mockImplementation(async () => {
+      read: vi.fn().mockImplementation(async () => {
         controller.abort();
         return { done: false, value: encoder.encode('{"ignored":true}\n') };
       }),
-      cancel: jest.fn().mockResolvedValue(undefined),
-      releaseLock: jest.fn(),
+      cancel: vi.fn().mockResolvedValue(undefined),
+      releaseLock: vi.fn(),
     };
     const stream = Stream.fromReadableStream({ getReader: () => reader } as any, controller);
 
@@ -215,10 +216,10 @@ describe('Stream.toReadableStream', () => {
   });
 
   test('closes the source iterator when the readable stream is canceled', async () => {
-    const returned = jest.fn().mockResolvedValue({ done: true, value: undefined });
+    const returned = vi.fn().mockResolvedValue({ done: true, value: undefined });
     const source = new Stream(
       () => ({
-        next: jest.fn().mockResolvedValue({ done: false, value: { id: 1 } }),
+        next: vi.fn().mockResolvedValue({ done: false, value: { id: 1 } }),
         return: returned,
       }),
       new AbortController(),
@@ -233,7 +234,7 @@ describe('Stream.toReadableStream', () => {
 
   test('propagates iterator failures through the readable stream', async () => {
     const failure = new OpenAIError('source failed');
-    const source = new Stream(() => ({ next: jest.fn().mockRejectedValue(failure) }), new AbortController());
+    const source = new Stream(() => ({ next: vi.fn().mockRejectedValue(failure) }), new AbortController());
 
     await expect(source.toReadableStream().getReader().read()).rejects.toBe(failure);
   });

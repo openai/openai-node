@@ -1,13 +1,15 @@
+import { vi, type MockedFunction } from 'vitest';
+
 import OpenAI from 'openai';
 import { AssistantStream } from 'openai/lib/AssistantStream';
 import { sleep } from 'openai/internal/utils/sleep';
 import type { NullableHeaders } from 'openai/internal/headers';
 
-jest.mock('openai/internal/utils/sleep', () => ({
-  sleep: jest.fn(async () => {}),
+vi.mock('openai/internal/utils/sleep', () => ({
+  sleep: vi.fn(async () => {}),
 }));
 
-const mockedSleep = sleep as jest.MockedFunction<typeof sleep>;
+const mockedSleep = sleep as MockedFunction<typeof sleep>;
 
 function createClient(): OpenAI {
   return new OpenAI({ apiKey: 'test-key', baseURL: 'https://example.com/v1/' });
@@ -24,7 +26,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  jest.restoreAllMocks();
+  vi.restoreAllMocks();
 });
 
 describe('vector store file helpers', () => {
@@ -32,8 +34,8 @@ describe('vector store file helpers', () => {
     const files = createClient().vectorStores.files;
     const created = { id: 'file_created', status: 'in_progress' };
     const completed = { id: 'file_created', status: 'completed' };
-    const create = jest.spyOn(files, 'create').mockImplementation(() => Promise.resolve(created) as any);
-    const poll = jest.spyOn(files, 'poll').mockResolvedValue(completed as any);
+    const create = vi.spyOn(files, 'create').mockImplementation(() => Promise.resolve(created) as any);
+    const poll = vi.spyOn(files, 'poll').mockResolvedValue(completed as any);
     const options = { pollIntervalMs: 12, headers: { 'X-Test': 'yes' } };
 
     await expect(files.createAndPoll('vs_123', { file_id: 'file_123' }, options)).resolves.toBe(completed);
@@ -49,7 +51,7 @@ describe('vector store file helpers', () => {
   ])('polls an in-progress file using the $name', async ({ interval, header, expected }) => {
     const files = createClient().vectorStores.files;
     const completed = { id: 'file_123', status: 'completed' };
-    const retrieve = jest
+    const retrieve = vi
       .spyOn(files, 'retrieve')
       .mockReturnValueOnce(
         withResponse(
@@ -72,7 +74,7 @@ describe('vector store file helpers', () => {
   test.each(['completed', 'failed'] as const)('returns a file in the %s terminal state', async (status) => {
     const files = createClient().vectorStores.files;
     const result = { id: 'file_123', status };
-    jest.spyOn(files, 'retrieve').mockReturnValue(withResponse(result));
+    vi.spyOn(files, 'retrieve').mockReturnValue(withResponse(result));
 
     await expect(files.poll('vs_123', 'file_123')).resolves.toEqual(result);
     expect(mockedSleep).not.toHaveBeenCalled();
@@ -84,10 +86,10 @@ describe('vector store file helpers', () => {
     const file = new File(['contents'], 'sample.txt');
     const uploaded = { id: 'file_uploaded' };
     const attached = { id: 'file_attached', status: 'completed' };
-    const upload = jest
+    const upload = vi
       .spyOn(client.files, 'create')
       .mockImplementation(() => Promise.resolve(uploaded) as any);
-    const create = jest.spyOn(resource, 'create').mockImplementation(() => Promise.resolve(attached) as any);
+    const create = vi.spyOn(resource, 'create').mockImplementation(() => Promise.resolve(attached) as any);
 
     await expect(resource.upload('vs_123', file)).resolves.toBe(attached);
     expect(upload).toHaveBeenCalledWith({ file, purpose: 'assistants' }, undefined);
@@ -100,8 +102,8 @@ describe('vector store file helpers', () => {
     const attached = { id: 'file_attached', status: 'in_progress' };
     const completed = { ...attached, status: 'completed' };
     const options = { pollIntervalMs: 5 };
-    const upload = jest.spyOn(files, 'upload').mockResolvedValue(attached as any);
-    const poll = jest.spyOn(files, 'poll').mockResolvedValue(completed as any);
+    const upload = vi.spyOn(files, 'upload').mockResolvedValue(attached as any);
+    const poll = vi.spyOn(files, 'poll').mockResolvedValue(completed as any);
 
     await expect(files.uploadAndPoll('vs_123', file, options)).resolves.toBe(completed);
     expect(upload).toHaveBeenCalledWith('vs_123', file, options);
@@ -114,8 +116,8 @@ describe('vector store file batch helpers', () => {
     const batches = createClient().vectorStores.fileBatches;
     const created = { id: 'batch_123', status: 'in_progress' };
     const completed = { ...created, status: 'completed' };
-    const create = jest.spyOn(batches, 'create').mockImplementation(() => Promise.resolve(created) as any);
-    const poll = jest.spyOn(batches, 'poll').mockResolvedValue(completed as any);
+    const create = vi.spyOn(batches, 'create').mockImplementation(() => Promise.resolve(created) as any);
+    const poll = vi.spyOn(batches, 'poll').mockResolvedValue(completed as any);
     const options = { pollIntervalMs: 5 };
 
     await expect(batches.createAndPoll('vs_123', { file_ids: ['file_123'] }, options)).resolves.toBe(
@@ -132,7 +134,7 @@ describe('vector store file batch helpers', () => {
   ])('polls in-progress batches with the $name', async ({ interval, header, expected }) => {
     const batches = createClient().vectorStores.fileBatches;
     const completed = { id: 'batch_123', status: 'completed' };
-    const retrieve = jest
+    const retrieve = vi
       .spyOn(batches, 'retrieve')
       .mockReturnValueOnce(
         withResponse({ id: 'batch_123', status: 'in_progress' }, { 'openai-poll-after-ms': header }),
@@ -152,7 +154,7 @@ describe('vector store file batch helpers', () => {
     async (status) => {
       const batches = createClient().vectorStores.fileBatches;
       const result = { id: 'batch_123', status };
-      jest.spyOn(batches, 'retrieve').mockReturnValue(withResponse(result));
+      vi.spyOn(batches, 'retrieve').mockReturnValue(withResponse(result));
 
       await expect(batches.poll('vs_123', 'batch_123')).resolves.toEqual(result);
       expect(mockedSleep).not.toHaveBeenCalled();
@@ -170,11 +172,11 @@ describe('vector store file batch helpers', () => {
     const batches = client.vectorStores.fileBatches;
     const files = [new File(['a'], 'a.txt'), new File(['b'], 'b.txt'), new File(['c'], 'c.txt')];
     let nextIdentifier = 0;
-    const upload = jest
+    const upload = vi
       .spyOn(client.files, 'create')
       .mockImplementation((async () => ({ id: `file_${++nextIdentifier}` })) as any);
     const result = { id: 'batch_123', status: 'completed' };
-    const createAndPoll = jest.spyOn(batches, 'createAndPoll').mockResolvedValue(result as any);
+    const createAndPoll = vi.spyOn(batches, 'createAndPoll').mockResolvedValue(result as any);
 
     await expect(
       batches.uploadAndPoll('vs_123', { files, fileIds: ['existing'] }, { maxConcurrency: 2 }),
@@ -188,11 +190,11 @@ describe('vector store file batch helpers', () => {
   test('propagates upload failures before creating a batch', async () => {
     const client = createClient();
     const batches = client.vectorStores.fileBatches;
-    jest
-      .spyOn(client.files, 'create')
-      .mockImplementation(() => Promise.reject(new Error('upload failed')) as any);
-    const createAndPoll = jest.spyOn(batches, 'createAndPoll');
-    const logError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(client.files, 'create').mockImplementation(
+      () => Promise.reject(new Error('upload failed')) as any,
+    );
+    const createAndPoll = vi.spyOn(batches, 'createAndPoll');
+    const logError = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     await expect(batches.uploadAndPoll('vs_123', { files: [new File(['a'], 'a.txt')] })).rejects.toThrow(
       '1 promise(s) failed',
@@ -207,8 +209,8 @@ describe('assistant run helpers', () => {
     const runs = createClient().beta.threads.runs;
     const run = { id: 'run_123', status: 'queued' };
     const completed = { ...run, status: 'completed' };
-    const create = jest.spyOn(runs, 'create').mockImplementation(() => Promise.resolve(run) as any);
-    const poll = jest.spyOn(runs, 'poll').mockResolvedValue(completed as any);
+    const create = vi.spyOn(runs, 'create').mockImplementation(() => Promise.resolve(run) as any);
+    const poll = vi.spyOn(runs, 'poll').mockResolvedValue(completed as any);
     const options = { pollIntervalMs: 3 };
 
     await expect(runs.createAndPoll('thread_123', { assistant_id: 'assistant_123' }, options)).resolves.toBe(
@@ -223,7 +225,7 @@ describe('assistant run helpers', () => {
     async (status) => {
       const runs = createClient().beta.threads.runs;
       const completed = { id: 'run_123', status: 'completed' };
-      const retrieve = jest
+      const retrieve = vi
         .spyOn(runs, 'retrieve')
         .mockReturnValueOnce(withResponse({ id: 'run_123', status }, { 'openai-poll-after-ms': '9' }))
         .mockReturnValueOnce(withResponse(completed));
@@ -240,7 +242,7 @@ describe('assistant run helpers', () => {
     async (status) => {
       const runs = createClient().beta.threads.runs;
       const run = { id: 'run_123', status };
-      jest.spyOn(runs, 'retrieve').mockReturnValue(withResponse(run));
+      vi.spyOn(runs, 'retrieve').mockReturnValue(withResponse(run));
 
       await expect(runs.poll('run_123', { thread_id: 'thread_123' })).resolves.toEqual(run);
       expect(mockedSleep).not.toHaveBeenCalled();
@@ -250,7 +252,7 @@ describe('assistant run helpers', () => {
   test('uses explicit and fallback polling intervals', async () => {
     const runs = createClient().beta.threads.runs;
     const completed = { id: 'run_123', status: 'completed' };
-    const retrieve = jest.spyOn(runs, 'retrieve');
+    const retrieve = vi.spyOn(runs, 'retrieve');
 
     retrieve
       .mockReturnValueOnce(
@@ -274,10 +276,8 @@ describe('assistant run helpers', () => {
     const run = { id: 'run_123', status: 'in_progress' };
     const completed = { ...run, status: 'completed' };
     const params = { thread_id: 'thread_123', tool_outputs: [{ tool_call_id: 'tool_123', output: 'done' }] };
-    const submit = jest
-      .spyOn(runs, 'submitToolOutputs')
-      .mockImplementation(() => Promise.resolve(run) as any);
-    const poll = jest.spyOn(runs, 'poll').mockResolvedValue(completed as any);
+    const submit = vi.spyOn(runs, 'submitToolOutputs').mockImplementation(() => Promise.resolve(run) as any);
+    const poll = vi.spyOn(runs, 'poll').mockResolvedValue(completed as any);
     const options = { pollIntervalMs: 3 };
 
     await expect(runs.submitToolOutputsAndPoll('run_123', params, options)).resolves.toBe(completed);
@@ -288,7 +288,7 @@ describe('assistant run helpers', () => {
   test('routes deprecated and current run streams through the same stream helper', () => {
     const runs = createClient().beta.threads.runs;
     const stream = {} as AssistantStream;
-    const createStream = jest.spyOn(AssistantStream, 'createAssistantStream').mockReturnValue(stream);
+    const createStream = vi.spyOn(AssistantStream, 'createAssistantStream').mockReturnValue(stream);
     const body = { assistant_id: 'assistant_123' };
     const options = { headers: { 'X-Test': 'yes' } };
 
@@ -301,7 +301,7 @@ describe('assistant run helpers', () => {
   test('creates a streaming tool-output runner', () => {
     const runs = createClient().beta.threads.runs;
     const stream = {} as AssistantStream;
-    const createStream = jest.spyOn(AssistantStream, 'createToolAssistantStream').mockReturnValue(stream);
+    const createStream = vi.spyOn(AssistantStream, 'createToolAssistantStream').mockReturnValue(stream);
     const params = { thread_id: 'thread_123', tool_outputs: [{ tool_call_id: 'tool_123', output: 'done' }] };
 
     expect(runs.submitToolOutputsStream('run_123', params)).toBe(stream);
@@ -314,10 +314,10 @@ describe('assistant thread helpers', () => {
     const threads = createClient().beta.threads;
     const run = { id: 'run_123', thread_id: 'thread_123', status: 'queued' };
     const completed = { ...run, status: 'completed' };
-    const createAndRun = jest
+    const createAndRun = vi
       .spyOn(threads, 'createAndRun')
       .mockImplementation(() => Promise.resolve(run) as any);
-    const poll = jest.spyOn(threads.runs, 'poll').mockResolvedValue(completed as any);
+    const poll = vi.spyOn(threads.runs, 'poll').mockResolvedValue(completed as any);
     const body = { assistant_id: 'assistant_123' };
     const options = { pollIntervalMs: 2 };
 
@@ -329,7 +329,7 @@ describe('assistant thread helpers', () => {
   test('creates a streamed thread and assistant run', () => {
     const threads = createClient().beta.threads;
     const stream = {} as AssistantStream;
-    const createStream = jest.spyOn(AssistantStream, 'createThreadAssistantStream').mockReturnValue(stream);
+    const createStream = vi.spyOn(AssistantStream, 'createThreadAssistantStream').mockReturnValue(stream);
     const body = { assistant_id: 'assistant_123' };
     const options = { headers: { 'X-Test': 'yes' } };
 

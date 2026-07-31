@@ -1,3 +1,5 @@
+import { vi } from 'vitest';
+
 import { EventEmitter } from 'node:events';
 import { BrowserWebSocket } from 'openai/internal/ws-adapter-browser';
 import { NodeWebSocket } from 'openai/internal/ws-adapter-node';
@@ -7,12 +9,12 @@ import { flattenRawData, isRecoverableClose, SendQueue } from 'openai/internal/w
 class FakeBrowserSocket {
   readyState = ReadyState.OPEN;
   binaryType = 'blob';
-  readonly send = jest.fn();
-  readonly close = jest.fn();
-  readonly addEventListener = jest.fn((event: string, listener: (...args: any[]) => void) => {
+  readonly send = vi.fn();
+  readonly close = vi.fn();
+  readonly addEventListener = vi.fn((event: string, listener: (...args: any[]) => void) => {
     this.listeners.set(event, listener);
   });
-  readonly removeEventListener = jest.fn((event: string) => {
+  readonly removeEventListener = vi.fn((event: string) => {
     this.listeners.delete(event);
   });
   readonly listeners = new Map<string, (...args: any[]) => void>();
@@ -24,8 +26,8 @@ class FakeBrowserSocket {
 
 class FakeNodeSocket extends EventEmitter {
   readyState = ReadyState.OPEN;
-  readonly send = jest.fn();
-  readonly close = jest.fn();
+  readonly send = vi.fn();
+  readonly close = vi.fn();
 }
 
 describe('BrowserWebSocket', () => {
@@ -47,8 +49,8 @@ describe('BrowserWebSocket', () => {
   test('normalizes text, binary, and close event arguments', () => {
     const socket = new FakeBrowserSocket();
     const adapter = new BrowserWebSocket(socket as any);
-    const onMessage = jest.fn();
-    const onClose = jest.fn();
+    const onMessage = vi.fn();
+    const onClose = vi.fn();
 
     adapter.on('message', onMessage);
     socket.emit('message', { data: 'hello' });
@@ -68,7 +70,7 @@ describe('BrowserWebSocket', () => {
   ])('normalizes browser error events', (event, message, cause) => {
     const socket = new FakeBrowserSocket();
     const adapter = new BrowserWebSocket(socket as any);
-    const listener = jest.fn();
+    const listener = vi.fn();
     adapter.on('error', listener);
 
     socket.emit('error', event);
@@ -82,8 +84,8 @@ describe('BrowserWebSocket', () => {
   test('forwards open listeners and removes regular and one-time listeners', () => {
     const socket = new FakeBrowserSocket();
     const adapter = new BrowserWebSocket(socket as any);
-    const onOpen = jest.fn();
-    const once = jest.fn();
+    const onOpen = vi.fn();
+    const once = vi.fn();
 
     adapter.off('missing', onOpen);
     adapter.on('open', onOpen);
@@ -127,7 +129,7 @@ describe('NodeWebSocket', () => {
   ] as const)('normalizes ws message payloads', (data, isBinary, expected) => {
     const socket = new FakeNodeSocket();
     const adapter = new NodeWebSocket(socket as any);
-    const listener = jest.fn();
+    const listener = vi.fn();
     adapter.on('message', listener);
 
     socket.emit('message', data, isBinary);
@@ -138,9 +140,9 @@ describe('NodeWebSocket', () => {
   test('normalizes close reasons, preserves pass-through events, and removes listeners', () => {
     const socket = new FakeNodeSocket();
     const adapter = new NodeWebSocket(socket as any);
-    const onClose = jest.fn();
-    const onOpen = jest.fn();
-    const once = jest.fn();
+    const onClose = vi.fn();
+    const onOpen = vi.fn();
+    const once = vi.fn();
 
     adapter.off('missing', onOpen);
     adapter.on('close', onClose);

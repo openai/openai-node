@@ -1,10 +1,12 @@
-jest.mock('node:child_process', () => ({ spawn: jest.fn() }));
+import { vi, type MockedFunction } from 'vitest';
+
+vi.mock('node:child_process', () => ({ spawn: vi.fn() }));
 
 import { spawn } from 'node:child_process';
 import { Readable, Writable } from 'node:stream';
 import { playAudio } from 'openai/helpers/audio';
 
-const spawnMock = spawn as jest.MockedFunction<typeof spawn>;
+const spawnMock = spawn as MockedFunction<typeof spawn>;
 
 function mockFfplay() {
   const chunks: Buffer[] = [];
@@ -16,8 +18,8 @@ function mockFfplay() {
   });
   const ffplay = {
     stdin,
-    kill: jest.fn(),
-    on: jest.fn(),
+    kill: vi.fn(),
+    on: vi.fn(),
   };
 
   ffplay.on.mockImplementation((event: string, listener: (code: number) => void) => {
@@ -37,7 +39,7 @@ function mockFfplay() {
 
 describe('playAudio', () => {
   afterEach(() => {
-    jest.resetAllMocks();
+    vi.resetAllMocks();
   });
 
   it('pipes a Response Web ReadableStream body to ffplay', async () => {

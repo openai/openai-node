@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import { allSettledWithThrow } from 'openai/lib/Util';
 
 describe('allSettledWithThrow', () => {
@@ -14,7 +15,7 @@ describe('allSettledWithThrow', () => {
   test('logs every rejection and reports how many promises failed', async () => {
     const firstError = new Error('first failure');
     const secondError = new Error('second failure');
-    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     try {
       await expect(

@@ -144,7 +144,7 @@ jobs:
           node-version: '${{ matrix.node-version }}'
 
       - name: Run tests
-        run: ./scripts/test
+        run: pnpm test
 
       - name: Test packed npm package
         if: matrix.experimental == false

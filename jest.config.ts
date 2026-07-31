@@ -8,6 +8,7 @@ const generatedTestPatterns = [
 ];
 
 const testSuite = process.env['OPENAI_TEST_SUITE'] ?? 'all';
+const partialCoverage = process.env['OPENAI_COVERAGE_PARTIAL'] === '1';
 
 if (!['all', 'generated', 'unit'].includes(testSuite)) {
   throw new Error(`Unknown OPENAI_TEST_SUITE: ${testSuite}. Expected all, generated, or unit.`);
@@ -32,15 +33,18 @@ const config: JestConfigWithTsJest = {
   coverageDirectory: '<rootDir>/coverage',
   coverageProvider: 'v8',
   coverageReporters: ['text-summary', 'json-summary', 'lcov'],
-  coverageThreshold: {
-    global: {
-      // Keep source-line coverage near total while independently ratcheting complex paths.
-      branches: 90,
-      functions: 93,
-      lines: 98,
-      statements: 98,
-    },
-  },
+  coverageThreshold:
+    partialCoverage ?
+      { global: {} }
+    : {
+        global: {
+          // Keep source-line coverage near total while independently ratcheting complex paths.
+          branches: 90,
+          functions: 93,
+          lines: 98,
+          statements: 98,
+        },
+      },
   testMatch: testSuite === 'generated' ? generatedTestPatterns : ['<rootDir>/tests/**/*.test.ts'],
   transform: {
     '^.+\\.(t|j)sx?$': ['@swc/jest', { sourceMaps: 'inline' }],

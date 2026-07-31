@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import { AzureOpenAI } from 'openai';
 import { APIUserAbortError } from 'openai';
 import { type Response, RequestInit, RequestInfo } from 'openai/internal/builtin-types';
@@ -12,10 +13,10 @@ describe('instantiate azure client', () => {
   const env = process.env;
 
   beforeEach(() => {
-    jest.resetModules();
+    vi.resetModules();
     process.env = { ...env };
 
-    console.warn = jest.fn();
+    console.warn = vi.fn();
   });
 
   afterEach(() => {
@@ -152,7 +153,7 @@ describe('instantiate azure client', () => {
     const controller = new AbortController();
     setTimeout(() => controller.abort(), 200);
 
-    const spy = jest.spyOn(client, 'request');
+    const spy = vi.spyOn(client, 'request');
 
     await expect(client.get('/foo', { signal: controller.signal })).rejects.toThrowError(APIUserAbortError);
     expect(spy).toHaveBeenCalledTimes(1);

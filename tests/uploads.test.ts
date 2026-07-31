@@ -1,3 +1,5 @@
+import { vi } from 'vitest';
+
 import fs from 'fs';
 import type { ResponseLike } from 'openai/internal/to-file';
 import { toFile } from 'openai/core/uploads';
@@ -18,23 +20,19 @@ describe('toFile', () => {
     await expect(
       // @ts-expect-error intentionally mismatched type
       toFile({ foo: 'string' }),
-    ).rejects.toThrowErrorMatchingInlineSnapshot(
-      `"Unexpected data type: object; constructor: Object; props: ["foo"]"`,
-    );
+    ).rejects.toThrow('Unexpected data type: object; constructor: Object; props: ["foo"]');
 
     await expect(
       // @ts-expect-error intentionally mismatched type
       toFile(new MyClass()),
-    ).rejects.toThrowErrorMatchingInlineSnapshot(
-      `"Unexpected data type: object; constructor: MyClass; props: ["name"]"`,
-    );
+    ).rejects.toThrow('Unexpected data type: object; constructor: MyClass; props: ["name"]');
   });
 
   it('disallows string at the type-level', async () => {
     // @ts-expect-error we intentionally do not type support for `string`
     // to help people avoid passing a file path
     const file = await toFile('contents');
-    expect(file.text()).resolves.toEqual('contents');
+    await expect(file.text()).resolves.toEqual('contents');
   });
 
   it('extracts a file name from a Response', async () => {
@@ -78,7 +76,7 @@ describe('missing File error message', () => {
   beforeEach(() => {
     // The file shim captures the global File object when it's first imported.
     // Reset modules before each test so we can test the error thrown when it's undefined.
-    jest.resetModules();
+    vi.resetModules();
     const buffer = require('node:buffer');
     // @ts-ignore
     prevGlobalFile = globalThis.File;
@@ -92,7 +90,7 @@ describe('missing File error message', () => {
     // @ts-ignore
     globalThis.File = prevGlobalFile;
     require('node:buffer').File = prevNodeFile;
-    jest.resetModules();
+    vi.resetModules();
   });
 
   test('is thrown', async () => {

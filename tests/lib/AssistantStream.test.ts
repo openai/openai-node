@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import { APIUserAbortError, OpenAIError } from 'openai/core/error';
 import { ReadableStreamFrom } from 'openai/internal/shims';
 import { AssistantStream } from 'openai/lib/AssistantStream';
@@ -80,7 +81,7 @@ describe('AssistantStream delta accumulation', () => {
       'property to be a number',
     );
 
-    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
       expect(() => AssistantStream.accumulateDelta({ entries: [{}] }, { entries: [{}] })).toThrow(
         'Expected array delta entry to have an `index` property',
@@ -147,12 +148,12 @@ describe('AssistantStream snapshots and message lifecycle', () => {
       { event: 'thread.message.completed', data: finalMessage },
       finalRun,
     ]);
-    const created = jest.fn();
-    const textCreated = jest.fn();
-    const textDelta = jest.fn();
-    const textDone = jest.fn();
-    const imageDone = jest.fn();
-    const messageDone = jest.fn();
+    const created = vi.fn();
+    const textCreated = vi.fn();
+    const textDelta = vi.fn();
+    const textDone = vi.fn();
+    const imageDone = vi.fn();
+    const messageDone = vi.fn();
 
     runner.on('messageCreated', created);
     runner.on('textCreated', textCreated);
@@ -204,7 +205,7 @@ describe('AssistantStream snapshots and message lifecycle', () => {
       },
       completedRun(),
     ]);
-    const textDone = jest.fn();
+    const textDone = vi.fn();
     runner.on('textDone', textDone);
 
     await runner.done();
@@ -291,12 +292,12 @@ describe('AssistantStream run-step lifecycle', () => {
       { event: 'thread.run.step.completed', data: finalStep },
       completedRun(),
     ]);
-    const stepCreated = jest.fn();
-    const stepDelta = jest.fn();
-    const stepDone = jest.fn();
-    const toolCreated = jest.fn();
-    const toolDelta = jest.fn();
-    const toolDone = jest.fn();
+    const stepCreated = vi.fn();
+    const stepDelta = vi.fn();
+    const stepDone = vi.fn();
+    const toolCreated = vi.fn();
+    const toolDelta = vi.fn();
+    const toolDone = vi.fn();
 
     runner.on('runStepCreated', stepCreated);
     runner.on('runStepDelta', stepDelta);
@@ -321,7 +322,7 @@ describe('AssistantStream run-step lifecycle', () => {
     async (event) => {
       const step = { id: 'step_123', step_details: { type: 'message_creation', message_creation: {} } };
       const runner = assistantStream([{ event, data: step }, completedRun()]);
-      const stepDone = jest.fn();
+      const stepDone = vi.fn();
       runner.on('runStepDone', stepDone);
 
       await runner.done();
@@ -360,7 +361,7 @@ describe('AssistantStream run-step lifecycle', () => {
       },
       completedRun(),
     ]);
-    const toolDone = jest.fn();
+    const toolDone = vi.fn();
     runner.on('toolCallDone', toolDone);
 
     await runner.done();
@@ -371,7 +372,7 @@ describe('AssistantStream run-step lifecycle', () => {
 
 describe('AssistantStream factories and async iteration', () => {
   test('creates a run stream with helper headers and a controlled abort signal', async () => {
-    const runs = { create: jest.fn().mockResolvedValue(iterableEvents([completedRun()])) };
+    const runs = { create: vi.fn().mockResolvedValue(iterableEvents([completedRun()])) };
     const runner = AssistantStream.createAssistantStream(
       'thread_123',
       runs as any,
@@ -391,7 +392,7 @@ describe('AssistantStream factories and async iteration', () => {
   });
 
   test('creates a thread-and-run stream with helper headers', async () => {
-    const threads = { createAndRun: jest.fn().mockResolvedValue(iterableEvents([completedRun()])) };
+    const threads = { createAndRun: vi.fn().mockResolvedValue(iterableEvents([completedRun()])) };
     const runner = AssistantStream.createThreadAssistantStream(
       { assistant_id: 'assistant_123' },
       threads as any,
@@ -410,7 +411,7 @@ describe('AssistantStream factories and async iteration', () => {
   });
 
   test('creates a tool-output stream with helper headers', async () => {
-    const runs = { submitToolOutputs: jest.fn().mockResolvedValue(iterableEvents([completedRun()])) };
+    const runs = { submitToolOutputs: vi.fn().mockResolvedValue(iterableEvents([completedRun()])) };
     const runner = AssistantStream.createToolAssistantStream(
       'run_123',
       runs as any,
@@ -534,19 +535,19 @@ describe('AssistantStream factories and async iteration', () => {
         case 'run':
           runner = AssistantStream.createAssistantStream(
             'thread_123',
-            { create: jest.fn().mockResolvedValue(stream) } as any,
+            { create: vi.fn().mockResolvedValue(stream) } as any,
             { assistant_id: 'assistant_123' },
           );
           break;
         case 'thread':
           runner = AssistantStream.createThreadAssistantStream({ assistant_id: 'assistant_123' }, {
-            createAndRun: jest.fn().mockResolvedValue(stream),
+            createAndRun: vi.fn().mockResolvedValue(stream),
           } as any);
           break;
         case 'tool':
           runner = AssistantStream.createToolAssistantStream(
             'run_123',
-            { submitToolOutputs: jest.fn().mockResolvedValue(stream) } as any,
+            { submitToolOutputs: vi.fn().mockResolvedValue(stream) } as any,
             { thread_id: 'thread_123', tool_outputs: [] },
             undefined,
           );

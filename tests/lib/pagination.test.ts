@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import {
   ConversationCursorPage,
   CursorPage,
@@ -19,7 +20,7 @@ const options: FinalRequestOptions = {
 
 describe('Page', () => {
   test('exposes its items without claiming that another page exists', async () => {
-    const client = { requestAPIList: jest.fn() } as any;
+    const client = { requestAPIList: vi.fn() } as any;
     const page = new Page<Item>(client, response, { object: 'list', data: [{ id: 'first' }] }, options);
 
     expect(page.object).toBe('list');
@@ -44,7 +45,7 @@ describe('Page', () => {
 
 describe('PagePromise', () => {
   test('parses and asynchronously iterates over the resolved page', async () => {
-    const client = { requestAPIList: jest.fn() } as any;
+    const client = { requestAPIList: vi.fn() } as any;
     const pageResponse = new Response(JSON.stringify({ object: 'list', data: [{ id: 'first' }] }), {
       headers: { 'content-type': 'application/json', 'x-request-id': 'req_123' },
     });
@@ -102,7 +103,7 @@ describe('CursorPage', () => {
   });
 
   test('requests and iterates subsequent pages through the owning client', async () => {
-    const client = { requestAPIList: jest.fn() } as any;
+    const client = { requestAPIList: vi.fn() } as any;
     const first = new CursorPage<Item>(
       client,
       response,
