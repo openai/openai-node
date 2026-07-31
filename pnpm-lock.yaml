@@ -140,6 +140,9 @@ importers:
       openai:
         specifier: file:..
         version: file:(@aws-sdk/credential-provider-node@3.972.47)(@smithy/hash-node@4.3.5)(@smithy/signature-v4@5.4.6)(ws@8.21.0)(zod@4.4.3)
+      undici:
+        specifier: ^8.0.0
+        version: 8.8.0
       zod-to-json-schema:
         specifier: ^3.21.4
         version: 3.25.2(zod@4.4.3)
@@ -3157,6 +3160,10 @@ packages:
 
   undici-types@7.16.0:
     resolution: {integrity: sha512-Zz+aZWSj8LE6zoxD+xrjh4VfkIG8Ya6LvYkZqtUQGJPZjYl53ypCaUwWqo7eI0x66KBGeRo+mlBEkMSeSZ38Nw==}
+
+  undici@8.8.0:
+    resolution: {integrity: sha512-ubshXMXwF3MQIMF1y/WxZdNBnjEKeSg2wF5mcGUtU55YTw34tnVVpKRlLf7ruDXZ5344KokPVX4RBx1wJm64Bw==}
+    engines: {node: '>=22.19.0'}
 
   unicode-emoji-modifier-base@1.0.0:
     resolution: {integrity: sha512-yLSH4py7oFH3oG/9K+XWrz1pSi3dfUrWEnInbxMfArOfc1+33BlGPQtLsOYwvdMy11AwUBetYuaRxSPqgkq+8g==}
@@ -6712,6 +6719,8 @@ snapshots:
     optional: true
 
   undici-types@7.16.0: {}
+
+  undici@8.8.0: {}
 
   unicode-emoji-modifier-base@1.0.0: {}
 

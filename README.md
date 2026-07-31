@@ -766,6 +766,38 @@ const client = new OpenAI({
 });
 ```
 
+### Mutual TLS
+
+The API mTLS beta combines your API key with a client certificate. For enrollment, certificate requirements, activation, and supported endpoints, see the [OpenAI Mutual TLS Beta Program](https://help.openai.com/en/articles/10876024-openai-mutual-tls-beta-program). Configure mTLS on your runtime's HTTP transport, then pass that transport to the SDK with `fetch` and `fetchOptions`. Set `baseURL` to the mTLS endpoint explicitly:
+
+```ts
+import { readFile } from 'node:fs/promises';
+import { Agent, fetch as undiciFetch } from 'undici';
+import OpenAI from 'openai';
+
+const dispatcher = new Agent({
+  connect: {
+    // One PEM chain: leaf certificate first, then required intermediates.
+    cert: await readFile('/path/to/client-cert-chain.pem'),
+    key: await readFile('/path/to/client-key.pem'),
+  },
+});
+
+const client = new OpenAI({
+  apiKey: process.env['OPENAI_API_KEY'],
+  baseURL: 'https://mtls.api.openai.com/v1',
+  fetch: undiciFetch,
+  fetchOptions: {
+    dispatcher,
+    redirect: 'manual',
+  },
+});
+```
+
+Use `https://mtls-eu.api.openai.com/v1` for EU Data Residency. The example uses manual redirects so the certificate-bearing transport does not automatically follow a redirect to another host. Close transports your application creates when they are no longer needed.
+
+See the runnable [Node.js, Deno, and Bun mTLS examples](./examples/mtls/README.md) for certificate-chain setup, optional Node.js encrypted-key support, and runtime-specific transport cleanup.
+
 ## Frequently Asked Questions
 
 ## Semantic versioning
