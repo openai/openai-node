@@ -20,8 +20,8 @@ export default defineConfig({
       'tests/stringifyQuery.test.ts',
       'tests/live/**',
     ],
-    fileParallelism: false,
-    maxWorkers: 1,
+    fileParallelism: true,
+    maxWorkers: 4,
     coverage: {
       provider: 'custom',
       customProviderModule: './scripts/vitest-coverage-provider.mjs',
