@@ -100,10 +100,11 @@ or `pnpm test -- tests/api-resources/models.test.ts`.
 The generated portion of the full, generated, and coverage suites automatically
 starts a [Steady mock server](https://github.com/dgellow/steady) against the
 OpenAPI spec when one is not already running. To manage that server yourself,
-run `./scripts/mock` in a separate terminal. Coverage combines Vitest and Jest
-results from SDK source files, excluding vendored third-party code and type-only
-modules. Both runners use V8 coverage; a shared Istanbul conversion keeps their
-source maps compatible before merging. The merged report is written to
+run `./scripts/mock` in a separate terminal. Coverage runs both suites through
+one V8 instrumenter, excluding vendored third-party code and type-only modules.
+A compatibility adapter lets handwritten Vitest tests share Jest's coverage
+pass without changing their normal Vitest runner. Incompatible coverage maps
+are rejected before merging. The report is written to
 `coverage/` in text-summary, JSON-summary, and LCOV formats. CI requires at
 least 98% statement and line coverage, 90% branch coverage, and 93% function
 coverage.

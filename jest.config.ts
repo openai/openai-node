@@ -1,18 +1,5 @@
 import type { JestConfigWithTsJest } from 'ts-jest';
-
-const generatedTestPatterns = [
-  '<rootDir>/tests/api-resources/**/*.test.ts',
-  '<rootDir>/tests/backwards-compat-resource-exports.test.ts',
-  '<rootDir>/tests/index.test.ts',
-  '<rootDir>/tests/stringifyQuery.test.ts',
-];
-
-const testSuite = process.env['OPENAI_TEST_SUITE'] ?? 'all';
-const partialCoverage = process.env['OPENAI_COVERAGE_PARTIAL'] === '1';
-
-if (!['all', 'generated', 'unit'].includes(testSuite)) {
-  throw new Error(`Unknown OPENAI_TEST_SUITE: ${testSuite}. Expected all, generated, or unit.`);
-}
+import generatedTestPatterns from './scripts/generated-test-patterns.json';
 
 const config: JestConfigWithTsJest = {
   preset: 'ts-jest/presets/default-esm',
@@ -33,19 +20,18 @@ const config: JestConfigWithTsJest = {
   coverageDirectory: '<rootDir>/coverage',
   coverageProvider: 'v8',
   coverageReporters: ['text-summary', 'json-summary', 'lcov'],
-  coverageThreshold:
-    partialCoverage ?
-      { global: {} }
-    : {
-        global: {
-          // Keep source-line coverage near total while independently ratcheting complex paths.
-          branches: 90,
-          functions: 93,
-          lines: 98,
-          statements: 98,
-        },
-      },
-  testMatch: testSuite === 'generated' ? generatedTestPatterns : ['<rootDir>/tests/**/*.test.ts'],
+  coverageThreshold: {
+    global: {
+      // Keep source-line coverage near total while independently ratcheting complex paths.
+      branches: 90,
+      functions: 93,
+      lines: 98,
+      statements: 98,
+    },
+  },
+  testMatch: generatedTestPatterns.map(
+    (pattern) => `<rootDir>/${pattern}${pattern.endsWith('.test.ts') ? '' : '/**/*.test.ts'}`,
+  ),
   transform: {
     '^.+\\.(t|j)sx?$': ['@swc/jest', { sourceMaps: 'inline' }],
   },
@@ -60,18 +46,7 @@ const config: JestConfigWithTsJest = {
     '<rootDir>/deno_tests/',
     '<rootDir>/packages/',
   ],
-  testPathIgnorePatterns: [
-    'scripts',
-    '<rootDir>/tests/live/',
-    ...(testSuite === 'unit' ?
-      [
-        '<rootDir>/tests/api-resources/',
-        '<rootDir>/tests/backwards-compat-resource-exports\\.test\\.ts$',
-        '<rootDir>/tests/index\\.test\\.ts$',
-        '<rootDir>/tests/stringifyQuery\\.test\\.ts$',
-      ]
-    : []),
-  ],
+  testPathIgnorePatterns: ['scripts', '<rootDir>/tests/live/'],
   // prettierPath: require.resolve('prettier-2'),
 };
 

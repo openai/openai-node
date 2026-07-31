@@ -4,6 +4,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -13,6 +14,14 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 const testScriptPath = join(process.cwd(), 'scripts/test');
+const generatedTestPatternsPath = join(process.cwd(), 'scripts/generated-test-patterns.json');
+const generatedTopLevelTests = readdirSync(join(process.cwd(), 'tests')).filter(
+  (file) =>
+    file.endsWith('.test.ts') &&
+    readFileSync(join(process.cwd(), 'tests', file), 'utf8').startsWith(
+      '// File generated from our OpenAPI spec by Stainless.',
+    ),
+);
 
 describe('scripts/test', () => {
   let fixtureDir: string;
@@ -25,6 +34,7 @@ describe('scripts/test', () => {
     mkdirSync(join(fixtureDir, 'bin'), { recursive: true });
 
     copyFileSync(testScriptPath, join(fixtureDir, 'scripts/test'));
+    copyFileSync(generatedTestPatternsPath, join(fixtureDir, 'scripts/generated-test-patterns.json'));
     chmodSync(join(fixtureDir, 'scripts/test'), 0o755);
 
     writeExecutable(
@@ -131,6 +141,25 @@ printf '%s\\0' "$@" > "$VITEST_ARGS_FILE"
     });
   });
 
+  test.each(generatedTopLevelTests)('routes Stainless-generated top-level test %s only to Jest', (file) => {
+    const testPath = `tests/${file}`;
+
+    expect(runTestScript([testPath])).toEqual({
+      jestArgs: ['--runInBand', testPath],
+      vitestArgs: [],
+    });
+  });
+
+  test.each([
+    { label: 'relative', testPath: './tests/index.test.ts' },
+    { label: 'absolute', testPath: join(process.cwd(), 'tests/index.test.ts') },
+  ])('routes $label generated path filters only to Jest', ({ testPath }) => {
+    expect(runTestScript([testPath])).toEqual({
+      jestArgs: ['--runInBand', testPath],
+      vitestArgs: [],
+    });
+  });
+
   test('splits handwritten and generated path filters between their runners', () => {
     expect(runTestScript(['tests/lib/parser.test.ts', 'tests/api-resources/models.test.ts'])).toEqual({
       jestArgs: ['--runInBand', 'tests/api-resources/models.test.ts'],
@@ -145,19 +174,53 @@ printf '%s\\0' "$@" > "$VITEST_ARGS_FILE"
     });
   });
 
+  test('forwards worker limits to both runners for the full suite', () => {
+    expect(runTestScript(['--maxWorkers=1'])).toEqual({
+      jestArgs: ['--maxWorkers=1'],
+      vitestArgs: ['run', '--config', 'vitest.config.mts', '--maxWorkers=1'],
+    });
+  });
+
+  test('forwards worker limits to filtered handwritten tests', () => {
+    expect(runTestScript(['tests/lib/parser.test.ts', '--maxWorkers', '1'])).toEqual({
+      jestArgs: [],
+      vitestArgs: ['run', '--config', 'vitest.config.mts', 'tests/lib/parser.test.ts', '--maxWorkers', '1'],
+    });
+  });
+
+  test('forwards worker limits to the unit-only suite', () => {
+    expect(runTestScript(['--max-workers', '1'], 'unit')).toEqual({
+      jestArgs: [],
+      vitestArgs: ['run', '--config', 'vitest.config.mts', '--maxWorkers', '1'],
+    });
+  });
+
+  test('preserves worker limits for the generated-only suite', () => {
+    expect(runTestScript(['--maxWorkers=1'], 'generated')).toEqual({
+      jestArgs: ['--maxWorkers=1'],
+      vitestArgs: [],
+    });
+  });
+
+  test('does not forward Jest-only worker options to an unfiltered Vitest run', () => {
+    expect(runTestScript(['--showConfig', '--run-in-band'])).toEqual({
+      jestArgs: ['--showConfig', '--run-in-band'],
+      vitestArgs: ['run', '--config', 'vitest.config.mts'],
+    });
+  });
+
   test.each([
-    { label: '--maxWorkers value', args: ['--maxWorkers', '2'] },
-    { label: '--maxWorkers=value', args: ['--maxWorkers=2'] },
-    { label: '--max-workers value', args: ['--max-workers', '2'] },
-    { label: '--max-workers=value', args: ['--max-workers=2'] },
-    { label: '-w value', args: ['-w', '2'] },
-    { label: '-w=value', args: ['-w=2'] },
-    { label: '-wvalue', args: ['-w2'] },
-    { label: '--run-in-band', args: ['--run-in-band'] },
-  ])('preserves explicit worker arguments: $label', ({ args }) => {
+    { label: '--maxWorkers value', args: ['--maxWorkers', '2'], vitestArgs: ['--maxWorkers', '2'] },
+    { label: '--maxWorkers=value', args: ['--maxWorkers=2'], vitestArgs: ['--maxWorkers=2'] },
+    { label: '--max-workers value', args: ['--max-workers', '2'], vitestArgs: ['--maxWorkers', '2'] },
+    { label: '--max-workers=value', args: ['--max-workers=2'], vitestArgs: ['--maxWorkers=2'] },
+    { label: '-w value', args: ['-w', '2'], vitestArgs: ['--maxWorkers', '2'] },
+    { label: '-w=value', args: ['-w=2'], vitestArgs: ['--maxWorkers=2'] },
+    { label: '-wvalue', args: ['-w2'], vitestArgs: ['--maxWorkers=2'] },
+  ])('forwards explicit worker arguments to both runners: $label', ({ args, vitestArgs }) => {
     expect(runTestScript(['--showConfig', ...args])).toEqual({
       jestArgs: ['--showConfig', ...args],
-      vitestArgs: ['run', '--config', 'vitest.config.mts'],
+      vitestArgs: ['run', '--config', 'vitest.config.mts', ...vitestArgs],
     });
   });
 });

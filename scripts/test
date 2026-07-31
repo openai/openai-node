@@ -40,6 +40,26 @@ function has_jest_worker_flag() {
   return 1
 }
 
+generated_test_patterns=()
+while IFS= read -r generated_test_pattern; do
+  generated_test_patterns+=("$generated_test_pattern")
+done < <(node -e 'for (const pattern of require("./scripts/generated-test-patterns.json")) console.log(pattern)')
+
+function is_generated_test_path() {
+  local test_path="$1"
+  local generated_test_pattern
+
+  for generated_test_pattern in "${generated_test_patterns[@]}"; do
+    case "$test_path" in
+      "$generated_test_pattern"|"$generated_test_pattern"/*|*/"$generated_test_pattern"|*/"$generated_test_pattern"/*)
+        return 0
+        ;;
+    esac
+  done
+
+  return 1
+}
+
 test_suite="${OPENAI_TEST_SUITE:-all}"
 vitest_args=()
 jest_args=()
@@ -53,26 +73,35 @@ for ((index = 0; index < ${#args[@]}; index++)); do
   case "$arg" in
     --)
       ;;
-    tests/api-resources|tests/api-resources/*|./tests/api-resources|./tests/api-resources/*|*/tests/api-resources|*/tests/api-resources/*|tests/backwards-compat-resource-exports.test.ts|./tests/backwards-compat-resource-exports.test.ts|*/tests/backwards-compat-resource-exports.test.ts|tests/index.test.ts|./tests/index.test.ts|*/tests/index.test.ts|tests/stringifyQuery.test.ts|./tests/stringifyQuery.test.ts|*/tests/stringifyQuery.test.ts)
-      has_generated_filter=true
-      jest_args+=("$arg")
-      ;;
     tests/*|./tests/*|*/tests/*)
-      has_unit_filter=true
-      vitest_args+=("$arg")
+      if is_generated_test_path "$arg"; then
+        has_generated_filter=true
+        jest_args+=("$arg")
+      else
+        has_unit_filter=true
+        vitest_args+=("$arg")
+      fi
       ;;
     --runInBand|--runInBand=*|--run-in-band|--run-in-band=*|-i|--showConfig)
       jest_args+=("$arg")
       ;;
     --maxWorkers|--max-workers|-w)
       jest_args+=("$arg")
+      vitest_args+=(--maxWorkers)
       if ((index + 1 < ${#args[@]})); then
         ((index += 1))
         jest_args+=("${args[index]}")
+        vitest_args+=("${args[index]}")
       fi
       ;;
-    --maxWorkers=*|--max-workers=*|-w?*)
+    --maxWorkers=*|--max-workers=*)
       jest_args+=("$arg")
+      vitest_args+=("--maxWorkers=${arg#*=}")
+      ;;
+    -w?*)
+      jest_args+=("$arg")
+      worker_count="${arg#-w}"
+      vitest_args+=("--maxWorkers=${worker_count#=}")
       ;;
     *)
       vitest_args+=("$arg")
@@ -89,11 +118,7 @@ case "$test_suite" in
   all)
     if ! $has_generated_filter || $has_unit_filter; then
       echo "==> Running handwritten unit tests"
-      if $has_unit_filter; then
-        ./node_modules/.bin/vitest run --config vitest.config.mts "${vitest_args[@]}"
-      else
-        ./node_modules/.bin/vitest run --config vitest.config.mts
-      fi
+      ./node_modules/.bin/vitest run --config vitest.config.mts "${vitest_args[@]}"
     fi
 
     if $has_unit_filter && ! $has_generated_filter; then

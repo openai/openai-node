@@ -1,5 +1,6 @@
 import { resolve } from 'node:path';
 import { defineConfig } from 'vitest/config';
+import generatedTestPatterns from './scripts/generated-test-patterns.json';
 
 export default defineConfig({
   resolve: {
@@ -14,17 +15,13 @@ export default defineConfig({
     testTimeout: 30_000,
     include: ['tests/**/*.test.ts'],
     exclude: [
-      'tests/api-resources/**',
-      'tests/backwards-compat-resource-exports.test.ts',
-      'tests/index.test.ts',
-      'tests/stringifyQuery.test.ts',
+      ...generatedTestPatterns.map((pattern) => (pattern.endsWith('.test.ts') ? pattern : `${pattern}/**`)),
       'tests/live/**',
     ],
     fileParallelism: true,
     maxWorkers: 4,
     coverage: {
-      provider: 'custom',
-      customProviderModule: './scripts/vitest-coverage-provider.mjs',
+      provider: 'v8',
       reportsDirectory: 'coverage/unit',
       reporter: ['json'],
       include: ['src/**/*.ts'],
