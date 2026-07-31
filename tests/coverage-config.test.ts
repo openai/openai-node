@@ -35,24 +35,23 @@ describe('Jest suite boundaries and coverage', () => {
     expect(coverageConfig.coverageReporters).toEqual(['text-summary', 'json-summary', 'lcov', 'json']);
   });
 
-  test('hoists Vitest-compatible module mocks before transformed imports', () => {
+  test.each([
+    { label: 'POSIX', filename: join(process.cwd(), 'tests/coverage-transformer.test.ts') },
+    { label: 'Windows', filename: 'C:\\workspace\\openai-node\\tests\\coverage-transformer.test.ts' },
+  ])('hoists Vitest-compatible module mocks before transformed imports for $label paths', ({ filename }) => {
     const vitestModule = ['vi', 'test'].join('');
     const mockMethod = ['vi', '.mock'].join('');
     const source = `import { vi } from '${vitestModule}';\n${mockMethod}('dependency', () => ({ value: vi.fn() }));`;
-    const transformed = coverageTransformer.process(
-      source,
-      join(process.cwd(), 'tests/coverage-transformer.test.ts'),
-      {
-        cacheFS: new Map(),
-        config: { cwd: process.cwd(), rootDir: process.cwd() },
-        configString: '{}',
-        instrument: false,
-        supportsDynamicImport: false,
-        supportsExportNamespaceFrom: false,
-        supportsStaticESM: false,
-        supportsTopLevelAwait: false,
-      },
-    );
+    const transformed = coverageTransformer.process(source, filename, {
+      cacheFS: new Map(),
+      config: { cwd: process.cwd(), rootDir: process.cwd() },
+      configString: '{}',
+      instrument: false,
+      supportsDynamicImport: false,
+      supportsExportNamespaceFrom: false,
+      supportsStaticESM: false,
+      supportsTopLevelAwait: false,
+    });
 
     const mockIndex = transformed.code.indexOf('jest.mock(');
     const importIndex = transformed.code.indexOf('require("vitest")');

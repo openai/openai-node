@@ -3,7 +3,7 @@ const { createTransformer } = require('@swc/jest');
 const transformer = createTransformer({ sourceMaps: 'inline' });
 
 function normalizeVitestMocks(source, filename) {
-  if (!filename.includes('/tests/') || !/from\s*['"]vitest['"]/.test(source)) {
+  if (!filename.replaceAll('\\', '/').includes('/tests/') || !/from\s*['"]vitest['"]/.test(source)) {
     return source;
   }
 
