@@ -90,6 +90,7 @@ function nodejsRecordAudio({ signal, device, timeout }: RecordAudioOptions = {})
   checkFileSupport();
   return new Promise((resolve, reject) => {
     const data: any[] = [];
+    let terminationRequested = false;
     const provider = recordingProviders[platform];
     try {
       const ffmpeg = spawn(
@@ -122,6 +123,10 @@ function nodejsRecordAudio({ signal, device, timeout }: RecordAudioOptions = {})
       });
 
       ffmpeg.on('close', (code) => {
+        if (code && !terminationRequested) {
+          reject(new Error(`ffmpeg process exited with code ${code}`));
+          return;
+        }
         returnData();
       });
 
@@ -131,17 +136,19 @@ function nodejsRecordAudio({ signal, device, timeout }: RecordAudioOptions = {})
         resolve(audioFile);
       }
 
+      function terminate() {
+        if (!terminationRequested && ffmpeg.exitCode === null && ffmpeg.signalCode === null) {
+          terminationRequested = ffmpeg.kill('SIGTERM');
+        }
+      }
+
       if (typeof timeout === 'number' && timeout > 0) {
         const internalSignal = AbortSignal.timeout(timeout);
-        internalSignal.addEventListener('abort', () => {
-          ffmpeg.kill('SIGTERM');
-        });
+        internalSignal.addEventListener('abort', terminate);
       }
 
       if (signal) {
-        signal.addEventListener('abort', () => {
-          ffmpeg.kill('SIGTERM');
-        });
+        signal.addEventListener('abort', terminate);
       }
     } catch (error) {
       reject(error);
