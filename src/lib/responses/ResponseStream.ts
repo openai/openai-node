@@ -8,7 +8,7 @@ import {
 } from '../../resources/responses/responses';
 import { RequestOptions } from '../../internal/request-options';
 import { type ReadableStream } from '../../internal/shim-types';
-import { APIUserAbortError, OpenAIError } from '../../error';
+import { APIError, APIUserAbortError, OpenAIError } from '../../error';
 import OpenAI from '../../index';
 import { type BaseEvents, EventStream } from '../EventStream';
 import { type ResponseFunctionCallArgumentsDeltaEvent, type ResponseTextDeltaEvent } from './EventTypes';
@@ -54,7 +54,7 @@ type ResponseEvents = BaseEvents &
     {
       [K in ResponseStreamEvent['type']]: (event: Extract<ResponseStreamEvent, { type: K }>) => void;
     },
-    'response.output_text.delta' | 'response.function_call_arguments.delta'
+    'response.output_text.delta' | 'response.function_call_arguments.delta' | 'error'
   > & {
     event: (event: ResponseStreamEvent) => void;
     'response.output_text.delta': (event: ResponseTextDeltaEvent) => void;
@@ -151,6 +151,12 @@ export class ResponseStream<ParsedT = null>
           });
         }
         break;
+      }
+      case 'error': {
+        // The API reports failures with an `error` event instead of a non-2xx response, so
+        // convert it here. Throwing hands it to `EventStream`'s error path, which rejects
+        // `finalResponse()` and notifies `error` listeners with the converted error.
+        throw new APIError(undefined, event, event.message, undefined);
       }
       default:
         maybeEmit(event.type, event);
