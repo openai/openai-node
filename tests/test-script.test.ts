@@ -26,6 +26,18 @@ const generatedTopLevelTests = readdirSync(join(process.cwd(), 'tests')).filter(
     ),
 );
 
+function toBashPath(path: string): string {
+  if (process.platform !== 'win32') return path;
+  return path
+    .replace(/^([A-Za-z]):[\\/]/, (_, drive: string) => `/${drive.toLowerCase()}/`)
+    .replace(/\\/g, '/');
+}
+
+function toBashArgument(arg: string): string {
+  if (process.platform !== 'win32' || !/^[A-Za-z]:[\\/]/.test(arg)) return arg;
+  return arg.replace(/\\/g, '/');
+}
+
 describe('scripts/test', () => {
   let fixtureDir: string;
 
@@ -72,20 +84,30 @@ printf '%s\\0' "$@" > "$VITEST_ARGS_FILE"
   function runTestScript(args: string[], suite = 'all'): { jestArgs: string[]; vitestArgs: string[] } {
     const jestArgsFile = join(fixtureDir, 'jest-args');
     const vitestArgsFile = join(fixtureDir, 'vitest-args');
-    const result = spawnSync(join(fixtureDir, 'scripts/test'), args, {
-      encoding: 'utf8',
-      env: {
-        ...process.env,
-        JEST_ARGS_FILE: jestArgsFile,
-        OPENAI_TEST_SUITE: suite,
-        PATH: `${join(fixtureDir, 'bin')}:${process.env['PATH']}`,
-        VITEST_ARGS_FILE: vitestArgsFile,
+    const result = spawnSync(
+      'bash',
+      [
+        '-c',
+        'PATH="$1:$PATH"; shift; exec "$@"',
+        'bash',
+        toBashPath(join(fixtureDir, 'bin')),
+        toBashPath(join(fixtureDir, 'scripts/test')),
+        ...args.map(toBashArgument),
+      ],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          JEST_ARGS_FILE: toBashPath(jestArgsFile),
+          OPENAI_TEST_SUITE: suite,
+          VITEST_ARGS_FILE: toBashPath(vitestArgsFile),
+        },
       },
-    });
+    );
 
     if (result.status !== 0) {
       throw new Error(
-        `scripts/test exited with ${result.status}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
+        `scripts/test exited with ${result.status}\nerror:\n${result.error?.message}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
       );
     }
 
@@ -163,11 +185,15 @@ printf '%s\\0' "$@" > "$VITEST_ARGS_FILE"
   });
 
   test.each([
-    { label: 'relative', testPath: './tests/index.test.ts' },
-    { label: 'absolute', testPath: join(process.cwd(), 'tests/index.test.ts') },
-  ])('routes $label generated path filters only to Jest', ({ testPath }) => {
+    { label: 'relative', testPath: './tests/index.test.ts', expectedTestPath: './tests/index.test.ts' },
+    {
+      label: 'absolute',
+      testPath: join(process.cwd(), 'tests/index.test.ts'),
+      expectedTestPath: toBashArgument(join(process.cwd(), 'tests/index.test.ts')),
+    },
+  ])('routes $label generated path filters only to Jest', ({ testPath, expectedTestPath }) => {
     expect(runTestScript([testPath])).toEqual({
-      jestArgs: ['--runInBand', testPath],
+      jestArgs: ['--runInBand', expectedTestPath],
       vitestArgs: [],
     });
   });
