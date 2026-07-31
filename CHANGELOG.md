@@ -1,5 +1,25 @@
 # Changelog
 
+## 7.3.0 (2026-07-31)
+
+Full Changelog: [v7.2.0...v7.3.0](https://github.com/openai/openai-node/compare/v7.2.0...v7.3.0)
+
+### Features
+
+* **api:** content provenance checks ([c6f9339](https://github.com/openai/openai-node/commit/c6f9339df44ff0e2180300c1452047592a867dc5))
+
+
+### Chores
+
+* remove Brewfile setup path ([#2031](https://github.com/openai/openai-node/issues/2031)) ([6b63159](https://github.com/openai/openai-node/commit/6b631599de7d91f90767f9c6df1e9d53e36768b5))
+* remove JSR publishing ([#2037](https://github.com/openai/openai-node/issues/2037)) ([b1fc7df](https://github.com/openai/openai-node/commit/b1fc7df4659aaf2cac0c78d3f5b6814251de2b0b))
+
+
+### Documentation
+
+* organize SDK guides and repository metadata ([#2032](https://github.com/openai/openai-node/issues/2032)) ([275dff4](https://github.com/openai/openai-node/commit/275dff4de124bf7aaa566ddecd7ada88c91eef81))
+* remove root-level provider guides ([98a2ae7](https://github.com/openai/openai-node/commit/98a2ae7cd801c8d09fda10be698816c52ddec059))
+
 ## 7.2.0 (2026-07-30)
 
 Full Changelog: [v7.1.0...v7.2.0](https://github.com/openai/openai-node/compare/v7.1.0...v7.2.0)
