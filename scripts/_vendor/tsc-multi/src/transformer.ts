@@ -140,12 +140,12 @@ export function createTransformer<T extends ts.SourceFile | ts.Bundle>(
             typeof node.original === 'object' &&
             node.original !== null &&
             ((original = node.original as ts.Node), nodeIsSynthesized(original)) &&
-            (isImportDeclaration(original) ?
-              isStringLiteral(original.moduleSpecifier) && original.moduleSpecifier.text === 'tslib'
-            : options.ts.isImportEqualsDeclaration(original) &&
-              options.ts.isExternalModuleReference(original.moduleReference) &&
-              isStringLiteral(original.moduleReference.expression) &&
-              original.moduleReference.expression.text === 'tslib')
+            (isImportDeclaration(original)
+              ? isStringLiteral(original.moduleSpecifier) && original.moduleSpecifier.text === 'tslib'
+              : options.ts.isImportEqualsDeclaration(original) &&
+                options.ts.isExternalModuleReference(original.moduleReference) &&
+                isStringLiteral(original.moduleReference.expression) &&
+                original.moduleReference.expression.text === 'tslib')
           ) {
             tslibRequires.add(requireCall);
           }
@@ -198,9 +198,9 @@ export function createTransformer<T extends ts.SourceFile | ts.Bundle>(
         if (!firstArg) return node;
 
         return factory.updateCallExpression(node, node.expression, node.typeArguments, [
-          resolvedShareHelpers && tslibRequires.has(node) ?
-            factory.createStringLiteral(getRelativeImport(resolvedShareHelpers))
-          : updateModuleSpecifier(ctx, sourceFile, firstArg),
+          resolvedShareHelpers && tslibRequires.has(node)
+            ? factory.createStringLiteral(getRelativeImport(resolvedShareHelpers))
+            : updateModuleSpecifier(ctx, sourceFile, firstArg),
           ...restArgs,
         ]);
       }
@@ -272,9 +272,8 @@ export function createTransformer<T extends ts.SourceFile | ts.Bundle>(
       return ctx.factory.updateSourceFile(
         sourceFile,
         newStatements.map((group) =>
-          Array.isArray(group) ?
-            (
-              group.length === 1 &&
+          Array.isArray(group)
+            ? group.length === 1 &&
               !(
                 group[0].members.some((member) => member.name?.kind === SyntaxKind.ComputedPropertyName) ||
                 group[0].heritageClauses?.some(
@@ -286,33 +285,32 @@ export function createTransformer<T extends ts.SourceFile | ts.Bundle>(
                     ),
                 )
               )
-            ) ?
-              group[0]
-            : ctx.factory.createVariableStatement(group[0].modifiers, [
-                ctx.factory.createVariableDeclaration(
-                  group[0].name.text,
-                  undefined,
-                  undefined,
-                  options.ts.addSyntheticLeadingComment(
-                    ctx.factory.createImmediatelyInvokedArrowFunction([
-                      ctx.factory.updateClassDeclaration(
-                        group[0],
-                        [],
-                        group[0].name,
-                        group[0].typeParameters,
-                        group[0].heritageClauses,
-                        group[0].members,
-                      ),
-                      ...group.slice(1),
-                      ctx.factory.createReturnStatement(ctx.factory.createIdentifier(group[0].name.text)),
-                    ]),
-                    SyntaxKind.MultiLineCommentTrivia,
-                    ' @__PURE__ ',
-                    false,
+              ? group[0]
+              : ctx.factory.createVariableStatement(group[0].modifiers, [
+                  ctx.factory.createVariableDeclaration(
+                    group[0].name.text,
+                    undefined,
+                    undefined,
+                    options.ts.addSyntheticLeadingComment(
+                      ctx.factory.createImmediatelyInvokedArrowFunction([
+                        ctx.factory.updateClassDeclaration(
+                          group[0],
+                          [],
+                          group[0].name,
+                          group[0].typeParameters,
+                          group[0].heritageClauses,
+                          group[0].members,
+                        ),
+                        ...group.slice(1),
+                        ctx.factory.createReturnStatement(ctx.factory.createIdentifier(group[0].name.text)),
+                      ]),
+                      SyntaxKind.MultiLineCommentTrivia,
+                      ' @__PURE__ ',
+                      false,
+                    ),
                   ),
-                ),
-              ])
-          : group,
+                ])
+            : group,
         ),
       );
     };

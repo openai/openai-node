@@ -1,9 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const indexJs =
-  process.env['DIST_PATH'] ?
-    path.resolve(process.env['DIST_PATH'], 'index.js')
+const indexJs = process.env['DIST_PATH']
+  ? path.resolve(process.env['DIST_PATH'], 'index.js')
   : path.resolve(__dirname, '..', '..', 'dist', 'index.js');
 
 let before = fs.readFileSync(indexJs, 'utf8');

@@ -63,15 +63,17 @@ export type RunnableFunctionWithoutParse<ToolContext = unknown> = {
   strict?: boolean | undefined;
 };
 
-export type RunnableFunction<Args extends object | string, ToolContext = unknown> = Args extends string ?
-  RunnableFunctionWithoutParse<ToolContext>
-: Args extends object ? RunnableFunctionWithParse<Args, ToolContext>
-: never;
+export type RunnableFunction<Args extends object | string, ToolContext = unknown> = Args extends string
+  ? RunnableFunctionWithoutParse<ToolContext>
+  : Args extends object
+    ? RunnableFunctionWithParse<Args, ToolContext>
+    : never;
 
-export type RunnableToolFunction<Args extends object | string, ToolContext = unknown> = Args extends string ?
-  RunnableToolFunctionWithoutParse<ToolContext>
-: Args extends object ? RunnableToolFunctionWithParse<Args, ToolContext>
-: never;
+export type RunnableToolFunction<Args extends object | string, ToolContext = unknown> = Args extends string
+  ? RunnableToolFunctionWithoutParse<ToolContext>
+  : Args extends object
+    ? RunnableToolFunctionWithParse<Args, ToolContext>
+    : never;
 
 export type RunnableToolFunctionWithoutParse<ToolContext = unknown> = {
   type: 'function';
@@ -111,22 +113,23 @@ export type BaseFunctionsArgs = readonly (object | string)[];
 
 export type RunnableFunctions<FunctionsArgs extends BaseFunctionsArgs, ToolContext = unknown> = [
   any[],
-] extends [FunctionsArgs] ?
-  readonly RunnableFunction<any, ToolContext>[]
-: {
-    [Index in keyof FunctionsArgs]: Index extends number ? RunnableFunction<FunctionsArgs[Index], ToolContext>
-    : FunctionsArgs[Index];
-  };
+] extends [FunctionsArgs]
+  ? readonly RunnableFunction<any, ToolContext>[]
+  : {
+      [Index in keyof FunctionsArgs]: Index extends number
+        ? RunnableFunction<FunctionsArgs[Index], ToolContext>
+        : FunctionsArgs[Index];
+    };
 
-export type RunnableTools<FunctionsArgs extends BaseFunctionsArgs, ToolContext = unknown> = [any[]] extends (
-  [FunctionsArgs]
-) ?
-  readonly RunnableToolFunction<any, ToolContext>[]
-: {
-    [Index in keyof FunctionsArgs]: Index extends number ?
-      RunnableToolFunction<FunctionsArgs[Index], ToolContext>
-    : FunctionsArgs[Index];
-  };
+export type RunnableTools<FunctionsArgs extends BaseFunctionsArgs, ToolContext = unknown> = [any[]] extends [
+  FunctionsArgs,
+]
+  ? readonly RunnableToolFunction<any, ToolContext>[]
+  : {
+      [Index in keyof FunctionsArgs]: Index extends number
+        ? RunnableToolFunction<FunctionsArgs[Index], ToolContext>
+        : FunctionsArgs[Index];
+    };
 
 /**
  * This is helper class for passing a `function` and `parse` where the `function`

@@ -49,10 +49,9 @@ export abstract class OpenAIRealtimeEmitter extends EventEmitter<RealtimeEvents>
   protected _onError(event: null, message: string, cause: any): void;
   protected _onError(event: ErrorEvent, message?: string | undefined): void;
   protected _onError(event: ErrorEvent | null, message?: string | undefined, cause?: any): void {
-    message =
-      event?.error ?
-        `${event.error.message} code=${event.error.code} param=${event.error.param} type=${event.error.type} event_id=${event.error.event_id}`
-      : message ?? 'unknown error';
+    message = event?.error
+      ? `${event.error.message} code=${event.error.code} param=${event.error.param} type=${event.error.type} event_id=${event.error.event_id}`
+      : (message ?? 'unknown error');
 
     if (!this._hasListener('error')) {
       const error = new OpenAIRealtimeError(

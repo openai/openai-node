@@ -302,9 +302,9 @@ describe('instantiate bedrock client', () => {
       const status = authorizationHeaders.length === 1 ? 500 : 404;
       return new globalThis.Response(
         JSON.stringify(
-          status === 500 ?
-            { error: 'server error' }
-          : { error: { message: 'AWS does not support organization invites here' } },
+          status === 500
+            ? { error: 'server error' }
+            : { error: { message: 'AWS does not support organization invites here' } },
         ),
         {
           status,
@@ -331,10 +331,13 @@ describe('instantiate bedrock client', () => {
       requests.push(`${init?.method} ${requestURL.pathname}`);
 
       const body =
-        requestURL.pathname === '/openai/v1/responses/compact' ? COMPACTED_RESPONSE_BODY
-        : requestURL.pathname === '/openai/v1/responses/input_tokens' ? INPUT_TOKENS_BODY
-        : requestURL.pathname === '/openai/v1/responses/resp_123/input_items' ? INPUT_ITEMS_BODY
-        : RESPONSE_BODY;
+        requestURL.pathname === '/openai/v1/responses/compact'
+          ? COMPACTED_RESPONSE_BODY
+          : requestURL.pathname === '/openai/v1/responses/input_tokens'
+            ? INPUT_TOKENS_BODY
+            : requestURL.pathname === '/openai/v1/responses/resp_123/input_items'
+              ? INPUT_ITEMS_BODY
+              : RESPONSE_BODY;
 
       return new globalThis.Response(JSON.stringify(body), {
         status: 200,

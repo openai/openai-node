@@ -5,8 +5,8 @@ export type JsonSchema7NullType = {
 };
 
 export function parseNullDef(refs: Refs): JsonSchema7NullType {
-  return refs.target === 'openApi3' ?
-      ({
+  return refs.target === 'openApi3'
+    ? ({
         enum: ['null'],
         nullable: true,
       } as any)

@@ -289,10 +289,12 @@ async function main() {
 
   // For some reason `yargs` doesn't pick up the positional args correctly
   const projectsToRun = (
-    args.projects?.length ? args.projects
-    : positionalArgs.length ?
-      positionalArgs.filter((n) => typeof n === 'string' && (projectNamesSet as Set<string>).has(n))
-    : projectNames) as typeof projectNames;
+    args.projects?.length
+      ? args.projects
+      : positionalArgs.length
+        ? positionalArgs.filter((n) => typeof n === 'string' && (projectNamesSet as Set<string>).has(n))
+        : projectNames
+  ) as typeof projectNames;
   console.error(`running projects: ${projectsToRun}`);
 
   const failed: typeof projectNames = [];

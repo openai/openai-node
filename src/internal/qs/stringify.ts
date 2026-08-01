@@ -113,8 +113,8 @@ function inner_stringify(
 
   if (obj === null) {
     if (strictNullHandling) {
-      return encoder && !encodeValuesOnly ?
-          // @ts-expect-error
+      return encoder && !encodeValuesOnly
+        ? // @ts-expect-error
           encoder(prefix, defaults.encoder, charset, 'key', format)
         : prefix;
     }
@@ -124,10 +124,10 @@ function inner_stringify(
 
   if (is_non_nullish_primitive(obj) || is_buffer(obj)) {
     if (encoder) {
-      const key_value =
-        encodeValuesOnly ? prefix
-          // @ts-expect-error
-        : encoder(prefix, defaults.encoder, charset, 'key', format);
+      const key_value = encodeValuesOnly
+        ? prefix
+        : // @ts-expect-error
+          encoder(prefix, defaults.encoder, charset, 'key', format);
       return [
         formatter?.(key_value) +
           '=' +
@@ -180,10 +180,9 @@ function inner_stringify(
 
     // @ts-ignore
     const encoded_key = allowDots && encodeDotInKeys ? (key as any).replace(/\./g, '%2E') : key;
-    const key_prefix =
-      isArray(obj) ?
-        typeof generateArrayPrefix === 'function' ?
-          generateArrayPrefix(adjusted_prefix, encoded_key)
+    const key_prefix = isArray(obj)
+      ? typeof generateArrayPrefix === 'function'
+        ? generateArrayPrefix(adjusted_prefix, encoded_key)
         : adjusted_prefix
       : adjusted_prefix + (allowDots ? '.' + encoded_key : '[' + encoded_key + ']');
 
@@ -267,11 +266,11 @@ function normalize_stringify_options(
   }
 
   const allowDots =
-    typeof opts.allowDots === 'undefined' ?
-      !!opts.encodeDotInKeys === true ?
-        true
-      : defaults.allowDots
-    : !!opts.allowDots;
+    typeof opts.allowDots === 'undefined'
+      ? !!opts.encodeDotInKeys === true
+        ? true
+        : defaults.allowDots
+      : !!opts.allowDots;
 
   return {
     addQueryPrefix: typeof opts.addQueryPrefix === 'boolean' ? opts.addQueryPrefix : defaults.addQueryPrefix,

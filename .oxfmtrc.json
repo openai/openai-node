@@ -1,0 +1,19 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "arrowParens": "always",
+  "printWidth": 110,
+  "singleQuote": true,
+  "trailingComma": "all",
+  "sortImports": false,
+  "sortPackageJson": false,
+  "ignorePatterns": [
+    "CHANGELOG.md",
+    "pnpm-lock.yaml",
+    "ecosystem-tests/*/**",
+    "node_modules/**",
+    "deno/**",
+    "api_reference/openapi.transformed.yml",
+    "dist/**",
+    "coverage/**"
+  ]
+}

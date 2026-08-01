@@ -84,9 +84,11 @@ function requestTarget(parsedURL: URL): { path: string; query: Record<string, st
   for (const [name, value] of parsedURL.searchParams) {
     const existing = query[name];
     query[name] =
-      existing === undefined ? value
-      : typeof existing === 'string' ? [existing, value]
-      : [...existing, value];
+      existing === undefined
+        ? value
+        : typeof existing === 'string'
+          ? [existing, value]
+          : [...existing, value];
   }
   return { path: parsedURL.pathname, query };
 }
@@ -191,9 +193,8 @@ class BedrockSigV4Auth implements BedrockRequestAuth {
         ...(body !== undefined ? { body } : {}),
       });
     } catch (cause) {
-      const message =
-        this.options.usesDefaultChain ?
-          'Could not find credentials for Bedrock. Pass AWS credentials to `bedrock(...)` or configure the default AWS credential chain.'
+      const message = this.options.usesDefaultChain
+        ? 'Could not find credentials for Bedrock. Pass AWS credentials to `bedrock(...)` or configure the default AWS credential chain.'
         : 'Failed to resolve AWS credentials for Bedrock. Verify your AWS profile, environment variables, or runtime identity configuration and try again.';
       throw errorWithCause(message, cause);
     }

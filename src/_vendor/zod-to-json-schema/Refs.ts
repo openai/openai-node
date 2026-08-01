@@ -24,9 +24,9 @@ export type Seen = {
 export const getRefs = (options?: string | Partial<Options<Targets>>): Refs => {
   const _options = getDefaultOptions(options);
   const currentPath =
-    _options.name !== undefined ?
-      [..._options.basePath, _options.definitionPath, _options.name]
-    : _options.basePath;
+    _options.name !== undefined
+      ? [..._options.basePath, _options.definitionPath, _options.name]
+      : _options.basePath;
   return {
     ..._options,
     currentPath: currentPath,

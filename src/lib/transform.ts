@@ -493,8 +493,8 @@ function rewriteLocalRefsIntoPromotedRootAnyOfBranch(
       }
     }
 
-    return promotedParts.length === 0 ?
-        '#'
+    return promotedParts.length === 0
+      ? '#'
       : '#/' + promotedParts.map(encodeJSONPointerTokenForURIFragment).join('/');
   };
 
@@ -883,7 +883,7 @@ export function resolveLocalRef(root: JSONSchema, ref: string): JSONSchemaDefini
   // forEachJSONSchemaChild so every accepted target is normalized before we
   // advertise the result as strict.
   let resolved: unknown = root;
-  for (let index = 0; index < parts.length; ) {
+  for (let index = 0; index < parts.length;) {
     if (!isObject(resolved)) {
       return undefined;
     }
@@ -969,8 +969,8 @@ function isObjectOnlySchema(
     }
 
     const branch = schema.allOf[0];
-    return branch !== undefined && branch !== true && branch !== false ?
-        isObjectOnlySchema(branch, root, seenRefs)
+    return branch !== undefined && branch !== true && branch !== false
+      ? isObjectOnlySchema(branch, root, seenRefs)
       : false;
   }
 
@@ -1012,8 +1012,8 @@ function isArrayOnlySchema(
     }
 
     const branch = schema.allOf[0];
-    return branch !== undefined && branch !== true && branch !== false ?
-        isArrayOnlySchema(branch, root, seenRefs)
+    return branch !== undefined && branch !== true && branch !== false
+      ? isArrayOnlySchema(branch, root, seenRefs)
       : false;
   }
 
@@ -1289,9 +1289,9 @@ function rewriteLocalRefsIntoFilteredAnyOfBranches(root: JSONSchema): void {
 
     for (const [index, part] of originalParts.entries()) {
       const resolvedRecord =
-        typeof resolved === 'object' && resolved !== null && !Array.isArray(resolved) ?
-          (resolved as Record<string, unknown>)
-        : undefined;
+        typeof resolved === 'object' && resolved !== null && !Array.isArray(resolved)
+          ? (resolved as Record<string, unknown>)
+          : undefined;
       if (
         part === 'anyOf' &&
         index < originalParts.length - 1 &&
@@ -1899,14 +1899,14 @@ function mergeObjectAllOf(
   // excluded by another closed branch are discarded, while required excluded
   // properties remain unrepresentable and fail closed.
   const allowedClosedProperties =
-    closedPropertySets.length === 0 ?
-      undefined
-    : closedPropertySets
-        .slice(1)
-        .reduce(
-          (allowed, keys) => new Set([...allowed].filter((key) => keys.has(key))),
-          new Set(closedPropertySets[0]),
-        );
+    closedPropertySets.length === 0
+      ? undefined
+      : closedPropertySets
+          .slice(1)
+          .reduce(
+            (allowed, keys) => new Set([...allowed].filter((key) => keys.has(key))),
+            new Set(closedPropertySets[0]),
+          );
   const excludesRequiredProperty =
     allowedClosedProperties !== undefined &&
     [...mergedRequired].some((key) => !allowedClosedProperties.has(key));

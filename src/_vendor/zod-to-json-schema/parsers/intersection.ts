@@ -55,8 +55,8 @@ export function parseIntersectionDef(
       mergedAllOf.push(nestedSchema);
     }
   });
-  return mergedAllOf.length ?
-      {
+  return mergedAllOf.length
+    ? {
         allOf: mergedAllOf,
         ...unevaluatedProperties,
       }

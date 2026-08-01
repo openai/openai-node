@@ -436,10 +436,10 @@ export class OpenAI {
 
     const {
       baseURL = provider ? null : readEnv('OPENAI_BASE_URL'),
-      apiKey = provider ? null : readEnv('OPENAI_API_KEY') ?? null,
-      adminAPIKey = provider ? null : readEnv('OPENAI_ADMIN_KEY') ?? null,
-      organization = provider ? null : readEnv('OPENAI_ORG_ID') ?? null,
-      project = provider ? null : readEnv('OPENAI_PROJECT_ID') ?? null,
+      apiKey = provider ? null : (readEnv('OPENAI_API_KEY') ?? null),
+      adminAPIKey = provider ? null : (readEnv('OPENAI_ADMIN_KEY') ?? null),
+      organization = provider ? null : (readEnv('OPENAI_ORG_ID') ?? null),
+      project = provider ? null : (readEnv('OPENAI_PROJECT_ID') ?? null),
       webhookSecret = readEnv('OPENAI_WEBHOOK_SECRET') ?? null,
       workloadIdentity,
       ...opts
@@ -474,7 +474,7 @@ export class OpenAI {
     }
 
     this.baseURL = options.baseURL!;
-    this.timeout = options.timeout ?? OpenAI.DEFAULT_TIMEOUT /* 10 minutes */;
+    this.timeout = options.timeout ?? OpenAI.DEFAULT_TIMEOUT; /* 10 minutes */
     this.logger = options.logger ?? console;
     const defaultLogLevel = 'warn';
     // Set default logLevel early so that we can log a warning in parseLogLevel.
@@ -674,9 +674,8 @@ export class OpenAI {
     defaultBaseURL?: string | undefined,
   ): string {
     const baseURL = (!this.#baseURLOverridden() && defaultBaseURL) || this.baseURL;
-    const url =
-      isAbsoluteURL(path) ?
-        new URL(path)
+    const url = isAbsoluteURL(path)
+      ? new URL(path)
       : new URL(baseURL + (baseURL.endsWith('/') && path.startsWith('/') ? path.slice(1) : path));
 
     const defaultQuery = this.defaultQuery();
@@ -827,8 +826,9 @@ export class OpenAI {
         );
         return this.retryRequest(options, retriesRemaining, retryOfRequestLogID ?? requestLogID);
       }
-      const terminalMessage =
-        hasStreamingBody ? 'error; streaming body cannot be retried' : 'error; no more retries left';
+      const terminalMessage = hasStreamingBody
+        ? 'error; streaming body cannot be retried'
+        : 'error; no more retries left';
       loggerFor(this).info(
         `[${requestLogID}] connection ${isTimeout ? 'timed out' : 'failed'} - ${terminalMessage}`,
       );
@@ -910,9 +910,9 @@ export class OpenAI {
         );
       }
 
-      const retryMessage =
-        shouldRetry ?
-          hasStreamingBody ? `error; streaming body cannot be retried`
+      const retryMessage = shouldRetry
+        ? hasStreamingBody
+          ? `error; streaming body cannot be retried`
           : `error; no more retries left`
         : `error; not retryable`;
 
@@ -960,9 +960,9 @@ export class OpenAI {
   ): Pagination.PagePromise<PageClass, Item> {
     return this.requestAPIList(
       Page,
-      opts && 'then' in opts ?
-        opts.then((opts) => ({ method: 'get', path, ...opts }))
-      : { method: 'get', path, ...opts },
+      opts && 'then' in opts
+        ? opts.then((opts) => ({ method: 'get', path, ...opts }))
+        : { method: 'get', path, ...opts },
     );
   }
 
@@ -1177,9 +1177,9 @@ export class OpenAI {
         'OpenAI-Organization': this.organization,
         'OpenAI-Project': this.project,
       },
-      this._provider ? undefined : (
-        await this.authHeaders(options, options.__security ?? { bearerAuth: true })
-      ),
+      this._provider
+        ? undefined
+        : await this.authHeaders(options, options.__security ?? { bearerAuth: true }),
       this._options.defaultHeaders,
       bodyHeaders,
       options.headers,

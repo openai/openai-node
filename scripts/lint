@@ -23,15 +23,15 @@ EOF
   fi
 
   # Old test files are checked for compatibility with the current SDK, not
-  # formatting drift against the current Prettier version.
-  find tests -name '*.test.ts' -print0 | xargs -0 ./node_modules/.bin/prettier --write
+  # formatting drift against the current Oxfmt version.
+  find tests -name '*.test.ts' -print0 | xargs -0 ./node_modules/.bin/oxfmt --write
 fi
 
-echo "==> Running prettier --check"
-./node_modules/.bin/prettier --check .
+echo "==> Running oxfmt --check"
+./node_modules/.bin/oxfmt --check .
 
-echo "==> Running eslint"
-./node_modules/.bin/eslint .
+echo "==> Running oxlint"
+./node_modules/.bin/oxlint .
 
 echo "==> Building"
 ./scripts/build
