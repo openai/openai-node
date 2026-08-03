@@ -6,6 +6,7 @@ import {
   ChatCompletionFunctionTool,
   ChatCompletionMessage,
   ChatCompletionMessageFunctionToolCall,
+  ChatCompletionMessageToolCall,
   ChatCompletionStreamingToolRunnerParams,
   ChatCompletionStreamingToolRunnerParamsWithContext,
   ChatCompletionStreamParams,
@@ -158,8 +159,6 @@ export function maybeParseChatCompletion<
     return {
       ...completion,
       choices: completion.choices.map((choice) => {
-        assertToolCallsAreChatCompletionFunctionToolCalls(choice.message.tool_calls);
-
         return {
           ...choice,
           message: {
@@ -167,7 +166,11 @@ export function maybeParseChatCompletion<
             parsed: null,
             ...(choice.message.tool_calls ?
               {
-                tool_calls: choice.message.tool_calls,
+                tool_calls: choice.message.tool_calls.map((toolCall) =>
+                  toolCall.type === 'function' ?
+                    { ...toolCall, function: { ...toolCall.function, parsed_arguments: null } }
+                  : toolCall,
+                ),
               }
             : undefined),
           },
@@ -191,8 +194,6 @@ export function parseChatCompletion<
     if (choice.finish_reason === 'content_filter') {
       throw new ContentFilterFinishReasonError();
     }
-
-    assertToolCallsAreChatCompletionFunctionToolCalls(choice.message.tool_calls);
 
     return {
       ...choice,
@@ -238,8 +239,12 @@ function parseResponseFormat<
 
 function parseToolCall<Params extends ChatCompletionCreateParams>(
   params: Params,
-  toolCall: ChatCompletionMessageFunctionToolCall,
-): ParsedFunctionToolCall {
+  toolCall: ChatCompletionMessageToolCall,
+): ParsedFunctionToolCall | ChatCompletionMessageToolCall {
+  if (toolCall.type !== 'function') {
+    return toolCall;
+  }
+
   const inputTool = params.tools?.find(
     (inputTool) =>
       isChatCompletionFunctionTool(inputTool) && inputTool.function?.name === toolCall.function.name,
@@ -258,9 +263,9 @@ function parseToolCall<Params extends ChatCompletionCreateParams>(
 
 export function shouldParseToolCall(
   params: ChatCompletionCreateParams | null | undefined,
-  toolCall: ChatCompletionMessageFunctionToolCall,
+  toolCall: ChatCompletionMessageToolCall,
 ): boolean {
-  if (!params || !('tools' in params) || !params.tools) {
+  if (!params || !('tools' in params) || !params.tools || toolCall.type !== 'function') {
     return false;
   }
 
