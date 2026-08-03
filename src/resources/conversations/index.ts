@@ -1,6 +1,6 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-export * from './conversations';
+export { Conversations } from './conversations';
 export {
   Items,
   type ConversationItem,

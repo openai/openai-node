@@ -11,7 +11,6 @@ import { CursorPage, type CursorPageParams, PagePromise } from '../../core/pagin
 import { buildHeaders } from '../../internal/headers';
 import { RequestOptions } from '../../internal/request-options';
 import { path } from '../../internal/utils/path';
-import { AssistantStream } from '../../lib/AssistantStream';
 
 /**
  * Build Assistants that can call models and use tools.
@@ -1531,6 +1530,4 @@ export declare namespace Assistants {
     type AssistantUpdateParams as AssistantUpdateParams,
     type AssistantListParams as AssistantListParams,
   };
-
-  export { AssistantStream };
 }

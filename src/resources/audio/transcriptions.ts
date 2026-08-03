@@ -29,43 +29,28 @@ export class Transcriptions extends APIResource {
    * ```
    */
   create(
-    body: TranscriptionCreateParamsNonStreaming<'json' | undefined>,
+    body: TranscriptionCreateParamsNonStreaming,
     options?: RequestOptions,
-  ): APIPromise<Transcription>;
-  create(
-    body: TranscriptionCreateParamsNonStreaming<'verbose_json'>,
-    options?: RequestOptions,
-  ): APIPromise<TranscriptionVerbose>;
-  create(
-    body: TranscriptionCreateParamsNonStreaming<'srt' | 'vtt' | 'text'>,
-    options?: RequestOptions,
-  ): APIPromise<string>;
-  create(body: TranscriptionCreateParamsNonStreaming, options?: RequestOptions): APIPromise<Transcription>;
+  ): APIPromise<TranscriptionCreateResponse>;
   create(
     body: TranscriptionCreateParamsStreaming,
     options?: RequestOptions,
   ): APIPromise<Stream<TranscriptionStreamEvent>>;
   create(
-    body: TranscriptionCreateParamsStreaming,
+    body: TranscriptionCreateParamsBase,
     options?: RequestOptions,
-  ): APIPromise<TranscriptionCreateResponse | string | Stream<TranscriptionStreamEvent>>;
+  ): APIPromise<Stream<TranscriptionStreamEvent> | TranscriptionCreateResponse>;
   create(
     body: TranscriptionCreateParams,
     options?: RequestOptions,
-  ): APIPromise<TranscriptionCreateResponse | string | Stream<TranscriptionStreamEvent>> {
+  ): APIPromise<TranscriptionCreateResponse> | APIPromise<Stream<TranscriptionStreamEvent>> {
     return this._client.post(
       '/audio/transcriptions',
       multipartFormRequestOptions(
-        {
-          body,
-          ...options,
-          stream: body.stream ?? false,
-          __metadata: { model: body.model },
-          __security: { bearerAuth: true },
-        },
+        { body, ...options, stream: body.stream ?? false, __security: { bearerAuth: true } },
         this._client,
       ),
-    );
+    ) as APIPromise<TranscriptionCreateResponse> | APIPromise<Stream<TranscriptionStreamEvent>>;
   }
 }
 
@@ -656,13 +641,11 @@ export interface TranscriptionWord {
  */
 export type TranscriptionCreateResponse = Transcription | TranscriptionDiarized | TranscriptionVerbose;
 
-export type TranscriptionCreateParams<
-  ResponseFormat extends AudioAPI.AudioResponseFormat | undefined = AudioAPI.AudioResponseFormat | undefined,
-> = TranscriptionCreateParamsNonStreaming<ResponseFormat> | TranscriptionCreateParamsStreaming;
+export type TranscriptionCreateParams =
+  | TranscriptionCreateParamsNonStreaming
+  | TranscriptionCreateParamsStreaming;
 
-export interface TranscriptionCreateParamsBase<
-  ResponseFormat extends AudioAPI.AudioResponseFormat | undefined = AudioAPI.AudioResponseFormat | undefined,
-> {
+export interface TranscriptionCreateParamsBase {
   /**
    * The audio file object (not file name) to transcribe, in one of these formats:
    * flac, mp3, mp4, mpeg, mpga, m4a, ogg, wav, or webm.
@@ -749,7 +732,7 @@ export interface TranscriptionCreateParamsBase<
    * `gpt-4o-transcribe-diarize`, the supported formats are `json`, `text`, and
    * `diarized_json`, with `diarized_json` required to receive speaker annotations.
    */
-  response_format?: ResponseFormat;
+  response_format?: AudioAPI.AudioResponseFormat;
 
   /**
    * If set to true, the model response data will be streamed to the client as it is
@@ -814,9 +797,7 @@ export namespace TranscriptionCreateParams {
   export type TranscriptionCreateParamsStreaming = TranscriptionsAPI.TranscriptionCreateParamsStreaming;
 }
 
-export interface TranscriptionCreateParamsNonStreaming<
-  ResponseFormat extends AudioAPI.AudioResponseFormat | undefined = AudioAPI.AudioResponseFormat | undefined,
-> extends TranscriptionCreateParamsBase<ResponseFormat> {
+export interface TranscriptionCreateParamsNonStreaming extends TranscriptionCreateParamsBase {
   /**
    * If set to true, the model response data will be streamed to the client as it is
    * generated using

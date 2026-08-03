@@ -1,7 +1,0 @@
-{
-  "tasks": {
-    "install": "npm install --ignore-scripts --no-package-lock --no-audit --no-fund --no-save ./openai.tgz",
-    "check": "deno lint && deno check --unstable-byonm main_test.ts",
-    "test": "deno test --unstable-byonm --allow-env --allow-net --allow-read"
-  }
-}

@@ -36,9 +36,6 @@ import { CursorPage, type CursorPageParams, PagePromise } from '../../../../core
 import { Stream } from '../../../../core/streaming';
 import { buildHeaders } from '../../../../internal/headers';
 import { RequestOptions } from '../../../../internal/request-options';
-import { AssistantStream, RunCreateParamsBaseStream } from '../../../../lib/AssistantStream';
-import { sleep } from '../../../../internal/utils/sleep';
-import { RunSubmitToolOutputsParamsStream } from '../../../../lib/AssistantStream';
 import { path } from '../../../../internal/utils/path';
 
 /**
@@ -144,96 +141,6 @@ export class Runs extends APIResource {
   }
 
   /**
-   * A helper to create a run an poll for a terminal state. More information on Run
-   * lifecycles can be found here:
-   * https://platform.openai.com/docs/assistants/how-it-works/runs-and-run-steps
-   */
-  async createAndPoll(
-    threadId: string,
-    body: RunCreateParamsNonStreaming,
-    options?: RequestOptions & { pollIntervalMs?: number },
-  ): Promise<Run> {
-    const run = await this.create(threadId, body, options);
-    return await this.poll(run.id, { thread_id: threadId }, options);
-  }
-
-  /**
-   * Create a Run stream
-   *
-   * @deprecated use `stream` instead
-   */
-  createAndStream(
-    threadId: string,
-    body: RunCreateParamsBaseStream,
-    options?: RequestOptions,
-  ): AssistantStream {
-    return AssistantStream.createAssistantStream(threadId, this._client.beta.threads.runs, body, options);
-  }
-
-  /**
-   * A helper to poll a run status until it reaches a terminal state. More
-   * information on Run lifecycles can be found here:
-   * https://platform.openai.com/docs/assistants/how-it-works/runs-and-run-steps
-   */
-  async poll(
-    runId: string,
-    params: RunRetrieveParams,
-    options?: RequestOptions & { pollIntervalMs?: number },
-  ): Promise<Run> {
-    const headers = buildHeaders([
-      options?.headers,
-      {
-        'X-Stainless-Poll-Helper': 'true',
-        'X-Stainless-Custom-Poll-Interval': options?.pollIntervalMs?.toString() ?? undefined,
-      },
-    ]);
-
-    while (true) {
-      const { data: run, response } = await this.retrieve(runId, params, {
-        ...options,
-        headers: { ...options?.headers, ...headers },
-      }).withResponse();
-
-      switch (run.status) {
-        //If we are in any sort of intermediate state we poll
-        case 'queued':
-        case 'in_progress':
-        case 'cancelling':
-          let sleepInterval = 5000;
-
-          if (options?.pollIntervalMs) {
-            sleepInterval = options.pollIntervalMs;
-          } else {
-            const headerInterval = response.headers.get('openai-poll-after-ms');
-            if (headerInterval) {
-              const headerIntervalMs = parseInt(headerInterval);
-              if (!isNaN(headerIntervalMs)) {
-                sleepInterval = headerIntervalMs;
-              }
-            }
-          }
-          await sleep(sleepInterval);
-          break;
-        //We return the run in any terminal state.
-        case 'requires_action':
-        case 'incomplete':
-        case 'cancelled':
-        case 'completed':
-        case 'failed':
-        case 'expired':
-          return run;
-      }
-    }
-  }
-
-  /**
-   * Create a Run stream
-   */
-  stream(threadId: string, body: RunCreateParamsBaseStream, options?: RequestOptions): AssistantStream {
-    return AssistantStream.createAssistantStream(threadId, this._client.beta.threads.runs, body, options);
-  }
-
-  /**
    * When a run has the `status: "requires_action"` and `required_action.type` is
    * `submit_tool_outputs`, this endpoint can be used to submit the outputs from the
    * tool calls once they're all completed. All outputs must be submitted in a single
@@ -270,33 +177,6 @@ export class Runs extends APIResource {
       __synthesizeEventData: true,
       __security: { bearerAuth: true },
     }) as APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
-  }
-
-  /**
-   * A helper to submit a tool output to a run and poll for a terminal run state.
-   * More information on Run lifecycles can be found here:
-   * https://platform.openai.com/docs/assistants/how-it-works/runs-and-run-steps
-   */
-  async submitToolOutputsAndPoll(
-    runId: string,
-    params: RunSubmitToolOutputsParamsNonStreaming,
-    options?: RequestOptions & { pollIntervalMs?: number },
-  ): Promise<Run> {
-    const run = await this.submitToolOutputs(runId, params, options);
-    return await this.poll(run.id, params, options);
-  }
-
-  /**
-   * Submit the tool outputs from a previous run and stream the run to a terminal
-   * state. More information on Run lifecycles can be found here:
-   * https://platform.openai.com/docs/assistants/how-it-works/runs-and-run-steps
-   */
-  submitToolOutputsStream(
-    runId: string,
-    params: RunSubmitToolOutputsParamsStream,
-    options?: RequestOptions,
-  ): AssistantStream {
-    return AssistantStream.createToolAssistantStream(runId, this._client.beta.threads.runs, params, options);
   }
 }
 
@@ -962,12 +842,6 @@ export interface RunCancelParams {
   thread_id: string;
 }
 
-export type RunCreateAndPollParams = ThreadsAPI.ThreadCreateAndRunParamsNonStreaming;
-
-export type RunCreateAndStreamParams = RunCreateParamsBaseStream;
-
-export type RunStreamParams = RunCreateParamsBaseStream;
-
 export type RunSubmitToolOutputsParams =
   | RunSubmitToolOutputsParamsNonStreaming
   | RunSubmitToolOutputsParamsStreaming;
@@ -1029,9 +903,6 @@ export interface RunSubmitToolOutputsParamsStreaming extends RunSubmitToolOutput
   stream: true;
 }
 
-export type RunSubmitToolOutputsAndPollParams = RunSubmitToolOutputsParamsNonStreaming;
-export type RunSubmitToolOutputsStreamParams = RunSubmitToolOutputsParamsStream;
-
 Runs.Steps = Steps;
 
 export declare namespace Runs {
@@ -1046,14 +917,10 @@ export declare namespace Runs {
     type RunRetrieveParams as RunRetrieveParams,
     type RunUpdateParams as RunUpdateParams,
     type RunListParams as RunListParams,
-    type RunCreateAndPollParams,
-    type RunCreateAndStreamParams,
-    type RunStreamParams,
+    type RunCancelParams as RunCancelParams,
     type RunSubmitToolOutputsParams as RunSubmitToolOutputsParams,
     type RunSubmitToolOutputsParamsNonStreaming as RunSubmitToolOutputsParamsNonStreaming,
     type RunSubmitToolOutputsParamsStreaming as RunSubmitToolOutputsParamsStreaming,
-    type RunSubmitToolOutputsAndPollParams,
-    type RunSubmitToolOutputsStreamParams,
   };
 
   export {

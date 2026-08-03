@@ -23,26 +23,10 @@ export class Translations extends APIResource {
    * });
    * ```
    */
-  create(
-    body: TranslationCreateParams<'json' | undefined>,
-    options?: RequestOptions,
-  ): APIPromise<Translation>;
-  create(
-    body: TranslationCreateParams<'verbose_json'>,
-    options?: RequestOptions,
-  ): APIPromise<TranslationVerbose>;
-  create(body: TranslationCreateParams<'text' | 'srt' | 'vtt'>, options?: RequestOptions): APIPromise<string>;
-  create(body: TranslationCreateParams, options?: RequestOptions): APIPromise<Translation>;
-  create(
-    body: TranslationCreateParams,
-    options?: RequestOptions,
-  ): APIPromise<TranslationCreateResponse | string> {
+  create(body: TranslationCreateParams, options?: RequestOptions): APIPromise<TranslationCreateResponse> {
     return this._client.post(
       '/audio/translations',
-      multipartFormRequestOptions(
-        { body, ...options, __metadata: { model: body.model }, __security: { bearerAuth: true } },
-        this._client,
-      ),
+      multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
     );
   }
 }
@@ -75,9 +59,7 @@ export interface TranslationVerbose {
 
 export type TranslationCreateResponse = Translation | TranslationVerbose;
 
-export interface TranslationCreateParams<
-  ResponseFormat extends AudioAPI.AudioResponseFormat | undefined = AudioAPI.AudioResponseFormat | undefined,
-> {
+export interface TranslationCreateParams {
   /**
    * The audio file object (not file name) translate, in one of these formats: flac,
    * mp3, mp4, mpeg, mpga, m4a, ogg, wav, or webm.

@@ -15,9 +15,6 @@ import { stringifyQuery } from './internal/utils/query';
 import { VERSION } from './version';
 import * as Errors from './core/error';
 import * as Pagination from './core/pagination';
-import type { WorkloadIdentity } from './auth/types';
-import { WorkloadIdentityAuth } from './auth/workload-identity-auth';
-import { OAuthError, SubjectTokenProviderError } from './core/error';
 import {
   AbstractPage,
   type ConversationCursorPageParams,
@@ -238,7 +235,6 @@ import {
 import { type Fetch } from './internal/builtin-types';
 import { isRunningInBrowser } from './internal/detect-platform';
 import { HeadersLike, NullableHeaders, buildHeaders } from './internal/headers';
-import { configureProvider, type Provider, type ProviderRuntime } from './internal/provider';
 import { FinalRequestOptions, RequestOptions } from './internal/request-options';
 import { readEnv } from './internal/utils/env';
 import {
@@ -250,24 +246,11 @@ import {
 } from './internal/utils/log';
 import { isEmptyObj } from './internal/utils/values';
 
-const WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER = 'workload-identity-auth';
-
-export type ApiKeySetter = () => Promise<string>;
-
 export interface ClientOptions {
   /**
-   * API key used for authentication.
-   *
-   * - Accepts either a static string or an async function that resolves to a string.
-   * - Defaults to process.env['OPENAI_API_KEY'].
-   * - When a function is provided, it is invoked before each request so you can rotate
-   *   or refresh credentials at runtime.
-   * - The function must return a non-empty string; otherwise an OpenAIError is thrown.
-   * - If the function throws, the error is wrapped in an OpenAIError with the original
-   *   error available as `cause`.
-   * - Mutually exclusive with `workloadIdentity`.
+   * Defaults to process.env['OPENAI_API_KEY'].
    */
-  apiKey?: string | ApiKeySetter | null | undefined;
+  apiKey?: string | null | undefined;
 
   /**
    * Defaults to process.env['OPENAI_ADMIN_KEY'].
@@ -306,7 +289,6 @@ export interface ClientOptions {
    * @unit milliseconds
    */
   timeout?: number | undefined;
-
   /**
    * Additional `RequestInit` options to be passed to `fetch` calls.
    * Properties will be overridden by per-request `fetchOptions`.
@@ -363,18 +345,6 @@ export interface ClientOptions {
    * Defaults to globalThis.console.
    */
   logger?: Logger | undefined;
-
-  /**
-   * Workload identity configuration for OAuth2 token exchange authentication.
-   * Mutually exclusive with `apiKey`.
-   */
-  workloadIdentity?: WorkloadIdentity | undefined;
-
-  /**
-   * Configure this client to use a third-party API provider.
-   * Mutually exclusive with top-level authentication and `baseURL` options.
-   */
-  provider?: Provider | undefined;
 }
 
 /**
@@ -397,9 +367,7 @@ export class OpenAI {
   private fetch: Fetch;
   #encoder: Opts.RequestEncoder;
   protected idempotencyHeader?: string;
-  protected _options: ClientOptions;
-  private _provider: ProviderRuntime | undefined;
-  private _workloadIdentityAuth?: WorkloadIdentityAuth;
+  private _options: ClientOptions;
 
   /**
    * API Client for interfacing with the OpenAI API.
@@ -410,7 +378,6 @@ export class OpenAI {
    * @param {string | null | undefined} [opts.project=process.env['OPENAI_PROJECT_ID'] ?? null]
    * @param {string | null | undefined} [opts.webhookSecret=process.env['OPENAI_WEBHOOK_SECRET'] ?? null]
    * @param {string} [opts.baseURL=process.env['OPENAI_BASE_URL'] ?? https://api.openai.com/v1] - Override the default base URL for the API.
-   * @param {Provider} [opts.provider] - Configure a third-party API provider. Mutually exclusive with top-level authentication and base URL options.
    * @param {number} [opts.timeout=10 minutes] - The maximum amount of time (in milliseconds) the client will wait for a response before timing out.
    * @param {MergedRequestInit} [opts.fetchOptions] - Additional `RequestInit` options to be passed to `fetch` calls.
    * @param {Fetch} [opts.fetch] - Specify a custom `fetch` function implementation.
@@ -419,53 +386,24 @@ export class OpenAI {
    * @param {Record<string, string | undefined>} opts.defaultQuery - Default query parameters to include with every request to the API.
    * @param {boolean} [opts.dangerouslyAllowBrowser=false] - By default, client-side use of this library is not allowed, as it risks exposing your secret API credentials to attackers.
    */
-  constructor(clientOptions: ClientOptions = {}) {
-    const provider = clientOptions.provider;
-    if (provider) {
-      const conflictingOptions = (['apiKey', 'adminAPIKey', 'workloadIdentity', 'baseURL'] as const).filter(
-        (key) => clientOptions[key] != null,
-      );
-      if (conflictingOptions.length) {
-        throw new Errors.OpenAIError(
-          `The \`provider\` option cannot be used with ${conflictingOptions
-            .map((key) => `\`${key}\``)
-            .join(', ')}. Configure authentication and the base URL through the provider instead.`,
-        );
-      }
-    }
-
-    const {
-      baseURL = provider ? null : readEnv('OPENAI_BASE_URL'),
-      apiKey = provider ? null : readEnv('OPENAI_API_KEY') ?? null,
-      adminAPIKey = provider ? null : readEnv('OPENAI_ADMIN_KEY') ?? null,
-      organization = provider ? null : readEnv('OPENAI_ORG_ID') ?? null,
-      project = provider ? null : readEnv('OPENAI_PROJECT_ID') ?? null,
-      webhookSecret = readEnv('OPENAI_WEBHOOK_SECRET') ?? null,
-      workloadIdentity,
-      ...opts
-    } = clientOptions;
-    const providerRuntime = provider ? configureProvider(provider) : undefined;
+  constructor({
+    baseURL = readEnv('OPENAI_BASE_URL'),
+    apiKey = readEnv('OPENAI_API_KEY') ?? null,
+    adminAPIKey = readEnv('OPENAI_ADMIN_KEY') ?? null,
+    organization = readEnv('OPENAI_ORG_ID') ?? null,
+    project = readEnv('OPENAI_PROJECT_ID') ?? null,
+    webhookSecret = readEnv('OPENAI_WEBHOOK_SECRET') ?? null,
+    ...opts
+  }: ClientOptions = {}) {
     const options: ClientOptions = {
       apiKey,
       adminAPIKey,
       organization,
       project,
       webhookSecret,
-      workloadIdentity,
-      provider,
       ...opts,
-      baseURL: providerRuntime?.baseURL ?? (baseURL || `https://api.openai.com/v1`),
+      baseURL: baseURL || `https://api.openai.com/v1`,
     };
-
-    if (apiKey && workloadIdentity) {
-      throw new Errors.OpenAIError('The `apiKey` and `workloadIdentity` options are mutually exclusive');
-    }
-
-    if (!providerRuntime && !apiKey && !adminAPIKey && !workloadIdentity) {
-      throw new Errors.OpenAIError(
-        'Missing credentials. Please pass an `apiKey`, `workloadIdentity`, `adminAPIKey`, or set the `OPENAI_API_KEY` or `OPENAI_ADMIN_KEY` environment variable.',
-      );
-    }
 
     if (!options.dangerouslyAllowBrowser && isRunningInBrowser()) {
       throw new Errors.OpenAIError(
@@ -488,7 +426,7 @@ export class OpenAI {
     this.fetch = options.fetch ?? Shims.getDefaultFetch();
     this.#encoder = Opts.FallbackEncoder;
 
-    const customHeadersEnv = provider ? undefined : readEnv('OPENAI_CUSTOM_HEADERS');
+    const customHeadersEnv = readEnv('OPENAI_CUSTOM_HEADERS');
     if (customHeadersEnv) {
       const parsed: Record<string, string> = {};
       for (const line of customHeadersEnv.split('\n')) {
@@ -497,17 +435,12 @@ export class OpenAI {
           parsed[line.substring(0, colon).trim()] = line.substring(colon + 1).trim();
         }
       }
-      options.defaultHeaders = buildHeaders([parsed, options.defaultHeaders]);
+      options.defaultHeaders = { ...parsed, ...options.defaultHeaders };
     }
 
     this._options = options;
-    this._provider = providerRuntime;
 
-    if (workloadIdentity) {
-      this._workloadIdentityAuth = new WorkloadIdentityAuth(workloadIdentity, this.fetch);
-    }
-
-    this.apiKey = typeof apiKey === 'string' ? apiKey : null;
+    this.apiKey = apiKey;
     this.adminAPIKey = adminAPIKey;
     this.organization = organization;
     this.project = project;
@@ -518,9 +451,7 @@ export class OpenAI {
    * Create a new client instance re-using the same options given to the current client with optional overriding.
    */
   withOptions(options: Partial<ClientOptions>): this {
-    const inheritedProvider = this._options.provider;
-    const provider = options.provider ?? inheritedProvider;
-    const inheritedOptions: ClientOptions = {
+    const client = new (this.constructor as any as new (props: ClientOptions) => typeof this)({
       ...this._options,
       baseURL: this.baseURL,
       maxRetries: this.maxRetries,
@@ -529,29 +460,12 @@ export class OpenAI {
       logLevel: this.logLevel,
       fetch: this.fetch,
       fetchOptions: this.fetchOptions,
-      apiKey: this._options.apiKey,
+      apiKey: this.apiKey,
       adminAPIKey: this.adminAPIKey,
-      workloadIdentity: this._options.workloadIdentity,
       organization: this.organization,
       project: this.project,
       webhookSecret: this.webhookSecret,
-    };
-    if (provider) {
-      delete inheritedOptions.apiKey;
-      delete inheritedOptions.adminAPIKey;
-      delete inheritedOptions.workloadIdentity;
-      delete inheritedOptions.baseURL;
-      if (provider !== inheritedProvider) {
-        delete inheritedOptions.organization;
-        delete inheritedOptions.project;
-        delete inheritedOptions.defaultHeaders;
-      }
-    }
-
-    const client = new (this.constructor as any as new (props: ClientOptions) => typeof this)({
-      ...inheritedOptions,
       ...options,
-      provider,
     });
     return client;
   }
@@ -560,42 +474,36 @@ export class OpenAI {
    * Check whether the base URL is set to its default.
    */
   #baseURLOverridden(): boolean {
-    return this._provider !== undefined || this.baseURL !== 'https://api.openai.com/v1';
+    return this.baseURL !== 'https://api.openai.com/v1';
   }
 
   protected defaultQuery(): Record<string, string | undefined> | undefined {
     return this._options.defaultQuery;
   }
 
-  protected validateHeaders(
-    { values, nulls }: NullableHeaders,
-    schemes: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean } = {
-      bearerAuth: true,
-      adminAPIKeyAuth: true,
-    },
-  ) {
-    if (values.get('authorization') || values.get('api-key')) {
+  protected validateHeaders({ values, nulls }: NullableHeaders) {
+    if (this.apiKey && values.get('authorization')) {
       return;
     }
-    if (nulls.has('authorization') || nulls.has('api-key')) {
+    if (nulls.has('authorization')) {
       return;
     }
 
-    if (this._workloadIdentityAuth && schemes.bearerAuth) {
+    if (this.adminAPIKey && values.get('authorization')) {
+      return;
+    }
+    if (nulls.has('authorization')) {
       return;
     }
 
     throw new Error(
-      'Could not resolve authentication method. Expected either apiKey or adminAPIKey to be set. Or for one of the "Authorization" or "api-key" headers to be explicitly omitted',
+      'Could not resolve authentication method. Expected either apiKey or adminAPIKey to be set. Or for one of the "Authorization" or "Authorization" headers to be explicitly omitted',
     );
   }
 
   protected async authHeaders(
     opts: FinalRequestOptions,
-    schemes: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean } = {
-      bearerAuth: true,
-      adminAPIKeyAuth: true,
-    },
+    schemes: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
   ): Promise<NullableHeaders | undefined> {
     return buildHeaders([
       schemes.bearerAuth ? await this.bearerAuth(opts) : null,
@@ -604,9 +512,6 @@ export class OpenAI {
   }
 
   protected async bearerAuth(opts: FinalRequestOptions): Promise<NullableHeaders | undefined> {
-    if (this._workloadIdentityAuth) {
-      return buildHeaders([{ Authorization: `Bearer ${await this._workloadIdentityAuth.getToken()}` }]);
-    }
     if (this.apiKey == null) {
       return undefined;
     }
@@ -641,33 +546,6 @@ export class OpenAI {
     return Errors.APIError.generate(status, error, message, headers);
   }
 
-  async _callApiKey(): Promise<boolean> {
-    if (this._provider) return false;
-
-    const apiKey = this._options.apiKey;
-    if (typeof apiKey !== 'function') return false;
-
-    let token: unknown;
-    try {
-      token = await apiKey();
-    } catch (err: any) {
-      if (err instanceof Errors.OpenAIError) throw err;
-      throw new Errors.OpenAIError(
-        `Failed to get token from 'apiKey' function: ${err.message}`,
-        // @ts-ignore
-        { cause: err },
-      );
-    }
-
-    if (typeof token !== 'string' || !token) {
-      throw new Errors.OpenAIError(
-        `Expected 'apiKey' function argument to return a string but it returned ${token}`,
-      );
-    }
-    this.apiKey = token;
-    return true;
-  }
-
   buildURL(
     path: string,
     query: Record<string, unknown> | null | undefined,
@@ -695,14 +573,7 @@ export class OpenAI {
   /**
    * Used as a callback for mutating the given `FinalRequestOptions` object.
    */
-  protected async prepareOptions(options: FinalRequestOptions): Promise<void> {
-    if (this._provider) return;
-
-    const security = options.__security ?? { bearerAuth: true };
-    if (security.bearerAuth) {
-      await this._callApiKey();
-    }
-  }
+  protected async prepareOptions(options: FinalRequestOptions): Promise<void> {}
 
   /**
    * Used as a callback for mutating the given `RequestInit` object.
@@ -770,10 +641,8 @@ export class OpenAI {
     const { req, url, timeout } = await this.buildRequest(options, {
       retryCount: maxRetries - retriesRemaining,
     });
-    const hasStreamingBody = options.__metadata?.['hasStreamingBody'] === true;
 
     await this.prepareRequest(req, { url, options });
-    await this._provider?.prepareRequest?.(req, { url, options });
 
     /** Not an API request ID, just for correlating local log entries. */
     const requestLogID = 'log_' + ((Math.random() * (1 << 24)) | 0).toString(16).padStart(6, '0');
@@ -795,9 +664,8 @@ export class OpenAI {
       throw new Errors.APIUserAbortError();
     }
 
-    const security = options.__security ?? { bearerAuth: true };
     const controller = new AbortController();
-    const response = await this.fetchWithAuth(url, req, timeout, controller, security).catch(castToError);
+    const response = await this.fetchWithTimeout(url, req, timeout, controller).catch(castToError);
     const headersTime = Date.now();
 
     if (response instanceof globalThis.Error) {
@@ -812,7 +680,7 @@ export class OpenAI {
       const isTimeout =
         isAbortError(response) ||
         /timed? ?out/i.test(String(response) + ('cause' in response ? String(response.cause) : ''));
-      if (retriesRemaining && !hasStreamingBody) {
+      if (retriesRemaining) {
         loggerFor(this).info(
           `[${requestLogID}] connection ${isTimeout ? 'timed out' : 'failed'} - ${retryMessage}`,
         );
@@ -827,13 +695,11 @@ export class OpenAI {
         );
         return this.retryRequest(options, retriesRemaining, retryOfRequestLogID ?? requestLogID);
       }
-      const terminalMessage =
-        hasStreamingBody ? 'error; streaming body cannot be retried' : 'error; no more retries left';
       loggerFor(this).info(
-        `[${requestLogID}] connection ${isTimeout ? 'timed out' : 'failed'} - ${terminalMessage}`,
+        `[${requestLogID}] connection ${isTimeout ? 'timed out' : 'failed'} - error; no more retries left`,
       );
       loggerFor(this).debug(
-        `[${requestLogID}] connection ${isTimeout ? 'timed out' : 'failed'} (${terminalMessage})`,
+        `[${requestLogID}] connection ${isTimeout ? 'timed out' : 'failed'} (error; no more retries left)`,
         formatRequestDetails({
           retryOfRequestLogID,
           url,
@@ -841,16 +707,10 @@ export class OpenAI {
           message: response.message,
         }),
       );
-      if (response instanceof OAuthError || response instanceof SubjectTokenProviderError) {
-        throw response;
-      }
       if (isTimeout) {
         throw new Errors.APIConnectionTimeoutError();
       }
-      throw new Errors.APIConnectionError({
-        message: getConnectionErrorMessage(response),
-        cause: response,
-      });
+      throw new Errors.APIConnectionError({ cause: response });
     }
 
     const specialHeaders = [...response.headers.entries()]
@@ -862,31 +722,8 @@ export class OpenAI {
     } with status ${response.status} in ${headersTime - startTime}ms`;
 
     if (!response.ok) {
-      if (
-        response.status === 401 &&
-        this._workloadIdentityAuth &&
-        security.bearerAuth &&
-        !options.__metadata?.['hasStreamingBody'] &&
-        !options.__metadata?.['workloadIdentityTokenRefreshed']
-      ) {
-        await Shims.CancelReadableStream(response.body);
-        this._workloadIdentityAuth.invalidateToken();
-
-        return this.makeRequest(
-          {
-            ...options,
-            __metadata: {
-              ...options.__metadata,
-              workloadIdentityTokenRefreshed: true,
-            },
-          },
-          retriesRemaining,
-          retryOfRequestLogID ?? requestLogID,
-        );
-      }
-
       const shouldRetry = await this.shouldRetry(response);
-      if (retriesRemaining && shouldRetry && !hasStreamingBody) {
+      if (retriesRemaining && shouldRetry) {
         const retryMessage = `retrying, ${retriesRemaining} attempts remaining`;
 
         // We don't need the body of this response.
@@ -910,11 +747,7 @@ export class OpenAI {
         );
       }
 
-      const retryMessage =
-        shouldRetry ?
-          hasStreamingBody ? `error; streaming body cannot be retried`
-          : `error; no more retries left`
-        : `error; not retryable`;
+      const retryMessage = shouldRetry ? `error; no more retries left` : `error; not retryable`;
 
       loggerFor(this).info(`${responseInfo} - ${retryMessage}`);
 
@@ -975,30 +808,6 @@ export class OpenAI {
   ): Pagination.PagePromise<PageClass, Item> {
     const request = this.makeRequest(options, null, undefined);
     return new Pagination.PagePromise<PageClass, Item>(this as any as OpenAI, request, Page);
-  }
-
-  protected async fetchWithAuth(
-    url: RequestInfo,
-    init: RequestInit,
-    timeout: number,
-    controller: AbortController,
-    schemes: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean } = {
-      bearerAuth: true,
-      adminAPIKeyAuth: true,
-    },
-  ): Promise<Response> {
-    if (this._workloadIdentityAuth && schemes.bearerAuth) {
-      const headers = init.headers as Headers;
-      const authHeader = headers.get('Authorization');
-      if (!authHeader || authHeader === `Bearer ${WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}`) {
-        const token = await this._workloadIdentityAuth.getToken();
-        headers.set('Authorization', `Bearer ${token}`);
-      }
-    }
-
-    const response = await this.fetchWithTimeout(url, init, timeout, controller);
-
-    return response;
   }
 
   async fetchWithTimeout(
@@ -1124,15 +933,7 @@ export class OpenAI {
     const url = this.buildURL(path!, query as Record<string, unknown>, defaultBaseURL);
     if ('timeout' in options) validatePositiveInteger('timeout', options.timeout);
     options.timeout = options.timeout ?? this.timeout;
-    const { bodyHeaders, body, isStreamingBody } = this.buildBody({ options });
-
-    if (isStreamingBody) {
-      inputOptions.__metadata = {
-        ...inputOptions.__metadata,
-        hasStreamingBody: true,
-      };
-    }
-
+    const { bodyHeaders, body } = this.buildBody({ options });
     const reqHeaders = await this.buildHeaders({ options: inputOptions, method, bodyHeaders, retryCount });
 
     const req: FinalizedRequestInit = {
@@ -1177,17 +978,13 @@ export class OpenAI {
         'OpenAI-Organization': this.organization,
         'OpenAI-Project': this.project,
       },
-      this._provider ? undefined : (
-        await this.authHeaders(options, options.__security ?? { bearerAuth: true })
-      ),
+      await this.authHeaders(options, options.__security ?? { bearerAuth: true, adminAPIKeyAuth: true }),
       this._options.defaultHeaders,
       bodyHeaders,
       options.headers,
     ]);
 
-    if (!this._provider) {
-      this.validateHeaders(headers, options.__security ?? { bearerAuth: true });
-    }
+    this.validateHeaders(headers);
 
     return headers.values;
   }
@@ -1201,7 +998,6 @@ export class OpenAI {
   private buildBody({ options }: { options: FinalRequestOptions }): {
     bodyHeaders: HeadersLike;
     body: BodyInit | undefined;
-    isStreamingBody: boolean;
   } {
     const { body, headers: rawHeaders } = options;
     if (!body) {
@@ -1209,26 +1005,12 @@ export class OpenAI {
       // request body, even if the caller omitted an optional body param. Keep the
       // content-type for those, and only elide it for operations with no body at
       // all (e.g. GET/DELETE).
-      if (body === undefined && 'body' in options) {
-        return { ...this.#encoder({ body, headers: buildHeaders([rawHeaders]) }), isStreamingBody: false };
+      if (body == null && 'body' in options) {
+        return this.#encoder({ body, headers: buildHeaders([rawHeaders]) });
       }
-      return { bodyHeaders: undefined, body: undefined, isStreamingBody: false };
+      return { bodyHeaders: undefined, body: undefined };
     }
     const headers = buildHeaders([rawHeaders]);
-
-    const isReadableStream =
-      typeof (globalThis as any).ReadableStream !== 'undefined' &&
-      body instanceof (globalThis as any).ReadableStream;
-
-    const isRetryableBody =
-      !isReadableStream &&
-      (typeof body === 'string' ||
-        body instanceof ArrayBuffer ||
-        ArrayBuffer.isView(body) ||
-        (typeof (globalThis as any).Blob !== 'undefined' && body instanceof (globalThis as any).Blob) ||
-        body instanceof URLSearchParams ||
-        body instanceof FormData);
-
     if (
       // Pass raw type verbatim
       ArrayBuffer.isView(body) ||
@@ -1244,19 +1026,15 @@ export class OpenAI {
       // `URLSearchParams` -> `application/x-www-form-urlencoded`
       body instanceof URLSearchParams ||
       // Send chunked stream (each chunk has own `length`)
-      isReadableStream
+      ((globalThis as any).ReadableStream && body instanceof (globalThis as any).ReadableStream)
     ) {
-      return { bodyHeaders: undefined, body: body as BodyInit, isStreamingBody: !isRetryableBody };
+      return { bodyHeaders: undefined, body: body as BodyInit };
     } else if (
       typeof body === 'object' &&
       (Symbol.asyncIterator in body ||
         (Symbol.iterator in body && 'next' in body && typeof body.next === 'function'))
     ) {
-      return {
-        bodyHeaders: undefined,
-        body: Shims.ReadableStreamFrom(body as AsyncIterable<Uint8Array>),
-        isStreamingBody: true,
-      };
+      return { bodyHeaders: undefined, body: Shims.ReadableStreamFrom(body as AsyncIterable<Uint8Array>) };
     } else if (
       typeof body === 'object' &&
       headers.values.get('content-type') === 'application/x-www-form-urlencoded'
@@ -1264,10 +1042,9 @@ export class OpenAI {
       return {
         bodyHeaders: { 'content-type': 'application/x-www-form-urlencoded' },
         body: this.stringifyQuery(body),
-        isStreamingBody: false,
       };
     } else {
-      return { ...this.#encoder({ body, headers }), isStreamingBody: false };
+      return this.#encoder({ body, headers });
     }
   }
 
@@ -1287,10 +1064,8 @@ export class OpenAI {
   static InternalServerError = Errors.InternalServerError;
   static PermissionDeniedError = Errors.PermissionDeniedError;
   static UnprocessableEntityError = Errors.UnprocessableEntityError;
-  static InvalidWebhookSignatureError = Errors.InvalidWebhookSignatureError;
 
   static toFile = Uploads.toFile;
-  static toStreamingFile = Uploads.toStreamingFile;
 
   /**
    * Given a prompt, the model will return one or more predicted completions, and can also return the probabilities of alternative tokens at each position.
@@ -1372,39 +1147,6 @@ OpenAI.Evals = Evals;
 OpenAI.Containers = Containers;
 OpenAI.Skills = Skills;
 OpenAI.Videos = Videos;
-
-function getConnectionErrorMessage(error: Error): string | undefined {
-  if (isUndiciDispatcherVersionMismatchError(error)) {
-    return `Connection error. This may be caused by passing an undici dispatcher, such as ProxyAgent, that is incompatible with the fetch implementation. If you are using undici's ProxyAgent, pass the fetch implementation from the same undici package: import { fetch, ProxyAgent } from 'undici'; new OpenAI({ fetch, fetchOptions: { dispatcher: new ProxyAgent(...) } });`;
-  }
-
-  return undefined;
-}
-
-type ErrorLikeWithCause = {
-  code?: unknown;
-  message?: unknown;
-  cause?: unknown;
-};
-
-function isUndiciDispatcherVersionMismatchError(error: unknown): boolean {
-  let current = error;
-
-  for (let i = 0; i < 8 && current && typeof current === 'object'; i++) {
-    const err = current as ErrorLikeWithCause;
-    if (
-      err.code === 'UND_ERR_INVALID_ARG' &&
-      typeof err.message === 'string' &&
-      err.message.includes('invalid onRequestStart method')
-    ) {
-      return true;
-    }
-
-    current = err.cause;
-  }
-
-  return false;
-}
 
 export declare namespace OpenAI {
   export type RequestOptions = Opts.RequestOptions;

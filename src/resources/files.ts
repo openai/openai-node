@@ -6,8 +6,6 @@ import { CursorPage, type CursorPageParams, PagePromise } from '../core/paginati
 import { type Uploadable } from '../core/uploads';
 import { buildHeaders } from '../internal/headers';
 import { RequestOptions } from '../internal/request-options';
-import { sleep } from '../internal/utils/sleep';
-import { APIConnectionTimeoutError } from '../error';
 import { multipartFormRequestOptions } from '../internal/uploads';
 import { path } from '../internal/utils/path';
 
@@ -89,32 +87,6 @@ export class Files extends APIResource {
       __security: { bearerAuth: true },
       __binaryResponse: true,
     });
-  }
-
-  /**
-   * Waits for the given file to be processed, default timeout is 30 mins.
-   */
-  async waitForProcessing(
-    id: string,
-    { pollInterval = 5000, maxWait = 30 * 60 * 1000 }: { pollInterval?: number; maxWait?: number } = {},
-  ): Promise<FileObject> {
-    const TERMINAL_STATES = new Set(['processed', 'error', 'deleted']);
-
-    const start = Date.now();
-    let file = await this.retrieve(id);
-
-    while (!file.status || !TERMINAL_STATES.has(file.status)) {
-      await sleep(pollInterval);
-
-      file = await this.retrieve(id);
-      if (Date.now() - start > maxWait) {
-        throw new APIConnectionTimeoutError({
-          message: `Giving up on waiting for file ${id} to finish processing after ${maxWait} milliseconds.`,
-        });
-      }
-    }
-
-    return file;
   }
 }
 

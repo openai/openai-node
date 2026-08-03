@@ -1,6 +1,0 @@
-[
-  "tests/api-resources",
-  "tests/backwards-compat-resource-exports.test.ts",
-  "tests/index.test.ts",
-  "tests/stringifyQuery.test.ts"
-]
