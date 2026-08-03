@@ -41,6 +41,16 @@ function assertNoMissingTypes(fixturePath) {
   return program;
 }
 
+function findDocumentedNode(program, fixturePath, predicate) {
+  let documented;
+  function visit(node) {
+    if (node.jsDoc?.some((comment) => comment.tags?.some(predicate))) documented ??= node;
+    ts.forEachChild(node, visit);
+  }
+  visit(program.getSourceFile(fixturePath));
+  return documented;
+}
+
 function runTypeScriptOutput(fixturePath) {
   const outputPath = fixturePath.replace(/\.ts$/u, '.cjs');
   const output = ts.transpileModule(fs.readFileSync(fixturePath, 'utf8'), {
@@ -134,6 +144,148 @@ test('resolves initializer-attached JSDoc type queries against function paramete
   );
   assert.match(fix(genuinelyUsed), /import \{ Foo \}/u, 'the genuine Foo type import must remain');
   assert.equal(run(process.execPath, [genuinelyUsed]), 'true', 'the retained import still runs');
+});
+
+test('resolves declaration and method JSDoc type queries against their parameter bindings', () => {
+  const returns = '/** @param {object} Foo @returns {typeof Foo} */';
+  const parameter = '/** @param {typeof Foo} Foo */';
+  const cases = [
+    ['function', `${returns}\nfunction documented(Foo) { return Foo; }`, 'FunctionDeclaration'],
+    [
+      'exported-function',
+      `${returns}\nexport function documented(Foo) { return Foo; }`,
+      'FunctionDeclaration',
+    ],
+    [
+      'default-named-function',
+      `${returns}\nexport default function documented(Foo) { return Foo; }`,
+      'FunctionDeclaration',
+    ],
+    [
+      'default-anonymous-function',
+      `${returns}\nexport default function (Foo) { return Foo; }`,
+      'FunctionDeclaration',
+    ],
+    [
+      'instance-method',
+      `class Documented {\n${returns}\ndocumented(Foo) { return Foo; }\n}`,
+      'MethodDeclaration',
+    ],
+    [
+      'static-method',
+      `class Documented {\n${returns}\nstatic documented(Foo) { return Foo; }\n}`,
+      'MethodDeclaration',
+    ],
+    [
+      'object-method',
+      `const documented = {\n${returns}\ndocumented(Foo) { return Foo; }\n};`,
+      'MethodDeclaration',
+    ],
+    [
+      'constructor',
+      `class Documented {\n${parameter}\nconstructor(Foo) { this.value = Foo; }\n}`,
+      'Constructor',
+    ],
+    ['setter', `class Documented {\n${parameter}\nset value(Foo) { this.stored = Foo; }\n}`, 'SetAccessor'],
+  ];
+
+  for (const [name, declaration, expectedHost] of cases) {
+    const source = `// @ts-check\nimport { Foo } from './parameter-side-effect.mjs';\nimport { Bar, Ref } from './parameter-types.mjs';\n${declaration}\n/** @type {Bar} */\nexport let retained;\nconsole.log(globalThis.parameterImportRan ?? false);\n`;
+    const fixturePath = writeFixture(`declaration-${name}.mjs`, source);
+    const before = assertNoMissingTypes(fixturePath);
+    const documented = findDocumentedNode(
+      before,
+      fixturePath,
+      (tag) => tag.typeExpression?.type && ts.isTypeQueryNode(tag.typeExpression.type),
+    );
+    assert.equal(ts.SyntaxKind[documented.kind], expectedHost, `${name}: compiler host`);
+    const tag = documented.jsDoc[0].tags.find(
+      (candidate) => candidate.typeExpression?.type && ts.isTypeQueryNode(candidate.typeExpression.type),
+    );
+    const binding = before.getTypeChecker().getSymbolAtLocation(tag.typeExpression.type.exprName);
+    assert.equal(ts.SyntaxKind[binding.declarations[0].kind], 'Parameter', `${name}: compiler binding`);
+    assert.equal(run(process.execPath, [fixturePath]), 'true', `${name}: side effect before fix`);
+
+    const fixed = fix(fixturePath);
+    const after = ts.createProgram([fixturePath], {
+      allowJs: true,
+      checkJs: true,
+      noEmit: true,
+      skipLibCheck: true,
+      types: [],
+    });
+    const fixedNode = findDocumentedNode(
+      after,
+      fixturePath,
+      (candidate) => candidate.typeExpression?.type && ts.isTypeQueryNode(candidate.typeExpression.type),
+    );
+    const fixedTag = fixedNode.jsDoc[0].tags.find(
+      (candidate) => candidate.typeExpression?.type && ts.isTypeQueryNode(candidate.typeExpression.type),
+    );
+    const fixedBinding = after.getTypeChecker().getSymbolAtLocation(fixedTag.typeExpression.type.exprName);
+    assert.equal(ts.SyntaxKind[fixedBinding.declarations[0].kind], 'Parameter', `${name}: binding after fix`);
+    assert.doesNotMatch(fixed, /import \{ Foo \}/u, `${name}: shadowed Foo`);
+    assert.match(fixed, /import \{ Bar \}/u, `${name}: genuine Bar reference`);
+    assert.doesNotMatch(fixed, /import \{[^}]*\bRef\b/u, `${name}: unrelated unused Ref`);
+    assert.equal(run(process.execPath, [fixturePath]), 'false', `${name}: removed side effect`);
+  }
+
+  for (const [name, declaration] of [
+    [
+      'function',
+      '/** @param {Foo} Foo @returns {typeof Foo} */\nexport function documented(Foo) { return Foo; }',
+    ],
+    [
+      'method',
+      'class Documented {\n/** @param {Foo} Foo @returns {typeof Foo} */\nstatic documented(Foo) { return Foo; }\n}',
+    ],
+    ['getter', 'class Documented {\n/** @returns {typeof Foo} */\nget value() { return Foo; }\n}'],
+  ]) {
+    const fixturePath = writeFixture(
+      `declaration-genuine-${name}.mjs`,
+      `// @ts-check\nimport { Foo } from './parameter-side-effect.mjs';\n${declaration}\nconsole.log(globalThis.parameterImportRan ?? false);\n`,
+    );
+    assertNoMissingTypes(fixturePath);
+    assert.match(fix(fixturePath), /import \{ Foo \}/u, `${name}: genuine Foo type import must remain`);
+    assertNoMissingTypes(fixturePath);
+    assert.equal(run(process.execPath, [fixturePath]), 'true', `${name}: retained side effect`);
+  }
+});
+
+test('ignores detached JSDoc comments without a real declaration host', () => {
+  const log = 'console.log(globalThis.parameterImportRan ?? false);';
+  const cases = [
+    ['eof', `const value = 1;\n${log}\n/** @type {Foo} */`],
+    ['eof-same-line', `const value = 1;\n${log} /** @type {Foo} */`],
+    ['consecutive-eof', `const value = 1;\n${log}\n/** @type {Foo} */\n/** @type {Foo} */`],
+    ['between-trailing', `const before = 1; /** @type {Foo} */\nconst after = 2;\n${log}`],
+    ['between-same-line', `const before = 1; /** @type {Foo} */ const after = 2;\n${log}`],
+    ['empty-statement', `const before = 1;\n/** @type {Foo} */\n;\nconst after = 2;\n${log}`],
+    ['before-closing-brace', `if (true) {\n  const value = 1;\n  /** @type {Foo} */\n}\n${log}`],
+  ];
+
+  for (const [name, body] of cases) {
+    const fixturePath = writeFixture(
+      `detached-${name}.mjs`,
+      `// @ts-check\nimport { Foo } from './parameter-side-effect.mjs';\n${body}\n`,
+    );
+    const program = assertNoMissingTypes(fixturePath);
+    const documented = findDocumentedNode(
+      program,
+      fixturePath,
+      (tag) => tag.typeExpression?.type && ts.isTypeReferenceNode(tag.typeExpression.type),
+    );
+    if (documented) {
+      assert.ok(
+        ts.isEmptyStatement(documented) || documented.kind === ts.SyntaxKind.EndOfFileToken,
+        `${name}: unexpected compiler JSDoc host ${ts.SyntaxKind[documented.kind]}`,
+      );
+    }
+    assert.equal(run(process.execPath, [fixturePath]), 'true', `${name}: side effect before fix`);
+    const fixed = fix(fixturePath);
+    assert.doesNotMatch(fixed, /import \{ Foo \}/u, `${name}: detached comment must not retain Foo`);
+    assert.equal(run(process.execPath, [fixturePath]), 'false', `${name}: removed side effect`);
+  }
 });
 
 test('removes unused require import-equals aliases and their emitted module side effects', () => {

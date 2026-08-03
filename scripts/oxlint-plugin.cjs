@@ -331,11 +331,25 @@ function getJSDocRootBinding(sourceCode, comment, name, namespace) {
   const node = token && sourceCode.getNodeByRangeIndex(token.range[0]);
 
   if (namespace === 'value') {
-    const documented = node?.type === 'ExportNamedDeclaration' ? node.declaration : node;
-    const initializer =
-      documented?.type === 'VariableDeclaration' ? documented.declarations[0]?.init : undefined;
-    if (initializer?.type === 'ArrowFunctionExpression' || initializer?.type === 'FunctionExpression') {
-      const parameter = sourceCode.getScope(initializer).set.get(name);
+    let documented = node;
+    if (documented?.type === 'ExportNamedDeclaration' || documented?.type === 'ExportDefaultDeclaration') {
+      documented = documented.declaration;
+    }
+    if (documented?.type === 'Identifier' && documented.parent?.key === documented) {
+      documented = documented.parent;
+    }
+    const callable =
+      documented?.type === 'VariableDeclaration'
+        ? documented.declarations[0]?.init
+        : documented?.type === 'MethodDefinition' || documented?.type === 'Property'
+          ? documented.value
+          : documented;
+    if (
+      callable?.type === 'ArrowFunctionExpression' ||
+      callable?.type === 'FunctionExpression' ||
+      callable?.type === 'FunctionDeclaration'
+    ) {
+      const parameter = sourceCode.getScope(callable).set.get(name);
       if (parameter?.defs.some((definition) => definition.type === 'Parameter')) return parameter;
     }
   }
@@ -348,11 +362,34 @@ function getJSDocRootBinding(sourceCode, comment, name, namespace) {
   }
 }
 
+function getAttachedJSDocComments(sourceCode) {
+  const compilerSource = ts.createSourceFile(
+    'oxlint-jsdoc.tsx',
+    sourceCode.text,
+    { languageVersion: ts.ScriptTarget.Latest, jsDocParsingMode: ts.JSDocParsingMode.ParseAll },
+    true,
+    ts.ScriptKind.TSX,
+  );
+  const attached = new Map();
+
+  function visit(node) {
+    if (!ts.isEmptyStatement(node) && node.kind !== ts.SyntaxKind.EndOfFileToken) {
+      for (const comment of node.jsDoc ?? []) attached.set(comment.pos, comment.end);
+    }
+    ts.forEachChild(node, visit);
+  }
+
+  visit(compilerSource);
+  return attached;
+}
+
 function getJSDocImportUsage(sourceCode) {
   const used = new Set();
+  const attached = getAttachedJSDocComments(sourceCode);
 
   for (const comment of sourceCode.getAllComments()) {
     if (comment.type !== 'Block' || !comment.value.startsWith('*')) continue;
+    if (attached.get(comment.range[0]) !== comment.range[1]) continue;
 
     const raw = sourceCode.text.slice(comment.range[0], comment.range[1]);
     const parsed = parseJSDocComment(raw);
