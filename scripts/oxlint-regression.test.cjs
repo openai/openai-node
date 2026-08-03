@@ -230,6 +230,377 @@ console.log(accept(produce()));
   );
 });
 
+test('removes imports appearing only in JSDoc string literals and property names', () => {
+  const cases = [
+    {
+      name: 'jsdoc-string-literal.js',
+      comment: '/** @type {"Foo"} */',
+    },
+    {
+      name: 'jsdoc-object-property-name.js',
+      comment: '/** @type {{ Foo: string }} */',
+    },
+  ];
+
+  for (const fixture of cases) {
+    const source = `import { Foo } from './dep';\n${fixture.comment}\nconsole.log('done');\n`;
+    const fixturePath = writeFixture(fixture.name, source);
+
+    runOxlintFix(fixturePath);
+    assert.equal(
+      fs.readFileSync(fixturePath, 'utf8'),
+      `\n${fixture.comment}\nconsole.log('done');\n`,
+      fixture.name,
+    );
+  }
+});
+
+test('distinguishes JSDoc type references from literals, members, keys, and binders', () => {
+  const cases = [
+    { name: 'StringLiteralOnly', type: '"StringLiteralOnly"', used: false },
+    { name: 'SingleQuotedLiteralOnly', type: "'SingleQuotedLiteralOnly'", used: false },
+    { name: 'TemplateLiteralTextOnly', type: '`TemplateLiteralTextOnly`', used: false },
+    { name: 'ObjectKeyOnly', type: '{ ObjectKeyOnly: string }', used: false },
+    { name: 'QuotedObjectKeyOnly', type: '{ "QuotedObjectKeyOnly": string }', used: false },
+    { name: 'SingleQuotedObjectKeyOnly', type: "{ 'SingleQuotedObjectKeyOnly': string }", used: false },
+    { name: 'OptionalObjectKeyOnly', type: '{ OptionalObjectKeyOnly?: string }', used: false },
+    { name: 'ReadonlyObjectKeyOnly', type: '{ readonly ReadonlyObjectKeyOnly: string }', used: false },
+    { name: 'ObjectMethodNameOnly', type: '{ ObjectMethodNameOnly(value: string): number }', used: false },
+    { name: 'QualifiedMemberOnly', type: 'Namespace.QualifiedMemberOnly', used: false },
+    { name: 'TypeofMemberOnly', type: 'typeof Namespace.TypeofMemberOnly', used: false },
+    { name: 'IndexedStringOnly', type: 'Container["IndexedStringOnly"]', used: false },
+    { name: 'ParameterNameOnly', type: '(ParameterNameOnly: string) => void', used: false },
+    { name: 'OptionalParameterOnly', type: '(OptionalParameterOnly?: string) => void', used: false },
+    { name: 'RestParameterOnly', type: '(...RestParameterOnly: string[]) => void', used: false },
+    { name: 'UntypedParameterOnly', type: '(UntypedParameterOnly) => string', used: false },
+    { name: 'OptionalUntypedParameterOnly', type: '(OptionalUntypedParameterOnly?) => string', used: false },
+    { name: 'RestUntypedParameterOnly', type: '(...RestUntypedParameterOnly) => string', used: false },
+    { name: 'DefaultParameterOnly', type: '(DefaultParameterOnly = value) => string', used: false },
+    {
+      name: 'UntypedConstructorParameterOnly',
+      type: 'new (UntypedConstructorParameterOnly) => string',
+      used: false,
+    },
+    {
+      name: 'UntypedMethodParameterOnly',
+      type: '{ method(UntypedMethodParameterOnly): string }',
+      used: false,
+    },
+    { name: 'UntypedCallParameterOnly', type: '{ (UntypedCallParameterOnly): string }', used: false },
+    { name: 'DestructuredPropertyOnly', type: '({ DestructuredPropertyOnly }: Input) => void', used: false },
+    { name: 'DestructuredAliasOnly', type: '({ value: DestructuredAliasOnly }: Input) => void', used: false },
+    { name: 'DestructuredArrayOnly', type: '([DestructuredArrayOnly]: Input) => void', used: false },
+    {
+      name: 'ConstructorParameterOnly',
+      type: 'new (ConstructorParameterOnly: string) => object',
+      used: false,
+    },
+    { name: 'ClosureParameterOnly', type: 'function(ClosureParameterOnly: string): void', used: false },
+    { name: 'TupleLabelOnly', type: '[TupleLabelOnly: string]', used: false },
+    { name: 'OptionalTupleLabelOnly', type: '[OptionalTupleLabelOnly?: string]', used: false },
+    { name: 'IndexSignatureNameOnly', type: '{ [IndexSignatureNameOnly: string]: number }', used: false },
+    { name: 'MappedBinderOnly', type: '{ [MappedBinderOnly in keyof Shape]: string }', used: false },
+    {
+      name: 'MappedShadowOnly',
+      type: '{ [MappedShadowOnly in keyof Shape]: MappedShadowOnly }',
+      used: false,
+    },
+    {
+      name: 'RemappedShadowOnly',
+      type: '{ [RemappedShadowOnly in keyof Shape as `${RemappedShadowOnly}`]: string }',
+      used: false,
+    },
+    {
+      name: 'InferredBinderOnly',
+      type: 'Source extends infer InferredBinderOnly ? string : never',
+      used: false,
+    },
+    {
+      name: 'InferredShadowOnly',
+      type: 'Source extends infer InferredShadowOnly ? InferredShadowOnly : never',
+      used: false,
+    },
+    {
+      name: 'GenericBinderOnly',
+      type: '<GenericBinderOnly extends Base>(value: GenericBinderOnly) => void',
+      used: false,
+    },
+    { name: 'ObjectValueOnly', type: '{ value: ObjectValueOnly }', used: true },
+    { name: 'QuotedPropertyValueOnly', type: '{ "label": QuotedPropertyValueOnly }', used: true },
+    { name: 'SingleQuotedPropertyValueOnly', type: "{ 'label': SingleQuotedPropertyValueOnly }", used: true },
+    { name: 'NumericPropertyValueOnly', type: '{ 0: NumericPropertyValueOnly }', used: true },
+    { name: 'HexPropertyValueOnly', type: '{ 0x10: HexPropertyValueOnly }', used: true },
+    { name: 'QualifiedNamespaceOnly', type: 'QualifiedNamespaceOnly.Member', used: true },
+    { name: 'NestedNamespaceOnly', type: 'NestedNamespaceOnly.Member.Deep', used: true },
+    { name: 'GenericValueOnly', type: 'Record<string, GenericValueOnly>', used: true },
+    { name: 'UnionLeftOnly', type: 'UnionLeftOnly | string', used: true },
+    { name: 'UnionRightOnly', type: 'string | UnionRightOnly', used: true },
+    { name: 'IntersectionOnly', type: 'IntersectionOnly & Record<string, unknown>', used: true },
+    { name: 'NullableOnly', type: '?NullableOnly', used: true },
+    { name: 'NonNullableOnly', type: '!NonNullableOnly', used: true },
+    { name: 'GroupedOnly', type: '(GroupedOnly | null)', used: true },
+    { name: 'TupleFirstOnly', type: '[TupleFirstOnly, string]', used: true },
+    { name: 'TupleSecondOnly', type: '[string, TupleSecondOnly?]', used: true },
+    { name: 'ArrayElementOnly', type: 'ArrayElementOnly[]', used: true },
+    { name: 'ReadonlyArrayOnly', type: 'readonly ReadonlyArrayOnly[]', used: true },
+    { name: 'FunctionParameterTypeOnly', type: '(value: FunctionParameterTypeOnly) => void', used: true },
+    { name: 'FunctionResultOnly', type: '(value: string) => FunctionResultOnly', used: true },
+    {
+      name: 'ConstructorParameterTypeOnly',
+      type: 'new (value: ConstructorParameterTypeOnly) => object',
+      used: true,
+    },
+    { name: 'ConstructorResultOnly', type: 'new (value: string) => ConstructorResultOnly', used: true },
+    { name: 'ClosureThisOnly', type: 'function(this: ClosureThisOnly): void', used: true },
+    { name: 'ClosureNewOnly', type: 'function(new: ClosureNewOnly): void', used: true },
+    { name: 'ClosureValueOnly', type: 'function(value: ClosureValueOnly): void', used: true },
+    {
+      name: 'ClosureUnnamedParameterTypeOnly',
+      type: 'function(ClosureUnnamedParameterTypeOnly): void',
+      used: true,
+    },
+    { name: 'ClosureResultOnly', type: 'function(value: string): ClosureResultOnly', used: true },
+    { name: 'MappedConstraintOnly', type: '{ [Key in keyof MappedConstraintOnly]: string }', used: true },
+    { name: 'MappedValueOnly', type: '{ [Key in keyof Shape]: MappedValueOnly }', used: true },
+    { name: 'IndexedContainerOnly', type: 'IndexedContainerOnly[string]', used: true },
+    { name: 'IndexedAccessOnly', type: 'Container[IndexedAccessOnly]', used: true },
+    { name: 'ComputedKeyOnly', type: '{ [ComputedKeyOnly]: string }', used: true },
+    { name: 'KeyofValueOnly', type: 'keyof KeyofValueOnly', used: true },
+    { name: 'TypeofRootOnly', type: 'typeof TypeofRootOnly.member', used: true },
+    {
+      name: 'ConditionalConditionOnly',
+      type: 'ConditionalConditionOnly extends Base ? string : number',
+      used: true,
+    },
+    {
+      name: 'ConditionalConstraintOnly',
+      type: 'Source extends ConditionalConstraintOnly ? string : number',
+      used: true,
+    },
+    { name: 'ConditionalTrueOnly', type: 'Source extends Base ? ConditionalTrueOnly : string', used: true },
+    { name: 'ConditionalFalseOnly', type: 'Source extends Base ? string : ConditionalFalseOnly', used: true },
+    {
+      name: 'InferConstraintOnly',
+      type: 'Source extends infer Value extends InferConstraintOnly ? Value : never',
+      used: true,
+    },
+    {
+      name: 'GenericSiblingReferenceOnly',
+      type: '{ first: <GenericSiblingReferenceOnly>(value: GenericSiblingReferenceOnly) => string; second: GenericSiblingReferenceOnly }',
+      used: true,
+    },
+    {
+      name: 'GenericMethodSiblingReferenceOnly',
+      type: '{ method<GenericMethodSiblingReferenceOnly>(value: GenericMethodSiblingReferenceOnly): string; second: GenericMethodSiblingReferenceOnly }',
+      used: true,
+    },
+    { name: 'TemplateInterpolationOnly', type: '`${TemplateInterpolationOnly}`', used: true },
+    {
+      name: 'NestedTemplateInterpolationOnly',
+      type: '`${string extends string ? `${NestedTemplateInterpolationOnly}` : `x`}`',
+      used: true,
+    },
+  ];
+  const imports = cases.map(({ name }) => `import { Foo as ${name} } from './dep.js';`);
+  const comments = cases.map(({ type }) => `/** @type {${type}} */`);
+  const fixturePath = writeFixture(
+    'jsdoc-structural-type-references.js',
+    `${imports.join('\n')}\n${comments.join('\n')}\nconsole.log('done');\n`,
+  );
+
+  runOxlintFix(fixturePath);
+  const fixed = fs.readFileSync(fixturePath, 'utf8');
+
+  for (const { name, used } of cases) {
+    assert.equal(fixed.includes(`import { Foo as ${name} }`), used, name);
+  }
+});
+
+test('preserves every reference in complete unbraced JSDoc type expressions', () => {
+  const used = [
+    'BareUnionLeftOnly',
+    'BareUnionRightOnly',
+    'BareNullableOnly',
+    'BareNonNullableOnly',
+    'BareGroupedOnly',
+    'BareIntersectionLeftOnly',
+    'BareIntersectionRightOnly',
+    'BareTupleFirstOnly',
+    'BareTupleSecondOnly',
+    'BareArrayOnly',
+    'BareKeyofOnly',
+    'BareTypeofOnly',
+    'BareFunctionParameterOnly',
+    'BareFunctionResultOnly',
+    'BareClosureParameterOnly',
+    'BareClosureResultOnly',
+    'BareConstructorParameterOnly',
+    'BareConstructorResultOnly',
+    'BareConditionalTrueOnly',
+    'BareConditionalFalseOnly',
+    'BareNestedGenericOnly',
+    'BareAfterSiblingOnly',
+  ];
+  const imports = [
+    ...used.map((name) => `import { Foo as ${name} } from './dep.js';`),
+    `import { Foo as BareTrailingProseOnly } from './dep.js';`,
+  ];
+  const comments = [
+    '/** @type BareUnionLeftOnly | BareUnionRightOnly */',
+    '/** @type ?BareNullableOnly */',
+    '/** @type !BareNonNullableOnly */',
+    '/** @type (BareGroupedOnly | null) */',
+    '/** @type BareIntersectionLeftOnly & BareIntersectionRightOnly */',
+    '/** @type [BareTupleFirstOnly, BareTupleSecondOnly] */',
+    '/** @type BareArrayOnly[] */',
+    '/** @type keyof BareKeyofOnly */',
+    '/** @type typeof BareTypeofOnly.member */',
+    '/** @type (value: BareFunctionParameterOnly) => BareFunctionResultOnly */',
+    '/** @type function (value: BareClosureParameterOnly): BareClosureResultOnly */',
+    '/** @type new (value: BareConstructorParameterOnly) => BareConstructorResultOnly */',
+    '/** @type string extends string ? BareConditionalTrueOnly : BareConditionalFalseOnly */',
+    '/** @implements Wrapper<Inner<string>, BareNestedGenericOnly> @returns {BareAfterSiblingOnly} */',
+    '/** @type BareUnionLeftOnly explanation BareTrailingProseOnly */',
+  ];
+  const fixturePath = writeFixture(
+    'jsdoc-complete-bare-types.js',
+    `${imports.join('\n')}\n${comments.join('\n')}\nconsole.log('done');\n`,
+  );
+
+  runOxlintFix(fixturePath);
+  const fixed = fs.readFileSync(fixturePath, 'utf8');
+
+  for (const name of used) {
+    assert.ok(fixed.includes(`import { Foo as ${name} }`), name);
+  }
+  assert.ok(!fixed.includes('import { Foo as BareTrailingProseOnly }'));
+});
+
+test('preserves genuine JSDoc documentation links without counting labels or URLs', () => {
+  const cases = [
+    { name: 'SeeSymbolOnly', comment: '/** @see SeeSymbolOnly */', used: true },
+    { name: 'SeeQualifiedOnly', comment: '/** @see SeeQualifiedOnly.member */', used: true },
+    { name: 'SeeHashOnly', comment: '/** @see SeeHashOnly#member */', used: true },
+    { name: 'SeeTildeOnly', comment: '/** @see SeeTildeOnly~member */', used: true },
+    { name: 'SeeLabelOnly', comment: '/** @see SeeLabelOnly readable label */', used: true },
+    { name: 'SeePipeOnly', comment: '/** @see SeePipeOnly|readable label */', used: true },
+    { name: 'LienÉchappé', comment: '/** @see Lien\\u00c9chapp\\u00e9 */', used: true },
+    { name: 'LinkSymbolOnly', comment: '/** @link LinkSymbolOnly */', used: true },
+    { name: 'LinkCodeSymbolOnly', comment: '/** @linkcode LinkCodeSymbolOnly */', used: true },
+    { name: 'LinkPlainSymbolOnly', comment: '/** @linkplain LinkPlainSymbolOnly */', used: true },
+    { name: 'InlineSymbolOnly', comment: '/** Description {@link InlineSymbolOnly}. */', used: true },
+    {
+      name: 'InlineLabelOnly',
+      comment: '/** Description {@link InlineLabelOnly readable label}. */',
+      used: true,
+    },
+    {
+      name: 'InlinePipeOnly',
+      comment: '/** Description {@link InlinePipeOnly|readable label}. */',
+      used: true,
+    },
+    {
+      name: 'InlineQualifiedOnly',
+      comment: '/** Description {@link InlineQualifiedOnly.member}. */',
+      used: true,
+    },
+    { name: 'InlineHashOnly', comment: '/** Description {@link InlineHashOnly#member}. */', used: true },
+    { name: 'InlineCodeOnly', comment: '/** Description {@linkcode InlineCodeOnly}. */', used: true },
+    { name: 'InlinePlainOnly', comment: '/** Description {@linkplain InlinePlainOnly}. */', used: true },
+    {
+      name: 'InlineDeprecatedOnly',
+      comment: '/** @deprecated Use {@link InlineDeprecatedOnly}. */',
+      used: true,
+    },
+    { name: 'SiblingSeeOnly', comment: '/** @see SiblingSeeOnly details @returns {string} */', used: true },
+    { name: 'SeeDisplayOnly', comment: '/** @see Other SeeDisplayOnly */', used: false },
+    { name: 'SeeMemberOnly', comment: '/** @see Namespace.SeeMemberOnly */', used: false },
+    { name: 'SeeEscapedPrefixOnly', comment: '/** @see SeeEscapedPrefixOnly\\u0042 */', used: false },
+    { name: 'SeeUrlOnly', comment: '/** @see https://example.com/SeeUrlOnly */', used: false },
+    { name: 'SeeMailOnly', comment: '/** @see mailto:SeeMailOnly */', used: false },
+    { name: 'QuotedSeeOnly', comment: '/** @see "QuotedSeeOnly" */', used: false },
+    { name: 'BracedSeeOnly', comment: '/** @see {BracedSeeOnly} */', used: false },
+    { name: 'LinkDisplayOnly', comment: '/** @link Other LinkDisplayOnly */', used: false },
+    { name: 'LinkUrlOnly', comment: '/** @link https://example.com/LinkUrlOnly */', used: false },
+    {
+      name: 'InlineDisplayOnly',
+      comment: '/** Description {@link Other InlineDisplayOnly}. */',
+      used: false,
+    },
+    {
+      name: 'InlinePipeDisplayOnly',
+      comment: '/** Description {@link Other|InlinePipeDisplayOnly}. */',
+      used: false,
+    },
+    {
+      name: 'InlineMemberOnly',
+      comment: '/** Description {@link Namespace.InlineMemberOnly}. */',
+      used: false,
+    },
+    {
+      name: 'InlineUrlOnly',
+      comment: '/** Description {@link https://example.com/InlineUrlOnly}. */',
+      used: false,
+    },
+    { name: 'InlineModuleOnly', comment: '/** Description {@link module:InlineModuleOnly}. */', used: false },
+    { name: 'ExampleInlineOnly', comment: '/** @example {@link ExampleInlineOnly} */', used: false },
+    { name: 'ExampleBlockOnly', comment: '/** @example @see ExampleBlockOnly */', used: false },
+    { name: 'QuotedInlineOnly', comment: '/** Description "{@link QuotedInlineOnly}". */', used: false },
+    {
+      name: 'BacktickedInlineOnly',
+      comment: '/** Description `{@link BacktickedInlineOnly}`. */',
+      used: false,
+    },
+    { name: 'EscapedInlineOnly', comment: '/** Description \\{@link EscapedInlineOnly}. */', used: false },
+  ];
+  const imports = cases.map(({ name }) => `import { Foo as ${name} } from './dep.js';`);
+  const comments = cases.map(({ comment }) => comment);
+  const fixturePath = writeFixture(
+    'jsdoc-documentation-links.js',
+    `${imports.join('\n')}\n${comments.join('\n')}\nconsole.log('done');\n`,
+  );
+
+  runOxlintFix(fixturePath);
+  const fixed = fs.readFileSync(fixturePath, 'utf8');
+
+  for (const { name, used } of cases) {
+    assert.equal(fixed.includes(`import { Foo as ${name} }`), used, name);
+  }
+});
+
+test('recognizes complete Unicode JSDoc identifiers without matching identifier prefixes', () => {
+  const cases = [
+    { name: 'Café', type: 'CaféÉ', used: false },
+    { name: 'CaféExact', type: 'CaféExact', used: true },
+    { name: 'Éclair', type: 'Namespace.Éclair', used: false },
+    { name: 'Δelta', type: '{ Δelta: string }', used: false },
+    { name: '变量', type: '{ value: 变量 }', used: true },
+    { name: 'Cafe\u0301', type: 'Cafe\u0301Suffix', used: false },
+    { name: 'Exact\u0301', type: 'Exact\u0301', used: true },
+    { name: '𐐀stral', type: '𐐀stralSuffix', used: false },
+    { name: '𐐁xact', type: '𐐁xact', used: true },
+    { name: 'CaféEscaped', type: 'Caf\\u00e9Escaped', used: true },
+    { name: 'ÉscapedStart', type: '\\u00c9scapedStart', used: true },
+    { name: '𐐀EscapedAstral', type: '\\u{10400}EscapedAstral', used: true },
+    { name: 'Combining\u0301Escaped', type: 'Combining\\u0301Escaped', used: true },
+    { name: 'FooEscapedPrefix', type: 'FooEscapedPrefix\\u0042', used: false },
+    { name: 'FooEscapedJoiner', type: 'FooEscapedJoiner\\u200cBar', used: false },
+  ];
+  const imports = cases.map(({ name }) => `import { Foo as ${name} } from './dep.js';`);
+  const comments = cases.map(({ type }) => `/** @type {${type}} */`);
+  const fixturePath = writeFixture(
+    'jsdoc-unicode-type-identifiers.js',
+    `${imports.join('\n')}\n${comments.join('\n')}\nconsole.log('done');\n`,
+  );
+
+  runOxlintFix(fixturePath);
+  const fixed = fs.readFileSync(fixturePath, 'utf8');
+
+  for (const { name, used } of cases) {
+    assert.equal(fixed.includes(`import { Foo as ${name} }`), used, name);
+  }
+});
+
 test('preserves every genuine type reference in same-line sibling JSDoc tags', () => {
   const usedImports = [
     'Foo',
