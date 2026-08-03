@@ -90,8 +90,8 @@ export function accumulateResponse(
         if (content.type !== 'output_text') {
           throw new OpenAIError(`expected content to be 'output_text', got ${content.type}`);
         }
-        content.text += event.delta;
-        snapshot.output_text += event.delta;
+        content.text = (content.text ?? '') + event.delta;
+        snapshot.output_text = (snapshot.output_text ?? '') + event.delta;
       }
       break;
     }
@@ -127,7 +127,7 @@ export function accumulateResponse(
         if (content.type !== 'refusal') {
           throw new OpenAIError(`expected content to be 'refusal', got ${content.type}`);
         }
-        content.refusal += event.delta;
+        content.refusal = (content.refusal ?? '') + event.delta;
       }
       break;
     }
@@ -145,7 +145,7 @@ export function accumulateResponse(
     case 'response.function_call_arguments.delta': {
       const output = getOutput(snapshot, event.output_index);
       if (output.type === 'function_call') {
-        output.arguments += event.delta;
+        output.arguments = (output.arguments ?? '') + event.delta;
       }
       break;
     }
@@ -166,7 +166,7 @@ export function accumulateResponse(
         if (content.type !== 'reasoning_text') {
           throw new OpenAIError(`expected content to be 'reasoning_text', got ${content.type}`);
         }
-        content.text += event.delta;
+        content.text = (content.text ?? '') + event.delta;
       }
       break;
     }
@@ -203,7 +203,7 @@ export function accumulateResponse(
       const output = getOutput(snapshot, event.output_index);
       if (output.type === 'reasoning') {
         const part = getContent(output.summary, event.summary_index);
-        part.text += event.delta;
+        part.text = (part.text ?? '') + event.delta;
       }
       break;
     }
@@ -218,7 +218,7 @@ export function accumulateResponse(
     case 'response.custom_tool_call_input.delta': {
       const output = getOutput(snapshot, event.output_index);
       if (output.type === 'custom_tool_call') {
-        output.input += event.delta;
+        output.input = (output.input ?? '') + event.delta;
       }
       break;
     }
@@ -232,7 +232,7 @@ export function accumulateResponse(
     case 'response.mcp_call_arguments.delta': {
       const output = getOutput(snapshot, event.output_index);
       if (output.type === 'mcp_call') {
-        output.arguments += event.delta;
+        output.arguments = (output.arguments ?? '') + event.delta;
       }
       break;
     }
