@@ -241,8 +241,6 @@ test('distinguishes type-bearing JSDoc tags from prose and documentation tags', 
     'enum',
     'exception',
     'extends',
-    'external',
-    'host',
     'implements',
     'member',
     'module',
@@ -264,6 +262,8 @@ test('distinguishes type-bearing JSDoc tags from prose and documentation tags', 
   ];
   const documentationTags = [
     'example',
+    'external',
+    'host',
     'deprecated',
     'description',
     'desc',
@@ -279,6 +279,7 @@ test('distinguishes type-bearing JSDoc tags from prose and documentation tags', 
     'todo',
     'license',
     'default',
+    'lends',
     'modifies',
     'callback',
     'overload',
@@ -297,12 +298,54 @@ test('distinguishes type-bearing JSDoc tags from prose and documentation tags', 
     tag,
     name: `Misleading${tag}Only`,
   }));
+  const templateLiteralTypes = [
+    { name: 'TemplateLiteralOnly', type: 'Record<`}`, TemplateLiteralOnly>' },
+    { name: 'OpeningBraceTemplateLiteralOnly', type: 'Record<`{`, OpeningBraceTemplateLiteralOnly>' },
+    {
+      name: 'EscapedBacktickTemplateLiteralOnly',
+      type: 'Record<`\\`}`, EscapedBacktickTemplateLiteralOnly>',
+    },
+    {
+      name: 'EscapedBackslashTemplateLiteralOnly',
+      type: 'Record<`\\\\}`, EscapedBackslashTemplateLiteralOnly>',
+    },
+    {
+      name: 'InterpolatedTemplateLiteralOnly',
+      type: 'Record<`${InterpolatedTemplateLiteralOnly}`, string>',
+    },
+    {
+      name: 'NestedTemplateLiteralOnly',
+      type: 'Record<`${string extends string ? `}` : `x`}`, NestedTemplateLiteralOnly>',
+    },
+  ];
+  const unicodeLineBoundaryTypes = [
+    { name: 'UnicodeLineSeparatorOnly', comment: '/**\u2028 * @type {UnicodeLineSeparatorOnly}\u2028 */' },
+    {
+      name: 'UnicodeParagraphSeparatorOnly',
+      comment: '/**\u2029 * @implements UnicodeParagraphSeparatorOnly\u2029 */',
+    },
+  ];
   const embeddedTypeTags = [
     { name: 'QuotedExampleOnly', comment: '/** @example "@type {QuotedExampleOnly}" */' },
     { name: 'BacktickedExampleOnly', comment: '/** @example `@type {BacktickedExampleOnly}` */' },
+    { name: 'UnquotedExampleOnly', comment: '/** @example @type {UnquotedExampleOnly} */' },
+    {
+      name: 'SingleLineCommentedExampleOnly',
+      comment: '/** @example // @type {SingleLineCommentedExampleOnly} */',
+    },
+    { name: 'ExampleOnly', comment: '/**\n * @example\n * // @type {ExampleOnly}\n */' },
+    {
+      name: 'MultilineUnquotedExampleOnly',
+      comment: '/**\n * @example\n * source @type {MultilineUnquotedExampleOnly}\n */',
+    },
     { name: 'QuotedDeprecatedOnly', comment: '/** @deprecated "@type {QuotedDeprecatedOnly}" */' },
     { name: 'EmailOnly', comment: '/** Contact user@type {EmailOnly} */' },
     { name: 'QuotedBareExampleOnly', comment: '/** @example "@type QuotedBareExampleOnly" */' },
+    { name: 'UnquotedBareExampleOnly', comment: '/** @example @implements UnquotedBareExampleOnly */' },
+    {
+      name: 'MultilineBareExampleOnly',
+      comment: '/**\n * @example\n * // @implements MultilineBareExampleOnly\n */',
+    },
     {
       name: 'BacktickedBareExampleOnly',
       comment: '/** @example `@implements BacktickedBareExampleOnly` */',
@@ -312,14 +355,23 @@ test('distinguishes type-bearing JSDoc tags from prose and documentation tags', 
   const imports = [
     ...tags.map(({ name }) => `import { Foo as ${name} } from './dep.js';`),
     ...misleadingTags.map(({ name }) => `import { Foo as ${name} } from './dep.js';`),
+    ...templateLiteralTypes.map(({ name }) => `import { Foo as ${name} } from './dep.js';`),
+    ...unicodeLineBoundaryTypes.map(({ name }) => `import { Foo as ${name} } from './dep.js';`),
     ...embeddedTypeTags.map(({ name }) => `import { Foo as ${name} } from './dep.js';`),
+    `import { Foo as ExampleBeforeRealOnly } from './dep.js';`,
     `import { Foo as RealNestedTagOnly } from './dep.js';`,
+    `import { Foo as RealNestedBareTagOnly } from './dep.js';`,
   ];
   const comments = [
-    ...tags.map(({ tag, name }) => `/** @${tag} {${name}} */`),
+    ...tags.map(
+      ({ tag, name }) =>
+        `/** @${tag} {${name}}${tag === 'module' || tag === 'namespace' ? ' DocumentedName' : ''} */`,
+    ),
     ...misleadingTags.map(({ tag, name }) => `/** @${tag} description {${name}} */`),
+    ...templateLiteralTypes.map(({ type }) => `/** @type {${type}} */`),
+    ...unicodeLineBoundaryTypes.map(({ comment }) => comment),
     ...embeddedTypeTags.map(({ comment }) => comment),
-    `/**\n * @example\n * @param {RealNestedTagOnly} value\n */`,
+    `/**\n * @example\n * // @type {ExampleBeforeRealOnly}\n * @param {RealNestedTagOnly} value\n * @implements RealNestedBareTagOnly\n */`,
   ];
   const fixturePath = writeFixture(
     'jsdoc-tag-classification.js',
@@ -336,10 +388,18 @@ test('distinguishes type-bearing JSDoc tags from prose and documentation tags', 
   for (const { name } of misleadingTags) {
     assert.ok(!fixed.includes(`import { Foo as ${name} }`), name);
   }
+  for (const { name } of templateLiteralTypes) {
+    assert.ok(fixed.includes(`import { Foo as ${name} }`), name);
+  }
+  for (const { name } of unicodeLineBoundaryTypes) {
+    assert.ok(fixed.includes(`import { Foo as ${name} }`), name);
+  }
   for (const { name } of embeddedTypeTags) {
     assert.ok(!fixed.includes(`import { Foo as ${name} }`), name);
   }
+  assert.ok(!fixed.includes(`import { Foo as ExampleBeforeRealOnly }`));
   assert.ok(fixed.includes(`import { Foo as RealNestedTagOnly }`));
+  assert.ok(fixed.includes(`import { Foo as RealNestedBareTagOnly }`));
 });
 
 test('does not conflate separate imports with sibling namespace use', () => {

@@ -10,8 +10,6 @@ const JSDOC_TYPE_BEARING_TAGS = new Set([
   'enum',
   'exception',
   'extends',
-  'external',
-  'host',
   'implements',
   'member',
   'module',
@@ -33,9 +31,9 @@ const JSDOC_TYPE_BEARING_TAGS = new Set([
 ]);
 const JSDOC_NAMED_TYPE_TAGS = new Set(['arg', 'argument', 'param', 'prop', 'property']);
 const JSDOC_BRACED_TYPE_TAG =
-  /(?:^|[\s*])@([A-Za-z][\w-]*)(?:(?:\s|\*(?=\s))+([^\s{}*@]+))?(?:\s|\*(?=\s))*\{/g;
+  /(?:^|[\r\n\u2028\u2029])[\t ]*\*?[\t ]*@([A-Za-z][\w-]*)(?:(?:\s|\*(?=\s))+([^\s{}*@]+))?(?:\s|\*(?=\s))*\{/g;
 const JSDOC_BARE_TYPE_TAG =
-  /(?:^|[\s*])@(?:implements|augments|extends|type|this|enum)(?:\s|\*(?=\s))+(?!\{)([A-Za-z_$][\w$.]*(?:\s*<[^\r\n]*>)?)/g;
+  /(?:^|[\r\n\u2028\u2029])[\t ]*\*?[\t ]*@(?:implements|augments|extends|type|this|enum)(?:\s|\*(?=\s))+(?!\{)([A-Za-z_$][\w$.]*(?:\s*<[^\r\n]*>)?)/g;
 
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -50,11 +48,16 @@ function* getJSDocTypeExpressions(comment) {
     const start = match.index + match[0].length;
     let depth = 1;
     let quote;
+    const templateInterpolationDepths = [];
 
     for (let end = start; end < comment.length; end++) {
       const character = comment[end];
       if (quote) {
         if (character === '\\') {
+          end++;
+        } else if (quote === '`' && character === '$' && comment[end + 1] === '{') {
+          templateInterpolationDepths.push(depth++);
+          quote = undefined;
           end++;
         } else if (character === quote) {
           quote = undefined;
@@ -62,13 +65,19 @@ function* getJSDocTypeExpressions(comment) {
         continue;
       }
 
-      if (character === '"' || character === "'") {
+      if (character === '"' || character === "'" || character === '`') {
         quote = character;
       } else if (character === '{') {
         depth++;
-      } else if (character === '}' && --depth === 0) {
-        yield comment.slice(start, end);
-        break;
+      } else if (character === '}') {
+        if (--depth === 0) {
+          yield comment.slice(start, end);
+          break;
+        }
+        if (templateInterpolationDepths.at(-1) === depth) {
+          templateInterpolationDepths.pop();
+          quote = '`';
+        }
       }
     }
   }
