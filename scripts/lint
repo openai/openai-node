@@ -45,6 +45,9 @@ echo "==> Checking published source types (TypeScript 4.9)"
 echo "==> Checking published source types (TypeScript 6)"
 ./node_modules/typescript/bin/tsc --project dist/src/tsconfig.json --noEmit
 
+echo "==> Checking isolated packed browser/edge consumer"
+node --experimental-strip-types scripts/test-packed-package.ts
+
 echo "==> Checking types"
 ./node_modules/typescript/bin/tsc
 

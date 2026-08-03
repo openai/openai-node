@@ -2,13 +2,13 @@
   // this config is included in the published src directory to prevent TS errors
   // from appearing when users go to source, and VSCode opens the source .ts file
   // via declaration maps
-  "include": ["index.ts"],
+  "include": ["index.ts", "tsconfig.dist-src.d.ts"],
   "compilerOptions": {
     "target": "ES2015",
     "lib": ["DOM", "DOM.Iterable", "ES2020"],
     "module": "Node16",
     "moduleResolution": "Node16",
-    "types": ["node"],
+    "types": [],
     "skipLibCheck": true
   }
 }
