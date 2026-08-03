@@ -4,7 +4,14 @@
     "correctness": "off"
   },
   "rules": {
-    "sdk/no-unused-imports": "error",
+    "sdk/no-unused-imports": [
+      "error",
+      {
+        "jsxRuntime": "classic",
+        "jsxFactory": "React.createElement",
+        "jsxFragmentFactory": "React.Fragment"
+      }
+    ],
     "no-restricted-imports": [
       "error",
       {

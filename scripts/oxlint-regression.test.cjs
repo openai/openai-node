@@ -230,6 +230,255 @@ console.log(accept(produce()));
   );
 });
 
+test('treats JSDoc template parameters as comment-local type binders', () => {
+  const cases = [
+    {
+      name: 'template-exact-review-repro.js',
+      imports: ['T'],
+      comment: '/** @template T @param {T} value */',
+    },
+    {
+      name: 'template-exact-single-line-review-repro.js',
+      imports: ['T'],
+      comment: '/** @template T @param {T} value */',
+      inlineImport: true,
+    },
+    {
+      name: 'template-before-earlier-sibling.js',
+      imports: ['T'],
+      comment: '/** @param {T} value @template T */',
+    },
+    {
+      name: 'template-comma-separated.js',
+      imports: ['T', 'U'],
+      comment: '/** @template T, U @param {T} value @returns {U} */',
+    },
+    {
+      name: 'template-multiple-tags.js',
+      imports: ['T', 'U'],
+      comment: '/** @template T @template U @param {T | U} value */',
+    },
+    {
+      name: 'template-before-earlier-documentation-link.js',
+      imports: ['T'],
+      comment: '/** @see T Description @template T */',
+    },
+    {
+      name: 'template-typescript-const-modifier.js',
+      imports: ['T'],
+      comment: '/** @template const T @param {T} value */',
+    },
+    {
+      name: 'template-typescript-in-modifier.js',
+      imports: ['T'],
+      comment: '/** @template in T @param {T} value */',
+    },
+    {
+      name: 'template-typescript-out-modifier.js',
+      imports: ['T'],
+      comment: '/** @template out T @param {T} value */',
+    },
+    {
+      name: 'template-typescript-combined-modifiers.js',
+      imports: ['T'],
+      comment: '/** @template in out const T @param {T} value */',
+    },
+    {
+      name: 'template-typescript-modified-comma-separated-binders.js',
+      imports: ['T', 'U', 'V'],
+      comment: '/** @template in T, out U, const V @param {T | U | V} value */',
+    },
+    {
+      name: 'template-typescript-modified-default.js',
+      imports: ['T', 'Default'],
+      retained: ['Default'],
+      comment: '/** @template [in T=Default] @param {T} value */',
+    },
+    {
+      name: 'template-typescript-contextual-modifier-as-binder.js',
+      imports: ['out'],
+      comment: '/** @template out @param {out} value */',
+    },
+    {
+      name: 'template-multiline.js',
+      imports: ['T', 'U'],
+      comment: '/**\n * @template\n * T,\n * U\n * @param {T | U} value\n */',
+    },
+    {
+      name: 'template-constraint.js',
+      imports: ['T', 'Constraint'],
+      retained: ['Constraint'],
+      comment: '/** @template {Constraint} T @param {T} value */',
+    },
+    {
+      name: 'template-constraint-and-multiple-binders.js',
+      imports: ['T', 'U', 'Constraint'],
+      retained: ['Constraint'],
+      comment: '/** @template {Record<string, Constraint>} T, U @param {T | U} value */',
+    },
+    {
+      name: 'template-constraint-matching-binder.js',
+      imports: ['T'],
+      retained: ['T'],
+      comment: '/** @template {T} T @param {T} value */',
+    },
+    {
+      name: 'template-typescript-default.js',
+      imports: ['T', 'Default'],
+      retained: ['Default'],
+      comment: '/** @template [T=Default] @param {T} value */',
+    },
+    {
+      name: 'template-typescript-default-matching-binder.js',
+      imports: ['T'],
+      retained: ['T'],
+      comment: '/** @template [T=T] @param {T} value */',
+    },
+    {
+      name: 'template-default-references-sibling-binder-import.js',
+      imports: ['T', 'U'],
+      retained: ['T'],
+      comment: '/** @template T, [U=T] @param {T | U} value */',
+    },
+    {
+      name: 'template-constraint-references-sibling-binder-import.js',
+      imports: ['T', 'U'],
+      retained: ['T'],
+      comment: '/** @template {T} U @template T @param {T | U} value */',
+    },
+    {
+      name: 'template-multiple-defaults.js',
+      imports: ['T', 'U', 'FirstDefault', 'SecondDefault'],
+      retained: ['FirstDefault', 'SecondDefault'],
+      comment: '/** @template [T=Record<string, FirstDefault>], [U=SecondDefault[]] @returns {T | U} */',
+    },
+    {
+      name: 'template-multiline-constraints-and-defaults.js',
+      imports: ['T', 'U', 'Constraint', 'Default'],
+      retained: ['Constraint', 'Default'],
+      comment: '/**\n * @template\n * {Constraint}\n * T,\n * [U = Default]\n * @param {T | U} value\n */',
+    },
+    {
+      name: 'template-same-line-sibling-default.js',
+      imports: ['T', 'Default', 'Result'],
+      retained: ['Default', 'Result'],
+      comment: '/** @template [T=Default] @param {T} value @returns {Result} */',
+    },
+    {
+      name: 'template-nested-object-and-tuple-default.js',
+      imports: ['T', 'ObjectDefault', 'TupleDefault'],
+      retained: ['ObjectDefault', 'TupleDefault'],
+      comment: '/** @template [T={ value: ObjectDefault, items: [TupleDefault, string] }] @returns {T} */',
+    },
+    {
+      name: 'template-interpolated-literal-default.js',
+      imports: ['T', 'InterpolatedDefault'],
+      retained: ['InterpolatedDefault'],
+      comment: '/** @template [T=`prefix-${InterpolatedDefault}`] @returns {T} */',
+    },
+    {
+      name: 'template-constraint-literal-and-property-safety.js',
+      imports: ['T', 'QuotedOnly', 'PropertyOnly'],
+      comment: '/** @template {{ PropertyOnly: "QuotedOnly" }} T @returns {T} */',
+    },
+    {
+      name: 'template-default-literal-and-property-safety.js',
+      imports: ['T', 'QuotedOnly', 'PropertyOnly'],
+      comment: '/** @template [T={ PropertyOnly: "QuotedOnly" }] @returns {T} */',
+    },
+    {
+      name: 'template-unicode.js',
+      imports: ['Δelta', '变量', '𐐀stral'],
+      comment: '/** @template Δelta, 变量, 𐐀stral @param {Δelta | 变量 | 𐐀stral} value */',
+    },
+    {
+      name: 'template-escaped-unicode.js',
+      imports: ['T', 'Éclair', '𐐀stral'],
+      comment: '/** @template \\u0054, \\u00c9clair, \\u{10400}stral @param {T | Éclair | 𐐀stral} value */',
+    },
+    {
+      name: 'template-unicode-combining-character.js',
+      imports: ['Cafe\u0301'],
+      comment: '/** @template Cafe\\u0301 @param {Cafe\u0301} value */',
+    },
+    {
+      name: 'template-prefix-does-not-shadow-longer-identifier.js',
+      imports: ['T', 'Template'],
+      retained: ['Template'],
+      comment: '/** @template T @param {T | Template} value */',
+    },
+    {
+      name: 'template-escaped-unicode-joiner.js',
+      imports: ['Type\u200cName'],
+      comment: '/** @template Type\\u200cName @param {Type\u200cName} value */',
+    },
+    {
+      name: 'template-documentation-link.js',
+      imports: ['T'],
+      comment: '/** @template T @see T Description {@link T}. */',
+    },
+    {
+      name: 'template-cross-comment-isolation.js',
+      imports: ['T'],
+      retained: ['T'],
+      comment: '/** @template T @param {T} value */\n/** @type {T} */',
+    },
+    {
+      name: 'template-quoted-lookalike.js',
+      imports: ['T'],
+      retained: ['T'],
+      comment: '/** @deprecated "@template T" @param {T} value */',
+    },
+    {
+      name: 'template-backticked-lookalike.js',
+      imports: ['T'],
+      retained: ['T'],
+      comment: '/** @deprecated `@template T` @param {T} value */',
+    },
+    {
+      name: 'template-example-lookalike.js',
+      imports: ['T'],
+      retained: ['T'],
+      comment: '/**\n * @example "@template T"\n * @param {T} value\n */',
+    },
+    {
+      name: 'template-trailing-constraint-lookalike.js',
+      imports: ['T', 'Constraint'],
+      comment: '/** @template T extends Constraint @param {T} value */',
+    },
+    {
+      name: 'template-invalid-binder.js',
+      imports: ['T'],
+      retained: ['T'],
+      comment: '/** @template 1T @param {T} value */',
+    },
+    {
+      name: 'template-invalid-bracketed-binder.js',
+      imports: ['T'],
+      retained: ['T'],
+      comment: '/** @template [T] @param {T} value */',
+    },
+  ];
+
+  for (const fixture of cases) {
+    const importPath = fixture.inlineImport ? './dep' : './dep.js';
+    const imports = fixture.imports.map((name) => `import { Foo as ${name} } from '${importPath}';`);
+    const importSeparator = fixture.inlineImport ? ' ' : '\n';
+    const source = `${imports.join('\n')}${importSeparator}${fixture.comment}\nconsole.log('done');\n`;
+    const fixturePath = writeFixture(fixture.name, source);
+
+    runOxlintFix(fixturePath);
+    const fixed = fs.readFileSync(fixturePath, 'utf8');
+    for (const name of fixture.imports) {
+      assert.equal(
+        fixed.includes(`import { Foo as ${name} }`),
+        (fixture.retained ?? []).includes(name),
+        `${fixture.name}: ${name}`,
+      );
+    }
+  }
+});
+
 test('removes imports appearing only in JSDoc string literals and property names', () => {
   const cases = [
     {
@@ -1000,4 +1249,372 @@ test('fast-format accepts lists containing only ignored lint files', () => {
   const fileList = writeFixture('ignored-files.txt', `${path.relative(repoRoot, ignoredPath)}${os.EOL}`);
 
   run(fastFormat, [path.relative(repoRoot, fileList)]);
+});
+
+function assertJSXImportBindings(fixturePath, bindings, fixtureName) {
+  const imports = fs
+    .readFileSync(fixturePath, 'utf8')
+    .split(/\r\n|[\n\r\u2028\u2029]/u)
+    .map((line) => line.slice(line.indexOf('import ')))
+    .filter((line) => line.startsWith('import '))
+    .join('\n');
+
+  for (const [name, retained] of Object.entries(bindings)) {
+    assert.equal(imports.includes(name), retained, `${fixtureName}: ${name}`);
+  }
+}
+
+function writeJSXConfiguration(directory, jsxOptions) {
+  const configuration = JSON.parse(fs.readFileSync(path.join(repoRoot, '.oxlintrc.json'), 'utf8'));
+  configuration.rules['sdk/no-unused-imports'] = ['error', jsxOptions];
+  configuration.jsPlugins = [{ name: 'sdk', specifier: path.join(repoRoot, 'scripts', 'oxlint-plugin.cjs') }];
+  return writeFixture(`${directory}/.oxlintrc.json`, JSON.stringify(configuration));
+}
+
+function runOxlintFixWithConfiguration(fixturePath, configurationPath) {
+  run(oxlint, [
+    '--fix',
+    '--no-ignore',
+    '--config',
+    path.relative(repoRoot, configurationPath),
+    path.relative(repoRoot, fixturePath),
+  ]);
+}
+
+test('preserves valid per-file classic JSX pragmas only for actual elements and fragments', () => {
+  const cases = [
+    {
+      name: 'jsx-pragma-element.jsx',
+      source: `/** @jsx h */\nimport { Foo as h, Foo as Unused } from './dep.js';\nexport const node = <div />;\n`,
+      bindings: { h: true, Unused: false },
+    },
+    {
+      name: 'jsx-pragma-same-line.jsx',
+      source: `/** @jsx h */ import { h } from './dep.js'; const node = <div />;\n`,
+      bindings: { h: true },
+    },
+    {
+      name: 'jsx-pragma-plain-block.jsx',
+      source: `/* @jsx h */\nimport { Foo as h } from './dep.js';\nexport const node = <div />;\n`,
+      bindings: { h: true },
+    },
+    {
+      name: 'jsx-pragma-case-insensitive.jsx',
+      source: `/** @JSX h */\nimport { Foo as h } from './dep.js';\nexport const node = <div />;\n`,
+      bindings: { h: true },
+    },
+    {
+      name: 'jsx-pragma-fragment.jsx',
+      source: `/** @jsx h */\n/** @jsxFrag Fragment */\nimport { Foo as h, Foo as Fragment, Foo as Unused } from './dep.js';\nexport const node = <>value</>;\n`,
+      bindings: { h: true, Fragment: true, Unused: false },
+    },
+    {
+      name: 'jsx-pragma-fragment-without-fragment.jsx',
+      source: `/** @jsx h */\n/** @jsxFrag Fragment */\nimport { Foo as h, Foo as Fragment } from './dep.js';\nexport const node = <div />;\n`,
+      bindings: { h: true, Fragment: false },
+    },
+    {
+      name: 'jsx-pragma-without-jsx.jsx',
+      source: `/** @jsx h */\n/** @jsxFrag Fragment */\nimport { Foo as h, Foo as Fragment } from './dep.js';\nexport const node = '<div />';\n`,
+      bindings: { h: false, Fragment: false },
+    },
+    {
+      name: 'jsx-pragma-member-root.jsx',
+      source: `/** @jsx Renderer.createElement */\nimport { Foo as Renderer, Foo as Unused } from './dep.js';\nexport const node = <div />;\n`,
+      bindings: { Renderer: true, Unused: false },
+    },
+    {
+      name: 'jsx-pragma-fragment-member-root.jsx',
+      source: `/** @jsx Renderer.createElement */\n/** @jsxFrag Fragments.Unit */\nimport { Foo as Renderer, Foo as Fragments } from './dep.js';\nexport const node = <></>;\n`,
+      bindings: { Renderer: true, Fragments: true },
+    },
+    {
+      name: 'jsx-pragma-same-line-sibling.jsx',
+      source: `/** @jsx h @jsxFrag Fragment */\nimport { Foo as h, Foo as Fragment } from './dep.js';\nexport const node = <></>;\n`,
+      bindings: { h: true, Fragment: false },
+    },
+    {
+      name: 'jsx-pragma-multiline.jsx',
+      source: `/**\n * @jsx Renderer.createElement\n * @jsxFrag Pieces.Fragment\n */\nimport { Foo as Renderer, Foo as Pieces } from './dep.js';\nexport const node = <></>;\n`,
+      bindings: { Renderer: true, Pieces: true },
+    },
+    {
+      name: 'jsx-pragma-line-comment.jsx',
+      source: `// @jsx h\nimport { Foo as h } from './dep.js';\nexport const node = <div />;\n`,
+      bindings: { h: false },
+    },
+    {
+      name: 'jsx-pragma-after-code.jsx',
+      source: `import { Foo as h } from './dep.js';\n/** @jsx h */\nexport const node = <div />;\n`,
+      bindings: { h: false },
+    },
+    {
+      name: 'jsx-pragma-quoted-lookalike.jsx',
+      source: `/** "@jsx h" */\nimport { Foo as h } from './dep.js';\nexport const node = <div />;\n`,
+      bindings: { h: false },
+    },
+    {
+      name: 'jsx-pragma-backticked-lookalike.jsx',
+      source: `/** \`@jsx h\` */\nimport { Foo as h } from './dep.js';\nexport const node = <div />;\n`,
+      bindings: { h: false },
+    },
+    {
+      name: 'jsx-pragma-prose-lookalike.jsx',
+      source: `/** @description @jsx h */\nimport { Foo as h } from './dep.js';\nexport const node = <div />;\n`,
+      bindings: { h: false },
+    },
+    {
+      name: 'jsx-pragma-example-lookalike.jsx',
+      source: `/** @example @jsx h */\nimport { Foo as h } from './dep.js';\nexport const node = <div />;\n`,
+      bindings: { h: false },
+    },
+    {
+      name: 'jsx-pragma-multiline-example-lookalike.jsx',
+      source: `/**\n * @example\n * @jsx h\n */\nimport { Foo as h } from './dep.js';\nexport const node = <div />;\n`,
+      bindings: { h: false },
+    },
+    {
+      name: 'jsx-pragma-shadowed-factory.jsx',
+      source: `/** @jsx h */\nimport { Foo as h } from './dep.js';\nexport function render(h) { return <div />; }\n`,
+      bindings: { h: false },
+    },
+    {
+      name: 'jsx-pragma-shadowed-and-visible-factory.jsx',
+      source: `/** @jsx h */\nimport { Foo as h } from './dep.js';\nexport function render(h) { return <div />; }\nexport const node = <div />;\n`,
+      bindings: { h: true },
+    },
+    {
+      name: 'jsx-pragma-shadowed-fragment.jsx',
+      source: `/** @jsx h */\n/** @jsxFrag Fragment */\nimport { Foo as h, Foo as Fragment } from './dep.js';\nexport function render(h, Fragment) { return <></>; }\n`,
+      bindings: { h: false, Fragment: false },
+    },
+    {
+      name: 'jsx-pragma-only-fragment-root-shadowed.jsx',
+      source: `/** @jsx h */\n/** @jsxFrag Fragment */\nimport { Foo as h, Foo as Fragment } from './dep.js';\nexport function render(Fragment) { return <></>; }\n`,
+      bindings: { h: true, Fragment: false },
+    },
+    {
+      name: 'jsx-pragma-unicode-root.jsx',
+      source: `/** @jsx CaféRenderer.createElement */\nimport { Foo as CaféRenderer } from './dep.js';\nexport const node = <div />;\n`,
+      bindings: { CaféRenderer: true },
+    },
+    {
+      name: 'jsx-pragma-escaped-unicode-root.jsx',
+      source: `/** @jsx Caf\\u00e9Renderer.createElement */\nimport { Foo as CaféRenderer } from './dep.js';\nexport const node = <div />;\n`,
+      bindings: { CaféRenderer: true },
+    },
+    {
+      name: 'jsx-pragma-escaped-import-alias.jsx',
+      source: `/** @jsx CaféRenderer.createElement */\nimport { Foo as Caf\\u00e9Renderer } from './dep.js';\nexport const node = <div />;\n`,
+      bindings: { 'Caf\\u00e9Renderer': true },
+    },
+    {
+      name: 'jsx-pragma-astral-root.jsx',
+      source: `/** @jsx \\u{10400}Renderer.createElement */\nimport { Foo as 𐐀Renderer } from './dep.js';\nexport const node = <div />;\n`,
+      bindings: { 𐐀Renderer: true },
+    },
+    {
+      name: 'jsx-pragma-identifier-prefix.jsx',
+      source: `/** @jsx CaféRendererSuffix.createElement */\nimport { Foo as CaféRenderer } from './dep.js';\nexport const node = <div />;\n`,
+      bindings: { CaféRenderer: false },
+    },
+    {
+      name: 'jsx-pragma-invalid-factory.jsx',
+      source: `/** @jsx Renderer.createElement() */\nimport { Foo as Renderer } from './dep.js';\nexport const node = <div />;\n`,
+      bindings: { Renderer: false },
+    },
+  ];
+
+  for (const fixture of cases) {
+    const fixturePath = writeFixture(fixture.name, fixture.source);
+    runOxlintFix(fixturePath);
+    assertJSXImportBindings(fixturePath, fixture.bindings, fixture.name);
+  }
+});
+
+test('preserves configured classic JSX factory roots only where JSX requires them', () => {
+  const directory = 'configured-classic-jsx';
+  const configurationPath = writeJSXConfiguration(directory, {
+    jsxRuntime: 'classic',
+    jsxFactory: 'Factories.createElement',
+    jsxFragmentFactory: 'Fragments.Unit',
+  });
+  const cases = [
+    {
+      name: 'element.tsx',
+      source: `import { Foo as Factories, Foo as Fragments, Foo as Unused } from '../dep.js';\nexport const node = <div />;\n`,
+      bindings: { Factories: true, Fragments: false, Unused: false },
+    },
+    {
+      name: 'fragment.tsx',
+      source: `import { Foo as Factories, Foo as Fragments, Foo as Unused } from '../dep.js';\nexport const node = <></>;\n`,
+      bindings: { Factories: true, Fragments: true, Unused: false },
+    },
+    {
+      name: 'without-jsx.tsx',
+      source: `import { Foo as Factories, Foo as Fragments } from '../dep.js';\nexport const node = '<div />';\n`,
+      bindings: { Factories: false, Fragments: false },
+    },
+    {
+      name: 'pragma-override.tsx',
+      source: `/** @jsx Local.create */\n/** @jsxFrag Pieces.Fragment */\nimport { Foo as Factories, Foo as Fragments, Foo as Local, Foo as Pieces } from '../dep.js';\nexport const node = <></>;\n`,
+      bindings: { Factories: false, Fragments: false, Local: true, Pieces: true },
+    },
+    {
+      name: 'shadowed-factory.tsx',
+      source: `import { Foo as Factories, Foo as Fragments } from '../dep.js';\nexport function render(Factories) { return <div />; }\n`,
+      bindings: { Factories: false, Fragments: false },
+    },
+    {
+      name: 'shadowed-and-visible-factory.tsx',
+      source: `import { Foo as Factories, Foo as Fragments } from '../dep.js';\nexport function render(Factories) { return <div />; }\nexport const node = <div />;\n`,
+      bindings: { Factories: true, Fragments: false },
+    },
+    {
+      name: 'shadowed-fragment.tsx',
+      source: `import { Foo as Factories, Foo as Fragments } from '../dep.js';\nexport function render(Fragments) { return <></>; }\n`,
+      bindings: { Factories: true, Fragments: false },
+    },
+    {
+      name: 'block-shadowed-factory.tsx',
+      source: `import { Foo as Factories } from '../dep.js';\nexport function render() { const Factories = () => null; return <div />; }\n`,
+      bindings: { Factories: false },
+    },
+    {
+      name: 'arrow-shadowed-factory.tsx',
+      source: `import { Foo as Factories } from '../dep.js';\nexport const render = (Factories) => <div />;\n`,
+      bindings: { Factories: false },
+    },
+    {
+      name: 'var-hoisted-shadowed-factory.tsx',
+      source: `import { Foo as Factories } from '../dep.js';\nexport function render() { const node = <div />; var Factories = () => null; return node; }\n`,
+      bindings: { Factories: false },
+    },
+    {
+      name: 'class-method-shadowed-factory.tsx',
+      source: `import { Foo as Factories } from '../dep.js';\nexport class View { render(Factories) { return <div />; } }\n`,
+      bindings: { Factories: false },
+    },
+    {
+      name: 'nested-fragments.tsx',
+      source: `import { Foo as Factories, Foo as Fragments } from '../dep.js';\nexport const node = <><><div /></></>;\n`,
+      bindings: { Factories: true, Fragments: true },
+    },
+    {
+      name: 'shadowed-and-visible-fragment.tsx',
+      source: `import { Foo as Factories, Foo as Fragments } from '../dep.js';\nexport function render(Fragments) { return <></>; }\nexport const node = <></>;\n`,
+      bindings: { Factories: true, Fragments: true },
+    },
+    {
+      name: 'default-react-element.tsx',
+      source: `import React from '../dep.js';\nexport const node = <div />;\n`,
+      bindings: { React: false },
+    },
+    {
+      name: 'default-react-shadowed.tsx',
+      source: `import React from '../dep.js';\nexport function render(React) { return <div />; }\n`,
+      bindings: { React: false },
+    },
+    {
+      name: 'explicit-react-use.tsx',
+      source: `import React from '../dep.js';\nexport const node = <div />;\nconsole.log(React);\n`,
+      bindings: { React: true },
+    },
+  ];
+
+  for (const fixture of cases) {
+    const fixturePath = writeFixture(`${directory}/${fixture.name}`, fixture.source);
+    runOxlintFixWithConfiguration(fixturePath, configurationPath);
+    assertJSXImportBindings(fixturePath, fixture.bindings, fixture.name);
+  }
+
+  const invalidDirectory = 'configured-invalid-classic-jsx';
+  const invalidConfigurationPath = writeJSXConfiguration(invalidDirectory, {
+    jsxRuntime: 'classic',
+    jsxFactory: 'Factories.createElement()',
+    jsxFragmentFactory: 'Fragments[Unit]',
+  });
+  const invalidFixturePath = writeFixture(
+    `${invalidDirectory}/invalid.tsx`,
+    `import { Foo as Factories, Foo as Fragments } from '../dep.js';\nexport const node = <></>;\n`,
+  );
+  runOxlintFixWithConfiguration(invalidFixturePath, invalidConfigurationPath);
+  assertJSXImportBindings(invalidFixturePath, { Factories: false, Fragments: false }, 'invalid-factories');
+});
+
+test('respects automatic JSX runtime and per-file runtime overrides', () => {
+  const automaticDirectory = 'configured-automatic-jsx';
+  const automaticConfigurationPath = writeJSXConfiguration(automaticDirectory, {
+    jsxRuntime: 'automatic',
+    jsxFactory: 'Factories.createElement',
+    jsxFragmentFactory: 'Fragments.Unit',
+  });
+  const automaticCases = [
+    {
+      name: 'automatic-element.tsx',
+      source: `import React, { Foo as Factories, Foo as Fragments } from '../dep.js';\nexport const node = <div />;\n`,
+      bindings: { React: false, Factories: false, Fragments: false },
+    },
+    {
+      name: 'automatic-fragment.tsx',
+      source: `import React, { Foo as Factories, Foo as Fragments } from '../dep.js';\nexport const node = <></>;\n`,
+      bindings: { React: false, Factories: false, Fragments: false },
+    },
+    {
+      name: 'automatic-explicit-use.tsx',
+      source: `import React, { Foo as Factories } from '../dep.js';\nexport const node = <div />;\nconsole.log(React);\n`,
+      bindings: { React: true, Factories: false },
+    },
+    {
+      name: 'automatic-component-use.tsx',
+      source: `import React from '../dep.js';\nexport const node = <React />;\n`,
+      bindings: { React: true },
+    },
+    {
+      name: 'pragma-classic-override.tsx',
+      source: `/** @jsxRuntime classic */\n/** @jsx Local.build */\n/** @jsxFrag Pieces.Fragment */\nimport { Foo as Factories, Foo as Fragments, Foo as Local, Foo as Pieces } from '../dep.js';\nexport const node = <></>;\n`,
+      bindings: { Factories: false, Fragments: false, Local: true, Pieces: true },
+    },
+  ];
+
+  for (const fixture of automaticCases) {
+    const fixturePath = writeFixture(`${automaticDirectory}/${fixture.name}`, fixture.source);
+    runOxlintFixWithConfiguration(fixturePath, automaticConfigurationPath);
+    assertJSXImportBindings(fixturePath, fixture.bindings, fixture.name);
+  }
+
+  const classicDirectory = 'runtime-override-jsx';
+  const classicConfigurationPath = writeJSXConfiguration(classicDirectory, {
+    jsxRuntime: 'classic',
+    jsxFactory: 'Factories.createElement',
+    jsxFragmentFactory: 'Fragments.Unit',
+  });
+  const classicCases = [
+    {
+      name: 'automatic-pragma.tsx',
+      source: `/** @jsxRuntime automatic */\nimport React, { Foo as Factories, Foo as Fragments } from '../dep.js';\nexport const node = <></>;\n`,
+      bindings: { React: false, Factories: false, Fragments: false },
+    },
+    {
+      name: 'automatic-import-source.tsx',
+      source: `/** @jsxImportSource custom-framework */\nimport React, { Foo as Factories, Foo as Fragments } from '../dep.js';\nexport const node = <div />;\n`,
+      bindings: { React: false, Factories: false, Fragments: false },
+    },
+    {
+      name: 'classic-runtime-overrides-import-source.tsx',
+      source: `/** @jsxImportSource custom-framework */\n/** @jsxRuntime classic */\nimport { Foo as Factories, Foo as Fragments } from '../dep.js';\nexport const node = <></>;\n`,
+      bindings: { Factories: true, Fragments: true },
+    },
+    {
+      name: 'invalid-runtime-pragma.tsx',
+      source: `/** @jsxRuntime unknown */\nimport { Foo as Factories } from '../dep.js';\nexport const node = <div />;\n`,
+      bindings: { Factories: true },
+    },
+  ];
+
+  for (const fixture of classicCases) {
+    const fixturePath = writeFixture(`${classicDirectory}/${fixture.name}`, fixture.source);
+    runOxlintFixWithConfiguration(fixturePath, classicConfigurationPath);
+    assertJSXImportBindings(fixturePath, fixture.bindings, fixture.name);
+  }
 });
