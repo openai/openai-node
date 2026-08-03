@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+
+# Exit 0 when the package version exists, 1 when it is available to publish,
+# and 2 when the registry returns an unexpected response.
+set -euo pipefail
+
+PACKAGE_NAME="$(jq -r -e '.name' package.json)"
+VERSION="$(jq -r -e '.version' package.json)"
+
+set +e
+NPM_INFO="$(npm view "$PACKAGE_NAME@$VERSION" version --json 2>/dev/null)"
+NPM_STATUS=$?
+set -e
+
+if [[ $NPM_STATUS -eq 0 ]]; then
+  if ! PUBLISHED_VERSION="$(jq -r -e '.' <<< "$NPM_INFO")"; then
+    echo "ERROR: npm returned invalid data for $PACKAGE_NAME@$VERSION:" >&2
+    echo "$NPM_INFO" >&2
+    exit 2
+  fi
+  if [[ "$PUBLISHED_VERSION" == "$VERSION" ]]; then
+    echo "$PACKAGE_NAME@$VERSION is already published"
+    exit 0
+  fi
+elif jq -e '.error.code == "E404"' <<< "$NPM_INFO" > /dev/null 2>&1; then
+  echo "$PACKAGE_NAME@$VERSION has not been published"
+  exit 1
+fi
+
+echo "ERROR: npm returned unexpected data for $PACKAGE_NAME@$VERSION:" >&2
+echo "$NPM_INFO" >&2
+exit 2
