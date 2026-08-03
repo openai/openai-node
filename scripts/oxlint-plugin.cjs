@@ -30,60 +30,210 @@ const JSDOC_TYPE_BEARING_TAGS = new Set([
   'yields',
 ]);
 const JSDOC_NAMED_TYPE_TAGS = new Set(['arg', 'argument', 'param', 'prop', 'property']);
-const JSDOC_BRACED_TYPE_TAG =
-  /(?:^|[\r\n\u2028\u2029])[\t ]*\*?[\t ]*@([A-Za-z][\w-]*)(?:(?:\s|\*(?=\s))+([^\s{}*@]+))?(?:\s|\*(?=\s))*\{/g;
-const JSDOC_BARE_TYPE_TAG =
-  /(?:^|[\r\n\u2028\u2029])[\t ]*\*?[\t ]*@(?:implements|augments|extends|type|this|enum)(?:\s|\*(?=\s))+(?!\{)([A-Za-z_$][\w$.]*(?:\s*<[^\r\n]*>)?)/g;
+const JSDOC_BARE_TYPE_TAGS = new Set(['implements', 'augments', 'extends', 'type', 'this', 'enum']);
 
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function* getJSDocTypeExpressions(comment) {
-  for (const match of comment.matchAll(JSDOC_BRACED_TYPE_TAG)) {
-    if (!JSDOC_TYPE_BEARING_TAGS.has(match[1]) || (match[2] && !JSDOC_NAMED_TYPE_TAGS.has(match[1]))) {
+function isJSDocLineTerminator(character) {
+  return character === '\n' || character === '\r' || character === '\u2028' || character === '\u2029';
+}
+
+function skipJSDocWhitespace(comment, index) {
+  while (
+    index < comment.length &&
+    (/\s/u.test(comment[index]) || (comment[index] === '*' && /\s/u.test(comment[index + 1] ?? '')))
+  ) {
+    index++;
+  }
+  return index;
+}
+
+function readJSDocBracedType(comment, start) {
+  let depth = 1;
+  let quote;
+  const templateInterpolationDepths = [];
+
+  for (let end = start; end < comment.length; end++) {
+    const character = comment[end];
+    if (quote) {
+      if (character === '\\') {
+        end++;
+      } else if (quote === '`' && character === '$' && comment[end + 1] === '{') {
+        templateInterpolationDepths.push(depth++);
+        quote = undefined;
+        end++;
+      } else if (character === quote) {
+        quote = undefined;
+      }
       continue;
     }
 
-    const start = match.index + match[0].length;
-    let depth = 1;
-    let quote;
-    const templateInterpolationDepths = [];
-
-    for (let end = start; end < comment.length; end++) {
-      const character = comment[end];
-      if (quote) {
-        if (character === '\\') {
-          end++;
-        } else if (quote === '`' && character === '$' && comment[end + 1] === '{') {
-          templateInterpolationDepths.push(depth++);
-          quote = undefined;
-          end++;
-        } else if (character === quote) {
-          quote = undefined;
-        }
-        continue;
+    if (character === '"' || character === "'" || character === '`') {
+      quote = character;
+    } else if (character === '{') {
+      depth++;
+    } else if (character === '}') {
+      if (--depth === 0) {
+        return { expression: comment.slice(start, end), end: end + 1 };
       }
-
-      if (character === '"' || character === "'" || character === '`') {
-        quote = character;
-      } else if (character === '{') {
-        depth++;
-      } else if (character === '}') {
-        if (--depth === 0) {
-          yield comment.slice(start, end);
-          break;
-        }
-        if (templateInterpolationDepths.at(-1) === depth) {
-          templateInterpolationDepths.pop();
-          quote = '`';
-        }
+      if (templateInterpolationDepths.at(-1) === depth) {
+        templateInterpolationDepths.pop();
+        quote = '`';
       }
     }
   }
+}
 
-  for (const match of comment.matchAll(JSDOC_BARE_TYPE_TAG)) {
-    yield match[1];
+function readJSDocBareType(comment, start) {
+  const identifier = /^[A-Za-z_$][\w$.]*/u.exec(comment.slice(start));
+  if (!identifier) return;
+
+  let end = start + identifier[0].length;
+  let genericStart = end;
+  while (comment[genericStart] === ' ' || comment[genericStart] === '\t') genericStart++;
+  if (comment[genericStart] !== '<') {
+    return { expression: comment.slice(start, end), end };
+  }
+
+  let depth = 1;
+  let quote;
+  for (let cursor = genericStart + 1; cursor < comment.length; cursor++) {
+    const character = comment[cursor];
+    if (isJSDocLineTerminator(character)) break;
+    if (quote) {
+      if (character === '\\') {
+        cursor++;
+      } else if (character === quote) {
+        quote = undefined;
+      }
+    } else if (character === '"' || character === "'" || character === '`') {
+      quote = character;
+    } else if (character === '<' && comment[cursor + 1] !== '=') {
+      depth++;
+    } else if (
+      character === '>' &&
+      comment[cursor - 1] !== '=' &&
+      comment[cursor + 1] !== '=' &&
+      --depth === 0
+    ) {
+      end = cursor + 1;
+      break;
+    }
+  }
+
+  return { expression: comment.slice(start, end), end };
+}
+
+function getNextJSDocLine(comment, index) {
+  while (index < comment.length && !isJSDocLineTerminator(comment[index])) index++;
+  if (comment[index] === '\r' && comment[index + 1] === '\n') return index + 2;
+  return index + 1;
+}
+
+function findJSDocSiblingTag(comment, index) {
+  let braceDepth = 0;
+  let quote;
+  const templateInterpolationDepths = [];
+
+  for (; index < comment.length && !isJSDocLineTerminator(comment[index]); index++) {
+    const character = comment[index];
+    if (quote) {
+      if (character === '\\') {
+        index++;
+      } else if (quote === '`' && character === '$' && comment[index + 1] === '{') {
+        templateInterpolationDepths.push(braceDepth++);
+        quote = undefined;
+        index++;
+      } else if (character === quote) {
+        quote = undefined;
+      }
+    } else if (
+      character === '`' ||
+      character === '"' ||
+      (character === "'" && !/[A-Za-z0-9_$]/u.test(comment[index - 1] ?? ''))
+    ) {
+      quote = character;
+    } else if (character === '\\') {
+      index++;
+    } else if (character === '{') {
+      braceDepth++;
+    } else if (character === '}' && braceDepth > 0) {
+      braceDepth--;
+      if (templateInterpolationDepths.at(-1) === braceDepth) {
+        templateInterpolationDepths.pop();
+        quote = '`';
+      }
+    } else if (character === '@' && braceDepth === 0 && /\s/u.test(comment[index - 1] ?? '')) {
+      return index;
+    }
+  }
+}
+
+function* getJSDocTypeExpressions(comment) {
+  for (let index = 0; index < comment.length;) {
+    while (comment[index] === ' ' || comment[index] === '\t') index++;
+    if (comment[index] === '*') index++;
+    while (comment[index] === ' ' || comment[index] === '\t') index++;
+
+    if (comment[index] !== '@') {
+      index = getNextJSDocLine(comment, index);
+      continue;
+    }
+
+    while (index < comment.length) {
+      const tagMatch = /^@([A-Za-z][\w-]*)/u.exec(comment.slice(index));
+      if (!tagMatch || tagMatch[1] === 'example') {
+        index = getNextJSDocLine(comment, index);
+        break;
+      }
+
+      const tag = tagMatch[1];
+      const afterTag = index + tagMatch[0].length;
+      if (!JSDOC_TYPE_BEARING_TAGS.has(tag)) {
+        const sibling = findJSDocSiblingTag(comment, afterTag);
+        if (sibling === undefined) {
+          index = getNextJSDocLine(comment, afterTag);
+          break;
+        }
+        index = sibling;
+        continue;
+      }
+
+      const afterWhitespace = skipJSDocWhitespace(comment, afterTag);
+      let type;
+
+      if (comment[afterWhitespace] === '{') {
+        type = readJSDocBracedType(comment, afterWhitespace + 1);
+      } else if (JSDOC_NAMED_TYPE_TAGS.has(tag)) {
+        let afterName = afterWhitespace;
+        while (
+          afterName < comment.length &&
+          !/\s/u.test(comment[afterName]) &&
+          !/[{}*@]/u.test(comment[afterName])
+        ) {
+          afterName++;
+        }
+        if (afterName > afterWhitespace) {
+          const afterNameWhitespace = skipJSDocWhitespace(comment, afterName);
+          if (comment[afterNameWhitespace] === '{') {
+            type = readJSDocBracedType(comment, afterNameWhitespace + 1);
+          }
+        }
+      } else if (JSDOC_BARE_TYPE_TAGS.has(tag) && afterWhitespace > afterTag) {
+        type = readJSDocBareType(comment, afterWhitespace);
+      }
+
+      if (type) yield type.expression;
+
+      const sibling = findJSDocSiblingTag(comment, type?.end ?? afterTag);
+      if (sibling === undefined) {
+        index = getNextJSDocLine(comment, type?.end ?? afterTag);
+        break;
+      }
+      index = sibling;
+    }
   }
 }
 

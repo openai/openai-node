@@ -230,6 +230,172 @@ console.log(accept(produce()));
   );
 });
 
+test('preserves every genuine type reference in same-line sibling JSDoc tags', () => {
+  const usedImports = [
+    'Foo',
+    'Bar',
+    'NamedFirstArgOnly',
+    'ArgumentAliasOnly',
+    'ReturnAliasOnly',
+    'ExceptionAliasOnly',
+    'YieldAliasOnly',
+    'YieldsAliasOnly',
+    'PropertyAliasOnly',
+    'NameFirstPropertyOnly',
+    'ThrowsAliasOnly',
+    'SatisfiesAliasOnly',
+    'BareImplementsOnly',
+    'BareAugmentsOnly',
+    'BareExtendsOnly',
+    'BareTypeOnly',
+    'BareThisOnly',
+    'BareEnumOnly',
+    'TypedefAliasOnly',
+    'TemplateAliasOnly',
+    'ConstAliasOnly',
+    'ConstantAliasOnly',
+    'DefineAliasOnly',
+    'VarAliasOnly',
+    'MemberAliasOnly',
+    'ModuleAliasOnly',
+    'NamespaceAliasOnly',
+    'NamedFirstParamOnly',
+    'NamedFirstPropOnly',
+    'NamedFirstArgumentOnly',
+    'UntypedTemplateParamOnly',
+    'UntypedTemplateReturnsOnly',
+    'BareNestedSiblingOnly',
+    'AfterBareGenericOnly',
+    'ArrowBareGenericOnly',
+    'AfterArrowBareGenericOnly',
+    'NonBreakingSpaceParamOnly',
+    'NonBreakingSpaceReturnsOnly',
+    'NestedArrowInputOnly',
+    'NestedArrowResultOnly',
+    'NestedArrowMemberOnly',
+    'AfterNestedArrowOnly',
+    'EmSpaceParamOnly',
+    'EmSpaceReturnsOnly',
+  ];
+  const unusedImport = `import { Foo as UnusedInlineOnly } from './dep.js';`;
+  const imports = [
+    ...usedImports.map((name) =>
+      name === 'Foo' ? `import { Foo } from './dep.js';` : `import { Foo as ${name} } from './dep.js';`,
+    ),
+    unusedImport,
+  ];
+  const comments = [
+    '/** @param {Foo} x @returns {Bar} */',
+    '/** @arg input {NamedFirstArgOnly} @argument {ArgumentAliasOnly} value @return {ReturnAliasOnly} @exception {ExceptionAliasOnly} @yield {YieldAliasOnly} @yields {YieldsAliasOnly} */',
+    '/** @prop {PropertyAliasOnly} field @property named {NameFirstPropertyOnly} @throws {ThrowsAliasOnly} @satisfies {SatisfiesAliasOnly} */',
+    '/** @implements BareImplementsOnly @augments BareAugmentsOnly @extends BareExtendsOnly @type BareTypeOnly @this BareThisOnly @enum BareEnumOnly */',
+    '/** @typedef {TypedefAliasOnly} Alias @template {TemplateAliasOnly} T @const {ConstAliasOnly} @constant {ConstantAliasOnly} @define {DefineAliasOnly} @var {VarAliasOnly} @member {MemberAliasOnly} */',
+    '/** @module {ModuleAliasOnly} InlineModule @namespace {NamespaceAliasOnly} InlineNamespace */',
+    '/** @param first {NamedFirstParamOnly} @prop field {NamedFirstPropOnly} @argument last {NamedFirstArgumentOnly} */',
+    '/** @template T @param {UntypedTemplateParamOnly} value @returns {UntypedTemplateReturnsOnly} */',
+    '/** @implements Wrapper<Inner<string>, BareNestedSiblingOnly> @returns {AfterBareGenericOnly} */',
+    '/** @implements Wrapper<() => ArrowBareGenericOnly> @returns {AfterArrowBareGenericOnly} */',
+    '/** @param {NonBreakingSpaceParamOnly} value\u00a0@returns {NonBreakingSpaceReturnsOnly} */',
+    '/** @implements Wrapper<{ run: (value: NestedArrowInputOnly) => NestedArrowResultOnly }, NestedArrowMemberOnly> @returns {AfterNestedArrowOnly} */',
+    '/** @param {EmSpaceParamOnly} value\u2003@returns {EmSpaceReturnsOnly} */',
+  ];
+  const fixturePath = writeFixture(
+    'jsdoc-same-line-sibling-tags.js',
+    `${imports.join('\n')}\n${comments.join('\n')}\nconsole.log('done');\n`,
+  );
+
+  const before = fs.readFileSync(fixturePath, 'utf8');
+  runOxlintFix(fixturePath);
+  assert.equal(fs.readFileSync(fixturePath, 'utf8'), before.replace(unusedImport, ''));
+});
+
+test('ignores example and prose lookalikes while preserving later genuine sibling tags', () => {
+  const exampleAndProseOnly = [
+    'UnquotedInlineExampleOnly',
+    'UnquotedEmbeddedExampleOnly',
+    'QuotedInlineExampleOnly',
+    'QuotedEmbeddedExampleOnly',
+    'BacktickedInlineExampleOnly',
+    'BacktickedEmbeddedExampleOnly',
+    'NestedQuotedExampleOnly',
+    'NestedBacktickedExampleOnly',
+    'SingleLineCommentExampleOnly',
+    'SingleLineBareExampleOnly',
+    'UnquotedBareExampleOnly',
+    'UnquotedBareEmbeddedExampleOnly',
+    'DeprecatedQuotedOnly',
+    'DeprecatedBacktickedOnly',
+    'DeprecatedBracedOnly',
+    'InterleavedDeprecatedBracedOnly',
+    'ExternalNestedFakeOnly',
+    'DeprecatedQuotedSiblingFakeOnly',
+    'InterpolatedBacktickProseFakeOnly',
+    'EmailProseOnly',
+    'QuotedAfterRealOnly',
+    'BacktickedAfterRealOnly',
+    'EmailAfterRealOnly',
+    'AfterRealExampleOnly',
+    'AfterRealEmbeddedExampleOnly',
+    'InlineExampleBeforeRecoveryOnly',
+    'MultilineCommentExampleOnly',
+    'MultilineCommentEmbeddedOnly',
+    'MultilineSourceBareExampleOnly',
+    'MultilineQuotedExampleOnly',
+    'UnusedExampleControlOnly',
+  ];
+  const genuineTypes = [
+    'RealBeforeProseOnly',
+    'RealAfterProseOnly',
+    'RealBeforeExampleOnly',
+    'AfterDeprecatedOnly',
+    'BeforeDeprecatedOnly',
+    'AfterInterleavedDeprecatedOnly',
+    'AfterExternalOnly',
+    'AfterQuotedDeprecatedOnly',
+    'BeforeInterpolatedBacktickOnly',
+    'AfterInterpolatedBacktickOnly',
+    'AfterExampleParamOnly',
+    'AfterExampleReturnsOnly',
+    'AfterExampleBareOnly',
+    'AfterExampleAugmentsOnly',
+  ];
+  const imports = [...exampleAndProseOnly, ...genuineTypes].map(
+    (name) => `import { Foo as ${name} } from './dep.js';`,
+  );
+  const comments = [
+    '/** @example @type {UnquotedInlineExampleOnly} @returns {UnquotedEmbeddedExampleOnly} */',
+    '/** @example "@type {QuotedInlineExampleOnly} @returns {QuotedEmbeddedExampleOnly}" */',
+    '/** @example `@type {BacktickedInlineExampleOnly} @implements BacktickedEmbeddedExampleOnly` */',
+    '/** @example call("@type {NestedQuotedExampleOnly}", `@returns {NestedBacktickedExampleOnly}`) */',
+    '/** @example // @type {SingleLineCommentExampleOnly} @implements SingleLineBareExampleOnly */',
+    '/** @example @implements UnquotedBareExampleOnly @type {UnquotedBareEmbeddedExampleOnly} */',
+    '/** @deprecated "@type {DeprecatedQuotedOnly}" `@returns {DeprecatedBacktickedOnly}` */',
+    '/** @deprecated description {DeprecatedBracedOnly} @returns {AfterDeprecatedOnly} */',
+    '/** @param {BeforeDeprecatedOnly} input @deprecated old {InterleavedDeprecatedBracedOnly} @returns {AfterInterleavedDeprecatedOnly} */',
+    '/** @external { @type {ExternalNestedFakeOnly} } @returns {AfterExternalOnly} */',
+    '/** @deprecated "@returns {DeprecatedQuotedSiblingFakeOnly}" @returns {AfterQuotedDeprecatedOnly} */',
+    '/** @param {BeforeInterpolatedBacktickOnly} x `${flag ? ` @returns {InterpolatedBacktickProseFakeOnly} ` : `x`}` @returns {AfterInterpolatedBacktickOnly} */',
+    '/** Contact user@type {EmailProseOnly} */',
+    '/** @param {RealBeforeProseOnly} input "@type {QuotedAfterRealOnly}" `@throws {BacktickedAfterRealOnly}` user@returns {EmailAfterRealOnly} @returns {RealAfterProseOnly} */',
+    '/** @returns {RealBeforeExampleOnly} @example @type {AfterRealExampleOnly} @throws {AfterRealEmbeddedExampleOnly} */',
+    '/**\n * @example @type {InlineExampleBeforeRecoveryOnly}\n * // @type {MultilineCommentExampleOnly} @returns {MultilineCommentEmbeddedOnly}\n * source @implements MultilineSourceBareExampleOnly\n * "@throws {MultilineQuotedExampleOnly}"\n * @param {AfterExampleParamOnly} input @returns {AfterExampleReturnsOnly}\n * @implements AfterExampleBareOnly @augments AfterExampleAugmentsOnly\n */',
+  ];
+  const fixturePath = writeFixture(
+    'jsdoc-inline-example-lookalikes.js',
+    `${imports.join('\n')}\n${comments.join('\n')}\nconsole.log('done');\n`,
+  );
+
+  runOxlintFix(fixturePath);
+  const fixed = fs.readFileSync(fixturePath, 'utf8');
+
+  for (const name of exampleAndProseOnly) {
+    assert.ok(!fixed.includes(`import { Foo as ${name} }`), name);
+  }
+  for (const name of genuineTypes) {
+    assert.ok(fixed.includes(`import { Foo as ${name} }`), name);
+  }
+});
+
 test('distinguishes type-bearing JSDoc tags from prose and documentation tags', () => {
   const typeBearingTags = [
     'arg',
