@@ -35,6 +35,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          legacy_pr="$(bash ./bin/find-legacy-release-pr)"
+          if [[ -n "${legacy_pr}" ]]; then
+            echo "Waiting for legacy release PR #${legacy_pr} before promoting next directly."
+            exit 0
+          fi
+
           if git diff --quiet origin/main HEAD --; then
             echo 'No Stainless changes to promote.'
             exit 0
@@ -65,12 +71,12 @@ jobs:
             promotion_range='origin/main..HEAD'
           fi
 
-          commit_subjects="$(git log "${promotion_range}" --format='%s')"
-          commit_messages="$(git log "${promotion_range}" --format='%s%n%b')"
+          commit_subjects="$(git log "${promotion_range}" --not origin/main --format='%s')"
+          commit_messages="$(git log "${promotion_range}" --not origin/main --format='%s%n%b')"
           conventional_commit='^(feat|fix|perf|revert|chore|docs|style|refactor|test|build|ci)(\([^)]*\))?!?:'
           if ! grep -Eq "${conventional_commit}" <<< "${commit_subjects}" && \
             ! grep -Eq '^BREAKING[ -]CHANGE:' <<< "${commit_messages}"; then
-            echo "No releasable commits in ${promotion_range}; skipping promotion."
+            echo "No unreleased conventional commits in ${promotion_range}; skipping promotion."
             exit 0
           fi
 
@@ -177,14 +183,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          legacy_pr="$(
-            gh pr list \
-              --repo "${GITHUB_REPOSITORY}" \
-              --state open \
-              --head 'release-please--branches--main--changes--next--components--openai' \
-              --json number \
-              --jq '.[0].number // empty'
-          )"
+          legacy_pr="$(bash ./bin/find-legacy-release-pr)"
           echo "legacy_pr=${legacy_pr}" >> "${GITHUB_OUTPUT}"
           if [[ -n "${legacy_pr}" ]]; then
             echo "Waiting for legacy release PR #${legacy_pr} to merge or close before cutover."
