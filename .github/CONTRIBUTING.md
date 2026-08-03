@@ -160,6 +160,22 @@ $ pnpm fix
 Changes made to this repository via the automated release PR pipeline should publish to npm automatically. If
 the changes aren't made through the automated pipeline, you may want to make releases manually.
 
+### Override an automated release version
+
+Do not edit an automated release PR title to change its version. The title must match the version generated in
+`package.json`, and CI rejects mismatches so that the package, changelog, tag, and release stay consistent.
+
+To select a different version, merge a conventional commit with a `Release-As: <version>` footer into `main`.
+For example:
+
+```text
+chore: set the next release version
+
+Release-As: 7.4.0
+```
+
+Release Please will then regenerate the release PR files and title with that version.
+
 ### Publish with a GitHub workflow
 
 You can release to package managers by using [the `Publish NPM` GitHub action](https://www.github.com/openai/openai-node/actions/workflows/publish-npm.yml). This requires a setup organization or repository secret to be set up.

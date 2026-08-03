@@ -56,7 +56,7 @@
     "oxfmt": "0.60.0",
     "oxlint": "1.75.0",
     "p-all": "^3.0.0",
-    "publint": "^0.2.12",
+    "publint": "^0.3.22",
     "signal-exit": "^3.0.7",
     "superstruct": "^1.0.4",
     "ts-jest": "^29.1.0",
