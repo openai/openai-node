@@ -33,6 +33,9 @@ echo "==> Running oxfmt --check"
 echo "==> Running oxlint"
 ./node_modules/.bin/oxlint .
 
+echo "==> Running Oxlint regressions"
+node --test scripts/oxlint-regression.test.cjs
+
 echo "==> Building"
 ./scripts/build
 

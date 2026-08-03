@@ -2,10 +2,21 @@
  * Import-only unused-binding checks for Oxlint, without ESLint dependencies.
  *
  * Stainless-generated sources sometimes import both a namespace and the same
- * member from one module. Preserve that existing convention when the member
- * is accessed through the namespace, even if the direct binding is unused.
+ * unaliased member from one module. Preserve that existing convention when the
+ * member is accessed through the namespace, even if the direct binding is
+ * unused.
  */
-function isUsedThroughSiblingNamespace(sourceCode, importDeclaration, name) {
+function isUsedThroughSiblingNamespace(sourceCode, importDeclaration, specifier) {
+  if (
+    specifier.type !== 'ImportSpecifier' ||
+    specifier.imported.type !== 'Identifier' ||
+    specifier.imported.name !== specifier.local.name
+  ) {
+    return false;
+  }
+
+  const name = specifier.imported.name;
+
   for (const declaration of sourceCode.ast.body) {
     if (
       declaration.type !== 'ImportDeclaration' ||
@@ -44,42 +55,66 @@ function isUsedThroughSiblingNamespace(sourceCode, importDeclaration, name) {
   return false;
 }
 
-function fixUnusedImport(sourceCode, declaration, specifier, fixer) {
-  if (declaration.specifiers.length === 1) {
+const JSDOC_TYPE_TAG = /@(?:type|typedef|param|returns?)\s*\{([^}]*)\}/g;
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function isUsedThroughJSDoc(sourceCode, name) {
+  const identifier = new RegExp(`(^|[^A-Za-z0-9_$])${escapeRegExp(name)}(?=$|[^A-Za-z0-9_$])`);
+
+  return sourceCode.getAllComments().some((comment) => {
+    if (comment.type !== 'Block' || !comment.value.startsWith('*')) {
+      return false;
+    }
+
+    return Array.from(comment.value.matchAll(JSDOC_TYPE_TAG), (match) => match[1]).some((typeExpression) =>
+      identifier.test(typeExpression),
+    );
+  });
+}
+
+function fixUnusedImports(sourceCode, declaration, unusedSpecifiers, fixer) {
+  const unused = new Set(unusedSpecifiers);
+  const retainedSpecifiers = declaration.specifiers.filter((specifier) => !unused.has(specifier));
+
+  if (retainedSpecifiers.length === 0) {
     return fixer.remove(declaration);
   }
 
-  const namedSpecifiers = declaration.specifiers.filter((candidate) => candidate.type === 'ImportSpecifier');
+  const defaultSpecifier = retainedSpecifiers.find(
+    (specifier) => specifier.type === 'ImportDefaultSpecifier',
+  );
+  const namespaceSpecifier = retainedSpecifiers.find(
+    (specifier) => specifier.type === 'ImportNamespaceSpecifier',
+  );
+  const namedSpecifiers = retainedSpecifiers.filter((specifier) => specifier.type === 'ImportSpecifier');
+  const bindings = [];
 
-  if (specifier.type === 'ImportSpecifier' && namedSpecifiers.length === 1) {
-    const openingBrace = sourceCode.getTokenBefore(specifier, {
-      filter: (token) => token.value === '{',
-    });
-    const precedingComma = openingBrace
-      ? sourceCode.getTokenBefore(openingBrace, {
-          filter: (token) => token.value === ',',
-        })
-      : undefined;
-    const closingBrace = sourceCode.getTokenAfter(specifier, {
-      filter: (token) => token.value === '}',
-    });
-
-    if (precedingComma && closingBrace) {
-      return fixer.removeRange([precedingComma.range[0], closingBrace.range[1]]);
-    }
+  if (defaultSpecifier) {
+    bindings.push(sourceCode.getText(defaultSpecifier));
   }
 
-  const nextToken = sourceCode.getTokenAfter(specifier);
-  if (nextToken?.value === ',') {
-    return fixer.removeRange([specifier.range[0], nextToken.range[1]]);
+  if (namespaceSpecifier) {
+    bindings.push(sourceCode.getText(namespaceSpecifier));
+  } else if (namedSpecifiers.length > 0) {
+    bindings.push(`{ ${namedSpecifiers.map((specifier) => sourceCode.getText(specifier)).join(', ')} }`);
   }
 
-  const previousToken = sourceCode.getTokenBefore(specifier);
-  if (previousToken?.value === ',') {
-    return fixer.removeRange([previousToken.range[0], specifier.range[1]]);
+  const importToken = sourceCode.getFirstToken(declaration);
+  const fromToken = sourceCode.getTokenBefore(declaration.source);
+  let bindingStart = importToken ? sourceCode.getTokenAfter(importToken) : undefined;
+
+  if (declaration.importKind === 'type' && bindingStart?.value === 'type') {
+    bindingStart = sourceCode.getTokenAfter(bindingStart);
   }
 
-  return null;
+  if (!bindingStart || fromToken?.value !== 'from') {
+    return null;
+  }
+
+  return fixer.replaceTextRange([bindingStart.range[0], fromToken.range[0]], `${bindings.join(', ')} `);
 }
 
 const noUnusedImports = {
@@ -88,7 +123,7 @@ const noUnusedImports = {
     fixable: 'code',
     schema: [],
     messages: {
-      unused: "'{{name}}' is imported but never used.",
+      unused: 'Imported bindings {{names}} are never used.',
     },
   },
 
@@ -97,11 +132,10 @@ const noUnusedImports = {
 
     return {
       ImportDeclaration(declaration) {
+        const unusedSpecifiers = [];
+
         for (const variable of sourceCode.getDeclaredVariables(declaration)) {
-          if (
-            variable.references.length > 0 ||
-            isUsedThroughSiblingNamespace(sourceCode, declaration, variable.name)
-          ) {
+          if (variable.references.length > 0 || isUsedThroughJSDoc(sourceCode, variable.name)) {
             continue;
           }
 
@@ -112,11 +146,19 @@ const noUnusedImports = {
             continue;
           }
 
+          if (isUsedThroughSiblingNamespace(sourceCode, declaration, specifier)) {
+            continue;
+          }
+
+          unusedSpecifiers.push(specifier);
+        }
+
+        if (unusedSpecifiers.length > 0) {
           context.report({
-            node: specifier.local,
+            node: declaration,
             messageId: 'unused',
-            data: { name: variable.name },
-            fix: (fixer) => fixUnusedImport(sourceCode, declaration, specifier, fixer),
+            data: { names: unusedSpecifiers.map((specifier) => `'${specifier.local.name}'`).join(', ') },
+            fix: (fixer) => fixUnusedImports(sourceCode, declaration, unusedSpecifiers, fixer),
           });
         }
       },

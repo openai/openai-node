@@ -25,9 +25,9 @@ if [ ! -f "$FILE_LIST" ]; then
 fi
 
 echo "==> Running oxlint --fix"
-LINT_FILES="$(grep -E '\.(ts|mts|cts|js|mjs|cjs)$' "$FILE_LIST" || true)"
+LINT_FILES="$(grep -E '\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$' "$FILE_LIST" || true)"
 if [ -n "$LINT_FILES" ]; then
-   echo "$LINT_FILES" | xargs ./node_modules/.bin/oxlint --fix
+   echo "$LINT_FILES" | xargs ./node_modules/.bin/oxlint --fix --no-error-on-unmatched-pattern
 fi
 
 echo "==> Running oxfmt --write"
