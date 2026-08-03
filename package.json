@@ -51,7 +51,7 @@
     "deep-object-diff": "^1.1.9",
     "eslint": "^9.39.1",
     "eslint-plugin-unused-imports": "^4.1.4",
-    "execa": "^5.1.1",
+    "execa": "^10.0.0",
     "fast-glob": "^3.3.2",
     "fast-check": "^3.22.0",
     "iconv-lite": "^0.6.3",
