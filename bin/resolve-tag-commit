@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+: "${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required}"
+
+TAG_NAME="${1:?tag name is required}"
+TAG_REF="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG_NAME}")"
+OBJECT_TYPE="$(jq -r -e '.object.type' <<< "$TAG_REF")"
+OBJECT_SHA="$(jq -r -e '.object.sha' <<< "$TAG_REF")"
+
+while [[ "$OBJECT_TYPE" == 'tag' ]]; do
+  TAG_OBJECT="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${OBJECT_SHA}")"
+  OBJECT_TYPE="$(jq -r -e '.object.type' <<< "$TAG_OBJECT")"
+  OBJECT_SHA="$(jq -r -e '.object.sha' <<< "$TAG_OBJECT")"
+done
+
+if [[ "$OBJECT_TYPE" != 'commit' ]]; then
+  echo "ERROR: ${TAG_NAME} resolves to a ${OBJECT_TYPE}, not a commit" >&2
+  exit 1
+fi
+
+echo "$OBJECT_SHA"
