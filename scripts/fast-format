@@ -32,5 +32,5 @@ fi
 
 echo "==> Running oxfmt --write"
 if [ -s "$FILE_LIST" ]; then
-   xargs ./node_modules/.bin/oxfmt --no-error-on-unmatched-pattern < "$FILE_LIST"
+   xargs ./node_modules/.bin/oxfmt --write --no-error-on-unmatched-pattern < "$FILE_LIST"
 fi
