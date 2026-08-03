@@ -440,28 +440,9 @@ test('retains compiler-recognized grouped keyof operands and newline-separated m
   for (const [name, names, comment] of cases) {
     const source = `// @ts-check\nimport { ${names.join(', ')} } from './type-dep.js';\n${comment}\nconst value = undefined;\n`;
     const fixturePath = writeFixture(`compiler-${name}.js`, source);
-    const assertNoMissingType = () => {
-      const program = ts.createProgram([fixturePath], {
-        allowJs: true,
-        checkJs: true,
-        noEmit: true,
-        skipLibCheck: true,
-        types: [],
-      });
-      const missing = ts.getPreEmitDiagnostics(program).filter((diagnostic) => diagnostic.code === 2304);
-      assert.deepEqual(
-        missing,
-        [],
-        `${name}: ${ts.formatDiagnostics(missing, {
-          getCanonicalFileName: (fileName) => fileName,
-          getCurrentDirectory: () => repoRoot,
-          getNewLine: () => '\n',
-        })}`,
-      );
-    };
-    assertNoMissingType();
+    assertNoMissingJSDocTypes(fixturePath, `${name}: before fix`);
     runOxlintFix(fixturePath);
-    assertNoMissingType();
+    assertNoMissingJSDocTypes(fixturePath, `${name}: after fix`);
     const imports = fs
       .readFileSync(fixturePath, 'utf8')
       .split(/\r?\n/u)
@@ -472,6 +453,49 @@ test('retains compiler-recognized grouped keyof operands and newline-separated m
         `${name}: ${binding}`,
       );
     }
+  }
+});
+
+test('matches compiler bindings for successive JSDoc generic defaults and constraints', () => {
+  writeFixture('generic-side-effect.mjs', 'globalThis.genericImportRan = true; export class Foo {}\n');
+  const cases = [
+    ['earlier-default', '<T, U = T>(value: U) => U', [], 'TypeParameter'],
+    ['earlier-constraint', '<T, U extends T>(value: U) => U', [], 'TypeParameter'],
+    ['imported-default', '<T, U = Ref>(value: U) => U', ['Ref'], 'ImportSpecifier'],
+    ['imported-constraint', '<T, U extends Ref>(value: U) => U', ['Ref'], 'ImportSpecifier'],
+    ['same-default', '<T = T>(value: T) => T', ['T'], 'TypeParameter'],
+    ['later-default', '<T = U, U = Ref>(value: T) => T', ['U', 'Ref'], 'TypeParameter'],
+  ];
+  for (const [name, type, retained, declaration] of cases) {
+    const source = `// @ts-check\nimport { Foo as T, Foo as U, Foo as Ref } from './generic-side-effect.mjs';\n/** @type {${type}} */\nexport let value;\nconsole.log(globalThis.genericImportRan ?? false);\n`;
+    const fixturePath = writeFixture(`compiler-generic-${name}.mjs`, source);
+    const program = ts.createProgram([fixturePath], {
+      allowJs: true,
+      checkJs: true,
+      noEmit: true,
+      types: [],
+    });
+    const statement = program.getSourceFile(fixturePath).statements.find((node) => node.jsDoc?.length);
+    const signature = statement.jsDoc[0].tags[0].typeExpression.type;
+    assert.ok(ts.isFunctionTypeNode(signature), name);
+    const parameter = signature.typeParameters.find((node) => node.default || node.constraint);
+    const reference = (parameter.default ?? parameter.constraint).typeName;
+    assert.equal(
+      ts.SyntaxKind[program.getTypeChecker().getSymbolAtLocation(reference).declarations[0].kind],
+      declaration,
+      name,
+    );
+    assertNoMissingJSDocTypes(fixturePath, `${name}: before fix`);
+    runOxlintFix(fixturePath);
+    assertNoMissingJSDocTypes(fixturePath, `${name}: after fix`);
+    const fixed = fs.readFileSync(fixturePath, 'utf8');
+    for (const binding of ['T', 'U', 'Ref'])
+      assert.equal(
+        new RegExp(`\\bFoo as ${binding}\\b`, 'u').test(fixed),
+        retained.includes(binding),
+        `${name}: ${binding}`,
+      );
+    assert.equal(run(process.execPath, [fixturePath]).stdout.trim(), String(retained.length > 0), name);
   }
 });
 

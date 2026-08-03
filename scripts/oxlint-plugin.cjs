@@ -146,8 +146,8 @@ function collectTypeReferences(node, bindings, used) {
   if (node.typeParameters?.length) {
     const innerBindings = new Set(bindings);
     for (const parameter of node.typeParameters) {
-      collectTypeReferences(parameter.constraint, bindings, used);
-      collectTypeReferences(parameter.default, bindings, used);
+      collectTypeReferences(parameter.constraint, innerBindings, used);
+      collectTypeReferences(parameter.default, innerBindings, used);
       innerBindings.add(ts.unescapeLeadingUnderscores(parameter.name.escapedText));
     }
     ts.forEachChild(node, (child) => {
