@@ -87,6 +87,7 @@ jobs:
       cancel-in-progress: true
     runs-on: ubuntu-latest
     permissions:
+      actions: read
       contents: read
       pull-requests: write
 
