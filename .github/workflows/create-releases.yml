@@ -310,7 +310,7 @@ jobs:
     needs: publication-check
     runs-on: ubuntu-latest
     concurrency:
-      group: publish-npm
+      group: publish-npm-${{ needs.publication-check.outputs.release_sha }}
       cancel-in-progress: false
     environment: publish
     permissions:
