@@ -113,6 +113,13 @@ export class ResponseStream<ParsedT = null>
       }
     };
 
+    if (event.type === 'error') {
+      // The API reports failures with an `error` event instead of a non-2xx response, so
+      // convert it before snapshot accumulation and event emission. Throwing hands it to
+      // `EventStream`'s error path, which rejects `finalResponse()` and async iteration.
+      throw new APIError(undefined, event, event.message, undefined);
+    }
+
     const response = accumulateResponse(event, this.#currentResponseSnapshot);
     this.#currentResponseSnapshot = response;
     maybeEmit('event', event);
@@ -151,12 +158,6 @@ export class ResponseStream<ParsedT = null>
           });
         }
         break;
-      }
-      case 'error': {
-        // The API reports failures with an `error` event instead of a non-2xx response, so
-        // convert it here. Throwing hands it to `EventStream`'s error path, which rejects
-        // `finalResponse()` and notifies `error` listeners with the converted error.
-        throw new APIError(undefined, event, event.message, undefined);
       }
       default:
         maybeEmit(event.type, event);
@@ -233,62 +234,83 @@ export class ResponseStream<ParsedT = null>
   }
 
   [Symbol.asyncIterator](this: ResponseStream<ParsedT>): AsyncIterator<ResponseStreamEvent> {
-    const pushQueue: ResponseStreamEvent[] = [];
-    const readQueue: {
-      resolve: (event: ResponseStreamEvent | undefined) => void;
-      reject: (err: unknown) => void;
-    }[] = [];
-    let done = false;
+    type Result = IteratorResult<ResponseStreamEvent>;
+    type Reader = {
+      resolve: (result: Result) => void;
+      reject: (error: OpenAIError) => void;
+    };
 
-    this.on('event', (event) => {
+    const pushQueue: ResponseStreamEvent[] = [];
+    const readQueue: Reader[] = [];
+    let ended = this.ended;
+    let failure: OpenAIError | undefined;
+    let failureDelivered = false;
+
+    const doneResult = (): Result => ({ value: undefined as never, done: true });
+    const finishReaders = () => {
+      while (readQueue.length) {
+        readQueue.shift()!.resolve(doneResult());
+      }
+    };
+    const rejectReader = () => {
+      if (!failure || failureDelivered || !readQueue.length) return;
+      failureDelivered = true;
+      readQueue.shift()!.reject(failure);
+    };
+    const cleanup = () => {
+      this.off('event', onEvent);
+      this.off('end', onEnd);
+      this.off('abort', onFailure);
+      this.off('error', onFailure);
+    };
+    const onEvent = (event: ResponseStreamEvent) => {
+      if (ended) return;
       const reader = readQueue.shift();
       if (reader) {
-        reader.resolve(event);
+        reader.resolve({ value: event, done: false });
       } else {
         pushQueue.push(event);
       }
-    });
-
-    this.on('end', () => {
-      done = true;
-      for (const reader of readQueue) {
-        reader.resolve(undefined);
+    };
+    const onFailure = (error: OpenAIError) => {
+      failure = error;
+      if (!pushQueue.length) rejectReader();
+    };
+    const onEnd = () => {
+      ended = true;
+      cleanup();
+      if (!pushQueue.length) {
+        rejectReader();
+        finishReaders();
       }
-      readQueue.length = 0;
-    });
+    };
 
-    this.on('abort', (err) => {
-      done = true;
-      for (const reader of readQueue) {
-        reader.reject(err);
-      }
-      readQueue.length = 0;
-    });
-
-    this.on('error', (err) => {
-      done = true;
-      for (const reader of readQueue) {
-        reader.reject(err);
-      }
-      readQueue.length = 0;
-    });
+    if (!ended) {
+      this.on('event', onEvent);
+      this.on('end', onEnd);
+      this.on('abort', onFailure);
+      this.on('error', onFailure);
+    }
 
     return {
-      next: async (): Promise<IteratorResult<ResponseStreamEvent>> => {
-        if (!pushQueue.length) {
-          if (done) {
-            return { value: undefined, done: true };
-          }
-          return new Promise<ResponseStreamEvent | undefined>((resolve, reject) =>
-            readQueue.push({ resolve, reject }),
-          ).then((event) => (event ? { value: event, done: false } : { value: undefined, done: true }));
+      next: () => {
+        const value = pushQueue.shift();
+        if (value) return Promise.resolve({ value, done: false });
+
+        if (failure && !failureDelivered) {
+          failureDelivered = true;
+          return Promise.reject(failure);
         }
-        const event = pushQueue.shift()!;
-        return { value: event, done: false };
+
+        if (ended) return Promise.resolve(doneResult());
+
+        return new Promise<Result>((resolve, reject) => {
+          readQueue.push({ resolve, reject });
+        });
       },
-      return: async () => {
+      return: () => {
         this.abort();
-        return { value: undefined, done: true };
+        return Promise.resolve(doneResult());
       },
     };
   }

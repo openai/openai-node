@@ -190,6 +190,87 @@ describe('.stream()', () => {
     expect(listenerErrors[0]).toBe(rejection);
   });
 
+  it('converts an initial error event into an APIError', async () => {
+    const event = {
+      type: 'error',
+      sequence_number: 0,
+      code: 'server_error',
+      message: 'The server had an error before creating a response.',
+      param: 'input',
+    } satisfies ResponseStreamEvent;
+    const stream = ResponseStream.fromReadableStream(readableStreamFromEvents([event]));
+
+    const rejection = await stream.finalResponse().then(
+      () => {
+        throw new Error('expected finalResponse() to reject');
+      },
+      (error: unknown) => error,
+    );
+
+    expect(rejection).toBeInstanceOf(APIError);
+    expect(rejection).toMatchObject({
+      message: 'The server had an error before creating a response.',
+      code: 'server_error',
+      param: 'input',
+    });
+  });
+
+  it('rejects async iteration when an error event arrives with no pending read', async () => {
+    const encoder = new TextEncoder();
+    let controller!: ReadableStreamDefaultController<Uint8Array>;
+    const readable = new ReadableStream<Uint8Array>({
+      start(readableController) {
+        controller = readableController;
+      },
+    });
+    const created = {
+      type: 'response.created',
+      sequence_number: 0,
+      response: makeResponse(),
+    } satisfies ResponseStreamEvent;
+    const error = {
+      type: 'error',
+      sequence_number: 1,
+      code: 'server_error',
+      message: 'The server had an error while streaming a response.',
+      param: null,
+    } satisfies ResponseStreamEvent;
+    let resolveCreatedRead!: () => void;
+    const createdRead = new Promise<void>((resolve) => {
+      resolveCreatedRead = resolve;
+    });
+    let releaseCreatedRead!: () => void;
+    const createdReadReleased = new Promise<void>((resolve) => {
+      releaseCreatedRead = resolve;
+    });
+    const stream = ResponseStream.fromReadableStream(readable);
+    const errorEmitted = stream.emitted('error');
+    const received: ResponseStreamEvent[] = [];
+    const consuming = (async () => {
+      for await (const event of stream) {
+        received.push(event);
+        resolveCreatedRead();
+        await createdReadReleased;
+      }
+    })();
+
+    controller.enqueue(encoder.encode(JSON.stringify(created) + '\n'));
+    await createdRead;
+    controller.enqueue(encoder.encode(JSON.stringify(error) + '\n'));
+    controller.close();
+    const emittedError = await errorEmitted;
+    releaseCreatedRead();
+
+    await expect(consuming).rejects.toBe(emittedError);
+    expect(emittedError).toBeInstanceOf(APIError);
+    expect(emittedError).toMatchObject({
+      message: 'The server had an error while streaming a response.',
+      code: 'server_error',
+      param: null,
+    });
+    expect(received).toEqual([created]);
+  });
+
   it('cancels a stalled readable stream when aborted', async () => {
     const encoder = new TextEncoder();
     const created = {
