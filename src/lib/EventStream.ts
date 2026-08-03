@@ -180,17 +180,50 @@ export class EventStream<EventTypes extends BaseEvents> {
     event: Event,
   ): AsyncIterableIterator<EventParameters<EventTypes, Event>> {
     type Parameters = EventParameters<EventTypes, Event>;
-    type Result = IteratorResult<Parameters>;
+    return this._createIterator<Parameters>(
+      (push) => {
+        const onEvent = (...args: Parameters) => push(args);
+        this.on(event, onEvent as EventListener<EventTypes, Event>);
+        return () => this.off(event, onEvent as EventListener<EventTypes, Event>);
+      },
+      {
+        // When iterating the 'error' or 'abort' event itself, yield it as a
+        // value instead of rejecting the iterator.
+        rejectOnError: event !== 'error',
+        rejectOnAbort: event !== 'abort',
+      },
+    );
+  }
+
+  /**
+   * Shared buffered async-iterator adapter over this stream's events.
+   *
+   * `attach` registers the producer listener(s) with the given `push` and
+   * returns a cleanup function that removes them. Termination is handled
+   * here: the iterator ends when the stream ends, listeners are removed on
+   * end/return, and a terminal error is retained until buffered values have
+   * drained so it is surfaced even when no reader was waiting when it fired.
+   */
+  protected _createIterator<T>(
+    attach: (push: (value: T) => void) => () => void,
+    {
+      rejectOnError = true,
+      rejectOnAbort = true,
+      onReturn,
+    }: { rejectOnError?: boolean; rejectOnAbort?: boolean; onReturn?: () => void } = {},
+  ): AsyncIterableIterator<T> {
+    type Result = IteratorResult<T>;
     type Reader = {
       resolve: (result: Result) => void;
       reject: (error: OpenAIError) => void;
     };
 
-    const pushQueue: Parameters[] = [];
+    const pushQueue: T[] = [];
     const readQueue: Reader[] = [];
     let ended = this.ended;
     let failure: OpenAIError | undefined;
     let failureDelivered = false;
+    let detach: () => void = () => {};
 
     const doneResult = (): Result => ({ value: undefined as never, done: true });
     const finishReaders = () => {
@@ -204,18 +237,18 @@ export class EventStream<EventTypes extends BaseEvents> {
       readQueue.shift()!.reject(failure);
     };
     const cleanup = () => {
-      this.off(event, onEvent as EventListener<EventTypes, Event>);
+      detach();
       this.off('end', onEnd);
-      if (event !== 'error') this.off('error', onFailure);
-      if (event !== 'abort') this.off('abort', onFailure);
+      if (rejectOnError) this.off('error', onFailure);
+      if (rejectOnAbort) this.off('abort', onFailure);
     };
-    const onEvent = (...args: Parameters) => {
+    const push = (value: T) => {
       if (ended) return;
       const reader = readQueue.shift();
       if (reader) {
-        reader.resolve({ value: args, done: false });
+        reader.resolve({ value, done: false });
       } else {
-        pushQueue.push(args);
+        pushQueue.push(value);
       }
     };
     const onFailure = (error: OpenAIError) => {
@@ -232,16 +265,17 @@ export class EventStream<EventTypes extends BaseEvents> {
     };
 
     if (!ended) {
-      this.on(event, onEvent as EventListener<EventTypes, Event>);
+      detach = attach(push);
       this.on('end', onEnd);
-      if (event !== 'error') this.on('error', onFailure);
-      if (event !== 'abort') this.on('abort', onFailure);
+      if (rejectOnError) this.on('error', onFailure);
+      if (rejectOnAbort) this.on('abort', onFailure);
     }
 
     return {
-      next: () => {
-        const value = pushQueue.shift();
-        if (value) return Promise.resolve({ value, done: false });
+      next: (): Promise<Result> => {
+        if (pushQueue.length) {
+          return Promise.resolve({ value: pushQueue.shift()!, done: false });
+        }
 
         if (failure && !failureDelivered) {
           failureDelivered = true;
@@ -259,6 +293,14 @@ export class EventStream<EventTypes extends BaseEvents> {
         pushQueue.length = 0;
         cleanup();
         finishReaders();
+        if (onReturn) {
+          // The consumer explicitly ended iteration, so any failure the
+          // onReturn callback triggers (e.g. aborting the stream) is
+          // self-inflicted; mark the stream's terminal promise as handled so
+          // it does not surface as an unhandled rejection.
+          this.done().catch(() => {});
+          onReturn();
+        }
         return Promise.resolve(doneResult());
       },
       [Symbol.asyncIterator]() {

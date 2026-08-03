@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import OpenAI, { APIUserAbortError } from 'openai';
+import OpenAI, { APIUserAbortError, OpenAIError } from 'openai';
 import { ReadableStreamFrom } from 'openai/internal/shims';
 import { ResponseStream } from 'openai/lib/responses/ResponseStream';
 import type { Response, ResponseStreamEvent } from 'openai/resources/responses/responses';
@@ -285,8 +285,9 @@ describe('.stream()', () => {
     // buffer in the iterator's internal queue instead of rejecting a pending
     // reader.
     const iterator = stream[Symbol.asyncIterator]();
-    // Let the producer drain the readable and hit the error before we read.
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    // Wait for the stream's terminal signal so the events and the error have
+    // definitely been emitted before we start reading.
+    await stream.done().catch(() => {});
 
     const collected: ResponseStreamEvent[] = [];
     let caught: unknown = null;
@@ -300,7 +301,8 @@ describe('.stream()', () => {
     }
 
     expect(collected).toHaveLength(validEvents.length);
-    expect(caught).toBeInstanceOf(Error);
+    expect(caught).toBeInstanceOf(OpenAIError);
+    expect((caught as OpenAIError).message).toBe('missing output at index 99');
   });
 });
 

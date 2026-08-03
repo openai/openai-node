@@ -69,89 +69,39 @@ export class ChatCompletionStreamingRunner<ParsedT = null>
   }
 
   override toReadableStream(): ReadableStream {
-    const pushQueue: ChatCompletionReadableStreamItem[] = [];
-    const readQueue: {
-      resolve: (event: ChatCompletionReadableStreamItem | undefined) => void;
-      reject: (err: unknown) => void;
-    }[] = [];
-    let done = false;
     let lastChunk: ChatCompletionChunk | undefined;
     let toolCallIds: string[] | undefined;
 
-    const pushEvent = (event: ChatCompletionReadableStreamItem) => {
-      const reader = readQueue.shift();
-      if (reader) {
-        reader.resolve(event);
-      } else {
-        pushQueue.push(event);
-      }
-    };
-
-    this.on('chunk', (chunk) => {
-      lastChunk = chunk;
-      pushEvent(chunk);
-    });
-    this.on('message', (message: ChatCompletionMessageParam) => {
-      if (isAssistantMessage(message)) {
-        toolCallIds = message.tool_calls?.map((toolCall) => toolCall.id);
-        return;
-      }
-
-      if (isToolMessage(message)) {
-        if (!lastChunk) {
-          throw new OpenAIError('cannot serialize a tool message before receiving any chunks');
-        }
-        pushEvent(makeChatCompletionReadableStreamMessageChunk(lastChunk, message, toolCallIds));
-      }
-    });
-
-    this.on('end', () => {
-      done = true;
-      for (const reader of readQueue) {
-        reader.resolve(undefined);
-      }
-      readQueue.length = 0;
-    });
-
-    this.on('abort', (err) => {
-      done = true;
-      for (const reader of readQueue) {
-        reader.reject(err);
-      }
-      readQueue.length = 0;
-    });
-
-    this.on('error', (err) => {
-      done = true;
-      for (const reader of readQueue) {
-        reader.reject(err);
-      }
-      readQueue.length = 0;
-    });
-
-    const iterator = (): AsyncIterator<ChatCompletionReadableStreamItem> => ({
-      next: async (): Promise<IteratorResult<ChatCompletionReadableStreamItem>> => {
-        if (!pushQueue.length) {
-          if (done) {
-            return { value: undefined, done: true };
+    const iterator = this._createIterator<ChatCompletionReadableStreamItem>(
+      (push) => {
+        const onChunk = (chunk: ChatCompletionChunk) => {
+          lastChunk = chunk;
+          push(chunk);
+        };
+        const onMessage = (message: ChatCompletionMessageParam) => {
+          if (isAssistantMessage(message)) {
+            toolCallIds = message.tool_calls?.map((toolCall) => toolCall.id);
+            return;
           }
-          return new Promise<ChatCompletionReadableStreamItem | undefined>((resolve, reject) =>
-            readQueue.push({ resolve, reject }),
-          ).then((event) => (event ? { value: event, done: false } : { value: undefined, done: true }));
-        }
-        const event = pushQueue.shift();
-        if (!event) {
-          return { value: undefined, done: true };
-        }
-        return { value: event, done: false };
-      },
-      return: async () => {
-        this.abort();
-        return { value: undefined, done: true };
-      },
-    });
 
-    const stream = new Stream(iterator, this.controller);
+          if (isToolMessage(message)) {
+            if (!lastChunk) {
+              throw new OpenAIError('cannot serialize a tool message before receiving any chunks');
+            }
+            push(makeChatCompletionReadableStreamMessageChunk(lastChunk, message, toolCallIds));
+          }
+        };
+        this.on('chunk', onChunk);
+        this.on('message', onMessage);
+        return () => {
+          this.off('chunk', onChunk);
+          this.off('message', onMessage);
+        };
+      },
+      { onReturn: () => this.abort() },
+    );
+
+    const stream = new Stream(() => iterator, this.controller);
     return stream.toReadableStream();
   }
 

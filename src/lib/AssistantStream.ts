@@ -94,66 +94,15 @@ export class AssistantStream
   #currentRunStepSnapshot: Runs.RunStep | undefined;
 
   [Symbol.asyncIterator](): AsyncIterator<AssistantStreamEvent> {
-    const pushQueue: AssistantStreamEvent[] = [];
-    const readQueue: {
-      resolve: (chunk: AssistantStreamEvent | undefined) => void;
-      reject: (err: unknown) => void;
-    }[] = [];
-    let done = false;
-
-    //Catch all for passing along all events
-    this.on('event', (event) => {
-      const eventCopy = structuredClone(event);
-      const reader = readQueue.shift();
-      if (reader) {
-        reader.resolve(eventCopy);
-      } else {
-        pushQueue.push(eventCopy);
-      }
-    });
-
-    this.on('end', () => {
-      done = true;
-      for (const reader of readQueue) {
-        reader.resolve(undefined);
-      }
-      readQueue.length = 0;
-    });
-
-    this.on('abort', (err) => {
-      done = true;
-      for (const reader of readQueue) {
-        reader.reject(err);
-      }
-      readQueue.length = 0;
-    });
-
-    this.on('error', (err) => {
-      done = true;
-      for (const reader of readQueue) {
-        reader.reject(err);
-      }
-      readQueue.length = 0;
-    });
-
-    return {
-      next: async (): Promise<IteratorResult<AssistantStreamEvent>> => {
-        if (!pushQueue.length) {
-          if (done) {
-            return { value: undefined, done: true };
-          }
-          return new Promise<AssistantStreamEvent | undefined>((resolve, reject) =>
-            readQueue.push({ resolve, reject }),
-          ).then((chunk) => (chunk ? { value: chunk, done: false } : { value: undefined, done: true }));
-        }
-        const chunk = pushQueue.shift()!;
-        return { value: chunk, done: false };
+    return this._createIterator<AssistantStreamEvent>(
+      (push) => {
+        //Catch all for passing along all events
+        const onEvent = (event: AssistantStreamEvent) => push(structuredClone(event));
+        this.on('event', onEvent);
+        return () => this.off('event', onEvent);
       },
-      return: async () => {
-        this.abort();
-        return { value: undefined, done: true };
-      },
-    };
+      { onReturn: () => this.abort() },
+    );
   }
 
   static fromReadableStream(stream: ReadableStream): AssistantStream {

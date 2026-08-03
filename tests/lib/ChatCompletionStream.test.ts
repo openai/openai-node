@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import OpenAI from 'openai';
+import OpenAI, { OpenAIError } from 'openai';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import { ChatCompletionStream } from 'openai/lib/ChatCompletionStream';
 import { ChatCompletionStreamingRunner } from 'openai/lib/ChatCompletionStreamingRunner';
@@ -783,7 +783,9 @@ describe('.stream()', () => {
     // buffer in the iterator's internal queue instead of rejecting a pending
     // reader.
     const iterator = stream[Symbol.asyncIterator]();
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    // Wait for the stream's terminal signal so the chunks and the error have
+    // definitely been emitted before we start reading.
+    await stream.done().catch(() => {});
 
     const collected: OpenAI.Chat.ChatCompletionChunk[] = [];
     let caught: unknown = null;
@@ -797,6 +799,138 @@ describe('.stream()', () => {
     }
 
     expect(collected).toHaveLength(chunks.length);
-    expect(caught).toBeInstanceOf(Error);
+    expect(caught).toBeInstanceOf(OpenAIError);
+    expect((caught as OpenAIError).message).toBe('network boom');
+  });
+
+  it('rejects a pending read exactly once when the stream errors while a reader is waiting', async () => {
+    const chunks = [
+      {
+        id: 'chatcmpl-test',
+        object: 'chat.completion.chunk',
+        created: 1,
+        model: 'gpt-4',
+        choices: [{ index: 0, delta: { role: 'assistant', content: 'hel' }, finish_reason: null }],
+      },
+      {
+        id: 'chatcmpl-test',
+        object: 'chat.completion.chunk',
+        created: 1,
+        model: 'gpt-4',
+        choices: [{ index: 0, delta: { content: 'lo' }, finish_reason: null }],
+      },
+    ] as unknown as OpenAI.Chat.ChatCompletionChunk[];
+    const readable = new Stream(async function* () {
+      for (const chunk of chunks) yield chunk;
+      throw new Error('network boom');
+    }, new AbortController()).toReadableStream();
+
+    const stream = ChatCompletionStream.fromReadableStream(readable);
+    // Consume eagerly so each read is awaiting when its chunk (and finally the
+    // error) arrives, exercising the pending-reader path rather than the
+    // buffered path.
+    const iterator = stream[Symbol.asyncIterator]();
+
+    await expect(iterator.next()).resolves.toMatchObject({ done: false });
+    await expect(iterator.next()).resolves.toMatchObject({ done: false });
+    const caught = await iterator.next().then(
+      () => null,
+      (err) => err,
+    );
+    expect(caught).toBeInstanceOf(OpenAIError);
+    expect((caught as OpenAIError).message).toBe('network boom');
+    // The failure is delivered exactly once; iteration then ends cleanly.
+    await expect(iterator.next()).resolves.toEqual({ value: undefined, done: true });
+  });
+
+  it('aborts the stream when the consumer breaks out of iteration', async () => {
+    const readable = new Stream(async function* (): AsyncGenerator<OpenAI.Chat.ChatCompletionChunk> {
+      yield {
+        id: 'chatcmpl-test',
+        object: 'chat.completion.chunk',
+        created: 1,
+        model: 'gpt-4',
+        choices: [{ index: 0, delta: { role: 'assistant', content: 'hel' }, finish_reason: null }],
+      } as unknown as OpenAI.Chat.ChatCompletionChunk;
+      // Hang so the only way the consumer stops is by breaking out.
+      await new Promise(() => {});
+    }, new AbortController()).toReadableStream();
+
+    const stream = ChatCompletionStream.fromReadableStream(readable);
+    for await (const chunk of stream) {
+      void chunk;
+      break;
+    }
+
+    expect(stream.controller.signal.aborted).toBe(true);
+  });
+
+  it('returns done immediately when iterating after the stream has ended', async () => {
+    const chunks = [
+      {
+        id: 'chatcmpl-test',
+        object: 'chat.completion.chunk',
+        created: 1,
+        model: 'gpt-4',
+        choices: [{ index: 0, delta: { role: 'assistant', content: 'hello' }, finish_reason: 'stop' }],
+      },
+    ] as unknown as OpenAI.Chat.ChatCompletionChunk[];
+    const readable = new Stream(async function* () {
+      for (const chunk of chunks) yield chunk;
+    }, new AbortController()).toReadableStream();
+
+    const stream = ChatCompletionStream.fromReadableStream(readable);
+    await stream.done();
+
+    const iterator = stream[Symbol.asyncIterator]();
+    await expect(iterator.next()).resolves.toEqual({ value: undefined, done: true });
+  });
+
+  it('toReadableStream surfaces a mid-stream error when items are buffered before consumption', async () => {
+    const chunks = [
+      {
+        id: 'chatcmpl-test',
+        object: 'chat.completion.chunk',
+        created: 1,
+        model: 'gpt-4',
+        choices: [{ index: 0, delta: { role: 'assistant', content: 'hel' }, finish_reason: null }],
+      },
+      {
+        id: 'chatcmpl-test',
+        object: 'chat.completion.chunk',
+        created: 1,
+        model: 'gpt-4',
+        choices: [{ index: 0, delta: { content: 'lo' }, finish_reason: null }],
+      },
+    ] as unknown as OpenAI.Chat.ChatCompletionChunk[];
+    const readable = new Stream(async function* () {
+      for (const chunk of chunks) yield chunk;
+      throw new Error('network boom');
+    }, new AbortController()).toReadableStream();
+
+    const runner = ChatCompletionStreamingRunner.fromReadableStream(readable);
+    // Bridge to a ReadableStream immediately (registering its listeners) but
+    // do not read from it until the runner has already errored, so the chunks
+    // and the error land while nothing is pulling: they buffer in the
+    // adapter's internal queue instead of rejecting a pending reader.
+    const proxied = Stream.fromReadableStream<OpenAI.Chat.ChatCompletionChunk>(
+      runner.toReadableStream(),
+      new AbortController(),
+    );
+    await runner.done().catch(() => {});
+
+    const collected: OpenAI.Chat.ChatCompletionChunk[] = [];
+    let caught: unknown = null;
+    try {
+      for await (const chunk of proxied) {
+        collected.push(chunk);
+      }
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(collected).toHaveLength(chunks.length);
+    expect(caught).toBeInstanceOf(OpenAIError);
+    expect((caught as OpenAIError).message).toBe('network boom');
   });
 });

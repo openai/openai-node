@@ -661,71 +661,14 @@ export class ChatCompletionStream<ParsedT = null>
   }
 
   [Symbol.asyncIterator](this: ChatCompletionStream<ParsedT>): AsyncIterator<ChatCompletionChunk> {
-    const pushQueue: ChatCompletionChunk[] = [];
-    const readQueue: {
-      resolve: (chunk: ChatCompletionChunk | undefined) => void;
-      reject: (err: unknown) => void;
-    }[] = [];
-    let done = false;
-    // Capture a terminal error so it can still be surfaced after any buffered
-    // chunks drain, even when no reader was waiting at the time it fired.
-    let failure: unknown = null;
-    let failureDelivered = false;
-
-    const rejectQueuedReaders = (err: unknown) => {
-      done = true;
-      failure = err;
-      if (readQueue.length) {
-        failureDelivered = true;
-      }
-      for (const reader of readQueue) {
-        reader.reject(err);
-      }
-      readQueue.length = 0;
-    };
-
-    this.on('chunk', (chunk) => {
-      const reader = readQueue.shift();
-      if (reader) {
-        reader.resolve(chunk);
-      } else {
-        pushQueue.push(chunk);
-      }
-    });
-
-    this.on('end', () => {
-      done = true;
-      for (const reader of readQueue) {
-        reader.resolve(undefined);
-      }
-      readQueue.length = 0;
-    });
-
-    this.on('abort', rejectQueuedReaders);
-    this.on('error', rejectQueuedReaders);
-
-    return {
-      next: async (): Promise<IteratorResult<ChatCompletionChunk>> => {
-        if (!pushQueue.length) {
-          if (failure !== null && !failureDelivered) {
-            failureDelivered = true;
-            return Promise.reject(failure);
-          }
-          if (done) {
-            return { value: undefined, done: true };
-          }
-          return new Promise<ChatCompletionChunk | undefined>((resolve, reject) =>
-            readQueue.push({ resolve, reject }),
-          ).then((chunk) => (chunk ? { value: chunk, done: false } : { value: undefined, done: true }));
-        }
-        const chunk = pushQueue.shift()!;
-        return { value: chunk, done: false };
+    return this._createIterator<ChatCompletionChunk>(
+      (push) => {
+        const onChunk = (chunk: ChatCompletionChunk) => push(chunk);
+        this.on('chunk', onChunk);
+        return () => this.off('chunk', onChunk);
       },
-      return: async () => {
-        this.abort();
-        return { value: undefined, done: true };
-      },
-    };
+      { onReturn: () => this.abort() },
+    );
   }
 
   toReadableStream(): ReadableStream {
