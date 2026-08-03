@@ -284,6 +284,9 @@ jobs:
     if: needs.publication-check.outputs.should_publish == 'true'
     needs: publication-check
     runs-on: ubuntu-latest
+    concurrency:
+      group: publish-npm
+      cancel-in-progress: false
     environment: publish
     permissions:
       contents: read
