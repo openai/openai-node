@@ -98,6 +98,9 @@ importers:
       typescript:
         specifier: 6.0.3
         version: 6.0.3
+      typescript-4-9:
+        specifier: npm:typescript@4.9.5
+        version: typescript@4.9.5
       vitest:
         specifier: 4.1.10
         version: 4.1.10(@types/node@24.12.4)(vite@8.1.5(@types/node@24.12.4))
@@ -3107,6 +3110,11 @@ packages:
   type-is@1.6.18:
     resolution: {integrity: sha512-TkRKr9sUTxEH8MdfuCSP7VizJyzRNMjj2J2do2Jr3Kym598JVdEksuzPQCnlFPW4ky9Q+iA+ma9BGm06XQBy8g==}
     engines: {node: '>= 0.6'}
+
+  typescript@4.9.5:
+    resolution: {integrity: sha512-1FXk9E2Hm+QzZQ7z+McJiHL4NW1F2EzMu9Nq9i3zAaGqibafqYwCVU6WyWAuyQRRzOlxou8xZSyXLEN8oKj24g==}
+    engines: {node: '>=4.2.0'}
+    hasBin: true
 
   typescript@5.6.1-rc:
     resolution: {integrity: sha512-E3b2+1zEFu84jB0YQi9BORDjz9+jGbwwy1Zi3G0LUNw7a7cePUrHMRNy8aPh53nXpkFGVHSxIZo5vKTfYaFiBQ==}
@@ -6488,6 +6496,8 @@ snapshots:
     dependencies:
       media-typer: 0.3.0
       mime-types: 2.1.35
+
+  typescript@4.9.5: {}
 
   typescript@5.6.1-rc: {}
 
