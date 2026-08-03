@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+RELEASE_TITLE="${1:?release PR title is required}"
+PACKAGE_VERSION="$(jq -r -e '.version' package.json)"
+EXPECTED_TITLE="release: ${PACKAGE_VERSION}"
+
+if [[ "$RELEASE_TITLE" != "$EXPECTED_TITLE" ]]; then
+  echo "Release PR title '$RELEASE_TITLE' does not match package.json version $PACKAGE_VERSION."
+  echo 'Do not edit the title to override the release version.'
+  echo 'Merge a conventional commit with a Release-As: <version> footer into main instead.'
+  exit 1
+fi

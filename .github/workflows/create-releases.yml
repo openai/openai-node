@@ -18,6 +18,9 @@ jobs:
   promote:
     name: promote Stainless changes
     if: github.ref == 'refs/heads/next' && github.repository == 'openai/openai-node'
+    concurrency:
+      group: promote-stainless-${{ github.ref }}
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -80,6 +83,12 @@ jobs:
           fi
           promotion_title="${promotion_type}: promote Stainless-generated changes"
 
+          current_next_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/next" --jq '.object.sha')"
+          if [[ "${current_next_sha}" != "${GITHUB_SHA}" ]]; then
+            echo "A newer next commit (${current_next_sha}) superseded this run (${GITHUB_SHA})."
+            exit 0
+          fi
+
           promotion_pr="$(
             gh pr list \
               --repo "${GITHUB_REPOSITORY}" \
@@ -132,14 +141,7 @@ jobs:
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
-          package_version="$(jq -r -e '.version' package.json)"
-          expected_title="release: ${package_version}"
-          if [[ "${PR_TITLE}" != "${expected_title}" ]]; then
-            echo "Release PR title '${PR_TITLE}' does not match package.json version ${package_version}."
-            echo 'Do not edit the title to override the release version.'
-            echo 'Add a conventional commit with a Release-As: <version> footer instead.'
-            exit 1
-          fi
+          bash ./bin/check-release-version "${PR_TITLE}"
 
   release:
     name: release
@@ -150,6 +152,26 @@ jobs:
       issues: write
       pull-requests: write
     steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Validate a merged release PR version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          release_pr_title="$(
+            gh api \
+              -H 'Accept: application/vnd.github+json' \
+              "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls" \
+              --jq '[.[] | select(
+                .merged_at != null and
+                .base.ref == "main" and
+                .head.ref == "release-please--branches--main--components--openai"
+              )][0].title // empty'
+          )"
+          if [[ -n "${release_pr_title}" ]]; then
+            bash ./bin/check-release-version "${release_pr_title}"
+          fi
+
       - name: Check for the legacy Stainless release PR
         id: cutover
         env:
@@ -204,6 +226,7 @@ jobs:
       contents: read
     outputs:
       should_publish: ${{ steps.check.outputs.should_publish }}
+      release_tag: ${{ steps.check.outputs.release_tag }}
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -230,6 +253,7 @@ jobs:
             echo "${release_info}"
             exit 1
           fi
+          echo "release_tag=${release_tag}" >> "${GITHUB_OUTPUT}"
 
           set +e
           bash ./bin/check-npm-version
@@ -256,6 +280,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ needs.publication-check.outputs.release_tag }}
 
       - name: Set up pnpm
         uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
