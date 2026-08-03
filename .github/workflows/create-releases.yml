@@ -17,6 +17,10 @@ jobs:
       pull-requests: write
 
     steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+
       - name: Create or re-draft the promotion PR
         env:
           GH_TOKEN: ${{ github.token }}
@@ -26,6 +30,14 @@ jobs:
             echo 'No Stainless changes to promote.'
             exit 0
           fi
+
+          promotion_type='fix(api)'
+          if git log origin/main..HEAD --format='%s%n%b' | grep -Eq '(^[[:alpha:]]+(\([^)]*\))?!:)|(^BREAKING[ -]CHANGE:)'; then
+            promotion_type='feat(api)!'
+          elif git log origin/main..HEAD --format='%s' | grep -Eq '^feat(\([^)]*\))?:'; then
+            promotion_type='feat(api)'
+          fi
+          promotion_title="${promotion_type}: promote Stainless-generated changes"
 
           promotion_pr="$(
             gh pr list \
@@ -43,10 +55,16 @@ jobs:
               --base main \
               --head next \
               --draft \
-              --title 'feat(api): promote Stainless-generated changes' \
+              --title "${promotion_title}" \
               --body 'Promotes the latest Stainless-generated SDK changes from `next`. Mark this PR ready for review to run CI.'
             exit 0
           fi
+
+          gh api \
+            --method PATCH \
+            "repos/${GITHUB_REPOSITORY}/pulls/${promotion_pr}" \
+            -f title="${promotion_title}" \
+            --silent
 
           if [[ "$(gh pr view "${promotion_pr}" --repo "${GITHUB_REPOSITORY}" --json isDraft --jq '.isDraft')" == 'false' ]]; then
             gh pr ready "${promotion_pr}" --repo "${GITHUB_REPOSITORY}" --undo
@@ -64,8 +82,27 @@ jobs:
       release_created: ${{ steps.release.outputs.release_created }}
 
     steps:
+      - name: Check for the legacy Stainless release PR
+        id: cutover
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          legacy_pr="$(
+            gh pr list \
+              --repo "${GITHUB_REPOSITORY}" \
+              --state open \
+              --head 'release-please--branches--main--changes--next--components--openai' \
+              --json number \
+              --jq '.[0].number // empty'
+          )"
+          echo "legacy_pr=${legacy_pr}" >> "${GITHUB_OUTPUT}"
+          if [[ -n "${legacy_pr}" ]]; then
+            echo "Waiting for legacy release PR #${legacy_pr} to merge or close before cutover."
+          fi
+
       - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         id: release
+        if: steps.cutover.outputs.legacy_pr == ''
         with:
           # Use the default token until the openai-sdks App credentials are provisioned.
           token: ${{ github.token }}
