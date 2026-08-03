@@ -1,12 +1,57 @@
-# Watches the default branch for release-please output, then publishes newly
-# created SDK releases to npm.
+# Promotes Stainless-generated changes from `next`, then watches the default
+# branch for release-please output and publishes newly created SDK releases.
 name: Create releases
 on:
   push:
     branches:
       - main
+      - next
 
 jobs:
+  promote:
+    name: promote Stainless changes
+    if: github.ref == 'refs/heads/next' && github.repository == 'openai/openai-node'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Create or re-draft the promotion PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ahead_by="$(gh api "repos/${GITHUB_REPOSITORY}/compare/main...next" --jq '.ahead_by')"
+          if [[ "${ahead_by}" == '0' ]]; then
+            echo 'No Stainless changes to promote.'
+            exit 0
+          fi
+
+          promotion_pr="$(
+            gh pr list \
+              --repo "${GITHUB_REPOSITORY}" \
+              --state open \
+              --base main \
+              --head next \
+              --json number \
+              --jq '.[0].number // empty'
+          )"
+
+          if [[ -z "${promotion_pr}" ]]; then
+            gh pr create \
+              --repo "${GITHUB_REPOSITORY}" \
+              --base main \
+              --head next \
+              --draft \
+              --title 'feat(api): promote Stainless-generated changes' \
+              --body 'Promotes the latest Stainless-generated SDK changes from `next`. Mark this PR ready for review to run CI.'
+            exit 0
+          fi
+
+          if [[ "$(gh pr view "${promotion_pr}" --repo "${GITHUB_REPOSITORY}" --json isDraft --jq '.isDraft')" == 'false' ]]; then
+            gh pr ready "${promotion_pr}" --repo "${GITHUB_REPOSITORY}" --undo
+          fi
+
   release:
     name: release
     if: github.ref == 'refs/heads/main' && github.repository == 'openai/openai-node'
@@ -27,6 +72,16 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
           target-branch: main
+
+      - name: Re-draft the updated release PR
+        if: steps.release.outputs.prs_created == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_PR: ${{ fromJSON(steps.release.outputs.pr).number }}
+        run: |
+          if [[ "$(gh pr view "${RELEASE_PR}" --repo "${GITHUB_REPOSITORY}" --json isDraft --jq '.isDraft')" == 'false' ]]; then
+            gh pr ready "${RELEASE_PR}" --repo "${GITHUB_REPOSITORY}" --undo
+          fi
 
   publish:
     name: publish
