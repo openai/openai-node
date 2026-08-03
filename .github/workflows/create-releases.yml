@@ -6,6 +6,13 @@ on:
     branches:
       - main
       - next
+  pull_request:
+    types:
+      - edited
+      - opened
+      - ready_for_review
+      - reopened
+      - synchronize
 
 jobs:
   promote:
@@ -25,16 +32,50 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          ahead_by="$(gh api "repos/${GITHUB_REPOSITORY}/compare/main...next" --jq '.ahead_by')"
-          if [[ "${ahead_by}" == '0' ]]; then
+          if git diff --quiet origin/main HEAD --; then
             echo 'No Stainless changes to promote.'
             exit 0
           fi
 
+          last_promoted_sha="$(
+            gh pr list \
+              --repo "${GITHUB_REPOSITORY}" \
+              --state merged \
+              --base main \
+              --head next \
+              --limit 100 \
+              --json headRefOid,mergedAt \
+              --jq 'sort_by(.mergedAt) | last | .headRefOid // empty'
+          )"
+
+          if [[ -n "${last_promoted_sha}" ]]; then
+            if ! git cat-file -e "${last_promoted_sha}^{commit}" 2>/dev/null; then
+              git fetch --no-tags origin "${last_promoted_sha}"
+            fi
+            if ! git merge-base --is-ancestor "${last_promoted_sha}" HEAD; then
+              echo "Last promoted commit ${last_promoted_sha} is not an ancestor of next."
+              echo 'Refusing to classify a rewritten promotion range.'
+              exit 1
+            fi
+            promotion_range="${last_promoted_sha}..HEAD"
+          else
+            promotion_range='origin/main..HEAD'
+          fi
+
+          commit_subjects="$(git log "${promotion_range}" --format='%s')"
+          commit_messages="$(git log "${promotion_range}" --format='%s%n%b')"
+          conventional_commit='^(feat|fix|perf|revert|chore|docs|style|refactor|test|build|ci)(\([^)]*\))?!?:'
+          if ! grep -Eq "${conventional_commit}" <<< "${commit_subjects}" && \
+            ! grep -Eq '^BREAKING[ -]CHANGE:' <<< "${commit_messages}"; then
+            echo "No releasable commits in ${promotion_range}; skipping promotion."
+            exit 0
+          fi
+
           promotion_type='fix(api)'
-          if git log origin/main..HEAD --format='%s%n%b' | grep -Eq '(^[[:alpha:]]+(\([^)]*\))?!:)|(^BREAKING[ -]CHANGE:)'; then
+          if grep -Eq '^[[:alpha:]]+(\([^)]*\))?!:' <<< "${commit_subjects}" || \
+            grep -Eq '^BREAKING[ -]CHANGE:' <<< "${commit_messages}"; then
             promotion_type='feat(api)!'
-          elif git log origin/main..HEAD --format='%s' | grep -Eq '^feat(\([^)]*\))?:'; then
+          elif grep -Eq '^feat(\([^)]*\))?:' <<< "${commit_subjects}"; then
             promotion_type='feat(api)'
           fi
           promotion_title="${promotion_type}: promote Stainless-generated changes"
@@ -70,6 +111,36 @@ jobs:
             gh pr ready "${promotion_pr}" --repo "${GITHUB_REPOSITORY}" --undo
           fi
 
+  validate-release-version:
+    name: validate release PR version
+    if: >-
+      ${{
+        github.event_name == 'pull_request' &&
+        github.event.pull_request.head.ref == 'release-please--branches--main--components--openai' &&
+        github.repository == 'openai/openai-node'
+      }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Compare the release title with the generated version
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          package_version="$(jq -r -e '.version' package.json)"
+          expected_title="release: ${package_version}"
+          if [[ "${PR_TITLE}" != "${expected_title}" ]]; then
+            echo "Release PR title '${PR_TITLE}' does not match package.json version ${package_version}."
+            echo 'Do not edit the title to override the release version.'
+            echo 'Add a conventional commit with a Release-As: <version> footer instead.'
+            exit 1
+          fi
+
   release:
     name: release
     if: github.ref == 'refs/heads/main' && github.repository == 'openai/openai-node'
@@ -78,9 +149,6 @@ jobs:
       contents: write
       issues: write
       pull-requests: write
-    outputs:
-      release_created: ${{ steps.release.outputs.release_created }}
-
     steps:
       - name: Check for the legacy Stainless release PR
         id: cutover
@@ -120,15 +188,66 @@ jobs:
             gh pr ready "${RELEASE_PR}" --repo "${GITHUB_REPOSITORY}" --undo
           fi
 
-  publish:
-    name: publish
+  publication-check:
+    name: check publication state
     if: >-
       ${{
         always() &&
         !cancelled() &&
-        needs.release.outputs.release_created == 'true'
+        github.event_name == 'push' &&
+        github.ref == 'refs/heads/main' &&
+        github.repository == 'openai/openai-node'
       }}
     needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      should_publish: ${{ steps.check.outputs.should_publish }}
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Check whether the current release needs publishing
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          package_version="$(jq -r -e '.version' package.json)"
+          release_tag="v${package_version}"
+
+          set +e
+          release_info="$(gh api --silent "repos/${GITHUB_REPOSITORY}/releases/tags/${release_tag}" 2>&1)"
+          release_status=$?
+          set -e
+          if [[ ${release_status} -ne 0 ]]; then
+            if grep -q 'HTTP 404' <<< "${release_info}"; then
+              echo "No GitHub release exists for ${release_tag}; nothing to publish."
+              echo 'should_publish=false' >> "${GITHUB_OUTPUT}"
+              exit 0
+            fi
+            echo "Unable to check for GitHub release ${release_tag}:"
+            echo "${release_info}"
+            exit 1
+          fi
+
+          set +e
+          bash ./bin/check-npm-version
+          version_status=$?
+          set -e
+
+          if [[ ${version_status} -eq 0 ]]; then
+            echo 'should_publish=false' >> "${GITHUB_OUTPUT}"
+          elif [[ ${version_status} -eq 1 ]]; then
+            echo 'should_publish=true' >> "${GITHUB_OUTPUT}"
+          else
+            exit "${version_status}"
+          fi
+
+  publish:
+    name: publish
+    if: needs.publication-check.outputs.should_publish == 'true'
+    needs: publication-check
     runs-on: ubuntu-latest
     environment: publish
     permissions:
