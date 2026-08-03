@@ -22,7 +22,7 @@ importers:
         version: 3.972.47
       '@smithy/hash-node':
         specifier: ^4.3.5
-        version: 4.3.5
+        version: 4.4.15
       '@smithy/protocol-http':
         specifier: ^5.4.5
         version: 5.4.5
@@ -117,8 +117,8 @@ importers:
         specifier: ^4.2.0
         version: 4.13.1
       dotenv:
-        specifier: ^16.4.7
-        version: 16.6.1
+        specifier: ^17.4.2
+        version: 17.4.2
       express:
         specifier: ^4.18.2
         version: 4.22.2
@@ -127,7 +127,7 @@ importers:
         version: 15.5.21(@babel/core@7.29.7)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       openai:
         specifier: file:..
-        version: file:(@aws-sdk/credential-provider-node@3.972.47)(@smithy/hash-node@4.3.5)(@smithy/signature-v4@5.4.6)(ws@8.21.0)(zod@4.4.3)
+        version: file:(@aws-sdk/credential-provider-node@3.972.47)(@smithy/hash-node@4.4.15)(@smithy/signature-v4@5.4.6)(ws@8.21.0)(zod@4.4.3)
       undici:
         specifier: ^8.0.0
         version: 8.8.0
@@ -1182,6 +1182,10 @@ packages:
     resolution: {integrity: sha512-wBXDRup6UU97VKyaiRo8AssnfStPtG0oAAfpq/bC0a1YYau8pM86YB4kM6ccoVi1mS8l/UHbn9oDM+7uozr/ug==}
     engines: {node: '>=18.0.0'}
 
+  '@smithy/core@3.31.1':
+    resolution: {integrity: sha512-CyogUINxvi7C7LDsh8Syo6hVJOT9ckz4rG8dRZfTJ8r91HkMY59PnNooaj7WcHyxEkxPfBAmbgztZU+xTo76lg==}
+    engines: {node: '>=18.0.0'}
+
   '@smithy/credential-provider-imds@4.3.8':
     resolution: {integrity: sha512-5cAM+KZC02sTqDt6NaLXyu50M/GNMd1eTzDVR8Lb0BBsVtu7RWHo47VPPEEv1vt3Yub6uzr+M5FHC+GtoT0USg==}
     engines: {node: '>=18.0.0'}
@@ -1190,8 +1194,8 @@ packages:
     resolution: {integrity: sha512-FEwEYJ1jlBKdhe9TPzfghEi1bP55ZeEImlDkEa62bBBYzUcnB6RUCyuiS2mqKt6ZVjUbBgcNhzfIctH+Hevx9g==}
     engines: {node: '>=18.0.0'}
 
-  '@smithy/hash-node@4.3.5':
-    resolution: {integrity: sha512-/tUIDaB36qjLq/CIhMRIiFXCT7rVGBGAhFmMA9PbC/iW2u3QPNATZuFSdK0JBO3qeSPoHBeudFMmsbFq2Mf5EQ==}
+  '@smithy/hash-node@4.4.15':
+    resolution: {integrity: sha512-mSduAzACCxNn6oThUhP1ytPI/s8bBot5CVZ7VcU3b1cE+gIjJdPAOEx7cjNvhrn/erLqsts7nNUa0XJ7KxMq6Q==}
     engines: {node: '>=18.0.0'}
 
   '@smithy/is-array-buffer@2.2.0':
@@ -1216,6 +1220,10 @@ packages:
 
   '@smithy/types@4.14.3':
     resolution: {integrity: sha512-YupL0ZWmFtJexUN2cHzkvvF/b9pKrtAIfT1o7/oY/Ppu8IYeZ+lDPM5vZdQJaSeA132dJCqojjGC9NhXeF71VQ==}
+    engines: {node: '>=18.0.0'}
+
+  '@smithy/types@4.16.1':
+    resolution: {integrity: sha512-0JFs3V2y2M9tKW5na/qxe69Zv+uxLMO7QBbhxF/FHu/Gp2NFZAAL9tWl9PU02xxo07pb3G9FTyjNc6D5uZrJIg==}
     engines: {node: '>=18.0.0'}
 
   '@smithy/util-buffer-from@2.2.0':
@@ -1789,8 +1797,8 @@ packages:
     resolution: {integrity: sha512-X07nttJQkwkfKfvTPG/KSnE2OMdcUCao6+eXF3wmnIQRn2aPAHH3VxDbDOdegkd6JbPsXqShpvEOHfAT+nCNwQ==}
     engines: {node: '>=0.3.1'}
 
-  dotenv@16.6.1:
-    resolution: {integrity: sha512-uBq4egWHTcTt33a72vpSG0z3HnPuIl6NqYcTrKEg2azoEyl2hpW0zqlxysq2pK9HlDIHyHyakeYaYnSAwd8bow==}
+  dotenv@17.4.2:
+    resolution: {integrity: sha512-nI4U3TottKAcAD9LLud4Cb7b2QztQMUEfHbvhTH09bqXTxnSie8WnjPALV/WMCrJZ6UV/qHJ6L03OqO3LcdYZw==}
     engines: {node: '>=12'}
 
   dunder-proto@1.0.1:
@@ -4382,6 +4390,11 @@ snapshots:
       '@smithy/types': 4.14.3
       tslib: 2.8.1
 
+  '@smithy/core@3.31.1':
+    dependencies:
+      '@smithy/types': 4.16.1
+      tslib: 2.8.1
+
   '@smithy/credential-provider-imds@4.3.8':
     dependencies:
       '@smithy/core': 3.24.6
@@ -4394,9 +4407,9 @@ snapshots:
       '@smithy/types': 4.14.3
       tslib: 2.8.1
 
-  '@smithy/hash-node@4.3.5':
+  '@smithy/hash-node@4.4.15':
     dependencies:
-      '@smithy/core': 3.24.6
+      '@smithy/core': 3.31.1
       tslib: 2.8.1
 
   '@smithy/is-array-buffer@2.2.0':
@@ -4427,6 +4440,10 @@ snapshots:
       tslib: 2.8.1
 
   '@smithy/types@4.14.3':
+    dependencies:
+      tslib: 2.8.1
+
+  '@smithy/types@4.16.1':
     dependencies:
       tslib: 2.8.1
 
@@ -4999,7 +5016,7 @@ snapshots:
 
   diff@4.0.4: {}
 
-  dotenv@16.6.1: {}
+  dotenv@17.4.2: {}
 
   dunder-proto@1.0.1:
     dependencies:
@@ -5952,10 +5969,10 @@ snapshots:
       is-inside-container: 1.0.0
       wsl-utils: 0.1.0
 
-  openai@file:(@aws-sdk/credential-provider-node@3.972.47)(@smithy/hash-node@4.3.5)(@smithy/signature-v4@5.4.6)(ws@8.21.0)(zod@4.4.3):
+  openai@file:(@aws-sdk/credential-provider-node@3.972.47)(@smithy/hash-node@4.4.15)(@smithy/signature-v4@5.4.6)(ws@8.21.0)(zod@4.4.3):
     optionalDependencies:
       '@aws-sdk/credential-provider-node': 3.972.47
-      '@smithy/hash-node': 4.3.5
+      '@smithy/hash-node': 4.4.15
       '@smithy/signature-v4': 5.4.6
       ws: 8.21.0
       zod: 4.4.3
