@@ -4,7 +4,6 @@ set -euo pipefail
 
 : "${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required}"
 
-RELEASE_BRANCH='release-please--branches--main--components--openai'
 PENDING_RELEASES="$(
   gh pr list \
     --repo "$GITHUB_REPOSITORY" \
@@ -12,7 +11,7 @@ PENDING_RELEASES="$(
     --base main \
     --label 'autorelease: pending' \
     --limit 1000 \
-    --json number,title,headRefName,mergeCommit
+    --json number,title,mergeCommit
 )"
 
 while IFS= read -r RELEASE; do
@@ -28,4 +27,4 @@ while IFS= read -r RELEASE; do
 
   echo "Validating pending release PR #${PR_NUMBER} at ${MERGE_SHA}."
   bash ./bin/check-release-version "$PR_TITLE" "$PACKAGE_VERSION"
-done < <(jq -c --arg branch "$RELEASE_BRANCH" '.[] | select(.headRefName == $branch)' <<< "$PENDING_RELEASES")
+done < <(jq -c '.[]' <<< "$PENDING_RELEASES")

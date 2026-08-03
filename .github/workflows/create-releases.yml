@@ -237,7 +237,7 @@ jobs:
       contents: read
     outputs:
       should_publish: ${{ steps.check.outputs.should_publish }}
-      release_tag: ${{ steps.check.outputs.release_tag }}
+      release_sha: ${{ steps.check.outputs.release_sha }}
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -264,7 +264,8 @@ jobs:
             echo "${release_info}"
             exit 1
           fi
-          echo "release_tag=${release_tag}" >> "${GITHUB_OUTPUT}"
+          release_sha="$(bash ./bin/resolve-tag-commit "${release_tag}")"
+          echo "release_sha=${release_sha}" >> "${GITHUB_OUTPUT}"
 
           set +e
           bash ./bin/check-npm-version
@@ -295,7 +296,13 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
-          ref: refs/tags/${{ needs.publication-check.outputs.release_tag }}
+          ref: ${{ needs.publication-check.outputs.release_sha }}
+
+      - name: Verify release commit
+        env:
+          RELEASE_SHA: ${{ needs.publication-check.outputs.release_sha }}
+        run: |
+          [[ "$(git rev-parse HEAD)" == "${RELEASE_SHA}" ]]
 
       - name: Set up pnpm
         uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
