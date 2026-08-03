@@ -241,6 +241,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
 
       - name: Check whether the current release needs publishing
         id: check
@@ -251,7 +253,7 @@ jobs:
           release_tag="v${package_version}"
 
           set +e
-          release_info="$(gh api --silent "repos/${GITHUB_REPOSITORY}/releases/tags/${release_tag}" 2>&1)"
+          release_info="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${release_tag}" 2>&1)"
           release_status=$?
           set -e
           if [[ ${release_status} -ne 0 ]]; then
@@ -264,7 +266,29 @@ jobs:
             echo "${release_info}"
             exit 1
           fi
+
+          release_target="$(jq -r -e '.target_commitish' <<< "${release_info}")"
+          if [[ ! "${release_target}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "GitHub release ${release_tag} does not identify an immutable commit: ${release_target}"
+            exit 1
+          fi
+
           release_sha="$(bash ./bin/resolve-tag-commit "${release_tag}")"
+          if [[ "${release_sha}" != "${release_target}" ]]; then
+            echo "Release tag ${release_tag} resolves to ${release_sha}, not release commit ${release_target}."
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "${release_sha}" "${GITHUB_SHA}"; then
+            echo "Release commit ${release_sha} is not reachable from protected main commit ${GITHUB_SHA}."
+            exit 1
+          fi
+
+          release_package_version="$(git show "${release_sha}:package.json" | jq -r -e '.version')"
+          if [[ "${release_package_version}" != "${package_version}" ]]; then
+            echo "Release commit ${release_sha} contains version ${release_package_version}, expected ${package_version}."
+            exit 1
+          fi
+
           echo "release_sha=${release_sha}" >> "${GITHUB_OUTPUT}"
 
           set +e
