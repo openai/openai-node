@@ -293,8 +293,9 @@ jobs:
         if: steps.release.outputs.prs_created == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_PR: ${{ fromJSON(steps.release.outputs.pr).number }}
+          RELEASE_PR_JSON: ${{ steps.release.outputs.pr }}
         run: |
+          RELEASE_PR="$(jq -er '.number' <<< "${RELEASE_PR_JSON}")"
           if [[ "$(gh pr view "${RELEASE_PR}" --repo "${GITHUB_REPOSITORY}" --json isDraft --jq '.isDraft')" == 'false' ]]; then
             gh pr ready "${RELEASE_PR}" --repo "${GITHUB_REPOSITORY}" --undo
           fi
