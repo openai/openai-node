@@ -14,6 +14,7 @@ fs.mkdirSync(distRoot, { recursive: true });
 const ignoredFixtureRoot = fs.mkdtempSync(path.join(distRoot, 'oxlint-regression-'));
 const oxlint = path.join(repoRoot, 'node_modules', '.bin', 'oxlint');
 const fastFormat = path.join(repoRoot, 'scripts', 'fast-format');
+const words = ([text]) => text.trim().split(/\s+/u);
 
 after(() => {
   fs.rmSync(fixtureRoot, { recursive: true, force: true });
@@ -66,11 +67,7 @@ function assertNoMissingJSDocTypes(fixturePath, name) {
     types: [],
   });
   const missing = ts.getPreEmitDiagnostics(program).filter((diagnostic) => diagnostic.code === 2304);
-  assert.deepEqual(
-    missing.map((diagnostic) => diagnostic.messageText),
-    [],
-    name,
-  );
+  assert.equal(missing.length, 0, name);
 }
 
 function assertJSXImportBindings(fixturePath, bindings, fixtureName) {
@@ -236,7 +233,9 @@ test('treats JSDoc template parameters as comment-local type binders', () => {
     'matching-constraint :: T :: @template {T} T @param {T} value :: T',
     'default :: T Default :: @template [T=Default] @param {T} value :: Default',
     'matching-default :: T :: @template [T=T] @param {T} value :: T',
-    'sibling-default :: T U :: @template T, [U=T] @param {T | U} value :: T',
+    'sibling-default :: T U :: @template T, [U=T] @param {T | U} value',
+    'sibling-imported-default :: T U Ref :: @template T, [U=Ref] @param {T | U} value :: Ref',
+    'separate-tag-default :: T U :: @template T @template [U=T] @param {T | U} value',
     'sibling-constraint :: T U :: @template {T} U @template T @param {T | U} value :: T',
     'multiple-defaults :: T U FirstDefault SecondDefault :: @template [T=Record<string, FirstDefault>], [U=SecondDefault[]] @returns {T | U} :: FirstDefault SecondDefault',
     'multiline-defaults :: T U Constraint Default :: \n * @template\n * {Constraint}\n * T,\n * [U = Default]\n * @param {T | U} value\n :: Constraint Default',
@@ -331,6 +330,7 @@ test('distinguishes JSDoc type references from literals, members, keys, and bind
     ],
     ['InferredBinderOnly', 'Source extends infer InferredBinderOnly ? string : never', false],
     ['InferredShadowOnly', 'Source extends infer InferredShadowOnly ? InferredShadowOnly : never', false],
+    ['X', 'string extends (number extends infer X ? X : never) ? X : never', true],
     ['GenericBinderOnly', '<GenericBinderOnly extends Base>(value: GenericBinderOnly) => void', false],
     ['ObjectValueOnly', '{ value: ObjectValueOnly }', true],
     ['QuotedPropertyValueOnly', '{ "label": QuotedPropertyValueOnly }', true],
@@ -395,13 +395,11 @@ test('distinguishes JSDoc type references from literals, members, keys, and bind
 });
 
 test('preserves every reference in complete unbraced JSDoc type expressions', () => {
-  const used = `BareUnionLeftOnly BareUnionRightOnly BareNullableOnly BareNonNullableOnly BareGroupedOnly
+  const used = words`BareUnionLeftOnly BareUnionRightOnly BareNullableOnly BareNonNullableOnly BareGroupedOnly
     BareIntersectionLeftOnly BareIntersectionRightOnly BareTupleFirstOnly BareTupleSecondOnly BareArrayOnly
     BareKeyofOnly BareTypeofOnly BareFunctionParameterOnly BareFunctionResultOnly BareClosureParameterOnly
     BareClosureResultOnly BareConstructorParameterOnly BareConstructorResultOnly BareConditionalTrueOnly
-    BareConditionalFalseOnly BareNestedGenericOnly BareAfterSiblingOnly`
-    .trim()
-    .split(/\s+/u);
+    BareConditionalFalseOnly BareNestedGenericOnly BareAfterSiblingOnly`;
   const comments = [
     '/** @type BareUnionLeftOnly | BareUnionRightOnly */',
     '/** @type ?BareNullableOnly */',
@@ -456,8 +454,9 @@ test('retains compiler-recognized grouped keyof operands and newline-separated m
   }
 });
 
-test('matches compiler bindings for successive JSDoc generic defaults and constraints', () => {
+test('matches compiler bindings for JSDoc templates, generic defaults, and conditional infer scopes', () => {
   writeFixture('generic-side-effect.mjs', 'globalThis.genericImportRan = true; export class Foo {}\n');
+  const nestedInfer = 'string extends (number extends infer X ? X : never) ? X : never';
   const cases = [
     ['earlier-default', '<T, U = T>(value: U) => U', [], 'TypeParameter'],
     ['earlier-constraint', '<T, U extends T>(value: U) => U', [], 'TypeParameter'],
@@ -465,9 +464,14 @@ test('matches compiler bindings for successive JSDoc generic defaults and constr
     ['imported-constraint', '<T, U extends Ref>(value: U) => U', ['Ref'], 'ImportSpecifier'],
     ['same-default', '<T = T>(value: T) => T', ['T'], 'TypeParameter'],
     ['later-default', '<T = U, U = Ref>(value: T) => T', ['U', 'Ref'], 'TypeParameter'],
+    ['template-earlier-default', '@template T, [U=T] @param {U} value', [], 'TypeParameter'],
+    ['template-imported-default', '@template T, [U=Ref] @param {U} value', ['Ref'], 'ImportSpecifier'],
+    ['nested-infer-outer', nestedInfer, ['X'], 'ImportSpecifier'],
   ];
   for (const [name, type, retained, declaration] of cases) {
-    const source = `// @ts-check\nimport { Foo as T, Foo as U, Foo as Ref } from './generic-side-effect.mjs';\n/** @type {${type}} */\nexport let value;\nconsole.log(globalThis.genericImportRan ?? false);\n`;
+    const documentation = type.startsWith('@') ? type : `@type {${type}}`;
+    const statement = type.startsWith('@') ? 'export function value(value) {}' : 'export let value;';
+    const source = `// @ts-check\nimport { Foo as T, Foo as U, Foo as Ref, Foo as X } from './generic-side-effect.mjs';\n/** ${documentation} */\n${statement}\nconsole.log(globalThis.genericImportRan ?? false);\n`;
     const fixturePath = writeFixture(`compiler-generic-${name}.mjs`, source);
     const program = ts.createProgram([fixturePath], {
       allowJs: true,
@@ -475,21 +479,28 @@ test('matches compiler bindings for successive JSDoc generic defaults and constr
       noEmit: true,
       types: [],
     });
-    const statement = program.getSourceFile(fixturePath).statements.find((node) => node.jsDoc?.length);
-    const signature = statement.jsDoc[0].tags[0].typeExpression.type;
-    assert.ok(ts.isFunctionTypeNode(signature), name);
-    const parameter = signature.typeParameters.find((node) => node.default || node.constraint);
-    const reference = (parameter.default ?? parameter.constraint).typeName;
+    const documented = program.getSourceFile(fixturePath).statements.find((node) => node.jsDoc?.length);
+    const tag = documented.jsDoc[0].tags[0];
+    const signature = ts.isJSDocTemplateTag(tag) ? tag : tag.typeExpression.type;
+    const parameter = signature.typeParameters?.find((node) => node.default || node.constraint);
+    const getDeclaration = (node) =>
+      ts.SyntaxKind[program.getTypeChecker().getSymbolAtLocation(node.typeName).declarations[0].kind];
     assert.equal(
-      ts.SyntaxKind[program.getTypeChecker().getSymbolAtLocation(reference).declarations[0].kind],
-      declaration,
+      getDeclaration(parameter ? (parameter.default ?? parameter.constraint) : signature.trueType),
+      name === 'template-earlier-default' ? 'ImportSpecifier' : declaration,
       name,
     );
+    if (ts.isConditionalTypeNode(signature))
+      assert.equal(
+        getDeclaration(signature.extendsType.type.trueType),
+        'TypeParameter',
+        `${name}: inner infer`,
+      );
     assertNoMissingJSDocTypes(fixturePath, `${name}: before fix`);
     runOxlintFix(fixturePath);
     assertNoMissingJSDocTypes(fixturePath, `${name}: after fix`);
     const fixed = fs.readFileSync(fixturePath, 'utf8');
-    for (const binding of ['T', 'U', 'Ref'])
+    for (const binding of ['T', 'U', 'Ref', 'X'])
       assert.equal(
         new RegExp(`\\bFoo as ${binding}\\b`, 'u').test(fixed),
         retained.includes(binding),
@@ -653,7 +664,7 @@ test('recognizes complete Unicode JSDoc identifiers without matching identifier 
 });
 
 test('preserves every genuine type reference in same-line sibling JSDoc tags', () => {
-  const names = `Foo Bar NamedFirstArgOnly ArgumentAliasOnly ReturnAliasOnly ExceptionAliasOnly YieldAliasOnly
+  const names = words`Foo Bar NamedFirstArgOnly ArgumentAliasOnly ReturnAliasOnly ExceptionAliasOnly YieldAliasOnly
     YieldsAliasOnly PropertyAliasOnly NameFirstPropertyOnly ThrowsAliasOnly SatisfiesAliasOnly
     BareImplementsOnly BareAugmentsOnly BareExtendsOnly BareTypeOnly BareThisOnly BareEnumOnly
     TypedefAliasOnly TemplateAliasOnly ConstAliasOnly ConstantAliasOnly DefineAliasOnly VarAliasOnly
@@ -661,9 +672,7 @@ test('preserves every genuine type reference in same-line sibling JSDoc tags', (
     NamedFirstArgumentOnly UntypedTemplateParamOnly UntypedTemplateReturnsOnly BareNestedSiblingOnly
     AfterBareGenericOnly ArrowBareGenericOnly AfterArrowBareGenericOnly NonBreakingSpaceParamOnly
     NonBreakingSpaceReturnsOnly NestedArrowInputOnly NestedArrowResultOnly NestedArrowMemberOnly
-    AfterNestedArrowOnly EmSpaceParamOnly EmSpaceReturnsOnly`
-    .trim()
-    .split(/\s+/u);
+    AfterNestedArrowOnly EmSpaceParamOnly EmSpaceReturnsOnly`;
   const comments = [
     '/** @param {Foo} x @returns {Bar} */',
     '/** @arg input {NamedFirstArgOnly} @argument {ArgumentAliasOnly} value @return {ReturnAliasOnly} @exception {ExceptionAliasOnly} @yield {YieldAliasOnly} @yields {YieldsAliasOnly} */',
@@ -694,22 +703,18 @@ test('preserves every genuine type reference in same-line sibling JSDoc tags', (
 });
 
 test('ignores example and prose lookalikes while preserving later genuine sibling tags', () => {
-  const unused = `UnquotedInlineExampleOnly UnquotedEmbeddedExampleOnly QuotedInlineExampleOnly
+  const unused = words`UnquotedInlineExampleOnly UnquotedEmbeddedExampleOnly QuotedInlineExampleOnly
     QuotedEmbeddedExampleOnly BacktickedInlineExampleOnly BacktickedEmbeddedExampleOnly NestedQuotedExampleOnly
     NestedBacktickedExampleOnly SingleLineCommentExampleOnly SingleLineBareExampleOnly UnquotedBareExampleOnly
     UnquotedBareEmbeddedExampleOnly DeprecatedQuotedOnly DeprecatedBacktickedOnly DeprecatedBracedOnly
     InterleavedDeprecatedBracedOnly ExternalNestedFakeOnly DeprecatedQuotedSiblingFakeOnly
     InterpolatedBacktickProseFakeOnly EmailProseOnly QuotedAfterRealOnly BacktickedAfterRealOnly EmailAfterRealOnly
     AfterRealExampleOnly AfterRealEmbeddedExampleOnly InlineExampleBeforeRecoveryOnly MultilineCommentExampleOnly
-    MultilineCommentEmbeddedOnly MultilineSourceBareExampleOnly MultilineQuotedExampleOnly UnusedExampleControlOnly`
-    .trim()
-    .split(/\s+/u);
-  const retained = `RealBeforeProseOnly RealAfterProseOnly RealBeforeExampleOnly AfterDeprecatedOnly
+    MultilineCommentEmbeddedOnly MultilineSourceBareExampleOnly MultilineQuotedExampleOnly UnusedExampleControlOnly`;
+  const retained = words`RealBeforeProseOnly RealAfterProseOnly RealBeforeExampleOnly AfterDeprecatedOnly
     BeforeDeprecatedOnly AfterInterleavedDeprecatedOnly AfterExternalOnly AfterQuotedDeprecatedOnly
     BeforeInterpolatedBacktickOnly AfterInterpolatedBacktickOnly AfterExampleParamOnly AfterExampleReturnsOnly
-    AfterExampleBareOnly AfterExampleAugmentsOnly`
-    .trim()
-    .split(/\s+/u);
+    AfterExampleBareOnly AfterExampleAugmentsOnly`;
   const comments = [
     '/** @example @type {UnquotedInlineExampleOnly} @returns {UnquotedEmbeddedExampleOnly} */',
     '/** @example "@type {QuotedInlineExampleOnly} @returns {QuotedEmbeddedExampleOnly}" */',
@@ -741,16 +746,11 @@ test('ignores example and prose lookalikes while preserving later genuine siblin
 });
 
 test('distinguishes type-bearing JSDoc tags from prose and documentation tags', () => {
-  const typeTags =
-    `arg argument augments const constant define enum exception extends implements member module
-    namespace param prop property return returns satisfies template this throws type typedef var yield yields`
-      .trim()
-      .split(/\s+/u);
-  const proseTags = `example external host deprecated description desc see link linkcode linklinkplain summary
+  const typeTags = words`arg argument augments const constant define enum exception extends implements member module
+    namespace param prop property return returns satisfies template this throws type typedef var yield yields`;
+  const proseTags = words`example external host deprecated description desc see link linkcode linklinkplain summary
     remarks author since version todo license default lends modifies callback overload class constructor private
-    protected public custom-tag`
-    .trim()
-    .split(/\s+/u);
+    protected public custom-tag`;
   const tagged = [
     ...typeTags.map((tag) => [tag, `Type${tag}Only`, true]),
     ...proseTags.map((tag) => [tag, `Prose${tag.replaceAll('-', '')}Only`, false]),

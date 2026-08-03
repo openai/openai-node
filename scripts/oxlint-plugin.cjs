@@ -68,6 +68,7 @@ function addEntityReference(entity, bindings, used) {
 }
 
 function getInferBindings(node, bindings = new Set()) {
+  if (ts.isConditionalTypeNode(node)) return bindings;
   if (ts.isInferTypeNode(node)) {
     bindings.add(ts.unescapeLeadingUnderscores(node.typeParameter.name.escapedText));
   }
@@ -348,6 +349,7 @@ function getJSDocImportUsage(sourceCode) {
     const references = new Set();
     const tags = doc.tags ?? [];
     const bindings = new Set();
+    const templateBindings = new Set();
     const templates = new Map();
     for (const tag of tags) {
       if (!ts.isJSDocTemplateTag(tag)) continue;
@@ -405,9 +407,10 @@ function getJSDocImportUsage(sourceCode) {
       if (!tag) continue;
 
       if (ts.isJSDocTemplateTag(tag)) {
-        collectTypeReferences(tag.constraint, new Set(), references);
+        collectTypeReferences(tag.constraint, templateBindings, references);
         for (const parameter of tag.typeParameters) {
-          collectTypeReferences(parameter.default, new Set(), references);
+          collectTypeReferences(parameter.default, templateBindings, references);
+          templateBindings.add(ts.unescapeLeadingUnderscores(parameter.name.escapedText));
         }
       } else if (ts.isJSDocSeeTag(tag)) {
         const prefix = parsed.text.slice(
