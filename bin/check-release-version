@@ -3,7 +3,11 @@
 set -euo pipefail
 
 RELEASE_TITLE="${1:?release PR title is required}"
-PACKAGE_VERSION="$(jq -r -e '.version' package.json)"
+if [[ $# -ge 2 ]]; then
+  PACKAGE_VERSION="$2"
+else
+  PACKAGE_VERSION="$(jq -r -e '.version' package.json)"
+fi
 EXPECTED_TITLE="release: ${PACKAGE_VERSION}"
 
 if [[ "$RELEASE_TITLE" != "$EXPECTED_TITLE" ]]; then

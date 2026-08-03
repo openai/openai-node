@@ -8,6 +8,7 @@ on:
       - next
   pull_request:
     types:
+      - closed
       - edited
       - opened
       - ready_for_review
@@ -17,9 +18,21 @@ on:
 jobs:
   promote:
     name: promote Stainless changes
-    if: github.ref == 'refs/heads/next' && github.repository == 'openai/openai-node'
+    if: >-
+      ${{
+        github.repository == 'openai/openai-node' &&
+        (
+          github.event_name == 'push' ||
+          (
+            github.event_name == 'pull_request' &&
+            github.event.action == 'closed' &&
+            github.event.pull_request.merged == false &&
+            github.event.pull_request.head.ref == 'release-please--branches--main--changes--next--components--openai'
+          )
+        )
+      }}
     concurrency:
-      group: promote-stainless-${{ github.ref }}
+      group: promote-stainless-next
       cancel-in-progress: true
     runs-on: ubuntu-latest
     permissions:
@@ -30,6 +43,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 0
+          ref: refs/heads/next
 
       - name: Create or re-draft the promotion PR
         env:
@@ -93,9 +107,10 @@ jobs:
           fi
           promotion_title="${promotion_type}: promote Stainless-generated changes"
 
+          checked_out_next_sha="$(git rev-parse HEAD)"
           current_next_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/next" --jq '.object.sha')"
-          if [[ "${current_next_sha}" != "${GITHUB_SHA}" ]]; then
-            echo "A newer next commit (${current_next_sha}) superseded this run (${GITHUB_SHA})."
+          if [[ "${current_next_sha}" != "${checked_out_next_sha}" ]]; then
+            echo "A newer next commit (${current_next_sha}) superseded this run (${checked_out_next_sha})."
             exit 0
           fi
 
@@ -155,7 +170,12 @@ jobs:
 
   release:
     name: release
-    if: github.ref == 'refs/heads/main' && github.repository == 'openai/openai-node'
+    if: >-
+      ${{
+        github.event_name == 'push' &&
+        github.ref == 'refs/heads/main' &&
+        github.repository == 'openai/openai-node'
+      }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -164,23 +184,11 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
-      - name: Validate a merged release PR version
+      - name: Validate pending release PR versions
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          release_pr_title="$(
-            gh api \
-              -H 'Accept: application/vnd.github+json' \
-              "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls" \
-              --jq '[.[] | select(
-                .merged_at != null and
-                .base.ref == "main" and
-                .head.ref == "release-please--branches--main--components--openai"
-              )][0].title // empty'
-          )"
-          if [[ -n "${release_pr_title}" ]]; then
-            bash ./bin/check-release-version "${release_pr_title}"
-          fi
+          bash ./bin/check-pending-release-versions
 
       - name: Check for the legacy Stainless release PR
         id: cutover
@@ -284,7 +292,7 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
-          ref: ${{ needs.publication-check.outputs.release_tag }}
+          ref: refs/tags/${{ needs.publication-check.outputs.release_tag }}
 
       - name: Set up pnpm
         uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
