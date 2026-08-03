@@ -1101,6 +1101,7 @@ export interface BetaResponse {
     | 'gpt-5.6-sol'
     | 'gpt-5.6-terra'
     | 'gpt-5.6-luna'
+    | 'gpt-5.5'
     | 'gpt-5.4'
     | 'gpt-5.4-mini'
     | 'gpt-5.4-nano'
@@ -4061,6 +4062,16 @@ export interface BetaResponseFunctionToolCallOutputItem {
    * The identifier of the actor that created the item.
    */
   created_by?: string;
+
+  /**
+   * The name of the tool that produced the output.
+   */
+  name?: string;
+
+  /**
+   * The namespace of the tool that produced the output.
+   */
+  namespace?: string;
 }
 
 export namespace BetaResponseFunctionToolCallOutputItem {
@@ -5064,6 +5075,16 @@ export namespace BetaResponseInputItem {
      * The execution context that produced this tool call.
      */
     caller?: FunctionCallOutput.Direct | FunctionCallOutput.Program | null;
+
+    /**
+     * The name of the tool that produced the output.
+     */
+    name?: string | null;
+
+    /**
+     * The namespace of the tool that produced the output.
+     */
+    namespace?: string | null;
 
     /**
      * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
@@ -10273,6 +10294,7 @@ export namespace BetaResponsesClientEvent {
       | 'gpt-5.6-sol'
       | 'gpt-5.6-terra'
       | 'gpt-5.6-luna'
+      | 'gpt-5.5'
       | 'gpt-5.4'
       | 'gpt-5.4-mini'
       | 'gpt-5.4-nano'
@@ -11648,6 +11670,7 @@ export interface ResponseCreateParamsBase {
     | 'gpt-5.6-sol'
     | 'gpt-5.6-terra'
     | 'gpt-5.6-luna'
+    | 'gpt-5.5'
     | 'gpt-5.4'
     | 'gpt-5.4-mini'
     | 'gpt-5.4-nano'
@@ -12291,6 +12314,7 @@ export interface ResponseCompactParams {
     | 'gpt-5.6-sol'
     | 'gpt-5.6-terra'
     | 'gpt-5.6-luna'
+    | 'gpt-5.5'
     | 'gpt-5.4'
     | 'gpt-5.4-mini'
     | 'gpt-5.4-nano'
