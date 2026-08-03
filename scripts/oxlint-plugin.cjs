@@ -1,8 +1,41 @@
 /** Import-only unused-binding checks for Oxlint, without ESLint dependencies. */
 
-const JSDOC_BRACED_TYPE_TAG = /@[A-Za-z][\w-]*(?:(?:\s|\*(?=\s))+[^\s{}*]+)?(?:\s|\*(?=\s))*\{/g;
+const JSDOC_TYPE_BEARING_TAGS = new Set([
+  'arg',
+  'argument',
+  'augments',
+  'const',
+  'constant',
+  'define',
+  'enum',
+  'exception',
+  'extends',
+  'external',
+  'host',
+  'implements',
+  'member',
+  'module',
+  'namespace',
+  'param',
+  'prop',
+  'property',
+  'return',
+  'returns',
+  'satisfies',
+  'template',
+  'this',
+  'throws',
+  'type',
+  'typedef',
+  'var',
+  'yield',
+  'yields',
+]);
+const JSDOC_NAMED_TYPE_TAGS = new Set(['arg', 'argument', 'param', 'prop', 'property']);
+const JSDOC_BRACED_TYPE_TAG =
+  /(?:^|[\s*])@([A-Za-z][\w-]*)(?:(?:\s|\*(?=\s))+([^\s{}*@]+))?(?:\s|\*(?=\s))*\{/g;
 const JSDOC_BARE_TYPE_TAG =
-  /@(?:implements|augments|extends|type|this|enum)(?:\s|\*(?=\s))+(?!\{)([A-Za-z_$][\w$.]*(?:\s*<[^\r\n]*>)?)/g;
+  /(?:^|[\s*])@(?:implements|augments|extends|type|this|enum)(?:\s|\*(?=\s))+(?!\{)([A-Za-z_$][\w$.]*(?:\s*<[^\r\n]*>)?)/g;
 
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -10,6 +43,10 @@ function escapeRegExp(value) {
 
 function* getJSDocTypeExpressions(comment) {
   for (const match of comment.matchAll(JSDOC_BRACED_TYPE_TAG)) {
+    if (!JSDOC_TYPE_BEARING_TAGS.has(match[1]) || (match[2] && !JSDOC_NAMED_TYPE_TAGS.has(match[1]))) {
+      continue;
+    }
+
     const start = match.index + match[0].length;
     let depth = 1;
     let quote;

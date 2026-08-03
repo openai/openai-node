@@ -230,6 +230,118 @@ console.log(accept(produce()));
   );
 });
 
+test('distinguishes type-bearing JSDoc tags from prose and documentation tags', () => {
+  const typeBearingTags = [
+    'arg',
+    'argument',
+    'augments',
+    'const',
+    'constant',
+    'define',
+    'enum',
+    'exception',
+    'extends',
+    'external',
+    'host',
+    'implements',
+    'member',
+    'module',
+    'namespace',
+    'param',
+    'prop',
+    'property',
+    'return',
+    'returns',
+    'satisfies',
+    'template',
+    'this',
+    'throws',
+    'type',
+    'typedef',
+    'var',
+    'yield',
+    'yields',
+  ];
+  const documentationTags = [
+    'example',
+    'deprecated',
+    'description',
+    'desc',
+    'see',
+    'link',
+    'linkcode',
+    'linkplain',
+    'summary',
+    'remarks',
+    'author',
+    'since',
+    'version',
+    'todo',
+    'license',
+    'default',
+    'modifies',
+    'callback',
+    'overload',
+    'class',
+    'constructor',
+    'private',
+    'protected',
+    'public',
+    'custom-tag',
+  ];
+  const tags = [
+    ...typeBearingTags.map((tag) => ({ tag, name: `Type${tag}Only`, used: true })),
+    ...documentationTags.map((tag) => ({ tag, name: `Prose${tag.replaceAll('-', '')}Only`, used: false })),
+  ];
+  const misleadingTags = ['throws', 'returns', 'typedef', 'template'].map((tag) => ({
+    tag,
+    name: `Misleading${tag}Only`,
+  }));
+  const embeddedTypeTags = [
+    { name: 'QuotedExampleOnly', comment: '/** @example "@type {QuotedExampleOnly}" */' },
+    { name: 'BacktickedExampleOnly', comment: '/** @example `@type {BacktickedExampleOnly}` */' },
+    { name: 'QuotedDeprecatedOnly', comment: '/** @deprecated "@type {QuotedDeprecatedOnly}" */' },
+    { name: 'EmailOnly', comment: '/** Contact user@type {EmailOnly} */' },
+    { name: 'QuotedBareExampleOnly', comment: '/** @example "@type QuotedBareExampleOnly" */' },
+    {
+      name: 'BacktickedBareExampleOnly',
+      comment: '/** @example `@implements BacktickedBareExampleOnly` */',
+    },
+    { name: 'BareEmailOnly', comment: '/** Contact user@type BareEmailOnly */' },
+  ];
+  const imports = [
+    ...tags.map(({ name }) => `import { Foo as ${name} } from './dep.js';`),
+    ...misleadingTags.map(({ name }) => `import { Foo as ${name} } from './dep.js';`),
+    ...embeddedTypeTags.map(({ name }) => `import { Foo as ${name} } from './dep.js';`),
+    `import { Foo as RealNestedTagOnly } from './dep.js';`,
+  ];
+  const comments = [
+    ...tags.map(({ tag, name }) => `/** @${tag} {${name}} */`),
+    ...misleadingTags.map(({ tag, name }) => `/** @${tag} description {${name}} */`),
+    ...embeddedTypeTags.map(({ comment }) => comment),
+    `/**\n * @example\n * @param {RealNestedTagOnly} value\n */`,
+  ];
+  const fixturePath = writeFixture(
+    'jsdoc-tag-classification.js',
+    `${imports.join('\n')}\n${comments.join('\n')}\nconsole.log('done');\n`,
+  );
+
+  runOxlintFix(fixturePath);
+  const fixed = fs.readFileSync(fixturePath, 'utf8');
+
+  for (const { name, used } of tags) {
+    const importText = `import { Foo as ${name} }`;
+    assert.equal(fixed.includes(importText), used, name);
+  }
+  for (const { name } of misleadingTags) {
+    assert.ok(!fixed.includes(`import { Foo as ${name} }`), name);
+  }
+  for (const { name } of embeddedTypeTags) {
+    assert.ok(!fixed.includes(`import { Foo as ${name} }`), name);
+  }
+  assert.ok(fixed.includes(`import { Foo as RealNestedTagOnly }`));
+});
+
 test('does not conflate separate imports with sibling namespace use', () => {
   const cases = [
     {
