@@ -1,59 +1,4 @@
-/**
- * Import-only unused-binding checks for Oxlint, without ESLint dependencies.
- *
- * Stainless-generated sources sometimes import both a namespace and the same
- * unaliased member from one module. Preserve that existing convention when the
- * member is accessed through the namespace, even if the direct binding is
- * unused.
- */
-function isUsedThroughSiblingNamespace(sourceCode, importDeclaration, specifier) {
-  if (
-    specifier.type !== 'ImportSpecifier' ||
-    specifier.imported.type !== 'Identifier' ||
-    specifier.imported.name !== specifier.local.name
-  ) {
-    return false;
-  }
-
-  const name = specifier.imported.name;
-
-  for (const declaration of sourceCode.ast.body) {
-    if (
-      declaration.type !== 'ImportDeclaration' ||
-      declaration === importDeclaration ||
-      declaration.source.value !== importDeclaration.source.value
-    ) {
-      continue;
-    }
-
-    for (const specifier of declaration.specifiers) {
-      if (specifier.type !== 'ImportNamespaceSpecifier') {
-        continue;
-      }
-
-      const variable = sourceCode
-        .getDeclaredVariables(declaration)
-        .find((candidate) => candidate.name === specifier.local.name);
-
-      if (
-        variable?.references.some(({ identifier }) => {
-          const parent = identifier.parent;
-          return (
-            (parent?.type === 'MemberExpression' &&
-              parent.object === identifier &&
-              !parent.computed &&
-              parent.property.name === name) ||
-            (parent?.type === 'TSQualifiedName' && parent.left === identifier && parent.right.name === name)
-          );
-        })
-      ) {
-        return true;
-      }
-    }
-  }
-
-  return false;
-}
+/** Import-only unused-binding checks for Oxlint, without ESLint dependencies. */
 
 const JSDOC_TYPE_TAG = /@(?:type|typedef|param|returns?)\s*\{([^}]*)\}/g;
 
@@ -143,10 +88,6 @@ const noUnusedImports = {
             (candidate) => candidate.local.name === variable.name,
           );
           if (!specifier) {
-            continue;
-          }
-
-          if (isUsedThroughSiblingNamespace(sourceCode, declaration, specifier)) {
             continue;
           }
 

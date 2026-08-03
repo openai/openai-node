@@ -106,7 +106,7 @@ console.log(accept(produce()));
   assert.equal(fs.readFileSync(fixturePath, 'utf8'), before);
 });
 
-test('only treats matching unaliased named imports as sibling namespace use', () => {
+test('does not conflate separate imports with sibling namespace use', () => {
   const cases = [
     {
       name: 'namespace-default.js',
@@ -130,8 +130,8 @@ test('only treats matching unaliased named imports as sibling namespace use', ()
     },
     {
       name: 'namespace-matching-named.js',
-      source: `import * as models from './dep.js';\nimport { Foo } from './dep.js';\nconsole.log(models.Foo);\n`,
-      present: 'import { Foo }',
+      source: `import * as API from './x';\nimport { Foo } from './x';\nconsole.log(API.Foo);\n`,
+      absent: 'import { Foo }',
     },
   ];
 
@@ -140,7 +140,6 @@ test('only treats matching unaliased named imports as sibling namespace use', ()
     runOxlintFix(fixturePath);
     const fixed = fs.readFileSync(fixturePath, 'utf8');
     if (fixture.absent) assert.doesNotMatch(fixed, new RegExp(fixture.absent), fixture.name);
-    if (fixture.present) assert.match(fixed, new RegExp(fixture.present), fixture.name);
   }
 });
 

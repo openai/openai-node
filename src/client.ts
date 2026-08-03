@@ -19,7 +19,6 @@ import type { WorkloadIdentity } from './auth/types';
 import { WorkloadIdentityAuth } from './auth/workload-identity-auth';
 import { OAuthError, SubjectTokenProviderError } from './core/error';
 import {
-  AbstractPage,
   type ConversationCursorPageParams,
   ConversationCursorPageResponse,
   type CursorPageParams,
