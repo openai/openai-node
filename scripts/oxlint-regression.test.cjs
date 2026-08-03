@@ -5,6 +5,7 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { after, test } = require('node:test');
 const ts = require('typescript');
+require('./oxlint-review-regression.test.cjs');
 
 const repoRoot = path.resolve(__dirname, '..');
 const fixtureRoot = fs.mkdtempSync(path.join(repoRoot, 'oxlint-regression-'));

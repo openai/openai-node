@@ -62,9 +62,12 @@ function getEntityRoot(entity) {
   }
 }
 
-function addEntityReference(entity, bindings, used) {
+function addEntityReference(entity, bindings, used, namespace = 'type') {
   const name = getEntityRoot(entity);
-  if (name && !bindings.has(name)) used.add(name);
+  if (!name || bindings.has(name)) return;
+  const namespaces = used.get(name) ?? new Set();
+  namespaces.add(namespace);
+  used.set(name, namespaces);
 }
 
 function getInferBindings(node, bindings = new Set()) {
@@ -81,7 +84,7 @@ function getInferBindings(node, bindings = new Set()) {
 function collectExpressionReferences(node, bindings, used) {
   if (!node) return;
   if (ts.isIdentifier(node)) {
-    addEntityReference(node, bindings, used);
+    addEntityReference(node, bindings, used, 'value');
   } else if (ts.isPropertyAccessExpression(node)) {
     collectExpressionReferences(node.expression, bindings, used);
   } else {
@@ -99,7 +102,7 @@ function collectTypeReferences(node, bindings, used) {
   }
 
   if (ts.isTypeQueryNode(node)) {
-    addEntityReference(node.exprName, bindings, used);
+    addEntityReference(node.exprName, bindings, used, 'value');
     node.typeArguments?.forEach((argument) => collectTypeReferences(argument, bindings, used));
     return;
   }
@@ -323,9 +326,19 @@ function normalizeJSDocTag(tag, text) {
   return parseJSDocComment(`/** @${canonicalName}${tail} */`).comment?.tags?.[0];
 }
 
-function getJSDocRootBinding(sourceCode, comment, name) {
+function getJSDocRootBinding(sourceCode, comment, name, namespace) {
   const token = sourceCode.getTokenAfter(comment) ?? sourceCode.getTokenBefore(comment);
   const node = token && sourceCode.getNodeByRangeIndex(token.range[0]);
+
+  if (namespace === 'value') {
+    const documented = node?.type === 'ExportNamedDeclaration' ? node.declaration : node;
+    const initializer =
+      documented?.type === 'VariableDeclaration' ? documented.declarations[0]?.init : undefined;
+    if (initializer?.type === 'ArrowFunctionExpression' || initializer?.type === 'FunctionExpression') {
+      const parameter = sourceCode.getScope(initializer).set.get(name);
+      if (parameter?.defs.some((definition) => definition.type === 'Parameter')) return parameter;
+    }
+  }
 
   for (let scope = sourceCode.getScope(node ?? sourceCode.ast); scope; scope = scope.upper) {
     const [start, end] = scope.block.range;
@@ -346,7 +359,7 @@ function getJSDocImportUsage(sourceCode) {
     const doc = parsed.comment;
     if (!doc) continue;
 
-    const references = new Set();
+    const references = new Map();
     const tags = doc.tags ?? [];
     const bindings = new Set();
     const templateBindings = new Set();
@@ -427,9 +440,11 @@ function getJSDocImportUsage(sourceCode) {
       previousTag = originalTag;
     }
 
-    for (const name of references) {
-      const binding = getJSDocRootBinding(sourceCode, comment, name);
-      if (binding) used.add(binding);
+    for (const [name, namespaces] of references) {
+      for (const namespace of namespaces) {
+        const binding = getJSDocRootBinding(sourceCode, comment, name, namespace);
+        if (binding) used.add(binding);
+      }
     }
   }
 
@@ -627,6 +642,27 @@ const noUnusedImports = {
             fix: (fixer) => fixUnusedImports(sourceCode, declaration, unusedSpecifiers, fixer),
           });
         }
+      },
+      TSImportEqualsDeclaration(declaration) {
+        if (declaration.parent?.type === 'ExportNamedDeclaration') return;
+
+        const [variable] = sourceCode.getDeclaredVariables(declaration);
+        if (
+          !variable ||
+          variable.references.some((reference) => reference.identifier !== variable.identifiers[0]) ||
+          jsxUsedImports.has(variable) ||
+          jsDocUsedImports.has(variable)
+        ) {
+          return;
+        }
+
+        context.report({
+          node: declaration,
+          messageId: 'unused',
+          data: { names: `'${variable.name}'` },
+          fix: (fixer) =>
+            sourceCode.getCommentsInside(declaration).length > 0 ? null : fixer.remove(declaration),
+        });
       },
     };
   },
