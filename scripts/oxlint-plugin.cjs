@@ -320,7 +320,122 @@ function readJSDocLinkTarget(comment, start) {
   return { expression: comment.slice(start, end), end };
 }
 
-function* getJSDocTypeExpressions(comment) {
+function readJSDocTemplateDefault(comment, start) {
+  let braceDepth = 0;
+  let parenthesisDepth = 0;
+  let bracketDepth = 0;
+  let genericDepth = 0;
+  let quote;
+  const templateInterpolationDepths = [];
+
+  for (let end = start; end < comment.length; end++) {
+    const character = comment[end];
+    if (quote) {
+      if (character === '\\') {
+        end++;
+      } else if (quote === '`' && character === '$' && comment[end + 1] === '{') {
+        templateInterpolationDepths.push(braceDepth++);
+        quote = undefined;
+        end++;
+      } else if (character === quote) {
+        quote = undefined;
+      }
+      continue;
+    }
+
+    if (character === '"' || character === "'" || character === '`') {
+      quote = character;
+    } else if (character === '{') {
+      braceDepth++;
+    } else if (character === '}') {
+      if (braceDepth === 0) return;
+      braceDepth--;
+      if (templateInterpolationDepths.at(-1) === braceDepth) {
+        templateInterpolationDepths.pop();
+        quote = '`';
+      }
+    } else if (character === '(') {
+      parenthesisDepth++;
+    } else if (character === ')' && parenthesisDepth > 0) {
+      parenthesisDepth--;
+    } else if (character === '[') {
+      bracketDepth++;
+    } else if (character === ']') {
+      if (bracketDepth > 0) {
+        bracketDepth--;
+      } else if (braceDepth === 0 && parenthesisDepth === 0 && genericDepth === 0) {
+        const expression = comment.slice(start, end).trim();
+        if (!expression) return;
+        return { expression, end: end + 1 };
+      }
+    } else if (character === '<' && comment[end + 1] !== '=') {
+      genericDepth++;
+    } else if (character === '>' && comment[end - 1] !== '=' && genericDepth > 0) {
+      genericDepth--;
+    } else if (
+      character === '@' &&
+      braceDepth === 0 &&
+      parenthesisDepth === 0 &&
+      bracketDepth === 0 &&
+      genericDepth === 0 &&
+      /\s/u.test(comment[end - 1] ?? '')
+    ) {
+      return;
+    }
+  }
+}
+
+function readJSDocTemplateDeclaration(comment, start) {
+  const bindings = [];
+  const types = [];
+  let cursor = start;
+  let end = start;
+
+  if (comment[cursor] === '{') {
+    const constraint = readJSDocBracedType(comment, cursor + 1);
+    if (!constraint) return { bindings, types, end };
+    types.push(constraint.expression);
+    cursor = skipJSDocWhitespace(comment, constraint.end);
+    end = constraint.end;
+  }
+
+  while (cursor < comment.length) {
+    const bracketed = comment[cursor] === '[';
+    if (bracketed) cursor = skipJSDocWhitespace(comment, cursor + 1);
+
+    let identifier = readJSDocIdentifier(comment, cursor);
+    while (identifier && ['in', 'out', 'const'].includes(identifier.value)) {
+      const next = readJSDocIdentifier(comment, skipJSDocWhitespace(comment, identifier.end));
+      if (!next) break;
+      identifier = next;
+    }
+    if (!identifier) break;
+
+    let parameterEnd = identifier.end;
+    if (bracketed) {
+      const afterIdentifier = skipJSDocWhitespace(comment, identifier.end);
+      if (comment[afterIdentifier] !== '=') break;
+
+      const defaultType = readJSDocTemplateDefault(
+        comment,
+        skipJSDocWhitespace(comment, afterIdentifier + 1),
+      );
+      if (!defaultType) break;
+      types.push(defaultType.expression);
+      parameterEnd = defaultType.end;
+    }
+
+    bindings.push(identifier.value);
+    end = parameterEnd;
+    cursor = skipJSDocWhitespace(comment, parameterEnd);
+    if (comment[cursor] !== ',') break;
+    cursor = skipJSDocWhitespace(comment, cursor + 1);
+  }
+
+  return { bindings, types, end };
+}
+
+function* getJSDocTypeExpressions(comment, templateBindings, templateTypes) {
   for (let index = 0; index < comment.length;) {
     while (comment[index] === ' ' || comment[index] === '\t') index++;
     if (comment[index] === '*') index++;
@@ -353,7 +468,12 @@ function* getJSDocTypeExpressions(comment) {
       const afterWhitespace = skipJSDocWhitespace(comment, afterTag);
       let type;
 
-      if (JSDOC_REFERENCE_TAGS.has(tag)) {
+      if (tag === 'template') {
+        const template = readJSDocTemplateDeclaration(comment, afterWhitespace);
+        for (const binding of template.bindings) templateBindings.add(binding);
+        templateTypes.push(...template.types);
+        type = template;
+      } else if (JSDOC_REFERENCE_TAGS.has(tag)) {
         type = readJSDocLinkTarget(comment, afterWhitespace);
       } else if (comment[afterWhitespace] === '{') {
         type = readJSDocBracedType(comment, afterWhitespace + 1);
@@ -376,7 +496,7 @@ function* getJSDocTypeExpressions(comment) {
         type = readJSDocBareType(comment, afterWhitespace);
       }
 
-      if (type) yield type.expression;
+      if (type?.expression) yield type.expression;
 
       const sibling = findJSDocSiblingTag(comment, type?.end ?? afterTag);
       if (sibling === undefined) {
@@ -749,12 +869,131 @@ function isUsedThroughJSDoc(sourceCode, name) {
       return false;
     }
 
-    const expressions = [
-      ...getJSDocTypeExpressions(comment.value),
-      ...getJSDocInlineLinkExpressions(comment.value),
-    ];
+    const templateBindings = new Set();
+    const templateTypes = [];
+    const typeExpressions = [...getJSDocTypeExpressions(comment.value, templateBindings, templateTypes)];
+    const expressions = templateBindings.has(name)
+      ? templateTypes
+      : [...typeExpressions, ...templateTypes, ...getJSDocInlineLinkExpressions(comment.value)];
     return expressions.some((expression) => isJSDocTypeReference(expression, name));
   });
+}
+
+function getJSXFactoryRoot(expression) {
+  if (typeof expression !== 'string') return;
+
+  const root = readJSDocIdentifier(expression, 0);
+  if (!root) return;
+
+  let index = root.end;
+  while (index < expression.length) {
+    if (expression[index] !== '.') return;
+    const member = readJSDocIdentifier(expression, index + 1);
+    if (!member) return;
+    index = member.end;
+  }
+
+  return root.value;
+}
+
+function getJSXPragmas(sourceCode) {
+  const pragmas = {};
+  const firstStatementStart = sourceCode.ast.body[0]?.range[0] ?? sourceCode.text.length;
+
+  for (const comment of sourceCode.getAllComments()) {
+    if (comment.range[1] > firstStatementStart) break;
+    if (comment.type !== 'Block') continue;
+
+    let inExample = false;
+    for (const rawLine of comment.value.split(/\r\n|[\n\r\u2028\u2029]/u)) {
+      let line = rawLine.trimStart();
+      if (line.startsWith('*')) line = line.slice(1).trimStart();
+
+      const tag = /^@([A-Za-z][\w-]*)(?=\s|$)/u.exec(line);
+      if (!tag) continue;
+
+      const name = tag[1].toLowerCase();
+      if (name === 'example') {
+        inExample = true;
+        continue;
+      }
+      if (!['jsx', 'jsxfrag', 'jsxruntime', 'jsximportsource'].includes(name)) {
+        inExample = false;
+        continue;
+      }
+      if (inExample) continue;
+
+      const value = line.slice(tag[0].length).trimStart().split(/\s/u, 1)[0];
+      if (!value) continue;
+
+      if (name === 'jsx' || name === 'jsxfrag') {
+        if (getJSXFactoryRoot(value)) pragmas[name] = value;
+      } else if (name === 'jsxruntime') {
+        if (value === 'classic' || value === 'automatic') pragmas[name] = value;
+      } else {
+        pragmas[name] = value;
+      }
+    }
+  }
+
+  return pragmas;
+}
+
+function getJSXRootBinding(sourceCode, node, name) {
+  for (let scope = sourceCode.getScope(node); scope; scope = scope.upper) {
+    const variable = scope.set.get(name);
+    if (variable) return variable;
+  }
+}
+
+function getJSXImportUsage(context) {
+  if (!context.languageOptions.parserOptions.ecmaFeatures.jsx) return new Set();
+
+  const sourceCode = context.sourceCode;
+  const visitorKeys = sourceCode.visitorKeys;
+  const nodes = [sourceCode.ast];
+  const jsxNodes = [];
+
+  while (nodes.length > 0) {
+    const node = nodes.pop();
+    if (!node) continue;
+    if (node.type === 'JSXElement' || node.type === 'JSXFragment') jsxNodes.push(node);
+
+    for (const key of visitorKeys[node.type] ?? []) {
+      const child = node[key];
+      if (Array.isArray(child)) {
+        nodes.push(...child);
+      } else if (child) {
+        nodes.push(child);
+      }
+    }
+  }
+
+  if (jsxNodes.length === 0) return new Set();
+
+  const options = context.options[0] ?? {};
+  const pragmas = getJSXPragmas(sourceCode);
+  let runtime = options.jsxRuntime ?? 'classic';
+  if (pragmas.jsximportsource) runtime = 'automatic';
+  if (pragmas.jsxruntime) runtime = pragmas.jsxruntime;
+  if (runtime !== 'classic') return new Set();
+
+  const used = new Set();
+  const factory = getJSXFactoryRoot(pragmas.jsx ?? options.jsxFactory ?? 'React.createElement');
+  const fragment = getJSXFactoryRoot(pragmas.jsxfrag ?? options.jsxFragmentFactory ?? 'React.Fragment');
+
+  for (const node of jsxNodes) {
+    if (factory) {
+      const binding = getJSXRootBinding(sourceCode, node, factory);
+      if (binding) used.add(binding);
+    }
+    if (fragment && node.type === 'JSXFragment') {
+      const binding = getJSXRootBinding(sourceCode, node, fragment);
+      if (binding) used.add(binding);
+    }
+  }
+
+  return used;
 }
 
 function fixCommentedUnusedImports(sourceCode, declaration, unusedSpecifiers, retainedSpecifiers, fixer) {
@@ -851,7 +1090,17 @@ const noUnusedImports = {
   meta: {
     type: 'problem',
     fixable: 'code',
-    schema: [],
+    schema: [
+      {
+        type: 'object',
+        properties: {
+          jsxRuntime: { enum: ['classic', 'automatic'] },
+          jsxFactory: { type: 'string' },
+          jsxFragmentFactory: { type: 'string' },
+        },
+        additionalProperties: false,
+      },
+    ],
     messages: {
       unused: 'Imported bindings {{names}} are never used.',
     },
@@ -859,13 +1108,18 @@ const noUnusedImports = {
 
   create(context) {
     const sourceCode = context.sourceCode;
+    const jsxUsedImports = getJSXImportUsage(context);
 
     return {
       ImportDeclaration(declaration) {
         const unusedSpecifiers = [];
 
         for (const variable of sourceCode.getDeclaredVariables(declaration)) {
-          if (variable.references.length > 0 || isUsedThroughJSDoc(sourceCode, variable.name)) {
+          if (
+            variable.references.some((reference) => reference.identifier !== variable.identifiers[0]) ||
+            jsxUsedImports.has(variable) ||
+            isUsedThroughJSDoc(sourceCode, variable.name)
+          ) {
             continue;
           }
 
