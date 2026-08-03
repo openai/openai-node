@@ -10,6 +10,7 @@ on:
       - CI
     types:
       - requested
+      - completed
     branches:
       - next
   pull_request:
@@ -22,6 +23,44 @@ on:
       - synchronize
 
 jobs:
+  redraft-promotion:
+    name: re-draft promotion PR
+    if: >-
+      ${{
+        github.repository == 'openai/openai-node' &&
+        github.event_name == 'workflow_run' &&
+        github.event.action == 'requested' &&
+        github.event.workflow_run.event == 'push'
+      }}
+    concurrency:
+      group: promote-stainless-next
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+
+    steps:
+      - name: Re-draft the existing promotion PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          promotion_pr="$(
+            gh pr list \
+              --repo "${GITHUB_REPOSITORY}" \
+              --state open \
+              --base main \
+              --head next \
+              --json isDraft,number \
+              --jq '.[0] // empty'
+          )"
+          if [[ -z "${promotion_pr}" || "$(jq -r '.isDraft' <<< "${promotion_pr}")" == 'true' ]]; then
+            exit 0
+          fi
+          gh pr ready \
+            "$(jq -r -e '.number' <<< "${promotion_pr}")" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --undo
+
   promote:
     name: promote Stainless changes
     if: >-
@@ -31,7 +70,9 @@ jobs:
           github.event_name == 'push' ||
           (
             github.event_name == 'workflow_run' &&
-            github.event.workflow_run.event == 'push'
+            github.event.action == 'completed' &&
+            github.event.workflow_run.event == 'push' &&
+            github.event.workflow_run.conclusion == 'success'
           ) ||
           (
             github.event_name == 'pull_request' &&
@@ -59,7 +100,7 @@ jobs:
         with:
           fetch-depth: 0
           path: .next
-          ref: refs/heads/next
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || 'refs/heads/next' }}
 
       - name: Create or re-draft the promotion PR
         env:
@@ -68,6 +109,30 @@ jobs:
           legacy_pr="$(bash ./bin/find-legacy-release-pr open-number)"
           if [[ -n "${legacy_pr}" ]]; then
             echo "Waiting for legacy release PR #${legacy_pr} before promoting next directly."
+            exit 0
+          fi
+
+          checked_out_next_sha="$(git -C .next rev-parse HEAD)"
+          current_next_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/next" --jq '.object.sha')"
+          if [[ "${current_next_sha}" != "${checked_out_next_sha}" ]]; then
+            echo "A newer next commit (${current_next_sha}) superseded this run (${checked_out_next_sha})."
+            exit 0
+          fi
+
+          successful_ci_runs="$(
+            gh run list \
+              --repo "${GITHUB_REPOSITORY}" \
+              --workflow ci.yml \
+              --branch next \
+              --commit "${checked_out_next_sha}" \
+              --event push \
+              --status success \
+              --limit 1 \
+              --json headSha \
+              --jq 'length'
+          )"
+          if [[ "${successful_ci_runs}" != '1' ]]; then
+            echo "No successful next CI run exists for ${checked_out_next_sha}; leaving promotion deferred."
             exit 0
           fi
 
@@ -125,13 +190,6 @@ jobs:
             promotion_type='fix(api)'
           fi
           promotion_title="${promotion_type}: promote Stainless-generated changes"
-
-          checked_out_next_sha="$(git -C .next rev-parse HEAD)"
-          current_next_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/next" --jq '.object.sha')"
-          if [[ "${current_next_sha}" != "${checked_out_next_sha}" ]]; then
-            echo "A newer next commit (${current_next_sha}) superseded this run (${checked_out_next_sha})."
-            exit 0
-          fi
 
           promotion_pr="$(
             gh pr list \
