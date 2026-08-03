@@ -57,6 +57,22 @@ function assertJSDocCases(fixtureName, cases) {
   }
 }
 
+function assertNoMissingJSDocTypes(fixturePath, name) {
+  const program = ts.createProgram([fixturePath], {
+    allowJs: true,
+    checkJs: true,
+    noEmit: true,
+    skipLibCheck: true,
+    types: [],
+  });
+  const missing = ts.getPreEmitDiagnostics(program).filter((diagnostic) => diagnostic.code === 2304);
+  assert.deepEqual(
+    missing.map((diagnostic) => diagnostic.messageText),
+    [],
+    name,
+  );
+}
+
 function assertJSXImportBindings(fixturePath, bindings, fixtureName) {
   const imports = fs
     .readFileSync(fixturePath, 'utf8')
@@ -456,6 +472,83 @@ test('retains compiler-recognized grouped keyof operands and newline-separated m
         `${name}: ${binding}`,
       );
     }
+  }
+});
+
+test('resolves JSDoc imports against their visible lexical bindings', () => {
+  const cases = [
+    ['function-local', 'export function use() { class Foo {} /** @type {Foo} */ let value; }', false],
+    ['block-local', 'export function use() { { class Foo {} /** @type {Foo} */ let value; } }', false],
+    ['hoisted-local', 'export function use() { /** @type {Foo} */ let value; class Foo {} }', false],
+    ['module-visible', '/** @type {Foo} */ export let value;', true],
+    [
+      'shadowed-and-visible',
+      'export function use() { class Foo {} /** @type {Foo} */ let local; }\n/** @type {Foo} */ export let visible;',
+      true,
+    ],
+  ];
+  for (const [name, body, keepFoo] of cases) {
+    const fixturePath = writeFixture(
+      `jsdoc-binding-${name}.js`,
+      `// @ts-check\nimport { Foo, Bar, Ref } from './type-dep.js';\n${body}\n/** @type {Bar} */ export let imported;\n`,
+    );
+    assertNoMissingJSDocTypes(fixturePath, `${name}: before fix`);
+    runOxlintFix(fixturePath);
+    assertNoMissingJSDocTypes(fixturePath, `${name}: after fix`);
+    const fixed = fs.readFileSync(fixturePath, 'utf8');
+    assert.equal(/\bFoo\b/u.test(fixed.split('\n')[1]), keepFoo, `${name}: Foo import`);
+    assert.match(fixed, /import \{[^}]*\bBar\b/u, `${name}: imported Bar`);
+    assert.doesNotMatch(fixed, /import \{[^}]*\bRef\b/u, `${name}: unused Ref`);
+  }
+});
+
+test('recognizes real sibling tags after individually closed prose code spans', () => {
+  for (const [name, prose] of [
+    ['comma-separated', '`a`, `b`'],
+    ['prose-separated', '`a` and `b`'],
+    ['three-spans', '`a`, ordinary `b`, then `c`'],
+  ]) {
+    const source = `// @ts-check\nimport { Foo, Bar, Ref } from './type-dep.js';\n/** @param {Foo} x ${prose} @returns {Bar} */\nexport function convert(x) { return x; }\n`;
+    const fixturePath = writeFixture(`jsdoc-closed-spans-${name}.js`, source);
+    const compilerSource = ts.createSourceFile(fixturePath, source, ts.ScriptTarget.Latest, true);
+    const tags = compilerSource.statements.at(-1).jsDoc[0].tags;
+    assert.ok(ts.isJSDocParameterTag(tags[0]) && ts.isJSDocReturnTag(tags[1]), name);
+    assertNoMissingJSDocTypes(fixturePath, `${name}: before fix`);
+    runOxlintFix(fixturePath);
+    assertNoMissingJSDocTypes(fixturePath, `${name}: after fix`);
+    const fixed = fs.readFileSync(fixturePath, 'utf8');
+    assert.match(fixed, /import \{ Foo, Bar \}/u, `${name}: Foo and Bar`);
+    assert.doesNotMatch(fixed, /import \{[^}]*\bRef\b/u, `${name}: unused Ref`);
+  }
+});
+
+test('retains imports used in nested callback and overload JSDoc signatures', () => {
+  const cases = [
+    [
+      'callback',
+      '/**\n * @callback Handler\n * @param {Foo} value\n * @returns {Bar}\n */\n/** @type {Handler} */\nexport let handler;',
+    ],
+    [
+      'overload',
+      '/**\n * @overload\n * @param {Foo} value\n * @returns {Bar}\n */\n/** @param {*} value @returns {*} */\nexport function convert(value) { return value; }',
+    ],
+  ];
+  for (const [name, body] of cases) {
+    const source = `// @ts-check\nimport { Foo, Bar, Ref } from './type-dep.js';\n${body}\n`;
+    const fixturePath = writeFixture(`jsdoc-signature-${name}.js`, source);
+    const compilerSource = ts.createSourceFile(fixturePath, source, ts.ScriptTarget.Latest, true);
+    const signature = compilerSource.statements.at(-1).jsDoc[0].tags[0];
+    assert.equal(
+      signature.kind,
+      ts.SyntaxKind[name === 'callback' ? 'JSDocCallbackTag' : 'JSDocOverloadTag'],
+    );
+    assert.ok(signature.typeExpression.parameters.length && signature.typeExpression.type, name);
+    assertNoMissingJSDocTypes(fixturePath, `${name}: before fix`);
+    runOxlintFix(fixturePath);
+    assertNoMissingJSDocTypes(fixturePath, `${name}: after fix`);
+    const fixed = fs.readFileSync(fixturePath, 'utf8');
+    assert.match(fixed, /import \{ Foo, Bar \}/u, `${name}: Foo and Bar`);
+    assert.doesNotMatch(fixed, /import \{[^}]*\bRef\b/u, `${name}: unused Ref`);
   }
 });
 

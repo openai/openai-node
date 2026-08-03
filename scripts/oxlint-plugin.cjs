@@ -212,7 +212,9 @@ function isWithinTemplateProse(text, previous, current) {
     `const value = ${expression};`,
     ts.ScriptTarget.Latest,
   );
-  return source.parseDiagnostics.length > 0;
+  return source.parseDiagnostics.some(
+    (diagnostic) => diagnostic.code === ts.Diagnostics.Unterminated_template_literal.code,
+  );
 }
 
 function getCanonicalTemplateTag(tag, parsed) {
@@ -320,6 +322,18 @@ function normalizeJSDocTag(tag, text) {
   return parseJSDocComment(`/** @${canonicalName}${tail} */`).comment?.tags?.[0];
 }
 
+function getJSDocRootBinding(sourceCode, comment, name) {
+  const token = sourceCode.getTokenAfter(comment) ?? sourceCode.getTokenBefore(comment);
+  const node = token && sourceCode.getNodeByRangeIndex(token.range[0]);
+
+  for (let scope = sourceCode.getScope(node ?? sourceCode.ast); scope; scope = scope.upper) {
+    const [start, end] = scope.block.range;
+    if (comment.range[0] < start || comment.range[1] > end) continue;
+    const variable = scope.set.get(name);
+    if (variable) return variable;
+  }
+}
+
 function getJSDocImportUsage(sourceCode) {
   const used = new Set();
 
@@ -331,6 +345,7 @@ function getJSDocImportUsage(sourceCode) {
     const doc = parsed.comment;
     if (!doc) continue;
 
+    const references = new Set();
     const tags = doc.tags ?? [];
     const bindings = new Set();
     const templates = new Map();
@@ -344,7 +359,7 @@ function getJSDocImportUsage(sourceCode) {
       }
     }
 
-    collectDocumentationLinks(doc.comment, bindings, used, parsed.text);
+    collectDocumentationLinks(doc.comment, bindings, references, parsed.text);
 
     let inExample = false;
     let documentationTag;
@@ -370,10 +385,17 @@ function getJSDocImportUsage(sourceCode) {
         continue;
       }
 
+      if (ts.isJSDocCallbackTag(originalTag) || ts.isJSDocOverloadTag(originalTag)) {
+        documentationTag = undefined;
+        collectTypeReferences(originalTag.typeExpression, bindings, references);
+        previousTag = originalTag;
+        continue;
+      }
+
       if (!TYPE_BEARING_TAGS.has(name) && !REFERENCE_TAGS.has(name)) {
         documentationTag = originalTag;
-        collectDocumentationLinks(originalTag.comment, bindings, used, parsed.text);
-        collectBacktickedDocumentationLinks(originalTag, bindings, used, parsed.text);
+        collectDocumentationLinks(originalTag.comment, bindings, references, parsed.text);
+        collectBacktickedDocumentationLinks(originalTag, bindings, references, parsed.text);
         previousTag = originalTag;
         continue;
       }
@@ -383,23 +405,28 @@ function getJSDocImportUsage(sourceCode) {
       if (!tag) continue;
 
       if (ts.isJSDocTemplateTag(tag)) {
-        collectTypeReferences(tag.constraint, new Set(), used);
+        collectTypeReferences(tag.constraint, new Set(), references);
         for (const parameter of tag.typeParameters) {
-          collectTypeReferences(parameter.default, new Set(), used);
+          collectTypeReferences(parameter.default, new Set(), references);
         }
       } else if (ts.isJSDocSeeTag(tag)) {
         const prefix = parsed.text.slice(
           originalTag.tagName.end,
           originalTag.name?.name?.pos ?? originalTag.name?.pos ?? originalTag.end,
         );
-        if (!prefix.includes('{')) addEntityReference(tag.name?.name, bindings, used);
+        if (!prefix.includes('{')) addEntityReference(tag.name?.name, bindings, references);
       } else {
-        collectJSDocTagReferences(tag, originalTag, parsed, bindings, used);
+        collectJSDocTagReferences(tag, originalTag, parsed, bindings, references);
       }
 
-      collectDocumentationLinks(originalTag.comment, bindings, used, parsed.text);
-      collectBacktickedDocumentationLinks(originalTag, bindings, used, parsed.text);
+      collectDocumentationLinks(originalTag.comment, bindings, references, parsed.text);
+      collectBacktickedDocumentationLinks(originalTag, bindings, references, parsed.text);
       previousTag = originalTag;
+    }
+
+    for (const name of references) {
+      const binding = getJSDocRootBinding(sourceCode, comment, name);
+      if (binding) used.add(binding);
     }
   }
 
@@ -578,7 +605,7 @@ const noUnusedImports = {
           if (
             variable.references.some((reference) => reference.identifier !== variable.identifiers[0]) ||
             jsxUsedImports.has(variable) ||
-            jsDocUsedImports.has(variable.name)
+            jsDocUsedImports.has(variable)
           ) {
             continue;
           }
