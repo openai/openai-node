@@ -79,8 +79,8 @@ $ pnpm link --global openai
 ## Running tests
 
 The test suite is split between handwritten unit tests, which run with Vitest,
-and Stainless-generated API-resource tests, which remain on Jest. Generated
-tests have a Stainless-generated comment at the top of the file and primarily
+and generated API-resource tests, which remain on Jest. Generated tests have a
+generator comment at the top of the file and primarily
 live in `tests/api-resources/`; a few generated client tests also live directly
 under `tests/`. Handwritten tests live in `tests/lib/`, `tests/helpers/`,
 `tests/auth/`, and the remaining unmarked test files. The existing Jest-based

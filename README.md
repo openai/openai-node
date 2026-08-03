@@ -4,7 +4,7 @@
 
 This library provides convenient access to the OpenAI REST API from TypeScript or JavaScript.
 
-It is generated from our [OpenAPI specification](https://github.com/openai/openai-openapi) with [Stainless](https://stainlessapi.com/).
+It is generated from our [OpenAPI specification](https://github.com/openai/openai-openapi).
 
 To learn how to use the OpenAI API, check out our [API Reference](https://platform.openai.com/docs/api-reference) and [Documentation](https://platform.openai.com/docs).
 
@@ -724,7 +724,7 @@ const client = new OpenAI({
 To modify proxy behavior, you can provide custom `fetchOptions` that add runtime-specific proxy
 options to requests:
 
-<img src="https://raw.githubusercontent.com/stainless-api/sdk-assets/refs/heads/main/node.svg" align="top" width="18" height="21"> **Node** <sup>[[docs](https://github.com/nodejs/undici/blob/main/docs/docs/api/ProxyAgent.md#example---proxyagent-with-fetch)]</sup>
+**Node** <sup>[[docs](https://github.com/nodejs/undici/blob/main/docs/docs/api/ProxyAgent.md#example---proxyagent-with-fetch)]</sup>
 
 ```ts
 import OpenAI from 'openai';
@@ -741,7 +741,7 @@ const client = new OpenAI({
 
 Undici-specific options like `dispatcher` must be paired with the matching `fetch` implementation.
 
-<img src="https://raw.githubusercontent.com/stainless-api/sdk-assets/refs/heads/main/bun.svg" align="top" width="18" height="21"> **Bun** <sup>[[docs](https://bun.sh/guides/http/proxy)]</sup>
+**Bun** <sup>[[docs](https://bun.sh/guides/http/proxy)]</sup>
 
 ```ts
 import OpenAI from 'openai';
@@ -753,7 +753,7 @@ const client = new OpenAI({
 });
 ```
 
-<img src="https://raw.githubusercontent.com/stainless-api/sdk-assets/refs/heads/main/deno.svg" align="top" width="18" height="21"> **Deno** <sup>[[docs](https://docs.deno.com/api/deno/~/Deno.createHttpClient)]</sup>
+**Deno** <sup>[[docs](https://docs.deno.com/api/deno/~/Deno.createHttpClient)]</sup>
 
 ```ts
 import OpenAI from 'npm:openai';
