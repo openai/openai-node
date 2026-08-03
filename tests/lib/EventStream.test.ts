@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import { OpenAIError } from 'openai/error';
 import { type BaseEvents, EventStream } from 'openai/lib/EventStream';
 
@@ -69,9 +70,7 @@ describe('EventStream.events', () => {
   test('does not suppress errors after iterator cleanup', async () => {
     const stream = new TestStream();
     const iterator = stream.events('foo');
-    const reject = jest
-      .spyOn(Promise, 'reject')
-      .mockImplementation(() => Promise.resolve() as Promise<never>);
+    const reject = vi.spyOn(Promise, 'reject').mockImplementation(() => Promise.resolve() as Promise<never>);
     const error = new OpenAIError('oops');
 
     try {

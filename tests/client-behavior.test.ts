@@ -1,3 +1,5 @@
+import { vi } from 'vitest';
+
 import OpenAI from 'openai';
 import {
   APIConnectionError,
@@ -24,7 +26,7 @@ function jsonResponse(value: unknown = {}, init: ResponseInit = {}): Response {
 
 describe('OpenAI client request behavior', () => {
   test('supports PUT requests through the public method helper', async () => {
-    const fetch = jest.fn(async () => jsonResponse({ updated: true }));
+    const fetch = vi.fn(async () => jsonResponse({ updated: true }));
     const client = new OpenAI({ apiKey: 'test-key', fetch });
 
     await expect(client.put('/items/123', { body: { enabled: true } })).resolves.toEqual({ updated: true });
@@ -52,7 +54,7 @@ describe('OpenAI client request behavior', () => {
   });
 
   test('resolves asynchronous pagination request options before fetching', async () => {
-    const fetch = jest.fn(async () => jsonResponse({ data: [{ id: 'item_123' }], has_more: false }));
+    const fetch = vi.fn(async () => jsonResponse({ data: [{ id: 'item_123' }], has_more: false }));
     const client = new OpenAI({ apiKey: 'test-key', fetch });
     const page = await client.getAPIList(
       '/items',
@@ -78,7 +80,7 @@ describe('OpenAI client request behavior', () => {
   ])(
     'retries HTTP status %i according to explicit headers and defaults',
     async (status, headers, retries) => {
-      const fetch = jest
+      const fetch = vi
         .fn()
         .mockResolvedValueOnce(
           jsonResponse(
@@ -103,8 +105,8 @@ describe('OpenAI client request behavior', () => {
   );
 
   test('honors HTTP-date retry-after headers', async () => {
-    const parseDate = jest.spyOn(Date, 'parse').mockReturnValue(Date.now() + 5);
-    const fetch = jest
+    const parseDate = vi.spyOn(Date, 'parse').mockReturnValue(Date.now() + 5);
+    const fetch = vi
       .fn()
       .mockResolvedValueOnce(
         jsonResponse(
@@ -133,7 +135,7 @@ describe('OpenAI client request behavior', () => {
     const client = new OpenAI({
       apiKey: 'test-key',
       maxRetries: 0,
-      fetch: jest.fn(async () => {
+      fetch: vi.fn(async () => {
         throw failure;
       }),
     });
@@ -156,7 +158,7 @@ describe('OpenAI client request behavior', () => {
   });
 
   test('rejects already-aborted requests before making network calls', async () => {
-    const fetch = jest.fn();
+    const fetch = vi.fn();
     const client = new OpenAI({ apiKey: 'test-key', fetch });
     const controller = new AbortController();
     controller.abort();

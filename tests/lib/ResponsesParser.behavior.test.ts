@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import {
   addOutputText,
   hasAutoParseableInput,
@@ -72,8 +73,8 @@ describe('response tool parsing', () => {
   });
 
   test('retains non-enumerable tool parsing metadata and callbacks', () => {
-    const parser = jest.fn(JSON.parse);
-    const callback = jest.fn();
+    const parser = vi.fn(JSON.parse);
+    const callback = vi.fn();
     const parseable = makeParseableResponseTool(strictTool, { parser, callback });
 
     expect(parseable.$parseRaw('{"city":"Paris"}')).toEqual({ city: 'Paris' });
@@ -189,7 +190,7 @@ describe('response output normalization', () => {
   });
 
   test('uses custom raw text parsers and returns the first parsed message', () => {
-    const rawParser = jest.fn((raw: string) => ({ raw }));
+    const rawParser = vi.fn((raw: string) => ({ raw }));
     const format = {
       type: 'json_schema',
       name: 'custom',

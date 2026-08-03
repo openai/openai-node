@@ -40,6 +40,99 @@ function has_jest_worker_flag() {
   return 1
 }
 
+generated_test_patterns=()
+while IFS= read -r generated_test_pattern; do
+  generated_test_patterns+=("$generated_test_pattern")
+done < <(node -e 'for (const pattern of require("./scripts/generated-test-patterns.json")) console.log(pattern)')
+
+function is_generated_test_path() {
+  local test_path="$1"
+  local generated_test_pattern
+
+  for generated_test_pattern in "${generated_test_patterns[@]}"; do
+    case "$test_path" in
+      "$generated_test_pattern"|"$generated_test_pattern"/*|*/"$generated_test_pattern"|*/"$generated_test_pattern"/*)
+        return 0
+        ;;
+    esac
+  done
+
+  return 1
+}
+
+test_suite="${OPENAI_TEST_SUITE:-all}"
+vitest_args=()
+jest_args=()
+has_unit_filter=false
+has_generated_filter=false
+args=("$@")
+
+for ((index = 0; index < ${#args[@]}; index++)); do
+  arg="${args[index]}"
+
+  case "$arg" in
+    --)
+      ;;
+    tests/*|./tests/*|*/tests/*)
+      if is_generated_test_path "$arg"; then
+        has_generated_filter=true
+        jest_args+=("$arg")
+      else
+        has_unit_filter=true
+        vitest_args+=("$arg")
+      fi
+      ;;
+    --runInBand|--runInBand=*|--run-in-band|--run-in-band=*|-i|--showConfig)
+      jest_args+=("$arg")
+      ;;
+    --maxWorkers|--max-workers|-w)
+      jest_args+=("$arg")
+      vitest_args+=(--maxWorkers)
+      if ((index + 1 < ${#args[@]})); then
+        ((index += 1))
+        jest_args+=("${args[index]}")
+        vitest_args+=("${args[index]}")
+      fi
+      ;;
+    --maxWorkers=*|--max-workers=*)
+      jest_args+=("$arg")
+      vitest_args+=("--maxWorkers=${arg#*=}")
+      ;;
+    -w?*)
+      jest_args+=("$arg")
+      worker_count="${arg#-w}"
+      vitest_args+=("--maxWorkers=${worker_count#=}")
+      ;;
+    *)
+      vitest_args+=("$arg")
+      jest_args+=("$arg")
+      ;;
+  esac
+done
+
+case "$test_suite" in
+  unit)
+    echo "==> Running handwritten unit tests"
+    exec ./node_modules/.bin/vitest run --config vitest.config.mts "${vitest_args[@]}"
+    ;;
+  all)
+    if ! $has_generated_filter || $has_unit_filter; then
+      echo "==> Running handwritten unit tests"
+      ./node_modules/.bin/vitest run --config vitest.config.mts "${vitest_args[@]}"
+    fi
+
+    if $has_unit_filter && ! $has_generated_filter; then
+      exit 0
+    fi
+    ;;
+  generated)
+    ;;
+  *)
+    echo "ERROR: Unknown OPENAI_TEST_SUITE: ${OPENAI_TEST_SUITE}. Expected all, generated, or unit." >&2
+    exit 1
+    ;;
+esac
+
 if ! is_overriding_api_base_url && ! steady_is_running ; then
   # When we exit this script, make sure to kill the background mock server process
   trap 'kill_server_on_port 4010' EXIT
@@ -67,14 +160,13 @@ else
   echo
 fi
 
-echo "==> Running tests"
-jest_args=("$@")
+echo "==> Running generated tests"
 
-if ! is_overriding_api_base_url && ! has_jest_worker_flag "$@"; then
+if ! is_overriding_api_base_url && ! has_jest_worker_flag "${jest_args[@]}"; then
   # The local Steady mock server is occasionally flaky under Jest's parallel
   # workers, especially for multipart requests. Keep the default harness stable
   # while allowing callers to opt into explicit worker settings.
   jest_args=(--runInBand "${jest_args[@]}")
 fi
 
-./node_modules/.bin/jest "${jest_args[@]}"
+OPENAI_TEST_SUITE=generated ./node_modules/.bin/jest "${jest_args[@]}"

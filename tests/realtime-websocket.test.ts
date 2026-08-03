@@ -1,3 +1,5 @@
+import { vi, type Mock } from 'vitest';
+
 import OpenAI, { AzureOpenAI } from 'openai';
 import { OpenAIRealtimeWebSocket as StableBrowserRealtime } from 'openai/realtime/websocket';
 import { OpenAIRealtimeWS as StableNodeRealtime } from 'openai/realtime/ws';
@@ -10,22 +12,22 @@ type Listener = (event: any) => void;
 type FakeNodeSocket = {
   url: URL;
   options: { headers?: Record<string, string> };
-  on: jest.Mock;
-  send: jest.Mock;
-  close: jest.Mock;
+  on: Mock;
+  send: Mock;
+  close: Mock;
   dispatch: (event: string, value: unknown) => void;
 };
 
-jest.mock('ws', () => ({
-  WebSocket: jest.fn().mockImplementation((url: URL, options: FakeNodeSocket['options']) => {
+vi.mock('ws', () => ({
+  WebSocket: vi.fn().mockImplementation(function (url: URL, options: FakeNodeSocket['options']) {
     const listeners = new Map<string, Listener>();
 
     return {
       url,
       options,
-      on: jest.fn((event: string, listener: Listener) => listeners.set(event, listener)),
-      send: jest.fn(),
-      close: jest.fn(),
+      on: vi.fn((event: string, listener: Listener) => listeners.set(event, listener)),
+      send: vi.fn(),
+      close: vi.fn(),
       dispatch: (event: string, value: unknown) => listeners.get(event)?.(value),
     } satisfies FakeNodeSocket;
   }),
@@ -35,8 +37,8 @@ class FakeBrowserSocket {
   static instances: FakeBrowserSocket[] = [];
 
   readonly listeners = new Map<string, Listener>();
-  readonly send = jest.fn();
-  readonly close = jest.fn();
+  readonly send = vi.fn();
+  readonly close = vi.fn();
 
   constructor(
     readonly url: string,
@@ -55,7 +57,7 @@ class FakeBrowserSocket {
 }
 
 const originalWebSocket = globalThis.WebSocket;
-const nodeSocketConstructor = WS.WebSocket as unknown as jest.Mock;
+const nodeSocketConstructor = WS.WebSocket as unknown as Mock;
 
 function lastBrowserSocket(): FakeBrowserSocket {
   return FakeBrowserSocket.instances[FakeBrowserSocket.instances.length - 1]!;
@@ -96,7 +98,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  jest.restoreAllMocks();
+  vi.restoreAllMocks();
   Object.defineProperty(globalThis, 'WebSocket', {
     configurable: true,
     value: originalWebSocket,
@@ -161,9 +163,9 @@ describe.each([
   test('dispatches valid events and reports malformed messages and socket failures', () => {
     const realtime = new Realtime({ model: 'gpt-realtime' }, createClient());
     const socket = lastBrowserSocket();
-    const events = jest.fn();
-    const created = jest.fn();
-    const errors = jest.fn();
+    const events = vi.fn();
+    const created = vi.fn();
+    const errors = vi.fn();
 
     onRealtimeEvent(realtime, 'event', events);
     onRealtimeEvent(realtime, 'response.created', created);
@@ -201,7 +203,7 @@ describe.each([
   test('reports failures while sending and closing', () => {
     const realtime = new Realtime({ model: 'gpt-realtime' }, createClient());
     const socket = lastBrowserSocket();
-    const errors = jest.fn();
+    const errors = vi.fn();
     onRealtimeEvent(realtime, 'error', errors);
 
     socket.send.mockImplementationOnce(() => {
@@ -279,9 +281,9 @@ describe.each([
   test('dispatches valid events and reports malformed messages and socket failures', () => {
     const realtime = new Realtime({ model: 'gpt-realtime' }, createClient());
     const socket = lastNodeSocket();
-    const events = jest.fn();
-    const created = jest.fn();
-    const errors = jest.fn();
+    const events = vi.fn();
+    const created = vi.fn();
+    const errors = vi.fn();
 
     onRealtimeEvent(realtime, 'event', events);
     onRealtimeEvent(realtime, 'response.created', created);
@@ -320,7 +322,7 @@ describe.each([
   test('reports send and close failures to error listeners', () => {
     const realtime = new Realtime({ model: 'gpt-realtime' }, createClient());
     const socket = lastNodeSocket();
-    const errors = jest.fn();
+    const errors = vi.fn();
     onRealtimeEvent(realtime, 'error', errors);
 
     socket.send.mockImplementationOnce(() => {

@@ -1,3 +1,5 @@
+import { vi } from 'vitest';
+
 import { ReadableStreamToAsyncIterable as adaptStandaloneReadableStream } from 'openai/internal/stream-utils';
 import {
   CancelReadableStream,
@@ -19,12 +21,12 @@ describe.each([
 
   test('reads values and releases the reader lock when the stream ends', async () => {
     const reader = {
-      read: jest
+      read: vi
         .fn()
         .mockResolvedValueOnce({ done: false, value: 'first' })
         .mockResolvedValueOnce({ done: true }),
-      releaseLock: jest.fn(),
-      cancel: jest.fn(),
+      releaseLock: vi.fn(),
+      cancel: vi.fn(),
     };
     const iterator = adapt<string>({ getReader: () => reader });
 
@@ -37,9 +39,9 @@ describe.each([
   test('releases the reader lock when reading fails', async () => {
     const failure = new Error('stream failed');
     const reader = {
-      read: jest.fn().mockRejectedValue(failure),
-      releaseLock: jest.fn(),
-      cancel: jest.fn(),
+      read: vi.fn().mockRejectedValue(failure),
+      releaseLock: vi.fn(),
+      cancel: vi.fn(),
     };
 
     await expect(adapt({ getReader: () => reader }).next()).rejects.toBe(failure);
@@ -48,9 +50,9 @@ describe.each([
 
   test('cancels the reader and releases its lock when iteration ends early', async () => {
     const reader = {
-      read: jest.fn(),
-      releaseLock: jest.fn(),
-      cancel: jest.fn().mockResolvedValue(undefined),
+      read: vi.fn(),
+      releaseLock: vi.fn(),
+      cancel: vi.fn().mockResolvedValue(undefined),
     };
 
     await expect(adapt({ getReader: () => reader }).return?.()).resolves.toEqual({
@@ -84,11 +86,11 @@ describe('ReadableStreamFrom', () => {
   });
 
   test('closes the source iterator when the readable stream is canceled', async () => {
-    const returned = jest.fn().mockResolvedValue({ done: true, value: undefined });
+    const returned = vi.fn().mockResolvedValue({ done: true, value: undefined });
     const iterable = {
       [Symbol.asyncIterator]() {
         return {
-          next: jest.fn().mockResolvedValue({ done: false, value: 'first' }),
+          next: vi.fn().mockResolvedValue({ done: false, value: 'first' }),
           return: returned,
         };
       },
@@ -108,7 +110,7 @@ describe('CancelReadableStream', () => {
   });
 
   test('closes asynchronously iterable streams through their iterator', async () => {
-    const returned = jest.fn().mockResolvedValue({ done: true, value: undefined });
+    const returned = vi.fn().mockResolvedValue({ done: true, value: undefined });
 
     await CancelReadableStream({ [Symbol.asyncIterator]: () => ({ return: returned }) });
 
@@ -117,8 +119,8 @@ describe('CancelReadableStream', () => {
 
   test('cancels reader-based streams and releases their locks', async () => {
     const reader = {
-      cancel: jest.fn().mockResolvedValue(undefined),
-      releaseLock: jest.fn(),
+      cancel: vi.fn().mockResolvedValue(undefined),
+      releaseLock: vi.fn(),
     };
 
     await CancelReadableStream({ getReader: () => reader });

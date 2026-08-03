@@ -1,3 +1,5 @@
+import { vi } from 'vitest';
+
 import OpenAI, { ClientOptions } from 'openai/index';
 
 const opts: ClientOptions = {
@@ -15,10 +17,10 @@ const opts: ClientOptions = {
 
 describe('debug()', () => {
   const env = process.env;
-  const spy = jest.spyOn(console, 'debug');
+  const spy = vi.spyOn(console, 'debug');
 
   beforeEach(() => {
-    jest.resetModules();
+    vi.resetModules();
     process.env = { ...env };
     process.env['DEBUG'] = 'true';
   });

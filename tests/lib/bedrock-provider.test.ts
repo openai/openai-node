@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import OpenAI from 'openai';
 import type { RequestInfo, RequestInit } from 'openai/internal/builtin-types';
 import { configureProvider } from 'openai/internal/provider';
@@ -25,8 +26,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  jest.useRealTimers();
-  jest.restoreAllMocks();
+  vi.useRealTimers();
+  vi.restoreAllMocks();
   process.env = originalEnv;
 });
 
@@ -77,7 +78,7 @@ describe('bedrock provider', () => {
   test('apiKey: null skips the environment bearer fallback', async () => {
     process.env['AWS_BEARER_TOKEN_BEDROCK'] = 'environment-token';
     process.env['AWS_EC2_METADATA_DISABLED'] = 'true';
-    const fetch = jest.fn(async () => jsonResponse());
+    const fetch = vi.fn(async () => jsonResponse());
     const client = new OpenAI({
       provider: bedrock({ region: 'us-east-1', apiKey: null }),
       fetch,
@@ -125,8 +126,8 @@ describe('bedrock provider', () => {
   });
 
   test('matches the canonical SigV4 fixture and disables automatic redirects', async () => {
-    jest.useFakeTimers();
-    jest.setSystemTime(new Date(sigV4Fixture.signingDate));
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(sigV4Fixture.signingDate));
     let requestedURL: RequestInfo | undefined;
     let requestedInit: RequestInit | undefined;
     const client = new OpenAI({
@@ -175,7 +176,7 @@ describe('bedrock provider', () => {
   });
 
   test('rejects a custom Authorization header before fetch', async () => {
-    const fetch = jest.fn(async () => jsonResponse());
+    const fetch = vi.fn(async () => jsonResponse());
     const client = new OpenAI({
       provider: bearerBedrock({ region: 'us-east-1', apiKey: 'bedrock-token' }),
       fetch,
@@ -192,7 +193,7 @@ describe('bedrock provider', () => {
   });
 
   test('rejects non-replayable SigV4 bodies before fetch', async () => {
-    const fetch = jest.fn(async () => jsonResponse());
+    const fetch = vi.fn(async () => jsonResponse());
     const body = new FormData();
     body.append('input', 'hello');
     const client = new OpenAI({
@@ -212,7 +213,7 @@ describe('bedrock provider', () => {
 
   test('surfaces bearer credential provider failures with their cause', async () => {
     const cause = new Error('token service unavailable');
-    const fetch = jest.fn(async () => jsonResponse());
+    const fetch = vi.fn(async () => jsonResponse());
     const client = new OpenAI({
       provider: bedrock({
         region: 'us-east-1',
@@ -233,7 +234,7 @@ describe('bedrock provider', () => {
   test.each([[''], ['   '], [undefined as unknown as string]])(
     'rejects an invalid value returned by a bearer credential provider',
     async (token) => {
-      const fetch = jest.fn(async () => jsonResponse());
+      const fetch = vi.fn(async () => jsonResponse());
       const client = new OpenAI({
         provider: bearerBedrock({ region: 'us-east-1', tokenProvider: async () => token }),
         fetch,
@@ -248,7 +249,7 @@ describe('bedrock provider', () => {
 
   test('fails if an ambient bearer credential disappears before the request', async () => {
     process.env['AWS_BEARER_TOKEN_BEDROCK'] = 'temporary-token';
-    const fetch = jest.fn(async () => jsonResponse());
+    const fetch = vi.fn(async () => jsonResponse());
     const client = new OpenAI({ provider: bearerBedrock({ region: 'us-east-1' }), fetch });
     delete process.env['AWS_BEARER_TOKEN_BEDROCK'];
 
@@ -267,7 +268,7 @@ describe('bedrock provider', () => {
     { accessKeyId: 'access-key', secretAccessKey: '' },
     { accessKeyId: 'access-key', secretAccessKey: 'secret-key', sessionToken: '' },
   ])('rejects an invalid identity returned by a credential provider', async (credentials) => {
-    const fetch = jest.fn(async () => jsonResponse());
+    const fetch = vi.fn(async () => jsonResponse());
     const client = new OpenAI({
       provider: bedrock({
         region: 'us-east-1',
@@ -284,7 +285,7 @@ describe('bedrock provider', () => {
 
   test('surfaces credential provider failures with their cause', async () => {
     const cause = new Error('credential service unavailable');
-    const fetch = jest.fn(async () => jsonResponse());
+    const fetch = vi.fn(async () => jsonResponse());
     const client = new OpenAI({
       provider: bedrock({
         region: 'us-east-1',
@@ -328,7 +329,7 @@ describe('bedrock provider', () => {
   });
 
   test('signs buffered body variants and replaces stale signing headers', async () => {
-    const sign = jest.spyOn(SignatureV4.prototype, 'sign');
+    const sign = vi.spyOn(SignatureV4.prototype, 'sign');
     const runtime = configureProvider(
       bedrock({
         region: 'us-east-1',
@@ -386,7 +387,7 @@ describe('bedrock provider', () => {
   });
 
   test('signs with a valid custom credential provider', async () => {
-    const credentialProvider = jest.fn(async () => ({
+    const credentialProvider = vi.fn(async () => ({
       accessKeyId: 'provider-access-key',
       secretAccessKey: 'provider-secret-key',
       sessionToken: 'provider-session-token',
@@ -417,7 +418,7 @@ describe('bedrock provider', () => {
   });
 
   test('rejects a canonical endpoint whose region does not match the signing region', async () => {
-    const fetch = jest.fn(async () => jsonResponse());
+    const fetch = vi.fn(async () => jsonResponse());
     const client = new OpenAI({
       provider: bedrock({
         region: 'us-east-1',

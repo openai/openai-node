@@ -1,3 +1,5 @@
+import { vi } from 'vitest';
+
 import { OpenAIError } from 'openai/core/error';
 import { buildHeaders } from 'openai/internal/headers';
 import { FallbackEncoder } from 'openai/internal/request-options';
@@ -80,21 +82,21 @@ describe('environment and request utilities', () => {
   });
 
   test('resolves after the requested timeout', async () => {
-    jest.useFakeTimers();
+    vi.useFakeTimers();
 
     try {
-      const completed = jest.fn();
+      const completed = vi.fn();
       const pending = sleep(25).then(completed);
 
-      jest.advanceTimersByTime(24);
+      vi.advanceTimersByTime(24);
       await Promise.resolve();
       expect(completed).not.toHaveBeenCalled();
 
-      jest.advanceTimersByTime(1);
+      vi.advanceTimersByTime(1);
       await pending;
       expect(completed).toHaveBeenCalledTimes(1);
     } finally {
-      jest.useRealTimers();
+      vi.useRealTimers();
     }
   });
 });

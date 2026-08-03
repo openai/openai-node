@@ -1,3 +1,5 @@
+import { vi } from 'vitest';
+
 type PlatformModule = typeof import('openai/internal/detect-platform');
 
 type PlatformGlobals = {
@@ -8,38 +10,33 @@ type PlatformGlobals = {
   window?: unknown;
 };
 
-function withGlobals<T>(overrides: PlatformGlobals, run: (detection: PlatformModule) => T): T {
-  let result!: T;
+async function withGlobals<T>(overrides: PlatformGlobals, run: (detection: PlatformModule) => T): Promise<T> {
+  vi.resetModules();
+  const detection = await import('openai/internal/detect-platform');
+  const descriptors = new Map<string, PropertyDescriptor | undefined>();
 
-  jest.isolateModules(() => {
-    const detection = require('openai/internal/detect-platform') as PlatformModule;
-    const descriptors = new Map<string, PropertyDescriptor | undefined>();
-
-    try {
-      for (const [name, value] of Object.entries(overrides)) {
-        descriptors.set(name, Object.getOwnPropertyDescriptor(globalThis, name));
-        if (value === undefined) {
-          delete (globalThis as Record<string, unknown>)[name];
-        } else {
-          Object.defineProperty(globalThis, name, { configurable: true, value });
-        }
-      }
-
-      result = run(detection);
-    } finally {
-      for (const [name, descriptor] of descriptors) {
-        if (descriptor) Object.defineProperty(globalThis, name, descriptor);
-        else delete (globalThis as Record<string, unknown>)[name];
+  try {
+    for (const [name, value] of Object.entries(overrides)) {
+      descriptors.set(name, Object.getOwnPropertyDescriptor(globalThis, name));
+      if (value === undefined) {
+        delete (globalThis as Record<string, unknown>)[name];
+      } else {
+        Object.defineProperty(globalThis, name, { configurable: true, value });
       }
     }
-  });
 
-  return result;
+    return run(detection);
+  } finally {
+    for (const [name, descriptor] of descriptors) {
+      if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+      else delete (globalThis as Record<string, unknown>)[name];
+    }
+  }
 }
 
 describe('platform detection', () => {
-  test('memoizes platform headers for repeated calls', () => {
-    withGlobals({}, ({ getPlatformHeaders }) => {
+  test('memoizes platform headers for repeated calls', async () => {
+    await withGlobals({}, ({ getPlatformHeaders }) => {
       expect(getPlatformHeaders()).toBe(getPlatformHeaders());
     });
   });
@@ -54,26 +51,29 @@ describe('platform detection', () => {
     ['openbsd', 'riscv64', 'OpenBSD', 'other:riscv64'],
     ['custom', 'mips', 'Other:custom', 'other:mips'],
     ['', '', 'Unknown', 'unknown'],
-  ])('normalizes Deno operating system %s and architecture %s', (os, arch, expectedOS, expectedArch) => {
-    const headers = withGlobals(
-      { Deno: { build: { os, arch }, version: { deno: '2.0.0' } } },
-      ({ getPlatformHeaders }) => getPlatformHeaders(),
-    );
+  ])(
+    'normalizes Deno operating system %s and architecture %s',
+    async (os, arch, expectedOS, expectedArch) => {
+      const headers = await withGlobals(
+        { Deno: { build: { os, arch }, version: { deno: '2.0.0' } } },
+        ({ getPlatformHeaders }) => getPlatformHeaders(),
+      );
 
-    expect(headers).toMatchObject({
-      'X-Stainless-Lang': 'js',
-      'X-Stainless-OS': expectedOS,
-      'X-Stainless-Arch': expectedArch,
-      'X-Stainless-Runtime': 'deno',
-      'X-Stainless-Runtime-Version': '2.0.0',
-    });
-  });
+      expect(headers).toMatchObject({
+        'X-Stainless-Lang': 'js',
+        'X-Stainless-OS': expectedOS,
+        'X-Stainless-Arch': expectedArch,
+        'X-Stainless-Runtime': 'deno',
+        'X-Stainless-Runtime-Version': '2.0.0',
+      });
+    },
+  );
 
   test.each([
     ['2.1.0', '2.1.0'],
     [undefined, 'unknown'],
-  ])('accepts string or missing Deno runtime version metadata', (version, expected) => {
-    const headers = withGlobals(
+  ])('accepts string or missing Deno runtime version metadata', async (version, expected) => {
+    const headers = await withGlobals(
       { Deno: { build: { os: 'linux', arch: 'x64' }, version } },
       ({ getPlatformHeaders }) => getPlatformHeaders(),
     );
@@ -81,8 +81,10 @@ describe('platform detection', () => {
     expect(headers['X-Stainless-Runtime-Version']).toBe(expected);
   });
 
-  test('detects edge runtimes and retains their runtime versions', () => {
-    const headers = withGlobals({ EdgeRuntime: 'vercel' }, ({ getPlatformHeaders }) => getPlatformHeaders());
+  test('detects edge runtimes and retains their runtime versions', async () => {
+    const headers = await withGlobals({ EdgeRuntime: 'vercel' }, ({ getPlatformHeaders }) =>
+      getPlatformHeaders(),
+    );
 
     expect(headers).toMatchObject({
       'X-Stainless-OS': 'Unknown',
@@ -92,14 +94,16 @@ describe('platform detection', () => {
     });
   });
 
-  test('detects Node.js platforms and handles missing process metadata', () => {
+  test('detects Node.js platforms and handles missing process metadata', async () => {
     const fakeProcess = {
       [Symbol.toStringTag]: 'process',
       platform: undefined,
       arch: undefined,
       version: undefined,
     };
-    const headers = withGlobals({ process: fakeProcess }, ({ getPlatformHeaders }) => getPlatformHeaders());
+    const headers = await withGlobals({ process: fakeProcess }, ({ getPlatformHeaders }) =>
+      getPlatformHeaders(),
+    );
 
     expect(headers).toMatchObject({
       'X-Stainless-OS': 'Other:unknown',
@@ -117,9 +121,10 @@ describe('platform detection', () => {
     ['Firefox/127.4', 'firefox', '127.4.0'],
     ['Version/17.3 Safari/605', 'safari', '17.3.0'],
     ['Mozilla Safari', 'safari', '0.0.0'],
-  ])('identifies %s browser user agents', (userAgent, browser, version) => {
-    const headers = withGlobals({ process: undefined, navigator: { userAgent } }, ({ getPlatformHeaders }) =>
-      getPlatformHeaders(),
+  ])('identifies %s browser user agents', async (userAgent, browser, version) => {
+    const headers = await withGlobals(
+      { process: undefined, navigator: { userAgent } },
+      ({ getPlatformHeaders }) => getPlatformHeaders(),
     );
 
     expect(headers).toMatchObject({
@@ -132,8 +137,8 @@ describe('platform detection', () => {
 
   test.each([{ userAgent: 'unrecognized browser' }, null, undefined])(
     'returns unknown runtime information when no platform is recognizable',
-    (navigator) => {
-      const headers = withGlobals({ process: undefined, navigator }, ({ getPlatformHeaders }) =>
+    async (navigator) => {
+      const headers = await withGlobals({ process: undefined, navigator }, ({ getPlatformHeaders }) =>
         getPlatformHeaders(),
       );
 
@@ -153,8 +158,8 @@ describe('platform detection', () => {
     [{ document: {} }, undefined, false],
   ])(
     'detects browser globals only when document and navigator are available',
-    (window, navigator, expected) => {
-      expect(withGlobals({ window, navigator }, ({ isRunningInBrowser }) => isRunningInBrowser())).toBe(
+    async (window, navigator, expected) => {
+      expect(await withGlobals({ window, navigator }, ({ isRunningInBrowser }) => isRunningInBrowser())).toBe(
         expected,
       );
     },

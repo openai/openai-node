@@ -78,26 +78,29 @@ $ pnpm link --global openai
 
 ## Running tests
 
-The test suite is split between handwritten unit tests and Stainless-generated
-API-resource tests. Generated tests have a Stainless-generated comment at the
-top of the file and primarily live in `tests/api-resources/`. Handwritten tests
-live in `tests/lib/`, `tests/helpers/`, `tests/auth/`, and the remaining
-unmarked test files.
+The test suite is split between handwritten unit tests, which run with Vitest,
+and Stainless-generated API-resource tests, which remain on Jest. Generated
+tests have a Stainless-generated comment at the top of the file and primarily
+live in `tests/api-resources/`; a few generated client tests also live directly
+under `tests/`. Handwritten tests live in `tests/lib/`, `tests/helpers/`,
+`tests/auth/`, and the remaining unmarked test files. The existing Jest-based
+live and ecosystem fixtures also retain their own runners.
 
 ```sh
+$ ./scripts/test       # Complete regular test suite; canonical repository entrypoint
+$ pnpm test            # Package-manager alias for the complete regular suite
 $ pnpm test:unit       # Handwritten, isolated SDK behavior; no mock server
 $ pnpm test:generated  # Generated API-resource and client tests
-$ pnpm test            # Complete regular test suite
-$ pnpm test:coverage   # Complete suite with enforced coverage thresholds
 ```
 
-The full, generated, and coverage suites automatically start a
-[Steady mock server](https://github.com/dgellow/steady) against the OpenAPI
-spec when one is not already running. To manage that server yourself, run
-`./scripts/mock` in a separate terminal. Coverage is collected from SDK source
-files, excluding vendored third-party code and type-only modules. CI requires
-at least 98% statement and line coverage, 90% branch coverage, and 93%
-function coverage.
+Pass a handwritten or generated test path to the full-suite command to run only
+its corresponding runner, for example `./scripts/test tests/lib/parser.test.ts`
+or `./scripts/test tests/api-resources/models.test.ts`.
+
+The generated portion of the full and generated suites automatically
+starts a [Steady mock server](https://github.com/dgellow/steady) against the
+OpenAPI spec when one is not already running. To manage that server yourself,
+run `./scripts/mock` in a separate terminal.
 
 ## Running performance benchmarks
 
@@ -156,6 +159,22 @@ $ pnpm fix
 
 Changes made to this repository via the automated release PR pipeline should publish to npm automatically. If
 the changes aren't made through the automated pipeline, you may want to make releases manually.
+
+### Override an automated release version
+
+Do not edit an automated release PR title to change its version. The title must match the version generated in
+`package.json`, and CI rejects mismatches so that the package, changelog, tag, and release stay consistent.
+
+To select a different version, merge a conventional commit with a `Release-As: <version>` footer into `main`.
+For example:
+
+```text
+chore: set the next release version
+
+Release-As: 7.4.0
+```
+
+Release Please will then regenerate the release PR files and title with that version.
 
 ### Publish with a GitHub workflow
 

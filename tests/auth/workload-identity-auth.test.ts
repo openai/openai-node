@@ -1,3 +1,5 @@
+import { vi } from 'vitest';
+
 import { WorkloadIdentityAuth } from 'openai/auth/workload-identity-auth';
 import { OAuthError, OpenAIError } from 'openai';
 import type { WorkloadIdentity } from 'openai/auth/types';
@@ -6,7 +8,7 @@ const originalFetch = global.fetch;
 
 describe('WorkloadIdentityAuth', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   afterEach(() => {
@@ -29,7 +31,7 @@ describe('WorkloadIdentityAuth', () => {
       },
     };
 
-    global.fetch = jest.fn(async () => {
+    global.fetch = vi.fn(async () => {
       fetchCallCount++;
       return new Response(
         JSON.stringify({
@@ -69,7 +71,7 @@ describe('WorkloadIdentityAuth', () => {
       },
     };
 
-    global.fetch = jest.fn(async () => {
+    global.fetch = vi.fn(async () => {
       fetchCallCount++;
       return new Response(
         JSON.stringify({
@@ -112,7 +114,7 @@ describe('WorkloadIdentityAuth', () => {
       },
     };
 
-    global.fetch = jest.fn(async () => {
+    global.fetch = vi.fn(async () => {
       fetchCallCount++;
       await new Promise((resolve) => setTimeout(resolve, 100));
       return new Response(
@@ -149,7 +151,7 @@ describe('WorkloadIdentityAuth', () => {
 
     let capturedRequest: { url: string; body: string; headers: Headers } | null = null;
 
-    global.fetch = jest.fn(async (url: string, init?: RequestInit) => {
+    global.fetch = vi.fn(async (url: string, init?: RequestInit) => {
       const body = init?.body?.toString() || '';
       const headers = new Headers(init?.headers);
 
@@ -194,7 +196,7 @@ describe('WorkloadIdentityAuth', () => {
 
     let capturedBody: string | null = null;
 
-    global.fetch = jest.fn(async (url: string, init?: RequestInit) => {
+    global.fetch = vi.fn(async (url: string, init?: RequestInit) => {
       capturedBody = init?.body?.toString() || '';
 
       return new Response(
@@ -232,7 +234,7 @@ describe('WorkloadIdentityAuth', () => {
 
     let capturedBody: string | null = null;
 
-    global.fetch = jest.fn(async (url: string, init?: RequestInit) => {
+    global.fetch = vi.fn(async (url: string, init?: RequestInit) => {
       capturedBody = init?.body?.toString() || '';
 
       return new Response(
@@ -263,7 +265,7 @@ describe('WorkloadIdentityAuth', () => {
       },
     };
 
-    global.fetch = jest.fn(async () => {
+    global.fetch = vi.fn(async () => {
       return new Response(
         JSON.stringify({
           error: 'invalid_grant',
@@ -289,7 +291,7 @@ describe('WorkloadIdentityAuth', () => {
       },
     };
 
-    global.fetch = jest.fn(async () => {
+    global.fetch = vi.fn(async () => {
       return new Response(
         JSON.stringify({
           access_token: 'access-token',
@@ -344,7 +346,7 @@ describe('WorkloadIdentityAuth', () => {
       },
     };
 
-    global.fetch = jest.fn(async () => {
+    global.fetch = vi.fn(async () => {
       return new Response(JSON.stringify(body), { status: 200 });
     }) as typeof fetch;
 
@@ -367,7 +369,7 @@ describe('WorkloadIdentityAuth', () => {
       },
     };
 
-    global.fetch = jest.fn(async () => {
+    global.fetch = vi.fn(async () => {
       fetchCallCount++;
       return new Response(
         JSON.stringify({
@@ -402,7 +404,7 @@ describe('WorkloadIdentityAuth', () => {
       },
     };
 
-    const customFetch = jest.fn(async () => {
+    const customFetch = vi.fn(async () => {
       return new Response(
         JSON.stringify({
           access_token: 'access-token',

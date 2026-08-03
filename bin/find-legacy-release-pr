@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+: "${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required}"
+
+LEGACY_BRANCH='release-please--branches--main--changes--next--components--openai'
+
+case "${1:-open-number}" in
+  open-number)
+    gh pr list \
+      --repo "$GITHUB_REPOSITORY" \
+      --state open \
+      --head "$LEGACY_BRANCH" \
+      --json number \
+      --jq '.[0].number // empty'
+    ;;
+  merged-next-sha)
+    LEGACY_HEAD="$(
+      gh pr list \
+        --repo "$GITHUB_REPOSITORY" \
+        --state merged \
+        --head "$LEGACY_BRANCH" \
+        --limit 100 \
+        --json headRefOid,mergedAt \
+        --jq 'sort_by(.mergedAt) | last | .headRefOid // empty'
+    )"
+    if [[ -n "$LEGACY_HEAD" ]]; then
+      gh api "repos/${GITHUB_REPOSITORY}/git/commits/${LEGACY_HEAD}" --jq '.parents[0].sha'
+    fi
+    ;;
+  *)
+    echo "usage: $0 [open-number|merged-next-sha]" >&2
+    exit 2
+    ;;
+esac

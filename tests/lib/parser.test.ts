@@ -3,8 +3,6 @@ import { z as z3 } from 'zod/v3';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import { makeSnapshotRequest } from '../utils/mock-snapshots';
 
-jest.setTimeout(1000 * 30);
-
 describe.each([
   { version: 'v3', z: z3 },
   { version: 'v4', z: z4 as any as typeof z3 },
