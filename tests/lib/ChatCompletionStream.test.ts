@@ -752,4 +752,51 @@ describe('.stream()', () => {
     `);
     expect(capturedLogProbs?.length).toEqual(choice?.logprobs?.refusal?.length);
   });
+
+  it('surfaces a mid-stream error when chunks are buffered before consumption', async () => {
+    const chunks = [
+      {
+        id: 'chatcmpl-test',
+        object: 'chat.completion.chunk',
+        created: 1,
+        model: 'gpt-4',
+        choices: [{ index: 0, delta: { role: 'assistant', content: 'hel' }, finish_reason: null }],
+      },
+      {
+        id: 'chatcmpl-test',
+        object: 'chat.completion.chunk',
+        created: 1,
+        model: 'gpt-4',
+        choices: [{ index: 0, delta: { content: 'lo' }, finish_reason: null }],
+      },
+    ] as unknown as OpenAI.Chat.ChatCompletionChunk[];
+    // Yield valid chunks, then throw to error the stream after they have been
+    // delivered (mimics a connection drop mid-response).
+    const readable = new Stream(async function* () {
+      for (const chunk of chunks) yield chunk;
+      throw new Error('network boom');
+    }, new AbortController()).toReadableStream();
+
+    const stream = ChatCompletionStream.fromReadableStream(readable);
+    // Grab the iterator (registering its listeners) but do not consume yet, so
+    // the valid chunks and the error land while no reader is waiting: they
+    // buffer in the iterator's internal queue instead of rejecting a pending
+    // reader.
+    const iterator = stream[Symbol.asyncIterator]();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    const collected: OpenAI.Chat.ChatCompletionChunk[] = [];
+    let caught: unknown = null;
+    try {
+      let result: IteratorResult<OpenAI.Chat.ChatCompletionChunk>;
+      while (!(result = await iterator.next()).done) {
+        collected.push(result.value);
+      }
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(collected).toHaveLength(chunks.length);
+    expect(caught).toBeInstanceOf(Error);
+  });
 });

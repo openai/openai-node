@@ -667,6 +667,22 @@ export class ChatCompletionStream<ParsedT = null>
       reject: (err: unknown) => void;
     }[] = [];
     let done = false;
+    // Capture a terminal error so it can still be surfaced after any buffered
+    // chunks drain, even when no reader was waiting at the time it fired.
+    let failure: unknown = null;
+    let failureDelivered = false;
+
+    const rejectQueuedReaders = (err: unknown) => {
+      done = true;
+      failure = err;
+      if (readQueue.length) {
+        failureDelivered = true;
+      }
+      for (const reader of readQueue) {
+        reader.reject(err);
+      }
+      readQueue.length = 0;
+    };
 
     this.on('chunk', (chunk) => {
       const reader = readQueue.shift();
@@ -685,25 +701,16 @@ export class ChatCompletionStream<ParsedT = null>
       readQueue.length = 0;
     });
 
-    this.on('abort', (err) => {
-      done = true;
-      for (const reader of readQueue) {
-        reader.reject(err);
-      }
-      readQueue.length = 0;
-    });
-
-    this.on('error', (err) => {
-      done = true;
-      for (const reader of readQueue) {
-        reader.reject(err);
-      }
-      readQueue.length = 0;
-    });
+    this.on('abort', rejectQueuedReaders);
+    this.on('error', rejectQueuedReaders);
 
     return {
       next: async (): Promise<IteratorResult<ChatCompletionChunk>> => {
         if (!pushQueue.length) {
+          if (failure !== null && !failureDelivered) {
+            failureDelivered = true;
+            return Promise.reject(failure);
+          }
           if (done) {
             return { value: undefined, done: true };
           }
