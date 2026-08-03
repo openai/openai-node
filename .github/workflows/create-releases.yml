@@ -5,6 +5,12 @@ on:
   push:
     branches:
       - main
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+    branches:
       - next
   pull_request:
     types:
@@ -23,6 +29,10 @@ jobs:
         github.repository == 'openai/openai-node' &&
         (
           github.event_name == 'push' ||
+          (
+            github.event_name == 'workflow_run' &&
+            github.event.workflow_run.event == 'push'
+          ) ||
           (
             github.event_name == 'pull_request' &&
             github.event.action == 'closed' &&
@@ -43,6 +53,12 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 0
+          ref: refs/heads/main
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+          path: .next
           ref: refs/heads/next
 
       - name: Create or re-draft the promotion PR
@@ -55,7 +71,7 @@ jobs:
             exit 0
           fi
 
-          if git diff --quiet origin/main HEAD --; then
+          if git -C .next diff --quiet origin/main HEAD --; then
             echo 'No Stainless changes to promote.'
             exit 0
           fi
@@ -76,10 +92,10 @@ jobs:
           fi
 
           if [[ -n "${promotion_start}" ]]; then
-            if ! git cat-file -e "${promotion_start}^{commit}" 2>/dev/null; then
-              git fetch --no-tags origin "${promotion_start}"
+            if ! git -C .next cat-file -e "${promotion_start}^{commit}" 2>/dev/null; then
+              git -C .next fetch --no-tags origin "${promotion_start}"
             fi
-            if ! git merge-base --is-ancestor "${promotion_start}" HEAD; then
+            if ! git -C .next merge-base --is-ancestor "${promotion_start}" HEAD; then
               echo "Promotion boundary ${promotion_start} is not an ancestor of next."
               echo 'Refusing to classify a rewritten promotion range.'
               exit 1
@@ -89,8 +105,8 @@ jobs:
           fi
           promotion_range="${promotion_start}..HEAD"
 
-          commit_subjects="$(git log "${promotion_range}" --not origin/main --format='%s')"
-          commit_messages="$(git log "${promotion_range}" --not origin/main --format='%s%n%b')"
+          commit_subjects="$(git -C .next log "${promotion_range}" --not origin/main --format='%s')"
+          commit_messages="$(git -C .next log "${promotion_range}" --not origin/main --format='%s%n%b')"
           conventional_commit='^(feat|fix|perf|revert|chore|docs|style|refactor|test|build|ci)(\([^)]*\))?!?:'
           if ! grep -Eq "${conventional_commit}" <<< "${commit_subjects}" && \
             ! grep -Eq '^BREAKING[ -]CHANGE:' <<< "${commit_messages}"; then
@@ -98,16 +114,19 @@ jobs:
             exit 0
           fi
 
-          promotion_type='fix(api)'
+          # Stainless can label generated API additions as chores. Keep only
+          # explicit patch-class commits at patch severity; default the rest
+          # to a backwards-compatible feature release.
+          promotion_type='feat(api)'
           if grep -Eq '^[[:alpha:]]+(\([^)]*\))?!:' <<< "${commit_subjects}" || \
             grep -Eq '^BREAKING[ -]CHANGE:' <<< "${commit_messages}"; then
             promotion_type='feat(api)!'
-          elif grep -Eq '^feat(\([^)]*\))?:' <<< "${commit_subjects}"; then
-            promotion_type='feat(api)'
+          elif ! grep -Eq '^(feat|chore|docs|style|refactor|test|build|ci)(\([^)]*\))?:' <<< "${commit_subjects}"; then
+            promotion_type='fix(api)'
           fi
           promotion_title="${promotion_type}: promote Stainless-generated changes"
 
-          checked_out_next_sha="$(git rev-parse HEAD)"
+          checked_out_next_sha="$(git -C .next rev-parse HEAD)"
           current_next_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/next" --jq '.object.sha')"
           if [[ "${current_next_sha}" != "${checked_out_next_sha}" ]]; then
             echo "A newer next commit (${current_next_sha}) superseded this run (${checked_out_next_sha})."
