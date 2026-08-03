@@ -9,7 +9,7 @@ node scripts/utils/check-version.cjs
 # Build into dist and will publish the package from there,
 # so that src/resources/foo.ts becomes <package root>/resources/foo.js
 # This way importing from `"openai/resources/foo"` works
-# even with `"moduleResolution": "node"`
+# even with `"moduleResolution": "bundler"`
 
 rm -rf dist; mkdir dist
 # Copy src to dist/src and build from dist/src into dist, so that

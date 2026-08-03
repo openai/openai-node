@@ -5,7 +5,7 @@
     "target": "es2020",
     "lib": ["es2020"],
     "module": "commonjs",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "esModuleInterop": true,
     "paths": {
       "openai/*": ["./src/*"],

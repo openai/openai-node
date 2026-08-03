@@ -6,6 +6,6 @@
   "compilerOptions": {
     "target": "ES2015",
     "lib": ["DOM", "DOM.Iterable", "ES2018"],
-    "moduleResolution": "node"
+    "moduleResolution": "bundler"
   }
 }
