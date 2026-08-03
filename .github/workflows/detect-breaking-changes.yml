@@ -7,6 +7,9 @@ on:
     branches:
       - main
       - next
+  merge_group:
+    types:
+      - checks_requested
 
 jobs:
   detect_breaking_changes:
@@ -15,14 +18,20 @@ jobs:
     if: github.repository == 'openai/openai-node'
     permissions:
       contents: read
+    env:
+      BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+      FETCH_DEPTH: 0
     steps:
       - name: Calculate fetch-depth
+        if: github.event_name == 'pull_request'
+        env:
+          PR_COMMITS: ${{ github.event.pull_request.commits }}
         run: |
-          echo "FETCH_DEPTH=$(expr ${{ github.event.pull_request.commits }} + 1)" >> $GITHUB_ENV
+          echo "FETCH_DEPTH=$((PR_COMMITS + 1))" >> "$GITHUB_ENV"
 
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
-          # Ensure we can check out the pull request base in the script below.
+          # Ensure the comparison base is available to the script below.
           fetch-depth: ${{ env.FETCH_DEPTH }}
 
       - name: Set up pnpm
@@ -42,5 +51,5 @@ jobs:
         run: |
           # Try to check out previous versions of the breaking change detection script. This ensures that
           # we still detect breaking changes when entire files and their tests are removed.
-          git checkout "${{ github.event.pull_request.base.sha }}" -- ./scripts/detect-breaking-changes 2>/dev/null || true
-          DETECT_BREAKING_CHANGES_COMPAT=1 ./scripts/detect-breaking-changes ${{ github.event.pull_request.base.sha }}
+          git checkout "$BASE_SHA" -- ./scripts/detect-breaking-changes 2>/dev/null || true
+          DETECT_BREAKING_CHANGES_COMPAT=1 ./scripts/detect-breaking-changes "$BASE_SHA"
