@@ -9,7 +9,7 @@ on:
     workflows:
       - CI
     types:
-      - completed
+      - requested
     branches:
       - next
   pull_request:
