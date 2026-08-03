@@ -1,9 +1,44 @@
 /** Import-only unused-binding checks for Oxlint, without ESLint dependencies. */
 
-const JSDOC_TYPE_TAG = /@(?:type|typedef|param|returns?)\s*\{([^}]*)\}/g;
+const JSDOC_BRACED_TYPE_TAG = /@[A-Za-z][\w-]*(?:(?:\s|\*(?=\s))+[^\s{}*]+)?(?:\s|\*(?=\s))*\{/g;
+const JSDOC_BARE_TYPE_TAG =
+  /@(?:implements|augments|extends|type|this|enum)(?:\s|\*(?=\s))+(?!\{)([A-Za-z_$][\w$.]*(?:\s*<[^\r\n]*>)?)/g;
 
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function* getJSDocTypeExpressions(comment) {
+  for (const match of comment.matchAll(JSDOC_BRACED_TYPE_TAG)) {
+    const start = match.index + match[0].length;
+    let depth = 1;
+    let quote;
+
+    for (let end = start; end < comment.length; end++) {
+      const character = comment[end];
+      if (quote) {
+        if (character === '\\') {
+          end++;
+        } else if (character === quote) {
+          quote = undefined;
+        }
+        continue;
+      }
+
+      if (character === '"' || character === "'") {
+        quote = character;
+      } else if (character === '{') {
+        depth++;
+      } else if (character === '}' && --depth === 0) {
+        yield comment.slice(start, end);
+        break;
+      }
+    }
+  }
+
+  for (const match of comment.matchAll(JSDOC_BARE_TYPE_TAG)) {
+    yield match[1];
+  }
 }
 
 function isUsedThroughJSDoc(sourceCode, name) {
@@ -14,15 +49,63 @@ function isUsedThroughJSDoc(sourceCode, name) {
       return false;
     }
 
-    return Array.from(comment.value.matchAll(JSDOC_TYPE_TAG), (match) => match[1]).some((typeExpression) =>
+    return Array.from(getJSDocTypeExpressions(comment.value)).some((typeExpression) =>
       identifier.test(typeExpression),
     );
   });
 }
 
+function fixCommentedUnusedImports(sourceCode, declaration, unusedSpecifiers, retainedSpecifiers, fixer) {
+  if (retainedSpecifiers.length === 0) {
+    return null;
+  }
+
+  const retainedNamedSpecifiers = retainedSpecifiers.filter(
+    (specifier) => specifier.type === 'ImportSpecifier',
+  );
+  if (
+    retainedNamedSpecifiers.length === 0 &&
+    unusedSpecifiers.some((specifier) => specifier.type === 'ImportSpecifier')
+  ) {
+    return null;
+  }
+
+  const fixes = [];
+
+  for (const specifier of unusedSpecifiers) {
+    if (sourceCode.getCommentsInside(specifier).length > 0) {
+      return null;
+    }
+
+    let comma;
+    if (specifier.type === 'ImportDefaultSpecifier') {
+      comma = sourceCode.getTokenAfter(specifier);
+    } else if (specifier.type === 'ImportNamespaceSpecifier') {
+      comma = sourceCode.getTokenBefore(specifier);
+    } else if (specifier.type === 'ImportSpecifier') {
+      const retainedPrecedes = retainedNamedSpecifiers.some(
+        (retained) => retained.range[0] < specifier.range[0],
+      );
+      comma = retainedPrecedes ? sourceCode.getTokenBefore(specifier) : sourceCode.getTokenAfter(specifier);
+    }
+
+    if (comma?.value !== ',') {
+      return null;
+    }
+
+    fixes.push(fixer.remove(specifier), fixer.remove(comma));
+  }
+
+  return fixes;
+}
+
 function fixUnusedImports(sourceCode, declaration, unusedSpecifiers, fixer) {
   const unused = new Set(unusedSpecifiers);
   const retainedSpecifiers = declaration.specifiers.filter((specifier) => !unused.has(specifier));
+
+  if (sourceCode.getCommentsInside(declaration).length > 0) {
+    return fixCommentedUnusedImports(sourceCode, declaration, unusedSpecifiers, retainedSpecifiers, fixer);
+  }
 
   if (retainedSpecifiers.length === 0) {
     return fixer.remove(declaration);

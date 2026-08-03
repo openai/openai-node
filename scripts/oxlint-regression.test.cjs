@@ -81,6 +81,82 @@ test('fixes every unused binding in one atomic import-declaration edit', () => {
   }
 });
 
+test('preserves import comments while removing unused bindings', () => {
+  const cases = [
+    {
+      name: 'comment-before-retained.js',
+      source: `import { /* explains Used */ Used, Unused } from './dep.js';\nconsole.log(Used);\n`,
+      comment: '/* explains Used */',
+      unused: ['Unused'],
+    },
+    {
+      name: 'comment-after-unused.js',
+      source: `import { Unused, /* explains Used */ Used } from './dep.js';\nconsole.log(Used);\n`,
+      comment: '/* explains Used */',
+      unused: ['Unused'],
+    },
+    {
+      name: 'line-comment-between-specifiers.js',
+      source: `import {\n  Unused, // explains Used\n  Used,\n} from './dep.js';\nconsole.log(Used);\n`,
+      comment: '// explains Used',
+      unused: ['Unused'],
+    },
+    {
+      name: 'comment-with-consecutive-unused.js',
+      source: `import { Used, /* explains Used */ UnusedOne, UnusedTwo } from './dep.js';\nconsole.log(Used);\n`,
+      comment: '/* explains Used */',
+      unused: ['UnusedOne', 'UnusedTwo'],
+    },
+    {
+      name: 'comment-with-unused-default.js',
+      source: `import UnusedDefault, { /* explains Used */ Used, Unused } from './dep.js';\nconsole.log(Used);\n`,
+      comment: '/* explains Used */',
+      unused: ['UnusedDefault', 'Unused'],
+    },
+  ];
+
+  for (const fixture of cases) {
+    const fixturePath = writeFixture(fixture.name, fixture.source);
+    runOxlintFix(fixturePath);
+    const fixed = fs.readFileSync(fixturePath, 'utf8');
+
+    assert.ok(fixed.includes(fixture.comment), fixture.name);
+    assert.match(fixed, /\bUsed\b/, fixture.name);
+    for (const unused of fixture.unused) {
+      assert.doesNotMatch(fixed, new RegExp(`\\b${unused}\\b`), fixture.name);
+    }
+    run(oxlint, ['--no-ignore', path.relative(repoRoot, fixturePath)]);
+  }
+});
+
+test('declines import autofixes when removing a binding would delete its comments', () => {
+  const cases = [
+    {
+      name: 'comment-in-unused-named-group.js',
+      source: `import Used, { /* explains Unused */ Unused } from './dep.js';\nconsole.log(Used);\n`,
+    },
+    {
+      name: 'comment-inside-unused-specifier.js',
+      source: `import { Used, Foo /* explains alias */ as Unused } from './dep.js';\nconsole.log(Used);\n`,
+    },
+    {
+      name: 'comment-in-fully-unused-import.js',
+      source: `import { /* explains Unused */ Unused } from './dep.js';\nconsole.log('side effect');\n`,
+    },
+  ];
+
+  for (const fixture of cases) {
+    const fixturePath = writeFixture(fixture.name, fixture.source);
+    const result = spawnSync(oxlint, ['--fix', '--no-ignore', path.relative(repoRoot, fixturePath)], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    });
+
+    assert.notEqual(result.status, 0, fixture.name);
+    assert.equal(fs.readFileSync(fixturePath, 'utf8'), fixture.source, fixture.name);
+  }
+});
+
 test('preserves imports used only by supported JSDoc type tags', () => {
   const fixturePath = writeFixture(
     'jsdoc.js',
@@ -89,21 +165,69 @@ import { Foo as TypeOnly } from './dep.js';
 import { Foo as TypedefOnly } from './dep.js';
 import { Foo as ParamOnly } from './dep.js';
 import { Foo as ReturnsOnly } from './dep.js';
+import { Foo as PropertyOnly } from './dep.js';
+import { Foo as ThrowsOnly } from './dep.js';
+import { Foo as ImplementsOnly } from './dep.js';
+import { Foo as SatisfiesOnly } from './dep.js';
+import { Foo as NestedOnly } from './dep.js';
+import { Foo as QuotedOnly } from './dep.js';
+import { Foo as QuotedNestedOnly } from './dep.js';
+import { Foo as MultilineOnly } from './dep.js';
+import { Foo as BareImplementsOnly } from './dep.js';
+import { Foo as BareExtendsOnly } from './dep.js';
+import { Foo as BareTypeOnly } from './dep.js';
+import { Foo as BareThisOnly } from './dep.js';
+import { Foo as BareEnumOnly } from './dep.js';
+import { Foo as BareNestedOnly } from './dep.js';
+import { Foo as NameFirstParamOnly } from './dep.js';
+import { Foo as NameFirstPropertyOnly } from './dep.js';
+import { Foo as ProseOnly } from './dep.js';
 
 /** @type {TypeOnly} */
 const value = {};
 /** @typedef {TypedefOnly} Alias */
 /** @param {ParamOnly} input */
 function accept(input) { return input; }
+/** @param input {NameFirstParamOnly} */
+function acceptNameFirst(input) { return input; }
 /** @returns {ReturnsOnly} */
 function produce() { return value; }
+/**
+ * @typedef {object} Shape
+ * @property {PropertyOnly} property
+ * @property {{ nested: { inner: string }, value: NestedOnly }} nested
+ * @property {Record<"}", QuotedOnly>} quoted
+ * @property {{ "}}": string, value: QuotedNestedOnly }} quotedNested
+ * @property property {NameFirstPropertyOnly}
+ * @property
+ * {MultilineOnly} multiline
+ * @property {string} ProseOnly
+ */
+/** @throws {ThrowsOnly} */
+/** @implements {ImplementsOnly} */
+/** @satisfies {SatisfiesOnly} */
+/** @implements BareImplementsOnly */
+class Implementation {}
+/** @extends BareExtendsOnly */
+class Extension {}
+/** @implements Wrapper<Inner<string>, BareNestedOnly> */
+class NestedImplementation {}
+/** @type BareTypeOnly */
+const bareValue = {};
+/** @this BareThisOnly */
+function withThis() {}
+/** @enum BareEnumOnly */
+const enumeration = {};
 console.log(accept(produce()));
 `,
   );
 
   const before = fs.readFileSync(fixturePath, 'utf8');
   runOxlintFix(fixturePath);
-  assert.equal(fs.readFileSync(fixturePath, 'utf8'), before);
+  assert.equal(
+    fs.readFileSync(fixturePath, 'utf8'),
+    before.replace(`import { Foo as ProseOnly } from './dep.js';`, ''),
+  );
 });
 
 test('does not conflate separate imports with sibling namespace use', () => {
