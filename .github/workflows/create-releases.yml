@@ -35,7 +35,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          legacy_pr="$(bash ./bin/find-legacy-release-pr)"
+          legacy_pr="$(bash ./bin/find-legacy-release-pr open-number)"
           if [[ -n "${legacy_pr}" ]]; then
             echo "Waiting for legacy release PR #${legacy_pr} before promoting next directly."
             exit 0
@@ -46,7 +46,7 @@ jobs:
             exit 0
           fi
 
-          last_promoted_sha="$(
+          promotion_start="$(
             gh pr list \
               --repo "${GITHUB_REPOSITORY}" \
               --state merged \
@@ -57,19 +57,23 @@ jobs:
               --jq 'sort_by(.mergedAt) | last | .headRefOid // empty'
           )"
 
-          if [[ -n "${last_promoted_sha}" ]]; then
-            if ! git cat-file -e "${last_promoted_sha}^{commit}" 2>/dev/null; then
-              git fetch --no-tags origin "${last_promoted_sha}"
+          if [[ -z "${promotion_start}" ]]; then
+            promotion_start="$(bash ./bin/find-legacy-release-pr merged-next-sha)"
+          fi
+
+          if [[ -n "${promotion_start}" ]]; then
+            if ! git cat-file -e "${promotion_start}^{commit}" 2>/dev/null; then
+              git fetch --no-tags origin "${promotion_start}"
             fi
-            if ! git merge-base --is-ancestor "${last_promoted_sha}" HEAD; then
-              echo "Last promoted commit ${last_promoted_sha} is not an ancestor of next."
+            if ! git merge-base --is-ancestor "${promotion_start}" HEAD; then
+              echo "Promotion boundary ${promotion_start} is not an ancestor of next."
               echo 'Refusing to classify a rewritten promotion range.'
               exit 1
             fi
-            promotion_range="${last_promoted_sha}..HEAD"
           else
-            promotion_range='origin/main..HEAD'
+            promotion_start='origin/main'
           fi
+          promotion_range="${promotion_start}..HEAD"
 
           commit_subjects="$(git log "${promotion_range}" --not origin/main --format='%s')"
           commit_messages="$(git log "${promotion_range}" --not origin/main --format='%s%n%b')"
@@ -183,7 +187,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          legacy_pr="$(bash ./bin/find-legacy-release-pr)"
+          legacy_pr="$(bash ./bin/find-legacy-release-pr open-number)"
           echo "legacy_pr=${legacy_pr}" >> "${GITHUB_OUTPUT}"
           if [[ -n "${legacy_pr}" ]]; then
             echo "Waiting for legacy release PR #${legacy_pr} to merge or close before cutover."
