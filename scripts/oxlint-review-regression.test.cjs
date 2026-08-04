@@ -73,6 +73,259 @@ writeFixture(
 );
 writeFixture('external-retained.cjs', 'module.exports = { value: 42 };\n');
 
+test('parses attached JSDoc with the linted TypeScript, JavaScript, and JSX source kind', () => {
+  const generic = 'const identity = <T>(value: T) => value;\n';
+  const moduleGeneric = 'const identity = <T,>(value: T) => value;\n';
+  const plain = 'const identity = (value) => value;\n';
+  const jsx =
+    'const React = { createElement: () => null };\nconst identity = (value) => value;\nconst element = <div />;\n';
+  const cases = [
+    ['generic-ts', 'ts', generic],
+    ['generic-mts', 'mts', moduleGeneric],
+    ['generic-cts', 'cts', moduleGeneric],
+    ['jsx-tsx', 'tsx', jsx],
+    ['jsx-jsx', 'jsx', jsx],
+    ['plain-js', 'js', plain],
+    ['plain-mjs', 'mjs', plain],
+  ];
+
+  for (const [name, extension, syntax] of cases) {
+    const fixturePath = writeFixture(
+      `source-kind-${name}.${extension}`,
+      `import { Foo } from './parameter-side-effect.mjs';\nimport { Bar, Ref } from './parameter-types.mjs';\n${syntax}/** @type {Foo} */\nexport let retained;\n/** @type {Bar} */\nexport let another;\nconsole.log(globalThis.parameterImportRan ?? false, identity('safe'));\n`,
+    );
+    const before = assertNoMissingTypes(fixturePath);
+    const documented = findDocumentedNode(
+      before,
+      fixturePath,
+      (tag) => tag.typeExpression?.type?.typeName?.escapedText === 'Foo',
+    );
+    assert.ok(documented, `${name}: compiler attaches the Foo JSDoc`);
+    const fixed = fix(fixturePath);
+    assert.match(fixed, /import \{ Foo \}/u, `${name}: genuine Foo JSDoc import`);
+    assert.match(fixed, /import \{ Bar \}/u, `${name}: genuine Bar JSDoc import`);
+    assert.doesNotMatch(fixed, /import \{[^}]*\bRef\b/u, `${name}: stale Ref import`);
+    assertNoMissingTypes(fixturePath);
+    if (extension === 'ts') {
+      assert.equal(
+        runTypeScriptOutput(fixturePath).stdout,
+        'true safe',
+        `${name}: retained import side effect`,
+      );
+    } else if (extension === 'mjs') {
+      assert.equal(run(process.execPath, [fixturePath]), 'true safe', `${name}: retained import side effect`);
+    }
+  }
+});
+
+test('uses parser JSX signals for unknown and virtual linted filenames', () => {
+  const plugin = require('./oxlint-plugin.cjs');
+
+  function reportsUnused(filename, jsx, syntax, options = {}) {
+    const text = `import { Foo } from './parameter-side-effect.mjs';\n${syntax}\n/** @type {Foo} */\nlet retained;\n`;
+    const start = text.indexOf('/**');
+    const comment = { type: 'Block', value: '* @type {Foo} ', range: [start, text.indexOf('*/') + 2] };
+    const identifier = { name: 'Foo' };
+    const variable = {
+      name: 'Foo',
+      identifiers: [identifier],
+      references: [],
+      defs: [{ type: 'ImportBinding' }],
+    };
+    const ast = { type: 'Program', range: [0, text.length] };
+    const scope = { block: ast, set: new Map([['Foo', variable]]), upper: null };
+    const sourceCode = {
+      ast,
+      text,
+      visitorKeys: { Program: [] },
+      getAllComments: () => [comment],
+      getTokenAfter: () => ({ range: [text.indexOf('let retained'), text.indexOf('let retained') + 3] }),
+      getNodeByRangeIndex: () => ast,
+      getScope: () => scope,
+      getDeclaredVariables: () => [variable],
+    };
+    const reports = [];
+    const context = {
+      filename,
+      physicalFilename: options.physicalFilename,
+      languageOptions: { parserOptions: { ecmaFeatures: { jsx }, filePath: options.filePath } },
+      options: [],
+      report: (diagnostic) => reports.push(diagnostic),
+      sourceCode,
+    };
+    plugin.rules['no-unused-imports'].create(context).ImportDeclaration({
+      specifiers: [{ type: 'ImportSpecifier', local: identifier }],
+    });
+    return reports.length > 0;
+  }
+
+  for (const filename of ['<input>', '<text>', 'virtual-component']) {
+    assert.equal(
+      reportsUnused(filename, false, 'const identity = <T>(value: T) => value;'),
+      false,
+      `${filename}: TypeScript parser mode`,
+    );
+    assert.equal(reportsUnused(filename, true, 'const element = <div />;'), false, `${filename}: JSX mode`);
+  }
+
+  for (const filename of ['source.js', 'source.mjs', 'source.cjs']) {
+    assert.equal(reportsUnused(filename, false, 'const identity = (value) => value;'), false, filename);
+  }
+  assert.equal(
+    reportsUnused('<input>', true, 'const identity = <T>(value: T) => value;', {
+      physicalFilename: 'source.ts',
+    }),
+    false,
+    'the physical TypeScript filename overrides an otherwise JSX-capable parser',
+  );
+  assert.equal(
+    reportsUnused('<input>', true, 'const identity = <T>(value: T) => value;', {
+      filePath: 'source.cts',
+    }),
+    false,
+    'the parser file path supplies a concrete source kind',
+  );
+  assert.equal(
+    reportsUnused('component.vue?lang=tsx', false, 'const element = <div />;'),
+    false,
+    'virtual query parameters preserve their explicit JSX mode',
+  );
+});
+
+test('resolves JSDoc type references through value-only shadows while preserving type-bearing shadows', () => {
+  const cases = [
+    [
+      'parameter',
+      'mjs',
+      'function documented(Foo) {\n/** @type {Foo} */\nlet value;\nreturn value ?? Foo;\n}',
+      'ImportSpecifier',
+      true,
+    ],
+    [
+      'variable',
+      'mjs',
+      'function documented() {\nconst Foo = {};\n/** @type {Foo} */\nlet value;\nreturn value ?? Foo;\n}',
+      'ImportSpecifier',
+      true,
+    ],
+    [
+      'function',
+      'mjs',
+      'function documented() {\nfunction Foo() {}\n/** @type {Foo} */\nlet value;\nreturn value ?? Foo();\n}',
+      'ImportSpecifier',
+      true,
+    ],
+    [
+      'class',
+      'mjs',
+      'function documented() {\nclass Foo {}\n/** @type {Foo} */\nlet value;\nreturn value ?? new Foo();\n}',
+      'ClassDeclaration',
+      false,
+    ],
+    [
+      'type-alias',
+      'ts',
+      'function documented() {\ntype Foo = { local: true };\n/** @type {Foo} */\nlet value;\nreturn value;\n}',
+      'TypeAliasDeclaration',
+      false,
+    ],
+    [
+      'interface',
+      'ts',
+      'function documented() {\ninterface Foo { local: true }\n/** @type {Foo} */\nlet value;\nreturn value;\n}',
+      'InterfaceDeclaration',
+      false,
+    ],
+    [
+      'enum',
+      'ts',
+      'function documented() {\nenum Foo { Value }\n/** @type {Foo} */\nlet value;\nreturn value ?? Foo.Value;\n}',
+      'EnumDeclaration',
+      false,
+    ],
+    [
+      'type-parameter',
+      'ts',
+      'function documented<Foo>() {\n/** @type {Foo} */\nlet value;\nreturn value;\n}',
+      'TypeParameter',
+      false,
+    ],
+    [
+      'namespace',
+      'ts',
+      'namespace Outer {\nexport namespace Foo { export class Nested {} }\n/** @type {Foo.Nested} */\nexport let value;\n}',
+      'ModuleDeclaration',
+      false,
+    ],
+  ];
+
+  for (const [name, extension, declaration, expectedBinding, retained] of cases) {
+    const fixturePath = writeFixture(
+      `type-shadow-${name}.${extension}`,
+      `// @ts-check\nimport { Foo } from './parameter-side-effect.mjs';\nimport { Bar, Ref } from './parameter-types.mjs';\n${declaration}\n/** @type {Bar} */\nexport let another;\nconsole.log(globalThis.parameterImportRan ?? false);\n`,
+    );
+    const before = assertNoMissingTypes(fixturePath);
+    const getRootTypeName = (tag) => {
+      let name = tag.typeExpression?.type?.typeName;
+      while (name && ts.isQualifiedName(name)) name = name.left;
+      return name;
+    };
+    const documented = findDocumentedNode(
+      before,
+      fixturePath,
+      (tag) => getRootTypeName(tag)?.escapedText === 'Foo',
+    );
+    const tag = documented.jsDoc[0].tags.find(
+      (candidate) => getRootTypeName(candidate)?.escapedText === 'Foo',
+    );
+    const binding = before.getTypeChecker().getSymbolAtLocation(getRootTypeName(tag));
+    assert.equal(ts.SyntaxKind[binding.declarations[0].kind], expectedBinding, `${name}: compiler binding`);
+
+    const fixed = fix(fixturePath);
+    assert.equal(/import \{ Foo \}/u.test(fixed), retained, `${name}: imported Foo retention`);
+    assert.match(fixed, /import \{ Bar \}/u, `${name}: unrelated genuine Bar import`);
+    assert.doesNotMatch(fixed, /import \{[^}]*\bRef\b/u, `${name}: stale Ref import`);
+    assertNoMissingTypes(fixturePath);
+    if (extension === 'mjs') {
+      assert.equal(run(process.execPath, [fixturePath]), String(retained), `${name}: import side effect`);
+    } else {
+      assert.equal(runTypeScriptOutput(fixturePath).stdout, String(retained), `${name}: import side effect`);
+    }
+  }
+});
+
+test('keeps typeof JSDoc references in the value namespace when local bindings shadow imports', () => {
+  const cases = [
+    ['parameter', 'function documented(Foo) {'],
+    ['variable', 'function documented() {\nconst Foo = {};'],
+    ['function', 'function documented() {\nfunction Foo() {}'],
+    ['class', 'function documented() {\nclass Foo {}'],
+  ];
+
+  for (const [name, opening] of cases) {
+    const fixturePath = writeFixture(
+      `value-shadow-${name}.mjs`,
+      `// @ts-check\nimport { Foo } from './parameter-side-effect.mjs';\nimport { Bar, Ref } from './parameter-types.mjs';\n${opening}\n/** @type {typeof Foo} */\nlet value;\nreturn value ?? Foo;\n}\n/** @type {Bar} */\nexport let another;\nconsole.log(globalThis.parameterImportRan ?? false);\n`,
+    );
+    const before = assertNoMissingTypes(fixturePath);
+    const documented = findDocumentedNode(
+      before,
+      fixturePath,
+      (tag) => tag.typeExpression?.type && ts.isTypeQueryNode(tag.typeExpression.type),
+    );
+    const tag = documented.jsDoc[0].tags.find(
+      (candidate) => candidate.typeExpression?.type && ts.isTypeQueryNode(candidate.typeExpression.type),
+    );
+    const binding = before.getTypeChecker().getSymbolAtLocation(tag.typeExpression.type.exprName);
+    assert.notEqual(ts.SyntaxKind[binding.declarations[0].kind], 'ImportSpecifier', `${name}: value binding`);
+    const fixed = fix(fixturePath);
+    assert.doesNotMatch(fixed, /import \{ Foo \}/u, `${name}: locally shadowed value import`);
+    assert.match(fixed, /import \{ Bar \}/u, `${name}: genuine type import`);
+    assert.doesNotMatch(fixed, /import \{[^}]*\bRef\b/u, `${name}: stale Ref import`);
+    assert.equal(run(process.execPath, [fixturePath]), 'false', `${name}: removed import side effect`);
+  }
+});
+
 test('resolves initializer-attached JSDoc type queries against function parameter bindings', () => {
   const cases = [
     ['arrow', 'const documented = (Foo) => Foo;', 'Parameter'],

@@ -326,6 +326,29 @@ function normalizeJSDocTag(tag, text) {
   return parseJSDocComment(`/** @${canonicalName}${tail} */`).comment?.tags?.[0];
 }
 
+function isTypeBinding(variable) {
+  if (typeof variable.isTypeVariable === 'boolean') return variable.isTypeVariable;
+
+  return variable.defs.some((definition) => {
+    if (typeof definition.isTypeDefinition === 'boolean') return definition.isTypeDefinition;
+
+    return (
+      definition.type === 'ImportBinding' ||
+      definition.type === 'ClassName' ||
+      definition.type === 'Type' ||
+      definition.type === 'TSEnumName' ||
+      definition.type === 'TSModuleName' ||
+      definition.type === 'TypeParameterName' ||
+      definition.node?.type === 'ClassDeclaration' ||
+      definition.node?.type === 'TSTypeAliasDeclaration' ||
+      definition.node?.type === 'TSInterfaceDeclaration' ||
+      definition.node?.type === 'TSEnumDeclaration' ||
+      definition.node?.type === 'TSModuleDeclaration' ||
+      definition.node?.type === 'TSTypeParameter'
+    );
+  });
+}
+
 function getJSDocRootBinding(sourceCode, comment, name, namespace) {
   const token = sourceCode.getTokenAfter(comment) ?? sourceCode.getTokenBefore(comment);
   const node = token && sourceCode.getNodeByRangeIndex(token.range[0]);
@@ -358,17 +381,37 @@ function getJSDocRootBinding(sourceCode, comment, name, namespace) {
     const [start, end] = scope.block.range;
     if (comment.range[0] < start || comment.range[1] > end) continue;
     const variable = scope.set.get(name);
-    if (variable) return variable;
+    if (variable && (namespace === 'value' || isTypeBinding(variable))) return variable;
   }
 }
 
-function getAttachedJSDocComments(sourceCode) {
+function getAttachedJSDocComments(context) {
+  const sourceCode = context.sourceCode;
+  const parserOptions = context.languageOptions.parserOptions;
+  const filenames = [context.physicalFilename, context.filename, parserOptions.filePath, sourceCode.filename];
+  let scriptKind = ts.ScriptKind.Unknown;
+
+  for (const filename of filenames) {
+    if (typeof filename !== 'string') continue;
+    scriptKind = ts.getScriptKindFromFileName(filename.split(/[?#]/u, 1)[0]);
+    if (scriptKind !== ts.ScriptKind.Unknown) break;
+    const mode = /(?:\?|&)lang=(tsx?|jsx?)(?:&|$)/iu.exec(filename)?.[1];
+    if (mode) {
+      scriptKind = ts.getScriptKindFromFileName(`oxlint-jsdoc.${mode}`);
+      break;
+    }
+  }
+
+  if (scriptKind === ts.ScriptKind.Unknown) {
+    scriptKind = parserOptions.ecmaFeatures?.jsx ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
+  }
+
   const compilerSource = ts.createSourceFile(
-    'oxlint-jsdoc.tsx',
+    'oxlint-jsdoc',
     sourceCode.text,
     { languageVersion: ts.ScriptTarget.Latest, jsDocParsingMode: ts.JSDocParsingMode.ParseAll },
     true,
-    ts.ScriptKind.TSX,
+    scriptKind,
   );
   const attached = new Map();
 
@@ -383,9 +426,10 @@ function getAttachedJSDocComments(sourceCode) {
   return attached;
 }
 
-function getJSDocImportUsage(sourceCode) {
+function getJSDocImportUsage(context) {
+  const sourceCode = context.sourceCode;
   const used = new Set();
-  const attached = getAttachedJSDocComments(sourceCode);
+  const attached = getAttachedJSDocComments(context);
 
   for (const comment of sourceCode.getAllComments()) {
     if (comment.type !== 'Block' || !comment.value.startsWith('*')) continue;
@@ -651,7 +695,7 @@ const noUnusedImports = {
   create(context) {
     const sourceCode = context.sourceCode;
     const jsxUsedImports = getJSXImportUsage(context);
-    const jsDocUsedImports = getJSDocImportUsage(sourceCode);
+    const jsDocUsedImports = getJSDocImportUsage(context);
 
     return {
       ImportDeclaration(declaration) {
