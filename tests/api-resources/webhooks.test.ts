@@ -52,6 +52,17 @@ describe('resource webhooks', () => {
       await client.webhooks.verifySignature(payload, headers, secret);
     });
 
+    it('should pass for valid signature without Buffer if WebCrypto is available', async () => {
+      const originalBuffer = globalThis.Buffer;
+      try {
+        // @ts-expect-error Can't assign undefined to BufferConstructor
+        delete globalThis.Buffer;
+        await client.webhooks.verifySignature(payload, headers, secret);
+      } finally {
+        globalThis.Buffer = originalBuffer;
+      }
+    });
+
     it('should throw an error for invalid secret format', async () => {
       await expect(
         client.webhooks.verifySignature(payload, headers, null as any),
