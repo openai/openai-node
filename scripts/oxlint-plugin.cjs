@@ -416,8 +416,15 @@ function getAttachedJSDocComments(context) {
   const attached = new Map();
 
   function visit(node) {
-    if (!ts.isEmptyStatement(node) && node.kind !== ts.SyntaxKind.EndOfFileToken) {
-      for (const comment of node.jsDoc ?? []) attached.set(comment.pos, comment.end);
+    if (!ts.isEmptyStatement(node)) {
+      for (const comment of node.jsDoc ?? []) {
+        if (
+          node.kind !== ts.SyntaxKind.EndOfFileToken ||
+          comment.tags?.some((tag) => ts.isJSDocTypedefTag(tag))
+        ) {
+          attached.set(comment.pos, comment.end);
+        }
+      }
     }
     ts.forEachChild(node, visit);
   }

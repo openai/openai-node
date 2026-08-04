@@ -541,6 +541,51 @@ test('ignores detached JSDoc comments without a real declaration host', () => {
   }
 });
 
+test('preserves EOF-hosted standalone typedefs without reviving neighboring orphans', () => {
+  const typedefPath = writeFixture(
+    'eof-standalone-typedef.mjs',
+    [
+      '// @ts-check',
+      "import { Foo } from './parameter-side-effect.mjs';",
+      'console.log(globalThis.parameterImportRan ?? false);',
+      '/** @typedef {Foo} Bar */',
+      '',
+    ].join('\n'),
+  );
+  const before = assertNoMissingTypes(typedefPath);
+  const documented = findDocumentedNode(before, typedefPath, (tag) => ts.isJSDocTypedefTag(tag));
+  assert.equal(
+    documented.kind,
+    ts.SyntaxKind.EndOfFileToken,
+    'TypeScript attaches a standalone typedef to EOF',
+  );
+  assert.equal(run(process.execPath, [typedefPath]), 'true', 'side effect before fix');
+  const fixed = fix(typedefPath);
+  assert.match(fixed, /import \{ Foo \}/u, 'the typedef keeps its import');
+  assertNoMissingTypes(typedefPath);
+  assert.equal(run(process.execPath, [typedefPath]), 'true', 'side effect after fix');
+
+  const mixedPath = writeFixture(
+    'eof-standalone-typedef-with-orphan.mjs',
+    [
+      '// @ts-check',
+      "import { Foo } from './parameter-side-effect.mjs';",
+      "import { Ref } from './parameter-types.mjs';",
+      'console.log(globalThis.parameterImportRan ?? false);',
+      '/** @type {Ref} */',
+      '/** @typedef {Foo} Bar */',
+      '',
+    ].join('\n'),
+  );
+  const mixedProgram = assertNoMissingTypes(mixedPath);
+  const eof = mixedProgram.getSourceFile(mixedPath).endOfFileToken;
+  assert.ok(eof.jsDoc?.some((comment) => comment.tags?.some((tag) => ts.isJSDocTypeTag(tag))));
+  assert.ok(eof.jsDoc?.some((comment) => comment.tags?.some((tag) => ts.isJSDocTypedefTag(tag))));
+  const mixedFixed = fix(mixedPath);
+  assert.match(mixedFixed, /import \{ Foo \}/u, 'the typedef import remains');
+  assert.doesNotMatch(mixedFixed, /import \{ Ref \}/u, 'the orphan import is removed');
+});
+
 test('removes unused require import-equals aliases and their emitted module side effects', () => {
   const source = `import Stale = require('./external-side-effect.cjs');\nimport Used = require('./external-retained.cjs');\nconst unrelated = 'safe';\nconsole.log(globalThis.externalImportRan ?? false, Used.value, unrelated);\n`;
   const fixturePath = writeFixture('import-equals-require.ts', source);
