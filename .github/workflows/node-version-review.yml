@@ -64,7 +64,7 @@ jobs:
         run: pnpm test:lint-regressions
 
       - name: Build the repository
-        run: pnpm build
+        run: ./scripts/build
 
       - name: Check TypeScript types
         run: pnpm exec tsc
@@ -79,7 +79,7 @@ jobs:
         run: pnpm exec publint dist
 
       - name: Run tests
-        run: pnpm test
+        run: ./scripts/test
 
       - name: Open or update the draft pull request
         uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7

@@ -69,7 +69,7 @@ jobs:
         run: ./scripts/bootstrap
 
       - name: Check build
-        run: pnpm build
+        run: ./scripts/build
 
       - name: Check package types
         run: |
