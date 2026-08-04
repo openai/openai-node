@@ -117,7 +117,9 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
 
   static async azure(
     client: Pick<AzureOpenAI, '_callApiKey' | 'apiVersion' | 'apiKey' | 'baseURL' | 'deploymentName'>,
-    options: { deploymentName?: string; dangerouslyAllowBrowser?: boolean } = {},
+    options:
+      | { deploymentName?: string; intent?: undefined; dangerouslyAllowBrowser?: boolean }
+      | { intent: 'transcription'; deploymentName?: undefined; dangerouslyAllowBrowser?: boolean } = {},
   ): Promise<OpenAIRealtimeWebSocket> {
     const isApiKeyProvider = await client._callApiKey();
     const apiKey = client.apiKey;
@@ -132,11 +134,28 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
         url.searchParams.set('api-key', azureApiKey);
       }
     }
+    const { dangerouslyAllowBrowser } = options;
+    if (options.intent && options.deploymentName !== undefined) {
+      throw new Error(
+        'Pass exactly one of `deploymentName`, `callID`, or transcription `intent` when opening an Azure Realtime WebSocket.',
+      );
+    }
+    if (options.intent) {
+      return new OpenAIRealtimeWebSocket(
+        {
+          intent: options.intent,
+          onURL,
+          ...(dangerouslyAllowBrowser ? { dangerouslyAllowBrowser } : {}),
+          __resolvedApiKey: isApiKeyProvider,
+        },
+        client,
+      );
+    }
+
     const deploymentName = options.deploymentName ?? client.deploymentName;
     if (!deploymentName) {
       throw new Error('No deployment name provided');
     }
-    const { dangerouslyAllowBrowser } = options;
     return new OpenAIRealtimeWebSocket(
       {
         model: deploymentName,

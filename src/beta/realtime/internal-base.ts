@@ -84,10 +84,20 @@ export type RealtimeConnectionConfig =
        * Start a new Realtime session using the given model.
        */
       model: string;
+      intent?: undefined;
+      callID?: undefined;
+    }
+  | {
+      /**
+       * Connect to the Realtime API with transcription intent.
+       */
+      intent: 'transcription';
+      model?: undefined;
       callID?: undefined;
     }
   | {
       model?: undefined;
+      intent?: undefined;
       /**
        * Attach to an in-progress Realtime call over a sideband control connection.
        */
@@ -104,12 +114,15 @@ export function buildRealtimeURL(
   const azure = isAzure(client);
   const hasModel = !!config.model;
   const hasCallID = !!config.callID;
+  const hasIntent = config.intent === 'transcription';
 
   const path = '/realtime';
   const url = new URL(baseURL + (baseURL.endsWith('/') ? path.slice(1) : path));
 
-  if (hasModel === hasCallID) {
-    throw new Error('Pass exactly one of `model` or `callID` when opening a Realtime WebSocket.');
+  if ([hasModel, hasCallID, hasIntent].filter(Boolean).length !== 1) {
+    throw new Error(
+      'Pass exactly one of `model`, `callID`, or transcription `intent` when opening a Realtime WebSocket.',
+    );
   }
 
   url.protocol = 'wss';
@@ -119,10 +132,16 @@ export function buildRealtimeURL(
       throw new Error('Azure `callID` connections require the stable Realtime helpers.');
     }
     url.searchParams.set('api-version', client.apiVersion);
-    url.searchParams.set('deployment', config.model!);
+    if (hasIntent) {
+      url.searchParams.set('intent', config.intent!);
+    } else {
+      url.searchParams.set('deployment', config.model!);
+    }
   } else {
     if (hasCallID) {
       url.searchParams.set('call_id', config.callID!);
+    } else if (hasIntent) {
+      url.searchParams.set('intent', config.intent!);
     } else {
       url.searchParams.set('model', config.model!);
     }
