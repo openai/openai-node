@@ -165,7 +165,12 @@ jobs:
     timeout-minutes: 10
     name: examples
     runs-on: ubuntu-latest
-    if: github.repository == 'openai/openai-node'
+    if: >-
+      ${{
+        github.repository == 'openai/openai-node' &&
+        github.ref != 'refs/heads/release-please--branches--main--components--openai' &&
+        github.head_ref != 'release-please--branches--main--components--openai'
+      }}
     environment: ci
     permissions:
       contents: read
@@ -200,6 +205,11 @@ jobs:
     name: ecosystem tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    if: >-
+      ${{
+        github.ref != 'refs/heads/release-please--branches--main--components--openai' &&
+        github.head_ref != 'release-please--branches--main--components--openai'
+      }}
     environment: ci
     permissions:
       contents: read
