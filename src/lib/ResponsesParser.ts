@@ -10,10 +10,15 @@ import {
   type Response,
   type ResponseCreateParamsBase,
   type ResponseCreateParamsNonStreaming,
+  type ResponseFormatTextJSONSchemaConfig,
   type ResponseFunctionToolCall,
   type Tool,
 } from '../resources/responses/responses';
-import { type AutoParseableTextFormat, isAutoParsableResponseFormat } from '../lib/parser';
+import {
+  type AutoParseableTextFormat,
+  isParseableResponseFormat,
+  parseResponseFormatContent,
+} from '../lib/parser';
 
 export type ParseableToolsParams = Array<Tool> | ChatCompletionTool | null;
 
@@ -23,8 +28,18 @@ export type ResponseCreateParamsWithTools = ResponseCreateParamsBase & {
 
 type TextConfigParams = { text?: ResponseTextConfig };
 
+/**
+ * Resolves the type of `output_parsed` / `content[].parsed` for the given params.
+ *
+ * This must stay in sync with `isParseableResponseFormat()` and
+ * `parseResponseFormatContent()`: formats built by an SDK helper carry their parsed
+ * type in the brand, while a raw `{ type: 'json_schema' }` format is parsed with
+ * `JSON.parse()` and so can only be described as `unknown`.
+ */
 export type ExtractParsedContentFromParams<Params extends TextConfigParams> =
-  NonNullable<Params['text']>['format'] extends AutoParseableTextFormat<infer P> ? P : null;
+  NonNullable<Params['text']>['format'] extends AutoParseableTextFormat<infer P> ? P
+  : NonNullable<Params['text']>['format'] extends ResponseFormatTextJSONSchemaConfig ? unknown
+  : null;
 
 export function maybeParseResponse<
   Params extends ResponseCreateParamsBase | null,
@@ -129,20 +144,11 @@ function parseTextFormat<
   Params extends ResponseCreateParamsBase,
   ParsedT = ExtractParsedContentFromParams<Params>,
 >(params: Params, content: string): ParsedT | null {
-  if (params.text?.format?.type !== 'json_schema') {
-    return null;
-  }
-
-  if ('$parseRaw' in params.text?.format) {
-    const text_format = params.text?.format as unknown as AutoParseableTextFormat<ParsedT>;
-    return text_format.$parseRaw(content);
-  }
-
-  return JSON.parse(content);
+  return parseResponseFormatContent<ParsedT>(params.text?.format, content);
 }
 
 export function hasAutoParseableInput(params: ResponseCreateParamsWithTools): boolean {
-  if (isAutoParsableResponseFormat(params.text?.format) || params.text?.format?.type === 'json_schema') {
+  if (isParseableResponseFormat(params.text?.format)) {
     return true;
   }
 

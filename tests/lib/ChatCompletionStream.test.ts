@@ -9,6 +9,38 @@ import { makeStreamSnapshotRequest } from '../utils/mock-snapshots';
 
 jest.setTimeout(1000 * 30);
 
+function mockStreamingClient(chunks: OpenAI.Chat.ChatCompletionChunk[]): OpenAI {
+  return {
+    chat: {
+      completions: {
+        create: jest.fn(async () => ({
+          controller: new AbortController(),
+          async *[Symbol.asyncIterator]() {
+            for (const chunk of chunks) yield chunk;
+          },
+        })),
+      },
+    },
+  } as unknown as OpenAI;
+}
+
+function contentChunks(...contents: string[]): OpenAI.Chat.ChatCompletionChunk[] {
+  return contents.map((content, index) => ({
+    id: 'chatcmpl-test',
+    object: 'chat.completion.chunk',
+    created: 1,
+    model: 'gpt-test',
+    choices: [
+      {
+        index: 0,
+        delta: index === 0 ? { role: 'assistant', content } : { content },
+        finish_reason: index === contents.length - 1 ? 'stop' : null,
+        logprobs: null,
+      },
+    ],
+  }));
+}
+
 describe('.stream()', () => {
   it('emits finalization failures as errors', async () => {
     const chunk: OpenAI.Chat.ChatCompletionChunk = {
@@ -752,5 +784,76 @@ describe('.stream()', () => {
       }
     `);
     expect(capturedLogProbs?.length).toEqual(choice?.logprobs?.refusal?.length);
+  });
+
+  it('parses stream events for raw json_schema response formats', async () => {
+    const stream = ChatCompletionStream.createChatCompletion(
+      mockStreamingClient(contentChunks('{"city":', '"SF"}')),
+      {
+        model: 'gpt-test',
+        messages: [{ role: 'user', content: "What's the weather like in SF?" }],
+        response_format: {
+          type: 'json_schema',
+          json_schema: { name: 'location', schema: { type: 'object' } },
+        },
+      },
+    );
+
+    const deltaParsed: unknown[] = [];
+    let doneParsed: unknown = undefined;
+    stream.on('content.delta', (event) => deltaParsed.push(event.parsed));
+    stream.on('content.done', (event) => (doneParsed = event.parsed));
+
+    const completion = await stream.finalChatCompletion();
+
+    // Partial events parse incrementally, and the final event agrees with the
+    // finalized completion rather than reporting `null`.
+    expect(deltaParsed).toEqual([{}, { city: 'SF' }]);
+    expect(doneParsed).toEqual({ city: 'SF' });
+    expect(completion.choices[0]?.message.parsed).toEqual({ city: 'SF' });
+  });
+
+  it('parses stream events for branded response formats', async () => {
+    const stream = ChatCompletionStream.createChatCompletion(
+      mockStreamingClient(contentChunks('{"city":', '"SF"}')),
+      {
+        model: 'gpt-test',
+        messages: [{ role: 'user', content: "What's the weather like in SF?" }],
+        response_format: zodResponseFormat(z.object({ city: z.string() }), 'location'),
+      },
+    );
+
+    const deltaParsed: unknown[] = [];
+    let doneParsed: unknown = undefined;
+    stream.on('content.delta', (event) => deltaParsed.push(event.parsed));
+    stream.on('content.done', (event) => (doneParsed = event.parsed));
+
+    const completion = await stream.finalChatCompletion();
+
+    expect(deltaParsed).toEqual([{}, { city: 'SF' }]);
+    expect(doneParsed).toEqual({ city: 'SF' });
+    expect(completion.choices[0]?.message.parsed).toEqual({ city: 'SF' });
+  });
+
+  it('leaves stream events unparsed for response formats without parsed output', async () => {
+    const stream = ChatCompletionStream.createChatCompletion(
+      mockStreamingClient(contentChunks('{"city":', '"SF"}')),
+      {
+        model: 'gpt-test',
+        messages: [{ role: 'user', content: "What's the weather like in SF?" }],
+        response_format: { type: 'json_object' },
+      },
+    );
+
+    const deltaParsed: unknown[] = [];
+    let doneParsed: unknown = undefined;
+    stream.on('content.delta', (event) => deltaParsed.push(event.parsed));
+    stream.on('content.done', (event) => (doneParsed = event.parsed));
+
+    const completion = await stream.finalChatCompletion();
+
+    expect(deltaParsed).toEqual([undefined, undefined]);
+    expect(doneParsed).toBeNull();
+    expect(completion.choices[0]?.message.parsed).toBeNull();
   });
 });

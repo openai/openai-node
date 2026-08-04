@@ -1,5 +1,13 @@
-import { makeParseableResponseTool, maybeParseResponse, parseResponse } from '../../src/lib/ResponsesParser';
+import OpenAI from 'openai';
+import {
+  makeParseableResponseTool,
+  maybeParseResponse,
+  parseResponse,
+  type ExtractParsedContentFromParams,
+} from '../../src/lib/ResponsesParser';
+import { makeParseableTextFormat, type AutoParseableTextFormat } from '../../src/lib/parser';
 import type { Response, ResponseCreateParamsBase } from '../../src/resources/responses/responses';
+import { compareType } from '../utils/typing';
 
 const structuredTextParams = {
   model: 'gpt-5.4-mini',
@@ -148,4 +156,73 @@ describe('ResponsesParser', () => {
 
     expect(response.output_parsed).toEqual({ size: 'large', quality: 'good' });
   });
+
+  it('prefers the branded callback over generic JSON for helper text formats', () => {
+    const parseRaw = jest.fn(() => ({ branded: true }));
+    const response = maybeParseResponse(makeResponse('completed', '{"size":"large"}'), {
+      model: 'gpt-5.4-mini',
+      input: 'Good large pea',
+      text: {
+        format: makeParseableTextFormat(
+          { type: 'json_schema', name: 'pea_schema', schema: { type: 'object' } },
+          parseRaw,
+        ),
+      },
+    });
+
+    expect(response.output_parsed).toEqual({ branded: true });
+    expect(parseRaw).toHaveBeenCalledWith('{"size":"large"}');
+  });
 });
+
+describe('ExtractParsedContentFromParams', () => {
+  it('resolves raw json_schema text formats to unknown', () => {
+    compareType<
+      ExtractParsedContentFromParams<{
+        text: { format: { type: 'json_schema'; name: 'pea_schema'; schema: {} } };
+      }>,
+      unknown
+    >(true);
+  });
+
+  it('resolves branded helper text formats to the helper output type', () => {
+    compareType<
+      ExtractParsedContentFromParams<{
+        text: { format: AutoParseableTextFormat<{ size: string }> };
+      }>,
+      { size: string }
+    >(true);
+  });
+
+  it('resolves text formats without parsed output to null', () => {
+    compareType<ExtractParsedContentFromParams<{}>, null>(true);
+    compareType<ExtractParsedContentFromParams<{ text: { format: { type: 'text' } } }>, null>(true);
+    compareType<ExtractParsedContentFromParams<{ text: { format: { type: 'json_object' } } }>, null>(true);
+  });
+});
+
+// Compile-time only; `tsc` covers this file, and the function is never called.
+async function _responsesParsedTypes(client: OpenAI) {
+  const rawSchemaResponse = await client.responses.parse({
+    model: 'gpt-5.4-mini',
+    input: 'Good large pea',
+    text: { format: { type: 'json_schema', name: 'pea_schema', schema: { type: 'object' } } },
+  });
+  compareType<(typeof rawSchemaResponse)['output_parsed'], unknown>(true);
+
+  const rawSchemaStream = await client.responses
+    .stream({
+      model: 'gpt-5.4-mini',
+      input: 'Good large pea',
+      text: { format: { type: 'json_schema', name: 'pea_schema', schema: { type: 'object' } } },
+    })
+    .finalResponse();
+  compareType<(typeof rawSchemaStream)['output_parsed'], unknown>(true);
+
+  const textResponse = await client.responses.parse({
+    model: 'gpt-5.4-mini',
+    input: 'Good large pea',
+    text: { format: { type: 'text' } },
+  });
+  compareType<(typeof textResponse)['output_parsed'], null>(true);
+}

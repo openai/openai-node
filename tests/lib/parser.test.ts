@@ -1,8 +1,16 @@
 import { z as z4 } from 'zod/v4';
 import { z as z3 } from 'zod/v3';
+import OpenAI from 'openai';
 import { zodResponseFormat } from 'openai/helpers/zod';
-import { maybeParseChatCompletion } from '../../src/lib/parser';
+import {
+  isParseableResponseFormat,
+  makeParseableResponseFormat,
+  maybeParseChatCompletion,
+  parseResponseFormatContent,
+  type ExtractParsedContentFromParams,
+} from '../../src/lib/parser';
 import { makeSnapshotRequest } from '../utils/mock-snapshots';
+import { compareType } from '../utils/typing';
 
 jest.setTimeout(1000 * 30);
 
@@ -1447,3 +1455,114 @@ describe('maybeParseChatCompletion', () => {
     });
   });
 });
+
+describe('isParseableResponseFormat', () => {
+  it('accepts branded helper formats', () => {
+    expect(isParseableResponseFormat(zodResponseFormat(z4.object({ city: z4.string() }), 'location'))).toBe(
+      true,
+    );
+  });
+
+  it('accepts raw json_schema formats', () => {
+    expect(
+      isParseableResponseFormat({ type: 'json_schema', json_schema: { name: 'location', schema: {} } }),
+    ).toBe(true);
+  });
+
+  it('rejects formats that produce no parsed output', () => {
+    expect(isParseableResponseFormat({ type: 'json_object' })).toBe(false);
+    expect(isParseableResponseFormat({ type: 'text' })).toBe(false);
+    expect(isParseableResponseFormat(undefined)).toBe(false);
+    expect(isParseableResponseFormat(null)).toBe(false);
+  });
+});
+
+describe('parseResponseFormatContent', () => {
+  it('uses the branded callback instead of generic JSON when present', () => {
+    const parseRaw = jest.fn(() => ({ branded: true }));
+    const format = makeParseableResponseFormat(
+      { type: 'json_schema', json_schema: { name: 'location', schema: {} } },
+      parseRaw,
+    );
+
+    expect(parseResponseFormatContent(format, '{"city":"San Francisco"}')).toEqual({ branded: true });
+    expect(parseRaw).toHaveBeenCalledWith('{"city":"San Francisco"}');
+  });
+
+  it('falls back to generic JSON for raw json_schema formats', () => {
+    expect(
+      parseResponseFormatContent(
+        { type: 'json_schema', json_schema: { name: 'location', schema: {} } },
+        '{"city":"San Francisco"}',
+      ),
+    ).toEqual({ city: 'San Francisco' });
+  });
+
+  it('returns null for non-parseable formats', () => {
+    expect(parseResponseFormatContent({ type: 'json_object' }, '{"city":"San Francisco"}')).toBeNull();
+    expect(parseResponseFormatContent(undefined, '{"city":"San Francisco"}')).toBeNull();
+  });
+});
+
+describe('ExtractParsedContentFromParams', () => {
+  type BaseParams = { model: string; messages: [] };
+
+  it('resolves raw json_schema formats to unknown', () => {
+    compareType<
+      ExtractParsedContentFromParams<
+        BaseParams & {
+          response_format: { type: 'json_schema'; json_schema: { name: 'location'; schema: {} } };
+        }
+      >,
+      unknown
+    >(true);
+  });
+
+  it('resolves branded helper formats to the helper output type', () => {
+    compareType<
+      ExtractParsedContentFromParams<
+        BaseParams & {
+          response_format: ReturnType<typeof zodResponseFormat<z4.ZodObject<{ city: z4.ZodString }>>>;
+        }
+      >,
+      { city: string }
+    >(true);
+  });
+
+  it('resolves formats without parsed output to null', () => {
+    compareType<ExtractParsedContentFromParams<BaseParams>, null>(true);
+    compareType<
+      ExtractParsedContentFromParams<BaseParams & { response_format: { type: 'json_object' } }>,
+      null
+    >(true);
+    compareType<ExtractParsedContentFromParams<BaseParams & { response_format: { type: 'text' } }>, null>(
+      true,
+    );
+  });
+});
+
+// Compile-time only; `tsc` covers this file, and the function is never called.
+async function _chatCompletionsParsedTypes(client: OpenAI) {
+  const rawSchemaCompletion = await client.chat.completions.parse({
+    model: 'gpt-4o-2024-08-06',
+    messages: [{ role: 'user', content: "What's the weather like in SF?" }],
+    response_format: { type: 'json_schema', json_schema: { name: 'location', schema: { type: 'object' } } },
+  });
+  compareType<(typeof rawSchemaCompletion)['choices'][number]['message']['parsed'], unknown>(true);
+
+  const rawSchemaStream = await client.chat.completions
+    .stream({
+      model: 'gpt-4o-2024-08-06',
+      messages: [{ role: 'user', content: "What's the weather like in SF?" }],
+      response_format: { type: 'json_schema', json_schema: { name: 'location', schema: { type: 'object' } } },
+    })
+    .finalChatCompletion();
+  compareType<(typeof rawSchemaStream)['choices'][number]['message']['parsed'], unknown>(true);
+
+  const jsonObjectCompletion = await client.chat.completions.parse({
+    model: 'gpt-4o-2024-08-06',
+    messages: [{ role: 'user', content: "What's the weather like in SF?" }],
+    response_format: { type: 'json_object' },
+  });
+  compareType<(typeof jsonObjectCompletion)['choices'][number]['message']['parsed'], null>(true);
+}
