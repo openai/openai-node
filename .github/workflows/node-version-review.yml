@@ -63,6 +63,15 @@ jobs:
       - name: Build the repository
         run: ./scripts/build
 
+      - name: Check published source types with TypeScript 4.9
+        run: ./node_modules/typescript-4-9/bin/tsc --project dist/src/tsconfig.json --noEmit
+
+      - name: Check published source types with TypeScript 6
+        run: ./node_modules/typescript/bin/tsc --project dist/src/tsconfig.json --noEmit
+
+      - name: Check packed browser and edge consumers
+        run: node --experimental-strip-types scripts/test-packed-package.ts
+
       - name: Check TypeScript types
         run: pnpm exec tsc
 

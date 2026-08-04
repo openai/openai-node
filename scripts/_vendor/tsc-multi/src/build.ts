@@ -16,7 +16,7 @@ const WORKER_TS_NODE_ENV = {
   TS_NODE_COMPILER_OPTIONS: JSON.stringify({
     esModuleInterop: true,
     module: 'commonjs',
-    moduleResolution: 'node',
+    moduleResolution: 'bundler',
     target: 'es2020',
   }),
 };

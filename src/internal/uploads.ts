@@ -214,7 +214,7 @@ const isReadableStream = (value: unknown): value is ReadableStream<BlobPart> =>
 const isStreamingFile = (value: unknown): value is StreamingFile =>
   typeof value === 'object' && value !== null && brand_privateStreamingFile in value;
 
-const isUploadable = (value: unknown) =>
+const isUploadable = (value: unknown): value is Uploadable =>
   typeof value === 'object' &&
   value !== null &&
   (value instanceof Response ||

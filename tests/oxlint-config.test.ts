@@ -13,7 +13,7 @@ test('inherits Ultracite native plugins and enforces their rules', () => {
     encoding: 'utf8',
   });
 
-  expect(printed.status, printed.stdout || printed.stderr).toBe(0);
+  expect(printed.status).toBe(0);
 
   const configuration = JSON.parse(printed.stdout) as {
     plugins: string[];
@@ -38,7 +38,7 @@ test('inherits Ultracite native plugins and enforces their rules', () => {
       { cwd: repoRoot, encoding: 'utf8' },
     );
 
-    expect(linted.status, linted.stdout || linted.stderr).toBe(1);
+    expect(linted.status).toBe(1);
 
     const { diagnostics } = JSON.parse(linted.stdout) as { diagnostics: { code: string }[] };
     expect(diagnostics.map(({ code }) => code)).toContain('unicorn(no-instanceof-array)');
@@ -49,7 +49,7 @@ test('inherits Ultracite native plugins and enforces their rules', () => {
       { cwd: repoRoot, encoding: 'utf8' },
     );
 
-    expect(formatted.status, formatted.stdout || formatted.stderr).toBe(0);
+    expect(formatted.status).toBe(0);
   } finally {
     rmSync(fixtureRoot, { recursive: true, force: true });
   }
