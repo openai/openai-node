@@ -28,13 +28,13 @@
     "bench": "vitest bench --run --config vitest.bench.config.mts",
     "bench:json": "vitest bench --run --config vitest.bench.config.mts --outputJson benchmark-results.json",
     "build": "./scripts/build",
-    "check": "ultracite check .",
+    "check": "ultracite check",
     "prepublishOnly": "echo 'to publish, run pnpm build && (cd dist; npm publish)' && exit 1",
-    "format": "ultracite fix . && oxfmt --write .",
+    "format": "ultracite fix",
     "prepare": "if ./scripts/utils/check-is-in-git-install.sh; then ./scripts/build && ./scripts/utils/git-swap.sh; fi",
     "tsn": "ts-node -r tsconfig-paths/register",
-    "lint": "ultracite check .",
-    "fix": "ultracite fix . && oxfmt --write ."
+    "lint": "ultracite check",
+    "fix": "ultracite fix"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.3",
