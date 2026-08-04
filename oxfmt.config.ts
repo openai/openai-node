@@ -1,6 +1,7 @@
-const { defineConfig } = require('oxfmt');
-const ultracite = require('ultracite/oxfmt').default;
-const stainlessGeneratedFiles = require('./scripts/stainless-generated-files.cjs');
+const requireConfig = require('node:module').createRequire(__filename);
+const { defineConfig } = requireConfig('oxfmt');
+const ultracite = requireConfig('ultracite/oxfmt').default;
+const stainlessGeneratedFiles = requireConfig('./scripts/stainless-generated-files.cjs');
 
 module.exports = defineConfig({
   ...ultracite,

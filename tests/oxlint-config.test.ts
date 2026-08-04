@@ -4,15 +4,16 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const repoRoot = process.cwd();
-const oxlint = join(repoRoot, 'node_modules/.bin/oxlint');
+const oxlint = join(repoRoot, 'node_modules/oxlint/bin/oxlint');
+const oxfmt = join(repoRoot, 'node_modules/oxfmt/bin/oxfmt');
 
 test('inherits Ultracite native plugins and enforces their rules', () => {
-  const printed = spawnSync(oxlint, ['--print-config', 'src/internal/uploads.ts'], {
+  const printed = spawnSync(process.execPath, [oxlint, '--print-config', 'src/internal/uploads.ts'], {
     cwd: repoRoot,
     encoding: 'utf8',
   });
 
-  expect(printed.status).toBe(0);
+  expect(printed.status, printed.stdout || printed.stderr).toBe(0);
 
   const configuration = JSON.parse(printed.stdout) as {
     plugins: string[];
@@ -32,15 +33,23 @@ test('inherits Ultracite native plugins and enforces their rules', () => {
     writeFileSync(fixturePath, 'const values = [];\nconsole.log(values instanceof Array);\n');
 
     const linted = spawnSync(
-      oxlint,
-      ['--config', join(repoRoot, 'oxlint.config.ts'), '--format', 'json', fixturePath],
+      process.execPath,
+      [oxlint, '--config', join(repoRoot, 'oxlint.config.ts'), '--format', 'json', fixturePath],
       { cwd: repoRoot, encoding: 'utf8' },
     );
 
-    expect(linted.status).toBe(1);
+    expect(linted.status, linted.stdout || linted.stderr).toBe(1);
 
     const { diagnostics } = JSON.parse(linted.stdout) as { diagnostics: { code: string }[] };
     expect(diagnostics.map(({ code }) => code)).toContain('unicorn(no-instanceof-array)');
+
+    const formatted = spawnSync(
+      process.execPath,
+      [oxfmt, '--config', join(repoRoot, 'oxfmt.config.ts'), '--check', fixturePath],
+      { cwd: repoRoot, encoding: 'utf8' },
+    );
+
+    expect(formatted.status, formatted.stdout || formatted.stderr).toBe(0);
   } finally {
     rmSync(fixtureRoot, { recursive: true, force: true });
   }

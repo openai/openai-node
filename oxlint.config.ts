@@ -1,6 +1,7 @@
-const { defineConfig } = require('oxlint');
-const core = require('ultracite/oxlint/core').default;
-const stainlessGeneratedFiles = require('./scripts/stainless-generated-files.cjs');
+const requireConfig = require('node:module').createRequire(__filename);
+const { defineConfig } = requireConfig('oxlint');
+const core = requireConfig('ultracite/oxlint/core').default;
+const stainlessGeneratedFiles = requireConfig('./scripts/stainless-generated-files.cjs');
 
 // Existing handwritten SDK patterns predate these preset rules.
 const compatibilityRules = [
