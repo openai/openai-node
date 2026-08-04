@@ -49,9 +49,9 @@ function parseJSDocComment(comment) {
   };
 }
 
-function getEntityRoot(entity) {
+function getEntityRootNode(entity) {
   while (entity) {
-    if (ts.isIdentifier(entity)) return ts.unescapeLeadingUnderscores(entity.escapedText);
+    if (ts.isIdentifier(entity)) return entity;
     if (ts.isQualifiedName(entity) || ts.isJSDocMemberName(entity)) {
       entity = entity.left;
     } else if (ts.isPropertyAccessExpression(entity)) {
@@ -60,6 +60,11 @@ function getEntityRoot(entity) {
       return;
     }
   }
+}
+
+function getEntityRoot(entity) {
+  const root = getEntityRootNode(entity);
+  return root && ts.unescapeLeadingUnderscores(root.escapedText);
 }
 
 function addEntityReference(entity, bindings, used, namespace = 'type') {
@@ -163,23 +168,39 @@ function collectTypeReferences(node, bindings, used) {
   ts.forEachChild(node, (child) => collectTypeReferences(child, bindings, used));
 }
 
-function collectDocumentationLinks(comment, bindings, used, text) {
+function addDocumentationReference(entity, bindings, used, namespaces) {
+  if (namespaces?.size) {
+    for (const namespace of namespaces) addEntityReference(entity, bindings, used, namespace);
+    return;
+  }
+
+  addEntityReference(entity, bindings, used);
+}
+
+function collectDocumentationLinks(comment, bindings, used, text, documentationNamespaces) {
   if (!Array.isArray(comment)) return;
 
   for (const node of comment) {
     if (!ts.isJSDocLinkLike(node) || text[node.pos - 1] === '\\') continue;
-    addEntityReference(node.name, bindings, used);
+    const name = getEntityRoot(node.name);
+    addDocumentationReference(node.name, bindings, used, documentationNamespaces?.get(name));
   }
 }
 
-function collectBacktickedDocumentationLinks(tag, bindings, used, text) {
+function collectBacktickedDocumentationLinks(tag, bindings, used, text, documentationNamespaces) {
   const comment = text.slice(tag.tagName.end, tag.end);
   if (!comment.includes('{@') || !comment.includes('`')) {
     return;
   }
 
   const normalized = parseJSDocComment(`/** @deprecated${comment.replaceAll('`', ' ')} */`);
-  collectDocumentationLinks(normalized.comment?.tags?.[0]?.comment, bindings, used, normalized.text);
+  collectDocumentationLinks(
+    normalized.comment?.tags?.[0]?.comment,
+    bindings,
+    used,
+    normalized.text,
+    documentationNamespaces,
+  );
 }
 
 function startsJSDocLine(text, position) {
@@ -408,19 +429,154 @@ function isStandaloneJSDocDeclarationTag(tag) {
   return ts.isJSDocTypedefTag(tag) || ts.isJSDocCallbackTag(tag);
 }
 
+function getSymbolNamespaces(checker, symbol) {
+  if (!symbol) return;
+
+  const original = symbol;
+  if (symbol.flags & ts.SymbolFlags.Alias) {
+    const aliased = checker.getAliasedSymbol(symbol);
+    if (aliased && aliased !== symbol && !(aliased.flags & ts.SymbolFlags.Unknown)) {
+      symbol = aliased;
+    }
+  }
+
+  const namespaces = new Set();
+  if (symbol.flags & ts.SymbolFlags.Type) namespaces.add('type');
+  if (symbol.flags & ts.SymbolFlags.Value) namespaces.add('value');
+
+  // An unresolved import alias is still a real documentation target. Keep both
+  // namespaces rather than guessing which export the unresolved module provides.
+  if (namespaces.size === 0 && original.flags & ts.SymbolFlags.Alias) {
+    namespaces.add('type');
+    namespaces.add('value');
+  }
+
+  return namespaces.size > 0 ? namespaces : undefined;
+}
+
+function isStandaloneJSDocDeclarationSymbol(symbol) {
+  return symbol?.declarations?.some(isStandaloneJSDocDeclarationTag);
+}
+
+function createJSDocChecker(compilerSource) {
+  const options = {
+    allowJs: true,
+    checkJs: true,
+    jsx: ts.JsxEmit.Preserve,
+    module: ts.ModuleKind.NodeNext,
+    moduleResolution: ts.ModuleResolutionKind.NodeNext,
+    noEmit: true,
+    noLib: true,
+    skipLibCheck: true,
+    target: ts.ScriptTarget.Latest,
+  };
+  const baseHost = ts.createCompilerHost(options, true);
+  const rootPath = ts.sys.resolvePath(compilerSource.fileName);
+  const isRoot = (filename) => ts.sys.resolvePath(filename) === rootPath;
+  const host = {
+    ...baseHost,
+    fileExists(filename) {
+      return isRoot(filename) || baseHost.fileExists(filename);
+    },
+    getSourceFile(filename, languageVersion, onError, shouldCreateNewSourceFile) {
+      if (isRoot(filename)) return compilerSource;
+      return baseHost.getSourceFile(filename, languageVersion, onError, shouldCreateNewSourceFile);
+    },
+    readFile(filename) {
+      return isRoot(filename) ? compilerSource.text : baseHost.readFile(filename);
+    },
+  };
+  const program = ts.createProgram({ rootNames: [compilerSource.fileName], options, host });
+  return program.getTypeChecker();
+}
+
+function getJSDocNamespaceInfo(compilerSource) {
+  const localTypeBindings = new Map();
+  const documentationNamespaces = new Map();
+  const comments = [];
+  let needsChecker = false;
+
+  function collectComment(comment) {
+    comments.push(comment);
+    function visit(node) {
+      if (isStandaloneJSDocDeclarationTag(node) || ts.isJSDocLinkLike(node) || ts.isJSDocSeeTag(node)) {
+        needsChecker = true;
+      }
+      ts.forEachChild(node, visit);
+    }
+    visit(comment);
+  }
+
+  function collectSource(node) {
+    for (const comment of node.jsDoc ?? []) collectComment(comment);
+    ts.forEachChild(node, collectSource);
+  }
+
+  collectSource(compilerSource);
+  if (!needsChecker) return { documentationNamespaces, localTypeBindings };
+  const checker = createJSDocChecker(compilerSource);
+
+  function addLocalTypeBinding(comment, entity, symbol) {
+    if (!isStandaloneJSDocDeclarationSymbol(symbol)) return;
+    const name = getEntityRoot(entity);
+    if (!name) return;
+    const bindings = localTypeBindings.get(comment.pos) ?? new Set();
+    bindings.add(name);
+    localTypeBindings.set(comment.pos, bindings);
+  }
+
+  function addDocumentationNamespaces(comment, entity) {
+    const root = getEntityRootNode(entity);
+    if (!root) return;
+    const namespaces = getSymbolNamespaces(checker, checker.getSymbolAtLocation(root));
+    if (!namespaces) return;
+    const name = ts.unescapeLeadingUnderscores(root.escapedText);
+    const references = documentationNamespaces.get(comment.pos) ?? new Map();
+    const existing = references.get(name) ?? new Set();
+    for (const namespace of namespaces) existing.add(namespace);
+    references.set(name, existing);
+    documentationNamespaces.set(comment.pos, references);
+  }
+
+  function visitComment(comment) {
+    function visit(node) {
+      if (ts.isTypeReferenceNode(node)) {
+        const root = getEntityRootNode(node.typeName);
+        addLocalTypeBinding(comment, root, checker.getSymbolAtLocation(root));
+      } else if (ts.isJSDocLinkLike(node)) {
+        addDocumentationNamespaces(comment, node.name);
+      } else if (ts.isJSDocSeeTag(node)) {
+        addDocumentationNamespaces(comment, node.name?.name);
+      }
+      ts.forEachChild(node, visit);
+    }
+
+    visit(comment);
+  }
+
+  for (const comment of comments) visitComment(comment);
+  return { documentationNamespaces, localTypeBindings };
+}
+
 function getAttachedJSDocComments(context) {
   const sourceCode = context.sourceCode;
   const parserOptions = context.languageOptions.parserOptions;
   const filenames = [context.physicalFilename, context.filename, parserOptions.filePath, sourceCode.filename];
   let scriptKind = ts.ScriptKind.Unknown;
+  let compilerFilename;
 
   for (const filename of filenames) {
     if (typeof filename !== 'string') continue;
-    scriptKind = ts.getScriptKindFromFileName(filename.split(/[?#]/u, 1)[0]);
-    if (scriptKind !== ts.ScriptKind.Unknown) break;
+    const cleanFilename = filename.split(/[?#]/u, 1)[0];
+    scriptKind = ts.getScriptKindFromFileName(cleanFilename);
+    if (scriptKind !== ts.ScriptKind.Unknown) {
+      compilerFilename = cleanFilename;
+      break;
+    }
     const mode = /(?:\?|&)lang=(tsx?|jsx?)(?:&|$)/iu.exec(filename)?.[1];
     if (mode) {
       scriptKind = ts.getScriptKindFromFileName(`oxlint-jsdoc.${mode}`);
+      compilerFilename = `oxlint-jsdoc.${mode}`;
       break;
     }
   }
@@ -429,8 +585,14 @@ function getAttachedJSDocComments(context) {
     scriptKind = parserOptions.ecmaFeatures?.jsx ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
   }
 
+  if (!compilerFilename) {
+    const extension =
+      scriptKind === ts.ScriptKind.TSX ? 'tsx' : scriptKind === ts.ScriptKind.JSX ? 'jsx' : 'ts';
+    compilerFilename = `oxlint-jsdoc.${extension}`;
+  }
+
   const compilerSource = ts.createSourceFile(
-    'oxlint-jsdoc',
+    compilerFilename,
     sourceCode.text,
     { languageVersion: ts.ScriptTarget.Latest, jsDocParsingMode: ts.JSDocParsingMode.ParseAll },
     true,
@@ -453,13 +615,15 @@ function getAttachedJSDocComments(context) {
   }
 
   visit(compilerSource);
-  return attached;
+  return { attached, compilerSource };
 }
 
 function getJSDocImportUsage(context) {
   const sourceCode = context.sourceCode;
   const used = new Set();
-  const attached = getAttachedJSDocComments(context);
+  const { attached, compilerSource } = getAttachedJSDocComments(context);
+  if (attached.size === 0) return used;
+  const { documentationNamespaces, localTypeBindings } = getJSDocNamespaceInfo(compilerSource);
 
   for (const comment of sourceCode.getAllComments()) {
     if (comment.type !== 'Block' || !comment.value.startsWith('*')) continue;
@@ -469,6 +633,8 @@ function getJSDocImportUsage(context) {
     const parsed = parseJSDocComment(raw);
     const doc = parsed.comment;
     if (!doc) continue;
+    const commentDocumentationNamespaces = documentationNamespaces.get(comment.range[0]);
+    const commentLocalTypeBindings = localTypeBindings.get(comment.range[0]);
 
     const references = new Map();
     const tags = doc.tags ?? [];
@@ -485,7 +651,7 @@ function getJSDocImportUsage(context) {
       }
     }
 
-    collectDocumentationLinks(doc.comment, bindings, references, parsed.text);
+    collectDocumentationLinks(doc.comment, bindings, references, parsed.text, commentDocumentationNamespaces);
 
     let inExample = false;
     let documentationTag;
@@ -520,8 +686,20 @@ function getJSDocImportUsage(context) {
 
       if (!TYPE_BEARING_TAGS.has(name) && !REFERENCE_TAGS.has(name)) {
         documentationTag = originalTag;
-        collectDocumentationLinks(originalTag.comment, bindings, references, parsed.text);
-        collectBacktickedDocumentationLinks(originalTag, bindings, references, parsed.text);
+        collectDocumentationLinks(
+          originalTag.comment,
+          bindings,
+          references,
+          parsed.text,
+          commentDocumentationNamespaces,
+        );
+        collectBacktickedDocumentationLinks(
+          originalTag,
+          bindings,
+          references,
+          parsed.text,
+          commentDocumentationNamespaces,
+        );
         previousTag = originalTag;
         continue;
       }
@@ -541,18 +719,39 @@ function getJSDocImportUsage(context) {
           originalTag.tagName.end,
           originalTag.name?.name?.pos ?? originalTag.name?.pos ?? originalTag.end,
         );
-        if (!prefix.includes('{')) addEntityReference(tag.name?.name, bindings, references);
+        if (!prefix.includes('{')) {
+          const name = getEntityRoot(tag.name?.name);
+          addDocumentationReference(
+            tag.name?.name,
+            bindings,
+            references,
+            commentDocumentationNamespaces?.get(name),
+          );
+        }
       } else {
         collectJSDocTagReferences(tag, originalTag, parsed, bindings, references);
       }
 
-      collectDocumentationLinks(originalTag.comment, bindings, references, parsed.text);
-      collectBacktickedDocumentationLinks(originalTag, bindings, references, parsed.text);
+      collectDocumentationLinks(
+        originalTag.comment,
+        bindings,
+        references,
+        parsed.text,
+        commentDocumentationNamespaces,
+      );
+      collectBacktickedDocumentationLinks(
+        originalTag,
+        bindings,
+        references,
+        parsed.text,
+        commentDocumentationNamespaces,
+      );
       previousTag = originalTag;
     }
 
     for (const [name, namespaces] of references) {
       for (const namespace of namespaces) {
+        if (namespace === 'type' && commentLocalTypeBindings?.has(name)) continue;
         const binding = getJSDocRootBinding(sourceCode, comment, name, namespace);
         if (binding) used.add(binding);
       }

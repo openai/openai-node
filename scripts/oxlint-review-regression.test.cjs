@@ -51,6 +51,20 @@ function findDocumentedNode(program, fixturePath, predicate) {
   return documented;
 }
 
+function findJSDocLink(program, fixturePath, name) {
+  let link;
+  function visitComment(node) {
+    if (ts.isJSDocLinkLike(node) && node.name?.escapedText === name) link ??= node;
+    ts.forEachChild(node, visitComment);
+  }
+  function visit(node) {
+    for (const comment of node.jsDoc ?? []) visitComment(comment);
+    ts.forEachChild(node, visit);
+  }
+  visit(program.getSourceFile(fixturePath));
+  return link;
+}
+
 function runTypeScriptOutput(fixturePath) {
   const outputPath = fixturePath.replace(/\.ts$/u, '.cjs');
   const output = ts.transpileModule(fs.readFileSync(fixturePath, 'utf8'), {
@@ -284,6 +298,146 @@ test('resolves JSDoc type references through value-only shadows while preserving
     const fixed = fix(fixturePath);
     assert.equal(/import \{ Foo \}/u.test(fixed), retained, `${name}: imported Foo retention`);
     assert.match(fixed, /import \{ Bar \}/u, `${name}: unrelated genuine Bar import`);
+    assert.doesNotMatch(fixed, /import \{[^}]*\bRef\b/u, `${name}: stale Ref import`);
+    assertNoMissingTypes(fixturePath);
+    if (extension === 'mjs') {
+      assert.equal(run(process.execPath, [fixturePath]), String(retained), `${name}: import side effect`);
+    } else {
+      assert.equal(runTypeScriptOutput(fixturePath).stdout, String(retained), `${name}: import side effect`);
+    }
+  }
+});
+
+test('resolves sibling JSDoc typedef and callback bindings in their lexical scopes', () => {
+  const cases = [
+    [
+      'module-typedef',
+      '/** @typedef {string} Foo */\n/** @type {Foo} */\nlet value;',
+      'JSDocTypedefTag',
+      false,
+    ],
+    [
+      'function-typedef',
+      'function documented() {\n/** @typedef {string} Foo */\n/** @type {Foo} */\nlet value;\nreturn value;\n}',
+      'JSDocTypedefTag',
+      false,
+      true,
+    ],
+    [
+      'block-callback',
+      'function documented() {\nif (true) {\n/**\n * @callback Foo\n * @returns {string}\n */\n/** @type {Foo} */\nlet value;\nreturn value;\n}\n}',
+      'JSDocCallbackTag',
+      false,
+    ],
+    [
+      'later-sibling-typedef',
+      'function documented() {\n/** @type {Foo} */\nlet value;\n/** @typedef {string} Foo */\n/** @type {number} */\nlet marker;\nreturn value ?? marker;\n}',
+      'JSDocTypedefTag',
+      false,
+    ],
+    [
+      'outer-typedef-visible-in-inner-block',
+      'function documented() {\n/** @typedef {string} Foo */\n/** @type {number} */\nlet marker;\nif (true) {\n/** @type {Foo} */\nlet value;\nreturn value ?? marker;\n}\n}',
+      'JSDocTypedefTag',
+      false,
+    ],
+    [
+      'inner-typedef-does-not-leak',
+      'function documented() {\nif (true) {\n/** @typedef {string} Foo */\n/** @type {number} */\nlet marker;\n}\n/** @type {Foo} */\nlet value;\nreturn value;\n}',
+      'ImportSpecifier',
+      true,
+    ],
+  ];
+
+  for (const [name, declaration, expectedBinding, retained, importsAfter = false] of cases) {
+    const imports = `import { Foo } from './parameter-side-effect.mjs';\nimport { Bar, Ref } from './parameter-types.mjs';`;
+    const fixturePath = writeFixture(
+      `sibling-jsdoc-${name}.mjs`,
+      `// @ts-check\n${importsAfter ? `${declaration}\n${imports}` : `${imports}\n${declaration}`}\n/** @type {Bar} */\nexport let another;\nconsole.log(globalThis.parameterImportRan ?? false);\n`,
+    );
+    const before = assertNoMissingTypes(fixturePath);
+    const documented = findDocumentedNode(
+      before,
+      fixturePath,
+      (tag) => tag.typeExpression?.type?.typeName?.escapedText === 'Foo',
+    );
+    const tag = documented.jsDoc
+      .flatMap((comment) => comment.tags ?? [])
+      .find((candidate) => candidate.typeExpression?.type?.typeName?.escapedText === 'Foo');
+    assert.ok(tag, `${name}: compiler attaches the Foo type tag`);
+    const symbol = before.getTypeChecker().getSymbolAtLocation(tag.typeExpression.type.typeName);
+    const declarationKinds = symbol.declarations.map((declaration) => ts.SyntaxKind[declaration.kind]);
+    assert.ok(declarationKinds.includes(expectedBinding), `${name}: compiler binding`);
+    assert.equal(run(process.execPath, [fixturePath]), 'true', `${name}: side effect before fix`);
+
+    const fixed = fix(fixturePath);
+    assert.equal(/import \{ Foo \}/u.test(fixed), retained, `${name}: imported Foo retention`);
+    assert.match(fixed, /import \{ Bar \}/u, `${name}: genuine Bar reference`);
+    assert.doesNotMatch(fixed, /import \{[^}]*\bRef\b/u, `${name}: stale Ref import`);
+    assertNoMissingTypes(fixturePath);
+    assert.equal(run(process.execPath, [fixturePath]), String(retained), `${name}: import side effect`);
+  }
+});
+
+test('resolves documentation links through TypeScript value, type, and mixed namespaces', () => {
+  const cases = [
+    [
+      'value-parameter',
+      'mjs',
+      'function documented(Foo) {\n/** See {@link Foo} and {@link Bar}. */\nlet value;\nreturn value ?? Foo;\n}',
+      'Parameter',
+      false,
+    ],
+    [
+      'value-variable',
+      'mjs',
+      'function documented() {\nconst Foo = {};\n/** See {@link Foo} and {@link Bar}. */\nlet value;\nreturn value ?? Foo;\n}',
+      'VariableDeclaration',
+      false,
+    ],
+    [
+      'type-alias',
+      'ts',
+      'function documented() {\ntype Foo = { local: true };\n/** See {@link Foo} and {@link Bar}. */\nlet value;\nreturn value;\n}',
+      'TypeAliasDeclaration',
+      false,
+    ],
+    [
+      'mixed-class',
+      'mjs',
+      'function documented() {\nclass Foo {}\n/** See {@link Foo} and {@link Bar}. */\nlet value;\nreturn value ?? new Foo();\n}',
+      'ClassDeclaration',
+      false,
+    ],
+    ['true-import', 'mjs', '/** See {@link Foo} and {@link Bar}. */\nlet value;', 'ImportSpecifier', true],
+  ];
+
+  for (const [name, extension, declaration, expectedBinding, retained] of cases) {
+    const fixturePath = writeFixture(
+      `documentation-link-${name}.${extension}`,
+      `// @ts-check\nimport { Foo } from './parameter-side-effect.mjs';\nimport { Bar, Ref } from './parameter-types.mjs';\n${declaration}\nconsole.log(globalThis.parameterImportRan ?? false);\n`,
+    );
+    const before = assertNoMissingTypes(fixturePath);
+    const fooLink = findJSDocLink(before, fixturePath, 'Foo');
+    const barLink = findJSDocLink(before, fixturePath, 'Bar');
+    const checker = before.getTypeChecker();
+    const fooSymbol = checker.getSymbolAtLocation(fooLink.name);
+    const barSymbol = checker.getSymbolAtLocation(barLink.name);
+    assert.equal(ts.SyntaxKind[fooSymbol.declarations[0].kind], expectedBinding, `${name}: Foo binding`);
+    assert.equal(ts.SyntaxKind[barSymbol.declarations[0].kind], 'ImportSpecifier', `${name}: Bar binding`);
+    if (name === 'mixed-class') {
+      assert.ok(fooSymbol.flags & ts.SymbolFlags.Type, 'class link has a type namespace');
+      assert.ok(fooSymbol.flags & ts.SymbolFlags.Value, 'class link has a value namespace');
+    }
+    if (extension === 'mjs') {
+      assert.equal(run(process.execPath, [fixturePath]), 'true', `${name}: side effect before fix`);
+    } else {
+      assert.equal(runTypeScriptOutput(fixturePath).stdout, 'true', `${name}: side effect before fix`);
+    }
+
+    const fixed = fix(fixturePath);
+    assert.equal(/import \{ Foo \}/u.test(fixed), retained, `${name}: imported Foo retention`);
+    assert.match(fixed, /import \{ Bar \}/u, `${name}: genuine Bar documentation link`);
     assert.doesNotMatch(fixed, /import \{[^}]*\bRef\b/u, `${name}: stale Ref import`);
     assertNoMissingTypes(fixturePath);
     if (extension === 'mjs') {
