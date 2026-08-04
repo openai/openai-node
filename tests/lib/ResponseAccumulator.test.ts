@@ -1,5 +1,9 @@
 import { accumulateResponse } from 'openai/lib/responses/ResponseAccumulator';
-import type { Response, ResponseStreamEvent } from 'openai/resources/responses/responses';
+import type {
+  Response,
+  ResponseOutputMessage,
+  ResponseStreamEvent,
+} from 'openai/resources/responses/responses';
 
 describe('ResponseAccumulator', () => {
   it('accumulates a final response snapshot from stream events', () => {
@@ -66,7 +70,7 @@ describe('ResponseAccumulator', () => {
           status: 'completed',
           output: [
             {
-              ...snapshot.output[0]!,
+              ...(snapshot.output[0]! as ResponseOutputMessage),
               status: 'completed',
             },
           ],
