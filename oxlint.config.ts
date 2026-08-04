@@ -1,7 +1,8 @@
 const { defineConfig } = require('oxlint');
 const core = require('ultracite/oxlint/core').default;
+const stainlessGeneratedFiles = require('./scripts/stainless-generated-files.cjs');
 
-// Generated SDK patterns and existing handwritten code predate these preset rules.
+// Existing handwritten SDK patterns predate these preset rules.
 const compatibilityRules = [
   'array-callback-return',
   'arrow-body-style',
@@ -219,7 +220,7 @@ module.exports = defineConfig({
       },
     ],
   },
-  ignorePatterns: ['dist/**', 'coverage/**'],
+  ignorePatterns: [...core.ignorePatterns, 'dist/**', 'coverage/**', ...stainlessGeneratedFiles],
   overrides: [
     {
       files: ['tests/**', 'examples/**', 'ecosystem-tests/**'],

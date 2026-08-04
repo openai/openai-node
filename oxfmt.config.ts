@@ -1,5 +1,6 @@
 const { defineConfig } = require('oxfmt');
 const ultracite = require('ultracite/oxfmt').default;
+const stainlessGeneratedFiles = require('./scripts/stainless-generated-files.cjs');
 
 module.exports = defineConfig({
   ...ultracite,
@@ -11,6 +12,7 @@ module.exports = defineConfig({
   sortImports: false,
   sortPackageJson: false,
   ignorePatterns: [
+    ...ultracite.ignorePatterns,
     'CHANGELOG.md',
     'pnpm-lock.yaml',
     'ecosystem-tests/*/**',
@@ -19,5 +21,6 @@ module.exports = defineConfig({
     'api_reference/openapi.transformed.yml',
     'dist/**',
     'coverage/**',
+    ...stainlessGeneratedFiles,
   ],
 });

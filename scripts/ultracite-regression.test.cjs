@@ -7,6 +7,8 @@ const { after, test } = require('node:test');
 const repoRoot = path.resolve(__dirname, '..');
 const fixtureRoot = fs.mkdtempSync(path.join(repoRoot, 'ultracite-regression-'));
 const ultracite = path.join(repoRoot, 'node_modules', '.bin', 'ultracite');
+const oxlint = path.join(repoRoot, 'node_modules', '.bin', 'oxlint');
+const oxfmt = path.join(repoRoot, 'node_modules', '.bin', 'oxfmt');
 
 after(() => fs.rmSync(fixtureRoot, { recursive: true, force: true }));
 
@@ -24,7 +26,8 @@ test('Ultracite preserves classic JSX and SDK unused-import checks without unuse
     },
   ]);
   assert.deepEqual(configuration.jsPlugins, [{ name: 'sdk', specifier: './scripts/oxlint-plugin.cjs' }]);
-  assert.deepEqual(configuration.ignorePatterns, ['dist/**', 'coverage/**']);
+  assert.ok(configuration.ignorePatterns.includes('dist/**'));
+  assert.ok(configuration.ignorePatterns.includes('coverage/**'));
   assert.equal(configuration.rules['no-restricted-imports'][1].patterns[0].regex, '^openai(/.*)?');
 
   fs.writeFileSync(path.join(fixtureRoot, 'dep.js'), 'export const Foo = 3;\n');
@@ -46,4 +49,64 @@ test('Ultracite preserves classic JSX and SDK unused-import checks without unuse
   assert.equal(fixed.status, 0, `${fixed.stdout}\n${fixed.stderr}`);
   assert.doesNotMatch(fs.readFileSync(fixturePath, 'utf8'), /import \{ Foo \}/);
   assert.match(fs.readFileSync(fixturePath, 'utf8'), /intentionallyUnused/);
+});
+
+test('Ultracite ignores Stainless-generated files without ignoring handwritten neighbors', () => {
+  const lintConfiguration = require(path.join(repoRoot, 'oxlint.config.ts'));
+  const formatConfiguration = require(path.join(repoRoot, 'oxfmt.config.ts'));
+  const generatedPaths = [
+    'src/client.ts',
+    'src/core/resource.ts',
+    'src/internal/headers.ts',
+    'src/resources/responses/responses.ts',
+    'tests/index.test.ts',
+    'tests/api-resources/models.test.ts',
+  ];
+  const handwrittenPaths = [
+    'src/core/streaming.ts',
+    'src/internal/uploads.ts',
+    'tests/generated-resource-helpers.test.ts',
+    'tests/test-script.test.ts',
+  ];
+
+  for (const configuration of [lintConfiguration, formatConfiguration]) {
+    for (const generatedPath of generatedPaths) {
+      assert.ok(configuration.ignorePatterns.includes(generatedPath), generatedPath);
+    }
+    for (const handwrittenPath of handwrittenPaths) {
+      assert.ok(!configuration.ignorePatterns.includes(handwrittenPath), handwrittenPath);
+    }
+  }
+
+  const mixedFixtureRoot = fs.mkdtempSync(path.join(repoRoot, 'src', 'internal', 'ultracite-stainless-'));
+  const generatedPath = path.join(mixedFixtureRoot, 'generated.ts');
+  const handwrittenPath = path.join(mixedFixtureRoot, 'handwritten.ts');
+
+  try {
+    fs.writeFileSync(
+      generatedPath,
+      '// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.\n' +
+        'import { Unused } from "./missing";\n',
+    );
+    fs.writeFileSync(handwrittenPath, "export const handwritten = 'checked';\n");
+
+    const paths = [generatedPath, handwrittenPath].map((file) => path.relative(repoRoot, file));
+    const options = { cwd: repoRoot, encoding: 'utf8' };
+    const linted = spawnSync(
+      oxlint,
+      ['--format', 'json', '--no-error-on-unmatched-pattern', ...paths],
+      options,
+    );
+
+    assert.equal(linted.status, 0, `${linted.stdout}\n${linted.stderr}`);
+    assert.equal(JSON.parse(linted.stdout).number_of_files, 1);
+
+    const formatted = spawnSync(oxfmt, ['--check', '--no-error-on-unmatched-pattern', ...paths], options);
+
+    assert.equal(formatted.status, 0, `${formatted.stdout}\n${formatted.stderr}`);
+    assert.match(formatted.stdout, /on 1 files?\b/);
+    assert.match(fs.readFileSync(generatedPath, 'utf8'), /import \{ Unused \} from "\.\/missing";/);
+  } finally {
+    fs.rmSync(mixedFixtureRoot, { recursive: true, force: true });
+  }
 });
