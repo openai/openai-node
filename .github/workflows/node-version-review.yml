@@ -58,6 +58,12 @@ jobs:
         run: |
           node --experimental-strip-types scripts/check-node-version-policy.ts
           pnpm lint
+          pnpm test:lint-regressions
+          pnpm build
+          pnpm exec tsc
+          pnpm exec attw --pack dist -f json > .attw.json || true
+          node scripts/utils/attw-report.cjs
+          pnpm exec publint dist
           pnpm test
 
       - name: Open or update the draft pull request

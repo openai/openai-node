@@ -30,11 +30,11 @@
     "build": "./scripts/build",
     "check": "ultracite check .",
     "prepublishOnly": "echo 'to publish, run pnpm build && (cd dist; npm publish)' && exit 1",
-    "format": "./scripts/format",
+    "format": "ultracite fix . && oxfmt --write .",
     "prepare": "if ./scripts/utils/check-is-in-git-install.sh; then ./scripts/build && ./scripts/utils/git-swap.sh; fi",
     "tsn": "ts-node -r tsconfig-paths/register",
-    "lint": "./scripts/lint",
-    "fix": "./scripts/format"
+    "lint": "ultracite check .",
+    "fix": "ultracite fix . && oxfmt --write ."
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.3",

@@ -151,17 +151,17 @@ same directories remain checked. Existing handwritten patterns are explicitly
 exempted from incompatible Ultracite rules, while the remaining preset rules stay
 enabled.
 
-To check formatting and lint rules without building:
-
-```sh
-$ pnpm check
-```
-
-To run all repository checks, including formatting, linting, build validation,
-type checking, and package checks:
+To check formatting and lint rules:
 
 ```sh
 $ pnpm lint
+```
+
+The lightweight `pnpm check` command performs the same checks. To run the
+separate Oxlint regression suite:
+
+```sh
+$ pnpm test:lint-regressions
 ```
 
 To format and fix all lint issues automatically:

@@ -9,7 +9,7 @@ const {
   runOxlintFix,
   words,
   writeFixture,
-} = require('./oxlint-regression-support.cjs');
+} = require('./oxlint-regression.test.cjs');
 
 test('preserves imports used only by supported JSDoc type tags', () => {
   const cases = [

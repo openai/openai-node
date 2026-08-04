@@ -11,7 +11,7 @@ const {
   runOxlintFix,
   runTypeScriptOutput,
   writeFixture,
-} = require('./oxlint-regression-support.cjs');
+} = require('./oxlint-regression.test.cjs');
 
 test('fixes every unused binding in one atomic import-declaration edit', () => {
   const cases = [

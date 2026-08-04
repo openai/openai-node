@@ -9,7 +9,7 @@ const {
   runOutput: run,
   runTypeScriptOutput,
   writeFixture,
-} = require('./oxlint-regression-support.cjs');
+} = require('./oxlint-regression.test.cjs');
 
 test('parses attached JSDoc with the linted TypeScript, JavaScript, and JSX source kind', () => {
   const generic = 'const identity = <T>(value: T) => value;\n';

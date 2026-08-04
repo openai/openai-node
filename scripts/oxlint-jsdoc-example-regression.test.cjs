@@ -7,7 +7,7 @@ const {
   fix,
   runOutput: run,
   writeFixture,
-} = require('./oxlint-regression-support.cjs');
+} = require('./oxlint-regression.test.cjs');
 
 test('preserves compiler-applied same-line parameter tags after JSDoc examples', () => {
   const cases = [

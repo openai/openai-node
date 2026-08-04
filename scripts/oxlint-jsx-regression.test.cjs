@@ -14,7 +14,7 @@ const {
   runOxlintFix,
   writeFixture,
   writeJSXConfiguration,
-} = require('./oxlint-regression-support.cjs');
+} = require('./oxlint-regression.test.cjs');
 
 test('fast-format lints TSX and JSX files incrementally', () => {
   const files = ['component.tsx', 'component.jsx'].map((name) =>

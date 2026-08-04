@@ -37,8 +37,14 @@ jobs:
       - name: Bootstrap
         run: ./scripts/bootstrap
 
+      - name: Check formatting and lint rules
+        run: pnpm lint
+
+      - name: Run lint regressions
+        run: pnpm test:lint-regressions
+
       - name: Check types
-        run: ./scripts/lint
+        run: pnpm exec tsc
 
   build:
     timeout-minutes: 5
@@ -63,7 +69,15 @@ jobs:
         run: ./scripts/bootstrap
 
       - name: Check build
-        run: ./scripts/build
+        run: pnpm build
+
+      - name: Check package types
+        run: |
+          pnpm exec attw --pack dist -f json > .attw.json || true
+          node scripts/utils/attw-report.cjs
+
+      - name: Check published package
+        run: pnpm exec publint dist
 
   node_matrix:
     name: Read Node.js test matrix
