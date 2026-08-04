@@ -505,6 +505,93 @@ test('resolves declaration and method JSDoc type queries against their parameter
   }
 });
 
+test('resolves declaration-attached JSDoc types against generic type parameters', () => {
+  const cases = [
+    [
+      'exported-function',
+      '/** @returns {T} */\nexport function documented<T>(): T { throw new Error(); }',
+      'FunctionDeclaration',
+    ],
+    [
+      'default-named-function',
+      '/** @returns {T} */\nexport default function documented<T>(): T { throw new Error(); }',
+      'FunctionDeclaration',
+    ],
+    [
+      'default-anonymous-function',
+      '/** @returns {T} */\nexport default function <T>(): T { throw new Error(); }',
+      'FunctionDeclaration',
+    ],
+    [
+      'exported-arrow',
+      '/** @returns {T} */\nexport const documented = <T>(): T => { throw new Error(); };',
+      'FirstStatement',
+    ],
+  ];
+
+  for (const [name, declaration, expectedHost] of cases) {
+    const fixturePath = writeFixture(
+      'declaration-generic-' + name + '.ts',
+      [
+        "import { Foo as T } from './parameter-side-effect.mjs';",
+        "import { Bar, Ref } from './parameter-types.mjs';",
+        declaration,
+        '/** @type {Bar} */',
+        'export let retained;',
+        'console.log(globalThis.parameterImportRan ?? false);',
+        '',
+      ].join('\n'),
+    );
+    const before = assertNoMissingTypes(fixturePath);
+    const documented = findDocumentedNode(before, fixturePath, ts.isJSDocReturnTag);
+    assert.equal(ts.SyntaxKind[documented.kind], expectedHost, name + ': compiler host');
+    const returnTag = documented.jsDoc[0].tags.find(ts.isJSDocReturnTag);
+    const binding = before.getTypeChecker().getSymbolAtLocation(returnTag.typeExpression.type.typeName);
+    assert.equal(ts.SyntaxKind[binding.declarations[0].kind], 'TypeParameter', name + ': compiler binding');
+    assert.equal(runTypeScriptOutput(fixturePath).stdout, 'true', name + ': side effect before fix');
+
+    const fixed = fix(fixturePath);
+    assert.doesNotMatch(fixed, /Foo as T/u, name + ': shadowed type import');
+    assert.match(fixed, /import \{ Bar \}/u, name + ': genuine Bar reference');
+    assert.doesNotMatch(fixed, /import \{[^}]*\bRef\b/u, name + ': unrelated unused Ref');
+    const after = assertNoMissingTypes(fixturePath);
+    const fixedDocumented = findDocumentedNode(after, fixturePath, ts.isJSDocReturnTag);
+    const fixedReturn = fixedDocumented.jsDoc[0].tags.find(ts.isJSDocReturnTag);
+    const fixedBinding = after.getTypeChecker().getSymbolAtLocation(fixedReturn.typeExpression.type.typeName);
+    assert.equal(
+      ts.SyntaxKind[fixedBinding.declarations[0].kind],
+      'TypeParameter',
+      name + ': compiler binding after fix',
+    );
+    assert.equal(runTypeScriptOutput(fixturePath).stdout, 'false', name + ': side effect after fix');
+  }
+});
+
+test('keeps declaration-attached generic typeof references in the value namespace', () => {
+  const fixturePath = writeFixture(
+    'declaration-generic-typeof.ts',
+    [
+      "import { Foo as T } from './parameter-side-effect.mjs';",
+      '/** @returns {typeof T} */',
+      'export function documented<T>(): unknown { throw new Error(); }',
+      'console.log(globalThis.parameterImportRan ?? false);',
+      '',
+    ].join('\n'),
+  );
+  const before = assertNoMissingTypes(fixturePath);
+  const documented = findDocumentedNode(before, fixturePath, ts.isJSDocReturnTag);
+  const returnTag = documented.jsDoc[0].tags.find(ts.isJSDocReturnTag);
+  const binding = before.getTypeChecker().getSymbolAtLocation(returnTag.typeExpression.type.exprName);
+  assert.equal(
+    ts.SyntaxKind[binding.declarations[0].kind],
+    'ImportSpecifier',
+    'TypeScript resolves typeof T through the value import',
+  );
+  const fixed = fix(fixturePath);
+  assert.match(fixed, /Foo as T/u, 'the value-namespace import remains');
+  assert.equal(runTypeScriptOutput(fixturePath).stdout, 'true', 'the retained import still runs');
+});
+
 test('ignores detached JSDoc comments without a real declaration host', () => {
   const log = 'console.log(globalThis.parameterImportRan ?? false);';
   const cases = [
@@ -584,6 +671,75 @@ test('preserves EOF-hosted standalone typedefs without reviving neighboring orph
   const mixedFixed = fix(mixedPath);
   assert.match(mixedFixed, /import \{ Foo \}/u, 'the typedef import remains');
   assert.doesNotMatch(mixedFixed, /import \{ Ref \}/u, 'the orphan import is removed');
+});
+
+test('preserves EOF-hosted standalone callbacks without reviving neighboring orphans', () => {
+  const callbackPath = writeFixture(
+    'eof-standalone-callback.mjs',
+    [
+      '// @ts-check',
+      "import { Foo } from './parameter-side-effect.mjs';",
+      'console.log(globalThis.parameterImportRan ?? false);',
+      '/**',
+      ' * @callback Handler',
+      ' * @param {Foo} value',
+      ' * @returns {Foo}',
+      ' */',
+      '',
+    ].join('\n'),
+  );
+  const before = assertNoMissingTypes(callbackPath);
+  const documented = findDocumentedNode(before, callbackPath, (tag) => ts.isJSDocCallbackTag(tag));
+  assert.equal(
+    documented.kind,
+    ts.SyntaxKind.EndOfFileToken,
+    'TypeScript attaches a standalone callback to EOF',
+  );
+  const callback = documented.jsDoc[0].tags.find(ts.isJSDocCallbackTag);
+  const references = [];
+  const collectReferences = (node) => {
+    if (ts.isTypeReferenceNode(node)) references.push(node.typeName);
+    ts.forEachChild(node, collectReferences);
+  };
+  collectReferences(callback);
+  assert.equal(references.length, 2, 'the nested callback parameter and return types are parsed');
+  for (const reference of references) {
+    const binding = before.getTypeChecker().getSymbolAtLocation(reference);
+    assert.equal(
+      ts.SyntaxKind[binding.declarations[0].kind],
+      'ImportSpecifier',
+      'TypeScript resolves the nested callback type through the import',
+    );
+  }
+  assert.equal(run(process.execPath, [callbackPath]), 'true', 'side effect before fix');
+  const fixed = fix(callbackPath);
+  assert.match(fixed, /import \{ Foo \}/u, 'the callback keeps its import');
+  assertNoMissingTypes(callbackPath);
+  assert.equal(run(process.execPath, [callbackPath]), 'true', 'side effect after fix');
+
+  const mixedPath = writeFixture(
+    'eof-standalone-callback-with-orphan.mjs',
+    [
+      '// @ts-check',
+      "import { Foo } from './parameter-side-effect.mjs';",
+      "import { Ref } from './parameter-types.mjs';",
+      'console.log(globalThis.parameterImportRan ?? false);',
+      '/** @type {Ref} */',
+      '/**',
+      ' * @callback Handler',
+      ' * @param {Foo} value',
+      ' * @returns {Foo}',
+      ' */',
+      '',
+    ].join('\n'),
+  );
+  const mixedProgram = assertNoMissingTypes(mixedPath);
+  const eof = mixedProgram.getSourceFile(mixedPath).endOfFileToken;
+  assert.ok(eof.jsDoc?.some((comment) => comment.tags?.some((tag) => ts.isJSDocTypeTag(tag))));
+  assert.ok(eof.jsDoc?.some((comment) => comment.tags?.some((tag) => ts.isJSDocCallbackTag(tag))));
+  const mixedFixed = fix(mixedPath);
+  assert.match(mixedFixed, /import \{ Foo \}/u, 'the callback import remains');
+  assert.doesNotMatch(mixedFixed, /import \{ Ref \}/u, 'the neighboring orphan import is removed');
 });
 
 test('removes unused require import-equals aliases and their emitted module side effects', () => {

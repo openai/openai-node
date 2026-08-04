@@ -349,24 +349,38 @@ function isTypeBinding(variable) {
   });
 }
 
-function getJSDocRootBinding(sourceCode, comment, name, namespace) {
+function isTypeParameterBinding(variable) {
+  return variable?.defs.some(
+    (definition) => definition.type === 'TypeParameterName' || definition.node?.type === 'TSTypeParameter',
+  );
+}
+
+function getJSDocHost(sourceCode, comment) {
   const token = sourceCode.getTokenAfter(comment) ?? sourceCode.getTokenBefore(comment);
   const node = token && sourceCode.getNodeByRangeIndex(token.range[0]);
+  let documented = node;
+  if (documented?.type === 'ExportNamedDeclaration' || documented?.type === 'ExportDefaultDeclaration') {
+    documented = documented.declaration;
+  }
+  if (documented?.type === 'Identifier' && documented.parent?.key === documented) {
+    documented = documented.parent;
+  }
+  return { node, documented };
+}
+
+function getJSDocCallableHost(documented) {
+  if (documented?.type === 'VariableDeclaration') return documented.declarations[0]?.init;
+  if (documented?.type === 'MethodDefinition' || documented?.type === 'Property') {
+    return documented.value;
+  }
+  return documented;
+}
+
+function getJSDocRootBinding(sourceCode, comment, name, namespace) {
+  const { node, documented } = getJSDocHost(sourceCode, comment);
+  const callable = getJSDocCallableHost(documented);
 
   if (namespace === 'value') {
-    let documented = node;
-    if (documented?.type === 'ExportNamedDeclaration' || documented?.type === 'ExportDefaultDeclaration') {
-      documented = documented.declaration;
-    }
-    if (documented?.type === 'Identifier' && documented.parent?.key === documented) {
-      documented = documented.parent;
-    }
-    const callable =
-      documented?.type === 'VariableDeclaration'
-        ? documented.declarations[0]?.init
-        : documented?.type === 'MethodDefinition' || documented?.type === 'Property'
-          ? documented.value
-          : documented;
     if (
       callable?.type === 'ArrowFunctionExpression' ||
       callable?.type === 'FunctionExpression' ||
@@ -377,12 +391,21 @@ function getJSDocRootBinding(sourceCode, comment, name, namespace) {
     }
   }
 
+  if (namespace === 'type' && callable) {
+    const typeParameter = sourceCode.getScope(callable).set.get(name);
+    if (isTypeParameterBinding(typeParameter)) return typeParameter;
+  }
+
   for (let scope = sourceCode.getScope(node ?? sourceCode.ast); scope; scope = scope.upper) {
     const [start, end] = scope.block.range;
     if (comment.range[0] < start || comment.range[1] > end) continue;
     const variable = scope.set.get(name);
     if (variable && (namespace === 'value' || isTypeBinding(variable))) return variable;
   }
+}
+
+function isStandaloneJSDocDeclarationTag(tag) {
+  return ts.isJSDocTypedefTag(tag) || ts.isJSDocCallbackTag(tag);
 }
 
 function getAttachedJSDocComments(context) {
@@ -420,7 +443,7 @@ function getAttachedJSDocComments(context) {
       for (const comment of node.jsDoc ?? []) {
         if (
           node.kind !== ts.SyntaxKind.EndOfFileToken ||
-          comment.tags?.some((tag) => ts.isJSDocTypedefTag(tag))
+          comment.tags?.some(isStandaloneJSDocDeclarationTag)
         ) {
           attached.set(comment.pos, comment.end);
         }
@@ -611,6 +634,26 @@ function getJSXImportUsage(context) {
   return used;
 }
 
+function hasCommentInRange(comments, start, end) {
+  return comments.some((comment) => comment.range[0] < end && comment.range[1] > start);
+}
+
+function hasUnsafeRemovalComments(sourceCode, specifier, comma) {
+  const comments = sourceCode.getAllComments();
+  const removalStart = Math.min(specifier.range[0], comma.range[0]);
+  const removalEnd = Math.max(specifier.range[1], comma.range[1]);
+  if (hasCommentInRange(comments, removalStart, removalEnd)) return true;
+
+  if (comma.range[0] < specifier.range[0]) {
+    const nextToken = sourceCode.getTokenAfter(specifier);
+    if (nextToken && hasCommentInRange(comments, specifier.range[1], nextToken.range[0])) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 function fixCommentedUnusedImports(sourceCode, declaration, unusedSpecifiers, retainedSpecifiers, fixer) {
   if (retainedSpecifiers.length === 0) return null;
 
@@ -640,7 +683,7 @@ function fixCommentedUnusedImports(sourceCode, declaration, unusedSpecifiers, re
       comma = retainedPrecedes ? sourceCode.getTokenBefore(specifier) : sourceCode.getTokenAfter(specifier);
     }
 
-    if (comma?.value !== ',') return null;
+    if (comma?.value !== ',' || hasUnsafeRemovalComments(sourceCode, specifier, comma)) return null;
     fixes.push(fixer.remove(specifier), fixer.remove(comma));
   }
 

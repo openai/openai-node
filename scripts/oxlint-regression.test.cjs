@@ -144,7 +144,7 @@ test('preserves import comments while removing unused bindings', () => {
     ['between-specifiers', '{\n  Unused, // explains Used\n  Used,\n}', '// explains Used', ['Unused']],
     [
       'consecutive-unused',
-      '{ Used, /* explains Used */ UnusedOne, UnusedTwo }',
+      '{ /* explains Used */ Used, UnusedOne, UnusedTwo }',
       '/* explains Used */',
       ['UnusedOne', 'UnusedTwo'],
     ],
@@ -174,6 +174,9 @@ test('declines import autofixes when removing a binding would delete its comment
     ['unused-named-group', 'Used, { /* explains Unused */ Unused }', 'Used'],
     ['inside-unused-specifier', '{ Used, Foo /* explains alias */ as Unused }', 'Used'],
     ['fully-unused-import', '{ /* explains Unused */ Unused }', "'side effect'"],
+    ['trailing-named-block', '{ Used, Unused /* explains Unused */ }', 'Used'],
+    ['trailing-named-line', '{\n  Used,\n  Unused // explains Unused\n}', 'Used'],
+    ['trailing-default', 'Unused /* explains Unused */, { Used }', 'Used'],
   ]) {
     const source = `import ${clause} from './dep.js';\nconsole.log(${usage});\n`;
     const fixturePath = writeFixture(`unsafe-${name}.js`, source);
@@ -182,6 +185,11 @@ test('declines import autofixes when removing a binding would delete its comment
       encoding: 'utf8',
     });
     assert.notEqual(result.status, 0, name);
+    assert.match(
+      result.stdout + '\n' + result.stderr,
+      /Imported bindings .* are never used/u,
+      name + ': diagnostic remains',
+    );
     assert.equal(fs.readFileSync(fixturePath, 'utf8'), source, name);
   }
 });
