@@ -58,7 +58,7 @@ jobs:
         run: node --experimental-strip-types scripts/check-node-version-policy.ts
 
       - name: Lint the repository
-        run: pnpm check
+        run: pnpm lint
 
       - name: Run lint regressions
         run: pnpm test:lint-regressions

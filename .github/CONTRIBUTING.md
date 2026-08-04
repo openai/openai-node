@@ -154,7 +154,7 @@ enabled.
 To check formatting and lint rules:
 
 ```sh
-$ pnpm check
+$ pnpm lint
 ```
 
 To run the separate Oxlint regression suite:
@@ -166,7 +166,7 @@ $ pnpm test:lint-regressions
 To format and fix all lint issues automatically:
 
 ```sh
-$ pnpm fix
+$ pnpm format
 ```
 
 Install the recommended Oxc VS Code extension to enable the checked-in
