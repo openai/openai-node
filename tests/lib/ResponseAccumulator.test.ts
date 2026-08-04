@@ -1,5 +1,9 @@
 import { accumulateResponse } from 'openai/lib/responses/ResponseAccumulator';
-import type { Response, ResponseStreamEvent } from 'openai/resources/responses/responses';
+import type {
+  Response,
+  ResponseReasoningItem,
+  ResponseStreamEvent,
+} from 'openai/resources/responses/responses';
 
 describe('ResponseAccumulator', () => {
   it('accumulates a final response snapshot from stream events', () => {
@@ -222,7 +226,133 @@ describe('ResponseAccumulator', () => {
       content: [{ type: 'refusal', refusal: 'I cannot help with that.' }],
     });
   });
+
+  it('normalizes reasoning items that arrive without a summary', () => {
+    const snapshot = accumulateEvents([
+      { type: 'response.created', sequence_number: 0, response: makeResponse() },
+      {
+        type: 'response.output_item.added',
+        sequence_number: 1,
+        output_index: 0,
+        item: reasoningItemWithoutSummary('rs_123'),
+      },
+    ]);
+
+    expect(snapshot.output[0]).toEqual({
+      id: 'rs_123',
+      type: 'reasoning',
+      status: 'in_progress',
+      summary: [],
+    });
+  });
+
+  it('normalizes reasoning items replaced by output_item.done without a summary', () => {
+    const snapshot = accumulateEvents([
+      { type: 'response.created', sequence_number: 0, response: makeResponse() },
+      {
+        type: 'response.output_item.added',
+        sequence_number: 1,
+        output_index: 0,
+        item: reasoningItemWithoutSummary('rs_123'),
+      },
+      {
+        type: 'response.output_item.done',
+        sequence_number: 2,
+        output_index: 0,
+        item: reasoningItemWithoutSummary('rs_123', 'completed'),
+      },
+    ]);
+
+    expect(snapshot.output[0]).toEqual({
+      id: 'rs_123',
+      type: 'reasoning',
+      status: 'completed',
+      summary: [],
+    });
+  });
+
+  it('normalizes reasoning items carried by lifecycle events without a summary', () => {
+    const snapshot = accumulateEvents([
+      { type: 'response.created', sequence_number: 0, response: makeResponse() },
+      {
+        type: 'response.completed',
+        sequence_number: 1,
+        response: makeResponse({
+          status: 'completed',
+          output: [reasoningItemWithoutSummary('rs_123', 'completed')],
+        }),
+      },
+    ]);
+
+    expect(snapshot.output[0]).toEqual({
+      id: 'rs_123',
+      type: 'reasoning',
+      status: 'completed',
+      summary: [],
+    });
+  });
+
+  it('handles reasoning summary events on output items with uninitialized summary', () => {
+    const snapshot = accumulateEvents([
+      { type: 'response.created', sequence_number: 0, response: makeResponse() },
+      {
+        type: 'response.output_item.added',
+        sequence_number: 1,
+        output_index: 0,
+        item: reasoningItemWithoutSummary('rs_123'),
+      },
+      {
+        type: 'response.reasoning_summary_part.added',
+        sequence_number: 2,
+        item_id: 'rs_123',
+        output_index: 0,
+        summary_index: 0,
+        part: { type: 'summary_text', text: '' },
+      },
+      {
+        type: 'response.reasoning_summary_text.delta',
+        sequence_number: 3,
+        item_id: 'rs_123',
+        output_index: 0,
+        summary_index: 0,
+        delta: 'The model ',
+      },
+      {
+        type: 'response.reasoning_summary_text.delta',
+        sequence_number: 4,
+        item_id: 'rs_123',
+        output_index: 0,
+        summary_index: 0,
+        delta: 'reasoned about the problem.',
+      },
+      {
+        type: 'response.reasoning_summary_part.done',
+        sequence_number: 5,
+        item_id: 'rs_123',
+        output_index: 0,
+        summary_index: 0,
+        part: { type: 'summary_text', text: 'The model reasoned about the problem.' },
+      },
+    ]);
+
+    expect(snapshot.output[0]).toMatchObject({
+      type: 'reasoning',
+      summary: [{ type: 'summary_text', text: 'The model reasoned about the problem.' }],
+    });
+  });
 });
+
+/**
+ * The wire can send a reasoning item without the `summary` the type requires, so
+ * build that shape at the boundary instead of widening a whole event to `any`.
+ */
+function reasoningItemWithoutSummary(
+  id: string,
+  status: ResponseReasoningItem['status'] = 'in_progress',
+): ResponseReasoningItem {
+  const item: Omit<ResponseReasoningItem, 'summary'> = { id, type: 'reasoning', status };
+  return item as ResponseReasoningItem;
+}
 
 function accumulateEvents(events: ResponseStreamEvent[]): Response {
   let snapshot: Response | undefined;

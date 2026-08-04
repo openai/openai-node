@@ -33,7 +33,7 @@ export function accumulateResponse(
 
   switch (event.type) {
     case 'response.output_item.added': {
-      snapshot.output.push(structuredClone(event.item));
+      snapshot.output.push(normalizeOutputItem(structuredClone(event.item)));
       if (event.item.type === 'message') {
         addOutputText(snapshot);
       }
@@ -41,7 +41,7 @@ export function accumulateResponse(
     }
     case 'response.output_item.done': {
       getOutput(snapshot, event.output_index);
-      snapshot.output[event.output_index] = structuredClone(event.item);
+      snapshot.output[event.output_index] = normalizeOutputItem(structuredClone(event.item));
       if (event.item.type === 'message') {
         addOutputText(snapshot);
       }
@@ -394,10 +394,25 @@ export function accumulateResponse(
 
 function cloneResponse(response: Response): Response {
   const snapshot = structuredClone(response);
+  for (const output of snapshot.output) {
+    normalizeOutputItem(output);
+  }
   if (!Object.getOwnPropertyDescriptor(snapshot, 'output_text') || snapshot.output_text == null) {
     addOutputText(snapshot);
   }
   return snapshot;
+}
+
+/**
+ * Reasoning items are required to carry a `summary` array, but the wire can omit it.
+ * Normalizing items as they enter a snapshot keeps that invariant for every snapshot
+ * we return, so consumers and the summary event handlers can rely on the array.
+ */
+function normalizeOutputItem(output: Response['output'][number]): Response['output'][number] {
+  if (output.type === 'reasoning' && !output.summary) {
+    output.summary = [];
+  }
+  return output;
 }
 
 function getOutput(snapshot: Response, outputIndex: number): Response['output'][number] {
