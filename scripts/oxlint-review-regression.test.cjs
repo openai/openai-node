@@ -1,91 +1,15 @@
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
-const { spawnSync } = require('node:child_process');
-const { after, test } = require('node:test');
+const { test } = require('node:test');
 const ts = require('typescript');
-
-const repoRoot = path.resolve(__dirname, '..');
-const fixtureRoot = fs.mkdtempSync(path.join(repoRoot, 'oxlint-review-regression-'));
-const oxlint = path.join(repoRoot, 'node_modules', '.bin', 'oxlint');
-
-after(() => fs.rmSync(fixtureRoot, { recursive: true, force: true }));
-
-function writeFixture(name, source) {
-  const fixturePath = path.join(fixtureRoot, name);
-  fs.writeFileSync(fixturePath, source);
-  return fixturePath;
-}
-
-function run(command, args) {
-  const result = spawnSync(command, args, { cwd: repoRoot, encoding: 'utf8' });
-  assert.equal(result.status, 0, `${command} failed\n${result.stdout}\n${result.stderr}`);
-  return result.stdout.trim();
-}
-
-function fix(fixturePath) {
-  run(oxlint, ['--fix', '--no-ignore', path.relative(repoRoot, fixturePath)]);
-  return fs.readFileSync(fixturePath, 'utf8');
-}
-
-function assertNoMissingTypes(fixturePath) {
-  const program = ts.createProgram([fixturePath], {
-    allowJs: true,
-    checkJs: true,
-    noEmit: true,
-    skipLibCheck: true,
-    types: [],
-  });
-  const missing = ts.getPreEmitDiagnostics(program).filter((diagnostic) => diagnostic.code === 2304);
-  assert.equal(missing.length, 0, missing.map((diagnostic) => diagnostic.messageText).join('\n'));
-  return program;
-}
-
-function findDocumentedNode(program, fixturePath, predicate) {
-  let documented;
-  function visit(node) {
-    if (node.jsDoc?.some((comment) => comment.tags?.some(predicate))) documented ??= node;
-    ts.forEachChild(node, visit);
-  }
-  visit(program.getSourceFile(fixturePath));
-  return documented;
-}
-
-function findJSDocLink(program, fixturePath, name) {
-  let link;
-  function visitComment(node) {
-    if (ts.isJSDocLinkLike(node) && node.name?.escapedText === name) link ??= node;
-    ts.forEachChild(node, visitComment);
-  }
-  function visit(node) {
-    for (const comment of node.jsDoc ?? []) visitComment(comment);
-    ts.forEachChild(node, visit);
-  }
-  visit(program.getSourceFile(fixturePath));
-  return link;
-}
-
-function runTypeScriptOutput(fixturePath) {
-  const outputPath = fixturePath.replace(/\.ts$/u, '.cjs');
-  const output = ts.transpileModule(fs.readFileSync(fixturePath, 'utf8'), {
-    compilerOptions: {
-      module: ts.ModuleKind.CommonJS,
-      target: ts.ScriptTarget.ES2022,
-      verbatimModuleSyntax: true,
-    },
-    fileName: fixturePath,
-  }).outputText;
-  fs.writeFileSync(outputPath, output);
-  return { output, stdout: run(process.execPath, [outputPath]) };
-}
-
-writeFixture('parameter-side-effect.mjs', 'globalThis.parameterImportRan = true; export class Foo {}\n');
-writeFixture('parameter-types.mjs', 'export class Bar {}\nexport class Ref {}\n');
-writeFixture(
-  'external-side-effect.cjs',
-  'globalThis.externalImportRan = true; module.exports = { value: 1 };\n',
-);
-writeFixture('external-retained.cjs', 'module.exports = { value: 42 };\n');
+const {
+  assertNoMissingTypes,
+  findDocumentedNode,
+  findJSDocLink,
+  fix,
+  runOutput: run,
+  runTypeScriptOutput,
+  writeFixture,
+} = require('./oxlint-regression-support.cjs');
 
 test('parses attached JSDoc with the linted TypeScript, JavaScript, and JSX source kind', () => {
   const generic = 'const identity = <T>(value: T) => value;\n';
@@ -894,62 +818,4 @@ test('preserves EOF-hosted standalone callbacks without reviving neighboring orp
   const mixedFixed = fix(mixedPath);
   assert.match(mixedFixed, /import \{ Foo \}/u, 'the callback import remains');
   assert.doesNotMatch(mixedFixed, /import \{ Ref \}/u, 'the neighboring orphan import is removed');
-});
-
-test('removes unused require import-equals aliases and their emitted module side effects', () => {
-  const source = `import Stale = require('./external-side-effect.cjs');\nimport Used = require('./external-retained.cjs');\nconst unrelated = 'safe';\nconsole.log(globalThis.externalImportRan ?? false, Used.value, unrelated);\n`;
-  const fixturePath = writeFixture('import-equals-require.ts', source);
-  const before = runTypeScriptOutput(fixturePath);
-  assert.match(before.output, /require\("\.\/external-side-effect\.cjs"\)/u);
-  assert.equal(before.stdout, 'true 42 safe');
-
-  const fixed = fix(fixturePath);
-  assert.doesNotMatch(fixed, /\bStale\b/u);
-  assert.match(fixed, /import Used = require/u);
-  assert.match(fixed, /const unrelated = 'safe'/u);
-  const afterFix = runTypeScriptOutput(fixturePath);
-  assert.doesNotMatch(afterFix.output, /external-side-effect/u);
-  assert.equal(afterFix.stdout, 'false 42 safe');
-});
-
-test('removes unused qualified import aliases without changing used or exported aliases', () => {
-  const source = `namespace Models { export class Foo {} export class Used {} }\nObject.defineProperty(Models, 'Foo', { get() { globalThis.qualifiedImportRan = true; return class {}; } });\nimport Stale = Models.Foo;\nimport Runtime = Models.Used;\nimport TypeOnly = Models.Used;\nexport import Public = Models.Used;\ntype Retained = TypeOnly;\nconst unrelated: Retained = new Runtime();\nconsole.log(globalThis.qualifiedImportRan ?? false, unrelated.constructor.name, Public.name);\n`;
-  const fixturePath = writeFixture('import-equals-qualified.ts', source);
-  const before = runTypeScriptOutput(fixturePath);
-  assert.match(before.output, /(?:var|const|let) Stale = Models\.Foo/u);
-  assert.equal(before.stdout, 'true Used Used');
-
-  const fixed = fix(fixturePath);
-  assert.doesNotMatch(fixed, /\bStale\b/u);
-  assert.match(fixed, /import Runtime = Models\.Used/u);
-  assert.match(fixed, /import TypeOnly = Models\.Used/u);
-  assert.match(fixed, /export import Public = Models\.Used/u);
-  assert.match(fixed, /const unrelated: Retained/u);
-  const afterFix = runTypeScriptOutput(fixturePath);
-  assert.doesNotMatch(afterFix.output, /Stale = Models\.Foo/u);
-  assert.equal(afterFix.stdout, 'false Used Used');
-});
-
-test('preserves used external import-equals aliases and reports commented unsafe removals', () => {
-  const exported = writeFixture(
-    'import-equals-exported.ts',
-    `export import Public = require('./external-retained.cjs');\nconsole.log('safe');\n`,
-  );
-  assert.match(fix(exported), /export import Public = require/u);
-
-  const documented = writeFixture(
-    'import-equals-jsdoc.ts',
-    `import Used = require('./external-retained.cjs');\n/** @type {Used} */\nexport let retained;\n`,
-  );
-  assert.match(fix(documented), /import Used = require/u);
-
-  const source = `import /* preserve this explanation */ Stale = require('./external-side-effect.cjs');\nconsole.log('safe');\n`;
-  const fixturePath = writeFixture('import-equals-commented.ts', source);
-  const result = spawnSync(oxlint, ['--fix', '--no-ignore', path.relative(repoRoot, fixturePath)], {
-    cwd: repoRoot,
-    encoding: 'utf8',
-  });
-  assert.notEqual(result.status, 0, 'unsafe removal should remain a diagnostic');
-  assert.match(`${result.stdout}\n${result.stderr}`, /Imported bindings 'Stale' are never used/u);
-  assert.equal(fs.readFileSync(fixturePath, 'utf8'), source, 'the internal comment must be preserved');
 });
