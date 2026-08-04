@@ -46,24 +46,33 @@ jobs:
         github.repository == 'openai/openai-node'
       }}
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      issues: write
-      pull-requests: write
+    environment: release
+    permissions: {}
     steps:
+      - name: Create release app token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.OPENAI_SDKS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.OPENAI_SDKS_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-issues: write
+          permission-pull-requests: write
+
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Validate pending release PR versions
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           bash ./bin/check-pending-release-versions
 
       - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         id: release
         with:
-          # Use the default token until the openai-sdks App credentials are provisioned.
-          token: ${{ github.token }}
+          token: ${{ steps.app-token.outputs.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
           target-branch: main
@@ -71,7 +80,7 @@ jobs:
       - name: Re-draft the updated release PR
         if: steps.release.outputs.prs_created == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           RELEASE_PR_JSON: ${{ steps.release.outputs.pr }}
         run: |
           RELEASE_PR="$(jq -er '.number' <<< "${RELEASE_PR_JSON}")"
