@@ -23,8 +23,8 @@ export const parseOptionalDef = (
     forceResolution,
   );
 
-  return innerSchema ?
-      {
+  return innerSchema
+    ? {
         anyOf: [
           {
             not: {},

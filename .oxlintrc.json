@@ -1,0 +1,43 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "categories": {
+    "correctness": "off"
+  },
+  "rules": {
+    "sdk/no-unused-imports": [
+      "error",
+      {
+        "jsxRuntime": "classic",
+        "jsxFactory": "React.createElement",
+        "jsxFragmentFactory": "React.Fragment"
+      }
+    ],
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "regex": "^openai(/.*)?",
+            "message": "Use a relative import, not a package import."
+          }
+        ]
+      }
+    ]
+  },
+  "ignorePatterns": ["dist/**", "coverage/**"],
+  "overrides": [
+    {
+      "files": ["tests/**", "examples/**", "ecosystem-tests/**"],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    }
+  ],
+  "plugins": [],
+  "jsPlugins": [
+    {
+      "name": "sdk",
+      "specifier": "./scripts/oxlint-plugin.cjs"
+    }
+  ]
+}

@@ -80,9 +80,9 @@ function createAzureClient(options: { tokenProvider?: boolean; deployment?: stri
   return new AzureOpenAI({
     apiVersion: '2024-10-01-preview',
     baseURL: 'https://azure.example.com/openai/',
-    ...(options.tokenProvider ?
-      { azureADTokenProvider: async () => 'azure-token' }
-    : { apiKey: 'azure-key' }),
+    ...(options.tokenProvider
+      ? { azureADTokenProvider: async () => 'azure-token' }
+      : { apiKey: 'azure-key' }),
     ...(options.deployment === undefined ? {} : { deployment: options.deployment }),
   });
 }

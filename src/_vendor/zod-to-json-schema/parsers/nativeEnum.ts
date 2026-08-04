@@ -17,11 +17,7 @@ export function parseNativeEnumDef(def: ZodNativeEnumDef): JsonSchema7NativeEnum
 
   return {
     type:
-      parsedTypes.length === 1 ?
-        parsedTypes[0] === 'string' ?
-          'string'
-        : 'number'
-      : ['string', 'number'],
+      parsedTypes.length === 1 ? (parsedTypes[0] === 'string' ? 'string' : 'number') : ['string', 'number'],
     enum: actualValues,
   };
 }

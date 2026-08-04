@@ -66,9 +66,11 @@ export function resolveBedrockEndpoint(options: BedrockEndpointOptions): {
     normalizeOptionalString(readEnv('AWS_REGION')) ??
     normalizeOptionalString(readEnv('AWS_DEFAULT_REGION'));
   const configuredBaseURL =
-    options.baseURL === undefined ? normalizeOptionalString(readEnv('AWS_BEDROCK_BASE_URL'))
-    : options.baseURL === null ? undefined
-    : normalizeOptionalString(options.baseURL);
+    options.baseURL === undefined
+      ? normalizeOptionalString(readEnv('AWS_BEDROCK_BASE_URL'))
+      : options.baseURL === null
+        ? undefined
+        : normalizeOptionalString(options.baseURL);
 
   if (configuredBaseURL) return { region, baseURL: normalizeBaseURL(configuredBaseURL) };
   if (!region) {

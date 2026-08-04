@@ -364,8 +364,9 @@ export class Worker {
   }
 
   private transpileProject(projectPath: string) {
-    const tsConfigPath =
-      this.system.fileExists(projectPath) ? projectPath : join(projectPath, 'tsconfig.json');
+    const tsConfigPath = this.system.fileExists(projectPath)
+      ? projectPath
+      : join(projectPath, 'tsconfig.json');
     const { options } = this.ts.convertCompilerOptionsFromJson(this.data.target, projectPath, tsConfigPath);
 
     const parseConfigFileHost: ts.ParseConfigFileHost = {

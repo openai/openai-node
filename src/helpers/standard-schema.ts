@@ -62,10 +62,13 @@ type StandardSchemaLike<Input = unknown, Output = Input> = {
   };
 };
 
-type InferStandardOutput<Schema extends StandardSchemaLike> =
-  [NonNullable<Schema['~standard']['types']>] extends [never] ? unknown
-  : NonNullable<Schema['~standard']['types']> extends { readonly output: infer Output } ? Output
-  : unknown;
+type InferStandardOutput<Schema extends StandardSchemaLike> = [
+  NonNullable<Schema['~standard']['types']>,
+] extends [never]
+  ? unknown
+  : NonNullable<Schema['~standard']['types']> extends { readonly output: infer Output }
+    ? Output
+    : unknown;
 
 type StandardSchemaJSONSchemaProps = {
   /**

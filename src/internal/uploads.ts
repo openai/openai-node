@@ -63,9 +63,9 @@ export const checkFileSupport = () => {
       typeof process?.versions?.node === 'string' && parseInt(process.versions.node.split('.')) < 20;
     throw new Error(
       '`File` is not defined as a global, which is required for file uploads.' +
-        (isOldNode ?
-          " Update to a supported Node.js LTS release, or set `globalThis.File` to `import('node:buffer').File`."
-        : ''),
+        (isOldNode
+          ? " Update to a supported Node.js LTS release, or set `globalThis.File` to `import('node:buffer').File`."
+          : ''),
     );
   }
 };
@@ -319,7 +319,7 @@ async function* iterateFormValue(key: string, value: unknown): AsyncGenerator<Fo
 }
 
 function getStreamingFileName(value: Uploadable): string {
-  return isStreamingFile(value) ? value.name : getName(value) ?? 'unknown_file';
+  return isStreamingFile(value) ? value.name : (getName(value) ?? 'unknown_file');
 }
 
 function getStreamingFileType(value: Uploadable): string {

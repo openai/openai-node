@@ -140,8 +140,8 @@ trends but are too variable for blocking performance thresholds.
 
 ## Linting and formatting
 
-This repository uses [prettier](https://www.npmjs.com/package/prettier) and
-[eslint](https://www.npmjs.com/package/eslint) to format the code in the repository.
+This repository uses [Oxfmt](https://oxc.rs/docs/guide/usage/formatter.html) and
+[Oxlint](https://oxc.rs/docs/guide/usage/linter.html) to format and lint its code.
 
 To lint:
 

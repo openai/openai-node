@@ -25,8 +25,9 @@ export class Embeddings extends APIResource {
     const hasUserProvidedEncodingFormat = !!body.encoding_format;
     // No encoding_format specified, defaulting to base64 for performance reasons
     // See https://github.com/openai/openai-node/pull/1312
-    let encoding_format: EmbeddingCreateParams['encoding_format'] =
-      hasUserProvidedEncodingFormat ? body.encoding_format : 'base64';
+    let encoding_format: EmbeddingCreateParams['encoding_format'] = hasUserProvidedEncodingFormat
+      ? body.encoding_format
+      : 'base64';
 
     if (hasUserProvidedEncodingFormat) {
       loggerFor(this._client).debug('embeddings/user defined encoding_format:', body.encoding_format);

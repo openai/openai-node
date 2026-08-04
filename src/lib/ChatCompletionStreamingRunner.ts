@@ -55,8 +55,9 @@ export type ChatCompletionStreamingToolRunnerParamsWithContext<
 export type ChatCompletionStreamingToolRunnerParams<
   FunctionsArgs extends BaseFunctionsArgs,
   ToolContext = never,
-> = [ToolContext] extends [never] ? ChatCompletionStreamingToolRunnerParamsWithoutContext<FunctionsArgs>
-: ChatCompletionStreamingToolRunnerParamsWithContext<FunctionsArgs, ToolContext>;
+> = [ToolContext] extends [never]
+  ? ChatCompletionStreamingToolRunnerParamsWithoutContext<FunctionsArgs>
+  : ChatCompletionStreamingToolRunnerParamsWithContext<FunctionsArgs, ToolContext>;
 
 export class ChatCompletionStreamingRunner<ParsedT = null>
   extends ChatCompletionStream<ParsedT>

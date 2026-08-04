@@ -47,9 +47,9 @@ export type ChatCompletionToolRunnerParamsWithContext<
  */
 export type ChatCompletionToolRunnerParams<FunctionsArgs extends BaseFunctionsArgs, ToolContext = never> = [
   ToolContext,
-] extends [never] ?
-  ChatCompletionToolRunnerParamsWithoutContext<FunctionsArgs>
-: ChatCompletionToolRunnerParamsWithContext<FunctionsArgs, ToolContext>;
+] extends [never]
+  ? ChatCompletionToolRunnerParamsWithoutContext<FunctionsArgs>
+  : ChatCompletionToolRunnerParamsWithContext<FunctionsArgs, ToolContext>;
 
 export class ChatCompletionRunner<ParsedT = null> extends AbstractChatCompletionRunner<
   ChatCompletionRunnerEvents,
