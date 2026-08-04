@@ -221,5 +221,4 @@ module.exports = defineConfig({
       },
     },
   ],
-  plugins: [],
 });
