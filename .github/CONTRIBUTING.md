@@ -140,10 +140,23 @@ trends but are too variable for blocking performance thresholds.
 
 ## Linting and formatting
 
-This repository uses [Oxfmt](https://oxc.rs/docs/guide/usage/formatter.html) and
+This repository uses [Ultracite](https://www.ultracite.ai/) with
+[Oxfmt](https://oxc.rs/docs/guide/usage/formatter.html) and
 [Oxlint](https://oxc.rs/docs/guide/usage/linter.html) to format and lint its code.
+The Ultracite presets live in `oxfmt.config.ts` and `oxlint.config.ts`, with
+repository-specific formatting options, import rules, fixture exceptions, and
+generated-file exclusions layered on top.
+Existing generated-code patterns are explicitly exempted from incompatible
+Ultracite rules, while the remaining preset rules stay enabled.
 
-To lint:
+To check formatting and lint rules without building:
+
+```sh
+$ pnpm check
+```
+
+To run all repository checks, including formatting, linting, build validation,
+type checking, and package checks:
 
 ```sh
 $ pnpm lint
@@ -154,6 +167,9 @@ To format and fix all lint issues automatically:
 ```sh
 $ pnpm fix
 ```
+
+Install the recommended Oxc VS Code extension to enable the checked-in
+format-on-save and lint-autofix editor settings.
 
 ## Publishing and releases
 

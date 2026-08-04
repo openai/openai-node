@@ -3,6 +3,7 @@
 set -e
 
 cd "$(dirname "$0")/.."
+export PATH="$PWD/node_modules/.bin:$PATH"
 
 if [ "${DETECT_BREAKING_CHANGES_COMPAT:-}" = "1" ]; then
   echo "==> Preparing historical breaking-change tests"
@@ -27,11 +28,8 @@ EOF
   find tests -name '*.test.ts' -print0 | xargs -0 ./node_modules/.bin/oxfmt --write
 fi
 
-echo "==> Running oxfmt --check"
-./node_modules/.bin/oxfmt --check .
-
-echo "==> Running oxlint"
-./node_modules/.bin/oxlint .
+echo "==> Running Ultracite checks"
+./node_modules/.bin/ultracite check .
 
 echo "==> Running Oxlint regressions"
 node --test scripts/oxlint-regression.test.cjs

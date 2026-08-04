@@ -4,3 +4,4 @@ require('./oxlint-import-regression.test.cjs');
 require('./oxlint-jsdoc-regression.test.cjs');
 require('./oxlint-jsx-regression.test.cjs');
 require('./oxlint-lifecycle-regression.test.cjs');
+require('./ultracite-regression.test.cjs');

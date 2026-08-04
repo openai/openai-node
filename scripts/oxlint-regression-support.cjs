@@ -29,6 +29,7 @@ function writeFixture(relativePath, contents, root = fixtureRoot) {
 }
 
 function run(command, args) {
+  if (command === oxlint) args.unshift('--allow=all', '--deny=sdk/no-unused-imports');
   const result = spawnSync(command, args, { cwd: repoRoot, encoding: 'utf8' });
   assert.equal(
     result.status,
@@ -142,8 +143,8 @@ function assertJSXImportBindings(fixturePath, bindings, fixtureName) {
 }
 
 function writeJSXConfiguration(directory, jsxOptions) {
-  const configuration = JSON.parse(fs.readFileSync(path.join(repoRoot, '.oxlintrc.json'), 'utf8'));
-  configuration.rules['sdk/no-unused-imports'] = ['error', jsxOptions];
+  const { extends: _presets, rules, ...configuration } = require(path.join(repoRoot, 'oxlint.config.ts'));
+  configuration.rules = { ...rules, 'sdk/no-unused-imports': ['error', jsxOptions] };
   configuration.jsPlugins = [{ name: 'sdk', specifier: path.join(repoRoot, 'scripts', 'oxlint-plugin.cjs') }];
   return writeFixture(`${directory}/.oxlintrc.json`, JSON.stringify(configuration));
 }
