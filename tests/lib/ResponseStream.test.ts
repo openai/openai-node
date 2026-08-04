@@ -1,7 +1,11 @@
 import OpenAI, { APIUserAbortError } from 'openai';
 import { ReadableStreamFrom } from 'openai/internal/shims';
 import { ResponseStream } from 'openai/lib/responses/ResponseStream';
-import type { Response, ResponseStreamEvent } from 'openai/resources/responses/responses';
+import type {
+  Response,
+  ResponseFunctionToolCall,
+  ResponseStreamEvent,
+} from 'openai/resources/responses/responses';
 import { makeStreamSnapshotRequest } from '../utils/mock-snapshots';
 
 jest.setTimeout(1000 * 30);
@@ -262,6 +266,17 @@ describe('.stream()', () => {
   });
 
   it('safely accumulates deltas when properties are uninitialized', async () => {
+    const item = {
+      id: 'call_123',
+      type: 'function_call',
+      call_id: 'call_123',
+      name: 'get_weather',
+      status: 'in_progress',
+    } as ResponseFunctionToolCall;
+    // The reported payload omits `arguments` on the added item, so the first delta
+    // has no string to append to.
+    expect(item.arguments).toBeUndefined();
+
     const events: ResponseStreamEvent[] = [
       {
         type: 'response.created',
@@ -272,14 +287,7 @@ describe('.stream()', () => {
         type: 'response.output_item.added',
         sequence_number: 1,
         output_index: 0,
-        item: {
-          id: 'call_123',
-          type: 'function_call',
-          call_id: 'call_123',
-          name: 'get_weather',
-          arguments: '',
-          status: 'in_progress',
-        },
+        item,
       },
       {
         type: 'response.function_call_arguments.delta',
