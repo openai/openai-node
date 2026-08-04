@@ -1,6 +1,7 @@
 import { z as z4 } from 'zod/v4';
 import { z as z3 } from 'zod/v3';
 import { zodResponseFormat } from 'openai/helpers/zod';
+import { maybeParseChatCompletion } from '../../src/lib/parser';
 import { makeSnapshotRequest } from '../utils/mock-snapshots';
 
 describe.each([
@@ -1401,6 +1402,46 @@ describe.each([
           "role": "assistant",
         }
       `);
+    });
+  });
+});
+
+describe('maybeParseChatCompletion', () => {
+  it('parses raw json_schema response_format', () => {
+    const rawCompletion = {
+      id: 'chatcmpl-123',
+      object: 'chat.completion' as const,
+      created: 1677652288,
+      model: 'gpt-4o-2024-08-06',
+      choices: [
+        {
+          index: 0,
+          finish_reason: 'stop' as const,
+          logprobs: null,
+          message: {
+            role: 'assistant' as const,
+            content: '{"city":"San Francisco","units":"c"}',
+            refusal: null,
+          },
+        },
+      ],
+    };
+
+    const parsed = maybeParseChatCompletion(rawCompletion, {
+      model: 'gpt-4o-2024-08-06',
+      messages: [{ role: 'user', content: 'hello' }],
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'location',
+          schema: { type: 'object' },
+        },
+      },
+    });
+
+    expect(parsed.choices[0]?.message.parsed).toEqual({
+      city: 'San Francisco',
+      units: 'c',
     });
   });
 });
