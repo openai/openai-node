@@ -4,8 +4,4 @@ set -e
 
 cd "$(dirname "$0")/.."
 
-echo "==> Running oxlint --fix"
-./node_modules/.bin/oxlint --fix .
-
-echo "==> Running oxfmt --write"
-./node_modules/.bin/oxfmt --write .
+PATH="$PWD/node_modules/.bin:$PATH" exec ./node_modules/.bin/ultracite fix

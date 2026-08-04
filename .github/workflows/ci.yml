@@ -37,8 +37,11 @@ jobs:
       - name: Bootstrap
         run: ./scripts/bootstrap
 
-      - name: Check types
+      - name: Check formatting and lint rules
         run: ./scripts/lint
+
+      - name: Check types
+        run: pnpm exec tsc
 
   build:
     timeout-minutes: 5
@@ -64,6 +67,20 @@ jobs:
 
       - name: Check build
         run: ./scripts/build
+
+      - name: Check published source types with TypeScript 4.9
+        run: ./node_modules/typescript-4-9/bin/tsc --project dist/src/tsconfig.json --noEmit
+
+      - name: Check published source types with TypeScript 6
+        run: ./node_modules/typescript/bin/tsc --project dist/src/tsconfig.json --noEmit
+
+      - name: Check package types
+        run: |
+          pnpm exec attw --pack dist -f json > .attw.json || true
+          node scripts/utils/attw-report.cjs
+
+      - name: Check published package
+        run: pnpm exec publint dist
 
   node_matrix:
     name: Read Node.js test matrix
