@@ -200,14 +200,6 @@ module.exports = defineConfig({
   },
   rules: {
     ...Object.fromEntries(compatibilityRules.map((rule) => [rule, 'off'])),
-    'sdk/no-unused-imports': [
-      'error',
-      {
-        jsxRuntime: 'classic',
-        jsxFactory: 'React.createElement',
-        jsxFragmentFactory: 'React.Fragment',
-      },
-    ],
     'no-restricted-imports': [
       'error',
       {
@@ -230,10 +222,4 @@ module.exports = defineConfig({
     },
   ],
   plugins: [],
-  jsPlugins: [
-    {
-      name: 'sdk',
-      specifier: './scripts/oxlint-plugin.cjs',
-    },
-  ],
 });

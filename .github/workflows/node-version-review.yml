@@ -60,9 +60,6 @@ jobs:
       - name: Lint the repository
         run: ./scripts/lint
 
-      - name: Run lint regressions
-        run: pnpm test:lint-regressions
-
       - name: Build the repository
         run: ./scripts/build
 

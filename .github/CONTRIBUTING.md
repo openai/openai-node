@@ -157,12 +157,6 @@ To check formatting and lint rules:
 $ pnpm lint
 ```
 
-To run the separate Oxlint regression suite:
-
-```sh
-$ pnpm test:lint-regressions
-```
-
 To format and fix all lint issues automatically:
 
 ```sh

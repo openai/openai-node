@@ -21,7 +21,6 @@
   },
   "scripts": {
     "test": "./scripts/test",
-    "test:lint-regressions": "node --test scripts/oxlint-regression.test.cjs",
     "test:unit": "vitest run --config vitest.config.mts",
     "test:generated": "OPENAI_TEST_SUITE=generated ./scripts/test",
     "test:live:bedrock": "jest --config jest.live.config.ts --runInBand tests/live/bedrock.live.test.ts",

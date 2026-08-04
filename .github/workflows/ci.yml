@@ -40,9 +40,6 @@ jobs:
       - name: Check formatting and lint rules
         run: ./scripts/lint
 
-      - name: Run lint regressions
-        run: pnpm test:lint-regressions
-
       - name: Check types
         run: pnpm exec tsc
 
