@@ -30,10 +30,8 @@
     "build": "./scripts/build",
     "check": "ultracite check",
     "prepublishOnly": "echo 'to publish, run pnpm build && (cd dist; npm publish)' && exit 1",
-    "format": "ultracite fix",
     "prepare": "if ./scripts/utils/check-is-in-git-install.sh; then ./scripts/build && ./scripts/utils/git-swap.sh; fi",
     "tsn": "ts-node -r tsconfig-paths/register",
-    "lint": "ultracite check",
     "fix": "ultracite fix"
   },
   "devDependencies": {

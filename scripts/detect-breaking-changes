@@ -26,5 +26,5 @@ fi
 
 # Generated tests are excluded from linting, so TypeScript performs the API
 # compatibility check against every historical resource test.
-pnpm lint
+pnpm check
 pnpm exec tsc

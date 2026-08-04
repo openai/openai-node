@@ -38,7 +38,7 @@ jobs:
         run: ./scripts/bootstrap
 
       - name: Check formatting and lint rules
-        run: pnpm lint
+        run: pnpm check
 
       - name: Run lint regressions
         run: pnpm test:lint-regressions

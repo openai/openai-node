@@ -57,7 +57,7 @@ jobs:
       - name: Validate the repository
         run: |
           node --experimental-strip-types scripts/check-node-version-policy.ts
-          pnpm lint
+          pnpm check
           pnpm test:lint-regressions
           pnpm build
           pnpm exec tsc

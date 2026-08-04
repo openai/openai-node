@@ -154,11 +154,10 @@ enabled.
 To check formatting and lint rules:
 
 ```sh
-$ pnpm lint
+$ pnpm check
 ```
 
-The lightweight `pnpm check` command performs the same checks. To run the
-separate Oxlint regression suite:
+To run the separate Oxlint regression suite:
 
 ```sh
 $ pnpm test:lint-regressions
