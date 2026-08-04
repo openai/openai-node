@@ -54,17 +54,32 @@ jobs:
           permission-profile: ':workspace'
           safety-strategy: drop-sudo
 
-      - name: Validate the repository
-        run: |
-          node --experimental-strip-types scripts/check-node-version-policy.ts
-          pnpm check
-          pnpm test:lint-regressions
-          pnpm build
-          pnpm exec tsc
-          pnpm exec attw --pack dist -f json > .attw.json || true
-          node scripts/utils/attw-report.cjs
-          pnpm exec publint dist
-          pnpm test
+      - name: Check Node.js version policy
+        run: node --experimental-strip-types scripts/check-node-version-policy.ts
+
+      - name: Lint the repository
+        run: pnpm check
+
+      - name: Run lint regressions
+        run: pnpm test:lint-regressions
+
+      - name: Build the repository
+        run: pnpm build
+
+      - name: Check TypeScript types
+        run: pnpm exec tsc
+
+      - name: Generate package type analysis
+        run: pnpm exec attw --pack dist -f json > .attw.json || true
+
+      - name: Check package types
+        run: node scripts/utils/attw-report.cjs
+
+      - name: Check the published package
+        run: pnpm exec publint dist
+
+      - name: Run tests
+        run: pnpm test
 
       - name: Open or update the draft pull request
         uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7
