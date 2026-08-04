@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+set -e
+
+cd "$(dirname "$0")/.."
+
+PATH="$PWD/node_modules/.bin:$PATH" exec ./node_modules/.bin/ultracite check
