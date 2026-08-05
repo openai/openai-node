@@ -66,7 +66,6 @@ const compatibilityRules = [
   'no-sequences',
   'no-shadow',
   'no-sparse-arrays',
-  'no-template-curly-in-string',
   'no-throw-literal',
   'no-unmodified-loop-condition',
   'no-unsafe-optional-chaining',
