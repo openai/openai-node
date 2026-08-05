@@ -59,7 +59,6 @@ const compatibilityRules = [
   'no-param-reassign',
   'no-plusplus',
   'no-promise-executor-return',
-  'no-prototype-builtins',
   'no-sequences',
   'no-shadow',
   'no-sparse-arrays',

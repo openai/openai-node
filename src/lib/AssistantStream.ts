@@ -640,7 +640,7 @@ export class AssistantStream
 
   static accumulateDelta(acc: Record<string, any>, delta: Record<string, any>): Record<string, any> {
     for (const [key, deltaValue] of Object.entries(delta)) {
-      if (!acc.hasOwnProperty(key)) {
+      if (!Object.prototype.hasOwnProperty.call(acc, key)) {
         acc[key] = deltaValue;
         continue;
       }
