@@ -27,6 +27,8 @@ export default async (request: NextRequest) => {
         return { role: 'assistant', content };
       case 'user':
         return { role: 'user', content };
+      default:
+        throw new Error('Unsupported message role');
     }
   });
 
