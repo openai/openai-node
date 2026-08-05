@@ -162,7 +162,10 @@ class RunnerListener {
       .on('finalFunctionToolCallResult', (result) => (this.finalFunctionCallResult = result))
       .on('totalUsage', (usage) => (this.totalUsage = usage))
       .on('error', (error) => (this.error = error))
-      .on('abort', (error) => ((this.error = error), (this.gotAbort = true)))
+      .on('abort', (error) => {
+        this.error = error;
+        this.gotAbort = true;
+      })
       .on('end', () => (this.gotEnd = true))
       .once('message', () => this.onceMessageCallCount++);
   }
