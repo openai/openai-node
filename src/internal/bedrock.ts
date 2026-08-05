@@ -34,7 +34,7 @@ export function errorWithCause(message: string, cause: unknown): Errors.OpenAIEr
 
 export function normalizeOptionalString(value: string | null | undefined): string | undefined {
   const normalized = typeof value === 'string' ? value.trim() : undefined;
-  return normalized ? normalized : undefined;
+  return normalized || undefined;
 }
 
 function normalizeBaseURL(baseURL: string): string {
