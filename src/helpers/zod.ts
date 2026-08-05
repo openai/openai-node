@@ -92,8 +92,10 @@ function escapeSchemaDefinitionRefs<T extends object>(
 }
 
 function getZodV3RootName(name: string, schemaDefinitions: ZodSchemaDefinitions | undefined): string {
+  if (!schemaDefinitions) return name;
+
   let rootName = name;
-  while (schemaDefinitions && Object.prototype.hasOwnProperty.call(schemaDefinitions, rootName)) {
+  while (Object.prototype.hasOwnProperty.call(schemaDefinitions, rootName)) {
     rootName = `${rootName}_root`;
   }
   return rootName;
