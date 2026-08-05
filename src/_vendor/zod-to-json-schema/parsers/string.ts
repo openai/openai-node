@@ -35,7 +35,8 @@ export const zodPatterns = {
    */
   emoji: () => {
     if (emojiRegex === undefined) {
-      emojiRegex = RegExp('^(\\p{Extended_Pictographic}|\\p{Emoji_Component})+$', 'u');
+      const emojiPattern = '^(\\p{Extended_Pictographic}|\\p{Emoji_Component})+$';
+      emojiRegex = RegExp(emojiPattern, 'u');
     }
     return emojiRegex;
   },
