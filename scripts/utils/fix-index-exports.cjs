@@ -11,6 +11,6 @@ let after = before.replace(
   `exports = module.exports = function (...args) {
     return new exports.default(...args)
   }
-  $1`.replace(/^  /gm, ''),
+  $1`.replace(/^ {2}/gm, ''),
 );
 fs.writeFileSync(indexJs, after, 'utf8');
