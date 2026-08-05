@@ -8,8 +8,8 @@ import {
   type ChatCompletionToolRunnerParams,
   ChatCompletionStreamingRunner,
   type ChatCompletionStreamingToolRunnerParams,
+  type ChatCompletionMessageParam,
 } from 'openai/resources/chat/completions';
-import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
 import type { RunnableToolFunction } from 'openai/lib/RunnableFunction';
 import { isAssistantMessage } from '../../src/lib/chatCompletionUtils';
 import { mockFetch } from '../utils/mock-fetch';

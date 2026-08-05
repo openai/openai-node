@@ -21,7 +21,6 @@ const compatibilityRules = [
   'import/namespace',
   'import/newline-after-import',
   'import/no-cycle',
-  'import/no-duplicates',
   'import/no-mutable-exports',
   'import/no-named-as-default-member',
   'import/no-self-import',
