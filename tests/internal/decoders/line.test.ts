@@ -1,6 +1,7 @@
 import { findDoubleNewlineIndex, LineDecoder } from 'openai/internal/decoders/line';
 
-function decodeChunks(chunks: string[], { flush }: { flush: boolean } = { flush: false }): string[] {
+function decodeChunks(chunks: string[], options?: { flush: boolean }): string[] {
+  const flush = options?.flush ?? false;
   const decoder = new LineDecoder();
   const lines: string[] = [];
   for (const chunk of chunks) {
