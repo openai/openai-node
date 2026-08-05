@@ -42,7 +42,6 @@ const compatibilityRules = [
   'no-await-in-loop',
   'no-bitwise',
   'no-case-declarations',
-  'no-duplicate-imports',
   'no-else-return',
   'no-empty',
   'no-empty-function',
