@@ -1,6 +1,5 @@
 import { vi } from 'vitest';
-import { AzureOpenAI } from 'openai';
-import { APIUserAbortError } from 'openai';
+import { AzureOpenAI, APIUserAbortError } from 'openai';
 import { type Response, RequestInit, RequestInfo } from 'openai/internal/builtin-types';
 
 const defaultFetch = fetch;
