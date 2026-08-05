@@ -1,14 +1,11 @@
-import { OpenAIError } from './error';
+import { OpenAIError, APIError } from './error';
 import { type ReadableStream } from '../internal/shim-types';
-import { makeReadableStream } from '../internal/shims';
+import { makeReadableStream, ReadableStreamToAsyncIterable } from '../internal/shims';
 import { findDoubleNewlineIndex, LineDecoder } from '../internal/decoders/line';
-import { ReadableStreamToAsyncIterable } from '../internal/shims';
 import { isAbortError } from '../internal/errors';
 import { encodeUTF8 } from '../internal/utils/bytes';
 import { loggerFor } from '../internal/utils/log';
 import type { OpenAI } from '../client';
-
-import { APIError } from './error';
 
 type Bytes = string | ArrayBuffer | Uint8Array | null | undefined;
 
