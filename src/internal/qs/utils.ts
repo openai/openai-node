@@ -2,10 +2,14 @@ import { RFC1738 } from './formats';
 import type { DefaultEncoder, Format } from './types';
 import { isArray } from '../utils/values';
 
-export let has = (obj: object, key: PropertyKey): boolean => (
-  (has = (Object as any).hasOwn ?? Function.prototype.call.bind(Object.prototype.hasOwnProperty)),
-  has(obj, key)
-);
+let cachedHas: ((obj: object, key: PropertyKey) => boolean) | undefined;
+
+export const has = (obj: object, key: PropertyKey): boolean => {
+  const resolvedHas: (obj: object, key: PropertyKey) => boolean =
+    cachedHas ?? (Object as any).hasOwn ?? Function.prototype.call.bind(Object.prototype.hasOwnProperty);
+  cachedHas = resolvedHas;
+  return resolvedHas(obj, key);
+};
 
 const hex_table = /* @__PURE__ */ (() => {
   const array = [];
