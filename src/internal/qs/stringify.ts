@@ -187,8 +187,7 @@ function inner_stringify(
       : adjusted_prefix + (allowDots ? '.' + encoded_key : '[' + encoded_key + ']');
 
     sideChannel.set(object, step);
-    const valueSideChannel = new WeakMap();
-    valueSideChannel.set(sentinel, sideChannel);
+    const valueSideChannel = new WeakMap([[sentinel, sideChannel]]);
     push_to_array(
       values,
       inner_stringify(
