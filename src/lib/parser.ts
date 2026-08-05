@@ -13,8 +13,8 @@ import {
   ChatCompletionToolRunnerParams,
   ChatCompletionToolRunnerParamsWithContext,
   ParsedChatCompletion,
+  ParsedChatCompletionMessageToolCall,
   ParsedChoice,
-  ParsedFunctionToolCall,
 } from '../resources/chat/completions';
 import { type ResponseFormatTextJSONSchemaConfig } from '../resources/responses/responses';
 import { ResponseFormatJSONSchema } from '../resources/shared';
@@ -166,17 +166,13 @@ export function maybeParseChatCompletion<
             parsed: null,
             ...(choice.message.tool_calls ?
               {
-                tool_calls: choice.message.tool_calls.map((toolCall) =>
-                  toolCall.type === 'function' ?
-                    { ...toolCall, function: { ...toolCall.function, parsed_arguments: null } }
-                  : toolCall,
-                ),
+                tool_calls: choice.message.tool_calls,
               }
             : undefined),
           },
         };
       }),
-    } as ParsedChatCompletion<ParsedT>;
+    };
   }
 
   return parseChatCompletion(completion, params);
@@ -210,7 +206,7 @@ export function parseChatCompletion<
             parseResponseFormat(params, choice.message.content)
           : null,
       },
-    } as ParsedChoice<ParsedT>;
+    };
   });
 
   return { ...completion, choices };
@@ -240,7 +236,7 @@ function parseResponseFormat<
 function parseToolCall<Params extends ChatCompletionCreateParams>(
   params: Params,
   toolCall: ChatCompletionMessageToolCall,
-): ParsedFunctionToolCall | ChatCompletionMessageToolCall {
+): ParsedChatCompletionMessageToolCall {
   if (toolCall.type !== 'function') {
     return toolCall;
   }
@@ -263,7 +259,11 @@ function parseToolCall<Params extends ChatCompletionCreateParams>(
 
 export function shouldParseToolCall(
   params: ChatCompletionCreateParams | null | undefined,
-  toolCall: ChatCompletionMessageToolCall,
+  // accepts partially accumulated tool calls so streaming snapshots can be checked as they build up
+  toolCall: {
+    type?: ChatCompletionMessageToolCall['type'];
+    function?: { name?: string };
+  },
 ): boolean {
   if (!params || !('tools' in params) || !params.tools || toolCall.type !== 'function') {
     return false;
@@ -271,7 +271,7 @@ export function shouldParseToolCall(
 
   const inputTool = params.tools?.find(
     (inputTool) =>
-      isChatCompletionFunctionTool(inputTool) && inputTool.function?.name === toolCall.function.name,
+      isChatCompletionFunctionTool(inputTool) && inputTool.function?.name === toolCall.function?.name,
   );
   return (
     isChatCompletionFunctionTool(inputTool) &&
@@ -305,10 +305,10 @@ export function assertToolCallsAreChatCompletionFunctionToolCalls(
 
 export function validateInputTools(tools: ChatCompletionCreateParamsBase['tools']) {
   for (const tool of tools ?? []) {
+    // Only `function` tools support auto-parsing; other tool types have no arguments
+    // schema to parse against so they're passed through to the API untouched.
     if (tool.type !== 'function') {
-      throw new OpenAIError(
-        `Currently only \`function\` tool types support auto-parsing; Received \`${tool.type}\``,
-      );
+      continue;
     }
 
     if (tool.function.strict !== true) {

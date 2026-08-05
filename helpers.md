@@ -140,7 +140,7 @@ const completion = await client.chat.completions.parse({
 console.dir(completion, { depth: 10 });
 
 const toolCall = completion.choices[0]?.message.tool_calls?.[0];
-if (toolCall) {
+if (toolCall?.type === 'function') {
   const args = toolCall.function.parsed_arguments as z.infer<typeof Query>;
   console.log(args);
   console.log(args.table_name);
@@ -154,7 +154,8 @@ main();
 The `chat.completions.parse()` method imposes some additional restrictions on it's usage that `chat.completions.create()` does not.
 
 - If the completion completes with `finish_reason` set to `length` or `content_filter`, the `LengthFinishReasonError` / `ContentFilterFinishReasonError` errors will be raised.
-- Only strict function tools can be passed, e.g. `{type: 'function', function: {..., strict: true}}`
+- Function tools must be strict, e.g. `{type: 'function', function: {..., strict: true}}`. Custom tools are also
+  accepted, but as they have no arguments schema their calls are returned as-is, without a `parsed_arguments`.
 
 # Streaming Helpers
 

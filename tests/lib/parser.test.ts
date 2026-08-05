@@ -1,7 +1,10 @@
 import { z as z4 } from 'zod/v4';
 import { z as z3 } from 'zod/v3';
+import OpenAI from 'openai/index';
 import { zodResponseFormat } from 'openai/helpers/zod';
+import { mockFetch } from '../utils/mock-fetch';
 import { makeSnapshotRequest } from '../utils/mock-snapshots';
+import { expectType } from '../utils/typing';
 
 jest.setTimeout(1000 * 30);
 
@@ -1408,47 +1411,118 @@ describe.each([
 });
 
 describe('custom tool calls', () => {
-  it('parses chat completion with custom tool calls without error', () => {
-    const { maybeParseChatCompletion } = require('openai/lib/parser');
-    const completion = {
-      id: 'chatcmpl-custom-1',
-      object: 'chat.completion',
-      created: 123456789,
-      model: 'gpt-4o',
-      choices: [
-        {
-          index: 0,
-          finish_reason: 'stop',
-          logprobs: null,
-          message: {
-            role: 'assistant',
-            content: null,
-            refusal: null,
-            tool_calls: [
-              {
-                id: 'call_custom_1',
-                type: 'custom',
-                custom: {
-                  name: 'my_custom_tool',
-                  input: '{"key":"value"}',
-                },
-              },
-            ],
-          },
-        },
-      ],
-    };
+  const customTool: OpenAI.Chat.ChatCompletionCustomTool = {
+    type: 'custom',
+    custom: { name: 'code_exec', description: 'Executes arbitrary code' },
+  };
 
-    const parsed = maybeParseChatCompletion(completion, null);
-    expect(parsed.choices[0].message.tool_calls).toEqual([
+  const strictFunctionTool: OpenAI.Chat.ChatCompletionFunctionTool = {
+    type: 'function',
+    function: {
+      name: 'get_weather',
+      strict: true,
+      parameters: {
+        type: 'object',
+        properties: { city: { type: 'string' } },
+        required: ['city'],
+        additionalProperties: false,
+      },
+    },
+  };
+
+  const response = {
+    id: 'chatcmpl-custom-1',
+    object: 'chat.completion',
+    created: 123456789,
+    model: 'gpt-4o-2024-08-06',
+    choices: [
       {
-        id: 'call_custom_1',
-        type: 'custom',
-        custom: {
-          name: 'my_custom_tool',
-          input: '{"key":"value"}',
+        index: 0,
+        finish_reason: 'tool_calls',
+        logprobs: null,
+        message: {
+          role: 'assistant',
+          content: null,
+          refusal: null,
+          tool_calls: [
+            {
+              id: 'call_custom_1',
+              type: 'custom',
+              custom: { name: 'code_exec', input: 'print("hello")' },
+            },
+            {
+              id: 'call_function_1',
+              type: 'function',
+              function: { name: 'get_weather', arguments: '{"city":"SF"}' },
+            },
+          ],
         },
       },
-    ]);
+    ],
+  };
+
+  it('passes custom tools through .parse() and returns their calls unparsed', async () => {
+    const { fetch, handleRequest } = mockFetch();
+    const client = new OpenAI({ apiKey: 'My API Key', fetch });
+
+    const completionPromise = client.chat.completions.parse({
+      model: 'gpt-4o-2024-08-06',
+      messages: [{ role: 'user', content: 'run some code' }],
+      tools: [customTool, strictFunctionTool],
+    });
+
+    let requestBody: any;
+    await handleRequest(async (_url, init) => {
+      requestBody = JSON.parse(init!.body as string);
+      return new Response(JSON.stringify(response), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    });
+
+    // the custom tool is forwarded to the API rather than rejected client-side
+    expect(requestBody.tools).toEqual([customTool, strictFunctionTool]);
+
+    const completion = await completionPromise;
+    const toolCalls = completion.choices[0]?.message.tool_calls;
+
+    // custom tool calls are returned exactly as the API sent them
+    expect(toolCalls?.[0]).toEqual({
+      id: 'call_custom_1',
+      type: 'custom',
+      custom: { name: 'code_exec', input: 'print("hello")' },
+    });
+
+    // function tool calls alongside them are still auto-parsed
+    expect(toolCalls?.[1]).toEqual({
+      id: 'call_function_1',
+      type: 'function',
+      function: {
+        name: 'get_weather',
+        arguments: '{"city":"SF"}',
+        parsed_arguments: { city: 'SF' },
+      },
+    });
+
+    const toolCall = toolCalls?.[0];
+    if (toolCall?.type === 'custom') {
+      expectType<string>(toolCall.custom.input);
+    } else {
+      throw new Error('expected a custom tool call');
+    }
+  });
+
+  it('still rejects function tools that are not strict', () => {
+    const client = new OpenAI({ apiKey: 'My API Key', fetch: mockFetch().fetch });
+
+    expect(() =>
+      client.chat.completions.parse({
+        model: 'gpt-4o-2024-08-06',
+        messages: [{ role: 'user', content: 'run some code' }],
+        tools: [customTool, { type: 'function', function: { name: 'get_weather' } }],
+      }),
+    ).toThrow(
+      'The `get_weather` tool is not marked with `strict: true`. Only strict function tools can be auto-parsed',
+    );
   });
 });

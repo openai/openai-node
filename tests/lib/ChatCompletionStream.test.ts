@@ -754,7 +754,7 @@ describe('.stream()', () => {
     expect(capturedLogProbs?.length).toEqual(choice?.logprobs?.refusal?.length);
   });
 
-  it('handles custom tool calls in stream chunks', async () => {
+  it('handles custom tool calls in stream chunks alongside function tool calls', async () => {
     const chunk1: OpenAI.Chat.ChatCompletionChunk = {
       id: 'chatcmpl-stream-custom',
       object: 'chat.completion.chunk',
@@ -769,12 +769,12 @@ describe('.stream()', () => {
               {
                 index: 0,
                 id: 'call_custom_123',
-                type: 'custom' as any,
+                type: 'custom',
                 custom: {
                   name: 'my_custom_tool',
                   input: '{"foo":',
                 },
-              } as any,
+              },
             ],
           },
           finish_reason: null,
@@ -797,10 +797,19 @@ describe('.stream()', () => {
                 custom: {
                   input: '"bar"}',
                 },
-              } as any,
+              },
+              {
+                index: 1,
+                id: 'call_function_456',
+                type: 'function',
+                function: {
+                  name: 'get_weather',
+                  arguments: '{"city":"SF"}',
+                },
+              },
             ],
           },
-          finish_reason: 'stop',
+          finish_reason: 'tool_calls',
         },
       ],
     };
@@ -824,7 +833,27 @@ describe('.stream()', () => {
       messages: [{ role: 'user', content: 'test' }],
     });
 
+    // the chunk deltas and the accumulated snapshot are both narrowable without casts
+    const inputDeltas: string[] = [];
+    const inputSnapshots: string[] = [];
+    stream.on('chunk', (chunk, snapshot) => {
+      for (const toolCallDelta of chunk.choices[0]?.delta.tool_calls ?? []) {
+        if (toolCallDelta.custom?.input) {
+          inputDeltas.push(toolCallDelta.custom.input);
+        }
+      }
+
+      const toolCallSnapshot = snapshot.choices[0]?.message.tool_calls?.[0];
+      if (toolCallSnapshot?.type === 'custom') {
+        inputSnapshots.push(toolCallSnapshot.custom.input);
+      }
+    });
+
     const completion = await stream.finalChatCompletion();
+    expect(inputDeltas).toEqual(['{"foo":', '"bar"}']);
+    expect(inputSnapshots).toEqual(['{"foo":', '{"foo":"bar"}']);
+    // no auto-parseable tools were given, so the function tool call is passed through
+    // untouched — in particular without a `parsed_arguments` property
     expect(completion.choices[0]?.message.tool_calls).toEqual([
       {
         id: 'call_custom_123',
@@ -834,6 +863,15 @@ describe('.stream()', () => {
           input: '{"foo":"bar"}',
         },
       },
+      {
+        id: 'call_function_456',
+        type: 'function',
+        function: {
+          name: 'get_weather',
+          arguments: '{"city":"SF"}',
+        },
+      },
     ]);
+    expect(completion.choices[0]?.message.tool_calls?.[1]).not.toHaveProperty('function.parsed_arguments');
   });
 });

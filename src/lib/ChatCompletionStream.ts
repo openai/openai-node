@@ -28,6 +28,7 @@ import {
   type ChatCompletionCreateParamsBase,
   type ChatCompletionCreateParamsStreaming,
   type ChatCompletionMessageParam,
+  type ChatCompletionMessageToolCall,
   type ChatCompletionRole,
 } from '../resources/chat/completions/completions';
 import { Stream } from '../streaming';
@@ -182,6 +183,20 @@ function getChatCompletionReadableStreamMessage(
     item.object.slice(CHAT_COMPLETION_READABLE_STREAM_MESSAGE_PREFIX.length),
   ) as ChatCompletionReadableStreamMessage;
 }
+
+/**
+ * A tool call snapshot while it is still being accumulated from stream chunks.
+ *
+ * Every property is optional because the deltas that make up a tool call arrive
+ * across chunks; once they have all been accumulated the entry satisfies
+ * {@link ChatCompletionSnapshot.Choice.Message.ToolCall}.
+ */
+type PartialToolCallSnapshot = {
+  id?: string;
+  type?: ChatCompletionSnapshot.Choice.Message.ToolCall['type'];
+  function?: ChatCompletionSnapshot.Choice.Message.ToolCall.FunctionToolCall.Function;
+  custom?: ChatCompletionSnapshot.Choice.Message.ToolCall.CustomToolCall.Custom;
+};
 
 interface ChoiceEventState {
   content_done: boolean;
@@ -350,6 +365,10 @@ export class ChatCompletionStream<ParsedT = null>
             parsed_arguments: toolCallSnapshot.function.parsed_arguments,
             arguments_delta: toolCallDelta.function?.arguments ?? '',
           });
+        } else if (toolCallSnapshot?.type === 'custom') {
+          // custom tool calls have no arguments to parse, so no delta event is emitted
+        } else {
+          assertNever(toolCallSnapshot);
         }
       }
     }
@@ -384,6 +403,10 @@ export class ChatCompletionStream<ParsedT = null>
           : inputTool?.function.strict ? JSON.parse(toolCallSnapshot.function.arguments)
           : null,
       });
+    } else if (toolCallSnapshot.type === 'custom') {
+      // custom tool calls have no arguments to parse, so no done event is emitted
+    } else {
+      assertNever(toolCallSnapshot);
     }
   }
 
@@ -633,27 +656,32 @@ export class ChatCompletionStream<ParsedT = null>
       }
 
       if (tool_calls) {
-        if (!choice.message.tool_calls) choice.message.tool_calls = [];
+        // Tool calls are built up across chunks, so while the stream is in progress the
+        // entries are only partially filled in; they match `ChatCompletionSnapshot.Choice.Message.ToolCall`
+        // once every delta for them has been accumulated.
+        const toolCallSnapshots = (choice.message.tool_calls ??= []) as PartialToolCallSnapshot[];
 
-        for (const { index, id, type, function: fn, custom, ...rest } of tool_calls as any[]) {
-          const tool_call: any = (choice.message.tool_calls[index] ??= {} as any);
+        for (const { index, id, type, function: fn, custom, ...rest } of tool_calls) {
+          const tool_call = (toolCallSnapshots[index] ??= {});
           Object.assign(tool_call, rest);
           if (id) tool_call.id = id;
           if (type) tool_call.type = type;
           if (custom) {
-            tool_call.custom ??= { name: custom.name ?? '', input: '' };
-            if (custom.name) tool_call.custom.name = custom.name;
+            const customSnapshot = (tool_call.custom ??= { name: custom.name ?? '', input: '' });
+            if (custom.name) customSnapshot.name = custom.name;
             if (custom.input) {
-              tool_call.custom.input += custom.input;
+              customSnapshot.input += custom.input;
             }
           }
-          if (fn) tool_call.function ??= { name: fn.name ?? '', arguments: '' };
-          if (fn?.name) tool_call.function.name = fn.name;
-          if (fn?.arguments) {
-            tool_call.function.arguments += fn.arguments;
+          if (fn) {
+            const functionSnapshot = (tool_call.function ??= { name: fn.name ?? '', arguments: '' });
+            if (fn.name) functionSnapshot.name = fn.name;
+            if (fn.arguments) {
+              functionSnapshot.arguments += fn.arguments;
 
-            if (shouldParseToolCall(this.#params, tool_call)) {
-              tool_call.function.parsed_arguments = partialParse(tool_call.function.arguments);
+              if (shouldParseToolCall(this.#params, tool_call)) {
+                functionSnapshot.parsed_arguments = partialParse(functionSnapshot.arguments);
+              }
             }
           }
         }
@@ -792,12 +820,13 @@ function finalizeChatCompletion<ParsedT>(
               role,
               content,
               refusal: message.refusal ?? null,
-              tool_calls: tool_calls.map((tool_call: any, i) => {
-                const { function: fn, custom, type, id, ...toolRest } = tool_call;
-                if (type == null) {
+              tool_calls: tool_calls.map((tool_call, i): ChatCompletionMessageToolCall => {
+                if (tool_call.type == null) {
                   throw new OpenAIError(`missing choices[${index}].tool_calls[${i}].type\n${str(snapshot)}`);
                 }
-                if (type === 'custom') {
+
+                if (tool_call.type === 'custom') {
+                  const { custom, type, id, ...toolRest } = tool_call;
                   const { input = '', name, ...customRest } = custom || {};
                   if (name == null) {
                     throw new OpenAIError(
@@ -812,6 +841,7 @@ function finalizeChatCompletion<ParsedT>(
                   };
                 }
 
+                const { function: fn, type, id, ...toolRest } = tool_call;
                 const { arguments: args, name, ...fnRest } = fn || {};
                 if (name == null) {
                   throw new OpenAIError(

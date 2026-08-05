@@ -57,7 +57,7 @@ async function main() {
   console.dir(completion, { depth: 10 });
 
   const toolCall = completion.choices[0]?.message.tool_calls?.[0];
-  if (toolCall) {
+  if (toolCall?.type === 'function') {
     const args = toolCall.function.parsed_arguments as z.infer<typeof Query>;
     console.log(args);
     console.log(args.table_name);
