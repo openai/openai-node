@@ -128,7 +128,6 @@ const compatibilityRules = [
   'unicorn/prefer-event-target',
   'unicorn/prefer-includes',
   'unicorn/prefer-module',
-  'unicorn/prefer-native-coercion-functions',
   'unicorn/prefer-node-protocol',
   'unicorn/prefer-number-properties',
   'unicorn/prefer-object-from-entries',
