@@ -40,7 +40,9 @@ describe('path template tag function', () => {
     const mathObject = Math;
     const numberObject = new Number();
     const stringObject = new String();
-    const basicClass = new (class {})();
+    const basicClass = new (class {
+      readonly kind = 'class';
+    })();
     const classWithToString = new (class {
       toString() {
         return 'ok';
