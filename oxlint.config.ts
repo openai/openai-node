@@ -134,7 +134,6 @@ const compatibilityRules = [
   'unicorn/consistent-function-scoping',
   'unicorn/custom-error-definition',
   'unicorn/error-message',
-  'unicorn/escape-case',
   'unicorn/filename-case',
   'unicorn/import-style',
   'unicorn/new-for-builtins',
