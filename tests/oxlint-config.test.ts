@@ -54,3 +54,33 @@ test('inherits Ultracite native plugins and enforces their rules', () => {
     rmSync(fixtureRoot, { recursive: true, force: true });
   }
 });
+
+test('formats generated SDK files without linting them', () => {
+  const generatedPath = 'src/client.ts';
+  const unformatted = [
+    '// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.',
+    '',
+    'export const generated = "formatted";',
+    '',
+  ].join('\n');
+
+  const formatted = spawnSync(process.execPath, [oxfmt, `--stdin-filepath=${generatedPath}`], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    input: unformatted,
+  });
+
+  expect(formatted.status).toBe(0);
+  expect(formatted.stdout).toContain("export const generated = 'formatted';");
+
+  const linted = spawnSync(
+    process.execPath,
+    [oxlint, '--format', 'json', '--no-error-on-unmatched-pattern', generatedPath],
+    { cwd: repoRoot, encoding: 'utf8' },
+  );
+
+  expect(linted.status).toBe(0);
+
+  const result = JSON.parse(linted.stdout) as { number_of_files: number };
+  expect(result.number_of_files).toBe(0);
+});
