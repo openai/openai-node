@@ -21,7 +21,6 @@ const compatibilityRules = [
   'import/newline-after-import',
   'import/no-cycle',
   'import/no-mutable-exports',
-  'jsdoc/check-property-names',
   'jsdoc/check-tag-names',
   'jsdoc/empty-tags',
   'jsdoc/no-defaults',
