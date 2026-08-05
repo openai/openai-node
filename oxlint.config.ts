@@ -73,7 +73,6 @@ const compatibilityRules = [
   'no-unused-vars',
   'no-use-before-define',
   'no-useless-concat',
-  'no-useless-constructor',
   'no-useless-escape',
   'no-useless-rename',
   'no-useless-return',
