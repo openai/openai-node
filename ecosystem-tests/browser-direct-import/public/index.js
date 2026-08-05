@@ -73,7 +73,7 @@ function it(description, run, timeout = 60000) {
  * @returns {{
  *   toEqual: (expected: any) => void;
  *   toBeSimilarTo: (comparedTo: string, expectedDistance: number) => void;
- * }}
+ * }} Matchers for validating the received value.
  */
 function expect(received) {
   return {
