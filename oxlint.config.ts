@@ -24,7 +24,6 @@ const compatibilityRules = [
   'jsdoc/check-tag-names',
   'jsdoc/no-defaults',
   'jsdoc/require-param-description',
-  'jsdoc/require-property-description',
   'jsdoc/require-property-name',
   'jsdoc/require-property-type',
   'jsdoc/require-returns-description',
