@@ -1231,8 +1231,7 @@ describe('stringify()', function () {
   // TODO(rob)
   test('skips properties that are part of the object prototype', function () {
     // st.intercept(Object.prototype, 'crash', { value: 'test' });
-    // @ts-expect-error
-    Object.prototype.crash = 'test';
+    Reflect.set(Object.prototype, 'crash', 'test');
 
     // st.equal(stringify({ a: 'b' }), 'a=b');
     // st.equal(stringify({ a: { b: 'c' } }), 'a%5Bb%5D=c');
