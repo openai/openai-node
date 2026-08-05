@@ -215,12 +215,11 @@ export class Stream<Item> implements AsyncIterable<Item> {
    * which can be turned back into a Stream with `Stream.fromReadableStream()`.
    */
   toReadableStream(): ReadableStream {
-    const self = this;
     let iter: AsyncIterator<Item>;
 
     return makeReadableStream({
-      async start() {
-        iter = self[Symbol.asyncIterator]();
+      start: async () => {
+        iter = this[Symbol.asyncIterator]();
       },
       async pull(ctrl: any) {
         try {
