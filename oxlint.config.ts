@@ -72,7 +72,6 @@ const compatibilityRules = [
   'promise/param-names',
   'promise/prefer-await-to-callbacks',
   'promise/prefer-await-to-then',
-  'promise/prefer-catch',
   'require-await',
   'require-unicode-regexp',
   'sort-keys',
