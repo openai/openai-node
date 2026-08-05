@@ -88,7 +88,6 @@ const compatibilityRules = [
   'prefer-arrow-callback',
   'prefer-const',
   'prefer-destructuring',
-  'prefer-exponentiation-operator',
   'prefer-named-capture-group',
   'prefer-object-has-own',
   'prefer-object-spread',
