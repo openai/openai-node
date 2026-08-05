@@ -88,7 +88,6 @@ const compatibilityRules = [
   'prefer-destructuring',
   'prefer-named-capture-group',
   'prefer-object-has-own',
-  'prefer-object-spread',
   'prefer-regex-literals',
   'prefer-template',
   'promise/avoid-new',

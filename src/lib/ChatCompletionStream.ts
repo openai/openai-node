@@ -546,7 +546,7 @@ export class ChatCompletionStream<ParsedT = null>
 
       if (logprobs) {
         if (!choice.logprobs) {
-          choice.logprobs = Object.assign({}, logprobs);
+          choice.logprobs = { ...logprobs };
         } else {
           const { content, refusal, ...rest } = logprobs;
           assertIsEmpty(rest);
