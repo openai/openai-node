@@ -60,7 +60,7 @@ export const checkFileSupport = () => {
   if (typeof File === 'undefined') {
     const { process } = globalThis as any;
     const isOldNode =
-      typeof process?.versions?.node === 'string' && parseInt(process.versions.node.split('.')) < 20;
+      typeof process?.versions?.node === 'string' && parseInt(process.versions.node.split('.'), 10) < 20;
     throw new Error(
       '`File` is not defined as a global, which is required for file uploads.' +
         (isOldNode
