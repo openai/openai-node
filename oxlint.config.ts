@@ -181,7 +181,6 @@ const compatibilityRules = [
   'unicorn/require-module-specifiers',
   'unicorn/switch-case-braces',
   'unicorn/text-encoding-identifier-case',
-  'unicorn/throw-new-error',
   'vars-on-top',
   'yoda',
 ];
