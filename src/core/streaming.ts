@@ -294,7 +294,7 @@ async function* iterSSEChunks(iterator: AsyncIterableIterator<Bytes>): AsyncGene
           ? encodeUTF8(chunk)
           : chunk;
 
-    let newData = new Uint8Array(data.length + binaryChunk.length);
+    const newData = new Uint8Array(data.length + binaryChunk.length);
     newData.set(data);
     newData.set(binaryChunk, data.length);
     data = newData;
@@ -350,7 +350,8 @@ class SSEDecoder {
       return null;
     }
 
-    let [fieldname, _, value] = partition(line, ':');
+    const [fieldname, , initialValue] = partition(line, ':');
+    let value = initialValue;
 
     if (value.startsWith(' ')) {
       value = value.substring(1);

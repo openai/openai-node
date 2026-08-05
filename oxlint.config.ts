@@ -81,7 +81,6 @@ const compatibilityRules = [
   'oxc/no-async-endpoint-handlers',
   'oxc/no-barrel-file',
   'prefer-arrow-callback',
-  'prefer-const',
   'prefer-destructuring',
   'prefer-named-capture-group',
   'prefer-object-has-own',

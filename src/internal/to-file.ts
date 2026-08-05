@@ -119,7 +119,7 @@ export async function toFile(
 }
 
 async function getBytes(value: BlobLikePart | AsyncIterable<BlobLikePart>): Promise<Array<BlobPart>> {
-  let parts: Array<BlobPart> = [];
+  const parts: Array<BlobPart> = [];
   if (
     typeof value === 'string' ||
     ArrayBuffer.isView(value) || // includes Uint8Array, Buffer, etc.

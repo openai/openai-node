@@ -426,8 +426,8 @@ export class AssistantStream
           for (const content of event.data.delta.content) {
             //If it is text delta, emit a text delta event
             if (content.type == 'text' && content.text) {
-              let textDelta = content.text;
-              let snapshot = accumulatedMessage.content[content.index];
+              const textDelta = content.text;
+              const snapshot = accumulatedMessage.content[content.index];
               if (snapshot && snapshot.type == 'text') {
                 this._emit('textDelta', textDelta, snapshot.text);
               } else {
@@ -550,12 +550,12 @@ export class AssistantStream
         return event.data;
 
       case 'thread.run.step.delta':
-        let snapshot = this.#runStepSnapshots[event.data.id] as Runs.RunStep;
+        const snapshot = this.#runStepSnapshots[event.data.id] as Runs.RunStep;
         if (!snapshot) {
           throw new Error('Received a RunStepDelta before creation of a snapshot');
         }
 
-        let data = event.data;
+        const data = event.data;
 
         if (data.delta) {
           const accumulated = AssistantStream.accumulateDelta(snapshot, data.delta) as Runs.RunStep;
@@ -581,7 +581,7 @@ export class AssistantStream
     event: AssistantStreamEvent,
     snapshot: Message | undefined,
   ): [Message, MessageContentDelta[]] {
-    let newContent: MessageContentDelta[] = [];
+    const newContent: MessageContentDelta[] = [];
 
     switch (event.event) {
       case 'thread.message.created':
@@ -595,13 +595,13 @@ export class AssistantStream
           );
         }
 
-        let data = event.data;
+        const data = event.data;
 
         //If this delta does not have content, nothing to process
         if (data.delta.content) {
           for (const contentElement of data.delta.content) {
             if (contentElement.index in snapshot.content) {
-              let currentContent = snapshot.content[contentElement.index];
+              const currentContent = snapshot.content[contentElement.index];
               snapshot.content[contentElement.index] = this.#accumulateContent(
                 contentElement,
                 currentContent,
