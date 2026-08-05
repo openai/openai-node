@@ -286,7 +286,7 @@ export class AssistantStream
 
   async finalRun(): Promise<Run> {
     await this.done();
-    if (!this.#finalRun) throw Error('Final run was not received.');
+    if (!this.#finalRun) throw new Error('Final run was not received.');
 
     return this.#finalRun;
   }
@@ -394,7 +394,7 @@ export class AssistantStream
       throw new OpenAIError(`stream has ended, this shouldn't happen`);
     }
 
-    if (!this.#finalRun) throw Error('Final run has not been received');
+    if (!this.#finalRun) throw new Error('Final run has not been received');
 
     return this.#finalRun;
   }
@@ -431,7 +431,7 @@ export class AssistantStream
               if (snapshot && snapshot.type == 'text') {
                 this._emit('textDelta', textDelta, snapshot.text);
               } else {
-                throw Error('The snapshot associated with this text delta is not text or missing');
+                throw new Error('The snapshot associated with this text delta is not text or missing');
               }
             }
 
@@ -552,7 +552,7 @@ export class AssistantStream
       case 'thread.run.step.delta':
         let snapshot = this.#runStepSnapshots[event.data.id] as Runs.RunStep;
         if (!snapshot) {
-          throw Error('Received a RunStepDelta before creation of a snapshot');
+          throw new Error('Received a RunStepDelta before creation of a snapshot');
         }
 
         let data = event.data;
@@ -590,7 +590,7 @@ export class AssistantStream
 
       case 'thread.message.delta':
         if (!snapshot) {
-          throw Error(
+          throw new Error(
             'Received a delta with no existing snapshot (there should be one from message creation)',
           );
         }
@@ -623,10 +623,10 @@ export class AssistantStream
         if (snapshot) {
           return [snapshot, newContent];
         } else {
-          throw Error('Received thread message event with no existing snapshot');
+          throw new Error('Received thread message event with no existing snapshot');
         }
     }
-    throw Error('Tried to accumulate a non-message event');
+    throw new Error('Tried to accumulate a non-message event');
   }
 
   #accumulateContent(
@@ -694,7 +694,7 @@ export class AssistantStream
         }
         continue;
       } else {
-        throw Error(`Unhandled record type: ${key}, deltaValue: ${deltaValue}, accValue: ${accValue}`);
+        throw new Error(`Unhandled record type: ${key}, deltaValue: ${deltaValue}, accValue: ${accValue}`);
       }
       acc[key] = accValue;
     }
