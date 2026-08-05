@@ -1,6 +1,6 @@
 import OpenAI, { AzureOpenAI } from 'openai';
 import { buildRealtimeURL as buildBetaRealtimeURL } from 'openai/beta/realtime/internal-base';
-import { buildRealtimeURL as buildRealtimeURL } from 'openai/realtime/internal-base';
+import { buildRealtimeURL } from 'openai/realtime/internal-base';
 
 const apiVersion = '2024-10-01-preview';
 
