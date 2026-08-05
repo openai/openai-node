@@ -103,7 +103,6 @@ const compatibilityRules = [
   'typescript/array-type',
   'typescript/ban-ts-comment',
   'typescript/ban-types',
-  'typescript/consistent-generic-constructors',
   'typescript/consistent-indexed-object-style',
   'typescript/consistent-type-definitions',
   'typescript/consistent-type-imports',

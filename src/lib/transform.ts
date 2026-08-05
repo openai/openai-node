@@ -170,10 +170,7 @@ export function toStrictJsonSchema(schema: JSONSchema): JSONSchema {
   return strictSchema;
 }
 
-function stripUndefinedSchemaKeywords(
-  schema: JSONSchemaDefinition,
-  visited: Set<JSONSchema> = new Set(),
-): void {
+function stripUndefinedSchemaKeywords(schema: JSONSchemaDefinition, visited = new Set<JSONSchema>()): void {
   if (typeof schema === 'boolean' || !isObject(schema) || visited.has(schema)) {
     return;
   }
@@ -557,11 +554,7 @@ function normalizeSingletonTypeArrays(schema: JSONSchemaDefinition): void {
   });
 }
 
-function isNullable(
-  schema: JSONSchemaDefinition,
-  root: JSONSchema,
-  seenRefs: Set<string> = new Set(),
-): boolean {
+function isNullable(schema: JSONSchemaDefinition, root: JSONSchema, seenRefs = new Set<string>()): boolean {
   if (typeof schema === 'boolean') {
     return schema;
   }
@@ -940,7 +933,7 @@ function isSchemaDefinition(value: unknown): value is JSONSchemaDefinition {
 function isObjectOnlySchema(
   schema: JSONSchemaDefinition,
   root: JSONSchema,
-  seenRefs: Set<string> = new Set(),
+  seenRefs = new Set<string>(),
 ): boolean {
   if (typeof schema === 'boolean' || !isObject(schema)) {
     return false;
@@ -983,7 +976,7 @@ function isObjectOnlySchema(
 function isArrayOnlySchema(
   schema: JSONSchemaDefinition,
   root: JSONSchema,
-  seenRefs: Set<string> = new Set(),
+  seenRefs = new Set<string>(),
 ): boolean {
   if (typeof schema === 'boolean' || !isObject(schema)) {
     return false;
@@ -1606,7 +1599,7 @@ function normalizeObjectAllOfBranches(
   schema: JSONSchemaDefinition,
   path: string[],
   root: JSONSchema,
-  normalizing: Set<JSONSchema> = new Set(),
+  normalizing = new Set<JSONSchema>(),
 ): void {
   if (typeof schema === 'boolean' || !isObject(schema)) {
     return;
@@ -1688,7 +1681,7 @@ function mergeObjectAllOf(
   jsonSchema: JSONSchema,
   path: string[],
   root: JSONSchema,
-  normalizing: Set<JSONSchema> = new Set(),
+  normalizing = new Set<JSONSchema>(),
 ): boolean {
   const allOf = jsonSchema.allOf;
   if (!Array.isArray(allOf) || allOf.length === 0) {
