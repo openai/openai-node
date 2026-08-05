@@ -98,7 +98,7 @@ export function parseResponse<
     },
   );
 
-  const parsed: Omit<ParsedResponse<ParsedT>, 'output_parsed'> = Object.assign({}, response, { output });
+  const parsed: Omit<ParsedResponse<ParsedT>, 'output_parsed'> = { ...response, output };
   if (needsOutputText(response, parsed)) {
     addOutputText(parsed);
   }
