@@ -156,7 +156,6 @@ const compatibilityRules = [
   'unicorn/no-useless-fallback-in-spread',
   'unicorn/no-useless-switch-case',
   'unicorn/no-useless-undefined',
-  'unicorn/no-zero-fractions',
   'unicorn/numeric-separators-style',
   'unicorn/prefer-at',
   'unicorn/prefer-bigint-literals',
