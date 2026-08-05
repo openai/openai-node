@@ -132,7 +132,6 @@ const compatibilityRules = [
   'unicorn/no-thenable',
   'unicorn/no-this-assignment',
   'unicorn/no-typeof-undefined',
-  'unicorn/no-useless-fallback-in-spread',
   'unicorn/no-useless-switch-case',
   'unicorn/no-useless-undefined',
   'unicorn/numeric-separators-style',
