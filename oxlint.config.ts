@@ -94,7 +94,6 @@ const compatibilityRules = [
   'promise/prefer-await-to-callbacks',
   'promise/prefer-await-to-then',
   'promise/prefer-catch',
-  'radix',
   'require-await',
   'require-unicode-regexp',
   'sort-keys',
