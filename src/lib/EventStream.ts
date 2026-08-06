@@ -43,26 +43,21 @@ export class EventStream<EventTypes extends BaseEvents> {
   protected _run(this: EventStream<EventTypes>, executor: () => Promise<any>) {
     // Unfortunately if we call `executor()` immediately we get runtime errors about
     // references to `this` before the `super()` constructor call returns.
-    setTimeout(() => {
-      let failed = false;
+    setTimeout(async () => {
+      try {
+        await executor();
+      } catch (error) {
+        this.#handleError(error);
+        return;
+      }
 
-      Promise.resolve()
-        .then(executor)
-        .catch((error) => {
-          failed = true;
-          this.#handleError(error);
-        })
-        .then(() => {
-          if (failed) return;
-
-          try {
-            this._emitFinal();
-          } catch (error) {
-            this.#handleError(error);
-            return;
-          }
-          this._emit('end');
-        });
+      try {
+        this._emitFinal();
+      } catch (error) {
+        this.#handleError(error);
+        return;
+      }
+      this._emit('end');
     }, 0);
   }
 
