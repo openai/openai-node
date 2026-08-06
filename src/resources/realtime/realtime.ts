@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../core/resource';
 import * as RealtimeAPI from './realtime';
@@ -16,6 +16,8 @@ import {
   RealtimeTranscriptionSessionTurnDetection,
 } from './client-secrets';
 import * as ResponsesAPI from '../responses/responses';
+import { APIPromise } from '../../core/api-promise';
+import { RequestOptions } from '../../internal/request-options';
 
 export class Realtime extends APIResource {
   clientSecrets: ClientSecretsAPI.ClientSecrets = new ClientSecretsAPI.ClientSecrets(this._client);

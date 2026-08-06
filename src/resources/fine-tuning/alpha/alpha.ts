@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../../core/resource';
 import * as GradersAPI from './graders';
@@ -9,6 +9,8 @@ import {
   GraderValidateResponse,
   Graders,
 } from './graders';
+import { APIPromise } from '../../../core/api-promise';
+import { RequestOptions } from '../../../internal/request-options';
 
 export class Alpha extends APIResource {
   graders: GradersAPI.Graders = new GradersAPI.Graders(this._client);

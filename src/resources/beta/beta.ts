@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../core/resource';
 import * as AssistantsAPI from './assistants';
@@ -200,6 +200,8 @@ import {
   ThreadUpdateParams,
   Threads,
 } from './threads/threads';
+import { APIPromise } from '../../core/api-promise';
+import { RequestOptions } from '../../internal/request-options';
 
 export class Beta extends APIResource {
   responses: ResponsesAPI.Responses = new ResponsesAPI.Responses(this._client);
