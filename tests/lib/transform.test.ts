@@ -1421,7 +1421,8 @@ describe('toStrictJsonSchema', () => {
           type: 'object',
           properties: {},
           if: { type: 'object' },
-          [String('then')]: { type: 'object' },
+          // oxlint-disable-next-line unicorn/no-thenable -- JSON Schema conditional keyword, not a promise-like API.
+          then: { type: 'object' },
           else: { type: 'object' },
           additionalProperties: false,
         },
