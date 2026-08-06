@@ -40,9 +40,8 @@ describe('path template tag function', () => {
     const mathObject = Math;
     const numberObject = new Number();
     const stringObject = new String();
-    const basicClass = new (class {
-      readonly kind = 'class';
-    })();
+    // oxlint-disable-next-line typescript/no-extraneous-class -- This test needs an otherwise-empty plain class instance.
+    const basicClass = new (class {})();
     const classWithToString = new (class {
       toString() {
         return 'ok';
