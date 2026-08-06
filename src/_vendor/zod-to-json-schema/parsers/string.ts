@@ -35,8 +35,8 @@ export const zodPatterns = {
    */
   emoji: () => {
     if (emojiRegex === undefined) {
-      const emojiPattern = '^(\\p{Extended_Pictographic}|\\p{Emoji_Component})+$';
-      emojiRegex = RegExp(emojiPattern, 'u');
+      // oxlint-disable-next-line prefer-regex-literals -- Unicode property escapes require lazy construction for React Native.
+      emojiRegex = RegExp('^(\\p{Extended_Pictographic}|\\p{Emoji_Component})+$', 'u');
     }
     return emojiRegex;
   },
