@@ -2,7 +2,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const repositoryRoot = path.resolve(__dirname, '..');
-const generatedHeader = '// File generated from our OpenAPI spec by Stainless.';
+const generatedHeaders = [
+  '// File generated from our OpenAPI spec by Stainless.',
+  '// File generated from our OpenAPI spec by Castiron.',
+];
 const ignoredDirectories = new Set(['.git', 'coverage', 'dist', 'node_modules']);
 
 function findGeneratedFiles(directory) {
@@ -11,7 +14,8 @@ function findGeneratedFiles(directory) {
 
     if (entry.isDirectory()) return ignoredDirectories.has(entry.name) ? [] : findGeneratedFiles(file);
     if (!entry.isFile() || !/\.[cm]?[jt]sx?$/.test(entry.name)) return [];
-    if (!fs.readFileSync(file, 'utf8').startsWith(generatedHeader)) return [];
+    const content = fs.readFileSync(file, 'utf8');
+    if (!generatedHeaders.some((header) => content.startsWith(header))) return [];
 
     return [path.relative(repositoryRoot, file).split(path.sep).join('/')];
   });
