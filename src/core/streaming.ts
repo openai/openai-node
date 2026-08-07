@@ -314,11 +314,10 @@ async function* iterSSEChunks(iterator: AsyncIterableIterator<Bytes>): AsyncGene
 
 class SSEDecoder {
   private data: string[];
-  private event: string | null;
+  private event: string | null = null;
   private chunks: string[];
 
   constructor() {
-    this.event = null;
     this.data = [];
     this.chunks = [];
   }
