@@ -22,7 +22,7 @@ async function runTests() {
       pre.id = 'results';
       document.body.append(pre);
     }
-    pre.innerText = JSON.stringify(results, null, 2);
+    pre.textContent = JSON.stringify(results, null, 2);
   }
   for (const { path, run, timeout } of tests) {
     console.log('running', ...path);
