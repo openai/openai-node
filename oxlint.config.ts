@@ -19,7 +19,6 @@ const compatibilityRules = [
   'import/first',
   'import/newline-after-import',
   'import/no-cycle',
-  'import/no-mutable-exports',
   'jsdoc/check-tag-names',
   'jsdoc/no-defaults',
   'jsdoc/require-param-description',
