@@ -281,3 +281,38 @@ test('rejects SDK package imports in generated source but allows them in generat
     rmSync(testsRoot, { recursive: true, force: true });
   }
 });
+
+test('checks and fixes generated imports through the public package commands', () => {
+  const fixtureRoot = mkdtempSync(join(repoRoot, '.oxlint-public-entrypoints-'));
+
+  try {
+    const generatedPath = join(fixtureRoot, 'generated.ts');
+    writeFileSync(
+      generatedPath,
+      [
+        '// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.',
+        "import { Unused } from './dependency';",
+        'export const value = 1;',
+        '',
+      ].join('\n'),
+    );
+
+    const rejected = spawnSync('pnpm', ['lint'], { cwd: repoRoot, encoding: 'utf8' });
+
+    expect(rejected.status).toBe(1);
+    expect(`${rejected.stdout}${rejected.stderr}`).toContain(
+      "Identifier 'Unused' is imported but never used.",
+    );
+
+    const fixed = spawnSync('pnpm', ['format'], { cwd: repoRoot, encoding: 'utf8' });
+
+    expect(fixed.status).toBe(0);
+    expect(readFileSync(generatedPath, 'utf8')).not.toContain('Unused');
+
+    const accepted = spawnSync('pnpm', ['lint'], { cwd: repoRoot, encoding: 'utf8' });
+
+    expect(accepted.status).toBe(0);
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
+});
