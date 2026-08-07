@@ -35,7 +35,6 @@ const compatibilityRules = [
   'no-inline-comments',
   'no-inner-declarations',
   'no-lonely-if',
-  'no-multi-assign',
   'no-negated-condition',
   'no-nested-ternary',
   'no-new-wrappers',
