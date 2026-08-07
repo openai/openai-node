@@ -5,7 +5,6 @@ const stainlessGeneratedFiles = requireConfig('./scripts/stainless-generated-fil
 
 // Existing handwritten SDK patterns predate these preset rules.
 const compatibilityRules = [
-  'array-callback-return',
   'arrow-body-style',
   'class-methods-use-this',
   'complexity',
