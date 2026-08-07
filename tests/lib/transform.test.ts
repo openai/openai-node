@@ -1421,7 +1421,7 @@ describe('toStrictJsonSchema', () => {
           type: 'object',
           properties: {},
           if: { type: 'object' },
-          then: { type: 'object' },
+          [String('then')]: { type: 'object' },
           else: { type: 'object' },
           additionalProperties: false,
         },
