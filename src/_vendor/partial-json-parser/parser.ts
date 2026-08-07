@@ -103,7 +103,7 @@ const _parseJSON = (jsonString: string, allow: number) => {
     if (
       jsonString.substring(index, index + 9) === '-Infinity' ||
       (Allow.MINUS_INFINITY & allow &&
-        1 < length - index &&
+        length - index > 1 &&
         length - index < 9 &&
         '-Infinity'.startsWith(jsonString.substring(index)))
     ) {
@@ -203,7 +203,7 @@ const _parseJSON = (jsonString: string, allow: number) => {
       } catch (e) {
         if (Allow.NUM & allow) {
           try {
-            if ('.' === jsonString[jsonString.length - 1])
+            if (jsonString[jsonString.length - 1] === '.')
               return JSON.parse(jsonString.substring(0, jsonString.lastIndexOf('.')));
             return JSON.parse(jsonString.substring(0, jsonString.lastIndexOf('e')));
           } catch (e) {}

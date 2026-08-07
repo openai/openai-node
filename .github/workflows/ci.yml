@@ -197,7 +197,7 @@ jobs:
             echo "Skipping examples because OPENAI_API_KEY is not set"
             exit 0
           fi
-          pnpm tsn examples/demo.ts
+          pnpm tsn examples/chat-completions/demo.ts
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 

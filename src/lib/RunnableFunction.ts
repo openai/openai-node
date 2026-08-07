@@ -136,11 +136,10 @@ export type RunnableTools<FunctionsArgs extends BaseFunctionsArgs, ToolContext =
  * argument type matches the `parse` return type.
  */
 export class ParsingToolFunction<Args extends object, ToolContext = unknown> {
-  type: 'function';
+  type = 'function' as const;
   function: RunnableFunctionWithParse<Args, ToolContext>;
 
   constructor(input: RunnableFunctionWithParse<Args, ToolContext>) {
-    this.type = 'function';
     this.function = input;
   }
 }

@@ -394,7 +394,7 @@ completion object for you).
 
 If you need to cancel a stream, you can `break` from a `for await` loop or call `stream.abort()`.
 
-See an example of streaming helpers in action in [`examples/stream.ts`](../examples/stream.ts).
+See an example of streaming helpers in action in [`examples/chat-completions/stream.ts`](../examples/chat-completions/stream.ts).
 
 ### Automated function calls
 
@@ -487,7 +487,7 @@ adjusting `maxChatCompletions` in the request options object. Note that `max_tok
 chat completion request, not for the entire call run.
 
 See an example of automated function calls in action in
-[`examples/tool-call-helpers.ts`](../examples/tool-call-helpers.ts).
+[`examples/chat-completions/tool-call-helpers.ts`](../examples/chat-completions/tool-call-helpers.ts).
 
 Note, `runFunctions` was also previously available, but has been deprecated in favor of `runTools`.
 
@@ -825,15 +825,15 @@ async function getWeather(args: z.infer<typeof GetWeatherParameters>) {
 main();
 ```
 
-See a more fully-fledged example in [`examples/tool-call-helpers-zod.ts`](../examples/tool-call-helpers-zod.ts).
+See a more fully-fledged example in [`examples/chat-completions/tool-call-helpers-zod.ts`](../examples/chat-completions/tool-call-helpers-zod.ts).
 
 #### Integrate with Next.JS
 
-See an example of a Next.JS integration here [`examples/stream-to-client-next.ts`](../examples/stream-to-client-next.ts).
+See an example of a Next.JS integration here [`examples/chat-completions/stream-to-client-next.ts`](../examples/chat-completions/stream-to-client-next.ts).
 
 #### Proxy Streaming to a Browser
 
-See an example of using express to stream to a browser here [`examples/stream-to-client-express.ts`](../examples/stream-to-client-express.ts).
+See an example of using express to stream to a browser here [`examples/chat-completions/stream-to-client-express.ts`](../examples/chat-completions/stream-to-client-express.ts).
 
 # Polling Helpers
 

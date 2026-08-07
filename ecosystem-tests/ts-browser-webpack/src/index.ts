@@ -20,9 +20,9 @@ async function runTests() {
     if (!pre) {
       pre = document.createElement('pre');
       pre.id = 'results';
-      document.body.appendChild(pre);
+      document.body.append(pre);
     }
-    pre.innerText = JSON.stringify(results, null, 2);
+    pre.textContent = JSON.stringify(results, null, 2);
   }
   for (const { path, run, timeout } of tests) {
     console.log('running', ...path);

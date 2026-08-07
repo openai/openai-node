@@ -76,12 +76,10 @@ type RunTurnResult = {
 
 type OpenableSocket = {
   readyState: number;
-  on(event: 'open', listener: () => void): void;
+  on(event: 'open' | 'close', listener: () => void): void;
   on(event: 'error', listener: (err: Error) => void): void;
-  on(event: 'close', listener: () => void): void;
-  off(event: 'open', listener: () => void): void;
+  off(event: 'open' | 'close', listener: () => void): void;
   off(event: 'error', listener: (err: Error) => void): void;
-  off(event: 'close', listener: () => void): void;
 };
 
 type CLIArgs = {
