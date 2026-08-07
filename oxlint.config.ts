@@ -127,7 +127,6 @@ const compatibilityRules = [
   'unicorn/prefer-number-properties',
   'unicorn/prefer-optional-catch-binding',
   'unicorn/prefer-query-selector',
-  'unicorn/prefer-regexp-test',
   'unicorn/prefer-response-static-json',
   'unicorn/prefer-spread',
   'unicorn/prefer-string-replace-all',

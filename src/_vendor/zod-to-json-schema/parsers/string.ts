@@ -342,7 +342,7 @@ const processRegExp = (regexOrFunction: RegExp | (() => RegExp), refs: Refs): st
 
     if (flags.i) {
       if (inCharGroup) {
-        if (source[i].match(/[a-z]/)) {
+        if (/[a-z]/.test(source[i])) {
           if (inCharRange) {
             pattern += source[i];
             pattern += `${source[i - 2]}-${source[i]}`.toUpperCase();
@@ -355,7 +355,7 @@ const processRegExp = (regexOrFunction: RegExp | (() => RegExp), refs: Refs): st
           }
           continue;
         }
-      } else if (source[i].match(/[a-z]/)) {
+      } else if (/[a-z]/.test(source[i])) {
         pattern += `[${source[i]}${source[i].toUpperCase()}]`;
         continue;
       }
