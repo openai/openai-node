@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../../core/resource';
 import * as PermissionsAPI from './permissions';
@@ -15,6 +15,8 @@ import {
   PermissionRetrieveResponse,
   Permissions,
 } from './permissions';
+import { APIPromise } from '../../../core/api-promise';
+import { RequestOptions } from '../../../internal/request-options';
 
 export class Checkpoints extends APIResource {
   permissions: PermissionsAPI.Permissions = new PermissionsAPI.Permissions(this._client);

@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../core/resource';
 import * as GraderModelsAPI from './grader-models';
@@ -12,6 +12,8 @@ import {
   StringCheckGrader,
   TextSimilarityGrader,
 } from './grader-models';
+import { APIPromise } from '../../core/api-promise';
+import { RequestOptions } from '../../internal/request-options';
 
 export class Graders extends APIResource {
   graderModels: GraderModelsAPI.GraderModels = new GraderModelsAPI.GraderModels(this._client);

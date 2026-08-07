@@ -1,7 +1,9 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../../core/resource';
 import * as Shared from '../../shared';
+import * as GraderModelsAPI from '../../graders/grader-models';
+import * as ResponsesAPI from '../../responses/responses';
 import * as MethodsAPI from '../methods';
 import * as CheckpointsAPI from './checkpoints';
 import {
