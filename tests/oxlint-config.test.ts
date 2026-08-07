@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -50,6 +50,30 @@ test('inherits Ultracite native plugins and enforces their rules', () => {
     );
 
     expect(formatted.status).toBe(0);
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
+});
+
+test('recognizes both Stainless and Castiron generated SDK files', () => {
+  const fixtureRoot = mkdtempSync(join(tmpdir(), 'openai-node-generated-files-'));
+
+  try {
+    const scriptsDirectory = join(fixtureRoot, 'scripts');
+    mkdirSync(scriptsDirectory);
+    const generatedFilesScript = join(scriptsDirectory, 'stainless-generated-files.cjs');
+    copyFileSync(join(repoRoot, 'scripts/stainless-generated-files.cjs'), generatedFilesScript);
+
+    for (const generator of ['Stainless', 'Castiron']) {
+      writeFileSync(
+        join(fixtureRoot, `${generator.toLowerCase()}.ts`),
+        `// File generated from our OpenAPI spec by ${generator}. See CONTRIBUTING.md for details.\n`,
+      );
+    }
+    writeFileSync(join(fixtureRoot, 'handwritten.ts'), 'export const handwritten = true;\n');
+
+    const generatedFiles = require(generatedFilesScript) as string[];
+    expect(generatedFiles).toEqual(['castiron.ts', 'stainless.ts']);
   } finally {
     rmSync(fixtureRoot, { recursive: true, force: true });
   }
