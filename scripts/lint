@@ -4,4 +4,6 @@ set -e
 
 cd "$(dirname "$0")/.."
 
+node ./scripts/lint-generated.cjs --check
+
 PATH="$PWD/node_modules/.bin:$PATH" exec ./node_modules/.bin/ultracite check
