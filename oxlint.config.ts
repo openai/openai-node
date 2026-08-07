@@ -116,7 +116,6 @@ const compatibilityRules = [
   'unicorn/numeric-separators-style',
   'unicorn/prefer-at',
   'unicorn/prefer-bigint-literals',
-  'unicorn/prefer-class-fields',
   'unicorn/prefer-code-point',
   'unicorn/prefer-event-target',
   'unicorn/prefer-module',
