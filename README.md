@@ -487,7 +487,7 @@ const rt = new OpenAIRealtimeWebSocket({ model: 'gpt-realtime-2' });
 rt.on('response.output_text.delta', (event) => process.stdout.write(event.delta));
 ```
 
-For more information see [realtime.md](realtime.md).
+For more information see [docs/realtime.md](docs/realtime.md).
 
 ## Microsoft Azure OpenAI
 
@@ -519,7 +519,7 @@ const result = await openai.chat.completions.create({
 console.log(result.choices[0]!.message?.content);
 ```
 
-For more information on support for the Azure API, see [azure.md](azure.md).
+For more information on support for the Azure API, see [docs/azure.md](docs/azure.md).
 
 ## Amazon Bedrock
 
@@ -559,7 +559,7 @@ Cannot find module '@aws-sdk/credential-provider-node'
 
 For Bedrock API key authentication, import `bedrock` from `openai/providers/bedrock` instead. That entrypoint has no AWS dependencies and works in browser-compatible runtimes when `dangerouslyAllowBrowser` is enabled. SigV4 authentication is supported in Node.js and compatible server runtimes and requires replayable request bodies. The legacy, bearer-only `BedrockOpenAI` class remains available for compatibility.
 
-For more information on support for Amazon Bedrock, see [bedrock.md](bedrock.md).
+For more information on support for Amazon Bedrock, see [docs/bedrock.md](docs/bedrock.md).
 
 ## Advanced Usage
 
@@ -856,4 +856,4 @@ for lifecycle, deprecation, and release rules.
 
 ## Contributing
 
-See [the contributing documentation](./CONTRIBUTING.md).
+See [the contributing documentation](./.github/CONTRIBUTING.md).
