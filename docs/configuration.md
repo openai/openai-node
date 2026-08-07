@@ -71,7 +71,7 @@ try {
 | No response   | `APIConnectionError`       |
 
 Timeouts raise `APIConnectionTimeoutError`. An API error exposes its HTTP status, response headers,
-parsed error body, and request ID when available. See the [error-handling example](../examples/errors.ts).
+parsed error body, and request ID when available. See the [error-handling example](../examples/client/errors.ts).
 
 ## Retries and timeouts
 
@@ -119,7 +119,7 @@ console.log(data.output_text, response.status, request_id);
 const response = await client.responses.create({ model: 'gpt-5.5', input: 'Hello' }).asResponse();
 ```
 
-See the [raw-response example](../examples/raw-response.ts).
+See the [raw-response example](../examples/client/raw-response.ts).
 
 ## Pagination
 

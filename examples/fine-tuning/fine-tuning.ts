@@ -18,7 +18,7 @@ async function main() {
   console.log(`Uploading file`);
 
   let file = await client.files.create({
-    file: fs.createReadStream('./examples/fine-tuning-data.jsonl'),
+    file: fs.createReadStream('./examples/fine-tuning/fine-tuning-data.jsonl'),
     purpose: 'fine-tune',
   });
   console.log(`Uploaded file with ID: ${file.id}`);
