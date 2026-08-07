@@ -1231,24 +1231,12 @@ describe('stringify()', function () {
   // TODO(rob)
   test('skips properties that are part of the object prototype', function () {
     // st.intercept(Object.prototype, 'crash', { value: 'test' });
-    const previousCrashDescriptor = Object.getOwnPropertyDescriptor(Object.prototype, 'crash');
+    Reflect.set(Object.prototype, 'crash', 'test');
 
-    try {
-      // @ts-expect-error -- This property only exists for the inherited-property fixture.
-      // oxlint-disable-next-line no-extend-native -- This test intentionally exercises an inherited enumerable property.
-      Object.prototype.crash = 'test';
-
-      // st.equal(stringify({ a: 'b' }), 'a=b');
-      // st.equal(stringify({ a: { b: 'c' } }), 'a%5Bb%5D=c');
-      expect(stringify({ a: 'b' })).toBe('a=b');
-      expect(stringify({ a: { b: 'c' } })).toBe('a%5Bb%5D=c');
-    } finally {
-      if (previousCrashDescriptor) {
-        Reflect.defineProperty(Object.prototype, 'crash', previousCrashDescriptor);
-      } else {
-        Reflect.deleteProperty(Object.prototype, 'crash');
-      }
-    }
+    // st.equal(stringify({ a: 'b' }), 'a=b');
+    // st.equal(stringify({ a: { b: 'c' } }), 'a%5Bb%5D=c');
+    expect(stringify({ a: 'b' })).toBe('a=b');
+    expect(stringify({ a: { b: 'c' } })).toBe('a%5Bb%5D=c');
   });
 
   test('stringifies boolean values', function () {
