@@ -66,7 +66,6 @@ const compatibilityRules = [
   'prefer-destructuring',
   'prefer-named-capture-group',
   'prefer-object-has-own',
-  'prefer-regex-literals',
   'prefer-template',
   'promise/avoid-new',
   'promise/no-multiple-resolved',
