@@ -457,32 +457,30 @@ async function main() {
       clearProgress();
     } else {
       const runProject = async (project: (typeof projectsToRun)[number]): Promise<void> => {
-        await withChdir(path.join(rootDir, 'ecosystem-tests', project), async () => {
-          const fn = projectRunners[project];
-          console.error('\n');
-          console.error(banner(`▶️ ${project}`));
-          console.error('\n');
+        const fn = projectRunners[project];
+        console.error('\n');
+        console.error(banner(`▶️ ${project}`));
+        console.error('\n');
 
-          try {
-            await withRetry(fn, project, state.retry, state.retryDelay);
-            console.error('\n');
-            console.error(`✅ ${project}`);
-          } catch (err) {
-            if (err && (err as any).shortMessage) {
-              console.error((err as any).shortMessage);
-            } else {
-              console.error(err);
-            }
-            console.error('\n');
-            console.error(`❌ ${project}`);
-            failed.push(project);
+        try {
+          await withRetry(fn, project, state.retry, state.retryDelay);
+          console.error('\n');
+          console.error(`✅ ${project}`);
+        } catch (err) {
+          if (err && (err as any).shortMessage) {
+            console.error((err as any).shortMessage);
+          } else {
+            console.error(err);
           }
           console.error('\n');
-        });
+          console.error(`❌ ${project}`);
+          failed.push(project);
+        }
+        console.error('\n');
       };
 
       for (const project of projectsToRun) {
-        await runProject(project);
+        await withChdir(path.join(rootDir, 'ecosystem-tests', project), runProject.bind(undefined, project));
       }
     }
   } finally {
