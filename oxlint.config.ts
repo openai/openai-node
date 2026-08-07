@@ -63,7 +63,6 @@ const compatibilityRules = [
   'no-var',
   'no-void',
   'no-warning-comments',
-  'node/callback-return',
   'node/global-require',
   'object-shorthand',
   'oxc/no-accumulating-spread',
