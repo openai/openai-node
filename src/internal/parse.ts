@@ -3,6 +3,7 @@
 import type { FinalRequestOptions } from './request-options';
 import { Stream } from '../core/streaming';
 import { type OpenAI } from '../client';
+import { isAbortError } from './errors';
 import { formatRequestDetails, loggerFor } from './utils/log';
 import type { AbstractPage } from '../pagination';
 
@@ -69,7 +70,9 @@ export async function defaultParseResponse<T>(
 
     const text = await response.text();
     return text as unknown as T;
-  })();
+  })().catch((error: unknown) => {
+    throw asAbortError(error, props.controller.signal);
+  });
   loggerFor(client).debug(
     `[${requestLogID}] response parsed`,
     formatRequestDetails({
@@ -81,6 +84,31 @@ export async function defaultParseResponse<T>(
     }),
   );
   return body;
+}
+
+/**
+ * Report a body read that failed because the request was cancelled as an
+ * `AbortError`, whatever reason the cancellation carried.
+ *
+ * The request signal is composed with the caller's, so it aborts with the
+ * caller's reason: `AbortSignal.timeout()` gives a `TimeoutError`, and a caller
+ * may pass any reason to `abort()`. Cancellation used to reach `fetch` through
+ * `controller.abort()`, which always produced an `AbortError`, and callers still
+ * classify cancellation that way.
+ *
+ * The test is identity with `signal.reason`, not `signal.aborted`: a read
+ * cancelled through the signal rejects with the signal's own reason object, so
+ * this attributes the failure to the cancellation exactly. A read that failed on
+ * its own is reported unchanged even if an abort landed in the meantime.
+ */
+function asAbortError(error: unknown, signal: AbortSignal): unknown {
+  if (!signal.aborted || error !== signal.reason || isAbortError(error)) return error;
+
+  const message = 'This operation was aborted';
+  const DOMExceptionCtor = (globalThis as any).DOMException;
+  return typeof DOMExceptionCtor === 'function'
+    ? new DOMExceptionCtor(message, 'AbortError')
+    : Object.assign(new Error(message), { name: 'AbortError' });
 }
 
 export type WithRequestID<T> = T extends Array<any> | Response | AbstractPage<any>

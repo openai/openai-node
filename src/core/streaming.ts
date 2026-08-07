@@ -87,7 +87,11 @@ export class Stream<Item> implements AsyncIterable<Item> {
         done = true;
       } catch (e) {
         // If the user calls `stream.controller.abort()`, we should exit without throwing.
-        if (isAbortError(e)) return;
+        // A caller-supplied signal aborts the request with its own reason, which is not
+        // necessarily an AbortError — `AbortSignal.timeout()` gives a TimeoutError. A read
+        // cancelled through the signal rejects with the signal's own reason object, so
+        // identity keeps an unrelated failure that lands after an abort from being swallowed.
+        if (isAbortError(e) || (controller.signal.aborted && e === controller.signal.reason)) return;
         throw e;
       } finally {
         // If the user `break`s, abort the ongoing request.
