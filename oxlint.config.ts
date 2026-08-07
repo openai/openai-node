@@ -32,7 +32,6 @@ const compatibilityRules = [
   'no-empty',
   'no-empty-function',
   'no-eq-null',
-  'no-extend-native',
   'no-fallthrough',
   'no-inline-comments',
   'no-inner-declarations',
