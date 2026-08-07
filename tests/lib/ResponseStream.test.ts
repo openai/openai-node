@@ -2,7 +2,11 @@ import { vi } from 'vitest';
 import OpenAI, { APIUserAbortError } from 'openai';
 import { ReadableStreamFrom } from 'openai/internal/shims';
 import { ResponseStream } from 'openai/lib/responses/ResponseStream';
-import type { Response, ResponseStreamEvent } from 'openai/resources/responses/responses';
+import type {
+  Response,
+  ResponseFunctionToolCall,
+  ResponseStreamEvent,
+} from 'openai/resources/responses/responses';
 import { makeStreamSnapshotRequest } from '../utils/mock-snapshots';
 
 describe('.stream()', () => {
@@ -252,6 +256,56 @@ describe('.stream()', () => {
       expect(final.output[1].content[0]).toMatchObject({ type: 'output_text', text: 'The answer is 42' });
     }
     expect(final.output_text).toBe('The answer is 42');
+  });
+
+  it('rejects with Response error message when finalResponse() is called without producing a response', async () => {
+    const stream = new ResponseStream(null);
+    stream._emit('end');
+    await expect(stream.finalResponse()).rejects.toThrowError('stream ended without producing a Response');
+  });
+
+  it('safely accumulates deltas when properties are uninitialized', async () => {
+    const item = {
+      id: 'call_123',
+      type: 'function_call',
+      call_id: 'call_123',
+      name: 'get_weather',
+      status: 'in_progress',
+    } as ResponseFunctionToolCall;
+    // The reported payload omits `arguments` on the added item, so the first delta
+    // has no string to append to.
+    expect(item.arguments).toBeUndefined();
+
+    const events: ResponseStreamEvent[] = [
+      {
+        type: 'response.created',
+        sequence_number: 0,
+        response: makeResponse(),
+      },
+      {
+        type: 'response.output_item.added',
+        sequence_number: 1,
+        output_index: 0,
+        item,
+      },
+      {
+        type: 'response.function_call_arguments.delta',
+        sequence_number: 2,
+        item_id: 'call_123',
+        output_index: 0,
+        delta: '{"loc',
+      },
+    ];
+
+    const stream = ResponseStream.fromReadableStream(readableStreamFromEvents(events));
+    for await (const _ of stream) {
+    }
+
+    const final = await stream.finalResponse();
+    expect(final.output[0]).toMatchObject({
+      type: 'function_call',
+      arguments: '{"loc',
+    });
   });
 });
 
