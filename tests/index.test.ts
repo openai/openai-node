@@ -323,6 +323,33 @@ describe('instantiate client', () => {
     expect(spy).toHaveBeenCalledTimes(1);
   });
 
+  test('custom signal listener is removed after fetch succeeds', async () => {
+    const client = new OpenAI({
+      apiKey: 'My API Key',
+      adminAPIKey: 'My Admin API Key',
+      fetch: async () =>
+        new Response(JSON.stringify({}), {
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    });
+
+    const callerController = new AbortController();
+    const requestController = new AbortController();
+    const addEventListenerSpy = jest.spyOn(callerController.signal, 'addEventListener');
+    const removeEventListenerSpy = jest.spyOn(callerController.signal, 'removeEventListener');
+
+    await client.fetchWithTimeout(
+      'http://localhost:5000/foo',
+      { signal: callerController.signal },
+      1000,
+      requestController,
+    );
+
+    const abortListener = addEventListenerSpy.mock.calls.find(([event]) => event === 'abort')?.[1];
+    expect(abortListener).toEqual(expect.any(Function));
+    expect(removeEventListenerSpy).toHaveBeenCalledWith('abort', abortListener);
+  });
+
   test('normalized method', async () => {
     let capturedRequest: RequestInit | undefined;
     const testFetch = async (url: string | URL | Request, init: RequestInit = {}): Promise<Response> => {
