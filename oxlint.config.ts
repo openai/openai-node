@@ -25,7 +25,6 @@ const compatibilityRules = [
   'jsdoc/no-defaults',
   'jsdoc/require-param-description',
   'jsdoc/require-returns-description',
-  'jsdoc/require-throws-type',
   'jsdoc/require-yields',
   'jsdoc/require-yields-description',
   'logical-assignment-operators',
