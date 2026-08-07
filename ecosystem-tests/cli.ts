@@ -364,8 +364,8 @@ async function main() {
       const queue = [...projectsToRun];
       const runningProjects = new Set();
 
-      const cursorLeft = '\x1B[G';
-      const eraseLine = '\x1B[2K';
+      const cursorLeft = '\u001B[G';
+      const eraseLine = '\u001B[2K';
 
       let progressDisplayed = false;
       function clearProgress() {
