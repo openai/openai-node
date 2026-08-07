@@ -5,6 +5,7 @@ export { OpenAI as default } from './client';
 export { type Uploadable, toFile, toStreamingFile } from './core/uploads';
 export { APIPromise } from './core/api-promise';
 export { OpenAI, type ClientOptions } from './client';
+export { type RunnerOptions } from './resources/chat/completions';
 export { PagePromise } from './core/pagination';
 export {
   OpenAIError,

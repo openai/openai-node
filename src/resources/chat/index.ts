@@ -44,6 +44,7 @@ export {
   type ChatCompletionCreateParamsStreaming,
   type ChatCompletionUpdateParams,
   type ChatCompletionListParams,
+  type RunnerOptions,
   type ChatCompletionStoreMessagesPage,
   type ChatCompletionsPage,
 } from './completions/index';

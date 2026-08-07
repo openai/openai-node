@@ -233,6 +233,7 @@ import {
   ChatCompletionUpdateParams,
   ChatCompletionUserMessageParam,
   ChatCompletionsPage,
+  RunnerOptions,
 } from './resources/chat/completions/completions';
 import { type Fetch } from './internal/builtin-types';
 import { isRunningInBrowser } from './internal/detect-platform';
@@ -1481,6 +1482,7 @@ export declare namespace OpenAI {
     type ChatCompletionCreateParamsStreaming as ChatCompletionCreateParamsStreaming,
     type ChatCompletionUpdateParams as ChatCompletionUpdateParams,
     type ChatCompletionListParams as ChatCompletionListParams,
+    type RunnerOptions as RunnerOptions,
   };
 
   export {
