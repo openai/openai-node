@@ -26,7 +26,6 @@ const compatibilityRules = [
   'jsdoc/require-param-description',
   'jsdoc/require-returns-description',
   'jsdoc/require-yields',
-  'jsdoc/require-yields-description',
   'logical-assignment-operators',
   'max-classes-per-file',
   'no-await-in-loop',
