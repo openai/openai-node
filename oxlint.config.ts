@@ -144,7 +144,6 @@ const compatibilityRules = [
   'unicorn/prefer-event-target',
   'unicorn/prefer-includes',
   'unicorn/prefer-logical-operator-over-ternary',
-  'unicorn/prefer-math-trunc',
   'unicorn/prefer-module',
   'unicorn/prefer-native-coercion-functions',
   'unicorn/prefer-node-protocol',
