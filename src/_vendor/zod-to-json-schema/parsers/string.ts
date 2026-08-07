@@ -220,6 +220,7 @@ export function parseStringDef(def: ZodStringDef, refs: Refs): JsonSchema7String
         }
         case 'nanoid': {
           addPattern(res, zodPatterns.nanoid, check.message, refs);
+          break;
         }
         case 'toLowerCase':
         case 'toUpperCase':
