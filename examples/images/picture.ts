@@ -10,11 +10,11 @@ const inputImages = process.argv.slice(2);
 /**
  * Run without arguments to generate an image:
  *
- *   ./examples/picture.ts
+ *   ./examples/images/picture.ts
  *
  * Pass one or more PNG, JPEG, or WebP files to create an edited image:
  *
- *   ./examples/picture.ts image-1.png image-2.png
+ *   ./examples/images/picture.ts image-1.png image-2.png
  */
 async function main() {
   if (inputImages.length === 0) {
