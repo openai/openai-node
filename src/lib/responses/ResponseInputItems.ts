@@ -37,6 +37,10 @@ export function toResponseInputItems(items: Iterable<ResponseInputItemLike>): Re
  * @throws {TypeError} If the item type is not supported by the installed SDK.
  */
 export function toResponseInputItem(item: ResponseInputItemLike): ResponseInputItem | null {
+  if (!item || typeof item !== 'object') {
+    return null;
+  }
+
   switch (item.type) {
     case 'additional_tools': {
       if (item.role !== 'developer') {
@@ -102,10 +106,13 @@ export function toResponseInputItem(item: ResponseInputItemLike): ResponseInputI
     case 'shell_call':
     case 'tool_search_call':
     case 'tool_search_output':
-    case 'web_search_call':
+    case 'web_search_call': {
+      return stripCreatedBy(item) as ResponseInputItem;
+    }
+
     case null:
     case undefined: {
-      return stripCreatedBy(item) as ResponseInputItem;
+      return null;
     }
 
     default: {
@@ -115,7 +122,7 @@ export function toResponseInputItem(item: ResponseInputItemLike): ResponseInputI
 }
 
 function stripCreatedBy<T extends object>(item: T): T {
-  if (!('created_by' in item)) {
+  if (!item || typeof item !== 'object' || !('created_by' in item)) {
     return item;
   }
 

@@ -270,4 +270,15 @@ describe('toResponseInputItems', () => {
       toResponseInputItem({ type: 'future_response_item' } as unknown as ResponseOutputItem),
     ).toThrow('Unsupported response item type: future_response_item');
   });
+
+  test('safely handles nullish, non-object, and nullish-type items', () => {
+    expect(toResponseInputItem(null as any)).toBeNull();
+    expect(toResponseInputItem(undefined as any)).toBeNull();
+    expect(toResponseInputItem(123 as any)).toBeNull();
+    expect(toResponseInputItem('string' as any)).toBeNull();
+    expect(toResponseInputItem({ type: null } as any)).toBeNull();
+    expect(toResponseInputItem({ type: undefined } as any)).toBeNull();
+
+    expect(toResponseInputItems([null as any, undefined as any, { type: null } as any])).toEqual([]);
+  });
 });
