@@ -130,7 +130,6 @@ const compatibilityRules = [
   'unicorn/prefer-module',
   'unicorn/prefer-node-protocol',
   'unicorn/prefer-number-properties',
-  'unicorn/prefer-object-from-entries',
   'unicorn/prefer-optional-catch-binding',
   'unicorn/prefer-query-selector',
   'unicorn/prefer-regexp-test',
