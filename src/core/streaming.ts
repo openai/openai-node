@@ -277,6 +277,8 @@ export async function* _iterSSEMessages(
 /**
  * Given an async iterable iterator, iterates over it and yields full
  * SSE chunks, i.e. yields when a double new-line is encountered.
+ *
+ * @yields {Uint8Array} A complete SSE chunk.
  */
 async function* iterSSEChunks(iterator: AsyncIterableIterator<Bytes>): AsyncGenerator<Uint8Array> {
   let data = new Uint8Array();
