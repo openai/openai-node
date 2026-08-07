@@ -91,7 +91,6 @@ const compatibilityRules = [
   'typescript/parameter-properties',
   'typescript/prefer-for-of',
   'typescript/prefer-ts-expect-error',
-  'typescript/unified-signatures',
   'unicorn/catch-error-name',
   'unicorn/consistent-assert',
   'unicorn/consistent-existence-index-check',
