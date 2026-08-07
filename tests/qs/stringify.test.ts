@@ -1655,7 +1655,7 @@ describe('stringify()', function () {
 
     var mutatedDate = new Date();
     mutatedDate.toISOString = function () {
-      throw new SyntaxError();
+      throw new SyntaxError('Invalid date serialization');
     };
     // st['throws'](function () {
     // 	mutatedDate.toISOString();

@@ -23,16 +23,14 @@ export function parseRecordDef(
     return {
       type: 'object',
       required: def.keyType._def.values,
-      properties: def.keyType._def.values.reduce(
-        (acc: Record<string, JsonSchema7Type>, key: string) => ({
-          ...acc,
-          [key]:
-            parseDef(def.valueType._def, {
-              ...refs,
-              currentPath: [...refs.currentPath, 'properties', key],
-            }) ?? {},
-        }),
-        {},
+      properties: Object.fromEntries(
+        def.keyType._def.values.map((key: string) => [
+          key,
+          parseDef(def.valueType._def, {
+            ...refs,
+            currentPath: [...refs.currentPath, 'properties', key],
+          }) ?? {},
+        ]),
       ),
       additionalProperties: false,
     } satisfies JsonSchema7ObjectType as any;
