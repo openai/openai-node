@@ -38,8 +38,8 @@ describe('path template tag function', () => {
 
     const emptyObject = {};
     const mathObject = Math;
-    const numberObject = new Number();
-    const stringObject = new String();
+    const numberObject = Object(0);
+    const stringObject = Object('');
     const basicClass = new (class {
       readonly kind = 'class';
     })();
