@@ -24,6 +24,9 @@ if [ ! -f "$FILE_LIST" ]; then
     exit 1
 fi
 
+echo "==> Fixing generated lint issues"
+node ./scripts/lint-generated.cjs --fix --file-list "$FILE_LIST"
+
 echo "==> Running oxlint --fix"
 LINT_FILES="$(grep -E '\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$' "$FILE_LIST" || true)"
 if [ -n "$LINT_FILES" ]; then
