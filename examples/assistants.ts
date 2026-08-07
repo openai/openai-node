@@ -21,7 +21,7 @@ async function main() {
     // tools = [],
   });
 
-  let assistantId = assistant.id;
+  const assistantId = assistant.id;
   console.log('Created Assistant with Id: ' + assistantId);
 
   const thread = await openai.beta.threads.create({
@@ -33,7 +33,7 @@ async function main() {
     ],
   });
 
-  let threadId = thread.id;
+  const threadId = thread.id;
   console.log('Created thread with Id: ' + threadId);
 
   const run = await openai.beta.threads.runs.createAndPoll(thread.id, {

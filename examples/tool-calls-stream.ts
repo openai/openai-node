@@ -125,7 +125,7 @@ async function main() {
     // We implement this logic in messageReducer, which coalesces deltas into the message.
     // `lineRewriter()` allows us to rewrite the last output with new text, which is one
     // way of forwarding the streamed output to a visual interface.
-    let writeLine = lineRewriter();
+    const writeLine = lineRewriter();
     let message = {} as ChatCompletionMessage;
     for await (const chunk of stream) {
       message = messageReducer(message, chunk);

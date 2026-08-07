@@ -37,7 +37,7 @@ import puppeteer from 'puppeteer';
 
     await page.waitForSelector('#running', { timeout: 15000 });
 
-    let start = Date.now();
+    const start = Date.now();
     while ((await page.$('#running')) != null && Date.now() - start < 3 * 60000) {
       await new Promise((r) => setTimeout(r, 1000));
     }

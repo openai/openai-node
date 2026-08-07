@@ -286,7 +286,7 @@ export class AssistantStream
 
   async finalRun(): Promise<Run> {
     await this.done();
-    if (!this.#finalRun) throw Error('Final run was not received.');
+    if (!this.#finalRun) throw new Error('Final run was not received.');
 
     return this.#finalRun;
   }
@@ -394,7 +394,7 @@ export class AssistantStream
       throw new OpenAIError(`stream has ended, this shouldn't happen`);
     }
 
-    if (!this.#finalRun) throw Error('Final run has not been received');
+    if (!this.#finalRun) throw new Error('Final run has not been received');
 
     return this.#finalRun;
   }
@@ -426,12 +426,12 @@ export class AssistantStream
           for (const content of event.data.delta.content) {
             //If it is text delta, emit a text delta event
             if (content.type == 'text' && content.text) {
-              let textDelta = content.text;
-              let snapshot = accumulatedMessage.content[content.index];
+              const textDelta = content.text;
+              const snapshot = accumulatedMessage.content[content.index];
               if (snapshot && snapshot.type == 'text') {
                 this._emit('textDelta', textDelta, snapshot.text);
               } else {
-                throw Error('The snapshot associated with this text delta is not text or missing');
+                throw new Error('The snapshot associated with this text delta is not text or missing');
               }
             }
 
@@ -550,12 +550,12 @@ export class AssistantStream
         return event.data;
 
       case 'thread.run.step.delta':
-        let snapshot = this.#runStepSnapshots[event.data.id] as Runs.RunStep;
+        const snapshot = this.#runStepSnapshots[event.data.id] as Runs.RunStep;
         if (!snapshot) {
-          throw Error('Received a RunStepDelta before creation of a snapshot');
+          throw new Error('Received a RunStepDelta before creation of a snapshot');
         }
 
-        let data = event.data;
+        const data = event.data;
 
         if (data.delta) {
           const accumulated = AssistantStream.accumulateDelta(snapshot, data.delta) as Runs.RunStep;
@@ -581,7 +581,7 @@ export class AssistantStream
     event: AssistantStreamEvent,
     snapshot: Message | undefined,
   ): [Message, MessageContentDelta[]] {
-    let newContent: MessageContentDelta[] = [];
+    const newContent: MessageContentDelta[] = [];
 
     switch (event.event) {
       case 'thread.message.created':
@@ -590,18 +590,18 @@ export class AssistantStream
 
       case 'thread.message.delta':
         if (!snapshot) {
-          throw Error(
+          throw new Error(
             'Received a delta with no existing snapshot (there should be one from message creation)',
           );
         }
 
-        let data = event.data;
+        const data = event.data;
 
         //If this delta does not have content, nothing to process
         if (data.delta.content) {
           for (const contentElement of data.delta.content) {
             if (contentElement.index in snapshot.content) {
-              let currentContent = snapshot.content[contentElement.index];
+              const currentContent = snapshot.content[contentElement.index];
               snapshot.content[contentElement.index] = this.#accumulateContent(
                 contentElement,
                 currentContent,
@@ -623,10 +623,10 @@ export class AssistantStream
         if (snapshot) {
           return [snapshot, newContent];
         } else {
-          throw Error('Received thread message event with no existing snapshot');
+          throw new Error('Received thread message event with no existing snapshot');
         }
     }
-    throw Error('Tried to accumulate a non-message event');
+    throw new Error('Tried to accumulate a non-message event');
   }
 
   #accumulateContent(
@@ -640,7 +640,7 @@ export class AssistantStream
 
   static accumulateDelta(acc: Record<string, any>, delta: Record<string, any>): Record<string, any> {
     for (const [key, deltaValue] of Object.entries(delta)) {
-      if (!acc.hasOwnProperty(key)) {
+      if (!Object.prototype.hasOwnProperty.call(acc, key)) {
         acc[key] = deltaValue;
         continue;
       }
@@ -694,7 +694,7 @@ export class AssistantStream
         }
         continue;
       } else {
-        throw Error(`Unhandled record type: ${key}, deltaValue: ${deltaValue}, accValue: ${accValue}`);
+        throw new Error(`Unhandled record type: ${key}, deltaValue: ${deltaValue}, accValue: ${accValue}`);
       }
       acc[key] = accValue;
     }

@@ -755,8 +755,7 @@ describe.each([
     });
 
     it('preserves intentional recursion through lazy types', () => {
-      let recursive: zv3.ZodTypeAny;
-      recursive = z.lazy(() =>
+      const recursive: zv3.ZodTypeAny = z.lazy(() =>
         z.object({
           value: z.string(),
           children: z.array(recursive),

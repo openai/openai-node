@@ -1,7 +1,6 @@
 const requireConfig = require('node:module').createRequire(__filename);
 const { defineConfig } = requireConfig('oxfmt');
 const ultracite = requireConfig('ultracite/oxfmt').default;
-const stainlessGeneratedFiles = requireConfig('./scripts/stainless-generated-files.cjs');
 
 module.exports = defineConfig({
   ...ultracite,
@@ -22,6 +21,5 @@ module.exports = defineConfig({
     'api_reference/openapi.transformed.yml',
     'dist/**',
     'coverage/**',
-    ...stainlessGeneratedFiles,
   ],
 });

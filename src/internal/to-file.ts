@@ -1,6 +1,5 @@
-import { BlobPart, getName, makeFile, isAsyncIterable } from './uploads';
+import { BlobPart, getName, makeFile, isAsyncIterable, checkFileSupport } from './uploads';
 import type { FilePropertyBag } from './builtin-types';
-import { checkFileSupport } from './uploads';
 
 type BlobLikePart = string | ArrayBuffer | ArrayBufferView | BlobLike | DataView;
 
@@ -120,7 +119,7 @@ export async function toFile(
 }
 
 async function getBytes(value: BlobLikePart | AsyncIterable<BlobLikePart>): Promise<Array<BlobPart>> {
-  let parts: Array<BlobPart> = [];
+  const parts: Array<BlobPart> = [];
   if (
     typeof value === 'string' ||
     ArrayBuffer.isView(value) || // includes Uint8Array, Buffer, etc.

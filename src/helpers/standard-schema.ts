@@ -315,7 +315,7 @@ function areMutuallyExclusive(left: unknown, right: unknown, root: JSONSchema): 
 function resolveLocalRefForExclusivity(
   schema: unknown,
   root: JSONSchema,
-  seenRefs: Set<string> = new Set(),
+  seenRefs = new Set<string>(),
 ): unknown | undefined {
   if (!schema || typeof schema !== 'object' || Array.isArray(schema)) return schema;
 

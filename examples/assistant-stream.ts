@@ -20,7 +20,7 @@ async function main() {
     instructions: 'You are a personal math tutor. Write and run code to answer math questions.',
   });
 
-  let assistantId = assistant.id;
+  const assistantId = assistant.id;
   console.log('Created Assistant with Id: ' + assistantId);
 
   const thread = await openai.beta.threads.create({
@@ -32,7 +32,7 @@ async function main() {
     ],
   });
 
-  let threadId = thread.id;
+  const threadId = thread.id;
   console.log('Created thread with Id: ' + threadId);
 
   const run = openai.beta.threads.runs
