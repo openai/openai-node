@@ -101,7 +101,6 @@ const compatibilityRules = [
   'unicorn/consistent-existence-index-check',
   'unicorn/consistent-function-scoping',
   'unicorn/custom-error-definition',
-  'unicorn/error-message',
   'unicorn/filename-case',
   'unicorn/import-style',
   'unicorn/new-for-builtins',
