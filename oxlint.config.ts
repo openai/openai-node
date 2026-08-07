@@ -115,7 +115,6 @@ const compatibilityRules = [
   'unicorn/no-lonely-if',
   'unicorn/no-negated-condition',
   'unicorn/no-nested-ternary',
-  'unicorn/no-object-as-default-parameter',
   'unicorn/no-thenable',
   'unicorn/no-this-assignment',
   'unicorn/no-typeof-undefined',
