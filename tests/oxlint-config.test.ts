@@ -140,7 +140,7 @@ test('removes adjacent unused imports from generated files until fixes stabilize
 
       const fixed = spawnSync(
         process.execPath,
-        [join(repoRoot, 'scripts/fix-generated-imports.cjs'), generatedPath, handwrittenPath],
+        [join(repoRoot, 'scripts/lint-generated.cjs'), '--fix', generatedPath, handwrittenPath],
         { cwd: repoRoot, encoding: 'utf8' },
       );
 
@@ -175,7 +175,7 @@ test('limits generated import cleanup to paths supplied through a fast-format fi
 
     const fixed = spawnSync(
       process.execPath,
-      [join(repoRoot, 'scripts/fix-generated-imports.cjs'), '--file-list', fileList],
+      [join(repoRoot, 'scripts/lint-generated.cjs'), '--fix', '--file-list', fileList],
       { cwd: repoRoot, encoding: 'utf8' },
     );
 
@@ -184,5 +184,100 @@ test('limits generated import cleanup to paths supplied through a fast-format fi
     expect(readFileSync(untouchedPath, 'utf8')).toBe(source);
   } finally {
     rmSync(fixtureRoot, { recursive: true, force: true });
+  }
+});
+
+test('checks unused generated imports without rejecting intentionally unused variables', () => {
+  const fixtureRoot = mkdtempSync(join(repoRoot, '.oxlint-generated-check-'));
+
+  try {
+    const generatedPath = join(fixtureRoot, 'generated.ts');
+    const source = [
+      '// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.',
+      "import { Unused } from './dependency';",
+      'const intentionallyUnused = 1;',
+      'export interface Result<T> { value: string; }',
+      '',
+    ].join('\n');
+    writeFileSync(generatedPath, source);
+
+    const checked = spawnSync(
+      process.execPath,
+      [join(repoRoot, 'scripts/lint-generated.cjs'), '--check', generatedPath],
+      { cwd: repoRoot, encoding: 'utf8' },
+    );
+
+    expect(checked.status).toBe(1);
+    expect(checked.stderr).toContain("Identifier 'Unused' is imported but never used.");
+    expect(checked.stderr).not.toContain('intentionallyUnused');
+    expect(checked.stderr).not.toContain("Variable 'T'");
+    expect(readFileSync(generatedPath, 'utf8')).toBe(source);
+
+    const fixed = spawnSync(
+      process.execPath,
+      [join(repoRoot, 'scripts/lint-generated.cjs'), '--fix', generatedPath],
+      { cwd: repoRoot, encoding: 'utf8' },
+    );
+
+    expect(fixed.status).toBe(0);
+    expect(readFileSync(generatedPath, 'utf8')).toContain('const intentionallyUnused = 1;');
+
+    const rechecked = spawnSync(
+      process.execPath,
+      [join(repoRoot, 'scripts/lint-generated.cjs'), '--check', generatedPath],
+      { cwd: repoRoot, encoding: 'utf8' },
+    );
+
+    expect(rechecked.status).toBe(0);
+    expect(rechecked.stderr).toBe('');
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
+});
+
+test('rejects SDK package imports in generated source but allows them in generated tests', () => {
+  const sourceRoot = mkdtempSync(join(repoRoot, 'src', '.oxlint-generated-source-'));
+  const testsRoot = mkdtempSync(join(repoRoot, 'tests', '.oxlint-generated-tests-'));
+
+  try {
+    const header = '// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.';
+    const sourcePath = join(sourceRoot, 'client.ts');
+    const testPath = join(testsRoot, 'client.test.ts');
+    const source = `${header}\nimport OpenAI from 'openai';\nexport const client = OpenAI;\n`;
+    writeFileSync(sourcePath, source);
+    writeFileSync(testPath, source);
+
+    const checkedSource = spawnSync(
+      process.execPath,
+      [join(repoRoot, 'scripts/lint-generated.cjs'), '--check', sourcePath],
+      { cwd: repoRoot, encoding: 'utf8' },
+    );
+
+    expect(checkedSource.status).toBe(1);
+    expect(checkedSource.stderr).toContain('Use a relative import, not a package import.');
+    expect(readFileSync(sourcePath, 'utf8')).toBe(source);
+
+    const fixedSource = spawnSync(
+      process.execPath,
+      [join(repoRoot, 'scripts/lint-generated.cjs'), '--fix', sourcePath],
+      { cwd: repoRoot, encoding: 'utf8' },
+    );
+
+    expect(fixedSource.status).toBe(1);
+    expect(readFileSync(sourcePath, 'utf8')).toBe(source);
+
+    for (const mode of ['--check', '--fix']) {
+      const generatedTest = spawnSync(
+        process.execPath,
+        [join(repoRoot, 'scripts/lint-generated.cjs'), mode, testPath],
+        { cwd: repoRoot, encoding: 'utf8' },
+      );
+
+      expect(generatedTest.status).toBe(0);
+      expect(readFileSync(testPath, 'utf8')).toBe(source);
+    }
+  } finally {
+    rmSync(sourceRoot, { recursive: true, force: true });
+    rmSync(testsRoot, { recursive: true, force: true });
   }
 });

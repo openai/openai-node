@@ -144,23 +144,36 @@ This repository uses [Ultracite](https://www.ultracite.ai/) with
 [Oxfmt](https://oxc.rs/docs/guide/usage/formatter.html) and
 [Oxlint](https://oxc.rs/docs/guide/usage/linter.html) to format and lint its code.
 The Ultracite presets live in `oxfmt.config.ts` and `oxlint.config.ts`, with
-repository-specific formatting options, import rules, fixture exceptions, and
-generated-file lint exclusions layered on top. Files with a Stainless- or
-Castiron-generated header are formatted and cleaned of unused imports but excluded from
-other lint rules; handwritten files in the same directories remain checked. Existing handwritten patterns are explicitly
-exempted from incompatible Ultracite rules, while the remaining preset rules stay
-enabled.
+repository-specific formatting options, import rules, and fixture exceptions
+layered on top. Files with a Stainless- or Castiron-generated header use the
+separate `oxlint.generated.config.json` configuration, which checks unused
+imports and rejects SDK package imports outside tests; handwritten files in the
+same directories retain the stricter Ultracite rules. Existing handwritten
+patterns are explicitly exempted from incompatible Ultracite rules, while the
+remaining preset rules stay enabled.
 
-To check formatting and lint rules:
+To check formatting and handwritten lint rules:
 
 ```sh
 $ pnpm lint
 ```
 
-To format and fix all lint issues automatically:
+The canonical CI entrypoint also checks generated imports:
+
+```sh
+$ ./scripts/lint
+```
+
+To format and fix handwritten lint issues automatically:
 
 ```sh
 $ pnpm format
+```
+
+The generator's formatter also fixes unused generated imports:
+
+```sh
+$ ./scripts/format
 ```
 
 Install the recommended Oxc VS Code extension to enable the checked-in

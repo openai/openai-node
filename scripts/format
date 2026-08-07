@@ -4,6 +4,6 @@ set -e
 
 cd "$(dirname "$0")/.."
 
-node ./scripts/fix-generated-imports.cjs
+node ./scripts/lint-generated.cjs --fix
 
 PATH="$PWD/node_modules/.bin:$PATH" exec ./node_modules/.bin/ultracite fix
