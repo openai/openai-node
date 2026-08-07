@@ -151,12 +151,10 @@ export function buildRealtimeURL(
       url.searchParams.set('api-version', client.apiVersion);
       url.searchParams.set('deployment', config.model!);
     }
+  } else if (hasCallID) {
+    url.searchParams.set('call_id', config.callID!);
   } else {
-    if (hasCallID) {
-      url.searchParams.set('call_id', config.callID!);
-    } else {
-      url.searchParams.set('model', config.model!);
-    }
+    url.searchParams.set('model', config.model!);
   }
   return url;
 }
