@@ -20,7 +20,7 @@ async function runTests() {
     if (!pre) {
       pre = document.createElement('pre');
       pre.id = 'results';
-      document.body.appendChild(pre);
+      document.body.append(pre);
     }
     pre.innerText = JSON.stringify(results, null, 2);
   }
