@@ -18,7 +18,6 @@ const compatibilityRules = [
   'guard-for-in',
   'import/consistent-type-specifier-style',
   'import/first',
-  'import/namespace',
   'import/newline-after-import',
   'import/no-cycle',
   'import/no-mutable-exports',
