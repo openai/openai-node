@@ -265,7 +265,7 @@ async function main() {
       args.skip[idx] = (projectName + '').toLowerCase();
     });
 
-    projectNames = projectNames.filter((projectName) => (args.skip as string[]).indexOf(projectName) < 0);
+    projectNames = projectNames.filter((projectName) => !(args.skip as string[]).includes(projectName));
 
     args.skip.forEach((projectName) => {
       projectNamesSet.delete(projectName as any);
