@@ -27,7 +27,7 @@ The `purpose` must match the intended API workflow. Available values include
 `fine-tune`, `batch`, `assistants`, `vision`, `user_data`, and `evals`.
 
 For a complete runnable workflow, see the
-[fine-tuning example](../examples/fine-tuning.ts).
+[fine-tuning example](../examples/fine-tuning/fine-tuning.ts).
 
 ## Upload a web File or fetch Response
 
@@ -83,7 +83,7 @@ MIME type.
 Creating a `File` consumes stream inputs completely, so `toFile` buffers their
 contents in memory. Existing `File` instances are returned without copying.
 
-See the [audio example](../examples/audio.ts) for uploads constructed from
+See the [audio example](../examples/audio/audio.ts) for uploads constructed from
 in-memory audio data.
 
 ## Stream a file with `toStreamingFile`

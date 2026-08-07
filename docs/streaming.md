@@ -228,8 +228,8 @@ console.log(final.output_text);
 
 `ResponseStream.fromReadableStream()` expects newline-separated JSON, not the API's original SSE wire format. For an
 Express server, write each text delta directly or forward the encoded readable stream; see the
-[raw proxy example](../examples/stream-to-client-raw.ts) and
-[Express proxy example](../examples/stream-to-client-express.ts).
+[raw proxy example](../examples/chat-completions/stream-to-client-raw.ts) and
+[Express proxy example](../examples/chat-completions/stream-to-client-express.ts).
 
 ## Related guides
 

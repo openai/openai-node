@@ -21,7 +21,7 @@ export const runtime = 'edge';
 //     const runner = ChatCompletionStreamingRunner.fromReadableStream(res)
 //   })
 //
-// See examples/stream-to-client-browser.ts for a more complete example.
+// See examples/chat-completions/stream-to-client-browser.ts for a more complete example.
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const openai = new OpenAI();
 

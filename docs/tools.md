@@ -218,7 +218,7 @@ Completions, and continues until the model produces a final answer. Tool calls r
 concurrently by default; set `parallel_tool_calls: false` to request sequential execution.
 
 See the [automated function calls documentation](helpers.md#automated-function-calls) and the complete
-[Zod tool runner example](../examples/tool-call-helpers-zod.ts).
+[Zod tool runner example](../examples/chat-completions/tool-call-helpers-zod.ts).
 
 ## Realtime function tools
 

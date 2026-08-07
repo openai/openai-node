@@ -41,16 +41,16 @@ modify the contents of the `src/lib/` and `examples/` directories.
 All files in the `examples/` directory are not modified by the generator and can be freely edited or added to.
 
 ```ts
-// add an example to examples/<your-example>.ts
+// add an example to examples/<category>/<your-example>.ts
 
 #!/usr/bin/env -S npm run tsn -- -T
 …
 ```
 
 ```sh
-$ chmod +x examples/<your-example>.ts
+$ chmod +x examples/<category>/<your-example>.ts
 # run the example against your api
-$ npm run tsn -- -T examples/<your-example>.ts
+$ npm run tsn -- -T examples/<category>/<your-example>.ts
 ```
 
 ## Using the repository from source

@@ -25,7 +25,7 @@ app.use(express.text());
 //     const runner = ChatCompletionStreamingRunner.fromReadableStream(res)
 //   })
 //
-// See examples/stream-to-client-browser.ts for a more complete example.
+// See examples/chat-completions/stream-to-client-browser.ts for a more complete example.
 app.post('/', async (req: Request, res: Response) => {
   try {
     console.log('Received request:', req.body);
