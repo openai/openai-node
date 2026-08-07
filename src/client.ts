@@ -794,7 +794,9 @@ export class OpenAI {
     }
 
     const security = options.__security ?? { bearerAuth: true };
-    const controller = new AbortController();
+    // `req.signal`, not `options.signal`: `prepareRequest` hooks run above and may
+    // have replaced it, and that replacement is what reaches `fetch`.
+    const controller = createRequestController(req.signal);
     const response = await this.fetchWithAuth(url, req, timeout, controller, security).catch(castToError);
     const headersTime = Date.now();
 
@@ -1008,7 +1010,14 @@ export class OpenAI {
   ): Promise<Response> {
     const { signal, method, ...options } = init || {};
     const abort = this._makeAbort(controller);
-    if (signal) signal.addEventListener('abort', abort, { once: true });
+    // A controller from `createRequestController` already aborts with the
+    // caller's signal. Anything else — a caller of this public method with its
+    // own controller — still needs the abort forwarded, which costs a listener
+    // (#1811).
+    const composed = !!signal && composedCallerSignals.get(controller) === signal;
+    if (signal && !composed) {
+      signal.addEventListener('abort', abort, { once: true });
+    }
 
     const timeout = setTimeout(abort, ms);
 
@@ -1031,6 +1040,9 @@ export class OpenAI {
     try {
       // use undefined this binding; fetch errors if bound to something else in browser/cloudflare
       return await this.fetch.call(undefined, url, fetchOptions);
+    } catch (err) {
+      if (signal && !composed) signal.removeEventListener('abort', abort);
+      throw err;
     } finally {
       clearTimeout(timeout);
     }
@@ -1371,6 +1383,63 @@ OpenAI.Evals = Evals;
 OpenAI.Containers = Containers;
 OpenAI.Skills = Skills;
 OpenAI.Videos = Videos;
+
+/** Caller signal each request controller was composed with, if any. */
+const composedCallerSignals = new WeakMap<AbortController, AbortSignal>();
+
+/**
+ * Create the controller for a request, aborting with `callerSignal` as well as
+ * on its own.
+ *
+ * `AbortSignal.any` records its result as a dependent of the source signals
+ * instead of registering a listener on them, which is the property that matters
+ * here: anything that listens to the caller's signal has to outlive the request
+ * (`fetch` resolves when headers arrive, so detaching there would cut off
+ * mid-stream aborts), and Deno keeps an `AbortSignal.timeout()` timer referenced
+ * for as long as its signal is listened to — including through a signal composed
+ * from it (#1811).
+ *
+ * The composed signal becomes `controller.signal` rather than being handed to
+ * `fetch` on its own, so the controller stays the single record of whether a
+ * request was cancelled. Both readers of a response body rely on that: `Stream`
+ * tells cancellation apart from failure with it, and `defaultParseResponse`
+ * reports a cancelled read as an `AbortError` — a composed signal aborts with
+ * the caller's reason, which is not necessarily an `AbortError`. The swap
+ * happens here, before the controller is handed to anything, so no other holder
+ * of `controller.signal` can be left watching a signal that never aborts.
+ *
+ * A body the caller owns — `.asResponse()`, `.withResponse()`, binary responses —
+ * is read outside the SDK, so its rejection carries the caller's reason as is:
+ * `AbortSignal.timeout()` surfaces a `TimeoutError` where cancellation used to be
+ * flattened to an `AbortError`. That matches what `fetch` gives a caller for the
+ * same signal, and normalising it would mean wrapping bodies the SDK never reads.
+ *
+ * Composition is skipped when the runtime predates `AbortSignal.any` (Deno <
+ * 1.38.2, Safari < 17.4; every Node.js release this package supports has it), or
+ * when the caller's signal is polyfilled or from another realm — `AbortSignal.any`
+ * ignores those rather than rejecting them, which would silently drop the
+ * caller's abort. Those requests fall back to forwarding with a listener, and on
+ * the affected Deno versions they keep hanging: nothing can watch a caller's
+ * signal without listening to it, and detaching before the body ends would cut
+ * off mid-stream aborts.
+ */
+function createRequestController(callerSignal: AbortSignal | null | undefined): AbortController {
+  const controller = new AbortController();
+  if (!callerSignal) return controller;
+
+  const nativeAbortSignal = (globalThis as any).AbortSignal;
+  if (typeof nativeAbortSignal?.any !== 'function' || !(callerSignal instanceof nativeAbortSignal)) {
+    return controller;
+  }
+  try {
+    const composed = nativeAbortSignal.any([controller.signal, callerSignal]) as AbortSignal;
+    Object.defineProperty(controller, 'signal', { value: composed, configurable: true });
+    composedCallerSignals.set(controller, callerSignal);
+  } catch {
+    // Leave the controller alone; the caller's abort is forwarded instead.
+  }
+  return controller;
+}
 
 function getConnectionErrorMessage(error: Error): string | undefined {
   if (isUndiciDispatcherVersionMismatchError(error)) {
