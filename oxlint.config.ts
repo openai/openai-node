@@ -83,7 +83,6 @@ const compatibilityRules = [
   'typescript/consistent-type-imports',
   'typescript/method-signature-style',
   'typescript/no-dynamic-delete',
-  'typescript/no-empty-interface',
   'typescript/no-empty-object-type',
   'typescript/no-explicit-any',
   'typescript/no-extraneous-class',
