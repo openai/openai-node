@@ -136,7 +136,6 @@ const compatibilityRules = [
   'unicorn/switch-case-braces',
   'unicorn/text-encoding-identifier-case',
   'vars-on-top',
-  'yoda',
 ];
 
 module.exports = defineConfig({
