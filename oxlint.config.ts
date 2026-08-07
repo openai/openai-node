@@ -112,7 +112,6 @@ const compatibilityRules = [
   'unicorn/no-await-expression-member',
   'unicorn/no-console-spaces',
   'unicorn/no-hex-escape',
-  'unicorn/no-immediate-mutation',
   'unicorn/no-lonely-if',
   'unicorn/no-negated-condition',
   'unicorn/no-nested-ternary',
