@@ -2,6 +2,8 @@ const pkgJson = require(process.env['PKG_JSON_PATH'] || '../../package.json');
 
 function processExportMap(m) {
   for (const key in m) {
+    if (!Object.hasOwn(m, key)) continue;
+
     const value = m[key];
     if (typeof value === 'string') m[key] = value.replace(/^\.\/dist\//, './');
     else processExportMap(value);

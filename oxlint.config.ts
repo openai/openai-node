@@ -14,7 +14,6 @@ const compatibilityRules = [
   'func-name-matching',
   'func-names',
   'func-style',
-  'guard-for-in',
   'import/consistent-type-specifier-style',
   'import/first',
   'import/newline-after-import',
