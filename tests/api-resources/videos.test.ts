@@ -1,6 +1,12 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import OpenAI, { toFile } from 'openai';
+import type { VideoSize } from '../../src/resources/videos';
+
+const expectType = <T>(_value: T): void => {};
+
+expectType<VideoSize>('1920x1080');
+expectType<VideoSize>('1080x1920');
 
 const client = new OpenAI({
   apiKey: 'My API Key',
