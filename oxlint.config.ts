@@ -127,7 +127,6 @@ const compatibilityRules = [
   'unicorn/prefer-dom-node-text-content',
   'unicorn/prefer-event-target',
   'unicorn/prefer-includes',
-  'unicorn/prefer-logical-operator-over-ternary',
   'unicorn/prefer-module',
   'unicorn/prefer-native-coercion-functions',
   'unicorn/prefer-node-protocol',
