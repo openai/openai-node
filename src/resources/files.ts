@@ -120,7 +120,7 @@ export class Files extends APIResource {
 
 export type FileObjectsPage = CursorPage<FileObject>;
 
-export type FileContent = string;
+export type FileContent = Response;
 
 export interface FileDeleted {
   id: string;
