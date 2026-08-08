@@ -69,6 +69,52 @@ describe('resource embeddings', () => {
 
     expect(typeof response.data?.[0]?.embedding).toBe('string');
   });
+
+  test('create: should handle OpenAI-compatible endpoints that return float arrays despite base64 request', async () => {
+    const { fetch, handleRequest } = mockFetch();
+
+    // Simulate ollama/LM Studio behavior: ignore encoding_format and return float array
+    handleRequest(async (_, init) => {
+      const floatArray = Array.from({ length: 1024 }, (_, i) => i * 0.01);
+      return new Response(
+        JSON.stringify({
+          object: 'list',
+          data: [
+            {
+              object: 'embedding',
+              index: 0,
+              embedding: floatArray,
+            },
+          ],
+          model: 'snowflake-arctic-embed-l-v2.0',
+          usage: { prompt_tokens: 1, total_tokens: 1 },
+        }),
+        {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+    });
+
+    const client = new OpenAI({
+      fetch,
+      apiKey: 'My API Key',
+      baseURL: 'http://localhost:11434',
+    });
+
+    const response = await client.embeddings.create({
+      input: 'test',
+      model: 'snowflake-arctic-embed-l-v2.0',
+    });
+
+    // Should preserve all 1024 dimensions, not truncate to 256
+    expect(Array.isArray(response.data?.[0]?.embedding)).toBe(true);
+    expect(response.data?.[0]?.embedding.length).toBe(1024);
+    expect(response.data?.[0]?.embedding[0]).toBe(0);
+    expect(response.data?.[0]?.embedding[1]).toBe(0.01);
+  });
 });
 
 function makeClient(): OpenAI {

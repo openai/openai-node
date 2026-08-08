@@ -57,7 +57,16 @@ export class Embeddings extends APIResource {
       if (response && response.data) {
         response.data.forEach((embeddingBase64Obj) => {
           const embeddingBase64Str = embeddingBase64Obj.embedding as unknown as string;
-          embeddingBase64Obj.embedding = toFloat32Array(embeddingBase64Str);
+          // Some OpenAI-compatible endpoints (e.g., ollama, LM Studio) ignore the encoding_format
+          // parameter and always return float arrays. Check if the embedding is already an array
+          // before attempting base64 decoding.
+          if (Array.isArray(embeddingBase64Str)) {
+            // Already a float array, no decoding needed
+            embeddingBase64Obj.embedding = embeddingBase64Str;
+          } else {
+            // Base64 string, decode it
+            embeddingBase64Obj.embedding = toFloat32Array(embeddingBase64Str);
+          }
         });
       }
 
