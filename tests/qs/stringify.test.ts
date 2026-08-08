@@ -35,7 +35,7 @@ describe('stringify()', function () {
   });
 
   test('stringifies bigints', function () {
-    var three = BigInt(3);
+    var three = 3n;
     // @ts-expect-error
     var encodeWithN = function (value, defaultEncoder, charset) {
       var result = defaultEncoder(value, defaultEncoder, charset);

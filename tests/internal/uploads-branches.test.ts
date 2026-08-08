@@ -127,7 +127,7 @@ describe('buffered multipart forms', () => {
 
   test('rejects null and unsupported primitive values', async () => {
     await expect(createForm({ value: null }, fetch)).rejects.toThrow('Received null for "value"');
-    await expect(createForm({ value: BigInt(1) }, fetch)).rejects.toThrow('Invalid value given to form');
+    await expect(createForm({ value: 1n }, fetch)).rejects.toThrow('Invalid value given to form');
   });
 
   test('rejects fetch implementations that stringify FormData objects', async () => {
@@ -304,7 +304,7 @@ describe('lazy multipart stream encoding', () => {
     }
 
     const options = await multipartFormRequestOptions(
-      { body: { upload: toStreamingFile(chunks(), 'audio.wav'), invalid: BigInt(1) } },
+      { body: { upload: toStreamingFile(chunks(), 'audio.wav'), invalid: 1n } },
       fetch,
     );
 
