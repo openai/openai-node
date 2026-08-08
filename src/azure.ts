@@ -112,10 +112,8 @@ export class AzureOpenAI extends OpenAI {
         endpointEnd--;
       }
       baseURL = `${endpoint.slice(0, endpointEnd)}/openai`;
-    } else {
-      if (endpoint) {
-        throw new Errors.OpenAIError('baseURL and endpoint are mutually exclusive');
-      }
+    } else if (endpoint) {
+      throw new Errors.OpenAIError('baseURL and endpoint are mutually exclusive');
     }
 
     super({

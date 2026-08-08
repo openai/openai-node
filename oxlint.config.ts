@@ -32,7 +32,6 @@ const compatibilityRules = [
   'no-eq-null',
   'no-inline-comments',
   'no-inner-declarations',
-  'no-lonely-if',
   'no-negated-condition',
   'no-nested-ternary',
   'no-param-reassign',
