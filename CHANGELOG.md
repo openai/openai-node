@@ -1,5 +1,100 @@
 # Changelog
 
+## [7.4.1](https://github.com/openai/openai-node/compare/v7.4.0...v7.4.1) (2026-08-08)
+
+
+### Bug Fixes
+
+* **format:** restore formatting for generated SDK files ([#2089](https://github.com/openai/openai-node/issues/2089)) ([6d69d4b](https://github.com/openai/openai-node/commit/6d69d4b7dae7f96d30d1299be9f0d5e487b641db))
+* **lint:** recognize Castiron-generated headers ([#2124](https://github.com/openai/openai-node/issues/2124)) ([cf6237f](https://github.com/openai/openai-node/commit/cf6237f23ca12290ed12c4149ccd9b6fbffda149))
+* **lint:** restore generated SDK lint rules ([#2126](https://github.com/openai/openai-node/issues/2126)) ([6b8162c](https://github.com/openai/openai-node/commit/6b8162cb06fe9e1abbb7f10aac9378739fb0de2f))
+
+
+### Chores
+
+* **lint:** enable array-callback-return ([#2104](https://github.com/openai/openai-node/issues/2104)) ([44fac0d](https://github.com/openai/openai-node/commit/44fac0d33f0609f7c4d5dad4979ce7ad1d2c2bcc))
+* **lint:** enable guard-for-in ([#2140](https://github.com/openai/openai-node/issues/2140)) ([1e2a7f4](https://github.com/openai/openai-node/commit/1e2a7f4c0c0513936f65c35961b546489a446fd8))
+* **lint:** enable import/namespace ([#2090](https://github.com/openai/openai-node/issues/2090)) ([31d8c66](https://github.com/openai/openai-node/commit/31d8c66b001ccdd6571c83379e70820a80982a70))
+* **lint:** enable import/no-duplicates ([#2081](https://github.com/openai/openai-node/issues/2081)) ([44df76a](https://github.com/openai/openai-node/commit/44df76a309ba6b30b67dc11be5d0999001cf0a89))
+* **lint:** enable import/no-mutable-exports ([#2105](https://github.com/openai/openai-node/issues/2105)) ([9399d4c](https://github.com/openai/openai-node/commit/9399d4c593a58dc97abe4e5f6fb4a48251f607af))
+* **lint:** enable import/no-named-as-default-member ([#2091](https://github.com/openai/openai-node/issues/2091)) ([bff8c24](https://github.com/openai/openai-node/commit/bff8c24a315001de49ba068d1904e9b4273b82bf))
+* **lint:** enable import/no-self-import ([#2092](https://github.com/openai/openai-node/issues/2092)) ([38acc27](https://github.com/openai/openai-node/commit/38acc277989d457b561dc7fd88697a8e8de029cb))
+* **lint:** enable jsdoc/check-property-names ([#2093](https://github.com/openai/openai-node/issues/2093)) ([689aef6](https://github.com/openai/openai-node/commit/689aef66cb627d5e936608ffdb731931286ac82a))
+* **lint:** enable jsdoc/check-tag-names ([#2147](https://github.com/openai/openai-node/issues/2147)) ([f7e60a9](https://github.com/openai/openai-node/commit/f7e60a9958d7dc0444d313e835d7a89e18439ac7))
+* **lint:** enable jsdoc/empty-tags ([#2094](https://github.com/openai/openai-node/issues/2094)) ([d653124](https://github.com/openai/openai-node/commit/d653124552c315575d8098388b34b9db21c0a75c))
+* **lint:** enable jsdoc/require-property-description ([#2095](https://github.com/openai/openai-node/issues/2095)) ([2832fef](https://github.com/openai/openai-node/commit/2832fef3405c3ae8f3eab05ad59fc7843835e1a0))
+* **lint:** enable jsdoc/require-property-name ([#2096](https://github.com/openai/openai-node/issues/2096)) ([27c46d7](https://github.com/openai/openai-node/commit/27c46d7cf0cd0226ad129ee3b242c4651a6fdae8))
+* **lint:** enable jsdoc/require-property-type ([#2097](https://github.com/openai/openai-node/issues/2097)) ([a1b69cd](https://github.com/openai/openai-node/commit/a1b69cdda6524bb5471d610c57e18bf414386331))
+* **lint:** enable jsdoc/require-returns-description ([#2106](https://github.com/openai/openai-node/issues/2106)) ([9aefc9e](https://github.com/openai/openai-node/commit/9aefc9e847d975b675a7e297b19803783d17613d))
+* **lint:** enable jsdoc/require-throws-description ([#2098](https://github.com/openai/openai-node/issues/2098)) ([693dc5a](https://github.com/openai/openai-node/commit/693dc5a5ebc72fe8218f11f193e1e7bec4d447f2))
+* **lint:** enable jsdoc/require-throws-type ([#2099](https://github.com/openai/openai-node/issues/2099)) ([2569734](https://github.com/openai/openai-node/commit/25697346e5902dbfa043347a7d89197aa7107cee))
+* **lint:** enable jsdoc/require-yields ([#2137](https://github.com/openai/openai-node/issues/2137)) ([9aba641](https://github.com/openai/openai-node/commit/9aba641c6fe230a9a3c748157f6256306e123f80))
+* **lint:** enable jsdoc/require-yields-description ([#2100](https://github.com/openai/openai-node/issues/2100)) ([be49a47](https://github.com/openai/openai-node/commit/be49a47c42cbacbfcf94e1b6d235bfaee463741f))
+* **lint:** enable no-duplicate-imports ([#2082](https://github.com/openai/openai-node/issues/2082)) ([3ea6880](https://github.com/openai/openai-node/commit/3ea688071ffe420d49b372db20fb84daa4eb6cd4))
+* **lint:** enable no-empty ([#2146](https://github.com/openai/openai-node/issues/2146)) ([8862525](https://github.com/openai/openai-node/commit/8862525cfcaff2dfbaf9b63c91c35114c5512fdc))
+* **lint:** enable no-extend-native ([#2107](https://github.com/openai/openai-node/issues/2107)) ([2e41934](https://github.com/openai/openai-node/commit/2e41934a4e4637a0f073fdde6675fb010e62c918))
+* **lint:** enable no-fallthrough ([#2134](https://github.com/openai/openai-node/issues/2134)) ([f40eb23](https://github.com/openai/openai-node/commit/f40eb23b5c1af40c9dad0c2b25463125e44bf222))
+* **lint:** enable no-lonely-if ([#2145](https://github.com/openai/openai-node/issues/2145)) ([e114825](https://github.com/openai/openai-node/commit/e1148259af3a93d8b4619fce3459a968c1e73839))
+* **lint:** enable no-loop-func ([#2108](https://github.com/openai/openai-node/issues/2108)) ([6f04bf0](https://github.com/openai/openai-node/commit/6f04bf0c65eb442b6a41c95909aba77d503f7ef9))
+* **lint:** enable no-multi-assign ([#2136](https://github.com/openai/openai-node/issues/2136)) ([dfe0fc6](https://github.com/openai/openai-node/commit/dfe0fc6ee6dfa180de36a119269ae102b018d536))
+* **lint:** enable no-new-wrappers ([#2141](https://github.com/openai/openai-node/issues/2141)) ([4051f9f](https://github.com/openai/openai-node/commit/4051f9fa463aa1bb715091a5b2162aa54e854fba))
+* **lint:** enable no-prototype-builtins ([#2084](https://github.com/openai/openai-node/issues/2084)) ([dcdd7f1](https://github.com/openai/openai-node/commit/dcdd7f10ad90fd52298b45997b23ced40d8d177a))
+* **lint:** enable no-regex-spaces ([#2077](https://github.com/openai/openai-node/issues/2077)) ([82d4671](https://github.com/openai/openai-node/commit/82d4671ea3cafbd6979ac0495cabc6e112da25ab))
+* **lint:** enable no-sequences ([#2123](https://github.com/openai/openai-node/issues/2123)) ([33b07fc](https://github.com/openai/openai-node/commit/33b07fcf9ddf46f4551a2dbb91a24cb3e71cd887))
+* **lint:** enable no-template-curly-in-string ([#2071](https://github.com/openai/openai-node/issues/2071)) ([3be6bc8](https://github.com/openai/openai-node/commit/3be6bc8e0ac55b8f8b7534449d44a1a9efd0ca8b))
+* **lint:** enable no-throw-literal ([#2149](https://github.com/openai/openai-node/issues/2149)) ([71bc2a6](https://github.com/openai/openai-node/commit/71bc2a6115f4c9aff3403dccb867a1b4661b877a))
+* **lint:** enable no-unmodified-loop-condition ([#2109](https://github.com/openai/openai-node/issues/2109)) ([0cd20f7](https://github.com/openai/openai-node/commit/0cd20f73cc48f47381eb509958ed5d710921f1b8))
+* **lint:** enable no-useless-constructor ([#2072](https://github.com/openai/openai-node/issues/2072)) ([04ab85b](https://github.com/openai/openai-node/commit/04ab85b8cfe501f080dfca82a3f61a9c19490392))
+* **lint:** enable no-useless-escape ([#2148](https://github.com/openai/openai-node/issues/2148)) ([bf154b5](https://github.com/openai/openai-node/commit/bf154b5b52d0215da035628f0b7d57d62ee01fd5))
+* **lint:** enable no-useless-rename ([#2076](https://github.com/openai/openai-node/issues/2076)) ([84df305](https://github.com/openai/openai-node/commit/84df305f5407ef10ef08b90bafdc85ff86139ce4))
+* **lint:** enable node/callback-return ([#2101](https://github.com/openai/openai-node/issues/2101)) ([2176c4e](https://github.com/openai/openai-node/commit/2176c4e2a32796554b033d0906aa15084dbfd719))
+* **lint:** enable prefer-const ([#2085](https://github.com/openai/openai-node/issues/2085)) ([3c261d3](https://github.com/openai/openai-node/commit/3c261d3d5fa39dda1346bfb586edda5c227a5f37))
+* **lint:** enable prefer-exponentiation-operator ([#2073](https://github.com/openai/openai-node/issues/2073)) ([10af170](https://github.com/openai/openai-node/commit/10af17093bd70edb6e20d9eb85b4dff0242b9ce9))
+* **lint:** enable prefer-object-spread ([#2078](https://github.com/openai/openai-node/issues/2078)) ([127d266](https://github.com/openai/openai-node/commit/127d26693127b0b2474f7932c19c700a2d1fa1b7))
+* **lint:** enable prefer-regex-literals ([#2110](https://github.com/openai/openai-node/issues/2110)) ([a6cbb45](https://github.com/openai/openai-node/commit/a6cbb45f2ae2744af9ffea4469335bc919113b61))
+* **lint:** enable promise/prefer-catch ([#2111](https://github.com/openai/openai-node/issues/2111)) ([fb3406a](https://github.com/openai/openai-node/commit/fb3406a9e133683c1e9120ecaa3b9cedbfc2b722))
+* **lint:** enable radix ([#2083](https://github.com/openai/openai-node/issues/2083)) ([a205dff](https://github.com/openai/openai-node/commit/a205dffe499423d10202cc94730ca57eb157c6a6))
+* **lint:** enable typescript/consistent-generic-constructors ([#2080](https://github.com/openai/openai-node/issues/2080)) ([f69b229](https://github.com/openai/openai-node/commit/f69b2295b98c639108ed502e1a31f897c5c393d6))
+* **lint:** enable typescript/no-empty-interface ([#2112](https://github.com/openai/openai-node/issues/2112)) ([9522416](https://github.com/openai/openai-node/commit/9522416730be075eafa72414e6ad97eefe1a2773))
+* **lint:** enable typescript/no-extraneous-class ([#2113](https://github.com/openai/openai-node/issues/2113)) ([509ba3e](https://github.com/openai/openai-node/commit/509ba3e428f2dbc32ee6e9571070779b414e98d0))
+* **lint:** enable typescript/no-this-alias ([#2114](https://github.com/openai/openai-node/issues/2114)) ([191e1fe](https://github.com/openai/openai-node/commit/191e1febdfe742d73b46d68c213ff650e5af81f4))
+* **lint:** enable typescript/unified-signatures ([#2139](https://github.com/openai/openai-node/issues/2139)) ([4427bb5](https://github.com/openai/openai-node/commit/4427bb5f1c5398792b454cbcb13451928de53563))
+* **lint:** enable unicorn/consistent-existence-index-check ([#2143](https://github.com/openai/openai-node/issues/2143)) ([1828b28](https://github.com/openai/openai-node/commit/1828b28719254192a581927f79166444b3493cbe))
+* **lint:** enable unicorn/error-message ([#2115](https://github.com/openai/openai-node/issues/2115)) ([61f47a8](https://github.com/openai/openai-node/commit/61f47a85991e3c953c197648809d7bf88c6382b8))
+* **lint:** enable unicorn/escape-case ([#2074](https://github.com/openai/openai-node/issues/2074)) ([808929e](https://github.com/openai/openai-node/commit/808929e47f9f07ef95077a38cc18bd2a6f838faf))
+* **lint:** enable unicorn/no-hex-escape ([#2129](https://github.com/openai/openai-node/issues/2129)) ([d395852](https://github.com/openai/openai-node/commit/d395852e9512dc2fcb28c1bf65c64e22d789fde6))
+* **lint:** enable unicorn/no-immediate-mutation ([#2116](https://github.com/openai/openai-node/issues/2116)) ([b06c584](https://github.com/openai/openai-node/commit/b06c5840bfc5d0dbbbb58de9ce99d4d1f4b06f13))
+* **lint:** enable unicorn/no-object-as-default-parameter ([#2117](https://github.com/openai/openai-node/issues/2117)) ([6ae2ed7](https://github.com/openai/openai-node/commit/6ae2ed7e230e4e95adcb0b331adc97dfd37411fd))
+* **lint:** enable unicorn/no-thenable ([#2118](https://github.com/openai/openai-node/issues/2118)) ([0b521ea](https://github.com/openai/openai-node/commit/0b521ea43f972236cb69b5381c710a257e83a7f2))
+* **lint:** enable unicorn/no-this-assignment ([#2119](https://github.com/openai/openai-node/issues/2119)) ([4a4396d](https://github.com/openai/openai-node/commit/4a4396db820d197f6d7a7904e9e197c57f23206d))
+* **lint:** enable unicorn/no-useless-fallback-in-spread ([#2102](https://github.com/openai/openai-node/issues/2102)) ([008eebd](https://github.com/openai/openai-node/commit/008eebd7ebb4e0c2463014d15445bdfef9ef5188))
+* **lint:** enable unicorn/no-zero-fractions ([#2075](https://github.com/openai/openai-node/issues/2075)) ([ec42da9](https://github.com/openai/openai-node/commit/ec42da9279d3342b1abd16d0bc26ac0895bed7c6))
+* **lint:** enable unicorn/prefer-bigint-literals ([#2144](https://github.com/openai/openai-node/issues/2144)) ([d272540](https://github.com/openai/openai-node/commit/d272540353c5b2e8c43cea2fa3344037adb07c74))
+* **lint:** enable unicorn/prefer-class-fields ([#2138](https://github.com/openai/openai-node/issues/2138)) ([da7b9f5](https://github.com/openai/openai-node/commit/da7b9f58272cd15fc479574a9e455f0b3c0d53c3))
+* **lint:** enable unicorn/prefer-dom-node-append ([#2131](https://github.com/openai/openai-node/issues/2131)) ([1369610](https://github.com/openai/openai-node/commit/1369610c196c2b88987397ada3e844cb539572ea))
+* **lint:** enable unicorn/prefer-dom-node-text-content ([#2132](https://github.com/openai/openai-node/issues/2132)) ([a210c6c](https://github.com/openai/openai-node/commit/a210c6c3c80323793588856d1f095ee4000b152b))
+* **lint:** enable unicorn/prefer-includes ([#2130](https://github.com/openai/openai-node/issues/2130)) ([892eeaf](https://github.com/openai/openai-node/commit/892eeaf5ea6b7cf142269c89d49c90b7543fb274))
+* **lint:** enable unicorn/prefer-logical-operator-over-ternary ([#2120](https://github.com/openai/openai-node/issues/2120)) ([7373314](https://github.com/openai/openai-node/commit/737331433961e2993cb04706c33220453d3b54ef))
+* **lint:** enable unicorn/prefer-math-trunc ([#2103](https://github.com/openai/openai-node/issues/2103)) ([1230e64](https://github.com/openai/openai-node/commit/1230e6401ba9a3f06bbd484e569228eba7fb6c74))
+* **lint:** enable unicorn/prefer-native-coercion-functions ([#2121](https://github.com/openai/openai-node/issues/2121)) ([a596287](https://github.com/openai/openai-node/commit/a596287845cdb149c73fa32925a9c6e045d34a66))
+* **lint:** enable unicorn/prefer-object-from-entries ([#2122](https://github.com/openai/openai-node/issues/2122)) ([1be3aae](https://github.com/openai/openai-node/commit/1be3aae606e2c698d306ab3cf30e10ebd506b20a))
+* **lint:** enable unicorn/prefer-regexp-test ([#2133](https://github.com/openai/openai-node/issues/2133)) ([68df5ae](https://github.com/openai/openai-node/commit/68df5ae1c96bae42241a075901cf3c36660ec72d))
+* **lint:** enable unicorn/throw-new-error ([#2079](https://github.com/openai/openai-node/issues/2079)) ([28408f8](https://github.com/openai/openai-node/commit/28408f80c19e6e20fa7e4e5ddbd63cc92ca034de))
+* **lint:** enable yoda ([#2135](https://github.com/openai/openai-node/issues/2135)) ([7eef244](https://github.com/openai/openai-node/commit/7eef244045485b3b3c3bddb9aceb787c074f9fef))
+
+
+### Documentation
+
+* **readme:** fix links to relocated documentation ([#2088](https://github.com/openai/openai-node/issues/2088)) ([a82e8de](https://github.com/openai/openai-node/commit/a82e8dee6700501be9f058dc63f978f821d9163e))
+
+
+### Build System
+
+* **deps:** bump ip-address from 10.2.0 to 10.4.0 in /ecosystem-tests/ts-browser-webpack ([#2069](https://github.com/openai/openai-node/issues/2069)) ([c6e9ba3](https://github.com/openai/openai-node/commit/c6e9ba35791fb9f6360001246245ef93a385a4f2))
+* **deps:** bump nanoid from 3.3.15 to 3.3.18 in /ecosystem-tests/vercel-edge ([#2142](https://github.com/openai/openai-node/issues/2142)) ([7b986fc](https://github.com/openai/openai-node/commit/7b986fc28a029541c083e3ddc9f77fd43903de7c))
+* **deps:** bump next from 15.5.20 to 15.5.21 in /ecosystem-tests/vercel-edge ([#2128](https://github.com/openai/openai-node/issues/2128)) ([3f8403a](https://github.com/openai/openai-node/commit/3f8403a99f3802fa0cc8c18c0837db184fa2f505))
+* **deps:** bump undici from 7.28.0 to 7.29.0 in /ecosystem-tests/node-ts-cjs ([#2070](https://github.com/openai/openai-node/issues/2070)) ([130b038](https://github.com/openai/openai-node/commit/130b0380cc4ab0e3e25b62c888744b624897984d))
+
 ## [7.4.0](https://github.com/openai/openai-node/compare/v7.3.0...v7.4.0) (2026-08-03)
 
 
