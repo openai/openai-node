@@ -39,7 +39,7 @@ export class EventEmitter<EventTypes extends Record<string, (...args: any) => an
     const listeners = this.#listeners[event];
     if (!listeners) return this;
     const index = listeners.findIndex((l) => l.listener === listener);
-    if (index >= 0) listeners.splice(index, 1);
+    if (index !== -1) listeners.splice(index, 1);
     return this;
   }
 

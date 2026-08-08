@@ -91,7 +91,6 @@ const compatibilityRules = [
   'typescript/prefer-ts-expect-error',
   'unicorn/catch-error-name',
   'unicorn/consistent-assert',
-  'unicorn/consistent-existence-index-check',
   'unicorn/consistent-function-scoping',
   'unicorn/custom-error-definition',
   'unicorn/filename-case',
