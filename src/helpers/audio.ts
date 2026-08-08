@@ -36,6 +36,7 @@ async function nodejsPlayAudio(stream: NodeJS.ReadableStream | Response | File):
   return new Promise((resolve, reject) => {
     try {
       const ffplay = spawn('ffplay', ['-autoexit', '-nodisp', '-i', 'pipe:0']);
+      ffplay.on('error', reject);
 
       let source: NodeJS.ReadableStream;
       if (isResponse(stream)) {
