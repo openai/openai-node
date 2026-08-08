@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import { OpenAIError } from 'openai/error';
+import { APIUserAbortError, OpenAIError } from 'openai/error';
 import { type BaseEvents, EventStream } from 'openai/lib/EventStream';
 
 interface TestEvents extends BaseEvents {
@@ -13,6 +13,10 @@ class TestStream extends EventStream<TestEvents> {
 
   emitError(error: OpenAIError) {
     this._emit('error', error);
+  }
+
+  emitAbort(error: APIUserAbortError) {
+    this._emit('abort', error);
   }
 
   end() {
@@ -64,6 +68,30 @@ describe('EventStream.events', () => {
 
     await expect(iterator.next()).resolves.toEqual({ value: ['first', 1], done: false });
     await expect(iterator.next()).rejects.toBe(error);
+    await expect(iterator.next()).resolves.toEqual({ value: undefined, done: true });
+  });
+
+  test('drains queued events before rejecting on abort', async () => {
+    const stream = new TestStream();
+    const iterator = stream.events('foo');
+    const error = new APIUserAbortError();
+
+    stream.emitFoo('first', 1);
+    stream.emitAbort(error);
+
+    await expect(iterator.next()).resolves.toEqual({ value: ['first', 1], done: false });
+    await expect(iterator.next()).rejects.toBe(error);
+    await expect(iterator.next()).resolves.toEqual({ value: undefined, done: true });
+  });
+
+  test("yields the 'error' event as a value instead of rejecting when iterating it", async () => {
+    const stream = new TestStream();
+    const iterator = stream.events('error');
+    const error = new OpenAIError('oops');
+
+    stream.emitError(error);
+
+    await expect(iterator.next()).resolves.toEqual({ value: [error], done: false });
     await expect(iterator.next()).resolves.toEqual({ value: undefined, done: true });
   });
 

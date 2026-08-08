@@ -227,64 +227,14 @@ export class ResponseStream<ParsedT = null>
   }
 
   [Symbol.asyncIterator](this: ResponseStream<ParsedT>): AsyncIterator<ResponseStreamEvent> {
-    const pushQueue: ResponseStreamEvent[] = [];
-    const readQueue: {
-      resolve: (event: ResponseStreamEvent | undefined) => void;
-      reject: (err: unknown) => void;
-    }[] = [];
-    let done = false;
-
-    this.on('event', (event) => {
-      const reader = readQueue.shift();
-      if (reader) {
-        reader.resolve(event);
-      } else {
-        pushQueue.push(event);
-      }
-    });
-
-    this.on('end', () => {
-      done = true;
-      for (const reader of readQueue) {
-        reader.resolve(undefined);
-      }
-      readQueue.length = 0;
-    });
-
-    this.on('abort', (err) => {
-      done = true;
-      for (const reader of readQueue) {
-        reader.reject(err);
-      }
-      readQueue.length = 0;
-    });
-
-    this.on('error', (err) => {
-      done = true;
-      for (const reader of readQueue) {
-        reader.reject(err);
-      }
-      readQueue.length = 0;
-    });
-
-    return {
-      next: async (): Promise<IteratorResult<ResponseStreamEvent>> => {
-        if (!pushQueue.length) {
-          if (done) {
-            return { value: undefined, done: true };
-          }
-          return new Promise<ResponseStreamEvent | undefined>((resolve, reject) =>
-            readQueue.push({ resolve, reject }),
-          ).then((event) => (event ? { value: event, done: false } : { value: undefined, done: true }));
-        }
-        const event = pushQueue.shift()!;
-        return { value: event, done: false };
+    return this._createIterator<ResponseStreamEvent>(
+      (push) => {
+        const onEvent = (event: ResponseStreamEvent) => push(event);
+        this.on('event', onEvent);
+        return () => this.off('event', onEvent);
       },
-      return: async () => {
-        this.abort();
-        return { value: undefined, done: true };
-      },
-    };
+      { onReturn: () => this.abort() },
+    );
   }
 
   /**

@@ -1,6 +1,7 @@
-import OpenAI from 'openai';
+import OpenAI, { OpenAIError } from 'openai';
 import { ReadableStreamFrom } from 'openai/internal/shims';
 import { AssistantStream } from 'openai/lib/AssistantStream';
+import { AssistantStreamEvent } from 'openai/resources/beta/assistants';
 import { Stream } from 'openai/streaming';
 
 const openai = new OpenAI({
@@ -95,5 +96,61 @@ describe('assistant tests', () => {
     }
 
     expect(deltas).toEqual(['E', 'ddy']);
+  });
+
+  test('surfaces a mid-stream error when events are buffered before consumption', async () => {
+    const encoder = new TextEncoder();
+    const events = [
+      {
+        event: 'thread.message.created',
+        data: {
+          id: 'msg_1',
+          content: [],
+        },
+      },
+      {
+        event: 'thread.message.delta',
+        data: {
+          id: 'msg_1',
+          delta: {
+            content: [{ index: 0, type: 'text', text: { value: 'hi', annotations: [] } }],
+          },
+        },
+      },
+    ];
+    // Yield valid events, then throw to error the stream after they have been
+    // delivered (mimics a connection drop mid-run).
+    const input = ReadableStreamFrom(
+      (async function* () {
+        for (const event of events) {
+          yield encoder.encode(JSON.stringify(event) + '\n');
+        }
+        throw new Error('assistant boom');
+      })(),
+    );
+    const assistantStream = AssistantStream.fromReadableStream(input);
+    // Grab the iterator (registering its listeners) but do not consume yet, so
+    // the valid events and the error land while no reader is waiting: they
+    // buffer in the iterator's internal queue instead of rejecting a pending
+    // reader.
+    const iterator = assistantStream[Symbol.asyncIterator]();
+    // Wait for the stream's terminal signal so the events and the error have
+    // definitely been emitted before we start reading.
+    await assistantStream.done().catch(() => {});
+
+    const collected: AssistantStreamEvent[] = [];
+    let caught: unknown = null;
+    try {
+      let result: IteratorResult<AssistantStreamEvent>;
+      while (!(result = await iterator.next()).done) {
+        collected.push(result.value);
+      }
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(collected.map((event) => event.event)).toEqual(['thread.message.created', 'thread.message.delta']);
+    expect(caught).toBeInstanceOf(OpenAIError);
+    expect((caught as OpenAIError).message).toBe('assistant boom');
   });
 });
