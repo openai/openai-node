@@ -1958,7 +1958,7 @@ describe('stringify()', function () {
       if (type === 'value') {
         return defaultEncoder(str, defaultEncoder, charset, type).toUpperCase();
       }
-      throw 'this should never happen! type: ' + type;
+      throw new Error('this should never happen! type: ' + type);
     };
 
     // st.deepEqual(stringify({ KeY: 'vAlUe' }, { encoder: encoder }), 'key=VALUE');

@@ -4,9 +4,11 @@ const path = require('path');
 const main = () => {
   const pkg = require('../../package.json');
   const version = pkg['version'];
-  if (!version) throw 'The version property is not set in the package.json file';
+  if (!version) throw new Error('The version property is not set in the package.json file');
   if (typeof version !== 'string') {
-    throw `Unexpected type for the package.json version field; got ${typeof version}, expected string`;
+    throw new Error(
+      `Unexpected type for the package.json version field; got ${typeof version}, expected string`,
+    );
   }
 
   const versionFile = path.resolve(__dirname, '..', '..', 'src', 'version.ts');
