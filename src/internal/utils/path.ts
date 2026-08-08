@@ -57,7 +57,7 @@ export const createPathTagFunction = (pathEncoder = encodeURIPath) =>
       invalidSegments.push({
         start: match.index,
         length: match[0].length,
-        error: `Value "${match[0]}" can\'t be safely passed as a path parameter`,
+        error: `Value "${match[0]}" can't be safely passed as a path parameter`,
       });
     }
 
