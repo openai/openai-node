@@ -43,7 +43,6 @@ const compatibilityRules = [
   'no-unused-vars',
   'no-use-before-define',
   'no-useless-concat',
-  'no-useless-escape',
   'no-useless-return',
   'no-var',
   'no-void',
