@@ -18,7 +18,6 @@ const compatibilityRules = [
   'import/first',
   'import/newline-after-import',
   'import/no-cycle',
-  'jsdoc/check-tag-names',
   'jsdoc/no-defaults',
   'jsdoc/require-param-description',
   'logical-assignment-operators',
@@ -135,6 +134,7 @@ module.exports = defineConfig({
   },
   rules: {
     ...Object.fromEntries(compatibilityRules.map((rule) => [rule, 'off'])),
+    'jsdoc/check-tag-names': ['error', { definedTags: ['jest-environment'] }],
     'no-restricted-imports': [
       'error',
       {
