@@ -80,7 +80,9 @@ export class WorkloadIdentityAuth {
 
       try {
         body = JSON.parse(errorText);
-      } catch {}
+      } catch {
+        // Ignore non-JSON error bodies.
+      }
 
       if (response.status === 400 || response.status === 401 || response.status === 403) {
         throw new OAuthError(response.status as 400 | 401 | 403, body, response.headers);

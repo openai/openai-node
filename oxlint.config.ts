@@ -27,7 +27,6 @@ const compatibilityRules = [
   'no-bitwise',
   'no-case-declarations',
   'no-else-return',
-  'no-empty',
   'no-empty-function',
   'no-eq-null',
   'no-inline-comments',

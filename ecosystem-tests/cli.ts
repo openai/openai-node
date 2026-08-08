@@ -597,7 +597,9 @@ async function installPackage() {
   try {
     // Ensure that there is a clean node_modules folder.
     await run('rm', ['-rf', `./node_modules`]);
-  } catch (err) {}
+  } catch (err) {
+    // Best-effort cleanup; installation below can continue.
+  }
 
   const packFile = getPackFile();
   await fs.copyFile(packFile, `./${TAR_NAME}`);

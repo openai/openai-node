@@ -206,7 +206,9 @@ const _parseJSON = (jsonString: string, allow: number) => {
             if (jsonString[jsonString.length - 1] === '.')
               return JSON.parse(jsonString.substring(0, jsonString.lastIndexOf('.')));
             return JSON.parse(jsonString.substring(0, jsonString.lastIndexOf('e')));
-          } catch (e) {}
+          } catch (e) {
+            // Fall through to report malformed input below.
+          }
         }
         throwMalformedError(String(e));
       }
