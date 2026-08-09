@@ -13,6 +13,7 @@ export type APIResponseProps = {
   requestLogID: string;
   retryOfRequestLogID: string | undefined;
   startTime: number;
+  actionToRunOnComplete?: () => void;
 };
 
 export async function defaultParseResponse<T>(
@@ -33,6 +34,7 @@ export async function defaultParseResponse<T>(
           props.controller,
           client,
           props.options.__synthesizeEventData,
+          props.actionToRunOnComplete,
         ) as any;
       }
 
@@ -41,6 +43,7 @@ export async function defaultParseResponse<T>(
         props.controller,
         client,
         props.options.__synthesizeEventData,
+        props.actionToRunOnComplete,
       ) as any;
     }
 
@@ -80,6 +83,9 @@ export async function defaultParseResponse<T>(
       durationMs: Date.now() - startTime,
     }),
   );
+  if (!props.options.stream && !props.options.__binaryResponse) {
+    props.actionToRunOnComplete?.();
+  }
   return body;
 }
 

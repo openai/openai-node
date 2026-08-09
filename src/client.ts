@@ -795,6 +795,13 @@ export class OpenAI {
 
     const security = options.__security ?? { bearerAuth: true };
     const controller = new AbortController();
+    const abort = this._makeAbort(controller);
+    let abortCleanup: (() => void) | undefined;
+    if (options.signal) {
+      options.signal.addEventListener('abort', abort);
+      abortCleanup = () => options.signal!.removeEventListener('abort', abort);
+    }
+
     const response = await this.fetchWithAuth(url, req, timeout, controller, security).catch(castToError);
     const headersTime = Date.now();
 
@@ -949,7 +956,7 @@ export class OpenAI {
       }),
     );
 
-    return { response, options, controller, requestLogID, retryOfRequestLogID, startTime };
+    return { response, options, controller, actionToRunOnComplete: abortCleanup, requestLogID, retryOfRequestLogID, startTime };
   }
 
   getAPIList<Item, PageClass extends Pagination.AbstractPage<Item> = Pagination.AbstractPage<Item>>(
@@ -1008,7 +1015,6 @@ export class OpenAI {
   ): Promise<Response> {
     const { signal, method, ...options } = init || {};
     const abort = this._makeAbort(controller);
-    if (signal) signal.addEventListener('abort', abort, { once: true });
 
     const timeout = setTimeout(abort, ms);
 
@@ -1033,7 +1039,6 @@ export class OpenAI {
       return await this.fetch.call(undefined, url, fetchOptions);
     } finally {
       clearTimeout(timeout);
-      if (signal) signal.removeEventListener('abort', abort);
     }
   }
 

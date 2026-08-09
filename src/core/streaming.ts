@@ -33,6 +33,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
     controller: AbortController,
     client?: OpenAI,
     synthesizeEventData?: boolean,
+    cleanup?: () => void,
   ): Stream<Item> {
     let consumed = false;
     const logger = client ? loggerFor(client) : console;
