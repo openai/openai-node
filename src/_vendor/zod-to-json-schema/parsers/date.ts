@@ -31,18 +31,21 @@ export function parseDateDef(
 
   switch (strategy) {
     case 'string':
-    case 'format:date-time':
+    case 'format:date-time': {
       return {
         type: 'string',
         format: 'date-time',
       };
-    case 'format:date':
+    }
+    case 'format:date': {
       return {
         type: 'string',
         format: 'date',
       };
-    case 'integer':
+    }
+    case 'integer': {
       return integerDateParser(def, refs);
+    }
   }
 }
 
@@ -58,7 +61,7 @@ const integerDateParser = (def: ZodDateDef, refs: Refs) => {
 
   for (const check of def.checks) {
     switch (check.kind) {
-      case 'min':
+      case 'min': {
         setResponseValueAndErrors(
           res,
           'minimum',
@@ -67,7 +70,8 @@ const integerDateParser = (def: ZodDateDef, refs: Refs) => {
           refs,
         );
         break;
-      case 'max':
+      }
+      case 'max': {
         setResponseValueAndErrors(
           res,
           'maximum',
@@ -76,6 +80,7 @@ const integerDateParser = (def: ZodDateDef, refs: Refs) => {
           refs,
         );
         break;
+      }
     }
   }
 

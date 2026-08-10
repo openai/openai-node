@@ -128,8 +128,9 @@ const get$ref = (
   | {}
   | undefined => {
   switch (refs.$refStrategy) {
-    case 'root':
+    case 'root': {
       return { $ref: item.path.join('/') };
+    }
     // this case is needed as OpenAI strict mode doesn't support top-level `$ref`s, i.e.
     // the top-level schema *must* be `{"type": "object", "properties": {...}}` but if we ever
     // need to define a `$ref`, relative `$ref`s aren't supported, so we need to extract
@@ -155,8 +156,9 @@ const get$ref = (
 
       return { $ref: [...refs.basePath, refs.definitionPath, name].join('/') };
     }
-    case 'relative':
+    case 'relative': {
       return { $ref: getRelativePath(refs.currentPath, item.path) };
+    }
     case 'none':
     case 'seen': {
       if (
@@ -203,76 +205,109 @@ const selectParser = (
   forceResolution: boolean,
 ): JsonSchema7Type | undefined => {
   switch (typeName) {
-    case ZodFirstPartyTypeKind.ZodString:
+    case ZodFirstPartyTypeKind.ZodString: {
       return parseStringDef(def, refs);
-    case ZodFirstPartyTypeKind.ZodNumber:
+    }
+    case ZodFirstPartyTypeKind.ZodNumber: {
       return parseNumberDef(def, refs);
-    case ZodFirstPartyTypeKind.ZodObject:
+    }
+    case ZodFirstPartyTypeKind.ZodObject: {
       return parseObjectDef(def, refs);
-    case ZodFirstPartyTypeKind.ZodBigInt:
+    }
+    case ZodFirstPartyTypeKind.ZodBigInt: {
       return parseBigintDef(def, refs);
-    case ZodFirstPartyTypeKind.ZodBoolean:
+    }
+    case ZodFirstPartyTypeKind.ZodBoolean: {
       return parseBooleanDef();
-    case ZodFirstPartyTypeKind.ZodDate:
+    }
+    case ZodFirstPartyTypeKind.ZodDate: {
       return parseDateDef(def, refs);
-    case ZodFirstPartyTypeKind.ZodUndefined:
+    }
+    case ZodFirstPartyTypeKind.ZodUndefined: {
       return parseUndefinedDef();
-    case ZodFirstPartyTypeKind.ZodNull:
+    }
+    case ZodFirstPartyTypeKind.ZodNull: {
       return parseNullDef(refs);
-    case ZodFirstPartyTypeKind.ZodArray:
+    }
+    case ZodFirstPartyTypeKind.ZodArray: {
       return parseArrayDef(def, refs);
+    }
     case ZodFirstPartyTypeKind.ZodUnion:
-    case ZodFirstPartyTypeKind.ZodDiscriminatedUnion:
+    case ZodFirstPartyTypeKind.ZodDiscriminatedUnion: {
       return parseUnionDef(def, refs);
-    case ZodFirstPartyTypeKind.ZodIntersection:
+    }
+    case ZodFirstPartyTypeKind.ZodIntersection: {
       return parseIntersectionDef(def, refs);
-    case ZodFirstPartyTypeKind.ZodTuple:
+    }
+    case ZodFirstPartyTypeKind.ZodTuple: {
       return parseTupleDef(def, refs);
-    case ZodFirstPartyTypeKind.ZodRecord:
+    }
+    case ZodFirstPartyTypeKind.ZodRecord: {
       return parseRecordDef(def, refs);
-    case ZodFirstPartyTypeKind.ZodLiteral:
+    }
+    case ZodFirstPartyTypeKind.ZodLiteral: {
       return parseLiteralDef(def, refs);
-    case ZodFirstPartyTypeKind.ZodEnum:
+    }
+    case ZodFirstPartyTypeKind.ZodEnum: {
       return parseEnumDef(def);
-    case ZodFirstPartyTypeKind.ZodNativeEnum:
+    }
+    case ZodFirstPartyTypeKind.ZodNativeEnum: {
       return parseNativeEnumDef(def);
-    case ZodFirstPartyTypeKind.ZodNullable:
+    }
+    case ZodFirstPartyTypeKind.ZodNullable: {
       return parseNullableDef(def, refs, forceResolution);
-    case ZodFirstPartyTypeKind.ZodOptional:
+    }
+    case ZodFirstPartyTypeKind.ZodOptional: {
       return parseOptionalDef(def, refs, forceResolution);
-    case ZodFirstPartyTypeKind.ZodMap:
+    }
+    case ZodFirstPartyTypeKind.ZodMap: {
       return parseMapDef(def, refs);
-    case ZodFirstPartyTypeKind.ZodSet:
+    }
+    case ZodFirstPartyTypeKind.ZodSet: {
       return parseSetDef(def, refs);
-    case ZodFirstPartyTypeKind.ZodLazy:
+    }
+    case ZodFirstPartyTypeKind.ZodLazy: {
       return parseDef(def.getter()._def, refs, forceResolution);
-    case ZodFirstPartyTypeKind.ZodPromise:
+    }
+    case ZodFirstPartyTypeKind.ZodPromise: {
       return parsePromiseDef(def, refs, forceResolution);
+    }
     case ZodFirstPartyTypeKind.ZodNaN:
-    case ZodFirstPartyTypeKind.ZodNever:
+    case ZodFirstPartyTypeKind.ZodNever: {
       return parseNeverDef();
-    case ZodFirstPartyTypeKind.ZodEffects:
+    }
+    case ZodFirstPartyTypeKind.ZodEffects: {
       return parseEffectsDef(def, refs, forceResolution);
-    case ZodFirstPartyTypeKind.ZodAny:
+    }
+    case ZodFirstPartyTypeKind.ZodAny: {
       return parseAnyDef();
-    case ZodFirstPartyTypeKind.ZodUnknown:
+    }
+    case ZodFirstPartyTypeKind.ZodUnknown: {
       return parseUnknownDef();
-    case ZodFirstPartyTypeKind.ZodDefault:
+    }
+    case ZodFirstPartyTypeKind.ZodDefault: {
       return parseDefaultDef(def, refs, forceResolution);
-    case ZodFirstPartyTypeKind.ZodBranded:
+    }
+    case ZodFirstPartyTypeKind.ZodBranded: {
       return parseBrandedDef(def, refs, forceResolution);
-    case ZodFirstPartyTypeKind.ZodReadonly:
+    }
+    case ZodFirstPartyTypeKind.ZodReadonly: {
       return parseReadonlyDef(def, refs, forceResolution);
-    case ZodFirstPartyTypeKind.ZodCatch:
+    }
+    case ZodFirstPartyTypeKind.ZodCatch: {
       return parseCatchDef(def, refs, forceResolution);
-    case ZodFirstPartyTypeKind.ZodPipeline:
+    }
+    case ZodFirstPartyTypeKind.ZodPipeline: {
       return parsePipelineDef(def, refs, forceResolution);
+    }
     case ZodFirstPartyTypeKind.ZodFunction:
     case ZodFirstPartyTypeKind.ZodVoid:
-    case ZodFirstPartyTypeKind.ZodSymbol:
+    case ZodFirstPartyTypeKind.ZodSymbol: {
       return undefined;
-    default:
+    }
+    default: {
       return ((_: never) => undefined)(typeName);
+    }
   }
 };
 

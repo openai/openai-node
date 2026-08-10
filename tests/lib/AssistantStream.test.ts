@@ -532,19 +532,21 @@ describe('AssistantStream factories and async iteration', () => {
       let runner: AssistantStream;
 
       switch (kind) {
-        case 'run':
+        case 'run': {
           runner = AssistantStream.createAssistantStream(
             'thread_123',
             { create: vi.fn().mockResolvedValue(stream) } as any,
             { assistant_id: 'assistant_123' },
           );
           break;
-        case 'thread':
+        }
+        case 'thread': {
           runner = AssistantStream.createThreadAssistantStream({ assistant_id: 'assistant_123' }, {
             createAndRun: vi.fn().mockResolvedValue(stream),
           } as any);
           break;
-        case 'tool':
+        }
+        case 'tool': {
           runner = AssistantStream.createToolAssistantStream(
             'run_123',
             { submitToolOutputs: vi.fn().mockResolvedValue(stream) } as any,
@@ -552,6 +554,7 @@ describe('AssistantStream factories and async iteration', () => {
             undefined,
           );
           break;
+        }
       }
 
       await expect(runner.done()).rejects.toThrow(APIUserAbortError);

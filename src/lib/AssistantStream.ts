@@ -344,9 +344,10 @@ export class AssistantStream
     this.#handleEvent(event);
 
     switch (event.event) {
-      case 'thread.created':
+      case 'thread.created': {
         //No action on this event.
         break;
+      }
 
       case 'thread.run.created':
       case 'thread.run.queued':
@@ -357,9 +358,10 @@ export class AssistantStream
       case 'thread.run.failed':
       case 'thread.run.cancelling':
       case 'thread.run.cancelled':
-      case 'thread.run.expired':
+      case 'thread.run.expired': {
         this.#handleRun(event);
         break;
+      }
 
       case 'thread.run.step.created':
       case 'thread.run.step.in_progress':
@@ -367,25 +369,29 @@ export class AssistantStream
       case 'thread.run.step.completed':
       case 'thread.run.step.failed':
       case 'thread.run.step.cancelled':
-      case 'thread.run.step.expired':
+      case 'thread.run.step.expired': {
         this.#handleRunStep(event);
         break;
+      }
 
       case 'thread.message.created':
       case 'thread.message.in_progress':
       case 'thread.message.delta':
       case 'thread.message.completed':
-      case 'thread.message.incomplete':
+      case 'thread.message.incomplete': {
         this.#handleMessage(event);
         break;
+      }
 
-      case 'error':
+      case 'error': {
         //This is included for completeness, but errors are processed in the SSE event processing so this should not occur
         throw new Error(
           'Encountered an error event in event processing - errors should be processed earlier',
         );
-      default:
+      }
+      default: {
         assertNever(event);
+      }
     }
   }
 
@@ -412,14 +418,16 @@ export class AssistantStream
     }
 
     switch (event.event) {
-      case 'thread.message.created':
+      case 'thread.message.created': {
         this._emit('messageCreated', event.data);
         break;
+      }
 
-      case 'thread.message.in_progress':
+      case 'thread.message.in_progress': {
         break;
+      }
 
-      case 'thread.message.delta':
+      case 'thread.message.delta': {
         this._emit('messageDelta', event.data.delta, accumulatedMessage);
 
         if (event.data.delta.content) {
@@ -439,12 +447,14 @@ export class AssistantStream
               //See if we have in progress content
               if (this.#currentContent) {
                 switch (this.#currentContent.type) {
-                  case 'text':
+                  case 'text': {
                     this._emit('textDone', this.#currentContent.text, this.#messageSnapshot);
                     break;
-                  case 'image_file':
+                  }
+                  case 'image_file': {
                     this._emit('imageFileDone', this.#currentContent.image_file, this.#messageSnapshot);
                     break;
+                  }
                 }
               }
 
@@ -456,20 +466,23 @@ export class AssistantStream
         }
 
         break;
+      }
 
       case 'thread.message.completed':
-      case 'thread.message.incomplete':
+      case 'thread.message.incomplete': {
         //We emit the latest content we were working on on completion (including incomplete)
         if (this.#currentContentIndex !== undefined) {
           const currentContent = event.data.content[this.#currentContentIndex];
           if (currentContent) {
             switch (currentContent.type) {
-              case 'image_file':
+              case 'image_file': {
                 this._emit('imageFileDone', currentContent.image_file, this.#messageSnapshot);
                 break;
-              case 'text':
+              }
+              case 'text': {
                 this._emit('textDone', currentContent.text, this.#messageSnapshot);
                 break;
+              }
             }
           }
         }
@@ -479,6 +492,7 @@ export class AssistantStream
         }
 
         this.#messageSnapshot = undefined;
+      }
     }
   }
 
@@ -487,9 +501,10 @@ export class AssistantStream
     this.#currentRunStepSnapshot = accumulatedRunStep;
 
     switch (event.event) {
-      case 'thread.run.step.created':
+      case 'thread.run.step.created': {
         this._emit('runStepCreated', event.data);
         break;
+      }
       case 'thread.run.step.delta': {
         const delta = event.data.delta;
         if (
@@ -533,8 +548,9 @@ export class AssistantStream
         this._emit('runStepDone', event.data, accumulatedRunStep);
         break;
       }
-      case 'thread.run.step.in_progress':
+      case 'thread.run.step.in_progress': {
         break;
+      }
     }
   }
 
@@ -545,9 +561,10 @@ export class AssistantStream
 
   #accumulateRunStep(event: RunStepStreamEvent): Runs.RunStep {
     switch (event.event) {
-      case 'thread.run.step.created':
+      case 'thread.run.step.created': {
         this.#runStepSnapshots[event.data.id] = event.data;
         return event.data;
+      }
 
       case 'thread.run.step.delta': {
         const snapshot = this.#runStepSnapshots[event.data.id] as Runs.RunStep;
@@ -569,9 +586,10 @@ export class AssistantStream
       case 'thread.run.step.failed':
       case 'thread.run.step.cancelled':
       case 'thread.run.step.expired':
-      case 'thread.run.step.in_progress':
+      case 'thread.run.step.in_progress': {
         this.#runStepSnapshots[event.data.id] = event.data;
         break;
+      }
     }
 
     if (this.#runStepSnapshots[event.data.id]) return this.#runStepSnapshots[event.data.id] as Runs.RunStep;
@@ -585,9 +603,10 @@ export class AssistantStream
     const newContent: MessageContentDelta[] = [];
 
     switch (event.event) {
-      case 'thread.message.created':
+      case 'thread.message.created': {
         //On creation the snapshot is just the initial message
         return [event.data, newContent];
+      }
 
       case 'thread.message.delta': {
         if (!snapshot) {
@@ -620,12 +639,13 @@ export class AssistantStream
 
       case 'thread.message.in_progress':
       case 'thread.message.completed':
-      case 'thread.message.incomplete':
+      case 'thread.message.incomplete': {
         //No changes on other thread events
         if (snapshot) {
           return [snapshot, newContent];
         }
         throw new Error('Received thread message event with no existing snapshot');
+      }
     }
     throw new Error('Tried to accumulate a non-message event');
   }
@@ -708,26 +728,31 @@ export class AssistantStream
     this.#currentRunSnapshot = event.data;
 
     switch (event.event) {
-      case 'thread.run.created':
+      case 'thread.run.created': {
         break;
-      case 'thread.run.queued':
+      }
+      case 'thread.run.queued': {
         break;
-      case 'thread.run.in_progress':
+      }
+      case 'thread.run.in_progress': {
         break;
+      }
       case 'thread.run.requires_action':
       case 'thread.run.cancelled':
       case 'thread.run.failed':
       case 'thread.run.completed':
       case 'thread.run.expired':
-      case 'thread.run.incomplete':
+      case 'thread.run.incomplete': {
         this.#finalRun = event.data;
         if (this.#currentToolCall) {
           this._emit('toolCallDone', this.#currentToolCall);
           this.#currentToolCall = undefined;
         }
         break;
-      case 'thread.run.cancelling':
+      }
+      case 'thread.run.cancelling': {
         break;
+      }
     }
   }
 

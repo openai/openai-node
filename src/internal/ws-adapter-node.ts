@@ -87,19 +87,22 @@ export class NodeWebSocket implements WebSocketLike {
 
   private static _wrapListener(event: string, listener: Listener): Listener {
     switch (event) {
-      case 'message':
+      case 'message': {
         return (data: Buffer | ArrayBuffer | Buffer[], isBinary: boolean) => {
           listener(NodeWebSocket._normalizeMessageData(data, isBinary), isBinary);
         };
+      }
 
-      case 'close':
+      case 'close': {
         return (code: number, reason: Buffer) => {
           listener(code, reason.toString());
         };
+      }
 
       // 'open' and 'error' pass through unchanged
-      default:
+      default: {
         return listener;
+      }
     }
   }
 }

@@ -48,17 +48,21 @@ const functions: OpenAI.Chat.ChatCompletionCreateParams.Function[] = [
 async function callFunction(function_call: ChatCompletionMessage.FunctionCall): Promise<any> {
   const args = JSON.parse(function_call.arguments!);
   switch (function_call.name) {
-    case 'list':
+    case 'list': {
       return await list(args['genre']);
+    }
 
-    case 'search':
+    case 'search': {
       return await search(args['name']);
+    }
 
-    case 'get':
+    case 'get': {
       return await get(args['id']);
+    }
 
-    default:
+    default: {
       throw new Error('No function found');
+    }
   }
 }
 

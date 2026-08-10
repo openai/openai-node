@@ -61,15 +61,18 @@ export function parseUnionDef(
       switch (type) {
         case 'string':
         case 'number':
-        case 'boolean':
+        case 'boolean': {
           types.push(type);
           break;
-        case 'bigint':
+        }
+        case 'bigint': {
           types.push('integer');
           break;
-        case 'object':
+        }
+        case 'object': {
           if (x._def.value === null) types.push('null');
           break;
+        }
       }
     }
 

@@ -15,7 +15,6 @@ const compatibilityRules = [
   'sort-keys',
   'typescript/consistent-type-imports',
   'typescript/no-explicit-any',
-  'unicorn/switch-case-braces',
 ];
 
 module.exports = defineConfig({

@@ -46,15 +46,19 @@ async function providerForAuth(
   endpoint: { region: string; baseURL?: string | undefined },
 ): Promise<Provider> {
   switch (mode) {
-    case 'bearer':
+    case 'bearer': {
       return bearerBedrock({ ...endpoint, apiKey: requiredEnv('AWS_BEARER_TOKEN_BEDROCK') });
-    case 'environment-bearer':
+    }
+    case 'environment-bearer': {
       requiredEnv('AWS_BEARER_TOKEN_BEDROCK');
       return bearerBedrock(endpoint);
-    case 'default-chain':
+    }
+    case 'default-chain': {
       return awsBedrock({ ...endpoint, apiKey: null });
-    case 'profile':
+    }
+    case 'profile': {
       return awsBedrock({ ...endpoint, apiKey: null, profile: requiredEnv('AWS_PROFILE') });
+    }
     case 'static': {
       const sessionToken = process.env['AWS_SESSION_TOKEN']?.trim();
       return awsBedrock({

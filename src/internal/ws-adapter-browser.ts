@@ -92,18 +92,20 @@ export class BrowserWebSocket implements WebSocketLike {
    */
   private static _wrapListener(event: string, listener: Listener): DOMEventHandler {
     switch (event) {
-      case 'message':
+      case 'message': {
         return (ev: MessageEvent) => {
           const isBinary = typeof ev.data !== 'string';
           listener(ev.data, isBinary);
         };
+      }
 
-      case 'close':
+      case 'close': {
         return (ev: CloseEvent) => {
           listener(ev.code, ev.reason);
         };
+      }
 
-      case 'error':
+      case 'error': {
         return (ev: any) => {
           // Some environments provide an ErrorEvent with a `.message`;
           // fall back to a generic message when the event carries nothing.
@@ -114,9 +116,11 @@ export class BrowserWebSocket implements WebSocketLike {
           }
           listener(err);
         };
+      }
 
-      default:
+      default: {
         return listener as DOMEventHandler;
+      }
     }
   }
 }
