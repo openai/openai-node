@@ -49,7 +49,6 @@ const compatibilityRules = [
   'node/global-require',
   'object-shorthand',
   'oxc/no-accumulating-spread',
-  'oxc/no-async-endpoint-handlers',
   'oxc/no-barrel-file',
   'prefer-arrow-callback',
   'prefer-destructuring',
