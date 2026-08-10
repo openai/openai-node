@@ -65,9 +65,6 @@ export function parseUnionDef(
         case 'object':
           if (x._def.value === null) return [...acc, 'null' as const];
           return acc;
-        case 'symbol':
-        case 'undefined':
-        case 'function':
         default:
           return acc;
       }

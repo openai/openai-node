@@ -115,7 +115,6 @@ export class BrowserWebSocket implements WebSocketLike {
           listener(err);
         };
 
-      case 'open':
       default:
         return listener as DOMEventHandler;
     }
