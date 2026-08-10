@@ -201,14 +201,13 @@ describe('.stream()', () => {
   it('standard text works', async () => {
     const deltas: string[] = [];
 
-    const stream = (
-      await makeStreamSnapshotRequest((openai) =>
-        openai.responses.stream({
-          model: 'gpt-4o-2024-08-06',
-          input: 'Say hello world',
-        }),
-      )
-    ).on('response.output_text.delta', (e) => {
+    const request = await makeStreamSnapshotRequest((openai) =>
+      openai.responses.stream({
+        model: 'gpt-4o-2024-08-06',
+        input: 'Say hello world',
+      }),
+    );
+    const stream = request.on('response.output_text.delta', (e) => {
       deltas.push(e.snapshot);
     });
 

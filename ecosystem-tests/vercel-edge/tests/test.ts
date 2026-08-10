@@ -4,7 +4,8 @@ console.log(baseUrl);
 it(
   'node runtime',
   async () => {
-    expect(await (await fetch(`${baseUrl}/api/node-test`)).text()).toEqual('Passed!');
+    const response = await fetch(`${baseUrl}/api/node-test`);
+    expect(await response.text()).toEqual('Passed!');
   },
   3 * 60000,
 );
@@ -12,7 +13,8 @@ it(
 it(
   'edge runtime',
   async () => {
-    expect(await (await fetch(`${baseUrl}/api/edge-test`)).text()).toEqual('Passed!');
+    const response = await fetch(`${baseUrl}/api/edge-test`);
+    expect(await response.text()).toEqual('Passed!');
   },
   3 * 60000,
 );
