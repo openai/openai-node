@@ -109,7 +109,6 @@ const compatibilityRules = [
   'unicorn/prefer-string-slice',
   'unicorn/prefer-ternary',
   'unicorn/prefer-type-error',
-  'unicorn/require-module-specifiers',
   'unicorn/switch-case-braces',
   'unicorn/text-encoding-identifier-case',
   'vars-on-top',

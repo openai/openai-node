@@ -5,4 +5,5 @@ async function typeTests(client: OpenAI) {
   const url: string = response.url;
 }
 
+// oxlint-disable-next-line unicorn/require-module-specifiers -- keep this type-test file a module
 export {};

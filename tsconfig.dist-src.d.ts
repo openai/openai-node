@@ -1,4 +1,5 @@
 // Keep published source navigation independent of consumers installing @types/node.
+// oxlint-disable-next-line unicorn/require-module-specifiers -- keep ambient globals scoped to a module
 export {};
 
 declare global {

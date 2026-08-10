@@ -18,4 +18,5 @@ it(
 );
 
 // make isolatedModules happy
+// oxlint-disable-next-line unicorn/require-module-specifiers -- keep this test file a module
 export {};
