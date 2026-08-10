@@ -7,7 +7,7 @@ type Listener = (...args: any[]) => void;
 type DOMEventHandler = (ev: any) => void;
 
 // Minimal browser API type declarations.
-declare class WebSocket {
+interface WebSocket {
   readonly readyState: number;
   binaryType: string;
   send(data: string | ArrayBufferLike | ArrayBufferView): void;
