@@ -387,17 +387,36 @@ function normalizeStructuredOutputSchema(schema: JSONSchema): JSONSchema {
           'Standard JSON Schema generated both `anyOf` and `oneOf`, which cannot be represented in an OpenAI strict schema',
         );
       }
-      // `false` can never validate, so it cannot overlap another oneOf
-      // branch. Keep it in place until the existing anyOf normalization runs
-      // so local refs into surviving branch indices can be rewritten before
-      // the impossible alternatives are removed.
-      const possibleBranches = record['oneOf'].filter((branch) => branch !== false);
-      if (!areOneOfBranchesMutuallyExclusive(possibleBranches, normalizedSchema)) {
-        throw new OpenAIError(
-          'Standard JSON Schema generated a `oneOf` whose branches are not provably mutually exclusive. OpenAI strict schemas do not support `oneOf`; use `anyOf` or add a discriminator with distinct literal values.',
+      const hasObjectShape =
+        record['type'] === 'object' ||
+        (Array.isArray(record['type']) && record['type'].includes('object')) ||
+        ['properties', 'required', 'additionalProperties', 'patternProperties', 'propertyNames'].some(
+          (keyword) => record[keyword] !== undefined,
         );
+      const hasOwnObjectConstraints = [
+        'properties',
+        'required',
+        'additionalProperties',
+        'patternProperties',
+        'propertyNames',
+        'minProperties',
+        'maxProperties',
+        'dependentRequired',
+        'dependentSchemas',
+      ].some((keyword) => record[keyword] !== undefined);
+      if (!hasObjectShape || !hasOwnObjectConstraints) {
+        // `false` can never validate, so it cannot overlap another oneOf
+        // branch. Keep it in place until the existing anyOf normalization runs
+        // so local refs into surviving branch indices can be rewritten before
+        // the impossible alternatives are removed.
+        const possibleBranches = record['oneOf'].filter((branch) => branch !== false);
+        if (!areOneOfBranchesMutuallyExclusive(possibleBranches, normalizedSchema)) {
+          throw new OpenAIError(
+            'Standard JSON Schema generated a `oneOf` whose branches are not provably mutually exclusive. OpenAI strict schemas do not support `oneOf`; use `anyOf` or add a discriminator with distinct literal values.',
+          );
+        }
+        oneOfSchemas.push(record);
       }
-      oneOfSchemas.push(record);
     }
 
     forEachJSONSchemaChild(record, [], (child) => visitSchema(child));

@@ -193,6 +193,26 @@ describe('Standard Schema helpers', () => {
     expect(format.json_schema.schema).toEqual(strictWeatherJSONSchema);
   });
 
+  it('preserves oneOf when an object schema has its own constraints', () => {
+    const schema = {
+      type: 'object',
+      properties: {
+        value: {
+          type: 'object',
+          properties: { name: { type: 'string' } },
+          required: ['name'],
+          additionalProperties: false,
+          oneOf: [{ type: 'string' }, { type: 'number' }],
+        },
+      },
+      required: ['value'],
+      additionalProperties: false,
+    };
+    const { standardSchema } = makeStandardSchema(schema);
+
+    expect(standardResponseFormat(standardSchema, 'value').json_schema.schema).toEqual(schema);
+  });
+
   it('normalizes provably exclusive oneOf branches before strictifying schemas', () => {
     const oneOfSchema = {
       type: 'object',
