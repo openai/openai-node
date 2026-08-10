@@ -375,7 +375,7 @@ const addFormValue = async (form: FormData, key: string, value: unknown): Promis
     );
   }
 
-  // TODO: make nested formats configurable
+  // Nested form keys use the current bracketed encoding.
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
     form.append(key, String(value));
   } else if (value instanceof Response) {

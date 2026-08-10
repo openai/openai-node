@@ -385,7 +385,7 @@ export class Worker {
 
     const helpersNeeded = new Set<string>();
 
-    // TODO: Merge custom transformers
+    // Custom transformers are not merged with the generated transformer.
     const transformers: ts.CustomTransformers = {
       after: [
         createTransformer({

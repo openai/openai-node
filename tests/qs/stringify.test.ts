@@ -1227,8 +1227,7 @@ describe('stringify()', function () {
     );
   });
 
-  // TODO: Investigate how to to intercept in vitest
-  // TODO(rob)
+  // This test mutates Object.prototype because Vitest lacks the old interception helper.
   test('skips properties that are part of the object prototype', function () {
     // st.intercept(Object.prototype, 'crash', { value: 'test' });
     Reflect.set(Object.prototype, 'crash', 'test');

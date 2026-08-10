@@ -87,7 +87,7 @@ it(`streaming works`, async function () {
   expect(chunks.map((c) => c.choices[0]?.delta.content || '').join('')).toBeSimilarTo('This is a test', 10);
 });
 
-// TODO: setup proxy server
+// Proxy coverage requires a configured proxy server.
 test.skip(`proxied request`, async function () {
   const dispatcher = new undici.ProxyAgent(process.env['ECOSYSTEM_TESTS_PROXY']!);
   const client = new OpenAI({

@@ -75,7 +75,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
               console.error(`From chunk:`, sse.raw);
               throw e;
             }
-            // TODO: Is this where the error should be thrown?
+            // SSE error events surface as APIError instances.
             if (sse.event == 'error') {
               throw new APIError(undefined, data.error, data.message, undefined);
             }
