@@ -147,11 +147,7 @@ describe('path template tag function', () => {
     expect(rawPath`${crossRealmString}/`).toBe('/');
     expect(rawPath`/${crossRealmClassWithToString}`).toBe('/ok');
 
-    const results: {
-      [pathParts: string]: {
-        [params: string]: { valid: boolean; result?: string; error?: string };
-      };
-    } = {};
+    const results: Record<string, Record<string, { valid: boolean; result?: string; error?: string }>> = {};
 
     for (const pathParts of testCases) {
       const pathResults: Record<string, { valid: boolean; result?: string; error?: string }> = {};

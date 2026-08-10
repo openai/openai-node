@@ -69,7 +69,7 @@ type _StableFunctionToolMayOmitOutputSchema = Assert<
   IsAssignable<
     {
       name: string;
-      parameters: { [key: string]: unknown } | null;
+      parameters: Record<string, unknown> | null;
       strict: boolean | null;
       type: 'function';
     },
@@ -87,7 +87,7 @@ type _BetaFunctionToolMayOmitOutputSchema = Assert<
   IsAssignable<
     {
       name: string;
-      parameters: { [key: string]: unknown } | null;
+      parameters: Record<string, unknown> | null;
       strict: boolean | null;
       type: 'function';
     },

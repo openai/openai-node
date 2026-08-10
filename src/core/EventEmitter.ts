@@ -5,9 +5,10 @@ type EventListeners<Events, EventType extends keyof Events> = Array<{
   once?: boolean;
 }>;
 
-export type EventParameters<Events, EventType extends keyof Events> = {
-  [Event in EventType]: EventListener<Events, EventType> extends (...args: infer P) => any ? P : never;
-}[EventType];
+export type EventParameters<Events, EventType extends keyof Events> = Record<
+  EventType,
+  EventListener<Events, EventType> extends (...args: infer P) => any ? P : never
+>[EventType];
 
 export class EventEmitter<EventTypes extends Record<string, (...args: any) => any>> {
   #listeners: {
