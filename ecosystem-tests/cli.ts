@@ -154,9 +154,7 @@ async function startProxy() {
   proxy.on('connect', (req, clientSocket, head) => {
     console.log('got proxied connection');
     const serverSocket = connect(443, 'api.openai.com', () => {
-      clientSocket.write(
-        'HTTP/1.1 200 Connection Established\r\n' + 'Proxy-agent: Node.js-Proxy\r\n' + '\r\n',
-      );
+      clientSocket.write('HTTP/1.1 200 Connection Established\r\nProxy-agent: Node.js-Proxy\r\n\r\n');
       serverSocket.write(head);
       serverSocket.pipe(clientSocket);
       clientSocket.pipe(serverSocket);

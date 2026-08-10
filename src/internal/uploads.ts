@@ -267,7 +267,7 @@ async function* iterateMultipartBody(body: unknown, boundary: string): AsyncGene
       yield encodeUTF8(
         `Content-Disposition: form-data; name="${escapeHeaderValue(key)}"; filename="${escapeHeaderValue(
           filename,
-        )}"\r\n` + `Content-Type: ${type}\r\n\r\n`,
+        )}"\r\nContent-Type: ${type}\r\n\r\n`,
       );
       yield* iterateBytes(getStreamingFileData(value));
     } else {
