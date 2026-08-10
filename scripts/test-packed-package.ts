@@ -182,7 +182,8 @@
     );
 
     const mappedSources = new Map<string, string>();
-    const sourceMaps = findSourceMaps(installedPackageRoot).sort();
+    const sourceMaps = findSourceMaps(installedPackageRoot);
+    sourceMaps.sort();
     for (const mapPath of sourceMaps) {
       const sourceMap = JSON.parse(fs.readFileSync(mapPath, 'utf8')) as SourceMap;
       for (const source of sourceMap.sources) {
@@ -229,8 +230,8 @@
     // Validate every other mapped source without installing either in this consumer.
     const browserSafeSources = Array.from(mappedSources.entries())
       .filter(([source]) => !requiresOptionalPeer(source))
-      .map(([, source]) => source)
-      .sort();
+      .map(([, source]) => source);
+    browserSafeSources.sort();
     const sourceNavigationConfig = path.join(temporaryDirectory, 'source-navigation.tsconfig.json');
     fs.writeFileSync(
       sourceNavigationConfig,

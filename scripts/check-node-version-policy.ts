@@ -109,11 +109,11 @@
     [...policySupported, ...policyForward].every((version) => /^\d+$/.test(version)),
     'Policy matrix versions must be major lines',
   );
+  const sortedPolicyRows = [...policyRows];
+  sortedPolicyRows.sort((left, right) => Number(left.major) - Number(right.major));
   assert.deepEqual(
     policyRows.map(({ major: version }) => version),
-    [...policyRows]
-      .sort((left, right) => Number(left.major) - Number(right.major))
-      .map(({ major: version }) => version),
+    sortedPolicyRows.map(({ major: version }) => version),
     'NODE_VERSION_POLICY.md compatibility rows must be ordered by major',
   );
   assert(matrixEntries.length > 0, 'Policy produces an empty Node.js test matrix');

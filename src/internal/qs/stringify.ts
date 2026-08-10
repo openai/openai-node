@@ -156,7 +156,10 @@ function inner_stringify(
     obj_keys = filter;
   } else {
     const keys = Object.keys(obj);
-    obj_keys = sort ? keys.sort(sort) : keys;
+    if (sort) {
+      keys.sort(sort);
+    }
+    obj_keys = keys;
   }
 
   const encoded_prefix = encodeDotInKeys ? String(prefix).replace(/\./g, '%2E') : String(prefix);
