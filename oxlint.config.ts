@@ -47,7 +47,6 @@ const compatibilityRules = [
   'unicorn/prefer-module',
   'unicorn/prefer-node-protocol',
   'unicorn/prefer-response-static-json',
-  'unicorn/prefer-string-slice',
   'unicorn/switch-case-braces',
   'unicorn/text-encoding-identifier-case',
 ];
@@ -342,6 +341,14 @@ module.exports = defineConfig({
       files: ['tests/qs/stringify.test.ts'],
       rules: {
         'no-sparse-arrays': 'off',
+      },
+    },
+    {
+      // The vendored partial parser relies on substring's clamping and bound-swapping
+      // behavior for malformed input, which is not equivalent to slice.
+      files: ['src/_vendor/partial-json-parser/parser.ts'],
+      rules: {
+        'unicorn/prefer-string-slice': 'off',
       },
     },
     {
