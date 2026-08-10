@@ -66,6 +66,7 @@ function snapshotRawData(data: RawWebSocketData): Exclude<RawWebSocketData, Arra
     copy.set(toUint8Array(data));
     return copy;
   }
+  // oxlint-disable-next-line unicorn/prefer-spread -- ArrayBufferLike.slice copies bytes while spread changes the return type.
   return data.slice(0);
 }
 
@@ -134,7 +135,7 @@ export class SendQueue<T = unknown> {
         send(pending[i]!.data);
       } catch (err) {
         const remaining = pending.slice(i);
-        this._queue = remaining.concat(this._queue);
+        this._queue = [...remaining, ...this._queue];
         this._bytes = this._queue.reduce((sum, item) => sum + item.byteLength, 0);
         throw err;
       }

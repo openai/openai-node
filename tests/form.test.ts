@@ -52,7 +52,7 @@ describe('form data validation', () => {
       },
       fetch,
     );
-    expect(Array.from(form.entries())).toEqual([]);
+    expect([...form.entries()]).toEqual([]);
 
     const form2 = await createForm(
       {
@@ -63,7 +63,7 @@ describe('form data validation', () => {
       },
       fetch,
     );
-    expect(Array.from(form2.entries())).toEqual([['bar[foo]', 'string']]);
+    expect([...form2.entries()]).toEqual([['bar[foo]', 'string']]);
   });
 
   test('nested undefined array item is stripped', async () => {
@@ -73,7 +73,7 @@ describe('form data validation', () => {
       },
       fetch,
     );
-    expect(Array.from(form.entries())).toEqual([]);
+    expect([...form.entries()]).toEqual([]);
 
     const form2 = await createForm(
       {
@@ -81,7 +81,7 @@ describe('form data validation', () => {
       },
       fetch,
     );
-    expect(Array.from(form2.entries())).toEqual([['bar[]', 'foo']]);
+    expect([...form2.entries()]).toEqual([['bar[]', 'foo']]);
   });
 
   test('streams multipart file content lazily', async () => {

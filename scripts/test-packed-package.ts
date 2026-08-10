@@ -228,7 +228,7 @@
 
     // Zod/AWS helpers require optional peers; Node-only helpers require @types/node.
     // Validate every other mapped source without installing either in this consumer.
-    const browserSafeSources = Array.from(mappedSources.entries())
+    const browserSafeSources = [...mappedSources.entries()]
       .filter(([source]) => !requiresOptionalPeer(source))
       .map(([, source]) => source);
     browserSafeSources.sort();

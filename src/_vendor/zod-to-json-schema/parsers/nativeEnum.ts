@@ -13,7 +13,7 @@ export function parseNativeEnumDef(def: ZodNativeEnumDef): JsonSchema7NativeEnum
 
   const actualValues = actualKeys.map((key: string) => object[key]!);
 
-  const parsedTypes = Array.from(new Set(actualValues.map((values: string | number) => typeof values)));
+  const parsedTypes = [...new Set(actualValues.map((values: string | number) => typeof values))];
 
   return {
     type:
