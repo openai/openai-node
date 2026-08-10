@@ -89,7 +89,6 @@ const compatibilityRules = [
   'unicorn/no-anonymous-default-export',
   'unicorn/no-array-for-each',
   'unicorn/no-array-reduce',
-  'unicorn/no-array-reverse',
   'unicorn/no-array-sort',
   'unicorn/no-await-expression-member',
   'unicorn/no-console-spaces',
