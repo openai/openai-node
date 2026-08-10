@@ -79,7 +79,6 @@ const compatibilityRules = [
   'unicorn/no-useless-undefined',
   'unicorn/numeric-separators-style',
   'unicorn/prefer-at',
-  'unicorn/prefer-event-target',
   'unicorn/prefer-module',
   'unicorn/prefer-node-protocol',
   'unicorn/prefer-optional-catch-binding',
@@ -153,6 +152,23 @@ module.exports = defineConfig({
       ],
       rules: {
         'typescript/no-empty-object-type': 'off',
+      },
+    },
+    {
+      // These SDK and test helpers intentionally use typed or Node EventEmitter APIs;
+      // EventTarget would lose multi-argument events, emit chaining, or public behavior.
+      files: [
+        'src/beta/realtime/internal-base.ts',
+        'src/core/EventEmitter.ts',
+        'src/realtime/internal-base.ts',
+        'tests/helpers/audio-recording.test.ts',
+        'tests/internal/websocket-adapters.test.ts',
+        'tests/lib/core-event-emitter.test.ts',
+        'tests/lib/eventEmitter.test.ts',
+        'tests/lib/responsesWebSocket.test.ts',
+      ],
+      rules: {
+        'unicorn/prefer-event-target': 'off',
       },
     },
     {
