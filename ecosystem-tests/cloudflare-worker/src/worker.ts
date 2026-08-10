@@ -48,15 +48,15 @@ export default {
 			console.error('created client');
 
 			const tests: Test[] = [];
-			function it(description: string, handler: () => Promise<void>) {
+			const it = (description: string, handler: () => Promise<void>) => {
 				tests.push({ description, handler });
-			}
-			function expectEqual(a: any, b: any) {
+			};
+			const expectEqual = (a: any, b: any) => {
 				if (!Object.is(a, b)) {
 					throw new Error(`expected values to be equal: ${JSON.stringify({ a, b })}`);
 				}
-			}
-			function expectSimilar(received: string, expected: string, maxDistance: number) {
+			};
+			const expectSimilar = (received: string, expected: string, maxDistance: number) => {
 				const receivedDistance = distance(received, expected);
 				if (receivedDistance < maxDistance) {
 					return;
@@ -70,7 +70,7 @@ export default {
 				].join('\n');
 
 				throw new Error(message);
-			}
+			};
 
 			uploadWebApiTestCases({
 				client: client as any,

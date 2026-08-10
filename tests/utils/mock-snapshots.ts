@@ -12,13 +12,13 @@ export async function makeSnapshotRequest<T>(
   if (process.env['UPDATE_API_SNAPSHOTS'] === '1') {
     var capturedResponseContent: string | null = null;
 
-    async function fetch(url: RequestInfo, init?: RequestInit) {
+    const snapshotFetch = async (url: RequestInfo, init?: RequestInit) => {
       const response = await defaultFetch(url, init);
       capturedResponseContent = await response.text();
       return new Response(capturedResponseContent, response);
-    }
+    };
 
-    const openai = new OpenAI({ fetch });
+    const openai = new OpenAI({ fetch: snapshotFetch });
 
     const result = await requestFn(openai);
     if (!capturedResponseContent) {
@@ -71,13 +71,13 @@ export async function makeStreamSnapshotRequest<T extends AsyncIterable<any>>(
   if (process.env['UPDATE_API_SNAPSHOTS'] === '1') {
     var capturedResponseContent: string | null = null;
 
-    async function fetch(url: RequestInfo, init?: RequestInit) {
+    const snapshotFetch = async (url: RequestInfo, init?: RequestInit) => {
       const response = await defaultFetch(url, init);
       capturedResponseContent = await response.text();
       return new Response(Readable.from(capturedResponseContent), response);
-    }
+    };
 
-    const openai = new OpenAI({ fetch });
+    const openai = new OpenAI({ fetch: snapshotFetch });
 
     const iterator = requestFn(openai);
     for await (const _ of iterator) {

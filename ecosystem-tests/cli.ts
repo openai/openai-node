@@ -366,15 +366,15 @@ async function main() {
       const eraseLine = '\u001B[2K';
 
       let progressDisplayed = false;
-      function clearProgress() {
+      const clearProgress = () => {
         if (progressDisplayed) {
           process.stderr.write(cursorLeft + eraseLine);
           progressDisplayed = false;
         }
-      }
+      };
       const spinner = ['|', '/', '-', '\\'];
 
-      function showProgress() {
+      const showProgress = () => {
         clearProgress();
         progressDisplayed = true;
         const spin = spinner[Math.floor(Date.now() / 500) % spinner.length];
@@ -382,7 +382,7 @@ async function main() {
           `${spin} Running ${[...runningProjects].join(', ')}`.substring(0, process.stdout.columns - 3) +
             '...',
         );
-      }
+      };
 
       const progressInterval = setInterval(showProgress, process.stdout.isTTY ? 500 : 5000);
       showProgress();

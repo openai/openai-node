@@ -112,6 +112,12 @@ function nodejsRecordAudio({ signal, device, timeout }: RecordAudioOptions = {})
         },
       );
 
+      const returnData = () => {
+        const audioBuffer = Buffer.concat(data);
+        const audioFile = new File([audioBuffer], 'audio.wav', { type: 'audio/wav' });
+        resolve(audioFile);
+      };
+
       ffmpeg.stdout.on('data', (chunk) => {
         data.push(chunk);
       });
@@ -124,12 +130,6 @@ function nodejsRecordAudio({ signal, device, timeout }: RecordAudioOptions = {})
       ffmpeg.on('close', (code) => {
         returnData();
       });
-
-      function returnData() {
-        const audioBuffer = Buffer.concat(data);
-        const audioFile = new File([audioBuffer], 'audio.wav', { type: 'audio/wav' });
-        resolve(audioFile);
-      }
 
       if (typeof timeout === 'number' && timeout > 0) {
         const internalSignal = AbortSignal.timeout(timeout);
