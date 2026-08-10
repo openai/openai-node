@@ -180,7 +180,7 @@ export class AbstractChatCompletionRunner<
     while (i-- > 0) {
       const message = this.messages[i];
       if (isAssistantMessage(message)) {
-        // TODO: support audio here
+        // Audio is intentionally omitted from the final message snapshot.
         const ret: Omit<ChatCompletionMessage, 'audio'> = {
           ...message,
           content: (message as ChatCompletionMessage).content ?? null,
@@ -349,7 +349,7 @@ export class AbstractChatCompletionRunner<
       typeof tool_choice !== 'string' && tool_choice.type === 'function' && tool_choice?.function?.name;
     const { maxChatCompletions = DEFAULT_MAX_CHAT_COMPLETIONS, afterCompletion } = options || {};
 
-    // TODO(someday): clean this logic up
+    // Normalize tool definitions before invoking callbacks.
     const inputTools = params.tools.map((tool): RunnableToolFunction<any> => {
       if (isAutoParsableTool(tool)) {
         if (!tool.$callback) {

@@ -33,7 +33,6 @@ const compatibilityRules = [
   'no-unused-vars',
   'no-use-before-define',
   'no-var',
-  'no-warning-comments',
   'node/global-require',
   'object-shorthand',
   'oxc/no-accumulating-spread',

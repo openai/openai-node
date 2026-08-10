@@ -132,7 +132,7 @@ async function getBytes(value: BlobLikePart | AsyncIterable<BlobLikePart>): Prom
     isAsyncIterable(value) // includes Readable, ReadableStream, etc.
   ) {
     for await (const chunk of value) {
-      parts.push(...(await getBytes(chunk as BlobLikePart))); // TODO, consider validating?
+      parts.push(...(await getBytes(chunk as BlobLikePart)));
     }
   } else {
     const constructor = value?.constructor?.name;
