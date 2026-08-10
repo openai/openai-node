@@ -93,9 +93,7 @@ describe('OpenAI with Workload Identity', () => {
   });
 
   test('does not satisfy admin-only auth with workload identity', async () => {
-    global.fetch = vi.fn(async () => {
-      return new Response('Unexpected request', { status: 500 });
-    }) as typeof fetch;
+    global.fetch = vi.fn(async () => new Response('Unexpected request', { status: 500 })) as typeof fetch;
 
     const client = new OpenAI(createTestClientOptions());
 

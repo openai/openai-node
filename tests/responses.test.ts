@@ -57,18 +57,16 @@ describe('request id', () => {
   test('envelope response', async () => {
     const promise = new APIPromise<{ data: { foo: string } }>(
       client,
-      (async () => {
-        return {
-          response: new Response(JSON.stringify({ data: { foo: 'bar' } }), {
-            headers: { 'x-request-id': 'req_id_xxx', 'content-type': 'application/json' },
-          }),
-          controller: {} as any,
-          options: {} as any,
-          requestLogID: 'log_...',
-          retryOfRequestLogID: undefined,
-          startTime: Date.now(),
-        };
-      })(),
+      Promise.resolve({
+        response: new Response(JSON.stringify({ data: { foo: 'bar' } }), {
+          headers: { 'x-request-id': 'req_id_xxx', 'content-type': 'application/json' },
+        }),
+        controller: {} as any,
+        options: {} as any,
+        requestLogID: 'log_...',
+        retryOfRequestLogID: undefined,
+        startTime: Date.now(),
+      }),
     )._thenUnwrap((d) => d.data);
 
     const rsp = await promise;
@@ -93,18 +91,16 @@ describe('request id', () => {
   test('array response', async () => {
     const promise = new APIPromise<Array<{ foo: string }>>(
       client,
-      (async () => {
-        return {
-          response: new Response(JSON.stringify([{ foo: 'bar' }]), {
-            headers: { 'x-request-id': 'req_id_xxx', 'content-type': 'application/json' },
-          }),
-          controller: {} as any,
-          options: {} as any,
-          requestLogID: 'log_...',
-          retryOfRequestLogID: undefined,
-          startTime: Date.now(),
-        };
-      })(),
+      Promise.resolve({
+        response: new Response(JSON.stringify([{ foo: 'bar' }]), {
+          headers: { 'x-request-id': 'req_id_xxx', 'content-type': 'application/json' },
+        }),
+        controller: {} as any,
+        options: {} as any,
+        requestLogID: 'log_...',
+        retryOfRequestLogID: undefined,
+        startTime: Date.now(),
+      }),
     );
 
     const rsp = await promise;
@@ -116,18 +112,16 @@ describe('request id', () => {
   test('string response', async () => {
     const promise = new APIPromise<string>(
       client,
-      (async () => {
-        return {
-          response: new Response('hello world', {
-            headers: { 'x-request-id': 'req_id_xxx', 'content-type': 'application/text' },
-          }),
-          controller: {} as any,
-          options: {} as any,
-          requestLogID: 'log_...',
-          retryOfRequestLogID: undefined,
-          startTime: Date.now(),
-        };
-      })(),
+      Promise.resolve({
+        response: new Response('hello world', {
+          headers: { 'x-request-id': 'req_id_xxx', 'content-type': 'application/text' },
+        }),
+        controller: {} as any,
+        options: {} as any,
+        requestLogID: 'log_...',
+        retryOfRequestLogID: undefined,
+        startTime: Date.now(),
+      }),
     );
 
     const result = await promise;

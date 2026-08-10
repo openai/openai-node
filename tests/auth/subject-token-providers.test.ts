@@ -113,14 +113,15 @@ describe('Azure IMDS Token Provider', () => {
   });
 
   test('uses the configured fetch implementation', async () => {
-    const customFetch = vi.fn(async () => {
-      return new Response(
-        JSON.stringify({
-          access_token: 'azure-token',
-        }),
-        { status: 200 },
-      );
-    }) as typeof fetch;
+    const customFetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            access_token: 'azure-token',
+          }),
+          { status: 200 },
+        ),
+    ) as typeof fetch;
 
     const provider = azureManagedIdentityTokenProvider(undefined, {
       fetch: customFetch,
@@ -131,9 +132,7 @@ describe('Azure IMDS Token Provider', () => {
   });
 
   test('throws SubjectTokenProviderError on failed request', async () => {
-    global.fetch = vi.fn(async () => {
-      return new Response('Not found', { status: 404 });
-    }) as typeof fetch;
+    global.fetch = vi.fn(async () => new Response('Not found', { status: 404 })) as typeof fetch;
 
     const provider = azureManagedIdentityTokenProvider();
     await expect(provider.getToken()).rejects.toThrow(SubjectTokenProviderError);
@@ -141,9 +140,9 @@ describe('Azure IMDS Token Provider', () => {
   });
 
   test('throws SubjectTokenProviderError when access_token missing', async () => {
-    global.fetch = vi.fn(async () => {
-      return new Response(JSON.stringify({ expires_in: '3600' }), { status: 200 });
-    }) as typeof fetch;
+    global.fetch = vi.fn(
+      async () => new Response(JSON.stringify({ expires_in: '3600' }), { status: 200 }),
+    ) as typeof fetch;
 
     const provider = azureManagedIdentityTokenProvider();
     await expect(provider.getToken()).rejects.toThrow(SubjectTokenProviderError);
@@ -181,9 +180,7 @@ describe('GCP Metadata Server Token Provider', () => {
   });
 
   test('uses the configured fetch implementation', async () => {
-    const customFetch = vi.fn(async () => {
-      return new Response('gcp-id-token', { status: 200 });
-    }) as typeof fetch;
+    const customFetch = vi.fn(async () => new Response('gcp-id-token', { status: 200 })) as typeof fetch;
 
     const provider = gcpIDTokenProvider('https://api.openai.com', {
       fetch: customFetch,
@@ -194,9 +191,7 @@ describe('GCP Metadata Server Token Provider', () => {
   });
 
   test('throws SubjectTokenProviderError on failed request', async () => {
-    global.fetch = vi.fn(async () => {
-      return new Response('Unauthorized', { status: 401 });
-    }) as typeof fetch;
+    global.fetch = vi.fn(async () => new Response('Unauthorized', { status: 401 })) as typeof fetch;
 
     const provider = gcpIDTokenProvider();
     await expect(provider.getToken()).rejects.toThrow(SubjectTokenProviderError);

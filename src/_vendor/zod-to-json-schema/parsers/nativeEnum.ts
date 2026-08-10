@@ -7,9 +7,9 @@ export type JsonSchema7NativeEnumType = {
 
 export function parseNativeEnumDef(def: ZodNativeEnumDef): JsonSchema7NativeEnumType {
   const object = def.values;
-  const actualKeys = Object.keys(def.values).filter((key: string) => {
-    return typeof object[object[key]!] !== 'number';
-  });
+  const actualKeys = Object.keys(def.values).filter(
+    (key: string) => typeof object[object[key]!] !== 'number',
+  );
 
   const actualValues = actualKeys.map((key: string) => object[key]!);
 
