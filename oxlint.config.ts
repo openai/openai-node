@@ -50,7 +50,6 @@ const compatibilityRules = [
   'typescript/no-dynamic-delete',
   'typescript/no-explicit-any',
   'typescript/no-import-type-side-effects',
-  'typescript/no-namespace',
   'typescript/no-non-null-assertion',
   'typescript/prefer-ts-expect-error',
   'unicorn/catch-error-name',
@@ -176,6 +175,26 @@ module.exports = defineConfig({
       files: ['tests/path.test.ts'],
       rules: {
         'max-classes-per-file': ['error', { ignoreExpressions: true }],
+      },
+    },
+    {
+      // Jest matcher augmentation and the public ChatCompletionStream type surface
+      // intentionally rely on TypeScript declaration-merging namespaces.
+      files: [
+        'ecosystem-tests/node-ts-cjs-auto/tests/test.ts',
+        'ecosystem-tests/node-ts-cjs-web/tests/test-jsdom.ts',
+        'ecosystem-tests/node-ts-cjs-web/tests/test-node.ts',
+        'ecosystem-tests/node-ts-cjs/tests/test-jsdom.ts',
+        'ecosystem-tests/node-ts-cjs/tests/test-node.ts',
+        'ecosystem-tests/node-ts-esm-auto/tests/test.ts',
+        'ecosystem-tests/node-ts-esm-web/tests/test.ts',
+        'ecosystem-tests/node-ts-esm/tests/test-esnext.ts',
+        'ecosystem-tests/node-ts-esm/tests/test.ts',
+        'ecosystem-tests/node-ts4.5-jest28/tests/test.ts',
+        'src/lib/ChatCompletionStream.ts',
+      ],
+      rules: {
+        'typescript/no-namespace': 'off',
       },
     },
     {
