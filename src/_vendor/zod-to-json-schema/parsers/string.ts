@@ -36,7 +36,7 @@ export const zodPatterns = {
   emoji: () => {
     if (emojiRegex === undefined) {
       const emojiPattern = '^(\\p{Extended_Pictographic}|\\p{Emoji_Component})+$';
-      emojiRegex = RegExp(emojiPattern, 'u');
+      emojiRegex = new RegExp(emojiPattern, 'u');
     }
     return emojiRegex;
   },
@@ -145,10 +145,10 @@ export function parseStringDef(def: ZodStringDef, refs: Refs): JsonSchema7String
           addPattern(res, zodPatterns.cuid2, check.message, refs);
           break;
         case 'startsWith':
-          addPattern(res, RegExp(`^${processPattern(check.value)}`), check.message, refs);
+          addPattern(res, new RegExp(`^${processPattern(check.value)}`), check.message, refs);
           break;
         case 'endsWith':
-          addPattern(res, RegExp(`${processPattern(check.value)}$`), check.message, refs);
+          addPattern(res, new RegExp(`${processPattern(check.value)}$`), check.message, refs);
           break;
 
         case 'datetime':
@@ -180,7 +180,7 @@ export function parseStringDef(def: ZodStringDef, refs: Refs): JsonSchema7String
           );
           break;
         case 'includes': {
-          addPattern(res, RegExp(processPattern(check.value)), check.message, refs);
+          addPattern(res, new RegExp(processPattern(check.value)), check.message, refs);
           break;
         }
         case 'ip': {

@@ -72,7 +72,6 @@ const compatibilityRules = [
   'unicorn/consistent-function-scoping',
   'unicorn/filename-case',
   'unicorn/import-style',
-  'unicorn/new-for-builtins',
   'unicorn/no-anonymous-default-export',
   'unicorn/no-array-for-each',
   'unicorn/no-array-reduce',
