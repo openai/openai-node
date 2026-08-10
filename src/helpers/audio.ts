@@ -61,6 +61,7 @@ async function nodejsPlayAudio(stream: NodeJS.ReadableStream | Response | File):
       ffplay.on('close', (code: number) => {
         if (code !== 0) {
           reject(new Error(`ffplay process exited with code ${code}`));
+          return;
         }
         resolve();
       });

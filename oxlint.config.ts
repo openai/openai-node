@@ -56,7 +56,6 @@ const compatibilityRules = [
   'prefer-object-has-own',
   'prefer-template',
   'promise/avoid-new',
-  'promise/no-multiple-resolved',
   'promise/param-names',
   'promise/prefer-await-to-callbacks',
   'promise/prefer-await-to-then',
