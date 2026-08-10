@@ -525,11 +525,9 @@ export class AssistantStream
       case 'thread.run.step.expired':
         this.#currentRunStepSnapshot = undefined;
         const details = event.data.step_details;
-        if (details.type == 'tool_calls') {
-          if (this.#currentToolCall) {
-            this._emit('toolCallDone', this.#currentToolCall as ToolCall);
-            this.#currentToolCall = undefined;
-          }
+        if (details.type == 'tool_calls' && this.#currentToolCall) {
+          this._emit('toolCallDone', this.#currentToolCall as ToolCall);
+          this.#currentToolCall = undefined;
         }
         this._emit('runStepDone', event.data, accumulatedRunStep);
         break;

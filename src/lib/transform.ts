@@ -593,25 +593,25 @@ function isNullable(schema: JSONSchemaDefinition, root: JSONSchema, seenRefs = n
     return false;
   }
 
-  if (schema.allOf !== undefined) {
-    if (!Array.isArray(schema.allOf) || !schema.allOf.every((variant) => isNullable(variant, root))) {
-      return false;
-    }
+  if (
+    schema.allOf !== undefined &&
+    (!Array.isArray(schema.allOf) || !schema.allOf.every((variant) => isNullable(variant, root)))
+  ) {
+    return false;
   }
 
-  if (schema.anyOf !== undefined) {
-    if (!Array.isArray(schema.anyOf) || !schema.anyOf.some((variant) => isNullable(variant, root))) {
-      return false;
-    }
+  if (
+    schema.anyOf !== undefined &&
+    (!Array.isArray(schema.anyOf) || !schema.anyOf.some((variant) => isNullable(variant, root)))
+  ) {
+    return false;
   }
 
-  if (schema.oneOf !== undefined) {
-    if (
-      !Array.isArray(schema.oneOf) ||
-      schema.oneOf.filter((variant) => isNullable(variant, root)).length !== 1
-    ) {
-      return false;
-    }
+  if (
+    schema.oneOf !== undefined &&
+    (!Array.isArray(schema.oneOf) || schema.oneOf.filter((variant) => isNullable(variant, root)).length !== 1)
+  ) {
+    return false;
   }
 
   // Conditional and negated schemas need a full JSON Schema evaluator to prove
@@ -739,27 +739,25 @@ function ensureStrictJsonSchema(
 
   // Handle intersections (allOf)
   const allOf = jsonSchema.allOf;
-  if (Array.isArray(allOf)) {
-    if (allOf.length === 1 && hasOnlyAnnotationSiblings(jsonSchema, 'allOf')) {
-      const branch = allOf[0]!;
-      if (branch === false) {
-        throw new Error(
-          `Schema at \`${
-            path.join('/') || '<root>'
-          }\` uses \`allOf: [false]\`, which cannot be represented in strict Structured Outputs.`,
-        );
-      }
-      if (branch === true) {
-        // true is the neutral schema for an intersection, so removing this
-        // branch preserves validation while retaining the parent annotations.
-        delete jsonSchema.allOf;
-      } else {
-        const resolved = ensureStrictJsonSchema(branch, [...path, 'allOf', '0'], root);
-        const annotations = { ...jsonSchema };
-        delete annotations.allOf;
-        Object.assign(jsonSchema, resolved, annotations);
-        delete jsonSchema.allOf;
-      }
+  if (Array.isArray(allOf) && allOf.length === 1 && hasOnlyAnnotationSiblings(jsonSchema, 'allOf')) {
+    const branch = allOf[0]!;
+    if (branch === false) {
+      throw new Error(
+        `Schema at \`${
+          path.join('/') || '<root>'
+        }\` uses \`allOf: [false]\`, which cannot be represented in strict Structured Outputs.`,
+      );
+    }
+    if (branch === true) {
+      // true is the neutral schema for an intersection, so removing this
+      // branch preserves validation while retaining the parent annotations.
+      delete jsonSchema.allOf;
+    } else {
+      const resolved = ensureStrictJsonSchema(branch, [...path, 'allOf', '0'], root);
+      const annotations = { ...jsonSchema };
+      delete annotations.allOf;
+      Object.assign(jsonSchema, resolved, annotations);
+      delete jsonSchema.allOf;
     }
   }
 

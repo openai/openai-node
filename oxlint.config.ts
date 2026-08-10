@@ -89,7 +89,6 @@ const compatibilityRules = [
   'unicorn/no-array-sort',
   'unicorn/no-await-expression-member',
   'unicorn/no-console-spaces',
-  'unicorn/no-lonely-if',
   'unicorn/no-negated-condition',
   'unicorn/no-nested-ternary',
   'unicorn/no-typeof-undefined',
