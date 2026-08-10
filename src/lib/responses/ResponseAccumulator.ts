@@ -1,8 +1,4 @@
-import {
-  type Response,
-  type ResponseOutputText,
-  type ResponseStreamEvent,
-} from '../../resources/responses/responses';
+import type { Response, ResponseOutputText, ResponseStreamEvent } from '../../resources/responses/responses';
 import { OpenAIError } from '../../error';
 import { addOutputText } from '../ResponsesParser';
 

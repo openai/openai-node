@@ -1,5 +1,5 @@
 import { OpenAIError, APIError } from './error';
-import { type ReadableStream } from '../internal/shim-types';
+import type { ReadableStream } from '../internal/shim-types';
 import { makeReadableStream, ReadableStreamToAsyncIterable } from '../internal/shims';
 import { findDoubleNewlineIndex, LineDecoder } from '../internal/decoders/line';
 import { isAbortError } from '../internal/errors';

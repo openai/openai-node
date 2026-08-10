@@ -1,6 +1,6 @@
-import {
-  type ChatCompletionMessageParam,
-  type ChatCompletionCreateParamsNonStreaming,
+import type {
+  ChatCompletionMessageParam,
+  ChatCompletionCreateParamsNonStreaming,
 } from '../resources/chat/completions';
 import { type BaseFunctionsArgs, RunnableTools } from './RunnableFunction';
 import {
