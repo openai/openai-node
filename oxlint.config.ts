@@ -9,7 +9,6 @@ const compatibilityRules = [
   'curly',
   'func-names',
   'func-style',
-  'import/no-cycle',
   'no-use-before-define',
   'prefer-arrow-callback',
   'require-await',
@@ -931,6 +930,28 @@ module.exports = defineConfig({
       ],
       rules: {
         'typescript/no-non-null-assertion': 'off',
+      },
+    },
+    {
+      // These are the two existing SDK/vendor cycle clusters; untangling module
+      // topology would be a behavior and public-surface refactor, not lint cleanup.
+      files: [
+        'src/_vendor/zod-to-json-schema/**',
+        'src/azure.ts',
+        'src/bedrock.ts',
+        'src/core/streaming.ts',
+        'src/lib/AbstractChatCompletionRunner.ts',
+        'src/lib/AssistantStream.ts',
+        'src/lib/ChatCompletionRunner.ts',
+        'src/lib/ChatCompletionStream.ts',
+        'src/lib/ChatCompletionStreamingRunner.ts',
+        'src/lib/ResponsesParser.ts',
+        'src/lib/parser.ts',
+        'src/lib/responses/ResponseAccumulator.ts',
+        'src/lib/responses/ResponseStream.ts',
+      ],
+      rules: {
+        'import/no-cycle': 'off',
       },
     },
     {
