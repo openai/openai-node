@@ -50,9 +50,8 @@ export function maybeParseResponse<
               parsed: null,
             })),
           };
-        } else {
-          return item;
         }
+        return item;
       }),
     };
 

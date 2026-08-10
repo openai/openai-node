@@ -10,14 +10,13 @@ function decideAdditionalProperties(def: ZodObjectDef, refs: Refs) {
           ...refs,
           currentPath: [...refs.currentPath, 'additionalProperties'],
         }) ?? true);
-  } else {
-    return def.catchall._def.typeName === 'ZodNever'
-      ? def.unknownKeys === 'passthrough'
-      : (parseDef(def.catchall._def, {
-          ...refs,
-          currentPath: [...refs.currentPath, 'additionalProperties'],
-        }) ?? true);
   }
+  return def.catchall._def.typeName === 'ZodNever'
+    ? def.unknownKeys === 'passthrough'
+    : (parseDef(def.catchall._def, {
+        ...refs,
+        currentPath: [...refs.currentPath, 'additionalProperties'],
+      }) ?? true);
 }
 
 export type JsonSchema7ObjectType = {

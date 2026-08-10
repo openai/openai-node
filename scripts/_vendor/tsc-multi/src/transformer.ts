@@ -326,9 +326,8 @@ export function createTransformer<T extends ts.SourceFile | ts.Bundle>(
             return pureClassAssignment(visitNode(file, visitor) as ts.SourceFile);
           }),
         ) as any;
-      } else {
-        assert(false);
       }
+      assert(false);
     };
   };
 }
