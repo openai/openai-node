@@ -62,7 +62,6 @@ const compatibilityRules = [
   'typescript/no-dynamic-delete',
   'typescript/no-explicit-any',
   'typescript/no-import-type-side-effects',
-  'typescript/no-inferrable-types',
   'typescript/no-namespace',
   'typescript/no-non-null-assertion',
   'typescript/parameter-properties',

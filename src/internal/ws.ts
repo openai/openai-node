@@ -84,10 +84,10 @@ function rawByteLength(data: RawWebSocketData): number {
  */
 export class SendQueue<T = unknown> {
   private _queue: QueueEntry[] = [];
-  private _bytes: number = 0;
+  private _bytes = 0;
   private _maxBytes: number;
 
-  constructor(maxBytes: number = 1_048_576) {
+  constructor(maxBytes = 1_048_576) {
     this._maxBytes = maxBytes;
   }
 
