@@ -490,7 +490,7 @@ export class AssistantStream
       case 'thread.run.step.created':
         this._emit('runStepCreated', event.data);
         break;
-      case 'thread.run.step.delta':
+      case 'thread.run.step.delta': {
         const delta = event.data.delta;
         if (
           delta.step_details &&
@@ -519,10 +519,11 @@ export class AssistantStream
 
         this._emit('runStepDelta', event.data.delta, accumulatedRunStep);
         break;
+      }
       case 'thread.run.step.completed':
       case 'thread.run.step.failed':
       case 'thread.run.step.cancelled':
-      case 'thread.run.step.expired':
+      case 'thread.run.step.expired': {
         this.#currentRunStepSnapshot = undefined;
         const details = event.data.step_details;
         if (details.type == 'tool_calls' && this.#currentToolCall) {
@@ -531,6 +532,7 @@ export class AssistantStream
         }
         this._emit('runStepDone', event.data, accumulatedRunStep);
         break;
+      }
       case 'thread.run.step.in_progress':
         break;
     }
@@ -547,7 +549,7 @@ export class AssistantStream
         this.#runStepSnapshots[event.data.id] = event.data;
         return event.data;
 
-      case 'thread.run.step.delta':
+      case 'thread.run.step.delta': {
         const snapshot = this.#runStepSnapshots[event.data.id] as Runs.RunStep;
         if (!snapshot) {
           throw new Error('Received a RunStepDelta before creation of a snapshot');
@@ -561,6 +563,7 @@ export class AssistantStream
         }
 
         return this.#runStepSnapshots[event.data.id] as Runs.RunStep;
+      }
 
       case 'thread.run.step.completed':
       case 'thread.run.step.failed':
@@ -586,7 +589,7 @@ export class AssistantStream
         //On creation the snapshot is just the initial message
         return [event.data, newContent];
 
-      case 'thread.message.delta':
+      case 'thread.message.delta': {
         if (!snapshot) {
           throw new Error(
             'Received a delta with no existing snapshot (there should be one from message creation)',
@@ -613,6 +616,7 @@ export class AssistantStream
         }
 
         return [snapshot, newContent];
+      }
 
       case 'thread.message.in_progress':
       case 'thread.message.completed':
