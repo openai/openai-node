@@ -1,11 +1,11 @@
 import { spawnSync } from 'node:child_process';
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import path from 'node:path';
 
 const repoRoot = process.cwd();
-const oxlint = join(repoRoot, 'node_modules/oxlint/bin/oxlint');
-const oxfmt = join(repoRoot, 'node_modules/oxfmt/bin/oxfmt');
+const oxlint = path.join(repoRoot, 'node_modules/oxlint/bin/oxlint');
+const oxfmt = path.join(repoRoot, 'node_modules/oxfmt/bin/oxfmt');
 
 test('inherits Ultracite native plugins and enforces their rules', () => {
   const printed = spawnSync(process.execPath, [oxlint, '--print-config', 'src/internal/uploads.ts'], {
@@ -26,15 +26,15 @@ test('inherits Ultracite native plugins and enforces their rules', () => {
   );
   expect(configuration.rules['unicorn/no-instanceof-array']).toBe('deny');
 
-  const fixtureRoot = mkdtempSync(join(tmpdir(), 'openai-node-oxlint-config-'));
+  const fixtureRoot = mkdtempSync(path.join(tmpdir(), 'openai-node-oxlint-config-'));
 
   try {
-    const fixturePath = join(fixtureRoot, 'native-plugin.ts');
+    const fixturePath = path.join(fixtureRoot, 'native-plugin.ts');
     writeFileSync(fixturePath, 'const values = [];\nconsole.log(values instanceof Array);\n');
 
     const linted = spawnSync(
       process.execPath,
-      [oxlint, '--config', join(repoRoot, 'oxlint.config.ts'), '--format', 'json', fixturePath],
+      [oxlint, '--config', path.join(repoRoot, 'oxlint.config.ts'), '--format', 'json', fixturePath],
       { cwd: repoRoot, encoding: 'utf8' },
     );
 
@@ -45,7 +45,7 @@ test('inherits Ultracite native plugins and enforces their rules', () => {
 
     const formatted = spawnSync(
       process.execPath,
-      [oxfmt, '--config', join(repoRoot, 'oxfmt.config.ts'), '--check', fixturePath],
+      [oxfmt, '--config', path.join(repoRoot, 'oxfmt.config.ts'), '--check', fixturePath],
       { cwd: repoRoot, encoding: 'utf8' },
     );
 
@@ -56,21 +56,21 @@ test('inherits Ultracite native plugins and enforces their rules', () => {
 });
 
 test('recognizes both Stainless and Castiron generated SDK files', () => {
-  const fixtureRoot = mkdtempSync(join(tmpdir(), 'openai-node-generated-files-'));
+  const fixtureRoot = mkdtempSync(path.join(tmpdir(), 'openai-node-generated-files-'));
 
   try {
-    const scriptsDirectory = join(fixtureRoot, 'scripts');
+    const scriptsDirectory = path.join(fixtureRoot, 'scripts');
     mkdirSync(scriptsDirectory);
-    const generatedFilesScript = join(scriptsDirectory, 'stainless-generated-files.cjs');
-    copyFileSync(join(repoRoot, 'scripts/stainless-generated-files.cjs'), generatedFilesScript);
+    const generatedFilesScript = path.join(scriptsDirectory, 'stainless-generated-files.cjs');
+    copyFileSync(path.join(repoRoot, 'scripts/stainless-generated-files.cjs'), generatedFilesScript);
 
     for (const generator of ['Stainless', 'Castiron']) {
       writeFileSync(
-        join(fixtureRoot, `${generator.toLowerCase()}.ts`),
+        path.join(fixtureRoot, `${generator.toLowerCase()}.ts`),
         `// File generated from our OpenAPI spec by ${generator}. See CONTRIBUTING.md for details.\n`,
       );
     }
-    writeFileSync(join(fixtureRoot, 'handwritten.ts'), 'export const handwritten = true;\n');
+    writeFileSync(path.join(fixtureRoot, 'handwritten.ts'), 'export const handwritten = true;\n');
 
     const generatedFiles = require(generatedFilesScript) as string[];
     expect(generatedFiles).toEqual(['castiron.ts', 'stainless.ts']);
@@ -110,15 +110,15 @@ test('formats generated SDK files without linting them', () => {
 });
 
 test('removes adjacent unused imports from generated files until fixes stabilize', () => {
-  const fixtureRoot = mkdtempSync(join(repoRoot, '.oxlint-generated-imports-'));
+  const fixtureRoot = mkdtempSync(path.join(repoRoot, '.oxlint-generated-imports-'));
 
   try {
-    const handwrittenPath = join(fixtureRoot, 'handwritten.ts');
+    const handwrittenPath = path.join(fixtureRoot, 'handwritten.ts');
     const handwritten = "import { HandwrittenUnused } from './dependency';\nexport const value = 1;\n";
     writeFileSync(handwrittenPath, handwritten);
 
     for (const generator of ['Stainless', 'Castiron']) {
-      const generatedPath = join(fixtureRoot, `${generator.toLowerCase()}.ts`);
+      const generatedPath = path.join(fixtureRoot, `${generator.toLowerCase()}.ts`);
       const imports = Array.from(
         { length: 20 },
         (_, index) => `import { Unused${index} } from './dependency-${index}';`,
@@ -140,7 +140,7 @@ test('removes adjacent unused imports from generated files until fixes stabilize
 
       const fixed = spawnSync(
         process.execPath,
-        [join(repoRoot, 'scripts/lint-generated.cjs'), '--fix', generatedPath, handwrittenPath],
+        [path.join(repoRoot, 'scripts/lint-generated.cjs'), '--fix', generatedPath, handwrittenPath],
         { cwd: repoRoot, encoding: 'utf8' },
       );
 
@@ -160,22 +160,22 @@ test('removes adjacent unused imports from generated files until fixes stabilize
 });
 
 test('limits generated import cleanup to paths supplied through a fast-format file list', () => {
-  const fixtureRoot = mkdtempSync(join(repoRoot, '.oxlint-generated-file-list-'));
+  const fixtureRoot = mkdtempSync(path.join(repoRoot, '.oxlint-generated-file-list-'));
 
   try {
     const header = '// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.';
-    const selectedPath = join(fixtureRoot, 'selected.ts');
-    const untouchedPath = join(fixtureRoot, 'untouched.ts');
+    const selectedPath = path.join(fixtureRoot, 'selected.ts');
+    const untouchedPath = path.join(fixtureRoot, 'untouched.ts');
     const source = `${header}\nimport { Unused } from './dependency';\nexport const value = 1;\n`;
     writeFileSync(selectedPath, source);
     writeFileSync(untouchedPath, source);
 
-    const fileList = join(fixtureRoot, 'files.txt');
+    const fileList = path.join(fixtureRoot, 'files.txt');
     writeFileSync(fileList, `${selectedPath}\n`);
 
     const fixed = spawnSync(
       process.execPath,
-      [join(repoRoot, 'scripts/lint-generated.cjs'), '--fix', '--file-list', fileList],
+      [path.join(repoRoot, 'scripts/lint-generated.cjs'), '--fix', '--file-list', fileList],
       { cwd: repoRoot, encoding: 'utf8' },
     );
 
@@ -188,10 +188,10 @@ test('limits generated import cleanup to paths supplied through a fast-format fi
 });
 
 test('checks unused generated imports without rejecting intentionally unused variables', () => {
-  const fixtureRoot = mkdtempSync(join(repoRoot, '.oxlint-generated-check-'));
+  const fixtureRoot = mkdtempSync(path.join(repoRoot, '.oxlint-generated-check-'));
 
   try {
-    const generatedPath = join(fixtureRoot, 'generated.ts');
+    const generatedPath = path.join(fixtureRoot, 'generated.ts');
     const source = [
       '// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.',
       "import { Unused } from './dependency';",
@@ -203,7 +203,7 @@ test('checks unused generated imports without rejecting intentionally unused var
 
     const checked = spawnSync(
       process.execPath,
-      [join(repoRoot, 'scripts/lint-generated.cjs'), '--check', generatedPath],
+      [path.join(repoRoot, 'scripts/lint-generated.cjs'), '--check', generatedPath],
       { cwd: repoRoot, encoding: 'utf8' },
     );
 
@@ -215,7 +215,7 @@ test('checks unused generated imports without rejecting intentionally unused var
 
     const fixed = spawnSync(
       process.execPath,
-      [join(repoRoot, 'scripts/lint-generated.cjs'), '--fix', generatedPath],
+      [path.join(repoRoot, 'scripts/lint-generated.cjs'), '--fix', generatedPath],
       { cwd: repoRoot, encoding: 'utf8' },
     );
 
@@ -224,7 +224,7 @@ test('checks unused generated imports without rejecting intentionally unused var
 
     const rechecked = spawnSync(
       process.execPath,
-      [join(repoRoot, 'scripts/lint-generated.cjs'), '--check', generatedPath],
+      [path.join(repoRoot, 'scripts/lint-generated.cjs'), '--check', generatedPath],
       { cwd: repoRoot, encoding: 'utf8' },
     );
 
@@ -236,20 +236,20 @@ test('checks unused generated imports without rejecting intentionally unused var
 });
 
 test('rejects SDK package imports in generated source but allows them in generated tests', () => {
-  const sourceRoot = mkdtempSync(join(repoRoot, 'src', '.oxlint-generated-source-'));
-  const testsRoot = mkdtempSync(join(repoRoot, 'tests', '.oxlint-generated-tests-'));
+  const sourceRoot = mkdtempSync(path.join(repoRoot, 'src', '.oxlint-generated-source-'));
+  const testsRoot = mkdtempSync(path.join(repoRoot, 'tests', '.oxlint-generated-tests-'));
 
   try {
     const header = '// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.';
-    const sourcePath = join(sourceRoot, 'client.ts');
-    const testPath = join(testsRoot, 'client.test.ts');
+    const sourcePath = path.join(sourceRoot, 'client.ts');
+    const testPath = path.join(testsRoot, 'client.test.ts');
     const source = `${header}\nimport OpenAI from 'openai';\nexport const client = OpenAI;\n`;
     writeFileSync(sourcePath, source);
     writeFileSync(testPath, source);
 
     const checkedSource = spawnSync(
       process.execPath,
-      [join(repoRoot, 'scripts/lint-generated.cjs'), '--check', sourcePath],
+      [path.join(repoRoot, 'scripts/lint-generated.cjs'), '--check', sourcePath],
       { cwd: repoRoot, encoding: 'utf8' },
     );
 
@@ -259,7 +259,7 @@ test('rejects SDK package imports in generated source but allows them in generat
 
     const fixedSource = spawnSync(
       process.execPath,
-      [join(repoRoot, 'scripts/lint-generated.cjs'), '--fix', sourcePath],
+      [path.join(repoRoot, 'scripts/lint-generated.cjs'), '--fix', sourcePath],
       { cwd: repoRoot, encoding: 'utf8' },
     );
 
@@ -269,7 +269,7 @@ test('rejects SDK package imports in generated source but allows them in generat
     for (const mode of ['--check', '--fix']) {
       const generatedTest = spawnSync(
         process.execPath,
-        [join(repoRoot, 'scripts/lint-generated.cjs'), mode, testPath],
+        [path.join(repoRoot, 'scripts/lint-generated.cjs'), mode, testPath],
         { cwd: repoRoot, encoding: 'utf8' },
       );
 
@@ -283,10 +283,10 @@ test('rejects SDK package imports in generated source but allows them in generat
 });
 
 test('checks and fixes generated imports through the public package commands', () => {
-  const fixtureRoot = mkdtempSync(join(repoRoot, '.oxlint-public-entrypoints-'));
+  const fixtureRoot = mkdtempSync(path.join(repoRoot, '.oxlint-public-entrypoints-'));
 
   try {
-    const generatedPath = join(fixtureRoot, 'generated.ts');
+    const generatedPath = path.join(fixtureRoot, 'generated.ts');
     writeFileSync(
       generatedPath,
       [

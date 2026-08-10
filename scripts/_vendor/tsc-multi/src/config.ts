@@ -1,4 +1,4 @@
-import { dirname, resolve } from 'path';
+import nodePath = require('path');
 import { object, string, array, Infer, validate, optional, type, integer, min, boolean } from 'superstruct';
 import Debug from './debug';
 import { readJSON, tryReadJSON } from './utils';
@@ -41,7 +41,7 @@ export interface LoadConfigOptions {
 
 export async function loadConfig({ cwd = process.cwd(), path }: LoadConfigOptions): Promise<Config> {
   const mustLoadConfig = !!path;
-  const configPath = resolve(cwd, path || 'tsc-multi.json');
+  const configPath = nodePath.resolve(cwd, path || 'tsc-multi.json');
 
   debug('Read config from %s', configPath);
 
@@ -61,6 +61,6 @@ export async function loadConfig({ cwd = process.cwd(), path }: LoadConfigOption
   return {
     ...config,
     cwd,
-    projects: await resolveProjectPath(dirname(configPath), config.projects || []),
+    projects: await resolveProjectPath(nodePath.dirname(configPath), config.projects || []),
   };
 }
