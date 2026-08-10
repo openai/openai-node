@@ -11,7 +11,7 @@ export const config = {
   ],
 };
 
-export default async (request: NextRequest) => {
+export default async function handler(request: NextRequest) {
   const openai = new OpenAI();
 
   const result = await openai.completions.create({
@@ -19,4 +19,4 @@ export default async (request: NextRequest) => {
     model: 'gpt-3.5-turbo-instruct',
   });
   return NextResponse.json(result);
-};
+}

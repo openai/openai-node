@@ -11,10 +11,10 @@ export const config = {
   ],
 };
 
-export default async (request: NextRequest) => {
+export default async function handler(request: NextRequest) {
   const openai = new OpenAI();
 
   const result = await openai.beta.assistants.list({ limit: 10 });
 
   return NextResponse.json(result);
-};
+}
