@@ -723,7 +723,7 @@ function ensureStrictJsonSchema(
   const items = jsonSchema.items;
   const additionalItems = jsonSchema.additionalItems;
   if (Array.isArray(items)) {
-    throw new Error(
+    throw new TypeError(
       `Schema at \`${
         path.join('/') || '<root>'
       }\` uses tuple-form \`items\`, which cannot be represented in strict Structured Outputs.`,

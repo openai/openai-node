@@ -683,7 +683,9 @@ export class AssistantStream
           }
 
           if (typeof index !== 'number') {
-            throw new Error(`Expected array delta entry \`index\` property to be a number but got ${index}`);
+            throw new TypeError(
+              `Expected array delta entry \`index\` property to be a number but got ${index}`,
+            );
           }
 
           const accEntry = accValue[index];
@@ -691,7 +693,9 @@ export class AssistantStream
         }
         continue;
       } else {
-        throw new Error(`Unhandled record type: ${key}, deltaValue: ${deltaValue}, accValue: ${accValue}`);
+        throw new TypeError(
+          `Unhandled record type: ${key}, deltaValue: ${deltaValue}, accValue: ${accValue}`,
+        );
       }
       acc[key] = accValue;
     }
