@@ -38,7 +38,6 @@ const compatibilityRules = [
   'no-shadow',
   'no-sparse-arrays',
   'no-unsafe-optional-chaining',
-  'no-unused-expressions',
   'no-unused-vars',
   'no-use-before-define',
   'no-useless-concat',

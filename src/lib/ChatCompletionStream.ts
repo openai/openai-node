@@ -445,7 +445,6 @@ export class ChatCompletionStream<ParsedT = null>
     params: ChatCompletionCreateParams,
     options?: RequestOptions,
   ): Promise<ParsedChatCompletion<ParsedT>> {
-    super._createChatCompletion;
     this._listenForAbort(options?.signal);
     this.#beginRequest();
 

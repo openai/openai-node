@@ -453,8 +453,7 @@ function _typeTests() {
           function: (_args, _runner, context) => {
             const eventId: string = context.eventId;
             // @ts-expect-error tool context only includes eventId
-            context.missing;
-            return eventId;
+            return context.missing ?? eventId;
           },
           parameters: {},
           description: 'updates an event',
