@@ -105,11 +105,11 @@ type StandardToolOptions<Parameters extends StandardSchemaLike> = {
 
 type StandardToolReturnOptions<
   Parameters extends StandardSchemaLike,
-  Function extends StandardToolFunction<Parameters> | undefined,
+  ToolFunction extends StandardToolFunction<Parameters> | undefined,
 > = {
   arguments: InferStandardOutput<Parameters>;
   name: string;
-  function: Function;
+  function: ToolFunction;
 };
 
 function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
@@ -507,10 +507,10 @@ export function standardTextFormat<Schema extends StandardSchemaLike>(
  */
 export function standardFunction<
   Parameters extends StandardSchemaLike,
-  Function extends StandardToolFunction<Parameters>,
+  ToolFunction extends StandardToolFunction<Parameters>,
 >(
-  options: StandardToolOptions<Parameters> & { function: Function },
-): AutoParseableTool<StandardToolReturnOptions<Parameters, Function>>;
+  options: StandardToolOptions<Parameters> & { function: ToolFunction },
+): AutoParseableTool<StandardToolReturnOptions<Parameters, ToolFunction>>;
 export function standardFunction<Parameters extends StandardSchemaLike>(
   options: StandardToolOptions<Parameters> & { function?: undefined },
 ): AutoParseableTool<StandardToolReturnOptions<Parameters, undefined>>;
@@ -542,10 +542,10 @@ export function standardFunction<Parameters extends StandardSchemaLike>(
  */
 export function standardResponsesFunction<
   Parameters extends StandardSchemaLike,
-  Function extends StandardToolFunction<Parameters>,
+  ToolFunction extends StandardToolFunction<Parameters>,
 >(
-  options: StandardToolOptions<Parameters> & { function: Function },
-): AutoParseableResponseTool<StandardToolReturnOptions<Parameters, Function>>;
+  options: StandardToolOptions<Parameters> & { function: ToolFunction },
+): AutoParseableResponseTool<StandardToolReturnOptions<Parameters, ToolFunction>>;
 export function standardResponsesFunction<Parameters extends StandardSchemaLike>(
   options: StandardToolOptions<Parameters> & { function?: undefined },
 ): AutoParseableResponseTool<StandardToolReturnOptions<Parameters, undefined>>;

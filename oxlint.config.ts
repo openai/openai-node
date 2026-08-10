@@ -44,7 +44,6 @@ const compatibilityRules = [
   'sort-keys',
   'typescript/array-type',
   'typescript/ban-ts-comment',
-  'typescript/ban-types',
   'typescript/consistent-indexed-object-style',
   'typescript/consistent-type-definitions',
   'typescript/consistent-type-imports',
@@ -137,6 +136,7 @@ module.exports = defineConfig({
         'src/_vendor/zod-to-json-schema/parsers/unknown.ts',
       ],
       rules: {
+        'typescript/ban-types': 'off',
         'typescript/no-empty-object-type': 'off',
       },
     },

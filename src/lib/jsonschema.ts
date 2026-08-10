@@ -12,14 +12,8 @@
  * @see https://tools.ietf.org/html/draft-handrews-json-schema-validation-01#section-6.1.1
  */
 export type JSONSchemaTypeName =
-  | ({} & string)
-  | 'string'
-  | 'number'
-  | 'integer'
-  | 'boolean'
-  | 'object'
-  | 'array'
-  | 'null';
+  // oxlint-disable-next-line typescript/ban-types -- The empty intersection preserves literal-union widening for arbitrary JSON Schema type names.
+  ({} & string) | 'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array' | 'null';
 
 /**
  * Primitive type
