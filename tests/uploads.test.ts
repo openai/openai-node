@@ -5,7 +5,7 @@ import type { ResponseLike } from 'openai/internal/to-file';
 import { toFile } from 'openai/core/uploads';
 
 class MyClass {
-  name: string = 'foo';
+  name = 'foo';
 }
 
 function mockResponse({ url, content }: { url: string; content?: Blob }): ResponseLike {

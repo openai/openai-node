@@ -22,7 +22,7 @@ async function defaultReadFile(path: string): Promise<string> {
 }
 
 export function k8sServiceAccountTokenProvider(
-  tokenPath: string = '/var/run/secrets/kubernetes.io/serviceaccount/token',
+  tokenPath = '/var/run/secrets/kubernetes.io/serviceaccount/token',
   config?: {
     readFile?: ReadFile;
   },
@@ -134,7 +134,7 @@ export function azureManagedIdentityTokenProvider(
 }
 
 export function gcpIDTokenProvider(
-  audience: string = 'https://api.openai.com/v1',
+  audience = 'https://api.openai.com/v1',
   config?: { timeout?: number; fetch?: Fetch },
 ): SubjectTokenProvider {
   const timeout = config?.timeout || 10000;

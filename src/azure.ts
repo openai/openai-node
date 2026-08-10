@@ -43,7 +43,7 @@ export interface AzureClientOptions extends Omit<ClientOptions, 'provider'> {
 /** API Client for interfacing with the Azure OpenAI API. */
 export class AzureOpenAI extends OpenAI {
   deploymentName: string | undefined;
-  apiVersion: string = '';
+  apiVersion = '';
 
   /**
    * API Client for interfacing with the Azure OpenAI API.
