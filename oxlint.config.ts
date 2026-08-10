@@ -7,7 +7,6 @@ const stainlessGeneratedFiles = requireConfig('./scripts/stainless-generated-fil
 // Existing handwritten SDK patterns predate these preset rules.
 const compatibilityRules = [
   'curly',
-  'func-names',
   'func-style',
   'no-use-before-define',
   'sort-keys',
@@ -517,9 +516,11 @@ module.exports = defineConfig({
         'tests/form.test.ts',
         'tests/helpers/standard-schema.test.ts',
         'tests/internal/uploads-branches.test.ts',
+        'tests/internal/stream-utils.test.ts',
         'tests/lib/azure.test.ts',
         'tests/lib/ChatCompletionRunFunctions.test.ts',
         'tests/lib/responsesWebSocket.test.ts',
+        'tests/lib/streaming-core.test.ts',
         'tests/lib/transform.test.ts',
         'tests/lib/workload-identity.test.ts',
         'tests/qs/stringify.test.ts',

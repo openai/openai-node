@@ -173,7 +173,7 @@ describe('Stream.tee', () => {
     const controller = new AbortController();
     const source = new Stream(
       () =>
-        (async function* () {
+        (async function* sourceItems() {
           yield 1;
           yield 2;
           yield 3;
@@ -201,7 +201,7 @@ describe('Stream.toReadableStream', () => {
   test('round-trips structured values as newline-delimited JSON', async () => {
     const original = new Stream(
       () =>
-        (async function* () {
+        (async function* originalItems() {
           yield { id: 1 };
           yield { id: 2 };
         })(),

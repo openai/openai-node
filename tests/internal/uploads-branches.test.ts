@@ -263,7 +263,7 @@ describe('lazy multipart stream encoding', () => {
       {
         body: {
           upload: toStreamingFile(
-            (async function* () {
+            (async function* upload() {
               yield legacyBlob;
             })(),
             'legacy.bin',

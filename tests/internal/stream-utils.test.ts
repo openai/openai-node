@@ -12,7 +12,7 @@ describe.each([
   ['runtime shim stream adapter', adaptShimReadableStream],
 ])('%s', (_name, adapt) => {
   test('returns streams that are already asynchronously iterable unchanged', () => {
-    const stream = (async function* () {
+    const stream = (async function* stream() {
       yield 'value';
     })();
 
@@ -73,7 +73,7 @@ describe('ReadableStreamFrom', () => {
 
     const asynchronous: string[] = [];
     for await (const value of ReadableStreamFrom(
-      (async function* () {
+      (async function* chunks() {
         yield 'first';
         yield 'second';
       })(),
