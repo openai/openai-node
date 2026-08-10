@@ -38,7 +38,6 @@ const compatibilityRules = [
   'no-unsafe-optional-chaining',
   'no-unused-vars',
   'no-use-before-define',
-  'no-useless-return',
   'no-var',
   'no-warning-comments',
   'node/global-require',

@@ -1009,7 +1009,7 @@ type AssertIsEmpty<T extends {}> = keyof T extends never ? T : never;
  * destructured.
  */
 function assertIsEmpty<T extends {}>(obj: AssertIsEmpty<T>): asserts obj is AssertIsEmpty<T> {
-  return;
+  void obj;
 }
 
 function assertNever(_x: never) {}

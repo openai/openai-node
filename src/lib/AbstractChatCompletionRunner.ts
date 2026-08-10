@@ -214,7 +214,7 @@ export class AbstractChatCompletionRunner<
       }
     }
 
-    return;
+    return undefined;
   }
 
   /**
@@ -243,7 +243,7 @@ export class AbstractChatCompletionRunner<
       }
     }
 
-    return;
+    return undefined;
   }
 
   async finalFunctionToolCallResult(): Promise<string | undefined> {
@@ -498,8 +498,6 @@ export class AbstractChatCompletionRunner<
 
       await afterCompletion?.(chatCompletion, runner);
     }
-
-    return;
   }
 
   #stringifyFunctionCallResult(rawContent: unknown): string {
