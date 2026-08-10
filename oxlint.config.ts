@@ -11,7 +11,6 @@ const compatibilityRules = [
   'func-style',
   'no-use-before-define',
   'prefer-arrow-callback',
-  'require-await',
   'sort-keys',
   'typescript/consistent-type-imports',
   'typescript/no-explicit-any',
@@ -1004,6 +1003,29 @@ module.exports = defineConfig({
       ],
       rules: {
         'require-unicode-regexp': 'off',
+      },
+    },
+    {
+      // These async fixtures and SDK contracts intentionally preserve promise
+      // return shapes, rejection timing, or iterator interfaces even without await.
+      files: [
+        'examples/**',
+        'tests/**',
+        'ecosystem-tests/ts-browser-webpack/src/index.ts',
+        'scripts/_vendor/tsc-multi/src/config.ts',
+        'src/azure.ts',
+        'src/bedrock.ts',
+        'src/core/streaming.ts',
+        'src/helpers/audio.ts',
+        'src/internal/bedrock.ts',
+        'src/lib/AssistantStream.ts',
+        'src/lib/ChatCompletionStream.ts',
+        'src/lib/ChatCompletionStreamingRunner.ts',
+        'src/lib/responses/ResponseStream.ts',
+        'src/providers/bedrock/aws.ts',
+      ],
+      rules: {
+        'require-await': 'off',
       },
     },
     {
