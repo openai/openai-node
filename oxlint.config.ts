@@ -22,7 +22,6 @@ const compatibilityRules = [
   'no-var',
   'prefer-arrow-callback',
   'prefer-destructuring',
-  'prefer-named-capture-group',
   'prefer-template',
   'require-await',
   'require-unicode-regexp',
@@ -390,6 +389,25 @@ module.exports = defineConfig({
       ],
       rules: {
         'promise/avoid-new': 'off',
+      },
+    },
+    {
+      // These validation and tooling regular expressions intentionally use legacy
+      // positional or non-semantic groups; renaming groups can change regex consumers.
+      files: [
+        'scripts/_vendor/tsc-multi/src/transformer.ts',
+        'scripts/_vendor/tsc-multi/src/worker/worker.ts',
+        'scripts/check-node-version-policy.ts',
+        'scripts/utils/check-version.cjs',
+        'scripts/utils/fix-index-exports.cjs',
+        'scripts/utils/make-dist-package-json.cjs',
+        'scripts/utils/postprocess-files.cjs',
+        'src/_vendor/zod-to-json-schema/parsers/string.ts',
+        'src/providers/bedrock/aws.ts',
+        'vitest.config.mts',
+      ],
+      rules: {
+        'prefer-named-capture-group': 'off',
       },
     },
     {
