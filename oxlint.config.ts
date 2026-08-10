@@ -77,7 +77,6 @@ const compatibilityRules = [
   'typescript/no-invalid-void-type',
   'typescript/no-namespace',
   'typescript/no-non-null-assertion',
-  'typescript/no-unsafe-function-type',
   'typescript/no-wrapper-object-types',
   'typescript/parameter-properties',
   'typescript/prefer-for-of',

@@ -105,7 +105,7 @@ type ToolOptions = {
 
 export type AutoParseableTool<
   OptionsT extends ToolOptions,
-  HasFunction = OptionsT['function'] extends Function ? true : false,
+  HasFunction = OptionsT['function'] extends (...args: never[]) => unknown ? true : false,
 > = ChatCompletionFunctionTool & {
   __arguments: OptionsT['arguments']; // type-level only
   __name: OptionsT['name']; // type-level only
