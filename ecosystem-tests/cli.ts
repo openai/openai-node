@@ -258,16 +258,16 @@ async function main() {
   // Some projects, e.g. Deno can be slow to run, so offer the option to skip them. Example:
   //   --skip=deno node-ts-cjs
   if (args.skip.length > 0) {
-    args.skip.forEach((projectName, idx) => {
+    for (const [idx, projectName] of args.skip.entries()) {
       // Ensure the inputted project name is lower case
       args.skip[idx] = (projectName + '').toLowerCase();
-    });
+    }
 
     projectNames = projectNames.filter((projectName) => !(args.skip as string[]).includes(projectName));
 
-    args.skip.forEach((projectName) => {
+    for (const projectName of args.skip) {
       projectNamesSet.delete(projectName as any);
-    });
+    }
   }
 
   const tmpFolderPath = path.resolve(process.cwd(), 'tmp');
