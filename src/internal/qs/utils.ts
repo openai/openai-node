@@ -30,9 +30,9 @@ function compact_queue<T extends Record<string, any>>(queue: Array<{ obj: T; pro
     if (isArray(obj)) {
       const compacted: unknown[] = [];
 
-      for (let j = 0; j < obj.length; ++j) {
-        if (typeof obj[j] !== 'undefined') {
-          compacted.push(obj[j]);
+      for (const value of obj) {
+        if (typeof value !== 'undefined') {
+          compacted.push(value);
         }
       }
 
@@ -218,14 +218,12 @@ export function compact(value: any) {
   const queue = [{ obj: { o: value }, prop: 'o' }];
   const refs: object[] = [];
 
-  for (let i = 0; i < queue.length; ++i) {
-    const item = queue[i];
+  for (const item of queue) {
     // @ts-ignore
     const obj = item.obj[item.prop];
 
     const keys = Object.keys(obj);
-    for (let j = 0; j < keys.length; ++j) {
-      const key = keys[j]!;
+    for (const key of keys) {
       const val = obj[key];
       if (typeof val === 'object' && val !== null && !refs.includes(val)) {
         queue.push({ obj: obj, prop: key });
@@ -258,8 +256,8 @@ export function combine(a: any, b: any) {
 export function maybe_map<T>(val: T[], fn: (v: T) => T) {
   if (isArray(val)) {
     const mapped = [];
-    for (let i = 0; i < val.length; i += 1) {
-      mapped.push(fn(val[i]!));
+    for (const item of val) {
+      mapped.push(fn(item));
     }
     return mapped;
   }

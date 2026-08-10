@@ -679,13 +679,10 @@ const fileCache = (() => {
   return {
     // Copy existing files from each ecosystem-tests project folder to the ./tmp folder
     cacheFiles: async (tmpFolderPath: string) => {
-      for (let i = 0; i < projectNames.length; i++) {
-        const projectName = (projectNames as any)[i] as string;
+      for (const projectName of projectNames) {
         const projectPath = path.resolve(process.cwd(), 'ecosystem-tests', projectName);
 
-        for (let j = 0; j < filesToCache.length; j++) {
-          const fileName = filesToCache[j] || '';
-
+        for (const fileName of filesToCache) {
           const filePath = path.resolve(projectPath, fileName);
           if (await fileExists(filePath)) {
             const tmpProjectPath = path.resolve(tmpFolderPath, projectName);
@@ -701,15 +698,11 @@ const fileCache = (() => {
 
     // Restore the original files to each ecosystem-tests project folder from the ./tmp folder
     restoreFiles: async (tmpFolderPath: string) => {
-      for (let i = 0; i < projectNames.length; i++) {
-        const projectName = (projectNames as any)[i] as string;
-
+      for (const projectName of projectNames) {
         const projectPath = path.resolve(process.cwd(), 'ecosystem-tests', projectName);
         const tmpProjectPath = path.resolve(tmpFolderPath, projectName);
 
-        for (let j = 0; j < filesToCache.length; j++) {
-          const fileName = filesToCache[j] || '';
-
+        for (const fileName of filesToCache) {
           const cachedFilePath = path.resolve(tmpProjectPath, fileName);
           const projectFilePath = path.resolve(projectPath, fileName);
           if (await fileExists(cachedFilePath)) {

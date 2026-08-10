@@ -171,8 +171,7 @@ function inner_stringify(
     return adjusted_prefix + '[]';
   }
 
-  for (let j = 0; j < obj_keys.length; ++j) {
-    const key = obj_keys[j];
+  for (const key of obj_keys) {
     const value =
       // @ts-ignore
       typeof key === 'object' && typeof key.value !== 'undefined' ? key.value : obj[key as any];
@@ -337,9 +336,7 @@ export function stringify(object: any, opts: StringifyOptions = {}) {
   }
 
   const sideChannel = new WeakMap();
-  for (let i = 0; i < obj_keys.length; ++i) {
-    const key = obj_keys[i]!;
-
+  for (const key of obj_keys) {
     if (options.skipNulls && obj[key] === null) {
       continue;
     }
