@@ -433,7 +433,7 @@ async function main() {
                 args.retryDelay,
                 isLikelyNodeCrash,
               );
-            } catch (error) {
+            } catch {
               failed.push(project);
             } finally {
               runningProjects.delete(project);
@@ -595,7 +595,7 @@ async function installPackage() {
   try {
     // Ensure that there is a clean node_modules folder.
     await run('rm', ['-rf', `./node_modules`]);
-  } catch (err) {
+  } catch {
     // Best-effort cleanup; installation below can continue.
   }
 
@@ -647,7 +647,7 @@ async function pathExists(path: string) {
   try {
     await fs.access(path);
     return true;
-  } catch (error) {
+  } catch {
     return false;
   }
 }

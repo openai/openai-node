@@ -139,7 +139,7 @@ const _parseJSON = (jsonString: string, allow: number) => {
     } else if (Allow.STR & allow) {
       try {
         return JSON.parse(jsonString.substring(start, index - Number(escape)) + '"');
-      } catch (e) {
+      } catch {
         // SyntaxError: Invalid escape sequence
         return JSON.parse(jsonString.substring(start, jsonString.lastIndexOf('\\')) + '"');
       }
@@ -168,7 +168,7 @@ const _parseJSON = (jsonString: string, allow: number) => {
         skipBlank();
         if (jsonString[index] === ',') index++; // skip comma
       }
-    } catch (e) {
+    } catch {
       if (Allow.OBJ & allow) return obj;
       markPartialJSON("Expected '}' at end of object");
     }
@@ -187,7 +187,7 @@ const _parseJSON = (jsonString: string, allow: number) => {
           index++; // skip comma
         }
       }
-    } catch (e) {
+    } catch {
       if (Allow.ARR & allow) {
         return arr;
       }
@@ -208,7 +208,7 @@ const _parseJSON = (jsonString: string, allow: number) => {
             if (jsonString[jsonString.length - 1] === '.')
               return JSON.parse(jsonString.substring(0, jsonString.lastIndexOf('.')));
             return JSON.parse(jsonString.substring(0, jsonString.lastIndexOf('e')));
-          } catch (e) {
+          } catch {
             // Fall through to report malformed input below.
           }
         }
@@ -225,7 +225,7 @@ const _parseJSON = (jsonString: string, allow: number) => {
 
     try {
       return JSON.parse(jsonString.substring(start, index));
-    } catch (e) {
+    } catch {
       if (jsonString.substring(start, index) === '-' && Allow.NUM & allow)
         markPartialJSON("Not sure what '-' is");
       try {
