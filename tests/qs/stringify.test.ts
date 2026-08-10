@@ -1614,7 +1614,7 @@ describe('stringify()', function () {
               if (typeof buffer === 'string') {
                 return buffer;
               }
-              return String.fromCharCode(buffer.readUInt8(0) + 97);
+              return String.fromCodePoint(buffer.readUInt8(0) + 97);
             },
           },
         ),
