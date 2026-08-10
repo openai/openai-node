@@ -443,22 +443,6 @@ export interface AuditLogListResponse {
   'service_account.updated'?: AuditLogListResponse.ServiceAccountUpdated;
 
   /**
-   * The server-derived administrative authorization context recorded for the action,
-   * when available. API-key paths identify the authenticated API surface;
-   * biscuit-authorized paths identify the permission namespace used for
-   * authorization. This does not necessarily identify the literal client software.
-   */
-  source?:
-    | 'cloud_console'
-    | 'adminapi'
-    | 'retool'
-    | 'glass'
-    | 'managementapi'
-    | 'tenantapi'
-    | 'scim'
-    | 'backfill';
-
-  /**
    * The details for events with this `type`.
    */
   'user.added'?: AuditLogListResponse.UserAdded;
