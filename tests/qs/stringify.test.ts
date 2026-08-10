@@ -5,8 +5,8 @@ import type { StringifyOptions } from 'openai/internal/qs/types';
 import { empty_test_cases } from './empty-keys-cases';
 import assert from 'node:assert';
 
-describe('stringify()', function () {
-  test('stringifies a querystring object', function () {
+describe('stringify()', () => {
+  test('stringifies a querystring object', () => {
     expect(stringify({ a: 'b' })).toBe('a=b');
     expect(stringify({ a: 1 })).toBe('a=1');
     expect(stringify({ a: 1, b: 2 })).toBe('a=1&b=2');
@@ -17,7 +17,7 @@ describe('stringify()', function () {
     expect(stringify({ a: '𐐷' })).toBe('a=%F0%90%90%B7');
   });
 
-  test('stringifies falsy values', function () {
+  test('stringifies falsy values', () => {
     expect(stringify(undefined)).toBe('');
     expect(stringify(null)).toBe('');
     expect(stringify(null, { strictNullHandling: true })).toBe('');
@@ -25,7 +25,7 @@ describe('stringify()', function () {
     expect(stringify(0)).toBe('');
   });
 
-  test('stringifies symbols', function () {
+  test('stringifies symbols', () => {
     expect(stringify(Symbol.iterator)).toBe('');
     expect(stringify([Symbol.iterator])).toBe('0=Symbol%28Symbol.iterator%29');
     expect(stringify({ a: Symbol.iterator })).toBe('a=Symbol%28Symbol.iterator%29');
@@ -34,7 +34,7 @@ describe('stringify()', function () {
     );
   });
 
-  test('stringifies bigints', function () {
+  test('stringifies bigints', () => {
     const three = 3n;
     // @ts-expect-error
     const encodeWithN = function (value, defaultEncoder, charset) {
@@ -53,7 +53,7 @@ describe('stringify()', function () {
     ).toBe('a[]=3n');
   });
 
-  test('encodes dot in key of object when encodeDotInKeys and allowDots is provided', function () {
+  test('encodes dot in key of object when encodeDotInKeys and allowDots is provided', () => {
     expect(
       stringify({ 'name.obj': { first: 'John', last: 'Doe' } }, { allowDots: false, encodeDotInKeys: false }),
     ).toBe('name.obj%5Bfirst%5D=John&name.obj%5Blast%5D=Doe');
@@ -125,7 +125,7 @@ describe('stringify()', function () {
     ).toBe('name%252Eobj%252Esubobject.first%252Egodly%252Ename=John&name%252Eobj%252Esubobject.last=Doe');
   });
 
-  test('should encode dot in key of object, and automatically set allowDots to `true` when encodeDotInKeys is true and allowDots in undefined', function () {
+  test('should encode dot in key of object, and automatically set allowDots to `true` when encodeDotInKeys is true and allowDots in undefined', () => {
     // st.equal(
     // 	stringify(
     // 		{ 'name.obj.subobject': { 'first.godly.name': 'John', last: 'Doe' } },
@@ -142,7 +142,7 @@ describe('stringify()', function () {
     ).toBe('name%252Eobj%252Esubobject.first%252Egodly%252Ename=John&name%252Eobj%252Esubobject.last=Doe');
   });
 
-  test('should encode dot in key of object when encodeDotInKeys and allowDots is provided, and nothing else when encodeValuesOnly is provided', function () {
+  test('should encode dot in key of object when encodeDotInKeys and allowDots is provided, and nothing else when encodeValuesOnly is provided', () => {
     // st.equal(
     // 	stringify(
     // 		{ 'name.obj': { first: 'John', last: 'Doe' } },
@@ -180,7 +180,7 @@ describe('stringify()', function () {
     ).toBe('name%2Eobj%2Esubobject.first%2Egodly%2Ename=John&name%2Eobj%2Esubobject.last=Doe');
   });
 
-  test('throws when `commaRoundTrip` is not a boolean', function () {
+  test('throws when `commaRoundTrip` is not a boolean', () => {
     // st['throws'](
     // 	function () {
     // 		stringify({}, { commaRoundTrip: 'not a boolean' });
@@ -194,7 +194,7 @@ describe('stringify()', function () {
     }).toThrow(TypeError);
   });
 
-  test('throws when `encodeDotInKeys` is not a boolean', function () {
+  test('throws when `encodeDotInKeys` is not a boolean', () => {
     // st['throws'](function () {
     // 	stringify({ a: [], b: 'zz' }, { encodeDotInKeys: 'foobar' });
     // }, TypeError);
@@ -228,17 +228,17 @@ describe('stringify()', function () {
     }).toThrow(TypeError);
   });
 
-  test('adds query prefix', function () {
+  test('adds query prefix', () => {
     // st.equal(stringify({ a: 'b' }, { addQueryPrefix: true }), '?a=b');
     expect(stringify({ a: 'b' }, { addQueryPrefix: true })).toBe('?a=b');
   });
 
-  test('with query prefix, outputs blank string given an empty object', function () {
+  test('with query prefix, outputs blank string given an empty object', () => {
     // st.equal(stringify({}, { addQueryPrefix: true }), '');
     expect(stringify({}, { addQueryPrefix: true })).toBe('');
   });
 
-  test('stringifies nested falsy values', function () {
+  test('stringifies nested falsy values', () => {
     // st.equal(stringify({ a: { b: { c: null } } }), 'a%5Bb%5D%5Bc%5D=');
     // st.equal(
     // 	stringify({ a: { b: { c: null } } }, { strictNullHandling: true }),
@@ -250,21 +250,21 @@ describe('stringify()', function () {
     expect(stringify({ a: { b: { c: false } } })).toBe('a%5Bb%5D%5Bc%5D=false');
   });
 
-  test('stringifies a nested object', function () {
+  test('stringifies a nested object', () => {
     // st.equal(stringify({ a: { b: 'c' } }), 'a%5Bb%5D=c');
     // st.equal(stringify({ a: { b: { c: { d: 'e' } } } }), 'a%5Bb%5D%5Bc%5D%5Bd%5D=e');
     expect(stringify({ a: { b: 'c' } })).toBe('a%5Bb%5D=c');
     expect(stringify({ a: { b: { c: { d: 'e' } } } })).toBe('a%5Bb%5D%5Bc%5D%5Bd%5D=e');
   });
 
-  test('`allowDots` option: stringifies a nested object with dots notation', function () {
+  test('`allowDots` option: stringifies a nested object with dots notation', () => {
     // st.equal(stringify({ a: { b: 'c' } }, { allowDots: true }), 'a.b=c');
     // st.equal(stringify({ a: { b: { c: { d: 'e' } } } }, { allowDots: true }), 'a.b.c.d=e');
     expect(stringify({ a: { b: 'c' } }, { allowDots: true })).toBe('a.b=c');
     expect(stringify({ a: { b: { c: { d: 'e' } } } }, { allowDots: true })).toBe('a.b.c.d=e');
   });
 
-  test('stringifies an array value', function () {
+  test('stringifies an array value', () => {
     // st.equal(
     // 	stringify({ a: ['b', 'c', 'd'] }, { arrayFormat: 'indices' }),
     // 	'a%5B0%5D=b&a%5B1%5D=c&a%5B2%5D=d',
@@ -303,7 +303,7 @@ describe('stringify()', function () {
     expect(stringify({ a: ['b', 'c', 'd'] })).toBe('a%5B0%5D=b&a%5B1%5D=c&a%5B2%5D=d');
   });
 
-  test('`skipNulls` option', function () {
+  test('`skipNulls` option', () => {
     // st.equal(
     // 	stringify({ a: 'b', c: null }, { skipNulls: true }),
     // 	'a=b',
@@ -319,17 +319,17 @@ describe('stringify()', function () {
     expect(stringify({ a: { b: 'c', d: null } }, { skipNulls: true })).toBe('a%5Bb%5D=c');
   });
 
-  test('omits array indices when asked', function () {
+  test('omits array indices when asked', () => {
     // st.equal(stringify({ a: ['b', 'c', 'd'] }, { indices: false }), 'a=b&a=c&a=d');
     expect(stringify({ a: ['b', 'c', 'd'] }, { indices: false })).toBe('a=b&a=c&a=d');
   });
 
-  test('omits object key/value pair when value is empty array', function () {
+  test('omits object key/value pair when value is empty array', () => {
     // st.equal(stringify({ a: [], b: 'zz' }), 'b=zz');
     expect(stringify({ a: [], b: 'zz' })).toBe('b=zz');
   });
 
-  test('should not omit object key/value pair when value is empty array and when asked', function () {
+  test('should not omit object key/value pair when value is empty array and when asked', () => {
     // st.equal(stringify({ a: [], b: 'zz' }), 'b=zz');
     // st.equal(stringify({ a: [], b: 'zz' }, { allowEmptyArrays: false }), 'b=zz');
     // st.equal(stringify({ a: [], b: 'zz' }, { allowEmptyArrays: true }), 'a[]&b=zz');
@@ -338,7 +338,7 @@ describe('stringify()', function () {
     expect(stringify({ a: [], b: 'zz' }, { allowEmptyArrays: true })).toBe('a[]&b=zz');
   });
 
-  test('should throw when allowEmptyArrays is not of type boolean', function () {
+  test('should throw when allowEmptyArrays is not of type boolean', () => {
     // st['throws'](function () {
     // 	stringify({ a: [], b: 'zz' }, { allowEmptyArrays: 'foobar' });
     // }, TypeError);
@@ -372,7 +372,7 @@ describe('stringify()', function () {
     }).toThrow(TypeError);
   });
 
-  test('allowEmptyArrays + strictNullHandling', function () {
+  test('allowEmptyArrays + strictNullHandling', () => {
     // st.equal(
     // 	stringify({ testEmptyArray: [] }, { strictNullHandling: true, allowEmptyArrays: true }),
     // 	'testEmptyArray[]',
@@ -382,8 +382,8 @@ describe('stringify()', function () {
     );
   });
 
-  describe('stringifies an array value with one item vs multiple items', function () {
-    test('non-array item', function () {
+  describe('stringifies an array value with one item vs multiple items', () => {
+    test('non-array item', () => {
       // s2t.equal(
       // 	stringify({ a: 'c' }, { encodeValuesOnly: true, arrayFormat: 'indices' }),
       // 	'a=c',
@@ -400,7 +400,7 @@ describe('stringify()', function () {
       expect(stringify({ a: 'c' }, { encodeValuesOnly: true })).toBe('a=c');
     });
 
-    test('array with a single item', function () {
+    test('array with a single item', () => {
       // s2t.equal(
       // 	stringify({ a: ['c'] }, { encodeValuesOnly: true, arrayFormat: 'indices' }),
       // 	'a[0]=c',
@@ -430,7 +430,7 @@ describe('stringify()', function () {
       expect(stringify({ a: ['c'] }, { encodeValuesOnly: true })).toBe('a[0]=c');
     });
 
-    test('array with multiple items', function () {
+    test('array with multiple items', () => {
       // s2t.equal(
       // 	stringify({ a: ['c', 'd'] }, { encodeValuesOnly: true, arrayFormat: 'indices' }),
       // 	'a[0]=c&a[1]=d',
@@ -464,7 +464,7 @@ describe('stringify()', function () {
       expect(stringify({ a: ['c', 'd'] }, { encodeValuesOnly: true })).toBe('a[0]=c&a[1]=d');
     });
 
-    test('array with multiple items with a comma inside', function () {
+    test('array with multiple items with a comma inside', () => {
       // s2t.equal(
       // 	stringify({ a: ['c,d', 'e'] }, { encodeValuesOnly: true, arrayFormat: 'comma' }),
       // 	'a=c%2Cd,e',
@@ -498,7 +498,7 @@ describe('stringify()', function () {
     });
   });
 
-  test('stringifies a nested array value', function () {
+  test('stringifies a nested array value', () => {
     expect(stringify({ a: { b: ['c', 'd'] } }, { encodeValuesOnly: true, arrayFormat: 'indices' })).toBe(
       'a[b][0]=c&a[b][1]=d',
     );
@@ -511,7 +511,7 @@ describe('stringify()', function () {
     expect(stringify({ a: { b: ['c', 'd'] } }, { encodeValuesOnly: true })).toBe('a[b][0]=c&a[b][1]=d');
   });
 
-  test('stringifies comma and empty array values', function () {
+  test('stringifies comma and empty array values', () => {
     // st.equal(
     // 	stringify({ a: [',', '', 'c,d%'] }, { encode: false, arrayFormat: 'indices' }),
     // 	'a[0]=,&a[1]=&a[2]=c,d%',
@@ -625,7 +625,7 @@ describe('stringify()', function () {
     ).toBe('a=%2C&a=&a=c%2Cd%25');
   });
 
-  test('stringifies comma and empty non-array values', function () {
+  test('stringifies comma and empty non-array values', () => {
     // st.equal(
     // 	stringify({ a: ',', b: '', c: 'c,d%' }, { encode: false, arrayFormat: 'indices' }),
     // 	'a=,&b=&c=c,d%',
@@ -753,7 +753,7 @@ describe('stringify()', function () {
     ).toBe('a=%2C&b=&c=c%2Cd%25');
   });
 
-  test('stringifies a nested array value with dots notation', function () {
+  test('stringifies a nested array value with dots notation', () => {
     // st.equal(
     // 	stringify(
     // 		{ a: { b: ['c', 'd'] } },
@@ -803,7 +803,7 @@ describe('stringify()', function () {
     );
   });
 
-  test('stringifies an object inside an array', function () {
+  test('stringifies an object inside an array', () => {
     // st.equal(
     // 	stringify({ a: [{ b: 'c' }] }, { arrayFormat: 'indices', encodeValuesOnly: true }),
     // 	'a[0][b]=c',
@@ -865,7 +865,7 @@ describe('stringify()', function () {
     expect(stringify({ a: [{ b: { c: [1] } }] }, { encodeValuesOnly: true })).toBe('a[0][b][c][0]=1');
   });
 
-  test('stringifies an array with mixed objects and primitives', function () {
+  test('stringifies an array with mixed objects and primitives', () => {
     // st.equal(
     // 	stringify({ a: [{ b: 1 }, 2, 3] }, { encodeValuesOnly: true, arrayFormat: 'indices' }),
     // 	'a[0][b]=1&a[1]=2&a[2]=3',
@@ -900,7 +900,7 @@ describe('stringify()', function () {
     expect(stringify({ a: [{ b: 1 }, 2, 3] }, { encodeValuesOnly: true })).toBe('a[0][b]=1&a[1]=2&a[2]=3');
   });
 
-  test('stringifies an object inside an array with dots notation', function () {
+  test('stringifies an object inside an array with dots notation', () => {
     // st.equal(
     // 	stringify({ a: [{ b: 'c' }] }, { allowDots: true, encode: false, arrayFormat: 'indices' }),
     // 	'a[0].b=c',
@@ -957,42 +957,42 @@ describe('stringify()', function () {
     expect(stringify({ a: [{ b: { c: [1] } }] }, { allowDots: true, encode: false })).toBe('a[0].b.c[0]=1');
   });
 
-  test('does not omit object keys when indices = false', function () {
+  test('does not omit object keys when indices = false', () => {
     // st.equal(stringify({ a: [{ b: 'c' }] }, { indices: false }), 'a%5Bb%5D=c');
     expect(stringify({ a: [{ b: 'c' }] }, { indices: false })).toBe('a%5Bb%5D=c');
   });
 
-  test('uses indices notation for arrays when indices=true', function () {
+  test('uses indices notation for arrays when indices=true', () => {
     // st.equal(stringify({ a: ['b', 'c'] }, { indices: true }), 'a%5B0%5D=b&a%5B1%5D=c');
     expect(stringify({ a: ['b', 'c'] }, { indices: true })).toBe('a%5B0%5D=b&a%5B1%5D=c');
   });
 
-  test('uses indices notation for arrays when no arrayFormat is specified', function () {
+  test('uses indices notation for arrays when no arrayFormat is specified', () => {
     // st.equal(stringify({ a: ['b', 'c'] }), 'a%5B0%5D=b&a%5B1%5D=c');
     expect(stringify({ a: ['b', 'c'] })).toBe('a%5B0%5D=b&a%5B1%5D=c');
   });
 
-  test('uses indices notation for arrays when arrayFormat=indices', function () {
+  test('uses indices notation for arrays when arrayFormat=indices', () => {
     // st.equal(stringify({ a: ['b', 'c'] }, { arrayFormat: 'indices' }), 'a%5B0%5D=b&a%5B1%5D=c');
     expect(stringify({ a: ['b', 'c'] }, { arrayFormat: 'indices' })).toBe('a%5B0%5D=b&a%5B1%5D=c');
   });
 
-  test('uses repeat notation for arrays when arrayFormat=repeat', function () {
+  test('uses repeat notation for arrays when arrayFormat=repeat', () => {
     // st.equal(stringify({ a: ['b', 'c'] }, { arrayFormat: 'repeat' }), 'a=b&a=c');
     expect(stringify({ a: ['b', 'c'] }, { arrayFormat: 'repeat' })).toBe('a=b&a=c');
   });
 
-  test('uses brackets notation for arrays when arrayFormat=brackets', function () {
+  test('uses brackets notation for arrays when arrayFormat=brackets', () => {
     // st.equal(stringify({ a: ['b', 'c'] }, { arrayFormat: 'brackets' }), 'a%5B%5D=b&a%5B%5D=c');
     expect(stringify({ a: ['b', 'c'] }, { arrayFormat: 'brackets' })).toBe('a%5B%5D=b&a%5B%5D=c');
   });
 
-  test('stringifies a complicated object', function () {
+  test('stringifies a complicated object', () => {
     // st.equal(stringify({ a: { b: 'c', d: 'e' } }), 'a%5Bb%5D=c&a%5Bd%5D=e');
     expect(stringify({ a: { b: 'c', d: 'e' } })).toBe('a%5Bb%5D=c&a%5Bd%5D=e');
   });
 
-  test('stringifies an empty value', function () {
+  test('stringifies an empty value', () => {
     // st.equal(stringify({ a: '' }), 'a=');
     // st.equal(stringify({ a: null }, { strictNullHandling: true }), 'a');
     expect(stringify({ a: '' })).toBe('a=');
@@ -1011,7 +1011,7 @@ describe('stringify()', function () {
     expect(stringify({ a: { b: null } }, { strictNullHandling: false })).toBe('a%5Bb%5D=');
   });
 
-  test('stringifies an empty array in different arrayFormat', function () {
+  test('stringifies an empty array in different arrayFormat', () => {
     // st.equal(stringify({ a: [], b: [null], c: 'c' }, { encode: false }), 'b[0]=&c=c');
     expect(stringify({ a: [], b: [null], c: 'c' }, { encode: false })).toBe('b[0]=&c=c');
     // arrayFormat default
@@ -1161,14 +1161,14 @@ describe('stringify()', function () {
     ).toBe('c=c');
   });
 
-  test('stringifies a null object', function () {
+  test('stringifies a null object', () => {
     const obj = Object.create(null);
     obj.a = 'b';
     // st.equal(stringify(obj), 'a=b');
     expect(stringify(obj)).toBe('a=b');
   });
 
-  test('returns an empty string for invalid input', function () {
+  test('returns an empty string for invalid input', () => {
     // st.equal(stringify(undefined), '');
     // st.equal(stringify(false), '');
     // st.equal(stringify(null), '');
@@ -1179,7 +1179,7 @@ describe('stringify()', function () {
     expect(stringify('')).toBe('');
   });
 
-  test('stringifies an object with a null object as a child', function () {
+  test('stringifies an object with a null object as a child', () => {
     const obj = { a: Object.create(null) };
 
     obj.a.b = 'c';
@@ -1187,7 +1187,7 @@ describe('stringify()', function () {
     expect(stringify(obj)).toBe('a%5Bb%5D=c');
   });
 
-  test('drops keys with a value of undefined', function () {
+  test('drops keys with a value of undefined', () => {
     // st.equal(stringify({ a: undefined }), '');
     expect(stringify({ a: undefined })).toBe('');
 
@@ -1205,19 +1205,19 @@ describe('stringify()', function () {
     expect(stringify({ a: { b: undefined, c: '' } })).toBe('a%5Bc%5D=');
   });
 
-  test('url encodes values', function () {
+  test('url encodes values', () => {
     // st.equal(stringify({ a: 'b c' }), 'a=b%20c');
     expect(stringify({ a: 'b c' })).toBe('a=b%20c');
   });
 
-  test('stringifies a date', function () {
+  test('stringifies a date', () => {
     const now = new Date();
     const str = 'a=' + encodeURIComponent(now.toISOString());
     // st.equal(stringify({ a: now }), str);
     expect(stringify({ a: now })).toBe(str);
   });
 
-  test('stringifies the weird object from qs', function () {
+  test('stringifies the weird object from qs', () => {
     // st.equal(
     // 	stringify({ 'my weird field': '~q1!2"\'w$5&7/z8)?' }),
     // 	'my%20weird%20field=~q1%212%22%27w%245%267%2Fz8%29%3F',
@@ -1228,7 +1228,7 @@ describe('stringify()', function () {
   });
 
   // This test mutates Object.prototype because Vitest lacks the old interception helper.
-  test('skips properties that are part of the object prototype', function () {
+  test('skips properties that are part of the object prototype', () => {
     // st.intercept(Object.prototype, 'crash', { value: 'test' });
     Reflect.set(Object.prototype, 'crash', 'test');
 
@@ -1238,7 +1238,7 @@ describe('stringify()', function () {
     expect(stringify({ a: { b: 'c' } })).toBe('a%5Bb%5D=c');
   });
 
-  test('stringifies boolean values', function () {
+  test('stringifies boolean values', () => {
     // st.equal(stringify({ a: true }), 'a=true');
     // st.equal(stringify({ a: { b: true } }), 'a%5Bb%5D=true');
     // st.equal(stringify({ b: false }), 'b=false');
@@ -1249,12 +1249,12 @@ describe('stringify()', function () {
     expect(stringify({ b: { c: false } })).toBe('b%5Bc%5D=false');
   });
 
-  test('stringifies buffer values', function () {
+  test('stringifies buffer values', () => {
     // st.equal(stringify({ a: Buffer.from('test') }), 'a=test');
     // st.equal(stringify({ a: { b: Buffer.from('test') } }), 'a%5Bb%5D=test');
   });
 
-  test('stringifies an object using an alternative delimiter', function () {
+  test('stringifies an object using an alternative delimiter', () => {
     // st.equal(stringify({ a: 'b', c: 'd' }, { delimiter: ';' }), 'a=b;c=d');
     expect(stringify({ a: 'b', c: 'd' }, { delimiter: ';' })).toBe('a=b;c=d');
   });
@@ -1271,7 +1271,7 @@ describe('stringify()', function () {
   // 	st.end();
   // });
 
-  test('does not crash when parsing circular references', function () {
+  test('does not crash when parsing circular references', () => {
     const a: any = {};
     a.b = a;
 
@@ -1310,7 +1310,7 @@ describe('stringify()', function () {
     }).not.toThrow();
   });
 
-  test('non-circular duplicated references can still work', function () {
+  test('non-circular duplicated references can still work', () => {
     const hourOfDay = {
       function: 'hour_of_day',
     };
@@ -1362,7 +1362,7 @@ describe('stringify()', function () {
     );
   });
 
-  test('selects properties when filter=array', function () {
+  test('selects properties when filter=array', () => {
     // st.equal(stringify({ a: 'b' }, { filter: ['a'] }), 'a=b');
     // st.equal(stringify({ a: 1 }, { filter: [] }), '');
     expect(stringify({ a: 'b' }, { filter: ['a'] })).toBe('a=b');
@@ -1406,7 +1406,7 @@ describe('stringify()', function () {
     ).toBe('a%5Bb%5D%5B%5D=1&a%5Bb%5D%5B%5D=3');
   });
 
-  test('supports custom representations when filter=function', function () {
+  test('supports custom representations when filter=function', () => {
     let calls = 0;
     const obj = { a: 'b', c: 'd', e: { f: new Date(1_257_894_000_000) } };
     const filterFunc: StringifyOptions['filter'] = function (prefix, value) {
@@ -1432,7 +1432,7 @@ describe('stringify()', function () {
     expect(calls).toBe(5);
   });
 
-  test('can disable uri encoding', function () {
+  test('can disable uri encoding', () => {
     // st.equal(stringify({ a: 'b' }, { encode: false }), 'a=b');
     // st.equal(stringify({ a: { b: 'c' } }, { encode: false }), 'a[b]=c');
     // st.equal(
@@ -1444,7 +1444,7 @@ describe('stringify()', function () {
     expect(stringify({ a: 'b', c: null }, { strictNullHandling: true, encode: false })).toBe('a=b&c');
   });
 
-  test('can sort the keys', function () {
+  test('can sort the keys', () => {
     // @ts-expect-error
     const sort: NonNullable<StringifyOptions['sort']> = function (a: string, b: string) {
       return a.localeCompare(b);
@@ -1460,7 +1460,7 @@ describe('stringify()', function () {
     );
   });
 
-  test('can sort the keys at depth 3 or more too', function () {
+  test('can sort the keys at depth 3 or more too', () => {
     // @ts-expect-error
     const sort: NonNullable<StringifyOptions['sort']> = function (a: string, b: string) {
       return a.localeCompare(b);
@@ -1493,7 +1493,7 @@ describe('stringify()', function () {
     ).toBe('a=a&z[zj][zjb]=zjb&z[zj][zja]=zja&z[zi][zib]=zib&z[zi][zia]=zia&b=b');
   });
 
-  test('can stringify with custom encoding', function () {
+  test('can stringify with custom encoding', () => {
     // st.equal(
     // 	stringify(
     // 		{ 県: '大阪府', '': '' },
@@ -1533,7 +1533,7 @@ describe('stringify()', function () {
     ).toBe('%8c%a7=%91%e5%8d%e3%95%7b&=');
   });
 
-  test('receives the default encoder as a second argument', function () {
+  test('receives the default encoder as a second argument', () => {
     // stringify(
     // 	{ a: 1, b: new Date(), c: true, d: [1] },
     // 	{
@@ -1556,7 +1556,7 @@ describe('stringify()', function () {
     );
   });
 
-  test('receives the default encoder as a second argument', function () {
+  test('receives the default encoder as a second argument', () => {
     // stringify(
     // 	{ a: 1 },
     // 	{
@@ -1577,7 +1577,7 @@ describe('stringify()', function () {
     );
   });
 
-  test('throws error with wrong encoder', function () {
+  test('throws error with wrong encoder', () => {
     // st['throws'](function () {
     // 	stringify({}, { encoder: 'string' });
     // }, new TypeError('Encoder has to be a function.'));
@@ -1588,62 +1588,59 @@ describe('stringify()', function () {
     }).toThrow(TypeError);
   });
 
-  (typeof Buffer === 'undefined' ? test.skip : test)(
-    'can use custom encoder for a buffer object',
-    function () {
-      // st.equal(
-      // 	stringify(
-      // 		{ a: Buffer.from([1]) },
-      // 		{
-      // 			encoder: function (buffer) {
-      // 				if (typeof buffer === 'string') {
-      // 					return buffer;
-      // 				}
-      // 				return String.fromCharCode(buffer.readUInt8(0) + 97);
-      // 			},
-      // 		},
-      // 	),
-      // 	'a=b',
-      // );
-      expect(
-        stringify(
-          { a: Buffer.from([1]) },
-          {
-            encoder(buffer) {
-              if (typeof buffer === 'string') {
-                return buffer;
-              }
-              return String.fromCodePoint(buffer.readUInt8(0) + 97);
-            },
-          },
-        ),
-      ).toBe('a=b');
-
-      // st.equal(
-      // 	stringify(
-      // 		{ a: Buffer.from('a b') },
-      // 		{
-      // 			encoder: function (buffer) {
-      // 				return buffer;
-      // 			},
-      // 		},
-      // 	),
-      // 	'a=a b',
-      // );
-      expect(
-        stringify(
-          { a: Buffer.from('a b') },
-          {
-            encoder(buffer) {
+  (typeof Buffer === 'undefined' ? test.skip : test)('can use custom encoder for a buffer object', () => {
+    // st.equal(
+    // 	stringify(
+    // 		{ a: Buffer.from([1]) },
+    // 		{
+    // 			encoder: function (buffer) {
+    // 				if (typeof buffer === 'string') {
+    // 					return buffer;
+    // 				}
+    // 				return String.fromCharCode(buffer.readUInt8(0) + 97);
+    // 			},
+    // 		},
+    // 	),
+    // 	'a=b',
+    // );
+    expect(
+      stringify(
+        { a: Buffer.from([1]) },
+        {
+          encoder(buffer) {
+            if (typeof buffer === 'string') {
               return buffer;
-            },
+            }
+            return String.fromCodePoint(buffer.readUInt8(0) + 97);
           },
-        ),
-      ).toBe('a=a b');
-    },
-  );
+        },
+      ),
+    ).toBe('a=b');
 
-  test('serializeDate option', function () {
+    // st.equal(
+    // 	stringify(
+    // 		{ a: Buffer.from('a b') },
+    // 		{
+    // 			encoder: function (buffer) {
+    // 				return buffer;
+    // 			},
+    // 		},
+    // 	),
+    // 	'a=a b',
+    // );
+    expect(
+      stringify(
+        { a: Buffer.from('a b') },
+        {
+          encoder(buffer) {
+            return buffer;
+          },
+        },
+      ),
+    ).toBe('a=a b');
+  });
+
+  test('serializeDate option', () => {
     const date = new Date();
     // st.equal(
     // 	stringify({ a: date }),
@@ -1750,7 +1747,7 @@ describe('stringify()', function () {
     ).toBe('a%5B%5D=' + date.getTime());
   });
 
-  test('RFC 1738 serialization', function () {
+  test('RFC 1738 serialization', () => {
     // st.equal(stringify({ a: 'b c' }, { format: formats.RFC1738 }), 'a=b+c');
     // st.equal(stringify({ 'a b': 'c d' }, { format: formats.RFC1738 }), 'a+b=c+d');
     // st.equal(
@@ -1765,7 +1762,7 @@ describe('stringify()', function () {
     expect(stringify({ 'foo(ref)': 'bar' }, { format: 'RFC1738' })).toBe('foo(ref)=bar');
   });
 
-  test('RFC 3986 spaces serialization', function () {
+  test('RFC 3986 spaces serialization', () => {
     // st.equal(stringify({ a: 'b c' }, { format: formats.RFC3986 }), 'a=b%20c');
     // st.equal(stringify({ 'a b': 'c d' }, { format: formats.RFC3986 }), 'a%20b=c%20d');
     // st.equal(
@@ -1777,14 +1774,14 @@ describe('stringify()', function () {
     expect(stringify({ 'a b': Buffer.from('a b') }, { format: 'RFC3986' })).toBe('a%20b=a%20b');
   });
 
-  test('Backward compatibility to RFC 3986', function () {
+  test('Backward compatibility to RFC 3986', () => {
     // st.equal(stringify({ a: 'b c' }), 'a=b%20c');
     // st.equal(stringify({ 'a b': Buffer.from('a b') }), 'a%20b=a%20b');
     expect(stringify({ a: 'b c' })).toBe('a=b%20c');
     expect(stringify({ 'a b': Buffer.from('a b') })).toBe('a%20b=a%20b');
   });
 
-  test('Edge cases and unknown formats', function () {
+  test('Edge cases and unknown formats', () => {
     for (const format of ['UFO1234', false, 1234, null, {}, []]) {
       // st['throws'](function () {
       // 	stringify({ a: 'b c' }, { format: format });
@@ -1796,7 +1793,7 @@ describe('stringify()', function () {
     }
   });
 
-  test('encodeValuesOnly', function () {
+  test('encodeValuesOnly', () => {
     // st.equal(
     // 	stringify(
     // 		{ a: 'b', c: ['d', 'e=f'], f: [['g'], ['h']] },
@@ -1866,7 +1863,7 @@ describe('stringify()', function () {
     );
   });
 
-  test('encodeValuesOnly - strictNullHandling', function () {
+  test('encodeValuesOnly - strictNullHandling', () => {
     // st.equal(
     // 	stringify({ a: { b: null } }, { encodeValuesOnly: true, strictNullHandling: true }),
     // 	'a[b]',
@@ -1874,7 +1871,7 @@ describe('stringify()', function () {
     expect(stringify({ a: { b: null } }, { encodeValuesOnly: true, strictNullHandling: true })).toBe('a[b]');
   });
 
-  test('throws if an invalid charset is specified', function () {
+  test('throws if an invalid charset is specified', () => {
     // st['throws'](function () {
     // 	stringify({ a: 'b' }, { charset: 'foobar' });
     // }, new TypeError('The charset option must be either utf-8, iso-8859-1, or undefined'));
@@ -1884,22 +1881,22 @@ describe('stringify()', function () {
     }).toThrow(TypeError);
   });
 
-  test('respects a charset of iso-8859-1', function () {
+  test('respects a charset of iso-8859-1', () => {
     // st.equal(stringify({ æ: 'æ' }, { charset: 'iso-8859-1' }), '%E6=%E6');
     expect(stringify({ æ: 'æ' }, { charset: 'iso-8859-1' })).toBe('%E6=%E6');
   });
 
-  test('encodes unrepresentable chars as numeric entities in iso-8859-1 mode', function () {
+  test('encodes unrepresentable chars as numeric entities in iso-8859-1 mode', () => {
     // st.equal(stringify({ a: '☺' }, { charset: 'iso-8859-1' }), 'a=%26%239786%3B');
     expect(stringify({ a: '☺' }, { charset: 'iso-8859-1' })).toBe('a=%26%239786%3B');
   });
 
-  test('respects an explicit charset of utf-8 (the default)', function () {
+  test('respects an explicit charset of utf-8 (the default)', () => {
     // st.equal(stringify({ a: 'æ' }, { charset: 'utf-8' }), 'a=%C3%A6');
     expect(stringify({ a: 'æ' }, { charset: 'utf-8' })).toBe('a=%C3%A6');
   });
 
-  test('`charsetSentinel` option', function () {
+  test('`charsetSentinel` option', () => {
     // st.equal(
     // 	stringify({ a: 'æ' }, { charsetSentinel: true, charset: 'utf-8' }),
     // 	'utf8=%E2%9C%93&a=%C3%A6',
@@ -1919,14 +1916,14 @@ describe('stringify()', function () {
     );
   });
 
-  test('does not mutate the options argument', function () {
+  test('does not mutate the options argument', () => {
     const options = {};
     stringify({}, options);
     // st.deepEqual(options, {});
     expect(options).toEqual({});
   });
 
-  test('strictNullHandling works with custom filter', function () {
+  test('strictNullHandling works with custom filter', () => {
     // @ts-expect-error
     const filter = function (_prefix, value) {
       return value;
@@ -1937,7 +1934,7 @@ describe('stringify()', function () {
     expect(stringify({ key: null }, options)).toBe('key');
   });
 
-  test('strictNullHandling works with null serializeDate', function () {
+  test('strictNullHandling works with null serializeDate', () => {
     const serializeDate = function () {
       return null;
     };
@@ -1948,7 +1945,7 @@ describe('stringify()', function () {
     expect(stringify({ key: date }, options)).toBe('key');
   });
 
-  test('allows for encoding keys and values differently', function () {
+  test('allows for encoding keys and values differently', () => {
     // @ts-expect-error
     const encoder = function (str, defaultEncoder, charset, type) {
       if (type === 'key') {
@@ -1964,7 +1961,7 @@ describe('stringify()', function () {
     expect(stringify({ KeY: 'vAlUe' }, { encoder })).toBe('key=VALUE');
   });
 
-  test('objects inside arrays', function () {
+  test('objects inside arrays', () => {
     const obj = { a: { b: { c: 'd', e: 'f' } } };
     const withArray = { a: { b: [{ c: 'd', e: 'f' }] } };
 
@@ -2035,7 +2032,7 @@ describe('stringify()', function () {
     // );
   });
 
-  test('stringifies sparse arrays', function () {
+  test('stringifies sparse arrays', () => {
     // st.equal(
     // 	stringify({ a: [, '2', , , '1'] }, { encodeValuesOnly: true, arrayFormat: 'indices' }),
     // 	'a[1]=2&a[4]=1',
@@ -2152,7 +2149,7 @@ describe('stringify()', function () {
     ).toBe('a[c]=1');
   });
 
-  test('encodes a very long string', function () {
+  test('encodes a very long string', () => {
     const chars = [];
     const expected = [];
     for (let i = 0; i < 5e3; i += 1) {
@@ -2174,9 +2171,9 @@ describe('stringify()', function () {
   });
 });
 
-describe('stringifies empty keys', function () {
+describe('stringifies empty keys', () => {
   for (const testCase of empty_test_cases) {
-    test('stringifies an object with empty string key with ' + testCase.input, function () {
+    test('stringifies an object with empty string key with ' + testCase.input, () => {
       // st.deepEqual(
       // 	stringify(testCase.withEmptyKeys, { encode: false, arrayFormat: 'indices' }),
       // 	testCase.stringifyOutput.indices,
@@ -2204,7 +2201,7 @@ describe('stringifies empty keys', function () {
     });
   }
 
-  test('edge case with object/arrays', function () {
+  test('edge case with object/arrays', () => {
     // st.deepEqual(stringify({ '': { '': [2, 3] } }, { encode: false }), '[][0]=2&[][1]=3');
     // st.deepEqual(
     // 	stringify({ '': { '': [2, 3], a: 2 } }, { encode: false }),

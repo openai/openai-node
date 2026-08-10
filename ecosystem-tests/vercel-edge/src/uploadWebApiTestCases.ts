@@ -50,7 +50,7 @@ export function uploadWebApiTestCases({
   }
 
   if (runtime === 'node') {
-    it(`raw response`, async function () {
+    it(`raw response`, async () => {
       const response = await client.chat.completions
         .create({
           model: 'gpt-4o-mini',
@@ -74,7 +74,7 @@ export function uploadWebApiTestCases({
       expectSimilar(json.choices[0]?.message.content || '', 'This is a test', 10);
     });
   } else {
-    it(`raw response`, async function () {
+    it(`raw response`, async () => {
       const response = await client.chat.completions
         .create({
           model: 'gpt-4o-mini',
@@ -108,7 +108,7 @@ export function uploadWebApiTestCases({
     });
   }
 
-  it(`streaming works`, async function () {
+  it(`streaming works`, async () => {
     const stream = await client.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: 'Reply with exactly this text and nothing else: This is a test' }],

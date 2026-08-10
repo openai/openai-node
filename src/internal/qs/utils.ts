@@ -159,9 +159,10 @@ export const encode: (
   }
 
   if (charset === 'iso-8859-1') {
-    return escape(string).replace(/%u[0-9a-f]{4}/gi, function ($0) {
-      return '%26%23' + Number.parseInt($0.slice(2), 16) + '%3B';
-    });
+    return escape(string).replace(
+      /%u[0-9a-f]{4}/gi,
+      ($0) => '%26%23' + Number.parseInt($0.slice(2), 16) + '%3B',
+    );
   }
 
   let out = '';
