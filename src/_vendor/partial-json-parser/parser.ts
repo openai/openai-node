@@ -32,8 +32,10 @@ const Allow = {
 };
 
 // The JSON string segment was unable to be parsed completely
+// oxlint-disable-next-line unicorn/custom-error-definition -- preserve the vendored exported class name
 class PartialJSON extends Error {}
 
+// oxlint-disable-next-line unicorn/custom-error-definition -- preserve the vendored exported class name
 class MalformedJSON extends Error {}
 
 /**

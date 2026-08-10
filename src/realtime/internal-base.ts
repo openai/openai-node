@@ -9,6 +9,8 @@ import { OpenAIError } from '../error';
 import OpenAI, { AzureOpenAI } from '../index';
 
 export class OpenAIRealtimeError extends OpenAIError {
+  override name = 'OpenAIRealtimeError';
+
   /**
    * The error data that the API sent back in an `error` event.
    */

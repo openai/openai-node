@@ -75,7 +75,6 @@ const compatibilityRules = [
   'unicorn/catch-error-name',
   'unicorn/consistent-assert',
   'unicorn/consistent-function-scoping',
-  'unicorn/custom-error-definition',
   'unicorn/filename-case',
   'unicorn/import-style',
   'unicorn/new-for-builtins',
