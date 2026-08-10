@@ -103,7 +103,6 @@ const compatibilityRules = [
   'unicorn/prefer-node-protocol',
   'unicorn/prefer-number-properties',
   'unicorn/prefer-optional-catch-binding',
-  'unicorn/prefer-query-selector',
   'unicorn/prefer-response-static-json',
   'unicorn/prefer-spread',
   'unicorn/prefer-string-replace-all',
