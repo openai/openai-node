@@ -114,7 +114,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
       let cancelPromise: Promise<void> | undefined;
       const cancel = () => {
         cancelPromise ??= reader.cancel();
-        cancelPromise.catch(() => {});
+        cancelPromise.catch(() => undefined);
       };
 
       controller.signal.addEventListener('abort', cancel, { once: true });

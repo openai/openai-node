@@ -227,7 +227,7 @@ export function parseStringDef(def: ZodStringDef, refs: Refs): JsonSchema7String
         case 'trim':
           break;
         default:
-          ((_: never) => {})(check);
+          ((_: never) => undefined)(check);
       }
     }
   }

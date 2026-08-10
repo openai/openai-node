@@ -1012,4 +1012,6 @@ function assertIsEmpty<T extends object>(obj: AssertIsEmpty<T>): asserts obj is 
   void obj;
 }
 
-function assertNever(_x: never) {}
+function assertNever(_x: never) {
+  return _x;
+}

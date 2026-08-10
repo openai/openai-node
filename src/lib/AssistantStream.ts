@@ -761,4 +761,6 @@ export class AssistantStream
   }
 }
 
-function assertNever(_x: never) {}
+function assertNever(_x: never) {
+  return _x;
+}
