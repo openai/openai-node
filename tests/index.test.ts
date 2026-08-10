@@ -319,7 +319,7 @@ describe('instantiate client', () => {
 
     const spy = jest.spyOn(client, 'request');
 
-    await expect(client.get('/foo', { signal: controller.signal })).rejects.toThrowError(APIUserAbortError);
+    await expect(client.get('/foo', { signal: controller.signal })).rejects.toThrow(APIUserAbortError);
     expect(spy).toHaveBeenCalledTimes(1);
   });
 
