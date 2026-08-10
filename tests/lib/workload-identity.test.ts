@@ -65,20 +65,20 @@ describe('OpenAI with Workload Identity', () => {
       const urlStr = url.toString();
 
       if (urlStr.includes('/oauth/token')) {
-        return new Response(
-          JSON.stringify({
+        return Response.json(
+          {
             access_token: 'exchanged-access-token',
             issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
             token_type: 'Bearer',
             expires_in: 3600,
-          }),
+          },
           { status: 200 },
         );
       }
 
       if (urlStr.includes('/models')) {
         apiRequestHeaders = new Headers(init?.headers);
-        return new Response(JSON.stringify({ data: [] }), { status: 200 });
+        return Response.json({ data: [] }, { status: 200 });
       }
 
       return new Response('Not found', { status: 404 });
@@ -118,19 +118,19 @@ describe('OpenAI with Workload Identity', () => {
 
       if (urlStr.includes('/oauth/token')) {
         tokenExchangeCallCount++;
-        return new Response(
-          JSON.stringify({
+        return Response.json(
+          {
             access_token: 'exchanged-access-token',
             issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
             token_type: 'Bearer',
             expires_in: 3600,
-          }),
+          },
           { status: 200 },
         );
       }
 
       if (urlStr.includes('/models')) {
-        return new Response(JSON.stringify({ data: [] }), { status: 200 });
+        return Response.json({ data: [] }, { status: 200 });
       }
 
       return new Response('Not found', { status: 404 });
@@ -154,13 +154,13 @@ describe('OpenAI with Workload Identity', () => {
 
       if (urlStr.includes('/oauth/token')) {
         tokenExchangeCallCount++;
-        return new Response(
-          JSON.stringify({
+        return Response.json(
+          {
             access_token: `access-token-${tokenExchangeCallCount}`,
             issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
             token_type: 'Bearer',
             expires_in: 3600,
-          }),
+          },
           { status: 200 },
         );
       }
@@ -168,9 +168,9 @@ describe('OpenAI with Workload Identity', () => {
       if (urlStr.includes('/models')) {
         apiCallCount++;
         if (apiCallCount === 1) {
-          return new Response(JSON.stringify({ error: { message: 'Unauthorized' } }), { status: 401 });
+          return Response.json({ error: { message: 'Unauthorized' } }, { status: 401 });
         }
-        return new Response(JSON.stringify({ data: [] }), { status: 200 });
+        return Response.json({ data: [] }, { status: 200 });
       }
 
       return new Response('Not found', { status: 404 });
@@ -194,20 +194,20 @@ describe('OpenAI with Workload Identity', () => {
 
       if (urlStr.includes('/oauth/token')) {
         tokenExchangeCallCount++;
-        return new Response(
-          JSON.stringify({
+        return Response.json(
+          {
             access_token: 'access-token',
             issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
             token_type: 'Bearer',
             expires_in: 3600,
-          }),
+          },
           { status: 200 },
         );
       }
 
       if (urlStr.includes('/models')) {
         apiCallCount++;
-        return new Response(JSON.stringify({ error: { message: 'Unauthorized' } }), { status: 401 });
+        return Response.json({ error: { message: 'Unauthorized' } }, { status: 401 });
       }
 
       return new Response('Not found', { status: 404 });
@@ -230,20 +230,20 @@ describe('OpenAI with Workload Identity', () => {
 
       if (urlStr.includes('/oauth/token')) {
         tokenExchangeCallCount++;
-        return new Response(
-          JSON.stringify({
+        return Response.json(
+          {
             access_token: 'access-token',
             issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
             token_type: 'Bearer',
             expires_in: 3600,
-          }),
+          },
           { status: 200 },
         );
       }
 
       if (urlStr.includes('/files')) {
         apiCallCount++;
-        return new Response(JSON.stringify({ error: { message: 'Unauthorized' } }), { status: 401 });
+        return Response.json({ error: { message: 'Unauthorized' } }, { status: 401 });
       }
 
       return new Response('Not found', { status: 404 });
@@ -290,11 +290,11 @@ describe('OpenAI with Workload Identity', () => {
       const urlStr = url.toString();
 
       if (urlStr.includes('/oauth/token')) {
-        return new Response(
-          JSON.stringify({
+        return Response.json(
+          {
             error: 'invalid_grant',
             error_description: 'Invalid subject token',
-          }),
+          },
           { status: 400 },
         );
       }
@@ -315,19 +315,19 @@ describe('OpenAI with Workload Identity', () => {
 
       if (urlStr.includes('/oauth/token')) {
         tokenExchangeCallCount++;
-        return new Response(
-          JSON.stringify({
+        return Response.json(
+          {
             access_token: `access-token-${tokenExchangeCallCount}`,
             issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
             token_type: 'Bearer',
             expires_in: 1,
-          }),
+          },
           { status: 200 },
         );
       }
 
       if (urlStr.includes('/models')) {
-        return new Response(JSON.stringify({ data: [] }), { status: 200 });
+        return Response.json({ data: [] }, { status: 200 });
       }
 
       return new Response('Not found', { status: 404 });
@@ -349,19 +349,19 @@ describe('OpenAI with Workload Identity', () => {
       const urlStr = url.toString();
 
       if (urlStr.includes('/oauth/token')) {
-        return new Response(
-          JSON.stringify({
+        return Response.json(
+          {
             access_token: 'access-token',
             issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
             token_type: 'Bearer',
             expires_in: 3600,
-          }),
+          },
           { status: 200 },
         );
       }
 
       if (urlStr.includes('/models')) {
-        return new Response(JSON.stringify({ data: [] }), { status: 200 });
+        return Response.json({ data: [] }, { status: 200 });
       }
 
       return new Response('Not found', { status: 404 });
@@ -383,19 +383,19 @@ describe('OpenAI with Workload Identity', () => {
       const urlStr = url.toString();
 
       if (urlStr.includes('/oauth/token')) {
-        return new Response(
-          JSON.stringify({
+        return Response.json(
+          {
             access_token: 'access-token',
             issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
             token_type: 'Bearer',
             expires_in: 3600,
-          }),
+          },
           { status: 200 },
         );
       }
 
       if (urlStr.includes('/models')) {
-        return new Response(JSON.stringify({ data: [] }), { status: 200 });
+        return Response.json({ data: [] }, { status: 200 });
       }
 
       return new Response('Not found', { status: 404 });
@@ -430,19 +430,19 @@ describe('OpenAI with Workload Identity', () => {
       const urlStr = url.toString();
 
       if (urlStr.includes('/oauth/token')) {
-        return new Response(
-          JSON.stringify({
+        return Response.json(
+          {
             access_token: 'access-token',
             issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
             token_type: 'Bearer',
             expires_in: 3600,
-          }),
+          },
           { status: 200 },
         );
       }
 
       if (urlStr.includes('/models')) {
-        return new Response(JSON.stringify({ data: [] }), { status: 200 });
+        return Response.json({ data: [] }, { status: 200 });
       }
 
       return new Response('Not found', { status: 404 });

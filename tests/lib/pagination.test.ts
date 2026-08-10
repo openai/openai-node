@@ -46,9 +46,12 @@ describe('Page', () => {
 describe('PagePromise', () => {
   test('parses and asynchronously iterates over the resolved page', async () => {
     const client = { requestAPIList: vi.fn() } as any;
-    const pageResponse = new Response(JSON.stringify({ object: 'list', data: [{ id: 'first' }] }), {
-      headers: { 'content-type': 'application/json', 'x-request-id': 'req_123' },
-    });
+    const pageResponse = Response.json(
+      { object: 'list', data: [{ id: 'first' }] },
+      {
+        headers: { 'content-type': 'application/json', 'x-request-id': 'req_123' },
+      },
+    );
     const promise = new PagePromise<Page<Item>>(
       client,
       Promise.resolve({

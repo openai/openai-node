@@ -8,9 +8,12 @@ const opts: ClientOptions = {
   logLevel: 'debug',
   fetch: (url) =>
     Promise.resolve(
-      new Response(JSON.stringify({ url, custom: true }), {
-        headers: { 'Content-Type': 'application/json' },
-      }),
+      Response.json(
+        { url, custom: true },
+        {
+          headers: { 'Content-Type': 'application/json' },
+        },
+      ),
     ),
 };
 

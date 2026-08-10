@@ -26,7 +26,7 @@ function mockChatCompletionFetch() {
       const rawBody = init?.body;
       if (typeof rawBody !== 'string') throw new Error(`expected init.body to be a string`);
       const body: ChatCompletionToolRunnerParams<any[]> = JSON.parse(rawBody);
-      return new Response(JSON.stringify(await handler(body)), {
+      return Response.json(await handler(body), {
         headers: { 'Content-Type': 'application/json' },
       });
     });

@@ -32,7 +32,7 @@ afterEach(() => {
 });
 
 function jsonResponse(body: unknown = {}): Response {
-  return new Response(JSON.stringify(body), {
+  return Response.json(body, {
     headers: { 'Content-Type': 'application/json' },
   });
 }

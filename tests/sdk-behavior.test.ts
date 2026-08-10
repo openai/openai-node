@@ -6,7 +6,7 @@ import { compact, decode, is_regexp, maybe_map } from 'openai/internal/qs/utils'
 import { toFloat32Array } from 'openai/internal/utils/base64';
 
 function jsonResponse(body: unknown): Response {
-  return new Response(JSON.stringify(body), {
+  return Response.json(body, {
     headers: { 'content-type': 'application/json' },
   });
 }
@@ -35,12 +35,14 @@ describe('handwritten SDK behavior', () => {
     const client = new OpenAI({
       apiKey: 'test-key',
       maxRetries: 0,
-      fetch: vi.fn(
-        async () =>
-          new Response(JSON.stringify({ error: { message: 'request failed' } }), {
+      fetch: vi.fn(async () =>
+        Response.json(
+          { error: { message: 'request failed' } },
+          {
             headers: { 'content-type': 'application/json' },
             status: 400,
-          }),
+          },
+        ),
       ),
     });
 
