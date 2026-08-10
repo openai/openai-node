@@ -41,7 +41,6 @@ const compatibilityRules = [
   'node/global-require',
   'object-shorthand',
   'oxc/no-accumulating-spread',
-  'oxc/no-barrel-file',
   'prefer-arrow-callback',
   'prefer-destructuring',
   'prefer-named-capture-group',
@@ -136,6 +135,20 @@ module.exports = defineConfig({
       ],
       rules: {
         'typescript/no-invalid-void-type': 'off',
+      },
+    },
+    {
+      files: [
+        'src/_vendor/zod-to-json-schema/index.ts',
+        'src/api-promise.ts',
+        'src/pagination.ts',
+        'src/resource.ts',
+        'src/resources.ts',
+        'src/streaming.ts',
+        'src/uploads.ts',
+      ],
+      rules: {
+        'oxc/no-barrel-file': 'off',
       },
     },
     {
