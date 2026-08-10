@@ -2,7 +2,7 @@ packages:
   - examples
   - '!ecosystem-tests/**'
 
-minimumReleaseAge: 1440
+minimumReleaseAge: 11520
 minimumReleaseAgeStrict: true
 trustPolicy: no-downgrade
 trustPolicyExclude:
