@@ -93,7 +93,6 @@ const compatibilityRules = [
   'unicorn/prefer-event-target',
   'unicorn/prefer-module',
   'unicorn/prefer-node-protocol',
-  'unicorn/prefer-number-properties',
   'unicorn/prefer-optional-catch-binding',
   'unicorn/prefer-response-static-json',
   'unicorn/prefer-spread',

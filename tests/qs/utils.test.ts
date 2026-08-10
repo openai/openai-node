@@ -150,7 +150,21 @@ describe('combine()', function () {
 });
 
 test('is_buffer()', function () {
-  for (const x of [null, undefined, true, false, '', 'abc', 42, 0, NaN, {}, [], function () {}, /a/g]) {
+  for (const x of [
+    null,
+    undefined,
+    true,
+    false,
+    '',
+    'abc',
+    42,
+    0,
+    Number.NaN,
+    {},
+    [],
+    function () {},
+    /a/g,
+  ]) {
     // t.equal(is_buffer(x), false, inspect(x) + ' is not a buffer');
     expect(is_buffer(x)).toEqual(false);
   }
