@@ -53,11 +53,11 @@ describe('merge()', function () {
       var getCount = 0;
       var observed: any[] = [];
       Object.defineProperty(observed, 0, {
-        get: function () {
+        get() {
           getCount += 1;
           return { bar: 'baz' };
         },
-        set: function () {
+        set() {
           setCount += 1;
         },
       });

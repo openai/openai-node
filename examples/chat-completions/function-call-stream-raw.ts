@@ -83,7 +83,7 @@ async function main() {
     const stream = await openai.chat.completions.create({
       model: 'gpt-3.5-turbo',
       messages,
-      functions: functions,
+      functions,
       stream: true,
     });
 

@@ -79,7 +79,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
             if (sse.event == 'error') {
               throw new APIError(undefined, data.error, data.message, undefined);
             }
-            yield { event: sse.event, data: data } as any;
+            yield { event: sse.event, data } as any;
           }
         }
         done = true;

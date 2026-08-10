@@ -231,7 +231,7 @@ export function compact(value: any) {
     for (const key of keys) {
       const val = obj[key];
       if (typeof val === 'object' && val !== null && !refs.includes(val)) {
-        queue.push({ obj: obj, prop: key });
+        queue.push({ obj, prop: key });
         refs.push(val);
       }
     }
