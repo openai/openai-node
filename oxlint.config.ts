@@ -60,7 +60,6 @@ const compatibilityRules = [
   'typescript/consistent-type-imports',
   'typescript/method-signature-style',
   'typescript/no-dynamic-delete',
-  'typescript/no-empty-object-type',
   'typescript/no-explicit-any',
   'typescript/no-import-type-side-effects',
   'typescript/no-inferrable-types',
@@ -149,6 +148,20 @@ module.exports = defineConfig({
       ],
       rules: {
         'oxc/no-barrel-file': 'off',
+      },
+    },
+    {
+      // Vendored zod-to-json-schema uses `{}` for the intentionally empty schema
+      // that accepts any JSON value; preserve that public type surface.
+      files: [
+        'src/_vendor/zod-to-json-schema/parseDef.ts',
+        'src/_vendor/zod-to-json-schema/parsers/any.ts',
+        'src/_vendor/zod-to-json-schema/parsers/never.ts',
+        'src/_vendor/zod-to-json-schema/parsers/undefined.ts',
+        'src/_vendor/zod-to-json-schema/parsers/unknown.ts',
+      ],
+      rules: {
+        'typescript/no-empty-object-type': 'off',
       },
     },
     {
