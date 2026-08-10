@@ -47,7 +47,7 @@
     "@types/yargs": "^17.0.35",
     "deep-object-diff": "^1.1.9",
     "execa": "^5.1.1",
-    "fast-check": "^3.22.0",
+    "fast-check": "^4.9.0",
     "fast-glob": "^3.3.2",
     "iconv-lite": "^0.6.3",
     "jest": "^30.4.2",
@@ -66,7 +66,7 @@
     "ultracite": "7.8.4",
     "vitest": "4.1.10",
     "ws": "^8.18.0",
-    "yargs": "^17.7.2",
+    "yargs": "^18.1.0",
     "zod": "^3.25 || ^4.0"
   },
   "overrides": {
