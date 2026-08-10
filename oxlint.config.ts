@@ -94,7 +94,6 @@ const compatibilityRules = [
   'unicorn/no-negated-condition',
   'unicorn/no-nested-ternary',
   'unicorn/no-typeof-undefined',
-  'unicorn/no-useless-switch-case',
   'unicorn/no-useless-undefined',
   'unicorn/numeric-separators-style',
   'unicorn/prefer-at',
