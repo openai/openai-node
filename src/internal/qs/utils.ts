@@ -169,6 +169,7 @@ export const encode: (
     const arr = [];
 
     for (let i = 0; i < segment.length; ++i) {
+      // oxlint-disable-next-line unicorn/prefer-code-point -- combine UTF-16 surrogate code units below
       let c = segment.charCodeAt(i);
       if (
         c === 0x2d || // -
@@ -201,6 +202,7 @@ export const encode: (
       }
 
       i += 1;
+      // oxlint-disable-next-line unicorn/prefer-code-point -- combine UTF-16 surrogate code units manually
       c = 0x10000 + (((c & 0x3ff) << 10) | (segment.charCodeAt(i) & 0x3ff));
 
       arr[arr.length] =

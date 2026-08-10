@@ -181,6 +181,7 @@ const encodeDefinitionPathPart = (part: string) => {
 
   let encoded = encodedDefinitionPathPartPrefix;
   for (let i = 0; i < part.length; i++) {
+    // oxlint-disable-next-line unicorn/prefer-code-point -- preserve UTF-16 code-unit encoding
     encoded += part.charCodeAt(i).toString(16).padStart(4, '0');
   }
   return encoded;

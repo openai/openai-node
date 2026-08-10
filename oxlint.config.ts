@@ -95,7 +95,6 @@ const compatibilityRules = [
   'unicorn/no-useless-undefined',
   'unicorn/numeric-separators-style',
   'unicorn/prefer-at',
-  'unicorn/prefer-code-point',
   'unicorn/prefer-event-target',
   'unicorn/prefer-module',
   'unicorn/prefer-node-protocol',

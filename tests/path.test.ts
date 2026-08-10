@@ -439,7 +439,7 @@ describe('encodeURIPath', () => {
   const testCases: string[] = [
     '',
     // Every ASCII character
-    ...Array.from({ length: 0x7f }, (_, i) => String.fromCharCode(i)),
+    ...Array.from({ length: 0x7f }, (_, i) => String.fromCodePoint(i)),
     // Unicode BMP codepoint
     'å',
     // Unicode supplementary codepoint
