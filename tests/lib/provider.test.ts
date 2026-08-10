@@ -63,7 +63,7 @@ describe('provider', () => {
       'https://provider.example/v1/models',
     );
     expect(requestedURL).toBe('https://provider.example/v1/models');
-    expect((requestedInit?.headers as Headers).get('authorization')).toBe('Provider token');
+    expect((requestedInit?.headers as Headers | undefined)?.get('authorization')).toBe('Provider token');
     expect(callApiKey).not.toHaveBeenCalled();
     expect(authHeaders).not.toHaveBeenCalled();
     expect(validateHeaders).not.toHaveBeenCalled();
@@ -180,7 +180,7 @@ describe('provider', () => {
       }),
       maxRetries: 1,
       fetch: async (_url, init) => {
-        if ((init?.headers as Headers).get('x-attempt') === '1') {
+        if (new Headers(init?.headers).get('x-attempt') === '1') {
           return new Response(undefined, {
             status: 429,
             headers: { 'Retry-After-Ms': '1' },

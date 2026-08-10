@@ -66,9 +66,9 @@ describe('vector store file helpers', () => {
     ).resolves.toEqual(completed);
     expect(mockedSleep).toHaveBeenCalledWith(expected);
 
-    const headers = (retrieve.mock.calls[0]![2]?.headers as NullableHeaders).values;
-    expect(headers.get('X-Stainless-Poll-Helper')).toBe('true');
-    expect(headers.get('X-Stainless-Custom-Poll-Interval')).toBe(interval ? String(interval) : null);
+    const headers = (retrieve.mock.calls[0]?.[2]?.headers as NullableHeaders | undefined)?.values;
+    expect(headers?.get('X-Stainless-Poll-Helper')).toBe('true');
+    expect(headers?.get('X-Stainless-Custom-Poll-Interval')).toBe(interval ? String(interval) : null);
   });
 
   test.each(['completed', 'failed'] as const)('returns a file in the %s terminal state', async (status) => {
@@ -145,8 +145,8 @@ describe('vector store file batch helpers', () => {
       batches.poll('vs_123', 'batch_123', interval ? { pollIntervalMs: interval } : {}),
     ).resolves.toEqual(completed);
     expect(mockedSleep).toHaveBeenCalledWith(expected);
-    const headers = (retrieve.mock.calls[0]![2]?.headers as NullableHeaders).values;
-    expect(headers.get('X-Stainless-Poll-Helper')).toBe('true');
+    const headers = (retrieve.mock.calls[0]?.[2]?.headers as NullableHeaders | undefined)?.values;
+    expect(headers?.get('X-Stainless-Poll-Helper')).toBe('true');
   });
 
   test.each(['completed', 'failed', 'cancelled'] as const)(
@@ -232,8 +232,8 @@ describe('assistant run helpers', () => {
 
       await expect(runs.poll('run_123', { thread_id: 'thread_123' })).resolves.toEqual(completed);
       expect(mockedSleep).toHaveBeenCalledWith(9);
-      const headers = (retrieve.mock.calls[0]![2]?.headers as NullableHeaders).values;
-      expect(headers.get('X-Stainless-Poll-Helper')).toBe('true');
+      const headers = (retrieve.mock.calls[0]?.[2]?.headers as NullableHeaders | undefined)?.values;
+      expect(headers?.get('X-Stainless-Poll-Helper')).toBe('true');
     },
   );
 

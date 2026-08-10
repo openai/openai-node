@@ -34,7 +34,6 @@ const compatibilityRules = [
   'no-promise-executor-return',
   'no-shadow',
   'no-sparse-arrays',
-  'no-unsafe-optional-chaining',
   'no-unused-vars',
   'no-use-before-define',
   'no-var',
