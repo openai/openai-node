@@ -16,7 +16,6 @@ const compatibilityRules = [
   'func-names',
   'func-style',
   'import/consistent-type-specifier-style',
-  'import/first',
   'import/no-cycle',
   'jsdoc/no-defaults',
   'jsdoc/require-param-description',
