@@ -1785,7 +1785,7 @@ describe('stringify()', function () {
   });
 
   test('Edge cases and unknown formats', function () {
-    ['UFO1234', false, 1234, null, {}, []].forEach(function (format) {
+    for (const format of ['UFO1234', false, 1234, null, {}, []]) {
       // st['throws'](function () {
       // 	stringify({ a: 'b c' }, { format: format });
       // }, new TypeError('Unknown format option provided.'));
@@ -1793,7 +1793,7 @@ describe('stringify()', function () {
         // @ts-expect-error
         stringify({ a: 'b c' }, { format: format });
       }).toThrow(TypeError);
-    });
+    }
   });
 
   test('encodeValuesOnly', function () {
@@ -2175,7 +2175,7 @@ describe('stringify()', function () {
 });
 
 describe('stringifies empty keys', function () {
-  empty_test_cases.forEach(function (testCase) {
+  for (const testCase of empty_test_cases) {
     test('stringifies an object with empty string key with ' + testCase.input, function () {
       // st.deepEqual(
       // 	stringify(testCase.withEmptyKeys, { encode: false, arrayFormat: 'indices' }),
@@ -2202,7 +2202,7 @@ describe('stringifies empty keys', function () {
         testCase.stringify_output.repeat,
       );
     });
-  });
+  }
 
   test('edge case with object/arrays', function () {
     // st.deepEqual(stringify({ '': { '': [2, 3] } }, { encode: false }), '[][0]=2&[][1]=3');

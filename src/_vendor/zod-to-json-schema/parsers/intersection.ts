@@ -35,7 +35,7 @@ export function parseIntersectionDef(
 
   const mergedAllOf: JsonSchema7Type[] = [];
   // If either of the schemas is an allOf, merge them into a single allOf
-  allOf.forEach((schema) => {
+  for (const schema of allOf) {
     if (isJsonSchema7AllOfType(schema)) {
       mergedAllOf.push(...schema.allOf);
       if (schema.unevaluatedProperties === undefined) {
@@ -54,7 +54,7 @@ export function parseIntersectionDef(
       }
       mergedAllOf.push(nestedSchema);
     }
-  });
+  }
   return mergedAllOf.length
     ? {
         allOf: mergedAllOf,

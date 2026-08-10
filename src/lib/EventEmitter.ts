@@ -96,7 +96,9 @@ export class EventEmitter<EventTypes extends Record<string, (...args: any) => an
     const listeners: EventListeners<EventTypes, Event> | undefined = this.#listeners[event];
     if (listeners) {
       this.#listeners[event] = listeners.filter((l) => !l.once) as any;
-      listeners.forEach(({ listener }: any) => listener(...(args as any)));
+      for (const { listener } of listeners as any) {
+        listener(...(args as any));
+      }
     }
   }
 

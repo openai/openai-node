@@ -87,18 +87,22 @@ export function merge(
   }
 
   if (isArray(target) && isArray(source)) {
-    source.forEach(function (item, i) {
-      if (has(target, i)) {
-        const targetItem = target[i];
-        if (targetItem && typeof targetItem === 'object' && item && typeof item === 'object') {
-          target[i] = merge(targetItem, item, options);
+    const sourceLength = source.length;
+    for (let i = 0; i < sourceLength; i += 1) {
+      if (i in source) {
+        const item = source[i];
+        if (has(target, i)) {
+          const targetItem = target[i];
+          if (targetItem && typeof targetItem === 'object' && item && typeof item === 'object') {
+            target[i] = merge(targetItem, item, options);
+          } else {
+            target.push(item);
+          }
         } else {
-          target.push(item);
+          target[i] = item;
         }
-      } else {
-        target[i] = item;
       }
-    });
+    }
     return target;
   }
 
