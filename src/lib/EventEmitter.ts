@@ -22,8 +22,7 @@ export class EventEmitter<EventTypes extends Record<string, (...args: any) => an
    * @returns this, so that calls can be chained
    */
   on<Event extends keyof EventTypes>(event: Event, listener: EventListener<EventTypes, Event>): this {
-    const listeners: EventListeners<EventTypes, Event> =
-      this.#listeners[event] || (this.#listeners[event] = []);
+    const listeners: EventListeners<EventTypes, Event> = (this.#listeners[event] ||= []);
     listeners.push({ listener });
     return this;
   }
@@ -49,8 +48,7 @@ export class EventEmitter<EventTypes extends Record<string, (...args: any) => an
    * @returns this, so that calls can be chained
    */
   once<Event extends keyof EventTypes>(event: Event, listener: EventListener<EventTypes, Event>): this {
-    const listeners: EventListeners<EventTypes, Event> =
-      this.#listeners[event] || (this.#listeners[event] = []);
+    const listeners: EventListeners<EventTypes, Event> = (this.#listeners[event] ||= []);
     listeners.push({ listener, once: true });
     return this;
   }

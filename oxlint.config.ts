@@ -20,7 +20,6 @@ const compatibilityRules = [
   'import/no-cycle',
   'jsdoc/no-defaults',
   'jsdoc/require-param-description',
-  'logical-assignment-operators',
   'max-classes-per-file',
   'no-await-in-loop',
   'no-bitwise',
