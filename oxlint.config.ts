@@ -62,7 +62,6 @@ const compatibilityRules = [
   'unicorn/consistent-assert',
   'unicorn/consistent-function-scoping',
   'unicorn/filename-case',
-  'unicorn/import-style',
   'unicorn/no-array-for-each',
   'unicorn/no-array-reduce',
   'unicorn/no-await-expression-member',

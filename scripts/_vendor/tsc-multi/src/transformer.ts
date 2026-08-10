@@ -1,4 +1,4 @@
-import { resolve, dirname, extname, relative } from 'path';
+import nodePath = require('path');
 import type ts from 'typescript';
 import { trimSuffix } from './utils';
 import assert from 'assert';
@@ -53,14 +53,14 @@ export function createTransformer<T extends ts.SourceFile | ts.Bundle>(
 
   function isDirectory(sourceFile: ts.SourceFile, path: string): boolean {
     const sourcePath = sourceFile.fileName;
-    const fullPath = resolve(dirname(sourcePath), path);
+    const fullPath = nodePath.resolve(nodePath.dirname(sourcePath), path);
 
     return sys.directoryExists(fullPath);
   }
 
   function fileExists(sourceFile: ts.SourceFile, path: string): boolean {
     const sourcePath = sourceFile.fileName;
-    const fullPath = resolve(dirname(sourcePath), path);
+    const fullPath = nodePath.resolve(nodePath.dirname(sourcePath), path);
 
     return sys.fileExists(fullPath);
   }
@@ -72,7 +72,7 @@ export function createTransformer<T extends ts.SourceFile | ts.Bundle>(
   ): ts.LiteralExpression | T {
     if (!isStringLiteral(node) || !isRelativePath(node.text)) return node;
 
-    const ext = extname(node.text);
+    const ext = nodePath.extname(node.text);
 
     if (ext === MJS_EXT || ext === CJS_EXT) {
       return node;
@@ -101,7 +101,7 @@ export function createTransformer<T extends ts.SourceFile | ts.Bundle>(
     let sourceFile: ts.SourceFile;
 
     function getRelativeImport(mod: string) {
-      const r = relative(dirname(sourceFile.fileName), mod);
+      const r = nodePath.relative(nodePath.dirname(sourceFile.fileName), mod);
       return /^\.?\.?\//.test(r) ? r : './' + r;
     }
 

@@ -4,7 +4,7 @@ import { createReporter, Reporter } from '../report';
 import { mergeCustomTransformers, trimSuffix, isIncrementalCompilation } from '../utils';
 import { createTransformer } from '../transformer';
 import { WorkerOptions } from './types';
-import { dirname, extname, join, resolve } from 'path';
+import nodePath = require('path');
 import assert from 'assert';
 import { helpers } from '../helpers';
 
@@ -265,8 +265,12 @@ export class Worker {
     };
 
     host.getParsedCommandLine = (path: string) => {
-      const basePath = trimSuffix(path, extname(path));
-      const { options } = this.ts.convertCompilerOptionsFromJson(this.data.target, dirname(path), path);
+      const basePath = trimSuffix(path, nodePath.extname(path));
+      const { options } = this.ts.convertCompilerOptionsFromJson(
+        this.data.target,
+        nodePath.dirname(path),
+        path,
+      );
 
       const config = this.ts.getParsedCommandLineOfConfigFile(path, options, parseConfigFileHost);
       if (!config) return;
@@ -274,7 +278,7 @@ export class Worker {
       if (this.data.shareHelpers) {
         const root = (this.ts as any).getCommonSourceDirectoryOfConfig(config);
         config.options.importHelpers = true;
-        resolvedShareHelpers = resolve(root, this.data.shareHelpers);
+        resolvedShareHelpers = nodePath.resolve(root, this.data.shareHelpers);
       }
 
       // Set separated tsbuildinfo paths to avoid that multiple workers to
@@ -340,7 +344,7 @@ export class Worker {
       }
     }
     write(
-      resolve(out, this.data.shareHelpers),
+      nodePath.resolve(out, this.data.shareHelpers),
       this.ts.transpileModule(
         helperDeps.map((name) => helpers[name].code).join('\n\n') +
           `\n\nexport { ${[...helpersNeeded].join(', ')} };\n`,
@@ -365,7 +369,7 @@ export class Worker {
   private transpileProject(projectPath: string) {
     const tsConfigPath = this.system.fileExists(projectPath)
       ? projectPath
-      : join(projectPath, 'tsconfig.json');
+      : nodePath.join(projectPath, 'tsconfig.json');
     const { options } = this.ts.convertCompilerOptionsFromJson(this.data.target, projectPath, tsConfigPath);
 
     const parseConfigFileHost: ts.ParseConfigFileHost = {
@@ -380,7 +384,7 @@ export class Worker {
     if (this.data.shareHelpers) {
       const root = (this.ts as any).getCommonSourceDirectoryOfConfig(config);
       config.options.importHelpers = true;
-      resolvedShareHelpers = resolve(root, this.data.shareHelpers);
+      resolvedShareHelpers = nodePath.resolve(root, this.data.shareHelpers);
     }
 
     const helpersNeeded = new Set<string>();

@@ -1,5 +1,5 @@
 import { fork } from 'child_process';
-import { join } from 'path';
+import path = require('path');
 import { Config, Target } from './config';
 import { WorkerOptions } from './worker/types';
 import { Stream } from 'stream';
@@ -9,7 +9,7 @@ import onExit from 'signal-exit';
 import pAll from 'p-all';
 import debug from './debug';
 
-const WORKER_PATH = join(__dirname, 'worker/entry.ts');
+const WORKER_PATH = path.join(__dirname, 'worker/entry.ts');
 const TS_NODE_REGISTER = require.resolve('ts-node/register/transpile-only');
 const WORKER_TS_NODE_ENV = {
   TS_NODE_SKIP_PROJECT: 'true',

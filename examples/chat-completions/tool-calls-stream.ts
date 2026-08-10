@@ -19,7 +19,7 @@
 //
 //
 
-import util from 'util';
+import { formatWithOptions } from 'util';
 import OpenAI from 'openai';
 import {
   ChatCompletionMessage,
@@ -209,7 +209,7 @@ function lineRewriter() {
     process.stdout.moveCursor(0, -lastMessageLines);
 
     // calculate where to move cursor back for the next move.
-    const text = util.formatWithOptions({ colors: false, breakLength: Infinity, depth: 4 }, value);
+    const text = formatWithOptions({ colors: false, breakLength: Infinity, depth: 4 }, value);
     const __LINE_BREAK_PLACE_HOLDER__ = '__LINE_BREAK_PLACE_HOLDER__';
     const lines = text
       // @ts-ignore-error this requires es2021
@@ -225,7 +225,7 @@ function lineRewriter() {
     lastMessageLines = Math.max(lastMessageLines, 0);
 
     process.stdout.clearScreenDown();
-    process.stdout.write(util.formatWithOptions({ colors: true, breakLength: Infinity, depth: 4 }, value));
+    process.stdout.write(formatWithOptions({ colors: true, breakLength: Infinity, depth: 4 }, value));
   };
 }
 const db: { id: string; name: string; genre: string; description: string }[] = [

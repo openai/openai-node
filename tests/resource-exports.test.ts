@@ -1,12 +1,12 @@
 import { readdirSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import nodePath from 'node:path';
 
-const repositoryRoot = join(__dirname, '..');
-const resourcesDirectory = join(repositoryRoot, 'src', 'resources');
+const repositoryRoot = nodePath.join(__dirname, '..');
+const resourcesDirectory = nodePath.join(repositoryRoot, 'src', 'resources');
 
 function findResourceIndexes(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-    const path = join(directory, entry.name);
+    const path = nodePath.join(directory, entry.name);
 
     if (entry.isDirectory()) return findResourceIndexes(path);
     return entry.name === 'index.ts' ? [path] : [];
@@ -14,16 +14,16 @@ function findResourceIndexes(directory: string): string[] {
 }
 
 const realtimeModules = ['realtime', 'beta/realtime'].flatMap((directory) => {
-  const moduleDirectory = join(repositoryRoot, 'src', directory);
+  const moduleDirectory = nodePath.join(repositoryRoot, 'src', directory);
 
   return readdirSync(moduleDirectory)
     .filter((name) => name.endsWith('.ts'))
-    .map((name) => join(moduleDirectory, name));
+    .map((name) => nodePath.join(moduleDirectory, name));
 });
 
 const resourceIndexes = [...findResourceIndexes(resourcesDirectory), ...realtimeModules].map(
   (modulePath) => ({
-    path: relative(repositoryRoot, modulePath),
+    path: nodePath.relative(repositoryRoot, modulePath),
     modulePath,
   }),
 );

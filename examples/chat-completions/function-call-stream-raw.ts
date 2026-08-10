@@ -1,6 +1,6 @@
 #!/usr/bin/env -S npm run tsn -- -T
 
-import util from 'util';
+import { formatWithOptions } from 'util';
 import OpenAI from 'openai';
 import {
   ChatCompletionMessage,
@@ -142,8 +142,8 @@ function lineRewriter() {
   return function write(value: any) {
     process.stdout.cursorTo(0);
     process.stdout.moveCursor(0, -Math.floor((lastMessageLength - 1) / process.stdout.columns));
-    lastMessageLength = util.formatWithOptions({ colors: false, breakLength: Infinity }, value).length;
-    process.stdout.write(util.formatWithOptions({ colors: true, breakLength: Infinity }, value));
+    lastMessageLength = formatWithOptions({ colors: false, breakLength: Infinity }, value).length;
+    process.stdout.write(formatWithOptions({ colors: true, breakLength: Infinity }, value));
   };
 }
 
