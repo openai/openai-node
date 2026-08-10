@@ -35,7 +35,6 @@ const compatibilityRules = [
   'no-var',
   'node/global-require',
   'object-shorthand',
-  'oxc/no-accumulating-spread',
   'prefer-arrow-callback',
   'prefer-destructuring',
   'prefer-named-capture-group',

@@ -1889,18 +1889,20 @@ function mergeObjectAllOf(
   // closed property sets before merging schemas so optional declarations
   // excluded by another closed branch are discarded, while required excluded
   // properties remain unrepresentable and fail closed.
-  const allowedClosedProperties =
-    closedPropertySets.length === 0
-      ? undefined
-      : closedPropertySets
-          .slice(1)
-          .reduce(
-            (allowed, keys) => new Set([...allowed].filter((key) => keys.has(key))),
-            new Set(closedPropertySets[0]),
-          );
+  let allowedClosedProperties: Set<string> | undefined;
+  if (closedPropertySets.length > 0) {
+    allowedClosedProperties = new Set(closedPropertySets[0]);
+    for (const keys of closedPropertySets.slice(1)) {
+      for (const key of allowedClosedProperties) {
+        if (!keys.has(key)) {
+          allowedClosedProperties.delete(key);
+        }
+      }
+    }
+  }
+  const closedProperties = allowedClosedProperties;
   const excludesRequiredProperty =
-    allowedClosedProperties !== undefined &&
-    [...mergedRequired].some((key) => !allowedClosedProperties.has(key));
+    closedProperties !== undefined && [...mergedRequired].some((key) => !closedProperties.has(key));
   const collapsesToNull = excludesRequiredProperty && !hasExplicitObjectType && hasExplicitNullableObjectType;
   const discardedPropertyPaths = propertyEntries
     .filter(

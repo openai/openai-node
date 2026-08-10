@@ -30,7 +30,7 @@ export function parseTupleDef(
             currentPath: [...refs.currentPath, 'items', `${i}`],
           }),
         )
-        .reduce((acc: JsonSchema7Type[], x) => (x === undefined ? acc : [...acc, x]), []),
+        .filter((x): x is JsonSchema7Type => x !== undefined),
       additionalItems: parseDef(def.rest._def, {
         ...refs,
         currentPath: [...refs.currentPath, 'additionalItems'],
@@ -48,6 +48,6 @@ export function parseTupleDef(
           currentPath: [...refs.currentPath, 'items', `${i}`],
         }),
       )
-      .reduce((acc: JsonSchema7Type[], x) => (x === undefined ? acc : [...acc, x]), []),
+      .filter((x): x is JsonSchema7Type => x !== undefined),
   };
 }
