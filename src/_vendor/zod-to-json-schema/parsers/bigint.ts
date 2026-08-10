@@ -5,11 +5,11 @@ import { ErrorMessages, setResponseValueAndErrors } from '../errorMessages';
 export type JsonSchema7BigintType = {
   type: 'integer';
   format: 'int64';
-  minimum?: BigInt;
-  exclusiveMinimum?: BigInt;
-  maximum?: BigInt;
-  exclusiveMaximum?: BigInt;
-  multipleOf?: BigInt;
+  minimum?: bigint;
+  exclusiveMinimum?: bigint;
+  maximum?: bigint;
+  exclusiveMaximum?: bigint;
+  multipleOf?: bigint;
   errorMessage?: ErrorMessages<JsonSchema7BigintType>;
 };
 

@@ -69,7 +69,6 @@ const compatibilityRules = [
   'typescript/no-inferrable-types',
   'typescript/no-namespace',
   'typescript/no-non-null-assertion',
-  'typescript/no-wrapper-object-types',
   'typescript/parameter-properties',
   'typescript/prefer-for-of',
   'typescript/prefer-ts-expect-error',
