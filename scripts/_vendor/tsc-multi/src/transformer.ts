@@ -329,7 +329,7 @@ export function createTransformer<T extends ts.SourceFile | ts.Bundle>(
           }),
         ) as any;
       }
-      assert(false);
+      assert.ok(false);
     };
   };
 }

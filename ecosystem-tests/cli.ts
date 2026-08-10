@@ -124,7 +124,7 @@ const projectRunners = {
     // dependency. For the default path, add that declaration only after npm
     // installs the local tarball so it cannot substitute a registry package.
     const installedPackage = JSON.parse(await fs.readFile('node_modules/openai/package.json', 'utf8'));
-    assert(typeof installedPackage.version === 'string');
+    assert.ok(typeof installedPackage.version === 'string');
     await fs.writeFile(
       'package.json',
       JSON.stringify(
@@ -164,7 +164,7 @@ async function startProxy() {
   await new Promise<void>((resolve) => proxy.listen(0, '127.0.0.1', resolve));
 
   const address = proxy.address();
-  assert(address && typeof address !== 'string');
+  assert.ok(address && typeof address !== 'string');
   process.env['ECOSYSTEM_TESTS_PROXY'] = 'http://127.0.0.1:' + address.port;
 
   return () => {
@@ -579,8 +579,8 @@ async function buildPackage() {
   });
 
   const pack = JSON.parse(proc.stdout);
-  assert(Array.isArray(pack), `Expected pack output to be an array but got ${typeof pack}`);
-  assert(pack.length === 1, `Expected pack output to be an array of length 1 but got ${pack.length}`);
+  assert.ok(Array.isArray(pack), `Expected pack output to be an array but got ${typeof pack}`);
+  assert.ok(pack.length === 1, `Expected pack output to be an array of length 1 but got ${pack.length}`);
 
   const filename = path.join('dist', (pack[0] as any).filename);
   console.error({ filename });
