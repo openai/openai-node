@@ -1418,7 +1418,7 @@ describe('stringify()', function () {
         expect(prefix).toBe('');
         expect(value).toBe(obj);
       } else if (prefix === 'c') {
-        return void 0;
+        return undefined;
       } else if (value instanceof Date) {
         // st.equal(prefix, 'e[f]');
         expect(prefix).toBe('e[f]');

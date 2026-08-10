@@ -50,12 +50,12 @@ export function mockFetch(): { fetch: Fetch; handleRequest: (handle: Fetch) => P
     return new Promise<void>((resolve, reject) => {
       fetchQueue.shift()?.(async (req, init) => {
         try {
-          return await handle(req, init);
+          const response = await handle(req, init);
+          resolve();
+          return response;
         } catch (err) {
           reject(err);
           return err as any;
-        } finally {
-          resolve();
         }
       });
     });

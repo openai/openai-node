@@ -26,26 +26,24 @@ app.use(express.text());
 //   })
 //
 // See examples/chat-completions/stream-to-client-browser.ts for a more complete example.
-app.post('/', async (req: Request, res: Response) => {
-  try {
-    console.log('Received request:', req.body);
+const handleRequest = async (req: Request, res: Response) => {
+  console.log('Received request:', req.body);
 
-    const stream = openai.chat.completions.stream({
-      model: 'gpt-3.5-turbo',
-      stream: true,
-      messages: [{ role: 'user', content: req.body }],
-    });
+  const stream = openai.chat.completions.stream({
+    model: 'gpt-3.5-turbo',
+    stream: true,
+    messages: [{ role: 'user', content: req.body }],
+  });
 
-    res.header('Content-Type', 'text/plain');
-    for await (const chunk of stream.toReadableStream()) {
-      res.write(chunk);
-    }
-
-    res.end();
-  } catch (e) {
-    console.error(e);
+  res.header('Content-Type', 'text/plain');
+  for await (const chunk of stream.toReadableStream()) {
+    res.write(chunk);
   }
-});
+
+  res.end();
+};
+
+app.post('/', (req: Request, res: Response) => handleRequest(req, res).catch(console.error));
 
 app.listen('3000', () => {
   console.log('Started proxy express server');

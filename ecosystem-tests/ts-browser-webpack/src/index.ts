@@ -29,7 +29,7 @@ async function runTests() {
     try {
       await Promise.race([
         run(),
-        new Promise((_, reject) =>
+        new Promise((_resolve, reject) =>
           setTimeout(() => reject(new Error(`Test timed out after ${timeout} ms`)), timeout),
         ),
       ]);

@@ -66,6 +66,14 @@ function mockStreamingChatCompletionFetch() {
   return { fetch, handleRequest };
 }
 
+function findLastAssistantMessage(messages: ChatCompletionMessageParam[]) {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message && isAssistantMessage(message)) return message;
+  }
+  return undefined;
+}
+
 // contentChoiceDeltas returns an async iterator which mocks a delta stream of a by splitting the
 // argument into chunks separated by whitespace.
 function* contentChoiceDeltas(
@@ -218,7 +226,7 @@ class RunnerListener {
       .map((m) => m.content as string)
       .filter(Boolean);
     expect(this.contents).toEqual(expectedContents);
-    expect(this.finalMessage).toEqual([...this.messages].reverse().find((x) => x.role === 'assistant'));
+    expect(this.finalMessage).toEqual(findLastAssistantMessage(this.messages));
     expect(await this.runner.finalMessage()).toEqual(this.finalMessage);
     expect(this.finalContent).toEqual(expectedContents[expectedContents.length - 1] ?? null);
     expect(await this.runner.finalContent()).toEqual(this.finalContent);
@@ -329,7 +337,7 @@ class StreamingRunnerListener {
     if (error) return;
 
     if (this.eventContents.length) expect(this.eventChunks.length).toBeGreaterThan(0);
-    expect(this.finalMessage).toEqual([...this.eventMessages].reverse().find((x) => x.role === 'assistant'));
+    expect(this.finalMessage).toEqual(findLastAssistantMessage(this.eventMessages));
     expect(await this.runner.finalMessage()).toEqual(this.finalMessage);
     expect(this.finalContent).toEqual(this.eventContents[this.eventContents.length - 1]?.[1] ?? null);
     expect(await this.runner.finalContent()).toEqual(this.finalContent);
@@ -453,8 +461,7 @@ function _typeTests() {
           function: (_args, _runner, context) => {
             const eventId: string = context.eventId;
             // @ts-expect-error tool context only includes eventId
-            context.missing;
-            return eventId;
+            return context.missing ?? eventId;
           },
           parameters: {},
           description: 'updates an event',
