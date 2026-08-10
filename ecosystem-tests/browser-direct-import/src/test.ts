@@ -50,7 +50,7 @@ import puppeteer from 'puppeteer';
     }
 
     if (!Array.isArray(results)) {
-      throw new Error(`failed to get test results from page`);
+      throw new TypeError(`failed to get test results from page`);
     }
     const failed = results.filter((r) => !r.passed);
     if (failed.length) {

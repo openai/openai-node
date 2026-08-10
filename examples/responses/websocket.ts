@@ -171,7 +171,7 @@ const parseArgs = (argv: Array<string>): CLIArgs => {
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (typeof arg !== 'string') {
-      throw new Error('Unexpected missing CLI argument');
+      throw new TypeError('Unexpected missing CLI argument');
     }
 
     if (arg === '--model') {
@@ -229,7 +229,7 @@ const parseSKUArguments = (rawArguments: string): SKUArguments => {
 
   const skuValue = parsed['sku'];
   if (typeof skuValue !== 'string') {
-    throw new Error(`Tool arguments must include a string \`sku\`: ${rawArguments}`);
+    throw new TypeError(`Tool arguments must include a string \`sku\`: ${rawArguments}`);
   }
 
   return { sku: skuValue };
