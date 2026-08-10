@@ -4,8 +4,8 @@ import { createReporter, Reporter } from '../report';
 import { mergeCustomTransformers, trimSuffix, isIncrementalCompilation } from '../utils';
 import { createTransformer } from '../transformer';
 import { WorkerOptions } from './types';
-import nodePath = require('path');
-import assert from 'assert';
+import nodePath = require('node:path');
+import assert from 'node:assert';
 import { helpers } from '../helpers';
 
 const JS_EXT = '.js';

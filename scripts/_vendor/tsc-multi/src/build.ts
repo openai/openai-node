@@ -1,8 +1,8 @@
-import { fork } from 'child_process';
-import path = require('path');
+import { fork } from 'node:child_process';
+import path = require('node:path');
 import { Config, Target } from './config';
 import { WorkerOptions } from './worker/types';
-import { Stream } from 'stream';
+import { Stream } from 'node:stream';
 import { trimPrefix } from './utils';
 import { getReportStyles } from './report';
 import onExit from 'signal-exit';

@@ -17,7 +17,7 @@ describe('Kubernetes Service Account Token Provider', () => {
   });
 
   test('reads token from file', async () => {
-    const fsPromises = await import('fs/promises');
+    const fsPromises = await import('node:fs/promises');
     (fsPromises.readFile as Mock).mockResolvedValue('  my-k8s-token  \n');
 
     const provider = k8sServiceAccountTokenProvider('/custom/path/token');
@@ -34,7 +34,7 @@ describe('Kubernetes Service Account Token Provider', () => {
   });
 
   test('throws SubjectTokenProviderError on file read failure', async () => {
-    const fsPromises = await import('fs/promises');
+    const fsPromises = await import('node:fs/promises');
     (fsPromises.readFile as Mock).mockRejectedValue(new Error('ENOENT: no such file or directory'));
 
     const provider = k8sServiceAccountTokenProvider('/nonexistent/path');

@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 import { Stream } from 'openai/core/streaming';
 import { OpenAIError, APIConnectionError } from 'openai/error';
-import { PassThrough } from 'stream';
+import { PassThrough } from 'node:stream';
 import {
   ParsingToolFunction,
   ChatCompletionRunner,

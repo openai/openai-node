@@ -1,5 +1,5 @@
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const indexJs = process.env['DIST_PATH']
   ? path.resolve(process.env['DIST_PATH'], 'index.js')

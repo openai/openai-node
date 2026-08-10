@@ -3,7 +3,7 @@ import { stringify } from 'openai/internal/qs';
 import { encode } from 'openai/internal/qs/utils';
 import { StringifyOptions } from 'openai/internal/qs/types';
 import { empty_test_cases } from './empty-keys-cases';
-import assert from 'assert';
+import assert from 'node:assert';
 
 describe('stringify()', function () {
   test('stringifies a querystring object', function () {

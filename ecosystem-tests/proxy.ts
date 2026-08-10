@@ -1,5 +1,5 @@
-import { createServer } from 'http';
-import { connect } from 'net';
+import { createServer } from 'node:http';
+import { connect } from 'node:net';
 
 async function startProxy() {
   const proxy = createServer((_req, res) => {

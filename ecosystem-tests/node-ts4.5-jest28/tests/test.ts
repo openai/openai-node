@@ -1,7 +1,7 @@
 import OpenAI, { toFile } from 'openai';
 import { TranscriptionCreateParams } from 'openai/resources/audio/transcriptions';
 import { File as FormDataFile, Blob as FormDataBlob } from 'formdata-node';
-import * as fs from 'fs';
+import * as fs from 'node:fs';
 import { distance } from 'fastest-levenshtein';
 import { ChatCompletion } from 'openai/resources/chat/completions';
 

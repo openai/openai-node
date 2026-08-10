@@ -1,7 +1,7 @@
-import nodePath = require('path');
+import nodePath = require('node:path');
 import type ts from 'typescript';
 import { trimSuffix } from './utils';
-import assert from 'assert';
+import assert from 'node:assert';
 
 const JS_EXT = '.js';
 const MJS_EXT = '.mjs';

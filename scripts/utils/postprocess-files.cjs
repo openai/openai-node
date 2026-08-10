@@ -1,6 +1,6 @@
 // @ts-check
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const distDir = process.env['DIST_PATH']
   ? path.resolve(process.env['DIST_PATH'])

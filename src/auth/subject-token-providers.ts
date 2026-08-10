@@ -12,7 +12,7 @@ type ReadFile = (path: string) => Promise<string>;
 let fsPromisesModule: Promise<typeof import('node:fs/promises')> | undefined;
 
 async function defaultReadFile(path: string): Promise<string> {
-  fsPromisesModule ??= import('fs/promises').catch((error) => {
+  fsPromisesModule ??= import('node:fs/promises').catch((error) => {
     fsPromisesModule = undefined;
     throw error;
   });

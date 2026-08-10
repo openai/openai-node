@@ -1,6 +1,6 @@
 import { vi } from 'vitest';
 
-import fs from 'fs';
+import fs from 'node:fs';
 import type { ResponseLike } from 'openai/internal/to-file';
 import { toFile } from 'openai/core/uploads';
 

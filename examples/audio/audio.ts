@@ -1,8 +1,8 @@
 #!/usr/bin/env -S npm run tsn -- -T
 
 import OpenAI, { toFile } from 'openai';
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 
 // gets API Key from environment variable OPENAI_API_KEY
 const openai = new OpenAI();
