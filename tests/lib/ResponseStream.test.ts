@@ -189,7 +189,7 @@ describe('.stream()', () => {
     await stream.emitted('response.created');
     await pullStarted;
 
-    const done = expect(stream.done()).rejects.toThrowError(APIUserAbortError);
+    const done = expect(stream.done()).rejects.toThrow(APIUserAbortError);
     stream.abort();
 
     await cancelled;

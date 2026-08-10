@@ -12,6 +12,7 @@
     "tsconfig-paths": "^4.0.0"
   },
   "devDependencies": {
+    "@types/jest": "28.1.8",
     "@types/node": "^20.4.2",
     "@types/ws": "^8.5.4",
     "fastest-levenshtein": "^1.0.16",

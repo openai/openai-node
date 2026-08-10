@@ -24,6 +24,15 @@ fs.writeFileSync(file, contents);
 EOF
 fi
 
+if [ -e tests/index.test.ts ]; then
+  node <<'EOF'
+const fs = require('fs');
+const file = 'tests/index.test.ts';
+const contents = fs.readFileSync(file, 'utf8').replaceAll('.toThrowError(', '.toThrow(');
+fs.writeFileSync(file, contents);
+EOF
+fi
+
 # Generated tests are excluded from linting, so TypeScript performs the API
 # compatibility check against every historical resource test.
 ./scripts/lint
