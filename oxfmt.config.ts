@@ -1,4 +1,5 @@
 const requireConfig = require('node:module').createRequire(__filename);
+
 const { defineConfig } = requireConfig('oxfmt');
 const ultracite = requireConfig('ultracite/oxfmt').default;
 
