@@ -105,11 +105,7 @@ export function merge(
   return Object.keys(source).reduce(function (acc, key) {
     const value = source[key];
 
-    if (has(acc, key)) {
-      acc[key] = merge(acc[key], value, options);
-    } else {
-      acc[key] = value;
-    }
+    acc[key] = has(acc, key) ? merge(acc[key], value, options) : value;
     return acc;
   }, mergeTarget);
 }

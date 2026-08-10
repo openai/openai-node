@@ -93,7 +93,6 @@ const compatibilityRules = [
   'unicorn/prefer-spread',
   'unicorn/prefer-string-replace-all',
   'unicorn/prefer-string-slice',
-  'unicorn/prefer-ternary',
   'unicorn/prefer-type-error',
   'unicorn/switch-case-braces',
   'unicorn/text-encoding-identifier-case',

@@ -343,11 +343,7 @@ async function* iterateBytes(value: unknown): AsyncGenerator<Uint8Array> {
   } else if (value instanceof ArrayBuffer) {
     yield new Uint8Array(value);
   } else if (value instanceof Response) {
-    if (value.body) {
-      yield* iterateBytes(value.body);
-    } else {
-      yield* iterateBytes(await value.blob());
-    }
+    yield* iterateBytes(value.body || (await value.blob()));
   } else if (value instanceof Blob) {
     if (typeof value.stream === 'function') {
       yield* iterateBytes(value.stream());

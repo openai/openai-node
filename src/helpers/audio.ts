@@ -40,11 +40,10 @@ async function nodejsPlayAudio(stream: NodeJS.ReadableStream | Response | File):
       let source: NodeJS.ReadableStream;
       if (isResponse(stream)) {
         const body = stream.body! as NodeReadableStream | NodeJS.ReadableStream;
-        if ('pipe' in body && typeof body.pipe === 'function') {
-          source = body;
-        } else {
-          source = Readable.fromWeb(body as NodeReadableStream);
-        }
+        source =
+          'pipe' in body && typeof body.pipe === 'function'
+            ? body
+            : Readable.fromWeb(body as NodeReadableStream);
       } else if (isFile(stream)) {
         source = Readable.from(stream.stream());
       } else {

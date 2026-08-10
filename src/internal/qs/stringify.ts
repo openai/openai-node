@@ -370,13 +370,12 @@ export function stringify(object: any, opts: StringifyOptions = {}) {
   let prefix = options.addQueryPrefix === true ? '?' : '';
 
   if (options.charsetSentinel) {
-    if (options.charset === 'iso-8859-1') {
-      // encodeURIComponent('&#10003;'), the "numeric entity" representation of a checkmark
-      prefix += 'utf8=%26%2310003%3B&';
-    } else {
-      // encodeURIComponent('✓')
-      prefix += 'utf8=%E2%9C%93&';
-    }
+    prefix +=
+      options.charset === 'iso-8859-1'
+        ? // encodeURIComponent('&#10003;'), the "numeric entity" representation of a checkmark
+          'utf8=%26%2310003%3B&'
+        : // encodeURIComponent('✓')
+          'utf8=%E2%9C%93&';
   }
 
   return joined.length > 0 ? prefix + joined : '';
