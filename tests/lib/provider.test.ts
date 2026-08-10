@@ -164,6 +164,7 @@ describe('provider', () => {
     let attempt = 0;
 
     class TestClient extends OpenAI {
+      // oxlint-disable-next-line class-methods-use-this -- This fixture exercises an overridable instance hook.
       protected override async prepareRequest(request: RequestInit): Promise<void> {
         order.push('subclass');
         (request.headers as Headers).set('x-prepared-by', 'subclass');

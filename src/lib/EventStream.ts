@@ -4,12 +4,14 @@ export class EventStream<EventTypes extends BaseEvents> {
   controller: AbortController = new AbortController();
 
   #connectedPromise: Promise<void>;
+  // oxlint-disable class-methods-use-this -- Deferred promise resolvers are intentionally per-instance mutable callbacks.
   #resolveConnectedPromise: () => void = () => undefined;
   #rejectConnectedPromise: (error: OpenAIError) => void = () => undefined;
 
   #endPromise: Promise<void>;
   #resolveEndPromise: () => void = () => undefined;
   #rejectEndPromise: (error: OpenAIError) => void = () => undefined;
+  // oxlint-enable class-methods-use-this
 
   #listeners: {
     [Event in keyof EventTypes]?: EventListeners<EventTypes, Event>;
@@ -357,6 +359,7 @@ export class EventStream<EventTypes extends BaseEvents> {
     }
   }
 
+  // oxlint-disable-next-line class-methods-use-this -- Subclasses override this instance hook.
   protected _emitFinal(): void {
     // Hook for subclasses.
   }

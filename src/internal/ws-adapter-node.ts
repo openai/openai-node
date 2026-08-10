@@ -32,7 +32,7 @@ export class NodeWebSocket implements WebSocketLike {
   }
 
   on(event: string, listener: Listener): void {
-    const wrapped = this._wrapListener(event, listener);
+    const wrapped = NodeWebSocket._wrapListener(event, listener);
     this._listenersFor(event).set(listener, wrapped);
     this._ws.on(event, wrapped);
   }
@@ -52,7 +52,7 @@ export class NodeWebSocket implements WebSocketLike {
       this.off(event, listener);
       listener(...args);
     };
-    const wrapped = this._wrapListener(event, onceListener);
+    const wrapped = NodeWebSocket._wrapListener(event, onceListener);
     this._listenersFor(event).set(listener, wrapped);
     this._ws.on(event, wrapped);
   }
@@ -85,7 +85,7 @@ export class NodeWebSocket implements WebSocketLike {
     return data;
   }
 
-  private _wrapListener(event: string, listener: Listener): Listener {
+  private static _wrapListener(event: string, listener: Listener): Listener {
     switch (event) {
       case 'message':
         return (data: Buffer | ArrayBuffer | Buffer[], isBinary: boolean) => {

@@ -297,7 +297,7 @@ export class AbstractChatCompletionRunner<
     }
   }
 
-  #validateParams(params: ChatCompletionCreateParams): void {
+  static #validateParams(params: ChatCompletionCreateParams): void {
     if (params.n != null && params.n > 1) {
       throw new OpenAIError(
         'ChatCompletion convenience helpers only support n=1 at this time. To use n>1, please use chat.completions.create() directly.',
@@ -311,7 +311,7 @@ export class AbstractChatCompletionRunner<
     options?: RequestOptions,
   ): Promise<ParsedChatCompletion<ParsedT>> {
     this._listenForAbort(options?.signal);
-    this.#validateParams(params);
+    AbstractChatCompletionRunner.#validateParams(params);
 
     const chatCompletion = await client.chat.completions.create(
       { ...params, stream: false },
@@ -444,7 +444,7 @@ export class AbstractChatCompletionRunner<
         rawContent = await fn.function(args, runner, toolContext);
       }
 
-      const content = this.#stringifyFunctionCallResult(rawContent);
+      const content = AbstractChatCompletionRunner.#stringifyFunctionCallResult(rawContent);
       return { message: { role, tool_call_id, content }, functionCalled: true };
     };
 
@@ -500,7 +500,7 @@ export class AbstractChatCompletionRunner<
     }
   }
 
-  #stringifyFunctionCallResult(rawContent: unknown): string {
+  static #stringifyFunctionCallResult(rawContent: unknown): string {
     return typeof rawContent === 'string'
       ? rawContent
       : rawContent === undefined
