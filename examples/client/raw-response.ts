@@ -14,8 +14,8 @@ async function main() {
         model: 'gpt-3.5-turbo-instruct',
       })
       .asResponse();
-    console.log(`response headers: `, Object.fromEntries(response.headers.entries()));
-    console.log(`response json: `, await response.json());
+    console.log(`response headers:`, Object.fromEntries(response.headers.entries()));
+    console.log(`response json:`, await response.json());
   }
 
   // getting the usual return value plus raw Response:
@@ -26,8 +26,8 @@ async function main() {
         model: 'gpt-3.5-turbo-instruct',
       })
       .withResponse();
-    console.log(`response headers: `, Object.fromEntries(response.headers.entries()));
-    console.log(`completion: `, completion);
+    console.log(`response headers:`, Object.fromEntries(response.headers.entries()));
+    console.log(`completion:`, completion);
   }
 }
 

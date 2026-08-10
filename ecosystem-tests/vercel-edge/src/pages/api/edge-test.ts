@@ -58,9 +58,9 @@ export default async function handler(request: NextRequest) {
       console.error('running', description);
       try {
         await handler();
-        console.error('passed ', description);
+        console.error('passed', description);
       } catch (error) {
-        console.error('failed ', description, error);
+        console.error('failed', description, error);
         return new NextResponse('Internal Server Error', { status: 500 });
       }
     }
