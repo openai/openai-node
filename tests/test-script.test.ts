@@ -21,7 +21,7 @@ const generatedTestPatternsPath = path.join(process.cwd(), 'scripts/generated-te
 const generatedTopLevelTests = readdirSync(path.join(process.cwd(), 'tests')).filter(
   (file) =>
     file.endsWith('.test.ts') &&
-    readFileSync(path.join(process.cwd(), 'tests', file), 'utf8').startsWith(
+    readFileSync(path.join(process.cwd(), 'tests', file), 'utf-8').startsWith(
       '// File generated from our OpenAPI spec by Stainless.',
     ),
 );
@@ -73,7 +73,7 @@ printf '%s\\0' "$@" > "$VITEST_ARGS_FILE"
     const jestArgsFile = path.join(fixtureDir, 'jest-args');
     const vitestArgsFile = path.join(fixtureDir, 'vitest-args');
     const result = spawnSync(path.join(fixtureDir, 'scripts/test'), args, {
-      encoding: 'utf8',
+      encoding: 'utf-8',
       env: {
         ...process.env,
         JEST_ARGS_FILE: jestArgsFile,
@@ -90,7 +90,7 @@ printf '%s\\0' "$@" > "$VITEST_ARGS_FILE"
     }
 
     const readArgs = (path: string) =>
-      existsSync(path) ? readFileSync(path, 'utf8').split('\0').slice(0, -1) : [];
+      existsSync(path) ? readFileSync(path, 'utf-8').split('\0').slice(0, -1) : [];
 
     return { jestArgs: readArgs(jestArgsFile), vitestArgs: readArgs(vitestArgsFile) };
   }

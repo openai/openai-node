@@ -14,7 +14,7 @@ function requestedFiles(arguments_) {
   if (arguments_[0] !== '--file-list') return arguments_;
   if (arguments_.length !== 2) throw new Error('--file-list requires exactly one path');
 
-  return fs.readFileSync(arguments_[1], 'utf8').split(/\r?\n/u).filter(Boolean);
+  return fs.readFileSync(arguments_[1], 'utf-8').split(/\r?\n/u).filter(Boolean);
 }
 
 function selectedGeneratedFiles(arguments_) {
@@ -68,7 +68,7 @@ function checkGeneratedFiles(files) {
   const result = spawnSync(
     process.execPath,
     [oxlint, '--config', generatedConfig, '--format', 'json', ...files],
-    { cwd: repositoryRoot, encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 },
+    { cwd: repositoryRoot, encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 },
   );
 
   if (result.error) throw result.error;

@@ -18,7 +18,7 @@ async function postprocess() {
   for await (const file of walk(distDir)) {
     if (!/(\.d)?[cm]?ts$/.test(file)) continue;
 
-    const code = await fs.promises.readFile(file, 'utf8');
+    const code = await fs.promises.readFile(file, 'utf-8');
 
     // strip out lib="dom", types="node", and types="react" references; these
     // are needed at build time, but would pollute the user's TS environment
@@ -37,7 +37,7 @@ async function postprocess() {
 
     if (transformed !== code) {
       console.error(`wrote ${path.relative(process.cwd(), file)}`);
-      await fs.promises.writeFile(file, transformed, 'utf8');
+      await fs.promises.writeFile(file, transformed, 'utf-8');
     }
   }
 

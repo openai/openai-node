@@ -33,12 +33,12 @@ const packedPackagePath = require('node:path');
   const run = (command: string, args: string[], options: RunOptions = {}): string =>
     childProcess.execFileSync(command, args, {
       cwd: temporaryDirectory,
-      encoding: 'utf8',
+      encoding: 'utf-8',
       stdio: 'pipe',
       ...options,
     });
   const readPackage = (file: string): PackageMetadata =>
-    JSON.parse(fs.readFileSync(file, 'utf8')) as PackageMetadata;
+    JSON.parse(fs.readFileSync(file, 'utf-8')) as PackageMetadata;
   const findSourceMaps = (directory: string): string[] => {
     const maps: string[] = [];
     const entries = fs.readdirSync(directory, { withFileTypes: true }) as import('node:fs').Dirent[];
@@ -190,7 +190,7 @@ const packedPackagePath = require('node:path');
     const sourceMaps = findSourceMaps(installedPackageRoot);
     sourceMaps.sort();
     for (const mapPath of sourceMaps) {
-      const sourceMap = JSON.parse(fs.readFileSync(mapPath, 'utf8')) as SourceMap;
+      const sourceMap = JSON.parse(fs.readFileSync(mapPath, 'utf-8')) as SourceMap;
       for (const source of sourceMap.sources) {
         const resolvedSource: string = path.resolve(
           path.dirname(mapPath),

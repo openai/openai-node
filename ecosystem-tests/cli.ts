@@ -123,7 +123,7 @@ const projectRunners = {
     // Deno's BYONM resolver requires package.json to declare the npm
     // dependency. For the default path, add that declaration only after npm
     // installs the local tarball so it cannot substitute a registry package.
-    const installedPackage = JSON.parse(await fs.readFile('node_modules/openai/package.json', 'utf8'));
+    const installedPackage = JSON.parse(await fs.readFile('node_modules/openai/package.json', 'utf-8'));
     assert.ok(typeof installedPackage.version === 'string');
     await fs.writeFile(
       'package.json',
@@ -422,7 +422,7 @@ async function main() {
                     ],
                     {
                       stdio: 'pipe',
-                      encoding: 'utf8',
+                      encoding: 'utf-8',
                       maxBuffer: 100 * 1024 * 1024,
                       env: {
                         DISABLE_V8_COMPILE_CACHE: process.env['DISABLE_V8_COMPILE_CACHE'] ?? '1',
