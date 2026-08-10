@@ -71,7 +71,6 @@ const compatibilityRules = [
   'typescript/no-explicit-any',
   'typescript/no-import-type-side-effects',
   'typescript/no-inferrable-types',
-  'typescript/no-invalid-void-type',
   'typescript/no-namespace',
   'typescript/no-non-null-assertion',
   'typescript/no-wrapper-object-types',
@@ -140,6 +139,19 @@ module.exports = defineConfig({
   },
   ignorePatterns: [...core.ignorePatterns, 'dist/**', 'coverage/**', ...stainlessGeneratedFiles],
   overrides: [
+    {
+      // These signatures intentionally expose direct `void` for zero-argument events,
+      // and the type test verifies the public `APIPromise<void>` contract.
+      files: [
+        'src/core/EventEmitter.ts',
+        'src/lib/EventEmitter.ts',
+        'src/lib/EventStream.ts',
+        'tests/responses.test.ts',
+      ],
+      rules: {
+        'typescript/no-invalid-void-type': 'off',
+      },
+    },
     {
       files: ['tests/**', 'examples/**', 'ecosystem-tests/**'],
       rules: {
