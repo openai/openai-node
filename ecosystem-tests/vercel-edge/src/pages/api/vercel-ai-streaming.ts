@@ -10,7 +10,7 @@ export const config = {
   ],
 };
 
-export default async (request: NextRequest) => {
+export default async function handler(request: NextRequest) {
   const openai = new OpenAI();
 
   const { messages }: { messages: UIMessage[] } = await request.json();
@@ -53,4 +53,4 @@ export default async (request: NextRequest) => {
   });
 
   return createUIMessageStreamResponse({ stream });
-};
+}

@@ -11,7 +11,7 @@ export const config = {
   ],
 };
 
-export default async (request: NextRequest) => {
+export default async function handler(request: NextRequest) {
   const openai = new OpenAI();
 
   const text: string[] = [];
@@ -27,4 +27,4 @@ export default async (request: NextRequest) => {
   }
 
   return NextResponse.json({ text: text.join('') });
-};
+}

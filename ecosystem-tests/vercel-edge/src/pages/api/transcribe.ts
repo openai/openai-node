@@ -12,7 +12,7 @@ export const config = {
   ],
 };
 
-export default async (request: NextRequest) => {
+export default async function handler(request: NextRequest) {
   const openai = new OpenAI();
 
   async function typeTests() {
@@ -33,4 +33,4 @@ export default async (request: NextRequest) => {
   const transcription = await openai.audio.transcriptions.create(params);
 
   return NextResponse.json(transcription);
-};
+}

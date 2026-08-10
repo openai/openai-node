@@ -40,7 +40,7 @@ function expectSimilar(received: string, expected: string, maxDistance: number) 
   throw new Error(message);
 }
 
-export default async (request: NextRequest) => {
+export default async function handler(request: NextRequest) {
   try {
     console.error('creating client');
     const client = new OpenAI();
@@ -70,4 +70,4 @@ export default async (request: NextRequest) => {
     console.error(error instanceof Error ? error.stack : String(error));
     return new NextResponse('Internal Server Error', { status: 500 });
   }
-};
+}
