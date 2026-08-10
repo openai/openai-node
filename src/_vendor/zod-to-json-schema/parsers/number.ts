@@ -18,7 +18,9 @@ export function parseNumberDef(def: ZodNumberDef, refs: Refs): JsonSchema7Number
     type: 'number',
   };
 
-  if (!def.checks) return res;
+  if (!def.checks) {
+    return res;
+  }
 
   for (const check of def.checks) {
     switch (check.kind) {

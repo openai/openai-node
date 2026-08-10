@@ -74,14 +74,14 @@ it.skip(`raw response`, async () => {
 
   // test that we can use web Response API
   const { body } = response;
-  if (!body) throw new Error('expected response.body to be defined');
+  if (!body) {throw new Error('expected response.body to be defined');}
 
   const reader = body.getReader();
   const chunks: Uint8Array[] = [];
   let result;
   do {
     result = await reader.read();
-    if (!result.done) chunks.push(result.value);
+    if (!result.done) {chunks.push(result.value);}
   } while (!result.done);
 
   reader.releaseLock();

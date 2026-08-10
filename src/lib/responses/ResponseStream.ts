@@ -102,12 +102,16 @@ export class ResponseStream<ParsedT = null>
   }
 
   #beginRequest() {
-    if (this.ended) return;
+    if (this.ended) {
+      return;
+    }
     this.#currentResponseSnapshot = undefined;
   }
 
   #addEvent(this: ResponseStream<ParsedT>, event: ResponseStreamEvent, starting_after: number | null) {
-    if (this.ended) return;
+    if (this.ended) {
+      return;
+    }
 
     const maybeEmit = (name: string, event: ResponseStreamEvent & { snapshot?: string }) => {
       if (starting_after == null || event.sequence_number > starting_after) {
@@ -297,7 +301,9 @@ export class ResponseStream<ParsedT = null>
   async finalResponse(): Promise<ParsedResponse<ParsedT>> {
     await this.done();
     const response = this.#finalResponse;
-    if (!response) throw new OpenAIError('stream ended without producing a ChatCompletion');
+    if (!response) {
+      throw new OpenAIError('stream ended without producing a ChatCompletion');
+    }
     return response;
   }
 }

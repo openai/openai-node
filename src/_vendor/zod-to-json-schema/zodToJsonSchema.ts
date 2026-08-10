@@ -66,7 +66,9 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
       const newDefinitions = Object.entries(refs.definitions).filter(
         ([key]) => !processedDefinitions.has(key),
       );
-      if (newDefinitions.length === 0) break;
+      if (newDefinitions.length === 0) {
+        break;
+      }
 
       for (const [key, schema] of newDefinitions) {
         definitions[key] =

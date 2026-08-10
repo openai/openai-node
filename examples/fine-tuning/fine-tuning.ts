@@ -56,9 +56,13 @@ async function main() {
     const { data } = await client.fineTuning.jobs.listEvents(fineTune.id, { limit: 100 });
     for (let index = data.length - 1; index >= 0; index -= 1) {
       const event = data[index];
-      if (event === undefined) continue;
+      if (event === undefined) {
+        continue;
+      }
 
-      if (event.id in events) continue;
+      if (event.id in events) {
+        continue;
+      }
       events[event.id] = event;
       const timestamp = new Date(event.created_at * 1000);
       console.log(`- ${timestamp.toLocaleTimeString()}: ${event.message}`);

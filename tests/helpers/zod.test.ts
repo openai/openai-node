@@ -14,10 +14,14 @@ import { z as zv4 } from 'zod/v4';
 import { z as zv4Mini } from 'zod/v4-mini';
 
 function collectRefs(value: unknown, refs: string[] = []): string[] {
-  if (!value || typeof value !== 'object') return refs;
+  if (!value || typeof value !== 'object') {
+    return refs;
+  }
 
   const maybeRef = (value as { $ref?: unknown }).$ref;
-  if (typeof maybeRef === 'string') refs.push(maybeRef);
+  if (typeof maybeRef === 'string') {
+    refs.push(maybeRef);
+  }
 
   for (const child of Object.values(value)) {
     collectRefs(child, refs);
@@ -27,7 +31,9 @@ function collectRefs(value: unknown, refs: string[] = []): string[] {
 }
 
 function countEnumValues(value: unknown): number {
-  if (!value || typeof value !== 'object') return 0;
+  if (!value || typeof value !== 'object') {
+    return 0;
+  }
   if (Array.isArray(value)) {
     let total = 0;
     for (const child of value) {
@@ -64,7 +70,9 @@ function resolveJsonPointer(root: Record<string, unknown>, pointer: string): unk
 
 function expectDefinitionRefsToResolve(schema: Record<string, unknown>) {
   const visit = (value: unknown, resolving: Set<string>) => {
-    if (!value || typeof value !== 'object') return;
+    if (!value || typeof value !== 'object') {
+      return;
+    }
 
     const ref = (value as Record<string, unknown>)['$ref'];
     if (typeof ref === 'string') {

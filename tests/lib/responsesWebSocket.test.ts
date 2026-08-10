@@ -56,7 +56,9 @@ describe.each(variants)('%s Responses WebSocket', (_version, Base, WebSocketErro
 
   async function waitForConnection(websocket: TestResponsesWebSocket, count: number) {
     for (let attempt = 0; attempt < 20; attempt++) {
-      if (websocket.connections.length >= count) return websocket.connections[count - 1]!;
+      if (websocket.connections.length >= count) {
+        return websocket.connections[count - 1]!;
+      }
       await new Promise((resolve) => setTimeout(resolve, 0));
     }
     throw new Error(`Expected ${count} WebSocket connections`);

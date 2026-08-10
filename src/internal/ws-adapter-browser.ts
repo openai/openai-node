@@ -59,7 +59,9 @@ export class BrowserWebSocket implements WebSocketLike {
 
   off(event: string, listener: Listener): void {
     const byListener = this._listenerMap.get(event);
-    if (!byListener) return;
+    if (!byListener) {
+      return;
+    }
     const wrapped = byListener.get(listener);
     if (wrapped) {
       byListener.delete(listener);

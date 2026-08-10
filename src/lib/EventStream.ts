@@ -55,7 +55,9 @@ export class EventStream<EventTypes extends BaseEvents> {
           this.#handleError(error);
         })
         .then(() => {
-          if (failed) return;
+          if (failed) {
+            return;
+          }
 
           try {
             this._emitFinal();
@@ -69,7 +71,9 @@ export class EventStream<EventTypes extends BaseEvents> {
   }
 
   protected _connected(this: EventStream<EventTypes>) {
-    if (this.ended) return;
+    if (this.ended) {
+      return;
+    }
     this.#resolveConnectedPromise();
     this._emit('connect');
   }
@@ -91,7 +95,9 @@ export class EventStream<EventTypes extends BaseEvents> {
   }
 
   protected _listenForAbort(signal: AbortSignal | null | undefined) {
-    if (!signal || this.ended) return;
+    if (!signal || this.ended) {
+      return;
+    }
     if (signal.aborted) {
       this.controller.abort();
       return;
@@ -130,9 +136,13 @@ export class EventStream<EventTypes extends BaseEvents> {
    */
   off<Event extends keyof EventTypes>(event: Event, listener: EventListener<EventTypes, Event>): this {
     const listeners = this.#listeners[event];
-    if (!listeners) return this;
+    if (!listeners) {
+      return this;
+    }
     const index = listeners.findIndex((l) => l.listener === listener);
-    if (index !== -1) listeners.splice(index, 1);
+    if (index !== -1) {
+      listeners.splice(index, 1);
+    }
     return this;
   }
 
@@ -169,7 +179,9 @@ export class EventStream<EventTypes extends BaseEvents> {
   > {
     return new Promise((resolve, reject) => {
       this.#catchingPromiseCreated = true;
-      if (event !== 'error') this.once('error', reject);
+      if (event !== 'error') {
+        this.once('error', reject);
+      }
       this.once(event, resolve as any);
     });
   }
@@ -209,18 +221,26 @@ export class EventStream<EventTypes extends BaseEvents> {
       }
     };
     const rejectReader = () => {
-      if (!failure || failureDelivered || !readQueue.length) return;
+      if (!failure || failureDelivered || !readQueue.length) {
+        return;
+      }
       failureDelivered = true;
       readQueue.shift()!.reject(failure);
     };
     const cleanup = () => {
       this.off(event, onEvent as EventListener<EventTypes, Event>);
       this.off('end', onEnd);
-      if (event !== 'error') this.off('error', onFailure);
-      if (event !== 'abort') this.off('abort', onFailure);
+      if (event !== 'error') {
+        this.off('error', onFailure);
+      }
+      if (event !== 'abort') {
+        this.off('abort', onFailure);
+      }
     };
     const onEvent = (...args: Parameters) => {
-      if (ended) return;
+      if (ended) {
+        return;
+      }
       const reader = readQueue.shift();
       if (reader) {
         reader.resolve({ value: args, done: false });
@@ -230,7 +250,9 @@ export class EventStream<EventTypes extends BaseEvents> {
     };
     const onFailure = (error: OpenAIError) => {
       failure = error;
-      if (!pushQueue.length) rejectReader();
+      if (!pushQueue.length) {
+        rejectReader();
+      }
     };
     const onEnd = () => {
       ended = true;
@@ -244,21 +266,29 @@ export class EventStream<EventTypes extends BaseEvents> {
     if (!ended) {
       this.on(event, onEvent as EventListener<EventTypes, Event>);
       this.on('end', onEnd);
-      if (event !== 'error') this.on('error', onFailure);
-      if (event !== 'abort') this.on('abort', onFailure);
+      if (event !== 'error') {
+        this.on('error', onFailure);
+      }
+      if (event !== 'abort') {
+        this.on('abort', onFailure);
+      }
     }
 
     return {
       next: () => {
         const value = pushQueue.shift();
-        if (value) return Promise.resolve({ value, done: false });
+        if (value) {
+          return Promise.resolve({ value, done: false });
+        }
 
         if (failure && !failureDelivered) {
           failureDelivered = true;
           return Promise.reject(failure);
         }
 
-        if (ended) return Promise.resolve(doneResult());
+        if (ended) {
+          return Promise.resolve(doneResult());
+        }
 
         return new Promise<Result>((resolve, reject) => {
           readQueue.push({ resolve, reject });

@@ -64,25 +64,33 @@ export class Worker {
   }
 
   private getJSPath(path: string): string {
-    if (!this.data.extname) return path;
+    if (!this.data.extname) {
+      return path;
+    }
 
     return trimSuffix(path, JS_EXT) + this.data.extname;
   }
 
   private getJSMapPath(path: string): string {
-    if (!this.data.extname) return path;
+    if (!this.data.extname) {
+      return path;
+    }
 
     return trimSuffix(path, JS_MAP_EXT) + this.data.extname + MAP_EXT;
   }
 
   private getDTSPath(path: string): string {
-    if (!this.data.extname) return path;
+    if (!this.data.extname) {
+      return path;
+    }
 
     return trimSuffix(path, DTS_EXT) + extnameDeclMap[this.data.extname];
   }
 
   private getDTSMapPath(path: string): string {
-    if (!this.data.extname) return path;
+    if (!this.data.extname) {
+      return path;
+    }
 
     return trimSuffix(path, DTS_MAP_EXT) + extnameDeclMap[this.data.extname] + MAP_EXT;
   }
@@ -152,14 +160,18 @@ export class Worker {
       ...sys,
       fileExists: (inputPath) => {
         for (const path of getReadPaths(inputPath)) {
-          if (sys.fileExists(path)) return true;
+          if (sys.fileExists(path)) {
+            return true;
+          }
         }
         return false;
       },
       readFile: (inputPath, encoding) => {
         for (const path of getReadPaths(inputPath)) {
           const result = sys.readFile(path, encoding);
-          if (result !== undefined && result !== null) return result;
+          if (result !== undefined && result !== null) {
+            return result;
+          }
         }
         return undefined;
       },
@@ -274,7 +286,9 @@ export class Worker {
       );
 
       const config = this.ts.getParsedCommandLineOfConfigFile(path, options, parseConfigFileHost);
-      if (!config) return;
+      if (!config) {
+        return;
+      }
 
       if (this.data.shareHelpers) {
         const root = (this.ts as any).getCommonSourceDirectoryOfConfig(config);
@@ -379,7 +393,9 @@ export class Worker {
     };
 
     const config = this.ts.getParsedCommandLineOfConfigFile(tsConfigPath, options, parseConfigFileHost);
-    if (!config) return;
+    if (!config) {
+      return;
+    }
 
     let resolvedShareHelpers: string | undefined;
     if (this.data.shareHelpers) {

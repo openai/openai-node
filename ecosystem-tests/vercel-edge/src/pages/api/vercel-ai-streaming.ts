@@ -50,7 +50,7 @@ export default async function handler(request: NextRequest) {
 
       for await (const chunk of completion) {
         const delta = chunk.choices[0]?.delta.content;
-        if (delta) writer.write({ type: 'text-delta', id: textPartID, delta });
+        if (delta) {writer.write({ type: 'text-delta', id: textPartID, delta });}
       }
 
       writer.write({ type: 'text-end', id: textPartID });

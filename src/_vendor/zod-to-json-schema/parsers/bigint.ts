@@ -20,7 +20,9 @@ export function parseBigintDef(def: ZodBigIntDef, refs: Refs): JsonSchema7Bigint
     format: 'int64',
   };
 
-  if (!def.checks) return res;
+  if (!def.checks) {
+    return res;
+  }
 
   for (const check of def.checks) {
     switch (check.kind) {

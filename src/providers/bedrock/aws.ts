@@ -56,7 +56,9 @@ function validateStaticCredentials(options: BedrockProviderOptions): AwsCredenti
       'The `accessKeyId` and `secretAccessKey` options must be provided together. A `sessionToken` may only be used with both.',
     );
   }
-  if (!hasAccessKey) return undefined;
+  if (!hasAccessKey) {
+    return undefined;
+  }
 
   if (
     typeof options.accessKeyId !== 'string' ||
@@ -98,8 +100,12 @@ function requestTarget(parsedURL: URL): { path: string; query: Record<string, st
 }
 
 function signableBody(body: BodyInit | null | undefined): string | ArrayBuffer | ArrayBufferView | undefined {
-  if (body === undefined || body === null) return undefined;
-  if (typeof body === 'string' || body instanceof ArrayBuffer || ArrayBuffer.isView(body)) return body;
+  if (body === undefined || body === null) {
+    return undefined;
+  }
+  if (typeof body === 'string' || body instanceof ArrayBuffer || ArrayBuffer.isView(body)) {
+    return body;
+  }
   throw new Errors.OpenAIError(
     "The SDK's Bedrock SigV4 mode requires a replayable request body. Buffer the body before sending or use bearer authentication.",
   );
@@ -139,7 +145,9 @@ class BedrockSigV4Auth implements BedrockRequestAuth {
   }
 
   private credentialsProvider(): () => Promise<AwsCredentialIdentity> {
-    if (this.resolvedCredentialsProvider) return this.resolvedCredentialsProvider;
+    if (this.resolvedCredentialsProvider) {
+      return this.resolvedCredentialsProvider;
+    }
 
     if (this.options.staticCredentials) {
       const credentials = this.options.staticCredentials;

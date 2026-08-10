@@ -130,7 +130,9 @@ const JSON_SCHEMA_TYPES = new Set(['string', 'number', 'integer', 'boolean', 'ob
 type JSONPrimitive = string | number | boolean | null;
 
 function getSchemaTypes(schema: unknown): Set<string> | undefined {
-  if (!schema || typeof schema !== 'object' || Array.isArray(schema)) return undefined;
+  if (!schema || typeof schema !== 'object' || Array.isArray(schema)) {
+    return undefined;
+  }
 
   const type = (schema as Record<string, unknown>)['type'];
   if (type === undefined) {
@@ -157,7 +159,9 @@ function isJSONPrimitive(value: unknown): value is JSONPrimitive {
 }
 
 function getLiteralValues(schema: unknown): JSONPrimitive[] | undefined {
-  if (!schema || typeof schema !== 'object' || Array.isArray(schema)) return undefined;
+  if (!schema || typeof schema !== 'object' || Array.isArray(schema)) {
+    return undefined;
+  }
 
   const record = schema as Record<string, unknown>;
   if ('const' in record && isJSONPrimitive(record['const'])) {
@@ -174,11 +178,15 @@ function getLiteralValues(schema: unknown): JSONPrimitive[] | undefined {
 
 function getLiteralSchemaTypes(schema: unknown): Set<string> | undefined {
   const literalValues = getLiteralValues(schema);
-  if (!literalValues) return undefined;
+  if (!literalValues) {
+    return undefined;
+  }
 
   return new Set(
     literalValues.map((value) => {
-      if (value === null) return 'null';
+      if (value === null) {
+        return 'null';
+      }
       return typeof value;
     }),
   );
@@ -187,7 +195,9 @@ function getLiteralSchemaTypes(schema: unknown): Set<string> | undefined {
 function haveDisjointLiteralValues(left: unknown, right: unknown): boolean {
   const leftValues = getLiteralValues(left);
   const rightValues = getLiteralValues(right);
-  if (!leftValues || !rightValues) return false;
+  if (!leftValues || !rightValues) {
+    return false;
+  }
 
   return leftValues.every((leftValue) => !rightValues.some((rightValue) => leftValue === rightValue));
 }
@@ -204,7 +214,9 @@ function isObjectOnlySchema(schema: unknown): boolean {
 }
 
 function haveDisjointObjectDiscriminator(left: unknown, right: unknown, root: JSONSchema): boolean {
-  if (!isObjectOnlySchema(left) || !isObjectOnlySchema(right)) return false;
+  if (!isObjectOnlySchema(left) || !isObjectOnlySchema(right)) {
+    return false;
+  }
 
   const leftRecord = left as Record<string, unknown>;
   const rightRecord = right as Record<string, unknown>;
@@ -244,7 +256,9 @@ function haveDisjointObjectDiscriminator(left: unknown, right: unknown, root: JS
 function getClosedObjectPropertySet(
   schema: unknown,
 ): { properties: Set<string>; required: string[] } | undefined {
-  if (!isObjectOnlySchema(schema)) return undefined;
+  if (!isObjectOnlySchema(schema)) {
+    return undefined;
+  }
 
   const record = schema as Record<string, unknown>;
   const properties = record['properties'];
@@ -275,7 +289,9 @@ function getClosedObjectPropertySet(
 function haveDisjointClosedObjectPropertySets(left: unknown, right: unknown): boolean {
   const leftShape = getClosedObjectPropertySet(left);
   const rightShape = getClosedObjectPropertySet(right);
-  if (!leftShape || !rightShape) return false;
+  if (!leftShape || !rightShape) {
+    return false;
+  }
 
   // If either closed branch requires a property the other branch does not
   // declare, every instance satisfying the first is rejected by the second as
@@ -312,7 +328,9 @@ function resolveLocalRefForExclusivity(
   root: JSONSchema,
   seenRefs = new Set<string>(),
 ): unknown | undefined {
-  if (!schema || typeof schema !== 'object' || Array.isArray(schema)) return schema;
+  if (!schema || typeof schema !== 'object' || Array.isArray(schema)) {
+    return schema;
+  }
 
   const record = schema as Record<string, unknown>;
   const ref = record['$ref'];
@@ -323,18 +341,26 @@ function resolveLocalRefForExclusivity(
     if (typeof ref !== 'string' || !hasOnlyRefAndAnnotations(record as JSONSchema)) {
       return undefined;
     }
-    if (seenRefs.has(ref)) return undefined;
+    if (seenRefs.has(ref)) {
+      return undefined;
+    }
 
     const resolved = resolveLocalRef(root, ref);
-    if (resolved === undefined) return undefined;
+    if (resolved === undefined) {
+      return undefined;
+    }
 
     return resolveLocalRefForExclusivity(resolved, root, new Set([...seenRefs, ref]));
   }
 
   if (record['allOf'] !== undefined) {
-    if (!Array.isArray(record['allOf'])) return undefined;
+    if (!Array.isArray(record['allOf'])) {
+      return undefined;
+    }
     const normalized = normalizeObjectAllOfForExclusivity(record as JSONSchema, root);
-    if (normalized === undefined) return undefined;
+    if (normalized === undefined) {
+      return undefined;
+    }
 
     // Flattening a singleton allOf can expose a bare local ref. Feed that
     // result through this same resolver so URI-fragment decoding and the
@@ -366,9 +392,13 @@ function normalizeStructuredOutputSchema(schema: JSONSchema): JSONSchema {
   const visitedSchemas = new Set<Record<string, unknown>>();
 
   const visitSchema = (value: unknown): void => {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) return;
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return;
+    }
     const record = value as Record<string, unknown>;
-    if (visitedSchemas.has(record)) return;
+    if (visitedSchemas.has(record)) {
+      return;
+    }
     visitedSchemas.add(record);
 
     if (record['oneOf'] !== undefined) {

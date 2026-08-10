@@ -287,7 +287,9 @@ export class AssistantStream
 
   async finalRun(): Promise<Run> {
     await this.done();
-    if (!this.#finalRun) throw new Error('Final run was not received.');
+    if (!this.#finalRun) {
+      throw new Error('Final run was not received.');
+    }
 
     return this.#finalRun;
   }
@@ -338,7 +340,9 @@ export class AssistantStream
   }
 
   #addEvent(event: AssistantStreamEvent) {
-    if (this.ended) return;
+    if (this.ended) {
+      return;
+    }
 
     this.#currentEvent = event;
 
@@ -401,7 +405,9 @@ export class AssistantStream
       throw new OpenAIError(`stream has ended, this shouldn't happen`);
     }
 
-    if (!this.#finalRun) throw new Error('Final run has not been received');
+    if (!this.#finalRun) {
+      throw new Error('Final run has not been received');
+    }
 
     return this.#finalRun;
   }
@@ -528,7 +534,9 @@ export class AssistantStream
 
               this.#currentToolCallIndex = toolCall.index;
               this.#currentToolCall = accumulatedRunStep.step_details.tool_calls[toolCall.index];
-              if (this.#currentToolCall) this._emit('toolCallCreated', this.#currentToolCall);
+              if (this.#currentToolCall) {
+                this._emit('toolCallCreated', this.#currentToolCall);
+              }
             }
           }
         }
@@ -593,7 +601,9 @@ export class AssistantStream
       }
     }
 
-    if (this.#runStepSnapshots[event.data.id]) return this.#runStepSnapshots[event.data.id] as Runs.RunStep;
+    if (this.#runStepSnapshots[event.data.id]) {
+      return this.#runStepSnapshots[event.data.id] as Runs.RunStep;
+    }
     throw new Error('No snapshot available');
   }
 

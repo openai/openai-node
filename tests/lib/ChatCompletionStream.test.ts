@@ -149,7 +149,9 @@ describe('.stream()', () => {
       } as unknown as OpenAI.Chat.ChatCompletionChunk,
     ];
     const readable = new Stream(async function* readable() {
-      for (const chunk of chunks) yield chunk;
+      for (const chunk of chunks) {
+        yield chunk;
+      }
     }, new AbortController()).toReadableStream();
 
     const stream = ChatCompletionStreamingRunner.fromReadableStream(readable);
@@ -222,7 +224,9 @@ describe('.stream()', () => {
       },
     ] as unknown as OpenAI.Chat.ChatCompletionChunk[];
     const readable = new Stream(async function* readable() {
-      for (const chunk of chunks) yield chunk;
+      for (const chunk of chunks) {
+        yield chunk;
+      }
     }, new AbortController()).toReadableStream();
 
     const stream = ChatCompletionStreamingRunner.fromReadableStream(readable);
@@ -297,7 +301,9 @@ describe('.stream()', () => {
       },
     ] as unknown as OpenAI.Chat.ChatCompletionChunk[];
     const readable = new Stream(async function* readable() {
-      for (const chunk of chunks) yield chunk;
+      for (const chunk of chunks) {
+        yield chunk;
+      }
     }, new AbortController()).toReadableStream();
 
     const stream = ChatCompletionStreamingRunner.fromReadableStream(readable);

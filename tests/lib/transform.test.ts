@@ -2554,7 +2554,9 @@ describe('toStrictJsonSchema', () => {
 
       const strict = toStrictJsonSchema(schema);
       const valueSchema = strict.properties?.['value'] as JSONSchema | undefined;
-      if (!valueSchema) throw new Error('Expected value schema');
+      if (!valueSchema) {
+        throw new Error('Expected value schema');
+      }
       const properties = valueSchema.properties;
 
       expect(properties).toEqual(

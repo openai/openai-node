@@ -139,7 +139,9 @@ const projectRunners = {
 
     await run('deno', ['task', 'check']);
 
-    if (state.live) await run('deno', ['task', 'test']);
+    if (state.live) {
+      await run('deno', ['task', 'test']);
+    }
   },
 };
 
@@ -451,7 +453,9 @@ async function main() {
             for (const { data } of chunks) {
               process.stdout.write(data);
             }
-            if (IS_CI) console.log('::endgroup::');
+            if (IS_CI) {
+              console.log('::endgroup::');
+            }
           }
         }),
       );
@@ -514,7 +518,9 @@ async function withRetry(
     try {
       return await fn();
     } catch (err) {
-      if (retriesLeft <= 0 || !shouldRetry(err)) throw err;
+      if (retriesLeft <= 0 || !shouldRetry(err)) {
+        throw err;
+      }
       retriesLeft -= 1;
       console.error(
         `${identifier} failed due to ${errorMessage(
@@ -555,7 +561,9 @@ function centerPad(text: string, width = text.length, char = ' '): string {
 
 function banner(name: string, width = 80): string {
   function line(text = ''): string {
-    if (text) text = centerPad(text, width - 40);
+    if (text) {
+      text = centerPad(text, width - 40);
+    }
     return centerPad(text, width, '/');
   }
   return [line(), line(), line(' '), line(name), line(' '), line(), line()].join('\n');
@@ -630,8 +638,12 @@ async function run(command: string, args: string[], config?: RunOpts): Promise<e
   } catch (error) {
     if (error instanceof Object && !state.verbose) {
       const { stderr, stdout } = error as any;
-      if (stderr) process.stderr.write(stderr);
-      if (stdout) process.stderr.write(stdout);
+      if (stderr) {
+        process.stderr.write(stderr);
+      }
+      if (stdout) {
+        process.stderr.write(stdout);
+      }
     }
     throw error;
   }

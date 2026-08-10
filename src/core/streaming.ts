@@ -43,7 +43,9 @@ export class Stream<Item> implements AsyncIterable<Item> {
       let done = false;
       try {
         for await (const sse of _iterSSEMessages(response, controller)) {
-          if (done) continue;
+          if (done) {
+            continue;
+          }
 
           if (sse.data.startsWith('[DONE]')) {
             done = true;
@@ -85,11 +87,15 @@ export class Stream<Item> implements AsyncIterable<Item> {
         done = true;
       } catch (e) {
         // If the user calls `stream.controller.abort()`, we should exit without throwing.
-        if (isAbortError(e)) return;
+        if (isAbortError(e)) {
+          return;
+        }
         throw e;
       } finally {
         // If the user `break`s, abort the ongoing request.
-        if (!done) controller.abort();
+        if (!done) {
+          controller.abort();
+        }
       }
     }
 
@@ -130,22 +136,32 @@ export class Stream<Item> implements AsyncIterable<Item> {
             closed = true;
             break;
           }
-          if (controller.signal.aborted) return;
+          if (controller.signal.aborted) {
+            return;
+          }
 
           for (const line of lineDecoder.decode(chunk)) {
-            if (controller.signal.aborted) return;
+            if (controller.signal.aborted) {
+              return;
+            }
             yield line;
           }
         }
 
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted) {
+          return;
+        }
         for (const line of lineDecoder.flush()) {
-          if (controller.signal.aborted) return;
+          if (controller.signal.aborted) {
+            return;
+          }
           yield line;
         }
       } finally {
         controller.signal.removeEventListener('abort', cancel);
-        if (!closed) cancel();
+        if (!closed) {
+          cancel();
+        }
         reader.releaseLock();
       }
     }
@@ -158,17 +174,25 @@ export class Stream<Item> implements AsyncIterable<Item> {
       let done = false;
       try {
         for await (const line of iterLines()) {
-          if (done) continue;
-          if (line) yield JSON.parse(line) as Item;
+          if (done) {
+            continue;
+          }
+          if (line) {
+            yield JSON.parse(line) as Item;
+          }
         }
         done = true;
       } catch (e) {
         // If the user calls `stream.controller.abort()`, we should exit without throwing.
-        if (controller.signal.aborted || isAbortError(e)) return;
+        if (controller.signal.aborted || isAbortError(e)) {
+          return;
+        }
         throw e;
       } finally {
         // If the user `break`s, abort the ongoing request.
-        if (!done) controller.abort();
+        if (!done) {
+          controller.abort();
+        }
       }
     }
 
@@ -220,7 +244,9 @@ export class Stream<Item> implements AsyncIterable<Item> {
       async pull(ctrl: any) {
         try {
           const { value, done } = await iter.next();
-          if (done) return ctrl.close();
+          if (done) {
+            return ctrl.close();
+          }
 
           const bytes = encodeUTF8(JSON.stringify(value) + '\n');
 
@@ -260,13 +286,17 @@ export async function* _iterSSEMessages(
   for await (const sseChunk of iterSSEChunks(iter)) {
     for (const line of lineDecoder.decode(sseChunk)) {
       const sse = sseDecoder.decode(line);
-      if (sse) yield sse;
+      if (sse) {
+        yield sse;
+      }
     }
   }
 
   for (const line of lineDecoder.flush()) {
     const sse = sseDecoder.decode(line);
-    if (sse) yield sse;
+    if (sse) {
+      yield sse;
+    }
   }
 }
 
@@ -327,7 +357,9 @@ class SSEDecoder {
 
     if (!line) {
       // empty line and we didn't previously encounter any messages
-      if (!this.event && !this.data.length) return null;
+      if (!this.event && !this.data.length) {
+        return null;
+      }
 
       const sse: ServerSentEvent = {
         event: this.event,

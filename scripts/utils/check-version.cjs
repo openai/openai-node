@@ -4,7 +4,9 @@ const pkg = require('../../package.json');
 
 const main = () => {
   const version = pkg['version'];
-  if (!version) throw new Error('The version property is not set in the package.json file');
+  if (!version) {
+    throw new Error('The version property is not set in the package.json file');
+  }
   if (typeof version !== 'string') {
     throw new TypeError(
       `Unexpected type for the package.json version field; got ${typeof version}, expected string`,

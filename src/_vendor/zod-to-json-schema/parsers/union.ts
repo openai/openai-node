@@ -32,7 +32,9 @@ export function parseUnionDef(
   def: ZodUnionDef | ZodDiscriminatedUnionDef<any, any>,
   refs: Refs,
 ): JsonSchema7PrimitiveUnionType | JsonSchema7AnyOfType | undefined {
-  if (refs.target === 'openApi3') return asAnyOf(def, refs);
+  if (refs.target === 'openApi3') {
+    return asAnyOf(def, refs);
+  }
 
   const options: readonly ZodTypeAny[] = def.options instanceof Map ? [...def.options.values()] : def.options;
 
@@ -71,7 +73,9 @@ export function parseUnionDef(
           break;
         }
         case 'object': {
-          if (x._def.value === null) types.push('null');
+          if (x._def.value === null) {
+            types.push('null');
+          }
           break;
         }
       }

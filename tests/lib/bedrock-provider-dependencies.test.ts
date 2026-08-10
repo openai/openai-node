@@ -12,7 +12,9 @@ const optionalDependencies = [
 
 beforeEach(() => {
   vi.resetModules();
-  for (const dependency of optionalDependencies) vi.doUnmock(dependency);
+  for (const dependency of optionalDependencies) {
+    vi.doUnmock(dependency);
+  }
 
   process.env = { ...originalEnv };
   delete process.env['AWS_BEARER_TOKEN_BEDROCK'];

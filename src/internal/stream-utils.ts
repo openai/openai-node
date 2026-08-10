@@ -5,14 +5,18 @@
  * This polyfill was pulled from https://github.com/MattiasBuelens/web-streams-polyfill/pull/122#issuecomment-1627354490
  */
 export function ReadableStreamToAsyncIterable<T>(stream: any): AsyncIterableIterator<T> {
-  if (stream[Symbol.asyncIterator]) return stream;
+  if (stream[Symbol.asyncIterator]) {
+    return stream;
+  }
 
   const reader = stream.getReader();
   return {
     async next() {
       try {
         const result = await reader.read();
-        if (result?.done) reader.releaseLock(); // release lock when stream becomes closed
+        if (result?.done) {
+          reader.releaseLock();
+        } // release lock when stream becomes closed
         return result;
       } catch (e) {
         reader.releaseLock(); // release lock when stream becomes errored
