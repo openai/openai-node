@@ -1,11 +1,10 @@
 import { vi, type MockedFunction } from 'vitest';
-
-vi.mock('node:child_process', () => ({ spawn: vi.fn() }));
-
 import { spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { PassThrough, Readable, Writable } from 'node:stream';
 import { playAudio, recordAudio } from 'openai/helpers/audio';
+
+vi.mock('node:child_process', () => ({ spawn: vi.fn() }));
 
 const spawnMock = spawn as MockedFunction<typeof spawn>;
 
