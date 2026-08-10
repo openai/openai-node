@@ -56,7 +56,6 @@ const compatibilityRules = [
   'unicorn/no-console-spaces',
   'unicorn/no-useless-undefined',
   'unicorn/numeric-separators-style',
-  'unicorn/prefer-at',
   'unicorn/prefer-module',
   'unicorn/prefer-node-protocol',
   'unicorn/prefer-response-static-json',
@@ -202,6 +201,22 @@ module.exports = defineConfig({
       ],
       rules: {
         'typescript/no-dynamic-delete': 'off',
+      },
+    },
+    {
+      // These last-item reads intentionally stay compatible with the repository's
+      // ES2020 declaration library, which does not include Array.prototype.at.
+      files: [
+        'scripts/check-node-version-policy.ts',
+        'src/_vendor/partial-json-parser/parser.ts',
+        'src/lib/AbstractChatCompletionRunner.ts',
+        'src/lib/ChatCompletionStream.ts',
+        'tests/_vendor/partial-json-parser/partial-json-parsing.test.ts',
+        'tests/lib/ChatCompletionRunFunctions.test.ts',
+        'tests/realtime-websocket.test.ts',
+      ],
+      rules: {
+        'unicorn/prefer-at': 'off',
       },
     },
     {
