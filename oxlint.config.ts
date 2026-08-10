@@ -1,4 +1,5 @@
 const requireConfig = require('node:module').createRequire(__filename);
+
 const { defineConfig } = requireConfig('oxlint');
 const core = requireConfig('ultracite/oxlint/core').default;
 const stainlessGeneratedFiles = requireConfig('./scripts/stainless-generated-files.cjs');
@@ -16,7 +17,6 @@ const compatibilityRules = [
   'func-style',
   'import/consistent-type-specifier-style',
   'import/first',
-  'import/newline-after-import',
   'import/no-cycle',
   'jsdoc/no-defaults',
   'jsdoc/require-param-description',
