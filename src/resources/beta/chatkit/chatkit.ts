@@ -30,8 +30,6 @@ import {
   ThreadListParams,
   Threads,
 } from './threads';
-import { APIPromise } from '../../../core/api-promise';
-import { RequestOptions } from '../../../internal/request-options';
 
 export class ChatKit extends APIResource {
   sessions: SessionsAPI.Sessions = new SessionsAPI.Sessions(this._client);

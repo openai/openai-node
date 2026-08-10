@@ -12,8 +12,6 @@ import {
   StringCheckGrader,
   TextSimilarityGrader,
 } from './grader-models';
-import { APIPromise } from '../../core/api-promise';
-import { RequestOptions } from '../../internal/request-options';
 
 export class Graders extends APIResource {
   graderModels: GraderModelsAPI.GraderModels = new GraderModelsAPI.GraderModels(this._client);

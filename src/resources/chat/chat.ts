@@ -49,8 +49,6 @@ import {
   ChatCompletionsPage,
   Completions,
 } from './completions/completions';
-import { APIPromise } from '../../core/api-promise';
-import { RequestOptions } from '../../internal/request-options';
 
 export class Chat extends APIResource {
   completions: CompletionsAPI.Completions = new CompletionsAPI.Completions(this._client);

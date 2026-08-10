@@ -9,8 +9,6 @@ import {
   GraderValidateResponse,
   Graders,
 } from './graders';
-import { APIPromise } from '../../../core/api-promise';
-import { RequestOptions } from '../../../internal/request-options';
 
 export class Alpha extends APIResource {
   graders: GradersAPI.Graders = new GradersAPI.Graders(this._client);

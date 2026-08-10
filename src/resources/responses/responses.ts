@@ -8,7 +8,7 @@ import { InputItemListParams, InputItems, ResponseItemList } from './input-items
 import * as InputTokensAPI from './input-tokens';
 import { InputTokenCountParams, InputTokenCountResponse, InputTokens } from './input-tokens';
 import { APIPromise } from '../../core/api-promise';
-import { CursorPage, PagePromise } from '../../core/pagination';
+import { CursorPage } from '../../core/pagination';
 import { Stream } from '../../core/streaming';
 import { buildHeaders } from '../../internal/headers';
 import { RequestOptions } from '../../internal/request-options';

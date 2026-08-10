@@ -29,8 +29,6 @@ import {
   JobListParams,
   Jobs,
 } from './jobs/jobs';
-import { APIPromise } from '../../core/api-promise';
-import { RequestOptions } from '../../internal/request-options';
 
 export class FineTuning extends APIResource {
   methods: MethodsAPI.Methods = new MethodsAPI.Methods(this._client);

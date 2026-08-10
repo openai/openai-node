@@ -200,8 +200,6 @@ import {
   ThreadUpdateParams,
   Threads,
 } from './threads/threads';
-import { APIPromise } from '../../core/api-promise';
-import { RequestOptions } from '../../internal/request-options';
 
 export class Beta extends APIResource {
   responses: ResponsesAPI.Responses = new ResponsesAPI.Responses(this._client);

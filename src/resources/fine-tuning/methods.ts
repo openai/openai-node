@@ -2,9 +2,6 @@
 
 import { APIResource } from '../../core/resource';
 import * as GraderModelsAPI from '../graders/grader-models';
-import * as ResponsesAPI from '../responses/responses';
-import { APIPromise } from '../../core/api-promise';
-import { RequestOptions } from '../../internal/request-options';
 
 export class Methods extends APIResource {}
 

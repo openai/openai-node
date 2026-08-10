@@ -3,7 +3,6 @@
 import { APIResource } from '../../../core/resource';
 import * as ResponsesAPI from './responses';
 import { BetaResponseItemsPage } from './responses';
-import { APIPromise } from '../../../core/api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pagination';
 import { buildHeaders } from '../../../internal/headers';
 import { RequestOptions } from '../../../internal/request-options';

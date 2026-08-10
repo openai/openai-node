@@ -1,7 +1,6 @@
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../../core/resource';
-import { APIPromise } from '../../../core/api-promise';
 import {
   ConversationCursorPage,
   type ConversationCursorPageParams,
@@ -442,6 +441,22 @@ export interface AuditLogListResponse {
    * The details for events with this `type`.
    */
   'service_account.updated'?: AuditLogListResponse.ServiceAccountUpdated;
+
+  /**
+   * The server-derived administrative authorization context recorded for the action,
+   * when available. API-key paths identify the authenticated API surface;
+   * biscuit-authorized paths identify the permission namespace used for
+   * authorization. This does not necessarily identify the literal client software.
+   */
+  source?:
+    | 'cloud_console'
+    | 'adminapi'
+    | 'retool'
+    | 'glass'
+    | 'managementapi'
+    | 'tenantapi'
+    | 'scim'
+    | 'backfill';
 
   /**
    * The details for events with this `type`.

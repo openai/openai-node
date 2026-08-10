@@ -15,8 +15,6 @@ import {
   PermissionRetrieveResponse,
   Permissions,
 } from './permissions';
-import { APIPromise } from '../../../core/api-promise';
-import { RequestOptions } from '../../../internal/request-options';
 
 export class Checkpoints extends APIResource {
   permissions: PermissionsAPI.Permissions = new PermissionsAPI.Permissions(this._client);

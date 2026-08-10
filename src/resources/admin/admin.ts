@@ -3,8 +3,6 @@
 import { APIResource } from '../../core/resource';
 import * as OrganizationAPI from './organization/organization';
 import { Organization } from './organization/organization';
-import { APIPromise } from '../../core/api-promise';
-import { RequestOptions } from '../../internal/request-options';
 
 export class Admin extends APIResource {
   organization: OrganizationAPI.Organization = new OrganizationAPI.Organization(this._client);

@@ -16,7 +16,6 @@ import { VERSION } from './version';
 import * as Errors from './core/error';
 import * as Pagination from './core/pagination';
 import {
-  AbstractPage,
   type ConversationCursorPageParams,
   ConversationCursorPageResponse,
   type CursorPageParams,

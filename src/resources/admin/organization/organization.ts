@@ -124,8 +124,6 @@ import {
   UserUpdateParams,
   Users,
 } from './users/users';
-import { APIPromise } from '../../../core/api-promise';
-import { RequestOptions } from '../../../internal/request-options';
 
 export class Organization extends APIResource {
   auditLogs: AuditLogsAPI.AuditLogs = new AuditLogsAPI.AuditLogs(this._client);
