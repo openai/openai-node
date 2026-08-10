@@ -35,10 +35,10 @@ describe('stringify()', function () {
   });
 
   test('stringifies bigints', function () {
-    var three = 3n;
+    const three = 3n;
     // @ts-expect-error
-    var encodeWithN = function (value, defaultEncoder, charset) {
-      var result = defaultEncoder(value, defaultEncoder, charset);
+    const encodeWithN = function (value, defaultEncoder, charset) {
+      const result = defaultEncoder(value, defaultEncoder, charset);
       return typeof value === 'bigint' ? result + 'n' : result;
     };
 
@@ -1162,7 +1162,7 @@ describe('stringify()', function () {
   });
 
   test('stringifies a null object', function () {
-    var obj = Object.create(null);
+    const obj = Object.create(null);
     obj.a = 'b';
     // st.equal(stringify(obj), 'a=b');
     expect(stringify(obj)).toBe('a=b');
@@ -1180,7 +1180,7 @@ describe('stringify()', function () {
   });
 
   test('stringifies an object with a null object as a child', function () {
-    var obj = { a: Object.create(null) };
+    const obj = { a: Object.create(null) };
 
     obj.a.b = 'c';
     // st.equal(stringify(obj), 'a%5Bb%5D=c');
@@ -1211,8 +1211,8 @@ describe('stringify()', function () {
   });
 
   test('stringifies a date', function () {
-    var now = new Date();
-    var str = 'a=' + encodeURIComponent(now.toISOString());
+    const now = new Date();
+    const str = 'a=' + encodeURIComponent(now.toISOString());
     // st.equal(stringify({ a: now }), str);
     expect(stringify({ a: now })).toBe(str);
   });
@@ -1272,7 +1272,7 @@ describe('stringify()', function () {
   // });
 
   test('does not crash when parsing circular references', function () {
-    var a: any = {};
+    const a: any = {};
     a.b = a;
 
     // st['throws'](
@@ -1311,15 +1311,15 @@ describe('stringify()', function () {
   });
 
   test('non-circular duplicated references can still work', function () {
-    var hourOfDay = {
+    const hourOfDay = {
       function: 'hour_of_day',
     };
 
-    var p1 = {
+    const p1 = {
       function: 'gte',
       arguments: [hourOfDay, 0],
     };
-    var p2 = {
+    const p2 = {
       function: 'lte',
       arguments: [hourOfDay, 23],
     };
@@ -1407,9 +1407,9 @@ describe('stringify()', function () {
   });
 
   test('supports custom representations when filter=function', function () {
-    var calls = 0;
-    var obj = { a: 'b', c: 'd', e: { f: new Date(1_257_894_000_000) } };
-    var filterFunc: StringifyOptions['filter'] = function (prefix, value) {
+    let calls = 0;
+    const obj = { a: 'b', c: 'd', e: { f: new Date(1_257_894_000_000) } };
+    const filterFunc: StringifyOptions['filter'] = function (prefix, value) {
       calls += 1;
       if (calls === 1) {
         // st.equal(prefix, '', 'prefix is empty');
@@ -1446,7 +1446,7 @@ describe('stringify()', function () {
 
   test('can sort the keys', function () {
     // @ts-expect-error
-    var sort: NonNullable<StringifyOptions['sort']> = function (a: string, b: string) {
+    const sort: NonNullable<StringifyOptions['sort']> = function (a: string, b: string) {
       return a.localeCompare(b);
     };
     // st.equal(stringify({ a: 'c', z: 'y', b: 'f' }, { sort: sort }), 'a=c&b=f&z=y');
@@ -1462,7 +1462,7 @@ describe('stringify()', function () {
 
   test('can sort the keys at depth 3 or more too', function () {
     // @ts-expect-error
-    var sort: NonNullable<StringifyOptions['sort']> = function (a: string, b: string) {
+    const sort: NonNullable<StringifyOptions['sort']> = function (a: string, b: string) {
       return a.localeCompare(b);
     };
     // st.equal(
@@ -1644,7 +1644,7 @@ describe('stringify()', function () {
   );
 
   test('serializeDate option', function () {
-    var date = new Date();
+    const date = new Date();
     // st.equal(
     // 	stringify({ a: date }),
     // 	'a=' + date.toISOString().replace(/:/g, '%3A'),
@@ -1920,7 +1920,7 @@ describe('stringify()', function () {
   });
 
   test('does not mutate the options argument', function () {
-    var options = {};
+    const options = {};
     stringify({}, options);
     // st.deepEqual(options, {});
     expect(options).toEqual({});
@@ -1928,21 +1928,21 @@ describe('stringify()', function () {
 
   test('strictNullHandling works with custom filter', function () {
     // @ts-expect-error
-    var filter = function (_prefix, value) {
+    const filter = function (_prefix, value) {
       return value;
     };
 
-    var options = { strictNullHandling: true, filter };
+    const options = { strictNullHandling: true, filter };
     // st.equal(stringify({ key: null }, options), 'key');
     expect(stringify({ key: null }, options)).toBe('key');
   });
 
   test('strictNullHandling works with null serializeDate', function () {
-    var serializeDate = function () {
+    const serializeDate = function () {
       return null;
     };
-    var options = { strictNullHandling: true, serializeDate };
-    var date = new Date();
+    const options = { strictNullHandling: true, serializeDate };
+    const date = new Date();
     // st.equal(stringify({ key: date }, options), 'key');
     // @ts-expect-error
     expect(stringify({ key: date }, options)).toBe('key');
@@ -1950,7 +1950,7 @@ describe('stringify()', function () {
 
   test('allows for encoding keys and values differently', function () {
     // @ts-expect-error
-    var encoder = function (str, defaultEncoder, charset, type) {
+    const encoder = function (str, defaultEncoder, charset, type) {
       if (type === 'key') {
         return defaultEncoder(str, defaultEncoder, charset, type).toLowerCase();
       }
@@ -1965,8 +1965,8 @@ describe('stringify()', function () {
   });
 
   test('objects inside arrays', function () {
-    var obj = { a: { b: { c: 'd', e: 'f' } } };
-    var withArray = { a: { b: [{ c: 'd', e: 'f' }] } };
+    const obj = { a: { b: { c: 'd', e: 'f' } } };
+    const withArray = { a: { b: [{ c: 'd', e: 'f' }] } };
 
     // st.equal(
     // 	stringify(obj, { encode: false }),
