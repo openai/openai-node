@@ -50,9 +50,9 @@ export function parseRecordDef(
   }
 
   if (def.keyType?._def.typeName === ZodFirstPartyTypeKind.ZodString && def.keyType._def.checks?.length) {
-    const keyType: JsonSchema7RecordPropertyNamesType = Object.entries(
-      parseStringDef(def.keyType._def, refs),
-    ).reduce((acc, [key, value]) => (key === 'type' ? acc : { ...acc, [key]: value }), {});
+    const keyType = Object.fromEntries(
+      Object.entries(parseStringDef(def.keyType._def, refs)).filter(([key]) => key !== 'type'),
+    ) as JsonSchema7RecordPropertyNamesType;
 
     return {
       ...schema,
