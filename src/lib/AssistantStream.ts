@@ -687,11 +687,7 @@ export class AssistantStream
           }
 
           const accEntry = accValue[index];
-          if (accEntry == null) {
-            accValue[index] = deltaEntry;
-          } else {
-            accValue[index] = this.accumulateDelta(accEntry, deltaEntry);
-          }
+          accValue[index] = accEntry == null ? deltaEntry : this.accumulateDelta(accEntry, deltaEntry);
         }
         continue;
       } else {

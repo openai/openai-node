@@ -17,11 +17,7 @@ const inputImages = process.argv.slice(2);
  *   ./examples/images/picture.ts image-1.png image-2.png
  */
 async function main() {
-  if (inputImages.length === 0) {
-    await createImage();
-  } else {
-    await createImageEdit(inputImages);
-  }
+  await (inputImages.length === 0 ? createImage() : createImageEdit(inputImages));
 }
 
 async function createImage() {
