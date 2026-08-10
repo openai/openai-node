@@ -7,7 +7,7 @@ it(
     const response = await fetch(`${baseUrl}/api/node-test`);
     expect(await response.text()).toEqual('Passed!');
   },
-  3 * 60000,
+  3 * 60_000,
 );
 
 it(
@@ -16,7 +16,7 @@ it(
     const response = await fetch(`${baseUrl}/api/edge-test`);
     expect(await response.text()).toEqual('Passed!');
   },
-  3 * 60000,
+  3 * 60_000,
 );
 
 // make isolatedModules happy

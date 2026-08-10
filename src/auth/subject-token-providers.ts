@@ -73,7 +73,7 @@ export function azureManagedIdentityTokenProvider(
   },
 ): SubjectTokenProvider {
   const apiVersion = config?.apiVersion ?? DEFAULT_AZURE_API_VERSION;
-  const timeout = config?.timeout ?? 10000;
+  const timeout = config?.timeout ?? 10_000;
 
   return {
     tokenType: 'jwt',
@@ -137,7 +137,7 @@ export function gcpIDTokenProvider(
   audience = 'https://api.openai.com/v1',
   config?: { timeout?: number; fetch?: Fetch },
 ): SubjectTokenProvider {
-  const timeout = config?.timeout || 10000;
+  const timeout = config?.timeout || 10_000;
 
   return {
     tokenType: 'id',

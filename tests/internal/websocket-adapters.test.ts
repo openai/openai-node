@@ -166,7 +166,7 @@ describe('NodeWebSocket', () => {
 
 describe('WebSocket transport helpers', () => {
   test('flattens fragmented array views while preserving standalone payloads', () => {
-    const first = new Uint16Array([0x0201]);
+    const first = new Uint16Array([0x02_01]);
     const second = Uint8Array.from([3]);
     const standalone = Uint8Array.from([4]);
 

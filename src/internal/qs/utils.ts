@@ -191,12 +191,12 @@ export const encode: (
         continue;
       }
 
-      if (c < 0x800) {
+      if (c < 0x8_00) {
         arr[arr.length] = hex_table[0xc0 | (c >> 6)]! + hex_table[0x80 | (c & 0x3f)];
         continue;
       }
 
-      if (c < 0xd800 || c >= 0xe000) {
+      if (c < 0xd8_00 || c >= 0xe0_00) {
         arr[arr.length] =
           hex_table[0xe0 | (c >> 12)]! + hex_table[0x80 | ((c >> 6) & 0x3f)] + hex_table[0x80 | (c & 0x3f)];
         continue;
@@ -204,7 +204,7 @@ export const encode: (
 
       i += 1;
       // oxlint-disable-next-line unicorn/prefer-code-point -- combine UTF-16 surrogate code units manually
-      c = 0x10000 + (((c & 0x3ff) << 10) | (segment.charCodeAt(i) & 0x3ff));
+      c = 0x1_00_00 + (((c & 0x3_ff) << 10) | (segment.charCodeAt(i) & 0x3_ff));
 
       arr[arr.length] =
         hex_table[0xf0 | (c >> 18)]! +

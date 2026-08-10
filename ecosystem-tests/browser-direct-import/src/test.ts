@@ -33,10 +33,10 @@ import puppeteer from 'puppeteer';
     // Navigate the page to a URL
     await page.goto(`http://localhost:8081/index.html?apiKey=${apiKey}`);
 
-    await page.waitForSelector('#running', { timeout: 15000 });
+    await page.waitForSelector('#running', { timeout: 15_000 });
 
     const start = Date.now();
-    while ((await page.$('#running')) != null && Date.now() - start < 3 * 60000) {
+    while ((await page.$('#running')) != null && Date.now() - start < 3 * 60_000) {
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
 

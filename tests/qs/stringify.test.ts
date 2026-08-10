@@ -1408,7 +1408,7 @@ describe('stringify()', function () {
 
   test('supports custom representations when filter=function', function () {
     var calls = 0;
-    var obj = { a: 'b', c: 'd', e: { f: new Date(1257894000000) } };
+    var obj = { a: 'b', c: 'd', e: { f: new Date(1_257_894_000_000) } };
     var filterFunc: StringifyOptions['filter'] = function (prefix, value) {
       calls += 1;
       if (calls === 1) {

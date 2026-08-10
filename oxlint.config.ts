@@ -31,7 +31,6 @@ const compatibilityRules = [
   'typescript/no-explicit-any',
   'typescript/no-non-null-assertion',
   'unicorn/consistent-function-scoping',
-  'unicorn/numeric-separators-style',
   'unicorn/prefer-node-protocol',
   'unicorn/prefer-response-static-json',
   'unicorn/switch-case-braces',

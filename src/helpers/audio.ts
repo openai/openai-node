@@ -4,7 +4,7 @@ import type { ReadableStream as NodeReadableStream } from 'node:stream/web';
 import { platform, versions } from 'node:process';
 import { checkFileSupport } from '../internal/uploads';
 
-const DEFAULT_SAMPLE_RATE = 24000;
+const DEFAULT_SAMPLE_RATE = 24_000;
 const DEFAULT_CHANNELS = 1;
 
 const isNode = Boolean(versions?.node);

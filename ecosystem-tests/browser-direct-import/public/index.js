@@ -64,7 +64,7 @@ function describe(description, handler) {
  * @param {() => any} run - Test case callback.
  * @param {number} [timeout] - Defaults to `60000`.
  */
-function it(description, run, timeout = 60000) {
+function it(description, run, timeout = 60_000) {
   tests.push({ path: [...testPath, description], run, timeout });
 }
 
