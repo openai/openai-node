@@ -90,7 +90,11 @@ export function assertProviderOwnsAuthorization(headers: Headers): void {
 }
 
 class BedrockBearerAuth implements BedrockRequestAuth {
-  constructor(private readonly tokenProvider: ApiKeySetter) {}
+  private readonly tokenProvider: ApiKeySetter;
+
+  constructor(tokenProvider: ApiKeySetter) {
+    this.tokenProvider = tokenProvider;
+  }
 
   async prepareRequest(request: FinalizedRequestInit, _context: ProviderRequestContext): Promise<void> {
     const headers = new Headers(request.headers);
