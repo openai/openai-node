@@ -28,14 +28,13 @@ function loadCompiler(cwd: string, name = 'typescript'): TS {
 }
 
 export class Worker {
+  private readonly data: WorkerOptions;
   private readonly ts: TS;
   private readonly system: ts.System;
   private readonly reporter: Reporter;
 
-  constructor(
-    private readonly data: WorkerOptions,
-    system?: ts.System,
-  ) {
+  constructor(data: WorkerOptions, system?: ts.System) {
+    this.data = data;
     this.ts = loadCompiler(data.cwd, data.compiler);
     this.system = this.createSystem(system || this.ts.sys);
     this.reporter = createReporter({

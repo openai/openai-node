@@ -18,12 +18,10 @@ export type ServerSentEvent = {
 export class Stream<Item> implements AsyncIterable<Item> {
   controller: AbortController;
   #client: OpenAI | undefined;
+  private iterator: () => AsyncIterator<Item>;
 
-  constructor(
-    private iterator: () => AsyncIterator<Item>,
-    controller: AbortController,
-    client?: OpenAI,
-  ) {
+  constructor(iterator: () => AsyncIterator<Item>, controller: AbortController, client?: OpenAI) {
+    this.iterator = iterator;
     this.controller = controller;
     this.#client = client;
   }

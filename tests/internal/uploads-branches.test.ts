@@ -132,7 +132,11 @@ describe('buffered multipart forms', () => {
 
   test('rejects fetch implementations that stringify FormData objects', async () => {
     class UnsupportedResponse {
-      constructor(private readonly body: FormData) {}
+      private readonly body: FormData;
+
+      constructor(body: FormData) {
+        this.body = body;
+      }
 
       async text() {
         return this.body.toString();

@@ -63,7 +63,6 @@ const compatibilityRules = [
   'typescript/no-import-type-side-effects',
   'typescript/no-namespace',
   'typescript/no-non-null-assertion',
-  'typescript/parameter-properties',
   'typescript/prefer-for-of',
   'typescript/prefer-ts-expect-error',
   'unicorn/catch-error-name',

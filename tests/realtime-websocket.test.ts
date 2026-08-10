@@ -39,11 +39,12 @@ class FakeBrowserSocket {
   readonly listeners = new Map<string, Listener>();
   readonly send = vi.fn();
   readonly close = vi.fn();
+  readonly url: string;
+  readonly protocols: string[];
 
-  constructor(
-    readonly url: string,
-    readonly protocols: string[],
-  ) {
+  constructor(url: string, protocols: string[]) {
+    this.url = url;
+    this.protocols = protocols;
     FakeBrowserSocket.instances.push(this);
   }
 

@@ -154,8 +154,10 @@ class RunnerListener {
   gotEnd = false;
 
   onceMessageCallCount = 0;
+  public runner: ChatCompletionRunner<any>;
 
-  constructor(public runner: ChatCompletionRunner<any>) {
+  constructor(runner: ChatCompletionRunner<any>) {
+    this.runner = runner;
     runner
       .on('connect', () => (this.gotConnect = true))
       .on('content', (content) => this.contents.push(content))
@@ -278,8 +280,10 @@ class StreamingRunnerListener {
   error: OpenAIError | undefined;
   gotConnect = false;
   gotEnd = false;
+  public runner: ChatCompletionStreamingRunner<any>;
 
-  constructor(public runner: ChatCompletionStreamingRunner<any>) {
+  constructor(runner: ChatCompletionStreamingRunner<any>) {
+    this.runner = runner;
     runner
       .on('connect', () => (this.gotConnect = true))
       .on('chunk', (chunk) => this.eventChunks.push(chunk))

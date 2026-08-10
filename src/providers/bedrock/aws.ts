@@ -117,19 +117,22 @@ function validateCredentialIdentity(identity: AwsCredentialIdentity): AwsCredent
   return identity;
 }
 
+type BedrockSigV4AuthOptions = {
+  region: string;
+  staticCredentials?: AwsCredentialIdentity | undefined;
+  profile?: string | undefined;
+  credentialProvider?: AwsCredentialsProvider | undefined;
+  usesDefaultChain: boolean;
+};
+
 class BedrockSigV4Auth implements BedrockRequestAuth {
   private signer: SignatureV4 | undefined;
   private resolvedCredentialsProvider: (() => Promise<AwsCredentialIdentity>) | undefined;
+  private readonly options: BedrockSigV4AuthOptions;
 
-  constructor(
-    private readonly options: {
-      region: string;
-      staticCredentials?: AwsCredentialIdentity | undefined;
-      profile?: string | undefined;
-      credentialProvider?: AwsCredentialsProvider | undefined;
-      usesDefaultChain: boolean;
-    },
-  ) {}
+  constructor(options: BedrockSigV4AuthOptions) {
+    this.options = options;
+  }
 
   private credentialsProvider(): () => Promise<AwsCredentialIdentity> {
     if (this.resolvedCredentialsProvider) return this.resolvedCredentialsProvider;
