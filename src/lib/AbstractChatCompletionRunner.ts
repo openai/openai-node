@@ -27,7 +27,8 @@ import type {
   ChatCompletionStreamingToolRunnerParamsWithoutContext,
 } from './ChatCompletionStreamingRunner';
 import { isAssistantMessage, isToolMessage } from './chatCompletionUtils';
-import { BaseEvents, EventStream } from './EventStream';
+import type { BaseEvents } from './EventStream';
+import { EventStream } from './EventStream';
 import { isRunnableFunctionWithParse } from './RunnableFunction';
 import type { BaseFunctionsArgs, RunnableFunction, RunnableToolFunction } from './RunnableFunction';
 

@@ -1,6 +1,7 @@
-import OpenAI, { toFile } from 'openai';
-import { TranscriptionCreateParams } from 'openai/resources/audio/transcriptions';
-import { ChatCompletion } from 'openai/resources/chat/completions';
+import type OpenAI from 'openai';
+import { toFile } from 'openai';
+import type { TranscriptionCreateParams } from 'openai/resources/audio/transcriptions';
+import type { ChatCompletion } from 'openai/resources/chat/completions';
 
 /**
  * Tests uploads using various Web API data objects.

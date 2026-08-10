@@ -2,16 +2,12 @@ import type {
   ChatCompletionMessageParam,
   ChatCompletionCreateParamsNonStreaming,
 } from '../resources/chat/completions';
-import { RunnableTools } from './RunnableFunction';
-import type { BaseFunctionsArgs } from './RunnableFunction';
-import {
-  AbstractChatCompletionRunner,
-  AbstractChatCompletionRunnerEvents,
-  RunnerOptions,
-} from './AbstractChatCompletionRunner';
+import type { BaseFunctionsArgs, RunnableTools } from './RunnableFunction';
+import type { AbstractChatCompletionRunnerEvents, RunnerOptions } from './AbstractChatCompletionRunner';
+import { AbstractChatCompletionRunner } from './AbstractChatCompletionRunner';
 import { isAssistantMessage } from './chatCompletionUtils';
-import OpenAI from '../index';
-import { AutoParseableTool } from '../lib/parser';
+import type OpenAI from '../index';
+import type { AutoParseableTool } from '../lib/parser';
 
 export interface ChatCompletionRunnerEvents extends AbstractChatCompletionRunnerEvents {
   content: (content: string) => void;

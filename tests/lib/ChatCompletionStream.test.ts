@@ -1,9 +1,9 @@
 import { vi } from 'vitest';
-import OpenAI from 'openai';
+import type OpenAI from 'openai';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import { ChatCompletionStream } from 'openai/lib/ChatCompletionStream';
 import { ChatCompletionStreamingRunner } from 'openai/lib/ChatCompletionStreamingRunner';
-import { ChatCompletionTokenLogprob } from 'openai/resources';
+import type { ChatCompletionTokenLogprob } from 'openai/resources';
 import { Stream } from 'openai/streaming';
 import { z } from 'zod/v4';
 import { makeStreamSnapshotRequest } from '../utils/mock-snapshots';

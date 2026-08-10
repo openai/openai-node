@@ -2,7 +2,7 @@ import type { RequestInit } from './internal/builtin-types';
 import type { NullableHeaders } from './internal/headers';
 import { buildHeaders } from './internal/headers';
 import * as Errors from './error';
-import { FinalRequestOptions } from './internal/request-options';
+import type { FinalRequestOptions } from './internal/request-options';
 import { isObj, readEnv } from './internal/utils';
 import { OpenAI } from './client';
 import type { ClientOptions } from './client';

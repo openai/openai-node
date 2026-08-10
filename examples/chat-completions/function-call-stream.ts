@@ -2,7 +2,7 @@
 
 import { formatWithOptions } from 'node:util';
 import OpenAI from 'openai';
-import {
+import type {
   ChatCompletionMessage,
   ChatCompletionChunk,
   ChatCompletionMessageParam,

@@ -1,13 +1,8 @@
 import { OpenAIError } from '../error';
-import {
-  AutoParseableResponseFormat,
-  AutoParseableTextFormat,
-  AutoParseableTool,
-  makeParseableResponseFormat,
-  makeParseableTextFormat,
-  makeParseableTool,
-} from '../lib/parser';
-import { AutoParseableResponseTool, makeParseableResponseTool } from '../lib/ResponsesParser';
+import type { AutoParseableResponseFormat, AutoParseableTextFormat, AutoParseableTool } from '../lib/parser';
+import { makeParseableResponseFormat, makeParseableTextFormat, makeParseableTool } from '../lib/parser';
+import type { AutoParseableResponseTool } from '../lib/ResponsesParser';
+import { makeParseableResponseTool } from '../lib/ResponsesParser';
 import type { JSONSchema } from '../lib/jsonschema';
 import {
   assertNoNestedSchemaIds,
@@ -18,7 +13,7 @@ import {
   rewriteLocalRefsIntoMovedOneOfBranches,
   toStrictJsonSchema,
 } from '../lib/transform';
-import { ResponseFormatJSONSchema } from '../resources/index';
+import type { ResponseFormatJSONSchema } from '../resources/index';
 import type { ResponseFormatTextJSONSchemaConfig } from '../resources/responses/responses';
 
 type StandardSchemaIssue = {

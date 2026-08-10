@@ -1,21 +1,16 @@
-import { ResponseFormatJSONSchema } from '../resources/index';
-import * as z3 from 'zod/v3';
+import type { ResponseFormatJSONSchema } from '../resources/index';
+import type * as z3 from 'zod/v3';
 import * as z4 from 'zod/v4';
 import type * as z4Mini from 'zod/v4-mini';
-import {
-  AutoParseableResponseFormat,
-  AutoParseableTextFormat,
-  AutoParseableTool,
-  makeParseableResponseFormat,
-  makeParseableTextFormat,
-  makeParseableTool,
-} from '../lib/parser';
+import type { AutoParseableResponseFormat, AutoParseableTextFormat, AutoParseableTool } from '../lib/parser';
+import { makeParseableResponseFormat, makeParseableTextFormat, makeParseableTool } from '../lib/parser';
 import { zodToJsonSchema as _zodToJsonSchema } from '../_vendor/zod-to-json-schema';
-import { AutoParseableResponseTool, makeParseableResponseTool } from '../lib/ResponsesParser';
+import type { AutoParseableResponseTool } from '../lib/ResponsesParser';
+import { makeParseableResponseTool } from '../lib/ResponsesParser';
 import type { ResponseFormatTextJSONSchemaConfig } from '../resources/responses/responses';
 import type { RealtimeFunctionTool } from '../resources/realtime/realtime';
 import { toStrictJsonSchema } from '../lib/transform';
-import { JSONSchema } from '../lib/jsonschema';
+import type { JSONSchema } from '../lib/jsonschema';
 import { hasOwn } from '../internal/utils/values';
 
 type ZodV4Schema = z4.ZodType | z4Mini.ZodMiniType;

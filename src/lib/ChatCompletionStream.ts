@@ -5,12 +5,12 @@ import {
   LengthFinishReasonError,
   OpenAIError,
 } from '../error';
-import OpenAI from '../index';
-import { RequestOptions } from '../internal/request-options';
+import type OpenAI from '../index';
+import type { RequestOptions } from '../internal/request-options';
 import type { ReadableStream } from '../internal/shim-types';
 import { uuid4 } from '../internal/utils/uuid';
+import type { AutoParseableResponseFormat } from '../lib/parser';
 import {
-  AutoParseableResponseFormat,
   hasAutoParseableInput,
   isAutoParsableResponseFormat,
   isAutoParsableTool,
@@ -18,8 +18,7 @@ import {
   maybeParseChatCompletion,
   shouldParseToolCall,
 } from '../lib/parser';
-import { ChatCompletionFunctionTool, ParsedChatCompletion } from '../resources/chat/completions';
-import { ChatCompletionTokenLogprob } from '../resources/chat/completions/completions';
+import type { ChatCompletionFunctionTool, ParsedChatCompletion } from '../resources/chat/completions';
 import type {
   ChatCompletionAudio,
   ChatCompletion,
@@ -29,6 +28,7 @@ import type {
   ChatCompletionCreateParamsStreaming,
   ChatCompletionMessageParam,
   ChatCompletionRole,
+  ChatCompletionTokenLogprob,
 } from '../resources/chat/completions/completions';
 import { Stream } from '../streaming';
 import { AbstractChatCompletionRunner } from './AbstractChatCompletionRunner';

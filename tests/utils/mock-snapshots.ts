@@ -1,5 +1,5 @@
 import OpenAI from 'openai/index';
-import { RequestInfo } from 'openai/internal/builtin-types';
+import type { RequestInfo } from 'openai/internal/builtin-types';
 import { mockFetch } from './mock-fetch';
 import { Readable } from 'node:stream';
 

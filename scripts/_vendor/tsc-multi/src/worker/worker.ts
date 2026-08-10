@@ -1,9 +1,10 @@
 import type ts from 'typescript';
 import debug from './debug';
-import { createReporter, Reporter } from '../report';
+import type { Reporter } from '../report';
+import { createReporter } from '../report';
 import { mergeCustomTransformers, trimSuffix, isIncrementalCompilation } from '../utils';
 import { createTransformer } from '../transformer';
-import { WorkerOptions } from './types';
+import type { WorkerOptions } from './types';
 import nodePath = require('node:path');
 import assert from 'node:assert';
 import { helpers } from '../helpers';

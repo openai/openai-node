@@ -1,6 +1,7 @@
 import type { ZodTypeDef } from 'zod/v3';
-import { getDefaultOptions, Options, Targets } from './Options';
-import { JsonSchema7Type } from './parseDef';
+import type { Options, Targets } from './Options';
+import { getDefaultOptions } from './Options';
+import type { JsonSchema7Type } from './parseDef';
 import { zodDef } from './util';
 
 export type Refs = {

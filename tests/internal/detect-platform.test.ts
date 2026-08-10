@@ -1,6 +1,7 @@
 import { vi } from 'vitest';
+import type * as DetectPlatform from 'openai/internal/detect-platform';
 
-type PlatformModule = typeof import('openai/internal/detect-platform');
+type PlatformModule = typeof DetectPlatform;
 
 type PlatformGlobals = {
   Deno?: unknown;

@@ -1,5 +1,5 @@
-import { JsonSchema7TypeUnion } from './parseDef';
-import { Refs } from './Refs';
+import type { JsonSchema7TypeUnion } from './parseDef';
+import type { Refs } from './Refs';
 
 export type ErrorMessages<T extends JsonSchema7TypeUnion, OmitProperties extends string = ''> = Partial<
   Omit<{ [key in keyof T]: string }, OmitProperties | 'type' | 'errorMessages'>

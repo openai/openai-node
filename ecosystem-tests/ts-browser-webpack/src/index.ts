@@ -1,7 +1,7 @@
 import OpenAI, { toFile } from 'openai';
 import { distance } from 'fastest-levenshtein';
 import { bedrock } from 'openai/providers/bedrock';
-import { ChatCompletion } from 'openai/resources/chat/completions';
+import type { ChatCompletion } from 'openai/resources/chat/completions';
 
 type TestCase = {
   path: string[];

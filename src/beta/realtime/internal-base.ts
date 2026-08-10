@@ -1,7 +1,12 @@
-import { RealtimeClientEvent, RealtimeServerEvent, ErrorEvent } from '../../resources/beta/realtime/realtime';
+import type {
+  RealtimeClientEvent,
+  RealtimeServerEvent,
+  ErrorEvent,
+} from '../../resources/beta/realtime/realtime';
 import { EventEmitter } from '../../lib/EventEmitter';
 import { OpenAIError } from '../../error';
-import OpenAI, { AzureOpenAI } from '../../index';
+import type OpenAI from '../../index';
+import { AzureOpenAI } from '../../index';
 
 export class OpenAIRealtimeError extends OpenAIError {
   override name = 'OpenAIRealtimeError';

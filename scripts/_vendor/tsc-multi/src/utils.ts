@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import ts from 'typescript';
+import type ts from 'typescript';
 
 export function trimPrefix(input: string, prefix: string): string {
   if (input.startsWith(prefix)) {

@@ -1,5 +1,6 @@
 import * as WS from 'ws';
-import { AzureOpenAI, OpenAI } from '../index';
+import type { AzureOpenAI } from '../index';
+import { OpenAI } from '../index';
 import type { RealtimeClientEvent, RealtimeServerEvent } from '../resources/realtime/realtime';
 import {
   OpenAIRealtimeEmitter,

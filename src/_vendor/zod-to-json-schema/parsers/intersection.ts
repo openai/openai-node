@@ -1,7 +1,8 @@
-import { ZodIntersectionDef } from 'zod/v3';
-import { JsonSchema7Type, parseDef } from '../parseDef';
-import { Refs } from '../Refs';
-import { JsonSchema7StringType } from './string';
+import type { ZodIntersectionDef } from 'zod/v3';
+import type { JsonSchema7Type } from '../parseDef';
+import { parseDef } from '../parseDef';
+import type { Refs } from '../Refs';
+import type { JsonSchema7StringType } from './string';
 
 export type JsonSchema7AllOfType = {
   allOf: JsonSchema7Type[];

@@ -12,7 +12,6 @@ const compatibilityRules = [
   'no-use-before-define',
   'prefer-arrow-callback',
   'sort-keys',
-  'typescript/consistent-type-imports',
   'typescript/no-explicit-any',
 ];
 

@@ -1,5 +1,5 @@
 import { ContentFilterFinishReasonError, LengthFinishReasonError, OpenAIError } from '../error';
-import {
+import type {
   ChatCompletion,
   ChatCompletionCreateParams,
   ChatCompletionCreateParamsBase,
@@ -16,7 +16,7 @@ import {
   ParsedFunctionToolCall,
 } from '../resources/chat/completions';
 import type { ResponseFormatTextJSONSchemaConfig } from '../resources/responses/responses';
-import { ResponseFormatJSONSchema } from '../resources/shared';
+import type { ResponseFormatJSONSchema } from '../resources/shared';
 
 type AnyChatCompletionCreateParams =
   | ChatCompletionCreateParams

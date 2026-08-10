@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import { Stream } from 'openai/core/streaming';
-import { OpenAIError, APIConnectionError } from 'openai/error';
+import type { OpenAIError } from 'openai/error';
+import { APIConnectionError } from 'openai/error';
 import { PassThrough } from 'node:stream';
 import {
   ParsingToolFunction,

@@ -1,4 +1,4 @@
-import {
+import type {
   TextContentBlock,
   ImageFileContentBlock,
   Message,
@@ -9,8 +9,8 @@ import {
   MessageDelta,
   MessageContent,
 } from '../resources/beta/threads/messages';
-import { RequestOptions } from '../internal/request-options';
-import {
+import type { RequestOptions } from '../internal/request-options';
+import type {
   Run,
   RunCreateParamsBase,
   RunCreateParamsStreaming,
@@ -21,15 +21,16 @@ import {
 import type { ReadableStream } from '../internal/shim-types';
 import { Stream } from '../streaming';
 import { APIUserAbortError, OpenAIError } from '../error';
-import {
+import type {
   AssistantStreamEvent,
   MessageStreamEvent,
   RunStepStreamEvent,
   RunStreamEvent,
 } from '../resources/beta/assistants';
-import { RunStep, RunStepDelta, ToolCall, ToolCallDelta } from '../resources/beta/threads/runs/steps';
-import { ThreadCreateAndRunParamsBase, Threads } from '../resources/beta/threads/threads';
-import { BaseEvents, EventStream } from './EventStream';
+import type { RunStep, RunStepDelta, ToolCall, ToolCallDelta } from '../resources/beta/threads/runs/steps';
+import type { ThreadCreateAndRunParamsBase, Threads } from '../resources/beta/threads/threads';
+import type { BaseEvents } from './EventStream';
+import { EventStream } from './EventStream';
 import { hasOwn, isObj } from '../internal/utils';
 
 export interface AssistantStreamEvents extends BaseEvents {
