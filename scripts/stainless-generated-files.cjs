@@ -21,4 +21,7 @@ function findGeneratedFiles(directory) {
   });
 }
 
-module.exports = findGeneratedFiles(repositoryRoot).sort();
+const generatedFiles = findGeneratedFiles(repositoryRoot);
+generatedFiles.sort();
+
+module.exports = generatedFiles;

@@ -1998,8 +1998,10 @@ function schemasEqual(left: unknown, right: unknown): boolean {
 
   const leftRecord = left as Record<string, unknown>;
   const rightRecord = right as Record<string, unknown>;
-  const leftKeys = Object.keys(leftRecord).sort();
-  const rightKeys = Object.keys(rightRecord).sort();
+  const leftKeys = Object.keys(leftRecord);
+  const rightKeys = Object.keys(rightRecord);
+  leftKeys.sort();
+  rightKeys.sort();
 
   if (leftKeys.length !== rightKeys.length) {
     return false;
