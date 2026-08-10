@@ -22,14 +22,17 @@ async function postprocess() {
 
     // strip out lib="dom", types="node", and types="react" references; these
     // are needed at build time, but would pollute the user's TS environment
-    let transformed = code.replace(
+    let transformed = code.replaceAll(
       /^ *\/\/\/ *<reference +(lib="dom"|types="(node|react)").*?\n/gm,
       // replace with same number of characters to avoid breaking source maps
       (match) => ' '.repeat(match.length - 1) + '\n',
     );
 
     if (/\.d\.[cm]?ts$/.test(file)) {
-      transformed = transformed.replace(/\/\*\* @ts-ignore ([^*]+?) \*\/ type /g, '// @ts-ignore $1\ntype ');
+      transformed = transformed.replaceAll(
+        /\/\*\* @ts-ignore ([^*]+?) \*\/ type /g,
+        '// @ts-ignore $1\ntype ',
+      );
     }
 
     if (transformed !== code) {
