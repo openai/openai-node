@@ -7,9 +7,9 @@ import puppeteer from 'puppeteer';
   let page;
   try {
     page = await browser.newPage();
-    function debugEvent(subj: string) {
+    const debugEvent = (subj: string) => {
       return subj.padEnd('requestfailed'.length);
-    }
+    };
     page
       .on('console', (message) =>
         console.error(
