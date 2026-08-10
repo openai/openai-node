@@ -81,7 +81,6 @@ const compatibilityRules = [
   'unicorn/prefer-at',
   'unicorn/prefer-module',
   'unicorn/prefer-node-protocol',
-  'unicorn/prefer-optional-catch-binding',
   'unicorn/prefer-response-static-json',
   'unicorn/prefer-spread',
   'unicorn/prefer-string-replace-all',

@@ -126,7 +126,7 @@ export function decode(str: string, _: any, charset: string) {
   // utf-8
   try {
     return decodeURIComponent(strWithoutPlus);
-  } catch (e) {
+  } catch {
     return strWithoutPlus;
   }
 }
