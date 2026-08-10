@@ -19,6 +19,7 @@ test('inherits Ultracite native plugins and enforces their rules', () => {
     plugins: string[];
     rules: Record<string, string>;
   };
+  // oxlint-disable-next-line node/global-require -- This test verifies the CommonJS config dependency used by oxlint.config.ts.
   const preset = require('ultracite/oxlint/core').default as { plugins: string[] };
 
   expect(configuration.plugins).toEqual(
@@ -72,6 +73,7 @@ test('recognizes both Stainless and Castiron generated SDK files', () => {
     }
     writeFileSync(path.join(fixtureRoot, 'handwritten.ts'), 'export const handwritten = true;\n');
 
+    // oxlint-disable-next-line node/global-require -- The fixture module path is created dynamically for this test.
     const generatedFiles = require(generatedFilesScript) as string[];
     expect(generatedFiles).toEqual(['castiron.ts', 'stainless.ts']);
   } finally {
