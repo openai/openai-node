@@ -163,14 +163,14 @@ const _parseJSON = (jsonString: string, allow: number) => {
           Object.defineProperty(obj, key, { value, writable: true, enumerable: true, configurable: true });
         } catch (e) {
           if (Allow.OBJ & allow) return obj;
-          else throw e;
+          throw e;
         }
         skipBlank();
         if (jsonString[index] === ',') index++; // skip comma
       }
     } catch (e) {
       if (Allow.OBJ & allow) return obj;
-      else markPartialJSON("Expected '}' at end of object");
+      markPartialJSON("Expected '}' at end of object");
     }
     index++; // skip final brace
     return obj;

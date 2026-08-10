@@ -36,19 +36,18 @@ export function parseTupleDef(
         currentPath: [...refs.currentPath, 'additionalItems'],
       }),
     };
-  } else {
-    return {
-      type: 'array',
-      minItems: def.items.length,
-      maxItems: def.items.length,
-      items: def.items
-        .map((x, i) =>
-          parseDef(x._def, {
-            ...refs,
-            currentPath: [...refs.currentPath, 'items', `${i}`],
-          }),
-        )
-        .reduce((acc: JsonSchema7Type[], x) => (x === undefined ? acc : [...acc, x]), []),
-    };
   }
+  return {
+    type: 'array',
+    minItems: def.items.length,
+    maxItems: def.items.length,
+    items: def.items
+      .map((x, i) =>
+        parseDef(x._def, {
+          ...refs,
+          currentPath: [...refs.currentPath, 'items', `${i}`],
+        }),
+      )
+      .reduce((acc: JsonSchema7Type[], x) => (x === undefined ? acc : [...acc, x]), []),
+  };
 }

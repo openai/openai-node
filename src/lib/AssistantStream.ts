@@ -624,9 +624,8 @@ export class AssistantStream
         //No changes on other thread events
         if (snapshot) {
           return [snapshot, newContent];
-        } else {
-          throw new Error('Received thread message event with no existing snapshot');
         }
+        throw new Error('Received thread message event with no existing snapshot');
     }
     throw new Error('Tried to accumulate a non-message event');
   }

@@ -23,7 +23,6 @@ const compatibilityRules = [
   'max-classes-per-file',
   'no-await-in-loop',
   'no-bitwise',
-  'no-else-return',
   'no-empty-function',
   'no-eq-null',
   'no-inline-comments',
