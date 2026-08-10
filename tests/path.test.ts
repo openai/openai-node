@@ -38,9 +38,9 @@ describe('path template tag function', () => {
 
     const emptyObject = {};
     const mathObject = Math;
-    // oxlint-disable-next-line no-new-wrappers -- intentionally test a boxed Number path parameter
+    // oxlint-disable-next-line no-new-wrappers, unicorn/new-for-builtins -- intentionally test a boxed Number path parameter
     const numberObject = new Number();
-    // oxlint-disable-next-line no-new-wrappers -- intentionally test a boxed String path parameter
+    // oxlint-disable-next-line no-new-wrappers, unicorn/new-for-builtins -- intentionally test a boxed String path parameter
     const stringObject = new String();
     const basicClass = new (class {
       readonly kind = 'class';

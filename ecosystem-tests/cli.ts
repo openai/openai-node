@@ -388,7 +388,7 @@ async function main() {
       showProgress();
 
       await Promise.all(
-        [...Array(jobs).keys()].map(async () => {
+        Array.from({ length: jobs }, (_, index) => index).map(async () => {
           while (queue.length) {
             const project = queue.shift();
             if (!project) {
