@@ -179,8 +179,7 @@ function messageReducer(previous: ChatCompletionMessage, item: ChatCompletionChu
         acc[key] = value;
       } else if (Array.isArray(acc[key]) && Array.isArray(value)) {
         const accArray = acc[key];
-        for (let i = 0; i < value.length; i++) {
-          const { index, ...chunkTool } = value[i];
+        for (const { index, ...chunkTool } of value) {
           if (index - accArray.length > 1) {
             throw new Error(
               `Error: An array has an empty value when tool_calls are constructed. tool_calls: ${accArray}; tool: ${value}`,
