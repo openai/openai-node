@@ -10,7 +10,6 @@ const compatibilityRules = [
   'complexity',
   'curly',
   'eqeqeq',
-  'func-name-matching',
   'func-names',
   'func-style',
   'import/consistent-type-specifier-style',
@@ -256,6 +255,14 @@ module.exports = defineConfig({
       ],
       rules: {
         'promise/prefer-await-to-callbacks': 'off',
+      },
+    },
+    {
+      // Function-tool fixtures intentionally give callbacks semantic names such as
+      // getWeather while assigning them to the protocol function field.
+      files: ['tests/lib/ChatCompletionRunFunctions.test.ts'],
+      rules: {
+        'func-name-matching': 'off',
       },
     },
     {
