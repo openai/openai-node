@@ -4,12 +4,12 @@ export class EventStream<EventTypes extends BaseEvents> {
   controller: AbortController = new AbortController();
 
   #connectedPromise: Promise<void>;
-  #resolveConnectedPromise: () => void = () => {};
-  #rejectConnectedPromise: (error: OpenAIError) => void = () => {};
+  #resolveConnectedPromise: () => void = () => undefined;
+  #rejectConnectedPromise: (error: OpenAIError) => void = () => undefined;
 
   #endPromise: Promise<void>;
-  #resolveEndPromise: () => void = () => {};
-  #rejectEndPromise: (error: OpenAIError) => void = () => {};
+  #resolveEndPromise: () => void = () => undefined;
+  #rejectEndPromise: (error: OpenAIError) => void = () => undefined;
 
   #listeners: {
     [Event in keyof EventTypes]?: EventListeners<EventTypes, Event>;
@@ -36,8 +36,8 @@ export class EventStream<EventTypes extends BaseEvents> {
     // we will manually cause an unhandled rejection error later
     // if the user hasn't registered any error listener or called
     // any promise-returning method.
-    this.#connectedPromise.catch(() => {});
-    this.#endPromise.catch(() => {});
+    this.#connectedPromise.catch(() => undefined);
+    this.#endPromise.catch(() => undefined);
   }
 
   protected _run(this: EventStream<EventTypes>, executor: () => Promise<any>) {
@@ -355,7 +355,9 @@ export class EventStream<EventTypes extends BaseEvents> {
     }
   }
 
-  protected _emitFinal(): void {}
+  protected _emitFinal(): void {
+    // Hook for subclasses.
+  }
 }
 
 type EventListener<Events, EventType extends keyof Events> = Events[EventType];

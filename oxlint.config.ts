@@ -21,7 +21,6 @@ const compatibilityRules = [
   'jsdoc/require-param-description',
   'no-await-in-loop',
   'no-bitwise',
-  'no-empty-function',
   'no-eq-null',
   'no-inline-comments',
   'no-nested-ternary',
