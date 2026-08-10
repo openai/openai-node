@@ -130,7 +130,7 @@ const _parseJSON = (jsonString: string, allow: number) => {
       escape = jsonString[index] === '\\' ? !escape : false;
       index++;
     }
-    if (jsonString.charAt(index) == '"') {
+    if (jsonString.charAt(index) === '"') {
       try {
         return JSON.parse(jsonString.substring(start, ++index - Number(escape)));
       } catch (e) {
@@ -221,7 +221,7 @@ const _parseJSON = (jsonString: string, allow: number) => {
     if (jsonString[index] === '-') index++;
     while (jsonString[index] && !',]}'.includes(jsonString[index]!)) index++;
 
-    if (index == length && !(Allow.NUM & allow)) markPartialJSON('Unterminated number literal');
+    if (index === length && !(Allow.NUM & allow)) markPartialJSON('Unterminated number literal');
 
     try {
       return JSON.parse(jsonString.substring(start, index));

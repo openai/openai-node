@@ -43,7 +43,7 @@ async function main() {
 
   console.log('Run finished with status: ' + run.status);
 
-  if (run.status == 'completed') {
+  if (run.status === 'completed') {
     const messages = await openai.beta.threads.messages.list(thread.id);
     for (const message of messages.getPaginatedItems()) {
       console.log(message);

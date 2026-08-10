@@ -7,7 +7,6 @@ const stainlessGeneratedFiles = requireConfig('./scripts/stainless-generated-fil
 // Existing handwritten SDK patterns predate these preset rules.
 const compatibilityRules = [
   'curly',
-  'eqeqeq',
   'func-names',
   'func-style',
   'import/consistent-type-specifier-style',
@@ -36,6 +35,9 @@ module.exports = defineConfig({
   },
   rules: {
     ...Object.fromEntries(compatibilityRules.map((rule) => [rule, 'off'])),
+    // Preserve intentional paired null-or-undefined checks while enforcing strict
+    // equality for every other comparison.
+    eqeqeq: ['error', 'always', { null: 'ignore' }],
     'jsdoc/check-tag-names': ['error', { definedTags: ['jest-environment'] }],
     'no-restricted-imports': [
       'error',

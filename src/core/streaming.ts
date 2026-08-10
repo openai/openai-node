@@ -76,7 +76,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
               throw e;
             }
             // SSE error events surface as APIError instances.
-            if (sse.event == 'error') {
+            if (sse.event === 'error') {
               throw new APIError(undefined, data.error, data.message, undefined);
             }
             yield { event: sse.event, data } as any;
