@@ -25,7 +25,6 @@ const compatibilityRules = [
   'require-await',
   'require-unicode-regexp',
   'sort-keys',
-  'typescript/array-type',
   'typescript/ban-ts-comment',
   'typescript/consistent-type-definitions',
   'typescript/consistent-type-imports',

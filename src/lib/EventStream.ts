@@ -16,7 +16,7 @@ export class EventStream<EventTypes extends BaseEvents> {
   #listeners: {
     [Event in keyof EventTypes]?: EventListeners<EventTypes, Event>;
   } = {};
-  #abortListeners: Array<{ signal: AbortSignal; listener: () => void }> = [];
+  #abortListeners: { signal: AbortSignal; listener: () => void }[] = [];
 
   #ended = false;
   #errored = false;
@@ -367,10 +367,10 @@ export class EventStream<EventTypes extends BaseEvents> {
 
 type EventListener<Events, EventType extends keyof Events> = Events[EventType];
 
-type EventListeners<Events, EventType extends keyof Events> = Array<{
+type EventListeners<Events, EventType extends keyof Events> = {
   listener: EventListener<Events, EventType>;
   once?: boolean;
-}>;
+}[];
 
 export type EventParameters<Events, EventType extends keyof Events> = Record<
   EventType,

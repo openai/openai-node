@@ -184,11 +184,11 @@ export class Stream<Item> implements AsyncIterable<Item> {
    * independently read from at different speeds.
    */
   tee(): [Stream<Item>, Stream<Item>] {
-    const left: Array<Promise<IteratorResult<Item>>> = [];
-    const right: Array<Promise<IteratorResult<Item>>> = [];
+    const left: Promise<IteratorResult<Item>>[] = [];
+    const right: Promise<IteratorResult<Item>>[] = [];
     const iterator = this.iterator();
 
-    const teeIterator = (queue: Array<Promise<IteratorResult<Item>>>): AsyncIterator<Item> => ({
+    const teeIterator = (queue: Promise<IteratorResult<Item>>[]): AsyncIterator<Item> => ({
       next: () => {
         if (queue.length === 0) {
           const result = iterator.next();

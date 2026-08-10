@@ -183,7 +183,7 @@ export function parseChatCompletion<
   Params extends ChatCompletionCreateParams,
   ParsedT = ExtractParsedContentFromParams<Params>,
 >(completion: ChatCompletion, params: Params): ParsedChatCompletion<ParsedT> {
-  const choices: Array<ParsedChoice<ParsedT>> = completion.choices.map((choice): ParsedChoice<ParsedT> => {
+  const choices: ParsedChoice<ParsedT>[] = completion.choices.map((choice): ParsedChoice<ParsedT> => {
     if (choice.finish_reason === 'length') {
       throw new LengthFinishReasonError();
     }

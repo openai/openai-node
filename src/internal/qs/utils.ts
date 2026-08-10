@@ -20,7 +20,7 @@ const hex_table = /* @__PURE__ */ (() => {
   return array;
 })();
 
-function compact_queue<T extends Record<string, any>>(queue: Array<{ obj: T; prop: string }>) {
+function compact_queue<T extends Record<string, any>>(queue: { obj: T; prop: string }[]) {
   while (queue.length > 1) {
     const item = queue.pop();
     if (!item) continue;

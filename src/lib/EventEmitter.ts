@@ -1,9 +1,9 @@
 type EventListener<Events, EventType extends keyof Events> = Events[EventType];
 
-type EventListeners<Events, EventType extends keyof Events> = Array<{
+type EventListeners<Events, EventType extends keyof Events> = {
   listener: EventListener<Events, EventType>;
   once?: boolean;
-}>;
+}[];
 
 export type EventParameters<Events, EventType extends keyof Events> = Record<
   EventType,

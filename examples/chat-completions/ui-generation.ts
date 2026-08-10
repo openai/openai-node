@@ -9,7 +9,7 @@ const openai = new OpenAI();
 interface UI {
   type: 'div' | 'button' | 'header' | 'section' | 'field' | 'form';
   label: string;
-  children: Array<UI>;
+  children: UI[];
   attributes: {
     value: string;
     name: string;

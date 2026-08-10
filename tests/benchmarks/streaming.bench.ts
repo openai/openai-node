@@ -21,7 +21,7 @@ type BenchmarkPayload = {
 type BenchmarkFixture = {
   label: string;
   chunks: Uint8Array[];
-  expected: Array<{ data: string; payload: BenchmarkPayload }>;
+  expected: { data: string; payload: BenchmarkPayload }[];
 };
 
 const BENCHMARK_OPTIONS = {

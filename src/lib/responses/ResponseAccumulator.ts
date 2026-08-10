@@ -404,7 +404,7 @@ function getOutput(snapshot: Response, outputIndex: number): Response['output'][
   return output;
 }
 
-function getContent<T>(content: Array<T>, contentIndex: number): T {
+function getContent<T>(content: T[], contentIndex: number): T {
   const part = content[contentIndex];
   if (!part) {
     throw new OpenAIError(`missing content at index ${contentIndex}`);

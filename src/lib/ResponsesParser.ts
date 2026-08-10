@@ -15,7 +15,7 @@ import {
 } from '../resources/responses/responses';
 import { type AutoParseableTextFormat, isAutoParsableResponseFormat } from '../lib/parser';
 
-export type ParseableToolsParams = Array<Tool> | ChatCompletionTool | null;
+export type ParseableToolsParams = Tool[] | ChatCompletionTool | null;
 
 export type ResponseCreateParamsWithTools = ResponseCreateParamsBase & {
   tools?: ParseableToolsParams;
@@ -70,13 +70,13 @@ export function parseResponse<
   ParsedT = ExtractParsedContentFromParams<Params>,
 >(response: Response, params: Params): ParsedResponse<ParsedT> {
   const shouldParse = !response.status || response.status === 'completed';
-  const output: Array<ParsedResponseOutputItem<ParsedT>> = response.output.map(
+  const output: ParsedResponseOutputItem<ParsedT>[] = response.output.map(
     (item): ParsedResponseOutputItem<ParsedT> => {
       if (item.type === 'function_call') {
         return shouldParse ? parseToolCall(params, item) : { ...item, parsed_arguments: null };
       }
       if (item.type === 'message') {
-        const content: Array<ParsedContent<ParsedT>> = item.content.map((content) => {
+        const content: ParsedContent<ParsedT>[] = item.content.map((content) => {
           if (content.type === 'output_text') {
             return {
               ...content,
@@ -205,7 +205,7 @@ export function isAutoParsableTool(tool: any): tool is AutoParseableResponseTool
   return tool?.['$brand'] === 'auto-parseable-tool';
 }
 
-function getInputToolByName(input_tools: Array<Tool>, name: string): FunctionTool | undefined {
+function getInputToolByName(input_tools: Tool[], name: string): FunctionTool | undefined {
   return input_tools.find((tool) => tool.type === 'function' && tool.name === name) as
     | FunctionTool
     | undefined;
