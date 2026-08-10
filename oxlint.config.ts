@@ -43,7 +43,6 @@ const compatibilityRules = [
   'no-useless-concat',
   'no-useless-return',
   'no-var',
-  'no-void',
   'no-warning-comments',
   'node/global-require',
   'object-shorthand',
