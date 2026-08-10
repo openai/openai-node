@@ -35,7 +35,6 @@ const compatibilityRules = [
   'prefer-arrow-callback',
   'prefer-destructuring',
   'prefer-named-capture-group',
-  'prefer-object-has-own',
   'prefer-template',
   'promise/avoid-new',
   'promise/prefer-await-to-callbacks',

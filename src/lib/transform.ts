@@ -1,4 +1,5 @@
 import type { JSONSchema, JSONSchemaDefinition } from './jsonschema';
+import { hasOwn } from '../internal/utils';
 
 const JSON_SCHEMA_ANNOTATION_KEYWORDS = new Set([
   '$comment',
@@ -442,10 +443,7 @@ function planPromotedRootAnyOfDefinitionRenames(
     let aliasIndex = 0;
 
     for (const [name, definition] of Object.entries(branchDefinitions)) {
-      if (
-        !Object.prototype.hasOwnProperty.call(rootDefinitions, name) ||
-        schemasEqual(rootDefinitions[name], definition)
-      ) {
+      if (!hasOwn(rootDefinitions, name) || schemasEqual(rootDefinitions[name], definition)) {
         continue;
       }
 
@@ -695,7 +693,7 @@ function ensureStrictJsonSchema(
   const properties = jsonSchema.properties;
   if (hasObjectShape(jsonSchema)) {
     for (const key of required) {
-      if (!isObject(properties) || !Object.prototype.hasOwnProperty.call(properties, key)) {
+      if (!isObject(properties) || !hasOwn(properties, key)) {
         throw new Error(
           `Object schema at \`${
             path.join('/') || '<root>'
@@ -850,13 +848,13 @@ function resolvePointerPart(resolved: unknown, part: string): unknown | undefine
     }
 
     const index = Number(part);
-    if (!Object.prototype.hasOwnProperty.call(resolved, index)) {
+    if (!hasOwn(resolved, index)) {
       return undefined;
     }
     return resolved[index];
   }
 
-  if (!isObject(resolved) || !Object.prototype.hasOwnProperty.call(resolved, part)) {
+  if (!isObject(resolved) || !hasOwn(resolved, part)) {
     return undefined;
   }
   return resolved[part];
@@ -1296,7 +1294,7 @@ function rewriteLocalRefsIntoFilteredAnyOfBranches(root: JSONSchema): void {
         }
 
         const branchIndex = Number(branchIndexPart);
-        if (!Object.prototype.hasOwnProperty.call(branches, branchIndex)) {
+        if (!hasOwn(branches, branchIndex)) {
           return ref;
         }
 
@@ -1390,7 +1388,7 @@ function preserveAllOfRefTargets(root: JSONSchema, rootOnly = false): void {
     }
 
     let alias = '__openai_strict_allOf_ref_' + aliasIndex++;
-    while (Object.prototype.hasOwnProperty.call(definitions, alias)) {
+    while (hasOwn(definitions, alias)) {
       alias = '__openai_strict_allOf_ref_' + aliasIndex++;
     }
     definitions[alias] = structuredClone(target);
@@ -1467,7 +1465,7 @@ function preserveDiscardedAllOfPropertyRefTargets(root: JSONSchema, discardedPat
     }
 
     let alias = '__openai_strict_allOf_property_ref_' + aliasIndex++;
-    while (Object.prototype.hasOwnProperty.call(definitions, alias)) {
+    while (hasOwn(definitions, alias)) {
       alias = '__openai_strict_allOf_property_ref_' + aliasIndex++;
     }
     definitions[alias] = structuredClone(target);
@@ -1935,10 +1933,7 @@ function mergeObjectAllOf(
     if (allowedClosedProperties !== undefined && !allowedClosedProperties.has(key)) {
       continue;
     }
-    if (
-      Object.prototype.hasOwnProperty.call(mergedProperties, key) &&
-      !schemasEqual(mergedProperties[key], propertySchema)
-    ) {
+    if (hasOwn(mergedProperties, key) && !schemasEqual(mergedProperties[key], propertySchema)) {
       fail();
     }
     mergedProperties[key] = propertySchema;
