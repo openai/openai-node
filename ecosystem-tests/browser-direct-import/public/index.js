@@ -13,7 +13,7 @@ async function runTests() {
   /** @type {TestResult[]} */
   const results = [];
   function displayResults() {
-    let pre = document.getElementById('results');
+    let pre = document.querySelector('#results');
     if (!pre) {
       pre = document.createElement('pre');
       pre.id = 'results';
@@ -39,7 +39,7 @@ async function runTests() {
     }
     displayResults();
   }
-  const runningEl = document.getElementById('running');
+  const runningEl = document.querySelector('#running');
   if (runningEl) runningEl.remove();
 }
 
