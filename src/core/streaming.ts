@@ -245,7 +245,7 @@ export async function* _iterSSEMessages(
   if (!response.body) {
     controller.abort();
     if (
-      typeof (globalThis as any).navigator !== 'undefined' &&
+      (globalThis as any).navigator !== undefined &&
       (globalThis as any).navigator.product === 'ReactNative'
     ) {
       throw new OpenAIError(

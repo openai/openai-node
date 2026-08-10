@@ -24,7 +24,7 @@ const recordingProviders: Record<NodeJS.Platform, string> = {
 };
 
 function isResponse(stream: NodeJS.ReadableStream | Response | File): stream is Response {
-  return typeof (stream as any).body !== 'undefined';
+  return (stream as any).body !== undefined;
 }
 
 function isFile(stream: NodeJS.ReadableStream | Response | File): stream is File {

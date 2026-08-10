@@ -31,7 +31,7 @@ function compact_queue<T extends Record<string, any>>(queue: Array<{ obj: T; pro
       const compacted: unknown[] = [];
 
       for (const value of obj) {
-        if (typeof value !== 'undefined') {
+        if (value !== undefined) {
           compacted.push(value);
         }
       }
@@ -45,7 +45,7 @@ function compact_queue<T extends Record<string, any>>(queue: Array<{ obj: T; pro
 function array_to_object(source: any[], options: { plainObjects: boolean }) {
   const obj = options && options.plainObjects ? Object.create(null) : {};
   for (let i = 0; i < source.length; ++i) {
-    if (typeof source[i] !== 'undefined') {
+    if (source[i] !== undefined) {
       obj[i] = source[i];
     }
   }

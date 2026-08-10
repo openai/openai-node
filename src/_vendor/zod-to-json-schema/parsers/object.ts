@@ -42,7 +42,7 @@ export function parseObjectDef(def: ZodObjectDef, refs: Refs) {
       refs.openaiStrictMode &&
       propDef.isOptional() &&
       !propDef.isNullable() &&
-      typeof propDef._def?.defaultValue === 'undefined'
+      propDef._def?.defaultValue === undefined
     ) {
       throw new Error(
         `Zod field at \`${propertyPath.join(
