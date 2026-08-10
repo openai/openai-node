@@ -377,15 +377,18 @@ export class ChatCompletionStream<ParsedT = null>
         (tool) => isChatCompletionFunctionTool(tool) && tool.function.name === toolCallSnapshot.function.name,
       ) as ChatCompletionFunctionTool | undefined; // TS doesn't narrow based on isChatCompletionTool
 
+      let parsedArguments: unknown = null;
+      if (isAutoParsableTool(inputTool)) {
+        parsedArguments = inputTool.$parseRaw(toolCallSnapshot.function.arguments);
+      } else if (inputTool?.function.strict) {
+        parsedArguments = JSON.parse(toolCallSnapshot.function.arguments);
+      }
+
       this._emit('tool_calls.function.arguments.done', {
         name: toolCallSnapshot.function.name,
         index: toolCallIndex,
         arguments: toolCallSnapshot.function.arguments,
-        parsed_arguments: isAutoParsableTool(inputTool)
-          ? inputTool.$parseRaw(toolCallSnapshot.function.arguments)
-          : inputTool?.function.strict
-            ? JSON.parse(toolCallSnapshot.function.arguments)
-            : null,
+        parsed_arguments: parsedArguments,
       });
     } else {
       assertNever(toolCallSnapshot.type);

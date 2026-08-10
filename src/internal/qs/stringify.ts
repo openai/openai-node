@@ -182,11 +182,15 @@ function inner_stringify(
 
     // @ts-ignore
     const encoded_key = allowDots && encodeDotInKeys ? (key as any).replace(/\./g, '%2E') : key;
-    const key_prefix = isArray(obj)
-      ? typeof generateArrayPrefix === 'function'
-        ? generateArrayPrefix(adjusted_prefix, encoded_key)
-        : adjusted_prefix
-      : adjusted_prefix + (allowDots ? '.' + encoded_key : '[' + encoded_key + ']');
+    let key_prefix: string;
+    if (isArray(obj)) {
+      key_prefix =
+        typeof generateArrayPrefix === 'function'
+          ? generateArrayPrefix(adjusted_prefix, encoded_key)
+          : adjusted_prefix;
+    } else {
+      key_prefix = adjusted_prefix + (allowDots ? '.' + encoded_key : '[' + encoded_key + ']');
+    }
 
     sideChannel.set(object, step);
     const valueSideChannel = new WeakMap([[sentinel, sideChannel]]);
@@ -266,12 +270,12 @@ function normalize_stringify_options(
     throw new TypeError('`commaRoundTrip` must be a boolean, or absent');
   }
 
-  const allowDots =
-    typeof opts.allowDots === 'undefined'
-      ? !!opts.encodeDotInKeys === true
-        ? true
-        : defaults.allowDots
-      : !!opts.allowDots;
+  let allowDots: boolean;
+  if (opts.allowDots === undefined) {
+    allowDots = !!opts.encodeDotInKeys === true ? true : defaults.allowDots;
+  } else {
+    allowDots = !!opts.allowDots;
+  }
 
   return {
     addQueryPrefix: typeof opts.addQueryPrefix === 'boolean' ? opts.addQueryPrefix : defaults.addQueryPrefix,

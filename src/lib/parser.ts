@@ -244,15 +244,18 @@ function parseToolCall<Params extends ChatCompletionCreateParams>(
     (inputTool) =>
       isChatCompletionFunctionTool(inputTool) && inputTool.function?.name === toolCall.function.name,
   ) as ChatCompletionFunctionTool | undefined; // TS doesn't narrow based on isChatCompletionTool
+  let parsedArguments: unknown = null;
+  if (isAutoParsableTool(inputTool)) {
+    parsedArguments = inputTool.$parseRaw(toolCall.function.arguments);
+  } else if (inputTool?.function.strict) {
+    parsedArguments = JSON.parse(toolCall.function.arguments);
+  }
+
   return {
     ...toolCall,
     function: {
       ...toolCall.function,
-      parsed_arguments: isAutoParsableTool(inputTool)
-        ? inputTool.$parseRaw(toolCall.function.arguments)
-        : inputTool?.function.strict
-          ? JSON.parse(toolCall.function.arguments)
-          : null,
+      parsed_arguments: parsedArguments,
     },
   };
 }

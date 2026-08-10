@@ -217,14 +217,17 @@ function parseToolCall<Params extends ResponseCreateParamsBase>(
 ): ParsedResponseFunctionToolCall {
   const inputTool = getInputToolByName(params.tools ?? [], toolCall.name);
 
+  let parsedArguments: unknown = null;
+  if (isAutoParsableTool(inputTool)) {
+    parsedArguments = inputTool.$parseRaw(toolCall.arguments);
+  } else if (inputTool?.strict) {
+    parsedArguments = JSON.parse(toolCall.arguments);
+  }
+
   return {
     ...toolCall,
     ...toolCall,
-    parsed_arguments: isAutoParsableTool(inputTool)
-      ? inputTool.$parseRaw(toolCall.arguments)
-      : inputTool?.strict
-        ? JSON.parse(toolCall.arguments)
-        : null,
+    parsed_arguments: parsedArguments,
   };
 }
 

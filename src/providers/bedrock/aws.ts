@@ -83,12 +83,13 @@ function requestTarget(parsedURL: URL): { path: string; query: Record<string, st
   const query: Record<string, string | string[]> = {};
   for (const [name, value] of parsedURL.searchParams) {
     const existing = query[name];
-    query[name] =
-      existing === undefined
-        ? value
-        : typeof existing === 'string'
-          ? [existing, value]
-          : [...existing, value];
+    if (existing === undefined) {
+      query[name] = value;
+    } else if (typeof existing === 'string') {
+      query[name] = [existing, value];
+    } else {
+      query[name] = [...existing, value];
+    }
   }
   return { path: parsedURL.pathname, query };
 }
