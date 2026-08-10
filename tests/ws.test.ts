@@ -1,4 +1,5 @@
-import { SendQueue, type RawWebSocketData } from 'openai/internal/ws';
+import { SendQueue } from 'openai/internal/ws';
+import type { RawWebSocketData } from 'openai/internal/ws';
 
 describe('SendQueue', () => {
   test('enqueues messages within the byte limit', () => {

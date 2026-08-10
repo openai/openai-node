@@ -1,12 +1,8 @@
 import * as WS from 'ws';
 import { AzureOpenAI, OpenAI } from '../../index';
 import type { RealtimeClientEvent, RealtimeServerEvent } from '../../resources/beta/realtime/realtime';
-import {
-  OpenAIRealtimeEmitter,
-  buildRealtimeURL,
-  isAzure,
-  type RealtimeConnectionConfig,
-} from './internal-base';
+import { OpenAIRealtimeEmitter, buildRealtimeURL, isAzure } from './internal-base';
+import type { RealtimeConnectionConfig } from './internal-base';
 
 export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
   url: URL;

@@ -1,4 +1,5 @@
-import { vi, type MockedFunction } from 'vitest';
+import { vi } from 'vitest';
+import type { MockedFunction } from 'vitest';
 
 import OpenAI from 'openai';
 import { AssistantStream } from 'openai/lib/AssistantStream';

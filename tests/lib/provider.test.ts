@@ -1,6 +1,7 @@
 import { vi } from 'vitest';
 import OpenAI from 'openai';
-import { createProvider, type ProviderRuntime } from 'openai/internal/provider';
+import { createProvider } from 'openai/internal/provider';
+import type { ProviderRuntime } from 'openai/internal/provider';
 import { formatRequestDetails } from 'openai/internal/utils/log';
 
 const originalEnv = process.env;

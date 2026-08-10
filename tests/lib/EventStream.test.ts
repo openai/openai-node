@@ -1,6 +1,7 @@
 import { vi } from 'vitest';
 import { OpenAIError } from 'openai/error';
-import { type BaseEvents, EventStream } from 'openai/lib/EventStream';
+import { EventStream } from 'openai/lib/EventStream';
+import type { BaseEvents } from 'openai/lib/EventStream';
 
 interface TestEvents extends BaseEvents {
   foo: (value: string, index: number) => void;

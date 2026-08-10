@@ -6,9 +6,8 @@ import {
   buildRealtimeURL,
   getAzureRealtimeConnection,
   isAzure,
-  type AzureRealtimeConnectionConfig,
-  type RealtimeConnectionConfig,
 } from './internal-base';
+import type { AzureRealtimeConnectionConfig, RealtimeConnectionConfig } from './internal-base';
 
 export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
   url: URL;

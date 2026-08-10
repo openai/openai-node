@@ -1,12 +1,8 @@
 import { AzureOpenAI, OpenAI } from '../../index';
 import { OpenAIError } from '../../error';
 import type { RealtimeClientEvent, RealtimeServerEvent } from '../../resources/beta/realtime/realtime';
-import {
-  OpenAIRealtimeEmitter,
-  buildRealtimeURL,
-  isAzure,
-  type RealtimeConnectionConfig,
-} from './internal-base';
+import { OpenAIRealtimeEmitter, buildRealtimeURL, isAzure } from './internal-base';
+import type { RealtimeConnectionConfig } from './internal-base';
 import { isRunningInBrowser } from '../../internal/detect-platform';
 
 interface MessageEvent {

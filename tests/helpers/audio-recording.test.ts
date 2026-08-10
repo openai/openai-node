@@ -1,4 +1,5 @@
-import { vi, type MockedFunction } from 'vitest';
+import { vi } from 'vitest';
+import type { MockedFunction } from 'vitest';
 import { spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { PassThrough, Readable, Writable } from 'node:stream';

@@ -10,11 +10,14 @@ import {
   normalizeOptionalString,
   resolveBedrockBearerAuth,
   resolveBedrockEndpoint,
-  type BedrockBearerOptions,
-  type BedrockEndpointOptions,
-  type BedrockRequestAuth,
 } from '../../internal/bedrock';
-import { createProvider, type Provider, type ProviderRequestContext } from '../../internal/provider';
+import type {
+  BedrockBearerOptions,
+  BedrockEndpointOptions,
+  BedrockRequestAuth,
+} from '../../internal/bedrock';
+import { createProvider } from '../../internal/provider';
+import type { Provider, ProviderRequestContext } from '../../internal/provider';
 import type { FinalizedRequestInit } from '../../internal/types';
 
 const BEDROCK_SERVICE = 'bedrock-mantle';

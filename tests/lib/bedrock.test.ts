@@ -1,5 +1,6 @@
 import { vi } from 'vitest';
-import { BedrockOpenAI, NotFoundError, type BedrockClientOptions } from 'openai';
+import { BedrockOpenAI, NotFoundError } from 'openai';
+import type { BedrockClientOptions } from 'openai';
 import type { RequestInfo, RequestInit } from 'openai/internal/builtin-types';
 
 const RESPONSE_BODY = {

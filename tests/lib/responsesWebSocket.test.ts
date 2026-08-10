@@ -1,15 +1,12 @@
 import { vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import OpenAI from 'openai';
-import { ReadyState, type WebSocketLike } from 'openai/internal/ws-adapter';
-import {
-  ResponsesWSBase as StableResponsesWSBase,
-  type ResponsesWSBaseOptions,
-} from 'openai/resources/responses/ws-base';
-import {
-  ResponsesWSBase as BetaResponsesWSBase,
-  type ResponsesWSBaseOptions as BetaResponsesWSBaseOptions,
-} from 'openai/resources/beta/responses/ws-base';
+import { ReadyState } from 'openai/internal/ws-adapter';
+import type { WebSocketLike } from 'openai/internal/ws-adapter';
+import { ResponsesWSBase as StableResponsesWSBase } from 'openai/resources/responses/ws-base';
+import type { ResponsesWSBaseOptions } from 'openai/resources/responses/ws-base';
+import { ResponsesWSBase as BetaResponsesWSBase } from 'openai/resources/beta/responses/ws-base';
+import type { ResponsesWSBaseOptions as BetaResponsesWSBaseOptions } from 'openai/resources/beta/responses/ws-base';
 import { WebSocketError as StableWebSocketError } from 'openai/resources/responses/internal-base';
 import { WebSocketError as BetaWebSocketError } from 'openai/resources/beta/responses/internal-base';
 

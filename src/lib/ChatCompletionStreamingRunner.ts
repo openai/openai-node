@@ -3,15 +3,17 @@ import type {
   ChatCompletionCreateParamsStreaming,
   ChatCompletionMessageParam,
 } from '../resources/chat/completions';
-import { RunnerOptions, type AbstractChatCompletionRunnerEvents } from './AbstractChatCompletionRunner';
+import { RunnerOptions } from './AbstractChatCompletionRunner';
+import type { AbstractChatCompletionRunnerEvents } from './AbstractChatCompletionRunner';
 import type { ReadableStream } from '../internal/shim-types';
-import { RunnableTools, type BaseFunctionsArgs } from './RunnableFunction';
+import { RunnableTools } from './RunnableFunction';
+import type { BaseFunctionsArgs } from './RunnableFunction';
 import {
-  type ChatCompletionReadableStreamItem,
   ChatCompletionSnapshot,
   ChatCompletionStream,
   makeChatCompletionReadableStreamMessageChunk,
 } from './ChatCompletionStream';
+import type { ChatCompletionReadableStreamItem } from './ChatCompletionStream';
 import { OpenAIError } from '../error';
 import OpenAI from '../index';
 import { AutoParseableTool } from '../lib/parser';
