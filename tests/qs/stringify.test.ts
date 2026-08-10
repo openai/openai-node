@@ -216,7 +216,7 @@ describe('stringify()', function () {
     // }, TypeError);
     expect(() => {
       // @ts-expect-error
-      stringify({ a: [], b: 'zz' }, { encodeDotInKeys: NaN });
+      stringify({ a: [], b: 'zz' }, { encodeDotInKeys: Number.NaN });
     }).toThrow(TypeError);
 
     // st['throws'](function () {
@@ -360,7 +360,7 @@ describe('stringify()', function () {
     // }, TypeError);
     expect(() => {
       // @ts-expect-error
-      stringify({ a: [], b: 'zz' }, { allowEmptyArrays: NaN });
+      stringify({ a: [], b: 'zz' }, { allowEmptyArrays: Number.NaN });
     }).toThrow(TypeError);
 
     // st['throws'](function () {

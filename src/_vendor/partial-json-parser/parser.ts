@@ -117,7 +117,7 @@ const _parseJSON = (jsonString: string, allow: number) => {
       (Allow.NAN & allow && length - index < 3 && 'NaN'.startsWith(jsonString.substring(index)))
     ) {
       index += 3;
-      return NaN;
+      return Number.NaN;
     }
     return parseNum();
   };
