@@ -132,8 +132,8 @@ function parseTextFormat<
     return null;
   }
 
-  if ('$parseRaw' in params.text?.format) {
-    const text_format = params.text?.format as unknown as AutoParseableTextFormat<ParsedT>;
+  if ('$parseRaw' in params.text.format) {
+    const text_format = params.text.format as unknown as AutoParseableTextFormat<ParsedT>;
     return text_format.$parseRaw(content);
   }
 
