@@ -46,7 +46,7 @@ describe('merge()', function () {
   // t.deepEqual(noOptionsNonObjectSource, { foo: 'baz', bar: true });
   expect(noOptionsNonObjectSource).toEqual({ foo: 'baz', bar: true });
 
-  (typeof Object.defineProperty !== 'function' ? test.skip : test)(
+  (typeof Object.defineProperty === 'function' ? test : test.skip)(
     'avoids invoking array setters unnecessarily',
     function () {
       var setCount = 0;

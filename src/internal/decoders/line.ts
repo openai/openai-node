@@ -56,7 +56,7 @@ export class LineDecoder {
       }
 
       const endIndex =
-        this.#carriageReturnIndex !== null ? patternIndex.preceding - 1 : patternIndex.preceding;
+        this.#carriageReturnIndex === null ? patternIndex.preceding : patternIndex.preceding - 1;
 
       const line = decodeUTF8(this.#buffer.subarray(0, endIndex));
       lines.push(line);

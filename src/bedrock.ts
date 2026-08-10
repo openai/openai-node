@@ -183,7 +183,7 @@ export class BedrockOpenAI extends OpenAI {
 
   override withOptions(options: Partial<BedrockClientOptions>): this {
     const bedrockTokenProvider =
-      options.apiKey !== undefined ? undefined : (options.bedrockTokenProvider ?? this.bedrockTokenProvider);
+      options.apiKey === undefined ? (options.bedrockTokenProvider ?? this.bedrockTokenProvider) : undefined;
 
     return super.withOptions({
       ...options,
