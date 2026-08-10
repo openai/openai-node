@@ -138,7 +138,7 @@ const get$ref = (
     // e.g. if we need to reference a schema at
     // `["#","definitions","contactPerson","properties","person1","properties","name"]`
     // then we'll extract it out to `contactPerson_properties_person1_properties_name`
-    case 'extract-to-root':
+    case 'extract-to-root': {
       const name = item.path
         .slice(refs.basePath.length + 1)
         // The first part is either the root schema name or an extracted definition
@@ -154,6 +154,7 @@ const get$ref = (
       }
 
       return { $ref: [...refs.basePath, refs.definitionPath, name].join('/') };
+    }
     case 'relative':
       return { $ref: getRelativePath(refs.currentPath, item.path) };
     case 'none':
