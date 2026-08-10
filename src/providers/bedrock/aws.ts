@@ -193,7 +193,7 @@ class BedrockSigV4Auth implements BedrockRequestAuth {
         method,
         ...requestTarget(parsedURL),
         headers: Object.fromEntries(headers.entries()),
-        ...(body !== undefined ? { body } : {}),
+        ...(body === undefined ? {} : { body }),
       });
     } catch (cause) {
       const message = this.options.usesDefaultChain

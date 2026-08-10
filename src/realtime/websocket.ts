@@ -98,10 +98,10 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
     });
 
     if (isAzure(client)) {
-      if (this.url.searchParams.get('Authorization') !== null) {
-        this.url.searchParams.set('Authorization', '<REDACTED>');
-      } else {
+      if (this.url.searchParams.get('Authorization') === null) {
         this.url.searchParams.set('api-key', '<REDACTED>');
+      } else {
+        this.url.searchParams.set('Authorization', '<REDACTED>');
       }
     }
   }

@@ -548,9 +548,7 @@ export class ChatCompletionStream<ParsedT = null>
       }
 
       if (logprobs) {
-        if (!choice.logprobs) {
-          choice.logprobs = { ...logprobs };
-        } else {
+        if (choice.logprobs) {
           const { content, refusal, ...rest } = logprobs;
           assertIsEmpty(rest);
           Object.assign(choice.logprobs, rest);
@@ -564,6 +562,8 @@ export class ChatCompletionStream<ParsedT = null>
             choice.logprobs.refusal ??= [];
             choice.logprobs.refusal.push(...refusal);
           }
+        } else {
+          choice.logprobs = { ...logprobs };
         }
       }
 
@@ -621,14 +621,14 @@ export class ChatCompletionStream<ParsedT = null>
         if (audio.expires_at != null) audioSnapshot.expires_at = audio.expires_at;
       }
       if (function_call) {
-        if (!choice.message.function_call) {
-          choice.message.function_call = function_call;
-        } else {
+        if (choice.message.function_call) {
           if (function_call.name) choice.message.function_call.name = function_call.name;
           if (function_call.arguments) {
             choice.message.function_call.arguments ??= '';
             choice.message.function_call.arguments += function_call.arguments;
           }
+        } else {
+          choice.message.function_call = function_call;
         }
       }
       if (content) {

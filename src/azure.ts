@@ -120,7 +120,7 @@ export class AzureOpenAI extends OpenAI {
       apiKey: azureADTokenProvider ?? apiKey,
       baseURL,
       ...opts,
-      ...(dangerouslyAllowBrowser !== undefined ? { dangerouslyAllowBrowser } : {}),
+      ...(dangerouslyAllowBrowser === undefined ? {} : { dangerouslyAllowBrowser }),
     });
 
     this.apiVersion = apiVersion;
