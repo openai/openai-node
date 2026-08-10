@@ -106,19 +106,19 @@ export function merge(
     return target;
   }
 
-  return Object.keys(source).reduce(function (acc, key) {
+  for (const key of Object.keys(source)) {
     const value = source[key];
 
-    acc[key] = has(acc, key) ? merge(acc[key], value, options) : value;
-    return acc;
-  }, mergeTarget);
+    mergeTarget[key] = has(mergeTarget, key) ? merge(mergeTarget[key], value, options) : value;
+  }
+  return mergeTarget;
 }
 
 export function assign_single_source(target: any, source: any) {
-  return Object.keys(source).reduce(function (acc, key) {
-    acc[key] = source[key];
-    return acc;
-  }, target);
+  for (const key of Object.keys(source)) {
+    target[key] = source[key];
+  }
+  return target;
 }
 
 export function decode(str: string, _: any, charset: string) {

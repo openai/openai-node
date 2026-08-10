@@ -28,14 +28,20 @@ function collectRefs(value: unknown, refs: string[] = []): string[] {
 function countEnumValues(value: unknown): number {
   if (!value || typeof value !== 'object') return 0;
   if (Array.isArray(value)) {
-    return value.reduce((total, child) => total + countEnumValues(child), 0);
+    let total = 0;
+    for (const child of value) {
+      total += countEnumValues(child);
+    }
+    return total;
   }
 
   const record = value as Record<string, unknown>;
   const enumValues = Array.isArray(record['enum']) ? record['enum'].length : 0;
-  return (
-    enumValues + Object.values(record).reduce<number>((total, child) => total + countEnumValues(child), 0)
-  );
+  let nestedEnumValues = 0;
+  for (const child of Object.values(record)) {
+    nestedEnumValues += countEnumValues(child);
+  }
+  return enumValues + nestedEnumValues;
 }
 
 function resolveJsonPointer(root: Record<string, unknown>, pointer: string): unknown {
@@ -45,12 +51,14 @@ function resolveJsonPointer(root: Record<string, unknown>, pointer: string): unk
     .split('/')
     .map((token) => token.replace(/~1/g, '/').replace(/~0/g, '~'));
 
-  return tokens.reduce<unknown>((value, token) => {
+  let value: unknown = root;
+  for (const token of tokens) {
     expect(value).not.toBeNull();
     expect(typeof value).toBe('object');
     expect(Object.prototype.hasOwnProperty.call(value, token)).toBe(true);
-    return (value as Record<string, unknown>)[token];
-  }, root);
+    value = (value as Record<string, unknown>)[token];
+  }
+  return value;
 }
 
 function expectDefinitionRefsToResolve(schema: Record<string, unknown>) {

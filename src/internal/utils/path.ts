@@ -21,32 +21,36 @@ export const createPathTagFunction = (pathEncoder = encodeURIPath) =>
 
     let postPath = false;
     const invalidSegments = [];
-    const path = statics.reduce((previousValue, currentValue, index) => {
-      if (/[?#]/.test(currentValue)) {
-        postPath = true;
+    let path = '';
+    for (let index = 0; index < statics.length; index += 1) {
+      if (index in statics) {
+        const currentValue = statics[index]!;
+        if (/[?#]/.test(currentValue)) {
+          postPath = true;
+        }
+        const value = params[index];
+        let encoded = (postPath ? encodeURIComponent : pathEncoder)('' + value);
+        if (
+          index !== params.length &&
+          (value == null ||
+            (typeof value === 'object' &&
+              // handle values from other realms
+              value.toString ===
+                Object.getPrototypeOf(Object.getPrototypeOf((value as any).hasOwnProperty ?? EMPTY) ?? EMPTY)
+                  ?.toString))
+        ) {
+          encoded = value + '';
+          invalidSegments.push({
+            start: path.length + currentValue.length,
+            length: encoded.length,
+            error: `Value of type ${Object.prototype.toString
+              .call(value)
+              .slice(8, -1)} is not a valid path parameter`,
+          });
+        }
+        path += currentValue + (index === params.length ? '' : encoded);
       }
-      const value = params[index];
-      let encoded = (postPath ? encodeURIComponent : pathEncoder)('' + value);
-      if (
-        index !== params.length &&
-        (value == null ||
-          (typeof value === 'object' &&
-            // handle values from other realms
-            value.toString ===
-              Object.getPrototypeOf(Object.getPrototypeOf((value as any).hasOwnProperty ?? EMPTY) ?? EMPTY)
-                ?.toString))
-      ) {
-        encoded = value + '';
-        invalidSegments.push({
-          start: previousValue.length + currentValue.length,
-          length: encoded.length,
-          error: `Value of type ${Object.prototype.toString
-            .call(value)
-            .slice(8, -1)} is not a valid path parameter`,
-        });
-      }
-      return previousValue + currentValue + (index === params.length ? '' : encoded);
-    }, '');
+    }
 
     const pathOnly = path.split(/[?#]/, 1)[0]!;
     const invalidSegmentPattern = /(?<=^|\/)(?:\.|%2e){1,2}(?=\/|$)/gi;
@@ -65,12 +69,13 @@ export const createPathTagFunction = (pathEncoder = encodeURIPath) =>
 
     if (invalidSegments.length > 0) {
       let lastEnd = 0;
-      const underline = invalidSegments.reduce((acc, segment) => {
+      let underline = '';
+      for (const segment of invalidSegments) {
         const spaces = ' '.repeat(segment.start - lastEnd);
         const arrows = '^'.repeat(segment.length);
         lastEnd = segment.start + segment.length;
-        return acc + spaces + arrows;
-      }, '');
+        underline += spaces + arrows;
+      }
 
       throw new OpenAIError(
         `Path parameters result in path with invalid segments:\n${invalidSegments

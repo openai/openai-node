@@ -149,18 +149,17 @@ export class Worker {
     return {
       ...sys,
       fileExists: (inputPath) => {
-        return getReadPaths(inputPath).reduce<boolean>(
-          (result, path) => result || sys.fileExists(path),
-          false,
-        );
+        for (const path of getReadPaths(inputPath)) {
+          if (sys.fileExists(path)) return true;
+        }
+        return false;
       },
       readFile: (inputPath, encoding) => {
-        return (
-          getReadPaths(inputPath).reduce<string | undefined | null>(
-            (result, path) => result ?? sys.readFile(path, encoding),
-            null,
-          ) ?? undefined
-        );
+        for (const path of getReadPaths(inputPath)) {
+          const result = sys.readFile(path, encoding);
+          if (result !== undefined && result !== null) return result;
+        }
+        return undefined;
       },
       writeFile: (path, data, writeByteOrderMark) => {
         const newPath = this.rewritePath(path);

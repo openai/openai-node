@@ -27,47 +27,37 @@ export type JsonSchema7ObjectType = {
 };
 
 export function parseObjectDef(def: ZodObjectDef, refs: Refs) {
+  const properties: Record<string, JsonSchema7Type> = {};
+  const required: string[] = [];
+  for (const [propName, propDef] of Object.entries(def.shape())) {
+    if (propDef === undefined || propDef._def === undefined) continue;
+    const propertyPath = [...refs.currentPath, 'properties', propName];
+    const parsedDef = parseDef(propDef._def, {
+      ...refs,
+      currentPath: propertyPath,
+      propertyPath,
+    });
+    if (parsedDef === undefined) continue;
+    if (
+      refs.openaiStrictMode &&
+      propDef.isOptional() &&
+      !propDef.isNullable() &&
+      typeof propDef._def?.defaultValue === 'undefined'
+    ) {
+      throw new Error(
+        `Zod field at \`${propertyPath.join(
+          '/',
+        )}\` uses \`.optional()\` without \`.nullable()\` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required`,
+      );
+    }
+    properties[propName] = parsedDef;
+    if (!propDef.isOptional() || refs.openaiStrictMode) required.push(propName);
+  }
+
   const result: JsonSchema7ObjectType = {
     type: 'object',
-    ...Object.entries(def.shape()).reduce(
-      (
-        acc: {
-          properties: Record<string, JsonSchema7Type>;
-          required: string[];
-        },
-        [propName, propDef],
-      ) => {
-        if (propDef === undefined || propDef._def === undefined) return acc;
-        const propertyPath = [...refs.currentPath, 'properties', propName];
-        const parsedDef = parseDef(propDef._def, {
-          ...refs,
-          currentPath: propertyPath,
-          propertyPath,
-        });
-        if (parsedDef === undefined) return acc;
-        if (
-          refs.openaiStrictMode &&
-          propDef.isOptional() &&
-          !propDef.isNullable() &&
-          typeof propDef._def?.defaultValue === 'undefined'
-        ) {
-          throw new Error(
-            `Zod field at \`${propertyPath.join(
-              '/',
-            )}\` uses \`.optional()\` without \`.nullable()\` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required`,
-          );
-        }
-        return {
-          properties: {
-            ...acc.properties,
-            [propName]: parsedDef,
-          },
-          required:
-            propDef.isOptional() && !refs.openaiStrictMode ? acc.required : [...acc.required, propName],
-        };
-      },
-      { properties: {}, required: [] },
-    ),
+    properties,
+    required,
     additionalProperties: decideAdditionalProperties(def, refs),
   };
   if (!result.required!.length) delete result.required;
