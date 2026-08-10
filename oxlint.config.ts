@@ -19,7 +19,6 @@ const compatibilityRules = [
   'import/no-cycle',
   'jsdoc/no-defaults',
   'jsdoc/require-param-description',
-  'max-classes-per-file',
   'no-await-in-loop',
   'no-bitwise',
   'no-empty-function',
@@ -168,6 +167,29 @@ module.exports = defineConfig({
       ],
       rules: {
         'unicorn/prefer-event-target': 'off',
+      },
+    },
+    {
+      // These files intentionally colocate one closely related class pair.
+      files: [
+        'src/_vendor/partial-json-parser/parser.ts',
+        'src/beta/realtime/internal-base.ts',
+        'src/core/EventEmitter.ts',
+        'src/core/streaming.ts',
+        'src/realtime/internal-base.ts',
+        'tests/internal/websocket-adapters.test.ts',
+        'tests/lib/ChatCompletionRunFunctions.test.ts',
+        'tests/lib/responsesWebSocket.test.ts',
+      ],
+      rules: {
+        'max-classes-per-file': ['error', { max: 2 }],
+      },
+    },
+    {
+      // Path validation deliberately creates anonymous class-expression fixtures.
+      files: ['tests/path.test.ts'],
+      rules: {
+        'max-classes-per-file': ['error', { ignoreExpressions: true }],
       },
     },
     {
