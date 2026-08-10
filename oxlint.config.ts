@@ -17,7 +17,6 @@ const compatibilityRules = [
   'no-eq-null',
   'no-inline-comments',
   'no-plusplus',
-  'no-shadow',
   'no-unused-vars',
   'no-use-before-define',
   'no-var',
@@ -383,6 +382,39 @@ module.exports = defineConfig({
       ],
       rules: {
         'unicorn/prefer-module': 'off',
+      },
+    },
+    {
+      // These vendored, fixture, and callback-heavy files intentionally reuse local
+      // protocol names; renaming them would obscure the behavior under test.
+      files: [
+        'ecosystem-tests/browser-direct-import/src/test.ts',
+        'ecosystem-tests/bun/openai.test.ts',
+        'ecosystem-tests/cli.ts',
+        'ecosystem-tests/node-ts-cjs/tests/test-node.ts',
+        'ecosystem-tests/ts-browser-webpack/src/test.ts',
+        'ecosystem-tests/vercel-edge/src/pages/api/edge-test.ts',
+        'ecosystem-tests/vercel-edge/src/pages/api/node-test.ts',
+        'examples/assistants/assistant-stream.ts',
+        'examples/audio/audio.ts',
+        'examples/mtls/deno.mjs',
+        'scripts/_vendor/tsc-multi/src/transformer.ts',
+        'src/_vendor/zod-to-json-schema/zodToJsonSchema.ts',
+        'src/auth/workload-identity-auth.ts',
+        'src/helpers/zod.ts',
+        'src/lib/AbstractChatCompletionRunner.ts',
+        'src/lib/ChatCompletionStream.ts',
+        'src/lib/ResponsesParser.ts',
+        'src/lib/parser.ts',
+        'src/lib/responses/ResponseStream.ts',
+        'tests/lib/ChatCompletionRunFunctions.test.ts',
+        'tests/lib/azure.test.ts',
+        'tests/realtime.test.ts',
+        'tests/responses.test.ts',
+        'tests/test-script.test.ts',
+      ],
+      rules: {
+        'no-shadow': 'off',
       },
     },
     {
