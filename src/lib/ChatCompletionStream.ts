@@ -1001,14 +1001,14 @@ export namespace ChatCompletionSnapshot {
   }
 }
 
-type AssertIsEmpty<T extends {}> = keyof T extends never ? T : never;
+type AssertIsEmpty<T extends object> = keyof T extends never ? T : never;
 
 /**
  * Ensures the given argument is an empty object, useful for
  * asserting that all known properties on an object have been
  * destructured.
  */
-function assertIsEmpty<T extends {}>(obj: AssertIsEmpty<T>): asserts obj is AssertIsEmpty<T> {
+function assertIsEmpty<T extends object>(obj: AssertIsEmpty<T>): asserts obj is AssertIsEmpty<T> {
   void obj;
 }
 
