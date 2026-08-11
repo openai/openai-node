@@ -13,7 +13,6 @@ const compatibilityRules = [
   'import/consistent-type-specifier-style',
   'import/no-cycle',
   'no-await-in-loop',
-  'no-eq-null',
   'no-inline-comments',
   'no-plusplus',
   'no-unused-vars',
@@ -483,6 +482,31 @@ module.exports = defineConfig({
       ],
       rules: {
         'no-bitwise': 'off',
+      },
+    },
+    {
+      // These checks intentionally use JavaScript's paired null-or-undefined
+      // semantics; expanding them would duplicate expressions and risk evaluation changes.
+      files: [
+        'ecosystem-tests/browser-direct-import/src/test.ts',
+        'ecosystem-tests/ts-browser-webpack/src/test.ts',
+        'scripts/_vendor/tsc-multi/src/build.ts',
+        'src/core/streaming.ts',
+        'src/internal/bedrock.ts',
+        'src/internal/decoders/line.ts',
+        'src/internal/to-file.ts',
+        'src/internal/uploads.ts',
+        'src/internal/utils/path.ts',
+        'src/lib/AbstractChatCompletionRunner.ts',
+        'src/lib/AssistantStream.ts',
+        'src/lib/ChatCompletionStream.ts',
+        'src/lib/ResponsesParser.ts',
+        'src/lib/chatCompletionUtils.ts',
+        'src/lib/responses/ResponseAccumulator.ts',
+        'src/lib/responses/ResponseStream.ts',
+      ],
+      rules: {
+        'no-eq-null': 'off',
       },
     },
     {
