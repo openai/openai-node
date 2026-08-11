@@ -1,7 +1,10 @@
 import { OpenAIError } from '../../core/error';
 
 /**
- * Percent-encode everything that isn't safe to have in a path without encoding safe chars.
+ * Percent-encodes a single URI path parameter while preserving RFC 3986 path characters.
+ *
+ * Slash, question-mark, and hash characters are encoded so an interpolated value
+ * cannot create another path segment, query string, or fragment.
  *
  * Taken from https://datatracker.ietf.org/doc/html/rfc3986#section-3.3:
  * > unreserved  = ALPHA / DIGIT / "-" / "." / "_" / "~"
@@ -14,6 +17,13 @@ export function encodeURIPath(str: string) {
 
 const EMPTY = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.create(null));
 
+/**
+ * Creates a template tag that safely interpolates SDK resource paths.
+ *
+ * Path values use the supplied encoder; values after a literal `?` or `#` use
+ * `encodeURIComponent`. Nullish values, ordinary objects, and literal or
+ * percent-encoded `.`/`..` path segments are rejected with an SDK error.
+ */
 export const createPathTagFunction = (pathEncoder = encodeURIPath) =>
   function path(statics: readonly string[], ...params: readonly unknown[]): string {
     // If there are no params, no processing is needed.
@@ -90,6 +100,8 @@ export const createPathTagFunction = (pathEncoder = encodeURIPath) =>
   };
 
 /**
- * URI-encodes path params and ensures no unsafe /./ or /../ path segments are introduced.
+ * Template tag that encodes resource-path parameters and rejects traversal segments.
+ *
+ * Values inside query strings and fragments are encoded as URI components.
  */
 export const path = /* @__PURE__ */ createPathTagFunction(encodeURIPath);

@@ -152,6 +152,12 @@ checked. Existing handwritten patterns are explicitly
 exempted from incompatible Ultracite rules, while the remaining preset rules stay
 enabled.
 
+Handwritten SDK exports, their public class members, configuration fields, and
+event payload properties must have accurate JSDoc so that their behavior is
+available through editor hover. Describe meaningful defaults, prerequisites,
+failure modes, and lifecycle semantics rather than repeating TypeScript types.
+Generated SDK files and vendored dependencies are excluded.
+
 To check formatting and lint rules:
 
 ```sh

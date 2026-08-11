@@ -269,6 +269,18 @@ describe('AssistantStream snapshots and message lifecycle', () => {
     },
   );
 
+  test('emits the finalized run exactly once', async () => {
+    const finalRun = completedRun();
+    const runner = assistantStream([finalRun]);
+    const listener = vi.fn();
+
+    runner.on('run', listener);
+
+    await runner.done();
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(listener).toHaveBeenCalledWith(finalRun.data);
+  });
   test('accumulates message content and exposes current and final snapshots', async () => {
     const initialMessage = { id: 'msg_123', role: 'assistant', status: 'in_progress', content: [] };
     const finalMessage = {

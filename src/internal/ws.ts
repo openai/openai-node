@@ -38,7 +38,22 @@ export type ReconnectingOverrides<Parameters = Record<string, unknown>> =
  */
 export type RawWebSocketData = string | ArrayBufferLike | ArrayBufferView | ArrayBufferView[];
 
-export type UnsentMessage<T> = { type: 'message'; message: T } | { type: 'raw'; data: RawWebSocketData };
+/** A queued application message or raw WebSocket frame that was never transmitted. */
+export type UnsentMessage<T> =
+  | {
+      /** Identifies a JSON-serialized application message. */
+      type: 'message';
+
+      /** The deserialized snapshot captured when the message was queued. */
+      message: T;
+    }
+  | {
+      /** Identifies an unencoded WebSocket frame. */
+      type: 'raw';
+
+      /** The string or copied binary payload captured when the frame was queued. */
+      data: RawWebSocketData;
+    };
 
 type QueueEntry =
   | { kind: 'json'; data: string; byteLength: number }
@@ -92,23 +107,28 @@ function rawByteLength(data: RawWebSocketData): number {
 }
 
 /**
- * A bounded queue for outgoing WebSocket messages. JSON messages are
- * serialized on enqueue; raw messages are stored as-is. The queue enforces
- * a configurable byte-size limit and can return the original messages via
- * {@link drain} when the connection permanently closes.
+ * Buffers outgoing WebSocket messages while a connection is unavailable.
+ *
+ * JSON values are serialized immediately, and raw binary payloads are copied,
+ * so later caller mutations cannot change queued messages. A single oversized
+ * message is accepted when the queue is empty; further messages are rejected
+ * whenever they would exceed the configured byte budget.
  */
 export class SendQueue<T = unknown> {
   private _queue: QueueEntry[] = [];
   private _bytes = 0;
   private _maxBytes: number;
 
+  /** Creates a queue with a one-mebibyte default byte budget. */
   constructor(maxBytes = 1_048_576) {
     this._maxBytes = maxBytes;
   }
 
   /**
-   * Serialize and enqueue a JSON message. Returns `true` if the message was
-   * accepted, `false` if it would exceed the byte-size limit.
+   * Serializes and snapshots a JSON message before queueing it.
+   *
+   * @returns `true` when accepted, including an oversized first message; `false`
+   * when adding it to a nonempty queue would exceed the byte budget.
    */
   enqueue(event: T): boolean {
     const data = JSON.stringify(event);
@@ -122,8 +142,11 @@ export class SendQueue<T = unknown> {
   }
 
   /**
-   * Enqueue raw data without serialization. Returns `true` if the data was
-   * accepted, `false` if it would exceed the byte-size limit.
+   * Queues a raw string or a defensive copy of a binary WebSocket payload.
+   * Fragmented typed-array payloads are flattened before storage.
+   *
+   * @returns `true` when accepted, including an oversized first frame; `false`
+   * when adding it to a nonempty queue would exceed the byte budget.
    */
   enqueueRaw(data: RawWebSocketData): boolean {
     const snapshot = snapshotRawData(data);
@@ -173,7 +196,13 @@ export class SendQueue<T = unknown> {
   }
 }
 
-// RFC 6455 §7.4.1
+/**
+ * Reports whether an RFC 6455 close code represents a recoverable interruption.
+ *
+ * Network failures, service restarts, temporary server errors, and TLS
+ * handshake failures can be retried; normal closure, protocol violations,
+ * invalid payloads, and unrecognized codes cannot.
+ */
 export function isRecoverableClose(code: number): boolean {
   switch (code) {
     case 1000: {

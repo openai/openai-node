@@ -100,13 +100,17 @@ function toRequestMessage(message: ChatCompletionMessageParam): ChatCompletionMe
   return requestMessage;
 }
 
+/** Mutable conversation state and cancellation controls available to runner callbacks. */
 export interface ChatCompletionRunnerContext {
+  /** The conversation so far; callbacks may append messages before the next request. */
   messages: ChatCompletionMessageParam[];
+  /** Cancels the active request and prevents the runner from continuing. */
   abort(): void;
 }
 
+/** Request and lifecycle options for chat completion tool-running helpers. */
 export interface RunnerOptions extends RequestOptions {
-  /** How many requests to make before canceling. Default 10. */
+  /** Maximum chat completion requests before the tool runner finishes; defaults to 10. */
   maxChatCompletions?: number;
   /**
    * A callback that runs after each chat completion and after any tool calls from
@@ -117,11 +121,13 @@ export interface RunnerOptions extends RequestOptions {
   afterCompletion?: (completion: ChatCompletion, runner: ChatCompletionRunnerContext) => void | Promise<void>;
 }
 
+/** Shared conversation, event, cancellation, and final-result behavior for chat completion runners. */
 export class AbstractChatCompletionRunner<
   EventTypes extends AbstractChatCompletionRunnerEvents,
   ParsedT,
 > extends EventStream<EventTypes> {
   protected _chatCompletions: ParsedChatCompletion<ParsedT>[] = [];
+  /** Mutable conversation history, including initial input, assistant replies, and tool results. */
   messages: ChatCompletionMessageParam[] = [];
 
   protected _addChatCompletion(
@@ -233,8 +239,8 @@ export class AbstractChatCompletionRunner<
   }
 
   /**
-   * @returns a promise that resolves with the content of the final FunctionCall, or rejects
-   * if an error occurred or the stream ended prematurely without producing a ChatCompletionMessage.
+   * Waits for completion and returns the last function-tool call, or `undefined`
+   * when no assistant message contains a function-tool call.
    */
   async finalFunctionToolCall(): Promise<ChatCompletionMessageFunctionToolCall.Function | undefined> {
     await this.done();
@@ -261,6 +267,7 @@ export class AbstractChatCompletionRunner<
     return undefined;
   }
 
+  /** Waits for completion and returns the last matching function-tool result, if any. */
   async finalFunctionToolCallResult(): Promise<string | undefined> {
     await this.done();
     return this.#getFinalFunctionToolCallResult();
@@ -282,11 +289,13 @@ export class AbstractChatCompletionRunner<
     return total;
   }
 
+  /** Waits for completion and sums token usage across every chat completion in the run. */
   async totalUsage(): Promise<CompletionUsage> {
     await this.done();
     return this.#calculateTotalUsage();
   }
 
+  /** Returns a copy of the chat completions received so far, in request order. */
   allChatCompletions(): ChatCompletion[] {
     return [...this._chatCompletions];
   }
@@ -542,15 +551,26 @@ export class AbstractChatCompletionRunner<
   }
 }
 
+/** Conversation and final-result events shared by chat completion runners. */
 export interface AbstractChatCompletionRunnerEvents extends BaseEvents {
+  /** Called for each function-tool call produced by an assistant message. */
   functionToolCall: (functionCall: ChatCompletionMessageFunctionToolCall.Function) => void;
+  /** Called when an assistant reply or tool-result message is appended to the conversation. */
   message: (message: ChatCompletionMessageParam) => void;
+  /** Called whenever a complete chat completion is received. */
   chatCompletion: (completion: ChatCompletion) => void;
+  /** Called at successful completion when the final assistant message contains nonempty text. */
   finalContent: (contentSnapshot: string) => void;
+  /** Called at successful completion with the final assistant message. */
   finalMessage: (message: ChatCompletionMessageParam) => void;
+  /** Called at successful completion with the last chat completion received. */
   finalChatCompletion: (completion: ChatCompletion) => void;
+  /** Called at successful completion when the conversation contains a function-tool call. */
   finalFunctionToolCall: (functionCall: ChatCompletionMessageFunctionToolCall.Function) => void;
+  /** Called when a function-tool result message with nonempty content is appended. */
   functionToolCallResult: (content: string) => void;
+  /** Called at successful completion when a matching function-tool result exists. */
   finalFunctionToolCallResult: (content: string) => void;
+  /** Called at successful completion when at least one response includes token usage. */
   totalUsage: (usage: CompletionUsage) => void;
 }

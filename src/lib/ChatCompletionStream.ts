@@ -34,93 +34,145 @@ import { Stream } from '../streaming';
 import { AbstractChatCompletionRunner } from './AbstractChatCompletionRunner';
 import type { AbstractChatCompletionRunnerEvents } from './AbstractChatCompletionRunner';
 
+/** An incremental assistant-text event and its accumulated state. */
 export interface ContentDeltaEvent {
+  /** The new text received in this chunk. */
   delta: string;
+  /** All assistant text received for this choice, including `delta`. */
   snapshot: string;
+  /** The partially parsed structured output when an auto-parseable response format is supplied. */
   parsed: unknown | null;
 }
 
+/** The completed assistant-text content and its fully parsed structured value. */
 export interface ContentDoneEvent<ParsedT = null> {
+  /** The complete assistant text for the finished choice. */
   content: string;
+  /** The fully parsed structured output, or `null` when no parser was supplied. */
   parsed: ParsedT | null;
 }
 
+/** An incremental refusal-text event and its accumulated state. */
 export interface RefusalDeltaEvent {
+  /** The new refusal text received in this chunk. */
   delta: string;
+  /** All refusal text received for this choice, including `delta`. */
   snapshot: string;
 }
 
+/** The complete refusal text emitted when the refusal finishes. */
 export interface RefusalDoneEvent {
+  /** The model's complete refusal message. */
   refusal: string;
 }
 
+/** An incremental function-tool argument event and its accumulated JSON state. */
 export interface FunctionToolCallArgumentsDeltaEvent {
+  /** The name of the function being called. */
   name: string;
 
+  /** The position of this tool call within the assistant message. */
   index: number;
 
+  /** The complete argument JSON received so far, including `arguments_delta`. */
   arguments: string;
 
+  /** The partially parsed arguments when the matching tool supports parsing. */
   parsed_arguments: unknown;
 
+  /** The new argument JSON fragment received in this chunk. */
   arguments_delta: string;
 }
 
+/** The final raw and parsed arguments for a completed function-tool call. */
 export interface FunctionToolCallArgumentsDoneEvent {
+  /** The name of the function being called. */
   name: string;
 
+  /** The position of this tool call within the assistant message. */
   index: number;
 
+  /** The complete JSON argument string produced for the tool call. */
   arguments: string;
 
+  /** The fully parsed arguments when the matching tool supports parsing. */
   parsed_arguments: unknown;
 }
 
+/** Newly received assistant-content token probabilities and their accumulated snapshot. */
 export interface LogProbsContentDeltaEvent {
+  /** Token probabilities received in the current chunk. */
   content: ChatCompletionTokenLogprob[];
+  /** All assistant-content token probabilities received for this choice. */
   snapshot: ChatCompletionTokenLogprob[];
 }
 
+/** The complete assistant-content token probabilities for a finished choice. */
 export interface LogProbsContentDoneEvent {
+  /** Every assistant-content token probability produced for this choice. */
   content: ChatCompletionTokenLogprob[];
 }
 
+/** Newly received refusal-token probabilities and their accumulated snapshot. */
 export interface LogProbsRefusalDeltaEvent {
+  /** Refusal-token probabilities received in the current chunk. */
   refusal: ChatCompletionTokenLogprob[];
+  /** All refusal-token probabilities received for this choice. */
   snapshot: ChatCompletionTokenLogprob[];
 }
 
+/** The complete refusal-token probabilities for a finished choice. */
 export interface LogProbsRefusalDoneEvent {
+  /** Every refusal-token probability produced for this choice. */
   refusal: ChatCompletionTokenLogprob[];
 }
 
+/** Event listeners supported by a streamed Chat Completions helper. */
 export interface ChatCompletionStreamEvents<ParsedT = null> extends AbstractChatCompletionRunnerEvents {
+  /** Called with each new text fragment and the complete text accumulated so far. */
   content: (contentDelta: string, contentSnapshot: string) => void;
+  /** Called with each raw API chunk and its accumulated chat-completion snapshot. */
   chunk: (chunk: ChatCompletionChunk, snapshot: ChatCompletionSnapshot) => void;
 
+  /** Called when assistant text arrives, including any partially parsed output. */
   'content.delta': (props: ContentDeltaEvent) => void;
+  /** Called once the assistant text is complete and can be fully parsed. */
   'content.done': (props: ContentDoneEvent<ParsedT>) => void;
 
+  /** Called when another fragment of a model refusal arrives. */
   'refusal.delta': (props: RefusalDeltaEvent) => void;
+  /** Called once the model's complete refusal is available. */
   'refusal.done': (props: RefusalDoneEvent) => void;
 
+  /** Called when another JSON argument fragment arrives for a function tool. */
   'tool_calls.function.arguments.delta': (props: FunctionToolCallArgumentsDeltaEvent) => void;
+  /** Called once a function tool's complete arguments are available. */
   'tool_calls.function.arguments.done': (props: FunctionToolCallArgumentsDoneEvent) => void;
 
+  /** Called when assistant-content token probabilities arrive. */
   'logprobs.content.delta': (props: LogProbsContentDeltaEvent) => void;
+  /** Called once all assistant-content token probabilities are available. */
   'logprobs.content.done': (props: LogProbsContentDoneEvent) => void;
 
+  /** Called when refusal-token probabilities arrive. */
   'logprobs.refusal.delta': (props: LogProbsRefusalDeltaEvent) => void;
+  /** Called once all refusal-token probabilities are available. */
   'logprobs.refusal.done': (props: LogProbsRefusalDoneEvent) => void;
 }
 
+/** Chat completion request parameters accepted by the streaming convenience helper. */
 export type ChatCompletionStreamParams = Omit<ChatCompletionCreateParamsBase, 'stream'> & {
+  /** Streaming is always enabled by the helper and may be specified explicitly. */
   stream?: true;
 };
 
+/** A conversation message embedded in a serialized chat completion stream. */
 type ChatCompletionReadableStreamMessage = {
+  /** Identifies this readable-stream item as a serialized conversation message. */
   type: 'message';
+  /** The conversation message to restore while replaying the serialized stream. */
   message: ChatCompletionMessageParam;
+  /** Tool-call identifiers to restore on the preceding assistant completion. */
   tool_call_ids?: string[];
 };
 
@@ -128,16 +180,21 @@ type ChatCompletionReadableStreamMessage = {
 // overwrites `object`, so the encoded payload does not leak into completions.
 const CHAT_COMPLETION_READABLE_STREAM_MESSAGE_PREFIX = 'chat.completion.chunk.message:';
 
+/** A serialized conversation message disguised as a backwards-compatible empty completion chunk. */
 type ChatCompletionReadableStreamMessageChunk = Pick<ChatCompletionChunk, 'id' | 'created' | 'model'> & {
+  /** Empty choices keep the encoded message compatible with older completion-stream readers. */
   choices: [];
+  /** Reserved object prefix followed by the JSON-encoded conversation-message payload. */
   object: `${typeof CHAT_COMPLETION_READABLE_STREAM_MESSAGE_PREFIX}${string}`;
 };
 
+/** A raw completion chunk or serialized message preserved in a transportable stream. */
 export type ChatCompletionReadableStreamItem =
   | ChatCompletionChunk
   | ChatCompletionReadableStreamMessage
   | ChatCompletionReadableStreamMessageChunk;
 
+/** Encodes a tool-result message as a backwards-compatible, empty completion chunk. */
 export function makeChatCompletionReadableStreamMessageChunk(
   chunk: ChatCompletionChunk,
   message: ChatCompletionMessageParam,
@@ -190,6 +247,7 @@ interface ChoiceEventState {
   done_tool_calls: Set<number>;
 }
 
+/** Streams chat completion chunks while accumulating snapshots, parsed output, and events. */
 export class ChatCompletionStream<ParsedT = null>
   extends AbstractChatCompletionRunner<ChatCompletionStreamEvents<ParsedT>, ParsedT>
   implements AsyncIterable<ChatCompletionChunk>
@@ -199,6 +257,7 @@ export class ChatCompletionStream<ParsedT = null>
   #choiceEventStates: ChoiceEventState[];
   #currentChatCompletionSnapshot: ChatCompletionSnapshot | undefined;
 
+  /** Creates an unstarted stream, retaining request parameters for structured-output parsing. */
   constructor(params: ChatCompletionCreateParams | null) {
     super();
     this.#params = params;
@@ -206,6 +265,7 @@ export class ChatCompletionStream<ParsedT = null>
     this.#choiceEventStates = [];
   }
 
+  /** The latest accumulated completion, or `undefined` before a chunk arrives or after finalization. */
   get currentChatCompletionSnapshot(): ChatCompletionSnapshot | undefined {
     return this.#currentChatCompletionSnapshot;
   }
@@ -214,8 +274,8 @@ export class ChatCompletionStream<ParsedT = null>
    * Intended for use on the frontend, consuming a stream produced with
    * `.toReadableStream()` on the backend.
    *
-   * Note that messages sent to the model do not appear in `.on('message')`
-   * in this context.
+   * Original input messages are not included in the serialized stream. Tool-result
+   * messages explicitly serialized by a streaming tool runner are replayed.
    */
   static fromReadableStream(stream: ReadableStream): ChatCompletionStream<null> {
     const runner = new ChatCompletionStream(null);
@@ -223,6 +283,7 @@ export class ChatCompletionStream<ParsedT = null>
     return runner;
   }
 
+  /** Starts a streaming chat completion request and returns its event-driven helper. */
   static createChatCompletion<ParsedT>(
     client: OpenAI,
     params: ChatCompletionStreamParams,
@@ -693,6 +754,7 @@ export class ChatCompletionStream<ParsedT = null>
     return snapshot;
   }
 
+  /** Iterates over raw API chunks; stopping iteration early aborts the underlying request. */
   [Symbol.asyncIterator](this: ChatCompletionStream<ParsedT>): AsyncIterator<ChatCompletionChunk> {
     const pushQueue: ChatCompletionChunk[] = [];
     const readQueue: {
@@ -754,6 +816,7 @@ export class ChatCompletionStream<ParsedT = null>
     };
   }
 
+  /** Serializes raw completion chunks into a readable stream for transfer to another runtime. */
   toReadableStream(): ReadableStream {
     const stream = new Stream(this[Symbol.asyncIterator].bind(this), this.controller);
     return stream.toReadableStream();
@@ -879,8 +942,8 @@ function str(x: unknown) {
 }
 
 /**
- * Represents a streamed chunk of a chat completion response returned by model,
- * based on the provided input.
+ * The chat completion accumulated from every streamed chunk received so far.
+ * Fields within each choice can remain incomplete until generation finishes.
  */
 export interface ChatCompletionSnapshot {
   /**
@@ -900,7 +963,7 @@ export interface ChatCompletionSnapshot {
   created: number;
 
   /**
-   * The model to generate the completion.
+   * The model generating the completion.
    */
   model: string;
 
@@ -917,10 +980,12 @@ export interface ChatCompletionSnapshot {
   system_fingerprint?: string;
 }
 
+/** Nested shapes used by an in-progress chat completion snapshot. */
 export namespace ChatCompletionSnapshot {
+  /** One in-progress assistant choice and the metadata accumulated for it. */
   export interface Choice {
     /**
-     * A chat completion delta generated by streamed model responses.
+     * The assistant message accumulated from streamed model response deltas.
      */
     message: Choice.Message;
 
@@ -928,8 +993,8 @@ export namespace ChatCompletionSnapshot {
      * The reason the model stopped generating tokens. This will be `stop` if the model
      * hit a natural stop point or a provided stop sequence, `length` if the maximum
      * number of tokens specified in the request was reached, `content_filter` if
-     * content was omitted due to a flag from our content filters, or `function_call`
-     * if the model called a function.
+     * content was omitted due to a flag from our content filters, `tool_calls` if
+     * the model called a tool, or the deprecated `function_call` value.
      */
     finish_reason: ChatCompletion.Choice['finish_reason'] | null;
 
@@ -944,20 +1009,24 @@ export namespace ChatCompletionSnapshot {
     index: number;
   }
 
+  /** Nested message shapes belonging to an in-progress completion choice. */
   export namespace Choice {
     /**
-     * A chat completion delta generated by streamed model responses.
+     * The assistant message accumulated from streamed response deltas.
      */
     export interface Message {
       /**
-       * The contents of the chunk message.
+       * The assistant text accumulated for this message so far.
        */
       content?: string | null;
 
+      /** Audio fields received so far; individual fields can remain absent until generation finishes. */
       audio?: Partial<ChatCompletionAudio> | null;
 
+      /** The model's refusal text accumulated so far, when the request is refused. */
       refusal?: string | null;
 
+      /** A best-effort partial parse of structured assistant content. */
       parsed?: unknown | null;
 
       /**
@@ -966,6 +1035,7 @@ export namespace ChatCompletionSnapshot {
        */
       function_call?: Message.FunctionCall;
 
+      /** Function-tool calls accumulated so far; arguments may still contain incomplete JSON. */
       tool_calls?: Message.ToolCall[];
 
       /**
@@ -974,13 +1044,16 @@ export namespace ChatCompletionSnapshot {
       role?: ChatCompletionRole;
     }
 
+    /** Nested function-call shapes belonging to an in-progress assistant message. */
     export namespace Message {
+      /** A function-tool call whose name, identifier, and arguments are streamed incrementally. */
       export interface ToolCall {
         /**
          * The ID of the tool call.
          */
         id: string;
 
+        /** The function name and the complete or partial JSON arguments received so far. */
         function: ToolCall.Function;
 
         /**
@@ -989,7 +1062,9 @@ export namespace ChatCompletionSnapshot {
         type: 'function';
       }
 
+      /** Function details nested under an in-progress tool call. */
       export namespace ToolCall {
+        /** The name and incrementally accumulated arguments of a function-tool call. */
         export interface Function {
           /**
            * The arguments to call the function with, as generated by the model in JSON
@@ -999,6 +1074,7 @@ export namespace ChatCompletionSnapshot {
            */
           arguments: string;
 
+          /** A best-effort partial parse of `arguments` for strict or auto-parseable tools. */
           parsed_arguments?: unknown;
 
           /**

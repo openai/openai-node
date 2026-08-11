@@ -14,11 +14,15 @@ import type { AutoParseableTool } from '../lib/parser';
 import { Stream } from '../streaming';
 import { isAssistantMessage, isToolMessage } from './chatCompletionUtils';
 
+/** Conversation and chunk events emitted by a streaming chat completion tool runner. */
 export interface ChatCompletionStreamEvents extends AbstractChatCompletionRunnerEvents {
+  /** Called with each assistant-text fragment and the text accumulated so far. */
   content: (contentDelta: string, contentSnapshot: string) => void;
+  /** Called with each raw API chunk and its accumulated completion snapshot. */
   chunk: (chunk: ChatCompletionChunk, snapshot: ChatCompletionSnapshot) => void;
 }
 
+/** Streaming chat completion request fields shared by all tool-runner overloads. */
 type ChatCompletionStreamingToolRunnerParamsBase = Omit<ChatCompletionCreateParamsStreaming, 'tools'>;
 
 /**
@@ -26,7 +30,9 @@ type ChatCompletionStreamingToolRunnerParamsBase = Omit<ChatCompletionCreatePara
  */
 export type ChatCompletionStreamingToolRunnerParamsWithoutContext<FunctionsArgs extends BaseFunctionsArgs> =
   ChatCompletionStreamingToolRunnerParamsBase & {
+    /** Runnable function tools or auto-parseable tools with an attached callback. */
     tools: RunnableTools<FunctionsArgs> | AutoParseableTool<any, true>[];
+    /** Context is unavailable for the no-context runner overload. */
     toolContext?: never;
   };
 
@@ -37,6 +43,7 @@ export type ChatCompletionStreamingToolRunnerParamsWithContext<
   FunctionsArgs extends BaseFunctionsArgs,
   ToolContext,
 > = ChatCompletionStreamingToolRunnerParamsBase & {
+  /** Runnable function tools or auto-parseable tools that receive `toolContext`. */
   tools: RunnableTools<FunctionsArgs, ToolContext> | AutoParseableTool<any, true>[];
   /**
    * Context to pass to each tool callback during this run.
@@ -55,16 +62,19 @@ export type ChatCompletionStreamingToolRunnerParams<
   ? ChatCompletionStreamingToolRunnerParamsWithoutContext<FunctionsArgs>
   : ChatCompletionStreamingToolRunnerParamsWithContext<FunctionsArgs, ToolContext>;
 
+/** Executes function tools while streaming every intermediate chat completion. */
 export class ChatCompletionStreamingRunner<ParsedT = null>
   extends ChatCompletionStream<ParsedT>
   implements AsyncIterable<ChatCompletionChunk>
 {
+  /** Restores a serialized tool run, including intermediate completions and tool-result messages. */
   static override fromReadableStream(stream: ReadableStream): ChatCompletionStreamingRunner<null> {
     const runner = new ChatCompletionStreamingRunner(null);
     runner._run(() => runner._fromReadableStream(stream));
     return runner;
   }
 
+  /** Serializes completion chunks and tool-result messages for replay in another runtime. */
   override toReadableStream(): ReadableStream {
     const pushQueue: ChatCompletionReadableStreamItem[] = [];
     const readQueue: {
@@ -152,17 +162,20 @@ export class ChatCompletionStreamingRunner<ParsedT = null>
     return stream.toReadableStream();
   }
 
+  /** Runs streaming function tools, passing the supplied context to each callback. */
   static runTools<T extends (string | object)[], ParsedT = null, ToolContext = unknown>(
     client: OpenAI,
     params: ChatCompletionStreamingToolRunnerParamsWithContext<T, ToolContext>,
     options?: RunnerOptions,
   ): ChatCompletionStreamingRunner<ParsedT>;
 
+  /** Runs streaming function tools until the model produces a final assistant message. */
   static runTools<T extends (string | object)[], ParsedT = null>(
     client: OpenAI,
     params: ChatCompletionStreamingToolRunnerParamsWithoutContext<T>,
     options?: RunnerOptions,
   ): ChatCompletionStreamingRunner<ParsedT>;
+  /** Starts a streaming tool loop and returns its event-driven conversation runner. */
   static runTools<T extends (string | object)[], ParsedT = null, ToolContext = unknown>(
     client: OpenAI,
     params:

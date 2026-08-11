@@ -23,8 +23,9 @@ export interface AzureClientOptions extends Omit<ClientOptions, 'provider'> {
   endpoint?: string | undefined;
 
   /**
-   * A model deployment, if given, sets the base client URL to include `/deployments/{deployment}`.
-   * Note: this means you won't be able to use non-deployment endpoints. Not supported with Assistants APIs.
+   * Azure model deployment inserted into supported deployment-scoped request
+   * paths. The client's base URL remains unchanged, so non-deployment endpoints
+   * remain available.
    */
   deployment?: string | undefined;
 
@@ -42,7 +43,9 @@ export interface AzureClientOptions extends Omit<ClientOptions, 'provider'> {
 
 /** API Client for interfacing with the Azure OpenAI API. */
 export class AzureOpenAI extends OpenAI {
+  /** Azure deployment configured for deployment-scoped model requests. */
   deploymentName: string | undefined;
+  /** Azure OpenAI API version included in requests made by this client. */
   apiVersion = '';
 
   /**
@@ -51,11 +54,11 @@ export class AzureOpenAI extends OpenAI {
    * @param {string | undefined} [opts.apiVersion] - Defaults to `process.env['OPENAI_API_VERSION'] ?? undefined`.
    * @param {string | undefined} [opts.endpoint] - Your Azure endpoint, including the resource, e.g. `https://example-resource.azure.openai.com/`. Defaults to `process.env['AZURE_OPENAI_ENDPOINT'] ?? undefined`.
    * @param {string | undefined} [opts.apiKey] - Defaults to `process.env['AZURE_OPENAI_API_KEY'] ?? undefined`.
-   * @param {string | undefined} opts.deployment - A model deployment, if given, sets the base client URL to include `/deployments/{deployment}`.
+   * @param {string | undefined} opts.deployment - Azure model deployment inserted into supported deployment-scoped request paths.
    * @param {string | null | undefined} [opts.organization] - Defaults to `process.env['OPENAI_ORG_ID'] ?? null`.
    * @param {string} [opts.baseURL] - Sets the base URL for the API, e.g. `https://example-resource.azure.openai.com/openai/`. Defaults to `process.env['OPENAI_BASE_URL']`.
    * @param {number} [opts.timeout] - The maximum amount of time (in milliseconds) the client will wait for a response before timing out. Defaults to 10 minutes.
-   * @param {number} [opts.httpAgent] - An HTTP agent used to manage HTTP(s) connections.
+   * @param {() => Promise<string>} [opts.azureADTokenProvider] - Returns a fresh Microsoft Entra access token for each request; cannot be combined with `apiKey`.
    * @param {Fetch} [opts.fetch] - Specify a custom `fetch` function implementation.
    * @param {number} [opts.maxRetries] - The maximum number of times the client will retry a request. Defaults to `2`.
    * @param {Headers} opts.defaultHeaders - Default headers to include with every request to the API.
@@ -127,10 +130,24 @@ export class AzureOpenAI extends OpenAI {
     this.deploymentName = deployment;
   }
 
+  /** Builds an Azure request and inserts its deployment into model-scoped endpoint paths. */
   override async buildRequest(
     options: FinalRequestOptions,
-    props: { retryCount?: number } = {},
-  ): Promise<{ req: RequestInit & { headers: Headers }; url: string; timeout: number }> {
+    props: {
+      /** Number of retries already attempted for the current request. */
+      retryCount?: number;
+    } = {},
+  ): Promise<{
+    /** Fetch request options after authentication, headers, and the body are prepared. */
+    req: RequestInit & {
+      /** Fully resolved request headers sent to Azure OpenAI. */
+      headers: Headers;
+    };
+    /** Absolute deployment-aware request URL. */
+    url: string;
+    /** Request timeout in milliseconds. */
+    timeout: number;
+  }> {
     if (_deployments_endpoints.has(options.path) && options.method === 'post' && options.body !== undefined) {
       if (!isObj(options.body)) {
         throw new Error('Expected request body to be an object');

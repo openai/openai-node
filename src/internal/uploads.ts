@@ -6,9 +6,21 @@ import { ReadableStreamFrom, ReadableStreamToAsyncIterable } from './shims';
 import type { ReadableStream } from './shim-types';
 import { encodeUTF8 } from './utils/bytes';
 
+/** Text, binary data, or a blob that can contribute bytes to an uploaded file. */
 export type BlobPart = string | ArrayBuffer | ArrayBufferView | Blob | DataView;
-type FsReadStream = AsyncIterable<Uint8Array> & { path: string | { toString(): string } };
 
+/** Node.js-compatible byte stream carrying the source path used to infer a filename. */
+type FsReadStream = AsyncIterable<Uint8Array> & {
+  /** Source filesystem path, represented as a string or path-like object. */
+  path:
+    | string
+    | {
+        /** Converts the path-like value into its filesystem path. */
+        toString(): string;
+      };
+};
+
+/** Asynchronous chunks consumed lazily while encoding a streaming multipart upload. */
 export type StreamingFileInput = AsyncIterable<BlobPart> | ReadableStream<BlobPart>;
 
 const brand_privateStreamingFile = /* @__PURE__ */ Symbol('brand.privateStreamingFile');
@@ -18,10 +30,16 @@ const brand_privateStreamingFile = /* @__PURE__ */ Symbol('brand.privateStreamin
  * Create one with {@link toStreamingFile} when buffering an upload into a `File` is undesirable.
  */
 export interface StreamingFile {
-  /** Brand check, prevent users from creating a StreamingFile without a filename. */
+  /** Ensures streaming files are created with a filename through {@link toStreamingFile}. */
   readonly [brand_privateStreamingFile]: true;
+
+  /** Source chunks read incrementally as the multipart request body is transmitted. */
   readonly data: StreamingFileInput;
+
+  /** Filename sent in the multipart part's `Content-Disposition` header. */
   readonly name: string;
+
+  /** Optional MIME type; defaults to `application/octet-stream` when omitted. */
   readonly type?: string | undefined;
 }
 
@@ -31,6 +49,11 @@ export interface StreamingFile {
  * Unlike {@link toFile}, this helper does not create a web `File`, because the `File` constructor
  * must consume all of its contents up front. The stream is instead encoded lazily as multipart
  * form data when the request is sent.
+ *
+ * @param data Async-iterable or readable-stream chunks containing text, binary data, or blobs.
+ * @param name Non-empty filename sent in the multipart request.
+ * @param options Optional MIME type for the streaming file.
+ * @throws {TypeError} If `name` is empty.
  */
 export function toStreamingFile(
   data: StreamingFileInput,
@@ -49,13 +72,28 @@ export function toStreamingFile(
   };
 }
 
-// https://github.com/oven-sh/bun/issues/5980
+/**
+ * Bun file compatibility shape for file objects whose names are optional in their types.
+ *
+ * @see https://github.com/oven-sh/bun/issues/5980
+ */
 interface BunFile extends Blob {
+  /** Filename exposed by Bun when one is available. */
   readonly name?: string | undefined;
 }
 
-type NamedBlob = Blob & { readonly name?: string | undefined };
+/** Blob-compatible upload value that exposes a filename at runtime. */
+type NamedBlob = Blob & {
+  /** Filename supplied by a native `File` or another named Blob implementation. */
+  readonly name?: string | undefined;
+};
 
+/**
+ * Verifies that the current runtime exposes the global `File` constructor.
+ *
+ * @throws {Error} If `File` is unavailable; older Node.js runtimes receive an
+ * additional upgrade or `node:buffer` compatibility suggestion.
+ */
 export const checkFileSupport = () => {
   if (typeof File === 'undefined') {
     const { process } = globalThis as any;
@@ -72,13 +110,12 @@ export const checkFileSupport = () => {
 };
 
 /**
- * Typically, this is a native "File" class.
+ * Values accepted by SDK methods that upload multipart files.
  *
- * We provide the {@link toFile} utility to convert a variety of objects
- * into the File class.
- *
- * For convenience, you can also pass a fetch Response, or in Node,
- * the result of fs.createReadStream().
+ * Supports native files, fetch responses, named blobs, Node.js filesystem read
+ * streams, async byte sources, web readable streams, and files created with
+ * {@link toStreamingFile}. Use {@link toFile} to materialize compatible content
+ * as a native `File` when buffering the complete upload is acceptable.
  */
 export type Uploadable =
   | File
@@ -93,6 +130,8 @@ export type Uploadable =
 /**
  * Construct a `File` instance. This is used to ensure a helpful error is thrown
  * for environments that don't define a global `File` yet.
+ *
+ * A missing filename becomes `unknown_file`.
  */
 export function makeFile(
   fileBits: BlobPart[],
@@ -103,6 +142,11 @@ export function makeFile(
   return new File(fileBits as any, fileName ?? 'unknown_file', options);
 }
 
+/**
+ * Infers a filename from an object's `name`, `url`, `filename`, or `path` value.
+ *
+ * Directory components separated by either `/` or `\\` are discarded.
+ */
 export function getName(value: any): string | undefined {
   return (
     (
@@ -119,12 +163,17 @@ export function getName(value: any): string | undefined {
   );
 }
 
+/** Identifies objects that expose a callable `Symbol.asyncIterator` method. */
 export const isAsyncIterable = (value: any): value is AsyncIterable<any> =>
   value != null && typeof value === 'object' && typeof value[Symbol.asyncIterator] === 'function';
 
 /**
- * Returns a multipart/form-data request if any part of the given request body contains a File / Blob value.
- * Otherwise returns the request as is.
+ * Converts a request to multipart form data when its body contains an upload.
+ *
+ * Uploads include files, named blobs, responses, async iterables, readable
+ * streams, and {@link StreamingFile} values anywhere in a nested body. Bodies
+ * containing streaming values are encoded lazily; other uploads use `FormData`.
+ * Requests without uploads are returned unchanged.
  */
 export const maybeMultipartFormRequestOptions = async (
   opts: RequestOptions,
@@ -141,8 +190,18 @@ export const maybeMultipartFormRequestOptions = async (
   return { ...opts, body: await createForm(opts.body, fetch) };
 };
 
-type MultipartFormRequestOptions = Omit<RequestOptions, 'body'> & { body: unknown };
+/** Request options whose body must be encoded as multipart form data. */
+type MultipartFormRequestOptions = Omit<RequestOptions, 'body'> & {
+  /** Nested fields and upload values to encode into the multipart request body. */
+  body: unknown;
+};
 
+/**
+ * Encodes a request body as multipart form data even when no file is present.
+ *
+ * Streaming uploads produce a lazy multipart `ReadableStream` and an explicit
+ * boundary header; other values are materialized into platform `FormData`.
+ */
 export const multipartFormRequestOptions = async (
   opts: MultipartFormRequestOptions,
   fetch: OpenAI | Fetch,
@@ -192,6 +251,16 @@ function supportsFormData(fetchObject: OpenAI | Fetch): Promise<boolean> {
   return promise;
 }
 
+/**
+ * Materializes an object into platform `FormData` after verifying fetch support.
+ *
+ * Strings, numbers, and booleans become text fields; responses, named blobs,
+ * and async byte sources become file fields. Arrays and nested objects use
+ * bracketed field names, while `undefined` values are omitted.
+ *
+ * @throws {TypeError} If the fetch implementation cannot encode global
+ * `FormData`, a field is `null`, or a field has an unsupported value.
+ */
 export const createForm = async <T = Record<string, unknown>>(
   body: T | undefined,
   fetch: OpenAI | Fetch,
