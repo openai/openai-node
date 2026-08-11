@@ -5,7 +5,7 @@ const core = requireConfig('ultracite/oxlint/core').default;
 const stainlessGeneratedFiles = requireConfig('./scripts/stainless-generated-files.cjs');
 
 // Existing handwritten SDK patterns predate these preset rules.
-const compatibilityRules = ['func-style', 'no-use-before-define', 'sort-keys', 'typescript/no-explicit-any'];
+const compatibilityRules = ['func-style', 'sort-keys', 'typescript/no-explicit-any'];
 
 module.exports = defineConfig({
   extends: [core],
@@ -38,6 +38,75 @@ module.exports = defineConfig({
       files: ['tests/realtime-websocket.test.ts'],
       rules: {
         'prefer-arrow-callback': 'off',
+      },
+    },
+    {
+      // These modules intentionally use hoisted helpers to keep public entrypoints,
+      // parsers, and test fixtures readable while still enforcing variable ordering.
+      files: [
+        'examples/audio/audio.ts',
+        'examples/chat-completions/chat-params-types.ts',
+        'examples/chat-completions/function-call-diy.ts',
+        'examples/chat-completions/function-call-stream-raw.ts',
+        'examples/chat-completions/function-call-stream.ts',
+        'examples/chat-completions/function-call.ts',
+        'examples/chat-completions/tool-call-helpers.ts',
+        'examples/chat-completions/tool-calls-stream.ts',
+        'examples/images/picture.ts',
+        'src/helpers/standard-schema.ts',
+        'src/internal/decoders/line.ts',
+        'src/internal/to-file.ts',
+        'src/lib/AssistantStream.ts',
+        'src/lib/ChatCompletionStream.ts',
+        'src/lib/ResponsesParser.ts',
+        'src/lib/parser.ts',
+        'src/lib/responses/ResponseAccumulator.ts',
+        'src/lib/responses/ResponseInputItems.ts',
+        'src/lib/responses/ResponseStream.ts',
+        'src/lib/transform.ts',
+        'tests/benchmarks/streaming.bench.ts',
+        'tests/benchmarks/structured-output-and-embeddings.bench.ts',
+        'tests/lib/ResponseAccumulator.test.ts',
+        'tests/lib/ResponseStream.test.ts',
+        'tests/test-script.test.ts',
+      ],
+      rules: {
+        'no-use-before-define': ['error', { functions: false }],
+      },
+    },
+    {
+      // These fixture, vendor, and state-machine files rely on deliberate
+      // declaration ordering or recursive initialization that is risky to reorder.
+      files: [
+        'ecosystem-tests/bun/openai.test.ts',
+        'ecosystem-tests/cli.ts',
+        'ecosystem-tests/node-ts-cjs-auto/tests/test.ts',
+        'ecosystem-tests/node-ts-cjs-web/tests/test-jsdom.ts',
+        'ecosystem-tests/node-ts-cjs-web/tests/test-node.ts',
+        'ecosystem-tests/node-ts-cjs/tests/test-jsdom.ts',
+        'ecosystem-tests/node-ts-cjs/tests/test-node.ts',
+        'ecosystem-tests/node-ts-esm-auto/tests/test.ts',
+        'ecosystem-tests/node-ts-esm-web/tests/test.ts',
+        'ecosystem-tests/node-ts-esm/tests/test-esnext.ts',
+        'ecosystem-tests/node-ts-esm/tests/test.ts',
+        'ecosystem-tests/node-ts4.5-jest28/tests/test.ts',
+        'examples/chat-completions/parsing-run-tools.ts',
+        'examples/chat-completions/tool-call-helpers-zod.ts',
+        'examples/responses/websocket.ts',
+        'src/_vendor/partial-json-parser/parser.ts',
+        'src/_vendor/zod-to-json-schema/parseDef.ts',
+        'src/_vendor/zod-to-json-schema/parsers/date.ts',
+        'src/_vendor/zod-to-json-schema/parsers/string.ts',
+        'src/_vendor/zod-to-json-schema/parsers/union.ts',
+        'src/azure.ts',
+        'src/core/streaming.ts',
+        'src/internal/uploads.ts',
+        'src/lib/EventEmitter.ts',
+        'src/lib/EventStream.ts',
+        'tests/buildHeaders.test.ts',
+      ],
+      rules: {
+        'no-use-before-define': 'off',
       },
     },
     {
