@@ -19,7 +19,6 @@ const compatibilityRules = [
   'no-inline-comments',
   'no-plusplus',
   'no-shadow',
-  'no-sparse-arrays',
   'no-unused-vars',
   'no-use-before-define',
   'no-var',
@@ -335,6 +334,14 @@ module.exports = defineConfig({
       ],
       rules: {
         'no-promise-executor-return': 'off',
+      },
+    },
+    {
+      // Sparse holes are the behavior under test in the query-string fixture;
+      // replacing them with explicit undefined values would change coverage.
+      files: ['tests/qs/stringify.test.ts'],
+      rules: {
+        'no-sparse-arrays': 'off',
       },
     },
     {
