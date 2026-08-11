@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../../core/resource';
 import * as CompletionsAPI from './completions';
@@ -33,7 +33,7 @@ export class Messages extends APIResource {
     return this._client.getAPIList(
       path`/chat/completions/${completionID}/messages`,
       CursorPage<CompletionsAPI.ChatCompletionStoreMessage>,
-      { query, ...options },
+      { query, ...options, __security: { bearerAuth: true } },
     );
   }
 }

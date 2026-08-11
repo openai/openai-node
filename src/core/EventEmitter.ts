@@ -1,14 +1,18 @@
+/** Listener callback associated with one event name in a typed event map. */
 type EventListener<Events, EventType extends keyof Events> = Events[EventType];
 
-type EventListeners<Events, EventType extends keyof Events> = Array<{
+type EventListeners<Events, EventType extends keyof Events> = {
   listener: EventListener<Events, EventType>;
   once?: boolean;
-}>;
+}[];
 
-export type EventParameters<Events, EventType extends keyof Events> = {
-  [Event in EventType]: EventListener<Events, EventType> extends (...args: infer P) => any ? P : never;
-}[EventType];
+/** Extracts the ordered listener-argument tuple for one named event. */
+export type EventParameters<Events, EventType extends keyof Events> = Record<
+  EventType,
+  EventListener<Events, EventType> extends (...args: infer P) => any ? P : never
+>[EventType];
 
+/** Registers strongly typed event listeners and awaits individual emitted events. */
 export class EventEmitter<EventTypes extends Record<string, (...args: any) => any>> {
   #listeners: {
     [Event in keyof EventTypes]?: EventListeners<EventTypes, Event>;
@@ -22,8 +26,7 @@ export class EventEmitter<EventTypes extends Record<string, (...args: any) => an
    * @returns this, so that calls can be chained
    */
   on<Event extends keyof EventTypes>(event: Event, listener: EventListener<EventTypes, Event>): this {
-    const listeners: EventListeners<EventTypes, Event> =
-      this.#listeners[event] || (this.#listeners[event] = []);
+    const listeners: EventListeners<EventTypes, Event> = (this.#listeners[event] ||= []);
     listeners.push({ listener });
     return this;
   }
@@ -37,9 +40,13 @@ export class EventEmitter<EventTypes extends Record<string, (...args: any) => an
    */
   off<Event extends keyof EventTypes>(event: Event, listener: EventListener<EventTypes, Event>): this {
     const listeners = this.#listeners[event];
-    if (!listeners) return this;
+    if (!listeners) {
+      return this;
+    }
     const index = listeners.findIndex((l) => l.listener === listener);
-    if (index >= 0) listeners.splice(index, 1);
+    if (index !== -1) {
+      listeners.splice(index, 1);
+    }
     return this;
   }
 
@@ -49,8 +56,7 @@ export class EventEmitter<EventTypes extends Record<string, (...args: any) => an
    * @returns this, so that calls can be chained
    */
   once<Event extends keyof EventTypes>(event: Event, listener: EventListener<EventTypes, Event>): this {
-    const listeners: EventListeners<EventTypes, Event> =
-      this.#listeners[event] || (this.#listeners[event] = []);
+    const listeners: EventListeners<EventTypes, Event> = (this.#listeners[event] ||= []);
     listeners.push({ listener, once: true });
     return this;
   }
@@ -58,9 +64,11 @@ export class EventEmitter<EventTypes extends Record<string, (...args: any) => an
   /**
    * This is similar to `.once()`, but returns a Promise that resolves the next time
    * the event is triggered, instead of calling a listener callback.
-   * @returns a Promise that resolves the next time given event is triggered,
-   * or rejects if an error is emitted.  (If you request the 'error' event,
-   * returns a promise that resolves with the error).
+   * Events without arguments resolve to `undefined`, single-argument events resolve
+   * to that argument, and events with multiple arguments resolve to an argument tuple.
+   *
+   * @returns A promise for the next event, or a rejection if an error occurs first.
+   * Requesting the `error` event resolves with the emitted error instead.
    *
    * Example:
    *
@@ -69,13 +77,30 @@ export class EventEmitter<EventTypes extends Record<string, (...args: any) => an
   emitted<Event extends keyof EventTypes>(
     event: Event,
   ): Promise<
-    EventParameters<EventTypes, Event> extends [infer Param] ? Param
-    : EventParameters<EventTypes, Event> extends [] ? void
-    : EventParameters<EventTypes, Event>
+    EventParameters<EventTypes, Event> extends [infer Param]
+      ? Param
+      : EventParameters<EventTypes, Event> extends []
+        ? void
+        : EventParameters<EventTypes, Event>
   > {
     return new Promise((resolve, reject) => {
-      // TODO: handle errors
-      this.once(event, resolve as any);
+      const listeners = {
+        onError: (error: unknown) => {
+          this.off(event, listeners.onEvent as any);
+          reject(error);
+        },
+        onEvent: (...values: unknown[]) => {
+          if (event !== 'error') {
+            this.off('error', listeners.onError as any);
+          }
+          resolve((values.length > 1 ? values : values[0]) as any);
+        },
+      };
+
+      if (event !== 'error') {
+        this.once('error', listeners.onError as any);
+      }
+      this.once(event, listeners.onEvent as any);
     });
   }
 
@@ -87,12 +112,31 @@ export class EventEmitter<EventTypes extends Record<string, (...args: any) => an
     const listeners: EventListeners<EventTypes, Event> | undefined = this.#listeners[event];
     if (listeners) {
       this.#listeners[event] = listeners.filter((l) => !l.once) as any;
-      listeners.forEach(({ listener }: any) => listener(...(args as any)));
+      for (const { listener } of listeners as any) {
+        listener(...(args as any));
+      }
     }
   }
 
   protected _hasListener(event: keyof EventTypes): boolean {
     const listeners = this.#listeners[event];
     return listeners && listeners.length > 0;
+  }
+}
+
+/**
+ * An EventEmitter variant that exposes `_emit()` publicly.
+ *
+ * The base {@link EventEmitter} keeps `_emit` protected so that consumers
+ * can only listen, not dispatch. When you need a separate emitter instance
+ * that your own code can emit on, without exposing emit on the
+ * consumer-facing emitter, use this class.
+ */
+export class InternalEventEmitter<
+  EventTypes extends Record<string, (...args: any) => any>,
+> extends EventEmitter<EventTypes> {
+  /** Dispatches a named event to its currently registered listeners. */
+  override _emit<Event extends keyof EventTypes>(event: Event, ...args: EventParameters<EventTypes, Event>) {
+    super._emit(event, ...args);
   }
 }

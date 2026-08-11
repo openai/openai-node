@@ -51,7 +51,9 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponseCustomToolCall</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseCustomToolCallInputDeltaEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseCustomToolCallInputDoneEvent</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseCustomToolCallItem</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseCustomToolCallOutput</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseCustomToolCallOutputItem</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseError</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseErrorEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseFailedEvent</a></code>

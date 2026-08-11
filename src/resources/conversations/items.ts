@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../core/resource';
 import * as ConversationsAPI from './conversations';
@@ -29,6 +29,7 @@ export class Items extends APIResource {
       query: { include },
       body,
       ...options,
+      __security: { bearerAuth: true },
     });
   }
 
@@ -41,7 +42,11 @@ export class Items extends APIResource {
     options?: RequestOptions,
   ): APIPromise<ConversationItem> {
     const { conversation_id, ...query } = params;
-    return this._client.get(path`/conversations/${conversation_id}/items/${itemID}`, { query, ...options });
+    return this._client.get(path`/conversations/${conversation_id}/items/${itemID}`, {
+      query,
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
@@ -55,7 +60,7 @@ export class Items extends APIResource {
     return this._client.getAPIList(
       path`/conversations/${conversationID}/items`,
       ConversationCursorPage<ConversationItem>,
-      { query, ...options },
+      { query, ...options, __security: { bearerAuth: true } },
     );
   }
 
@@ -68,7 +73,10 @@ export class Items extends APIResource {
     options?: RequestOptions,
   ): APIPromise<ConversationsAPI.Conversation> {
     const { conversation_id } = params;
-    return this._client.delete(path`/conversations/${conversation_id}/items/${itemID}`, options);
+    return this._client.delete(path`/conversations/${conversation_id}/items/${itemID}`, {
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 }
 
@@ -90,7 +98,11 @@ export type ConversationItem =
   | ResponsesAPI.ResponseComputerToolCallOutputItem
   | ResponsesAPI.ResponseToolSearchCall
   | ResponsesAPI.ResponseToolSearchOutputItem
+  | ConversationItem.AdditionalTools
   | ResponsesAPI.ResponseReasoningItem
+  | ConversationItem.Program
+  | ConversationItem.ProgramOutput
+  | ResponsesAPI.ResponseCompactionItem
   | ResponsesAPI.ResponseCodeInterpreterToolCall
   | ConversationItem.LocalShellCall
   | ConversationItem.LocalShellCallOutput
@@ -129,6 +141,82 @@ export namespace ConversationItem {
      * The type of the image generation call. Always `image_generation_call`.
      */
     type: 'image_generation_call';
+  }
+
+  export interface AdditionalTools {
+    /**
+     * The unique ID of the additional tools item.
+     */
+    id: string;
+
+    /**
+     * The role that provided the additional tools.
+     */
+    role: 'unknown' | 'user' | 'assistant' | 'system' | 'critic' | 'discriminator' | 'developer' | 'tool';
+
+    /**
+     * The additional tool definitions made available at this item.
+     */
+    tools: Array<ResponsesAPI.Tool>;
+
+    /**
+     * The type of the item. Always `additional_tools`.
+     */
+    type: 'additional_tools';
+  }
+
+  export interface Program {
+    /**
+     * The unique ID of the program item.
+     */
+    id: string;
+
+    /**
+     * The stable call ID of the program item.
+     */
+    call_id: string;
+
+    /**
+     * The JavaScript source executed by programmatic tool calling.
+     */
+    code: string;
+
+    /**
+     * Opaque program replay fingerprint that must be round-tripped.
+     */
+    fingerprint: string;
+
+    /**
+     * The type of the item. Always `program`.
+     */
+    type: 'program';
+  }
+
+  export interface ProgramOutput {
+    /**
+     * The unique ID of the program output item.
+     */
+    id: string;
+
+    /**
+     * The call ID of the program item.
+     */
+    call_id: string;
+
+    /**
+     * The result produced by the program item.
+     */
+    result: string;
+
+    /**
+     * The terminal status of the program output item.
+     */
+    status: 'completed' | 'incomplete';
+
+    /**
+     * The type of the item. Always `program_output`.
+     */
+    type: 'program_output';
   }
 
   /**

@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../../core/resource';
 import * as RunsAPI from './runs';
@@ -20,7 +20,10 @@ export class OutputItems extends APIResource {
     options?: RequestOptions,
   ): APIPromise<OutputItemRetrieveResponse> {
     const { eval_id, run_id } = params;
-    return this._client.get(path`/evals/${eval_id}/runs/${run_id}/output_items/${outputItemID}`, options);
+    return this._client.get(path`/evals/${eval_id}/runs/${run_id}/output_items/${outputItemID}`, {
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
@@ -35,7 +38,7 @@ export class OutputItems extends APIResource {
     return this._client.getAPIList(
       path`/evals/${eval_id}/runs/${runID}/output_items`,
       CursorPage<OutputItemListResponse>,
-      { query, ...options },
+      { query, ...options, __security: { bearerAuth: true } },
     );
   }
 }

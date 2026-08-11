@@ -1,6 +1,7 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 import { castToError } from '../internal/errors';
+import type { OAuthErrorCode } from '../resources/shared';
 
 export class OpenAIError extends Error {}
 
@@ -36,13 +37,13 @@ export class APIError<
   }
 
   private static makeMessage(status: number | undefined, error: any, message: string | undefined) {
-    const msg =
-      error?.message ?
-        typeof error.message === 'string' ?
-          error.message
+    const msg = error?.message
+      ? typeof error.message === 'string'
+        ? error.message
         : JSON.stringify(error.message)
-      : error ? JSON.stringify(error)
-      : message;
+      : error
+        ? JSON.stringify(error)
+        : message;
 
     if (status && msg) {
       return `${status} ${msg}`;
@@ -156,5 +157,44 @@ export class ContentFilterFinishReasonError extends OpenAIError {
 export class InvalidWebhookSignatureError extends Error {
   constructor(message: string) {
     super(message);
+  }
+}
+
+/**
+ * Error thrown by the API server during OAuth token exchange.
+ * Can have status codes 400, 401, or 403.
+ * Other status codes from OAuth endpoints are raised as normal APIError types.
+ */
+export class OAuthError extends APIError<400 | 401 | 403, Headers> {
+  readonly error_code: OAuthErrorCode | undefined;
+
+  constructor(status: 400 | 401 | 403, error: Object | undefined, headers: Headers) {
+    let finalMessage = 'OAuth2 authentication error';
+    let error_code: OAuthErrorCode | undefined = undefined;
+
+    if (error && typeof error === 'object') {
+      const errorData = error as Record<string, any>;
+      error_code = errorData['error'];
+      const description = errorData['error_description'];
+      if (description && typeof description === 'string') {
+        finalMessage = description;
+      } else if (error_code) {
+        finalMessage = error_code;
+      }
+    }
+
+    super(status, error, finalMessage, headers);
+    this.error_code = error_code;
+  }
+}
+
+export class SubjectTokenProviderError extends OpenAIError {
+  readonly provider: string;
+  readonly cause: Error | undefined;
+
+  constructor(message: string, provider: string, cause?: Error) {
+    super(message);
+    this.provider = provider;
+    this.cause = cause;
   }
 }

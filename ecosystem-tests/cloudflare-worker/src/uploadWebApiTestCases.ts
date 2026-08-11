@@ -1,6 +1,7 @@
-import OpenAI, { toFile } from 'openai';
-import { TranscriptionCreateParams } from 'openai/resources/audio/transcriptions';
-import { ChatCompletion } from 'openai/resources/chat/completions';
+import type OpenAI from 'openai';
+import { toFile } from 'openai';
+import type { TranscriptionCreateParams } from 'openai/resources/audio/transcriptions';
+import type { ChatCompletion } from 'openai/resources/chat/completions';
 
 /**
  * Tests uploads using various Web API data objects.
@@ -46,24 +47,24 @@ export function uploadWebApiTestCases({
 		await client.audio.transcriptions.create({ file: 'test', model: 'whisper-1' });
 	}
 
-	it(`raw response`, async function () {
+	it(`raw response`, async () => {
 		const response = await client.chat.completions
 			.create({
-				model: 'gpt-4',
-				messages: [{ role: 'user', content: 'Say this is a test' }],
+				model: 'gpt-4o-mini',
+				messages: [{ role: 'user', content: 'Reply with exactly this text and nothing else: This is a test' }],
 			})
 			.asResponse();
 
 		// test that we can use web Response API
 		const { body } = response;
-		if (!body) throw new Error('expected response.body to be defined');
+		if (!body) {throw new Error('expected response.body to be defined');}
 
 		const reader = body.getReader();
 		const chunks: Uint8Array[] = [];
 		let result;
 		do {
 			result = await reader.read();
-			if (!result.done) chunks.push(result.value);
+			if (!result.done) {chunks.push(result.value);}
 		} while (!result.done);
 
 		reader.releaseLock();
@@ -79,10 +80,10 @@ export function uploadWebApiTestCases({
 		expectSimilar(json.choices[0]?.message.content || '', 'This is a test', 10);
 	});
 
-	it(`streaming works`, async function () {
+	it(`streaming works`, async () => {
 		const stream = await client.chat.completions.create({
-			model: 'gpt-4',
-			messages: [{ role: 'user', content: 'Say this is a test' }],
+			model: 'gpt-4o-mini',
+			messages: [{ role: 'user', content: 'Reply with exactly this text and nothing else: This is a test' }],
 			stream: true,
 		});
 		const chunks = [];

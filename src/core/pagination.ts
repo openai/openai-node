@@ -73,9 +73,9 @@ export abstract class AbstractPage<Item> implements AsyncIterable<Item> {
  *    }
  */
 export class PagePromise<
-    PageClass extends AbstractPage<Item>,
-    Item = ReturnType<PageClass['getPaginatedItems']>[number],
-  >
+  PageClass extends AbstractPage<Item>,
+  Item = ReturnType<PageClass['getPaginatedItems']>[number],
+>
   extends APIPromise<PageClass>
   implements AsyncIterable<Item>
 {
@@ -254,6 +254,68 @@ export class ConversationCursorPage<Item>
 
   nextPageRequestOptions(): PageRequestOptions | null {
     const cursor = this.last_id;
+    if (!cursor) {
+      return null;
+    }
+
+    return {
+      ...this.options,
+      query: {
+        ...maybeObj(this.options.query),
+        after: cursor,
+      },
+    };
+  }
+}
+
+export interface NextCursorPageResponse<Item> {
+  data: Array<Item>;
+
+  has_more: boolean;
+
+  next: string | null;
+}
+
+export interface NextCursorPageParams {
+  after?: string;
+
+  limit?: number;
+}
+
+export class NextCursorPage<Item> extends AbstractPage<Item> implements NextCursorPageResponse<Item> {
+  data: Array<Item>;
+
+  has_more: boolean;
+
+  next: string | null;
+
+  constructor(
+    client: OpenAI,
+    response: Response,
+    body: NextCursorPageResponse<Item>,
+    options: FinalRequestOptions,
+  ) {
+    super(client, response, body, options);
+
+    this.data = body.data || [];
+    this.has_more = body.has_more || false;
+    this.next = body.next || null;
+  }
+
+  getPaginatedItems(): Item[] {
+    return this.data ?? [];
+  }
+
+  override hasNextPage(): boolean {
+    if (this.has_more === false) {
+      return false;
+    }
+
+    return super.hasNextPage();
+  }
+
+  nextPageRequestOptions(): PageRequestOptions | null {
+    const cursor = this.next;
     if (!cursor) {
       return null;
     }

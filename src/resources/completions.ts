@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../core/resource';
 import * as CompletionsAPI from './completions';
@@ -20,7 +20,7 @@ export class Completions extends APIResource {
    * @example
    * ```ts
    * const completion = await client.completions.create({
-   *   model: 'string',
+   *   model: 'gpt-3.5-turbo-instruct',
    *   prompt: 'This is a test.',
    * });
    * ```
@@ -35,9 +35,12 @@ export class Completions extends APIResource {
     body: CompletionCreateParams,
     options?: RequestOptions,
   ): APIPromise<Completion> | APIPromise<Stream<Completion>> {
-    return this._client.post('/completions', { body, ...options, stream: body.stream ?? false }) as
-      | APIPromise<Completion>
-      | APIPromise<Stream<Completion>>;
+    return this._client.post('/completions', {
+      body,
+      ...options,
+      stream: body.stream ?? false,
+      __security: { bearerAuth: true },
+    }) as APIPromise<Completion> | APIPromise<Stream<Completion>>;
   }
 }
 
@@ -181,6 +184,11 @@ export namespace CompletionUsage {
      * Audio input tokens present in the prompt.
      */
     audio_tokens?: number;
+
+    /**
+     * The unadjusted number of prompt tokens written to cache.
+     */
+    cache_write_tokens?: number;
 
     /**
      * Cached tokens present in the prompt.

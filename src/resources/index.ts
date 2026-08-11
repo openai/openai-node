@@ -1,7 +1,8 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 export * from './chat/index';
 export * from './shared';
+export { Admin } from './admin/admin';
 export { Audio, type AudioModel, type AudioResponseFormat } from './audio/audio';
 export {
   Batches,
@@ -32,6 +33,11 @@ export {
   type ContainerListParams,
   type ContainerListResponsesPage,
 } from './containers/containers';
+export {
+  ContentProvenanceChecks,
+  type ContentProvenanceCheck,
+  type ContentProvenanceCheckCreateParams,
+} from './content-provenance-checks';
 export { Conversations } from './conversations/conversations';
 export {
   Embeddings,
@@ -130,15 +136,21 @@ export {
 } from './vector-stores/vector-stores';
 export {
   Videos,
+  type ImageInputReferenceParam,
   type Video,
   type VideoCreateError,
   type VideoModel,
   type VideoSeconds,
   type VideoSize,
   type VideoDeleteResponse,
+  type VideoCreateCharacterResponse,
+  type VideoGetCharacterResponse,
   type VideoCreateParams,
   type VideoListParams,
+  type VideoCreateCharacterParams,
   type VideoDownloadContentParams,
+  type VideoEditParams,
+  type VideoExtendParams,
   type VideoRemixParams,
   type VideosPage,
 } from './videos';

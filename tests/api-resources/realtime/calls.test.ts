@@ -1,9 +1,10 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import OpenAI from 'openai';
 
 const client = new OpenAI({
   apiKey: 'My API Key',
+  adminAPIKey: 'My Admin API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
@@ -27,8 +28,11 @@ describe('resource calls', () => {
           format: { rate: 24000, type: 'audio/pcm' },
           noise_reduction: { type: 'near_field' },
           transcription: {
+            delay: 'minimal',
+            keywords: ['string'],
             language: 'language',
-            model: 'string',
+            languages: ['string'],
+            model: 'whisper-1',
             prompt: 'prompt',
           },
           turn_detection: {
@@ -44,19 +48,21 @@ describe('resource calls', () => {
         output: {
           format: { rate: 24000, type: 'audio/pcm' },
           speed: 0.25,
-          voice: 'ash',
+          voice: 'alloy',
         },
       },
       include: ['item.input_audio_transcription.logprobs'],
       instructions: 'instructions',
-      max_output_tokens: 0,
-      model: 'string',
+      max_output_tokens: 'inf',
+      model: 'gpt-realtime',
       output_modalities: ['text'],
+      parallel_tool_calls: true,
       prompt: {
         id: 'id',
         variables: { foo: 'string' },
         version: 'version',
       },
+      reasoning: { effort: 'minimal' },
       tool_choice: 'none',
       tools: [
         {

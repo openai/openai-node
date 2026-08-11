@@ -1,9 +1,10 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import OpenAI from 'openai';
 
 const client = new OpenAI({
   apiKey: 'My API Key',
+  adminAPIKey: 'My Admin API Key',
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
@@ -29,10 +30,13 @@ describe('resource inputTokens', () => {
           instructions: 'instructions',
           model: 'model',
           parallel_tool_calls: true,
+          personality: 'friendly',
           previous_response_id: 'resp_123',
           reasoning: {
+            context: 'auto',
             effort: 'none',
             generate_summary: 'auto',
+            mode: 'standard',
             summary: 'auto',
           },
           text: {
@@ -46,8 +50,10 @@ describe('resource inputTokens', () => {
               parameters: { foo: 'bar' },
               strict: true,
               type: 'function',
+              allowed_callers: ['direct'],
               defer_loading: true,
               description: 'description',
+              output_schema: { foo: 'bar' },
             },
           ],
           truncation: 'auto',

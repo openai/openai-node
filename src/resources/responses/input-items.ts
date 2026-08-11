@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../core/resource';
 import * as ResponsesAPI from './responses';
@@ -29,7 +29,7 @@ export class InputItems extends APIResource {
     return this._client.getAPIList(
       path`/responses/${responseID}/input_items`,
       CursorPage<ResponsesAPI.ResponseItem>,
-      { query, ...options },
+      { query, ...options, __security: { bearerAuth: true } },
     );
   }
 }

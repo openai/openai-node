@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../../core/resource';
 import * as GraderModelsAPI from '../../graders/grader-models';
@@ -27,7 +27,11 @@ export class Graders extends APIResource {
    * ```
    */
   run(body: GraderRunParams, options?: RequestOptions): APIPromise<GraderRunResponse> {
-    return this._client.post('/fine_tuning/alpha/graders/run', { body, ...options });
+    return this._client.post('/fine_tuning/alpha/graders/run', {
+      body,
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 
   /**
@@ -48,7 +52,11 @@ export class Graders extends APIResource {
    * ```
    */
   validate(body: GraderValidateParams, options?: RequestOptions): APIPromise<GraderValidateResponse> {
-    return this._client.post('/fine_tuning/alpha/graders/validate', { body, ...options });
+    return this._client.post('/fine_tuning/alpha/graders/validate', {
+      body,
+      ...options,
+      __security: { bearerAuth: true },
+    });
   }
 }
 
