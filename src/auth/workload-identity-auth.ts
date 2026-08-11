@@ -25,6 +25,7 @@ const TOKEN_EXCHANGE_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:token-exchan
 export class WorkloadIdentityAuth {
   private cachedToken: CachedToken | null = null;
   private refreshPromise: Promise<string> | null = null;
+  private tokenGeneration = 0;
   private readonly config: WorkloadIdentity;
   private readonly tokenExchangeUrl: string = 'https://auth.openai.com/oauth/token';
   private readonly fetch: Fetch;
@@ -56,27 +57,32 @@ export class WorkloadIdentityAuth {
         return await this.refreshPromise;
       }
 
-      this.refreshPromise = this.refreshToken();
+      const refreshPromise = this.refreshToken(this.tokenGeneration);
+      this.refreshPromise = refreshPromise;
 
       try {
-        const token = await this.refreshPromise;
-        return token;
+        return await refreshPromise;
       } finally {
-        this.refreshPromise = null;
+        if (this.refreshPromise === refreshPromise) {
+          this.refreshPromise = null;
+        }
       }
     }
 
     if (this.needsRefresh(this.cachedToken) && !this.refreshPromise) {
-      this.refreshPromise = this.refreshToken().finally(() => {
-        this.refreshPromise = null;
+      const refreshPromise = this.refreshToken(this.tokenGeneration).finally(() => {
+        if (this.refreshPromise === refreshPromise) {
+          this.refreshPromise = null;
+        }
       });
-      void this.refreshPromise.catch(() => null);
+      this.refreshPromise = refreshPromise;
+      void refreshPromise.catch(() => null);
     }
 
     return this.cachedToken.token;
   }
 
-  private async refreshToken(): Promise<string> {
+  private async refreshToken(generation: number): Promise<string> {
     const subjectToken = await this.config.provider.getToken();
     const body: Record<string, string> = {
       grant_type: TOKEN_EXCHANGE_GRANT_TYPE,
@@ -134,10 +140,12 @@ export class WorkloadIdentityAuth {
     const expiresIn = (tokenResponse as Partial<TokenExchangeResponse>).expires_in ?? 3600;
     const expiresAt = Date.now() + expiresIn * 1000;
 
-    this.cachedToken = {
-      token: accessToken,
-      expiresAt,
-    };
+    if (this.tokenGeneration === generation) {
+      this.cachedToken = {
+        token: accessToken,
+        expiresAt,
+      };
+    }
 
     return accessToken;
   }
@@ -154,6 +162,7 @@ export class WorkloadIdentityAuth {
 
   /** Discards the cached access token so the next request performs a fresh exchange. */
   invalidateToken(): void {
+    this.tokenGeneration += 1;
     this.cachedToken = null;
     this.refreshPromise = null;
   }

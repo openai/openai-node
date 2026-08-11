@@ -120,7 +120,8 @@ export async function toFile(
       return value;
     }
 
-    const fileOptions = options?.type || !value.type ? options : { ...options, type: value.type };
+    const fileOptions =
+      options?.type === undefined && value.type ? { ...options, type: value.type } : options;
     return makeFile([await value.arrayBuffer()], name ?? value.name, fileOptions);
   }
 
@@ -135,7 +136,7 @@ export async function toFile(
 
   name ||= getName(value);
 
-  if (!options?.type) {
+  if (options?.type === undefined) {
     const typedPart = parts.find(
       (part): part is Blob => typeof part === 'object' && 'type' in part && !!part.type,
     );

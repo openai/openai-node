@@ -15,6 +15,18 @@ function tokenExchangeResponse(accessToken: string, expiresIn: number): Response
   });
 }
 
+function pendingTokenExchange(): {
+  response: Promise<Response>;
+  resolve: (response: Response) => void;
+} {
+  let resolveResponse!: (response: Response) => void;
+  const response = new Promise<Response>((resolve) => {
+    resolveResponse = resolve;
+  });
+
+  return { response, resolve: resolveResponse };
+}
+
 describe('WorkloadIdentityAuth', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -427,6 +439,87 @@ describe('WorkloadIdentityAuth', () => {
     const token2 = await auth.getToken();
     expect(token2).toBe('access-token-2');
     expect(fetchCallCount).toBe(2);
+  });
+
+  test('keeps a newer foreground exchange shared after an invalidated exchange finishes', async () => {
+    const config: WorkloadIdentity = {
+      identityProviderId: 'test-identity-provider-id',
+      serviceAccountId: 'test-service-account-id',
+      provider: {
+        tokenType: 'jwt',
+        getToken: async () => 'subject-token',
+      },
+    };
+    const invalidatedExchange = pendingTokenExchange();
+    const freshExchange = pendingTokenExchange();
+    const customFetch = vi
+      .fn()
+      .mockReturnValueOnce(invalidatedExchange.response)
+      .mockReturnValueOnce(freshExchange.response);
+    const auth = new WorkloadIdentityAuth(config, customFetch);
+    const invalidatedToken = auth.getToken();
+
+    await vi.waitFor(() => expect(customFetch).toHaveBeenCalledTimes(1));
+    auth.invalidateToken();
+
+    const firstFreshToken = auth.getToken();
+    await vi.waitFor(() => expect(customFetch).toHaveBeenCalledTimes(2));
+
+    invalidatedExchange.resolve(tokenExchangeResponse('invalidated-token', 3600));
+    await expect(invalidatedToken).resolves.toBe('invalidated-token');
+
+    const secondFreshToken = auth.getToken();
+    freshExchange.resolve(tokenExchangeResponse('fresh-token', 3600));
+
+    await expect(Promise.all([firstFreshToken, secondFreshToken])).resolves.toEqual([
+      'fresh-token',
+      'fresh-token',
+    ]);
+    await expect(auth.getToken()).resolves.toBe('fresh-token');
+    expect(customFetch).toHaveBeenCalledTimes(2);
+  });
+
+  test('does not let an invalidated background exchange overwrite a newer cached token', async () => {
+    const config: WorkloadIdentity = {
+      identityProviderId: 'test-identity-provider-id',
+      serviceAccountId: 'test-service-account-id',
+      provider: {
+        tokenType: 'jwt',
+        getToken: async () => 'subject-token',
+      },
+    };
+    const invalidatedExchange = pendingTokenExchange();
+    const freshExchange = pendingTokenExchange();
+    const customFetch = vi
+      .fn()
+      .mockResolvedValueOnce(tokenExchangeResponse('cached-token', 60))
+      .mockReturnValueOnce(invalidatedExchange.response)
+      .mockReturnValueOnce(freshExchange.response);
+    const auth = new WorkloadIdentityAuth(config, customFetch);
+    const initialTime = Date.now();
+    const dateNow = vi.spyOn(Date, 'now').mockReturnValue(initialTime);
+
+    try {
+      await expect(auth.getToken()).resolves.toBe('cached-token');
+      await expect(auth.getToken()).resolves.toBe('cached-token');
+      await vi.waitFor(() => expect(customFetch).toHaveBeenCalledTimes(2));
+
+      dateNow.mockReturnValue(initialTime + 60_000);
+      const invalidatedToken = auth.getToken();
+      auth.invalidateToken();
+
+      const freshToken = auth.getToken();
+      await vi.waitFor(() => expect(customFetch).toHaveBeenCalledTimes(3));
+      freshExchange.resolve(tokenExchangeResponse('fresh-token', 3600));
+      await expect(freshToken).resolves.toBe('fresh-token');
+
+      invalidatedExchange.resolve(tokenExchangeResponse('invalidated-token', 3600));
+      await expect(invalidatedToken).resolves.toBe('invalidated-token');
+      await expect(auth.getToken()).resolves.toBe('fresh-token');
+      expect(customFetch).toHaveBeenCalledTimes(3);
+    } finally {
+      dateNow.mockRestore();
+    }
   });
 
   test('uses the configured fetch implementation for token exchange', async () => {

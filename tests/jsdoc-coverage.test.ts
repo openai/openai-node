@@ -95,6 +95,118 @@ describe('handwritten SDK JSDoc coverage', () => {
     );
   });
 
+  test('checks named local exports, aliases, type exports, and namespace-local exports', () => {
+    const source = `
+      const missingValue = true;
+      /** Documented declaration. */
+      const documentedValue = true;
+      const documentedSpecifier = true;
+      /** Documented type. */
+      interface Local {
+        /** Documented member. */
+        member: string;
+      }
+      export {
+        missingValue as missingAlias,
+        documentedValue as documentedAlias,
+        /** Documented alias. */
+        documentedSpecifier,
+      };
+      export type { Local as Public };
+      /** Accepts the public type without counting its local alias separately. */
+      export function accepts(value: Local): void {}
+      /** Documented namespace. */
+      export namespace Group {
+        const missingNested = true;
+        export { missingNested as exposed };
+      }
+    `;
+
+    expect(missing(source)).toEqual(['missingAlias', 'Group.exposed']);
+    expect(inspectSource('src/fixture.ts', source).map(({ name }) => name)).toEqual([
+      'missingAlias',
+      'documentedAlias',
+      'documentedSpecifier',
+      'Public',
+      'Public.member',
+      'accepts',
+      'Group',
+      'Group.exposed',
+    ]);
+  });
+
+  test('does not require duplicate documentation on re-export-only barrels', () => {
+    const source = `
+      export { value, type Shape } from './generated';
+      export type { Local } from './handwritten';
+      export * from './generated';
+    `;
+
+    expect(inspectSource('src/fixture.ts', source)).toEqual([]);
+  });
+
+  test('checks default exports of local declarations and expressions', () => {
+    expect(missing('const value = true; export default value;')).toEqual(['default']);
+    expect(missing('/** Documented value. */\nconst value = true; export default value;')).toEqual([]);
+    expect(missing('const value = true;\n/** Documented default. */\nexport default value;')).toEqual([]);
+    expect(missing('export default () => true;')).toEqual(['default']);
+    expect(missing('/** Documented default. */\nexport default () => true;')).toEqual([]);
+    expect(missing('/** Documented default. */\nexport default function create() {}')).toEqual([]);
+    expect(missing('/** Documented default. */\nexport default class Client {}')).toEqual([]);
+    expect(missing('/** Documented default. */\nexport default { undocumented: true };')).toEqual([
+      'default.undocumented',
+    ]);
+  });
+
+  test('checks each member of an exported enum', () => {
+    const source = `
+      /** Connection state. */
+      export enum State {
+        /** The connection is open. */
+        Open,
+        Closed,
+      }
+    `;
+
+    expect(missing(source)).toEqual(['State.Closed']);
+  });
+
+  test('checks index, call, and construct signatures on interfaces and type literals', () => {
+    const source = `
+      /** Callable public interface. */
+      export interface PublicInterface {
+        [key: string]: { indexOutput: string };
+        (options: { callInput: string }): { callOutput: string };
+        new (options: { constructInput: string }): { constructOutput: string };
+      }
+      /** Callable public type literal. */
+      export type PublicType = {
+        [index: number]: { indexOutput: string };
+        (options: { callInput: string }): { callOutput: string };
+        new (options: { constructInput: string }): { constructOutput: string };
+      };
+    `;
+
+    expect(missing(source)).toEqual([
+      'PublicInterface.[key: string]',
+      'PublicInterface.[key: string].result.indexOutput',
+      'PublicInterface.[call]',
+      'PublicInterface.[call].options.callInput',
+      'PublicInterface.[call].result.callOutput',
+      'PublicInterface.[new]',
+      'PublicInterface.[new].options.constructInput',
+      'PublicInterface.[new].result.constructOutput',
+      'PublicType.[index: number]',
+      'PublicType.[index: number].result.indexOutput',
+      'PublicType.[call]',
+      'PublicType.[call].options.callInput',
+      'PublicType.[call].result.callOutput',
+      'PublicType.[new]',
+      'PublicType.[new].options.constructInput',
+      'PublicType.[new].result.constructOutput',
+    ]);
+  });
+
   test('checks inferred object properties and signatures of exported function values', () => {
     const source = `
       type Options = { timeout: number };

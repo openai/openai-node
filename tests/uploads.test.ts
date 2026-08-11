@@ -65,6 +65,23 @@ describe('toFile', () => {
     expect(file.type).toBe('application/custom');
   });
 
+  it('allows an explicit empty MIME type to override the input Blob type', async () => {
+    const input = new Blob(['contents'], { type: 'text/plain' });
+
+    const file = await toFile(input, 'contents.txt', { type: '' });
+
+    expect(file.type).toBe('');
+  });
+
+  it('infers the input Blob MIME type when no type is provided', async () => {
+    const input = new Blob(['contents'], { type: 'text/plain' });
+
+    const file = await toFile(input, 'contents.txt', { lastModified: 42 });
+
+    expect(file.type).toBe('text/plain');
+    expect(file.lastModified).toBe(42);
+  });
+
   it('preserves the filename and MIME type of a non-native File-compatible input', async () => {
     const input = Object.assign(new Blob(['foreign contents'], { type: 'text/plain' }), {
       name: 'foreign.txt',
@@ -91,6 +108,32 @@ describe('toFile', () => {
 
     expect(file.name).toBe('override.txt');
     expect(file.type).toBe('application/custom');
+    expect(file.lastModified).toBe(42);
+  });
+
+  it('allows an explicit empty MIME type to override a non-native File-compatible input', async () => {
+    const input = Object.assign(new Blob(['foreign contents'], { type: 'text/plain' }), {
+      name: 'foreign.txt',
+      lastModified: 123,
+    });
+
+    const file = await toFile(input, 'override.txt', { type: '', lastModified: 42 });
+
+    expect(file.name).toBe('override.txt');
+    expect(file.type).toBe('');
+    expect(file.lastModified).toBe(42);
+  });
+
+  it('infers a non-native File-compatible MIME type when no type is provided', async () => {
+    const input = Object.assign(new Blob(['foreign contents'], { type: 'text/plain' }), {
+      name: 'foreign.txt',
+      lastModified: 123,
+    });
+
+    const file = await toFile(input, undefined, { lastModified: 42 });
+
+    expect(file.name).toBe('foreign.txt');
+    expect(file.type).toBe('text/plain');
     expect(file.lastModified).toBe(42);
   });
 
